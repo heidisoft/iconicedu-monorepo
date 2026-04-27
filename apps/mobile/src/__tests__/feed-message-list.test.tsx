@@ -6,6 +6,7 @@ import {
   waitFor,
   within,
 } from '@testing-library/react-native';
+import { FlatList } from 'react-native';
 import type {
   AudioRecordingMessageVM,
   FileAttachmentVM,
@@ -202,6 +203,42 @@ describe('FeedMessageList', () => {
     expect(screen.getByTestId('feed-message-post')).toBeTruthy();
     expect(screen.getByText('Happy Friday!')).toBeTruthy();
     expect(screen.getByText('Tutor')).toBeTruthy();
+  });
+
+  it('renders pending uploads in the footer near latest feed content', () => {
+    const onRetryUpload = jest.fn();
+    const { UNSAFE_getByType } = render(
+      <FeedMessageList
+        messages={[makeTextMessage('msg-1', 'Happy Friday!')]}
+        currentProfileId="profile-current"
+        pendingUploads={[
+          {
+            id: 'pending-1',
+            type: 'file',
+            attachments: [
+              {
+                uri: 'file:///tmp/lesson.pdf',
+                name: 'lesson.pdf',
+                mimeType: 'application/pdf',
+              },
+            ],
+            senderName: 'Tutor',
+            createdAt: '2025-01-15T10:31:00Z',
+            caption: 'Uploading lesson plan',
+            failed: true,
+          },
+        ]}
+        onRetryUpload={onRetryUpload}
+      />,
+    );
+
+    const list = UNSAFE_getByType(FlatList);
+    expect(list.props.ListHeaderComponent).toBeUndefined();
+    expect(list.props.ListFooterComponent).toBeTruthy();
+    expect(screen.getByText('Uploading lesson plan')).toBeTruthy();
+
+    fireEvent.press(screen.getByText('Failed to send · tap to retry'));
+    expect(onRetryUpload).toHaveBeenCalledWith('pending-1');
   });
 
   it('shows sender presence on feed avatars', () => {

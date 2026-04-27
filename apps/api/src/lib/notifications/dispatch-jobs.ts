@@ -217,7 +217,7 @@ export async function enqueueNotificationDispatchJobs(input: EnqueueDispatchInpu
         org_id: input.event.org_id,
         activity_event_id: input.event.id,
         recipient_profile_id: recipientProfileId,
-        pref_key: input.event.event_type,
+        pref_key: decision.prefKey,
         scope_kind: decision.scopeKind,
         scope_id: decision.scopeId,
         delivery_channel: channel,

@@ -192,7 +192,7 @@ POST /internal/notifications/dispatch
 Authorization: Bearer <INTERNAL_NOTIFICATIONS_TOKEN_API>
 ```
 
-**API handler:** `apps/api/src/modules/notification-engine/notification-engine.controller.ts`
+**API handler:** `apps/api/src/modules/events/events.controller.ts`
 
 Calls `dispatchDueNotificationJobs()` which:
 
@@ -212,6 +212,7 @@ Calls `dispatchDueNotificationJobs()` which:
 
 ```bash
 INTERNAL_ACTIVITY_FEED_TOKEN=<long-random-secret>
+INTERNAL_ACTIVITY_PROJECTOR_TOKEN=<long-random-secret>
 INTERNAL_NOTIFICATIONS_TOKEN_API=<long-random-secret>
 EXPO_ACCESS_TOKEN=<expo-personal-access-token>
 ```
@@ -220,9 +221,12 @@ EXPO_ACCESS_TOKEN=<expo-personal-access-token>
 
 ```bash
 NOTIFICATIONS_DISPATCH_URL=https://<your-api-domain>/internal/notifications/dispatch
+ACTIVITY_PROJECTOR_DISPATCH_URL=https://<your-api-domain>/internal/activity-feed/project
 INTERNAL_NOTIFICATIONS_TOKEN=<same-value-as-INTERNAL_NOTIFICATIONS_TOKEN_API>
+INTERNAL_ACTIVITY_PROJECTOR_TOKEN=<same-value-as-INTERNAL_ACTIVITY_PROJECTOR_TOKEN in apps/api>
 # optional:
 NOTIFICATIONS_DISPATCH_LIMIT=100
+ACTIVITY_PROJECTOR_DISPATCH_LIMIT=25
 NOTIFICATIONS_DISPATCH_LEASE_SECONDS=120
 NOTIFICATIONS_DISPATCH_LEASE_OWNER=supabase-edge-cron
 ```
@@ -231,6 +235,7 @@ NOTIFICATIONS_DISPATCH_LEASE_OWNER=supabase-edge-cron
 
 - `NOTIFICATIONS_DISPATCH_URL` must target `https://<your-api-domain>/internal/notifications/dispatch`
 - `REMINDERS_DISPATCH_URL` must target `https://<your-api-domain>/internal/reminders/dispatch`
+- `ACTIVITY_PROJECTOR_DISPATCH_URL` must target `https://<your-api-domain>/internal/activity-feed/project`
 - neither secret should point at `apps/web` or `/api/internal/...`
 
 ---
@@ -242,7 +247,7 @@ The edge function is not needed for local testing. You can drive the entire pipe
 ### Prerequisites
 
 - `pnpm dev:api` running (Nest on `http://localhost:3001`)
-- `INTERNAL_ACTIVITY_FEED_TOKEN` and `INTERNAL_NOTIFICATIONS_TOKEN_API` set in `apps/api/.env`
+- `INTERNAL_ACTIVITY_FEED_TOKEN`, `INTERNAL_ACTIVITY_PROJECTOR_TOKEN`, and `INTERNAL_NOTIFICATIONS_TOKEN_API` set in `apps/api/.env`
 - Supabase connected (remote or local)
 - a real Expo push token from a physical device if you want to validate actual delivery
 

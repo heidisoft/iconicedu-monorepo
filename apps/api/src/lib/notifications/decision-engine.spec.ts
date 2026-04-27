@@ -1,4 +1,5 @@
 import { buildNotificationDecision } from './decision-engine';
+import { resolveEffectivePreference } from './resolve-effective-preference';
 
 jest.mock('@iconicedu/api/lib/notifications/resolve-effective-preference', () => ({
   resolveEffectivePreference: jest.fn(async () => ({
@@ -77,6 +78,12 @@ function createSupabaseMock(options: {
 }
 
 describe('buildNotificationDecision', () => {
+  const resolveEffectivePreferenceMock = jest.mocked(resolveEffectivePreference);
+
+  beforeEach(() => {
+    resolveEffectivePreferenceMock.mockClear();
+  });
+
   it('queries thread-level read state for thread reply events', async () => {
     const { client, channelReadFilters } = createSupabaseMock({
       channelLastReadAt: '2026-04-21T11:59:00.000Z',
@@ -104,6 +111,12 @@ describe('buildNotificationDecision', () => {
     );
     expect(result.deliveryTiming).toBe('delayed');
     expect(result.reasonCodes).toContain('channel_recently_read');
+    expect(resolveEffectivePreferenceMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        defaultChannels: ['push'],
+        prefKey: 'message.posted',
+      }),
+    );
   });
 
   it('uses the freshest of channel and thread read state timestamps', async () => {
@@ -127,5 +140,38 @@ describe('buildNotificationDecision', () => {
 
     expect(result.deliveryTiming).toBe('delayed');
     expect(result.reasonCodes).toContain('channel_recently_read');
+  });
+
+  it('uses immediate critical policy and push/email defaults for session reminders', async () => {
+    const { client } = createSupabaseMock({
+      channelLastReadAt: null,
+      threadLastReadAt: null,
+    });
+
+    const result = await buildNotificationDecision({
+      supabase: client as never,
+      event: {
+        id: 'event-1',
+        org_id: 'org-1',
+        event_type: 'session.reminder.sent',
+        occurred_at: '2026-04-21T11:59:30.000Z',
+        payload: { channelId: 'channel-1' },
+        scope: { kind: 'channel', channelId: 'channel-1' },
+      } as never,
+      recipientProfileId: 'profile-1',
+    });
+
+    expect(result.policy).toMatchObject({
+      prefKey: 'session.reminder.sent',
+      critical: true,
+      defaultDelaySeconds: 0,
+    });
+    expect(result.deliveryTiming).toBe('immediate');
+    expect(resolveEffectivePreferenceMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        defaultChannels: ['push', 'email'],
+        prefKey: 'session.reminder.sent',
+      }),
+    );
   });
 });

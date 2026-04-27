@@ -738,6 +738,7 @@ jobs:
             --arg anon  "${{ steps.branch-creds.outputs.anon_key }}" \
             --arg jwt   "${{ steps.branch-creds.outputs.jwt_secret }}" \
             --arg act   "${{ secrets.INTERNAL_ACTIVITY_FEED_TOKEN }}" \
+            --arg act_p "${{ secrets.INTERNAL_ACTIVITY_PROJECTOR_TOKEN || secrets.INTERNAL_ACTIVITY_FEED_TOKEN }}" \
             --arg act_w "${{ secrets.INTERNAL_ACTIVITY_WORKER_TOKEN }}" \
             --arg rem   "${{ secrets.INTERNAL_REMINDERS_TOKEN }}" \
             --arg not   "${{ secrets.INTERNAL_NOTIFICATIONS_TOKEN_API || secrets.INTERNAL_NOTIFICATIONS_TOKEN }}" \
@@ -747,6 +748,7 @@ jobs:
             '{DATABASE_URL:$db, DIRECT_URL:$dir, SUPABASE_URL:$surl,
               SUPABASE_SERVICE_ROLE_KEY:$srkey, SUPABASE_ANON_KEY:$anon, JWT_SECRET:$jwt,
               INTERNAL_ACTIVITY_FEED_TOKEN:$act,
+              INTERNAL_ACTIVITY_PROJECTOR_TOKEN:$act_p,
               INTERNAL_ACTIVITY_WORKER_TOKEN:$act_w,
               INTERNAL_REMINDERS_TOKEN_API:$rem,
               INTERNAL_NOTIFICATIONS_TOKEN_API:$not,
@@ -916,6 +918,7 @@ jobs:
         env:
           BRANCH_API_URL: ${{ steps.branch-creds.outputs.branch_api_url }}
           BRANCH_PROJECT_REF: ${{ steps.supabase-branch.outputs.branch_ref }}
+          INTERNAL_ACTIVITY_PROJECTOR_TOKEN: ${{ secrets.INTERNAL_ACTIVITY_PROJECTOR_TOKEN || secrets.INTERNAL_ACTIVITY_FEED_TOKEN }}
           INTERNAL_ACTIVITY_WORKER_TOKEN: ${{ secrets.INTERNAL_ACTIVITY_WORKER_TOKEN }}
           INTERNAL_NOTIFICATIONS_TOKEN: ${{ secrets.INTERNAL_NOTIFICATIONS_TOKEN_API || secrets.INTERNAL_NOTIFICATIONS_TOKEN }}
           INTERNAL_REMINDERS_TOKEN: ${{ secrets.INTERNAL_REMINDERS_TOKEN }}
@@ -939,9 +942,11 @@ jobs:
           REMINDERS_DISPATCH_URL=${RAILWAY_API_URL}/internal/reminders/dispatch
           NOTIFICATIONS_DISPATCH_URL=${RAILWAY_API_URL}/internal/notifications/dispatch
           ACTIVITY_WORKER_DISPATCH_URL=${RAILWAY_API_URL}/internal/activity-worker/dispatch
+          ACTIVITY_PROJECTOR_DISPATCH_URL=${RAILWAY_API_URL}/internal/activity-feed/project
           INTERNAL_REMINDERS_TOKEN=${INTERNAL_REMINDERS_TOKEN}
           INTERNAL_NOTIFICATIONS_TOKEN=${INTERNAL_NOTIFICATIONS_TOKEN}
           INTERNAL_ACTIVITY_WORKER_TOKEN=${INTERNAL_ACTIVITY_WORKER_TOKEN}
+          INTERNAL_ACTIVITY_PROJECTOR_TOKEN=${INTERNAL_ACTIVITY_PROJECTOR_TOKEN}
           EOF
 
           supabase secrets set \

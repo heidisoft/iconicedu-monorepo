@@ -161,6 +161,87 @@ describe('updateChannelFromPayload', () => {
     expect(publishActivityEventMock).not.toHaveBeenCalled();
   });
 
+  it('defaults group DMs to the classic message UI theme when omitted', async () => {
+    const payload: ChannelCreatePayload = {
+      basics: {
+        kind: 'group_dm',
+        topic: 'Group DM',
+        iconKey: null,
+        description: null,
+        visibility: 'private',
+        purpose: 'general',
+      },
+      ui: { themeKey: 'teal' },
+      liveSession: null,
+      postingPolicy: {
+        kind: 'members-only',
+        allowThreads: true,
+        allowReactions: true,
+      },
+      lifecycle: { status: 'active' },
+      participants: [{ profileId: 'profile-1', roleInChannel: null }],
+      capabilities: [],
+    };
+
+    const channelsTable = createMaybeSingleTable({
+      data: {
+        topic: 'Group DM',
+        description: null,
+        icon_key: null,
+        visibility: 'private',
+        purpose: 'general',
+        kind: 'group_dm',
+        ui_theme_key: 'teal',
+        ui_defaults: { themeKey: 'teal', messageUiThemeKey: 'classic' },
+        live_session_config: null,
+        status: 'active',
+        posting_policy_kind: 'members-only',
+        allow_threads: true,
+        allow_reactions: true,
+      },
+      error: null,
+    });
+    const membersTable = createListTable({
+      data: [{ profile_id: 'profile-1' }],
+      error: null,
+    });
+    const capabilitiesTable = createListTable({
+      data: [],
+      error: null,
+    });
+
+    const supabase = {
+      auth: {
+        getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user-1' } } })),
+      },
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case 'channels':
+            return channelsTable;
+          case 'channel_members':
+            return membersTable;
+          case 'channel_capabilities':
+            return capabilitiesTable;
+          default:
+            throw new Error(`Unexpected table ${table}`);
+        }
+      }),
+    };
+
+    createSupabaseServerClientMock.mockResolvedValue(supabase);
+
+    await updateChannelFromPayload('channel-1', payload);
+
+    expect(channelsTable.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ui_defaults: expect.objectContaining({
+          themeKey: 'teal',
+          messageUiThemeKey: 'classic',
+        }),
+      }),
+    );
+  });
+
   it('does not publish legacy channel.updated events', async () => {
     const payload: ChannelCreatePayload = {
       basics: {

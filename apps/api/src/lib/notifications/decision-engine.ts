@@ -7,7 +7,10 @@ import type {
 import type { ActivityEventRow } from '@iconicedu/shared-types';
 import type { SupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 
-import { getNotificationPolicyConfig } from '@iconicedu/api/lib/notifications/policy-config';
+import {
+  getNotificationDefaultChannels,
+  getNotificationPolicyConfig,
+} from '@iconicedu/api/lib/notifications/policy-config';
 import { resolveEffectivePreference } from '@iconicedu/api/lib/notifications/resolve-effective-preference';
 
 type DeliveryContext = {
@@ -169,7 +172,7 @@ export function buildDeliveryPlan(input: {
   const decision: NotificationDecisionVM = {
     eventId: input.event.id,
     recipientProfileId: input.recipientProfileId,
-    prefKey: input.event.event_type,
+    prefKey: policy.prefKey,
     shouldWriteInbox: true,
     deliveryChannels: input.channels,
     deliveryTiming,
@@ -187,11 +190,13 @@ export async function buildNotificationDecision(input: {
   recipientProfileId: string;
 }) {
   const reasonCodes: NotificationDecisionReason[] = [];
+  const policy = getNotificationPolicyConfig(input.event.event_type);
   const preference = await resolveEffectivePreference({
     supabase: input.supabase,
     event: input.event,
     recipientProfileId: input.recipientProfileId,
-    defaultChannels: ['push', 'email'],
+    prefKey: policy.prefKey,
+    defaultChannels: getNotificationDefaultChannels(input.event.event_type),
   });
 
   reasonCodes.push(preference.source as NotificationDecisionReason);
@@ -200,13 +205,13 @@ export async function buildNotificationDecision(input: {
     return {
       eventId: input.event.id,
       recipientProfileId: input.recipientProfileId,
-      prefKey: input.event.event_type,
+      prefKey: policy.prefKey,
       shouldWriteInbox: true,
       deliveryChannels: [] as NotificationDeliveryChannel[],
       deliveryTiming: 'immediate' as NotificationDeliveryTiming,
       runAt: new Date().toISOString(),
       reasonCodes: [...reasonCodes, 'no_channels_enabled'],
-      policy: getNotificationPolicyConfig(input.event.event_type),
+      policy,
       scopeKind: preference.scopeKind,
       scopeId: preference.scopeId,
     };

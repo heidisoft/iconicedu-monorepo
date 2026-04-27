@@ -381,6 +381,9 @@ verify_jwt = false
 [functions.activity-worker-dispatch]
 verify_jwt = false
 
+[functions.activity-projector-dispatch]
+verify_jwt = false
+
 [functions.notifications-dispatch]
 verify_jwt = false
 
