@@ -26,6 +26,7 @@ export type ChannelListItem = {
   last_message_sender: string | null;
   icon_key?: string | null;
   themeKey?: string | null;
+  messageUiThemeKey?: 'classic' | 'feed' | null;
   student_name?: string | null;
   student_profiles?: Array<{ name: string; themeKey?: string | null }>;
   participant_profiles?: Array<{

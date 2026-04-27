@@ -3,6 +3,7 @@ import type { MessageMentionVM } from '@iconicedu/shared-types';
 
 import { cn } from '@iconicedu/ui-web/lib/utils';
 import { buildMessageTextSegments } from './message-mentions.utils';
+import { isEmojiOnlyText } from './message-action-visibility.utils';
 
 type MessageTextContentProps = {
   text: string;
@@ -16,6 +17,7 @@ export const MessageTextContent = memo(function MessageTextContent({
   className,
 }: MessageTextContentProps) {
   const segments = buildMessageTextSegments(text, mentions);
+  const isEmojiOnly = isEmojiOnlyText(text);
 
   const renderFormattedText = (value: string) => {
     const parts: Array<{ type: 'text' | 'bold' | 'italic'; text: string }> = [];
@@ -61,6 +63,7 @@ export const MessageTextContent = memo(function MessageTextContent({
     <p
       className={cn(
         'text-sm leading-relaxed whitespace-pre-wrap break-words text-foreground',
+        isEmojiOnly && 'text-4xl leading-tight',
         className,
       )}
     >

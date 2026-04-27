@@ -31,7 +31,7 @@ import {
   useOnlineProfileIds,
   useProfilePresenceSummary,
 } from '@/hooks/use-online-profile-ids';
-import { MessageList } from '@/components/messages/message-list';
+import { resolveMobileMessageUiTheme } from '@/components/messages/themes/registry';
 import { MessageInput } from '@/components/messages/message-input';
 import { TypingIndicator } from '@/components/messages/typing-indicator';
 import { ConversationHeader } from '@/components/messages/conversation-header';
@@ -119,6 +119,7 @@ export default function DmConversationScreen() {
   const { data: account } = useAccount();
   const { data: profile } = useProfile();
   const { colors } = useTheme();
+  const ThemedMessageList = resolveMobileMessageUiTheme('classic').MessageList;
 
   const orgId = account?.org_id ?? '';
   const accountId =
@@ -288,6 +289,8 @@ export default function DmConversationScreen() {
     typingUsers,
     broadcastTyping,
     broadcastTypingStop,
+    removeMessage,
+    restoreMessage,
   } = useMessages(channelId ?? '', profileId, accountId, senderName, orgId);
   const { data: channelReadState } = useQuery({
     queryKey: queryKeys.channelReadState(channelId ?? '', accountId),
@@ -558,9 +561,17 @@ export default function DmConversationScreen() {
   // ── Delete message ──
   const handleDelete = useCallback(
     async (messageId: string) => {
-      await deleteMessage(messageId, orgId, profileId);
+      const removedMessage = removeMessage(messageId);
+      try {
+        await deleteMessage(messageId, orgId, profileId);
+      } catch {
+        if (removedMessage) {
+          restoreMessage(removedMessage);
+        }
+        Alert.alert('Unable to delete message', 'Please try again.');
+      }
     },
-    [orgId, profileId],
+    [orgId, profileId, removeMessage, restoreMessage],
   );
 
   // ── Reaction toggle ──
@@ -611,7 +622,7 @@ export default function DmConversationScreen() {
         {isLoading ? (
           <MessageBubblesSkeleton />
         ) : (
-          <MessageList
+          <ThemedMessageList
             messages={messages ?? []}
             channelId={channelId ?? ''}
             currentProfileId={profileId}

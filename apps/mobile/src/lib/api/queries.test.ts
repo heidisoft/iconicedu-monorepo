@@ -10,6 +10,7 @@ import {
   toggleReaction,
   queryKeys,
 } from './queries';
+import { mapRowToMessageVM, type RawMessageRow } from './map-row-to-vm';
 
 // ─── Supabase mock ──────────────────────────────────────────────────────────────
 
@@ -759,6 +760,43 @@ describe('filterVisibleMessageRows', () => {
     ];
 
     expect(filterVisibleMessageRows(rows, 'profile-child-1')).toEqual(rows);
+  });
+});
+
+describe('mapRowToMessageVM', () => {
+  it('preserves audio-recording text captions from the payload', () => {
+    const message = mapRowToMessageVM(
+      {
+        id: 'msg-audio-1',
+        org_id: 'org-1',
+        channel_id: 'channel-1',
+        sender_profile_id: 'profile-1',
+        type: 'audio-recording',
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+        sender: {
+          id: 'profile-1',
+          display_name: 'Tutor One',
+          first_name: null,
+          last_name: null,
+          avatar_url: null,
+          avatar_seed: 'profile-1',
+          kind: 'educator',
+        },
+      } as RawMessageRow,
+      {
+        url: 'org-1/channel-1/audio.m4a',
+        storagePath: 'org-1/channel-1/audio.m4a',
+        durationSeconds: 12,
+        mimeType: 'audio/mp4',
+        text: 'Audio caption text.',
+      },
+      [],
+    );
+
+    expect((message as { content?: { text?: string } }).content?.text).toBe(
+      'Audio caption text.',
+    );
   });
 });
 

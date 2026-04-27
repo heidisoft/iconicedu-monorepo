@@ -25,6 +25,7 @@ describe('mapChannelRowToVM', () => {
       ui_defaults: {
         defaultRightPanelOpen: false,
         defaultRightPanelKey: 'saved',
+        messageUiThemeKey: 'feed',
         infoPanel: {
           showMembers: false,
           showMedia: false,
@@ -52,6 +53,7 @@ describe('mapChannelRowToVM', () => {
     expect(channel.ui?.defaultRightPanelKey).toBe('saved');
     expect(channel.ui?.infoPanel?.showMembers).toBe(false);
     expect(channel.ui?.themeKey).toBe('sky');
+    expect(channel.ui?.messageUiThemeKey).toBe('feed');
   });
 
   it('does not auto-open the right panel for learning-space channels without explicit ui defaults', () => {
@@ -115,6 +117,7 @@ describe('mapChannelRowToVM', () => {
       ui_theme_key: null,
       ui_defaults: {
         disabledTabs: ['members', 'saved'],
+        messageUiThemeKey: 'nope',
       },
       created_by_profile_id: 'profile-1',
       created_at: '2026-01-01T00:00:00.000Z',
@@ -135,6 +138,7 @@ describe('mapChannelRowToVM', () => {
     });
 
     expect(channel.ui?.disabledTabs).toEqual(['members', 'saved']);
+    expect(channel.ui?.messageUiThemeKey).toBeNull();
   });
 
   it('maps provider-neutral live session config from live_session_config', () => {

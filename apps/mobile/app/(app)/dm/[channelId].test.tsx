@@ -109,6 +109,7 @@ jest.mock('@/hooks/use-online-profile-ids', () => ({
 }));
 
 jest.mock('@/components/messages/message-list', () => ({
+  findLatestUnreadIncomingMessageId: () => null,
   MessageList: () => null,
 }));
 

@@ -6,7 +6,10 @@ import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service
 import { compileLearningSpaceReminderJobs } from '@iconicedu/web/lib/automation/reminder-jobs';
 import { requireParentActorContext } from '@iconicedu/web/lib/family-view/actor-context';
 import { toStoredLiveSessionConfig } from '@iconicedu/web/lib/admin/live-session-config';
-import { withInfoPanelDisabled } from '@iconicedu/web/lib/channels/ui-defaults';
+import {
+  FEED_MESSAGE_UI_THEME_KEY,
+  withInfoPanelDisabled,
+} from '@iconicedu/web/lib/channels/ui-defaults';
 import {
   addMinutesToIso,
   buildRRuleFields,
@@ -202,7 +205,11 @@ async function insertChannel(supabase: SupabaseClient, payload: ChannelInsertPay
     allow_threads: true,
     allow_reactions: true,
     ui_theme_key: payload.uiThemeKey,
-    ui_defaults: withInfoPanelDisabled(payload.uiDefaults),
+    ui_defaults: withInfoPanelDisabled({
+      ...(payload.uiDefaults ?? {}),
+      messageUiThemeKey:
+        payload.uiDefaults?.messageUiThemeKey ?? FEED_MESSAGE_UI_THEME_KEY,
+    }),
     live_session_config: toStoredLiveSessionConfig(payload.liveSession),
     primary_entity_kind: 'learning_space',
     primary_entity_id: payload.primaryEntityId,

@@ -5,6 +5,10 @@ import type { ChannelCreatePayload, ChannelCapabilityVM } from '@iconicedu/share
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { requireParentActorContext } from '@iconicedu/web/lib/family-view/actor-context';
 import { toStoredLiveSessionConfig } from '@iconicedu/web/lib/admin/live-session-config';
+import {
+  CLASSIC_MESSAGE_UI_THEME_KEY,
+  FEED_MESSAGE_UI_THEME_KEY,
+} from '@iconicedu/web/lib/channels/ui-defaults';
 
 export async function updateChannelFromPayload(
   channelId: string,
@@ -87,6 +91,15 @@ export async function updateChannelFromPayload(
   const existingCapabilities = [
     ...new Set((existingCapabilitiesResponse.data ?? []).map((row) => row.capability)),
   ].sort();
+  const messageUiThemeKey =
+    payload.ui?.messageUiThemeKey ??
+    (payload.basics.kind === 'dm'
+      ? CLASSIC_MESSAGE_UI_THEME_KEY
+      : FEED_MESSAGE_UI_THEME_KEY);
+  const uiDefaults = {
+    ...(payload.ui ?? {}),
+    messageUiThemeKey,
+  };
 
   const changeSummaryParts: string[] = [];
   if ((existingChannel.topic ?? null) !== payload.basics.topic) {
@@ -117,8 +130,7 @@ export async function updateChannelFromPayload(
     changeSummaryParts.push('Updated channel theme');
   }
   if (
-    JSON.stringify(existingChannel.ui_defaults ?? null) !==
-    JSON.stringify(payload.ui ?? null)
+    JSON.stringify(existingChannel.ui_defaults ?? null) !== JSON.stringify(uiDefaults)
   ) {
     changeSummaryParts.push('Updated channel defaults');
   }
@@ -171,7 +183,7 @@ export async function updateChannelFromPayload(
     purpose: payload.basics.purpose,
     kind: payload.basics.kind,
     themeKey: payload.ui?.themeKey ?? 'teal',
-    uiDefaults: payload.ui ?? null,
+    uiDefaults,
     liveSessionConfig: payload.liveSession ?? null,
     status: payload.lifecycle?.status ?? 'active',
     postingPolicyKind: payload.postingPolicy.kind,

@@ -2,10 +2,8 @@
 
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { reportObservedError } from '@iconicedu/utils';
-import {
-  MessageList,
-  type MessageListRef,
-} from '@iconicedu/ui-web/components/messages/message-list';
+import type { MessageListRef } from '@iconicedu/ui-web/components/messages/message-list';
+import { resolveWebMessageUiTheme } from '@iconicedu/ui-web/components/messages/themes/registry';
 import { MessageInput } from '@iconicedu/ui-web/components/messages/message-input';
 import { TypingIndicator } from '@iconicedu/ui-web/components/messages/typing-indicator';
 import { useMessages } from '@iconicedu/ui-web/hooks/use-messages';
@@ -854,38 +852,52 @@ export function MessagesContainer({
         toggleMessageFilter(messageFilter);
       }
       const sendMessage = async () => {
-        if (messageWriteClient && currentUserId) {
-          const created = await runWithNetworkActivity(() =>
-            messageWriteClient.sendTextMessage({
-              orgId: channel.ids.orgId,
-              channelId: channel.ids.id,
-              senderProfileId: currentUserId,
-              content,
-              mentions,
-              homework,
-            }),
-          );
-          const exists = messagesRef.current.some(
-            (message) => message.ids.id === created.ids.id,
-          );
-          if (!exists) {
-            addMessage(created);
-          }
-          return;
-        }
-        const newMessage = buildOptimisticComposerMessage({
+        const optimisticMessage = buildOptimisticComposerMessage({
           orgId: channel.ids.orgId,
           sender: senderProfile,
           content,
           mentions,
           homework,
         });
-        addMessage(newMessage);
+        addMessage(optimisticMessage);
+
+        if (messageWriteClient && currentUserId) {
+          try {
+            const created = await runWithNetworkActivity(() =>
+              messageWriteClient.sendTextMessage({
+                orgId: channel.ids.orgId,
+                channelId: channel.ids.id,
+                senderProfileId: currentUserId,
+                content,
+                mentions,
+                homework,
+              }),
+            );
+            const exists = messagesRef.current.some(
+              (message) => message.ids.id === created.ids.id,
+            );
+            if (exists) {
+              deleteMessage(optimisticMessage.ids.id);
+            } else {
+              updateMessage(optimisticMessage.ids.id, created);
+            }
+          } catch (error) {
+            deleteMessage(optimisticMessage.ids.id);
+            reportObservedError({
+              error,
+              source: 'web.messages.send_message',
+              message: 'Failed to send message',
+              context: { channelId: channel.ids.id },
+            });
+          }
+          return;
+        }
       };
-      void sendMessage();
+      return sendMessage();
     },
     [
       addMessage,
+      deleteMessage,
       senderProfile,
       messageFilter,
       toggleMessageFilter,
@@ -895,6 +907,7 @@ export function MessagesContainer({
       currentUserId,
       readOnly,
       runWithNetworkActivity,
+      updateMessage,
     ],
   );
 
@@ -1810,6 +1823,7 @@ export function MessagesContainer({
       onDelete: handleDeleteMessage,
       getMessageActionState,
       currentUserId,
+      currentUserProfile: resolvedCurrentUserProfile,
       currentUserCanDeleteAnyMessages: currentUserProfile?.kind === 'staff',
       isReadOnly: readOnly,
       onSendThreadReply: handleSendThreadReply,
@@ -1848,9 +1862,11 @@ export function MessagesContainer({
 
   const renderActiveTabContent = () => {
     if (activeTab === 'messages') {
+      const messageTheme = resolveWebMessageUiTheme(channel.ui?.messageUiThemeKey);
+      const ThemedMessageList = messageTheme.MessageList;
       return (
         <>
-          <MessageList ref={messageListRef} {...messageListProps} />
+          <ThemedMessageList ref={messageListRef} {...messageListProps} />
           {typingParticipants.length ? (
             <TypingIndicator
               profiles={typingParticipants}
@@ -1876,6 +1892,12 @@ export function MessagesContainer({
                     }),
                   );
                   createdMessages.forEach((created) => {
+                    const exists = messagesRef.current.some(
+                      (message) => message.ids.id === created.ids.id,
+                    );
+                    if (!exists) {
+                      addMessage(created);
+                    }
                     if (
                       created.core.type === 'file' ||
                       created.core.type === 'image' ||

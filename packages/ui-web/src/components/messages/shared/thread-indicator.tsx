@@ -58,7 +58,6 @@ export const ThreadIndicator = memo(function ThreadIndicator({
               key={participant.ids.id}
               name={participantName}
               avatar={participant.profile.avatar}
-              presence={participant.presence}
               themeKey={participant.ui?.themeKey}
               roleLabel={getAvatarRoleLabel(participant.kind)}
               sizeClassName="h-5 w-5 border-2 border-background"

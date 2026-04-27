@@ -17,6 +17,7 @@ import type {
   UserProfileVM,
   EntityRefVM,
   ChannelUiDefaultsVM,
+  MessageUiThemeKeyVM,
 } from '@iconicedu/shared-types';
 import { resolveThemeKey } from '@iconicedu/web/lib/profile/derive';
 
@@ -35,6 +36,13 @@ function parseUiDefaults(uiDefaultsValue: unknown): Partial<ChannelUiDefaultsVM>
     resolveThemeKey(
       typeof uiDefaultsValue.themeKey === 'string' ? uiDefaultsValue.themeKey : null,
     ) ?? null;
+
+  if (
+    uiDefaultsValue.messageUiThemeKey === 'classic' ||
+    uiDefaultsValue.messageUiThemeKey === 'feed'
+  ) {
+    parsed.messageUiThemeKey = uiDefaultsValue.messageUiThemeKey as MessageUiThemeKeyVM;
+  }
 
   if (typeof uiDefaultsValue.defaultRightPanelOpen === 'boolean') {
     parsed.defaultRightPanelOpen = uiDefaultsValue.defaultRightPanelOpen;
@@ -197,6 +205,7 @@ export function mapChannelRowToVM(
             resolveThemeKey(row.ui_theme_key ?? null) ??
             parsedUiDefaults?.themeKey ??
             null,
+          messageUiThemeKey: parsedUiDefaults?.messageUiThemeKey ?? null,
           disabledTabs: parsedUiDefaults?.disabledTabs ?? null,
           defaultRightPanelOpen: parsedUiDefaults?.defaultRightPanelOpen,
           defaultRightPanelKey:

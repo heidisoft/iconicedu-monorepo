@@ -32,6 +32,7 @@ type ChannelListItem = {
   last_message_sender: string | null;
   icon_key?: string | null;
   themeKey?: string | null;
+  messageUiThemeKey?: 'classic' | 'feed' | null;
   participants?: DmParticipant[];
   is_supervised?: boolean;
   supervised_child_name?: string | null;
@@ -53,6 +54,14 @@ const PREVIEW_LABELS: Record<string, string> = {
   'payment-reminder': 'Payment reminder',
   'feedback-request': 'Feedback request',
 };
+
+function resolveMessageUiThemeKey(uiDefaults: unknown): 'classic' | 'feed' | null {
+  if (!uiDefaults || typeof uiDefaults !== 'object' || Array.isArray(uiDefaults)) {
+    return null;
+  }
+  const value = (uiDefaults as { messageUiThemeKey?: unknown }).messageUiThemeKey;
+  return value === 'classic' || value === 'feed' ? value : null;
+}
 
 @Injectable()
 export class ChannelsService {
@@ -161,7 +170,7 @@ export class ChannelsService {
     );
     const { data: chRows, error: chError } = await supabase
       .from('channels')
-      .select('id, org_id, topic, description, kind, updated_at')
+      .select('id, org_id, topic, description, kind, updated_at, ui_defaults')
       .in('id', userChannelIds)
       .eq('org_id', input.orgId)
       .eq('kind', 'dm')
@@ -245,6 +254,7 @@ export class ChannelsService {
         last_message_at: last?.at ?? null,
         last_message_sender: last?.sender ?? null,
         participants: participantMap.get(channel.id) ?? [],
+        messageUiThemeKey: resolveMessageUiThemeKey(channel.ui_defaults) ?? 'classic',
       };
     });
   }
@@ -310,7 +320,7 @@ export class ChannelsService {
 
       const { data: chRows, error: channelsError } = await supabase
         .from('channels')
-        .select('id, org_id, topic, description, kind, updated_at')
+        .select('id, org_id, topic, description, kind, updated_at, ui_defaults')
         .in('id', childOnlyChannelIds)
         .eq('org_id', input.orgId)
         .eq('kind', 'dm')
@@ -395,6 +405,7 @@ export class ChannelsService {
           participants: participantsMap.get(channel.id) ?? [],
           is_supervised: true,
           supervised_child_name: childName,
+          messageUiThemeKey: resolveMessageUiThemeKey(channel.ui_defaults) ?? 'classic',
         });
       }
     }
@@ -505,7 +516,7 @@ export class ChannelsService {
       .from('channels')
       .select(
         `
-        id, org_id, topic, description, kind, updated_at,
+        id, org_id, topic, description, kind, updated_at, ui_defaults,
         channel_read_state!left(unread_count)
       `,
       )
@@ -541,6 +552,7 @@ export class ChannelsService {
         last_message_text: last?.text ?? null,
         last_message_at: last?.at ?? null,
         last_message_sender: last?.sender ?? null,
+        messageUiThemeKey: resolveMessageUiThemeKey(channel.ui_defaults) ?? 'feed',
       };
     });
   }

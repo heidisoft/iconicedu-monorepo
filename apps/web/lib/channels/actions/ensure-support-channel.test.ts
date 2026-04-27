@@ -31,6 +31,7 @@ describe('ensureSupportChannel', () => {
         ui_defaults: {
           defaultRightPanelOpen: false,
           defaultRightPanelKey: 'channel_info',
+          messageUiThemeKey: 'feed',
           disabledTabs: ['members'],
           infoPanel: {
             showHeader: false,
@@ -106,6 +107,7 @@ describe('ensureSupportChannel', () => {
         ui_defaults: expect.objectContaining({
           defaultRightPanelOpen: false,
           defaultRightPanelKey: 'channel_info',
+          messageUiThemeKey: 'feed',
           disabledTabs: expect.arrayContaining(['members']),
           infoPanel: expect.objectContaining({
             showHeader: false,
@@ -199,6 +201,7 @@ describe('ensureSupportChannel', () => {
         ui_defaults: expect.objectContaining({
           defaultRightPanelOpen: false,
           defaultRightPanelKey: 'channel_info',
+          messageUiThemeKey: 'feed',
           disabledTabs: expect.arrayContaining(['members']),
           infoPanel: expect.objectContaining({
             showHeader: false,

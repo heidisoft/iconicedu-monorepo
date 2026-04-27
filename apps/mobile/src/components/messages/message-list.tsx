@@ -381,12 +381,12 @@ const skelStyles = StyleSheet.create({
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
-type MessageListProps = {
+export type MessageListProps = {
   messages: MessageVM[];
   channelId?: string;
   currentProfileId: string;
   currentAccountId?: string;
-  onLoadMore?: () => void;
+  onLoadMore?: () => boolean | void | Promise<boolean | void>;
   loading?: boolean;
   refreshing?: boolean;
   onRefresh?: () => void;
@@ -408,6 +408,7 @@ type MessageListProps = {
   lastReadAt?: string | null;
   unreadCount?: number;
   onSendAnnotation?: (attachment: import('./attachment-sheet').AttachmentPayload) => void;
+  messageUiThemeKey?: 'classic' | 'feed';
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -437,11 +438,16 @@ export const MessageList: React.FC<MessageListProps> = ({
   lastReadAt,
   unreadCount,
   onSendAnnotation,
+  messageUiThemeKey = 'classic',
 }) => {
   const flatListRef = useRef<FlatList>(null);
   const { colors } = useTheme();
   const isNearBottomRef = useRef(true);
   const lastNotifiedReadIdRef = useRef<string | null>(null);
+  const scrollOffsetRef = useRef(0);
+  const contentHeightRef = useRef(0);
+  const reactionStartContentHeightRef = useRef(0);
+  const preserveOffsetAfterReactionRef = useRef(false);
 
   // Build items newest-first so inverted FlatList renders newest at the bottom
   const unreadAnchorMessageId = useMemo(
@@ -513,6 +519,15 @@ export const MessageList: React.FC<MessageListProps> = ({
     maybeMarkUnreadAsViewed();
   }, [maybeMarkUnreadAsViewed]);
 
+  const handleReactionToggle = useCallback(
+    (messageId: string, emoji: string) => {
+      preserveOffsetAfterReactionRef.current = true;
+      reactionStartContentHeightRef.current = contentHeightRef.current;
+      onReactionToggle?.(messageId, emoji);
+    },
+    [onReactionToggle],
+  );
+
   const renderItem = useCallback(
     ({ item, index }: { item: MessageListItem; index: number }) => {
       if (isDateSeparator(item)) {
@@ -555,13 +570,14 @@ export const MessageList: React.FC<MessageListProps> = ({
           isGroupStart={isGroupStart}
           colors={colors}
           onLongPress={onMessageLongPress}
-          onReactionToggle={onReactionToggle}
+          onReactionToggle={handleReactionToggle}
           onThreadOpen={onThreadOpen}
           onProfilePress={onProfilePress}
           currentProfileId={currentProfileId}
           currentAccountId={currentAccountId}
           isReadOnly={isReadOnly}
           onSendAnnotation={onSendAnnotation}
+          messageUiThemeKey={messageUiThemeKey}
         />
       );
     },
@@ -572,11 +588,12 @@ export const MessageList: React.FC<MessageListProps> = ({
       listData,
       colors,
       onMessageLongPress,
-      onReactionToggle,
+      handleReactionToggle,
       onThreadOpen,
       onProfilePress,
       isReadOnly,
       onSendAnnotation,
+      messageUiThemeKey,
     ],
   );
 
@@ -636,10 +653,27 @@ export const MessageList: React.FC<MessageListProps> = ({
       onEndReachedThreshold={0.3}
       onScroll={(event) => {
         const offsetY = event.nativeEvent.contentOffset.y;
+        scrollOffsetRef.current = offsetY;
         isNearBottomRef.current = offsetY <= 40;
         maybeMarkUnreadAsViewed();
       }}
       scrollEventThrottle={120}
+      onContentSizeChange={(_, contentHeight) => {
+        if (!preserveOffsetAfterReactionRef.current) {
+          contentHeightRef.current = contentHeight;
+          return;
+        }
+        preserveOffsetAfterReactionRef.current = false;
+        const heightDelta = contentHeight - reactionStartContentHeightRef.current;
+        const offset = scrollOffsetRef.current;
+        contentHeightRef.current = contentHeight;
+        requestAnimationFrame(() => {
+          flatListRef.current?.scrollToOffset({
+            offset: Math.max(0, offset + Math.max(0, heightDelta)),
+            animated: false,
+          });
+        });
+      }}
       // In an inverted FlatList, ListHeaderComponent renders at the VISUAL BOTTOM —
       // perfect for pending uploads that appear just above the input bar.
       ListHeaderComponent={

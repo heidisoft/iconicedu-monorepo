@@ -106,6 +106,17 @@ export function useMarkRead({
           queryKey: queryKeys.messages(input.channelId, profileId),
           exact: true,
         });
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.directMessages(input.orgId, profileId),
+          exact: true,
+        });
+        void queryClient.invalidateQueries({
+          queryKey: ['learningSpaceChannels', input.orgId, profileId],
+        });
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.supervisedDirectMessages(input.orgId, accountId),
+          exact: true,
+        });
       }
     },
     [accountId, profileId, queryClient],

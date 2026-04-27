@@ -15,6 +15,7 @@ import {
 } from '@iconicedu/web/lib/admin/learning-space-schedule-hash';
 import { toStoredLiveSessionConfig } from '@iconicedu/web/lib/admin/live-session-config';
 import { compileLearningSpaceReminderJobs } from '@iconicedu/web/lib/automation/reminder-jobs';
+import { FEED_MESSAGE_UI_THEME_KEY } from '@iconicedu/web/lib/channels/ui-defaults';
 import type {
   ChannelUiDefaultsVM,
   LearningSpaceCreatePayload,
@@ -148,6 +149,15 @@ function toTimeOrZero(value: string) {
 
 function canonicalJson(value: unknown) {
   return JSON.stringify(normalizeForCompare(value));
+}
+
+function withLearningSpaceMessageUiTheme(
+  uiDefaults?: ChannelUiDefaultsVM | null,
+): ChannelUiDefaultsVM {
+  return {
+    ...(uiDefaults ?? {}),
+    messageUiThemeKey: uiDefaults?.messageUiThemeKey ?? FEED_MESSAGE_UI_THEME_KEY,
+  };
 }
 
 function normalizeForCompare(value: unknown): unknown {
@@ -578,13 +588,16 @@ export async function updateLearningSpaceFromPayload(
     (learningSpace.description ?? null) !== (payload.basics.description ?? null);
 
   const existingChannel = channelStateResponse.data ?? {};
+  const nextChannelUiDefaults = withLearningSpaceMessageUiTheme(
+    payload.settings?.uiDefaults ?? null,
+  );
   const hasChannelSettingsChanges =
     (existingChannel.topic ?? null) !== (payload.basics.title ?? null) ||
     (existingChannel.description ?? null) !== (payload.basics.description ?? null) ||
     (existingChannel.icon_key ?? null) !== (payload.basics.iconKey ?? null) ||
     (existingChannel.ui_theme_key ?? null) !== (payload.settings?.themeKey ?? null) ||
     canonicalJson(existingChannel.ui_defaults ?? null) !==
-      canonicalJson(payload.settings?.uiDefaults ?? null) ||
+      canonicalJson(nextChannelUiDefaults) ||
     canonicalJson(existingChannel.live_session_config ?? null) !==
       canonicalJson(toStoredLiveSessionConfig(payload.liveSession));
 
@@ -693,7 +706,7 @@ export async function updateLearningSpaceFromPayload(
     description: payload.basics.description ?? null,
     iconKey: payload.basics.iconKey ?? null,
     uiThemeKey: payload.settings?.themeKey ?? null,
-    uiDefaults: payload.settings?.uiDefaults ?? null,
+    uiDefaults: nextChannelUiDefaults,
     liveSession: payload.liveSession ?? null,
     updatedBy: actorProfileId,
     updatedAt: now,
@@ -764,7 +777,7 @@ export async function updateLearningSpaceFromPayload(
   }
   if (
     canonicalJson(existingChannel.ui_defaults ?? null) !==
-    canonicalJson(payload.settings?.uiDefaults ?? null)
+    canonicalJson(nextChannelUiDefaults)
   ) {
     infoChangeSummaryParts.push('Updated class defaults');
   }

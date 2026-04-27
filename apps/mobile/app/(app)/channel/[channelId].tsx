@@ -32,7 +32,7 @@ import {
 import type { AttachmentPayload } from '@/components/messages/attachment-sheet';
 import type { PendingUpload } from '@/components/messages/pending-message-row';
 import { useTheme } from '@/providers/theme-provider';
-import { MessageList } from '@/components/messages/message-list';
+import { resolveMobileMessageUiTheme } from '@/components/messages/themes/registry';
 import { MessageInput } from '@/components/messages/message-input';
 import { TypingIndicator } from '@/components/messages/typing-indicator';
 import { ConversationHeader } from '@/components/messages/conversation-header';
@@ -67,6 +67,7 @@ export default function ChannelConversationScreen() {
     isLearningSpace,
     purpose,
     isStaffObserverReadOnly,
+    messageUiThemeKey,
   } = useLocalSearchParams<{
     channelId: string;
     topic?: string;
@@ -78,6 +79,7 @@ export default function ChannelConversationScreen() {
     isLearningSpace?: string;
     purpose?: string;
     isStaffObserverReadOnly?: string;
+    messageUiThemeKey?: string;
   }>();
   const router = useRouter();
   const isFocused = useIsFocused();
@@ -124,6 +126,8 @@ export default function ChannelConversationScreen() {
     typingUsers,
     broadcastTyping,
     broadcastTypingStop,
+    removeMessage,
+    restoreMessage,
   } = useMessages(channelId ?? '', profileId, accountId, senderName, orgId);
 
   const {
@@ -174,6 +178,8 @@ export default function ChannelConversationScreen() {
   // ── Tab state ──
   const [activeTab, setActiveTab] = useState<ChannelTab>('messages');
   const s = useMemo(() => makeStyles(colors), [colors]);
+  const messageTheme = resolveMobileMessageUiTheme(messageUiThemeKey ?? 'feed');
+  const ThemedMessageList = messageTheme.MessageList;
 
   // ── Info sheet state ──
   const [infoVisible, setInfoVisible] = useState(false);
@@ -337,9 +343,17 @@ export default function ChannelConversationScreen() {
   // ── Delete message ──
   const handleDelete = useCallback(
     async (messageId: string) => {
-      await deleteMessage(messageId, orgId, profileId);
+      const removedMessage = removeMessage(messageId);
+      try {
+        await deleteMessage(messageId, orgId, profileId);
+      } catch {
+        if (removedMessage) {
+          restoreMessage(removedMessage);
+        }
+        Alert.alert('Unable to delete message', 'Please try again.');
+      }
     },
-    [orgId, profileId],
+    [orgId, profileId, removeMessage, restoreMessage],
   );
 
   // ── Retry a failed upload ──
@@ -559,7 +573,7 @@ export default function ChannelConversationScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={0}
         >
-          <MessageList
+          <ThemedMessageList
             messages={messages ?? []}
             channelId={channelId ?? ''}
             currentProfileId={profileId}

@@ -33,6 +33,7 @@ export type ChannelHeaderIconKey =
 
 export type ChannelHeaderActionKey = 'info' | 'saved' | 'custom';
 export type ChannelUiTabKeyVM = 'messages' | 'files' | 'schedule' | 'saved' | 'members';
+export type MessageUiThemeKeyVM = 'classic' | 'feed';
 
 export interface ChannelHeaderActionVM {
   key: ChannelHeaderActionKey;
@@ -171,6 +172,7 @@ export interface ChannelUiDefaultsVM {
   defaultRightPanelOpen?: boolean;
   defaultRightPanelKey?: MessagesRightPanelIntentKey;
   themeKey?: ThemeKey | null;
+  messageUiThemeKey?: MessageUiThemeKeyVM | null;
   disabledTabs?: ChannelUiTabKeyVM[] | null;
   infoPanel?: {
     showHeader?: boolean;

@@ -1,7 +1,12 @@
 'use client';
 
-import { memo } from 'react';
-import type { MessageVM, ThreadVM, UUID } from '@iconicedu/shared-types';
+import { memo, type ReactNode } from 'react';
+import type {
+  MessageUiThemeKeyVM,
+  MessageVM,
+  ThreadVM,
+  UUID,
+} from '@iconicedu/shared-types';
 import {
   isTextMessage,
   isImageMessage,
@@ -59,6 +64,8 @@ interface MessageItemProps {
   onToggleImportant?: (messageId: string) => void;
   onDelete?: (messageId: string) => void;
   actionState?: MessageActionState;
+  messageUiThemeKey?: MessageUiThemeKeyVM;
+  inlineThreadContent?: ReactNode;
 }
 
 export const MessageItem = memo(function MessageItem({
@@ -75,6 +82,8 @@ export const MessageItem = memo(function MessageItem({
   onToggleImportant,
   onDelete,
   actionState,
+  messageUiThemeKey = 'classic',
+  inlineThreadContent,
 }: MessageItemProps) {
   if (!isMessageVisibleToUser(message, currentUserId)) {
     return null;
@@ -113,6 +122,8 @@ export const MessageItem = memo(function MessageItem({
     currentUserId,
     canDeleteAnyMessages: currentUserCanDeleteAnyMessages,
     actionState,
+    messageUiThemeKey,
+    inlineThreadContent,
   };
 
   if (isTextMessage(message)) {

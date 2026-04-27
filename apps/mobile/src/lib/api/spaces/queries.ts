@@ -24,6 +24,7 @@ export async function fetchSpaceChannelMetaByChannelId(channelId: string): Promi
     kind: 'educator' | 'guardian' | 'child' | 'staff' | 'system';
     themeKey?: string | null;
   }>;
+  messageUiThemeKey?: 'classic' | 'feed' | null;
 } | null> {
   if (!channelId) return null;
 
@@ -39,7 +40,7 @@ export async function fetchSpaceChannelMetaByChannelId(channelId: string): Promi
         description,
         deleted_at
       ),
-      channel:channels!channel_id(ui_theme_key, live_session_config)
+      channel:channels!channel_id(ui_theme_key, ui_defaults, live_session_config)
     `,
     )
     .eq('channel_id', channelId)
@@ -61,7 +62,11 @@ export async function fetchSpaceChannelMetaByChannelId(channelId: string): Promi
     | null
     | undefined;
   const channel = data?.channel as
-    | { ui_theme_key: string | null; live_session_config?: unknown }
+    | {
+        ui_theme_key: string | null;
+        ui_defaults?: { messageUiThemeKey?: unknown } | null;
+        live_session_config?: unknown;
+      }
     | null
     | undefined;
 
@@ -161,6 +166,11 @@ export async function fetchSpaceChannelMetaByChannelId(channelId: string): Promi
     subtitle: space.subject ?? null,
     iconKey: space.icon_key ?? null,
     themeKey: channel?.ui_theme_key ?? null,
+    messageUiThemeKey:
+      channel?.ui_defaults?.messageUiThemeKey === 'classic' ||
+      channel?.ui_defaults?.messageUiThemeKey === 'feed'
+        ? channel.ui_defaults.messageUiThemeKey
+        : 'feed',
     description: space.description ?? null,
     liveSession: liveSessionConfig,
     studentProfiles,
@@ -174,6 +184,7 @@ export async function fetchSupportChannel(orgId: string): Promise<{
   description: string | null;
   icon_key?: string | null;
   themeKey?: string | null;
+  messageUiThemeKey?: 'classic' | 'feed' | null;
   updated_at?: string | null;
 } | null> {
   const data = await apiGet<{
@@ -182,6 +193,7 @@ export async function fetchSupportChannel(orgId: string): Promise<{
     description: string | null;
     icon_key?: string | null;
     ui_theme_key?: string | null;
+    ui_defaults?: { messageUiThemeKey?: unknown } | null;
     updated_at?: string | null;
   } | null>('/spaces/support-channel', { orgId });
   if (!data) return null;
@@ -191,6 +203,11 @@ export async function fetchSupportChannel(orgId: string): Promise<{
     description: data.description ?? null,
     icon_key: data.icon_key ?? null,
     themeKey: data.ui_theme_key ?? null,
+    messageUiThemeKey:
+      data.ui_defaults?.messageUiThemeKey === 'classic' ||
+      data.ui_defaults?.messageUiThemeKey === 'feed'
+        ? data.ui_defaults.messageUiThemeKey
+        : 'feed',
     updated_at: data.updated_at ?? null,
   };
 }
@@ -233,6 +250,7 @@ export async function fetchLearningSpaceChannels(
       last_message_sender: null,
       icon_key: supportChannel.icon_key ?? 'life-buoy',
       themeKey: supportChannel.themeKey ?? null,
+      messageUiThemeKey: supportChannel.messageUiThemeKey ?? 'feed',
       student_name: null,
       student_profiles: [],
       participant_profiles: [],

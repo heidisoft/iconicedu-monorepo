@@ -158,7 +158,11 @@ export function mapRowToMessageVM(
         },
       } as MessageVM;
     case 'audio-recording':
-      return { ...base, audio: c } as MessageVM;
+      return {
+        ...base,
+        content: previewText ? { text: previewText } : undefined,
+        audio: c,
+      } as MessageVM;
     default:
       return { ...base, content: { text: previewText } } as MessageVM;
   }

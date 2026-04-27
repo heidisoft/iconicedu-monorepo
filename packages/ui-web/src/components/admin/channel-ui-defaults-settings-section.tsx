@@ -5,6 +5,7 @@ import * as React from 'react';
 import type {
   ChannelUiDefaultsVM,
   ChannelUiTabKeyVM,
+  MessageUiThemeKeyVM,
   ThemeKey,
 } from '@iconicedu/shared-types';
 import { PROFILE_THEME_OPTIONS } from '@iconicedu/ui-web/components/sidebar/user-settings/constants';
@@ -43,6 +44,11 @@ const TAB_OPTIONS: Array<{ key: ChannelUiTabKeyVM; label: string }> = [
   { key: 'members', label: 'Members' },
 ];
 
+const MESSAGE_STYLE_OPTIONS: Array<{ key: MessageUiThemeKeyVM; label: string }> = [
+  { key: 'classic', label: 'Classic' },
+  { key: 'feed', label: 'Feed' },
+];
+
 export function ChannelUiDefaultsSettingsSection({
   uiDefaults,
   onUiDefaultsChange,
@@ -52,6 +58,7 @@ export function ChannelUiDefaultsSettingsSection({
   children,
 }: ChannelUiDefaultsSettingsSectionProps) {
   const themeKey = (uiDefaults?.themeKey ?? 'teal') as ThemeKey;
+  const messageUiThemeKey = uiDefaults?.messageUiThemeKey ?? 'feed';
   const defaultRightPanelOpen = uiDefaults?.defaultRightPanelOpen ?? true;
   const defaultRightPanelKey: 'channel_info' | 'saved' =
     uiDefaults?.defaultRightPanelKey === 'saved' ? 'saved' : 'channel_info';
@@ -81,6 +88,33 @@ export function ChannelUiDefaultsSettingsSection({
     <FieldSet>
       <FieldLegend>{legend}</FieldLegend>
       <FieldGroup>
+        <Field>
+          <FieldLabel htmlFor={`${themeSelectId}-message-style`}>
+            Message style
+          </FieldLabel>
+          <Select
+            value={messageUiThemeKey}
+            onValueChange={(value) =>
+              onUiDefaultsChange({
+                messageUiThemeKey: value as MessageUiThemeKeyVM,
+              })
+            }
+          >
+            <SelectTrigger id={`${themeSelectId}-message-style`}>
+              <SelectValue placeholder="Select message style" />
+            </SelectTrigger>
+            <SelectContent>
+              {MESSAGE_STYLE_OPTIONS.map((option) => (
+                <SelectItem key={option.key} value={option.key}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <FieldDescription>
+            Controls the message layout for this channel.
+          </FieldDescription>
+        </Field>
         <Field>
           <FieldLabel htmlFor={themeSelectId}>Color theme</FieldLabel>
           <Select
