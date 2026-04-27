@@ -35,6 +35,7 @@ import type {
   ReactionVM,
 } from '@iconicedu/shared-types';
 import type { AppColors } from '@/lib/theme';
+import type { PresenceDisplayStatus } from '@/hooks/use-online-profile-ids';
 import { reportMobileObservedError } from '@/lib/analytics/report-error';
 import { fetchThreadMessages } from '@/lib/api/queries';
 import { useMarkRead } from '@/hooks/use-mark-read';
@@ -145,6 +146,8 @@ export function MessageAvatar({
   src,
   seed,
   role,
+  presence,
+  presenceStatus,
   size = AVATAR_SIZE,
   badgeSizeOverride,
 }: {
@@ -152,12 +155,33 @@ export function MessageAvatar({
   src: string | null;
   seed: string;
   role?: string | null;
+  presence?: MessageVM['core']['sender']['presence'];
+  presenceStatus?: PresenceDisplayStatus | null;
   size?: number;
   badgeSizeOverride?: number;
 }) {
   const radius = size / 2;
   const initialsSize = Math.max(10, Math.round(size * 0.36));
   const badgeSize = badgeSizeOverride ?? Math.max(10, Math.round(size * 0.42));
+  const resolvedPresenceStatus =
+    presenceStatus ?? presence?.displayStatus ?? presence?.liveStatus ?? null;
+  const presenceColor = getAvatarPresenceColor(resolvedPresenceStatus);
+  const presenceSize = Math.max(10, Math.round(size * 0.28));
+  const presenceBadge = presenceColor ? (
+    <View
+      accessibilityLabel={`Status: ${resolvedPresenceStatus}`}
+      style={[
+        avatarStyles.presenceBadge,
+        {
+          width: presenceSize,
+          height: presenceSize,
+          borderRadius: presenceSize / 2,
+          backgroundColor: presenceColor,
+        },
+      ]}
+      testID="message-avatar-presence"
+    />
+  ) : null;
 
   if (src) {
     return (
@@ -168,6 +192,7 @@ export function MessageAvatar({
           accessibilityLabel={name}
         />
         <RoleAvatarBadge role={role} size={badgeSize} />
+        {presenceBadge}
       </View>
     );
   }
@@ -189,8 +214,26 @@ export function MessageAvatar({
         </Text>
       </View>
       <RoleAvatarBadge role={role} size={badgeSize} />
+      {presenceBadge}
     </View>
   );
+}
+
+function getAvatarPresenceColor(
+  status?: PresenceDisplayStatus | string | null,
+): string | null {
+  if (status === 'online') return '#22c55e';
+  if (status === 'away' || status === 'idle') return '#eab308';
+  if (
+    status === 'busy' ||
+    status === 'in_class' ||
+    status === 'teaching' ||
+    status === 'reviewing_work'
+  ) {
+    return '#dc2626';
+  }
+  if (status === 'offline') return '#4b5563';
+  return null;
 }
 
 const avatarStyles = StyleSheet.create({
@@ -200,6 +243,13 @@ const avatarStyles = StyleSheet.create({
     justifyContent: 'center',
   },
   initials: { color: '#fff', fontSize: 13, fontWeight: '700', letterSpacing: 0.3 },
+  presenceBadge: {
+    position: 'absolute',
+    right: -1,
+    bottom: -1,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
 });
 
 // Deterministic color per sender name (Slack-style)
@@ -217,7 +267,7 @@ type S = ReturnType<typeof makeStyles>;
 const EMOJI_ONLY_RE =
   /(?:\p{Regional_Indicator}{2}|[#*0-9]\uFE0F?\u20E3|(?:\p{Extended_Pictographic}|\p{Emoji_Presentation})(?:\uFE0F|\uFE0E)?(?:\p{Emoji_Modifier})?(?:\u200D(?:\p{Extended_Pictographic}|\p{Emoji_Presentation})(?:\uFE0F|\uFE0E)?(?:\p{Emoji_Modifier})?)*)/gu;
 
-function isEmojiOnlyText(text: string): boolean {
+export function isEmojiOnlyText(text: string): boolean {
   const trimmed = text.trim();
   return (
     trimmed.length > 0 &&
@@ -336,9 +386,10 @@ type SocialBarProps = {
   disabledActions?: boolean;
   /** When true, the thread pill and reply button are hidden (used in thread replies). */
   hideThreadButton?: boolean;
+  replyButtonLabel?: string;
 };
 
-function SocialBar({
+export function SocialBar({
   reactions,
   thread,
   threadUnreadCount,
@@ -350,6 +401,7 @@ function SocialBar({
   hideActions,
   disabledActions,
   hideThreadButton,
+  replyButtonLabel,
 }: SocialBarProps) {
   const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
   const hasThread = !!thread && thread.stats.messageCount > 0;
@@ -373,6 +425,7 @@ function SocialBar({
           flexWrap: 'wrap',
           gap: 6,
           marginTop: 4,
+          minHeight: 30,
           alignItems: 'center',
         }}
       >
@@ -436,6 +489,7 @@ function SocialBar({
                   onPress={onThreadPress}
                   disabled={disabledActions ?? false}
                   inline
+                  label={replyButtonLabel}
                 />
               ))}
           </>
@@ -649,7 +703,7 @@ function ThreadPill({
   );
 }
 
-function findInlineUnreadStartIndex(input: {
+export function findInlineUnreadStartIndex(input: {
   replies: MessageVM[];
   lastReadMessageId?: string;
   unreadCount?: number;
@@ -725,7 +779,13 @@ function getVisibilityLabel(message: MessageVM): string | null {
   return 'Private';
 }
 
-function VisibilityBadge({ message, colors }: { message: MessageVM; colors: AppColors }) {
+export function VisibilityBadge({
+  message,
+  colors,
+}: {
+  message: MessageVM;
+  colors: AppColors;
+}) {
   const label = getVisibilityLabel(message);
   if (!label) return null;
 
@@ -826,16 +886,18 @@ function InlineReply({
   );
 }
 
-function ThreadReplyButton({
+export function ThreadReplyButton({
   colors,
   onPress,
   disabled,
   inline = false,
+  label,
 }: {
   colors: AppColors;
   onPress?: () => void;
   disabled?: boolean;
   inline?: boolean;
+  label?: string;
 }) {
   return (
     <TouchableOpacity
@@ -858,6 +920,11 @@ function ThreadReplyButton({
       }}
     >
       <CornerUpLeft size={14} color={colors.textMuted} />
+      {label ? (
+        <Text style={{ color: colors.textMuted, fontSize: 13, fontWeight: '600' }}>
+          {label}
+        </Text>
+      ) : null}
     </TouchableOpacity>
   );
 }
@@ -1483,13 +1550,30 @@ function makeStyles(colors: AppColors) {
     },
 
     // ── Text inside bubble ────────────────────────────────────────────────────
-    textContent: { fontSize: 15, lineHeight: 22, color: colors.text },
+    textContent: {
+      width: '100%',
+      flexShrink: 1,
+      fontSize: 15,
+      lineHeight: 22,
+      color: colors.text,
+    },
     textContentOwn: { color: '#fff' },
+    emojiOnlyTextContent: {
+      fontSize: 36,
+      lineHeight: 42,
+    },
 
     // ── File attachment ────────────────────────────────────────────────────────
     // width:'85%' (not maxWidth) gives a definite pixel width → flex:1 inside rows resolves
     fileBubble: {
       width: '85%' as const,
+      borderRadius: 18,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+    },
+    fileCaptionBubble: {
+      width: '85%' as const,
+      maxWidth: '85%' as const,
       borderRadius: 18,
       paddingHorizontal: 14,
       paddingVertical: 10,
@@ -1699,6 +1783,115 @@ const CARD_TYPES = new Set([
   'live-session-started',
 ]);
 
+export function isRichMessageType(type: string): boolean {
+  return type === 'session-complete' || CARD_TYPES.has(type);
+}
+
+export function RichMessageContent({
+  message,
+  colors,
+}: {
+  message: MessageVM;
+  colors: AppColors;
+}) {
+  const s = makeStyles(colors);
+  const type = message.core.type;
+
+  if (type === 'session-complete') {
+    return (
+      <SessionCompleteBar
+        message={message as SessionCompleteMessageVM}
+        colors={colors}
+        s={s}
+      />
+    );
+  }
+
+  if (type === 'lesson-assignment') {
+    return (
+      <AssignmentCard
+        message={message as LessonAssignmentMessageVM}
+        colors={colors}
+        s={s}
+      />
+    );
+  }
+
+  if (type === 'session-summary') {
+    return (
+      <SessionSummaryCard
+        message={message as SessionSummaryMessageVM}
+        colors={colors}
+        s={s}
+      />
+    );
+  }
+
+  if (type === 'progress-update') {
+    return (
+      <ProgressCard message={message as ProgressUpdateMessageVM} colors={colors} s={s} />
+    );
+  }
+
+  if (type === 'event-reminder') {
+    return (
+      <EventCard message={message as EventReminderMessageVM} colors={colors} s={s} />
+    );
+  }
+
+  if (type === 'homework-submission') {
+    return (
+      <HomeworkCard
+        message={message as HomeworkSubmissionMessageVM}
+        colors={colors}
+        s={s}
+      />
+    );
+  }
+
+  if (type === 'feedback-request') {
+    return (
+      <FeedbackRequestCard
+        message={message as FeedbackRequestMessageVM}
+        colors={colors}
+        s={s}
+      />
+    );
+  }
+
+  if (type === 'session-booking') {
+    return (
+      <SessionBookingCard
+        message={message as SessionBookingMessageVM}
+        colors={colors}
+        s={s}
+      />
+    );
+  }
+
+  if (type === 'payment-reminder') {
+    return (
+      <PaymentReminderCard
+        message={message as PaymentReminderMessageVM}
+        colors={colors}
+        s={s}
+      />
+    );
+  }
+
+  if (type === 'live-session-started') {
+    return (
+      <LiveSessionStartedCard
+        message={message as LiveSessionStartedMessageVM}
+        colors={colors}
+        s={s}
+      />
+    );
+  }
+
+  return null;
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export type MessageItemProps = {
@@ -1716,6 +1909,7 @@ export type MessageItemProps = {
   isReadOnly?: boolean;
   isThreadMessage?: boolean;
   onSendAnnotation?: (attachment: AttachmentPayload) => void;
+  messageUiThemeKey?: 'classic' | 'feed';
 };
 
 export const MessageItem: React.FC<MessageItemProps> = ({
@@ -1733,6 +1927,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   isReadOnly,
   isThreadMessage = false,
   onSendAnnotation,
+  messageUiThemeKey = 'classic',
 }) => {
   const { markThreadRead } = useMarkRead({
     orgId: message.ids.orgId,
@@ -1837,6 +2032,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   const time = formatTime(message.core.createdAt);
   const reactions = message.social?.reactions ?? [];
   const thread = message.social?.thread ?? null;
+  const isFeedTheme = messageUiThemeKey === 'feed';
   const isCard = CARD_TYPES.has(type);
   const msgText = (message as { content?: { text?: string } }).content?.text ?? null;
   const hideActions = msgText !== null && isEmojiOnlyText(msgText);
@@ -2051,7 +2247,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
 
   // Layout is identical in channel and thread (own = right-aligned, "You", teal bubble).
   // isThreadMessage only controls: visibility badge, thread/reply button, inline expansion.
-  const ownInChannel = isOwn;
+  const ownInChannel = isFeedTheme ? false : isOwn;
 
   // ── Image message (rendered edge-to-edge, no bubble padding) ─────────────
 
@@ -2130,7 +2326,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     return (
       <>
         {!!fm.content?.text && (
-          <View style={[s.bubble, ownInChannel ? s.bubbleOwn : s.bubbleOther]}>
+          <View style={[s.fileCaptionBubble, ownInChannel ? s.bubbleOwn : s.bubbleOther]}>
             <FormattedText
               text={fm.content.text}
               style={[s.textContent, ownInChannel && s.textContentOwn]}
@@ -2313,7 +2509,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     return (
       <>
         {!!captionText && (
-          <View style={[s.bubble, ownInChannel ? s.bubbleOwn : s.bubbleOther]}>
+          <View style={[s.fileCaptionBubble, ownInChannel ? s.bubbleOwn : s.bubbleOther]}>
             <FormattedText
               text={captionText}
               style={[s.textContent, ownInChannel && s.textContentOwn]}
@@ -2448,11 +2644,16 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     const text = (message as { content?: { text?: string } }).content?.text ?? '';
     const mentions = (message as { content?: { mentions?: MessageMentionVM[] } }).content
       ?.mentions;
+    const emojiOnly = isEmojiOnlyText(text);
     return (
       <FormattedText
         text={text}
         mentions={mentions}
-        style={[s.textContent, ownInChannel && s.textContentOwn]}
+        style={[
+          s.textContent,
+          emojiOnly && s.emojiOnlyTextContent,
+          ownInChannel && s.textContentOwn,
+        ]}
         isOwn={ownInChannel}
       />
     );

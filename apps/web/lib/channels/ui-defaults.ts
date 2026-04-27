@@ -1,5 +1,8 @@
 import type { ChannelUiDefaultsVM } from '@iconicedu/shared-types';
 
+export const CLASSIC_MESSAGE_UI_THEME_KEY = 'classic' as const;
+export const FEED_MESSAGE_UI_THEME_KEY = 'feed' as const;
+
 export function withInfoPanelDisabled(
   uiDefaults?: ChannelUiDefaultsVM | null,
 ): ChannelUiDefaultsVM {

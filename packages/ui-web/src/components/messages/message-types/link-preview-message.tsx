@@ -17,10 +17,12 @@ export const LinkPreviewMessage = memo(function LinkPreviewMessage(
   props: LinkPreviewMessageProps,
 ) {
   const { message, ...baseProps } = props;
+  const isFeedTheme = baseProps.messageUiThemeKey === 'feed';
+  const caption = message.content?.text?.replace(message.link.url, '').trim();
 
   return (
     <MessageBase message={message} {...baseProps}>
-      {message.content?.text && (
+      {!isFeedTheme && message.content?.text && (
         <MessageTextContent
           text={message.content.text}
           mentions={message.content.mentions}
@@ -43,6 +45,11 @@ export const LinkPreviewMessage = memo(function LinkPreviewMessage(
           className="block max-w-md overflow-hidden rounded-xl border border-border bg-card transition-colors hover:bg-accent"
         />
       </a>
+      {isFeedTheme && caption && (
+        <div className="mt-3 rounded-[10px] border border-border/70 bg-background px-4 py-3 text-sm leading-relaxed text-foreground">
+          <MessageTextContent text={caption} mentions={message.content?.mentions} />
+        </div>
+      )}
     </MessageBase>
   );
 });

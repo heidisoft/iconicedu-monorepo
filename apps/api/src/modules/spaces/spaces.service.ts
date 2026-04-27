@@ -1,6 +1,14 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
 
+function resolveMessageUiThemeKey(uiDefaults: unknown): 'classic' | 'feed' | null {
+  if (!uiDefaults || typeof uiDefaults !== 'object' || Array.isArray(uiDefaults)) {
+    return null;
+  }
+  const value = (uiDefaults as { messageUiThemeKey?: unknown }).messageUiThemeKey;
+  return value === 'classic' || value === 'feed' ? value : null;
+}
+
 @Injectable()
 export class SpacesService {
   async list(accessToken: string, orgId: string) {
@@ -44,7 +52,7 @@ export class SpacesService {
         `
         channel_id,
         space:learning_spaces!learning_space_id(id, title, icon_key, subject, status, deleted_at),
-        channel:channels!channel_id(id, org_id, ui_theme_key, updated_at)
+        channel:channels!channel_id(id, org_id, ui_theme_key, ui_defaults, updated_at)
         `,
       )
       .eq('org_id', orgId)
@@ -201,6 +209,7 @@ export class SpacesService {
           org_id: string;
           updated_at: string;
           ui_theme_key?: string | null;
+          ui_defaults?: unknown;
         };
         return {
           id: channel.id,
@@ -216,6 +225,7 @@ export class SpacesService {
           last_message_sender: null,
           icon_key: space.icon_key ?? null,
           themeKey: channel.ui_theme_key ?? null,
+          messageUiThemeKey: resolveMessageUiThemeKey(channel.ui_defaults) ?? 'feed',
           student_profiles: space.id
             ? (studentProfilesBySpaceId.get(space.id) ?? [])
             : [],
@@ -247,7 +257,7 @@ export class SpacesService {
     const supabase = createSupabaseSessionClient(accessToken);
     const { data, error } = await supabase
       .from('channels')
-      .select('id, topic, description, icon_key, ui_theme_key, updated_at')
+      .select('id, topic, description, icon_key, ui_theme_key, ui_defaults, updated_at')
       .eq('org_id', orgId)
       .eq('purpose', 'support')
       .eq('status', 'active')

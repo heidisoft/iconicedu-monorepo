@@ -1,6 +1,9 @@
 import { randomUUID } from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { withInfoPanelDisabled } from '@iconicedu/web/lib/channels/ui-defaults';
+import {
+  FEED_MESSAGE_UI_THEME_KEY,
+  withInfoPanelDisabled,
+} from '@iconicedu/web/lib/channels/ui-defaults';
 
 type EnsureSupportChannelInput = {
   supabase: SupabaseClient;
@@ -14,6 +17,7 @@ const SUPPORT_THEME_KEY = 'amber';
 const SUPPORT_UI_DEFAULTS = withInfoPanelDisabled({
   defaultRightPanelKey: 'channel_info',
   disabledTabs: ['members'],
+  messageUiThemeKey: FEED_MESSAGE_UI_THEME_KEY,
 });
 
 function hasExpectedSupportUiDefaults(uiDefaults: unknown): boolean {
@@ -25,6 +29,7 @@ function hasExpectedSupportUiDefaults(uiDefaults: unknown): boolean {
     defaultRightPanelKey?: unknown;
     disabledTabs?: unknown;
     infoPanel?: unknown;
+    messageUiThemeKey?: unknown;
   };
   const hasExpectedTabs =
     Array.isArray(candidate.disabledTabs) && candidate.disabledTabs.includes('members');
@@ -43,6 +48,7 @@ function hasExpectedSupportUiDefaults(uiDefaults: unknown): boolean {
   return (
     candidate.defaultRightPanelOpen === false &&
     candidate.defaultRightPanelKey === 'channel_info' &&
+    candidate.messageUiThemeKey === FEED_MESSAGE_UI_THEME_KEY &&
     hasExpectedTabs &&
     hasInfoPanelDisabled
   );

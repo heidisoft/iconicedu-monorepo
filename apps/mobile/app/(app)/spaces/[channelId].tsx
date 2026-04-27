@@ -30,7 +30,7 @@ import {
   queryKeys,
 } from '@/lib/api/queries';
 import { useTheme } from '@/providers/theme-provider';
-import { MessageList } from '@/components/messages/message-list';
+import { resolveMobileMessageUiTheme } from '@/components/messages/themes/registry';
 import { MessageInput } from '@/components/messages/message-input';
 import { TypingIndicator } from '@/components/messages/typing-indicator';
 import { ConversationHeader } from '@/components/messages/conversation-header';
@@ -58,16 +58,25 @@ type PendingUpload = {
 type SpaceTab = 'messages' | 'sessions';
 
 export default function SpaceDetailScreen() {
-  const { channelId, topic, iconKey, themeKey, subtitle, tab, isStaffObserverReadOnly } =
-    useLocalSearchParams<{
-      channelId: string;
-      topic?: string;
-      iconKey?: string;
-      themeKey?: string;
-      subtitle?: string;
-      tab?: string;
-      isStaffObserverReadOnly?: string;
-    }>();
+  const {
+    channelId,
+    topic,
+    iconKey,
+    themeKey,
+    subtitle,
+    tab,
+    isStaffObserverReadOnly,
+    messageUiThemeKey,
+  } = useLocalSearchParams<{
+    channelId: string;
+    topic?: string;
+    iconKey?: string;
+    themeKey?: string;
+    subtitle?: string;
+    tab?: string;
+    isStaffObserverReadOnly?: string;
+    messageUiThemeKey?: string;
+  }>();
   const router = useRouter();
   const isFocused = useIsFocused();
   const queryClient = useQueryClient();
@@ -117,6 +126,8 @@ export default function SpaceDetailScreen() {
     typingUsers,
     broadcastTyping,
     broadcastTypingStop,
+    removeMessage,
+    restoreMessage,
   } = useMessages(channelId ?? '', profileId, accountId, senderName, orgId);
   const { data: spaceMeta, isLoading: isLoadingMeta } = useQuery({
     queryKey: queryKeys.spaceChannelMeta(channelId ?? ''),
@@ -219,9 +230,17 @@ export default function SpaceDetailScreen() {
   // ── Delete message ──
   const handleDelete = useCallback(
     async (messageId: string) => {
-      await deleteMessage(messageId, orgId, profileId);
+      const removedMessage = removeMessage(messageId);
+      try {
+        await deleteMessage(messageId, orgId, profileId);
+      } catch {
+        if (removedMessage) {
+          restoreMessage(removedMessage);
+        }
+        Alert.alert('Unable to delete message', 'Please try again.');
+      }
     },
-    [orgId, profileId],
+    [orgId, profileId, removeMessage, restoreMessage],
   );
 
   const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
@@ -435,6 +454,10 @@ export default function SpaceDetailScreen() {
   const resolvedParticipantProfiles = spaceMeta?.participantProfiles ?? [];
   const resolvedIconKey = spaceMeta?.iconKey ?? iconKey ?? null;
   const resolvedThemeKey = spaceMeta?.themeKey ?? themeKey ?? null;
+  const messageTheme = resolveMobileMessageUiTheme(
+    spaceMeta?.messageUiThemeKey ?? messageUiThemeKey ?? 'feed',
+  );
+  const ThemedMessageList = messageTheme.MessageList;
   const resolvedLiveJoinUrl =
     spaceMeta?.liveSession?.joinUrl ??
     (spaceMeta?.liveSession?.enabled ? (liveSession?.meetingLink ?? null) : null);
@@ -499,7 +522,7 @@ export default function SpaceDetailScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={0}
         >
-          <MessageList
+          <ThemedMessageList
             messages={messages ?? []}
             channelId={channelId ?? ''}
             currentProfileId={profileId}

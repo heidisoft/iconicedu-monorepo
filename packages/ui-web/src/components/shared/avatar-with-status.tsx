@@ -57,6 +57,7 @@ interface AvatarWithStatusProps {
   messageHref?: string | null;
   onMessageClick?: (() => void) | null;
   enableProfilePreview?: boolean;
+  onProfileClick?: (() => void) | null;
 }
 
 const getInitials = (name?: string | null, maxLength = 2) =>
@@ -116,6 +117,7 @@ export function AvatarWithStatus({
   messageHref,
   onMessageClick,
   enableProfilePreview = true,
+  onProfileClick,
 }: AvatarWithStatusProps) {
   const liveStatus = presence?.liveStatus ?? 'offline';
   const derivedDisplayStatus =
@@ -161,39 +163,58 @@ export function AvatarWithStatus({
       fallbackExtraClassName?: string;
       statusExtraClassName?: string;
       displayStatus?: PresenceDisplayStatusVM;
-    }) => (
-      <div className="relative z-10">
-        <Avatar
-          className={cn(
-            avatarSizeClassName,
-            themeClass,
-            themeKey ? 'border theme-border' : '',
-          )}
-        >
-          {avatarUrl ? <AvatarImage src={avatarUrl} alt={safeName} /> : null}
-          <AvatarFallback
+    }) => {
+      const avatarContent = (
+        <>
+          <Avatar
             className={cn(
-              fallbackClassName,
-              fallbackExtraClassName,
-              themeKey ? 'theme-bg theme-fg' : '',
+              avatarSizeClassName,
+              themeClass,
+              themeKey ? 'border theme-border' : '',
             )}
           >
-            {getInitials(safeName, initials)}
-          </AvatarFallback>
-        </Avatar>
-        {shouldShowStatus && (
-          <span
-            className={cn(
-              'absolute z-20 rounded-full border-2 border-card',
-              STATUS_COLORS[displayStatus],
-              statusClassName ?? 'bottom-0 right-0 h-2.5 w-2.5',
-              statusExtraClassName,
-            )}
-            aria-label={`Status: ${displayStatus}`}
-          />
-        )}
-      </div>
-    ),
+            {avatarUrl ? <AvatarImage src={avatarUrl} alt={safeName} /> : null}
+            <AvatarFallback
+              className={cn(
+                fallbackClassName,
+                fallbackExtraClassName,
+                themeKey ? 'theme-bg theme-fg' : '',
+              )}
+            >
+              {getInitials(safeName, initials)}
+            </AvatarFallback>
+          </Avatar>
+          {shouldShowStatus && (
+            <span
+              className={cn(
+                'absolute z-20 rounded-full border-2 border-card',
+                STATUS_COLORS[displayStatus],
+                statusClassName ?? 'bottom-0 right-0 h-2.5 w-2.5',
+                statusExtraClassName,
+              )}
+              aria-label={`Status: ${displayStatus}`}
+            />
+          )}
+        </>
+      );
+
+      if (onProfileClick) {
+        return (
+          <button
+            type="button"
+            onClick={onProfileClick}
+            className="relative z-10 inline-flex rounded-full transition-opacity hover:opacity-80"
+            aria-label={`View ${safeName}'s profile`}
+          >
+            {avatarContent}
+          </button>
+        );
+      }
+
+      return (
+        <span className="relative z-10 inline-flex rounded-full">{avatarContent}</span>
+      );
+    },
     [
       avatarUrl,
       derivedDisplayStatus,
@@ -204,6 +225,7 @@ export function AvatarWithStatus({
       statusClassName,
       themeClass,
       themeKey,
+      onProfileClick,
     ],
   );
   const avatarNode = renderAvatar({

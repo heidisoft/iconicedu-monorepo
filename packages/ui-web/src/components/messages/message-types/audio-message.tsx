@@ -56,6 +56,7 @@ export function resolveAudioDuration(
 
 export const AudioMessage = memo(function AudioMessage(props: AudioMessageProps) {
   const { message, ...baseProps } = props;
+  const isFeedTheme = baseProps.messageUiThemeKey === 'feed';
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(message.audio.durationSeconds ?? 0);
@@ -224,12 +225,12 @@ export const AudioMessage = memo(function AudioMessage(props: AudioMessageProps)
 
   return (
     <MessageBase message={message} {...baseProps}>
-      {message.content?.text && (
+      {!isFeedTheme && message.content?.text && (
         <p className="mb-3 whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground">
           {message.content.text}
         </p>
       )}
-      <div className="max-w-md rounded-2xl border border-border bg-card px-3 py-3 shadow-sm">
+      <div className="max-w-md rounded-2xl border border-border bg-card px-3 py-3">
         <audio
           ref={audioRef}
           src={audioSrc ?? undefined}
@@ -242,7 +243,7 @@ export const AudioMessage = memo(function AudioMessage(props: AudioMessageProps)
             onClick={togglePlayPause}
             size="icon"
             className={cn(
-              'h-10 w-10 rounded-full border border-primary/20 bg-primary/12 text-primary shadow-sm transition-colors hover:bg-primary/18',
+              'h-10 w-10 rounded-full border border-primary/20 bg-primary/12 text-primary transition-colors hover:bg-primary/18',
               isPlaying && 'bg-primary text-primary-foreground hover:bg-primary/90',
               !canPlay && 'opacity-80',
             )}
@@ -268,7 +269,7 @@ export const AudioMessage = memo(function AudioMessage(props: AudioMessageProps)
               aria-valuenow={Math.round(currentTime)}
               aria-valuetext={`${formatAudioTime(currentTime)} of ${formatAudioTime(resolvedDuration)}`}
               className={cn(
-                'flex h-6 cursor-pointer items-end gap-0.5 rounded-xl border border-border/70 bg-muted/70 px-2 outline-none shadow-inner',
+                'flex h-6 cursor-pointer items-end gap-0.5 rounded-xl border border-border/70 bg-muted/70 px-2 outline-none',
                 canPlay
                   ? 'focus-visible:ring-2 focus-visible:ring-ring'
                   : 'cursor-not-allowed opacity-60',
@@ -293,6 +294,11 @@ export const AudioMessage = memo(function AudioMessage(props: AudioMessageProps)
           </div>
         </div>
       </div>
+      {isFeedTheme && message.content?.text && (
+        <p className="mt-3 rounded-[10px] border border-border/70 bg-background px-4 py-3 text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words">
+          {message.content.text}
+        </p>
+      )}
     </MessageBase>
   );
 });

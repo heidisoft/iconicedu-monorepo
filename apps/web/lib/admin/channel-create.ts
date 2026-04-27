@@ -5,7 +5,11 @@ import type { ChannelCreatePayload, ChannelCapabilityVM } from '@iconicedu/share
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { requireParentActorContext } from '@iconicedu/web/lib/family-view/actor-context';
 import { toStoredLiveSessionConfig } from '@iconicedu/web/lib/admin/live-session-config';
-import { withInfoPanelDisabled } from '@iconicedu/web/lib/channels/ui-defaults';
+import {
+  CLASSIC_MESSAGE_UI_THEME_KEY,
+  FEED_MESSAGE_UI_THEME_KEY,
+  withInfoPanelDisabled,
+} from '@iconicedu/web/lib/channels/ui-defaults';
 
 const DEFAULT_CAPABILITIES: ChannelCapabilityVM[] = [];
 
@@ -24,6 +28,11 @@ export async function createAdminChannel(payload: ChannelCreatePayload) {
   const now = new Date().toISOString();
   const channelId = randomUUID();
   const status = payload.lifecycle?.status ?? 'active';
+  const messageUiThemeKey =
+    payload.ui?.messageUiThemeKey ??
+    (payload.basics.kind === 'dm'
+      ? CLASSIC_MESSAGE_UI_THEME_KEY
+      : FEED_MESSAGE_UI_THEME_KEY);
 
   const { error } = await supabase.from('channels').insert({
     id: channelId,
@@ -35,7 +44,10 @@ export async function createAdminChannel(payload: ChannelCreatePayload) {
     visibility: payload.basics.visibility,
     purpose: payload.basics.purpose,
     ui_theme_key: payload.ui?.themeKey ?? 'teal',
-    ui_defaults: withInfoPanelDisabled(payload.ui ?? null),
+    ui_defaults: withInfoPanelDisabled({
+      ...(payload.ui ?? {}),
+      messageUiThemeKey,
+    }),
     live_session_config: toStoredLiveSessionConfig(payload.liveSession),
     status,
     posting_policy_kind: payload.postingPolicy.kind,

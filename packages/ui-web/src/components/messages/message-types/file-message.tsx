@@ -31,15 +31,16 @@ export function getFileAttachments(message: FileMessageType) {
 export const FileMessage = memo(function FileMessage(props: FileMessageProps) {
   const { message, ...baseProps } = props;
   const attachments = getFileAttachments(message);
+  const isFeedTheme = baseProps.messageUiThemeKey === 'feed';
 
   return (
     <MessageBase message={message} {...baseProps}>
-      {message.content?.text && (
+      {!isFeedTheme && message.content?.text && (
         <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap break-words mb-2">
           {message.content.text}
         </p>
       )}
-      <div className="max-w-sm overflow-hidden rounded-xl border border-border bg-muted/30">
+      <div className="max-w-sm overflow-hidden rounded-xl border border-border bg-card">
         {attachments.map((attachment, index) => (
           <div
             key={`${attachment.storagePath ?? attachment.name}-${index}`}
@@ -81,6 +82,11 @@ export const FileMessage = memo(function FileMessage(props: FileMessageProps) {
           </div>
         ))}
       </div>
+      {isFeedTheme && message.content?.text && (
+        <p className="mt-3 rounded-[10px] border border-border/70 bg-background px-4 py-3 text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words">
+          {message.content.text}
+        </p>
+      )}
     </MessageBase>
   );
 });

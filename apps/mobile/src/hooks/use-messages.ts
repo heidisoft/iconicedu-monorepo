@@ -261,26 +261,90 @@ export function useMessages(
 
   // ── Load more ─────────────────────────────────────────────────────────────
   const messages = useMemo(() => query.data ?? [], [query.data]);
+  const isLoadingOlderRef = useRef(false);
+  const hasMoreOlderMessagesRef = useRef(true);
+
+  useEffect(() => {
+    hasMoreOlderMessagesRef.current = true;
+    isLoadingOlderRef.current = false;
+  }, [channelId]);
 
   const loadMore = useCallback(async () => {
-    if (!messages.length) return;
+    if (
+      !messages.length ||
+      isLoadingOlderRef.current ||
+      !hasMoreOlderMessagesRef.current
+    ) {
+      return false;
+    }
     const oldest = messages[0];
-    if (!oldest) return;
+    if (!oldest) return false;
 
-    const olderMessages = await fetchChannelMessages(
-      orgId,
-      channelId,
-      currentProfileId,
-      currentAccountId,
-      40,
-      oldest.core.createdAt,
-    );
+    isLoadingOlderRef.current = true;
+    try {
+      const olderMessages = await fetchChannelMessages(
+        orgId,
+        channelId,
+        currentProfileId,
+        currentAccountId,
+        40,
+        oldest.core.createdAt,
+      );
 
-    queryClient.setQueryData(
-      queryKeys.messages(channelId, currentProfileId),
-      (prev: typeof messages) => [...olderMessages, ...(prev ?? [])],
-    );
+      if (olderMessages.length === 0) {
+        hasMoreOlderMessagesRef.current = false;
+        return false;
+      }
+
+      queryClient.setQueryData(
+        queryKeys.messages(channelId, currentProfileId),
+        (prev: typeof messages) => {
+          const existingIds = new Set((prev ?? []).map((message) => message.ids.id));
+          const uniqueOlderMessages = olderMessages.filter(
+            (message) => !existingIds.has(message.ids.id),
+          );
+          return [...uniqueOlderMessages, ...(prev ?? [])];
+        },
+      );
+      return true;
+    } finally {
+      isLoadingOlderRef.current = false;
+    }
   }, [channelId, currentProfileId, currentAccountId, messages, orgId, queryClient]);
+
+  const removeMessage = useCallback(
+    (messageId: string) => {
+      const key = queryKeys.messages(channelId, currentProfileId);
+      let removedMessage: MessageVM | null = null;
+
+      queryClient.setQueryData<MessageVM[]>(key, (current) => {
+        if (!current) return current;
+        removedMessage = current.find((message) => message.ids.id === messageId) ?? null;
+        return current.filter((message) => message.ids.id !== messageId);
+      });
+
+      return removedMessage;
+    },
+    [channelId, currentProfileId, queryClient],
+  );
+
+  const restoreMessage = useCallback(
+    (message: MessageVM) => {
+      const key = queryKeys.messages(channelId, currentProfileId);
+
+      queryClient.setQueryData<MessageVM[]>(key, (current) => {
+        const existing = current ?? [];
+        if (existing.some((item) => item.ids.id === message.ids.id)) {
+          return existing;
+        }
+        return [...existing, message].sort(
+          (a, b) =>
+            new Date(a.core.createdAt).getTime() - new Date(b.core.createdAt).getTime(),
+        );
+      });
+    },
+    [channelId, currentProfileId, queryClient],
+  );
 
   // ── Reaction toggle ───────────────────────────────────────────────────────
 
@@ -364,5 +428,7 @@ export function useMessages(
     typingUsers,
     broadcastTyping,
     broadcastTypingStop,
+    removeMessage,
+    restoreMessage,
   };
 }

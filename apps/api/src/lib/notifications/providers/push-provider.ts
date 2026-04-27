@@ -248,7 +248,6 @@ export async function sendPushNotification(payload: PushNotificationPayload) {
         .select('unread_count')
         .eq('org_id', payload.orgId)
         .eq('account_id', accountId)
-        .is('thread_id', null)
         .is('deleted_at', null);
 
       if (Array.isArray(unreadRows)) {

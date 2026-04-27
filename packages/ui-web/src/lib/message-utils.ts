@@ -25,6 +25,20 @@ export const formatFullDate = (date: Date | string): string => {
   );
 };
 
+export const formatFeedDate = (date: Date | string): string => {
+  const dateValue = toDate(date);
+  const timezone = getViewerTimezone();
+  const dateText = new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: timezone,
+  }).format(dateValue);
+  const timeText = formatTimeInViewerZone(dateValue);
+
+  return `${dateText} / ${timeText}`;
+};
+
 export const formatThreadTime = (date: Date | string): string => {
   const dateValue = toDate(date);
   const now = new Date();
