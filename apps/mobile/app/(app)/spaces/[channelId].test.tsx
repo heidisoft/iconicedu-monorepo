@@ -118,6 +118,7 @@ jest.mock('@/providers/theme-provider', () => ({
 }));
 
 jest.mock('@/components/messages/message-list', () => ({
+  findLatestUnreadIncomingMessageId: () => null,
   MessageList: () => null,
 }));
 
