@@ -16,7 +16,7 @@ import { ThreadsModule } from '@iconicedu/api/modules/threads/threads.module';
 import { ProfilesModule } from '@iconicedu/api/modules/profiles/profiles.module';
 import { AccountsModule } from '@iconicedu/api/modules/accounts/accounts.module';
 import { NotificationPreferencesModule } from '@iconicedu/api/modules/notification-preferences/notification-preferences.module';
-import { NotificationEngineModule } from '@iconicedu/api/modules/notification-engine/notification-engine.module';
+import { EventsModule } from '@iconicedu/api/modules/events/events.module';
 import { ActivityWorkerModule } from '@iconicedu/api/modules/activity-worker/activity-worker.module';
 import { PresenceModule } from '@iconicedu/api/modules/presence/presence.module';
 import { SpacesModule } from '@iconicedu/api/modules/spaces/spaces.module';
@@ -42,7 +42,7 @@ import { RequestLoggingInterceptor } from '@iconicedu/api/observability/request-
     ProfilesModule,
     AccountsModule,
     NotificationPreferencesModule,
-    NotificationEngineModule,
+    EventsModule,
     ActivityWorkerModule,
     PresenceModule,
     SpacesModule,

@@ -6,8 +6,7 @@ import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { requireParentActorContext } from '@iconicedu/web/lib/family-view/actor-context';
 import { toStoredLiveSessionConfig } from '@iconicedu/web/lib/admin/live-session-config';
 import {
-  CLASSIC_MESSAGE_UI_THEME_KEY,
-  FEED_MESSAGE_UI_THEME_KEY,
+  defaultMessageUiThemeKeyForChannelKind,
   withInfoPanelDisabled,
 } from '@iconicedu/web/lib/channels/ui-defaults';
 
@@ -30,9 +29,7 @@ export async function createAdminChannel(payload: ChannelCreatePayload) {
   const status = payload.lifecycle?.status ?? 'active';
   const messageUiThemeKey =
     payload.ui?.messageUiThemeKey ??
-    (payload.basics.kind === 'dm'
-      ? CLASSIC_MESSAGE_UI_THEME_KEY
-      : FEED_MESSAGE_UI_THEME_KEY);
+    defaultMessageUiThemeKeyForChannelKind(payload.basics.kind);
 
   const { error } = await supabase.from('channels').insert({
     id: channelId,

@@ -280,7 +280,7 @@ export class RemindersService {
       emitterLabel: 'api:reminders',
       occurredAt: now,
       sourceKind: 'system',
-      actorProfileId: systemProfileId,
+      actorProfileId: null,
       scope,
       targetRef: payload.learningSpaceId
         ? { kind: 'learning_space', id: payload.learningSpaceId }
@@ -304,7 +304,11 @@ export class RemindersService {
       createdBy: systemProfileId,
     });
 
-    await supabase
+    if (!activityEvent) {
+      throw new Error(`Activity event suppressed for ${eventType}`);
+    }
+
+    const updateResponse = await supabase
       .from('reminder_jobs')
       .update({
         status: 'succeeded',
@@ -317,6 +321,10 @@ export class RemindersService {
       })
       .eq('id', job.id)
       .eq('org_id', job.org_id);
+
+    if (updateResponse.error) {
+      throw new Error(updateResponse.error.message);
+    }
 
     await this.logDispatch({
       supabase,

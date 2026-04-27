@@ -18,6 +18,7 @@ import {
 
 type FunctionKind =
   | 'activity-worker-dispatch'
+  | 'activity-projector-dispatch'
   | 'reminders-dispatch'
   | 'notifications-dispatch'
   | 'channel-read-state-repair';
@@ -43,14 +44,20 @@ const FUNCTIONS: FunctionConfig[] = [
     kind: 'activity-worker-dispatch',
     title: 'Activity Worker Dispatch',
     description:
-      'Claims pending activity_source_jobs and processes them into activity_feed_items + notifications.',
+      'Claims pending activity_source_jobs and publishes durable activity_events.',
+    hasDispatchParams: true,
+  },
+  {
+    kind: 'activity-projector-dispatch',
+    title: 'Activity Projector Dispatch',
+    description:
+      'Retries pending and failed activity_events projection into activity_feed_items and notification dispatch jobs.',
     hasDispatchParams: true,
   },
   {
     kind: 'reminders-dispatch',
     title: 'Reminders Dispatch',
-    description:
-      'Claims due reminder_jobs (session reminders, payment reminders, feedback requests) and sends notifications.',
+    description: 'Claims due reminder_jobs and publishes reminder activity_events.',
     hasDispatchParams: true,
   },
   {

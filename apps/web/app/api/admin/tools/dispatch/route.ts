@@ -4,6 +4,7 @@ import { requireAdminOrgContext } from '@iconicedu/web/lib/admin/require-admin-o
 
 const ALLOWED_KINDS = [
   'activity-worker-dispatch',
+  'activity-projector-dispatch',
   'reminders-dispatch',
   'notifications-dispatch',
   'channel-read-state-repair',

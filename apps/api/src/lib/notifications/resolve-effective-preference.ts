@@ -46,9 +46,11 @@ export async function resolveEffectivePreference(input: {
   supabase: SupabaseServiceClient;
   event: ActivityEventRow;
   recipientProfileId: string;
+  prefKey?: string;
   defaultChannels: NotificationDeliveryChannel[];
 }) {
   const scopedTarget = resolveScopedEventTarget(input.event);
+  const prefKey = input.prefKey ?? input.event.event_type;
 
   const scopedPreferencePromise = scopedTarget
     ? input.supabase
@@ -58,7 +60,7 @@ export async function resolveEffectivePreference(input: {
         .eq('profile_id', input.recipientProfileId)
         .eq('scope_kind', scopedTarget.scopeKind)
         .eq('scope_id', scopedTarget.scopeId)
-        .eq('pref_key', input.event.event_type)
+        .eq('pref_key', prefKey)
         .is('deleted_at', null)
         .maybeSingle<PreferenceRow>()
     : Promise.resolve({ data: null, error: null });
@@ -68,7 +70,7 @@ export async function resolveEffectivePreference(input: {
     .select('channels, muted')
     .eq('org_id', input.event.org_id)
     .eq('profile_id', input.recipientProfileId)
-    .eq('pref_key', input.event.event_type)
+    .eq('pref_key', prefKey)
     .is('deleted_at', null)
     .maybeSingle<PreferenceRow>();
 

@@ -1436,6 +1436,29 @@ export const FeedMessageList: React.FC<FeedMessageListProps> = ({
     return emptyNode;
   }
 
+  const footerNode: ReactNode =
+    pendingUploads?.length || loading ? (
+      <View>
+        {loading ? (
+          <View style={styles.loadingWrap}>
+            <ActivityIndicator size="small" color={FEED.blue} />
+          </View>
+        ) : null}
+        {pendingUploads?.length ? (
+          <View style={{ paddingVertical: 8 }}>
+            {pendingUploads.map((pending) => (
+              <PendingMessageRow
+                key={pending.id}
+                pending={pending}
+                colors={colors}
+                onRetry={() => onRetryUpload?.(pending.id)}
+              />
+            ))}
+          </View>
+        ) : null}
+      </View>
+    ) : null;
+
   return (
     <FlatList
       ref={flatListRef}
@@ -1503,27 +1526,7 @@ export const FeedMessageList: React.FC<FeedMessageListProps> = ({
           isReadOnly={isReadOnly}
         />
       )}
-      ListHeaderComponent={
-        pendingUploads?.length ? (
-          <View style={{ paddingVertical: 8 }}>
-            {pendingUploads.map((pending) => (
-              <PendingMessageRow
-                key={pending.id}
-                pending={pending}
-                colors={colors}
-                onRetry={() => onRetryUpload?.(pending.id)}
-              />
-            ))}
-          </View>
-        ) : null
-      }
-      ListFooterComponent={
-        loading ? (
-          <View style={styles.loadingWrap}>
-            <ActivityIndicator size="small" color={FEED.blue} />
-          </View>
-        ) : null
-      }
+      ListFooterComponent={footerNode}
     />
   );
 };

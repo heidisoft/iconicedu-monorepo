@@ -6,6 +6,7 @@ import type {
   InboxActionButtonVM,
   InboxLeadingVM,
   InboxTabKeyVM,
+  NotificationDeliveryChannel,
 } from '@iconicedu/shared-types';
 import type { ActivityEventRow } from '@iconicedu/shared-types';
 import type { SupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
@@ -26,6 +27,13 @@ export type ActivityEventDefinition = {
   eventType: string;
   tabKey: InboxTabKeyVM;
   importance?: ActivityImportanceVM;
+  notification?: {
+    defaultChannels: NotificationDeliveryChannel[];
+    timing: 'immediate' | 'standard' | 'digest';
+    isCritical?: boolean;
+    presenceAware?: boolean;
+    prefKey?: string;
+  };
   group?: {
     groupType: ActivityGroupKeyVM;
     collapseByDefault?: boolean;
@@ -254,6 +262,10 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     eventType: 'message.posted',
     tabKey: 'all',
     importance: 'normal',
+    notification: {
+      defaultChannels: ['push'],
+      timing: 'standard',
+    },
     group: {
       groupType: 'message',
       collapseByDefault: true,
@@ -283,6 +295,10 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     eventType: 'reaction.added',
     tabKey: 'all',
     importance: 'normal',
+    notification: {
+      defaultChannels: ['push'],
+      timing: 'standard',
+    },
     group: {
       groupType: 'message',
       collapseByDefault: true,
@@ -313,6 +329,11 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     eventType: 'class.session.rescheduled',
     tabKey: 'classes',
     importance: 'important',
+    notification: {
+      defaultChannels: ['push', 'email'],
+      timing: 'immediate',
+      isCritical: true,
+    },
     group: {
       groupType: 'class',
       collapseByDefault: true,
@@ -327,6 +348,12 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     eventType: 'class.sessions.rescheduled',
     tabKey: 'classes',
     importance: 'important',
+    notification: {
+      defaultChannels: ['push', 'email'],
+      timing: 'immediate',
+      isCritical: true,
+      prefKey: 'class.session.rescheduled',
+    },
     group: {
       groupType: 'class',
       collapseByDefault: true,
@@ -342,6 +369,11 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     eventType: 'class.session.canceled',
     tabKey: 'classes',
     importance: 'important',
+    notification: {
+      defaultChannels: ['push', 'email'],
+      timing: 'immediate',
+      isCritical: true,
+    },
     group: {
       groupType: 'class',
       collapseByDefault: true,
@@ -356,6 +388,12 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     eventType: 'class.sessions.canceled',
     tabKey: 'classes',
     importance: 'important',
+    notification: {
+      defaultChannels: ['push', 'email'],
+      timing: 'immediate',
+      isCritical: true,
+      prefKey: 'class.session.canceled',
+    },
     group: {
       groupType: 'class',
       collapseByDefault: true,
@@ -371,6 +409,11 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     eventType: 'session.reminder.sent',
     tabKey: 'classes',
     importance: 'normal',
+    notification: {
+      defaultChannels: ['push', 'email'],
+      timing: 'immediate',
+      isCritical: true,
+    },
     group: {
       groupType: 'reminder',
       collapseByDefault: true,
@@ -381,6 +424,20 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
           asOptionalString(payload.messageId) ??
           null
         );
+      },
+      renderGroup: (event) => {
+        const payload = asRecord(event.payload);
+        return {
+          verb: 'sessions.reminder.sent',
+          leading: { kind: 'icon', iconKey: 'Bell', tone: 'info' },
+          headline: {
+            primary: 'Upcoming class reminders',
+            secondary: getContextTitle(payload),
+            secondaryHref: buildInboxSourceHref(event, payload),
+          },
+          summary: asOptionalString(payload.summary),
+          actionButton: sourceAction(event, payload, 'default', 'Open class'),
+        };
       },
     },
     resolveRecipients: DEFAULT_RECIPIENTS,
@@ -404,6 +461,12 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     eventType: 'sessions.reminder.sent',
     tabKey: 'classes',
     importance: 'normal',
+    notification: {
+      defaultChannels: ['push', 'email'],
+      timing: 'immediate',
+      isCritical: true,
+      prefKey: 'session.reminder.sent',
+    },
     group: {
       groupType: 'reminder',
       collapseByDefault: true,
@@ -436,6 +499,10 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     eventType: 'session.feedback_request.sent',
     tabKey: 'classes',
     importance: 'normal',
+    notification: {
+      defaultChannels: ['push', 'email'],
+      timing: 'immediate',
+    },
     group: {
       groupType: 'reminder',
       collapseByDefault: true,
@@ -446,6 +513,21 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
           asOptionalString(payload.messageId) ??
           null
         );
+      },
+      renderGroup: (event) => {
+        const payload = asRecord(event.payload);
+        return {
+          verb: 'sessions.feedback_request.sent',
+          leading: { kind: 'icon', iconKey: 'Bell', tone: 'info' },
+          headline: {
+            primary: 'Feedback requested',
+            secondary: getContextTitle(payload),
+            secondaryHref: buildInboxSourceHref(event, payload),
+          },
+          summary:
+            asOptionalString(payload.summary) ?? 'Share feedback about recent sessions.',
+          actionButton: sourceAction(event, payload, 'outline', 'Open class'),
+        };
       },
     },
     resolveRecipients: DEFAULT_RECIPIENTS,
@@ -469,6 +551,11 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     eventType: 'sessions.feedback_request.sent',
     tabKey: 'classes',
     importance: 'normal',
+    notification: {
+      defaultChannels: ['push', 'email'],
+      timing: 'immediate',
+      prefKey: 'session.feedback_request.sent',
+    },
     group: {
       groupType: 'reminder',
       collapseByDefault: true,

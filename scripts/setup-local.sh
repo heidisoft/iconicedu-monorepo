@@ -380,6 +380,7 @@ sync_env_files() {
 
   ensure_env_var "$API_ENV_FILE" "INTERNAL_REMINDERS_TOKEN_API" "$(generate_secret)" >/dev/null
   ensure_env_var "$API_ENV_FILE" "INTERNAL_ACTIVITY_FEED_TOKEN" "$(generate_secret)" >/dev/null
+  ensure_env_var "$API_ENV_FILE" "INTERNAL_ACTIVITY_PROJECTOR_TOKEN" "$(generate_secret)" >/dev/null
   ensure_env_var "$API_ENV_FILE" "INTERNAL_NOTIFICATIONS_TOKEN_API" "$(generate_secret)" >/dev/null
 
   set_env_var "$WEB_ENV_FILE" "NEXT_PUBLIC_SUPABASE_URL" "$API_URL"

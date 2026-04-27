@@ -7,10 +7,14 @@ import type {
   FeedScopeVM,
 } from '@iconicedu/shared-types';
 
-import { NotificationEngineService } from '@iconicedu/api/modules/notification-engine/notification-engine.service';
+import { EventsService } from '@iconicedu/api/modules/events/events.service';
 
 function resolveExpectedActivityFeedToken() {
   return process.env.INTERNAL_ACTIVITY_FEED_TOKEN?.trim() || '';
+}
+
+function resolveExpectedActivityProjectorToken() {
+  return process.env.INTERNAL_ACTIVITY_PROJECTOR_TOKEN?.trim() || '';
 }
 
 function resolveExpectedNotificationsToken() {
@@ -21,9 +25,16 @@ function resolveExpectedNotificationsToken() {
   );
 }
 
+function isAuthorizedBearer(
+  authorization: string | undefined,
+  tokens: Array<string | undefined>,
+) {
+  return tokens.some((token) => Boolean(token) && authorization === `Bearer ${token}`);
+}
+
 @Controller()
-export class NotificationEngineController {
-  constructor(private readonly notificationEngineService: NotificationEngineService) {}
+export class EventsController {
+  constructor(private readonly eventsService: EventsService) {}
 
   @Post('internal/activity-feed/publish')
   async publishActivityFeedEvent(
@@ -46,7 +57,7 @@ export class NotificationEngineController {
     } | null,
   ) {
     const expectedToken = resolveExpectedActivityFeedToken();
-    if (!expectedToken || authorization !== `Bearer ${expectedToken}`) {
+    if (!expectedToken || !isAuthorizedBearer(authorization, [expectedToken])) {
       throw new UnauthorizedException('Unauthorized');
     }
 
@@ -64,7 +75,7 @@ export class NotificationEngineController {
       throw new UnauthorizedException('Invalid activity publish payload');
     }
 
-    return this.notificationEngineService.publishActivityEvent({
+    return this.eventsService.publishEvent({
       orgId: body.orgId,
       eventType: body.eventType,
       emitterLabel: body.emitterLabel,
@@ -86,12 +97,13 @@ export class NotificationEngineController {
     @Headers('authorization') authorization: string | undefined,
     @Body() body: { eventIds?: string[]; limit?: number } | null,
   ) {
-    const expectedToken = resolveExpectedActivityFeedToken();
-    if (!expectedToken || authorization !== `Bearer ${expectedToken}`) {
+    const expectedToken = resolveExpectedActivityProjectorToken();
+    const fallbackToken = resolveExpectedActivityFeedToken();
+    if (!isAuthorizedBearer(authorization, [expectedToken, fallbackToken])) {
       throw new UnauthorizedException('Unauthorized');
     }
 
-    return this.notificationEngineService.projectActivityEvents({
+    return this.eventsService.projectPendingEvents({
       eventIds: Array.isArray(body?.eventIds) ? body.eventIds : undefined,
       limit: typeof body?.limit === 'number' ? body.limit : undefined,
     });
@@ -103,11 +115,11 @@ export class NotificationEngineController {
     @Body() body: { limit?: number; leaseSeconds?: number; leaseOwner?: string } | null,
   ) {
     const expectedToken = resolveExpectedNotificationsToken();
-    if (!expectedToken || authorization !== `Bearer ${expectedToken}`) {
+    if (!expectedToken || !isAuthorizedBearer(authorization, [expectedToken])) {
       throw new UnauthorizedException('Unauthorized');
     }
 
-    return this.notificationEngineService.dispatchDueNotificationJobs({
+    return this.eventsService.dispatchDueNotifications({
       leaseOwner:
         typeof body?.leaseOwner === 'string' && body.leaseOwner.trim().length > 0
           ? body.leaseOwner.trim()

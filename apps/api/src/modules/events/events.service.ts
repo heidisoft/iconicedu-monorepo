@@ -13,8 +13,8 @@ import type {
 } from '@iconicedu/shared-types';
 
 @Injectable()
-export class NotificationEngineService {
-  async publishActivityEvent<TPayload extends object>(input: {
+export class EventsService {
+  async publishEvent<TPayload extends object>(input: {
     orgId: string;
     eventType: ActivityEventTypeVM;
     emitterLabel?: string;
@@ -48,12 +48,12 @@ export class NotificationEngineService {
     });
   }
 
-  async projectActivityEvents(input: { eventIds?: string[]; limit?: number }) {
+  async projectPendingEvents(input: { eventIds?: string[]; limit?: number }) {
     const supabase = createSupabaseServiceClient();
     return projectActivityEvents(supabase, input);
   }
 
-  async dispatchDueNotificationJobs(input: {
+  async dispatchDueNotifications(input: {
     leaseOwner: string;
     limit?: number;
     leaseSeconds?: number;
