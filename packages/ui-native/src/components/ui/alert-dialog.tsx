@@ -13,7 +13,8 @@ import { FullWindowOverlay as RNFullWindowOverlay } from 'react-native-screens';
 
 const AlertDialog = AlertDialogPrimitive.Root;
 
-const AlertDialogTrigger = AlertDialogPrimitive.Trigger;
+const AlertDialogTrigger: typeof AlertDialogPrimitive.Trigger =
+  AlertDialogPrimitive.Trigger;
 
 const AlertDialogPortal = AlertDialogPrimitive.Portal;
 

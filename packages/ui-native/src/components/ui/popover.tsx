@@ -9,7 +9,7 @@ import { FullWindowOverlay as RNFullWindowOverlay } from 'react-native-screens';
 
 const Popover = PopoverPrimitive.Root;
 
-const PopoverTrigger = PopoverPrimitive.Trigger;
+const PopoverTrigger: typeof PopoverPrimitive.Trigger = PopoverPrimitive.Trigger;
 
 const FullWindowOverlay = Platform.OS === 'ios' ? RNFullWindowOverlay : React.Fragment;
 

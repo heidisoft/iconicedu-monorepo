@@ -9,7 +9,7 @@ import { FullWindowOverlay as RNFullWindowOverlay } from 'react-native-screens';
 
 const Tooltip = TooltipPrimitive.Root;
 
-const TooltipTrigger = TooltipPrimitive.Trigger;
+const TooltipTrigger: typeof TooltipPrimitive.Trigger = TooltipPrimitive.Trigger;
 
 const FullWindowOverlay = Platform.OS === 'ios' ? RNFullWindowOverlay : React.Fragment;
 
