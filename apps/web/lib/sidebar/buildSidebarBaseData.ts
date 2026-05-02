@@ -24,6 +24,9 @@ export async function buildSidebarBaseData(
       buildAllChannels(supabase, orgId, { accountId }),
       resolveSupportChannelId(supabase, orgId),
     ]);
+  const activeLearningSpaces = learningSpaces.filter(
+    (space) => space.basics?.status !== 'archived' && !space.lifecycle?.archivedAt,
+  );
   const alertChannels = allChannels.filter((channel) =>
     isNonLearningSpaceAlertChannel(channel, accountId),
   );
@@ -79,7 +82,7 @@ export async function buildSidebarBaseData(
       navSecondary,
     },
     collections: {
-      learningSpaces,
+      learningSpaces: activeLearningSpaces,
       directMessages,
       classRequestChannels,
       alertChannels,

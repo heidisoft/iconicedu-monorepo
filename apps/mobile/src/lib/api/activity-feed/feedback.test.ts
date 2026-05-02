@@ -33,6 +33,13 @@ function createUpsertSingleChain(resolvedValue: { data: unknown; error: unknown 
   return chain;
 }
 
+function createActiveClassroomChain() {
+  return createMaybeSingleChain({
+    data: { status: 'active', archived_at: null },
+    error: null,
+  });
+}
+
 describe('submitActivityFeedFeedback', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -70,6 +77,7 @@ describe('submitActivityFeedFeedback', () => {
     });
 
     mockFrom
+      .mockReturnValueOnce(createActiveClassroomChain())
       .mockReturnValueOnce(activityChain)
       .mockReturnValueOnce(scheduleChain)
       .mockReturnValueOnce(upsertChain);
@@ -86,9 +94,10 @@ describe('submitActivityFeedFeedback', () => {
       recipientProfileId: 'profile-1',
     });
 
-    expect(mockFrom).toHaveBeenNthCalledWith(1, 'activity_feed_items');
-    expect(mockFrom).toHaveBeenNthCalledWith(2, 'class_schedules');
-    expect(mockFrom).toHaveBeenNthCalledWith(3, 'class_session_feedback');
+    expect(mockFrom).toHaveBeenNthCalledWith(1, 'learning_spaces');
+    expect(mockFrom).toHaveBeenNthCalledWith(2, 'activity_feed_items');
+    expect(mockFrom).toHaveBeenNthCalledWith(3, 'class_schedules');
+    expect(mockFrom).toHaveBeenNthCalledWith(4, 'class_session_feedback');
     expect(upsertChain.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         org_id: 'org-1',
@@ -141,6 +150,7 @@ describe('submitActivityFeedFeedback', () => {
     });
 
     mockFrom
+      .mockReturnValueOnce(createActiveClassroomChain())
       .mockReturnValueOnce(activityChain)
       .mockReturnValueOnce(messageChain)
       .mockReturnValueOnce(membershipChain)
@@ -160,9 +170,9 @@ describe('submitActivityFeedFeedback', () => {
       recipientProfileId: 'profile-1',
     });
 
-    expect(mockFrom).toHaveBeenNthCalledWith(2, 'messages');
-    expect(mockFrom).toHaveBeenNthCalledWith(3, 'channel_members');
-    expect(mockFrom).toHaveBeenNthCalledWith(4, 'class_schedules');
+    expect(mockFrom).toHaveBeenNthCalledWith(3, 'messages');
+    expect(mockFrom).toHaveBeenNthCalledWith(4, 'channel_members');
+    expect(mockFrom).toHaveBeenNthCalledWith(5, 'class_schedules');
   });
 
   it('throws when the session is missing', async () => {
@@ -189,7 +199,9 @@ describe('submitActivityFeedFeedback', () => {
       data: null,
       error: null,
     });
-    mockFrom.mockReturnValueOnce(activityChain);
+    mockFrom
+      .mockReturnValueOnce(createActiveClassroomChain())
+      .mockReturnValueOnce(activityChain);
 
     await expect(
       submitActivityFeedFeedback({
@@ -202,6 +214,35 @@ describe('submitActivityFeedFeedback', () => {
         recipientProfileId: 'profile-1',
       }),
     ).rejects.toThrow('Activity not found');
+  });
+
+  it('rejects post-archive classroom feedback', async () => {
+    mockGetSession.mockResolvedValue({
+      data: { session: { access_token: 'token-123' } },
+    });
+
+    mockFrom.mockReturnValueOnce(
+      createMaybeSingleChain({
+        data: {
+          status: 'archived',
+          archived_at: '2026-03-15T00:00:00.000Z',
+        },
+        error: null,
+      }),
+    );
+
+    await expect(
+      submitActivityFeedFeedback({
+        orgId: 'org-1',
+        classSessionId: '33333333-3333-4333-8333-333333333333',
+        classroomId: '44444444-4444-4444-8444-444444444444',
+        channelId: '55555555-5555-4555-8555-555555555555',
+        sourceEventId: '11111111-1111-4111-8111-111111111111',
+        occurrenceStartAt: '2026-03-16T10:00:00.000Z',
+        rating: 5,
+        recipientProfileId: 'profile-1',
+      }),
+    ).rejects.toThrow('Archived classrooms cannot receive feedback');
   });
 
   it('resolves a schedule id from source_session_id before writing', async () => {
@@ -236,6 +277,7 @@ describe('submitActivityFeedFeedback', () => {
     });
 
     mockFrom
+      .mockReturnValueOnce(createActiveClassroomChain())
       .mockReturnValueOnce(activityChain)
       .mockReturnValueOnce(scheduleChain)
       .mockReturnValueOnce(upsertChain);

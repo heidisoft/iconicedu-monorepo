@@ -81,6 +81,10 @@ describe('RemindersService', () => {
       updated_by: 'profile-1',
       deleted_at: null,
       deleted_by: null,
+      source_learning_space: {
+        status: 'active',
+        archived_at: null,
+      },
       participants: [
         {
           id: 'participant-1',
@@ -108,6 +112,23 @@ describe('RemindersService', () => {
       data: input?.scheduleRows ?? [buildScheduleRow()],
       error: null,
     });
+    const learningSpacesChain = makeChain({
+      data: (input?.scheduleRows ?? [buildScheduleRow()]).map((row) => {
+        const schedule = row as {
+          source_learning_space_id?: string | null;
+          source_learning_space?: {
+            status?: string | null;
+            archived_at?: string | null;
+          } | null;
+        };
+        return {
+          id: schedule.source_learning_space_id ?? 'space-1',
+          status: schedule.source_learning_space?.status ?? 'active',
+          archived_at: schedule.source_learning_space?.archived_at ?? null,
+        };
+      }),
+      error: null,
+    });
     const existingChain = makeChain({
       data: input?.existingRows ?? [],
       error: null,
@@ -121,10 +142,9 @@ describe('RemindersService', () => {
       in: jest.fn(() => staleUpdateChain),
     };
     const reminderJobsTable = {
-      select: jest
-        .fn()
-        .mockReturnValueOnce(existingChain)
-        .mockReturnValueOnce(staleChain),
+      select: jest.fn((columns?: string) =>
+        String(columns ?? '').includes('status') ? existingChain : staleChain,
+      ),
       upsert: jest.fn(async () => ({ error: null })),
       update: jest.fn(() => staleUpdateChain),
     };
@@ -135,6 +155,8 @@ describe('RemindersService', () => {
             return { select: jest.fn(() => accountChain) };
           case 'class_schedules':
             return { select: jest.fn(() => schedulesChain) };
+          case 'learning_spaces':
+            return { select: jest.fn(() => learningSpacesChain) };
           case 'reminder_jobs':
             return reminderJobsTable;
           default:
@@ -269,6 +291,64 @@ describe('RemindersService', () => {
     );
   });
 
+  it('skips and cancels reminder jobs after a classroom archive cutoff', async () => {
+    const { reminderJobsTable, supabase } = makeCompileSupabase({
+      scheduleRows: [
+        buildScheduleRow({
+          source_learning_space: {
+            status: 'archived',
+            archived_at: '2030-03-06T09:00:00.000Z',
+          },
+        }),
+      ],
+      staleRows: [
+        {
+          id: 'stale-after-archive',
+          dedupe_key:
+            'session.feedback_request:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z',
+        },
+      ],
+    });
+    createSupabaseServiceClientMock.mockReturnValue(supabase as never);
+
+    const service = new RemindersService(analytics as never);
+    const result = await service.compileLearningSpaceReminderJobs('token-1', {
+      orgId: 'org-1',
+      learningSpaceId: 'space-1',
+    });
+
+    expect(result).toEqual({ compiledCount: 0, canceledCount: 1 });
+    expect(reminderJobsTable.upsert).not.toHaveBeenCalled();
+  });
+
+  it('keeps reminder jobs before or on the classroom archive cutoff', async () => {
+    const { reminderJobsTable, supabase } = makeCompileSupabase({
+      scheduleRows: [
+        buildScheduleRow({
+          source_learning_space: {
+            status: 'archived',
+            archived_at: '2030-03-06T10:00:00.000Z',
+          },
+        }),
+      ],
+    });
+    createSupabaseServiceClientMock.mockReturnValue(supabase as never);
+
+    const service = new RemindersService(analytics as never);
+    await service.compileLearningSpaceReminderJobs('token-1', {
+      orgId: 'org-1',
+      learningSpaceId: 'space-1',
+    });
+
+    const compiledRows = reminderJobsTable.upsert.mock.calls[0]?.[0] as Array<{
+      job_type: string;
+    }>;
+    expect(compiledRows.map((row) => row.job_type)).toEqual([
+      'session.reminder',
+      'session.reminder',
+    ]);
+  });
+
   it('cancels pending, leased, and failed learning-space reminder jobs', async () => {
     const accountChain = makeChain({ data: { id: 'account-1' }, error: null });
     const updateChain = {
@@ -358,6 +438,12 @@ describe('RemindersService', () => {
             return { select: jest.fn(() => profilesSelectChain) };
           case 'reminder_jobs':
             return { update: jest.fn(() => reminderJobsUpdateChain) };
+          case 'learning_spaces':
+            return {
+              select: jest.fn(() =>
+                makeChain({ data: { status: 'active', archived_at: null }, error: null }),
+              ),
+            };
           case 'reminder_dispatch_logs':
             return { insert: jest.fn(async () => ({ error: null })) };
           case 'class_schedules':
@@ -453,6 +539,12 @@ describe('RemindersService', () => {
             return { select: jest.fn(() => profilesSelectChain) };
           case 'reminder_jobs':
             return { update: reminderJobsUpdate };
+          case 'learning_spaces':
+            return {
+              select: jest.fn(() =>
+                makeChain({ data: { status: 'active', archived_at: null }, error: null }),
+              ),
+            };
           case 'reminder_dispatch_logs':
             return { insert: dispatchLogsInsert };
           default:

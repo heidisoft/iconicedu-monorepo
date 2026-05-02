@@ -34,6 +34,8 @@ export type EventSourceVM =
       learningSpaceId: UUID;
       channelId?: UUID;
       sessionId?: UUID;
+      archivedAt?: ISODateTime | null;
+      learningSpaceStatus?: string | null;
     }
   | { kind: 'availability_block'; ownerUserId: UUID }
   | {
@@ -168,4 +170,63 @@ export interface ClassScheduleInstanceVM {
 
   participants: ClassScheduleParticipantVM[];
   source: EventSourceVM;
+}
+
+export type ArchiveAwareClassScheduleVM = ClassScheduleVM & {
+  uiState?: {
+    kind?: 'default' | 'exception' | 'override';
+    disabled?: boolean;
+    reason?: string | null;
+    originalStartAt?: string;
+    originalEndAt?: string;
+  };
+};
+
+export function getClassScheduleArchiveCutoff(
+  schedule: Pick<ClassScheduleVM, 'source'>,
+): ISODateTime | null {
+  if (schedule.source.kind !== 'class_session') return null;
+  return schedule.source.archivedAt ?? null;
+}
+
+export function isClassScheduleArchived(
+  schedule: Pick<ClassScheduleVM, 'source'>,
+): boolean {
+  if (schedule.source.kind !== 'class_session') return false;
+  return Boolean(
+    schedule.source.archivedAt || schedule.source.learningSpaceStatus === 'archived',
+  );
+}
+
+export function isClassScheduleAfterArchiveCutoff(
+  schedule: Pick<ClassScheduleVM, 'source' | 'startAt'>,
+): boolean {
+  const archivedAt = getClassScheduleArchiveCutoff(schedule);
+  if (!archivedAt) return false;
+
+  const startMs = new Date(schedule.startAt).getTime();
+  const archivedMs = new Date(archivedAt).getTime();
+  if (!Number.isFinite(startMs) || !Number.isFinite(archivedMs)) return false;
+
+  return startMs > archivedMs;
+}
+
+export function applyArchiveCutoffToDisplaySchedules<
+  T extends ArchiveAwareClassScheduleVM,
+>(schedules: T[]): T[] {
+  return schedules
+    .filter((schedule) => !isClassScheduleAfterArchiveCutoff(schedule))
+    .map((schedule) => {
+      if (!isClassScheduleArchived(schedule)) return schedule;
+
+      return {
+        ...schedule,
+        meetingLink: null,
+        uiState: {
+          ...schedule.uiState,
+          disabled: true,
+          reason: schedule.uiState?.reason ?? 'Classroom archived',
+        },
+      };
+    });
 }

@@ -128,6 +128,22 @@ export async function updateClassScheduleSessionAction(
     throw new Error('Session not found.');
   }
 
+  const { data: learningSpaceRow, error: learningSpaceError } = await serviceSupabase
+    .from('learning_spaces')
+    .select('status, archived_at')
+    .eq('id', scheduleRow.source_learning_space_id)
+    .eq('org_id', org.id)
+    .is('deleted_at', null)
+    .maybeSingle<{ status: string | null; archived_at: string | null }>();
+
+  if (learningSpaceError) {
+    throw new Error(learningSpaceError.message);
+  }
+
+  if (learningSpaceRow?.archived_at || learningSpaceRow?.status === 'archived') {
+    throw new Error('Archived classrooms cannot be changed.');
+  }
+
   const detail = await getLearningSpaceDetail(scheduleRow.source_learning_space_id);
   const targetSchedule = detail.schedules.find(
     (schedule) => schedule.id === input.scheduleId,

@@ -62,11 +62,17 @@ function mapClassScheduleRow(row: Record<string, unknown>): ClassScheduleVM {
   let source: EventSourceVM;
   const sourceKind = row.source_kind as string;
   if (sourceKind === 'class_session') {
+    const sourceLearningSpace = row.source_learning_space as
+      | Record<string, unknown>
+      | null
+      | undefined;
     source = {
       kind: 'class_session',
       learningSpaceId: row.source_learning_space_id as string,
       channelId: (row.source_channel_id as string | null) ?? undefined,
       sessionId: (row.source_session_id as string | null) ?? undefined,
+      archivedAt: (sourceLearningSpace?.archived_at as string | null) ?? null,
+      learningSpaceStatus: (sourceLearningSpace?.status as string | null) ?? null,
     };
   } else if (sourceKind === 'availability_block') {
     source = {

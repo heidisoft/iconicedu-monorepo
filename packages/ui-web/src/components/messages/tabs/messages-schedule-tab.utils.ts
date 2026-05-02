@@ -1,4 +1,8 @@
-import type { ClassScheduleVM } from '@iconicedu/shared-types';
+import type {
+  ArchiveAwareClassScheduleVM,
+  ClassScheduleVM,
+} from '@iconicedu/shared-types';
+import { applyArchiveCutoffToDisplaySchedules } from '@iconicedu/shared-types';
 import { getLocalDate } from '@iconicedu/utils';
 import { expandRecurringEvents } from '@iconicedu/ui-web/lib/class-schedule-utils';
 import {
@@ -24,15 +28,7 @@ export interface MonthScheduleGroup {
   schedules: DisplaySchedule[];
 }
 
-export interface DisplaySchedule extends ClassScheduleVM {
-  uiState?: {
-    kind?: 'default' | 'exception' | 'override';
-    disabled?: boolean;
-    reason?: string | null;
-    originalStartAt?: string;
-    originalEndAt?: string;
-  };
-}
+export type DisplaySchedule = ArchiveAwareClassScheduleVM;
 
 function getScheduleDisplayTimezoneInput(
   schedule: Pick<DisplaySchedule, 'timezone' | 'recurrence'>,
@@ -262,7 +258,7 @@ export function expandSchedulesForDisplay(
     uiState: { kind: 'default' },
   }));
   if (!recurring.length) {
-    return normalizedNonRecurring;
+    return applyArchiveCutoffToDisplaySchedules(normalizedNonRecurring);
   }
 
   const { rangeStart, rangeEnd } = getRecurringDisplayRange(schedules, now);
@@ -316,9 +312,11 @@ export function expandSchedulesForDisplay(
     };
   });
 
-  return dedupeDisplaySchedules(
-    [...normalizedNonRecurring, ...normalizedRecurring],
-    recurringById,
+  return applyArchiveCutoffToDisplaySchedules(
+    dedupeDisplaySchedules(
+      [...normalizedNonRecurring, ...normalizedRecurring],
+      recurringById,
+    ),
   );
 }
 

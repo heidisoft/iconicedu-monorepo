@@ -63,6 +63,34 @@ describe('messages-schedule-tab.utils', () => {
     expect(past).toHaveLength(0);
   });
 
+  it('keeps archived classroom history but removes future archived sessions', () => {
+    const now = new Date('2026-03-04T10:00:00.000Z');
+    const beforeArchive = {
+      ...buildSchedule('before', '2026-03-01T10:00:00.000Z'),
+      source: {
+        kind: 'class_session' as const,
+        learningSpaceId: 'space-1',
+        channelId: 'channel-1',
+        archivedAt: '2026-03-02T10:00:00.000Z',
+        learningSpaceStatus: 'archived',
+      },
+    };
+    const afterArchive = {
+      ...buildSchedule('after', '2026-03-03T10:00:00.000Z'),
+      source: beforeArchive.source,
+    };
+
+    const { upcoming, past } = splitSchedulesByTimeline(
+      [beforeArchive, afterArchive],
+      now,
+    );
+
+    expect(upcoming).toHaveLength(0);
+    expect(past.map((item) => item.ids.id)).toEqual(['before']);
+    expect(past[0]?.uiState?.disabled).toBe(true);
+    expect(past[0]?.meetingLink).toBeNull();
+  });
+
   it('formats status labels', () => {
     expect(formatScheduleStatus('scheduled')).toBe('Scheduled');
     expect(formatScheduleStatus('rescheduled')).toBe('Rescheduled');

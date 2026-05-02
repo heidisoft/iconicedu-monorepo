@@ -128,6 +128,24 @@ function createServiceSupabaseStub(input?: {
         };
       }
 
+      if (table === 'learning_spaces') {
+        return {
+          select() {
+            return this;
+          },
+          eq() {
+            return this;
+          },
+          is() {
+            return this;
+          },
+          maybeSingle: async () => ({
+            data: { status: 'active', archived_at: null },
+            error: null,
+          }),
+        };
+      }
+
       if (table === 'channel_members') {
         const filters: { profileIds?: string[] } = {};
         return {

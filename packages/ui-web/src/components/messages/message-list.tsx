@@ -641,7 +641,7 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                               className="my-2"
                             />
                           )}
-                          <div className="flex w-full items-start gap-3 py-0.5">
+                          <div className="flex w-full items-start gap-2.5 py-0.5">
                             <AvatarWithStatus
                               accountId={reply.core.sender.ids.accountId}
                               profileId={reply.core.sender.ids.id}
@@ -655,13 +655,14 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                                 reply.core.sender.location,
                               )}
                               about={reply.core.sender.profile.bio ?? null}
-                              sizeClassName="h-9 w-9 rounded-full"
-                              fallbackClassName="text-sm"
+                              sizeClassName="h-8 w-8 rounded-full"
+                              statusClassName="bottom-0 right-0 h-2 w-2"
+                              fallbackClassName="text-xs"
                               onProfileClick={() =>
                                 onProfileClick(reply.core.sender.ids.id)
                               }
                             />
-                            <div className="min-w-0 flex-1 rounded-xl border border-border bg-muted/45 px-4 py-3">
+                            <div className="min-w-0 flex-1 rounded-xl border border-border bg-muted/45 px-3 py-2.5">
                               <div className="flex items-start justify-between gap-2">
                                 <div className="min-w-0">
                                   <span className="block truncate text-sm font-semibold leading-tight text-foreground">
@@ -766,10 +767,10 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                                   </DropdownMenu>
                                 </div>
                               </div>
-                              <p className="mt-3 break-words text-left text-sm leading-6 text-foreground/85">
+                              <p className="mt-2 break-words text-left text-sm leading-6 text-foreground/85">
                                 {getInlineReplyPreview(reply)}
                               </p>
-                              <div className="mt-2 flex flex-wrap items-center gap-2">
+                              <div className="mt-2 flex flex-wrap items-center gap-1.5">
                                 <div
                                   className={cn(
                                     isReadOnly && 'pointer-events-none opacity-60',
@@ -778,6 +779,7 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                                   <ReactionBar
                                     reactions={reply.social.reactions}
                                     pendingEmojis={pendingReplyReactionEmojis}
+                                    size="compact"
                                     onToggleReaction={
                                       isReadOnly
                                         ? undefined
@@ -792,10 +794,10 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                                       variant="ghost"
                                       size="icon"
                                       disabled
-                                      className="h-7 w-7 rounded-full border border-border bg-background/60 text-muted-foreground"
+                                      className="h-6 w-6 rounded-full border border-border bg-background/60 text-muted-foreground"
                                       aria-label="Add emoji"
                                     >
-                                      <SmilePlus className="h-4 w-4" />
+                                      <SmilePlus className="h-3.5 w-3.5" />
                                     </Button>
                                   ) : (
                                     <EmojiPicker
@@ -807,13 +809,13 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                                         variant="ghost"
                                         size="icon"
                                         disabled={isAddingReactionReply}
-                                        className="h-7 w-7 rounded-full border border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+                                        className="h-6 w-6 rounded-full border border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground"
                                         aria-label="Add emoji"
                                       >
                                         {isAddingReactionReply ? (
-                                          <Loader2 className="h-4 w-4 animate-spin" />
+                                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
                                         ) : (
-                                          <SmilePlus className="h-4 w-4" />
+                                          <SmilePlus className="h-3.5 w-3.5" />
                                         )}
                                       </Button>
                                     </EmojiPicker>
@@ -834,7 +836,7 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                           void handleSendInlineReply(message, inlineThread);
                         }}
                       >
-                        <div className="flex w-full items-start gap-3 pt-1">
+                        <div className="flex w-full items-start gap-2.5 pt-1">
                           {currentUserComposerProfile ? (
                             <AvatarWithStatus
                               accountId={currentUserComposerProfile.ids.accountId}
@@ -853,8 +855,9 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                                 currentUserComposerProfile.location,
                               )}
                               about={currentUserComposerProfile.profile.bio ?? null}
-                              sizeClassName="h-9 w-9 rounded-full"
-                              fallbackClassName="text-sm"
+                              sizeClassName="h-8 w-8 rounded-full"
+                              statusClassName="bottom-0 right-0 h-2 w-2"
+                              fallbackClassName="text-xs"
                               onProfileClick={
                                 currentUserId
                                   ? () => onProfileClick(currentUserId)
@@ -862,7 +865,7 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                               }
                             />
                           ) : null}
-                          <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-border bg-muted/45 px-3 py-2">
+                          <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-border bg-muted/45 px-3 py-1.5">
                             <Input
                               value={draftByParent[message.ids.id] ?? ''}
                               onChange={(event) =>

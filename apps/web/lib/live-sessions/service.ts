@@ -190,6 +190,30 @@ async function verifyChannelMembership(
   return Boolean(response.data?.[0]?.id);
 }
 
+async function assertLearningSpaceIsActionable(input: {
+  supabase: SupabaseServiceClient;
+  orgId: string;
+  learningSpaceId: string | null;
+}) {
+  if (!input.learningSpaceId) return;
+
+  const response = await input.supabase
+    .from('learning_spaces')
+    .select('status, archived_at')
+    .eq('org_id', input.orgId)
+    .eq('id', input.learningSpaceId)
+    .is('deleted_at', null)
+    .maybeSingle<{ status: string | null; archived_at: string | null }>();
+
+  if (response.error) {
+    throw new Error(response.error.message);
+  }
+
+  if (response.data?.archived_at || response.data?.status === 'archived') {
+    throw new Error('Archived classrooms cannot start or join live sessions');
+  }
+}
+
 async function resolveAuthorizedLiveSessionProfileIds(input: {
   supabase: SupabaseServiceClient;
   orgId: string;
@@ -610,6 +634,16 @@ export async function createOrJoinLiveSession(input: {
     orgId: channel.org_id,
     channelId: channel.id,
   });
+  const learningSpaceId =
+    channel.primary_entity_id ??
+    (scope.schedule?.source.kind === 'class_session'
+      ? scope.schedule.source.learningSpaceId
+      : null);
+  await assertLearningSpaceIsActionable({
+    supabase: input.serviceSupabase,
+    orgId: channel.org_id,
+    learningSpaceId,
+  });
 
   const activeSessionResponse = await getActiveLiveSession(
     input.serviceSupabase,
@@ -671,12 +705,6 @@ export async function createOrJoinLiveSession(input: {
   if (liveSessionConfig.provider === 'custom' && !joinPath) {
     throw new Error('Custom live session join URL is missing');
   }
-  const learningSpaceId =
-    channel.primary_entity_id ??
-    (scope.schedule?.source.kind === 'class_session'
-      ? scope.schedule.source.learningSpaceId
-      : null);
-
   const insertResponse = await input.serviceSupabase
     .from('channel_live_sessions')
     .insert({

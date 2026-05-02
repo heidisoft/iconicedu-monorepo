@@ -64,10 +64,12 @@ async function buildClassSchedulesFromRows(
   }
 
   const scheduleIds = scheduleRows.map((row) => row.id);
-  const [participantsResponse, recurrencesResponse] = await Promise.all([
-    getClassScheduleParticipantsByScheduleIds(supabase, orgId, scheduleIds),
-    getClassScheduleRecurrencesByScheduleIds(supabase, orgId, scheduleIds),
-  ]);
+  const [participantsResponse, recurrencesResponse, archiveMetadataBySpaceId] =
+    await Promise.all([
+      getClassScheduleParticipantsByScheduleIds(supabase, orgId, scheduleIds),
+      getClassScheduleRecurrencesByScheduleIds(supabase, orgId, scheduleIds),
+      loadLearningSpaceArchiveMetadata(supabase, orgId, scheduleRows),
+    ]);
 
   const participantsBySchedule = groupParticipantsBySchedule(
     participantsResponse.data ?? [],
@@ -78,12 +80,50 @@ async function buildClassSchedulesFromRows(
     recurrencesResponse.data ?? [],
   );
 
-  return scheduleRows.map((row) =>
-    mapClassScheduleRow(row, {
-      participants: participantsBySchedule.get(row.id) ?? [],
-      recurrence: recurrencesBySchedule.get(row.id) ?? null,
-    }),
+  return scheduleRows.map((row) => {
+    const sourceLearningSpace = row.source_learning_space_id
+      ? archiveMetadataBySpaceId.get(row.source_learning_space_id)
+      : null;
+    return mapClassScheduleRow(
+      {
+        ...row,
+        source_learning_space: sourceLearningSpace ?? null,
+      },
+      {
+        participants: participantsBySchedule.get(row.id) ?? [],
+        recurrence: recurrencesBySchedule.get(row.id) ?? null,
+      },
+    );
+  });
+}
+
+async function loadLearningSpaceArchiveMetadata(
+  supabase: SupabaseClient,
+  orgId: string,
+  scheduleRows: ClassScheduleRow[],
+) {
+  const learningSpaceIds = Array.from(
+    new Set(
+      scheduleRows
+        .map((row) => row.source_learning_space_id)
+        .filter((id): id is string => Boolean(id)),
+    ),
   );
+
+  if (!learningSpaceIds.length) {
+    return new Map<string, { status?: string | null; archived_at?: string | null }>();
+  }
+
+  const response = await supabase
+    .from('learning_spaces')
+    .select('id,status,archived_at')
+    .eq('org_id', orgId)
+    .in('id', learningSpaceIds)
+    .returns<
+      Array<{ id: string; status?: string | null; archived_at?: string | null }>
+    >();
+
+  return new Map((response.data ?? []).map((row) => [row.id, row]));
 }
 
 function groupParticipantsBySchedule(
