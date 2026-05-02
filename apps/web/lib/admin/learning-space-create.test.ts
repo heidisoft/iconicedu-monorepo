@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   createSupabaseServerClientMock,
   createSupabaseServiceClientMock,
-  compileLearningSpaceReminderJobsMock,
+  apiPostMock,
   requireParentActorContextMock,
   getAccountByAuthUserIdMock,
   getProfileByAccountIdMock,
@@ -11,7 +11,7 @@ const {
 } = vi.hoisted(() => ({
   createSupabaseServerClientMock: vi.fn(),
   createSupabaseServiceClientMock: vi.fn(),
-  compileLearningSpaceReminderJobsMock: vi.fn(),
+  apiPostMock: vi.fn(),
   requireParentActorContextMock: vi.fn(),
   getAccountByAuthUserIdMock: vi.fn(),
   getProfileByAccountIdMock: vi.fn(),
@@ -26,8 +26,8 @@ vi.mock('@iconicedu/web/lib/supabase/service', () => ({
   createSupabaseServiceClient: createSupabaseServiceClientMock,
 }));
 
-vi.mock('@iconicedu/web/lib/automation/reminder-jobs', () => ({
-  compileLearningSpaceReminderJobs: compileLearningSpaceReminderJobsMock,
+vi.mock('@iconicedu/web/lib/api/http-client', () => ({
+  createApiClient: vi.fn(() => ({ post: apiPostMock })),
 }));
 
 vi.mock('@iconicedu/web/lib/family-view/actor-context', () => ({
@@ -68,6 +68,7 @@ describe('createLearningSpaceFromPayload', () => {
       })),
     });
     createSupabaseServiceClientMock.mockReturnValue({});
+    apiPostMock.mockResolvedValue({ compiledCount: 3, canceledCount: 0 });
     getAccountByAuthUserIdMock.mockResolvedValue({
       data: { id: 'account-1', org_id: 'org-1' },
       error: null,
@@ -122,7 +123,10 @@ describe('createLearningSpaceFromPayload', () => {
       ],
     });
 
-    expect(compileLearningSpaceReminderJobsMock).toHaveBeenCalled();
+    expect(apiPostMock).toHaveBeenCalledWith('/reminders/learning-space/compile', {
+      orgId: 'org-1',
+      learningSpaceId: expect.any(String),
+    });
   });
 
   it('supports creating a learning space with multiple participants under the pruned activity model', async () => {

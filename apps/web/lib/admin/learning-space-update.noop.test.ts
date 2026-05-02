@@ -7,7 +7,7 @@ const {
   getAccountByAuthUserIdMock,
   getProfileByAccountIdMock,
   publishActivityEventMock,
-  compileLearningSpaceReminderJobsMock,
+  apiPostMock,
   ensureSystemProfileIdMock,
 } = vi.hoisted(() => ({
   createSupabaseServerClientMock: vi.fn(),
@@ -16,7 +16,7 @@ const {
   getAccountByAuthUserIdMock: vi.fn(),
   getProfileByAccountIdMock: vi.fn(),
   publishActivityEventMock: vi.fn(),
-  compileLearningSpaceReminderJobsMock: vi.fn(),
+  apiPostMock: vi.fn(),
   ensureSystemProfileIdMock: vi.fn(),
 }));
 
@@ -44,8 +44,8 @@ vi.mock('@iconicedu/web/lib/activity-feed/publisher/activity-publisher', () => (
   publishActivityEvent: publishActivityEventMock,
 }));
 
-vi.mock('@iconicedu/web/lib/automation/reminder-jobs', () => ({
-  compileLearningSpaceReminderJobs: compileLearningSpaceReminderJobsMock,
+vi.mock('@iconicedu/web/lib/api/http-client', () => ({
+  createApiClient: vi.fn(() => ({ post: apiPostMock })),
 }));
 
 vi.mock('@iconicedu/web/lib/automation/system-profile', () => ({
@@ -312,7 +312,7 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
     await updateLearningSpaceFromPayload('space-1', payload);
 
     expect(publishActivityEventMock).not.toHaveBeenCalled();
-    expect(compileLearningSpaceReminderJobsMock).not.toHaveBeenCalled();
+    expect(apiPostMock).not.toHaveBeenCalled();
     expect(ensureSystemProfileIdMock).not.toHaveBeenCalled();
   });
 
@@ -485,7 +485,7 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
 
     await updateLearningSpaceFromPayload('space-1', payload);
 
-    expect(compileLearningSpaceReminderJobsMock).not.toHaveBeenCalled();
+    expect(apiPostMock).not.toHaveBeenCalled();
     expect(publishActivityEventMock).not.toHaveBeenCalled();
   });
 
@@ -668,13 +668,11 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
 
     await updateLearningSpaceFromPayload('space-1', payload);
 
-    expect(compileLearningSpaceReminderJobsMock).toHaveBeenCalledTimes(1);
-    expect(compileLearningSpaceReminderJobsMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        orgId: 'org-1',
-        learningSpaceId: 'space-1',
-      }),
-    );
+    expect(apiPostMock).toHaveBeenCalledTimes(1);
+    expect(apiPostMock).toHaveBeenCalledWith('/reminders/learning-space/compile', {
+      orgId: 'org-1',
+      learningSpaceId: 'space-1',
+    });
     expect(publishActivityEventMock).not.toHaveBeenCalled();
 
     expect(logSpy).not.toHaveBeenCalled();
@@ -1433,7 +1431,7 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
     await updateLearningSpaceFromPayload('space-1', payload);
 
     expect(publishActivityEventMock).not.toHaveBeenCalled();
-    expect(compileLearningSpaceReminderJobsMock).not.toHaveBeenCalled();
+    expect(apiPostMock).not.toHaveBeenCalled();
     expect(ensureSystemProfileIdMock).not.toHaveBeenCalled();
   });
 
@@ -1649,7 +1647,7 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
     await updateLearningSpaceFromPayload('space-1', payload);
 
     expect(publishActivityEventMock).not.toHaveBeenCalled();
-    expect(compileLearningSpaceReminderJobsMock).not.toHaveBeenCalled();
+    expect(apiPostMock).not.toHaveBeenCalled();
     expect(ensureSystemProfileIdMock).not.toHaveBeenCalled();
   });
 });

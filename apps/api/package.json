@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "@iconicedu/shared-types": "workspace:*",
+    "@iconicedu/utils": "workspace:*",
     "@nestjs/common": "^11.1.9",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.1.18",
@@ -50,7 +51,8 @@
     "moduleNameMapper": {
       "^@iconicedu/api/(.*)$": "<rootDir>/src/$1",
       "^@iconicedu/shared-types/(.*)$": "<rootDir>/../../packages/shared-types/src/$1",
-      "^@iconicedu/shared-types$": "<rootDir>/../../packages/shared-types/src"
+      "^@iconicedu/shared-types$": "<rootDir>/../../packages/shared-types/src",
+      "^@iconicedu/utils$": "<rootDir>/../../packages/utils/src"
     }
   },
   "devDependencies": {
