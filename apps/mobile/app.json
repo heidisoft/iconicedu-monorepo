@@ -21,7 +21,10 @@
       "supportsTablet": true,
       "buildNumber": "1",
       "bundleIdentifier": "com.heidisoft.iconicedu",
-      "userInterfaceStyle": "automatic"
+      "userInterfaceStyle": "automatic",
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
