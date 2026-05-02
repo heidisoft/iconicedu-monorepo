@@ -10,11 +10,11 @@ import { FullWindowOverlay as RNFullWindowOverlay } from 'react-native-screens';
 
 const Dialog = DialogPrimitive.Root;
 
-const DialogTrigger = DialogPrimitive.Trigger;
+const DialogTrigger: typeof DialogPrimitive.Trigger = DialogPrimitive.Trigger;
 
 const DialogPortal = DialogPrimitive.Portal;
 
-const DialogClose = DialogPrimitive.Close;
+const DialogClose: typeof DialogPrimitive.Close = DialogPrimitive.Close;
 
 const FullWindowOverlay = Platform.OS === 'ios' ? RNFullWindowOverlay : React.Fragment;
 

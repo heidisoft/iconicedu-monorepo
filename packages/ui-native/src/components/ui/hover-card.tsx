@@ -9,7 +9,7 @@ import { FullWindowOverlay as RNFullWindowOverlay } from 'react-native-screens';
 
 const HoverCard = HoverCardPrimitive.Root;
 
-const HoverCardTrigger = HoverCardPrimitive.Trigger;
+const HoverCardTrigger: typeof HoverCardPrimitive.Trigger = HoverCardPrimitive.Trigger;
 
 const FullWindowOverlay = Platform.OS === 'ios' ? RNFullWindowOverlay : React.Fragment;
 

@@ -18,7 +18,8 @@ import { FullWindowOverlay as RNFullWindowOverlay } from 'react-native-screens';
 
 const DropdownMenu = DropdownMenuPrimitive.Root;
 
-const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
+const DropdownMenuTrigger: typeof DropdownMenuPrimitive.Trigger =
+  DropdownMenuPrimitive.Trigger;
 
 const DropdownMenuGroup = DropdownMenuPrimitive.Group;
 

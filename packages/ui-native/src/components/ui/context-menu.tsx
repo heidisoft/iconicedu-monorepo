@@ -17,7 +17,8 @@ import { FadeIn } from 'react-native-reanimated';
 import { FullWindowOverlay as RNFullWindowOverlay } from 'react-native-screens';
 
 const ContextMenu = ContextMenuPrimitive.Root;
-const ContextMenuTrigger = ContextMenuPrimitive.Trigger;
+const ContextMenuTrigger: typeof ContextMenuPrimitive.Trigger =
+  ContextMenuPrimitive.Trigger;
 const ContextMenuGroup = ContextMenuPrimitive.Group;
 const ContextMenuSub = ContextMenuPrimitive.Sub;
 const ContextMenuRadioGroup = ContextMenuPrimitive.RadioGroup;
