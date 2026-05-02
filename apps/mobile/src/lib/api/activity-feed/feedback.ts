@@ -79,6 +79,32 @@ export async function submitActivityFeedFeedback(
     comment: normalizeComment(input.comment),
   };
 
+  const { data: classroom, error: classroomError } = await supabase
+    .from('learning_spaces')
+    .select('status, archived_at')
+    .eq('org_id', payload.orgId)
+    .eq('id', payload.classroomId)
+    .is('deleted_at', null)
+    .maybeSingle<{ status: string | null; archived_at: string | null }>();
+
+  if (classroomError) {
+    throw new Error(classroomError.message);
+  }
+
+  const archivedAt = classroom?.archived_at ?? null;
+  const occurrenceMs = payload.occurrenceStartAt
+    ? new Date(payload.occurrenceStartAt).getTime()
+    : Number.POSITIVE_INFINITY;
+  const archivedMs = archivedAt ? new Date(archivedAt).getTime() : Number.NaN;
+  if (
+    (archivedAt || classroom?.status === 'archived') &&
+    (!Number.isFinite(occurrenceMs) ||
+      !Number.isFinite(archivedMs) ||
+      occurrenceMs > archivedMs)
+  ) {
+    throw new Error('Archived classrooms cannot receive feedback for future sessions');
+  }
+
   if (payload.sourceEventId) {
     const { data: activityItem, error: activityError } = await supabase
       .from('activity_feed_items')

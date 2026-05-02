@@ -91,6 +91,8 @@ export function mapClassScheduleRow(
           learningSpaceId: row.source_learning_space_id ?? '',
           channelId: row.source_channel_id ?? undefined,
           sessionId: row.source_session_id ?? undefined,
+          archivedAt: row.source_learning_space?.archived_at ?? null,
+          learningSpaceStatus: row.source_learning_space?.status ?? null,
         } satisfies EventSourceVM;
       case 'availability_block':
         return {

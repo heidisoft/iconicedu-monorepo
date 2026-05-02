@@ -26,6 +26,10 @@ export interface ClassScheduleRow {
   updated_by?: UUID | null;
   deleted_at?: ISODateTime | null;
   deleted_by?: UUID | null;
+  source_learning_space?: {
+    status?: string | null;
+    archived_at?: ISODateTime | null;
+  } | null;
 }
 
 export interface ClassScheduleParticipantRow {

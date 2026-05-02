@@ -1,9 +1,11 @@
 import type {
+  ArchiveAwareClassScheduleVM,
   ClassScheduleVM,
   ClassScheduleViewVM,
   RecurrenceVM,
   WeekdayVM,
 } from '@iconicedu/shared-types';
+import { applyArchiveCutoffToDisplaySchedules } from '@iconicedu/shared-types';
 import { getLocalDate, getLocalTime, toUtcFromLocal } from '@iconicedu/utils';
 import {
   formatScheduleDisplayTimeWithZone,
@@ -15,15 +17,7 @@ import {
 } from '@iconicedu/ui-web/lib/schedule-display-timezone';
 import { WEEKDAYS } from '@iconicedu/ui-web/lib/recurrence-types';
 
-export interface DisplayClassScheduleVM extends ClassScheduleVM {
-  uiState?: {
-    kind?: 'default' | 'exception' | 'override';
-    disabled?: boolean;
-    reason?: string | null;
-    originalStartAt?: string;
-    originalEndAt?: string;
-  };
-}
+export type DisplayClassScheduleVM = ArchiveAwareClassScheduleVM;
 
 function getScheduleTimezone(event: Pick<ClassScheduleVM, 'timezone' | 'recurrence'>) {
   return event.timezone ?? event.recurrence?.rule.timezone ?? 'UTC';
@@ -707,8 +701,10 @@ export const expandRecurringEvents = (
     }
   });
 
-  return dedupeExpandedEvents(expanded).filter((schedule) =>
-    isWithinRange(new Date(schedule.startAt), rangeStartDay, rangeEndDay),
+  return applyArchiveCutoffToDisplaySchedules(
+    dedupeExpandedEvents(expanded).filter((schedule) =>
+      isWithinRange(new Date(schedule.startAt), rangeStartDay, rangeEndDay),
+    ),
   );
 };
 

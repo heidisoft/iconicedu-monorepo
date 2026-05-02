@@ -81,6 +81,40 @@ function createRecurringServiceSupabase() {
         };
       }
 
+      if (table === 'learning_spaces') {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                is: vi.fn(() => ({
+                  maybeSingle: vi.fn(async () => ({
+                    data: { status: 'active', archived_at: null },
+                    error: null,
+                  })),
+                })),
+              })),
+            })),
+          })),
+        };
+      }
+
+      if (table === 'learning_spaces') {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                is: vi.fn(() => ({
+                  maybeSingle: vi.fn(async () => ({
+                    data: { status: 'active', archived_at: null },
+                    error: null,
+                  })),
+                })),
+              })),
+            })),
+          })),
+        };
+      }
+
       if (table === 'class_schedule_recurrence') {
         return {
           select: vi.fn(() => ({
@@ -135,10 +169,28 @@ function createRecurringServiceSupabase() {
 
 function createSingleServiceSupabase() {
   const updateSchedule = vi.fn(async () => ({ error: null }));
+  const activeLearningSpaceQuery = {
+    select: vi.fn(() => ({
+      eq: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          is: vi.fn(() => ({
+            maybeSingle: vi.fn(async () => ({
+              data: { status: 'active', archived_at: null },
+              error: null,
+            })),
+          })),
+        })),
+      })),
+    })),
+  };
 
   return {
     updateSchedule,
     from: vi.fn((table: string) => {
+      if (table === 'learning_spaces') {
+        return activeLearningSpaceQuery;
+      }
+
       if (table === 'class_schedules') {
         return {
           select: vi.fn(() => ({

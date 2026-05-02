@@ -51,7 +51,7 @@ export class SpacesService {
       .select(
         `
         channel_id,
-        space:learning_spaces!learning_space_id(id, title, icon_key, subject, status, deleted_at),
+        space:learning_spaces!learning_space_id(id, title, icon_key, subject, status, archived_at, deleted_at),
         channel:channels!channel_id(id, org_id, ui_theme_key, ui_defaults, updated_at)
         `,
       )
@@ -189,11 +189,13 @@ export class SpacesService {
         const space = row.space as {
           id?: string | null;
           status?: string | null;
+          archived_at?: string | null;
           deleted_at?: string | null;
         } | null;
         return (
           space &&
           !space.deleted_at &&
+          !space.archived_at &&
           (space.status === 'active' || space.status === 'paused')
         );
       })

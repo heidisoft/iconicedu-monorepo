@@ -96,6 +96,40 @@ describe('class-schedule-utils', () => {
     ).toEqual([['schedule-4', 'schedule-5'], ['schedule-6']]);
   });
 
+  it('hides recurring class occurrences after the classroom archive cutoff', () => {
+    const schedule: ClassScheduleVM = {
+      ...buildRecurringSchedule(),
+      recurrence: {
+        ids: { id: 'recurrence-1', orgId: 'org-1' },
+        rule: {
+          frequency: 'daily',
+          interval: 1,
+          count: 4,
+        },
+      },
+      source: {
+        kind: 'class_session',
+        learningSpaceId: 'space-1',
+        channelId: 'channel-1',
+        archivedAt: '2026-03-02T15:00:00.000Z',
+        learningSpaceStatus: 'archived',
+      },
+    };
+
+    const expanded = expandRecurringEvents(
+      [schedule],
+      new Date('2026-03-01T00:00:00.000Z'),
+      new Date('2026-03-05T00:00:00.000Z'),
+    );
+
+    expect(expanded.map((event) => event.startAt)).toEqual([
+      '2026-03-01T15:00:00.000Z',
+      '2026-03-02T15:00:00.000Z',
+    ]);
+    expect(expanded.every((event) => event.meetingLink === null)).toBe(true);
+    expect(expanded.every((event) => event.uiState?.disabled)).toBe(true);
+  });
+
   it('returns no overflow groups when all columns remain visible', () => {
     const events: ClassScheduleVM[] = [
       buildRecurringSchedule(),

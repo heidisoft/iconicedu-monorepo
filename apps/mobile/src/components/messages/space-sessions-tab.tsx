@@ -10,7 +10,11 @@ import {
 import { CalendarDays, ChevronDown, CheckCircle2 } from 'lucide-react-native';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
-import type { ClassScheduleVM } from '@iconicedu/shared-types';
+import type {
+  ArchiveAwareClassScheduleVM,
+  ClassScheduleVM,
+} from '@iconicedu/shared-types';
+import { applyArchiveCutoffToDisplaySchedules } from '@iconicedu/shared-types';
 import {
   ClassSession,
   SessionCard,
@@ -38,15 +42,7 @@ type MonthProgressStats = {
   completedCount: number;
 };
 
-export type DisplaySchedule = ClassScheduleVM & {
-  uiState?: {
-    kind: 'default' | 'exception' | 'override';
-    disabled?: boolean;
-    reason?: string | null;
-    originalStartAt?: string;
-    originalEndAt?: string;
-  };
-};
+export type DisplaySchedule = ArchiveAwareClassScheduleVM;
 
 // ─── Recurring expansion helpers ───────────────────────────────────────────────
 
@@ -243,7 +239,7 @@ export function expandRecurringSchedules(
     }
   }
 
-  return Array.from(deduped.values());
+  return applyArchiveCutoffToDisplaySchedules(Array.from(deduped.values()));
 }
 
 // ─── Split + group ──────────────────────────────────────────────────────────────

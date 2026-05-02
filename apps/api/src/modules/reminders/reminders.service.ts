@@ -13,6 +13,7 @@ import type {
   ReminderJobRow,
   WeekdayVM,
 } from '@iconicedu/shared-types';
+import { isClassScheduleAfterArchiveCutoff } from '@iconicedu/shared-types';
 import { getLocalDate, getLocalTime, toUtcFromLocal } from '@iconicedu/utils';
 import { randomUUID } from 'crypto';
 
@@ -87,6 +88,10 @@ type ClassScheduleRow = {
   updated_by?: string | null;
   deleted_at?: string | null;
   deleted_by?: string | null;
+  source_learning_space?: {
+    status?: string | null;
+    archived_at?: string | null;
+  } | null;
   participants?: Array<{
     id?: string;
     org_id: string;
@@ -199,7 +204,8 @@ export class RemindersService {
       now.getTime() + REMINDER_HORIZON_DAYS * 24 * 60 * 60 * 1000,
     );
     const occurrences = this.expandRecurringEvents(relevant, rangeStart, rangeEnd).filter(
-      (schedule) => schedule.status !== 'cancelled',
+      (schedule) =>
+        schedule.status !== 'cancelled' && !isClassScheduleAfterArchiveCutoff(schedule),
     );
 
     const dedupeKeys = new Set<string>();
@@ -250,6 +256,9 @@ export class RemindersService {
         if (reminderRunAt.getTime() <= now.getTime()) {
           continue;
         }
+        if (this.isJobRunAfterArchiveCutoff(occurrence, reminderRunAt)) {
+          continue;
+        }
         const reminderDedupe = this.buildSessionReminderDedupeKey({
           orgId: input.orgId,
           learningSpaceId: occurrence.source.learningSpaceId,
@@ -292,6 +301,13 @@ export class RemindersService {
         channelId: occurrence.source.channelId,
         occurrenceStart: occurrence.startAt,
       });
+      const feedbackRunAt = new Date(
+        feedbackBaseTime.getTime() + SESSION_FEEDBACK_OFFSET_MINUTES * 60 * 1000,
+      );
+      if (this.isJobRunAfterArchiveCutoff(occurrence, feedbackRunAt)) {
+        continue;
+      }
+
       dedupeKeys.add(feedbackDedupe);
       rows.push({
         org_id: input.orgId,
@@ -301,9 +317,7 @@ export class RemindersService {
         source_learning_space_id: occurrence.source.learningSpaceId,
         source_schedule_id: normalizedScheduleId,
         occurrence_start_at: occurrence.startAt,
-        run_at: new Date(
-          feedbackBaseTime.getTime() + SESSION_FEEDBACK_OFFSET_MINUTES * 60 * 1000,
-        ).toISOString(),
+        run_at: feedbackRunAt.toISOString(),
         timezone: occurrence.timezone ?? 'UTC',
         payload: { ...payload },
         dedupe_key: feedbackDedupe,
@@ -441,13 +455,18 @@ export class RemindersService {
 
     const claimed = (claimResponse.data ?? []) as ReminderJobRow[];
     let succeeded = 0;
+    let skipped = 0;
     let failed = 0;
     let deadLettered = 0;
 
     for (const job of claimed) {
       try {
-        await this.processReminderJob(job, supabase);
-        succeeded += 1;
+        const result = await this.processReminderJob(job, supabase);
+        if (result === 'skipped') {
+          skipped += 1;
+        } else {
+          succeeded += 1;
+        }
       } catch (error) {
         this.analytics.capture('api reminder job failed', {
           jobId: job.id,
@@ -510,6 +529,7 @@ export class RemindersService {
       runId,
       claimed: claimed.length,
       succeeded,
+      skipped,
       failed,
       deadLettered,
       durationMs,
@@ -520,7 +540,7 @@ export class RemindersService {
       claimed: claimed.length,
       succeeded,
       failed,
-      skipped: 0,
+      skipped,
       deadLettered,
       durationMs,
     };
@@ -573,7 +593,52 @@ export class RemindersService {
       throw new InternalServerErrorException(response.error.message);
     }
 
-    return (response.data ?? []).map((row) => this.mapClassScheduleRow(row));
+    const rows = await this.attachLearningSpaceArchiveMetadata(
+      supabase,
+      orgId,
+      response.data ?? [],
+    );
+
+    return rows.map((row) => this.mapClassScheduleRow(row));
+  }
+
+  private async attachLearningSpaceArchiveMetadata(
+    supabase: SupabaseServiceClient,
+    orgId: string,
+    rows: ClassScheduleRow[],
+  ): Promise<ClassScheduleRow[]> {
+    const learningSpaceIds = Array.from(
+      new Set(
+        rows
+          .map((row) => row.source_learning_space_id)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    );
+
+    if (!learningSpaceIds.length) {
+      return rows;
+    }
+
+    const response = await supabase
+      .from('learning_spaces')
+      .select('id,status,archived_at')
+      .eq('org_id', orgId)
+      .in('id', learningSpaceIds)
+      .returns<
+        Array<{ id: string; status?: string | null; archived_at?: string | null }>
+      >();
+
+    if (response.error) {
+      throw new InternalServerErrorException(response.error.message);
+    }
+
+    const byId = new Map((response.data ?? []).map((row) => [row.id, row]));
+    return rows.map((row) => ({
+      ...row,
+      source_learning_space: row.source_learning_space_id
+        ? (byId.get(row.source_learning_space_id) ?? null)
+        : null,
+    }));
   }
 
   private mapClassScheduleRow(row: ClassScheduleRow): ClassScheduleVM {
@@ -602,6 +667,8 @@ export class RemindersService {
         learningSpaceId: row.source_learning_space_id ?? '',
         channelId: row.source_channel_id ?? undefined,
         sessionId: row.source_session_id ?? undefined,
+        archivedAt: row.source_learning_space?.archived_at ?? null,
+        learningSpaceStatus: row.source_learning_space?.status ?? null,
       },
       recurrence: this.mapRecurrence(row.recurrence),
       audit: {
@@ -655,6 +722,16 @@ export class RemindersService {
     const marker = '__';
     const index = scheduleId.indexOf(marker);
     return index === -1 ? scheduleId : scheduleId.slice(0, index);
+  }
+
+  private isJobRunAfterArchiveCutoff(schedule: ClassScheduleVM, runAt: Date) {
+    if (schedule.source.kind !== 'class_session') return false;
+    const archivedAt = schedule.source.archivedAt;
+    if (!archivedAt) return false;
+
+    const archiveMs = new Date(archivedAt).getTime();
+    if (!Number.isFinite(archiveMs)) return false;
+    return runAt.getTime() > archiveMs;
   }
 
   private formatStartsInSummary(offsetMinutes: number) {
@@ -1097,11 +1174,45 @@ export class RemindersService {
     }
   }
 
-  private async processReminderJob(job: ReminderJobRow, supabase: SupabaseServiceClient) {
+  private async processReminderJob(
+    job: ReminderJobRow,
+    supabase: SupabaseServiceClient,
+  ): Promise<'succeeded' | 'skipped'> {
     const payload = (job.payload ?? {}) as ReminderJobPayload;
     const now = new Date().toISOString();
 
     const systemProfileId = await this.ensureSystemProfileId(supabase, job.org_id);
+    if (await this.shouldSkipReminderJobForArchivedClassroom(job, supabase, payload)) {
+      const updateResponse = await supabase
+        .from('reminder_jobs')
+        .update({
+          status: 'canceled',
+          lease_owner: null,
+          lease_until: null,
+          updated_at: now,
+          updated_by: systemProfileId,
+          last_error: null,
+        })
+        .eq('id', job.id)
+        .eq('org_id', job.org_id);
+
+      if (updateResponse.error) {
+        throw new Error(updateResponse.error.message);
+      }
+
+      await this.logDispatch({
+        supabase,
+        orgId: job.org_id,
+        jobId: job.id,
+        result: 'idempotent_hit',
+        details: {
+          skipped_reason: 'classroom_archived',
+          job_type: job.job_type,
+        },
+      });
+
+      return 'skipped';
+    }
 
     const eventType =
       job.job_type === 'session.feedback_request'
@@ -1173,5 +1284,47 @@ export class RemindersService {
       result: 'succeeded',
       details: { event_type: eventType },
     });
+
+    return 'succeeded';
+  }
+
+  private async shouldSkipReminderJobForArchivedClassroom(
+    job: ReminderJobRow,
+    supabase: SupabaseServiceClient,
+    payload: ReminderJobPayload,
+  ) {
+    const learningSpaceId = payload.learningSpaceId ?? job.source_learning_space_id;
+    if (!learningSpaceId) return false;
+
+    const response = await supabase
+      .from('learning_spaces')
+      .select('status, archived_at')
+      .eq('org_id', job.org_id)
+      .eq('id', learningSpaceId)
+      .is('deleted_at', null)
+      .maybeSingle<{ status: string | null; archived_at: string | null }>();
+
+    if (response.error) {
+      throw new Error(response.error.message);
+    }
+
+    const archivedAt = response.data?.archived_at ?? null;
+    if (!archivedAt && response.data?.status !== 'archived') return false;
+    if (!archivedAt) return true;
+
+    const archivedMs = new Date(archivedAt).getTime();
+    const runMs = new Date(job.run_at).getTime();
+    const occurrenceStart = payload.occurrenceStart ?? payload.startAt;
+    const occurrenceMs = occurrenceStart
+      ? new Date(occurrenceStart).getTime()
+      : Number.POSITIVE_INFINITY;
+
+    return (
+      !Number.isFinite(archivedMs) ||
+      !Number.isFinite(runMs) ||
+      !Number.isFinite(occurrenceMs) ||
+      runMs > archivedMs ||
+      occurrenceMs > archivedMs
+    );
   }
 }

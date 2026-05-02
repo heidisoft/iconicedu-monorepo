@@ -16,15 +16,18 @@ interface ReactionBarProps {
   reactions: ReactionVM[];
   onToggleReaction?: (emoji: string) => void;
   pendingEmojis?: string[];
+  size?: 'default' | 'compact';
 }
 
 export const ReactionBar = memo(function ReactionBar({
   reactions,
   onToggleReaction,
   pendingEmojis = [],
+  size = 'default',
 }: ReactionBarProps) {
   const hasReactions = reactions && reactions.length > 0;
   const pendingEmojiSet = new Set(pendingEmojis);
+  const isCompact = size === 'compact';
 
   const handleReactionClick = useCallback(
     (emoji: string) => {
@@ -40,7 +43,7 @@ export const ReactionBar = memo(function ReactionBar({
       }`}
     >
       <div className="overflow-visible">
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className={`flex flex-wrap items-center ${isCompact ? 'gap-1' : 'gap-1.5'}`}>
           {reactions.map((reaction, index) => {
             const isUserReaction = reaction.reactedByMe ?? false;
             const isPending = pendingEmojiSet.has(reaction.emoji);
@@ -53,7 +56,7 @@ export const ReactionBar = memo(function ReactionBar({
                       size="sm"
                       onClick={() => handleReactionClick(reaction.emoji)}
                       disabled={isPending}
-                      className={`h-7 min-w-[2.4rem] rounded-full border px-2 text-[12px] leading-none border-muted-foreground/20 transition-all duration-200 hover:scale-[1.03] ${
+                      className={`${isCompact ? 'h-6 min-w-8 px-1.5 text-[11px]' : 'h-7 min-w-[2.4rem] px-2 text-[12px]'} rounded-full border leading-none border-muted-foreground/20 transition-all duration-200 hover:scale-[1.03] ${
                         isUserReaction
                           ? 'bg-primary/10 text-primary border-primary/20'
                           : 'bg-background/60 text-foreground'
@@ -63,13 +66,17 @@ export const ReactionBar = memo(function ReactionBar({
                       }}
                       aria-label={`${reaction.emoji} reaction, ${reaction.count} ${reaction.count === 1 ? 'person' : 'people'}`}
                     >
-                      <span className="mr-1 text-[13px] leading-none">
+                      <span
+                        className={`${isCompact ? 'mr-0.5 text-[12px]' : 'mr-1 text-[13px]'} leading-none`}
+                      >
                         {reaction.emoji}
                       </span>
                       {isPending ? (
                         <Loader2 className="h-3 w-3 animate-spin" />
                       ) : (
-                        <span className="text-[13px] font-semibold tracking-tight leading-none">
+                        <span
+                          className={`${isCompact ? 'text-[12px]' : 'text-[13px]'} font-semibold tracking-tight leading-none`}
+                        >
                           {reaction.count}
                         </span>
                       )}

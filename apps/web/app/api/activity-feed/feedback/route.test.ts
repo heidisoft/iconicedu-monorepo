@@ -77,6 +77,22 @@ describe('POST /api/activity-feed/feedback', () => {
         if (table === 'channel_members') {
           return { select: vi.fn(() => channelMemberQuery) };
         }
+        if (table === 'learning_spaces') {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                eq: vi.fn(() => ({
+                  is: vi.fn(() => ({
+                    maybeSingle: vi.fn(async () => ({
+                      data: { status: 'active', archived_at: null },
+                      error: null,
+                    })),
+                  })),
+                })),
+              })),
+            })),
+          };
+        }
         if (table === 'class_session_feedback') {
           return { upsert: vi.fn(() => upsertQuery) };
         }
@@ -142,6 +158,22 @@ describe('POST /api/activity-feed/feedback', () => {
         }
         if (table === 'class_session_feedback') {
           return { upsert: vi.fn(() => upsertQuery) };
+        }
+        if (table === 'learning_spaces') {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                eq: vi.fn(() => ({
+                  is: vi.fn(() => ({
+                    maybeSingle: vi.fn(async () => ({
+                      data: { status: 'active', archived_at: null },
+                      error: null,
+                    })),
+                  })),
+                })),
+              })),
+            })),
+          };
         }
         throw new Error(`Unexpected table ${table}`);
       }),

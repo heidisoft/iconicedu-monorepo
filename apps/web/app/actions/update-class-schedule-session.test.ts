@@ -71,33 +71,50 @@ function createServerSupabase() {
 function createServiceSupabase() {
   return {
     from: vi.fn((table: string) => {
-      if (table !== 'class_schedules') {
-        throw new Error(`Unexpected table ${table}`);
-      }
-
-      return {
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
+      if (table === 'class_schedules') {
+        return {
+          select: vi.fn(() => ({
             eq: vi.fn(() => ({
-              is: vi.fn(() => ({
-                maybeSingle: vi.fn(async () => ({
-                  data: {
-                    id: 'schedule-1',
-                    org_id: 'org-1',
-                    source_learning_space_id: 'space-1',
-                    source_channel_id: 'channel-1',
-                    timezone: 'America/New_York',
-                    title: 'Algebra',
-                    start_at: '2026-03-21T14:00:00.000Z',
-                    end_at: '2026-03-21T15:00:00.000Z',
-                  },
-                  error: null,
+              eq: vi.fn(() => ({
+                is: vi.fn(() => ({
+                  maybeSingle: vi.fn(async () => ({
+                    data: {
+                      id: 'schedule-1',
+                      org_id: 'org-1',
+                      source_learning_space_id: 'space-1',
+                      source_channel_id: 'channel-1',
+                      timezone: 'America/New_York',
+                      title: 'Algebra',
+                      start_at: '2026-03-21T14:00:00.000Z',
+                      end_at: '2026-03-21T15:00:00.000Z',
+                    },
+                    error: null,
+                  })),
                 })),
               })),
             })),
           })),
-        })),
-      };
+        };
+      }
+
+      if (table === 'learning_spaces') {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                is: vi.fn(() => ({
+                  maybeSingle: vi.fn(async () => ({
+                    data: { status: 'active', archived_at: null },
+                    error: null,
+                  })),
+                })),
+              })),
+            })),
+          })),
+        };
+      }
+
+      throw new Error(`Unexpected table ${table}`);
     }),
   };
 }

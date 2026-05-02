@@ -390,10 +390,10 @@ export const MessageBase = memo(function MessageBase({
     >
       <div
         className={cn(
-          'relative flex w-full items-start gap-3',
+          'relative flex w-full items-start',
           isFeedTheme
-            ? 'max-w-[min(56rem,100%)] rounded-xl border border-border bg-muted/25 p-4'
-            : 'max-w-[min(78ch,85%)]',
+            ? 'max-w-[min(56rem,100%)] gap-3 rounded-xl border border-border bg-muted/25 px-3 py-3'
+            : 'max-w-[min(78ch,85%)] gap-3',
           !isFeedTheme && (isOwnMessage ? 'flex-row-reverse' : 'flex-row'),
         )}
       >
@@ -410,8 +410,10 @@ export const MessageBase = memo(function MessageBase({
             locationLabel={getAvatarLocationLabel(message.core.sender.location)}
             about={message.core.sender.profile.bio ?? null}
             sizeClassName={
-              isFeedTheme ? 'h-11 w-11 rounded-full' : 'h-9 w-9 rounded-full'
+              isFeedTheme ? 'h-10 w-10 rounded-full' : 'h-9 w-9 rounded-full'
             }
+            statusClassName={isFeedTheme ? 'bottom-0 right-0 h-2 w-2' : undefined}
+            fallbackClassName={isFeedTheme ? 'text-sm' : undefined}
             onProfileClick={handleProfileClick}
           />
         </div>
@@ -428,7 +430,7 @@ export const MessageBase = memo(function MessageBase({
             )}
           >
             {isFeedTheme ? (
-              <div className="flex w-full items-start gap-3">
+              <div className="flex w-full items-start gap-2.5">
                 <div className="min-w-0 flex-1">
                   <button
                     onClick={handleProfileClick}
@@ -569,12 +571,12 @@ export const MessageBase = memo(function MessageBase({
 
           <div
             className={cn(
-              'mt-2 flex flex-wrap items-center gap-2',
+              'mt-2 flex flex-wrap items-center',
               isFeedTheme
-                ? 'justify-start text-xs'
+                ? 'justify-start gap-1.5 text-xs'
                 : isOwnMessage
-                  ? 'justify-end'
-                  : 'justify-start',
+                  ? 'justify-end gap-2'
+                  : 'justify-start gap-2',
             )}
           >
             <div
@@ -586,6 +588,7 @@ export const MessageBase = memo(function MessageBase({
                   isInteractionDisabled ? undefined : handleToggleReaction
                 }
                 pendingEmojis={pendingReactionEmojis}
+                size={isFeedTheme ? 'compact' : 'default'}
               />
             </div>
 
@@ -596,10 +599,13 @@ export const MessageBase = memo(function MessageBase({
                     variant="ghost"
                     size="icon"
                     disabled
-                    className="h-7 w-7 rounded-full border border-border bg-background/60 text-muted-foreground"
+                    className={cn(
+                      'rounded-full border border-border bg-background/60 text-muted-foreground',
+                      isFeedTheme ? 'h-6 w-6' : 'h-7 w-7',
+                    )}
                     aria-label="Add emoji"
                   >
-                    <SmilePlus className="h-4 w-4" />
+                    <SmilePlus className={isFeedTheme ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
                   </Button>
                 ) : (
                   <EmojiPicker
@@ -609,13 +615,21 @@ export const MessageBase = memo(function MessageBase({
                       variant="ghost"
                       size="icon"
                       disabled={isAddingReaction}
-                      className="h-7 w-7 rounded-full border border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+                      className={cn(
+                        'rounded-full border border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground',
+                        isFeedTheme ? 'h-6 w-6' : 'h-7 w-7',
+                      )}
                       aria-label="Add emoji"
                     >
                       {isAddingReaction ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <Loader2
+                          className={cn(
+                            'animate-spin',
+                            isFeedTheme ? 'h-3.5 w-3.5' : 'h-4 w-4',
+                          )}
+                        />
                       ) : (
-                        <SmilePlus className="h-4 w-4" />
+                        <SmilePlus className={isFeedTheme ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
                       )}
                     </Button>
                   </EmojiPicker>
@@ -635,15 +649,22 @@ export const MessageBase = memo(function MessageBase({
                       onClick={handleThreadClick}
                       disabled={isInteractionDisabled || isThreadActionPending}
                       className={cn(
-                        'h-7 rounded-full border border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground',
-                        isFeedTheme ? 'gap-1 px-2' : 'w-7',
+                        'rounded-full border border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground',
+                        isFeedTheme ? 'h-6 gap-1 px-2 text-xs' : 'h-7 w-7',
                       )}
                       aria-label="Reply"
                     >
                       {isThreadActionPending ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <Loader2
+                          className={cn(
+                            'animate-spin',
+                            isFeedTheme ? 'h-3.5 w-3.5' : 'h-4 w-4',
+                          )}
+                        />
                       ) : (
-                        <MessageCircleReply className="h-4 w-4" />
+                        <MessageCircleReply
+                          className={isFeedTheme ? 'h-3.5 w-3.5' : 'h-4 w-4'}
+                        />
                       )}
                       {isFeedTheme ? <span>Reply</span> : null}
                     </Button>

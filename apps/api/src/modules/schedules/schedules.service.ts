@@ -1,5 +1,6 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
+import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 
 const CLASS_SCHEDULE_SELECT = `
   id, org_id, title, description, location, meeting_link,
@@ -33,7 +34,7 @@ export class SchedulesService {
 
     const { data, error } = await query;
     if (error) throw new InternalServerErrorException(error.message);
-    return data ?? [];
+    return this.attachLearningSpaceArchiveMetadata(input.orgId, data ?? []);
   }
 
   async createException(
@@ -53,5 +54,41 @@ export class SchedulesService {
       .single();
     if (error) throw new InternalServerErrorException(error.message);
     return data;
+  }
+
+  private async attachLearningSpaceArchiveMetadata(
+    orgId: string,
+    rows: Array<Record<string, unknown>>,
+  ) {
+    const learningSpaceIds = Array.from(
+      new Set(
+        rows
+          .map((row) => row.source_learning_space_id)
+          .filter((id): id is string => typeof id === 'string' && id.length > 0),
+      ),
+    );
+
+    if (!learningSpaceIds.length) {
+      return rows;
+    }
+
+    const { data, error } = await createSupabaseServiceClient()
+      .from('learning_spaces')
+      .select('id,status,archived_at')
+      .eq('org_id', orgId)
+      .in('id', learningSpaceIds);
+
+    if (error) {
+      return rows;
+    }
+
+    const byId = new Map((data ?? []).map((row) => [row.id, row]));
+    return rows.map((row) => ({
+      ...row,
+      source_learning_space:
+        typeof row.source_learning_space_id === 'string'
+          ? (byId.get(row.source_learning_space_id) ?? null)
+          : null,
+    }));
   }
 }

@@ -75,6 +75,35 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Comment is too long' }, { status: 400 });
   }
 
+  const classroomResponse = await supabase
+    .from('learning_spaces')
+    .select('status, archived_at')
+    .eq('org_id', actor.account.org_id)
+    .eq('id', body.classroomId)
+    .is('deleted_at', null)
+    .maybeSingle<{ status: string | null; archived_at: string | null }>();
+
+  if (classroomResponse.error) {
+    return NextResponse.json({ error: classroomResponse.error.message }, { status: 500 });
+  }
+
+  const archivedAt = classroomResponse.data?.archived_at ?? null;
+  const occurrenceMs = body.occurrenceStartAt
+    ? new Date(body.occurrenceStartAt).getTime()
+    : Number.POSITIVE_INFINITY;
+  const archivedMs = archivedAt ? new Date(archivedAt).getTime() : Number.NaN;
+  if (
+    (archivedAt || classroomResponse.data?.status === 'archived') &&
+    (!Number.isFinite(occurrenceMs) ||
+      !Number.isFinite(archivedMs) ||
+      occurrenceMs > archivedMs)
+  ) {
+    return NextResponse.json(
+      { error: 'Archived classrooms cannot receive feedback for future sessions' },
+      { status: 403 },
+    );
+  }
+
   if (body.sourceEventId) {
     const activityAccessResponse = await supabase
       .from('activity_feed_items')
