@@ -334,10 +334,10 @@ function FormattedText({
   isOwn?: boolean;
 }) {
   const segs = buildFmtSegments(text, mentions);
-  const mentionBg = isOwn ? 'rgba(255,255,255,0.25)' : '#e0f2fe';
-  const mentionColor = isOwn ? '#fff' : '#0369a1';
+  const mentionBg = '#e0f2fe';
+  const mentionColor = '#0369a1';
   return (
-    <Text style={style}>
+    <Text testID="message-text-content" style={style}>
       {segs.map((seg, i) => {
         if (seg.kind === 'bold')
           return (
@@ -1515,9 +1515,9 @@ function makeStyles(colors: AppColors) {
     row: {
       flexDirection: 'row',
       alignItems: 'flex-start',
-      paddingHorizontal: 12,
-      paddingVertical: 3,
-      gap: 8,
+      paddingHorizontal: 8,
+      paddingVertical: 8,
+      gap: 12,
     },
     rowOwn: { flexDirection: 'row-reverse' },
     rowGroupStart: { paddingTop: 12 },
@@ -1537,27 +1537,28 @@ function makeStyles(colors: AppColors) {
 
     // ── Message bubble ────────────────────────────────────────────────────────
     bubble: {
-      maxWidth: '85%',
-      borderRadius: 18,
-      paddingHorizontal: 14,
-      paddingVertical: 10,
+      width: '85%',
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
     },
     bubbleOther: {
-      backgroundColor: colors.card,
+      backgroundColor: 'rgba(148, 163, 184, 0.16)',
     },
     bubbleOwn: {
-      backgroundColor: colors.teal,
+      backgroundColor: 'rgba(45, 212, 168, 0.22)',
     },
 
     // ── Text inside bubble ────────────────────────────────────────────────────
     textContent: {
       width: '100%',
       flexShrink: 1,
-      fontSize: 15,
-      lineHeight: 22,
+      flexWrap: 'wrap',
+      fontSize: 14,
+      lineHeight: 20,
       color: colors.text,
     },
-    textContentOwn: { color: '#fff' },
+    textContentOwn: { color: colors.text },
     emojiOnlyTextContent: {
       fontSize: 36,
       lineHeight: 42,
@@ -1567,16 +1568,16 @@ function makeStyles(colors: AppColors) {
     // width:'85%' (not maxWidth) gives a definite pixel width → flex:1 inside rows resolves
     fileBubble: {
       width: '85%' as const,
-      borderRadius: 18,
-      paddingHorizontal: 14,
-      paddingVertical: 10,
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
     },
     fileCaptionBubble: {
       width: '85%' as const,
       maxWidth: '85%' as const,
-      borderRadius: 18,
-      paddingHorizontal: 14,
-      paddingVertical: 10,
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
     },
     // File list: standalone card matching web "max-w-sm rounded-xl border border-border bg-muted/30"
     fileListWrap: {
@@ -2894,7 +2895,10 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           ) : type === 'link-preview' ? (
             renderLinkContent()
           ) : (
-            <View style={[s.bubble, ownInChannel ? s.bubbleOwn : s.bubbleOther]}>
+            <View
+              testID="message-bubble"
+              style={[s.bubble, ownInChannel ? s.bubbleOwn : s.bubbleOther]}
+            >
               {renderBubbleContent()}
             </View>
           )}

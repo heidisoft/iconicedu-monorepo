@@ -6,7 +6,7 @@ import {
   waitFor,
   within,
 } from '@testing-library/react-native';
-import { FlatList } from 'react-native';
+import { FlatList, StyleSheet } from 'react-native';
 import type {
   AudioRecordingMessageVM,
   FileAttachmentVM,
@@ -203,6 +203,34 @@ describe('FeedMessageList', () => {
     expect(screen.getByTestId('feed-message-post')).toBeTruthy();
     expect(screen.getByText('Happy Friday!')).toBeTruthy();
     expect(screen.getByText('Tutor')).toBeTruthy();
+  });
+
+  it('uses the mobile DM bubble colors for feed text cards', () => {
+    render(
+      <FeedMessageList
+        messages={[
+          makeTextMessage('msg-other', 'Incoming feed note.', {
+            senderId: 'profile-other',
+          }),
+          makeTextMessage('msg-own', 'My feed note.', {
+            senderId: 'profile-current',
+          }),
+        ]}
+        currentProfileId="profile-current"
+      />,
+    );
+
+    const cards = screen.getAllByTestId('feed-text-card');
+    expect(StyleSheet.flatten(cards[0].props.style)).toEqual(
+      expect.objectContaining({
+        backgroundColor: 'rgba(148, 163, 184, 0.16)',
+      }),
+    );
+    expect(StyleSheet.flatten(cards[1].props.style)).toEqual(
+      expect.objectContaining({
+        backgroundColor: 'rgba(45, 212, 168, 0.22)',
+      }),
+    );
   });
 
   it('renders pending uploads in the footer near latest feed content', () => {

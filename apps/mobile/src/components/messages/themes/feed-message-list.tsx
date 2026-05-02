@@ -77,6 +77,8 @@ const FEED = {
   muted: '#8B9098',
   border: '#E5E7EB',
   blue: '#4F7DF3',
+  bubbleOther: 'rgba(148, 163, 184, 0.16)',
+  bubbleOwn: 'rgba(45, 212, 168, 0.22)',
   gap: 16,
   radius: 12,
   avatar: 44,
@@ -898,9 +900,11 @@ function FeedAudioPlayer({ message }: { message: AudioRecordingMessageVM }) {
 function FeedContentCard({
   message,
   compact = false,
+  isOwn = false,
 }: {
   message: MessageVM;
   compact?: boolean;
+  isOwn?: boolean;
 }) {
   let text = getMessageText(message);
   if (message.core.type === 'link-preview') {
@@ -910,7 +914,14 @@ function FeedContentCard({
   if (!text) return null;
   const emojiOnly = isEmojiOnlyText(text);
   return (
-    <View style={[styles.textCard, compact && styles.commentTextCard]}>
+    <View
+      testID="feed-text-card"
+      style={[
+        styles.textCard,
+        isOwn ? styles.ownBubbleCard : styles.otherBubbleCard,
+        compact && styles.commentTextCard,
+      ]}
+    >
       <View style={styles.captionTextWrap}>
         <FeedText
           text={text}
@@ -961,6 +972,7 @@ function FeedActions({
 
 function FeedComment({
   message,
+  currentProfileId,
   onReactionToggle,
   onThreadPress,
   onProfilePress,
@@ -969,6 +981,7 @@ function FeedComment({
   presenceStatus,
 }: {
   message: MessageVM;
+  currentProfileId?: string;
   onReactionToggle?: (messageId: string, emoji: string) => void;
   onThreadPress?: () => void;
   onProfilePress?: (user: MessageVM['core']['sender']) => void;
@@ -979,6 +992,9 @@ function FeedComment({
   const senderName = message.core.sender.profile.displayName;
   const { url, seed } = getAvatarInfo(message);
   const handleProfilePress = () => onProfilePress?.(message.core.sender);
+  const isOwn = Boolean(
+    currentProfileId && message.core.sender.ids.id === currentProfileId,
+  );
   return (
     <Pressable
       testID="feed-comment-card"
@@ -1004,7 +1020,13 @@ function FeedComment({
         />
       </TouchableOpacity>
       <View style={styles.commentBody}>
-        <View style={styles.commentCard}>
+        <View
+          testID="feed-comment-bubble"
+          style={[
+            styles.commentCard,
+            isOwn ? styles.ownBubbleCard : styles.otherBubbleCard,
+          ]}
+        >
           <View style={styles.commentHeaderRow}>
             <View style={{ flex: 1, minWidth: 0 }}>
               <TouchableOpacity
@@ -1220,7 +1242,10 @@ function FeedPost({
           <FeedAudioPlayer message={message as AudioRecordingMessageVM} />
         ) : null}
         {!isRichMessageType(message.core.type) ? (
-          <FeedContentCard message={message} />
+          <FeedContentCard
+            message={message}
+            isOwn={message.core.sender.ids.id === currentProfileId}
+          />
         ) : null}
         <FeedActions
           message={message}
@@ -1245,6 +1270,7 @@ function FeedPost({
                     ) : null}
                     <FeedComment
                       message={reply}
+                      currentProfileId={currentProfileId}
                       presenceStatus={
                         presenceByProfileId.get(reply.core.sender.ids.id) ?? null
                       }
@@ -1300,6 +1326,7 @@ export const FeedMessageList: React.FC<FeedMessageListProps> = ({
   const contentHeightRef = React.useRef(0);
   const reactionStartContentHeightRef = React.useRef(0);
   const preserveOffsetAfterReactionRef = React.useRef(false);
+  const isNearLatestRef = React.useRef(true);
   const [preserveVisibleContent, setPreserveVisibleContent] = useState(false);
   const sortedMessages = useMemo(
     () =>
@@ -1394,10 +1421,13 @@ export const FeedMessageList: React.FC<FeedMessageListProps> = ({
 
   const handleScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      scrollOffsetRef.current = event.nativeEvent.contentOffset.y;
+      const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+      scrollOffsetRef.current = contentOffset.y;
+      isNearLatestRef.current =
+        contentOffset.y + layoutMeasurement.height >= contentSize.height - 80;
       if (!didInitialScrollRef.current) return;
       if (!onLoadMore || isLoadingOlderRef.current) return;
-      if (event.nativeEvent.contentOffset.y > 40) return;
+      if (contentOffset.y > 40) return;
 
       isLoadingOlderRef.current = true;
       setPreserveVisibleContent(true);
@@ -1486,20 +1516,28 @@ export const FeedMessageList: React.FC<FeedMessageListProps> = ({
       onContentSizeChange={(_, contentHeight) => {
         if (preserveOffsetAfterReactionRef.current) {
           preserveOffsetAfterReactionRef.current = false;
-          const heightDelta = contentHeight - reactionStartContentHeightRef.current;
           const offset = scrollOffsetRef.current;
+          const previousContentHeight = reactionStartContentHeightRef.current;
           contentHeightRef.current = contentHeight;
           requestAnimationFrame(() => {
             flatListRef.current?.scrollToOffset({
-              offset: Math.max(0, offset + Math.max(0, heightDelta)),
+              offset: Math.max(0, offset),
               animated: false,
             });
           });
+          if (isNearLatestRef.current && contentHeight > previousContentHeight) {
+            scrollToLatest(false);
+          }
           return;
         }
+        const previousContentHeight = contentHeightRef.current;
         contentHeightRef.current = contentHeight;
         if (pendingScrollToLatestRef.current) {
           scrollToLatest(didInitialScrollRef.current);
+          return;
+        }
+        if (isNearLatestRef.current && contentHeight > previousContentHeight) {
+          scrollToLatest(false);
         }
       }}
       maintainVisibleContentPosition={
@@ -1691,12 +1729,15 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     width: '100%',
     maxWidth: '100%',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: FEED.border,
-    borderRadius: 10,
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  otherBubbleCard: {
+    backgroundColor: FEED.bubbleOther,
+  },
+  ownBubbleCard: {
+    backgroundColor: FEED.bubbleOwn,
   },
   feedText: {
     width: '100%',
@@ -1711,8 +1752,8 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   commentTextCard: {
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   fileCard: {
     overflow: 'hidden',
@@ -1825,12 +1866,9 @@ const styles = StyleSheet.create({
     gap: 0,
   },
   commentCard: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: FEED.border,
-    borderRadius: 10,
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   commentHeaderRow: {
     flexDirection: 'row',

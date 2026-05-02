@@ -646,6 +646,7 @@ export const MessageList: React.FC<MessageListProps> = ({
       renderItem={renderItem}
       keyExtractor={keyExtractor}
       inverted
+      style={{ flex: 1 }}
       contentContainerStyle={{ paddingVertical: 8, flexGrow: 1 }}
       onRefresh={onRefresh}
       refreshing={refreshing}
@@ -659,20 +660,32 @@ export const MessageList: React.FC<MessageListProps> = ({
       }}
       scrollEventThrottle={120}
       onContentSizeChange={(_, contentHeight) => {
-        if (!preserveOffsetAfterReactionRef.current) {
+        if (preserveOffsetAfterReactionRef.current) {
+          preserveOffsetAfterReactionRef.current = false;
+          const offset = scrollOffsetRef.current;
+          const previousContentHeight = reactionStartContentHeightRef.current;
           contentHeightRef.current = contentHeight;
+          requestAnimationFrame(() => {
+            flatListRef.current?.scrollToOffset({
+              offset: Math.max(0, offset),
+              animated: false,
+            });
+          });
+          if (isNearBottomRef.current && contentHeight > previousContentHeight) {
+            requestAnimationFrame(() => {
+              flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+            });
+          }
           return;
         }
-        preserveOffsetAfterReactionRef.current = false;
-        const heightDelta = contentHeight - reactionStartContentHeightRef.current;
-        const offset = scrollOffsetRef.current;
+
+        const previousContentHeight = contentHeightRef.current;
         contentHeightRef.current = contentHeight;
-        requestAnimationFrame(() => {
-          flatListRef.current?.scrollToOffset({
-            offset: Math.max(0, offset + Math.max(0, heightDelta)),
-            animated: false,
+        if (isNearBottomRef.current && contentHeight > previousContentHeight) {
+          requestAnimationFrame(() => {
+            flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
           });
-        });
+        }
       }}
       // In an inverted FlatList, ListHeaderComponent renders at the VISUAL BOTTOM —
       // perfect for pending uploads that appear just above the input bar.

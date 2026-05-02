@@ -1,5 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 import { MessageItem } from '@/components/messages/message-item';
 import type { MessageVM } from '@iconicedu/shared-types';
 import { lightColors as LIGHT } from '@/lib/theme';
@@ -185,6 +186,27 @@ describe('MessageItem', () => {
       <MessageItem message={baseMessage} isOwn={false} isGroupStart colors={colors} />,
     );
     expect(screen.getByText('Hello world')).toBeTruthy();
+  });
+
+  it('gives long text messages a definite bubble width so they wrap on mobile', () => {
+    const longMessage = {
+      ...baseMessage,
+      ids: { ...baseMessage.ids, id: 'msg-long' },
+      content: {
+        text: 'Andrea is doing well getting started. She listens carefully and keeps building confidence through the lesson.',
+      },
+    } as unknown as MessageVM;
+
+    render(
+      <MessageItem message={longMessage} isOwn={false} isGroupStart colors={colors} />,
+    );
+
+    expect(StyleSheet.flatten(screen.getByTestId('message-bubble').props.style)).toEqual(
+      expect.objectContaining({ width: '85%', borderRadius: 12 }),
+    );
+    expect(
+      StyleSheet.flatten(screen.getByTestId('message-text-content').props.style),
+    ).toEqual(expect.objectContaining({ flexWrap: 'wrap', fontSize: 14, width: '100%' }));
   });
 
   it('renders sender name when isGroupStart is true', () => {
