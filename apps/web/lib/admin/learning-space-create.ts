@@ -1,9 +1,8 @@
 import { randomUUID } from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+import { createApiClient } from '@iconicedu/web/lib/api/http-client';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
-import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
-import { compileLearningSpaceReminderJobs } from '@iconicedu/web/lib/automation/reminder-jobs';
 import { requireParentActorContext } from '@iconicedu/web/lib/family-view/actor-context';
 import { toStoredLiveSessionConfig } from '@iconicedu/web/lib/admin/live-session-config';
 import {
@@ -130,9 +129,8 @@ export async function createLearningSpaceFromPayload(
     schedules: payload.schedules ?? [],
   });
 
-  const serviceClient = createSupabaseServiceClient();
-  await compileLearningSpaceReminderJobs({
-    supabase: serviceClient,
+  const api = createApiClient(supabase);
+  await api.post('/reminders/learning-space/compile', {
     orgId,
     learningSpaceId,
   });

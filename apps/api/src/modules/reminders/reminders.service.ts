@@ -1,5 +1,19 @@
-import { Injectable } from '@nestjs/common';
-import type { FeedScopeVM, ReminderJobRow } from '@iconicedu/shared-types';
+import {
+  ForbiddenException,
+  Injectable,
+  InternalServerErrorException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import type {
+  ClassScheduleParticipantVM,
+  ClassScheduleVM,
+  FeedScopeVM,
+  ParticipantRoleVM,
+  RecurrenceVM,
+  ReminderJobRow,
+  WeekdayVM,
+} from '@iconicedu/shared-types';
+import { getLocalDate, getLocalTime, toUtcFromLocal } from '@iconicedu/utils';
 import { randomUUID } from 'crypto';
 
 import { AnalyticsService } from '@iconicedu/api/analytics/analytics.service';
@@ -8,11 +22,16 @@ import {
   createSupabaseServiceClient,
   type SupabaseServiceClient,
 } from '@iconicedu/api/lib/supabase/service';
+import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
 
+const REMINDER_HORIZON_DAYS = 30;
 const DEFAULT_JOB_LIMIT = 100;
 const DEFAULT_LEASE_SECONDS = 120;
+const DEFAULT_MAX_ATTEMPTS = 8;
 const RETRY_BASE_MS = 15_000;
 const RETRY_MAX_MS = 10 * 60_000;
+const SESSION_REMINDER_OFFSETS_MINUTES = [30, 5] as const;
+const SESSION_FEEDBACK_OFFSET_MINUTES = 15;
 
 type ReminderJobPayload = {
   title: string;
@@ -42,6 +61,113 @@ type ReminderJobPayload = {
   }> | null;
 };
 
+type ClassScheduleRow = {
+  id: string;
+  org_id: string;
+  title: string;
+  description?: string | null;
+  location?: string | null;
+  meeting_link?: string | null;
+  start_at: string;
+  end_at: string;
+  timezone?: string | null;
+  status: string;
+  visibility?: string | null;
+  theme_key?: string | null;
+  source_kind: string;
+  source_learning_space_id?: string | null;
+  source_channel_id?: string | null;
+  source_session_id?: string | null;
+  source_owner_user_id?: string | null;
+  source_created_by_user_id?: string | null;
+  source_related_learning_space_id?: string | null;
+  created_at?: string | null;
+  created_by?: string | null;
+  updated_at?: string | null;
+  updated_by?: string | null;
+  deleted_at?: string | null;
+  deleted_by?: string | null;
+  participants?: Array<{
+    id?: string;
+    org_id: string;
+    profile_id: string;
+    role: string;
+    status?: string | null;
+    display_name?: string | null;
+    avatar_url?: string | null;
+    theme_key?: string | null;
+  }> | null;
+  recurrence?:
+    | Array<{
+        id: string;
+        org_id: string;
+        frequency: string;
+        interval?: number | null;
+        count?: number | null;
+        until?: string | null;
+        timezone?: string | null;
+        byday?: string[] | null;
+        exceptions?: Array<{
+          id: string;
+          occurrence_key: string;
+          reason?: string | null;
+        }>;
+        overrides?: Array<{
+          id: string;
+          occurrence_key: string;
+          patch?: Record<string, unknown> | null;
+        }>;
+      }>
+    | {
+        id: string;
+        org_id: string;
+        frequency: string;
+        interval?: number | null;
+        count?: number | null;
+        until?: string | null;
+        timezone?: string | null;
+        byday?: string[] | null;
+        exceptions?: Array<{
+          id: string;
+          occurrence_key: string;
+          reason?: string | null;
+        }>;
+        overrides?: Array<{
+          id: string;
+          occurrence_key: string;
+          patch?: Record<string, unknown> | null;
+        }>;
+      }
+    | null;
+};
+
+type ExpandedClassSchedule = ClassScheduleVM & {
+  uiState?: {
+    kind?: 'default' | 'exception' | 'override';
+    disabled?: boolean;
+    reason?: string | null;
+    originalStartAt?: string;
+    originalEndAt?: string;
+  };
+};
+
+const CLASS_SCHEDULE_SELECT = `
+  id, org_id, title, description, location, meeting_link,
+  start_at, end_at, timezone, status, visibility, theme_key,
+  source_kind, source_learning_space_id, source_channel_id,
+  source_session_id, source_owner_user_id, source_created_by_user_id,
+  source_related_learning_space_id,
+  created_at, created_by, updated_at, updated_by, deleted_at, deleted_by,
+  participants:class_schedule_participants(
+    id, org_id, profile_id, role, status, display_name, avatar_url, theme_key
+  ),
+  recurrence:class_schedule_recurrence(
+    id, org_id, frequency, interval, count, until, timezone, byday,
+    exceptions:class_schedule_recurrence_exceptions(id, occurrence_key, reason),
+    overrides:class_schedule_recurrence_overrides(id, occurrence_key, patch)
+  )
+`;
+
 @Injectable()
 export class RemindersService {
   constructor(private readonly analytics: AnalyticsService) {}
@@ -52,6 +178,246 @@ export class RemindersService {
    */
   private getSupabase(): SupabaseServiceClient {
     return createSupabaseServiceClient();
+  }
+
+  async compileLearningSpaceReminderJobs(
+    accessToken: string,
+    input: { orgId: string; learningSpaceId: string },
+  ) {
+    await this.requireOrgActor(accessToken, input.orgId);
+    const supabase = this.getSupabase();
+    const schedules = await this.buildClassSchedulesByOrg(supabase, input.orgId);
+    const relevant = schedules.filter(
+      (schedule) =>
+        schedule.source.kind === 'class_session' &&
+        schedule.source.learningSpaceId === input.learningSpaceId,
+    );
+
+    const now = new Date();
+    const rangeStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const rangeEnd = new Date(
+      now.getTime() + REMINDER_HORIZON_DAYS * 24 * 60 * 60 * 1000,
+    );
+    const occurrences = this.expandRecurringEvents(relevant, rangeStart, rangeEnd).filter(
+      (schedule) => schedule.status !== 'cancelled',
+    );
+
+    const dedupeKeys = new Set<string>();
+    const rows: Array<Record<string, unknown>> = [];
+    const createdAt = new Date().toISOString();
+
+    for (const occurrence of occurrences) {
+      if (occurrence.source.kind !== 'class_session' || !occurrence.source.channelId) {
+        continue;
+      }
+
+      const occurrenceStart = new Date(occurrence.startAt);
+      if (Number.isNaN(occurrenceStart.getTime())) {
+        continue;
+      }
+      const occurrenceEnd = new Date(occurrence.endAt);
+      const feedbackBaseTime = Number.isNaN(occurrenceEnd.getTime())
+        ? occurrenceStart
+        : occurrenceEnd;
+      const normalizedScheduleId = this.normalizeBaseScheduleId(occurrence.ids.id);
+      const payload: ReminderJobPayload = {
+        title: occurrence.title,
+        summary: occurrence.description ?? null,
+        description: occurrence.description ?? null,
+        timezone: occurrence.timezone ?? 'UTC',
+        channelId: occurrence.source.channelId,
+        learningSpaceId: occurrence.source.learningSpaceId,
+        scheduleId: normalizedScheduleId,
+        occurrenceStart: occurrence.startAt,
+        startAt: occurrence.startAt,
+        endAt: occurrence.endAt,
+        location: occurrence.location ?? null,
+        meetingLink: occurrence.meetingLink ?? null,
+        channelRouteKind: 'space',
+        members: occurrence.participants.map((participant) => ({
+          profileId: participant.ids.id,
+          role: participant.role,
+          displayName: participant.displayName ?? null,
+          avatarUrl: participant.avatarUrl ?? null,
+          themeKey: participant.themeKey ?? null,
+        })),
+      };
+
+      for (const offsetMinutes of SESSION_REMINDER_OFFSETS_MINUTES) {
+        const reminderRunAt = new Date(
+          occurrenceStart.getTime() - offsetMinutes * 60 * 1000,
+        );
+        if (reminderRunAt.getTime() <= now.getTime()) {
+          continue;
+        }
+        const reminderDedupe = this.buildSessionReminderDedupeKey({
+          orgId: input.orgId,
+          learningSpaceId: occurrence.source.learningSpaceId,
+          channelId: occurrence.source.channelId,
+          occurrenceStart: occurrence.startAt,
+          offsetMinutes,
+        });
+        dedupeKeys.add(reminderDedupe);
+        rows.push({
+          org_id: input.orgId,
+          job_type: 'session.reminder',
+          target_kind: 'channel',
+          target_id: occurrence.source.channelId,
+          source_learning_space_id: occurrence.source.learningSpaceId,
+          source_schedule_id: normalizedScheduleId,
+          occurrence_start_at: occurrence.startAt,
+          run_at: reminderRunAt.toISOString(),
+          timezone: occurrence.timezone ?? 'UTC',
+          payload: {
+            ...payload,
+            summary: this.formatStartsInSummary(offsetMinutes),
+            reminderOffsetMinutes: offsetMinutes,
+          },
+          dedupe_key: reminderDedupe,
+          status: 'pending',
+          max_attempts: DEFAULT_MAX_ATTEMPTS,
+          created_at: createdAt,
+          updated_at: createdAt,
+          next_attempt_at: null,
+          lease_owner: null,
+          lease_until: null,
+          last_error: null,
+          deleted_at: null,
+        });
+      }
+
+      const feedbackDedupe = this.buildSessionFeedbackDedupeKey({
+        orgId: input.orgId,
+        learningSpaceId: occurrence.source.learningSpaceId,
+        channelId: occurrence.source.channelId,
+        occurrenceStart: occurrence.startAt,
+      });
+      dedupeKeys.add(feedbackDedupe);
+      rows.push({
+        org_id: input.orgId,
+        job_type: 'session.feedback_request',
+        target_kind: 'channel',
+        target_id: occurrence.source.channelId,
+        source_learning_space_id: occurrence.source.learningSpaceId,
+        source_schedule_id: normalizedScheduleId,
+        occurrence_start_at: occurrence.startAt,
+        run_at: new Date(
+          feedbackBaseTime.getTime() + SESSION_FEEDBACK_OFFSET_MINUTES * 60 * 1000,
+        ).toISOString(),
+        timezone: occurrence.timezone ?? 'UTC',
+        payload: { ...payload },
+        dedupe_key: feedbackDedupe,
+        status: 'pending',
+        max_attempts: DEFAULT_MAX_ATTEMPTS,
+        created_at: createdAt,
+        updated_at: createdAt,
+        next_attempt_at: null,
+        lease_owner: null,
+        lease_until: null,
+        last_error: null,
+        deleted_at: null,
+      });
+    }
+
+    const dedupeKeyList = Array.from(dedupeKeys);
+    const existingByDedupe = new Map<string, ReminderJobRow['status']>();
+    if (dedupeKeyList.length) {
+      const existingResponse = await supabase
+        .from('reminder_jobs')
+        .select('dedupe_key, status')
+        .eq('org_id', input.orgId)
+        .in('dedupe_key', dedupeKeyList)
+        .is('deleted_at', null)
+        .returns<Array<{ dedupe_key: string; status: ReminderJobRow['status'] }>>();
+
+      if (existingResponse.error) {
+        throw new InternalServerErrorException(existingResponse.error.message);
+      }
+
+      for (const row of existingResponse.data ?? []) {
+        existingByDedupe.set(row.dedupe_key, row.status);
+      }
+    }
+
+    const rowsToUpsert = rows.filter((row) => {
+      const dedupeKey = typeof row.dedupe_key === 'string' ? row.dedupe_key : null;
+      if (!dedupeKey) return true;
+      return existingByDedupe.get(dedupeKey) !== 'succeeded';
+    });
+
+    if (rowsToUpsert.length) {
+      const upsertResponse = await supabase
+        .from('reminder_jobs')
+        .upsert(rowsToUpsert, { onConflict: 'org_id,dedupe_key' });
+      if (upsertResponse.error) {
+        throw new InternalServerErrorException(upsertResponse.error.message);
+      }
+    }
+
+    const staleCandidatesResponse = await supabase
+      .from('reminder_jobs')
+      .select('id, dedupe_key')
+      .eq('org_id', input.orgId)
+      .eq('source_learning_space_id', input.learningSpaceId)
+      .in('job_type', ['session.reminder', 'session.feedback_request'])
+      .in('status', ['pending', 'leased', 'failed'])
+      .is('deleted_at', null)
+      .returns<Array<{ id: string; dedupe_key: string }>>();
+
+    if (staleCandidatesResponse.error) {
+      throw new InternalServerErrorException(staleCandidatesResponse.error.message);
+    }
+
+    const staleIds = (staleCandidatesResponse.data ?? [])
+      .filter((row) => !dedupeKeys.has(row.dedupe_key))
+      .map((row) => row.id);
+
+    if (staleIds.length) {
+      const staleUpdateResponse = await supabase
+        .from('reminder_jobs')
+        .update({
+          status: 'canceled',
+          updated_at: createdAt,
+          lease_owner: null,
+          lease_until: null,
+        })
+        .eq('org_id', input.orgId)
+        .in('id', staleIds);
+
+      if (staleUpdateResponse.error) {
+        throw new InternalServerErrorException(staleUpdateResponse.error.message);
+      }
+    }
+
+    return {
+      compiledCount: rowsToUpsert.length,
+      canceledCount: staleIds.length,
+    };
+  }
+
+  async cancelLearningSpaceReminderJobs(
+    accessToken: string,
+    input: { orgId: string; learningSpaceId: string },
+  ) {
+    await this.requireOrgActor(accessToken, input.orgId);
+    const response = await this.getSupabase()
+      .from('reminder_jobs')
+      .update({
+        status: 'canceled',
+        lease_owner: null,
+        lease_until: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('org_id', input.orgId)
+      .eq('source_learning_space_id', input.learningSpaceId)
+      .in('status', ['pending', 'leased', 'failed'])
+      .is('deleted_at', null);
+
+    if (response.error) {
+      throw new InternalServerErrorException(response.error.message);
+    }
+
+    return { success: true };
   }
 
   async dispatchDueReminderJobs(input: {
@@ -158,6 +524,479 @@ export class RemindersService {
       deadLettered,
       durationMs,
     };
+  }
+
+  private async requireOrgActor(accessToken: string, orgId: string) {
+    const sessionSupabase = createSupabaseSessionClient(accessToken);
+    const {
+      data: { user },
+      error: userError,
+    } = await sessionSupabase.auth.getUser();
+
+    if (userError) {
+      throw new UnauthorizedException(userError.message);
+    }
+    if (!user) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+
+    const { data: account, error: accountError } = await this.getSupabase()
+      .from('accounts')
+      .select('id')
+      .eq('auth_user_id', user.id)
+      .eq('org_id', orgId)
+      .is('deleted_at', null)
+      .maybeSingle<{ id: string }>();
+
+    if (accountError) {
+      throw new InternalServerErrorException(accountError.message);
+    }
+    if (!account) {
+      throw new ForbiddenException('Forbidden');
+    }
+  }
+
+  private async buildClassSchedulesByOrg(
+    supabase: SupabaseServiceClient,
+    orgId: string,
+  ): Promise<ClassScheduleVM[]> {
+    const response = await supabase
+      .from('class_schedules')
+      .select(CLASS_SCHEDULE_SELECT)
+      .eq('org_id', orgId)
+      .eq('source_kind', 'class_session')
+      .is('deleted_at', null)
+      .order('start_at', { ascending: true })
+      .returns<ClassScheduleRow[]>();
+
+    if (response.error) {
+      throw new InternalServerErrorException(response.error.message);
+    }
+
+    return (response.data ?? []).map((row) => this.mapClassScheduleRow(row));
+  }
+
+  private mapClassScheduleRow(row: ClassScheduleRow): ClassScheduleVM {
+    return {
+      ids: { id: row.id, orgId: row.org_id },
+      title: row.title,
+      description: row.description ?? null,
+      location: row.location ?? null,
+      meetingLink: row.meeting_link ?? null,
+      startAt: row.start_at,
+      endAt: row.end_at,
+      timezone: row.timezone ?? undefined,
+      status: row.status as ClassScheduleVM['status'],
+      visibility: (row.visibility ?? 'private') as ClassScheduleVM['visibility'],
+      themeKey: row.theme_key as ClassScheduleVM['themeKey'],
+      participants: (row.participants ?? []).map((participant) => ({
+        ids: { id: participant.profile_id, orgId: participant.org_id },
+        role: participant.role as ParticipantRoleVM,
+        status: participant.status as ClassScheduleParticipantVM['status'],
+        displayName: participant.display_name ?? undefined,
+        avatarUrl: participant.avatar_url ?? null,
+        themeKey: participant.theme_key as ClassScheduleParticipantVM['themeKey'],
+      })),
+      source: {
+        kind: 'class_session',
+        learningSpaceId: row.source_learning_space_id ?? '',
+        channelId: row.source_channel_id ?? undefined,
+        sessionId: row.source_session_id ?? undefined,
+      },
+      recurrence: this.mapRecurrence(row.recurrence),
+      audit: {
+        createdAt: row.created_at ?? row.start_at,
+        createdBy: row.created_by ?? '',
+        updatedAt: row.updated_at ?? undefined,
+        updatedBy: row.updated_by ?? undefined,
+        deletedAt: row.deleted_at ?? undefined,
+        deletedBy: row.deleted_by ?? undefined,
+      },
+    };
+  }
+
+  private mapRecurrence(row: ClassScheduleRow['recurrence']): RecurrenceVM | undefined {
+    const recurrence = Array.isArray(row) ? row[0] : row;
+    if (!recurrence) return undefined;
+    return {
+      ids: { id: recurrence.id, orgId: recurrence.org_id },
+      rule: {
+        frequency: recurrence.frequency as RecurrenceVM['rule']['frequency'],
+        interval: recurrence.interval ?? undefined,
+        byWeekday: recurrence.byday?.filter(this.isWeekday) ?? undefined,
+        count: recurrence.count ?? undefined,
+        until: recurrence.until ?? undefined,
+        timezone: recurrence.timezone ?? undefined,
+      },
+      exceptions: recurrence.exceptions?.length
+        ? recurrence.exceptions.map((exception) => ({
+            occurrenceKey: exception.occurrence_key,
+            reason: exception.reason ?? undefined,
+          }))
+        : undefined,
+      overrides: recurrence.overrides?.length
+        ? recurrence.overrides.map((override) => ({
+            occurrenceKey: override.occurrence_key,
+            patch: override.patch as RecurrenceVM['overrides'] extends Array<infer T>
+              ? T extends { patch: infer P }
+                ? P
+                : never
+              : never,
+          }))
+        : undefined,
+    };
+  }
+
+  private isWeekday(value: string): value is WeekdayVM {
+    return ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'].includes(value);
+  }
+
+  private normalizeBaseScheduleId(scheduleId: string) {
+    const marker = '__';
+    const index = scheduleId.indexOf(marker);
+    return index === -1 ? scheduleId : scheduleId.slice(0, index);
+  }
+
+  private formatStartsInSummary(offsetMinutes: number) {
+    return `Class starts in ${offsetMinutes} minutes`;
+  }
+
+  private buildSessionReminderDedupeKey(input: {
+    orgId: string;
+    learningSpaceId?: string | null;
+    channelId: string;
+    occurrenceStart: string;
+    offsetMinutes: number;
+  }) {
+    const learningSpaceId = input.learningSpaceId ?? 'unknown-space';
+    return `session.reminder:${input.orgId}:${learningSpaceId}:${input.channelId}:${input.occurrenceStart}:${input.offsetMinutes}`;
+  }
+
+  private buildSessionFeedbackDedupeKey(input: {
+    orgId: string;
+    learningSpaceId?: string | null;
+    channelId: string;
+    occurrenceStart: string;
+  }) {
+    const learningSpaceId = input.learningSpaceId ?? 'unknown-space';
+    return `session.feedback_request:${input.orgId}:${learningSpaceId}:${input.channelId}:${input.occurrenceStart}`;
+  }
+
+  private getScheduleTimezone(event: Pick<ClassScheduleVM, 'timezone' | 'recurrence'>) {
+    return event.timezone ?? event.recurrence?.rule.timezone ?? 'UTC';
+  }
+
+  private startOfDay(date: Date) {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  }
+
+  private addDays(date: Date, days: number) {
+    const next = new Date(date);
+    next.setDate(next.getDate() + days);
+    return next;
+  }
+
+  private toDateKey(value: Date) {
+    return value.toISOString().slice(0, 10);
+  }
+
+  private parseDateKey(value: string) {
+    const [yearText, monthText, dayText] = value.split('-');
+    const year = Number.parseInt(yearText ?? '1970', 10);
+    const month = Number.parseInt(monthText ?? '1', 10);
+    const day = Number.parseInt(dayText ?? '1', 10);
+    return new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0));
+  }
+
+  private getDateDiffInDays(left: string, right: string) {
+    return Math.round(
+      (this.parseDateKey(left).getTime() - this.parseDateKey(right).getTime()) /
+        (24 * 60 * 60 * 1000),
+    );
+  }
+
+  private getWeekdayTokenFromDateKey(value: string): WeekdayVM {
+    const weekday = this.parseDateKey(value).getUTCDay();
+    return ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][weekday] as WeekdayVM;
+  }
+
+  private getScheduleLocalDayKey(
+    isoDateTime: string,
+    event: Pick<ClassScheduleVM, 'timezone' | 'recurrence'>,
+  ) {
+    return (
+      getLocalDate(isoDateTime, this.getScheduleTimezone(event)) ??
+      isoDateTime.slice(0, 10)
+    );
+  }
+
+  private isWithinRange(date: Date, rangeStart: Date, rangeEnd: Date) {
+    const day = this.startOfDay(date).getTime();
+    return day >= rangeStart.getTime() && day <= rangeEnd.getTime();
+  }
+
+  private getMinDate(dates: Date[]) {
+    return dates.reduce((min, current) => (current < min ? current : min), dates[0]!);
+  }
+
+  private getMaxDate(dates: Date[]) {
+    return dates.reduce((max, current) => (current > max ? current : max), dates[0]!);
+  }
+
+  private getDisplaySchedulePriority(schedule: ExpandedClassSchedule) {
+    if (schedule.uiState?.kind === 'exception') return 3;
+    if (schedule.uiState?.kind === 'override') return 2;
+    return 1;
+  }
+
+  private getDisplayScheduleOccurrenceIdentity(schedule: ExpandedClassSchedule) {
+    const baseId = this.normalizeBaseScheduleId(schedule.ids.id);
+    const originalStartAt = schedule.uiState?.originalStartAt;
+    if (originalStartAt) {
+      return `${baseId}|${originalStartAt}`;
+    }
+    const separatorIndex = schedule.ids.id.indexOf('__');
+    if (separatorIndex !== -1) {
+      const [, occurrenceKey = schedule.startAt] = schedule.ids.id.split('__');
+      return `${baseId}|${occurrenceKey}`;
+    }
+    return `${baseId}|${schedule.startAt}`;
+  }
+
+  private dedupeExpandedEvents(schedules: ExpandedClassSchedule[]) {
+    const deduped = new Map<string, ExpandedClassSchedule>();
+    schedules.forEach((schedule) => {
+      const key = this.getDisplayScheduleOccurrenceIdentity(schedule);
+      const existing = deduped.get(key);
+      if (
+        !existing ||
+        this.getDisplaySchedulePriority(schedule) >
+          this.getDisplaySchedulePriority(existing)
+      ) {
+        deduped.set(key, schedule);
+      }
+    });
+    return Array.from(deduped.values());
+  }
+
+  private expandRecurringEvents(
+    events: ClassScheduleVM[],
+    rangeStart: Date,
+    rangeEnd: Date,
+  ) {
+    const expanded: ExpandedClassSchedule[] = [];
+    const rangeStartDay = this.startOfDay(rangeStart);
+    const rangeEndDay = this.startOfDay(rangeEnd);
+
+    events.forEach((event) => {
+      if (!event.recurrence) {
+        const eventDate = this.startOfDay(new Date(event.startAt));
+        if (this.isWithinRange(eventDate, rangeStartDay, rangeEndDay)) {
+          const isCancelled = event.status === 'cancelled';
+          expanded.push({
+            ...event,
+            meetingLink: isCancelled ? null : event.meetingLink,
+            uiState: isCancelled
+              ? {
+                  kind: 'exception',
+                  disabled: true,
+                  reason: event.description ?? null,
+                  originalStartAt: event.startAt,
+                  originalEndAt: event.endAt,
+                }
+              : { kind: 'default' },
+          });
+        }
+        return;
+      }
+
+      const recurrence = event.recurrence;
+      const rule = recurrence.rule;
+      const interval = rule.interval ?? 1;
+      const scheduleTimezone = this.getScheduleTimezone(event);
+      const baseStart = new Date(event.startAt);
+      const baseLocalDate =
+        getLocalDate(event.startAt, scheduleTimezone) ?? event.startAt.slice(0, 10);
+      const baseLocalTime = getLocalTime(event.startAt, scheduleTimezone) ?? '00:00';
+      const durationMs = new Date(event.endAt).getTime() - baseStart.getTime();
+      const exceptions = new Set(
+        recurrence.exceptions?.map((exception) => exception.occurrenceKey) ?? [],
+      );
+      const exceptionsByDay = new Set(
+        recurrence.exceptions?.map((exception) =>
+          this.getScheduleLocalDayKey(exception.occurrenceKey, event),
+        ) ?? [],
+      );
+      const overrides = new Map(
+        recurrence.overrides?.map((override) => [
+          override.occurrenceKey,
+          override.patch,
+        ]) ?? [],
+      );
+      const overridesByDay = new Map(
+        recurrence.overrides?.map((override) => [
+          this.getScheduleLocalDayKey(override.occurrenceKey, event),
+          override.patch,
+        ]) ?? [],
+      );
+      const byWeekday = rule.byWeekday?.length
+        ? rule.byWeekday
+        : [this.getWeekdayTokenFromDateKey(baseLocalDate)];
+      const overrideOriginalDates =
+        recurrence.overrides?.map((override) =>
+          this.getScheduleLocalDayKey(override.occurrenceKey, event),
+        ) ?? [];
+      const overridePatchedDates =
+        recurrence.overrides
+          ?.map((override) =>
+            override.patch.startAt
+              ? this.getScheduleLocalDayKey(override.patch.startAt, event)
+              : null,
+          )
+          .filter((date): date is string => Boolean(date)) ?? [];
+      const exceptionDates =
+        recurrence.exceptions?.map((exception) =>
+          this.getScheduleLocalDayKey(exception.occurrenceKey, event),
+        ) ?? [];
+      const rangeStartLocalDate =
+        getLocalDate(rangeStart.toISOString(), scheduleTimezone) ??
+        this.toDateKey(rangeStartDay);
+      const rangeEndLocalDate =
+        getLocalDate(rangeEnd.toISOString(), scheduleTimezone) ??
+        this.toDateKey(rangeEndDay);
+      const iterationStart = this.getMinDate(
+        [
+          this.parseDateKey(baseLocalDate),
+          this.parseDateKey(rangeStartLocalDate),
+          ...overrideOriginalDates,
+          ...exceptionDates,
+        ].map((value) => (typeof value === 'string' ? this.parseDateKey(value) : value)),
+      );
+      const iterationEnd = this.getMaxDate(
+        [
+          this.parseDateKey(rangeEndLocalDate),
+          ...overrideOriginalDates,
+          ...overridePatchedDates,
+          ...exceptionDates,
+        ].map((value) => (typeof value === 'string' ? this.parseDateKey(value) : value)),
+      );
+
+      recurrence.exceptions?.forEach((exception) => {
+        const originalStart = new Date(exception.occurrenceKey);
+        const occurrenceDayKey = this.getScheduleLocalDayKey(
+          exception.occurrenceKey,
+          event,
+        );
+        if (
+          overrides.has(exception.occurrenceKey) ||
+          overridesByDay.has(occurrenceDayKey)
+        )
+          return;
+        const originalEnd = new Date(originalStart.getTime() + durationMs);
+        expanded.push({
+          ...event,
+          ids: {
+            ...event.ids,
+            id: `${event.ids.id}__${exception.occurrenceKey}__exception`,
+          },
+          startAt: originalStart.toISOString(),
+          endAt: originalEnd.toISOString(),
+          status: 'cancelled',
+          meetingLink: null,
+          recurrence: undefined,
+          description: exception.reason ?? event.description ?? null,
+          uiState: {
+            kind: 'exception',
+            disabled: true,
+            reason: exception.reason ?? null,
+            originalStartAt: originalStart.toISOString(),
+            originalEndAt: originalEnd.toISOString(),
+          },
+        });
+      });
+
+      let occurrenceCount = 0;
+      const until = rule.until
+        ? (getLocalDate(rule.until, scheduleTimezone) ?? rule.until.slice(0, 10))
+        : null;
+
+      for (
+        let current = iterationStart;
+        current <= iterationEnd;
+        current = this.addDays(current, 1)
+      ) {
+        const currentLocalDate = this.toDateKey(current);
+        if (currentLocalDate < baseLocalDate) continue;
+        if (until && currentLocalDate > until) break;
+
+        const diffDays = this.getDateDiffInDays(currentLocalDate, baseLocalDate);
+        let matches = false;
+        if (rule.frequency === 'daily') {
+          matches = diffDays % interval === 0;
+        } else if (rule.frequency === 'weekly') {
+          const weeksDiff = Math.floor(diffDays / 7);
+          matches =
+            weeksDiff % interval === 0 &&
+            byWeekday.includes(this.getWeekdayTokenFromDateKey(currentLocalDate));
+        }
+
+        const occurrenceKey =
+          toUtcFromLocal(currentLocalDate, baseLocalTime, scheduleTimezone) ??
+          (() => {
+            const occurrenceStart = new Date(current);
+            occurrenceStart.setHours(
+              baseStart.getHours(),
+              baseStart.getMinutes(),
+              baseStart.getSeconds(),
+              baseStart.getMilliseconds(),
+            );
+            return occurrenceStart.toISOString();
+          })();
+        const occurrenceStart = new Date(occurrenceKey);
+        const occurrenceDayKey = currentLocalDate;
+        const override =
+          overrides.get(occurrenceKey) ?? overridesByDay.get(occurrenceDayKey);
+        const hasOverride = Boolean(override);
+
+        if (!matches && !hasOverride) continue;
+        if (
+          (exceptions.has(occurrenceKey) || exceptionsByDay.has(occurrenceDayKey)) &&
+          !hasOverride
+        )
+          continue;
+        if (rule.count && occurrenceCount >= rule.count) break;
+
+        const occurrenceEnd = new Date(occurrenceStart.getTime() + durationMs);
+        expanded.push({
+          ...event,
+          ...override,
+          ids: { ...event.ids, id: `${event.ids.id}__${occurrenceKey}` },
+          startAt: override?.startAt ?? occurrenceStart.toISOString(),
+          endAt: override?.endAt ?? occurrenceEnd.toISOString(),
+          status: override?.status ?? (hasOverride ? 'rescheduled' : event.status),
+          recurrence: event.recurrence,
+          uiState: hasOverride
+            ? {
+                kind: 'override',
+                reason:
+                  typeof override?.description === 'string'
+                    ? override.description
+                    : typeof (override as { reason?: unknown } | undefined)?.reason ===
+                        'string'
+                      ? ((override as { reason?: string }).reason ?? null)
+                      : null,
+                originalStartAt: occurrenceStart.toISOString(),
+                originalEndAt: occurrenceEnd.toISOString(),
+              }
+            : { kind: 'default' },
+        });
+        occurrenceCount += 1;
+      }
+    });
+
+    return this.dedupeExpandedEvents(expanded).filter((schedule) =>
+      this.isWithinRange(new Date(schedule.startAt), rangeStartDay, rangeEndDay),
+    );
   }
 
   private resolveRetryDelayMs(attemptCount: number) {

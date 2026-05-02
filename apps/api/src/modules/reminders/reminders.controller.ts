@@ -4,13 +4,21 @@ import {
   Get,
   Headers,
   Post,
+  Req,
   UnauthorizedException,
+  UseGuards,
 } from '@nestjs/common';
 
+import {
+  extractBearerToken,
+  type AuthenticatedRequest,
+} from '@iconicedu/api/lib/http/authenticated-request';
+import { AuthGuard } from '@iconicedu/api/modules/auth/auth.guard';
 import {
   parseDispatchRemindersDto,
   type DispatchRemindersDto,
 } from '@iconicedu/api/modules/reminders/dto/dispatch-reminders.dto';
+import { parseLearningSpaceRemindersDto } from '@iconicedu/api/modules/reminders/dto/learning-space-reminders.dto';
 import { RemindersService } from '@iconicedu/api/modules/reminders/reminders.service';
 
 function resolveExpectedToken() {
@@ -50,5 +58,25 @@ export class RemindersController {
       limit: dto.limit,
       leaseSeconds: dto.leaseSeconds,
     });
+  }
+
+  @Post('reminders/learning-space/compile')
+  @UseGuards(AuthGuard)
+  compileLearningSpace(@Req() req: AuthenticatedRequest, @Body() body: unknown) {
+    const dto = parseLearningSpaceRemindersDto(body);
+    return this.remindersService.compileLearningSpaceReminderJobs(
+      extractBearerToken(req.headers.authorization),
+      dto,
+    );
+  }
+
+  @Post('reminders/learning-space/cancel')
+  @UseGuards(AuthGuard)
+  cancelLearningSpace(@Req() req: AuthenticatedRequest, @Body() body: unknown) {
+    const dto = parseLearningSpaceRemindersDto(body);
+    return this.remindersService.cancelLearningSpaceReminderJobs(
+      extractBearerToken(req.headers.authorization),
+      dto,
+    );
   }
 }

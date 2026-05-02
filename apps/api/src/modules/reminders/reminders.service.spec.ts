@@ -1,9 +1,14 @@
 import { RemindersService } from '@iconicedu/api/modules/reminders/reminders.service';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
+import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
 import { publishActivityEvent } from '@iconicedu/api/lib/activity-feed/activity-publisher';
 
 jest.mock('@iconicedu/api/lib/supabase/service', () => ({
   createSupabaseServiceClient: jest.fn(),
+}));
+
+jest.mock('@iconicedu/api/lib/supabase/session', () => ({
+  createSupabaseSessionClient: jest.fn(),
 }));
 
 jest.mock('@iconicedu/api/lib/activity-feed/activity-publisher', () => ({
@@ -13,10 +18,294 @@ jest.mock('@iconicedu/api/lib/activity-feed/activity-publisher', () => ({
 describe('RemindersService', () => {
   const analytics = { capture: jest.fn() };
   const createSupabaseServiceClientMock = jest.mocked(createSupabaseServiceClient);
+  const createSupabaseSessionClientMock = jest.mocked(createSupabaseSessionClient);
   const publishActivityEventMock = jest.mocked(publishActivityEvent);
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.useFakeTimers().setSystemTime(new Date('2030-03-01T00:00:00.000Z'));
+    createSupabaseSessionClientMock.mockReturnValue({
+      auth: {
+        getUser: jest.fn(async () => ({
+          data: { user: { id: 'auth-user-1' } },
+          error: null,
+        })),
+      },
+    } as never);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  function makeChain<T>(result: { data: T; error: null } | { data: null; error: Error }) {
+    const chain = {
+      select: jest.fn(() => chain),
+      eq: jest.fn(() => chain),
+      is: jest.fn(() => chain),
+      in: jest.fn(() => chain),
+      order: jest.fn(() => chain),
+      limit: jest.fn(() => chain),
+      maybeSingle: jest.fn(async () => result),
+      returns: jest.fn(async () => result),
+      update: jest.fn(() => chain),
+      upsert: jest.fn(async () => ({ error: null })),
+    };
+    return chain;
+  }
+
+  function buildScheduleRow(input?: Partial<Record<string, unknown>>) {
+    return {
+      id: 'schedule-1',
+      org_id: 'org-1',
+      title: 'Algebra',
+      description: 'Bring your workbook',
+      location: null,
+      meeting_link: null,
+      start_at: '2030-03-06T10:00:00.000Z',
+      end_at: '2030-03-06T11:00:00.000Z',
+      timezone: 'UTC',
+      status: 'scheduled',
+      visibility: 'private',
+      theme_key: null,
+      source_kind: 'class_session',
+      source_learning_space_id: 'space-1',
+      source_channel_id: 'channel-1',
+      source_session_id: null,
+      source_owner_user_id: null,
+      source_created_by_user_id: null,
+      source_related_learning_space_id: null,
+      created_at: '2030-01-01T00:00:00.000Z',
+      created_by: 'profile-1',
+      updated_at: '2030-01-01T00:00:00.000Z',
+      updated_by: 'profile-1',
+      deleted_at: null,
+      deleted_by: null,
+      participants: [
+        {
+          id: 'participant-1',
+          org_id: 'org-1',
+          profile_id: 'profile-1',
+          role: 'child',
+          status: 'active',
+          display_name: 'Alex Student',
+          avatar_url: 'https://cdn.test/alex.png',
+          theme_key: 'blue',
+        },
+      ],
+      recurrence: null,
+      ...input,
+    };
+  }
+
+  function makeCompileSupabase(input?: {
+    scheduleRows?: unknown[];
+    existingRows?: Array<{ dedupe_key: string; status: string }>;
+    staleRows?: Array<{ id: string; dedupe_key: string }>;
+  }) {
+    const accountChain = makeChain({ data: { id: 'account-1' }, error: null });
+    const schedulesChain = makeChain({
+      data: input?.scheduleRows ?? [buildScheduleRow()],
+      error: null,
+    });
+    const existingChain = makeChain({
+      data: input?.existingRows ?? [],
+      error: null,
+    });
+    const staleChain = makeChain({
+      data: input?.staleRows ?? [],
+      error: null,
+    });
+    const staleUpdateChain = {
+      eq: jest.fn(() => staleUpdateChain),
+      in: jest.fn(() => staleUpdateChain),
+    };
+    const reminderJobsTable = {
+      select: jest
+        .fn()
+        .mockReturnValueOnce(existingChain)
+        .mockReturnValueOnce(staleChain),
+      upsert: jest.fn(async () => ({ error: null })),
+      update: jest.fn(() => staleUpdateChain),
+    };
+    const supabase = {
+      from: jest.fn((table: string) => {
+        switch (table) {
+          case 'accounts':
+            return { select: jest.fn(() => accountChain) };
+          case 'class_schedules':
+            return { select: jest.fn(() => schedulesChain) };
+          case 'reminder_jobs':
+            return reminderJobsTable;
+          default:
+            throw new Error(`Unexpected table ${table}`);
+        }
+      }),
+    };
+    return { supabase, reminderJobsTable };
+  }
+
+  it('compiles two class reminders and one feedback request for a learning space', async () => {
+    const { supabase, reminderJobsTable } = makeCompileSupabase();
+    createSupabaseServiceClientMock.mockReturnValue(supabase as never);
+
+    const service = new RemindersService(analytics as never);
+    const result = await service.compileLearningSpaceReminderJobs('token-1', {
+      orgId: 'org-1',
+      learningSpaceId: 'space-1',
+    });
+
+    expect(result).toEqual({ compiledCount: 3, canceledCount: 0 });
+    expect(reminderJobsTable.upsert).toHaveBeenCalledTimes(1);
+    const compiledRows = reminderJobsTable.upsert.mock.calls[0]?.[0] as Array<{
+      job_type: string;
+      dedupe_key: string;
+      run_at: string;
+      payload: { summary?: string | null; members?: Array<{ profileId: string }> };
+    }>;
+    const reminderRows = compiledRows
+      .filter((row) => row.job_type === 'session.reminder')
+      .sort((a, b) => a.run_at.localeCompare(b.run_at));
+    expect(reminderRows.map((row) => row.run_at)).toEqual([
+      '2030-03-06T09:30:00.000Z',
+      '2030-03-06T09:55:00.000Z',
+    ]);
+    expect(reminderRows.map((row) => row.payload.summary)).toEqual([
+      'Class starts in 30 minutes',
+      'Class starts in 5 minutes',
+    ]);
+    expect(reminderRows[0]?.dedupe_key).toContain(':30');
+    expect(reminderRows[1]?.dedupe_key).toContain(':5');
+    const feedbackRow = compiledRows.find(
+      (row) => row.job_type === 'session.feedback_request',
+    );
+    expect(feedbackRow?.run_at).toBe('2030-03-06T11:15:00.000Z');
+    expect(feedbackRow?.payload.members?.[0]).toMatchObject({
+      profileId: 'profile-1',
+      role: 'child',
+    });
+  });
+
+  it('falls back to start time when end time is invalid for feedback scheduling', async () => {
+    const { reminderJobsTable, supabase } = makeCompileSupabase({
+      scheduleRows: [buildScheduleRow({ end_at: 'not-a-date' })],
+    });
+    createSupabaseServiceClientMock.mockReturnValue(supabase as never);
+
+    const service = new RemindersService(analytics as never);
+    await service.compileLearningSpaceReminderJobs('token-1', {
+      orgId: 'org-1',
+      learningSpaceId: 'space-1',
+    });
+
+    const compiledRows = reminderJobsTable.upsert.mock.calls[0]?.[0] as Array<{
+      job_type: string;
+      run_at: string;
+    }>;
+    expect(
+      compiledRows.find((row) => row.job_type === 'session.feedback_request')?.run_at,
+    ).toBe('2030-03-06T10:15:00.000Z');
+  });
+
+  it('does not reactivate succeeded reminder jobs when schedule ids change', async () => {
+    const { reminderJobsTable, supabase } = makeCompileSupabase({
+      scheduleRows: [buildScheduleRow({ id: 'schedule-2' })],
+      existingRows: [
+        {
+          dedupe_key:
+            'session.reminder:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z:30',
+          status: 'succeeded',
+        },
+        {
+          dedupe_key:
+            'session.reminder:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z:5',
+          status: 'succeeded',
+        },
+        {
+          dedupe_key:
+            'session.feedback_request:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z',
+          status: 'succeeded',
+        },
+      ],
+    });
+    createSupabaseServiceClientMock.mockReturnValue(supabase as never);
+
+    const service = new RemindersService(analytics as never);
+    const result = await service.compileLearningSpaceReminderJobs('token-1', {
+      orgId: 'org-1',
+      learningSpaceId: 'space-1',
+    });
+
+    expect(result.compiledCount).toBe(0);
+    expect(reminderJobsTable.upsert).not.toHaveBeenCalled();
+  });
+
+  it('skips session reminders when reminder run_at is in the past', async () => {
+    const now = Date.now();
+    const occurrenceStart = new Date(now - 10 * 60 * 1000).toISOString();
+    const occurrenceEnd = new Date(now + 50 * 60 * 1000).toISOString();
+    const { reminderJobsTable, supabase } = makeCompileSupabase({
+      scheduleRows: [
+        buildScheduleRow({
+          start_at: occurrenceStart,
+          end_at: occurrenceEnd,
+        }),
+      ],
+    });
+    createSupabaseServiceClientMock.mockReturnValue(supabase as never);
+
+    const service = new RemindersService(analytics as never);
+    await service.compileLearningSpaceReminderJobs('token-1', {
+      orgId: 'org-1',
+      learningSpaceId: 'space-1',
+    });
+
+    const compiledRows = reminderJobsTable.upsert.mock.calls[0]?.[0] as Array<{
+      job_type: string;
+    }>;
+    expect(compiledRows.some((row) => row.job_type === 'session.reminder')).toBe(false);
+    expect(compiledRows.some((row) => row.job_type === 'session.feedback_request')).toBe(
+      true,
+    );
+  });
+
+  it('cancels pending, leased, and failed learning-space reminder jobs', async () => {
+    const accountChain = makeChain({ data: { id: 'account-1' }, error: null });
+    const updateChain = {
+      eq: jest.fn(() => updateChain),
+      in: jest.fn(() => updateChain),
+      is: jest.fn(async () => ({ error: null })),
+    };
+    const reminderJobsUpdate = jest.fn(() => updateChain);
+    const supabase = {
+      from: jest.fn((table: string) => {
+        switch (table) {
+          case 'accounts':
+            return { select: jest.fn(() => accountChain) };
+          case 'reminder_jobs':
+            return { update: reminderJobsUpdate };
+          default:
+            throw new Error(`Unexpected table ${table}`);
+        }
+      }),
+    };
+    createSupabaseServiceClientMock.mockReturnValue(supabase as never);
+
+    const service = new RemindersService(analytics as never);
+    await expect(
+      service.cancelLearningSpaceReminderJobs('token-1', {
+        orgId: 'org-1',
+        learningSpaceId: 'space-1',
+      }),
+    ).resolves.toEqual({ success: true });
+    expect(reminderJobsUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'canceled', lease_owner: null }),
+    );
+    expect(updateChain.in).toHaveBeenCalledWith('status', [
+      'pending',
+      'leased',
+      'failed',
+    ]);
   });
 
   it('dispatches only precompiled reminder_jobs and does not read schedules', async () => {

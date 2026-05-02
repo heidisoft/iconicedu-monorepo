@@ -1,8 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+import { createApiClient } from '@iconicedu/web/lib/api/http-client';
 import { requireAdminAuthContext } from '@iconicedu/web/lib/admin/_auth-context';
-import { cancelLearningSpaceReminderJobs } from '@iconicedu/web/lib/automation/reminder-jobs';
-import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 
 export async function deleteLearningSpaceCascade(learningSpaceId: string) {
   const { supabase, orgId } = await requireAdminAuthContext();
@@ -49,8 +48,8 @@ export async function deleteLearningSpaceCascade(learningSpaceId: string) {
 
   const scheduleIds = (scheduleRows ?? []).map((row) => row.id).filter(Boolean);
 
-  await cancelLearningSpaceReminderJobs({
-    supabase: createSupabaseServiceClient(),
+  const api = createApiClient(supabase);
+  await api.post('/reminders/learning-space/cancel', {
     orgId,
     learningSpaceId,
   });
