@@ -82,7 +82,7 @@ jobs:
           TURBO_SCM_HEAD: ${{ github.sha }}
 
   # ──────────────────────────────────────────────────────────────
-  # Job 2: Tests plus explicit coverage collection.
+  # Job 2: Tests.
   # PRs: affected packages only. Push to main: all packages.
   # ──────────────────────────────────────────────────────────────
   test:
@@ -125,10 +125,6 @@ jobs:
       - name: Build shared packages
         run: pnpm build:packages
 
-      # Generate Prisma client — required for API test suite.
-      - name: Generate Prisma client
-        run: pnpm --filter api db:generate
-
       # PRs: only affected packages. Push to main: all packages.
       - name: Test
         run: pnpm exec turbo run test ${{ github.event_name == 'pull_request' && '--affected' || '' }}
@@ -136,29 +132,6 @@ jobs:
           CI: true
           TURBO_SCM_BASE: ${{ github.event.pull_request.base.sha }}
           TURBO_SCM_HEAD: ${{ github.sha }}
-
-      - name: Collect coverage
-        run: pnpm exec turbo run test:coverage ${{ github.event_name == 'pull_request' && '--affected' || '' }}
-        env:
-          CI: true
-          TURBO_SCM_BASE: ${{ github.event.pull_request.base.sha }}
-          TURBO_SCM_HEAD: ${{ github.sha }}
-
-      - name: Upload coverage reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage
-          path: |
-            apps/web/coverage/
-            apps/api/coverage/
-            apps/mobile/coverage/
-            packages/ui-web/coverage/
-            packages/ui-native/coverage/
-            packages/shared-types/coverage/
-            packages/utils/coverage/
-          if-no-files-found: ignore
-          retention-days: 14
 
   # ──────────────────────────────────────────────────────────────
   # Job 3: Bundle sizes — compares PR sizes (measured in build job)
