@@ -37,6 +37,7 @@ type FunctionConfig = {
   title: string;
   description: string;
   hasDispatchParams: boolean;
+  hasLeaseParams?: boolean;
 };
 
 const FUNCTIONS: FunctionConfig[] = [
@@ -46,6 +47,7 @@ const FUNCTIONS: FunctionConfig[] = [
     description:
       'Claims pending activity_source_jobs and publishes durable activity_events.',
     hasDispatchParams: true,
+    hasLeaseParams: true,
   },
   {
     kind: 'activity-projector-dispatch',
@@ -59,6 +61,7 @@ const FUNCTIONS: FunctionConfig[] = [
     title: 'Reminders Dispatch',
     description: 'Claims due reminder_jobs and publishes reminder activity_events.',
     hasDispatchParams: true,
+    hasLeaseParams: true,
   },
   {
     kind: 'notifications-dispatch',
@@ -66,6 +69,7 @@ const FUNCTIONS: FunctionConfig[] = [
     description:
       'Claims pending notification_dispatch_jobs and delivers push notifications via Expo.',
     hasDispatchParams: true,
+    hasLeaseParams: true,
   },
   {
     kind: 'channel-read-state-repair',
@@ -93,6 +97,7 @@ type FunctionCardProps = {
 
 function FunctionCard({ orgId, config }: FunctionCardProps) {
   const [limit, setLimit] = React.useState('');
+  const [leaseSeconds, setLeaseSeconds] = React.useState('');
   const [leaseOwner, setLeaseOwner] = React.useState('');
   const [result, setResult] = React.useState<FunctionResult>({ status: 'idle' });
 
@@ -107,7 +112,10 @@ function FunctionCard({ orgId, config }: FunctionCardProps) {
           orgId,
           kind: config.kind,
           ...(config.hasDispatchParams && limit ? { limit: Number(limit) } : {}),
-          ...(config.hasDispatchParams && leaseOwner ? { leaseOwner } : {}),
+          ...(config.hasLeaseParams && leaseSeconds
+            ? { leaseSeconds: Number(leaseSeconds) }
+            : {}),
+          ...(config.hasLeaseParams && leaseOwner ? { leaseOwner } : {}),
         }),
       });
 
@@ -174,27 +182,47 @@ function FunctionCard({ orgId, config }: FunctionCardProps) {
                 disabled={isRunning}
               />
             </div>
-            <div className="flex flex-col gap-1">
-              <Label htmlFor={`${config.kind}-lease-owner`} className="text-xs">
-                Lease owner
-              </Label>
-              <Input
-                id={`${config.kind}-lease-owner`}
-                type="text"
-                placeholder="admin-tools"
-                value={leaseOwner}
-                onChange={(e) => setLeaseOwner(e.target.value)}
-                className="w-48"
-                disabled={isRunning}
-              />
-            </div>
+            {config.hasLeaseParams && (
+              <>
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor={`${config.kind}-lease-seconds`} className="text-xs">
+                    Lease seconds
+                  </Label>
+                  <Input
+                    id={`${config.kind}-lease-seconds`}
+                    type="number"
+                    placeholder="default"
+                    value={leaseSeconds}
+                    onChange={(e) => setLeaseSeconds(e.target.value)}
+                    className="w-32"
+                    min={1}
+                    max={600}
+                    disabled={isRunning}
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor={`${config.kind}-lease-owner`} className="text-xs">
+                    Lease owner
+                  </Label>
+                  <Input
+                    id={`${config.kind}-lease-owner`}
+                    type="text"
+                    placeholder="supabase-edge-cron"
+                    value={leaseOwner}
+                    onChange={(e) => setLeaseOwner(e.target.value)}
+                    className="w-52"
+                    disabled={isRunning}
+                  />
+                </div>
+              </>
+            )}
           </div>
         )}
 
         <div className="flex items-center gap-3">
           <Button size="sm" onClick={handleRun} disabled={isRunning}>
             {isRunning && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
-            Run now
+            Run cron job
           </Button>
           {result.ranAt && (
             <span className="text-muted-foreground text-xs">
@@ -224,9 +252,9 @@ export function EdgeFunctionsDashboard({ orgId }: EdgeFunctionsDashboardProps) {
   return (
     <div className="flex flex-col gap-4">
       <p className="text-muted-foreground text-sm">
-        Manually trigger Supabase edge functions. Each function normally runs on a cron
-        schedule; use these controls to fire them immediately during development or to
-        force a repair.
+        Run the same work kicked off by the Supabase cron edge functions. The API-backed
+        jobs call their internal dispatch endpoints with cron-style payloads; the repair
+        job runs the same unread-count repair RPC used by its edge function.
       </p>
       <div className="grid gap-4 sm:grid-cols-2">
         {FUNCTIONS.map((config) => (

@@ -68,7 +68,7 @@ describe('createLearningSpaceFromPayload', () => {
       })),
     });
     createSupabaseServiceClientMock.mockReturnValue({});
-    apiPostMock.mockResolvedValue({ compiledCount: 3, canceledCount: 0 });
+    apiPostMock.mockResolvedValue({ scheduleIds: ['schedule-1'] });
     getAccountByAuthUserIdMock.mockResolvedValue({
       data: { id: 'account-1', org_id: 'org-1' },
       error: null,
@@ -123,10 +123,13 @@ describe('createLearningSpaceFromPayload', () => {
       ],
     });
 
-    expect(apiPostMock).toHaveBeenCalledWith('/reminders/learning-space/compile', {
-      orgId: 'org-1',
-      learningSpaceId: expect.any(String),
-    });
+    expect(apiPostMock).toHaveBeenCalledWith(
+      '/schedules/learning-space/replace',
+      expect.objectContaining({
+        orgId: 'org-1',
+        learningSpaceId: expect.any(String),
+      }),
+    );
   });
 
   it('supports creating a learning space with multiple participants under the pruned activity model', async () => {

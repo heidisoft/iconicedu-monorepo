@@ -116,24 +116,28 @@ export async function createLearningSpaceFromPayload(
     createdAt: now,
   });
 
-  const scheduleIds = await insertClassSchedules(supabase, {
-    orgId,
-    learningSpaceId,
-    channelId,
-    createdBy: actorProfileId,
-    createdAt: now,
-    title: payload.basics.title,
-    description: payload.basics.description ?? null,
-    themeKey: payload.settings?.themeKey ?? null,
-    participants: payload.participants,
-    schedules: payload.schedules ?? [],
-  });
-
   const api = createApiClient(supabase);
-  await api.post('/reminders/learning-space/compile', {
-    orgId,
-    learningSpaceId,
-  });
+  const replaceResult = await api.post<{ scheduleIds: string[] }>(
+    '/schedules/learning-space/replace',
+    {
+      orgId,
+      learningSpaceId,
+      channelId,
+      createdBy: actorProfileId,
+      title: payload.basics.title,
+      description: payload.basics.description ?? null,
+      themeKey: payload.settings?.themeKey ?? null,
+      participants: payload.participants.map((p) => ({
+        profileId: p.profileId,
+        kind: p.kind,
+        displayName: p.displayName ?? null,
+        avatarUrl: p.avatarUrl ?? null,
+        themeKey: p.themeKey ?? null,
+      })),
+      schedules: buildScheduleRowsForApi(payload.schedules ?? []),
+    },
+  );
+  const scheduleIds = replaceResult.scheduleIds ?? [];
 
   return { learningSpaceId, channelId, scheduleIds };
 }
@@ -721,4 +725,112 @@ function formatUtcDateTime(date: Date) {
 
 function pad2(value: number) {
   return value.toString().padStart(2, '0');
+}
+
+export function buildScheduleRowsForApi(
+  schedules: LearningSpaceSchedulePayload[],
+): Array<{
+  startAt: string;
+  endAt: string;
+  timezone: string;
+  recurrence: null | {
+    frequency: string;
+    interval: number | null;
+    count: number | null;
+    until: string | null;
+    timezone: string | null;
+    rawRrule: string | null;
+    bysecond: number[] | null;
+    byminute: number[] | null;
+    byhour: number[] | null;
+    byday: string[] | null;
+    bymonthday: number[] | null;
+    byyearday: number[] | null;
+    byweekno: number[] | null;
+    bymonth: number[] | null;
+    bysetpos: number[] | null;
+    wkst: string | null;
+    exceptions: Array<{ occurrenceKey: string; reason: string | null }>;
+    overrides: Array<{
+      occurrenceKey: string;
+      patch: { startAt: string; endAt: string; reason: string | null };
+    }>;
+  };
+}> {
+  return schedules.map((schedule) => {
+    const expanded = buildScheduleStart(schedule);
+    const timezone = schedule.timezone ?? schedule.rule?.timezone ?? 'UTC';
+
+    if (!schedule.rule) {
+      return {
+        startAt: expanded.startAt,
+        endAt: expanded.endAt,
+        timezone,
+        recurrence: null,
+      };
+    }
+
+    const rruleFields = buildRRuleFields(schedule.rule, schedule.startDate, timezone);
+    const rawRrule = buildRawRRule(schedule.rule, rruleFields);
+
+    const exceptions = (schedule.exceptions ?? []).map((exc) => ({
+      occurrenceKey: toOccurrenceKeyInTimezone(exc.date, expanded.time, timezone),
+      reason: exc.reason ?? null,
+    }));
+
+    // Compute base duration for overrides (same logic as insertClassScheduleRecurrenceOverrides)
+    const [baseStartHour, baseStartMinute] = expanded.time
+      .split(':')
+      .map((v) => Number(v));
+    const baseStartMinutes = (baseStartHour ?? 0) * 60 + (baseStartMinute ?? 0);
+    const endTimeStr = schedule.endTime ?? expanded.time;
+    const [baseEndHour, baseEndMinute] = endTimeStr.split(':').map((v) => Number(v));
+    let baseEndMinutes = (baseEndHour ?? 0) * 60 + (baseEndMinute ?? 0);
+    if (baseEndMinutes <= baseStartMinutes) baseEndMinutes += 24 * 60;
+    const baseDurationMinutes = Math.max(1, baseEndMinutes - baseStartMinutes);
+
+    const overrides = (schedule.overrides ?? []).map((ov) => {
+      const time = ov.newTime ?? expanded.time;
+      const startAt = toOccurrenceKeyInTimezone(ov.newDate, time, timezone);
+      const endAt =
+        ov.newEndTime != null
+          ? toOccurrenceKeyInTimezone(ov.newDate, ov.newEndTime, timezone)
+          : addMinutesToIso(startAt, baseDurationMinutes);
+      const occurrenceKey = toOccurrenceKeyInTimezone(
+        ov.originalDate,
+        expanded.time,
+        timezone,
+      );
+      return {
+        occurrenceKey,
+        patch: { startAt, endAt, reason: ov.reason ?? null },
+      };
+    });
+
+    return {
+      startAt: expanded.startAt,
+      endAt: expanded.endAt,
+      timezone,
+      recurrence: {
+        frequency: schedule.rule.frequency,
+        interval: schedule.rule.interval ?? null,
+        count: schedule.rule.count ?? null,
+        until: schedule.rule.until ?? null,
+        timezone: timezone ?? null,
+        rawRrule,
+        bysecond: rruleFields.bysecond,
+        byminute: rruleFields.byminute,
+        byhour: rruleFields.byhour,
+        byday: rruleFields.byday,
+        bymonthday: rruleFields.bymonthday,
+        byyearday: rruleFields.byyearday,
+        byweekno: rruleFields.byweekno,
+        bymonth: rruleFields.bymonth,
+        bysetpos: rruleFields.bysetpos,
+        wkst: rruleFields.wkst,
+        exceptions,
+        overrides,
+      },
+    };
+  });
 }
