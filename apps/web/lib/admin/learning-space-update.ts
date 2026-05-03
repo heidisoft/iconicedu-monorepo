@@ -4,7 +4,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 import { requireParentActorContext } from '@iconicedu/web/lib/family-view/actor-context';
-import { insertClassSchedules } from '@iconicedu/web/lib/admin/learning-space-create';
+import { buildScheduleRowsForApi } from '@iconicedu/web/lib/admin/learning-space-create';
+import { createApiClient } from '@iconicedu/web/lib/api/http-client';
 import {
   type CanonicalLearningSpaceSchedule,
   buildCanonicalLearningSpaceSchedulesFromExisting,
@@ -854,6 +855,15 @@ async function updateChannel(supabase: SupabaseClient, payload: UpdateChannelPay
   }
 }
 
+async function ensureDeleted(
+  request: PromiseLike<{ error: { message: string } | null }>,
+) {
+  const { error } = await request;
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
 type ReplaceParticipantsPayload = {
   orgId: string;
   learningSpaceId: string;
@@ -955,107 +965,22 @@ export async function replaceLearningSpaceSchedules(
   supabase: SupabaseClient,
   payload: ReplaceSchedulesPayload,
 ) {
-  const serviceClient = createSupabaseServiceClient();
-  void supabase;
-
-  const { data: schedules, error } = await serviceClient
-    .from('class_schedules')
-    .select('id')
-    .eq('org_id', payload.orgId)
-    .eq('source_learning_space_id', payload.learningSpaceId)
-    .is('deleted_at', null);
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  const scheduleIds = (schedules ?? []).map((row) => row.id).filter(Boolean);
-  await deleteSchedules(serviceClient, payload.orgId, scheduleIds);
-
-  if (!payload.schedules?.length) {
-    return;
-  }
-
-  await insertClassSchedules(serviceClient, {
+  const api = createApiClient(supabase);
+  await api.post('/schedules/learning-space/replace', {
     orgId: payload.orgId,
     learningSpaceId: payload.learningSpaceId,
     channelId: payload.channelId,
     createdBy: payload.createdBy,
-    createdAt: payload.createdAt,
     title: payload.title,
     description: payload.description,
     themeKey: payload.themeKey ?? null,
-    participants: payload.participants,
-    schedules: payload.schedules ?? [],
+    participants: payload.participants.map((p) => ({
+      profileId: p.profileId,
+      kind: p.kind,
+      displayName: p.displayName ?? null,
+      avatarUrl: p.avatarUrl ?? null,
+      themeKey: p.themeKey ?? null,
+    })),
+    schedules: buildScheduleRowsForApi(payload.schedules ?? []),
   });
-}
-
-async function deleteSchedules(
-  supabase: SupabaseClient,
-  orgId: string,
-  scheduleIds: string[],
-) {
-  if (!scheduleIds.length) {
-    return;
-  }
-
-  const { data: recurrenceRows, error: recurrenceError } = await supabase
-    .from('class_schedule_recurrence')
-    .select('id')
-    .eq('org_id', orgId)
-    .in('schedule_id', scheduleIds)
-    .is('deleted_at', null);
-
-  if (recurrenceError) {
-    throw new Error(recurrenceError.message);
-  }
-
-  const recurrenceIds = (recurrenceRows ?? []).map((row) => row.id).filter(Boolean);
-
-  if (recurrenceIds.length) {
-    await ensureDeleted(
-      supabase
-        .from('class_schedule_recurrence_exceptions')
-        .delete()
-        .eq('org_id', orgId)
-        .in('recurrence_id', recurrenceIds),
-    );
-
-    await ensureDeleted(
-      supabase
-        .from('class_schedule_recurrence_overrides')
-        .delete()
-        .eq('org_id', orgId)
-        .in('recurrence_id', recurrenceIds),
-    );
-  }
-
-  await ensureDeleted(
-    supabase
-      .from('class_schedule_recurrence')
-      .delete()
-      .eq('org_id', orgId)
-      .in('schedule_id', scheduleIds),
-  );
-
-  await ensureDeleted(
-    supabase
-      .from('class_schedule_participants')
-      .delete()
-      .eq('org_id', orgId)
-      .in('schedule_id', scheduleIds),
-  );
-
-  await ensureDeleted(
-    supabase.from('class_schedules').delete().eq('org_id', orgId).in('id', scheduleIds),
-  );
-}
-
-async function ensureDeleted(
-  request: PromiseLike<{ error: { message: string } | null }>,
-) {
-  const { error } = await request;
-  if (error) {
-    throw new Error(error.message);
-  }
 }

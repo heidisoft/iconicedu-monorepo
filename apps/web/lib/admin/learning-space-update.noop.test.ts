@@ -668,7 +668,10 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
 
     await updateLearningSpaceFromPayload('space-1', payload);
 
-    expect(apiPostMock).not.toHaveBeenCalled();
+    expect(apiPostMock).toHaveBeenCalledWith(
+      '/schedules/learning-space/replace',
+      expect.objectContaining({ orgId: 'org-1', learningSpaceId: 'space-1' }),
+    );
     expect(publishActivityEventMock).not.toHaveBeenCalled();
 
     expect(logSpy).not.toHaveBeenCalled();

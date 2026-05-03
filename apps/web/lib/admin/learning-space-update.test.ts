@@ -1,12 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { createSupabaseServiceClientMock, insertClassSchedulesMock } = vi.hoisted(() => ({
-  createSupabaseServiceClientMock: vi.fn(),
-  insertClassSchedulesMock: vi.fn(),
+const { apiPostMock } = vi.hoisted(() => ({
+  apiPostMock: vi.fn(),
 }));
 
-vi.mock('@iconicedu/web/lib/supabase/service', () => ({
-  createSupabaseServiceClient: createSupabaseServiceClientMock,
+vi.mock('@iconicedu/web/lib/api/http-client', () => ({
+  createApiClient: vi.fn(() => ({ post: apiPostMock })),
 }));
 
 vi.mock('@iconicedu/web/lib/admin/learning-space-create', async () => {
@@ -16,85 +15,27 @@ vi.mock('@iconicedu/web/lib/admin/learning-space-create', async () => {
 
   return {
     ...actual,
-    insertClassSchedules: insertClassSchedulesMock,
   };
 });
 
 import { replaceLearningSpaceSchedules } from '@iconicedu/web/lib/admin/learning-space-update';
 
-function createSelectChain(result: { data: unknown; error: { message: string } | null }) {
-  const chain = {
-    eq: vi.fn(() => chain),
-    in: vi.fn(() => chain),
-    is: vi.fn(async () => result),
-  };
-
-  return {
-    select: vi.fn(() => chain),
-  };
-}
-
-function createDeleteChain() {
-  const chain = {
-    eq: vi.fn(() => chain),
-    in: vi.fn(async () => ({ error: null })),
-    delete: vi.fn(() => chain),
-  };
-
-  return chain;
-}
-
-function createTableWithSelectAndDelete(result: {
-  data: unknown;
-  error: { message: string } | null;
-}) {
-  return {
-    ...createSelectChain(result),
-    ...createDeleteChain(),
-  };
-}
-
 describe('replaceLearningSpaceSchedules', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    apiPostMock.mockResolvedValue({ scheduleIds: ['schedule-2'] });
   });
 
-  it('replaces schedules using the service client', async () => {
-    const classSchedulesTable = createTableWithSelectAndDelete({
-      data: [{ id: 'schedule-1' }],
-      error: null,
-    });
-    const recurrenceTable = createTableWithSelectAndDelete({
-      data: [{ id: 'recurrence-1' }],
-      error: null,
-    });
-    const recurrenceExceptionsDelete = createDeleteChain();
-    const recurrenceOverridesDelete = createDeleteChain();
-    const scheduleParticipantsDelete = createDeleteChain();
-
-    const serviceClient = {
-      from: vi.fn((table: string) => {
-        switch (table) {
-          case 'class_schedules':
-            return classSchedulesTable;
-          case 'class_schedule_recurrence':
-            return recurrenceTable;
-          case 'class_schedule_recurrence_exceptions':
-            return recurrenceExceptionsDelete;
-          case 'class_schedule_recurrence_overrides':
-            return recurrenceOverridesDelete;
-          case 'class_schedule_participants':
-            return scheduleParticipantsDelete;
-          default:
-            throw new Error(`Unexpected table ${table}`);
-        }
-      }),
+  it('delegates schedule replacement to the API', async () => {
+    const mockSupabase = {
+      auth: {
+        getSession: vi.fn(async () => ({
+          data: { session: { access_token: 'token-1' } },
+        })),
+      },
     };
 
-    createSupabaseServiceClientMock.mockReturnValue(serviceClient);
-    insertClassSchedulesMock.mockResolvedValue(['schedule-2']);
-
-    await replaceLearningSpaceSchedules({} as never, {
+    await replaceLearningSpaceSchedules(mockSupabase as never, {
       orgId: 'org-1',
       learningSpaceId: 'space-1',
       channelId: 'channel-1',
@@ -119,9 +60,8 @@ describe('replaceLearningSpaceSchedules', () => {
       ],
     });
 
-    expect(createSupabaseServiceClientMock).toHaveBeenCalledTimes(1);
-    expect(insertClassSchedulesMock).toHaveBeenCalledWith(
-      serviceClient,
+    expect(apiPostMock).toHaveBeenCalledWith(
+      '/schedules/learning-space/replace',
       expect.objectContaining({
         orgId: 'org-1',
         learningSpaceId: 'space-1',
@@ -129,7 +69,5 @@ describe('replaceLearningSpaceSchedules', () => {
         title: 'Algebra',
       }),
     );
-    expect(classSchedulesTable.delete).toHaveBeenCalledTimes(1);
-    expect(recurrenceTable.delete).toHaveBeenCalledTimes(1);
   });
 });

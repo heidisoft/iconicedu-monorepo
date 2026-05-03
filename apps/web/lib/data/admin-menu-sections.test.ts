@@ -26,6 +26,16 @@ describe('buildAdminMenuSections', () => {
     expect(settingsSection?.links.map((link) => link.title)).toContain('Subjects');
   });
 
+  it('includes admin tools under settings', () => {
+    const sections = buildAdminMenuSections('/iconic-academy');
+    const settingsSection = sections.find((section) => section.title === 'Settings');
+
+    expect(settingsSection?.links).toContainEqual({
+      title: 'Tools',
+      url: '/iconic-academy/admin/tools',
+    });
+  });
+
   it('links classrooms admin routes with the classrooms path', () => {
     const sections = buildAdminMenuSections('/iconic-academy');
     const classroomsSection = sections.find((section) => section.title === 'Classrooms');

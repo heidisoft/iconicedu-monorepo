@@ -5,12 +5,17 @@ import {
   extractBearerToken,
   type AuthenticatedRequest,
 } from '@iconicedu/api/lib/http/authenticated-request';
+import {
+  parseCancelSessionDto,
+  parseDeleteSchedulesDto,
+  parseReplaceSchedulesDto,
+} from '@iconicedu/api/modules/schedules/dto';
 
-@Controller('schedules')
+@Controller()
 export class SchedulesController {
   constructor(private readonly schedulesService: SchedulesService) {}
 
-  @Get()
+  @Get('schedules')
   @UseGuards(AuthGuard)
   list(
     @Req() req: AuthenticatedRequest,
@@ -23,7 +28,7 @@ export class SchedulesController {
     });
   }
 
-  @Post('exceptions')
+  @Post('schedules/exceptions')
   @UseGuards(AuthGuard)
   createException(
     @Req() req: AuthenticatedRequest,
@@ -33,6 +38,36 @@ export class SchedulesController {
     return this.schedulesService.createException(
       extractBearerToken(req.headers.authorization),
       body,
+    );
+  }
+
+  @Post('schedules/learning-space/replace')
+  @UseGuards(AuthGuard)
+  replaceSchedules(@Req() req: AuthenticatedRequest, @Body() body: unknown) {
+    const dto = parseReplaceSchedulesDto(body);
+    return this.schedulesService.replaceSchedulesForLearningSpace(
+      extractBearerToken(req.headers.authorization),
+      dto,
+    );
+  }
+
+  @Post('schedules/learning-space/delete')
+  @UseGuards(AuthGuard)
+  deleteSchedules(@Req() req: AuthenticatedRequest, @Body() body: unknown) {
+    const dto = parseDeleteSchedulesDto(body);
+    return this.schedulesService.deleteSchedulesForLearningSpace(
+      extractBearerToken(req.headers.authorization),
+      dto,
+    );
+  }
+
+  @Post('schedules/session/cancel')
+  @UseGuards(AuthGuard)
+  cancelSession(@Req() req: AuthenticatedRequest, @Body() body: unknown) {
+    const dto = parseCancelSessionDto(body);
+    return this.schedulesService.cancelScheduleSession(
+      extractBearerToken(req.headers.authorization),
+      dto,
     );
   }
 }

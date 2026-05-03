@@ -1,20 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const createSupabaseServerClientMock = vi.fn();
-const createSupabaseServiceClientMock = vi.fn();
 const buildOrgBySlugMock = vi.fn();
 const getAccountByAuthUserIdInOrgMock = vi.fn();
-const getProfileByAccountIdMock = vi.fn();
 const revalidatePathMock = vi.fn();
+const apiPostMock = vi.fn();
 
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
   createSupabaseServerClient: (...args: unknown[]) =>
     createSupabaseServerClientMock(...args),
-}));
-
-vi.mock('@iconicedu/web/lib/supabase/service', () => ({
-  createSupabaseServiceClient: (...args: unknown[]) =>
-    createSupabaseServiceClientMock(...args),
 }));
 
 vi.mock('@iconicedu/web/lib/org/builders/org.builder', () => ({
@@ -26,8 +20,8 @@ vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
     getAccountByAuthUserIdInOrgMock(...args),
 }));
 
-vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
-  getProfileByAccountId: (...args: unknown[]) => getProfileByAccountIdMock(...args),
+vi.mock('@iconicedu/web/lib/api/http-client', () => ({
+  createApiClient: vi.fn(() => ({ post: apiPostMock })),
 }));
 
 vi.mock('next/cache', () => ({
@@ -44,228 +38,26 @@ function createServerSupabase() {
           user: { id: 'auth-1' },
         },
       })),
-    },
-  };
-}
-
-function createRecurringServiceSupabase() {
-  const deleteOverride = vi.fn(async () => ({ error: null }));
-  const insertException = vi.fn(async () => ({ error: null }));
-
-  return {
-    deleteOverride,
-    insertException,
-    from: vi.fn((table: string) => {
-      if (table === 'class_schedules') {
-        return {
-          select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              eq: vi.fn(() => ({
-                is: vi.fn(() => ({
-                  maybeSingle: vi.fn(async () => ({
-                    data: {
-                      id: 'schedule-1',
-                      org_id: 'org-1',
-                      source_learning_space_id: 'space-1',
-                      source_channel_id: 'channel-1',
-                      timezone: 'America/New_York',
-                      title: 'Algebra',
-                      start_at: '2026-03-21T10:00:00.000Z',
-                    },
-                    error: null,
-                  })),
-                })),
-              })),
-            })),
-          })),
-        };
-      }
-
-      if (table === 'learning_spaces') {
-        return {
-          select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              eq: vi.fn(() => ({
-                is: vi.fn(() => ({
-                  maybeSingle: vi.fn(async () => ({
-                    data: { status: 'active', archived_at: null },
-                    error: null,
-                  })),
-                })),
-              })),
-            })),
-          })),
-        };
-      }
-
-      if (table === 'learning_spaces') {
-        return {
-          select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              eq: vi.fn(() => ({
-                is: vi.fn(() => ({
-                  maybeSingle: vi.fn(async () => ({
-                    data: { status: 'active', archived_at: null },
-                    error: null,
-                  })),
-                })),
-              })),
-            })),
-          })),
-        };
-      }
-
-      if (table === 'class_schedule_recurrence') {
-        return {
-          select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              eq: vi.fn(() => ({
-                is: vi.fn(() => ({
-                  maybeSingle: vi.fn(async () => ({
-                    data: { id: 'recurrence-1' },
-                    error: null,
-                  })),
-                })),
-              })),
-            })),
-          })),
-        };
-      }
-
-      if (table === 'class_schedule_recurrence_overrides') {
-        return {
-          delete: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              eq: vi.fn(() => ({
-                eq: deleteOverride,
-              })),
-            })),
-          })),
-        };
-      }
-
-      if (table === 'class_schedule_recurrence_exceptions') {
-        return {
-          select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              eq: vi.fn(() => ({
-                eq: vi.fn(() => ({
-                  maybeSingle: vi.fn(async () => ({
-                    data: null,
-                    error: null,
-                  })),
-                })),
-              })),
-            })),
-          })),
-          insert: insertException,
-        };
-      }
-
-      throw new Error(`Unexpected table ${table}`);
-    }),
-  };
-}
-
-function createSingleServiceSupabase() {
-  const updateSchedule = vi.fn(async () => ({ error: null }));
-  const activeLearningSpaceQuery = {
-    select: vi.fn(() => ({
-      eq: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          is: vi.fn(() => ({
-            maybeSingle: vi.fn(async () => ({
-              data: { status: 'active', archived_at: null },
-              error: null,
-            })),
-          })),
-        })),
+      getSession: vi.fn(async () => ({
+        data: { session: { access_token: 'token-1' } },
       })),
-    })),
-  };
-
-  return {
-    updateSchedule,
-    from: vi.fn((table: string) => {
-      if (table === 'learning_spaces') {
-        return activeLearningSpaceQuery;
-      }
-
-      if (table === 'class_schedules') {
-        return {
-          select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              eq: vi.fn(() => ({
-                is: vi.fn(() => ({
-                  maybeSingle: vi.fn(async () => ({
-                    data: {
-                      id: 'schedule-1',
-                      org_id: 'org-1',
-                      source_learning_space_id: 'space-1',
-                      source_channel_id: 'channel-1',
-                      timezone: 'America/New_York',
-                      title: 'Algebra',
-                      start_at: '2026-03-21T10:00:00.000Z',
-                    },
-                    error: null,
-                  })),
-                })),
-              })),
-            })),
-          })),
-          update: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              eq: vi.fn(() => ({
-                is: updateSchedule,
-              })),
-            })),
-          })),
-        };
-      }
-
-      if (table === 'class_schedule_recurrence') {
-        return {
-          select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              eq: vi.fn(() => ({
-                is: vi.fn(() => ({
-                  maybeSingle: vi.fn(async () => ({
-                    data: null,
-                    error: null,
-                  })),
-                })),
-              })),
-            })),
-          })),
-        };
-      }
-
-      throw new Error(`Unexpected table ${table}`);
-    }),
+    },
   };
 }
 
 describe('cancelClassScheduleSessionAction', () => {
   beforeEach(() => {
-    createSupabaseServerClientMock.mockReset();
-    createSupabaseServiceClientMock.mockReset();
-    buildOrgBySlugMock.mockReset();
-    getAccountByAuthUserIdInOrgMock.mockReset();
-    revalidatePathMock.mockReset();
+    vi.clearAllMocks();
 
     createSupabaseServerClientMock.mockResolvedValue(createServerSupabase());
     buildOrgBySlugMock.mockResolvedValue({ id: 'org-1', slug: 'iconic-academy' });
     getAccountByAuthUserIdInOrgMock.mockResolvedValue({
       data: { id: 'account-1', org_id: 'org-1', primary_role: 'owner' },
     });
-    getProfileByAccountIdMock.mockResolvedValue({
-      data: { id: 'profile-1' },
-    });
   });
 
-  it('creates a recurrence exception and removes any matching override for recurring sessions', async () => {
-    const serviceSupabase = createRecurringServiceSupabase();
-    createSupabaseServiceClientMock.mockReturnValue(serviceSupabase);
+  it('delegates session cancellation to the API for recurring sessions', async () => {
+    apiPostMock.mockResolvedValue({ mode: 'recurring' });
 
     const result = await cancelClassScheduleSessionAction({
       orgSlug: 'iconic-academy',
@@ -274,20 +66,12 @@ describe('cancelClassScheduleSessionAction', () => {
       reason: ' Tutor unavailable ',
     });
 
-    expect(serviceSupabase.deleteOverride).toHaveBeenCalledWith(
-      'occurrence_key',
-      '2026-03-21T10:00:00.000Z',
-    );
-    expect(serviceSupabase.insertException).toHaveBeenCalledWith(
-      expect.objectContaining({
-        org_id: 'org-1',
-        recurrence_id: 'recurrence-1',
-        occurrence_key: '2026-03-21T10:00:00.000Z',
-        reason: 'Tutor unavailable',
-        created_by: 'profile-1',
-        updated_by: 'profile-1',
-      }),
-    );
+    expect(apiPostMock).toHaveBeenCalledWith('/schedules/session/cancel', {
+      orgId: 'org-1',
+      scheduleId: 'schedule-1',
+      occurrenceKey: '2026-03-21T10:00:00.000Z',
+      reason: 'Tutor unavailable',
+    });
     expect(revalidatePathMock).toHaveBeenCalledWith('/iconic-academy/class-schedule');
     expect(result).toEqual({
       scheduleId: 'schedule-1',
@@ -297,9 +81,8 @@ describe('cancelClassScheduleSessionAction', () => {
     });
   });
 
-  it('updates single schedules directly when no recurrence exists', async () => {
-    const serviceSupabase = createSingleServiceSupabase();
-    createSupabaseServiceClientMock.mockReturnValue(serviceSupabase);
+  it('delegates session cancellation to the API for single sessions', async () => {
+    apiPostMock.mockResolvedValue({ mode: 'single' });
 
     const result = await cancelClassScheduleSessionAction({
       orgSlug: 'iconic-academy',
@@ -308,7 +91,12 @@ describe('cancelClassScheduleSessionAction', () => {
       reason: null,
     });
 
-    expect(serviceSupabase.updateSchedule).toHaveBeenCalled();
+    expect(apiPostMock).toHaveBeenCalledWith('/schedules/session/cancel', {
+      orgId: 'org-1',
+      scheduleId: 'schedule-1',
+      occurrenceKey: '2026-03-21T10:00:00.000Z',
+      reason: null,
+    });
     expect(revalidatePathMock).toHaveBeenCalledWith('/iconic-academy/class-schedule');
     expect(result).toEqual({
       scheduleId: 'schedule-1',
@@ -319,7 +107,6 @@ describe('cancelClassScheduleSessionAction', () => {
   });
 
   it('rejects non-staff non-owner profiles', async () => {
-    createSupabaseServiceClientMock.mockReturnValue(createSingleServiceSupabase());
     getAccountByAuthUserIdInOrgMock.mockResolvedValue({
       data: { id: 'account-1', org_id: 'org-1', primary_role: 'guardian' },
     });

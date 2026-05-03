@@ -26,6 +26,7 @@ import {
 } from '@iconicedu/api/lib/supabase/service';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
 import { getRequestContext } from '@iconicedu/api/observability/request-context';
+import { ReminderReconcileService } from '@iconicedu/api/modules/reminders/reminder-reconcile.service';
 
 const REMINDER_HORIZON_DAYS = 30;
 const DEFAULT_JOB_LIMIT = 100;
@@ -192,7 +193,10 @@ const CLASS_SCHEDULE_SELECT = `
 export class RemindersService {
   private readonly logger = new Logger(RemindersService.name);
 
-  constructor(private readonly analytics: AnalyticsService) {}
+  constructor(
+    private readonly analytics: AnalyticsService,
+    private readonly reminderReconcileService: ReminderReconcileService,
+  ) {}
 
   /**
    * Keep Supabase env validation out of Nest bootstrap so the API can expose
@@ -424,6 +428,27 @@ export class RemindersService {
       compiledCount: rowsToUpsert.length,
       canceledCount: staleIds.length,
     };
+  }
+
+  async reconcileLearningSpaceReminderJobs(
+    accessToken: string,
+    input: { orgId: string; learningSpaceId: string },
+  ) {
+    await this.requireOrgActor(accessToken, input.orgId);
+    return this.reminderReconcileService.reconcileAllSchedulesForLearningSpace(
+      input.orgId,
+      input.learningSpaceId,
+    );
+  }
+
+  async reconcileLearningSpaceReminderJobsInternal(input: {
+    orgId: string;
+    learningSpaceId: string;
+  }) {
+    return this.reminderReconcileService.reconcileAllSchedulesForLearningSpace(
+      input.orgId,
+      input.learningSpaceId,
+    );
   }
 
   async cancelLearningSpaceReminderJobs(
@@ -1365,6 +1390,31 @@ export class RemindersService {
       result: 'succeeded',
       details: { event_type: eventType },
     });
+
+    // Replenish: insert the next job in the chain for this schedule
+    if (job.source_schedule_id) {
+      try {
+        await this.reminderReconcileService.reconcileNextReminderJobForSchedule({
+          orgId: job.org_id,
+          scheduleId: job.source_schedule_id,
+        });
+      } catch (replenishError) {
+        await this.logDispatch({
+          supabase,
+          orgId: job.org_id,
+          jobId: job.id,
+          result: 'retryable_failure',
+          details: {
+            replenish_error:
+              replenishError instanceof Error
+                ? replenishError.message
+                : String(replenishError),
+            phase: 'replenishment',
+          },
+        });
+        // Non-fatal: the dispatch itself succeeded
+      }
+    }
 
     return 'succeeded';
   }

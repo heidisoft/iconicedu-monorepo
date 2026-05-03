@@ -79,4 +79,27 @@ export class RemindersController {
       dto,
     );
   }
+
+  @Post('reminders/learning-space/reconcile')
+  @UseGuards(AuthGuard)
+  reconcileLearningSpace(@Req() req: AuthenticatedRequest, @Body() body: unknown) {
+    const dto = parseLearningSpaceRemindersDto(body);
+    return this.remindersService.reconcileLearningSpaceReminderJobs(
+      extractBearerToken(req.headers.authorization),
+      dto,
+    );
+  }
+
+  @Post('internal/reminders/reconcile-space')
+  async reconcileSpaceInternal(
+    @Headers('authorization') authorization: string | undefined,
+    @Body() body: unknown,
+  ) {
+    const expectedToken = resolveExpectedToken();
+    if (!expectedToken || authorization !== `Bearer ${expectedToken}`) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+    const dto = parseLearningSpaceRemindersDto(body);
+    return this.remindersService.reconcileLearningSpaceReminderJobsInternal(dto);
+  }
 }
