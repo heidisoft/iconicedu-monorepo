@@ -1,3 +1,4 @@
+import { ForbiddenException, Logger } from '@nestjs/common';
 import { RemindersService } from '@iconicedu/api/modules/reminders/reminders.service';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
@@ -20,10 +21,16 @@ describe('RemindersService', () => {
   const createSupabaseServiceClientMock = jest.mocked(createSupabaseServiceClient);
   const createSupabaseSessionClientMock = jest.mocked(createSupabaseSessionClient);
   const publishActivityEventMock = jest.mocked(publishActivityEvent);
+  const originalSupabaseUrl = process.env.SUPABASE_URL;
+  let loggerLogSpy: jest.SpyInstance;
+  let loggerWarnSpy: jest.SpyInstance;
 
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers().setSystemTime(new Date('2030-03-01T00:00:00.000Z'));
+    process.env.SUPABASE_URL = 'https://prod-ref.supabase.co';
+    loggerLogSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation();
+    loggerWarnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
     createSupabaseSessionClientMock.mockReturnValue({
       auth: {
         getUser: jest.fn(async () => ({
@@ -35,6 +42,9 @@ describe('RemindersService', () => {
   });
 
   afterEach(() => {
+    process.env.SUPABASE_URL = originalSupabaseUrl;
+    loggerLogSpy.mockRestore();
+    loggerWarnSpy.mockRestore();
     jest.useRealTimers();
   });
 
@@ -103,11 +113,15 @@ describe('RemindersService', () => {
   }
 
   function makeCompileSupabase(input?: {
+    account?: { id: string } | null;
     scheduleRows?: unknown[];
     existingRows?: Array<{ dedupe_key: string; status: string }>;
     staleRows?: Array<{ id: string; dedupe_key: string }>;
   }) {
-    const accountChain = makeChain({ data: { id: 'account-1' }, error: null });
+    const accountChain = makeChain({
+      data: input?.account === undefined ? { id: 'account-1' } : input.account,
+      error: null,
+    });
     const schedulesChain = makeChain({
       data: input?.scheduleRows ?? [buildScheduleRow()],
       error: null,
@@ -206,6 +220,27 @@ describe('RemindersService', () => {
       profileId: 'profile-1',
       role: 'child',
     });
+    expect(loggerLogSpy).toHaveBeenCalledWith(
+      expect.stringContaining('reminders org actor account resolved'),
+    );
+  });
+
+  it('throws Forbidden when the token user has no account in the org', async () => {
+    const { supabase } = makeCompileSupabase({ account: null });
+    createSupabaseServiceClientMock.mockReturnValue(supabase as never);
+
+    const service = new RemindersService(analytics as never);
+
+    await expect(
+      service.compileLearningSpaceReminderJobs('token-1', {
+        orgId: 'org-1',
+        learningSpaceId: 'space-1',
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(loggerWarnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('reminders org actor account missing'),
+    );
+    expect(loggerWarnSpy).toHaveBeenCalledWith(expect.stringContaining('accountFound'));
   });
 
   it('falls back to start time when end time is invalid for feedback scheduling', async () => {

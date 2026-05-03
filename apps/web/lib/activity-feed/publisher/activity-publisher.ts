@@ -45,6 +45,16 @@ async function parseInternalResponse<T>(response: Response): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+function logActivityPublishFailure(reason: string, details: Record<string, unknown>) {
+  // eslint-disable-next-line no-console
+  console.warn(
+    `activity publish skipped ${JSON.stringify({
+      reason,
+      ...details,
+    })}`,
+  );
+}
+
 export async function publishActivityEvent<TPayload extends object>(
   input: PublishActivityEventInput<TPayload>,
 ) {
@@ -53,36 +63,56 @@ export async function publishActivityEvent<TPayload extends object>(
   const internalApiUrl = resolveInternalApiUrl();
 
   if (!internalApiUrl) {
-    throw new Error('API_URL or NEXT_PUBLIC_API_URL is required for activity publishing');
+    logActivityPublishFailure('missing_api_url', {
+      orgId: input.orgId,
+      eventType: input.eventType,
+      dedupeKey: input.dedupeKey ?? null,
+    });
+    return null;
   }
 
   const token = resolveInternalActivityFeedToken();
   if (!token) {
-    throw new Error('INTERNAL_ACTIVITY_FEED_TOKEN is required for activity publishing');
-  }
-
-  const response = await fetch(`${internalApiUrl}/internal/activity-feed/publish`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({
+    logActivityPublishFailure('missing_internal_token', {
       orgId: input.orgId,
       eventType: input.eventType,
-      emitterLabel: input.emitterLabel,
-      occurredAt: input.occurredAt,
-      sourceKind: input.sourceKind,
-      actorProfileId: input.actorProfileId ?? null,
-      scope: input.scope,
-      objectRef: input.objectRef ?? null,
-      targetRef: input.targetRef ?? null,
-      audienceRules: input.audienceRules ?? [],
-      payload: input.payload,
       dedupeKey: input.dedupeKey ?? null,
-      createdBy: input.createdBy ?? input.actorProfileId ?? null,
-    }),
-  });
+    });
+    return null;
+  }
 
-  return parseInternalResponse<ActivityEventRow | null>(response);
+  try {
+    const response = await fetch(`${internalApiUrl}/internal/activity-feed/publish`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        orgId: input.orgId,
+        eventType: input.eventType,
+        emitterLabel: input.emitterLabel,
+        occurredAt: input.occurredAt,
+        sourceKind: input.sourceKind,
+        actorProfileId: input.actorProfileId ?? null,
+        scope: input.scope,
+        objectRef: input.objectRef ?? null,
+        targetRef: input.targetRef ?? null,
+        audienceRules: input.audienceRules ?? [],
+        payload: input.payload,
+        dedupeKey: input.dedupeKey ?? null,
+        createdBy: input.createdBy ?? input.actorProfileId ?? null,
+      }),
+    });
+
+    return await parseInternalResponse<ActivityEventRow | null>(response);
+  } catch (error) {
+    logActivityPublishFailure('publish_failed', {
+      orgId: input.orgId,
+      eventType: input.eventType,
+      dedupeKey: input.dedupeKey ?? null,
+      errorMessage: error instanceof Error ? error.message : 'Unknown error',
+    });
+    return null;
+  }
 }

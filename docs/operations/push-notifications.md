@@ -130,6 +130,15 @@ When an activity event is projected, `enqueueNotificationDispatchJobs()` is call
 1. `buildNotificationDecision()` runs the preference + policy check
 2. Eligible channels (`push`, `email`, `sms`) are written as rows into `notification_dispatch_jobs` with `status = 'pending'`
 
+`enqueueNotificationDispatchJobs()` builds one row per eligible recipient/channel pair:
+
+- `activity_event_id`, `recipient_profile_id`, `pref_key`, `scope_kind`, and `scope_id` come from the activity event plus `buildNotificationDecision()`.
+- `delivery_channel` is one of the channels returned by the decision engine.
+- `delivery_timing`, `run_at`, and `attempt_bucket` control when the dispatcher can claim the job.
+- `payload` includes `eventType`, decision `reasonCodes`, `sourceKind`, `occurredAt`, `title`, `summary`, optional `threadId`, and `rawEventPayload`.
+- Session reminder and feedback events may receive personalized copy from `buildPersonalizedSessionCopy()` when the activity payload contains member metadata.
+- Rows are upserted on `activity_event_id,recipient_profile_id,delivery_channel,attempt_bucket`, so repeated projection is idempotent for the same delivery window.
+
 **Delivery timing logic** (`apps/api/src/lib/notifications/policy-config.ts`):
 
 | Category             | Examples                                                                                                                                                       | Timing                                                   |
@@ -146,6 +155,13 @@ When an activity event is projected, `enqueueNotificationDispatchJobs()` is call
 - `notification_preferences.muted = true` for the pref key or master `__push__` key → suppressed entirely
 
 **Important:** the presence of this projector in `apps/api` does not by itself guarantee every app flow uses it yet. Push only works for flows that actually publish activity events through the API-owned path.
+
+Activity publishing is intentionally non-blocking for product flows. Web and
+mobile actions should complete even if activity publishing is unavailable,
+misconfigured, or rejected by the internal API. In those cases the publisher logs
+the skipped event and returns `null`; the action should not surface the activity
+failure to the user. Push delivery for that action may be absent until the
+underlying activity publish issue is fixed.
 
 ---
 
@@ -203,6 +219,23 @@ Calls `dispatchDueNotificationJobs()` which:
 5. Marks jobs `succeeded`, `failed` (retryable with exponential backoff), or `dead_letter` (after max 8 attempts or non-retryable error)
 
 **Retry schedule:** 15s, 30s, 60s, 120s, 240s, 480s, 600s, 600s (capped at 10 min).
+
+Status transitions:
+
+| Status        | When it is set                                                                                        | Important data changes                                                                                       |
+| ------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `leased`      | `claim_due_notification_dispatch_jobs()` claims a pending/failed due row.                             | Sets `lease_owner`, `lease_until`, and `updated_at`.                                                         |
+| `suppressed`  | Source `activity_events` row is missing, or the latest decision no longer includes the job's channel. | Clears lease fields, writes `last_error` for missing source, and inserts a `notification_dispatch_logs` row. |
+| `succeeded`   | Provider send succeeds.                                                                               | Sets `dispatched_at`, clears lease/error fields, and stores Expo ticket IDs for push jobs.                   |
+| `failed`      | Error is retryable and attempts remain.                                                               | Increments `attempt_count`, clears lease fields, sets `next_attempt_at`, and writes `last_error`.            |
+| `dead_letter` | Error is non-retryable or max attempts are exhausted.                                                 | Increments `attempt_count`, clears lease fields, clears `next_attempt_at`, and writes `last_error`.          |
+
+Provider behavior:
+
+- `push` resolves the projected `activity_feed_items.id` for the recipient and includes it in metadata so mobile can mark the inbox item read on notification tap.
+- `push` sends through Expo using active `push_tokens`; invalid downstream tokens are revoked lazily by the provider.
+- `email` and `sms` use the same job title/summary metadata, but currently flow through their own provider wrappers.
+- Every provider outcome writes `notification_dispatch_logs` with `succeeded`, `suppressed`, `retryable_failure`, or `fatal_failure`.
 
 ---
 
