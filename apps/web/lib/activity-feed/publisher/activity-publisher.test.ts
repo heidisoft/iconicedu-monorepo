@@ -6,17 +6,20 @@ describe('publishActivityEvent', () => {
   const originalApiUrl = process.env.API_URL;
   const originalToken = process.env.INTERNAL_ACTIVITY_FEED_TOKEN;
   const fetchMock = vi.fn();
+  let warnSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.API_URL = 'http://127.0.0.1:54321';
     process.env.INTERNAL_ACTIVITY_FEED_TOKEN = 'secret-token';
     vi.stubGlobal('fetch', fetchMock);
+    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
   });
 
   afterEach(() => {
     process.env.API_URL = originalApiUrl;
     process.env.INTERNAL_ACTIVITY_FEED_TOKEN = originalToken;
+    warnSpy.mockRestore();
     vi.unstubAllGlobals();
   });
 
@@ -92,7 +95,7 @@ describe('publishActivityEvent', () => {
     expect(result).toBeNull();
   });
 
-  it('throws the API error message when publishing fails', async () => {
+  it('returns null when publishing fails', async () => {
     fetchMock.mockResolvedValueOnce(
       new Response(JSON.stringify({ message: 'Unauthorized' }), {
         status: 401,
@@ -100,16 +103,37 @@ describe('publishActivityEvent', () => {
       }),
     );
 
-    await expect(
-      publishActivityEvent({
-        supabase: {} as never,
-        orgId: 'org-1',
-        eventType: 'message.posted',
-        sourceKind: 'profile',
-        actorProfileId: 'profile-1',
-        scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
-        payload: { messageId: 'message-3' },
-      }),
-    ).rejects.toThrow('Unauthorized');
+    const result = await publishActivityEvent({
+      supabase: {} as never,
+      orgId: 'org-1',
+      eventType: 'message.posted',
+      sourceKind: 'profile',
+      actorProfileId: 'profile-1',
+      scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+      payload: { messageId: 'message-3' },
+    });
+
+    expect(result).toBeNull();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('activity publish skipped'),
+    );
+  });
+
+  it('returns null when activity publishing env vars are missing', async () => {
+    process.env.API_URL = '';
+
+    const result = await publishActivityEvent({
+      supabase: {} as never,
+      orgId: 'org-1',
+      eventType: 'message.posted',
+      sourceKind: 'profile',
+      actorProfileId: 'profile-1',
+      scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+      payload: { messageId: 'message-4' },
+    });
+
+    expect(result).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('missing_api_url'));
   });
 });

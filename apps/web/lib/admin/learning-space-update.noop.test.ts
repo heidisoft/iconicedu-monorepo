@@ -489,7 +489,7 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
     expect(publishActivityEventMock).not.toHaveBeenCalled();
   });
 
-  it('emits class.updated and class.session.rescheduled for schedule override edits', async () => {
+  it('updates schedule override edits without compiling reminder jobs', async () => {
     vi.stubEnv('DEBUG_LEARNING_SPACE_SCHEDULE_DIFF', '1');
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
 
@@ -668,11 +668,7 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
 
     await updateLearningSpaceFromPayload('space-1', payload);
 
-    expect(apiPostMock).toHaveBeenCalledTimes(1);
-    expect(apiPostMock).toHaveBeenCalledWith('/reminders/learning-space/compile', {
-      orgId: 'org-1',
-      learningSpaceId: 'space-1',
-    });
+    expect(apiPostMock).not.toHaveBeenCalled();
     expect(publishActivityEventMock).not.toHaveBeenCalled();
 
     expect(logSpy).not.toHaveBeenCalled();

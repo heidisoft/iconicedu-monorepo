@@ -2,6 +2,7 @@ import {
   ForbiddenException,
   Injectable,
   InternalServerErrorException,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import type {
@@ -24,6 +25,7 @@ import {
   type SupabaseServiceClient,
 } from '@iconicedu/api/lib/supabase/service';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
+import { getRequestContext } from '@iconicedu/api/observability/request-context';
 
 const REMINDER_HORIZON_DAYS = 30;
 const DEFAULT_JOB_LIMIT = 100;
@@ -33,6 +35,19 @@ const RETRY_BASE_MS = 15_000;
 const RETRY_MAX_MS = 10 * 60_000;
 const SESSION_REMINDER_OFFSETS_MINUTES = [30, 5] as const;
 const SESSION_FEEDBACK_OFFSET_MINUTES = 15;
+
+function resolveSupabaseHost() {
+  const supabaseUrl = process.env.SUPABASE_URL?.trim();
+  if (!supabaseUrl) {
+    return 'missing';
+  }
+
+  try {
+    return new URL(supabaseUrl).host;
+  } catch {
+    return 'invalid';
+  }
+}
 
 type ReminderJobPayload = {
   title: string;
@@ -175,6 +190,8 @@ const CLASS_SCHEDULE_SELECT = `
 
 @Injectable()
 export class RemindersService {
+  private readonly logger = new Logger(RemindersService.name);
+
   constructor(private readonly analytics: AnalyticsService) {}
 
   /**
@@ -547,6 +564,17 @@ export class RemindersService {
   }
 
   private async requireOrgActor(accessToken: string, orgId: string) {
+    const requestId = getRequestContext()?.requestId;
+    const supabaseHost = resolveSupabaseHost();
+    this.logger.log(
+      `reminders org actor lookup started ${JSON.stringify({
+        requestId,
+        orgId,
+        supabaseHost,
+        hasAccessToken: Boolean(accessToken),
+      })}`,
+    );
+
     const sessionSupabase = createSupabaseSessionClient(accessToken);
     const {
       data: { user },
@@ -554,11 +582,35 @@ export class RemindersService {
     } = await sessionSupabase.auth.getUser();
 
     if (userError) {
+      this.logger.warn(
+        `reminders org actor auth lookup failed ${JSON.stringify({
+          requestId,
+          orgId,
+          supabaseHost,
+          errorMessage: userError.message,
+        })}`,
+      );
       throw new UnauthorizedException(userError.message);
     }
     if (!user) {
+      this.logger.warn(
+        `reminders org actor auth user missing ${JSON.stringify({
+          requestId,
+          orgId,
+          supabaseHost,
+        })}`,
+      );
       throw new UnauthorizedException('Unauthorized');
     }
+
+    this.logger.log(
+      `reminders org actor auth user resolved ${JSON.stringify({
+        requestId,
+        orgId,
+        authUserId: user.id,
+        supabaseHost,
+      })}`,
+    );
 
     const { data: account, error: accountError } = await this.getSupabase()
       .from('accounts')
@@ -569,11 +621,40 @@ export class RemindersService {
       .maybeSingle<{ id: string }>();
 
     if (accountError) {
+      this.logger.warn(
+        `reminders org actor account lookup failed ${JSON.stringify({
+          requestId,
+          orgId,
+          authUserId: user.id,
+          supabaseHost,
+          errorMessage: accountError.message,
+        })}`,
+      );
       throw new InternalServerErrorException(accountError.message);
     }
     if (!account) {
+      this.logger.warn(
+        `reminders org actor account missing ${JSON.stringify({
+          requestId,
+          orgId,
+          authUserId: user.id,
+          supabaseHost,
+          accountFound: false,
+        })}`,
+      );
       throw new ForbiddenException('Forbidden');
     }
+
+    this.logger.log(
+      `reminders org actor account resolved ${JSON.stringify({
+        requestId,
+        orgId,
+        authUserId: user.id,
+        accountId: account.id,
+        supabaseHost,
+        accountFound: true,
+      })}`,
+    );
   }
 
   private async buildClassSchedulesByOrg(

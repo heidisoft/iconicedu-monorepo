@@ -1,7 +1,6 @@
 import { randomUUID } from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import { createApiClient } from '@iconicedu/web/lib/api/http-client';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 import { requireParentActorContext } from '@iconicedu/web/lib/family-view/actor-context';
@@ -740,14 +739,6 @@ export async function updateLearningSpaceFromPayload(
       themeKey: payload.settings?.themeKey ?? null,
       participants: payload.participants,
       schedules: payload.schedules ?? [],
-    });
-  }
-
-  if (hasSemanticScheduleChanges) {
-    const api = createApiClient(supabase);
-    await api.post('/reminders/learning-space/compile', {
-      orgId,
-      learningSpaceId,
     });
   }
 
