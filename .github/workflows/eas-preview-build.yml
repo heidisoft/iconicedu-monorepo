@@ -108,7 +108,7 @@ jobs:
             echo "Looking for Supabase branch: $BRANCH_NAME"
 
             BRANCH_DATA=$(supabase branches list \
-              --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}" \
+              --project-ref "${{ vars.SUPABASE_PROJECT_ID }}" \
               --output json \
               | jq --arg name "$BRANCH_NAME" '.[] | select(.name==$name)')
 
@@ -123,7 +123,7 @@ jobs:
               exit 1
             fi
           else
-            PROJECT_REF="${{ secrets.SUPABASE_PROJECT_ID }}"
+            PROJECT_REF="${{ vars.SUPABASE_PROJECT_ID }}"
             if [[ -z "$PROJECT_REF" || "$PROJECT_REF" == "null" ]]; then
               echo "::error::SUPABASE_PROJECT_ID is not configured."
               exit 1
@@ -155,10 +155,10 @@ jobs:
           BRANCH_NAME: ${{ steps.context.outputs.branch_name }}
           PR_NUMBER: ${{ steps.context.outputs.pr_number }}
           RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
-          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+          RAILWAY_PROJECT_ID: ${{ vars.RAILWAY_PROJECT_ID }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+          VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
         run: |
           set -euo pipefail
 
@@ -316,7 +316,7 @@ jobs:
             --arg supabase_url "${{ steps.supabase-creds.outputs.api_url }}" \
             --arg anon_key "${{ steps.supabase-creds.outputs.anon_key }}" \
             --arg posthog_key "${{ secrets.POSTHOG_KEY }}" \
-            --arg posthog_host "${{ secrets.NEXT_PUBLIC_POSTHOG_HOST || 'https://t.iconicedu.lk' }}" \
+            --arg posthog_host "${{ vars.POSTHOG_HOST || 'https://t.iconicedu.lk' }}" \
             --arg api_url "${{ steps.app-urls.outputs.api_url }}" \
             --arg web_url "${{ steps.app-urls.outputs.web_url }}" \
             '.build[$profile].env = ((.build[$profile].env // {}) + {

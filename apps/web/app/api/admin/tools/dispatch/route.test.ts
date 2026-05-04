@@ -19,8 +19,8 @@ const originalEnv = {
   API_URL: process.env.API_URL,
   NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
   NODE_ENV: process.env.NODE_ENV,
-  INTERNAL_REMINDERS_TOKEN_API: process.env.INTERNAL_REMINDERS_TOKEN_API,
-  INTERNAL_EVENTS_TOKEN_API: process.env.INTERNAL_EVENTS_TOKEN_API,
+  INTERNAL_REMINDERS_TOKEN: process.env.INTERNAL_REMINDERS_TOKEN,
+  INTERNAL_EVENTS_TOKEN: process.env.INTERNAL_EVENTS_TOKEN,
 };
 
 function request(body: Record<string, unknown>) {
@@ -41,16 +41,16 @@ describe('POST /api/admin/tools/dispatch', () => {
     });
     process.env.API_URL = 'http://127.0.0.1:3001/';
     process.env.NEXT_PUBLIC_API_URL = '';
-    process.env.INTERNAL_REMINDERS_TOKEN_API = 'reminders-token';
-    process.env.INTERNAL_EVENTS_TOKEN_API = 'events-token';
+    process.env.INTERNAL_REMINDERS_TOKEN = 'reminders-token';
+    process.env.INTERNAL_EVENTS_TOKEN = 'events-token';
   });
 
   afterEach(() => {
     process.env.API_URL = originalEnv.API_URL;
     process.env.NEXT_PUBLIC_API_URL = originalEnv.NEXT_PUBLIC_API_URL;
     process.env.NODE_ENV = originalEnv.NODE_ENV;
-    process.env.INTERNAL_REMINDERS_TOKEN_API = originalEnv.INTERNAL_REMINDERS_TOKEN_API;
-    process.env.INTERNAL_EVENTS_TOKEN_API = originalEnv.INTERNAL_EVENTS_TOKEN_API;
+    process.env.INTERNAL_REMINDERS_TOKEN = originalEnv.INTERNAL_REMINDERS_TOKEN;
+    process.env.INTERNAL_EVENTS_TOKEN = originalEnv.INTERNAL_EVENTS_TOKEN;
   });
 
   it('runs unified event pipeline jobs through the API endpoint', async () => {

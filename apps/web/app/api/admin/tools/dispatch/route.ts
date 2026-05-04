@@ -44,17 +44,9 @@ function resolveInternalApiUrl() {
 function resolveInternalToken(kind: FunctionKind) {
   switch (kind) {
     case 'events-dispatch':
-      return (
-        process.env.INTERNAL_EVENTS_TOKEN_API?.trim() ||
-        process.env.INTERNAL_EVENTS_TOKEN?.trim() ||
-        ''
-      );
+      return process.env.INTERNAL_EVENTS_TOKEN?.trim() || '';
     case 'reminders-dispatch':
-      return (
-        process.env.INTERNAL_REMINDERS_TOKEN_API?.trim() ||
-        process.env.INTERNAL_REMINDERS_TOKEN?.trim() ||
-        ''
-      );
+      return process.env.INTERNAL_REMINDERS_TOKEN?.trim() || '';
     case 'channel-read-state-repair':
       return '';
   }

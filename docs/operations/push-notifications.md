@@ -32,7 +32,7 @@ What still must be true in the running environment for push to work end to end:
 
 - all real event-producing flows that should notify users must write through `apps/api` or a source-of-truth table trigger
 - the deployed `events-dispatch` cron / edge function must call `apps/api`
-- `INTERNAL_EVENTS_TOKEN_API` and `EXPO_ACCESS_TOKEN` must be configured in the deployed API environment
+- `INTERNAL_EVENTS_TOKEN` and `EXPO_ACCESS_TOKEN` must be configured in the deployed API environment
 - at least one real device flow should be verified end to end
 
 Older activity worker/projector endpoints may remain available for guarded admin replay and compatibility while queues drain, but they are not the normal product path.
@@ -209,7 +209,7 @@ It calls:
 
 ```
 POST /internal/events/dispatch
-Authorization: Bearer <INTERNAL_EVENTS_TOKEN_API>
+Authorization: Bearer <INTERNAL_EVENTS_TOKEN>
 ```
 
 **API handler:** `apps/api/src/modules/events/events.controller.ts`
@@ -248,7 +248,7 @@ Provider behavior:
 **API app (`apps/api`):**
 
 ```bash
-INTERNAL_EVENTS_TOKEN_API=<long-random-secret>
+INTERNAL_EVENTS_TOKEN=<long-random-secret>
 EXPO_ACCESS_TOKEN=<expo-personal-access-token>
 ```
 
@@ -256,7 +256,7 @@ EXPO_ACCESS_TOKEN=<expo-personal-access-token>
 
 ```bash
 EVENTS_DISPATCH_URL=https://<your-api-domain>/internal/events/dispatch
-INTERNAL_EVENTS_TOKEN=<same-value-as-INTERNAL_EVENTS_TOKEN_API>
+INTERNAL_EVENTS_TOKEN=<same-value-as-apps-api>
 # optional:
 EVENTS_DISPATCH_LIMIT=100
 EVENTS_DISPATCH_LEASE_SECONDS=120
@@ -269,12 +269,8 @@ EVENTS_DISPATCH_LEASE_OWNER=supabase-edge-cron
 - `REMINDERS_DISPATCH_URL` must target `https://<your-api-domain>/internal/reminders/dispatch`
 - no dispatch secret should point at `apps/web` or `/api/internal/...`
 
-Compatibility/admin-only secrets may still exist while legacy replay endpoints
-remain enabled:
-
-- `INTERNAL_ACTIVITY_FEED_TOKEN`
-
-Do not add new product flows that depend on those legacy tokens.
+Do not add product or admin flows that create activity events or projection jobs
+directly. Use `event_outbox` and `event_pipeline_jobs`.
 
 ---
 
@@ -285,7 +281,7 @@ The edge function is not needed for local testing. You can drive the entire pipe
 ### Prerequisites
 
 - `pnpm dev:api` running (Nest on `http://localhost:3001`)
-- `INTERNAL_EVENTS_TOKEN_API` set in `apps/api/.env`
+- `INTERNAL_EVENTS_TOKEN` set in `apps/api/.env`
 - Supabase connected (remote or local)
 - a real Expo push token from a physical device if you want to validate actual delivery
 
@@ -371,7 +367,7 @@ No need to invoke the edge function. Call the API endpoint directly:
 ```bash
 curl -X POST http://localhost:3001/internal/events/dispatch \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <INTERNAL_EVENTS_TOKEN_API>" \
+  -H "Authorization: Bearer <INTERNAL_EVENTS_TOKEN>" \
   -d '{"leaseOwner": "local-test"}'
 ```
 

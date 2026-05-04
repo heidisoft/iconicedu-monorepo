@@ -44,7 +44,7 @@ graph TD
 
     subgraph Clients["Client Applications"]
         WEB["apps/web\nNext.js 15 — App Router, SSR\nAdmin + Parent workflows"]
-        MOBILE["apps/mobile\nExpo 54 — Expo Router\nStudent + Teacher UX"]
+        MOBILE["apps/mobile\nExpo 55 — Expo Router v7\nStudent + Teacher UX"]
     end
 
     subgraph Backend["Backend Services"]

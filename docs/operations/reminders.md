@@ -77,16 +77,16 @@ schedule no longer exists or is no longer eligible.
 
 In your API deployment, set:
 
-- `INTERNAL_REMINDERS_TOKEN_API=<long-random-secret>`
-  (API also accepts legacy `INTERNAL_REMINDERS_TOKEN` when `INTERNAL_REMINDERS_TOKEN_API` is not set)
-- `INTERNAL_EVENTS_TOKEN_API=<long-random-secret>`
+- `INTERNAL_REMINDERS_TOKEN=<long-random-secret>`
+- `INTERNAL_EVENTS_TOKEN=<long-random-secret>`
   (used by the unified event pipeline dispatcher)
 - `SUPABASE_URL=<https://<project-ref>.supabase.co>`
 - `SUPABASE_SERVICE_ROLE_KEY=<service-role-key>`
 - `POSTHOG_API_KEY=<optional-posthog-key>`
 - `POSTHOG_HOST=https://us.i.posthog.com`
 
-`INTERNAL_REMINDERS_TOKEN_API` must match the secret configured in Supabase function env below.
+The same `INTERNAL_REMINDERS_TOKEN` and `INTERNAL_EVENTS_TOKEN` values must be
+configured in both `apps/api` and the Supabase Edge Function secrets.
 
 ## 2. Required function env (Supabase)
 
@@ -97,8 +97,8 @@ functions:
 - `SUPABASE_SERVICE_ROLE_KEY=<service-role-key>` (used by the daily channel read-state repair function)
 - `REMINDERS_DISPATCH_URL=https://<your-api-domain>/internal/reminders/dispatch`
 - `EVENTS_DISPATCH_URL=https://<your-api-domain>/internal/events/dispatch`
-- `INTERNAL_REMINDERS_TOKEN=<same-value-as-INTERNAL_REMINDERS_TOKEN_API>`
-- `INTERNAL_EVENTS_TOKEN=<same-value-as-INTERNAL_EVENTS_TOKEN_API>`
+- `INTERNAL_REMINDERS_TOKEN=<same-value-as-apps-api>`
+- `INTERNAL_EVENTS_TOKEN=<same-value-as-apps-api>`
 
 Optional:
 
@@ -165,8 +165,7 @@ Preview branches created by `.github/workflows/ci.yml` run this automatically af
 ## 6. Reminder Dispatch Details
 
 `dispatchDueReminderJobs()` is called by `POST /internal/reminders/dispatch`.
-The endpoint is protected by `INTERNAL_REMINDERS_TOKEN_API` or the legacy
-`INTERNAL_REMINDERS_TOKEN`.
+The endpoint is protected by `INTERNAL_REMINDERS_TOKEN`.
 
 Execution:
 

@@ -23,12 +23,7 @@ vi.mock('@iconicedu/web/lib/live-sessions/providers', () => ({
   })),
 }));
 
-vi.mock('@iconicedu/web/lib/activity-feed/publisher/activity-publisher', () => ({
-  publishActivityEvent: vi.fn(),
-}));
-
 import { getProfilesByIds } from '@iconicedu/web/lib/profile/queries/profiles.query';
-import { publishActivityEvent } from '@iconicedu/web/lib/activity-feed/publisher/activity-publisher';
 import { resolveChannelLiveSessionScope } from '@iconicedu/web/lib/live-sessions/scope';
 import {
   createOrJoinLiveSession,
@@ -481,7 +476,6 @@ describe('createOrJoinLiveSession', () => {
       countRejoins: true,
       source: 'hybrid',
     });
-    expect(vi.mocked(publishActivityEvent)).not.toHaveBeenCalled();
     expect(serviceSupabase.state.liveSessionRow?.app_metadata).toMatchObject({
       mode: 'video',
     });
@@ -526,7 +520,6 @@ describe('createOrJoinLiveSession', () => {
       created: false,
       provider: 'daily',
     });
-    expect(vi.mocked(publishActivityEvent)).not.toHaveBeenCalled();
   });
 
   it('does not publish removed session start activity when reusing an outside-schedule huddle session', async () => {
@@ -570,8 +563,6 @@ describe('createOrJoinLiveSession', () => {
       schedulePostJoinSideEffects: scheduler.schedule,
     });
     await scheduler.flush();
-
-    expect(vi.mocked(publishActivityEvent)).not.toHaveBeenCalled();
   });
 
   it('returns the integrated join path immediately and still queues activity side effects', async () => {
@@ -601,8 +592,6 @@ describe('createOrJoinLiveSession', () => {
     });
 
     await scheduler.flush();
-
-    expect(vi.mocked(publishActivityEvent)).not.toHaveBeenCalled();
   });
 
   it('allows guardians to join when a linked child is a channel member', async () => {
@@ -734,8 +723,6 @@ describe('createOrJoinLiveSession', () => {
     });
 
     await scheduler.flush();
-
-    expect(vi.mocked(publishActivityEvent)).not.toHaveBeenCalled();
     expect(serviceSupabase.state.liveSessionRow?.app_metadata).toMatchObject({
       learningSpaceId: 'space-derived',
       scheduleId: 'schedule-1',
@@ -757,15 +744,12 @@ describe('createOrJoinLiveSession', () => {
     });
 
     await scheduler.flush();
-
-    expect(vi.mocked(publishActivityEvent)).not.toHaveBeenCalled();
   });
 
-  it('returns successfully even when activity publishing fails without logging', async () => {
+  it('returns successfully without legacy activity publishing', async () => {
     const serviceSupabase = createServiceSupabaseStub();
     const scheduler = createImmediateScheduler();
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    vi.mocked(publishActivityEvent).mockRejectedValueOnce(new Error('activity failed'));
 
     const result = await createOrJoinLiveSession({
       serviceSupabase: serviceSupabase as never,

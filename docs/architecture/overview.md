@@ -10,7 +10,7 @@ Engineers who need a system-level mental model before changing features or infra
 
 ## Last Updated
 
-2026-03-23
+2026-05-04
 
 ## Related Docs
 
@@ -30,7 +30,7 @@ Engineers who need a system-level mental model before changing features or infra
 │                                                             │
 │   ┌─────────────────┐       ┌─────────────────────────┐    │
 │   │   Web App        │       │     Mobile App           │    │
-│   │   Next.js 15     │       │     Expo 54 / RN 0.81   │    │
+│   │   Next.js 15     │       │     Expo 55 / RN 0.83.2 │    │
 │   │   (App Router)   │       │     (Expo Router)        │    │
 │   └────────┬────────┘       └────────────┬────────────┘    │
 │            │                             │                  │
@@ -78,7 +78,7 @@ The web app talks directly to Supabase for most operations. The NestJS API is ca
 
 ### Mobile (`apps/mobile`)
 
-- **Framework:** Expo 54 with Expo Router (file-based routing)
+- **Framework:** Expo 55 with Expo Router v7 (file-based routing)
 - **Data access:** React Query + Supabase JS client with `expo-secure-store` for session persistence
 - **Real-time:** Supabase Realtime WebSocket subscriptions for live message updates
 - **Auth:** Supabase OTP (email) and Google OAuth (via `expo-web-browser`)

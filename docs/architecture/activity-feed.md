@@ -96,10 +96,10 @@ flowchart TD
 | Due `reminder_jobs`                                                          | `session.reminder.sent`                | Claimed reminder job is due, not archived past cutoff, and job type is `session.reminder`.                                                                                              | Learning-space or channel scope from reminder payload.                                        | `<reminderJob.dedupe_key>:activity`.                                  |
 | Due `reminder_jobs`                                                          | `session.feedback_request.sent`        | Claimed reminder job is due, not archived past cutoff, and job type is `session.feedback_request`.                                                                                      | Learning-space or channel scope from reminder payload.                                        | `<reminderJob.dedupe_key>:activity`.                                  |
 
-`POST /internal/activity-feed/publish` exists only as a guarded replay/admin
-compatibility path while older callers are drained. Normal web and mobile
-product flows must not call it, and feature code must not insert
-`activity_events`, `activity_feed_items`, or notification jobs directly.
+Activity generation and projection are worker-owned. Web and mobile product
+flows must not call internal activity publish/project endpoints, and feature code
+must not insert `activity_events`, `activity_feed_items`, or notification jobs
+directly.
 
 ## Projector Execution Details
 
