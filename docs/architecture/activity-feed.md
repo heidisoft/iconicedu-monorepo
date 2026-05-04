@@ -24,13 +24,13 @@ flowchart TD
   Jobs --> WorkerCron[Unified events dispatch]
   WorkerCron --> ClaimSource[claim_due_event_pipeline_jobs]
   ClaimSource --> ProcessSource[Resolve source row and context]
-  ProcessSource --> Publish[publishActivityEvent]
-  Publish --> Events[(activity_events)]
+  ProcessSource --> Generate[ActivityGenerationService]
+  Generate --> Events[(activity_events)]
 ```
 
 ```mermaid
 flowchart TD
-  Publish[publishActivityEvent] --> Suppression[Verb suppression check]
+  Generate[ActivityGenerationService] --> Suppression[Verb suppression check]
   Suppression -->|suppressed| Null[Return null]
   Suppression -->|allowed| OrgSlug[Resolve org slug]
   OrgSlug --> InsertEvent[Insert activity_events row]
@@ -84,7 +84,6 @@ flowchart TD
 
 | Source                                                                       | Event type                             | Conditions                                                                                                                                                                              | Scope and audience                                                                            | Dedupe                                                                |
 | ---------------------------------------------------------------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| `POST /internal/activity-feed/publish`                                       | Request `eventType`                    | Internal bearer token is valid; payload validates; used by the web-side publisher.                                                                                                      | Request-provided `scope`, `audienceRules`, refs, and payload.                                 | Request `dedupeKey`.                                                  |
 | `messages` insert trigger -> `event_outbox.event_kind='message'`             | Worker emits downstream message events | Trigger skips deleted rows and message types `event-reminder`, `payment-reminder`, `feedback-request`, `session-booking`, `session-complete`, `session-summary`, and `progress-update`. | Worker resolves channel context, message visibility, content, and mentions.                   | Source job `message:<messageId>`.                                     |
 | Mention message                                                              | `message.posted`                       | Message has mentioned profiles that are channel members, not sender, and allowed by visibility.                                                                                         | One user-scoped event per mentioned profile with `users_only`.                                | `message.mention:<messageId>:<recipientProfileId>`.                   |
 | Channel or class message                                                     | `message.posted`                       | Not suppressed by message visibility; non-DM top-level message.                                                                                                                         | Channel or learning-space scope from channel context; visibility audience rules when present. | `message.posted:<messageId>`.                                         |
@@ -96,6 +95,11 @@ flowchart TD
 | `class_schedule_recurrence_overrides` insert trigger -> `session_reschedule` | `class.session.rescheduled`            | Override row exists and schedule/learning-space context resolves.                                                                                                                       | Learning-space scope and target ref; payload includes from/to occurrence and invited members. | `session.rescheduled:<overrideId>`.                                   |
 | Due `reminder_jobs`                                                          | `session.reminder.sent`                | Claimed reminder job is due, not archived past cutoff, and job type is `session.reminder`.                                                                                              | Learning-space or channel scope from reminder payload.                                        | `<reminderJob.dedupe_key>:activity`.                                  |
 | Due `reminder_jobs`                                                          | `session.feedback_request.sent`        | Claimed reminder job is due, not archived past cutoff, and job type is `session.feedback_request`.                                                                                      | Learning-space or channel scope from reminder payload.                                        | `<reminderJob.dedupe_key>:activity`.                                  |
+
+`POST /internal/activity-feed/publish` exists only as a guarded replay/admin
+compatibility path while older callers are drained. Normal web and mobile
+product flows must not call it, and feature code must not insert
+`activity_events`, `activity_feed_items`, or notification jobs directly.
 
 ## Projector Execution Details
 

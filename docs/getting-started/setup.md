@@ -365,16 +365,18 @@ When synced from local Supabase, the command writes:
 - `SUPABASE_ANON_KEY=<ANON_KEY>`
 - `JWT_SECRET=<JWT_SECRET>`
 - `INTERNAL_REMINDERS_TOKEN_API` if missing
-- `INTERNAL_ACTIVITY_FEED_TOKEN` if missing
-- `INTERNAL_ACTIVITY_PROJECTOR_TOKEN` if missing
 - `INTERNAL_EVENTS_TOKEN_API` if missing
 
-For push notification projection and dispatch in API, also set:
+For unified activity, notification, and push dispatch in API, also set:
 
-- `INTERNAL_ACTIVITY_FEED_TOKEN=<long-random-secret>`
-- `INTERNAL_ACTIVITY_PROJECTOR_TOKEN=<long-random-secret>`
 - `INTERNAL_EVENTS_TOKEN_API=<long-random-secret>`
 - `EXPO_ACCESS_TOKEN=<expo-personal-access-token>` for authenticated Expo Push API calls
+
+Legacy activity replay/admin endpoints may still use `INTERNAL_ACTIVITY_FEED_TOKEN`,
+`INTERNAL_ACTIVITY_PROJECTOR_TOKEN`, or `INTERNAL_ACTIVITY_WORKER_TOKEN_API` while
+older queues are drained. New product flows should use the unified
+`event_outbox` + `event_pipeline_jobs` path and only require
+`INTERNAL_EVENTS_TOKEN_API` for dispatcher authentication.
 
 ---
 

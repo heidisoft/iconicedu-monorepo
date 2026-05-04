@@ -42,17 +42,17 @@ flowchart TD
   NextJob --> Upsert[(reminder_jobs upsert/cancel)]
   Cron[reminders-dispatch cron] --> Dispatch[dispatchDueReminderJobs]
   Dispatch --> Claim[claim_due_reminder_jobs]
-  Claim --> Activity[publishActivityEvent]
+  Claim --> Activity[ActivityGenerationService]
   Activity --> Events[(activity_events)]
-  Events --> Projector[projectActivityEvents]
+  Events --> Projector[event_pipeline_jobs activity.project]
   Projector --> Feed[(activity_feed_items)]
   Projector --> Notifications[(event_pipeline_jobs notification.prepare/deliver)]
 ```
 
 Classroom and schedule UI updates no longer synchronously depend on reminder
-compilation. If reminder compilation or activity publishing is unavailable, the
-primary class update should still complete; reminder/feed/push side effects can
-be replayed or repaired separately.
+compilation. If reminder compilation, activity generation, projection, or
+notification delivery is unavailable, the primary class update should still
+complete; reminder/feed/push side effects can be replayed or repaired separately.
 
 ## Reminder Reconciliation Details
 
@@ -90,9 +90,9 @@ In your API deployment, set:
 
 ## 2. Required function env (Supabase)
 
-Set these Supabase secrets for the `reminders-dispatch` function:
+Set these Supabase secrets for the `events-dispatch` and `reminders-dispatch`
+functions:
 
-- `REMINDERS_RECONCILE_DISPATCH_URL=https://<your-api-domain>/internal/reminders/reconcile-dispatch`
 - `REMINDERS_DISPATCH_URL=https://<your-api-domain>/internal/reminders/dispatch`
 - `EVENTS_DISPATCH_URL=https://<your-api-domain>/internal/events/dispatch`
 - `INTERNAL_REMINDERS_TOKEN=<same-value-as-INTERNAL_REMINDERS_TOKEN_API>`
@@ -100,9 +100,9 @@ Set these Supabase secrets for the `reminders-dispatch` function:
 
 Optional:
 
-- `REMINDERS_RECONCILE_DISPATCH_LIMIT=100`
-- `REMINDERS_RECONCILE_DISPATCH_LEASE_SECONDS=120`
-- `REMINDERS_RECONCILE_DISPATCH_LEASE_OWNER=supabase-edge-cron`
+- `EVENTS_DISPATCH_LIMIT=100`
+- `EVENTS_DISPATCH_LEASE_SECONDS=120`
+- `EVENTS_DISPATCH_LEASE_OWNER=supabase-edge-cron`
 - `REMINDERS_DISPATCH_LIMIT=100`
 - `REMINDERS_DISPATCH_LEASE_SECONDS=120`
 - `REMINDERS_DISPATCH_LEASE_OWNER=supabase-edge-cron`
@@ -116,9 +116,12 @@ only claims due `reminder_jobs` via `claim_due_reminder_jobs`.
 
 ```bash
 supabase functions deploy events-dispatch
-supabase functions deploy reminders-reconcile-dispatch
 supabase functions deploy reminders-dispatch
 ```
+
+`reminders-reconcile-dispatch` is a legacy compatibility bridge for the older
+dedicated reconcile queue. New schedule-table reconciliation should run through
+`events-dispatch` and `event_pipeline_jobs` with `job_kind='reminder.reconcile'`.
 
 If you deploy to a linked remote project, ensure `supabase link --project-ref <ref>` is already done.
 
@@ -145,9 +148,9 @@ Preview branches created by `.github/workflows/ci.yml` run this automatically af
 ## 5. Validate
 
 1. Invoke function manually once from dashboard.
-2. Verify `cron.job` contains `edge-function-reminders-reconcile-dispatch` and
+2. Verify `cron.job` contains `edge-function-events-dispatch` and
    `edge-function-reminders-dispatch`.
-3. Verify API logs show requests to `/internal/reminders/reconcile-dispatch` and
+3. Verify API logs show requests to `/internal/events/dispatch` and
    `/internal/reminders/dispatch`.
 4. Verify response payload has counters like `claimed/succeeded/failed`.
 5. Verify DB updates:
@@ -171,8 +174,8 @@ Execution:
 5. Map job type to activity event:
    - `session.reminder` -> `session.reminder.sent`
    - `session.feedback_request` -> `session.feedback_request.sent`
-6. Publish the activity event with `sourceKind='system'`, learning-space/channel scope, payload schedule metadata, and dedupe key `<reminder_jobs.dedupe_key>:activity`.
-7. Projection turns that event into feed rows and notification jobs through the normal activity pipeline.
+6. Create or reuse the activity event through the API-owned activity generation path with `sourceKind='system'`, learning-space/channel scope, payload schedule metadata, and dedupe key `<reminder_jobs.dedupe_key>:activity`.
+7. `activity.project`, `notification.prepare`, and `notification.deliver` jobs turn that event into feed rows and notification delivery through the normal event pipeline.
 8. If the activity event is created, mark the reminder job `succeeded`, set `dispatched_at`, clear lease/error fields, and write a successful `reminder_dispatch_logs` row with the `activity_event_id`.
 9. If processing throws, increment `attempt_count`, set `failed` with `next_attempt_at` for retryable errors, or `dead_letter` when non-retryable/max attempts are reached.
 
@@ -193,8 +196,7 @@ analytics as `claimed`, `succeeded`, `skipped`, `failed`, and `deadLettered`.
 After the API-owned migration, reminders and notifications should both target `apps/api`:
 
 - `REMINDERS_DISPATCH_URL=https://<your-api-domain>/internal/reminders/dispatch`
-- `REMINDERS_RECONCILE_DISPATCH_URL=https://<your-api-domain>/internal/reminders/reconcile-dispatch`
-- `ACTIVITY_PROJECTOR_DISPATCH_URL=https://<your-api-domain>/internal/activity-feed/project`
+- `EVENTS_DISPATCH_URL=https://<your-api-domain>/internal/events/dispatch`
 
 The legacy web endpoint (`/api/internal/reminders/dispatch`) should not be used anymore.
 

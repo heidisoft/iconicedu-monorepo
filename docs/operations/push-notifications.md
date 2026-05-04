@@ -2,11 +2,11 @@
 
 ## Purpose
 
-End-to-end reference for Expo push notifications: how tokens are managed on device, how activity events flow into dispatch jobs, and how to test the full pipeline locally without a physical device or deployed edge function.
+End-to-end reference for Expo push notifications: how tokens are managed on device, how canonical events become activity and notification jobs, and how to test the unified pipeline locally without a physical device or deployed edge function.
 
 ## Last Updated
 
-2026-04-20
+2026-05-04
 
 ## Related Docs
 
@@ -18,23 +18,24 @@ End-to-end reference for Expo push notifications: how tokens are managed on devi
 
 ## Current Status
 
-The API-owned push notification pipeline is now implemented in the repo.
+The API-owned push notification pipeline runs through the unified event pipeline.
 
 That means:
 
 - mobile push token registration/revocation goes through `apps/api`
-- activity event projection into unified `event_pipeline_jobs` notification work exists in `apps/api`
+- DB triggers and API command handlers enqueue canonical signals into `event_outbox`
+- `events-dispatch` claims `event_pipeline_jobs` and runs activity generation, activity projection, notification preparation, and notification delivery
 - notification dispatch to Expo exists in `apps/api`
-- internal API endpoints exist for projection and dispatch
+- `activity_events` and `activity_feed_items` remain durable user-facing tables, but only API-owned services write generated activity/projection rows
 
 What still must be true in the running environment for push to work end to end:
 
-- all real event-producing flows that should notify users must publish through `apps/api`
-- the deployed `events-dispatch` cron / edge function must call the API endpoint, not the legacy web endpoint
+- all real event-producing flows that should notify users must write through `apps/api` or a source-of-truth table trigger
+- the deployed `events-dispatch` cron / edge function must call `apps/api`
 - `INTERNAL_EVENTS_TOKEN_API` and `EXPO_ACCESS_TOKEN` must be configured in the deployed API environment
 - at least one real device flow should be verified end to end
 
-Until those runtime checks are confirmed, treat this document as the intended and implemented backend architecture, but not as proof that every deployed environment is already using it.
+Older activity worker/projector endpoints may remain available for guarded admin replay and compatibility while queues drain, but they are not the normal product path.
 
 ---
 
@@ -47,34 +48,36 @@ Mobile device
   └─ usePushRegistration           ← registers Expo push token on login / permission grant
   └─ usePushToggle                 ← in-app on/off switch, syncs revoked_at in DB
 
-Activity event occurs (message, session, etc.)
-  └─ projectActivityEvents()       ← enqueues notification.prepare rows
+Canonical event occurs
+  └─ API command or DB trigger inserts event_outbox
+      └─ event_pipeline_jobs activity.generate
 
 Supabase Edge Function (cron every 1 min)
   └─ events-dispatch               ← HTTP POST → API internal endpoint
 
 API app
-  └─ POST /internal/notifications/dispatch
+  └─ POST /internal/events/dispatch
       └─ EventPipelineService.dispatchDueJobs()
-          └─ buildNotificationDecision()    ← checks preferences, presence, delay policy
-          └─ sendPushNotification()         ← looks up push_tokens, calls authenticated Expo Push API
-              └─ pollExpoPushReceipts()     ← confirms downstream delivery / credential errors
-              └─ Expo Push API → APNs / FCM → device
+          └─ activity.generate      ← ActivityGenerationService writes activity_events
+          └─ activity.project       ← projectActivityEvents writes feed rows
+          └─ notification.prepare   ← NotificationService evaluates recipients/channels
+          └─ notification.deliver   ← sendPushNotification via Expo → APNs / FCM → device
 ```
 
 ---
 
 ### Normal App Flow vs Internal Endpoints
 
-For normal product usage, clients should not call the internal projection or dispatch endpoints directly.
+For normal product usage, clients do not call internal activity, projection, notification, or dispatch endpoints directly.
 
 Expected runtime flow:
 
-1. Mobile or web creates a message / reaction / session event through `apps/api`
-2. `apps/api` writes the `activity_events` row
-3. `apps/api` projects that event and enqueues notification preparation/delivery jobs in `event_pipeline_jobs`
-4. cron later calls the unified internal dispatch endpoint
-5. API sends the push notification through Expo
+1. Mobile or web performs a product action through `apps/api`.
+2. The API writes product data; API command code or DB triggers enqueue a canonical `event_outbox` signal.
+3. `events-dispatch` claims `activity.generate` work and writes or reuses the canonical `activity_events` row.
+4. `activity.project` writes `activity_feed_items`/groups and enqueues `notification.prepare`.
+5. `notification.prepare` evaluates preferences, suppression, timing, and channels, then enqueues `notification.deliver`.
+6. `notification.deliver` sends the push notification through Expo and logs the outcome.
 
 For guardian switch-user flows, the frontend still sends the selected acting profile id, but `apps/api` is the authority that validates whether the authenticated account may act as that profile before any message, activity, or notification work is performed.
 
@@ -123,9 +126,13 @@ Runs once per session after the user is authenticated and profile data is loaded
 
 ### 3. Notification Events and Queuing
 
-**Entry point:** `apps/api/src/lib/activity-feed/projector/project-activity-events.ts`
+**Entry points:**
 
-When an activity event is projected, a `notification.prepare` job is enqueued. For each recipient profile:
+- `apps/api/src/modules/events/event-pipeline.service.ts`
+- `apps/api/src/modules/events/notification.service.ts`
+- `apps/api/src/lib/activity-feed/projector/project-activity-events.ts`
+
+When an activity event is projected, an idempotent `notification.prepare` job is enqueued. For each recipient profile:
 
 1. `buildNotificationDecision()` runs the preference + policy check
 2. Eligible channels (`push`, `email`, `sms`) are written as `notification.deliver` rows in `event_pipeline_jobs` with `status = 'pending'`
@@ -154,14 +161,11 @@ When an activity event is projected, a `notification.prepare` job is enqueued. F
 - Channel recently read (read timestamp ≥ event timestamp) → notification delayed
 - `notification_preferences.muted = true` for the pref key or master `__push__` key → suppressed entirely
 
-**Important:** the presence of this projector in `apps/api` does not by itself guarantee every app flow uses it yet. Push only works for flows that actually publish activity events through the API-owned path.
-
-Activity publishing is intentionally non-blocking for product flows. Web and
-mobile actions should complete even if activity publishing is unavailable,
-misconfigured, or rejected by the internal API. In those cases the publisher logs
-the skipped event and returns `null`; the action should not surface the activity
-failure to the user. Push delivery for that action may be absent until the
-underlying activity publish issue is fixed.
+Activity and notification side effects are intentionally non-blocking for product
+flows. Web and mobile actions should complete once the primary product write is
+committed. If pipeline work fails, workers retry from `event_pipeline_jobs`; if a
+job reaches `dead_letter`, it can be inspected and replayed operationally without
+re-running the user action.
 
 ---
 
@@ -244,8 +248,6 @@ Provider behavior:
 **API app (`apps/api`):**
 
 ```bash
-INTERNAL_ACTIVITY_FEED_TOKEN=<long-random-secret>
-INTERNAL_ACTIVITY_PROJECTOR_TOKEN=<long-random-secret>
 INTERNAL_EVENTS_TOKEN_API=<long-random-secret>
 EXPO_ACCESS_TOKEN=<expo-personal-access-token>
 ```
@@ -254,12 +256,9 @@ EXPO_ACCESS_TOKEN=<expo-personal-access-token>
 
 ```bash
 EVENTS_DISPATCH_URL=https://<your-api-domain>/internal/events/dispatch
-ACTIVITY_PROJECTOR_DISPATCH_URL=https://<your-api-domain>/internal/activity-feed/project
 INTERNAL_EVENTS_TOKEN=<same-value-as-INTERNAL_EVENTS_TOKEN_API>
-INTERNAL_ACTIVITY_PROJECTOR_TOKEN=<same-value-as-INTERNAL_ACTIVITY_PROJECTOR_TOKEN in apps/api>
 # optional:
 EVENTS_DISPATCH_LIMIT=100
-ACTIVITY_PROJECTOR_DISPATCH_LIMIT=25
 EVENTS_DISPATCH_LEASE_SECONDS=120
 EVENTS_DISPATCH_LEASE_OWNER=supabase-edge-cron
 ```
@@ -268,8 +267,16 @@ EVENTS_DISPATCH_LEASE_OWNER=supabase-edge-cron
 
 - `EVENTS_DISPATCH_URL` must target `https://<your-api-domain>/internal/events/dispatch`
 - `REMINDERS_DISPATCH_URL` must target `https://<your-api-domain>/internal/reminders/dispatch`
-- `ACTIVITY_PROJECTOR_DISPATCH_URL` must target `https://<your-api-domain>/internal/activity-feed/project`
-- neither secret should point at `apps/web` or `/api/internal/...`
+- no dispatch secret should point at `apps/web` or `/api/internal/...`
+
+Compatibility/admin-only secrets may still exist while legacy replay endpoints
+remain enabled:
+
+- `INTERNAL_ACTIVITY_FEED_TOKEN`
+- `INTERNAL_ACTIVITY_PROJECTOR_TOKEN`
+- `INTERNAL_ACTIVITY_WORKER_TOKEN_API`
+
+Do not add new product flows that depend on those legacy tokens.
 
 ---
 
@@ -280,7 +287,7 @@ The edge function is not needed for local testing. You can drive the entire pipe
 ### Prerequisites
 
 - `pnpm dev:api` running (Nest on `http://localhost:3001`)
-- `INTERNAL_ACTIVITY_FEED_TOKEN`, `INTERNAL_ACTIVITY_PROJECTOR_TOKEN`, and `INTERNAL_EVENTS_TOKEN_API` set in `apps/api/.env`
+- `INTERNAL_EVENTS_TOKEN_API` set in `apps/api/.env`
 - Supabase connected (remote or local)
 - a real Expo push token from a physical device if you want to validate actual delivery
 
@@ -305,20 +312,23 @@ To get a real token from a dev build: add a `console.log` in `storePushToken` te
 
 ---
 
-### Step 2 — Enqueue a notification job
+### Step 2 — Enqueue pipeline work
 
-Insert an activity event that matches a supported `event_type`. The projector picks it up via the internal API:
+For a full local run, create a real product event through the API or enqueue a canonical source signal through the DB helper:
 
-```bash
-curl -X POST http://localhost:3001/internal/activity-feed/project \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <INTERNAL_ACTIVITY_FEED_TOKEN>" \
-  -d '{
-    "eventIds": ["<activity-event-id>"]
-  }'
+```sql
+SELECT enqueue_event_outbox(
+  p_org_id := '<org-id>',
+  p_event_kind := 'message',
+  p_dedupe_key := 'message:<message-id>',
+  p_payload := jsonb_build_object('messageId', '<message-id>'),
+  p_source_table := 'messages',
+  p_source_id := '<message-id>',
+  p_source_kind := 'message'
+);
 ```
 
-Or enqueue a delivery job directly in `event_pipeline_jobs` to skip the projector:
+For a lower-level notification provider test, you can enqueue a delivery job directly in `event_pipeline_jobs` to skip activity generation/projection:
 
 ```sql
 INSERT INTO event_pipeline_jobs (
@@ -352,7 +362,7 @@ INSERT INTO event_pipeline_jobs (
 );
 ```
 
-> **Note:** If you use a fake `activityEventId`, the dispatcher will mark the job `suppressed` (source event missing). Use a real event ID for a full end-to-end run.
+> **Note:** Direct `notification.deliver` inserts are only for local debugging. If you use a fake `activityEventId`, the dispatcher will mark the job `suppressed` because the source event is missing.
 
 ---
 
@@ -417,7 +427,7 @@ ORDER BY created_at ASC;
 - `status = suppressed` → check `notification_preferences` for the profile/pref_key, or check if the profile has active presence
 - `status = failed` / `dead_letter` → check `last_error` column
 - `status = succeeded` but no notification → the Expo token is invalid or the device has notifications disabled at OS level; check if `DeviceNotRegistered` would have been returned (Expo's response is logged in the push-provider but not persisted — add a `console.log` in `push-provider.ts` to inspect tickets)
-- no `notification.deliver` rows created → the event was not projected or notification preparation did not run; check whether the producing code path is using the API-owned activity pipeline
+- no `notification.deliver` rows created → check `event_outbox`, `event_pipeline_jobs` for `activity.generate`/`activity.project`/`notification.prepare`, and `activity_events.last_projection_error`
 
 ---
 
