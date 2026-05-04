@@ -225,7 +225,7 @@ CMD ["node", "dist/main.js"]
 | `DIRECT_URL`                | Non-pooled URL for Prisma migrations          |
 | `SUPABASE_URL`              | Supabase project URL                          |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service role key (bypasses RLS)               |
-| `JWT_SECRET`                | From Supabase → Settings → API → JWT Settings |
+| `SUPABASE_JWT_SECRET`       | From Supabase → Settings → API → JWT Settings |
 | `INTERNAL_EVENTS_TOKEN`     | Shared secret for unified event dispatcher    |
 | `INTERNAL_REMINDERS_TOKEN`  | Shared secret for reminder dispatcher         |
 | `EXPO_ACCESS_TOKEN`         | Expo push API token                           |
@@ -295,7 +295,7 @@ Production GitHub Actions secrets:
 | Derived by CI       | `DATABASE_URL` / `DIRECT_URL`                                      | Derived from Supabase project metadata and DB password                 |
 | Production variable | `API_URL`                                                          | Public production API origin; CI can derive it from Railway if omitted |
 | Derived by CI       | `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` | Derived from `SUPABASE_PROJECT_ID` via the Supabase API                |
-| Production values   | `JWT_SECRET` or `SUPABASE_JWT_SECRET`                              | Supabase JWT secret if the Supabase API cannot derive it               |
+| Production values   | `SUPABASE_JWT_SECRET`                                              | Supabase JWT secret if the Supabase API cannot derive it               |
 | Production values   | `INTERNAL_EVENTS_TOKEN`                                            | Long random secret for unified event dispatch                          |
 | Production values   | `INTERNAL_REMINDERS_TOKEN`                                         | Long random secret for reminder dispatch                               |
 | Production values   | `EXPO_ACCESS_TOKEN` or `EXPO_TOKEN`                                | Required for authenticated Expo push sends                             |
@@ -366,7 +366,7 @@ Supabase automatically takes daily backups on paid plans. For additional safety,
 | `DATABASE_URL`                  | —                       | —      | ✅  | Pooled Postgres URL                 |
 | `DIRECT_URL`                    | —                       | —      | ✅  | Non-pooled, for migrations          |
 | `SUPABASE_URL`                  | —                       | —      | ✅  |                                     |
-| `JWT_SECRET`                    | —                       | —      | ✅  | From Supabase JWT settings          |
+| `SUPABASE_JWT_SECRET`           | —                       | —      | ✅  | From Supabase JWT settings          |
 | `INTERNAL_EVENTS_TOKEN`         | ✅ (server/admin tools) | —      | ✅  | Match Supabase Edge Function secret |
 | `INTERNAL_REMINDERS_TOKEN`      | ✅ (server/admin tools) | —      | ✅  | Match Supabase Edge Function secret |
 | `EXPO_ACCESS_TOKEN`             | —                       | —      | ✅  | Expo push provider token            |
