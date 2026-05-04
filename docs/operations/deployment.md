@@ -219,14 +219,19 @@ CMD ["node", "dist/main.js"]
 
 ### Environment variables
 
-| Variable                    | Description                                   |
-| --------------------------- | --------------------------------------------- |
-| `DATABASE_URL`              | Supabase Postgres connection string (pooled)  |
-| `DIRECT_URL`                | Non-pooled URL for Prisma migrations          |
-| `SUPABASE_URL`              | Supabase project URL                          |
-| `SUPABASE_SERVICE_ROLE_KEY` | Service role key (bypasses RLS)               |
-| `JWT_SECRET`                | From Supabase → Settings → API → JWT Settings |
-| `PORT`                      | HTTP port (default `3001`)                    |
+| Variable                            | Description                                   |
+| ----------------------------------- | --------------------------------------------- |
+| `DATABASE_URL`                      | Supabase Postgres connection string (pooled)  |
+| `DIRECT_URL`                        | Non-pooled URL for Prisma migrations          |
+| `SUPABASE_URL`                      | Supabase project URL                          |
+| `SUPABASE_SERVICE_ROLE_KEY`         | Service role key (bypasses RLS)               |
+| `JWT_SECRET`                        | From Supabase → Settings → API → JWT Settings |
+| `INTERNAL_EVENTS_TOKEN_API`         | Shared secret for unified event dispatcher    |
+| `INTERNAL_REMINDERS_TOKEN_API`      | Shared secret for reminder dispatcher         |
+| `INTERNAL_ACTIVITY_WORKER_TOKEN`    | Legacy preview compatibility dispatcher       |
+| `INTERNAL_ACTIVITY_PROJECTOR_TOKEN` | Legacy preview compatibility dispatcher       |
+| `EXPO_ACCESS_TOKEN`                 | Expo push API token                           |
+| `PORT`                              | HTTP port (default `3001`)                    |
 
 ### Prisma in production
 
@@ -242,6 +247,40 @@ node dist/main.js
 ## Database — Supabase
 
 The database is fully managed by Supabase. Schema changes are applied via migration files in `supabase/migrations/`.
+
+### Edge Functions And Cron
+
+Preview CI now deploys all Supabase Edge Functions and sets branch-local secrets after the Railway API preview URL is known. The unified activity/notification path is:
+
+- `events-dispatch` Edge Function
+- `EVENTS_DISPATCH_URL=https://<api-domain>/internal/events/dispatch`
+- `INTERNAL_EVENTS_TOKEN=<same value as API INTERNAL_EVENTS_TOKEN_API>`
+
+Production must be configured the same way:
+
+```bash
+supabase secrets set \
+  EVENTS_DISPATCH_URL=https://<api-domain>/internal/events/dispatch \
+  INTERNAL_EVENTS_TOKEN=<long-random-secret> \
+  REMINDERS_DISPATCH_URL=https://<api-domain>/internal/reminders/dispatch \
+  INTERNAL_REMINDERS_TOKEN=<long-random-secret>
+
+supabase functions deploy --use-api
+```
+
+After functions are deployed and migrations are applied, configure pg_cron with the Supabase project URL:
+
+```sql
+select public.configure_edge_function_cron('https://<project-ref>.supabase.co');
+```
+
+Required production checks:
+
+- `apps/api` has `INTERNAL_EVENTS_TOKEN_API` matching Supabase `INTERNAL_EVENTS_TOKEN`.
+- `apps/api` has `INTERNAL_REMINDERS_TOKEN_API` matching Supabase `INTERNAL_REMINDERS_TOKEN`.
+- `events-dispatch` is deployed with `verify_jwt=false`.
+- `cron.job` includes `edge-function-events-dispatch`.
+- `EXPO_ACCESS_TOKEN` is set in `apps/api` if push delivery should use Expo authenticated sends.
 
 ### Applying migrations to production
 
@@ -271,14 +310,17 @@ Supabase automatically takes daily backups on paid plans. For additional safety,
 
 ## Environment Variables Reference
 
-| Variable                        | Web         | Mobile | API | Notes                      |
-| ------------------------------- | ----------- | ------ | --- | -------------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`      | ✅          | —      | —   | Public, browser-safe       |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅          | —      | —   | Public, browser-safe       |
-| `SUPABASE_SERVICE_ROLE_KEY`     | ✅ (server) | —      | ✅  | Never expose client-side   |
-| `EXPO_PUBLIC_SUPABASE_URL`      | —           | ✅     | —   | Inlined at build time      |
-| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | —           | ✅     | —   | Inlined at build time      |
-| `DATABASE_URL`                  | —           | —      | ✅  | Pooled Postgres URL        |
-| `DIRECT_URL`                    | —           | —      | ✅  | Non-pooled, for migrations |
-| `SUPABASE_URL`                  | —           | —      | ✅  |                            |
-| `JWT_SECRET`                    | —           | —      | ✅  | From Supabase JWT settings |
+| Variable                        | Web                     | Mobile | API | Notes                                     |
+| ------------------------------- | ----------------------- | ------ | --- | ----------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`      | ✅                      | —      | —   | Public, browser-safe                      |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅                      | —      | —   | Public, browser-safe                      |
+| `SUPABASE_SERVICE_ROLE_KEY`     | ✅ (server)             | —      | ✅  | Never expose client-side                  |
+| `EXPO_PUBLIC_SUPABASE_URL`      | —                       | ✅     | —   | Inlined at build time                     |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | —                       | ✅     | —   | Inlined at build time                     |
+| `DATABASE_URL`                  | —                       | —      | ✅  | Pooled Postgres URL                       |
+| `DIRECT_URL`                    | —                       | —      | ✅  | Non-pooled, for migrations                |
+| `SUPABASE_URL`                  | —                       | —      | ✅  |                                           |
+| `JWT_SECRET`                    | —                       | —      | ✅  | From Supabase JWT settings                |
+| `INTERNAL_EVENTS_TOKEN_API`     | ✅ (server/admin tools) | —      | ✅  | Match Supabase `INTERNAL_EVENTS_TOKEN`    |
+| `INTERNAL_REMINDERS_TOKEN_API`  | ✅ (server/admin tools) | —      | ✅  | Match Supabase `INTERNAL_REMINDERS_TOKEN` |
+| `EXPO_ACCESS_TOKEN`             | —                       | —      | ✅  | Expo push provider token                  |
