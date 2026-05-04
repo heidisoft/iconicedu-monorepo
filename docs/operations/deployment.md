@@ -281,29 +281,29 @@ supabase functions deploy --use-api --jobs 4
 
 Production GitHub Actions secrets:
 
-| Where                 | Variable / value                          | Notes                                                   |
-| --------------------- | ----------------------------------------- | ------------------------------------------------------- |
-| Platform access       | `RAILWAY_API_TOKEN`                       | Lets CI configure Railway production                    |
-| Platform access       | `RAILWAY_PROJECT_ID`                      | Railway project containing the production API service   |
-| Platform access       | `VERCEL_TOKEN`                            | Lets CI configure Vercel production env                 |
-| Platform access       | `VERCEL_PROJECT_ID`                       | Vercel project ID                                       |
-| Platform access       | `VERCEL_ORG_ID`                           | Vercel team/user ID                                     |
-| Platform access       | `SUPABASE_ACCESS_TOKEN`                   | Lets CI deploy functions and set secrets                |
-| Platform access       | `SUPABASE_PROJECT_ID`                     | Production Supabase project ref                         |
-| Production values     | `PROD_DATABASE_URL`                       | Railway API pooled Postgres URL                         |
-| Production values     | `PROD_DIRECT_URL`                         | Direct Postgres URL for migrations and cron setup       |
-| Production values     | `PROD_SUPABASE_URL`                       | Production Supabase URL                                 |
-| Production values     | `PROD_SUPABASE_ANON_KEY`                  | Public Supabase anon key                                |
-| Production values     | `PROD_SUPABASE_SERVICE_ROLE_KEY`          | Service role key for API and Edge maintenance functions |
-| Production values     | `PROD_JWT_SECRET`                         | Supabase JWT secret                                     |
-| Production values     | `PROD_API_URL`                            | Public production API URL                               |
-| Production values     | `PROD_INTERNAL_EVENTS_TOKEN_API`          | Long random secret for unified event dispatch           |
-| Production values     | `PROD_INTERNAL_REMINDERS_TOKEN_API`       | Long random secret for reminder dispatch                |
-| Production values     | `PROD_EXPO_ACCESS_TOKEN`                  | Required for authenticated Expo push sends              |
-| Optional telemetry    | `PROD_POSTHOG_KEY`                        | Optional PostHog key                                    |
-| Optional telemetry    | `PROD_POSTHOG_HOST`                       | Optional PostHog host                                   |
-| Optional legacy admin | `PROD_INTERNAL_ACTIVITY_WORKER_TOKEN_API` | Optional web admin compatibility token                  |
-| Optional legacy admin | `PROD_INTERNAL_ACTIVITY_PROJECTOR_TOKEN`  | Optional web admin compatibility token                  |
+| Where                 | Variable / value                                                      | Notes                                                   |
+| --------------------- | --------------------------------------------------------------------- | ------------------------------------------------------- |
+| Platform access       | `RAILWAY_API_TOKEN`                                                   | Lets CI configure Railway production                    |
+| Platform access       | `RAILWAY_PROJECT_ID`                                                  | Railway project containing the production API service   |
+| Platform access       | `VERCEL_TOKEN`                                                        | Lets CI configure Vercel production env                 |
+| Platform access       | `VERCEL_PROJECT_ID`                                                   | Vercel project ID                                       |
+| Platform access       | `VERCEL_ORG_ID`                                                       | Vercel team/user ID                                     |
+| Platform access       | `SUPABASE_ACCESS_TOKEN`                                               | Lets CI deploy functions and set secrets                |
+| Platform access       | `SUPABASE_PROJECT_ID`                                                 | Production Supabase project ref                         |
+| Production values     | `DATABASE_URL`                                                        | Railway API pooled Postgres URL                         |
+| Production values     | `DIRECT_URL`                                                          | Direct Postgres URL for migrations and cron setup       |
+| Production values     | `API_URL`                                                             | Public production API URL                               |
+| Production values     | `SUPABASE_URL` or `NEXT_PUBLIC_SUPABASE_URL`                          | Production Supabase URL                                 |
+| Production values     | `SUPABASE_ANON_KEY` or `NEXT_PUBLIC_SUPABASE_ANON_KEY`                | Public Supabase anon key                                |
+| Production values     | `SUPABASE_SERVICE_ROLE_KEY`                                           | Service role key for API and Edge maintenance functions |
+| Production values     | `JWT_SECRET`                                                          | Supabase JWT secret                                     |
+| Production values     | `INTERNAL_EVENTS_TOKEN_API` or `INTERNAL_EVENTS_TOKEN`                | Long random secret for unified event dispatch           |
+| Production values     | `INTERNAL_REMINDERS_TOKEN`                                            | Long random secret for reminder dispatch                |
+| Production values     | `EXPO_ACCESS_TOKEN`                                                   | Required for authenticated Expo push sends              |
+| Optional telemetry    | `POSTHOG_KEY`                                                         | Optional PostHog key                                    |
+| Optional telemetry    | `NEXT_PUBLIC_POSTHOG_HOST`                                            | Optional PostHog host                                   |
+| Optional legacy admin | `INTERNAL_ACTIVITY_WORKER_TOKEN`                                      | Optional web admin compatibility token                  |
+| Optional legacy admin | `INTERNAL_ACTIVITY_PROJECTOR_TOKEN` or `INTERNAL_ACTIVITY_FEED_TOKEN` | Optional web admin compatibility token                  |
 
 When a PR introduces a new production env var, add it to
 `ops/env/production.env.json` and add the matching GitHub Actions secret before
