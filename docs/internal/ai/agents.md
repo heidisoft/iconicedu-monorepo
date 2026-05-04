@@ -52,6 +52,7 @@ AI coding agents and engineers maintaining agent-facing repo guidance.
 - Never edit an existing Supabase migration after it has been created.
 - Every database, trigger, RPC, cron, policy, or storage change must be added as a new forward migration in `supabase/migrations`.
 - If a recent migration needs correction, create another migration that amends or replaces the behavior; do not rewrite the earlier file.
+- Every migration filename must have a unique timestamp/version prefix. Supabase stores that prefix as the migration primary key, so duplicate prefixes will fail during `supabase db push`.
 
 ### 4.1 Hard Boundary — FE Apps Are Read/Write Forbidden at the DB Layer
 
