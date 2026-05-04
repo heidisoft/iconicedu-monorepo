@@ -1121,7 +1121,7 @@ jobs:
 
       - name: Validate and render production env manifest
         env:
-          PROD_SECRETS_JSON: ${{ toJson(secrets) }}
+          CI_SECRETS_JSON: ${{ toJson(secrets) }}
         run: |
           set -euo pipefail
 
@@ -1131,7 +1131,7 @@ jobs:
 
           const manifestPath = 'ops/env/production.env.json';
           const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-          const secrets = JSON.parse(process.env.PROD_SECRETS_JSON || '{}');
+          const secrets = JSON.parse(process.env.CI_SECRETS_JSON || '{}');
           const outDir = '/tmp/iconicedu-production-env';
           const requiredPlatformSecrets = [
             'RAILWAY_API_TOKEN',
@@ -1150,6 +1150,13 @@ jobs:
             }
           }
 
+          function sourceNamesFor(entry) {
+            if (Array.isArray(entry.sources)) {
+              return entry.sources.filter((source) => typeof source === 'string' && source.trim());
+            }
+            return typeof entry.source === 'string' && entry.source.trim() ? [entry.source] : [];
+          }
+
           function resolveEntry(entry, groupName) {
             if (!entry || typeof entry.name !== 'string' || !entry.name.trim()) {
               throw new Error(`Invalid env manifest entry in ${groupName}: missing name`);
@@ -1159,17 +1166,19 @@ jobs:
               return { name: entry.name, value: entry.value };
             }
 
-            if (!entry.source || typeof entry.source !== 'string') {
+            const sourceNames = sourceNamesFor(entry);
+            if (sourceNames.length === 0) {
               throw new Error(`Invalid env manifest entry ${groupName}.${entry.name}: missing source or value`);
             }
 
-            const sourceValue = String(secrets[entry.source] ?? '').trim();
-            if (!sourceValue) {
+            const resolvedSource = sourceNames.find((source) => String(secrets[source] ?? '').trim());
+            if (!resolvedSource) {
               if (entry.optional === true) return null;
-              missing.push(entry.source);
+              missing.push(sourceNames.join(' or '));
               return null;
             }
 
+            const sourceValue = String(secrets[resolvedSource] ?? '').trim();
             const baseValue = typeof entry.suffix === 'string'
               ? sourceValue.replace(/\/+$/, '')
               : sourceValue;
@@ -1204,8 +1213,11 @@ jobs:
           fs.writeFileSync(path.join(outDir, 'railway.json'), JSON.stringify(Object.fromEntries(railway.map((entry) => [entry.name, entry.value]))));
           fs.writeFileSync(path.join(outDir, 'vercel.json'), JSON.stringify(vercel));
           fs.writeFileSync(path.join(outDir, 'supabase.env'), `${supabaseEdge.map((entry) => `${entry.name}=${entry.value}`).join('\n')}\n`);
-          fs.writeFileSync(path.join(outDir, 'prod-direct-url.txt'), String(secrets.PROD_DIRECT_URL).trim());
-          fs.writeFileSync(path.join(outDir, 'prod-supabase-url.txt'), String(secrets.PROD_SUPABASE_URL).trim());
+          const railwayByName = Object.fromEntries(railway.map((entry) => [entry.name, entry.value]));
+          const edgeByName = Object.fromEntries(supabaseEdge.map((entry) => [entry.name, entry.value]));
+
+          fs.writeFileSync(path.join(outDir, 'prod-direct-url.txt'), railwayByName.DIRECT_URL);
+          fs.writeFileSync(path.join(outDir, 'prod-supabase-url.txt'), edgeByName.SUPABASE_URL);
 
           for (const entry of [...railway, ...vercel, ...supabaseEdge]) {
             if (entry.value) console.log(`::add-mask::${entry.value}`);
