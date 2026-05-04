@@ -588,6 +588,8 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
   },
 };
 
+export const ActivityEventCatalog = ACTIVITY_EVENT_DEFINITIONS;
+
 export function getActivityEventDefinition(eventType: string) {
   return ACTIVITY_EVENT_DEFINITIONS[eventType];
 }

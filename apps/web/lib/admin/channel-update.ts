@@ -1,28 +1,30 @@
 import { randomUUID } from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+import { requireAdminAuthContext } from '@iconicedu/web/lib/admin/_auth-context';
 import type { ChannelCreatePayload, ChannelCapabilityVM } from '@iconicedu/shared-types';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
-import { requireParentActorContext } from '@iconicedu/web/lib/family-view/actor-context';
 import { toStoredLiveSessionConfig } from '@iconicedu/web/lib/admin/live-session-config';
 import { defaultMessageUiThemeKeyForChannelKind } from '@iconicedu/web/lib/channels/ui-defaults';
 
 export async function updateChannelFromPayload(
   channelId: string,
   payload: ChannelCreatePayload,
+  actorContext?: {
+    orgId: string;
+    actorProfileId: string;
+  },
 ) {
   const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const authContext = actorContext
+    ? {
+        orgId: actorContext.orgId,
+        profileId: actorContext.actorProfileId,
+      }
+    : await requireAdminAuthContext();
 
-  if (!user) {
-    throw new Error('Unauthorized');
-  }
-
-  const actor = await requireParentActorContext(supabase);
-
-  const orgId = actor.account.org_id;
+  const orgId = authContext.orgId;
+  const profileId = authContext.profileId;
   const now = new Date().toISOString();
   const { data: existingChannel, error: existingChannelError } = await supabase
     .from('channels')
@@ -184,14 +186,14 @@ export async function updateChannelFromPayload(
     postingPolicyKind: payload.postingPolicy.kind,
     allowThreads: payload.postingPolicy.allowThreads ?? true,
     allowReactions: payload.postingPolicy.allowReactions ?? true,
-    updatedBy: actor.profile.id,
+    updatedBy: profileId,
     updatedAt: now,
   });
 
   await replaceChannelMembers(supabase, {
     orgId,
     channelId,
-    createdBy: actor.profile.id,
+    createdBy: profileId,
     createdAt: now,
     participants: payload.participants ?? [],
   });
@@ -199,7 +201,7 @@ export async function updateChannelFromPayload(
   await replaceChannelCapabilities(supabase, {
     orgId,
     channelId,
-    createdBy: actor.profile.id,
+    createdBy: profileId,
     createdAt: now,
     capabilities: payload.capabilities ?? [],
   });

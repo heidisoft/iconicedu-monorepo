@@ -29,23 +29,24 @@ Current class-session timing behavior:
 - `session.feedback_request` jobs: 15 minutes after session end
   (falls back to 15 minutes after start if end time is invalid).
 
-Reminder compilation and dispatch are split on purpose:
+Reminder reconciliation and dispatch are split on purpose:
 
 ```mermaid
 flowchart TD
-  ScheduleChange[Class schedule create/update] --> Compile[compileLearningSpaceReminderJobs]
-  Compile --> LoadSchedules[Load class_schedules and recurrence data]
-  LoadSchedules --> Expand[Expand occurrences from now-24h to now+30d]
-  Expand --> BuildJobs[Build 30m, 5m, and +15m reminder_jobs]
-  BuildJobs --> Upsert[(reminder_jobs upsert by org_id,dedupe_key)]
-  BuildJobs --> CancelStale[Cancel stale pending/leased/failed jobs]
+  ScheduleChange[Schedule table insert/update/delete] --> Trigger[DB trigger enqueues event_pipeline_jobs reminder.reconcile]
+  Trigger --> ReconcileCron[events-dispatch cron]
+  ReconcileCron --> ClaimReconcile[claim_due_event_pipeline_jobs]
+  ClaimReconcile --> Reconcile[ReminderReconcileService]
+  Reconcile --> LoadSchedules[Load class_schedules and recurrence data]
+  LoadSchedules --> NextJob[Compute next reminder or feedback job]
+  NextJob --> Upsert[(reminder_jobs upsert/cancel)]
   Cron[reminders-dispatch cron] --> Dispatch[dispatchDueReminderJobs]
   Dispatch --> Claim[claim_due_reminder_jobs]
   Claim --> Activity[publishActivityEvent]
   Activity --> Events[(activity_events)]
   Events --> Projector[projectActivityEvents]
   Projector --> Feed[(activity_feed_items)]
-  Projector --> Notifications[(notification_dispatch_jobs)]
+  Projector --> Notifications[(event_pipeline_jobs notification.prepare/deliver)]
 ```
 
 Classroom and schedule UI updates no longer synchronously depend on reminder
@@ -53,33 +54,24 @@ compilation. If reminder compilation or activity publishing is unavailable, the
 primary class update should still complete; reminder/feed/push side effects can
 be replayed or repaired separately.
 
-## Reminder Compilation Details
+## Reminder Reconciliation Details
 
-`compileLearningSpaceReminderJobs()` runs behind
-`POST /reminders/learning-space/compile` and is authorized by the caller's
-Supabase bearer token. The API verifies that the token resolves to an auth user
-with a non-deleted `accounts` row in the requested org.
+Schedule writes do not call reminder compile endpoints. Database triggers on all
+class schedule tables enqueue one durable `reminder.reconcile` pipeline job per
+schedule:
 
-Execution:
+- `class_schedules`
+- `class_schedule_participants`
+- `class_schedule_recurrence`
+- `class_schedule_recurrence_exceptions`
+- `class_schedule_recurrence_overrides`
 
-1. Load all non-deleted `class_schedules` for the org where `source_kind='class_session'`.
-2. Attach archive metadata from `learning_spaces` so archived classes can be filtered.
-3. Filter to the requested `learningSpaceId`.
-4. Expand recurring events across `now - 24h` through `now + 30d`.
-5. Drop canceled occurrences and occurrences after a classroom archive cutoff.
-6. For each occurrence with a channel:
-   - Build `session.reminder` rows for 30 minutes and 5 minutes before `start_at`.
-   - Skip reminder rows whose `run_at` is already in the past.
-   - Build one `session.feedback_request` row for 15 minutes after `end_at`.
-   - If `end_at` is invalid, use 15 minutes after `start_at`.
-   - Include payload metadata such as `channelId`, `learningSpaceId`, `scheduleId`, `occurrenceStart`, timezone, title/summary, route kind, and members.
-7. Build deterministic dedupe keys from org, learning space/channel, occurrence start, and reminder offset/job kind.
-8. Preserve already `succeeded` jobs by not re-upserting the same dedupe key.
-9. Upsert pending rows into `reminder_jobs` with `status='pending'`, `max_attempts=8`, no lease, and no `next_attempt_at`.
-10. Cancel stale `pending`, `leased`, or `failed` reminder jobs for the learning space when their dedupe keys are no longer produced by the current schedule state.
-
-`cancelLearningSpaceReminderJobs()` marks pending/leased/failed jobs for a
-learning space as `canceled`. It does not affect jobs that already succeeded.
+The unified event dispatcher claims rows through `claim_due_event_pipeline_jobs` and
+calls `ReminderReconcileService.reconcileNextReminderJobForSchedule()`.
+Reconciliation loads the latest schedule, recurrence, exception, override,
+participant, and learning-space archive state; then it keeps exactly the next
+pending reminder/feedback job for that schedule or cancels active jobs when the
+schedule no longer exists or is no longer eligible.
 
 ## 1. Required API env (`apps/api`)
 
@@ -87,6 +79,8 @@ In your API deployment, set:
 
 - `INTERNAL_REMINDERS_TOKEN_API=<long-random-secret>`
   (API also accepts legacy `INTERNAL_REMINDERS_TOKEN` when `INTERNAL_REMINDERS_TOKEN_API` is not set)
+- `INTERNAL_EVENTS_TOKEN_API=<long-random-secret>`
+  (used by the unified event pipeline dispatcher)
 - `SUPABASE_URL=<https://<project-ref>.supabase.co>`
 - `SUPABASE_SERVICE_ROLE_KEY=<service-role-key>`
 - `POSTHOG_API_KEY=<optional-posthog-key>`
@@ -98,24 +92,30 @@ In your API deployment, set:
 
 Set these Supabase secrets for the `reminders-dispatch` function:
 
+- `REMINDERS_RECONCILE_DISPATCH_URL=https://<your-api-domain>/internal/reminders/reconcile-dispatch`
 - `REMINDERS_DISPATCH_URL=https://<your-api-domain>/internal/reminders/dispatch`
+- `EVENTS_DISPATCH_URL=https://<your-api-domain>/internal/events/dispatch`
 - `INTERNAL_REMINDERS_TOKEN=<same-value-as-INTERNAL_REMINDERS_TOKEN_API>`
+- `INTERNAL_EVENTS_TOKEN=<same-value-as-INTERNAL_EVENTS_TOKEN_API>`
 
 Optional:
 
+- `REMINDERS_RECONCILE_DISPATCH_LIMIT=100`
+- `REMINDERS_RECONCILE_DISPATCH_LEASE_SECONDS=120`
+- `REMINDERS_RECONCILE_DISPATCH_LEASE_OWNER=supabase-edge-cron`
 - `REMINDERS_DISPATCH_LIMIT=100`
 - `REMINDERS_DISPATCH_LEASE_SECONDS=120`
 - `REMINDERS_DISPATCH_LEASE_OWNER=supabase-edge-cron`
 
-The Edge Function is intentionally a thin HTTP bridge. It must not read
-`class_schedules` or expand recurrence on the minute cron. Schedule reads happen when
-learning-space schedules are created or updated, where the app compiles future rows into
-`reminder_jobs`. The cron path only calls the API dispatcher, which claims due rows via
-`claim_due_reminder_jobs`.
+The Edge Functions are intentionally thin HTTP bridges. They must not read
+`class_schedules` or expand recurrence. Schedule reads happen in `apps/api` after
+the unified event dispatcher claims due `reminder.reconcile` jobs; reminder sending
+only claims due `reminder_jobs` via `claim_due_reminder_jobs`.
 
 ## 3. Deploy the Edge Function
 
 ```bash
+supabase functions deploy reminders-reconcile-dispatch
 supabase functions deploy reminders-dispatch
 ```
 
@@ -146,13 +146,16 @@ Preview branches created by `.github/workflows/ci.yml` run this automatically af
 ## 5. Validate
 
 1. Invoke function manually once from dashboard.
-2. Verify `cron.job` contains `edge-function-reminders-dispatch`.
-3. Verify API logs show requests to `/internal/reminders/dispatch`.
+2. Verify `cron.job` contains `edge-function-reminders-reconcile-dispatch` and
+   `edge-function-reminders-dispatch`.
+3. Verify API logs show requests to `/internal/reminders/reconcile-dispatch` and
+   `/internal/reminders/dispatch`.
 4. Verify response payload has counters like `claimed/succeeded/failed`.
 5. Verify DB updates:
+   - `event_pipeline_jobs` `reminder.reconcile` status transitions
    - `reminder_jobs.status` transitions
    - `activity_events` created for reminder/feedback events
-   - `activity_feed_items` and `notification_dispatch_jobs` created by projection.
+   - `activity_feed_items` and notification delivery jobs created by projection.
 
 ## 6. Reminder Dispatch Details
 
@@ -191,7 +194,7 @@ analytics as `claimed`, `succeeded`, `skipped`, `failed`, and `deadLettered`.
 After the API-owned migration, reminders and notifications should both target `apps/api`:
 
 - `REMINDERS_DISPATCH_URL=https://<your-api-domain>/internal/reminders/dispatch`
-- `NOTIFICATIONS_DISPATCH_URL=https://<your-api-domain>/internal/notifications/dispatch`
+- `REMINDERS_RECONCILE_DISPATCH_URL=https://<your-api-domain>/internal/reminders/reconcile-dispatch`
 - `ACTIVITY_PROJECTOR_DISPATCH_URL=https://<your-api-domain>/internal/activity-feed/project`
 
 The legacy web endpoint (`/api/internal/reminders/dispatch`) should not be used anymore.

@@ -1184,7 +1184,7 @@ sequenceDiagram
 
     DB--)MEMBER: Realtime: message-added (event-reminder)
     DB--)MEMBER: ActivityFeedItem created via projection
-    MEMBER->>MEMBER: Push notification via\nNotificationDispatchJob
+    MEMBER->>MEMBER: Push notification via\nevent_pipeline_jobs notification.deliver
 ```
 
 ---
@@ -1253,7 +1253,7 @@ flowchart TD
 
         INSERT_FEED["INSERT ActivityFeedItemRow\nper recipient profile"]
 
-        NOTIF["INSERT NotificationDispatchJobRow\nper delivery channel\n(push, email, sms)"]
+        NOTIF["INSERT EventPipelineJobRow\njob_kind=notification.deliver\nper delivery channel"]
     end
 
     subgraph DELIVERY["Delivery"]
@@ -1335,15 +1335,12 @@ erDiagram
         boolean is_enabled
     }
 
-    NotificationDispatchJobRow {
+    EventPipelineJobRow {
         uuid id PK
         uuid org_id FK
-        uuid activity_event_id FK
-        uuid recipient_profile_id FK
-        string pref_key
-        string delivery_channel "push|email|sms"
-        string delivery_timing "immediate|delayed|digest"
-        string attempt_bucket
+        string job_kind "notification.deliver"
+        uuid source_id FK "activity_event_id"
+        json payload "recipient, pref, channel, timing"
         timestamp run_at
         json payload
         string status "pending|leased|succeeded|suppressed|failed|dead_letter"
@@ -1355,7 +1352,7 @@ erDiagram
     }
 
     ActivityEventRow ||--o{ ActivityFeedItemRow : "projected into"
-    ActivityEventRow ||--o{ NotificationDispatchJobRow : "triggers"
+    ActivityEventRow ||--o{ EventPipelineJobRow : "triggers notification.deliver"
     ActivityEventSuppressionRuleRow }o--|| ActivityEventRow : "may suppress"
 ```
 
@@ -1382,7 +1379,7 @@ flowchart LR
         BATCH_EVENT["ActivityEventRow\nprojection_status=pending"]
         BATCH_WORKER["Projection Worker\n(polls pending events\nevery N seconds)"]
         BATCH_FEED["ActivityFeedItemRow\n(grouped/collapsed if many)"]
-        BATCH_NOTIF["NotificationDispatchJobRow\nrun_at = now() + delay"]
+        BATCH_NOTIF["EventPipelineJobRow\nnotification.deliver\nrun_at = now() + delay"]
 
         SESSION_END2 --> BATCH_EVENT --> BATCH_WORKER --> BATCH_FEED --> BATCH_NOTIF
     end
@@ -1425,13 +1422,13 @@ flowchart TD
     ONLINE_CHECK -->|Yes| SUPPRESS_PUSH["suppress push\n(reason: presence_active)"]
     ONLINE_CHECK -->|No| READ_CHECK{Channel\nrecently read?}
     READ_CHECK -->|Yes| SUPPRESS_PUSH2["suppress push\n(reason: channel_recently_read)"]
-    READ_CHECK -->|No| QUEUE_PUSH["INSERT NotificationDispatchJobRow\nchannel=push\ntiming=immediate"]
+    READ_CHECK -->|No| QUEUE_PUSH["INSERT EventPipelineJobRow\nnotification.deliver\nchannel=push"]
 
     EMAIL_CHECK -->|Yes| TIMING_CHECK{Timing?}
-    TIMING_CHECK -->|immediate| QUEUE_EMAIL_NOW["INSERT NotificationDispatchJobRow\nchannel=email\nrun_at=now()"]
-    TIMING_CHECK -->|digest| QUEUE_EMAIL_DIGEST["INSERT NotificationDispatchJobRow\nchannel=email\nrun_at=next_digest_time\nattempt_bucket=daily"]
+    TIMING_CHECK -->|immediate| QUEUE_EMAIL_NOW["INSERT EventPipelineJobRow\nchannel=email\nrun_at=now()"]
+    TIMING_CHECK -->|digest| QUEUE_EMAIL_DIGEST["INSERT EventPipelineJobRow\nchannel=email\nrun_at=next_digest_time"]
 
-    SMS_CHECK -->|Yes| QUEUE_SMS["INSERT NotificationDispatchJobRow\nchannel=sms\ntiming=immediate"]
+    SMS_CHECK -->|Yes| QUEUE_SMS["INSERT EventPipelineJobRow\nchannel=sms\ntiming=immediate"]
 
     subgraph REASON_CODES["Decision Reason Codes"]
         RC1["no_channels_enabled"]
@@ -1511,27 +1508,27 @@ block-beta
 
 ---
 
-### 4.6 Notification Dispatch Job State Machine
+### 4.6 Notification Delivery Job State Machine
 
 Full lifecycle of a notification dispatch job from creation to delivery.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> pending : NotificationDispatchJobRow created\n(run_at set, status=pending)
+    [*] --> pending : EventPipelineJobRow notification.deliver created\n(run_at set, status=pending)
 
     pending --> leased : Dispatch worker polls\nSELECT WHERE run_at<=now() AND status=pending\nUPDATE lease_owner, lease_until
 
-    leased --> succeeded : Notification delivered\n(push sent, email sent, etc.)\nINSERT NotificationDispatchLogRow (succeeded)
+    leased --> succeeded : Notification delivered\n(push sent, email sent, etc.)\nINSERT EventPipelineLogRow (succeeded)
 
-    leased --> suppressed : Decision engine suppresses\n(user online, recently read, preference off)\nINSERT NotificationDispatchLogRow (suppressed)
+    leased --> suppressed : Decision engine suppresses\n(user online, recently read, preference off)\nINSERT EventPipelineLogRow (suppressed)
 
     leased --> retryable_failure : Transient error\n(network timeout, rate limit)\nattempt_count < max_attempts\nnext_attempt_at = now() + backoff
 
     retryable_failure --> leased : Retry attempt\n(attempt_count++)
 
-    leased --> fatal_failure : Non-retryable error\n(invalid token, bad address)\nINSERT NotificationDispatchLogRow (fatal_failure)
+    leased --> fatal_failure : Non-retryable error\n(invalid token, bad address)\nINSERT EventPipelineLogRow (fatal_failure)
 
-    retryable_failure --> dead_letter : Max attempts reached\n(attempt_count >= max_attempts)\nINSERT NotificationDispatchLogRow (fatal_failure)
+    retryable_failure --> dead_letter : Max attempts reached\n(attempt_count >= max_attempts)\nINSERT EventPipelineLogRow (fatal_failure)
 
     fatal_failure --> [*]
     dead_letter --> [*]

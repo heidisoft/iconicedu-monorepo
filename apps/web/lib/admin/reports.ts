@@ -9,11 +9,11 @@ import type {
   ChannelLiveSessionRow,
   ChannelMemberRow,
   ChannelRow,
+  EventPipelineJobRow,
   FamilyLinkRow,
   FamilyRow,
   LearningSpaceRow,
   MessageRow,
-  NotificationDispatchJobRow,
   ProfileRow,
 } from '@iconicedu/shared-types';
 import {
@@ -57,7 +57,7 @@ type ReportDataSnapshot = {
   schedules: ClassScheduleVM[];
   messages: MessageRow[];
   activityFeedItems: ActivityFeedItemRow[];
-  notificationDispatchJobs: NotificationDispatchJobRow[];
+  notificationDeliveryJobs: EventPipelineJobRow[];
   liveSessions: ChannelLiveSessionRow[];
   liveSessionParticipants: ChannelLiveSessionParticipantRow[];
 };
@@ -514,7 +514,7 @@ function buildChannelSummary(input: {
 
 function buildActivitySummary(input: {
   activityFeedItems: ActivityFeedItemRow[];
-  notificationDispatchJobs: NotificationDispatchJobRow[];
+  notificationDeliveryJobs: EventPipelineJobRow[];
   now: Date;
 }): AdminReportsDashboardVM['activitySummary'] {
   const currentMonthStart = startOfMonth(input.now).getTime();
@@ -529,7 +529,7 @@ function buildActivitySummary(input: {
     );
   });
 
-  const currentMonthJobs = input.notificationDispatchJobs.filter((job) => {
+  const currentMonthJobs = input.notificationDeliveryJobs.filter((job) => {
     const createdAt = toTimestamp(job.created_at);
     return (
       Number.isFinite(createdAt) &&
@@ -840,18 +840,19 @@ function buildUpcomingScheduledSessionsByWeek(input: {
 }
 
 function buildNotificationDispatchByChannel(input: {
-  notificationDispatchJobs: NotificationDispatchJobRow[];
+  notificationDeliveryJobs: EventPipelineJobRow[];
 }): AdminRankedMetricVM[] {
   const counts = new Map<string, number>();
   const successCounts = new Map<string, number>();
 
-  input.notificationDispatchJobs.forEach((job) => {
-    counts.set(job.delivery_channel, (counts.get(job.delivery_channel) ?? 0) + 1);
+  input.notificationDeliveryJobs.forEach((job) => {
+    const channel =
+      typeof job.payload?.deliveryChannel === 'string'
+        ? job.payload.deliveryChannel
+        : 'unknown';
+    counts.set(channel, (counts.get(channel) ?? 0) + 1);
     if (job.status === 'succeeded') {
-      successCounts.set(
-        job.delivery_channel,
-        (successCounts.get(job.delivery_channel) ?? 0) + 1,
-      );
+      successCounts.set(channel, (successCounts.get(channel) ?? 0) + 1);
     }
   });
 
@@ -1077,7 +1078,7 @@ export function buildAdminReportsDashboardVM(
     }),
     activitySummary: buildActivitySummary({
       activityFeedItems: snapshot.activityFeedItems,
-      notificationDispatchJobs: snapshot.notificationDispatchJobs,
+      notificationDeliveryJobs: snapshot.notificationDeliveryJobs,
       now,
     }),
     monthlyUserGrowth: buildMonthlyUserGrowth(snapshot.accounts, monthlyBuckets),
@@ -1143,7 +1144,7 @@ export function buildAdminReportsDashboardVM(
       channelById,
     }),
     notificationDispatchByChannel: buildNotificationDispatchByChannel({
-      notificationDispatchJobs: snapshot.notificationDispatchJobs,
+      notificationDeliveryJobs: snapshot.notificationDeliveryJobs,
     }),
     inboxActivityByVerb: buildInboxActivityByVerb({
       activityFeedItems: snapshot.activityFeedItems,
@@ -1169,7 +1170,7 @@ async function loadReportSnapshot(orgId: string, now: Date): Promise<ReportDataS
     schedules,
     messagesResponse,
     activityFeedItemsResponse,
-    notificationDispatchJobsResponse,
+    notificationDeliveryJobsResponse,
     liveSessionsResponse,
   ] = await Promise.all([
     supabase
@@ -1234,12 +1235,13 @@ async function loadReportSnapshot(orgId: string, now: Date): Promise<ReportDataS
       .gte('occurred_at', oldestWindowStartIso)
       .returns<ActivityFeedItemRow[]>(),
     supabase
-      .from('notification_dispatch_jobs')
+      .from('event_pipeline_jobs')
       .select('*')
       .eq('org_id', orgId)
       .is('deleted_at', null)
+      .eq('job_kind', 'notification.deliver')
       .gte('created_at', oldestWindowStartIso)
-      .returns<NotificationDispatchJobRow[]>(),
+      .returns<EventPipelineJobRow[]>(),
     supabase
       .from('channel_live_sessions')
       .select('*')
@@ -1260,7 +1262,7 @@ async function loadReportSnapshot(orgId: string, now: Date): Promise<ReportDataS
     { data: schedules, error: null },
     messagesResponse,
     activityFeedItemsResponse,
-    notificationDispatchJobsResponse,
+    notificationDeliveryJobsResponse,
     liveSessionsResponse,
   ].forEach((response) => {
     if ('error' in response && response.error) {
@@ -1297,7 +1299,7 @@ async function loadReportSnapshot(orgId: string, now: Date): Promise<ReportDataS
     schedules,
     messages: messagesResponse.data ?? [],
     activityFeedItems: activityFeedItemsResponse.data ?? [],
-    notificationDispatchJobs: notificationDispatchJobsResponse.data ?? [],
+    notificationDeliveryJobs: notificationDeliveryJobsResponse.data ?? [],
     liveSessions: liveSessionsResponse.data ?? [],
     liveSessionParticipants: liveSessionParticipantsResponse.data ?? [],
   };

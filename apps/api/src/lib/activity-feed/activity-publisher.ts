@@ -7,7 +7,6 @@ import type {
 } from '@iconicedu/shared-types';
 import { Logger } from '@nestjs/common';
 
-import { projectActivityEvents } from '@iconicedu/api/lib/activity-feed/projector/project-activity-events';
 import { resolveActivityVerbSuppressionDecision } from '@iconicedu/api/lib/activity-feed/activity-verb-suppression';
 import type { SupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 
@@ -75,6 +74,30 @@ async function resolveActivityOrgSlug(
   return slug;
 }
 
+async function enqueueActivityProjectionJob(input: {
+  supabase: SupabaseServiceClient;
+  event: ActivityEventRow;
+  createdBy?: string | null;
+}) {
+  const response = await input.supabase.rpc('enqueue_event_pipeline_job', {
+    p_org_id: input.event.org_id,
+    p_job_kind: 'activity.project',
+    p_dedupe_key: `activity.project:${input.event.id}`,
+    p_payload: { eventId: input.event.id },
+    p_outbox_id: null,
+    p_source_kind: 'activity_event',
+    p_source_id: input.event.id,
+    p_run_at: new Date().toISOString(),
+    p_priority: 60,
+    p_created_by: input.createdBy ?? input.event.created_by ?? null,
+    p_updated_by: input.createdBy ?? input.event.updated_by ?? null,
+  });
+
+  if (response.error) {
+    throw new Error(response.error.message);
+  }
+}
+
 export async function publishActivityEvent<TPayload extends object>(
   input: PublishActivityEventInput<TPayload>,
 ) {
@@ -137,12 +160,13 @@ export async function publishActivityEvent<TPayload extends object>(
 
         if (existingResponse.data) {
           try {
-            await projectActivityEvents(input.supabase, {
-              eventIds: [existingResponse.data.id],
-              limit: 1,
+            await enqueueActivityProjectionJob({
+              supabase: input.supabase,
+              event: existingResponse.data,
+              createdBy: input.createdBy ?? input.actorProfileId ?? null,
             });
           } catch {
-            // Keep the event durable even if immediate projection fails.
+            // Keep the event durable even if projection enqueue fails.
           }
         }
 
@@ -153,12 +177,13 @@ export async function publishActivityEvent<TPayload extends object>(
     }
 
     try {
-      await projectActivityEvents(input.supabase, {
-        eventIds: [insertResponse.data.id],
-        limit: 1,
+      await enqueueActivityProjectionJob({
+        supabase: input.supabase,
+        event: insertResponse.data,
+        createdBy: input.createdBy ?? input.actorProfileId ?? null,
       });
     } catch {
-      // Keep the event durable even if immediate projection fails.
+      // Keep the event durable even if projection enqueue fails.
     }
 
     return insertResponse.data;

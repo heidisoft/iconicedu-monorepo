@@ -21,6 +21,8 @@ const originalEnv = {
   NODE_ENV: process.env.NODE_ENV,
   INTERNAL_ACTIVITY_WORKER_TOKEN_API: process.env.INTERNAL_ACTIVITY_WORKER_TOKEN_API,
   INTERNAL_ACTIVITY_PROJECTOR_TOKEN: process.env.INTERNAL_ACTIVITY_PROJECTOR_TOKEN,
+  INTERNAL_REMINDERS_TOKEN_API: process.env.INTERNAL_REMINDERS_TOKEN_API,
+  INTERNAL_EVENTS_TOKEN_API: process.env.INTERNAL_EVENTS_TOKEN_API,
 };
 
 function request(body: Record<string, unknown>) {
@@ -43,6 +45,8 @@ describe('POST /api/admin/tools/dispatch', () => {
     process.env.NEXT_PUBLIC_API_URL = '';
     process.env.INTERNAL_ACTIVITY_WORKER_TOKEN_API = 'worker-token';
     process.env.INTERNAL_ACTIVITY_PROJECTOR_TOKEN = 'projector-token';
+    process.env.INTERNAL_REMINDERS_TOKEN_API = 'reminders-token';
+    process.env.INTERNAL_EVENTS_TOKEN_API = 'events-token';
   });
 
   afterEach(() => {
@@ -53,6 +57,43 @@ describe('POST /api/admin/tools/dispatch', () => {
       originalEnv.INTERNAL_ACTIVITY_WORKER_TOKEN_API;
     process.env.INTERNAL_ACTIVITY_PROJECTOR_TOKEN =
       originalEnv.INTERNAL_ACTIVITY_PROJECTOR_TOKEN;
+    process.env.INTERNAL_REMINDERS_TOKEN_API = originalEnv.INTERNAL_REMINDERS_TOKEN_API;
+    process.env.INTERNAL_EVENTS_TOKEN_API = originalEnv.INTERNAL_EVENTS_TOKEN_API;
+  });
+
+  it('runs unified event pipeline jobs through the API endpoint', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ claimed: 1, succeeded: 1 }), { status: 200 }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await POST(
+      request({
+        orgId: 'org-1',
+        kind: 'events-dispatch',
+        limit: 5,
+        leaseSeconds: 90,
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:3001/internal/events/dispatch',
+      expect.objectContaining({
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer events-token',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          limit: 5,
+          leaseSeconds: 90,
+          leaseOwner: 'supabase-edge-cron',
+        }),
+      }),
+    );
   });
 
   it('runs activity worker jobs through the API endpoint with cron-style defaults', async () => {
@@ -116,6 +157,39 @@ describe('POST /api/admin/tools/dispatch', () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ limit: 2 }),
+      }),
+    );
+  });
+
+  it('runs reminder reconcile jobs through the API endpoint', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ claimed: 1, succeeded: 1 }), { status: 200 }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await POST(
+      request({
+        orgId: 'org-1',
+        kind: 'reminders-reconcile-dispatch',
+        limit: 7,
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:3001/internal/reminders/reconcile-dispatch',
+      expect.objectContaining({
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer reminders-token',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          limit: 7,
+          leaseOwner: 'supabase-edge-cron',
+        }),
       }),
     );
   });

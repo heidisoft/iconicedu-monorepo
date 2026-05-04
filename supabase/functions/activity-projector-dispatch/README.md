@@ -6,7 +6,7 @@ Calls the internal app endpoint:
 
 This function retries pending and failed `activity_events` projection work so
 durable activity events eventually fan out to `activity_feed_items` and
-`notification_dispatch_jobs`.
+notification preparation jobs in `event_pipeline_jobs`.
 
 Scheduler source of truth:
 

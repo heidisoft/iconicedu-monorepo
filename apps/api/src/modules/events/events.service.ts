@@ -2,18 +2,21 @@ import { Injectable } from '@nestjs/common';
 import { publishActivityEvent } from '@iconicedu/api/lib/activity-feed/activity-publisher';
 
 import { projectActivityEvents } from '@iconicedu/api/lib/activity-feed/projector/project-activity-events';
-import { dispatchDueNotificationJobs } from '@iconicedu/api/lib/notifications/dispatch-jobs';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
+import { EventPipelineService } from '@iconicedu/api/modules/events/event-pipeline.service';
 import type {
   ActivityEventRow,
   ActivityEventTypeVM,
   AudienceRuleVM,
+  EventPipelineJobKind,
   EntityRefVM,
   FeedScopeVM,
 } from '@iconicedu/shared-types';
 
 @Injectable()
 export class EventsService {
+  constructor(private readonly eventPipelineService: EventPipelineService) {}
+
   async publishEvent<TPayload extends object>(input: {
     orgId: string;
     eventType: ActivityEventTypeVM;
@@ -53,17 +56,12 @@ export class EventsService {
     return projectActivityEvents(supabase, input);
   }
 
-  async dispatchDueNotifications(input: {
+  async dispatchDuePipelineJobs(input: {
     leaseOwner: string;
     limit?: number;
     leaseSeconds?: number;
+    jobKinds?: EventPipelineJobKind[];
   }) {
-    const supabase = createSupabaseServiceClient();
-    return dispatchDueNotificationJobs({
-      supabase,
-      leaseOwner: input.leaseOwner,
-      limit: input.limit,
-      leaseSeconds: input.leaseSeconds,
-    });
+    return this.eventPipelineService.dispatchDueJobs(input);
   }
 }

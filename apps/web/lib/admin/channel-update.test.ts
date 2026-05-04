@@ -3,13 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   createSupabaseServerClientMock,
   createSupabaseServiceClientMock,
-  requireParentActorContextMock,
+  requireAdminAuthContextMock,
   ensureSystemProfileIdMock,
   publishActivityEventMock,
 } = vi.hoisted(() => ({
   createSupabaseServerClientMock: vi.fn(),
   createSupabaseServiceClientMock: vi.fn(),
-  requireParentActorContextMock: vi.fn(),
+  requireAdminAuthContextMock: vi.fn(),
   ensureSystemProfileIdMock: vi.fn(),
   publishActivityEventMock: vi.fn(),
 }));
@@ -22,8 +22,8 @@ vi.mock('@iconicedu/web/lib/supabase/service', () => ({
   createSupabaseServiceClient: createSupabaseServiceClientMock,
 }));
 
-vi.mock('@iconicedu/web/lib/family-view/actor-context', () => ({
-  requireParentActorContext: requireParentActorContextMock,
+vi.mock('@iconicedu/web/lib/admin/_auth-context', () => ({
+  requireAdminAuthContext: requireAdminAuthContextMock,
 }));
 
 vi.mock('@iconicedu/web/lib/automation/system-profile', () => ({
@@ -80,10 +80,10 @@ describe('updateChannelFromPayload', () => {
     vi.clearAllMocks();
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-01T12:00:00.000Z'));
-    requireParentActorContextMock.mockResolvedValue({
-      account: { id: 'account-1', org_id: 'org-1' },
-      profile: { id: 'profile-actor-1', account_id: 'account-1', org_id: 'org-1' },
-      source: 'parent',
+    requireAdminAuthContextMock.mockResolvedValue({
+      accountId: 'account-1',
+      orgId: 'org-1',
+      profileId: 'profile-actor-1',
     });
   });
 

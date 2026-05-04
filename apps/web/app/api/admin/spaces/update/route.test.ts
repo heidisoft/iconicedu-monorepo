@@ -3,19 +3,12 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { POST } from '@iconicedu/web/app/api/admin/spaces/update/route';
 import { resolveAppUrl } from '@iconicedu/web/lib/config/app-url';
 
-const createSupabaseServerClientMock = vi.fn();
-const requireParentActorContextMock = vi.fn();
+const requireAdminAuthContextMock = vi.fn();
 const updateLearningSpaceFromPayloadMock = vi.fn();
 const APP_URL = resolveAppUrl();
 
-vi.mock('@iconicedu/web/lib/supabase/server', () => ({
-  createSupabaseServerClient: (...args: unknown[]) =>
-    createSupabaseServerClientMock(...args),
-}));
-
-vi.mock('@iconicedu/web/lib/family-view/actor-context', () => ({
-  requireParentActorContext: (...args: unknown[]) =>
-    requireParentActorContextMock(...args),
+vi.mock('@iconicedu/web/lib/admin/_auth-context', () => ({
+  requireAdminAuthContext: (...args: unknown[]) => requireAdminAuthContextMock(...args),
 }));
 
 vi.mock('@iconicedu/web/lib/admin/learning-space-update', () => ({
@@ -40,11 +33,7 @@ describe('POST /api/admin/spaces/update', () => {
   });
 
   it('returns 401 when user is not authenticated', async () => {
-    createSupabaseServerClientMock.mockResolvedValue({
-      auth: {
-        getUser: vi.fn(async () => ({ data: { user: null } })),
-      },
-    });
+    requireAdminAuthContextMock.mockRejectedValue(new Error('Unauthorized'));
 
     const response = await POST(
       new Request(`${APP_URL}/api/admin/spaces/update`, {
@@ -68,15 +57,9 @@ describe('POST /api/admin/spaces/update', () => {
   });
 
   it('passes current profile context into learning space update', async () => {
-    createSupabaseServerClientMock.mockResolvedValue({
-      auth: {
-        getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user-1' } } })),
-      },
-    });
-    requireParentActorContextMock.mockResolvedValue({
-      account: { id: 'account-1', org_id: 'org-1' },
-      profile: { id: 'profile-actor-1', account_id: 'account-1', org_id: 'org-1' },
-      source: 'parent',
+    requireAdminAuthContextMock.mockResolvedValue({
+      orgId: 'org-1',
+      profileId: 'profile-actor-1',
     });
     updateLearningSpaceFromPayloadMock.mockResolvedValue(undefined);
 

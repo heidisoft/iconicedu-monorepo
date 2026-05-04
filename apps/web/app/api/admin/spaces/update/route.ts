@@ -1,11 +1,8 @@
 import { NextResponse } from 'next/server';
 
+import { requireAdminAuthContext } from '@iconicedu/web/lib/admin/_auth-context';
 import { updateLearningSpaceFromPayload } from '@iconicedu/web/lib/admin/learning-space-update';
-import {
-  ParentModeRequiredError,
-  requireParentActorContext,
-} from '@iconicedu/web/lib/family-view/actor-context';
-import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
+import { ParentModeRequiredError } from '@iconicedu/web/lib/family-view/actor-context';
 import type { LearningSpaceCreatePayload } from '@iconicedu/shared-types';
 
 type UpdateLearningSpaceRequest = {
@@ -34,27 +31,27 @@ export async function POST(request: Request) {
   }
 
   try {
-    const supabase = await createSupabaseServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 },
-      );
-    }
-
-    const actor = await requireParentActorContext(supabase);
+    const auth = await requireAdminAuthContext();
 
     await updateLearningSpaceFromPayload(learningSpaceId, payload!, {
-      orgId: actor.account.org_id,
-      actorProfileId: actor.profile.id,
+      orgId: auth.orgId,
+      actorProfileId: auth.profileId,
     });
     return NextResponse.json({ success: true });
   } catch (error) {
     if (error instanceof ParentModeRequiredError) {
+      return NextResponse.json(
+        { success: false, message: error.message },
+        { status: 403 },
+      );
+    }
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json(
+        { success: false, message: error.message },
+        { status: 401 },
+      );
+    }
+    if (error instanceof Error && error.message === 'Forbidden') {
       return NextResponse.json(
         { success: false, message: error.message },
         { status: 403 },

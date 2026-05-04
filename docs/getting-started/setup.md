@@ -367,13 +367,13 @@ When synced from local Supabase, the command writes:
 - `INTERNAL_REMINDERS_TOKEN_API` if missing
 - `INTERNAL_ACTIVITY_FEED_TOKEN` if missing
 - `INTERNAL_ACTIVITY_PROJECTOR_TOKEN` if missing
-- `INTERNAL_NOTIFICATIONS_TOKEN_API` if missing
+- `INTERNAL_EVENTS_TOKEN_API` if missing
 
 For push notification projection and dispatch in API, also set:
 
 - `INTERNAL_ACTIVITY_FEED_TOKEN=<long-random-secret>`
 - `INTERNAL_ACTIVITY_PROJECTOR_TOKEN=<long-random-secret>`
-- `INTERNAL_NOTIFICATIONS_TOKEN_API=<long-random-secret>`
+- `INTERNAL_EVENTS_TOKEN_API=<long-random-secret>`
 - `EXPO_ACCESS_TOKEN=<expo-personal-access-token>` for authenticated Expo Push API calls
 
 ---
