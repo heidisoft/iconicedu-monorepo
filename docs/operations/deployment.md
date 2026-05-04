@@ -250,23 +250,48 @@ The database is fully managed by Supabase. Schema changes are applied via migrat
 
 ### Edge Functions And Cron
 
-Preview CI now deploys all Supabase Edge Functions and sets branch-local secrets after the Railway API preview URL is known. The unified activity/notification path is:
+Preview CI now deploys the required Supabase Edge Functions and sets branch-local secrets after the Railway API preview URL is known. The unified activity/notification path is:
 
 - `events-dispatch` Edge Function
 - `EVENTS_DISPATCH_URL=https://<api-domain>/internal/events/dispatch`
 - `INTERNAL_EVENTS_TOKEN=<same value as API INTERNAL_EVENTS_TOKEN_API>`
 
-Production must be configured the same way:
+Preview CI applies migrations, sets branch-local Edge Function secrets, deploys
+functions, runs `public.configure_edge_function_cron(...)`, and verifies the
+active cron set. Production must be configured with the same values manually or
+through your production deploy automation:
 
 ```bash
 supabase secrets set \
+  SUPABASE_URL=https://<project-ref>.supabase.co \
+  SUPABASE_SERVICE_ROLE_KEY=<service-role-key> \
   EVENTS_DISPATCH_URL=https://<api-domain>/internal/events/dispatch \
   INTERNAL_EVENTS_TOKEN=<long-random-secret> \
   REMINDERS_DISPATCH_URL=https://<api-domain>/internal/reminders/dispatch \
   INTERNAL_REMINDERS_TOKEN=<long-random-secret>
 
-supabase functions deploy --use-api
+supabase functions deploy --use-api --jobs 4
 ```
+
+Manual production values:
+
+| Where                 | Variable / value                   | Notes                                                              |
+| --------------------- | ---------------------------------- | ------------------------------------------------------------------ |
+| `apps/api`            | `INTERNAL_EVENTS_TOKEN_API`        | Long random secret; must match Supabase `INTERNAL_EVENTS_TOKEN`    |
+| `apps/api`            | `INTERNAL_REMINDERS_TOKEN_API`     | Long random secret; must match Supabase `INTERNAL_REMINDERS_TOKEN` |
+| `apps/api`            | `EXPO_ACCESS_TOKEN`                | Required for authenticated Expo push sends                         |
+| Supabase Edge secrets | `EVENTS_DISPATCH_URL`              | `https://<api-domain>/internal/events/dispatch`                    |
+| Supabase Edge secrets | `INTERNAL_EVENTS_TOKEN`            | Same value as `apps/api` `INTERNAL_EVENTS_TOKEN_API`               |
+| Supabase Edge secrets | `REMINDERS_DISPATCH_URL`           | `https://<api-domain>/internal/reminders/dispatch`                 |
+| Supabase Edge secrets | `INTERNAL_REMINDERS_TOKEN`         | Same value as `apps/api` `INTERNAL_REMINDERS_TOKEN_API`            |
+| Supabase Edge secrets | `SUPABASE_URL`                     | Required by `channel-read-state-repair`                            |
+| Supabase Edge secrets | `SUPABASE_SERVICE_ROLE_KEY`        | Required by `channel-read-state-repair`                            |
+| Supabase Edge secrets | `EVENTS_DISPATCH_LIMIT`            | Optional, default API limit is okay; start with `100`              |
+| Supabase Edge secrets | `EVENTS_DISPATCH_LEASE_SECONDS`    | Optional; start with `120`                                         |
+| Supabase Edge secrets | `EVENTS_DISPATCH_LEASE_OWNER`      | Optional; use `supabase-edge-cron`                                 |
+| Supabase Edge secrets | `REMINDERS_DISPATCH_LIMIT`         | Optional; start with `100`                                         |
+| Supabase Edge secrets | `REMINDERS_DISPATCH_LEASE_SECONDS` | Optional; start with `120`                                         |
+| Supabase Edge secrets | `REMINDERS_DISPATCH_LEASE_OWNER`   | Optional; use `supabase-edge-cron`                                 |
 
 After functions are deployed and migrations are applied, configure pg_cron with the Supabase project URL:
 
@@ -279,8 +304,13 @@ Required production checks:
 - `apps/api` has `INTERNAL_EVENTS_TOKEN_API` matching Supabase `INTERNAL_EVENTS_TOKEN`.
 - `apps/api` has `INTERNAL_REMINDERS_TOKEN_API` matching Supabase `INTERNAL_REMINDERS_TOKEN`.
 - `events-dispatch` is deployed with `verify_jwt=false`.
-- `cron.job` includes `edge-function-events-dispatch`.
+- `cron.job` includes `edge-function-events-dispatch`, `edge-function-reminders-dispatch`, and `edge-function-channel-read-state-repair`.
+- `cron.job` does not include deprecated `edge-function-notifications-dispatch`, `edge-function-reminders-reconcile-dispatch`, `edge-function-activity-worker-dispatch`, or `edge-function-activity-projector-dispatch`.
 - `EXPO_ACCESS_TOKEN` is set in `apps/api` if push delivery should use Expo authenticated sends.
+
+`supabase functions deploy` accepts an optional function name. Omitting the name
+deploys all local functions. Add `--prune` only when you intentionally want to
+delete remote functions that no longer exist locally.
 
 ### Applying migrations to production
 

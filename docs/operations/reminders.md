@@ -93,6 +93,8 @@ In your API deployment, set:
 Set these Supabase secrets for the `events-dispatch` and `reminders-dispatch`
 functions:
 
+- `SUPABASE_URL=https://<project-ref>.supabase.co`
+- `SUPABASE_SERVICE_ROLE_KEY=<service-role-key>` (used by the daily channel read-state repair function)
 - `REMINDERS_DISPATCH_URL=https://<your-api-domain>/internal/reminders/dispatch`
 - `EVENTS_DISPATCH_URL=https://<your-api-domain>/internal/events/dispatch`
 - `INTERNAL_REMINDERS_TOKEN=<same-value-as-INTERNAL_REMINDERS_TOKEN_API>`
@@ -115,8 +117,7 @@ only claims due `reminder_jobs` via `claim_due_reminder_jobs`.
 ## 3. Deploy the Edge Function
 
 ```bash
-supabase functions deploy events-dispatch
-supabase functions deploy reminders-dispatch
+supabase functions deploy --use-api --jobs 4
 ```
 
 `reminders-reconcile-dispatch` is a legacy compatibility bridge for the older
@@ -150,6 +151,8 @@ Preview branches created by `.github/workflows/ci.yml` run this automatically af
 1. Invoke function manually once from dashboard.
 2. Verify `cron.job` contains `edge-function-events-dispatch` and
    `edge-function-reminders-dispatch`.
+   `edge-function-channel-read-state-repair` should also exist as the daily
+   maintenance cron.
 3. Verify API logs show requests to `/internal/events/dispatch` and
    `/internal/reminders/dispatch`.
 4. Verify response payload has counters like `claimed/succeeded/failed`.
