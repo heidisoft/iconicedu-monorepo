@@ -156,7 +156,7 @@ The current CLI returns values like:
 {
   "API_URL": "http://127.0.0.1:54321",
   "DB_URL": "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
-  "JWT_SECRET": "super-secret-jwt-token-with-at-least-32-characters-long",
+  "SUPABASE_JWT_SECRET": "super-secret-jwt-token-with-at-least-32-characters-long",
   "PUBLISHABLE_KEY": "sb_publishable_...",
   "ANON_KEY": "eyJ...",
   "SECRET_KEY": "sb_secret_...",
@@ -353,7 +353,7 @@ SUPABASE_URL=https://your-project-ref.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
 # JWT secret — from Supabase dashboard → Settings → API → JWT Settings
-JWT_SECRET=your-jwt-secret
+SUPABASE_JWT_SECRET=your-jwt-secret
 ```
 
 When synced from local Supabase, the command writes:
@@ -363,7 +363,7 @@ When synced from local Supabase, the command writes:
 - `SUPABASE_URL=<API_URL>`
 - `SUPABASE_SERVICE_ROLE_KEY=<SERVICE_ROLE_KEY>`
 - `SUPABASE_ANON_KEY=<ANON_KEY>`
-- `JWT_SECRET=<JWT_SECRET>`
+- `SUPABASE_JWT_SECRET=<SUPABASE_JWT_SECRET>`
 - `INTERNAL_REMINDERS_TOKEN` if missing
 - `INTERNAL_EVENTS_TOKEN` if missing
 

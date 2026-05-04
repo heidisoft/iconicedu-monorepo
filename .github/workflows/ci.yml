@@ -717,7 +717,7 @@ jobs:
             --arg phk   "${{ secrets.POSTHOG_KEY }}" \
             --arg phh   "${{ vars.POSTHOG_HOST }}" \
             '{DATABASE_URL:$db, DIRECT_URL:$dir, SUPABASE_URL:$surl,
-              SUPABASE_SERVICE_ROLE_KEY:$srkey, SUPABASE_ANON_KEY:$anon, JWT_SECRET:$jwt,
+              SUPABASE_SERVICE_ROLE_KEY:$srkey, SUPABASE_ANON_KEY:$anon, SUPABASE_JWT_SECRET:$jwt,
               INTERNAL_EVENTS_TOKEN:$evt,
               INTERNAL_REMINDERS_TOKEN:$rem,
               EXPO_ACCESS_TOKEN:$expo,
@@ -1305,7 +1305,7 @@ jobs:
               SUPABASE_ANON_KEY: $anonKey,
               NEXT_PUBLIC_SUPABASE_ANON_KEY: $anonKey,
               SUPABASE_SERVICE_ROLE_KEY: $serviceRoleKey
-            } + (if $jwtSecret != "" then {JWT_SECRET: $jwtSecret} else {} end)' \
+            } + (if $jwtSecret != "" then {SUPABASE_JWT_SECRET: $jwtSecret} else {} end)' \
             > "$OUT_DIR/derived-secrets.json"
 
       - name: Validate and render production env manifest
