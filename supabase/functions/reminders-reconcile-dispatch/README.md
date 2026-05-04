@@ -1,8 +1,11 @@
-# reminders-reconcile-dispatch (Supabase Edge Function)
+# reminders-reconcile-dispatch (legacy Supabase Edge Function)
 
-Thin cron bridge for API-owned reminder reconciliation.
+Compatibility bridge for the older dedicated reminder reconciliation queue. New
+schedule-table changes enqueue `event_pipeline_jobs` with
+`job_kind='reminder.reconcile'`, and `events-dispatch` calls
+`POST /internal/events/dispatch` to process them.
 
-Calls:
+This legacy function calls:
 
 - `POST /internal/reminders/reconcile-dispatch`
 

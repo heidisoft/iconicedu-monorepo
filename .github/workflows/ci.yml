@@ -946,7 +946,8 @@ jobs:
           set -euo pipefail
           supabase functions deploy \
             --project-ref "${{ steps.supabase-branch.outputs.branch_ref }}" \
-            --use-api
+            --use-api \
+            --jobs 4
 
       # 9. Create or refresh branch-local cron jobs with the preview branch URL.
       - name: Configure Supabase preview cron jobs
@@ -963,6 +964,32 @@ jobs:
           PGSSLMODE=require psql "${ADMIN_DATABASE_URL}" \
             -v ON_ERROR_STOP=1 \
             -c "select jobname, schedule from cron.job where jobname like 'edge-function-%' order by jobname;"
+
+          PGSSLMODE=require psql "${ADMIN_DATABASE_URL}" \
+            -v ON_ERROR_STOP=1 \
+            -c "do \$\$ begin
+              if not exists (select 1 from cron.job where jobname = 'edge-function-events-dispatch') then
+                raise exception 'missing edge-function-events-dispatch cron job';
+              end if;
+              if not exists (select 1 from cron.job where jobname = 'edge-function-reminders-dispatch') then
+                raise exception 'missing edge-function-reminders-dispatch cron job';
+              end if;
+              if not exists (select 1 from cron.job where jobname = 'edge-function-channel-read-state-repair') then
+                raise exception 'missing edge-function-channel-read-state-repair cron job';
+              end if;
+              if exists (
+                select 1
+                from cron.job
+                where jobname in (
+                  'edge-function-notifications-dispatch',
+                  'edge-function-reminders-reconcile-dispatch',
+                  'edge-function-activity-worker-dispatch',
+                  'edge-function-activity-projector-dispatch'
+                )
+              ) then
+                raise exception 'deprecated split dispatcher cron jobs are still scheduled';
+              end if;
+            end \$\$;"
 
       # 10. Post / update the single unified PR comment
       - name: Post preview environment comment

@@ -1,12 +1,16 @@
-# activity-projector-dispatch (Supabase Edge Function)
+# activity-projector-dispatch (legacy Supabase Edge Function)
 
-Calls the internal app endpoint:
+Compatibility bridge for guarded projection replay. The normal activity,
+notification, and reminder pipeline now runs through `events-dispatch` and
+`POST /internal/events/dispatch`.
+
+This legacy function calls the internal app endpoint:
 
 - `POST /internal/activity-feed/project`
 
-This function retries pending and failed `activity_events` projection work so
-durable activity events eventually fan out to `activity_feed_items` and
-notification preparation jobs in `event_pipeline_jobs`.
+It retries pending and failed `activity_events` projection work for older
+operational flows. New product flows should enqueue `event_pipeline_jobs`
+`activity.project` work and let `events-dispatch` process it.
 
 Scheduler source of truth:
 

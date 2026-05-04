@@ -1241,9 +1241,13 @@ flowchart TD
     end
 
     subgraph PIPELINE["Event Pipeline"]
-        PUBLISH["publishActivityEvent()\nINSERT ActivityEventRow\nprojection_status=pending"]
+        OUTBOX["event_outbox\ncanonical source signal"]
 
-        PROJECTOR["projectActivityEvents()\n(worker / cron)\nReads pending events"]
+        JOBS["event_pipeline_jobs\nactivity.generate → activity.project"]
+
+        GENERATE["ActivityGenerationService\nINSERT/REUSE ActivityEventRow\nprojection_status=pending"]
+
+        PROJECTOR["projectActivityEvents()\nvia events-dispatch\nReads explicit pipeline job"]
 
         RESOLVE["Resolve Recipients\nFrom audience_rules\n(who sees this event?)"]
 
@@ -1252,6 +1256,8 @@ flowchart TD
         BUILD["Build ActivityFeedItemVM\n- Determine tab_key\n- Set importance\n- Build content, preview, action_button\n- Determine group_key, group_type\n- Dedupe by dedupe_key"]
 
         INSERT_FEED["INSERT ActivityFeedItemRow\nper recipient profile"]
+
+        NOTIF_PREP["INSERT EventPipelineJobRow\njob_kind=notification.prepare"]
 
         NOTIF["INSERT EventPipelineJobRow\njob_kind=notification.deliver\nper delivery channel"]
     end
@@ -1263,14 +1269,17 @@ flowchart TD
         SMS["SMS Notification\n(Twilio / etc.)"]
     end
 
-    SOURCES --> PUBLISH
-    PUBLISH --> PROJECTOR
+    SOURCES --> OUTBOX
+    OUTBOX --> JOBS
+    JOBS --> GENERATE
+    GENERATE --> PROJECTOR
     PROJECTOR --> RESOLVE
     RESOLVE --> SUPPRESS
     SUPPRESS -->|Not suppressed| BUILD
     SUPPRESS -->|Suppressed| SKIP["Skip — no feed item\nno notification"]
     BUILD --> INSERT_FEED
-    BUILD --> NOTIF
+    BUILD --> NOTIF_PREP
+    NOTIF_PREP --> NOTIF
     INSERT_FEED --> INBOX
     NOTIF --> PUSH & EMAIL & SMS
 
