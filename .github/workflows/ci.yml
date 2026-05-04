@@ -1414,6 +1414,9 @@ jobs:
 
           fs.writeFileSync(path.join(outDir, 'prod-direct-url.txt'), railwayByName.DIRECT_URL);
           fs.writeFileSync(path.join(outDir, 'prod-supabase-url.txt'), edgeByName.SUPABASE_URL);
+          if (derivedSecrets.ADMIN_DATABASE_URL) {
+            fs.writeFileSync(path.join(outDir, 'prod-admin-url.txt'), derivedSecrets.ADMIN_DATABASE_URL);
+          }
 
           for (const entry of [...railway, ...vercel, ...supabaseEdge]) {
             if (entry.value) console.log(`::add-mask::${entry.value}`);
@@ -1564,6 +1567,7 @@ jobs:
 
           DIRECT_URL="$(cat /tmp/iconicedu-production-env/prod-direct-url.txt)"
           SUPABASE_URL="$(cat /tmp/iconicedu-production-env/prod-supabase-url.txt)"
+          ADMIN_URL="$(cat /tmp/iconicedu-production-env/prod-admin-url.txt 2>/dev/null || echo "$DIRECT_URL")"
 
           supabase link --project-ref "$SUPABASE_PROJECT_ID"
 
@@ -1589,15 +1593,15 @@ jobs:
               --yes || true
           done
 
-          PGSSLMODE=require psql "$DIRECT_URL" \
+          PGSSLMODE=require psql "$ADMIN_URL" \
             -v ON_ERROR_STOP=1 \
             -c "select public.configure_edge_function_cron('${SUPABASE_URL}');"
 
-          PGSSLMODE=require psql "$DIRECT_URL" \
+          PGSSLMODE=require psql "$ADMIN_URL" \
             -v ON_ERROR_STOP=1 \
             -c "select jobname, schedule from cron.job where jobname like 'edge-function-%' order by jobname;"
 
-          PGSSLMODE=require psql "$DIRECT_URL" \
+          PGSSLMODE=require psql "$ADMIN_URL" \
             -v ON_ERROR_STOP=1 \
             -c "do \$\$ begin
               if not exists (select 1 from cron.job where jobname = 'edge-function-events-dispatch') then
