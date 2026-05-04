@@ -14,15 +14,10 @@ function resolveExpectedActivityFeedToken() {
   return process.env.INTERNAL_ACTIVITY_FEED_TOKEN?.trim() || '';
 }
 
-function resolveExpectedActivityProjectorToken() {
-  return process.env.INTERNAL_ACTIVITY_PROJECTOR_TOKEN?.trim() || '';
-}
-
 function resolveExpectedEventsDispatchToken() {
   return (
     process.env.INTERNAL_EVENTS_TOKEN_API?.trim() ||
     process.env.INTERNAL_EVENTS_TOKEN?.trim() ||
-    process.env.INTERNAL_ACTIVITY_WORKER_TOKEN_API?.trim() ||
     process.env.INTERNAL_ACTIVITY_WORKER_TOKEN?.trim() ||
     ''
   );
@@ -100,9 +95,8 @@ export class EventsController {
     @Headers('authorization') authorization: string | undefined,
     @Body() body: { eventIds?: string[]; limit?: number } | null,
   ) {
-    const expectedToken = resolveExpectedActivityProjectorToken();
     const fallbackToken = resolveExpectedActivityFeedToken();
-    if (!isAuthorizedBearer(authorization, [expectedToken, fallbackToken])) {
+    if (!isAuthorizedBearer(authorization, [fallbackToken])) {
       throw new UnauthorizedException('Unauthorized');
     }
 

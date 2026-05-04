@@ -19,7 +19,6 @@ import {
   type DispatchRemindersDto,
 } from '@iconicedu/api/modules/reminders/dto/dispatch-reminders.dto';
 import { parseLearningSpaceRemindersDto } from '@iconicedu/api/modules/reminders/dto/learning-space-reminders.dto';
-import { ReminderReconcileWorkerService } from '@iconicedu/api/modules/reminders/reminder-reconcile-worker.service';
 import { RemindersService } from '@iconicedu/api/modules/reminders/reminders.service';
 
 function resolveExpectedToken() {
@@ -32,10 +31,7 @@ function resolveExpectedToken() {
 
 @Controller()
 export class RemindersController {
-  constructor(
-    private readonly remindersService: RemindersService,
-    private readonly reminderReconcileWorkerService: ReminderReconcileWorkerService,
-  ) {}
+  constructor(private readonly remindersService: RemindersService) {}
 
   @Get('healthz')
   health() {
@@ -59,24 +55,6 @@ export class RemindersController {
     const dto: DispatchRemindersDto = parseDispatchRemindersDto(body);
     return this.remindersService.dispatchDueReminderJobs({
       leaseOwner: dto.leaseOwner ?? 'internal-reminders-dispatch-api',
-      limit: dto.limit,
-      leaseSeconds: dto.leaseSeconds,
-    });
-  }
-
-  @Post('internal/reminders/reconcile-dispatch')
-  async dispatchReconcile(
-    @Headers('authorization') authorization: string | undefined,
-    @Body() body: unknown,
-  ) {
-    const expectedToken = resolveExpectedToken();
-    if (!expectedToken || authorization !== `Bearer ${expectedToken}`) {
-      throw new UnauthorizedException('Unauthorized');
-    }
-
-    const dto: DispatchRemindersDto = parseDispatchRemindersDto(body);
-    return this.reminderReconcileWorkerService.dispatchDuePendingJobs({
-      leaseOwner: dto.leaseOwner ?? 'internal-reminders-reconcile-dispatch-api',
       limit: dto.limit,
       leaseSeconds: dto.leaseSeconds,
     });

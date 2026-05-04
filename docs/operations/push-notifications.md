@@ -273,8 +273,6 @@ Compatibility/admin-only secrets may still exist while legacy replay endpoints
 remain enabled:
 
 - `INTERNAL_ACTIVITY_FEED_TOKEN`
-- `INTERNAL_ACTIVITY_PROJECTOR_TOKEN`
-- `INTERNAL_ACTIVITY_WORKER_TOKEN_API`
 
 Do not add new product flows that depend on those legacy tokens.
 

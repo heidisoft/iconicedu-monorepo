@@ -47,6 +47,7 @@ These rules are **non-negotiable** and apply everywhere in the repo. Violations 
 
 ## Non-negotiable Repo Rules
 
+- Never edit an existing Supabase migration after it has been created. Add a new forward migration for every database or cron change, even if the earlier migration is recent.
 - Keep reusable web UI in `packages/ui-web` rather than `apps/web`.
 - Treat shared VMs in `packages/shared-types` as the cross-app contract between FE and API.
 - Prefer vendor-isolated adapters and keep feature code vendor-agnostic where practical.

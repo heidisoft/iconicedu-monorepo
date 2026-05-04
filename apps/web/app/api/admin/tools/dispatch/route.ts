@@ -5,9 +5,6 @@ import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service
 
 const ALLOWED_KINDS = [
   'events-dispatch',
-  'reminders-reconcile-dispatch',
-  'activity-worker-dispatch',
-  'activity-projector-dispatch',
   'reminders-dispatch',
   'channel-read-state-repair',
 ] as const;
@@ -52,15 +49,6 @@ function resolveInternalToken(kind: FunctionKind) {
         process.env.INTERNAL_EVENTS_TOKEN?.trim() ||
         ''
       );
-    case 'activity-worker-dispatch':
-      return (
-        process.env.INTERNAL_ACTIVITY_WORKER_TOKEN_API?.trim() ||
-        process.env.INTERNAL_ACTIVITY_WORKER_TOKEN?.trim() ||
-        ''
-      );
-    case 'activity-projector-dispatch':
-      return process.env.INTERNAL_ACTIVITY_PROJECTOR_TOKEN?.trim() || '';
-    case 'reminders-reconcile-dispatch':
     case 'reminders-dispatch':
       return (
         process.env.INTERNAL_REMINDERS_TOKEN_API?.trim() ||
@@ -76,12 +64,6 @@ function resolveApiPath(kind: FunctionKind) {
   switch (kind) {
     case 'events-dispatch':
       return '/internal/events/dispatch';
-    case 'reminders-reconcile-dispatch':
-      return '/internal/reminders/reconcile-dispatch';
-    case 'activity-worker-dispatch':
-      return '/internal/activity-worker/dispatch';
-    case 'activity-projector-dispatch':
-      return '/internal/activity-feed/project';
     case 'reminders-dispatch':
       return '/internal/reminders/dispatch';
     case 'channel-read-state-repair':
@@ -105,10 +87,6 @@ function buildCronBridgeBody(kind: FunctionKind, body: AdminToolsDispatchRequest
   const limit = asOptionalPositiveInt(body.limit);
   const leaseSeconds = asOptionalPositiveInt(body.leaseSeconds);
   const leaseOwner = asOptionalString(body.leaseOwner) ?? 'supabase-edge-cron';
-
-  if (kind === 'activity-projector-dispatch') {
-    return { ...(limit != null ? { limit } : {}) };
-  }
 
   return {
     ...(limit != null ? { limit } : {}),
