@@ -22,11 +22,7 @@ import { parseLearningSpaceRemindersDto } from '@iconicedu/api/modules/reminders
 import { RemindersService } from '@iconicedu/api/modules/reminders/reminders.service';
 
 function resolveExpectedToken() {
-  return (
-    process.env.INTERNAL_REMINDERS_TOKEN_API?.trim() ||
-    process.env.INTERNAL_REMINDERS_TOKEN?.trim() ||
-    ''
-  );
+  return process.env.INTERNAL_REMINDERS_TOKEN?.trim() || '';
 }
 
 @Controller()

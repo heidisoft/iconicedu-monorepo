@@ -219,17 +219,17 @@ CMD ["node", "dist/main.js"]
 
 ### Environment variables
 
-| Variable                       | Description                                   |
-| ------------------------------ | --------------------------------------------- |
-| `DATABASE_URL`                 | Supabase Postgres connection string (pooled)  |
-| `DIRECT_URL`                   | Non-pooled URL for Prisma migrations          |
-| `SUPABASE_URL`                 | Supabase project URL                          |
-| `SUPABASE_SERVICE_ROLE_KEY`    | Service role key (bypasses RLS)               |
-| `JWT_SECRET`                   | From Supabase → Settings → API → JWT Settings |
-| `INTERNAL_EVENTS_TOKEN_API`    | Shared secret for unified event dispatcher    |
-| `INTERNAL_REMINDERS_TOKEN_API` | Shared secret for reminder dispatcher         |
-| `EXPO_ACCESS_TOKEN`            | Expo push API token                           |
-| `PORT`                         | HTTP port (default `3001`)                    |
+| Variable                    | Description                                   |
+| --------------------------- | --------------------------------------------- |
+| `DATABASE_URL`              | Supabase Postgres connection string (pooled)  |
+| `DIRECT_URL`                | Non-pooled URL for Prisma migrations          |
+| `SUPABASE_URL`              | Supabase project URL                          |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role key (bypasses RLS)               |
+| `JWT_SECRET`                | From Supabase → Settings → API → JWT Settings |
+| `INTERNAL_EVENTS_TOKEN`     | Shared secret for unified event dispatcher    |
+| `INTERNAL_REMINDERS_TOKEN`  | Shared secret for reminder dispatcher         |
+| `EXPO_ACCESS_TOKEN`         | Expo push API token                           |
+| `PORT`                      | HTTP port (default `3001`)                    |
 
 ### Prisma in production
 
@@ -252,7 +252,7 @@ Preview CI now deploys the required Supabase Edge Functions and sets branch-loca
 
 - `events-dispatch` Edge Function
 - `EVENTS_DISPATCH_URL=https://<api-domain>/internal/events/dispatch`
-- `INTERNAL_EVENTS_TOKEN=<same value as API INTERNAL_EVENTS_TOKEN_API>`
+- `INTERNAL_EVENTS_TOKEN=<same value in apps/api and Supabase Edge Functions>`
 
 Preview CI applies migrations, sets branch-local Edge Function secrets, deploys
 functions, deletes deprecated remote functions, runs
@@ -281,32 +281,31 @@ supabase functions deploy --use-api --jobs 4
 
 Production GitHub Actions secrets:
 
-| Where                 | Variable / value                                                   | Notes                                                    |
-| --------------------- | ------------------------------------------------------------------ | -------------------------------------------------------- |
-| Platform access       | `RAILWAY_API_TOKEN`                                                | Lets CI configure Railway production                     |
-| Platform access       | `RAILWAY_PROJECT_ID`                                               | Railway project containing the production API service    |
-| Platform access       | `VERCEL_TOKEN`                                                     | Lets CI configure Vercel production env                  |
-| Platform access       | `VERCEL_PROJECT_ID`                                                | Vercel project ID                                        |
-| Platform access       | `VERCEL_ORG_ID`                                                    | Vercel team/user ID                                      |
-| Platform access       | `SUPABASE_ACCESS_TOKEN`                                            | Lets CI deploy functions and set secrets                 |
-| Platform access       | `SUPABASE_PROJECT_ID`                                              | Production Supabase project ref                          |
-| Platform access       | `SUPABASE_DB_PASSWORD`                                             | Lets CI derive production DB connection strings          |
-| Derived by CI         | `DATABASE_URL` / `DIRECT_URL`                                      | Derived from Supabase project metadata and DB password   |
-| Derived by CI         | `API_URL`                                                          | Derived from the Railway production service domain       |
-| Derived by CI         | `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` | Derived from `SUPABASE_PROJECT_ID` via the Supabase API  |
-| Production values     | `JWT_SECRET` or `SUPABASE_JWT_SECRET`                              | Supabase JWT secret if the Supabase API cannot derive it |
-| Production values     | `INTERNAL_EVENTS_TOKEN_API` or `INTERNAL_EVENTS_TOKEN`             | Long random secret for unified event dispatch            |
-| Production values     | `INTERNAL_REMINDERS_TOKEN`                                         | Long random secret for reminder dispatch                 |
-| Production values     | `EXPO_ACCESS_TOKEN` or `EXPO_TOKEN`                                | Required for authenticated Expo push sends               |
-| Optional telemetry    | `POSTHOG_KEY`                                                      | Optional PostHog key                                     |
-| Optional telemetry    | `NEXT_PUBLIC_POSTHOG_KEY`                                          | Optional public PostHog key                              |
-| Optional telemetry    | `NEXT_PUBLIC_POSTHOG_HOST` or `EXPO_PUBLIC_POSTHOG_HOST`           | Optional PostHog host                                    |
-| Optional legacy admin | `INTERNAL_ACTIVITY_FEED_TOKEN`                                     | Optional admin activity replay token                     |
+| Where               | Variable / value                                                   | Notes                                                                  |
+| ------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------------------- |
+| Platform access     | `RAILWAY_API_TOKEN`                                                | Lets CI configure Railway production                                   |
+| Production variable | `RAILWAY_PROJECT_ID`                                               | Railway project containing the production API service                  |
+| Production variable | `RAILWAY_SERVICE_ID`                                               | Railway API service ID                                                 |
+| Platform access     | `VERCEL_TOKEN`                                                     | Lets CI configure Vercel production env                                |
+| Production variable | `VERCEL_PROJECT_ID`                                                | Vercel project ID                                                      |
+| Production variable | `VERCEL_ORG_ID`                                                    | Vercel team/user ID                                                    |
+| Platform access     | `SUPABASE_ACCESS_TOKEN`                                            | Lets CI deploy functions and set secrets                               |
+| Production variable | `SUPABASE_PROJECT_ID`                                              | Production Supabase project ref                                        |
+| Platform access     | `SUPABASE_DB_PASSWORD`                                             | Lets CI derive production DB connection strings                        |
+| Derived by CI       | `DATABASE_URL` / `DIRECT_URL`                                      | Derived from Supabase project metadata and DB password                 |
+| Production variable | `API_URL`                                                          | Public production API origin; CI can derive it from Railway if omitted |
+| Derived by CI       | `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` | Derived from `SUPABASE_PROJECT_ID` via the Supabase API                |
+| Production values   | `JWT_SECRET` or `SUPABASE_JWT_SECRET`                              | Supabase JWT secret if the Supabase API cannot derive it               |
+| Production values   | `INTERNAL_EVENTS_TOKEN`                                            | Long random secret for unified event dispatch                          |
+| Production values   | `INTERNAL_REMINDERS_TOKEN`                                         | Long random secret for reminder dispatch                               |
+| Production values   | `EXPO_ACCESS_TOKEN` or `EXPO_TOKEN`                                | Required for authenticated Expo push sends                             |
+| Optional telemetry  | `POSTHOG_KEY`                                                      | Optional PostHog key                                                   |
+| Optional telemetry  | `POSTHOG_HOST`                                                     | Optional PostHog host                                                  |
 
 When a PR introduces a new production env var, add it to
-`ops/env/production.env.json` and add the matching GitHub Actions secret before
-merge. The production job fails before mutating anything if a required manifest
-secret is missing.
+`ops/env/production.env.json` and add the matching GitHub Actions secret or
+variable before merge. The production job fails before mutating anything if a
+required manifest value is missing.
 
 After functions are deployed and migrations are applied, configure pg_cron with the Supabase project URL:
 
@@ -316,8 +315,8 @@ select public.configure_edge_function_cron('https://<project-ref>.supabase.co');
 
 Required production checks:
 
-- `apps/api` has `INTERNAL_EVENTS_TOKEN_API` matching Supabase `INTERNAL_EVENTS_TOKEN`.
-- `apps/api` has `INTERNAL_REMINDERS_TOKEN_API` matching Supabase `INTERNAL_REMINDERS_TOKEN`.
+- `apps/api` and Supabase Edge Functions use the same `INTERNAL_EVENTS_TOKEN`.
+- `apps/api` and Supabase Edge Functions use the same `INTERNAL_REMINDERS_TOKEN`.
 - `events-dispatch` is deployed with `verify_jwt=false`.
 - `cron.job` includes `edge-function-events-dispatch`, `edge-function-reminders-dispatch`, and `edge-function-channel-read-state-repair`.
 - `cron.job` does not include deprecated `edge-function-notifications-dispatch`, `edge-function-reminders-reconcile-dispatch`, `edge-function-activity-worker-dispatch`, or `edge-function-activity-projector-dispatch`.
@@ -357,17 +356,17 @@ Supabase automatically takes daily backups on paid plans. For additional safety,
 
 ## Environment Variables Reference
 
-| Variable                        | Web                     | Mobile | API | Notes                                     |
-| ------------------------------- | ----------------------- | ------ | --- | ----------------------------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`      | ✅                      | —      | —   | Public, browser-safe                      |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅                      | —      | —   | Public, browser-safe                      |
-| `SUPABASE_SERVICE_ROLE_KEY`     | ✅ (server)             | —      | ✅  | Never expose client-side                  |
-| `EXPO_PUBLIC_SUPABASE_URL`      | —                       | ✅     | —   | Inlined at build time                     |
-| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | —                       | ✅     | —   | Inlined at build time                     |
-| `DATABASE_URL`                  | —                       | —      | ✅  | Pooled Postgres URL                       |
-| `DIRECT_URL`                    | —                       | —      | ✅  | Non-pooled, for migrations                |
-| `SUPABASE_URL`                  | —                       | —      | ✅  |                                           |
-| `JWT_SECRET`                    | —                       | —      | ✅  | From Supabase JWT settings                |
-| `INTERNAL_EVENTS_TOKEN_API`     | ✅ (server/admin tools) | —      | ✅  | Match Supabase `INTERNAL_EVENTS_TOKEN`    |
-| `INTERNAL_REMINDERS_TOKEN_API`  | ✅ (server/admin tools) | —      | ✅  | Match Supabase `INTERNAL_REMINDERS_TOKEN` |
-| `EXPO_ACCESS_TOKEN`             | —                       | —      | ✅  | Expo push provider token                  |
+| Variable                        | Web                     | Mobile | API | Notes                               |
+| ------------------------------- | ----------------------- | ------ | --- | ----------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`      | ✅                      | —      | —   | Public, browser-safe                |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅                      | —      | —   | Public, browser-safe                |
+| `SUPABASE_SERVICE_ROLE_KEY`     | ✅ (server)             | —      | ✅  | Never expose client-side            |
+| `EXPO_PUBLIC_SUPABASE_URL`      | —                       | ✅     | —   | Inlined at build time               |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | —                       | ✅     | —   | Inlined at build time               |
+| `DATABASE_URL`                  | —                       | —      | ✅  | Pooled Postgres URL                 |
+| `DIRECT_URL`                    | —                       | —      | ✅  | Non-pooled, for migrations          |
+| `SUPABASE_URL`                  | —                       | —      | ✅  |                                     |
+| `JWT_SECRET`                    | —                       | —      | ✅  | From Supabase JWT settings          |
+| `INTERNAL_EVENTS_TOKEN`         | ✅ (server/admin tools) | —      | ✅  | Match Supabase Edge Function secret |
+| `INTERNAL_REMINDERS_TOKEN`      | ✅ (server/admin tools) | —      | ✅  | Match Supabase Edge Function secret |
+| `EXPO_ACCESS_TOKEN`             | —                       | —      | ✅  | Expo push provider token            |

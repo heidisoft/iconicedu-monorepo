@@ -6,13 +6,8 @@ import { useRouter } from 'next/navigation';
 import {
   Badge,
   Button,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
   Input,
   Loader2,
-  MoreHorizontal,
   RotateCw,
   Select,
   SelectContent,
@@ -25,7 +20,6 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  toast,
 } from '@iconicedu/ui-web';
 
 import type { AdminActivityEventRow } from '@iconicedu/web/lib/admin/activity-events';
@@ -100,7 +94,6 @@ export function ActivityEventsDashboard({ orgId, rows }: ActivityEventsDashboard
   const [statusFilter, setStatusFilter] = React.useState<ProjectionStatus>('all');
   const [pageIndex, setPageIndex] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(PAGE_SIZES[0]);
-  const [retryingId, setRetryingId] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     setPageIndex(1);
@@ -122,36 +115,6 @@ export function ActivityEventsDashboard({ orgId, rows }: ActivityEventsDashboard
     startTransition(() => {
       router.refresh();
     });
-  };
-
-  const handleRetry = async (eventId: string) => {
-    setRetryingId(eventId);
-
-    try {
-      const response = await fetch('/api/admin/activity/events/retry', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ eventId, orgId }),
-      });
-
-      const payload = (await response.json()) as {
-        success?: boolean;
-        message?: string;
-      };
-
-      if (!response.ok || !payload.success) {
-        throw new Error(payload.message ?? 'Unable to retry activity event.');
-      }
-
-      toast.success('Retry queued.');
-      router.refresh();
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : 'Unable to retry activity event.',
-      );
-    } finally {
-      setRetryingId(null);
-    }
   };
 
   return (
@@ -229,92 +192,60 @@ export function ActivityEventsDashboard({ orgId, rows }: ActivityEventsDashboard
               <TableHead>Attempts</TableHead>
               <TableHead>Occurred</TableHead>
               <TableHead>Error</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {visibleRows.length ? (
-              visibleRows.map((row) => {
-                const retryable = row.projection_status === 'failed';
-                const isRetrying = retryingId === row.id;
-
-                return (
-                  <TableRow
-                    key={row.id}
-                    className="border-b border-border/60 last:border-b-0"
-                  >
-                    <TableCell>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold">{row.event_type}</p>
-                        <p className="truncate text-xs text-muted-foreground">
-                          {row.targetLabel ?? row.objectLabel ?? row.id}
-                        </p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm">{row.scopeLabel}</p>
-                        <p className="truncate text-xs text-muted-foreground">
-                          {row.dedupe_key ?? 'No dedupe key'}
-                        </p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm">
-                          {row.actorDisplayName ?? 'Unknown actor'}
-                        </p>
-                        <p className="text-xs capitalize text-muted-foreground">
-                          {row.source_kind.replace(/_/g, ' ')}
-                        </p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={STATUS_BADGE_VARIANTS[row.projection_status] ?? 'ghost'}
-                        className="px-3 text-xs"
-                      >
-                        {row.projection_status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm">{row.projection_attempts}</TableCell>
-                    <TableCell className="text-sm">
-                      {formatDateTime(row.occurred_at)}
-                    </TableCell>
-                    <TableCell>
-                      <span className="block max-w-xs truncate text-sm text-muted-foreground">
-                        {toErrorPreview(row.last_projection_error)}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="outline" size="sm" className="px-2">
-                            <MoreHorizontal className="size-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => {
-                              if (retryable) {
-                                void handleRetry(row.id);
-                              }
-                            }}
-                            disabled={!retryable || isRetrying}
-                          >
-                            {isRetrying ? (
-                              <Loader2 className="mr-2 size-3 animate-spin" />
-                            ) : (
-                              <RotateCw className="mr-2 size-3" />
-                            )}
-                            Retry projection
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
+              visibleRows.map((row) => (
+                <TableRow
+                  key={row.id}
+                  className="border-b border-border/60 last:border-b-0"
+                >
+                  <TableCell>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold">{row.event_type}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {row.targetLabel ?? row.objectLabel ?? row.id}
+                      </p>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm">{row.scopeLabel}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {row.dedupe_key ?? 'No dedupe key'}
+                      </p>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm">
+                        {row.actorDisplayName ?? 'Unknown actor'}
+                      </p>
+                      <p className="text-xs capitalize text-muted-foreground">
+                        {row.source_kind.replace(/_/g, ' ')}
+                      </p>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={STATUS_BADGE_VARIANTS[row.projection_status] ?? 'ghost'}
+                      className="px-3 text-xs"
+                    >
+                      {row.projection_status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-sm">{row.projection_attempts}</TableCell>
+                  <TableCell className="text-sm">
+                    {formatDateTime(row.occurred_at)}
+                  </TableCell>
+                  <TableCell>
+                    <span className="block max-w-xs truncate text-sm text-muted-foreground">
+                      {toErrorPreview(row.last_projection_error)}
+                    </span>
+                  </TableCell>
+                </TableRow>
+              ))
             ) : (
               <TableRow>
                 <TableCell

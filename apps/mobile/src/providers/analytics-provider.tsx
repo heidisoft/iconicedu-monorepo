@@ -7,11 +7,13 @@ import { createNoopAnalytics, setGlobalErrorReporter } from '@iconicedu/utils';
 
 const POSTHOG_KEY: string =
   (Constants.expoConfig?.extra?.['posthogKey'] as string | undefined) ??
+  process.env.POSTHOG_KEY ??
   process.env.EXPO_PUBLIC_POSTHOG_KEY ??
   '';
 
 const POSTHOG_HOST: string =
   (Constants.expoConfig?.extra?.['posthogHost'] as string | undefined) ??
+  process.env.POSTHOG_HOST ??
   process.env.EXPO_PUBLIC_POSTHOG_HOST ??
   'https://us.i.posthog.com';
 

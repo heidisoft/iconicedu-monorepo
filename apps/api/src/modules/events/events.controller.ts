@@ -1,26 +1,10 @@
 import { Body, Controller, Headers, Post, UnauthorizedException } from '@nestjs/common';
-import type {
-  ActivityEventRow,
-  ActivityEventTypeVM,
-  AudienceRuleVM,
-  EventPipelineJobKind,
-  EntityRefVM,
-  FeedScopeVM,
-} from '@iconicedu/shared-types';
+import type { EventPipelineJobKind } from '@iconicedu/shared-types';
 
-import { EventsService } from '@iconicedu/api/modules/events/events.service';
-
-function resolveExpectedActivityFeedToken() {
-  return process.env.INTERNAL_ACTIVITY_FEED_TOKEN?.trim() || '';
-}
+import { EventPipelineService } from '@iconicedu/api/modules/events/event-pipeline.service';
 
 function resolveExpectedEventsDispatchToken() {
-  return (
-    process.env.INTERNAL_EVENTS_TOKEN_API?.trim() ||
-    process.env.INTERNAL_EVENTS_TOKEN?.trim() ||
-    process.env.INTERNAL_ACTIVITY_WORKER_TOKEN?.trim() ||
-    ''
-  );
+  return process.env.INTERNAL_EVENTS_TOKEN?.trim() || '';
 }
 
 function isAuthorizedBearer(
@@ -32,79 +16,7 @@ function isAuthorizedBearer(
 
 @Controller()
 export class EventsController {
-  constructor(private readonly eventsService: EventsService) {}
-
-  @Post('internal/activity-feed/publish')
-  async publishActivityFeedEvent(
-    @Headers('authorization') authorization: string | undefined,
-    @Body()
-    body: {
-      orgId: string;
-      eventType: ActivityEventTypeVM;
-      emitterLabel?: string;
-      occurredAt?: string;
-      sourceKind: ActivityEventRow['source_kind'];
-      actorProfileId?: string | null;
-      scope: FeedScopeVM;
-      objectRef?: EntityRefVM | null;
-      targetRef?: EntityRefVM | null;
-      audienceRules?: AudienceRuleVM[];
-      payload: Record<string, unknown>;
-      dedupeKey?: string | null;
-      createdBy?: string | null;
-    } | null,
-  ) {
-    const expectedToken = resolveExpectedActivityFeedToken();
-    if (!expectedToken || !isAuthorizedBearer(authorization, [expectedToken])) {
-      throw new UnauthorizedException('Unauthorized');
-    }
-
-    if (
-      !body ||
-      typeof body.orgId !== 'string' ||
-      typeof body.eventType !== 'string' ||
-      typeof body.sourceKind !== 'string' ||
-      !body.scope ||
-      typeof body.scope !== 'object' ||
-      !body.payload ||
-      typeof body.payload !== 'object' ||
-      Array.isArray(body.payload)
-    ) {
-      throw new UnauthorizedException('Invalid activity publish payload');
-    }
-
-    return this.eventsService.publishEvent({
-      orgId: body.orgId,
-      eventType: body.eventType,
-      emitterLabel: body.emitterLabel,
-      occurredAt: body.occurredAt,
-      sourceKind: body.sourceKind,
-      actorProfileId: body.actorProfileId ?? null,
-      scope: body.scope,
-      objectRef: body.objectRef ?? null,
-      targetRef: body.targetRef ?? null,
-      audienceRules: Array.isArray(body.audienceRules) ? body.audienceRules : undefined,
-      payload: body.payload,
-      dedupeKey: body.dedupeKey ?? null,
-      createdBy: body.createdBy ?? null,
-    });
-  }
-
-  @Post('internal/activity-feed/project')
-  async projectActivityFeed(
-    @Headers('authorization') authorization: string | undefined,
-    @Body() body: { eventIds?: string[]; limit?: number } | null,
-  ) {
-    const fallbackToken = resolveExpectedActivityFeedToken();
-    if (!isAuthorizedBearer(authorization, [fallbackToken])) {
-      throw new UnauthorizedException('Unauthorized');
-    }
-
-    return this.eventsService.projectPendingEvents({
-      eventIds: Array.isArray(body?.eventIds) ? body.eventIds : undefined,
-      limit: typeof body?.limit === 'number' ? body.limit : undefined,
-    });
-  }
+  constructor(private readonly eventPipelineService: EventPipelineService) {}
 
   @Post('internal/events/dispatch')
   async dispatchEventPipeline(
@@ -136,7 +48,7 @@ export class EventsController {
         )
       : undefined;
 
-    return this.eventsService.dispatchDuePipelineJobs({
+    return this.eventPipelineService.dispatchDueJobs({
       leaseOwner:
         typeof body?.leaseOwner === 'string' && body.leaseOwner.trim().length > 0
           ? body.leaseOwner.trim()
