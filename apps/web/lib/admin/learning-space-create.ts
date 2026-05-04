@@ -1,9 +1,9 @@
 import { randomUUID } from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+import { requireAdminAuthContext } from '@iconicedu/web/lib/admin/_auth-context';
 import { createApiClient } from '@iconicedu/web/lib/api/http-client';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
-import { requireParentActorContext } from '@iconicedu/web/lib/family-view/actor-context';
 import { toStoredLiveSessionConfig } from '@iconicedu/web/lib/admin/live-session-config';
 import {
   FEED_MESSAGE_UI_THEME_KEY,
@@ -40,21 +40,24 @@ type CreateLearningSpaceResult = {
 
 export async function createLearningSpaceFromPayload(
   payload: LearningSpaceCreatePayload,
+  actorContext?: {
+    orgId: string;
+    actorProfileId: string;
+  },
 ): Promise<CreateLearningSpaceResult> {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const authContext = actorContext
+    ? {
+        supabase: await createSupabaseServerClient(),
+        orgId: actorContext.orgId,
+        profileId: actorContext.actorProfileId,
+        now: new Date().toISOString(),
+      }
+    : await requireAdminAuthContext();
 
-  if (!user) {
-    throw new Error('Unauthorized');
-  }
-
-  const actor = await requireParentActorContext(supabase);
-
-  const orgId = actor.account.org_id;
-  const actorProfileId = actor.profile.id;
-  const now = new Date().toISOString();
+  const supabase = authContext.supabase;
+  const orgId = authContext.orgId;
+  const actorProfileId = authContext.profileId;
+  const now = authContext.now;
 
   const learningSpaceId = randomUUID();
   await insertLearningSpace(supabase, {
@@ -127,13 +130,15 @@ export async function createLearningSpaceFromPayload(
       title: payload.basics.title,
       description: payload.basics.description ?? null,
       themeKey: payload.settings?.themeKey ?? null,
-      participants: payload.participants.map((p) => ({
-        profileId: p.profileId,
-        kind: p.kind,
-        displayName: p.displayName ?? null,
-        avatarUrl: p.avatarUrl ?? null,
-        themeKey: p.themeKey ?? null,
-      })),
+      participants: payload.participants
+        .filter((p) => p.kind !== 'system')
+        .map((p) => ({
+          profileId: p.profileId,
+          kind: p.kind,
+          displayName: p.displayName ?? null,
+          avatarUrl: p.avatarUrl ?? null,
+          themeKey: p.themeKey ?? null,
+        })),
       schedules: buildScheduleRowsForApi(payload.schedules ?? []),
     },
   );
@@ -469,7 +474,7 @@ async function insertClassScheduleParticipants(
   payload: ClassScheduleParticipantsInsertPayload,
 ) {
   const scheduleParticipants = payload.participants.filter(
-    (participant) => participant.kind === 'educator' || participant.kind === 'child',
+    (participant) => participant.kind !== 'system',
   );
 
   if (!scheduleParticipants.length) {

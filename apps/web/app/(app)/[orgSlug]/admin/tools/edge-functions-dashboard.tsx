@@ -17,10 +17,11 @@ import {
 } from '@iconicedu/ui-web';
 
 type FunctionKind =
+  | 'events-dispatch'
+  | 'reminders-reconcile-dispatch'
   | 'activity-worker-dispatch'
   | 'activity-projector-dispatch'
   | 'reminders-dispatch'
-  | 'notifications-dispatch'
   | 'channel-read-state-repair';
 
 type RunStatus = 'idle' | 'running' | 'success' | 'error';
@@ -42,6 +43,22 @@ type FunctionConfig = {
 
 const FUNCTIONS: FunctionConfig[] = [
   {
+    kind: 'events-dispatch',
+    title: 'Unified Events Dispatch',
+    description:
+      'Claims event_pipeline_jobs for activity generation, projection, notification delivery, and reminder reconciliation.',
+    hasDispatchParams: true,
+    hasLeaseParams: true,
+  },
+  {
+    kind: 'reminders-reconcile-dispatch',
+    title: 'Reminders Reconcile Dispatch',
+    description:
+      'Claims pending reminder_reconcile_jobs and creates or cancels the next reminder job per schedule.',
+    hasDispatchParams: true,
+    hasLeaseParams: true,
+  },
+  {
     kind: 'activity-worker-dispatch',
     title: 'Activity Worker Dispatch',
     description:
@@ -60,14 +77,6 @@ const FUNCTIONS: FunctionConfig[] = [
     kind: 'reminders-dispatch',
     title: 'Reminders Dispatch',
     description: 'Claims due reminder_jobs and publishes reminder activity_events.',
-    hasDispatchParams: true,
-    hasLeaseParams: true,
-  },
-  {
-    kind: 'notifications-dispatch',
-    title: 'Notifications Dispatch',
-    description:
-      'Claims pending notification_dispatch_jobs and delivers push notifications via Expo.',
     hasDispatchParams: true,
     hasLeaseParams: true,
   },

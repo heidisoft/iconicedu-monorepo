@@ -44,7 +44,7 @@ export type ScheduleRowInput = {
 
 export type ParticipantRowInput = {
   profileId: string;
-  kind: 'educator' | 'child';
+  kind: 'educator' | 'child' | 'guardian' | 'staff' | 'observer';
   displayName: string | null;
   avatarUrl: string | null;
   themeKey: string | null;
@@ -93,9 +93,15 @@ function parseParticipant(item: unknown, index: number): ParticipantRowInput {
   }
   const p = item as Record<string, unknown>;
   const kind = p['kind'];
-  if (kind !== 'educator' && kind !== 'child') {
+  if (
+    kind !== 'educator' &&
+    kind !== 'child' &&
+    kind !== 'guardian' &&
+    kind !== 'staff' &&
+    kind !== 'observer'
+  ) {
     throw new BadRequestException(
-      `participants[${index}].kind must be educator or child`,
+      `participants[${index}].kind must be educator, child, guardian, staff, or observer`,
     );
   }
   return {

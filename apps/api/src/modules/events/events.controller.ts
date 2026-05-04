@@ -3,6 +3,7 @@ import type {
   ActivityEventRow,
   ActivityEventTypeVM,
   AudienceRuleVM,
+  EventPipelineJobKind,
   EntityRefVM,
   FeedScopeVM,
 } from '@iconicedu/shared-types';
@@ -17,10 +18,12 @@ function resolveExpectedActivityProjectorToken() {
   return process.env.INTERNAL_ACTIVITY_PROJECTOR_TOKEN?.trim() || '';
 }
 
-function resolveExpectedNotificationsToken() {
+function resolveExpectedEventsDispatchToken() {
   return (
-    process.env.INTERNAL_NOTIFICATIONS_TOKEN_API?.trim() ||
-    process.env.INTERNAL_NOTIFICATIONS_TOKEN?.trim() ||
+    process.env.INTERNAL_EVENTS_TOKEN_API?.trim() ||
+    process.env.INTERNAL_EVENTS_TOKEN?.trim() ||
+    process.env.INTERNAL_ACTIVITY_WORKER_TOKEN_API?.trim() ||
+    process.env.INTERNAL_ACTIVITY_WORKER_TOKEN?.trim() ||
     ''
   );
 }
@@ -109,24 +112,45 @@ export class EventsController {
     });
   }
 
-  @Post('internal/notifications/dispatch')
-  async dispatchNotifications(
+  @Post('internal/events/dispatch')
+  async dispatchEventPipeline(
     @Headers('authorization') authorization: string | undefined,
-    @Body() body: { limit?: number; leaseSeconds?: number; leaseOwner?: string } | null,
+    @Body()
+    body: {
+      limit?: number;
+      leaseSeconds?: number;
+      leaseOwner?: string;
+      jobKinds?: EventPipelineJobKind[];
+    } | null,
   ) {
-    const expectedToken = resolveExpectedNotificationsToken();
+    const expectedToken = resolveExpectedEventsDispatchToken();
     if (!expectedToken || !isAuthorizedBearer(authorization, [expectedToken])) {
       throw new UnauthorizedException('Unauthorized');
     }
 
-    return this.eventsService.dispatchDueNotifications({
+    const allowedKinds = new Set<EventPipelineJobKind>([
+      'activity.generate',
+      'activity.project',
+      'notification.prepare',
+      'notification.deliver',
+      'reminder.reconcile',
+      'reminder.dispatch',
+    ]);
+    const jobKinds = Array.isArray(body?.jobKinds)
+      ? body.jobKinds.filter((kind): kind is EventPipelineJobKind =>
+          allowedKinds.has(kind),
+        )
+      : undefined;
+
+    return this.eventsService.dispatchDuePipelineJobs({
       leaseOwner:
         typeof body?.leaseOwner === 'string' && body.leaseOwner.trim().length > 0
           ? body.leaseOwner.trim()
-          : 'internal-notifications-dispatch-api',
+          : 'internal-events-dispatch-api',
       limit: typeof body?.limit === 'number' ? body.limit : undefined,
       leaseSeconds:
         typeof body?.leaseSeconds === 'number' ? body.leaseSeconds : undefined,
+      jobKinds,
     });
   }
 }

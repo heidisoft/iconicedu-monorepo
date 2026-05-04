@@ -1,5 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import type { ActivitySourceJobRow, MessageMentionVM } from '@iconicedu/shared-types';
+import type {
+  ActivitySourceJobKind,
+  ActivitySourceJobRow,
+  EventPipelineJobRow,
+  MessageMentionVM,
+} from '@iconicedu/shared-types';
 import { randomUUID } from 'crypto';
 
 import { AnalyticsService } from '@iconicedu/api/analytics/analytics.service';
@@ -163,17 +168,7 @@ export class ActivityWorkerService {
   }
 
   private async processJob(job: ActivitySourceJobRow, supabase: SupabaseServiceClient) {
-    if (job.job_kind === 'message') {
-      await this.processMessageJob(job, supabase);
-    } else if (job.job_kind === 'reaction') {
-      await this.processReactionJob(job, supabase);
-    } else if (job.job_kind === 'session_cancel') {
-      await this.processSessionCancelJob(job, supabase);
-    } else if (job.job_kind === 'session_reschedule') {
-      await this.processSessionRescheduleJob(job, supabase);
-    } else {
-      throw new Error(`Unsupported activity source job kind: ${job.job_kind}`);
-    }
+    await this.processSourceJobPayload(job, supabase);
 
     const now = new Date().toISOString();
     const response = await supabase
@@ -192,6 +187,107 @@ export class ActivityWorkerService {
 
     if (response.error) {
       throw new Error(response.error.message);
+    }
+  }
+
+  async processEventPipelineGenerationJob(
+    job: EventPipelineJobRow,
+    supabase: SupabaseServiceClient,
+  ) {
+    const payload = job.payload ?? {};
+    const rawSourceKind =
+      typeof payload.sourceKind === 'string'
+        ? payload.sourceKind
+        : typeof payload.eventKind === 'string'
+          ? payload.eventKind
+          : job.source_kind;
+    if (
+      rawSourceKind !== 'message' &&
+      rawSourceKind !== 'reaction' &&
+      rawSourceKind !== 'session_cancel' &&
+      rawSourceKind !== 'session_reschedule'
+    ) {
+      throw new Error(`Unsupported activity source job kind: ${String(rawSourceKind)}`);
+    }
+    const sourceKind: ActivitySourceJobKind = rawSourceKind;
+    const sourceId =
+      typeof payload.sourceId === 'string'
+        ? payload.sourceId
+        : typeof job.source_id === 'string'
+          ? job.source_id
+          : null;
+
+    const sourceJob = {
+      id: job.id,
+      org_id: job.org_id,
+      job_kind: sourceKind,
+      message_id:
+        sourceKind === 'message'
+          ? typeof payload.messageId === 'string'
+            ? payload.messageId
+            : sourceId
+          : null,
+      reaction_id:
+        sourceKind === 'reaction'
+          ? typeof payload.reactionId === 'string'
+            ? payload.reactionId
+            : sourceId
+          : null,
+      exception_id:
+        sourceKind === 'session_cancel'
+          ? typeof payload.exceptionId === 'string'
+            ? payload.exceptionId
+            : sourceId
+          : null,
+      override_id:
+        sourceKind === 'session_reschedule'
+          ? typeof payload.overrideId === 'string'
+            ? payload.overrideId
+            : sourceId
+          : null,
+      dedupe_key: job.dedupe_key,
+      status:
+        job.status === 'pending' ||
+        job.status === 'leased' ||
+        job.status === 'succeeded' ||
+        job.status === 'failed' ||
+        job.status === 'dead_letter' ||
+        job.status === 'canceled'
+          ? job.status
+          : 'failed',
+      attempt_count: job.attempt_count,
+      max_attempts: job.max_attempts,
+      run_at: job.run_at,
+      lease_owner: job.lease_owner,
+      lease_until: job.lease_until,
+      next_attempt_at: job.next_attempt_at,
+      last_error: job.last_error,
+      dispatched_at: job.dispatched_at,
+      created_at: job.created_at,
+      created_by: job.created_by,
+      updated_at: job.updated_at,
+      updated_by: job.updated_by,
+      deleted_at: job.deleted_at,
+      deleted_by: job.deleted_by,
+    } satisfies ActivitySourceJobRow;
+
+    await this.processSourceJobPayload(sourceJob, supabase);
+  }
+
+  private async processSourceJobPayload(
+    job: ActivitySourceJobRow,
+    supabase: SupabaseServiceClient,
+  ) {
+    if (job.job_kind === 'message') {
+      await this.processMessageJob(job, supabase);
+    } else if (job.job_kind === 'reaction') {
+      await this.processReactionJob(job, supabase);
+    } else if (job.job_kind === 'session_cancel') {
+      await this.processSessionCancelJob(job, supabase);
+    } else if (job.job_kind === 'session_reschedule') {
+      await this.processSessionRescheduleJob(job, supabase);
+    } else {
+      throw new Error(`Unsupported activity source job kind: ${job.job_kind}`);
     }
   }
 

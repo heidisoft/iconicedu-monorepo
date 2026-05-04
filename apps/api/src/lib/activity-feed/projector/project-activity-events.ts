@@ -5,7 +5,6 @@ import type { SupabaseServiceClient } from '@iconicedu/api/lib/supabase/service'
 import { getActivityEventDefinition } from '@iconicedu/api/lib/activity-feed/definitions/activity-definitions';
 import { shouldReplaceGroupParent } from '@iconicedu/api/lib/activity-feed/projector/group-parent-priority';
 import { resolveActiveConversationSuppressedRecipients } from '@iconicedu/api/lib/activity-feed/suppression/active-conversation-suppression';
-import { enqueueNotificationDispatchJobs } from '@iconicedu/api/lib/notifications/dispatch-jobs';
 
 async function getProfilesByIds(
   supabase: SupabaseServiceClient,
@@ -401,11 +400,26 @@ async function projectEvent(supabase: SupabaseServiceClient, event: ActivityEven
     }
   }
 
-  await enqueueNotificationDispatchJobs({
-    supabase,
-    event,
-    recipientProfileIds,
+  const notificationJobResponse = await supabase.rpc('enqueue_event_pipeline_job', {
+    p_org_id: event.org_id,
+    p_job_kind: 'notification.prepare',
+    p_dedupe_key: `notification.prepare:${event.id}`,
+    p_payload: {
+      eventId: event.id,
+      recipientProfileIds,
+    },
+    p_outbox_id: null,
+    p_source_kind: 'activity_event',
+    p_source_id: event.id,
+    p_run_at: new Date().toISOString(),
+    p_priority: 70,
+    p_created_by: event.created_by ?? event.actor_profile_id ?? null,
+    p_updated_by: event.updated_by ?? event.actor_profile_id ?? null,
   });
+
+  if (notificationJobResponse.error) {
+    throw new Error(notificationJobResponse.error.message);
+  }
 }
 
 export async function projectActivityEvents(

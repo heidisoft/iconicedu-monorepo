@@ -23,15 +23,15 @@ The API-owned push notification pipeline is now implemented in the repo.
 That means:
 
 - mobile push token registration/revocation goes through `apps/api`
-- activity event projection into `notification_dispatch_jobs` exists in `apps/api`
+- activity event projection into unified `event_pipeline_jobs` notification work exists in `apps/api`
 - notification dispatch to Expo exists in `apps/api`
 - internal API endpoints exist for projection and dispatch
 
 What still must be true in the running environment for push to work end to end:
 
 - all real event-producing flows that should notify users must publish through `apps/api`
-- the deployed `notifications-dispatch` cron / edge function must call the API endpoint, not the legacy web endpoint
-- `INTERNAL_NOTIFICATIONS_TOKEN_API` and `EXPO_ACCESS_TOKEN` must be configured in the deployed API environment
+- the deployed `events-dispatch` cron / edge function must call the API endpoint, not the legacy web endpoint
+- `INTERNAL_EVENTS_TOKEN_API` and `EXPO_ACCESS_TOKEN` must be configured in the deployed API environment
 - at least one real device flow should be verified end to end
 
 Until those runtime checks are confirmed, treat this document as the intended and implemented backend architecture, but not as proof that every deployed environment is already using it.
@@ -48,14 +48,14 @@ Mobile device
   └─ usePushToggle                 ← in-app on/off switch, syncs revoked_at in DB
 
 Activity event occurs (message, session, etc.)
-  └─ projectActivityEvents()       ← enqueues notification_dispatch_jobs rows
+  └─ projectActivityEvents()       ← enqueues notification.prepare rows
 
 Supabase Edge Function (cron every 1 min)
-  └─ notifications-dispatch        ← HTTP POST → API internal endpoint
+  └─ events-dispatch               ← HTTP POST → API internal endpoint
 
 API app
   └─ POST /internal/notifications/dispatch
-      └─ dispatchDueNotificationJobs()
+      └─ EventPipelineService.dispatchDueJobs()
           └─ buildNotificationDecision()    ← checks preferences, presence, delay policy
           └─ sendPushNotification()         ← looks up push_tokens, calls authenticated Expo Push API
               └─ pollExpoPushReceipts()     ← confirms downstream delivery / credential errors
@@ -72,8 +72,8 @@ Expected runtime flow:
 
 1. Mobile or web creates a message / reaction / session event through `apps/api`
 2. `apps/api` writes the `activity_events` row
-3. `apps/api` projects that event into `notification_dispatch_jobs`
-4. cron later calls the internal dispatch endpoint
+3. `apps/api` projects that event and enqueues notification preparation/delivery jobs in `event_pipeline_jobs`
+4. cron later calls the unified internal dispatch endpoint
 5. API sends the push notification through Expo
 
 For guardian switch-user flows, the frontend still sends the selected acting profile id, but `apps/api` is the authority that validates whether the authenticated account may act as that profile before any message, activity, or notification work is performed.
@@ -125,19 +125,19 @@ Runs once per session after the user is authenticated and profile data is loaded
 
 **Entry point:** `apps/api/src/lib/activity-feed/projector/project-activity-events.ts`
 
-When an activity event is projected, `enqueueNotificationDispatchJobs()` is called. For each recipient profile:
+When an activity event is projected, a `notification.prepare` job is enqueued. For each recipient profile:
 
 1. `buildNotificationDecision()` runs the preference + policy check
-2. Eligible channels (`push`, `email`, `sms`) are written as rows into `notification_dispatch_jobs` with `status = 'pending'`
+2. Eligible channels (`push`, `email`, `sms`) are written as `notification.deliver` rows in `event_pipeline_jobs` with `status = 'pending'`
 
-`enqueueNotificationDispatchJobs()` builds one row per eligible recipient/channel pair:
+`NotificationService.prepareForActivityEvent()` builds one row per eligible recipient/channel pair:
 
-- `activity_event_id`, `recipient_profile_id`, `pref_key`, `scope_kind`, and `scope_id` come from the activity event plus `buildNotificationDecision()`.
+- `activityEventId`, `recipientProfileId`, `prefKey`, `scopeKind`, and `scopeId` come from the activity event plus `buildNotificationDecision()`.
 - `delivery_channel` is one of the channels returned by the decision engine.
 - `delivery_timing`, `run_at`, and `attempt_bucket` control when the dispatcher can claim the job.
 - `payload` includes `eventType`, decision `reasonCodes`, `sourceKind`, `occurredAt`, `title`, `summary`, optional `threadId`, and `rawEventPayload`.
 - Session reminder and feedback events may receive personalized copy from `buildPersonalizedSessionCopy()` when the activity payload contains member metadata.
-- Rows are upserted on `activity_event_id,recipient_profile_id,delivery_channel,attempt_bucket`, so repeated projection is idempotent for the same delivery window.
+- Rows are upserted on the unified job dedupe key `notification.deliver:<eventId>:<recipientProfileId>:<channel>:<attemptBucket>`, so repeated projection is idempotent for the same delivery window.
 
 **Delivery timing logic** (`apps/api/src/lib/notifications/policy-config.ts`):
 
@@ -199,43 +199,43 @@ Notes:
 
 ### 4. Dispatch Pipeline
 
-**Cron trigger:** Supabase Edge Function `notifications-dispatch` runs via `public.configure_edge_function_cron()` in `supabase/migrations/20260417000000_edge_function_cron.sql`.
+**Cron trigger:** Supabase Edge Function `events-dispatch` runs via `public.configure_edge_function_cron()`.
 
 It calls:
 
 ```
-POST /internal/notifications/dispatch
-Authorization: Bearer <INTERNAL_NOTIFICATIONS_TOKEN_API>
+POST /internal/events/dispatch
+Authorization: Bearer <INTERNAL_EVENTS_TOKEN_API>
 ```
 
 **API handler:** `apps/api/src/modules/events/events.controller.ts`
 
-Calls `dispatchDueNotificationJobs()` which:
+Calls `EventPipelineService.dispatchDueJobs()` which:
 
-1. Claims `N` due jobs from `notification_dispatch_jobs` via `claim_due_notification_dispatch_jobs()` RPC (lease-based, idempotent — safe for overlapping ticks)
+1. Claims `N` due jobs from `event_pipeline_jobs` via `claim_due_event_pipeline_jobs()` RPC (lease-based, idempotent — safe for overlapping ticks)
 2. Re-evaluates each job's `buildNotificationDecision()` at dispatch time (preferences may have changed since enqueue)
 3. For push jobs: `sendPushNotification()` → queries `push_tokens` by `profile_id` → calls Expo Push API in batch with optional `EXPO_ACCESS_TOKEN`
-4. Successful Expo ticket IDs are persisted back onto `notification_dispatch_jobs.payload.expoTicketIds` for follow-up receipt polling
+4. Successful Expo ticket IDs are persisted on delivery job metadata for follow-up receipt polling
 5. Marks jobs `succeeded`, `failed` (retryable with exponential backoff), or `dead_letter` (after max 8 attempts or non-retryable error)
 
 **Retry schedule:** 15s, 30s, 60s, 120s, 240s, 480s, 600s, 600s (capped at 10 min).
 
 Status transitions:
 
-| Status        | When it is set                                                                                        | Important data changes                                                                                       |
-| ------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `leased`      | `claim_due_notification_dispatch_jobs()` claims a pending/failed due row.                             | Sets `lease_owner`, `lease_until`, and `updated_at`.                                                         |
-| `suppressed`  | Source `activity_events` row is missing, or the latest decision no longer includes the job's channel. | Clears lease fields, writes `last_error` for missing source, and inserts a `notification_dispatch_logs` row. |
-| `succeeded`   | Provider send succeeds.                                                                               | Sets `dispatched_at`, clears lease/error fields, and stores Expo ticket IDs for push jobs.                   |
-| `failed`      | Error is retryable and attempts remain.                                                               | Increments `attempt_count`, clears lease fields, sets `next_attempt_at`, and writes `last_error`.            |
-| `dead_letter` | Error is non-retryable or max attempts are exhausted.                                                 | Increments `attempt_count`, clears lease fields, clears `next_attempt_at`, and writes `last_error`.          |
+| Status        | When it is set                                                                                        | Important data changes                                                                              |
+| ------------- | ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `leased`      | `claim_due_event_pipeline_jobs()` claims a pending/failed delivery row.                               | Sets `lease_owner`, `lease_until`, and `updated_at`.                                                |
+| `suppressed`  | Source `activity_events` row is missing, or the latest decision no longer includes the job's channel. | Clears lease fields and writes an `event_pipeline_logs` row.                                        |
+| `succeeded`   | Provider send succeeds.                                                                               | Sets `dispatched_at`, clears lease/error fields, and stores Expo ticket IDs for push jobs.          |
+| `failed`      | Error is retryable and attempts remain.                                                               | Increments `attempt_count`, clears lease fields, sets `next_attempt_at`, and writes `last_error`.   |
+| `dead_letter` | Error is non-retryable or max attempts are exhausted.                                                 | Increments `attempt_count`, clears lease fields, clears `next_attempt_at`, and writes `last_error`. |
 
 Provider behavior:
 
 - `push` resolves the projected `activity_feed_items.id` for the recipient and includes it in metadata so mobile can mark the inbox item read on notification tap.
 - `push` sends through Expo using active `push_tokens`; invalid downstream tokens are revoked lazily by the provider.
 - `email` and `sms` use the same job title/summary metadata, but currently flow through their own provider wrappers.
-- Every provider outcome writes `notification_dispatch_logs` with `succeeded`, `suppressed`, `retryable_failure`, or `fatal_failure`.
+- Every provider outcome writes `event_pipeline_logs` with `succeeded`, `suppressed`, `retryable_failure`, or `fatal_failure`.
 
 ---
 
@@ -246,27 +246,27 @@ Provider behavior:
 ```bash
 INTERNAL_ACTIVITY_FEED_TOKEN=<long-random-secret>
 INTERNAL_ACTIVITY_PROJECTOR_TOKEN=<long-random-secret>
-INTERNAL_NOTIFICATIONS_TOKEN_API=<long-random-secret>
+INTERNAL_EVENTS_TOKEN_API=<long-random-secret>
 EXPO_ACCESS_TOKEN=<expo-personal-access-token>
 ```
 
 **Supabase Edge Function secrets:**
 
 ```bash
-NOTIFICATIONS_DISPATCH_URL=https://<your-api-domain>/internal/notifications/dispatch
+EVENTS_DISPATCH_URL=https://<your-api-domain>/internal/events/dispatch
 ACTIVITY_PROJECTOR_DISPATCH_URL=https://<your-api-domain>/internal/activity-feed/project
-INTERNAL_NOTIFICATIONS_TOKEN=<same-value-as-INTERNAL_NOTIFICATIONS_TOKEN_API>
+INTERNAL_EVENTS_TOKEN=<same-value-as-INTERNAL_EVENTS_TOKEN_API>
 INTERNAL_ACTIVITY_PROJECTOR_TOKEN=<same-value-as-INTERNAL_ACTIVITY_PROJECTOR_TOKEN in apps/api>
 # optional:
-NOTIFICATIONS_DISPATCH_LIMIT=100
+EVENTS_DISPATCH_LIMIT=100
 ACTIVITY_PROJECTOR_DISPATCH_LIMIT=25
-NOTIFICATIONS_DISPATCH_LEASE_SECONDS=120
-NOTIFICATIONS_DISPATCH_LEASE_OWNER=supabase-edge-cron
+EVENTS_DISPATCH_LEASE_SECONDS=120
+EVENTS_DISPATCH_LEASE_OWNER=supabase-edge-cron
 ```
 
 **Dispatch URL sanity check after the API migration:**
 
-- `NOTIFICATIONS_DISPATCH_URL` must target `https://<your-api-domain>/internal/notifications/dispatch`
+- `EVENTS_DISPATCH_URL` must target `https://<your-api-domain>/internal/events/dispatch`
 - `REMINDERS_DISPATCH_URL` must target `https://<your-api-domain>/internal/reminders/dispatch`
 - `ACTIVITY_PROJECTOR_DISPATCH_URL` must target `https://<your-api-domain>/internal/activity-feed/project`
 - neither secret should point at `apps/web` or `/api/internal/...`
@@ -280,7 +280,7 @@ The edge function is not needed for local testing. You can drive the entire pipe
 ### Prerequisites
 
 - `pnpm dev:api` running (Nest on `http://localhost:3001`)
-- `INTERNAL_ACTIVITY_FEED_TOKEN`, `INTERNAL_ACTIVITY_PROJECTOR_TOKEN`, and `INTERNAL_NOTIFICATIONS_TOKEN_API` set in `apps/api/.env`
+- `INTERNAL_ACTIVITY_FEED_TOKEN`, `INTERNAL_ACTIVITY_PROJECTOR_TOKEN`, and `INTERNAL_EVENTS_TOKEN_API` set in `apps/api/.env`
 - Supabase connected (remote or local)
 - a real Expo push token from a physical device if you want to validate actual delivery
 
@@ -318,34 +318,41 @@ curl -X POST http://localhost:3001/internal/activity-feed/project \
   }'
 ```
 
-Or insert directly into `notification_dispatch_jobs` to skip the projector:
+Or enqueue a delivery job directly in `event_pipeline_jobs` to skip the projector:
 
 ```sql
-INSERT INTO notification_dispatch_jobs (
-  id, org_id, activity_event_id, recipient_profile_id,
-  pref_key, delivery_channel, delivery_timing, attempt_bucket,
-  run_at, payload, status, attempt_count, max_attempts,
+INSERT INTO event_pipeline_jobs (
+  id, org_id, job_kind, source_kind, source_id, dedupe_key,
+  run_at, payload, status, attempt_count, max_attempts, priority,
   created_at, updated_at
 ) VALUES (
   gen_random_uuid(),
   '<org-id>',
-  gen_random_uuid(),           -- fake event id, projector check will suppress it — use a real one if you want full flow
-  '<profile-id>',
-  'message.posted',
-  'push',
-  'immediate',
-  'immediate:' || to_char(now(), 'YYYY-MM-DD"T"HH24:MI'),
+  'notification.deliver',
+  'activity_event',
+  '<activity-event-id>',
+  'notification.deliver:<activity-event-id>:<profile-id>:push:manual-test',
   now(),
-  '{"title": "Test notification", "summary": "Hello from local"}',
+  jsonb_build_object(
+    'activityEventId', '<activity-event-id>',
+    'recipientProfileId', '<profile-id>',
+    'prefKey', 'message.posted',
+    'deliveryChannel', 'push',
+    'deliveryTiming', 'immediate',
+    'attemptBucket', 'manual-test',
+    'title', 'Test notification',
+    'summary', 'Hello from local'
+  ),
   'pending',
   0,
   8,
+  80,
   now(),
   now()
 );
 ```
 
-> **Note:** If you use a fake `activity_event_id`, the dispatcher will mark the job `suppressed` (source event missing). Use a real event ID for a full end-to-end run.
+> **Note:** If you use a fake `activityEventId`, the dispatcher will mark the job `suppressed` (source event missing). Use a real event ID for a full end-to-end run.
 
 ---
 
@@ -354,9 +361,9 @@ INSERT INTO notification_dispatch_jobs (
 No need to invoke the edge function. Call the API endpoint directly:
 
 ```bash
-curl -X POST http://localhost:3001/internal/notifications/dispatch \
+curl -X POST http://localhost:3001/internal/events/dispatch \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <INTERNAL_NOTIFICATIONS_TOKEN_API>" \
+  -H "Authorization: Bearer <INTERNAL_EVENTS_TOKEN_API>" \
   -d '{"leaseOwner": "local-test"}'
 ```
 
@@ -375,13 +382,14 @@ Expected response:
 ```sql
 -- Check job status
 SELECT id, status, dispatched_at, last_error, attempt_count
-FROM notification_dispatch_jobs
+FROM event_pipeline_jobs
+WHERE job_kind = 'notification.deliver'
 ORDER BY created_at DESC
 LIMIT 10;
 
 -- Check dispatch log
 SELECT result, details, created_at
-FROM notification_dispatch_logs
+FROM event_pipeline_logs
 ORDER BY created_at DESC
 LIMIT 10;
 ```
@@ -397,9 +405,10 @@ FROM activity_events
 WHERE id = '<activity-event-id>';
 
 -- 2. projection created one or more notification jobs
-SELECT id, recipient_profile_id, delivery_channel, status, run_at, last_error
-FROM notification_dispatch_jobs
-WHERE activity_event_id = '<activity-event-id>'
+SELECT id, payload->>'recipientProfileId' AS recipient_profile_id, payload->>'deliveryChannel' AS delivery_channel, status, run_at, last_error
+FROM event_pipeline_jobs
+WHERE job_kind = 'notification.deliver'
+  AND source_id = '<activity-event-id>'
 ORDER BY created_at ASC;
 ```
 
@@ -408,7 +417,7 @@ ORDER BY created_at ASC;
 - `status = suppressed` → check `notification_preferences` for the profile/pref_key, or check if the profile has active presence
 - `status = failed` / `dead_letter` → check `last_error` column
 - `status = succeeded` but no notification → the Expo token is invalid or the device has notifications disabled at OS level; check if `DeviceNotRegistered` would have been returned (Expo's response is logged in the push-provider but not persisted — add a `console.log` in `push-provider.ts` to inspect tickets)
-- no `notification_dispatch_jobs` rows created → the event was not projected; check whether the producing code path is using the API-owned activity publisher
+- no `notification.deliver` rows created → the event was not projected or notification preparation did not run; check whether the producing code path is using the API-owned activity pipeline
 
 ---
 
@@ -422,7 +431,7 @@ WHERE revoked_at IS NULL
 ORDER BY updated_at DESC;
 
 -- Reset a job to pending for re-testing
-UPDATE notification_dispatch_jobs
+UPDATE event_pipeline_jobs
 SET status = 'pending', attempt_count = 0, lease_owner = NULL,
     lease_until = NULL, run_at = now(), last_error = NULL
 WHERE id = '<job-id>';

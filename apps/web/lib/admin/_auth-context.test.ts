@@ -4,6 +4,7 @@ import { requireAdminAuthContext } from './_auth-context';
 
 const getUser = vi.fn();
 const requireEffectiveActorContext = vi.fn();
+const getUserRoles = vi.fn();
 
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(async () => ({
@@ -17,6 +18,10 @@ vi.mock('@iconicedu/web/lib/family-view/actor-context', () => ({
   requireEffectiveActorContext: (...args: unknown[]) =>
     requireEffectiveActorContext(...args),
   ParentModeRequiredError: class ParentModeRequiredError extends Error {},
+}));
+
+vi.mock('@iconicedu/web/lib/profile/queries/roles.query', () => ({
+  getUserRoles: (...args: unknown[]) => getUserRoles(...args),
 }));
 
 describe('requireAdminAuthContext', () => {
@@ -34,6 +39,10 @@ describe('requireAdminAuthContext', () => {
       profile: { id: 'profile-1' },
       isViewingAsChild: false,
     });
+    getUserRoles.mockResolvedValue({
+      data: [{ role_key: 'staff' }],
+      error: null,
+    });
 
     const result = await requireAdminAuthContext();
 
@@ -49,5 +58,23 @@ describe('requireAdminAuthContext', () => {
     });
 
     await expect(requireAdminAuthContext()).rejects.toThrow('Unauthorized');
+  });
+
+  it('throws when the user is not an admin manager', async () => {
+    getUser.mockResolvedValue({
+      data: { user: { id: 'auth-user-1' } },
+    });
+    requireEffectiveActorContext.mockResolvedValue({
+      authUserId: 'auth-user-1',
+      account: { id: 'account-1', org_id: 'org-1' },
+      profile: { id: 'profile-1' },
+      isViewingAsChild: false,
+    });
+    getUserRoles.mockResolvedValue({
+      data: [{ role_key: 'guardian' }],
+      error: null,
+    });
+
+    await expect(requireAdminAuthContext()).rejects.toThrow('Forbidden');
   });
 });

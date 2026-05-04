@@ -1,9 +1,9 @@
 import { randomUUID } from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+import { requireAdminAuthContext } from '@iconicedu/web/lib/admin/_auth-context';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
-import { requireParentActorContext } from '@iconicedu/web/lib/family-view/actor-context';
 import { buildScheduleRowsForApi } from '@iconicedu/web/lib/admin/learning-space-create';
 import { createApiClient } from '@iconicedu/web/lib/api/http-client';
 import {
@@ -445,16 +445,9 @@ export async function updateLearningSpaceFromPayload(
     orgId = actorContext.orgId;
     actorProfileId = actorContext.actorProfileId;
   } else {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      throw new Error('Unauthorized');
-    }
-    const actor = await requireParentActorContext(supabase);
-    orgId = actor.account.org_id;
-    actorProfileId = actor.profile.id;
+    const authContext = await requireAdminAuthContext();
+    orgId = authContext.orgId;
+    actorProfileId = authContext.profileId;
   }
   const now = new Date().toISOString();
   const nextParticipantsSnapshot = payload.participants ?? [];
@@ -974,13 +967,15 @@ export async function replaceLearningSpaceSchedules(
     title: payload.title,
     description: payload.description,
     themeKey: payload.themeKey ?? null,
-    participants: payload.participants.map((p) => ({
-      profileId: p.profileId,
-      kind: p.kind,
-      displayName: p.displayName ?? null,
-      avatarUrl: p.avatarUrl ?? null,
-      themeKey: p.themeKey ?? null,
-    })),
+    participants: payload.participants
+      .filter((p) => p.kind !== 'system')
+      .map((p) => ({
+        profileId: p.profileId,
+        kind: p.kind,
+        displayName: p.displayName ?? null,
+        avatarUrl: p.avatarUrl ?? null,
+        themeKey: p.themeKey ?? null,
+      })),
     schedules: buildScheduleRowsForApi(payload.schedules ?? []),
   });
 }

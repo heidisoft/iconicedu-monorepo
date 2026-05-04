@@ -3,12 +3,7 @@ import { getUserRoles } from '@iconicedu/web/lib/profile/queries/roles.query';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 
 function canManageChannels(roleKey: string | null | undefined) {
-  return (
-    roleKey === 'owner' ||
-    roleKey === 'admin' ||
-    roleKey === 'staff' ||
-    roleKey === 'educator'
-  );
+  return roleKey === 'owner' || roleKey === 'admin' || roleKey === 'staff';
 }
 
 export async function deleteChannel(channelId: string) {

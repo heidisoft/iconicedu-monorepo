@@ -10,7 +10,6 @@ import {
   createSupabaseServiceClient,
   type SupabaseServiceClient,
 } from '@iconicedu/api/lib/supabase/service';
-import { ReminderReconcileService } from '@iconicedu/api/modules/reminders/reminder-reconcile.service';
 import type {
   CancelSessionDto,
   DeleteSchedulesDto,
@@ -37,8 +36,6 @@ const CLASS_SCHEDULE_SELECT = `
 
 @Injectable()
 export class SchedulesService {
-  constructor(private readonly reminderReconcileService: ReminderReconcileService) {}
-
   // ─── Read endpoints ──────────────────────────────────────────────────────────
 
   async list(accessToken: string, input: { orgId: string; channelId?: string }) {
@@ -94,10 +91,6 @@ export class SchedulesService {
     );
 
     if (!dto.schedules.length) {
-      await this.reminderReconcileService.reconcileAllSchedulesForLearningSpace(
-        dto.orgId,
-        dto.learningSpaceId,
-      );
       return { scheduleIds: [] };
     }
 
@@ -156,12 +149,6 @@ export class SchedulesService {
       }
     }
 
-    // Reconcile reminder jobs for each new schedule
-    await this.reminderReconcileService.reconcileAllSchedulesForLearningSpace(
-      dto.orgId,
-      dto.learningSpaceId,
-    );
-
     return { scheduleIds };
   }
 
@@ -171,20 +158,6 @@ export class SchedulesService {
   ): Promise<{ success: true }> {
     await this.requireOrgActor(accessToken, dto.orgId);
     const supabase = createSupabaseServiceClient();
-
-    // Cancel active reminder jobs first
-    await supabase
-      .from('reminder_jobs')
-      .update({
-        status: 'canceled',
-        lease_owner: null,
-        lease_until: null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('org_id', dto.orgId)
-      .eq('source_learning_space_id', dto.learningSpaceId)
-      .not('status', 'in', '("succeeded","canceled","dead_letter")')
-      .is('deleted_at', null);
 
     await this.cascadeDeleteSchedulesForLearningSpace(
       supabase,
@@ -228,14 +201,6 @@ export class SchedulesService {
       if (updateError) {
         throw new InternalServerErrorException(updateError.message);
       }
-
-      // Reconcile: cancelled schedule → cancel reminder jobs
-      await this.reminderReconcileService
-        .reconcileNextReminderJobForSchedule({
-          orgId: dto.orgId,
-          scheduleId: dto.scheduleId,
-        })
-        .catch(() => undefined);
 
       return { success: true, mode: 'single' };
     }
@@ -287,14 +252,6 @@ export class SchedulesService {
       }
     }
 
-    // Reconcile: the cancelled occurrence is now an exception; advance to next
-    await this.reminderReconcileService
-      .reconcileNextReminderJobForSchedule({
-        orgId: dto.orgId,
-        scheduleId: dto.scheduleId,
-      })
-      .catch(() => undefined);
-
     return { success: true, mode: 'recurring' };
   }
 
@@ -324,6 +281,28 @@ export class SchedulesService {
     }
     if (!account) {
       throw new ForbiddenException('Not a member of this organization');
+    }
+
+    const { data: roles, error: rolesError } = await createSupabaseServiceClient()
+      .from('user_roles')
+      .select('role_key')
+      .eq('account_id', account.id)
+      .eq('org_id', orgId)
+      .is('deleted_at', null)
+      .returns<Array<{ role_key: string | null }>>();
+
+    if (rolesError) {
+      throw new InternalServerErrorException(rolesError.message);
+    }
+
+    const canManageSchedules = (roles ?? []).some(
+      (role) =>
+        role.role_key === 'owner' ||
+        role.role_key === 'admin' ||
+        role.role_key === 'staff',
+    );
+    if (!canManageSchedules) {
+      throw new ForbiddenException('Forbidden');
     }
   }
 
@@ -406,9 +385,7 @@ export class SchedulesService {
     createdBy: string,
     now: string,
   ) {
-    const filtered = participants.filter(
-      (p) => p.kind === 'educator' || p.kind === 'child',
-    );
+    const filtered = participants;
     if (!filtered.length) return;
 
     const rows = filtered.map((p) => ({

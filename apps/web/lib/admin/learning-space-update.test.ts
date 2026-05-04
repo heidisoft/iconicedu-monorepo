@@ -44,7 +44,36 @@ describe('replaceLearningSpaceSchedules', () => {
       title: 'Algebra',
       description: 'Updated schedule',
       themeKey: 'teal',
-      participants: [],
+      participants: [
+        {
+          profileId: 'educator-1',
+          kind: 'educator',
+          displayName: 'Ada Teacher',
+          avatarUrl: null,
+          themeKey: 'teal',
+        },
+        {
+          profileId: 'child-1',
+          kind: 'child',
+          displayName: 'Milo Student',
+          avatarUrl: null,
+          themeKey: 'rose',
+        },
+        {
+          profileId: 'guardian-1',
+          kind: 'guardian',
+          displayName: 'Gina Guardian',
+          avatarUrl: null,
+          themeKey: 'pink',
+        },
+        {
+          profileId: 'staff-1',
+          kind: 'staff',
+          displayName: 'Sam Staff',
+          avatarUrl: null,
+          themeKey: 'slate',
+        },
+      ],
       schedules: [
         {
           startDate: '2026-03-10T14:00:00.000Z',
@@ -67,6 +96,12 @@ describe('replaceLearningSpaceSchedules', () => {
         learningSpaceId: 'space-1',
         channelId: 'channel-1',
         title: 'Algebra',
+        participants: [
+          expect.objectContaining({ profileId: 'educator-1', kind: 'educator' }),
+          expect.objectContaining({ profileId: 'child-1', kind: 'child' }),
+          expect.objectContaining({ profileId: 'guardian-1', kind: 'guardian' }),
+          expect.objectContaining({ profileId: 'staff-1', kind: 'staff' }),
+        ],
       }),
     );
   });

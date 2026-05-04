@@ -384,9 +384,6 @@ verify_jwt = false
 [functions.activity-projector-dispatch]
 verify_jwt = false
 
-[functions.notifications-dispatch]
-verify_jwt = false
-
 [functions.channel-read-state-repair]
 verify_jwt = false
 

@@ -1,8 +1,5 @@
 /* global Deno, Response, crypto */
 
-// Supabase Edge Function: notifications-dispatch
-// Triggers the app's internal notifications dispatcher endpoint.
-
 const jsonHeaders = { 'Content-Type': 'application/json' };
 
 function requireEnv(name: string): string {
@@ -42,15 +39,17 @@ function parseJsonOrRaw(body: string) {
 Deno.serve(async () => {
   const runId = crypto.randomUUID();
   const startedAt = Date.now();
-  try {
-    const dispatchUrl = requireEnv('NOTIFICATIONS_DISPATCH_URL');
-    const internalToken = requireEnv('INTERNAL_NOTIFICATIONS_TOKEN');
-    const limit = asOptionalInt('NOTIFICATIONS_DISPATCH_LIMIT');
-    const leaseSeconds = asOptionalInt('NOTIFICATIONS_DISPATCH_LEASE_SECONDS');
-    const leaseOwner =
-      asOptionalString('NOTIFICATIONS_DISPATCH_LEASE_OWNER') ?? 'supabase-edge-cron';
 
-    console.log('notifications_dispatch.started', {
+  try {
+    const dispatchUrl = requireEnv('REMINDERS_RECONCILE_DISPATCH_URL');
+    const internalToken = requireEnv('INTERNAL_REMINDERS_TOKEN');
+    const limit = asOptionalInt('REMINDERS_RECONCILE_DISPATCH_LIMIT');
+    const leaseSeconds = asOptionalInt('REMINDERS_RECONCILE_DISPATCH_LEASE_SECONDS');
+    const leaseOwner =
+      asOptionalString('REMINDERS_RECONCILE_DISPATCH_LEASE_OWNER') ??
+      'supabase-edge-cron';
+
+    console.log('reminders_reconcile_dispatch.started', {
       runId,
       dispatchUrl,
       limit: limit ?? null,
@@ -58,24 +57,18 @@ Deno.serve(async () => {
       leaseOwner,
     });
 
-    const body = {
-      limit,
-      leaseSeconds,
-      leaseOwner,
-    };
-
     const response = await fetch(dispatchUrl, {
       method: 'POST',
       headers: {
         ...jsonHeaders,
         Authorization: `Bearer ${internalToken}`,
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ limit, leaseSeconds, leaseOwner }),
     });
 
     const text = await response.text();
     if (!response.ok) {
-      console.warn('notifications_dispatch.failed_upstream', {
+      console.warn('reminders_reconcile_dispatch.failed_upstream', {
         runId,
         status: response.status,
         durationMs: Date.now() - startedAt,
@@ -91,8 +84,7 @@ Deno.serve(async () => {
       );
     }
 
-    const parsedBody = parseJsonOrRaw(text);
-    console.log('notifications_dispatch.succeeded', {
+    console.log('reminders_reconcile_dispatch.succeeded', {
       runId,
       status: response.status,
       durationMs: Date.now() - startedAt,
@@ -102,12 +94,12 @@ Deno.serve(async () => {
       JSON.stringify({
         ok: true,
         status: response.status,
-        body: parsedBody,
+        body: parseJsonOrRaw(text),
       }),
       { headers: jsonHeaders },
     );
   } catch (error) {
-    console.error('notifications_dispatch.exception', {
+    console.error('reminders_reconcile_dispatch.exception', {
       runId,
       durationMs: Date.now() - startedAt,
       error: toErrorMessage(error),

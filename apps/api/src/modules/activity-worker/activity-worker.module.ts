@@ -8,5 +8,6 @@ import { ActivityWorkerService } from '@iconicedu/api/modules/activity-worker/ac
   imports: [AnalyticsModule],
   controllers: [ActivityWorkerController],
   providers: [ActivityWorkerService],
+  exports: [ActivityWorkerService],
 })
 export class ActivityWorkerModule {}

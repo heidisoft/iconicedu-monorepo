@@ -4,7 +4,7 @@ const {
   createSupabaseServerClientMock,
   createSupabaseServiceClientMock,
   apiPostMock,
-  requireParentActorContextMock,
+  requireAdminAuthContextMock,
   getAccountByAuthUserIdMock,
   getProfileByAccountIdMock,
   insertClassSchedulesMock,
@@ -12,7 +12,7 @@ const {
   createSupabaseServerClientMock: vi.fn(),
   createSupabaseServiceClientMock: vi.fn(),
   apiPostMock: vi.fn(),
-  requireParentActorContextMock: vi.fn(),
+  requireAdminAuthContextMock: vi.fn(),
   getAccountByAuthUserIdMock: vi.fn(),
   getProfileByAccountIdMock: vi.fn(),
   insertClassSchedulesMock: vi.fn(),
@@ -30,8 +30,8 @@ vi.mock('@iconicedu/web/lib/api/http-client', () => ({
   createApiClient: vi.fn(() => ({ post: apiPostMock })),
 }));
 
-vi.mock('@iconicedu/web/lib/family-view/actor-context', () => ({
-  requireParentActorContext: requireParentActorContextMock,
+vi.mock('@iconicedu/web/lib/admin/_auth-context', () => ({
+  requireAdminAuthContext: requireAdminAuthContextMock,
 }));
 
 vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
@@ -59,14 +59,15 @@ describe('createLearningSpaceFromPayload', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    createSupabaseServerClientMock.mockResolvedValue({
+    const serverClient = {
       auth: {
         getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user-1' } } })),
       },
       from: vi.fn(() => ({
         insert: vi.fn(() => ({ error: null })),
       })),
-    });
+    };
+    createSupabaseServerClientMock.mockResolvedValue(serverClient);
     createSupabaseServiceClientMock.mockReturnValue({});
     apiPostMock.mockResolvedValue({ scheduleIds: ['schedule-1'] });
     getAccountByAuthUserIdMock.mockResolvedValue({
@@ -78,10 +79,12 @@ describe('createLearningSpaceFromPayload', () => {
       error: null,
     });
     insertClassSchedulesMock.mockResolvedValue(['schedule-1']);
-    requireParentActorContextMock.mockResolvedValue({
-      account: { id: 'account-1', org_id: 'org-1' },
-      profile: { id: 'profile-1', account_id: 'account-1', org_id: 'org-1' },
-      source: 'parent',
+    requireAdminAuthContextMock.mockResolvedValue({
+      supabase: serverClient,
+      accountId: 'account-1',
+      orgId: 'org-1',
+      profileId: 'profile-1',
+      now: '2026-03-01T00:00:00.000Z',
     });
   });
 
@@ -101,11 +104,32 @@ describe('createLearningSpaceFromPayload', () => {
       liveSession: null,
       participants: [
         {
+          profileId: 'educator-1',
+          kind: 'educator',
+          displayName: 'Ada Teacher',
+          avatarUrl: null,
+          themeKey: 'teal',
+        },
+        {
           profileId: 'student-1',
           kind: 'child',
           displayName: 'Tehara Morgan',
           avatarUrl: null,
           themeKey: null,
+        },
+        {
+          profileId: 'guardian-1',
+          kind: 'guardian',
+          displayName: 'Riley Morgan',
+          avatarUrl: null,
+          themeKey: 'emerald',
+        },
+        {
+          profileId: 'staff-1',
+          kind: 'staff',
+          displayName: 'Sam Staff',
+          avatarUrl: null,
+          themeKey: 'slate',
         },
       ],
       schedules: [
@@ -128,6 +152,12 @@ describe('createLearningSpaceFromPayload', () => {
       expect.objectContaining({
         orgId: 'org-1',
         learningSpaceId: expect.any(String),
+        participants: [
+          expect.objectContaining({ profileId: 'educator-1', kind: 'educator' }),
+          expect.objectContaining({ profileId: 'student-1', kind: 'child' }),
+          expect.objectContaining({ profileId: 'guardian-1', kind: 'guardian' }),
+          expect.objectContaining({ profileId: 'staff-1', kind: 'staff' }),
+        ],
       }),
     );
   });
