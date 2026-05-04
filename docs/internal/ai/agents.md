@@ -10,7 +10,7 @@ AI coding agents and engineers maintaining agent-facing repo guidance.
 
 ## Last Updated
 
-2026-04-18
+2026-05-04
 
 ## Related Docs
 
@@ -46,6 +46,12 @@ AI coding agents and engineers maintaining agent-facing repo guidance.
 - `apps/mobile` must not depend on `apps/web` API routes. When mobile needs an HTTP endpoint, add or use it in `apps/api`.
 
 ## 4. Data Access & Security Rules
+
+### 4.0 Migration Immutability
+
+- Never edit an existing Supabase migration after it has been created.
+- Every database, trigger, RPC, cron, policy, or storage change must be added as a new forward migration in `supabase/migrations`.
+- If a recent migration needs correction, create another migration that amends or replaces the behavior; do not rewrite the earlier file.
 
 ### 4.1 Hard Boundary — FE Apps Are Read/Write Forbidden at the DB Layer
 

@@ -219,19 +219,17 @@ CMD ["node", "dist/main.js"]
 
 ### Environment variables
 
-| Variable                            | Description                                   |
-| ----------------------------------- | --------------------------------------------- |
-| `DATABASE_URL`                      | Supabase Postgres connection string (pooled)  |
-| `DIRECT_URL`                        | Non-pooled URL for Prisma migrations          |
-| `SUPABASE_URL`                      | Supabase project URL                          |
-| `SUPABASE_SERVICE_ROLE_KEY`         | Service role key (bypasses RLS)               |
-| `JWT_SECRET`                        | From Supabase → Settings → API → JWT Settings |
-| `INTERNAL_EVENTS_TOKEN_API`         | Shared secret for unified event dispatcher    |
-| `INTERNAL_REMINDERS_TOKEN_API`      | Shared secret for reminder dispatcher         |
-| `INTERNAL_ACTIVITY_WORKER_TOKEN`    | Legacy preview compatibility dispatcher       |
-| `INTERNAL_ACTIVITY_PROJECTOR_TOKEN` | Legacy preview compatibility dispatcher       |
-| `EXPO_ACCESS_TOKEN`                 | Expo push API token                           |
-| `PORT`                              | HTTP port (default `3001`)                    |
+| Variable                       | Description                                   |
+| ------------------------------ | --------------------------------------------- |
+| `DATABASE_URL`                 | Supabase Postgres connection string (pooled)  |
+| `DIRECT_URL`                   | Non-pooled URL for Prisma migrations          |
+| `SUPABASE_URL`                 | Supabase project URL                          |
+| `SUPABASE_SERVICE_ROLE_KEY`    | Service role key (bypasses RLS)               |
+| `JWT_SECRET`                   | From Supabase → Settings → API → JWT Settings |
+| `INTERNAL_EVENTS_TOKEN_API`    | Shared secret for unified event dispatcher    |
+| `INTERNAL_REMINDERS_TOKEN_API` | Shared secret for reminder dispatcher         |
+| `EXPO_ACCESS_TOKEN`            | Expo push API token                           |
+| `PORT`                         | HTTP port (default `3001`)                    |
 
 ### Prisma in production
 
@@ -257,11 +255,13 @@ Preview CI now deploys the required Supabase Edge Functions and sets branch-loca
 - `INTERNAL_EVENTS_TOKEN=<same value as API INTERNAL_EVENTS_TOKEN_API>`
 
 Preview CI applies migrations, sets branch-local Edge Function secrets, deploys
-functions, runs `public.configure_edge_function_cron(...)`, and verifies the
-active cron set. Production configuration runs automatically after a PR is merged
-to `main`, waits for the GitHub `production` Environment approval, then uses
+functions, deletes deprecated remote functions, runs
+`public.configure_edge_function_cron(...)`, and verifies the active cron set.
+Production configuration runs automatically after a PR is merged to `main`, waits
+for the GitHub `production` Environment approval, then uses
 `ops/env/production.env.json` and GitHub Actions secrets to configure Railway,
-Vercel, Supabase Edge Function secrets, Edge Functions, migrations, and cron.
+Vercel, Supabase Edge Function secrets, Edge Functions, migrations, remote
+function cleanup, and cron.
 Configure required reviewers on the GitHub `production` Environment; otherwise
 GitHub will not pause the job for approval.
 
@@ -281,29 +281,27 @@ supabase functions deploy --use-api --jobs 4
 
 Production GitHub Actions secrets:
 
-| Where                 | Variable / value                                                      | Notes                                                   |
-| --------------------- | --------------------------------------------------------------------- | ------------------------------------------------------- |
-| Platform access       | `RAILWAY_API_TOKEN`                                                   | Lets CI configure Railway production                    |
-| Platform access       | `RAILWAY_PROJECT_ID`                                                  | Railway project containing the production API service   |
-| Platform access       | `VERCEL_TOKEN`                                                        | Lets CI configure Vercel production env                 |
-| Platform access       | `VERCEL_PROJECT_ID`                                                   | Vercel project ID                                       |
-| Platform access       | `VERCEL_ORG_ID`                                                       | Vercel team/user ID                                     |
-| Platform access       | `SUPABASE_ACCESS_TOKEN`                                               | Lets CI deploy functions and set secrets                |
-| Platform access       | `SUPABASE_PROJECT_ID`                                                 | Production Supabase project ref                         |
-| Production values     | `DATABASE_URL`                                                        | Railway API pooled Postgres URL                         |
-| Production values     | `DIRECT_URL`                                                          | Direct Postgres URL for migrations and cron setup       |
-| Production values     | `API_URL`                                                             | Public production API URL                               |
-| Production values     | `SUPABASE_URL` or `NEXT_PUBLIC_SUPABASE_URL`                          | Production Supabase URL                                 |
-| Production values     | `SUPABASE_ANON_KEY` or `NEXT_PUBLIC_SUPABASE_ANON_KEY`                | Public Supabase anon key                                |
-| Production values     | `SUPABASE_SERVICE_ROLE_KEY`                                           | Service role key for API and Edge maintenance functions |
-| Production values     | `JWT_SECRET`                                                          | Supabase JWT secret                                     |
-| Production values     | `INTERNAL_EVENTS_TOKEN_API` or `INTERNAL_EVENTS_TOKEN`                | Long random secret for unified event dispatch           |
-| Production values     | `INTERNAL_REMINDERS_TOKEN`                                            | Long random secret for reminder dispatch                |
-| Production values     | `EXPO_ACCESS_TOKEN`                                                   | Required for authenticated Expo push sends              |
-| Optional telemetry    | `POSTHOG_KEY`                                                         | Optional PostHog key                                    |
-| Optional telemetry    | `NEXT_PUBLIC_POSTHOG_HOST`                                            | Optional PostHog host                                   |
-| Optional legacy admin | `INTERNAL_ACTIVITY_WORKER_TOKEN`                                      | Optional web admin compatibility token                  |
-| Optional legacy admin | `INTERNAL_ACTIVITY_PROJECTOR_TOKEN` or `INTERNAL_ACTIVITY_FEED_TOKEN` | Optional web admin compatibility token                  |
+| Where                 | Variable / value                                                   | Notes                                                    |
+| --------------------- | ------------------------------------------------------------------ | -------------------------------------------------------- |
+| Platform access       | `RAILWAY_API_TOKEN`                                                | Lets CI configure Railway production                     |
+| Platform access       | `RAILWAY_PROJECT_ID`                                               | Railway project containing the production API service    |
+| Platform access       | `VERCEL_TOKEN`                                                     | Lets CI configure Vercel production env                  |
+| Platform access       | `VERCEL_PROJECT_ID`                                                | Vercel project ID                                        |
+| Platform access       | `VERCEL_ORG_ID`                                                    | Vercel team/user ID                                      |
+| Platform access       | `SUPABASE_ACCESS_TOKEN`                                            | Lets CI deploy functions and set secrets                 |
+| Platform access       | `SUPABASE_PROJECT_ID`                                              | Production Supabase project ref                          |
+| Platform access       | `SUPABASE_DB_PASSWORD`                                             | Lets CI derive production DB connection strings          |
+| Derived by CI         | `DATABASE_URL` / `DIRECT_URL`                                      | Derived from Supabase project metadata and DB password   |
+| Derived by CI         | `API_URL`                                                          | Derived from the Railway production service domain       |
+| Derived by CI         | `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` | Derived from `SUPABASE_PROJECT_ID` via the Supabase API  |
+| Production values     | `JWT_SECRET` or `SUPABASE_JWT_SECRET`                              | Supabase JWT secret if the Supabase API cannot derive it |
+| Production values     | `INTERNAL_EVENTS_TOKEN_API` or `INTERNAL_EVENTS_TOKEN`             | Long random secret for unified event dispatch            |
+| Production values     | `INTERNAL_REMINDERS_TOKEN`                                         | Long random secret for reminder dispatch                 |
+| Production values     | `EXPO_ACCESS_TOKEN` or `EXPO_TOKEN`                                | Required for authenticated Expo push sends               |
+| Optional telemetry    | `POSTHOG_KEY`                                                      | Optional PostHog key                                     |
+| Optional telemetry    | `NEXT_PUBLIC_POSTHOG_KEY`                                          | Optional public PostHog key                              |
+| Optional telemetry    | `NEXT_PUBLIC_POSTHOG_HOST` or `EXPO_PUBLIC_POSTHOG_HOST`           | Optional PostHog host                                    |
+| Optional legacy admin | `INTERNAL_ACTIVITY_FEED_TOKEN`                                     | Optional admin activity replay token                     |
 
 When a PR introduces a new production env var, add it to
 `ops/env/production.env.json` and add the matching GitHub Actions secret before
@@ -326,8 +324,10 @@ Required production checks:
 - `EXPO_ACCESS_TOKEN` is set in `apps/api` if push delivery should use Expo authenticated sends.
 
 `supabase functions deploy` accepts an optional function name. Omitting the name
-deploys all local functions. Add `--prune` only when you intentionally want to
-delete remote functions that no longer exist locally.
+deploys all local functions. CI does not use `--prune`; it explicitly deletes
+only the known deprecated functions after deployment:
+`notifications-dispatch`, `reminders-reconcile-dispatch`,
+`activity-worker-dispatch`, and `activity-projector-dispatch`.
 
 ### Applying migrations to production
 

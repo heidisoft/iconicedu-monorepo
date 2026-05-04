@@ -19,8 +19,6 @@ const originalEnv = {
   API_URL: process.env.API_URL,
   NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
   NODE_ENV: process.env.NODE_ENV,
-  INTERNAL_ACTIVITY_WORKER_TOKEN_API: process.env.INTERNAL_ACTIVITY_WORKER_TOKEN_API,
-  INTERNAL_ACTIVITY_PROJECTOR_TOKEN: process.env.INTERNAL_ACTIVITY_PROJECTOR_TOKEN,
   INTERNAL_REMINDERS_TOKEN_API: process.env.INTERNAL_REMINDERS_TOKEN_API,
   INTERNAL_EVENTS_TOKEN_API: process.env.INTERNAL_EVENTS_TOKEN_API,
 };
@@ -43,8 +41,6 @@ describe('POST /api/admin/tools/dispatch', () => {
     });
     process.env.API_URL = 'http://127.0.0.1:3001/';
     process.env.NEXT_PUBLIC_API_URL = '';
-    process.env.INTERNAL_ACTIVITY_WORKER_TOKEN_API = 'worker-token';
-    process.env.INTERNAL_ACTIVITY_PROJECTOR_TOKEN = 'projector-token';
     process.env.INTERNAL_REMINDERS_TOKEN_API = 'reminders-token';
     process.env.INTERNAL_EVENTS_TOKEN_API = 'events-token';
   });
@@ -53,10 +49,6 @@ describe('POST /api/admin/tools/dispatch', () => {
     process.env.API_URL = originalEnv.API_URL;
     process.env.NEXT_PUBLIC_API_URL = originalEnv.NEXT_PUBLIC_API_URL;
     process.env.NODE_ENV = originalEnv.NODE_ENV;
-    process.env.INTERNAL_ACTIVITY_WORKER_TOKEN_API =
-      originalEnv.INTERNAL_ACTIVITY_WORKER_TOKEN_API;
-    process.env.INTERNAL_ACTIVITY_PROJECTOR_TOKEN =
-      originalEnv.INTERNAL_ACTIVITY_PROJECTOR_TOKEN;
     process.env.INTERNAL_REMINDERS_TOKEN_API = originalEnv.INTERNAL_REMINDERS_TOKEN_API;
     process.env.INTERNAL_EVENTS_TOKEN_API = originalEnv.INTERNAL_EVENTS_TOKEN_API;
   });
@@ -96,7 +88,7 @@ describe('POST /api/admin/tools/dispatch', () => {
     );
   });
 
-  it('runs activity worker jobs through the API endpoint with cron-style defaults', async () => {
+  it('runs reminder dispatch jobs through the API endpoint', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValue(
@@ -107,79 +99,14 @@ describe('POST /api/admin/tools/dispatch', () => {
     const response = await POST(
       request({
         orgId: 'org-1',
-        kind: 'activity-worker-dispatch',
-        limit: 5,
-        leaseSeconds: 90,
-      }),
-    );
-    const json = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(json.success).toBe(true);
-    expect(fetchMock).toHaveBeenCalledWith(
-      'http://127.0.0.1:3001/internal/activity-worker/dispatch',
-      expect.objectContaining({
-        method: 'POST',
-        headers: {
-          Authorization: 'Bearer worker-token',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          limit: 5,
-          leaseSeconds: 90,
-          leaseOwner: 'supabase-edge-cron',
-        }),
-      }),
-    );
-  });
-
-  it('runs projector jobs with the same body shape as the edge function', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(new Response(JSON.stringify({ processed: 2 }), { status: 200 }));
-    vi.stubGlobal('fetch', fetchMock);
-
-    const response = await POST(
-      request({
-        orgId: 'org-1',
-        kind: 'activity-projector-dispatch',
-        limit: 2,
-        leaseOwner: 'ignored',
-      }),
-    );
-
-    expect(response.status).toBe(200);
-    expect(fetchMock).toHaveBeenCalledWith(
-      'http://127.0.0.1:3001/internal/activity-feed/project',
-      expect.objectContaining({
-        headers: {
-          Authorization: 'Bearer projector-token',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ limit: 2 }),
-      }),
-    );
-  });
-
-  it('runs reminder reconcile jobs through the API endpoint', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(
-        new Response(JSON.stringify({ claimed: 1, succeeded: 1 }), { status: 200 }),
-      );
-    vi.stubGlobal('fetch', fetchMock);
-
-    const response = await POST(
-      request({
-        orgId: 'org-1',
-        kind: 'reminders-reconcile-dispatch',
+        kind: 'reminders-dispatch',
         limit: 7,
       }),
     );
 
     expect(response.status).toBe(200);
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://127.0.0.1:3001/internal/reminders/reconcile-dispatch',
+      'http://127.0.0.1:3001/internal/reminders/dispatch',
       expect.objectContaining({
         method: 'POST',
         headers: {

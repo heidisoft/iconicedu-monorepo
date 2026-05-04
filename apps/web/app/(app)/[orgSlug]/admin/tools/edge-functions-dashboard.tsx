@@ -18,9 +18,6 @@ import {
 
 type FunctionKind =
   | 'events-dispatch'
-  | 'reminders-reconcile-dispatch'
-  | 'activity-worker-dispatch'
-  | 'activity-projector-dispatch'
   | 'reminders-dispatch'
   | 'channel-read-state-repair';
 
@@ -49,29 +46,6 @@ const FUNCTIONS: FunctionConfig[] = [
       'Claims event_pipeline_jobs for activity generation, projection, notification delivery, and reminder reconciliation.',
     hasDispatchParams: true,
     hasLeaseParams: true,
-  },
-  {
-    kind: 'reminders-reconcile-dispatch',
-    title: 'Reminders Reconcile Dispatch',
-    description:
-      'Claims pending reminder_reconcile_jobs and creates or cancels the next reminder job per schedule.',
-    hasDispatchParams: true,
-    hasLeaseParams: true,
-  },
-  {
-    kind: 'activity-worker-dispatch',
-    title: 'Activity Worker Dispatch',
-    description:
-      'Claims pending activity_source_jobs and publishes durable activity_events.',
-    hasDispatchParams: true,
-    hasLeaseParams: true,
-  },
-  {
-    kind: 'activity-projector-dispatch',
-    title: 'Activity Projector Dispatch',
-    description:
-      'Retries pending and failed activity_events projection into activity_feed_items and notification dispatch jobs.',
-    hasDispatchParams: true,
   },
   {
     kind: 'reminders-dispatch',

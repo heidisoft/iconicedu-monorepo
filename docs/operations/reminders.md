@@ -120,9 +120,9 @@ only claims due `reminder_jobs` via `claim_due_reminder_jobs`.
 supabase functions deploy --use-api --jobs 4
 ```
 
-`reminders-reconcile-dispatch` is a legacy compatibility bridge for the older
-dedicated reconcile queue. New schedule-table reconciliation should run through
-`events-dispatch` and `event_pipeline_jobs` with `job_kind='reminder.reconcile'`.
+The old `reminders-reconcile-dispatch` bridge has been removed. Schedule-table
+reconciliation now runs through `events-dispatch` and `event_pipeline_jobs` with
+`job_kind='reminder.reconcile'`.
 
 If you deploy to a linked remote project, ensure `supabase link --project-ref <ref>` is already done.
 

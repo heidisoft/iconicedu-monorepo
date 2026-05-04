@@ -5,9 +5,7 @@ import type {
   EventPipelineJobRow,
   MessageMentionVM,
 } from '@iconicedu/shared-types';
-import { randomUUID } from 'crypto';
 
-import { AnalyticsService } from '@iconicedu/api/analytics/analytics.service';
 import { publishActivityEvent } from '@iconicedu/api/lib/activity-feed/activity-publisher';
 import {
   publishReactionAddedActivity,
@@ -15,15 +13,7 @@ import {
   resolveActivityChannelContext,
   resolveVisibilityAudienceFromMessageRow,
 } from '@iconicedu/api/lib/messages/message-activity';
-import {
-  createSupabaseServiceClient,
-  type SupabaseServiceClient,
-} from '@iconicedu/api/lib/supabase/service';
-
-const DEFAULT_JOB_LIMIT = 100;
-const DEFAULT_LEASE_SECONDS = 120;
-const RETRY_BASE_MS = 15_000;
-const RETRY_MAX_MS = 10 * 60_000;
+import { type SupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 
 type MessageRow = {
   id: string;
@@ -61,135 +51,6 @@ type LearningSpaceContext = {
 
 @Injectable()
 export class ActivityWorkerService {
-  constructor(private readonly analytics: AnalyticsService) {}
-
-  private getSupabase(): SupabaseServiceClient {
-    return createSupabaseServiceClient();
-  }
-
-  async dispatchDuePendingJobs(input: {
-    leaseOwner: string;
-    limit?: number;
-    leaseSeconds?: number;
-  }) {
-    const supabase = this.getSupabase();
-    const runId = randomUUID();
-    const startedAt = Date.now();
-
-    const claimResponse = await supabase.rpc('claim_due_activity_source_jobs', {
-      p_limit: input.limit ?? DEFAULT_JOB_LIMIT,
-      p_lease_owner: input.leaseOwner,
-      p_lease_seconds: input.leaseSeconds ?? DEFAULT_LEASE_SECONDS,
-    });
-
-    if (claimResponse.error) {
-      throw new Error(claimResponse.error.message);
-    }
-
-    const claimed = (claimResponse.data ?? []) as ActivitySourceJobRow[];
-    let succeeded = 0;
-    let failed = 0;
-    let deadLettered = 0;
-
-    for (const job of claimed) {
-      try {
-        await this.processJob(job, supabase);
-        succeeded += 1;
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        const retryable =
-          this.isRetryableError(error) && job.attempt_count + 1 < job.max_attempts;
-        const now = new Date();
-        const nextAttemptAt = new Date(
-          now.getTime() + this.resolveRetryDelayMs(job.attempt_count + 1),
-        ).toISOString();
-
-        const response = await supabase
-          .from('activity_source_jobs')
-          .update({
-            status: retryable ? 'failed' : 'dead_letter',
-            attempt_count: job.attempt_count + 1,
-            next_attempt_at: retryable ? nextAttemptAt : null,
-            last_error: message,
-            lease_owner: null,
-            lease_until: null,
-            updated_at: now.toISOString(),
-          })
-          .eq('id', job.id)
-          .eq('org_id', job.org_id);
-
-        if (response.error) {
-          throw new Error(response.error.message);
-        }
-
-        this.analytics.capture('api activity source job failed', {
-          jobId: job.id,
-          orgId: job.org_id,
-          jobKind: job.job_kind,
-          attemptCount: job.attempt_count + 1,
-          nextStatus: retryable ? 'failed' : 'dead_letter',
-          errorMessage: message,
-        });
-
-        failed += 1;
-        if (!retryable) deadLettered += 1;
-      }
-    }
-
-    const durationMs = Date.now() - startedAt;
-    this.analytics.capture('api activity worker dispatch completed', {
-      runId,
-      claimed: claimed.length,
-      succeeded,
-      failed,
-      deadLettered,
-      durationMs,
-    });
-
-    return {
-      runId,
-      claimed: claimed.length,
-      succeeded,
-      failed,
-      deadLettered,
-      durationMs,
-    };
-  }
-
-  private resolveRetryDelayMs(attemptCount: number) {
-    const exponential = RETRY_BASE_MS * 2 ** Math.max(0, attemptCount - 1);
-    const jitter = Math.floor(Math.random() * 2_000);
-    return Math.min(RETRY_MAX_MS, exponential + jitter);
-  }
-
-  private isRetryableError(error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
-    return !/invalid|unauthorized|forbidden|not found|missing/i.test(message);
-  }
-
-  private async processJob(job: ActivitySourceJobRow, supabase: SupabaseServiceClient) {
-    await this.processSourceJobPayload(job, supabase);
-
-    const now = new Date().toISOString();
-    const response = await supabase
-      .from('activity_source_jobs')
-      .update({
-        status: 'succeeded',
-        dispatched_at: now,
-        lease_owner: null,
-        lease_until: null,
-        next_attempt_at: null,
-        last_error: null,
-        updated_at: now,
-      })
-      .eq('id', job.id)
-      .eq('org_id', job.org_id);
-
-    if (response.error) {
-      throw new Error(response.error.message);
-    }
-  }
-
   async processEventPipelineGenerationJob(
     job: EventPipelineJobRow,
     supabase: SupabaseServiceClient,

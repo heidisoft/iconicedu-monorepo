@@ -378,16 +378,7 @@ allow_dynamic_registration = false
 [functions.reminders-dispatch]
 verify_jwt = false
 
-[functions.reminders-reconcile-dispatch]
-verify_jwt = false
-
 [functions.events-dispatch]
-verify_jwt = false
-
-[functions.activity-worker-dispatch]
-verify_jwt = false
-
-[functions.activity-projector-dispatch]
 verify_jwt = false
 
 [functions.channel-read-state-repair]

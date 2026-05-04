@@ -640,6 +640,7 @@ jobs:
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
           RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+          RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
         run: |
           set -euo pipefail
 
@@ -711,8 +712,6 @@ jobs:
             --arg anon  "${{ steps.branch-creds.outputs.anon_key }}" \
             --arg jwt   "${{ steps.branch-creds.outputs.jwt_secret }}" \
             --arg act   "${{ secrets.INTERNAL_ACTIVITY_FEED_TOKEN }}" \
-            --arg act_p "${{ secrets.INTERNAL_ACTIVITY_PROJECTOR_TOKEN || secrets.INTERNAL_ACTIVITY_FEED_TOKEN }}" \
-            --arg act_w "${{ secrets.INTERNAL_ACTIVITY_WORKER_TOKEN }}" \
             --arg rem   "${{ secrets.INTERNAL_REMINDERS_TOKEN }}" \
             --arg evt   "${{ secrets.INTERNAL_EVENTS_TOKEN_API || secrets.INTERNAL_EVENTS_TOKEN || secrets.INTERNAL_ACTIVITY_WORKER_TOKEN }}" \
             --arg expo  "${{ secrets.EXPO_ACCESS_TOKEN }}" \
@@ -721,8 +720,6 @@ jobs:
             '{DATABASE_URL:$db, DIRECT_URL:$dir, SUPABASE_URL:$surl,
               SUPABASE_SERVICE_ROLE_KEY:$srkey, SUPABASE_ANON_KEY:$anon, JWT_SECRET:$jwt,
               INTERNAL_ACTIVITY_FEED_TOKEN:$act,
-              INTERNAL_ACTIVITY_PROJECTOR_TOKEN:$act_p,
-              INTERNAL_ACTIVITY_WORKER_TOKEN:$act_w,
               INTERNAL_EVENTS_TOKEN_API:$evt,
               INTERNAL_REMINDERS_TOKEN_API:$rem,
               EXPO_ACCESS_TOKEN:$expo,
@@ -860,8 +857,6 @@ jobs:
           set_vercel_env "NEXT_PUBLIC_APP_ENV" "preview"
           set_vercel_env "INTERNAL_EVENTS_TOKEN_API" "${{ secrets.INTERNAL_EVENTS_TOKEN_API || secrets.INTERNAL_EVENTS_TOKEN || secrets.INTERNAL_ACTIVITY_WORKER_TOKEN }}"
           set_vercel_env "INTERNAL_REMINDERS_TOKEN_API" "${{ secrets.INTERNAL_REMINDERS_TOKEN }}"
-          set_vercel_env "INTERNAL_ACTIVITY_WORKER_TOKEN_API" "${{ secrets.INTERNAL_ACTIVITY_WORKER_TOKEN }}"
-          set_vercel_env "INTERNAL_ACTIVITY_PROJECTOR_TOKEN" "${{ secrets.INTERNAL_ACTIVITY_PROJECTOR_TOKEN || secrets.INTERNAL_ACTIVITY_FEED_TOKEN }}"
 
           LATEST_DEPLOYMENT_JSON=$(curl -sf \
             -H "Authorization: Bearer $VERCEL_TOKEN" \
@@ -895,8 +890,6 @@ jobs:
         env:
           BRANCH_API_URL: ${{ steps.branch-creds.outputs.branch_api_url }}
           BRANCH_PROJECT_REF: ${{ steps.supabase-branch.outputs.branch_ref }}
-          INTERNAL_ACTIVITY_PROJECTOR_TOKEN: ${{ secrets.INTERNAL_ACTIVITY_PROJECTOR_TOKEN || secrets.INTERNAL_ACTIVITY_FEED_TOKEN }}
-          INTERNAL_ACTIVITY_WORKER_TOKEN: ${{ secrets.INTERNAL_ACTIVITY_WORKER_TOKEN }}
           INTERNAL_EVENTS_TOKEN: ${{ secrets.INTERNAL_EVENTS_TOKEN_API || secrets.INTERNAL_EVENTS_TOKEN || secrets.INTERNAL_ACTIVITY_WORKER_TOKEN }}
           INTERNAL_REMINDERS_TOKEN: ${{ secrets.INTERNAL_REMINDERS_TOKEN }}
           RAILWAY_API_URL: ${{ steps.railway.outputs.railway_api_url }}
@@ -926,12 +919,8 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
           EVENTS_DISPATCH_URL=${RAILWAY_API_URL}/internal/events/dispatch
           REMINDERS_DISPATCH_URL=${RAILWAY_API_URL}/internal/reminders/dispatch
-          ACTIVITY_WORKER_DISPATCH_URL=${RAILWAY_API_URL}/internal/activity-worker/dispatch
-          ACTIVITY_PROJECTOR_DISPATCH_URL=${RAILWAY_API_URL}/internal/activity-feed/project
           INTERNAL_EVENTS_TOKEN=${INTERNAL_EVENTS_TOKEN}
           INTERNAL_REMINDERS_TOKEN=${INTERNAL_REMINDERS_TOKEN}
-          INTERNAL_ACTIVITY_WORKER_TOKEN=${INTERNAL_ACTIVITY_WORKER_TOKEN}
-          INTERNAL_ACTIVITY_PROJECTOR_TOKEN=${INTERNAL_ACTIVITY_PROJECTOR_TOKEN}
           EOF
 
           supabase secrets set \
@@ -948,6 +937,17 @@ jobs:
             --project-ref "${{ steps.supabase-branch.outputs.branch_ref }}" \
             --use-api \
             --jobs 4
+
+          for function_name in \
+            notifications-dispatch \
+            reminders-reconcile-dispatch \
+            activity-worker-dispatch \
+            activity-projector-dispatch
+          do
+            supabase functions delete "$function_name" \
+              --project-ref "${{ steps.supabase-branch.outputs.branch_ref }}" \
+              --yes || true
+          done
 
       # 9. Create or refresh branch-local cron jobs with the preview branch URL.
       - name: Configure Supabase preview cron jobs
@@ -1119,6 +1119,197 @@ jobs:
         with:
           version: latest
 
+      - name: Resolve production platform values
+        env:
+          API_URL: ${{ secrets.API_URL }}
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
+          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+          RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+
+          OUT_DIR="/tmp/iconicedu-production-env"
+          mkdir -p "$OUT_DIR"
+
+          if [[ -z "${SUPABASE_DB_PASSWORD:-}" ]]; then
+            echo "::error::Missing SUPABASE_DB_PASSWORD. It is required to derive production DB connection strings."
+            exit 1
+          fi
+
+          GQL="https://backboard.railway.app/graphql/v2"
+
+          railway_api() {
+            local body="$1"
+            local resp
+            resp=$(curl -sf \
+              -H "Authorization: Bearer $RAILWAY_TOKEN" \
+              -H "Content-Type: application/json" \
+              "$GQL" \
+              -d "$body") || { echo "::error::Railway API HTTP request failed"; exit 1; }
+            local errs
+            errs=$(echo "$resp" | jq -r 'if .errors then .errors | map(.message) | join(", ") else empty end')
+            if [[ -n "$errs" ]]; then
+              echo "::error::Railway GQL error: $errs"
+              exit 1
+            fi
+            echo "$resp"
+          }
+
+          SERVICE_NAME="${{ github.event.repository.name }}"
+          ENV_NAME="production"
+
+          ENV_RESP=$(railway_api "$(jq -n --arg pid "$RAILWAY_PROJECT_ID" \
+            '{query:"query environments($projectId: String!) { environments(projectId: $projectId) { edges { node { id name } } } }", variables:{projectId:$pid}}')")
+          ENV_ID=$(echo "$ENV_RESP" | jq -r --arg name "$ENV_NAME" \
+            '.data.environments.edges[]? | select(.node.name==$name) | .node.id // empty')
+          if [[ -z "$ENV_ID" ]]; then
+            echo "::error::Railway production environment '$ENV_NAME' not found."
+            exit 1
+          fi
+
+          if [[ -n "${RAILWAY_SERVICE_ID:-}" ]]; then
+            SERVICE_ID="$RAILWAY_SERVICE_ID"
+          else
+            PROJECT_RESP=$(railway_api "$(jq -n --arg pid "$RAILWAY_PROJECT_ID" \
+              '{query:"query project($id: String!) { project(id: $id) { services { edges { node { id name } } } } }", variables:{id:$pid}}')")
+            SERVICE_ID=$(echo "$PROJECT_RESP" | jq -r --arg name "$SERVICE_NAME" \
+              '.data.project.services.edges[]? | select(.node.name==$name) | .node.id // empty')
+          fi
+          if [[ -z "$SERVICE_ID" ]]; then
+            echo "::error::Railway service id could not be resolved. Set RAILWAY_SERVICE_ID or use a service named '$SERVICE_NAME'."
+            exit 1
+          fi
+
+          if [[ -z "${API_URL:-}" ]]; then
+            DOMAIN_RESP=$(railway_api "$(jq -n \
+              --arg pid "$RAILWAY_PROJECT_ID" \
+              --arg eid "$ENV_ID" \
+              --arg sid "$SERVICE_ID" \
+              '{query:"query domains($projectId: String!, $environmentId: String!, $serviceId: String!) { domains(projectId: $projectId, environmentId: $environmentId, serviceId: $serviceId) { serviceDomains { domain } customDomains { domain } } }", variables:{projectId:$pid, environmentId:$eid, serviceId:$sid}}')")
+            RAILWAY_DOMAIN=$(echo "$DOMAIN_RESP" | jq -r \
+              '.data.domains.customDomains[0]?.domain // .data.domains.serviceDomains[0]?.domain // empty')
+            if [[ -z "$RAILWAY_DOMAIN" ]]; then
+              echo "::error::Unable to resolve a Railway production API domain. Set API_URL as a GitHub secret or configure a Railway domain."
+              exit 1
+            fi
+            API_URL="https://${RAILWAY_DOMAIN}"
+          fi
+          API_URL="${API_URL%/}"
+
+          SUPABASE_URL="https://${SUPABASE_PROJECT_ID}.supabase.co"
+          DB_PASS_ENCODED=$(jq -nr --arg v "$SUPABASE_DB_PASSWORD" '$v|@uri')
+
+          API_KEYS=$(curl -sf \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_ID}/api-keys")
+          SUPABASE_ANON_KEY=$(echo "$API_KEYS" | jq -r '.[] | select(.name=="anon") | .api_key')
+          SUPABASE_SERVICE_ROLE_KEY=$(echo "$API_KEYS" | jq -r '.[] | select(.name=="service_role") | .api_key')
+          if [[ -z "$SUPABASE_ANON_KEY" || "$SUPABASE_ANON_KEY" == "null" || -z "$SUPABASE_SERVICE_ROLE_KEY" || "$SUPABASE_SERVICE_ROLE_KEY" == "null" ]]; then
+            echo "::error::Unable to resolve production Supabase anon/service_role keys."
+            exit 1
+          fi
+
+          PROJECT_CONFIG=$(curl -sf \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_ID}" \
+            || echo '{}')
+          JWT_SECRET=$(echo "$PROJECT_CONFIG" | jq -r '.jwt_secret // .jwtSecret // empty')
+
+          POOLER_CONFIG=$(curl -sf \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_ID}/config/database/pooler")
+          PGBOUNCER_CONFIG=$(curl -sf \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_ID}/config/database/pgbouncer" \
+            || echo '{}')
+
+          DATABASE_URL=$(echo "$POOLER_CONFIG" | jq -r '
+            if type == "array" then
+              map(select((.pool_mode // "") == "transaction" or (.db_port // 0) == 6543))[0].connectionString
+              // map(select((.pool_mode // "") == "transaction" or (.db_port // 0) == 6543))[0].connection_string
+              // .[0].connectionString
+              // .[0].connection_string
+              // empty
+            elif type == "object" then
+              .connectionString // .connection_string // empty
+            else
+              empty
+            end')
+          if [[ -z "$DATABASE_URL" || "$DATABASE_URL" == "null" ]]; then
+            DATABASE_URL=$(echo "$PGBOUNCER_CONFIG" | jq -r '.connectionString // .connection_string // empty')
+          fi
+
+          ADMIN_DATABASE_URL=$(echo "$POOLER_CONFIG" | jq -r '
+            if type == "array" then
+              map(select((.pool_mode // "") == "session" or (.db_port // 0) == 5432))[0].connectionString
+              // map(select((.pool_mode // "") == "session" or (.db_port // 0) == 5432))[0].connection_string
+              // map(select((.pool_mode // "") == "transaction" or (.db_port // 0) == 6543))[0].connectionString
+              // map(select((.pool_mode // "") == "transaction" or (.db_port // 0) == 6543))[0].connection_string
+              // .[0].connectionString
+              // .[0].connection_string
+              // empty
+            elif type == "object" then
+              .connectionString // .connection_string // empty
+            else
+              empty
+            end')
+          if [[ -z "$ADMIN_DATABASE_URL" || "$ADMIN_DATABASE_URL" == "null" ]]; then
+            ADMIN_DATABASE_URL=$(echo "$PGBOUNCER_CONFIG" | jq -r '.connectionString // .connection_string // empty')
+          fi
+
+          if [[ -z "$DATABASE_URL" || "$DATABASE_URL" == "null" || -z "$ADMIN_DATABASE_URL" || "$ADMIN_DATABASE_URL" == "null" ]]; then
+            echo "::warning::Supabase pooler config payload: $(echo "$POOLER_CONFIG" | jq -c 'if type == "array" then map({pool_mode,db_host,db_port,has_connection:(has("connectionString") or has("connection_string"))}) else {type:(type),keys:(keys // [])} end' 2>/dev/null || echo unavailable)"
+            echo "::warning::Supabase pgbouncer config payload: $(echo "$PGBOUNCER_CONFIG" | jq -c '{pool_mode,db_host,has_connection:(has("connectionString") or has("connection_string"))}' 2>/dev/null || echo unavailable)"
+            echo "::error::Supabase production database config did not include required pooler connection strings."
+            exit 1
+          fi
+
+          set_password() {
+            local url="$1"
+            CONNECTION_URL="$url" DB_PASSWORD="$SUPABASE_DB_PASSWORD" node <<'NODE'
+          const url = new URL(process.env.CONNECTION_URL);
+          url.password = process.env.DB_PASSWORD;
+          process.stdout.write(url.toString());
+          NODE
+          }
+
+          DATABASE_URL=$(set_password "$DATABASE_URL")
+          ADMIN_DATABASE_URL=$(set_password "$ADMIN_DATABASE_URL")
+          DIRECT_URL="postgresql://postgres:${DB_PASS_ENCODED}@db.${SUPABASE_PROJECT_ID}.supabase.co:5432/postgres"
+
+          echo "::add-mask::$SUPABASE_DB_PASSWORD"
+          echo "::add-mask::$DATABASE_URL"
+          echo "::add-mask::$ADMIN_DATABASE_URL"
+          echo "::add-mask::$DIRECT_URL"
+          echo "::add-mask::$SUPABASE_ANON_KEY"
+          echo "::add-mask::$SUPABASE_SERVICE_ROLE_KEY"
+          [[ -n "$JWT_SECRET" ]] && echo "::add-mask::$JWT_SECRET"
+
+          jq -n \
+            --arg apiUrl "$API_URL" \
+            --arg databaseUrl "$DATABASE_URL" \
+            --arg directUrl "$DIRECT_URL" \
+            --arg adminDatabaseUrl "$ADMIN_DATABASE_URL" \
+            --arg supabaseUrl "$SUPABASE_URL" \
+            --arg anonKey "$SUPABASE_ANON_KEY" \
+            --arg serviceRoleKey "$SUPABASE_SERVICE_ROLE_KEY" \
+            --arg jwtSecret "$JWT_SECRET" \
+            '{
+              API_URL: $apiUrl,
+              DATABASE_URL: $databaseUrl,
+              DIRECT_URL: $directUrl,
+              ADMIN_DATABASE_URL: $adminDatabaseUrl,
+              SUPABASE_URL: $supabaseUrl,
+              NEXT_PUBLIC_SUPABASE_URL: $supabaseUrl,
+              SUPABASE_ANON_KEY: $anonKey,
+              NEXT_PUBLIC_SUPABASE_ANON_KEY: $anonKey,
+              SUPABASE_SERVICE_ROLE_KEY: $serviceRoleKey
+            } + (if $jwtSecret != "" then {JWT_SECRET: $jwtSecret} else {} end)' \
+            > "$OUT_DIR/derived-secrets.json"
+
       - name: Validate and render production env manifest
         env:
           CI_SECRETS_JSON: ${{ toJson(secrets) }}
@@ -1131,8 +1322,13 @@ jobs:
 
           const manifestPath = 'ops/env/production.env.json';
           const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-          const secrets = JSON.parse(process.env.CI_SECRETS_JSON || '{}');
           const outDir = '/tmp/iconicedu-production-env';
+          const derivedSecretsPath = path.join(outDir, 'derived-secrets.json');
+          const githubSecrets = JSON.parse(process.env.CI_SECRETS_JSON || '{}');
+          const derivedSecrets = fs.existsSync(derivedSecretsPath)
+            ? JSON.parse(fs.readFileSync(derivedSecretsPath, 'utf8'))
+            : {};
+          const secrets = { ...githubSecrets, ...derivedSecrets };
           const requiredPlatformSecrets = [
             'RAILWAY_API_TOKEN',
             'RAILWAY_PROJECT_ID',
@@ -1263,13 +1459,16 @@ jobs:
             exit 1
           fi
 
-          PROJECT_RESP=$(api "$(jq -n --arg pid "$RAILWAY_PROJECT_ID" \
-            '{query:"query project($id: String!) { project(id: $id) { services { edges { node { id name } } } } }", variables:{id:$pid}}')")
-          SERVICE_ID=$(echo "$PROJECT_RESP" | jq -r --arg name "$SERVICE_NAME" \
-            '.data.project.services.edges[]? | select(.node.name==$name) | .node.id // empty')
+          if [[ -n "${RAILWAY_SERVICE_ID:-}" ]]; then
+            SERVICE_ID="$RAILWAY_SERVICE_ID"
+          else
+            PROJECT_RESP=$(api "$(jq -n --arg pid "$RAILWAY_PROJECT_ID" \
+              '{query:"query project($id: String!) { project(id: $id) { services { edges { node { id name } } } } }", variables:{id:$pid}}')")
+            SERVICE_ID=$(echo "$PROJECT_RESP" | jq -r --arg name "$SERVICE_NAME" \
+              '.data.project.services.edges[]? | select(.node.name==$name) | .node.id // empty')
+          fi
           if [[ -z "$SERVICE_ID" ]]; then
-            echo "::error::Railway service '$SERVICE_NAME' not found in project."
-            echo "$PROJECT_RESP" | jq -r '.data.project.services.edges[]?.node.name'
+            echo "::error::Railway service id could not be resolved. Set RAILWAY_SERVICE_ID or use a service named '$SERVICE_NAME'."
             exit 1
           fi
 
@@ -1378,6 +1577,17 @@ jobs:
             --project-ref "$SUPABASE_PROJECT_ID" \
             --use-api \
             --jobs 4
+
+          for function_name in \
+            notifications-dispatch \
+            reminders-reconcile-dispatch \
+            activity-worker-dispatch \
+            activity-projector-dispatch
+          do
+            supabase functions delete "$function_name" \
+              --project-ref "$SUPABASE_PROJECT_ID" \
+              --yes || true
+          done
 
           PGSSLMODE=require psql "$DIRECT_URL" \
             -v ON_ERROR_STOP=1 \

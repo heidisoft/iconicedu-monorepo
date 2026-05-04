@@ -372,9 +372,8 @@ For unified activity, notification, and push dispatch in API, also set:
 - `INTERNAL_EVENTS_TOKEN_API=<long-random-secret>`
 - `EXPO_ACCESS_TOKEN=<expo-personal-access-token>` for authenticated Expo Push API calls
 
-Legacy activity replay/admin endpoints may still use `INTERNAL_ACTIVITY_FEED_TOKEN`,
-`INTERNAL_ACTIVITY_PROJECTOR_TOKEN`, or `INTERNAL_ACTIVITY_WORKER_TOKEN_API` while
-older queues are drained. New product flows should use the unified
+Legacy activity replay/admin endpoints may still use `INTERNAL_ACTIVITY_FEED_TOKEN`.
+New product flows should use the unified
 `event_outbox` + `event_pipeline_jobs` path and only require
 `INTERNAL_EVENTS_TOKEN_API` for dispatcher authentication.
 
