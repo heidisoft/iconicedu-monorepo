@@ -378,6 +378,9 @@ allow_dynamic_registration = false
 [functions.reminders-dispatch]
 verify_jwt = false
 
+[functions.events-dispatch]
+verify_jwt = false
+
 [functions.activity-worker-dispatch]
 verify_jwt = false
 

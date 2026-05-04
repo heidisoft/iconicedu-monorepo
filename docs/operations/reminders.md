@@ -115,6 +115,7 @@ only claims due `reminder_jobs` via `claim_due_reminder_jobs`.
 ## 3. Deploy the Edge Function
 
 ```bash
+supabase functions deploy events-dispatch
 supabase functions deploy reminders-reconcile-dispatch
 supabase functions deploy reminders-dispatch
 ```
@@ -131,9 +132,7 @@ Ensure your Railway service uses `apps/api` as the service root so this config i
 
 ## 4. Configure cron jobs
 
-Cron schedules are repo-managed by `public.configure_edge_function_cron()` from:
-
-- `supabase/migrations/20260417000000_edge_function_cron.sql`
+Cron schedules are repo-managed by `public.configure_edge_function_cron()` from the latest Supabase migrations, including the unified event pipeline migration.
 
 Apply migrations to the target environment, then configure the jobs with that environment's own Supabase URL:
 

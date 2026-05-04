@@ -714,7 +714,7 @@ jobs:
             --arg act_p "${{ secrets.INTERNAL_ACTIVITY_PROJECTOR_TOKEN || secrets.INTERNAL_ACTIVITY_FEED_TOKEN }}" \
             --arg act_w "${{ secrets.INTERNAL_ACTIVITY_WORKER_TOKEN }}" \
             --arg rem   "${{ secrets.INTERNAL_REMINDERS_TOKEN }}" \
-            --arg not   "${{ secrets.INTERNAL_NOTIFICATIONS_TOKEN_API || secrets.INTERNAL_NOTIFICATIONS_TOKEN }}" \
+            --arg evt   "${{ secrets.INTERNAL_EVENTS_TOKEN_API || secrets.INTERNAL_EVENTS_TOKEN || secrets.INTERNAL_ACTIVITY_WORKER_TOKEN }}" \
             --arg expo  "${{ secrets.EXPO_ACCESS_TOKEN }}" \
             --arg phk   "${{ secrets.POSTHOG_KEY }}" \
             --arg phh   "${{ secrets.NEXT_PUBLIC_POSTHOG_HOST }}" \
@@ -723,8 +723,8 @@ jobs:
               INTERNAL_ACTIVITY_FEED_TOKEN:$act,
               INTERNAL_ACTIVITY_PROJECTOR_TOKEN:$act_p,
               INTERNAL_ACTIVITY_WORKER_TOKEN:$act_w,
+              INTERNAL_EVENTS_TOKEN_API:$evt,
               INTERNAL_REMINDERS_TOKEN_API:$rem,
-              INTERNAL_NOTIFICATIONS_TOKEN_API:$not,
               EXPO_ACCESS_TOKEN:$expo,
               NODE_ENV:"production", NEXT_PUBLIC_APP_ENV:"preview",
               POSTHOG_KEY:$phk, POSTHOG_HOST:$phh}')
@@ -858,6 +858,10 @@ jobs:
           set_vercel_env "NEXT_PUBLIC_API_URL" "${{ steps.railway.outputs.railway_api_url }}"
           set_vercel_env "EXPO_PUBLIC_API_URL" "${{ steps.railway.outputs.railway_api_url }}"
           set_vercel_env "NEXT_PUBLIC_APP_ENV" "preview"
+          set_vercel_env "INTERNAL_EVENTS_TOKEN_API" "${{ secrets.INTERNAL_EVENTS_TOKEN_API || secrets.INTERNAL_EVENTS_TOKEN || secrets.INTERNAL_ACTIVITY_WORKER_TOKEN }}"
+          set_vercel_env "INTERNAL_REMINDERS_TOKEN_API" "${{ secrets.INTERNAL_REMINDERS_TOKEN }}"
+          set_vercel_env "INTERNAL_ACTIVITY_WORKER_TOKEN_API" "${{ secrets.INTERNAL_ACTIVITY_WORKER_TOKEN }}"
+          set_vercel_env "INTERNAL_ACTIVITY_PROJECTOR_TOKEN" "${{ secrets.INTERNAL_ACTIVITY_PROJECTOR_TOKEN || secrets.INTERNAL_ACTIVITY_FEED_TOKEN }}"
 
           LATEST_DEPLOYMENT_JSON=$(curl -sf \
             -H "Authorization: Bearer $VERCEL_TOKEN" \
@@ -893,7 +897,7 @@ jobs:
           BRANCH_PROJECT_REF: ${{ steps.supabase-branch.outputs.branch_ref }}
           INTERNAL_ACTIVITY_PROJECTOR_TOKEN: ${{ secrets.INTERNAL_ACTIVITY_PROJECTOR_TOKEN || secrets.INTERNAL_ACTIVITY_FEED_TOKEN }}
           INTERNAL_ACTIVITY_WORKER_TOKEN: ${{ secrets.INTERNAL_ACTIVITY_WORKER_TOKEN }}
-          INTERNAL_NOTIFICATIONS_TOKEN: ${{ secrets.INTERNAL_NOTIFICATIONS_TOKEN_API || secrets.INTERNAL_NOTIFICATIONS_TOKEN }}
+          INTERNAL_EVENTS_TOKEN: ${{ secrets.INTERNAL_EVENTS_TOKEN_API || secrets.INTERNAL_EVENTS_TOKEN || secrets.INTERNAL_ACTIVITY_WORKER_TOKEN }}
           INTERNAL_REMINDERS_TOKEN: ${{ secrets.INTERNAL_REMINDERS_TOKEN }}
           RAILWAY_API_URL: ${{ steps.railway.outputs.railway_api_url }}
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
@@ -905,6 +909,14 @@ jobs:
             echo "::error::Railway preview API URL is unavailable, cannot configure Supabase function secrets."
             exit 1
           fi
+          if [[ -z "${INTERNAL_EVENTS_TOKEN:-}" ]]; then
+            echo "::error::Missing INTERNAL_EVENTS_TOKEN_API/INTERNAL_EVENTS_TOKEN GitHub secret. events-dispatch cannot authenticate to apps/api."
+            exit 1
+          fi
+          if [[ -z "${INTERNAL_REMINDERS_TOKEN:-}" ]]; then
+            echo "::error::Missing INTERNAL_REMINDERS_TOKEN GitHub secret. reminders-dispatch cannot authenticate to apps/api."
+            exit 1
+          fi
 
           ENV_FILE="$(mktemp)"
           trap 'rm -f "$ENV_FILE"' EXIT
@@ -912,12 +924,12 @@ jobs:
           cat <<EOF > "$ENV_FILE"
           SUPABASE_URL=${BRANCH_API_URL}
           SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+          EVENTS_DISPATCH_URL=${RAILWAY_API_URL}/internal/events/dispatch
           REMINDERS_DISPATCH_URL=${RAILWAY_API_URL}/internal/reminders/dispatch
-          NOTIFICATIONS_DISPATCH_URL=${RAILWAY_API_URL}/internal/notifications/dispatch
           ACTIVITY_WORKER_DISPATCH_URL=${RAILWAY_API_URL}/internal/activity-worker/dispatch
           ACTIVITY_PROJECTOR_DISPATCH_URL=${RAILWAY_API_URL}/internal/activity-feed/project
+          INTERNAL_EVENTS_TOKEN=${INTERNAL_EVENTS_TOKEN}
           INTERNAL_REMINDERS_TOKEN=${INTERNAL_REMINDERS_TOKEN}
-          INTERNAL_NOTIFICATIONS_TOKEN=${INTERNAL_NOTIFICATIONS_TOKEN}
           INTERNAL_ACTIVITY_WORKER_TOKEN=${INTERNAL_ACTIVITY_WORKER_TOKEN}
           INTERNAL_ACTIVITY_PROJECTOR_TOKEN=${INTERNAL_ACTIVITY_PROJECTOR_TOKEN}
           EOF
