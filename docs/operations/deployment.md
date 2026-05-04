@@ -258,8 +258,14 @@ Preview CI now deploys the required Supabase Edge Functions and sets branch-loca
 
 Preview CI applies migrations, sets branch-local Edge Function secrets, deploys
 functions, runs `public.configure_edge_function_cron(...)`, and verifies the
-active cron set. Production must be configured with the same values manually or
-through your production deploy automation:
+active cron set. Production configuration runs automatically after a PR is merged
+to `main`, waits for the GitHub `production` Environment approval, then uses
+`ops/env/production.env.json` and GitHub Actions secrets to configure Railway,
+Vercel, Supabase Edge Function secrets, Edge Functions, migrations, and cron.
+Configure required reviewers on the GitHub `production` Environment; otherwise
+GitHub will not pause the job for approval.
+
+Manual fallback for operators:
 
 ```bash
 supabase secrets set \
@@ -273,25 +279,36 @@ supabase secrets set \
 supabase functions deploy --use-api --jobs 4
 ```
 
-Manual production values:
+Production GitHub Actions secrets:
 
-| Where                 | Variable / value                   | Notes                                                              |
-| --------------------- | ---------------------------------- | ------------------------------------------------------------------ |
-| `apps/api`            | `INTERNAL_EVENTS_TOKEN_API`        | Long random secret; must match Supabase `INTERNAL_EVENTS_TOKEN`    |
-| `apps/api`            | `INTERNAL_REMINDERS_TOKEN_API`     | Long random secret; must match Supabase `INTERNAL_REMINDERS_TOKEN` |
-| `apps/api`            | `EXPO_ACCESS_TOKEN`                | Required for authenticated Expo push sends                         |
-| Supabase Edge secrets | `EVENTS_DISPATCH_URL`              | `https://<api-domain>/internal/events/dispatch`                    |
-| Supabase Edge secrets | `INTERNAL_EVENTS_TOKEN`            | Same value as `apps/api` `INTERNAL_EVENTS_TOKEN_API`               |
-| Supabase Edge secrets | `REMINDERS_DISPATCH_URL`           | `https://<api-domain>/internal/reminders/dispatch`                 |
-| Supabase Edge secrets | `INTERNAL_REMINDERS_TOKEN`         | Same value as `apps/api` `INTERNAL_REMINDERS_TOKEN_API`            |
-| Supabase Edge secrets | `SUPABASE_URL`                     | Required by `channel-read-state-repair`                            |
-| Supabase Edge secrets | `SUPABASE_SERVICE_ROLE_KEY`        | Required by `channel-read-state-repair`                            |
-| Supabase Edge secrets | `EVENTS_DISPATCH_LIMIT`            | Optional, default API limit is okay; start with `100`              |
-| Supabase Edge secrets | `EVENTS_DISPATCH_LEASE_SECONDS`    | Optional; start with `120`                                         |
-| Supabase Edge secrets | `EVENTS_DISPATCH_LEASE_OWNER`      | Optional; use `supabase-edge-cron`                                 |
-| Supabase Edge secrets | `REMINDERS_DISPATCH_LIMIT`         | Optional; start with `100`                                         |
-| Supabase Edge secrets | `REMINDERS_DISPATCH_LEASE_SECONDS` | Optional; start with `120`                                         |
-| Supabase Edge secrets | `REMINDERS_DISPATCH_LEASE_OWNER`   | Optional; use `supabase-edge-cron`                                 |
+| Where                 | Variable / value                          | Notes                                                   |
+| --------------------- | ----------------------------------------- | ------------------------------------------------------- |
+| Platform access       | `RAILWAY_API_TOKEN`                       | Lets CI configure Railway production                    |
+| Platform access       | `RAILWAY_PROJECT_ID`                      | Railway project containing the production API service   |
+| Platform access       | `VERCEL_TOKEN`                            | Lets CI configure Vercel production env                 |
+| Platform access       | `VERCEL_PROJECT_ID`                       | Vercel project ID                                       |
+| Platform access       | `VERCEL_ORG_ID`                           | Vercel team/user ID                                     |
+| Platform access       | `SUPABASE_ACCESS_TOKEN`                   | Lets CI deploy functions and set secrets                |
+| Platform access       | `SUPABASE_PROJECT_ID`                     | Production Supabase project ref                         |
+| Production values     | `PROD_DATABASE_URL`                       | Railway API pooled Postgres URL                         |
+| Production values     | `PROD_DIRECT_URL`                         | Direct Postgres URL for migrations and cron setup       |
+| Production values     | `PROD_SUPABASE_URL`                       | Production Supabase URL                                 |
+| Production values     | `PROD_SUPABASE_ANON_KEY`                  | Public Supabase anon key                                |
+| Production values     | `PROD_SUPABASE_SERVICE_ROLE_KEY`          | Service role key for API and Edge maintenance functions |
+| Production values     | `PROD_JWT_SECRET`                         | Supabase JWT secret                                     |
+| Production values     | `PROD_API_URL`                            | Public production API URL                               |
+| Production values     | `PROD_INTERNAL_EVENTS_TOKEN_API`          | Long random secret for unified event dispatch           |
+| Production values     | `PROD_INTERNAL_REMINDERS_TOKEN_API`       | Long random secret for reminder dispatch                |
+| Production values     | `PROD_EXPO_ACCESS_TOKEN`                  | Required for authenticated Expo push sends              |
+| Optional telemetry    | `PROD_POSTHOG_KEY`                        | Optional PostHog key                                    |
+| Optional telemetry    | `PROD_POSTHOG_HOST`                       | Optional PostHog host                                   |
+| Optional legacy admin | `PROD_INTERNAL_ACTIVITY_WORKER_TOKEN_API` | Optional web admin compatibility token                  |
+| Optional legacy admin | `PROD_INTERNAL_ACTIVITY_PROJECTOR_TOKEN`  | Optional web admin compatibility token                  |
+
+When a PR introduces a new production env var, add it to
+`ops/env/production.env.json` and add the matching GitHub Actions secret before
+merge. The production job fails before mutating anything if a required manifest
+secret is missing.
 
 After functions are deployed and migrations are applied, configure pg_cron with the Supabase project URL:
 

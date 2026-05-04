@@ -1089,7 +1089,320 @@ jobs:
             }
 
   # ──────────────────────────────────────────────────────────────
-  # Job 6: Cleanup — runs only when a PR is closed (merged or not)
+  # Job 6: Production configuration — runs only after a PR is merged
+  # into main. Requires the GitHub "production" Environment approval
+  # before mutating Railway, Vercel, or Supabase production.
+  # ──────────────────────────────────────────────────────────────
+  production-config:
+    name: Configure Production Env · Edge Functions · Cron
+    if: >
+      github.event_name == 'pull_request' &&
+      github.event.action == 'closed' &&
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.base.ref == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Validate and render production env manifest
+        env:
+          PROD_SECRETS_JSON: ${{ toJson(secrets) }}
+        run: |
+          set -euo pipefail
+
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+
+          const manifestPath = 'ops/env/production.env.json';
+          const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+          const secrets = JSON.parse(process.env.PROD_SECRETS_JSON || '{}');
+          const outDir = '/tmp/iconicedu-production-env';
+          const requiredPlatformSecrets = [
+            'RAILWAY_API_TOKEN',
+            'RAILWAY_PROJECT_ID',
+            'VERCEL_TOKEN',
+            'VERCEL_PROJECT_ID',
+            'VERCEL_ORG_ID',
+            'SUPABASE_ACCESS_TOKEN',
+            'SUPABASE_PROJECT_ID',
+          ];
+          const missing = [];
+
+          for (const key of requiredPlatformSecrets) {
+            if (!String(secrets[key] ?? '').trim()) {
+              missing.push(key);
+            }
+          }
+
+          function resolveEntry(entry, groupName) {
+            if (!entry || typeof entry.name !== 'string' || !entry.name.trim()) {
+              throw new Error(`Invalid env manifest entry in ${groupName}: missing name`);
+            }
+
+            if (typeof entry.value === 'string') {
+              return { name: entry.name, value: entry.value };
+            }
+
+            if (!entry.source || typeof entry.source !== 'string') {
+              throw new Error(`Invalid env manifest entry ${groupName}.${entry.name}: missing source or value`);
+            }
+
+            const sourceValue = String(secrets[entry.source] ?? '').trim();
+            if (!sourceValue) {
+              if (entry.optional === true) return null;
+              missing.push(entry.source);
+              return null;
+            }
+
+            const baseValue = typeof entry.suffix === 'string'
+              ? sourceValue.replace(/\/+$/, '')
+              : sourceValue;
+
+            return {
+              name: entry.name,
+              value: `${baseValue}${typeof entry.suffix === 'string' ? entry.suffix : ''}`,
+            };
+          }
+
+          function resolveGroup(groupName) {
+            const group = manifest[groupName];
+            if (!Array.isArray(group)) {
+              throw new Error(`Production env manifest is missing array: ${groupName}`);
+            }
+            return group
+              .map((entry) => resolveEntry(entry, groupName))
+              .filter((entry) => entry !== null);
+          }
+
+          const railway = resolveGroup('railway');
+          const vercel = resolveGroup('vercel');
+          const supabaseEdge = resolveGroup('supabaseEdge');
+
+          if (missing.length > 0) {
+            const uniqueMissing = [...new Set(missing)].sort();
+            console.error(`::error::Missing required GitHub Actions secrets: ${uniqueMissing.join(', ')}`);
+            process.exit(1);
+          }
+
+          fs.mkdirSync(outDir, { recursive: true });
+          fs.writeFileSync(path.join(outDir, 'railway.json'), JSON.stringify(Object.fromEntries(railway.map((entry) => [entry.name, entry.value]))));
+          fs.writeFileSync(path.join(outDir, 'vercel.json'), JSON.stringify(vercel));
+          fs.writeFileSync(path.join(outDir, 'supabase.env'), `${supabaseEdge.map((entry) => `${entry.name}=${entry.value}`).join('\n')}\n`);
+          fs.writeFileSync(path.join(outDir, 'prod-direct-url.txt'), String(secrets.PROD_DIRECT_URL).trim());
+          fs.writeFileSync(path.join(outDir, 'prod-supabase-url.txt'), String(secrets.PROD_SUPABASE_URL).trim());
+
+          for (const entry of [...railway, ...vercel, ...supabaseEdge]) {
+            if (entry.value) console.log(`::add-mask::${entry.value}`);
+          }
+
+          console.log(`Rendered ${railway.length} Railway vars, ${vercel.length} Vercel vars, and ${supabaseEdge.length} Supabase Edge secrets.`);
+          NODE
+
+      - name: Configure Railway production env and trigger deploy
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
+          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+
+          SERVICE_NAME="${{ github.event.repository.name }}"
+          ENV_NAME="production"
+          GQL="https://backboard.railway.app/graphql/v2"
+
+          api() {
+            local body="$1"
+            local resp
+            resp=$(curl -sf \
+              -H "Authorization: Bearer $RAILWAY_TOKEN" \
+              -H "Content-Type: application/json" \
+              "$GQL" \
+              -d "$body") || { echo "::error::Railway API HTTP request failed"; exit 1; }
+            local errs
+            errs=$(echo "$resp" | jq -r 'if .errors then .errors | map(.message) | join(", ") else empty end')
+            if [[ -n "$errs" ]]; then
+              echo "::error::Railway GQL error: $errs"
+              exit 1
+            fi
+            echo "$resp"
+          }
+
+          ENV_RESP=$(api "$(jq -n --arg pid "$RAILWAY_PROJECT_ID" \
+            '{query:"query environments($projectId: String!) { environments(projectId: $projectId) { edges { node { id name } } } }", variables:{projectId:$pid}}')")
+          ENV_ID=$(echo "$ENV_RESP" | jq -r --arg name "$ENV_NAME" \
+            '.data.environments.edges[]? | select(.node.name==$name) | .node.id // empty')
+          if [[ -z "$ENV_ID" ]]; then
+            echo "::error::Railway production environment '$ENV_NAME' not found."
+            exit 1
+          fi
+
+          PROJECT_RESP=$(api "$(jq -n --arg pid "$RAILWAY_PROJECT_ID" \
+            '{query:"query project($id: String!) { project(id: $id) { services { edges { node { id name } } } } }", variables:{id:$pid}}')")
+          SERVICE_ID=$(echo "$PROJECT_RESP" | jq -r --arg name "$SERVICE_NAME" \
+            '.data.project.services.edges[]? | select(.node.name==$name) | .node.id // empty')
+          if [[ -z "$SERVICE_ID" ]]; then
+            echo "::error::Railway service '$SERVICE_NAME' not found in project."
+            echo "$PROJECT_RESP" | jq -r '.data.project.services.edges[]?.node.name'
+            exit 1
+          fi
+
+          VARS_JSON=$(cat /tmp/iconicedu-production-env/railway.json)
+
+          api "$(jq -n \
+            --arg pid "$RAILWAY_PROJECT_ID" \
+            --arg eid "$ENV_ID" \
+            --arg sid "$SERVICE_ID" \
+            --argjson vars "$VARS_JSON" \
+            '{query:"mutation variableCollectionUpsert($input: VariableCollectionUpsertInput!) { variableCollectionUpsert(input: $input) }",
+              variables:{input:{projectId:$pid, environmentId:$eid, serviceId:$sid, variables:$vars, skipDeploys:true}}}')" > /dev/null
+          echo "Railway production variables set."
+
+          api "$(jq -n \
+            --arg pid "$RAILWAY_PROJECT_ID" \
+            --arg sid "$SERVICE_ID" \
+            --arg eid "$ENV_ID" \
+            '{query:"mutation environmentTriggersDeploy($input: EnvironmentTriggersDeployInput!) { environmentTriggersDeploy(input: $input) }", variables:{input:{projectId:$pid, serviceId:$sid, environmentId:$eid}}}')" > /dev/null
+          echo "Railway production deploy triggered."
+
+      - name: Configure Vercel production env
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+        run: |
+          set -euo pipefail
+
+          PROJECT_ID="${VERCEL_PROJECT_ID:-}"
+          ORG_ID="${VERCEL_ORG_ID:-}"
+          TEAM_AMP=""
+          TEAM_Q=""
+
+          fail_vercel_config() { echo "::error::$1"; exit 1; }
+
+          [[ -z "$PROJECT_ID" ]] && fail_vercel_config "Missing VERCEL_PROJECT_ID."
+          [[ -z "$ORG_ID" ]] && fail_vercel_config "Missing VERCEL_ORG_ID."
+
+          case "$ORG_ID" in
+            team_*) TEAM_AMP="&teamId=${ORG_ID}"; TEAM_Q="?teamId=${ORG_ID}" ;;
+            user_*) ;;
+            *) fail_vercel_config "VERCEL_ORG_ID must start with team_ or user_." ;;
+          esac
+
+          PROJECT_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v9/projects/${PROJECT_ID}${TEAM_Q}")
+          if [[ "$PROJECT_STATUS" != "200" ]]; then
+            fail_vercel_config "Vercel project preflight failed (HTTP ${PROJECT_STATUS})."
+          fi
+
+          set_vercel_env() {
+            local KEY="$1" VALUE="$2"
+            EXISTING_IDS=$(curl -sf \
+              -H "Authorization: Bearer $VERCEL_TOKEN" \
+              "https://api.vercel.com/v10/projects/${PROJECT_ID}/env?target=production${TEAM_AMP}" \
+              | jq -r --arg k "$KEY" '.envs[] | select(.key==$k) | .id' 2>/dev/null || echo "")
+            if [[ -n "$EXISTING_IDS" ]]; then
+              while IFS= read -r EXISTING_ID; do
+                [[ -z "$EXISTING_ID" ]] && continue
+                curl -sf -X DELETE \
+                  -H "Authorization: Bearer $VERCEL_TOKEN" \
+                  "https://api.vercel.com/v10/projects/${PROJECT_ID}/env/${EXISTING_ID}${TEAM_Q}" > /dev/null
+              done <<< "$EXISTING_IDS"
+            fi
+            POST_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+              -H "Authorization: Bearer $VERCEL_TOKEN" \
+              -H "Content-Type: application/json" \
+              "https://api.vercel.com/v10/projects/${PROJECT_ID}/env${TEAM_Q}" \
+              -d "$(jq -n --arg k "$KEY" --arg v "$VALUE" \
+                '{"key":$k,"value":$v,"target":["production"],"type":"encrypted"}')")
+            if [[ ! "$POST_STATUS" =~ ^2[0-9][0-9]$ ]]; then
+              echo "::error::Vercel env write failed for $KEY (HTTP $POST_STATUS)"
+              exit 1
+            fi
+          }
+
+          jq -c '.[]' /tmp/iconicedu-production-env/vercel.json | while read -r ENTRY; do
+            KEY=$(echo "$ENTRY" | jq -r '.name')
+            VALUE=$(echo "$ENTRY" | jq -r '.value')
+            set_vercel_env "$KEY" "$VALUE"
+          done
+
+          echo "Vercel production variables set."
+
+      - name: Configure Supabase production Edge Functions and cron
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+
+          DIRECT_URL="$(cat /tmp/iconicedu-production-env/prod-direct-url.txt)"
+          SUPABASE_URL="$(cat /tmp/iconicedu-production-env/prod-supabase-url.txt)"
+
+          supabase link --project-ref "$SUPABASE_PROJECT_ID"
+
+          supabase secrets set \
+            --project-ref "$SUPABASE_PROJECT_ID" \
+            --env-file /tmp/iconicedu-production-env/supabase.env
+
+          supabase db push --linked
+
+          supabase functions deploy \
+            --project-ref "$SUPABASE_PROJECT_ID" \
+            --use-api \
+            --jobs 4
+
+          PGSSLMODE=require psql "$DIRECT_URL" \
+            -v ON_ERROR_STOP=1 \
+            -c "select public.configure_edge_function_cron('${SUPABASE_URL}');"
+
+          PGSSLMODE=require psql "$DIRECT_URL" \
+            -v ON_ERROR_STOP=1 \
+            -c "select jobname, schedule from cron.job where jobname like 'edge-function-%' order by jobname;"
+
+          PGSSLMODE=require psql "$DIRECT_URL" \
+            -v ON_ERROR_STOP=1 \
+            -c "do \$\$ begin
+              if not exists (select 1 from cron.job where jobname = 'edge-function-events-dispatch') then
+                raise exception 'missing edge-function-events-dispatch cron job';
+              end if;
+              if not exists (select 1 from cron.job where jobname = 'edge-function-reminders-dispatch') then
+                raise exception 'missing edge-function-reminders-dispatch cron job';
+              end if;
+              if not exists (select 1 from cron.job where jobname = 'edge-function-channel-read-state-repair') then
+                raise exception 'missing edge-function-channel-read-state-repair cron job';
+              end if;
+              if exists (
+                select 1
+                from cron.job
+                where jobname in (
+                  'edge-function-notifications-dispatch',
+                  'edge-function-reminders-reconcile-dispatch',
+                  'edge-function-activity-worker-dispatch',
+                  'edge-function-activity-projector-dispatch'
+                )
+              ) then
+                raise exception 'deprecated split dispatcher cron jobs are still scheduled';
+              end if;
+            end \$\$;"
+
+  # ──────────────────────────────────────────────────────────────
+  # Job 7: Cleanup — runs only when a PR is closed (merged or not)
   # Deletes the Supabase preview branch, Railway environment, and
   # Vercel branch-scoped env vars for this PR.
   # ──────────────────────────────────────────────────────────────
