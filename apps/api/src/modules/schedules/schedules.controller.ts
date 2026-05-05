@@ -9,6 +9,7 @@ import {
   parseCancelSessionDto,
   parseDeleteSchedulesDto,
   parseReplaceSchedulesDto,
+  parseRescheduleSessionDto,
 } from '@iconicedu/api/modules/schedules/dto';
 
 @Controller()
@@ -66,6 +67,16 @@ export class SchedulesController {
   cancelSession(@Req() req: AuthenticatedRequest, @Body() body: unknown) {
     const dto = parseCancelSessionDto(body);
     return this.schedulesService.cancelScheduleSession(
+      extractBearerToken(req.headers.authorization),
+      dto,
+    );
+  }
+
+  @Post('schedules/session/reschedule')
+  @UseGuards(AuthGuard)
+  rescheduleSession(@Req() req: AuthenticatedRequest, @Body() body: unknown) {
+    const dto = parseRescheduleSessionDto(body);
+    return this.schedulesService.rescheduleScheduleSession(
       extractBearerToken(req.headers.authorization),
       dto,
     );

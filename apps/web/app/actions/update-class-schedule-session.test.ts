@@ -8,7 +8,7 @@ const buildOrgBySlugMock = vi.fn();
 const getAccountByAuthUserIdInOrgMock = vi.fn();
 const getProfileByAccountIdMock = vi.fn();
 const getLearningSpaceDetailMock = vi.fn();
-const updateLearningSpaceFromPayloadMock = vi.fn();
+const apiPostMock = vi.fn();
 const revalidatePathMock = vi.fn();
 
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
@@ -45,9 +45,8 @@ vi.mock('@iconicedu/web/lib/admin/learning-space-detail', async () => {
   };
 });
 
-vi.mock('@iconicedu/web/lib/admin/learning-space-update', () => ({
-  updateLearningSpaceFromPayload: (...args: unknown[]) =>
-    updateLearningSpaceFromPayloadMock(...args),
+vi.mock('@iconicedu/web/lib/api/http-client', () => ({
+  createApiClient: vi.fn(() => ({ post: apiPostMock })),
 }));
 
 vi.mock('next/cache', () => ({
@@ -178,7 +177,7 @@ describe('updateClassScheduleSessionAction', () => {
     getAccountByAuthUserIdInOrgMock.mockReset();
     getProfileByAccountIdMock.mockReset();
     getLearningSpaceDetailMock.mockReset();
-    updateLearningSpaceFromPayloadMock.mockReset();
+    apiPostMock.mockReset();
     revalidatePathMock.mockReset();
 
     createSupabaseServerClientMock.mockResolvedValue(createServerSupabase());
@@ -190,10 +189,10 @@ describe('updateClassScheduleSessionAction', () => {
     getProfileByAccountIdMock.mockResolvedValue({
       data: { id: 'profile-1' },
     });
-    updateLearningSpaceFromPayloadMock.mockResolvedValue(undefined);
+    apiPostMock.mockResolvedValue({ success: true, mode: 'recurring' });
   });
 
-  it('upserts one recurring override and passes notification intent through the update pipeline', async () => {
+  it('delegates recurring reschedules to the API without rewriting exceptions', async () => {
     getLearningSpaceDetailMock.mockResolvedValue(
       createLearningSpaceDetail({
         rule: { frequency: 'weekly', timezone: 'America/New_York' },
@@ -220,36 +219,18 @@ describe('updateClassScheduleSessionAction', () => {
       endTime: '12:45',
       timezone: 'America/Chicago',
       reason: ' Family requested a change ',
-      sendActivityNotifications: false,
     });
 
-    const recurringCall = updateLearningSpaceFromPayloadMock.mock.calls[0];
-    expect(recurringCall?.[0]).toBe('space-1');
-    expect(recurringCall?.[2]).toEqual({
+    expect(apiPostMock).toHaveBeenCalledWith('/schedules/session/reschedule', {
       orgId: 'org-1',
-      actorProfileId: 'profile-1',
+      scheduleId: 'schedule-1',
+      occurrenceKey: '2026-03-21T14:00:00.000Z',
+      startAt: toOccurrenceKeyInTimezone('2026-03-22', '11:30', 'America/New_York'),
+      endAt: toOccurrenceKeyInTimezone('2026-03-22', '12:45', 'America/New_York'),
+      timezone: 'America/New_York',
+      reason: 'Family requested a change',
+      suppressNotifications: false,
     });
-    expect(recurringCall?.[3]).toBeUndefined();
-    const recurringPayload = recurringCall?.[1];
-    expect(recurringPayload?.schedules).toHaveLength(1);
-    expect(recurringPayload?.schedules[0]).toEqual(
-      expect.objectContaining({
-        startTime: '10:00',
-        endTime: '11:00',
-        timezone: 'America/New_York',
-        exceptions: [{ date: '2026-03-14', reason: 'Holiday' }],
-        overrides: [
-          {
-            originalDate: '2026-03-21',
-            newDate: '2026-03-22',
-            newTime: '11:30',
-            newEndTime: '12:45',
-            reason: 'Family requested a change',
-          },
-        ],
-      }),
-    );
-    expect(recurringPayload?.schedules[0]?.startDate).toContain('2026-03-01');
     expect(revalidatePathMock).toHaveBeenCalledWith('/iconic-academy/class-schedule');
     expect(revalidatePathMock).toHaveBeenCalledWith('/iconic-academy/s/channel-1');
     expect(result).toEqual({
@@ -264,7 +245,7 @@ describe('updateClassScheduleSessionAction', () => {
     });
   });
 
-  it('rewrites single-session schedule fields directly and defaults notifications on', async () => {
+  it('delegates single-session schedule edits to the API', async () => {
     getLearningSpaceDetailMock.mockResolvedValue(
       createLearningSpaceDetail({
         startDate: new Date('2026-03-21T00:00:00.000Z'),
@@ -285,26 +266,16 @@ describe('updateClassScheduleSessionAction', () => {
       reason: null,
     });
 
-    const singleCall = updateLearningSpaceFromPayloadMock.mock.calls[0];
-    expect(singleCall?.[0]).toBe('space-1');
-    expect(singleCall?.[2]).toEqual({
+    expect(apiPostMock).toHaveBeenCalledWith('/schedules/session/reschedule', {
       orgId: 'org-1',
-      actorProfileId: 'profile-1',
+      scheduleId: 'schedule-1',
+      occurrenceKey: '2026-03-21T10:00:00.000Z',
+      startAt: toOccurrenceKeyInTimezone('2026-03-23', '09:15', 'America/Chicago'),
+      endAt: toOccurrenceKeyInTimezone('2026-03-23', '10:00', 'America/Chicago'),
+      timezone: 'America/Chicago',
+      reason: null,
+      suppressNotifications: false,
     });
-    expect(singleCall?.[3]).toBeUndefined();
-    const singlePayload = singleCall?.[1];
-    expect(singlePayload?.schedules).toHaveLength(1);
-    expect(singlePayload?.schedules[0]).toEqual(
-      expect.objectContaining({
-        startTime: '09:15',
-        endTime: '10:00',
-        timezone: 'America/Chicago',
-        rule: null,
-        exceptions: [],
-        overrides: [],
-      }),
-    );
-    expect(singlePayload?.schedules[0]?.startDate).toContain('2026-03-23');
     expect(result).toEqual({
       scheduleId: 'schedule-1',
       occurrenceKey: '2026-03-21T10:00:00.000Z',
@@ -333,5 +304,33 @@ describe('updateClassScheduleSessionAction', () => {
         timezone: 'America/New_York',
       }),
     ).rejects.toThrow('Only staff or owner users can edit sessions.');
+  });
+
+  it('passes silent reschedule intent to the API', async () => {
+    getLearningSpaceDetailMock.mockResolvedValue(
+      createLearningSpaceDetail({
+        rule: { frequency: 'weekly', timezone: 'America/New_York' },
+      }),
+    );
+
+    await updateClassScheduleSessionAction({
+      orgSlug: 'iconic-academy',
+      scheduleId: 'schedule-1',
+      occurrenceKey: '2026-03-21T14:00:00.000Z',
+      date: '2026-03-22',
+      startTime: '11:30',
+      endTime: '12:45',
+      timezone: 'America/Chicago',
+      suppressNotifications: true,
+    });
+
+    expect(apiPostMock).toHaveBeenCalledWith(
+      '/schedules/session/reschedule',
+      expect.objectContaining({
+        orgId: 'org-1',
+        scheduleId: 'schedule-1',
+        suppressNotifications: true,
+      }),
+    );
   });
 });

@@ -11,6 +11,7 @@ export type CancelClassScheduleSessionActionInput = {
   scheduleId: string;
   occurrenceKey: string;
   reason?: string | null;
+  suppressNotifications?: boolean;
 };
 
 export type CancelClassScheduleSessionActionResult = {
@@ -59,6 +60,7 @@ export async function cancelClassScheduleSessionAction(
       scheduleId: input.scheduleId,
       occurrenceKey: input.occurrenceKey ?? null,
       reason,
+      suppressNotifications: input.suppressNotifications === true,
     },
   );
 

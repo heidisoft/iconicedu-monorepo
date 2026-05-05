@@ -84,6 +84,30 @@ describe('buildNotificationDecision', () => {
     resolveEffectivePreferenceMock.mockClear();
   });
 
+  it('suppresses external delivery when the source event requests silent notifications', async () => {
+    const { client } = createSupabaseMock({
+      channelLastReadAt: null,
+      threadLastReadAt: null,
+    });
+
+    const result = await buildNotificationDecision({
+      supabase: client as never,
+      event: {
+        id: 'event-1',
+        org_id: 'org-1',
+        event_type: 'class.session.rescheduled',
+        occurred_at: '2026-04-21T11:59:30.000Z',
+        payload: { suppressNotifications: true },
+        scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+      } as never,
+      recipientProfileId: 'profile-1',
+    });
+
+    expect(result.deliveryChannels).toEqual([]);
+    expect(result.reasonCodes).toEqual(['source_suppressed']);
+    expect(resolveEffectivePreferenceMock).not.toHaveBeenCalled();
+  });
+
   it('queries thread-level read state for thread reply events', async () => {
     const { client, channelReadFilters } = createSupabaseMock({
       channelLastReadAt: '2026-04-21T11:59:00.000Z',
