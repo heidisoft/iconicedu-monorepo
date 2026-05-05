@@ -60,16 +60,6 @@ export function NotificationsPageClient({
       },
       scheduleRefresh,
     );
-    channel.on(
-      'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'activity_feed_group_members',
-        filter: `org_id=eq.${orgId}`,
-      },
-      scheduleRefresh,
-    );
     channel.subscribe();
 
     const onFocus = () => {

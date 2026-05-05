@@ -1,14 +1,11 @@
 import type { AvatarVM, UserProfileVM } from '@iconicedu/shared-types/vm/profile';
 import type {
-  ConnectionVM,
   EntityRefVM,
   IdsBaseVM,
   ISODateTime,
   ThemeKey,
   UUID,
 } from '@iconicedu/shared-types/shared/shared';
-
-export type ActivityGroupKeyVM = 'message' | 'class' | 'payment' | 'reminder';
 
 export type ActivityVerbVM =
   | 'class.session.rescheduled'
@@ -108,11 +105,6 @@ export interface ActivityItemRefsVM {
   target?: EntityRefVM;
 }
 
-export interface ActivityItemGroupingVM {
-  groupKey?: string;
-  groupType?: ActivityGroupKeyVM;
-}
-
 export interface ActivityItemContentVM {
   leading?: InboxLeadingVM;
   headline: InboxHeadlineVM;
@@ -145,8 +137,6 @@ export interface ActivityFeedItemBaseVM {
 
   refs: ActivityItemRefsVM;
 
-  grouping?: ActivityItemGroupingVM;
-
   content: ActivityItemContentVM;
 
   state?: ActivityItemStateVM;
@@ -156,30 +146,9 @@ export interface ActivityFeedItemBaseVM {
 
 export type ActivityFeedLeafItemVM = ActivityFeedItemBaseVM & {
   kind: 'leaf';
-
-  grouping?: {
-    groupKey?: never;
-    groupType?: never;
-  };
-
-  subActivities?: never;
 };
 
-export type ActivityFeedGroupItemVM = ActivityFeedItemBaseVM & {
-  kind: 'group';
-
-  grouping: {
-    groupType: ActivityGroupKeyVM;
-    groupKey: string;
-  };
-
-  isCollapsed?: boolean;
-  subActivityCount?: number;
-
-  subActivities?: ConnectionVM<ActivityFeedLeafItemVM>;
-};
-
-export type ActivityFeedItemVM = ActivityFeedLeafItemVM | ActivityFeedGroupItemVM;
+export type ActivityFeedItemVM = ActivityFeedLeafItemVM;
 
 export type ActivityFeedSectionVM = {
   label: string;

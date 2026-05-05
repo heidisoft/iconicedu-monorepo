@@ -34,37 +34,12 @@ describe('POST /api/activity-feed/read', () => {
         })),
       })),
     }));
-    const itemsSelectIn = vi.fn(() => ({
-      is: vi.fn(async () => ({
-        data: [
-          { id: '11111111-1111-4111-8111-111111111111', kind: 'leaf' },
-          { id: '22222222-2222-4222-8222-222222222222', kind: 'leaf' },
-        ],
-        error: null,
-      })),
-    }));
-    const itemsSelect = vi.fn(() => ({
-      eq: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          in: itemsSelectIn,
-        })),
-      })),
-    }));
     createSupabaseServerClient.mockResolvedValue({
       from: vi.fn((table: string) => {
-        if (table === 'activity_feed_items') {
-          return {
-            select: itemsSelect,
-            update,
-          };
+        if (table !== 'activity_feed_items') {
+          throw new Error(`Unexpected table ${table}`);
         }
-        return {
-          select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              in: vi.fn(async () => ({ data: [], error: null })),
-            })),
-          })),
-        };
+        return { update };
       }),
     });
 
@@ -93,71 +68,6 @@ describe('POST /api/activity-feed/read', () => {
     ]);
   });
 
-  it('expands group ids to include member item ids before marking read', async () => {
-    const inUpdate = vi.fn(() => ({
-      is: vi.fn(async () => ({ error: null })),
-    }));
-    const update = vi.fn(() => ({
-      eq: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          in: inUpdate,
-        })),
-      })),
-    }));
-    const itemsSelect = vi.fn(() => ({
-      eq: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          in: vi.fn(() => ({
-            is: vi.fn(async () => ({
-              data: [{ id: '33333333-3333-4333-8333-333333333333', kind: 'group' }],
-              error: null,
-            })),
-          })),
-        })),
-      })),
-    }));
-    const groupMembersSelect = vi.fn(() => ({
-      eq: vi.fn(() => ({
-        in: vi.fn(async () => ({
-          data: [
-            { item_id: '44444444-4444-4444-8444-444444444444' },
-            { item_id: '55555555-5555-4555-8555-555555555555' },
-          ],
-          error: null,
-        })),
-      })),
-    }));
-
-    createSupabaseServerClient.mockResolvedValue({
-      from: vi.fn((table: string) => {
-        if (table === 'activity_feed_items') {
-          return {
-            select: itemsSelect,
-            update,
-          };
-        }
-        if (table === 'activity_feed_group_members') {
-          return { select: groupMembersSelect };
-        }
-        throw new Error(`Unexpected table ${table}`);
-      }),
-    });
-
-    const response = await POST(
-      new Request('http://localhost/api/activity-feed/read', {
-        method: 'POST',
-        body: JSON.stringify({ ids: ['33333333-3333-4333-8333-333333333333'] }),
-      }),
-    );
-
-    expect(response.status).toBe(200);
-    expect(inUpdate).toHaveBeenCalledWith('id', [
-      '33333333-3333-4333-8333-333333333333',
-      '44444444-4444-4444-8444-444444444444',
-      '55555555-5555-4555-8555-555555555555',
-    ]);
-  });
-
   it('ignores invalid/non-uuid ids and still updates valid ids', async () => {
     const inUpdate = vi.fn(() => ({
       is: vi.fn(async () => ({ error: null })),
@@ -169,36 +79,8 @@ describe('POST /api/activity-feed/read', () => {
         })),
       })),
     }));
-    const itemsSelectIn = vi.fn(() => ({
-      is: vi.fn(async () => ({
-        data: [{ id: '11111111-1111-4111-8111-111111111111', kind: 'leaf' }],
-        error: null,
-      })),
-    }));
-    const itemsSelect = vi.fn(() => ({
-      eq: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          in: itemsSelectIn,
-        })),
-      })),
-    }));
-
     createSupabaseServerClient.mockResolvedValue({
-      from: vi.fn((table: string) => {
-        if (table === 'activity_feed_items') {
-          return {
-            select: itemsSelect,
-            update,
-          };
-        }
-        return {
-          select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              in: vi.fn(async () => ({ data: [], error: null })),
-            })),
-          })),
-        };
-      }),
+      from: vi.fn(() => ({ update })),
     });
 
     const response = await POST(
@@ -215,9 +97,6 @@ describe('POST /api/activity-feed/read', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(itemsSelectIn).toHaveBeenCalledWith('id', [
-      '11111111-1111-4111-8111-111111111111',
-    ]);
     expect(inUpdate).toHaveBeenCalledWith('id', ['11111111-1111-4111-8111-111111111111']);
   });
 });

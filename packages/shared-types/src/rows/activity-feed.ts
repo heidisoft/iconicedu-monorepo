@@ -13,10 +13,6 @@ export interface ActivityFeedItemRow {
   verb: string;
   actor_profile_id?: UUID | null;
   refs?: Record<string, unknown> | null;
-  group_key?: string | null;
-  group_type?: string | null;
-  is_collapsed?: boolean | null;
-  sub_activity_count?: number | null;
   content: Record<string, unknown>;
   summary?: string | null;
   preview?: Record<string, unknown> | null;
@@ -38,19 +34,6 @@ export interface ActivityFeedSectionRow {
   id: UUID;
   org_id: UUID;
   label: string;
-  created_at: ISODateTime;
-  created_by?: UUID | null;
-  updated_at: ISODateTime;
-  updated_by?: UUID | null;
-  deleted_at?: ISODateTime | null;
-  deleted_by?: UUID | null;
-}
-
-export interface ActivityFeedGroupMemberRow {
-  id: UUID;
-  org_id: UUID;
-  group_id: UUID;
-  item_id: UUID;
   created_at: ISODateTime;
   created_by?: UUID | null;
   updated_at: ISODateTime;

@@ -68,7 +68,7 @@ describe('NotificationsPageClient', () => {
     );
 
     expect(supabaseChannel).toHaveBeenCalledWith('inbox:org-1:profile-1');
-    expect(channelOn).toHaveBeenCalledTimes(2);
+    expect(channelOn).toHaveBeenCalledTimes(1);
     expect(channelSubscribe).toHaveBeenCalled();
 
     unmount();

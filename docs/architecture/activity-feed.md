@@ -47,14 +47,8 @@ flowchart TD
   Processing --> Definition[Resolve activity definition]
   Definition --> Recipients[Resolve recipients and active-conversation suppression]
   Recipients --> Render[Render per-recipient content]
-  Render --> Leaf[(activity_feed_items leaf rows)]
-  Render --> Group{Definition has group?}
-  Group -->|yes| GroupParent[(activity_feed_items group rows)]
-  GroupParent --> GroupMember[(activity_feed_group_members)]
-  GroupMember --> Count[Update sub_activity_count]
-  Group -->|no| Notifications
-  Count --> Notifications[(event_pipeline_jobs notification.prepare)]
-  Leaf --> Notifications
+  Render --> Items[(activity_feed_items rows)]
+  Items --> Notifications[(event_pipeline_jobs notification.prepare)]
   Notifications --> Jobs[(event_pipeline_jobs notification.deliver)]
   Jobs --> Projected[Set activity_events.projection_status=projected]
 ```
@@ -114,17 +108,12 @@ directly.
 4. Resolve recipients through the definition's `resolveRecipients`, then apply active-conversation suppression.
 5. Load recipient profiles to attach `viewerTimezone`, `viewerRole`, and `viewerIsActor` into the per-recipient render payload.
 6. Render the feed content from the activity definition.
-7. Upsert one leaf `activity_feed_items` row per recipient:
+7. Upsert one `activity_feed_items` row per recipient:
    - Uses `recipient_profile_id,dedupe_key` when a dedupe key exists.
    - Otherwise uses `recipient_profile_id,source_event_id`.
    - Marks actor-recipient rows read immediately.
-8. If the definition has grouping:
-   - Build a group key.
-   - Create or touch the group parent in `activity_feed_items`.
-   - Upsert `activity_feed_group_members`.
-   - Recount members and update `sub_activity_count`.
-9. Enqueue `notification.prepare` in `event_pipeline_jobs` with the event and final recipient list.
-10. Mark the event `projected`; on any event-level error mark it `failed` and store `last_projection_error`.
+8. Enqueue `notification.prepare` in `event_pipeline_jobs` with the event and final recipient list.
+9. Mark the event `projected`; on any event-level error mark it `failed` and store `last_projection_error`.
 
 ## Notification Queue Handoff
 
@@ -141,7 +130,7 @@ Eligible channels are idempotently upserted into `event_pipeline_jobs` as
 
 ## Allowed `activity_feed_items` Writes
 
-- Projector-managed writes in `project-activity-events.ts` for leaf/group projection and counters.
+- Projector-managed writes in `project-activity-events.ts` for per-recipient projection.
 - Recipient read-state updates (`is_read` / `read_at`) in `api/activity-feed/read/route.ts`.
 
 ## Why

@@ -21,7 +21,6 @@ import {
   ActivityFeedbackRequest,
   canRenderActivityFeedbackRequest,
 } from '@iconicedu/ui-web/components/notification/activity-feedback-request';
-import { ActivityWithSubitems } from '@iconicedu/ui-web/components/notification/activity-with-subitems';
 import type {
   ActivityFeedItemVM,
   ActivityFeedLeafItemVM,
@@ -94,35 +93,6 @@ export function applyReadStateToSections(
   return sections.map((section) => ({
     ...section,
     items: section.items.map((item) => {
-      if (item.kind === 'group' && item.subActivities?.items) {
-        const markEntireGroup = readIds.has(item.ids.id);
-        const nextSubItems = item.subActivities.items.map(
-          (sub: ActivityFeedLeafItemVM) =>
-            markEntireGroup || shouldMarkItemRead(sub, readIds)
-              ? {
-                  ...sub,
-                  state: {
-                    ...sub.state,
-                    isRead: true,
-                  },
-                }
-              : sub,
-        );
-        const allSubItemsRead = nextSubItems.every(
-          (sub: ActivityFeedLeafItemVM) => sub.state?.isRead,
-        );
-        return {
-          ...item,
-          state: {
-            ...item.state,
-            isRead: markEntireGroup || allSubItemsRead || item.state?.isRead,
-          },
-          subActivities: {
-            ...item.subActivities,
-            items: nextSubItems,
-          },
-        };
-      }
       if (shouldMarkItemRead(item, readIds)) {
         return {
           ...item,
@@ -147,39 +117,15 @@ export function resolveReadIdsForActivity(
     );
 
   for (const section of sections) {
-    for (const item of section.items) {
-      if (item.ids.id === id) {
-        if (item.kind === 'group') {
-          const subIds =
-            item.subActivities?.items.flatMap((sub: ActivityFeedLeafItemVM) =>
-              getItemReadIds(sub),
-            ) ?? [];
-          return dedupeIds([id, ...subIds]);
-        }
-        return dedupeIds(getItemReadIds(item));
-      }
-      if (item.kind === 'group') {
-        const matchedSub = item.subActivities?.items.find(
-          (sub: ActivityFeedLeafItemVM) => sub.ids.id === id,
-        );
-        if (matchedSub) {
-          return dedupeIds(getItemReadIds(matchedSub));
-        }
-      }
+    const matchedItem = section.items.find((item) => item.ids.id === id);
+    if (matchedItem) {
+      return dedupeIds(getItemReadIds(matchedItem));
     }
   }
   return dedupeIds([id]);
 }
 
 function getUnreadCountForItem(item: ActivityFeedItemVM): number {
-  if (item.kind === 'group') {
-    return (
-      item.subActivities?.items.filter(
-        (sub: ActivityFeedLeafItemVM) => !sub.state?.isRead,
-      ).length ?? (!item.state?.isRead ? 1 : 0)
-    );
-  }
-
   return item.state?.isRead ? 0 : 1;
 }
 
@@ -221,15 +167,6 @@ export function resolveUnreadIdsForTab(
   sections.forEach((section) => {
     section.items.forEach((item) => {
       if (activeTab !== 'all' && item.tabKey !== activeTab) {
-        return;
-      }
-
-      if (item.kind === 'group') {
-        item.subActivities?.items.forEach((sub: ActivityFeedLeafItemVM) => {
-          if (!sub.state?.isRead) {
-            getItemReadIds(sub).forEach((id) => unreadIds.add(id));
-          }
-        });
         return;
       }
 
@@ -673,17 +610,6 @@ export function InboxContainer({
       applySessionParentLocalHeadline(activity, displayTimezone),
       displayTimezone,
     );
-
-    if (displayActivity.kind === 'group') {
-      return (
-        <ActivityWithSubitems
-          activity={displayActivity}
-          onMarkRead={markAsRead}
-          onAutoRead={autoMarkAsRead}
-          showActionButton={Boolean(displayActivity.content.actionButton)}
-        />
-      );
-    }
 
     if (displayActivity.verb === 'session.feedback_request.sent') {
       if (!canRenderActivityFeedbackRequest(displayActivity as ActivityFeedLeafItemVM)) {

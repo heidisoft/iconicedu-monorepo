@@ -1253,7 +1253,7 @@ flowchart TD
 
         SUPPRESS["Check Suppression Rules\nActivityEventSuppressionRuleRow\n(is this event suppressed for org/actor?)"]
 
-        BUILD["Build ActivityFeedItemVM\n- Determine tab_key\n- Set importance\n- Build content, preview, action_button\n- Determine group_key, group_type\n- Dedupe by dedupe_key"]
+        BUILD["Build ActivityFeedItemVM\n- Determine tab_key\n- Set importance\n- Build content, preview, action_button\n- Dedupe by dedupe_key"]
 
         INSERT_FEED["INSERT ActivityFeedItemRow\nper recipient profile"]
 
@@ -1324,10 +1324,6 @@ erDiagram
         string verb "ActivityVerbVM"
         uuid actor_profile_id FK
         json refs "entity references"
-        string group_key
-        string group_type "homework|message|class|reminder|etc."
-        boolean is_collapsed
-        int sub_activity_count
         json content "leading, headline, summary, preview"
         json action_button
         string importance "normal|important|urgent"
@@ -1452,9 +1448,9 @@ flowchart TD
 
 ---
 
-### 4.5 Feed Projection & Grouping
+### 4.5 Feed Projection
 
-How raw ActivityEventRows become a structured inbox with tabs, sections, and groups.
+How raw ActivityEventRows become a structured inbox with tabs and sections.
 
 ```mermaid
 flowchart TD
@@ -1467,19 +1463,9 @@ flowchart TD
     DETERMINE_TAB -->|verb=system.*| SYSTEM_TAB["tab_key = system"]
     DETERMINE_TAB -->|all other verbs| ALL_TAB["tab_key = all"]
 
-    CLASSES_TAB & PAYMENT_TAB & SYSTEM_TAB & ALL_TAB --> DETERMINE_GROUP{Has\ngroup_key?}
+    CLASSES_TAB & PAYMENT_TAB & SYSTEM_TAB & ALL_TAB --> ITEM["kind = leaf\nStandalone feed item"]
 
-    DETERMINE_GROUP -->|No| LEAF["kind = leaf\nStandalone feed item"]
-
-    DETERMINE_GROUP -->|Yes| FIND_GROUP{Existing group\nfor group_key?}
-
-    FIND_GROUP -->|No| CREATE_GROUP["Create group item\nkind = group\nis_collapsed = true\nsub_activity_count = 1"]
-
-    FIND_GROUP -->|Yes| ADD_TO_GROUP["Add as sub-activity\nIncrement sub_activity_count\nUpdate group preview"]
-
-    LEAF --> CHECK_DEDUPE{dedupe_key\nalready exists?}
-    CREATE_GROUP --> CHECK_DEDUPE
-    ADD_TO_GROUP --> CHECK_DEDUPE
+    ITEM --> CHECK_DEDUPE{dedupe_key\nalready exists?}
 
     CHECK_DEDUPE -->|Yes| SKIP_ITEM["Skip — idempotent\n(dedupe protection)"]
     CHECK_DEDUPE -->|No| INSERT["INSERT ActivityFeedItemRow\nprojection_status=succeeded"]
@@ -1506,12 +1492,10 @@ block-beta
         space
     end
     block:items:4
-        block:group1:2
-            G["📦 Group: 3 new homeworks\n[Collapsed — click to expand]\ngroup_type=homework"]
-        end
-        block:leaf1:2
-            L["📄 Leaf: Class scheduled tomorrow\nverb=class.session.scheduled\nkind=leaf"]
-        end
+        L1["📄 Item: Homework posted\nverb=message.posted\nkind=leaf"]
+        L2["📄 Item: Class scheduled tomorrow\nverb=class.session.scheduled\nkind=leaf"]
+        L3["📄 Item: Feedback requested\nverb=session.feedback_request.sent\nkind=leaf"]
+        space
     end
 ```
 

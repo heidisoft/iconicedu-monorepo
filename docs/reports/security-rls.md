@@ -395,13 +395,6 @@ All 15 payload tables (`message_text`, `message_image`, `message_file`, `message
 | UPDATE      | Own recipient rows AND org member (mark-as-read, migration 027)                          |
 | ALL (write) | Org admin                                                                                |
 
-#### `activity_feed_group_members`
-
-| Operation   | Who                                                                                         |
-| ----------- | ------------------------------------------------------------------------------------------- |
-| SELECT      | **Own recipient's group OR org admin** _(tightened from "all org members" — migration 031)_ |
-| ALL (write) | Org admin                                                                                   |
-
 #### `message_session_feedback` _(migration 030)_
 
 | Operation | Who                            |
@@ -443,7 +436,6 @@ All 15 payload tables (`message_text`, `message_image`, `message_file`, `message
 | -------------------------------------------- | ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
 | `message_saves`                              | RLS not enabled; no policies — any authenticated user could read/write all saves      | Enable RLS; add self-access (profile owner + channel member) + admin read    |
 | `activity_feed_items`                        | SELECT "read by org" let every org member see every feed item regardless of recipient | Replace with "read own or admin" — recipient profile owner or org admin only |
-| `activity_feed_group_members`                | Same over-broad "read by org" SELECT                                                  | Replace with "read own or admin" via parent feed item recipient check        |
 | `channel_live_sessions`                      | SELECT-only policy; no write policy                                                   | Add admin ALL policy (service_role backend still bypasses RLS)               |
 | `channel_live_session_participants`          | SELECT-only                                                                           | Add admin ALL policy                                                         |
 | `channel_live_session_participant_events`    | SELECT-only                                                                           | Add admin ALL policy                                                         |

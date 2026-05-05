@@ -3039,35 +3039,6 @@ describe('deleteMessageAction', () => {
     feedItemsDeleteChain.is = vi.fn(async () => ({ error: null }));
     const updateFeedItems = vi.fn(() => feedItemsDeleteChain);
 
-    const feedItemsGroupUpdateChain: any = {};
-    feedItemsGroupUpdateChain.eq = vi.fn(() => feedItemsGroupUpdateChain);
-    feedItemsGroupUpdateChain.is = vi.fn(async () => ({ error: null }));
-    const updateFeedItemsForGroup = vi.fn(() => feedItemsGroupUpdateChain);
-
-    const groupMembersSelectChain: any = {};
-    groupMembersSelectChain.eq = vi.fn(() => groupMembersSelectChain);
-    groupMembersSelectChain.in = vi.fn(() => groupMembersSelectChain);
-    groupMembersSelectChain.is = vi.fn(() => groupMembersSelectChain);
-    groupMembersSelectChain.returns = vi.fn(async () => ({
-      data: [{ group_id: 'group-1', item_id: 'leaf-1' }],
-      error: null,
-    }));
-
-    const groupMembersDeleteChain: any = {};
-    groupMembersDeleteChain.eq = vi.fn(() => groupMembersDeleteChain);
-    groupMembersDeleteChain.in = vi.fn(() => groupMembersDeleteChain);
-    groupMembersDeleteChain.is = vi.fn(async () => ({ error: null }));
-    const updateGroupMembers = vi.fn(() => groupMembersDeleteChain);
-
-    const remainingGroupMembersChain: any = {};
-    remainingGroupMembersChain.eq = vi.fn(() => remainingGroupMembersChain);
-    remainingGroupMembersChain.is = vi.fn(() => remainingGroupMembersChain);
-    remainingGroupMembersChain.returns = vi.fn(async () => ({ data: [], error: null }));
-
-    let activityFeedItemsSelectCalls = 0;
-    let activityFeedItemsUpdateCalls = 0;
-    let groupMembersSelectCalls = 0;
-
     serviceSupabase.from.mockImplementation((table: string) => {
       if (table === 'messages') {
         return { update: updateMessage };
@@ -3077,31 +3048,8 @@ describe('deleteMessageAction', () => {
       }
       if (table === 'activity_feed_items') {
         return {
-          select: () => {
-            activityFeedItemsSelectCalls += 1;
-            if (activityFeedItemsSelectCalls === 1) {
-              return feedItemsSelectChain;
-            }
-            return remainingGroupMembersChain;
-          },
-          update: (payload: Record<string, unknown>) => {
-            activityFeedItemsUpdateCalls += 1;
-            if (activityFeedItemsUpdateCalls === 1) {
-              return updateFeedItems(payload);
-            }
-            return updateFeedItemsForGroup(payload);
-          },
-        };
-      }
-      if (table === 'activity_feed_group_members') {
-        return {
-          select: () => {
-            groupMembersSelectCalls += 1;
-            return groupMembersSelectCalls === 1
-              ? groupMembersSelectChain
-              : remainingGroupMembersChain;
-          },
-          update: updateGroupMembers,
+          select: () => feedItemsSelectChain,
+          update: updateFeedItems,
         };
       }
       return {};
@@ -3111,13 +3059,6 @@ describe('deleteMessageAction', () => {
 
     expect(updateActivityEvents).toHaveBeenCalled();
     expect(updateFeedItems).toHaveBeenCalled();
-    expect(updateGroupMembers).toHaveBeenCalled();
-    expect(updateFeedItemsForGroup).toHaveBeenCalledWith(
-      expect.objectContaining({
-        deleted_at: expect.any(String),
-        deleted_by: 'profile-1',
-      }),
-    );
   });
 
   it('rejects deleting another user message when actor is not staff', async () => {

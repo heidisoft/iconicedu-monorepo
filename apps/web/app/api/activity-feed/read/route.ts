@@ -37,45 +37,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ updated: 0 });
   }
 
-  const baseItemsResponse = await supabase
-    .from('activity_feed_items')
-    .select('id, kind')
-    .eq('org_id', actor.account.org_id)
-    .eq('recipient_profile_id', actor.profile.id)
-    .in('id', ids)
-    .is('deleted_at', null);
-
-  if (baseItemsResponse.error) {
-    return NextResponse.json({ error: baseItemsResponse.error.message }, { status: 500 });
-  }
-
-  const groupIds = (baseItemsResponse.data ?? [])
-    .filter((item) => item.kind === 'group')
-    .map((item) => item.id);
-
-  const resolvedIds = new Set(ids);
-  if (groupIds.length) {
-    const groupMembersResponse = await supabase
-      .from('activity_feed_group_members')
-      .select('item_id')
-      .eq('org_id', actor.account.org_id)
-      .in('group_id', groupIds);
-
-    if (groupMembersResponse.error) {
-      return NextResponse.json(
-        { error: groupMembersResponse.error.message },
-        { status: 500 },
-      );
-    }
-
-    for (const member of groupMembersResponse.data ?? []) {
-      if (member.item_id) {
-        resolvedIds.add(member.item_id);
-      }
-    }
-  }
-
-  const idsToUpdate = Array.from(resolvedIds);
+  const idsToUpdate = Array.from(new Set(ids));
   if (!idsToUpdate.length) {
     return NextResponse.json({ updated: 0 });
   }

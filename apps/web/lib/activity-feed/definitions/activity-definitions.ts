@@ -1,5 +1,4 @@
 import type {
-  ActivityGroupKeyVM,
   ActivityImportanceVM,
   ActivityItemContentVM,
   ActivityVerbVM,
@@ -26,12 +25,6 @@ export type ActivityEventDefinition = {
   eventType: string;
   tabKey: InboxTabKeyVM;
   importance?: ActivityImportanceVM;
-  group?: {
-    groupType: ActivityGroupKeyVM;
-    collapseByDefault?: boolean;
-    buildGroupKey: (event: ActivityEventRow) => string | null;
-    renderGroup?: (event: ActivityEventRow) => ActivityRenderResult;
-  } | null;
   resolveRecipients: (
     supabase: SupabaseServiceClient,
     event: ActivityEventRow,
@@ -116,29 +109,6 @@ function sourceAction(
     variant,
     href,
   } satisfies InboxActionButtonVM;
-}
-
-function buildHourlyChannelGroupKey(
-  prefix: string,
-  event: ActivityEventRow,
-  payload: Record<string, unknown>,
-) {
-  const channelId = asOptionalString(payload.channelId);
-  if (!channelId) {
-    return null;
-  }
-
-  return `${prefix}:${channelId}:${event.occurred_at.slice(0, 13)}`;
-}
-
-function buildClassUpdateGroupKey(event: ActivityEventRow) {
-  const payload = asRecord(event.payload);
-  const learningSpaceId = getLearningSpaceId(event, payload);
-  if (!learningSpaceId) {
-    return null;
-  }
-
-  return `class-updated:${learningSpaceId}:${event.occurred_at.slice(0, 10)}`;
 }
 
 function renderClassUpdateGroup(
@@ -248,23 +218,6 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     eventType: 'dm.posted',
     tabKey: 'all',
     importance: 'normal',
-    group: {
-      groupType: 'message',
-      collapseByDefault: true,
-      buildGroupKey: (event) =>
-        buildHourlyChannelGroupKey('dm-posted', event, asRecord(event.payload)),
-      renderGroup: (event) => {
-        const payload = asRecord(event.payload);
-        return {
-          verb: 'messages.posted',
-          leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'info' },
-          headline: {
-            primary: 'New messages',
-            secondary: getContextTitle(payload),
-          },
-        };
-      },
-    },
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => renderMessageItem(event, 'message.posted', true),
   },
@@ -272,28 +225,6 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     eventType: 'message.posted',
     tabKey: 'all',
     importance: 'normal',
-    group: {
-      groupType: 'message',
-      collapseByDefault: true,
-      buildGroupKey: (event) => {
-        const payload = asRecord(event.payload);
-        if (asOptionalString(payload.mentionedProfileId)) {
-          return null;
-        }
-        return buildHourlyChannelGroupKey('message-posted', event, payload);
-      },
-      renderGroup: (event) => {
-        const payload = asRecord(event.payload);
-        return {
-          verb: 'messages.posted',
-          leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'info' },
-          headline: {
-            primary: 'New messages',
-            secondary: getContextTitle(payload),
-          },
-        };
-      },
-    },
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => renderMessageItem(event, 'message.posted', false),
   },
@@ -301,29 +232,6 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     eventType: 'reaction.added',
     tabKey: 'all',
     importance: 'normal',
-    group: {
-      groupType: 'message',
-      collapseByDefault: true,
-      buildGroupKey: (event) => {
-        const payload = asRecord(event.payload);
-        return buildHourlyChannelGroupKey(
-          payload.channelRouteKind === 'dm' ? 'dm-posted' : 'message-posted',
-          event,
-          payload,
-        );
-      },
-      renderGroup: (event) => {
-        const payload = asRecord(event.payload);
-        return {
-          verb: 'reactions.added',
-          leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'info' },
-          headline: {
-            primary: 'New reactions',
-            secondary: getContextTitle(payload),
-          },
-        };
-      },
-    },
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => renderReactionItem(event),
   },
@@ -331,13 +239,6 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     eventType: 'class.session.rescheduled',
     tabKey: 'classes',
     importance: 'important',
-    group: {
-      groupType: 'class',
-      collapseByDefault: true,
-      buildGroupKey: (event) => buildClassUpdateGroupKey(event),
-      renderGroup: (event) =>
-        renderClassUpdateGroup(event, 'Class session rescheduled', 'info'),
-    },
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => renderClassUpdateGroup(event, 'Class session rescheduled', 'info'),
   },
@@ -345,13 +246,6 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     eventType: 'class.sessions.rescheduled',
     tabKey: 'classes',
     importance: 'important',
-    group: {
-      groupType: 'class',
-      collapseByDefault: true,
-      buildGroupKey: (event) => buildClassUpdateGroupKey(event),
-      renderGroup: (event) =>
-        renderClassUpdateGroup(event, 'Class sessions rescheduled', 'info'),
-    },
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) =>
       renderClassUpdateGroup(event, 'Class sessions rescheduled', 'info'),
@@ -360,13 +254,6 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     eventType: 'class.session.canceled',
     tabKey: 'classes',
     importance: 'important',
-    group: {
-      groupType: 'class',
-      collapseByDefault: true,
-      buildGroupKey: (event) => buildClassUpdateGroupKey(event),
-      renderGroup: (event) =>
-        renderClassUpdateGroup(event, 'Class session canceled', 'warning'),
-    },
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => renderClassUpdateGroup(event, 'Class session canceled', 'warning'),
   },
@@ -374,13 +261,6 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     eventType: 'class.sessions.canceled',
     tabKey: 'classes',
     importance: 'important',
-    group: {
-      groupType: 'class',
-      collapseByDefault: true,
-      buildGroupKey: (event) => buildClassUpdateGroupKey(event),
-      renderGroup: (event) =>
-        renderClassUpdateGroup(event, 'Class sessions canceled', 'warning'),
-    },
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) =>
       renderClassUpdateGroup(event, 'Class sessions canceled', 'warning'),
@@ -389,18 +269,6 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     eventType: 'session.reminder.sent',
     tabKey: 'classes',
     importance: 'normal',
-    group: {
-      groupType: 'reminder',
-      collapseByDefault: true,
-      buildGroupKey: (event) => {
-        const payload = asRecord(event.payload);
-        return (
-          asOptionalString(payload.scheduleId) ??
-          asOptionalString(payload.messageId) ??
-          null
-        );
-      },
-    },
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => {
       const payload = asRecord(event.payload);
@@ -422,18 +290,6 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     eventType: 'sessions.reminder.sent',
     tabKey: 'classes',
     importance: 'normal',
-    group: {
-      groupType: 'reminder',
-      collapseByDefault: true,
-      buildGroupKey: (event) => {
-        const payload = asRecord(event.payload);
-        return (
-          asOptionalString(payload.scheduleId) ??
-          asOptionalString(payload.messageId) ??
-          null
-        );
-      },
-    },
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => {
       const payload = asRecord(event.payload);
@@ -454,18 +310,6 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     eventType: 'session.feedback_request.sent',
     tabKey: 'classes',
     importance: 'normal',
-    group: {
-      groupType: 'reminder',
-      collapseByDefault: true,
-      buildGroupKey: (event) => {
-        const payload = asRecord(event.payload);
-        return (
-          asOptionalString(payload.scheduleId) ??
-          asOptionalString(payload.messageId) ??
-          null
-        );
-      },
-    },
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => {
       const payload = asRecord(event.payload);
@@ -487,18 +331,6 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     eventType: 'sessions.feedback_request.sent',
     tabKey: 'classes',
     importance: 'normal',
-    group: {
-      groupType: 'reminder',
-      collapseByDefault: true,
-      buildGroupKey: (event) => {
-        const payload = asRecord(event.payload);
-        return (
-          asOptionalString(payload.scheduleId) ??
-          asOptionalString(payload.messageId) ??
-          null
-        );
-      },
-    },
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => {
       const payload = asRecord(event.payload);
