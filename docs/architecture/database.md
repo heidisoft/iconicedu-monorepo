@@ -10,7 +10,7 @@ Engineers changing database schema, RLS, Prisma, or Supabase-backed data access.
 
 ## Last Updated
 
-2026-03-23
+2026-05-05
 
 ## Related Docs
 
@@ -164,7 +164,10 @@ supabase/migrations/
 ├── 20260102000202_003_constraints_indexes.sql
 ├── 20260102000203_004_triggers_audit.sql
 ├── ...
-└── 20260222200000_023_channel_ui_defaults_json.sql
+├── 20260419000000_activity_source_jobs.sql
+├── 20260505000000_unified_event_pipeline.sql
+├── 20260508000000_drop_legacy_event_pipeline_tables.sql
+└── 20260509000000_remove_activity_feed_grouping.sql
 ```
 
 Files are applied in **alphabetical (timestamp) order**. The prefix timestamp determines the sequence.

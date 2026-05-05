@@ -34,7 +34,7 @@ Detailed design and architecture diagrams for the four core feature domains: Use
    - [4.2 Activity Event ER Diagram](#42-activity-event-er-diagram)
    - [4.3 Realtime vs Batch vs Cron Paths](#43-realtime-vs-batch-vs-cron-paths)
    - [4.4 Notification Decision & Dispatch](#44-notification-decision--dispatch)
-   - [4.5 Feed Projection & Grouping](#45-feed-projection--grouping)
+   - [4.5 Feed Projection](#45-feed-projection)
    - [4.6 Notification Dispatch Job State Machine](#46-notification-dispatch-job-state-machine)
 
 ---
@@ -1383,7 +1383,7 @@ flowchart LR
         SESSION_END2["Session ended\nor homework submitted"]
         BATCH_EVENT["ActivityEventRow\nprojection_status=pending"]
         BATCH_WORKER["Projection Worker\n(polls pending events\nevery N seconds)"]
-        BATCH_FEED["ActivityFeedItemRow\n(grouped/collapsed if many)"]
+        BATCH_FEED["ActivityFeedItemRow"]
         BATCH_NOTIF["EventPipelineJobRow\nnotification.deliver\nrun_at = now() + delay"]
 
         SESSION_END2 --> BATCH_EVENT --> BATCH_WORKER --> BATCH_FEED --> BATCH_NOTIF

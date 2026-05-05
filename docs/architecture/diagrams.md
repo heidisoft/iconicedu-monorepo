@@ -114,11 +114,11 @@ graph TD
     end
 
     subgraph ExtMobile["Mobile Ecosystem"]
-        EXPO54["Expo SDK 54\nExpo Router · SecureStore"]
+        EXPO55["Expo SDK 55\nExpo Router · SecureStore"]
         NATIVEWIND["NativeWind 4.x\nTailwind for RN"]
         RNPRIM["rn-primitives\nHeadless RN components"]
         TANSTACK["TanStack Query\nServer state + cache"]
-        RN["React Native 0.81.5"]
+        RN["React Native 0.83.2"]
         REANIMATED["Reanimated 4.x\nAnimations"]
     end
 
@@ -1193,8 +1193,8 @@ React Native component library built on NativeWind and rn-primitives.
 ```mermaid
 graph TD
     subgraph Foundation["Foundation"]
-        RN["React Native 0.81.5"]
-        NW["NativeWind 4.2.1\nTailwind className API"]
+        RN["React Native 0.83.2"]
+        NW["NativeWind 4.x\nTailwind className API"]
         RNP["rn-primitives\nheadless Radix-like for RN"]
         CVA["class-variance-authority\nstyle variants"]
     end
@@ -1587,4 +1587,4 @@ graph LR
 
 ---
 
-_Generated from codebase exploration — `iconicedu-monorepo`. Last updated: 2026-02-27._
+_Generated from codebase exploration — `iconicedu-monorepo`. Last updated: 2026-05-05._
