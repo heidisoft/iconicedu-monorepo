@@ -408,6 +408,15 @@ All 15 payload tables (`message_text`, `message_image`, `message_file`, `message
 | SELECT    | Org admin only |
 | ALL       | Org admin only |
 
+#### `event_outbox` / `event_pipeline_jobs` / `event_pipeline_logs` _(unified event pipeline — migration 048)_
+
+These tables replaced the legacy `activity_source_jobs`, `notification_dispatch_jobs`, and `reminder_reconcile_jobs` tables (all dropped in migration `drop_legacy_event_pipeline_tables`). The new tables are admin-only — the NestJS API and edge functions access them via service_role.
+
+| Operation | Who                                                                     |
+| --------- | ----------------------------------------------------------------------- |
+| SELECT    | Org admin only                                                          |
+| ALL       | Org admin only; backend service_role bypasses RLS for worker operations |
+
 ---
 
 ### Onboarding

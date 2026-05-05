@@ -286,6 +286,9 @@ export function formatActivityPrimaryHeadline(
   viewerTimezone?: string | null,
 ) {
   const metadata = item.metadata as Record<string, unknown> | undefined;
+  if (metadata?.preserveActivitySummary === true) {
+    return item.content.headline.primary;
+  }
   if (!metadata?.sessionGroupLocalTime) {
     return item.content.headline.primary;
   }

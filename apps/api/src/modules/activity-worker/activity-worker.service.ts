@@ -345,6 +345,7 @@ export class ActivityWorkerService {
         timezone: context.timezone ?? 'UTC',
       },
       dedupeKey: `session.canceled:${job.exception_id}`,
+      refreshOnDedupe: true,
       createdBy: actorProfileId,
     });
   }
@@ -423,6 +424,7 @@ export class ActivityWorkerService {
         timezone: context.timezone ?? 'UTC',
       },
       dedupeKey: `session.rescheduled:${job.override_id}`,
+      refreshOnDedupe: true,
       createdBy: actorProfileId,
     });
   }

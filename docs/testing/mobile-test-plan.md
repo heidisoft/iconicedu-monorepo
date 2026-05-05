@@ -1,7 +1,6 @@
 # Mobile App — Manual QA Test Plan
 
-> Branch: `feature/expo-notifications-update`  
-> Last updated: 2026-04-14  
+> Last updated: 2026-05-05  
 > Covers: Expo 55 / SDK 55, React Native 0.83.2, Expo Router v7
 
 Check off each item as it is verified. Mark with **FAIL** and a note if something is broken.
@@ -177,8 +176,7 @@ Check off each item as it is verified. Mark with **FAIL** and a note if somethin
 - [ ] Activity feed loads with items grouped by date
 - [ ] "All" and "Unread" tabs switch the view correctly
 - [ ] "Mark all as read" button clears unread states
-- [ ] Single activity items show correct metadata (sender, content preview, timestamp)
-- [ ] Grouped activity items expand / collapse sub-activities
+- [ ] Activity items show correct metadata (sender, content preview, timestamp)
 - [ ] Tapping an activity item navigates to the relevant screen
 - [ ] Pull-to-refresh loads new activities
 

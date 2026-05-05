@@ -3,6 +3,7 @@ import type { ProfileRow } from '@iconicedu/shared-types';
 import type { SupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 
 import { getActivityEventDefinition } from '@iconicedu/api/lib/activity-feed/definitions/activity-definitions';
+import { resolveActivityRenderContext } from '@iconicedu/api/lib/activity-feed/projector/activity-render-context';
 import { resolveActiveConversationSuppressedRecipients } from '@iconicedu/api/lib/activity-feed/suppression/active-conversation-suppression';
 
 async function getProfilesByIds(
@@ -140,6 +141,9 @@ async function projectEvent(supabase: SupabaseServiceClient, event: ActivityEven
       profile.kind ?? null,
     ]),
   );
+  const recipientProfileById = new Map(
+    (recipientProfilesResponse.data ?? []).map((profile) => [profile.id, profile]),
+  );
   const refs = {
     actor: null,
     object: event.object_ref ?? undefined,
@@ -149,6 +153,14 @@ async function projectEvent(supabase: SupabaseServiceClient, event: ActivityEven
     const recipientTimezone =
       recipientTimezoneByProfileId.get(recipientProfileId) ?? null;
     const recipientRole = recipientRoleByProfileId.get(recipientProfileId) ?? null;
+    const recipientProfile = recipientProfileById.get(recipientProfileId);
+    const activityContext = recipientProfile
+      ? await resolveActivityRenderContext({
+          supabase,
+          event,
+          recipientProfile,
+        })
+      : null;
     const recipientEvent =
       event.payload && typeof event.payload === 'object' && !Array.isArray(event.payload)
         ? {
@@ -157,6 +169,8 @@ async function projectEvent(supabase: SupabaseServiceClient, event: ActivityEven
               ...event.payload,
               viewerTimezone: recipientTimezone,
               viewerRole: recipientRole,
+              viewerRoleKeys: activityContext?.viewerRoleKeys ?? [],
+              activityContext,
               viewerIsActor:
                 Boolean(event.actor_profile_id) &&
                 event.actor_profile_id === recipientProfileId,
@@ -201,7 +215,23 @@ async function projectEvent(supabase: SupabaseServiceClient, event: ActivityEven
       importance: definition.importance ?? 'normal',
       is_read: isActorRecipient,
       read_at: isActorRecipient ? event.occurred_at : null,
-      metadata: rendered.metadata ?? {},
+      metadata: {
+        ...(activityContext
+          ? {
+              classTitle: activityContext.classTitle ?? null,
+              contextTitle: activityContext.contextTitle ?? null,
+              teacherNames: activityContext.teacherNames,
+              studentNames: activityContext.studentNames,
+              guardianNames: activityContext.guardianNames,
+              viewerStudentNames: activityContext.viewerStudentNames,
+              participantNamesLabel: activityContext.participantNamesLabel ?? null,
+              viewerRole: activityContext.viewerRole ?? null,
+              viewerRoleKeys: activityContext.viewerRoleKeys,
+              viewerIsAdminStaff: activityContext.viewerIsAdminStaff,
+            }
+          : {}),
+        ...(rendered.metadata ?? {}),
+      },
       created_at: event.occurred_at,
       updated_at: new Date().toISOString(),
       created_by: event.actor_profile_id ?? null,

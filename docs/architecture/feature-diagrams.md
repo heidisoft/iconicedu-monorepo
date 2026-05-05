@@ -35,7 +35,7 @@ Detailed design and architecture diagrams for the four core feature domains: Use
    - [4.3 Realtime vs Batch vs Cron Paths](#43-realtime-vs-batch-vs-cron-paths)
    - [4.4 Notification Decision & Dispatch](#44-notification-decision--dispatch)
    - [4.5 Feed Projection](#45-feed-projection)
-   - [4.6 Notification Dispatch Job State Machine](#46-notification-dispatch-job-state-machine)
+   - [4.6 Notification Delivery Job State Machine](#46-notification-delivery-job-state-machine)
 
 ---
 
@@ -1340,24 +1340,57 @@ erDiagram
         boolean is_enabled
     }
 
+    EventOutboxRow {
+        uuid id PK
+        uuid org_id FK
+        string event_kind
+        string source_table
+        uuid source_id
+        string source_kind
+        uuid actor_profile_id FK
+        json payload
+        string dedupe_key
+        string status "pending|processing|processed|failed|dead_letter|canceled"
+        timestamp processed_at
+        string last_error
+        timestamp created_at
+    }
+
     EventPipelineJobRow {
         uuid id PK
         uuid org_id FK
-        string job_kind "notification.deliver"
-        uuid source_id FK "activity_event_id"
-        json payload "recipient, pref, channel, timing"
-        timestamp run_at
+        uuid outbox_id FK
+        string job_kind "activity.generate|activity.project|notification.prepare|notification.deliver|reminder.reconcile|reminder.dispatch"
+        string source_kind
+        uuid source_id
+        string dedupe_key
         json payload
-        string status "pending|leased|succeeded|suppressed|failed|dead_letter"
+        int priority
+        string status "pending|leased|succeeded|suppressed|failed|dead_letter|canceled"
         int attempt_count
         int max_attempts
+        timestamp run_at
         string lease_owner
         timestamp lease_until
         timestamp next_attempt_at
+        string last_error
+    }
+
+    EventPipelineLogRow {
+        uuid id PK
+        uuid org_id FK
+        uuid job_id FK
+        uuid outbox_id FK
+        string job_kind
+        string result "succeeded|suppressed|retryable_failure|fatal_failure|canceled"
+        json details
+        timestamp created_at
     }
 
     ActivityEventRow ||--o{ ActivityFeedItemRow : "projected into"
-    ActivityEventRow ||--o{ EventPipelineJobRow : "triggers notification.deliver"
+    ActivityEventRow ||--o{ EventPipelineJobRow : "triggers jobs"
+    EventOutboxRow ||--o{ EventPipelineJobRow : "spawns"
+    EventPipelineJobRow ||--o{ EventPipelineLogRow : "logged by"
     ActivityEventSuppressionRuleRow }o--|| ActivityEventRow : "may suppress"
 ```
 
@@ -1391,8 +1424,8 @@ flowchart LR
 
     subgraph CRON["Cron / Scheduled Path\n(minutes to hours ahead)"]
         SCHED_CLASS["Class scheduled\n(e.g., tomorrow 10am)"]
-        REMINDER_JOB["ReminderJobRow\nrun_at = class_time - 30min\nstatus=pending"]
-        CRON_TICK["Cron worker ticks\nevery minute\nSELECT WHERE run_at <= now()"]
+        REMINDER_JOB["reminder_jobs row\nrun_at = class_time - 30min\nstatus=pending"]
+        CRON_TICK["reminders-dispatch edge function\nticks every minute via pg_cron\nSELECT WHERE run_at <= now()"]
         REMINDER_MSG["EventReminderMessage\nposted to channel"]
         CRON_EVENT["ActivityEventRow\nsession.reminder.sent"]
         CRON_FEED["ActivityFeedItemRow"]

@@ -37,7 +37,7 @@ decodeToken(token: string): any {
 }
 ```
 
-`jwt.decode` never checks the signature. Any client can craft a JSON payload, base64-encode it, and pass a fake `sub` / `app_role`. Use `jwt.verify` with the Supabase JWKS endpoint or a symmetric secret:
+`jwt.decode` never checks the signature. Any client can craft a JSON payload, base64-encode it, and pass a fake `sub` / `app_role`. Use `jwt.verify` with the Supabase JWKS endpoint (RS256) or the symmetric secret (`SUPABASE_JWT_SECRET` — injected by CI):
 
 ```ts
 // Recommended pattern
@@ -197,7 +197,7 @@ This pattern appears in several builders. Fix it consistently.
 
 **File**: [apps/web/lib/activity-feed/builders/activity-feed.builder.ts](../../apps/web/lib/activity-feed/builders/activity-feed.builder.ts)
 
-The feed builder loads items, then loads actors, then loads group members — sequentially. Use `Promise.all` where the data shapes are known upfront, or batch the second/third fetches into the initial query with Supabase `select` joins.
+The feed builder loads items, then loads actors sequentially. Use `Promise.all` where the data shapes are known upfront, or batch the second/third fetches into the initial query with Supabase `select` joins.
 
 ### P2 — `buildUserProfileById` is called in many builders independently
 
@@ -548,6 +548,7 @@ export const env = EnvSchema.parse(process.env);
 // apps/api/src/config/env.ts — call in main.ts before app.listen()
 const ApiEnvSchema = z.object({
   DATABASE_URL: z.string().url(),
+  SUPABASE_JWT_SECRET: z.string().min(1),
   PORT: z.coerce.number().default(3000),
 });
 ```
@@ -1540,7 +1541,7 @@ Status note: This checklist is updated incrementally as fixes land. Items should
 - [ ] `cache()` wrapping on expensive builders
 - [ ] Zod schemas at mapper boundaries for DB rows
 - [ ] Payload Zod validation in server actions
-- [x] Environment variable validation at startup
+- [x] Environment variable validation at startup (web — `apps/web/lib/config/env.ts`; API still pending)
 - [ ] API integration tests
 - [x] Move `groupBy` and shared helpers to `packages/utils`
 - [x] Decouple `ui-web` Tailwind config from `apps/web` path

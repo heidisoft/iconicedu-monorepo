@@ -23,7 +23,7 @@ Key requirements:
 
 Use **Expo** (managed workflow with EAS) built on **React Native**.
 
-- **Expo SDK 54** with React Native 0.81.5
+- **Expo SDK 55** with React Native 0.83.2
 - **Expo Router** (file-based routing, mirrors Next.js App Router conventions)
 - **EAS Build** for producing iOS and Android binaries
 - **EAS Update** for over-the-air JS updates
@@ -57,12 +57,12 @@ Use **Expo** (managed workflow with EAS) built on **React Native**.
 - Expo managed workflow abstracts native code — if a native module is unavailable in Expo, a custom dev client build is needed
 - `node-linker=hoisted` required in `.npmrc` for pnpm + Expo/jest-expo compatibility
 - React Native version is pinned by Expo SDK — cannot upgrade RN independently
-- `pnpm overrides` needed to pin `react` to exactly `19.1.0` for renderer compatibility
+- `pnpm overrides` needed to pin `react` to exactly `19.2.4` for renderer compatibility
 - NativeWind v4 requires explicit type casts for `className` prop on standard RN components
 
 ### Risks
 
-- Expo SDK upgrades (e.g. SDK 54 → 55) require coordinated updates of all bundled native modules
+- Expo SDK upgrades (e.g. SDK 55 → 56) require coordinated updates of all bundled native modules
 - EAS Build is a paid service at scale (free tier has limited builds per month)
 - OTA updates can be misused to ship significant changes without App Store review — must be used responsibly
 
@@ -71,4 +71,4 @@ Use **Expo** (managed workflow with EAS) built on **React Native**.
 - `apps/mobile/package.json` — exact SDK and dependency versions
 - `docs/getting-started/setup.md#mobile-setup` — local development setup
 - `docs/operations/deployment.md#mobile--eas-build-and-submit` — EAS build and release process
-- [Expo SDK 54 release notes](https://expo.dev/changelog/sdk-54)
+- [Expo SDK 55 release notes](https://expo.dev/changelog/sdk-55)

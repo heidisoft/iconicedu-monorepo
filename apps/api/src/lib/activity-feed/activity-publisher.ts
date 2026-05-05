@@ -24,6 +24,7 @@ type PublishActivityEventInput<TPayload extends object = Record<string, unknown>
   audienceRules?: AudienceRuleVM[];
   payload: TPayload;
   dedupeKey?: string | null;
+  refreshOnDedupe?: boolean;
   createdBy?: string | null;
 };
 
@@ -146,13 +147,36 @@ export async function publishActivityEvent<TPayload extends object>(
 
     if (insertResponse.error) {
       if (input.dedupeKey && insertResponse.error.code === '23505') {
-        const existingResponse = await input.supabase
-          .from('activity_events')
-          .select('*')
-          .eq('org_id', input.orgId)
-          .eq('dedupe_key', input.dedupeKey)
-          .is('deleted_at', null)
-          .maybeSingle<ActivityEventRow>();
+        const existingResponse = input.refreshOnDedupe
+          ? await input.supabase
+              .from('activity_events')
+              .update({
+                event_type: input.eventType,
+                occurred_at: input.occurredAt ?? now,
+                source_kind: input.sourceKind,
+                actor_profile_id: input.actorProfileId ?? null,
+                scope: input.scope,
+                object_ref: input.objectRef ?? null,
+                target_ref: input.targetRef ?? null,
+                payload,
+                audience_rules: input.audienceRules ?? [],
+                projection_status: 'pending',
+                last_projection_error: null,
+                updated_at: now,
+                updated_by: input.createdBy ?? input.actorProfileId ?? null,
+              })
+              .eq('org_id', input.orgId)
+              .eq('dedupe_key', input.dedupeKey)
+              .is('deleted_at', null)
+              .select('*')
+              .maybeSingle<ActivityEventRow>()
+          : await input.supabase
+              .from('activity_events')
+              .select('*')
+              .eq('org_id', input.orgId)
+              .eq('dedupe_key', input.dedupeKey)
+              .is('deleted_at', null)
+              .maybeSingle<ActivityEventRow>();
 
         if (existingResponse.error) {
           throw new Error(existingResponse.error.message);

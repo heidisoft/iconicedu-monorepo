@@ -98,6 +98,29 @@ describe('ActivityItem', () => {
     );
   });
 
+  it('preserves context-rich activity headlines', () => {
+    const item = {
+      ...makeBaseActivity(),
+      content: {
+        ...makeBaseActivity().content,
+        headline: {
+          primary: 'Class reminder',
+          secondary: 'Algebra I for Priya with Ms. Chen',
+        },
+      },
+      metadata: {
+        preserveActivitySummary: true,
+        sessionGroupLocalTime: true,
+        occurrenceStart: '2026-03-19T22:00:00.000Z',
+        timezone: 'America/New_York',
+      },
+    } as ActivityFeedItemVM;
+
+    expect(formatActivityPrimaryHeadline(item, 'America/New_York')).toBe(
+      'Class reminder',
+    );
+  });
+
   it('renders the feedback widget inline for feedback request activities', () => {
     const item = {
       ...makeBaseActivity(),

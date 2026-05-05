@@ -10,7 +10,7 @@ Internal engineers working day to day in the monorepo.
 
 ## Last Updated
 
-2026-04-01
+2026-05-05
 
 ## Related Docs
 
@@ -266,3 +266,9 @@ pnpm mobile:eas:submit
 ## Required GitHub Secrets
 
 Preview environments depend on repository secrets for Supabase, Railway, Vercel, PostHog, and internal tokens. Keep the workflow file and environment setup documentation aligned when new secrets are introduced.
+
+Key secrets used by the CI workflow:
+
+- `INTERNAL_EVENTS_TOKEN` — authenticates the `events-dispatch` edge function to the NestJS API. Required for preview and production environments.
+- `CI_SECRETS_JSON` — a JSON blob injected by GitHub Actions containing all repository secrets; used by the production deploy job to forward secrets into the Railway environment without listing them individually.
+- `ADMIN_DATABASE_URL` — derived at runtime by the CI workflow from Supabase pooler credentials; not a secret you set manually in GitHub. It is used by CI to run `configure_edge_function_cron()` and other admin SQL steps against the preview or production database.

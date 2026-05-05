@@ -43,12 +43,12 @@ Step-by-step guide to get the IconicEdu monorepo running on your machine.
 
 ### Required tools
 
-| Tool         | Version | How to install                                               |
-| ------------ | ------- | ------------------------------------------------------------ |
-| Node.js      | 20.19.0 | nvm or asdf                                                  |
-| pnpm         | 9.12.0  | `corepack enable && corepack prepare pnpm@9.12.0 --activate` |
-| Git          | any     | system                                                       |
-| Supabase CLI | latest  | `brew install supabase/tap/supabase`                         |
+| Tool         | Version | How to install                                                |
+| ------------ | ------- | ------------------------------------------------------------- |
+| Node.js      | 20.19.0 | nvm or asdf                                                   |
+| pnpm         | 10.33.0 | `corepack enable && corepack prepare pnpm@10.33.0 --activate` |
+| Git          | any     | system                                                        |
+| Supabase CLI | latest  | `brew install supabase/tap/supabase`                          |
 
 ### macOS only (for iOS development)
 
@@ -92,7 +92,7 @@ asdf install
 
 ```bash
 corepack enable
-corepack prepare pnpm@9.12.0 --activate
+corepack prepare pnpm@10.33.0 --activate
 ```
 
 ---
@@ -584,7 +584,7 @@ pnpm --filter api db:studio
 Ensure you are using the exact pnpm version:
 
 ```bash
-corepack prepare pnpm@9.12.0 --activate
+corepack prepare pnpm@10.33.0 --activate
 pnpm install
 ```
 
@@ -623,9 +623,9 @@ The variable name must start with `NEXT_PUBLIC_` and the Next.js dev server must
 ### Corepack fails with signature validation error
 
 ```bash
-nvm use 20
+nvm use 20.19.0
 npm install -g corepack
-corepack prepare pnpm@9.12.0 --activate
+corepack prepare pnpm@10.33.0 --activate
 ```
 
 ### Windows: Metro symlink errors
