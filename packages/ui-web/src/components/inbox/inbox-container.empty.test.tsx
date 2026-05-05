@@ -20,10 +20,6 @@ vi.mock('@iconicedu/ui-web/components/notification/activity-feedback-request', (
   ActivityFeedbackRequest: () => null,
 }));
 
-vi.mock('@iconicedu/ui-web/components/notification/activity-with-subitems', () => ({
-  ActivityWithSubitems: () => null,
-}));
-
 describe('InboxContainer empty state', () => {
   it('renders a shadcn-style empty message when there are no alerts', () => {
     render(

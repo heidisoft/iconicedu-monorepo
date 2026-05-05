@@ -68,13 +68,13 @@ describe('activity event definitions', () => {
     });
   });
 
-  it('does not group mentioned channel messages into hourly message parents', () => {
+  it('renders mentioned channel messages as standalone message items', () => {
     const definition = getActivityEventDefinition('message.posted');
-    if (!definition?.group) {
-      throw new Error('Missing message.posted grouping');
+    if (!definition) {
+      throw new Error('Missing message.posted definition');
     }
 
-    const key = definition.group.buildGroupKey({
+    const rendered = definition.render({
       id: 'event-message-mention-1',
       org_id: 'org-1',
       event_type: 'message.posted',
@@ -100,16 +100,18 @@ describe('activity event definitions', () => {
       updated_at: '2026-03-03T12:45:00.000Z',
     });
 
-    expect(key).toBeNull();
+    expect(rendered.verb).toBe('message.posted');
+    expect(rendered.headline.primary).toBe('Jane mentioned you in');
+    expect(rendered.expandedContent).toBe('@you hello');
   });
 
-  it('groups reactions under the matching dm/message hourly parent key', () => {
+  it('renders reactions as standalone reaction items', () => {
     const definition = getActivityEventDefinition('reaction.added');
-    if (!definition?.group) {
-      throw new Error('Missing reaction.added grouping');
+    if (!definition) {
+      throw new Error('Missing reaction.added definition');
     }
 
-    const dmKey = definition.group.buildGroupKey({
+    const dmReaction = definition.render({
       id: 'event-dm-reaction-1',
       org_id: 'org-1',
       event_type: 'reaction.added',
@@ -134,7 +136,7 @@ describe('activity event definitions', () => {
       updated_at: '2026-03-03T12:25:00.000Z',
     });
 
-    const channelKey = definition.group.buildGroupKey({
+    const channelReaction = definition.render({
       id: 'event-channel-reaction-1',
       org_id: 'org-1',
       event_type: 'reaction.added',
@@ -159,13 +161,13 @@ describe('activity event definitions', () => {
       updated_at: '2026-03-03T12:25:00.000Z',
     });
 
-    expect(dmKey).toBe('dm-posted:channel-dm-1:2026-03-03T12');
-    expect(channelKey).toBe('message-posted:channel-1:2026-03-03T12');
+    expect(dmReaction.headline.primary).toBe('Jane reacted 👍 to your direct message');
+    expect(channelReaction.headline.primary).toBe('Jane reacted 👍 to your message in');
   });
 
   it('renders class cancellation activities as important class updates', () => {
     const definition = getActivityEventDefinition('class.session.canceled');
-    if (!definition?.group) {
+    if (!definition) {
       throw new Error('Missing class.session.canceled definition');
     }
 
@@ -193,31 +195,7 @@ describe('activity event definitions', () => {
       updated_at: '2026-03-03T12:00:00.000Z',
     });
 
-    const key = definition.group.buildGroupKey({
-      id: 'event-cancel-1',
-      org_id: 'org-1',
-      event_type: 'class.session.canceled',
-      occurred_at: '2026-03-03T12:00:00.000Z',
-      source_kind: 'system',
-      actor_profile_id: 'profile-1',
-      scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
-      object_ref: null,
-      target_ref: { kind: 'learning_space', id: 'space-1' },
-      payload: {
-        learningSpaceId: 'space-1',
-        channelId: 'channel-1',
-        learningSpaceTitle: 'Algebra I',
-      },
-      audience_rules: [],
-      dedupe_key: 'session.canceled:exception-1',
-      projection_status: 'pending',
-      projection_attempts: 0,
-      created_at: '2026-03-03T12:00:00.000Z',
-      updated_at: '2026-03-03T12:00:00.000Z',
-    });
-
     expect(definition.importance).toBe('important');
-    expect(key).toBe('class-updated:space-1:2026-03-03');
     expect(rendered.headline.primary).toBe('Class session canceled');
     expect(rendered.actionButton).toEqual({
       label: 'Open class',

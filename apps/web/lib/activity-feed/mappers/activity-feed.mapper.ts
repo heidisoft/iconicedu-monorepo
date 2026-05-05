@@ -10,7 +10,6 @@ import type {
   ActivityItemStateVM,
   ActivityVerbVM,
   InboxTabKeyVM,
-  ActivityItemGroupingVM,
   InboxLeadingVM,
 } from '@iconicedu/shared-types';
 
@@ -80,16 +79,8 @@ export function mapActivityFeedItemRow(
     scope: audienceBase.scope ?? { kind: 'global' },
     visibility: audienceBase.visibility ?? 'public',
   };
-  const grouping: ActivityItemGroupingVM | undefined =
-    row.group_key || row.group_type
-      ? {
-          groupKey: row.group_key ?? undefined,
-          groupType: row.group_type as ActivityItemGroupingVM['groupType'],
-        }
-      : (content as Partial<{ grouping: ActivityItemGroupingVM }>).grouping;
-
   const base = {
-    kind: (row.kind ?? 'leaf') as ActivityFeedItemVM['kind'],
+    kind: 'leaf',
     ids: { id: row.id, orgId: row.org_id },
     timestamps: {
       occurredAt: row.occurred_at ?? row.created_at,
@@ -108,10 +99,6 @@ export function mapActivityFeedItemRow(
 
   return {
     ...base,
-    grouping,
-    subActivities: (content as Partial<ActivityFeedItemVM>).subActivities,
-    subActivityCount: row.sub_activity_count ?? undefined,
-    isCollapsed: row.is_collapsed ?? undefined,
     metadata: {
       ...(row.metadata ?? {}),
       sourceEventId:

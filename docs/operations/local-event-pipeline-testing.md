@@ -13,7 +13,7 @@ product write or DB trigger
   -> event_pipeline_jobs activity.generate
   -> activity_events
   -> event_pipeline_jobs activity.project
-  -> activity_feed_items / activity_feed_group_members
+  -> activity_feed_items
   -> event_pipeline_jobs notification.prepare
   -> event_pipeline_jobs notification.deliver
   -> event_pipeline_logs

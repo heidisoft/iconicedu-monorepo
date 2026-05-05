@@ -2,7 +2,6 @@ import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import type {
   ActivityFeedVM,
   ActivityFeedItemVM,
-  ActivityFeedLeafItemVM,
   ActivityFeedSectionVM,
   ActivityFeedTabVM,
   InboxTabKeyVM,
@@ -11,9 +10,7 @@ import type {
   ActivityItemAudienceVM,
   ActivityItemRefsVM,
   ActivityItemStateVM,
-  ActivityItemGroupingVM,
   ActivityFeedItemRow,
-  ActivityFeedGroupMemberRow,
   ClassSessionFeedbackRow,
   UserProfileVM,
 } from '@iconicedu/shared-types';
@@ -33,10 +30,6 @@ const ACTIVITY_FEED_ITEM_SELECT = [
   'verb',
   'actor_profile_id',
   'refs',
-  'group_key',
-  'group_type',
-  'is_collapsed',
-  'sub_activity_count',
   'content',
   'summary',
   'preview',
@@ -50,9 +43,6 @@ const ACTIVITY_FEED_ITEM_SELECT = [
   'updated_at',
   'deleted_at',
 ].join(',');
-
-const ACTIVITY_FEED_GROUP_MEMBER_SELECT =
-  'id,org_id,group_id,item_id,updated_at,deleted_at';
 
 const FEED_TABS: Array<{ key: InboxTabKeyVM; label: string }> = [
   { key: 'all', label: 'All' },
@@ -90,13 +80,6 @@ function mapFeedRow(row: ActivityFeedItemRow): ActivityFeedItemVM {
 
   const refsBase = (row.refs ?? {}) as Partial<ActivityItemRefsVM>;
   const audienceBase = (row.audience ?? {}) as Partial<ActivityItemAudienceVM>;
-  const grouping: ActivityItemGroupingVM | undefined =
-    row.group_key || row.group_type
-      ? {
-          groupKey: row.group_key ?? undefined,
-          groupType: row.group_type as ActivityItemGroupingVM['groupType'],
-        }
-      : undefined;
 
   const state: ActivityItemStateVM = {
     importance: row.importance as ActivityItemStateVM['importance'],
@@ -104,7 +87,7 @@ function mapFeedRow(row: ActivityFeedItemRow): ActivityFeedItemVM {
   };
 
   return {
-    kind: (row.kind ?? 'leaf') as ActivityFeedItemVM['kind'],
+    kind: 'leaf',
     ids: { id: row.id, orgId: row.org_id },
     timestamps: {
       occurredAt: row.occurred_at ?? row.created_at,
@@ -120,9 +103,6 @@ function mapFeedRow(row: ActivityFeedItemRow): ActivityFeedItemVM {
     refs: { ...refsBase } as ActivityItemRefsVM,
     content,
     state,
-    grouping,
-    subActivityCount: row.sub_activity_count ?? undefined,
-    isCollapsed: row.is_collapsed ?? undefined,
     metadata: row.metadata ?? undefined,
   } as ActivityFeedItemVM;
 }
@@ -151,44 +131,6 @@ export class ActivityFeedQueryService {
 
     return new Map(
       (data ?? []).map((profile) => [profile.id, buildSenderProfile(profile, orgId)]),
-    );
-  }
-
-  private attachFeedGroupMembers(
-    items: ActivityFeedItemVM[],
-    groupMembers: ActivityFeedGroupMemberRow[],
-  ): ActivityFeedItemVM[] {
-    if (!groupMembers.length) return items;
-
-    const itemMap = new Map(items.map((item) => [item.ids.id, item]));
-    const membersByGroup = new Map<string, string[]>();
-    groupMembers.forEach((member) => {
-      const list = membersByGroup.get(member.group_id) ?? [];
-      list.push(member.item_id);
-      membersByGroup.set(member.group_id, list);
-    });
-
-    const groupedMemberIds = new Set<string>();
-    const withGroups = items.map((item) => {
-      if (item.kind !== 'group') return item;
-      const memberIds = membersByGroup.get(item.ids.id) ?? [];
-      const members = memberIds
-        .map((id) => itemMap.get(id))
-        .filter(
-          (member): member is ActivityFeedLeafItemVM =>
-            !!member && member.kind === 'leaf',
-        );
-      memberIds.forEach((id) => groupedMemberIds.add(id));
-
-      return {
-        ...item,
-        subActivities: { items: members },
-        subActivityCount: item.subActivityCount ?? members.length,
-      } as ActivityFeedItemVM;
-    });
-
-    return withGroups.filter(
-      (item) => item.kind === 'group' || !groupedMemberIds.has(item.ids.id),
     );
   }
 
@@ -347,17 +289,8 @@ export class ActivityFeedQueryService {
   private buildFeedTabs(items: ActivityFeedItemVM[]): ActivityFeedTabVM[] {
     const counts = new Map<InboxTabKeyVM, number>();
     items.forEach((item) => {
-      const unread =
-        item.kind === 'group'
-          ? ((
-              item as { subActivities?: { items: ActivityFeedLeafItemVM[] } }
-            ).subActivities?.items.filter((sub) => !sub.state?.isRead).length ??
-            (!item.state?.isRead ? 1 : 0))
-          : !item.state?.isRead
-            ? 1
-            : 0;
-      if (!unread) return;
-      counts.set(item.tabKey, (counts.get(item.tabKey) ?? 0) + unread);
+      if (item.state?.isRead) return;
+      counts.set(item.tabKey, (counts.get(item.tabKey) ?? 0) + 1);
     });
 
     return FEED_TABS.map((tab) => ({
@@ -388,20 +321,6 @@ export class ActivityFeedQueryService {
 
     const rows = itemRows ?? [];
     const actorProfiles = await this.loadActivityFeedActors(accessToken, orgId, rows);
-    const groupIds = rows.filter((row) => row.kind === 'group').map((row) => row.id);
-
-    let groupMembers: ActivityFeedGroupMemberRow[] = [];
-    if (groupIds.length) {
-      const { data: members, error: membersError } = await supabase
-        .from('activity_feed_group_members')
-        .select(ACTIVITY_FEED_GROUP_MEMBER_SELECT)
-        .eq('org_id', orgId)
-        .in('group_id', groupIds)
-        .is('deleted_at', null)
-        .returns<ActivityFeedGroupMemberRow[]>();
-      if (membersError) throw new InternalServerErrorException(membersError.message);
-      groupMembers = members ?? [];
-    }
 
     const mappedItems = rows.map((row) => {
       const item = mapFeedRow(row);
@@ -421,8 +340,7 @@ export class ActivityFeedQueryService {
       profileId,
       mappedItems,
     );
-    const groupedItems = this.attachFeedGroupMembers(feedbackItems, groupMembers);
-    const sections = this.buildFeedSections(groupedItems);
+    const sections = this.buildFeedSections(feedbackItems);
     const tabs = this.buildFeedTabs(feedbackItems);
     const unreadCount = feedbackItems.filter((item) => !item.state?.isRead).length;
 
@@ -438,15 +356,6 @@ export class ActivityFeedQueryService {
   async markRead(accessToken: string, orgId: string, profileId: string, ids: string[]) {
     if (!ids.length) return { success: true };
     const supabase = createSupabaseSessionClient(accessToken);
-    const { data: members, error: membersError } = await supabase
-      .from('activity_feed_group_members')
-      .select('item_id')
-      .eq('org_id', orgId)
-      .in('group_id', ids);
-    if (membersError) throw new InternalServerErrorException(membersError.message);
-
-    const childIds = (members ?? []).map((member) => member.item_id as string);
-    const allIds = [...new Set([...ids, ...childIds])];
     const now = new Date().toISOString();
     const { error } = await supabase
       .from('activity_feed_items')
@@ -458,7 +367,7 @@ export class ActivityFeedQueryService {
       })
       .eq('org_id', orgId)
       .eq('recipient_profile_id', profileId)
-      .in('id', allIds);
+      .in('id', ids);
     if (error) throw new InternalServerErrorException(error.message);
     return { success: true };
   }

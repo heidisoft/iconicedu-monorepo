@@ -79,7 +79,6 @@ describe('ActivityItem', () => {
   it('formats scheduled class session headlines without the timezone suffix', () => {
     const item = {
       ...makeBaseActivity(),
-      kind: 'group',
       content: {
         ...makeBaseActivity().content,
         headline: {

@@ -7,13 +7,10 @@ import {
   CalendarCheck,
   CalendarX,
   Check,
-  CheckCheck,
-  ChevronDown,
   CreditCard,
   GraduationCap,
   MessageSquare,
 } from 'lucide-react';
-import { Badge } from '@iconicedu/ui-web/ui/badge';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 import { ActivityBadge } from '@iconicedu/ui-web/components/notification/activity-badge';
@@ -27,12 +24,7 @@ type ActivityItemBaseProps = {
   onToggle?: (event: React.MouseEvent) => void;
   isSubActivity?: boolean;
   parentExpanded?: boolean;
-  isCollapsed?: boolean;
-  showSubActivityToggle?: boolean;
   showActionButton?: boolean;
-  subActivityCount?: number;
-  unreadSubActivityCount?: number;
-  hasUnreadSubActivities?: boolean;
   showTimelineConnector?: boolean;
   footer?: React.ReactNode;
   className?: string;
@@ -62,21 +54,6 @@ const TONE_CLASSNAMES = {
 };
 
 const getDefaultIconKey = (activity: ActivityFeedItemVM): InboxIconKeyVM => {
-  if (activity.kind === 'group') {
-    switch (activity.grouping?.groupType) {
-      case 'payment':
-        return 'CreditCard';
-      case 'reminder':
-        return 'Bell';
-      case 'message':
-        return 'MessageSquare';
-      case 'class':
-        return 'GraduationCap';
-      default:
-        return 'Bell';
-    }
-  }
-
   switch (activity.verb) {
     case 'message.posted':
     case 'messages.posted':
@@ -123,12 +100,7 @@ export function ActivityItemBase({
   onToggle,
   isSubActivity = false,
   parentExpanded = false,
-  isCollapsed = false,
-  showSubActivityToggle = false,
   showActionButton = false,
-  subActivityCount,
-  unreadSubActivityCount,
-  hasUnreadSubActivities = false,
   showTimelineConnector = false,
   footer,
   className,
@@ -150,18 +122,6 @@ export function ActivityItemBase({
     activity.content.headline.secondaryHref ??
     activity.content.actionButton?.href ??
     undefined;
-  const isGroupParent = activity.kind === 'group';
-  const groupChildCount = isGroupParent
-    ? (subActivityCount ?? activity.subActivities?.items.length ?? 0)
-    : 0;
-  const showParentReadIndicator =
-    isGroupParent && groupChildCount > 0 && !hasUnreadSubActivities;
-  const groupUnreadCount =
-    typeof unreadSubActivityCount === 'number'
-      ? unreadSubActivityCount
-      : hasUnreadSubActivities
-        ? Math.max(1, groupChildCount)
-        : 0;
   const rootRef = useRef<HTMLDivElement>(null);
   const autoReadTriggeredRef = useRef(false);
 
@@ -258,7 +218,6 @@ export function ActivityItemBase({
         className={cn(
           'group relative z-10 flex min-w-0 flex-1 items-start gap-2.5 rounded-md px-2 py-1 -mx-2 transition-all duration-200',
           onToggle && !isSubActivity && 'cursor-pointer hover:bg-muted/50',
-          onToggle && showSubActivityToggle && !isCollapsed && 'bg-muted/30',
           isSubActivity && parentExpanded && 'bg-muted/30',
         )}
       >
@@ -304,39 +263,6 @@ export function ActivityItemBase({
                 <Check className="size-3.5" />
               </Button>
             )}
-
-            {showSubActivityToggle && (
-              <>
-                <Badge
-                  variant="secondary"
-                  className="shrink-0 text-[10px] h-4 px-1.5 gap-1"
-                >
-                  {groupUnreadCount > 0 ? (
-                    <span
-                      className="size-1.5 rounded-full bg-rose-500"
-                      aria-label="Unread sub activities"
-                    />
-                  ) : null}
-                  {groupUnreadCount}
-                </Badge>
-                <ChevronDown
-                  className={cn(
-                    'size-4 shrink-0 text-muted-foreground transition-transform duration-200',
-                    !isCollapsed && 'rotate-180',
-                  )}
-                />
-              </>
-            )}
-
-            {showParentReadIndicator ? (
-              <span
-                className="inline-flex shrink-0 items-center text-muted-foreground/90 transition-colors duration-300"
-                aria-label="Read"
-                title="Read"
-              >
-                <CheckCheck className="size-3" />
-              </span>
-            ) : null}
 
             {isSubActivity && !activity.state?.isRead ? (
               <span

@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchActivityFeed, markActivityFeedRead, queryKeys } from '@/lib/api/queries';
 import { useAccount } from './use-account';
 import { useProfile } from './use-profile';
-import type { ActivityFeedVM, ActivityFeedGroupItemVM } from '@iconicedu/shared-types';
+import type { ActivityFeedVM } from '@iconicedu/shared-types';
 
 export function useActivityFeed() {
   const { data: account } = useAccount();
@@ -50,21 +50,6 @@ export function useMarkActivityFeedRead() {
             ...section,
             items: section.items.map((item) => {
               const targeted = idSet.has(item.ids.id);
-              if (item.kind === 'group') {
-                const group = item as ActivityFeedGroupItemVM;
-                const updatedSubs = group.subActivities?.items.map((sub) =>
-                  targeted || idSet.has(sub.ids.id)
-                    ? { ...sub, state: { ...sub.state, isRead: true } }
-                    : sub,
-                );
-                return {
-                  ...group,
-                  state: targeted ? { ...group.state, isRead: true } : group.state,
-                  subActivities: updatedSubs
-                    ? { ...group.subActivities!, items: updatedSubs }
-                    : group.subActivities,
-                };
-              }
               return targeted
                 ? { ...item, state: { ...item.state, isRead: true } }
                 : item;

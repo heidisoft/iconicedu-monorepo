@@ -1,7 +1,6 @@
 import type {
   ActivityFeedVM,
   ActivityFeedItemVM,
-  ActivityFeedLeafItemVM,
   ActivityFeedSectionVM,
   ActivityFeedTabVM,
   InboxTabKeyVM,
@@ -10,9 +9,7 @@ import type {
   ActivityItemAudienceVM,
   ActivityItemRefsVM,
   ActivityItemStateVM,
-  ActivityItemGroupingVM,
   ActivityFeedItemRow,
-  ActivityFeedGroupMemberRow,
   ClassSessionFeedbackRow,
   UserProfileVM,
 } from '@iconicedu/shared-types';
@@ -33,10 +30,6 @@ const ACTIVITY_FEED_ITEM_SELECT = [
   'verb',
   'actor_profile_id',
   'refs',
-  'group_key',
-  'group_type',
-  'is_collapsed',
-  'sub_activity_count',
   'content',
   'summary',
   'preview',
@@ -50,9 +43,6 @@ const ACTIVITY_FEED_ITEM_SELECT = [
   'updated_at',
   'deleted_at',
 ].join(',');
-
-const ACTIVITY_FEED_GROUP_MEMBER_SELECT =
-  'id,org_id,group_id,item_id,updated_at,deleted_at';
 
 const FEED_TABS: Array<{ key: InboxTabKeyVM; label: string }> = [
   { key: 'all', label: 'All' },
@@ -90,13 +80,6 @@ function mapFeedRow(row: ActivityFeedItemRow): ActivityFeedItemVM {
 
   const refsBase = (row.refs ?? {}) as Partial<ActivityItemRefsVM>;
   const audienceBase = (row.audience ?? {}) as Partial<ActivityItemAudienceVM>;
-  const grouping: ActivityItemGroupingVM | undefined =
-    row.group_key || row.group_type
-      ? {
-          groupKey: row.group_key ?? undefined,
-          groupType: row.group_type as ActivityItemGroupingVM['groupType'],
-        }
-      : undefined;
 
   const state: ActivityItemStateVM = {
     importance: row.importance as ActivityItemStateVM['importance'],
@@ -104,7 +87,7 @@ function mapFeedRow(row: ActivityFeedItemRow): ActivityFeedItemVM {
   };
 
   return {
-    kind: (row.kind ?? 'leaf') as ActivityFeedItemVM['kind'],
+    kind: 'leaf',
     ids: { id: row.id, orgId: row.org_id },
     timestamps: {
       occurredAt: row.occurred_at ?? row.created_at,
@@ -120,9 +103,6 @@ function mapFeedRow(row: ActivityFeedItemRow): ActivityFeedItemVM {
     refs: { ...refsBase } as ActivityItemRefsVM,
     content,
     state,
-    grouping,
-    subActivityCount: row.sub_activity_count ?? undefined,
-    isCollapsed: row.is_collapsed ?? undefined,
     metadata: row.metadata ?? undefined,
   } as ActivityFeedItemVM;
 }
@@ -154,45 +134,6 @@ async function loadActivityFeedActors(
       profile.id,
       buildSenderProfile(profile, orgId),
     ]),
-  );
-}
-
-function attachFeedGroupMembers(
-  items: ActivityFeedItemVM[],
-  groupMembers: ActivityFeedGroupMemberRow[],
-): ActivityFeedItemVM[] {
-  if (!groupMembers.length) return items;
-
-  const itemMap = new Map(items.map((item) => [item.ids.id, item]));
-  const membersByGroup = new Map<string, string[]>();
-  groupMembers.forEach((member) => {
-    const list = membersByGroup.get(member.group_id) ?? [];
-    list.push(member.item_id);
-    membersByGroup.set(member.group_id, list);
-  });
-
-  const groupedMemberIds = new Set<string>();
-  const withGroups = items.map((item) => {
-    if (item.kind !== 'group') return item;
-
-    const memberIds = membersByGroup.get(item.ids.id) ?? [];
-    const members = memberIds
-      .map((id) => itemMap.get(id))
-      .filter(
-        (member): member is ActivityFeedLeafItemVM => !!member && member.kind === 'leaf',
-      );
-
-    memberIds.forEach((id) => groupedMemberIds.add(id));
-
-    return {
-      ...item,
-      subActivities: { items: members },
-      subActivityCount: item.subActivityCount ?? members.length,
-    } as ActivityFeedItemVM;
-  });
-
-  return withGroups.filter(
-    (item) => item.kind === 'group' || !groupedMemberIds.has(item.ids.id),
   );
 }
 
@@ -361,17 +302,8 @@ function buildFeedSections(items: ActivityFeedItemVM[]): ActivityFeedSectionVM[]
 function buildFeedTabs(items: ActivityFeedItemVM[]): ActivityFeedTabVM[] {
   const counts = new Map<InboxTabKeyVM, number>();
   items.forEach((item) => {
-    const unread =
-      item.kind === 'group'
-        ? ((
-            item as { subActivities?: { items: ActivityFeedLeafItemVM[] } }
-          ).subActivities?.items.filter((sub) => !sub.state?.isRead).length ??
-          (!item.state?.isRead ? 1 : 0))
-        : !item.state?.isRead
-          ? 1
-          : 0;
-    if (!unread) return;
-    counts.set(item.tabKey, (counts.get(item.tabKey) ?? 0) + unread);
+    if (item.state?.isRead) return;
+    counts.set(item.tabKey, (counts.get(item.tabKey) ?? 0) + 1);
   });
 
   return FEED_TABS.map((tab) => ({

@@ -1,19 +1,14 @@
 import type {
   ActivityFeedItemVM,
-  ActivityFeedLeafItemVM,
   ActivityFeedVM,
   ActivityFeedTabVM,
-  InboxLeadingVM,
   InboxTabKeyVM,
   ClassSessionFeedbackRow,
 } from '@iconicedu/shared-types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { mapActivityFeedItemRow } from '@iconicedu/web/lib/activity-feed/mappers/activity-feed.mapper';
-import {
-  getActivityFeedGroupMembersByGroupIds,
-  getActivityFeedItemsByOrg,
-} from '@iconicedu/web/lib/activity-feed/queries/activity-feed.query';
+import { getActivityFeedItemsByOrg } from '@iconicedu/web/lib/activity-feed/queries/activity-feed.query';
 import { buildUserProfileFromRow } from '@iconicedu/web/lib/profile/builders/user-profile.builder';
 import { getProfilesByIds } from '@iconicedu/web/lib/profile/queries/profiles.query';
 
@@ -38,13 +33,7 @@ export async function buildActivityFeedForProfile(
   const itemsResponse = await getActivityFeedItemsByOrg(supabase, orgId, profileId);
   const itemRows = itemsResponse.data ?? [];
 
-  const groupIds = itemRows.filter((row) => row.kind === 'group').map((row) => row.id);
-  const [actorProfiles, groupMembersResponse] = await Promise.all([
-    loadActivityFeedActors(supabase, orgId, itemRows),
-    groupIds.length
-      ? getActivityFeedGroupMembersByGroupIds(supabase, orgId, groupIds)
-      : Promise.resolve({ data: [] }),
-  ]);
+  const actorProfiles = await loadActivityFeedActors(supabase, orgId, itemRows);
   const mappedItems = itemRows.map((row) =>
     mapActivityFeedItemRow(row, {
       actor: row.actor_profile_id ? actorProfiles.get(row.actor_profile_id) : null,
@@ -57,19 +46,14 @@ export async function buildActivityFeedForProfile(
     mappedItems,
   );
 
-  const groupedItems = await attachGroupMembers(
-    itemsWithFeedback,
-    groupMembersResponse.data ?? [],
-  );
-
   const filteredItems =
     activeTab === 'all'
-      ? groupedItems
-      : groupedItems.filter((item) => item.tabKey === activeTab);
+      ? itemsWithFeedback
+      : itemsWithFeedback.filter((item) => item.tabKey === activeTab);
 
   const sections = buildActivitySections(filteredItems);
-  const tabs = buildFeedTabs(groupedItems);
-  const unreadCount = countUnreadItems(groupedItems);
+  const tabs = buildFeedTabs(itemsWithFeedback);
+  const unreadCount = countUnreadItems(itemsWithFeedback);
 
   return {
     activeTab,
@@ -217,17 +201,8 @@ export async function buildActivityFeedUnreadCountForProfile(
 ) {
   const itemsResponse = await getActivityFeedItemsByOrg(supabase, orgId, profileId);
   const itemRows = itemsResponse.data ?? [];
-  const groupIds = itemRows.filter((row) => row.kind === 'group').map((row) => row.id);
-  const groupMembersResponse = groupIds.length
-    ? await getActivityFeedGroupMembersByGroupIds(supabase, orgId, groupIds)
-    : { data: [] };
-
   const mappedItems = itemRows.map((row) => mapActivityFeedItemRow(row));
-  const groupedItems = await attachGroupMembers(
-    mappedItems,
-    groupMembersResponse.data ?? [],
-  );
-  return countUnreadItems(groupedItems);
+  return countUnreadItems(mappedItems);
 }
 
 export async function buildActivityFeedByOrg(
@@ -264,193 +239,6 @@ async function loadActivityFeedActors(
   return new Map(actorEntries);
 }
 
-async function attachGroupMembers(
-  items: ActivityFeedItemVM[],
-  groupMembers: Array<{ group_id: string; item_id: string }>,
-) {
-  if (!groupMembers.length) {
-    return items;
-  }
-
-  const itemMap = new Map(items.map((item) => [item.ids.id, item]));
-  const membersByGroup = new Map<string, string[]>();
-  groupMembers.forEach((member) => {
-    const list = membersByGroup.get(member.group_id) ?? [];
-    list.push(member.item_id);
-    membersByGroup.set(member.group_id, list);
-  });
-
-  const groupedMemberIds = new Set<string>();
-
-  const withGroups = items.map((item) => {
-    if (item.kind !== 'group') {
-      return item;
-    }
-
-    const memberIds = membersByGroup.get(item.ids.id) ?? [];
-    const members = memberIds
-      .map((memberId) => itemMap.get(memberId))
-      .filter(
-        (member): member is ActivityFeedLeafItemVM =>
-          member !== undefined && member.kind === 'leaf',
-      )
-      .sort((a, b) => {
-        const aTime = new Date(a.timestamps.occurredAt).getTime();
-        const bTime = new Date(b.timestamps.occurredAt).getTime();
-        return bTime - aTime;
-      });
-    const aggregatedMembers = members;
-    const nextParent = normalizeChannelGroupedParent(
-      normalizeDmGroupedParent(item, aggregatedMembers),
-      aggregatedMembers,
-    );
-
-    memberIds.forEach((memberId) => groupedMemberIds.add(memberId));
-
-    return {
-      ...nextParent,
-      subActivities: {
-        items: aggregatedMembers,
-      },
-      subActivityCount: item.subActivityCount ?? aggregatedMembers.length,
-    } as ActivityFeedItemVM;
-  });
-
-  return withGroups.filter(
-    (item) => item.kind === 'group' || !groupedMemberIds.has(item.ids.id),
-  );
-}
-
-function normalizeDmGroupedParent(
-  parent: Extract<ActivityFeedItemVM, { kind: 'group' }>,
-  members: ActivityFeedLeafItemVM[],
-): Extract<ActivityFeedItemVM, { kind: 'group' }> {
-  if (parent.verb !== 'messages.posted' || !members.length) {
-    return parent;
-  }
-
-  const senderName = members[0]?.refs.actor?.profile?.displayName ?? 'Someone';
-  const contextTitle = parent.content.headline.secondary;
-
-  return {
-    ...parent,
-    content: {
-      ...parent.content,
-      headline: {
-        primary: contextTitle
-          ? `${senderName} sent you multiple direct messages in`
-          : `${senderName} sent you multiple direct messages`,
-        secondary: contextTitle,
-      },
-    },
-  };
-}
-
-function buildGroupedMessageLeading(
-  members: ActivityFeedLeafItemVM[],
-): InboxLeadingVM | undefined {
-  const aggregatedAvatars = collectUniqueAvatars(
-    members.map((member) => {
-      const actor = member.refs.actor;
-      if (!actor) {
-        return member.content.leading;
-      }
-
-      return {
-        kind: 'avatars' as const,
-        avatars: [
-          {
-            name: actor.profile.displayName ?? 'Someone',
-            avatar: actor.profile.avatar ?? {
-              source: 'seed' as const,
-              seed: actor.ids.id,
-            },
-            themeKey: actor.ui?.themeKey ?? null,
-          },
-        ],
-        overflowCount: 0,
-      };
-    }),
-  );
-
-  if (!aggregatedAvatars.length) {
-    return undefined;
-  }
-
-  return {
-    kind: 'avatars',
-    avatars: aggregatedAvatars.slice(0, 3),
-    overflowCount: Math.max(0, aggregatedAvatars.length - 3),
-  };
-}
-
-function normalizeChannelGroupedParent(
-  parent: Extract<ActivityFeedItemVM, { kind: 'group' }>,
-  members: ActivityFeedLeafItemVM[],
-): Extract<ActivityFeedItemVM, { kind: 'group' }> {
-  if (parent.verb !== 'messages.posted' || !members.length) {
-    return parent;
-  }
-
-  const messageCount = members.filter(
-    (member) => member.verb === 'message.posted',
-  ).length;
-  const senderNames = Array.from(
-    new Set(
-      members
-        .map((member) => member.refs.actor?.profile?.displayName)
-        .filter(
-          (value): value is string => typeof value === 'string' && value.length > 0,
-        ),
-    ),
-  );
-  const contextTitle = parent.content.headline.secondary ?? 'Channel';
-  const leading = buildGroupedMessageLeading(members);
-
-  return {
-    ...parent,
-    content: {
-      ...parent.content,
-      leading: leading ?? parent.content.leading,
-      headline: {
-        primary:
-          senderNames.length <= 1
-            ? `${senderNames[0] ?? 'Someone'} sent you multiple messages in`
-            : 'New messages in',
-        secondary: contextTitle,
-      },
-      summary: messageCount > 1 ? `${messageCount} new messages` : parent.content.summary,
-    },
-  };
-}
-
-function collectUniqueAvatars(leads: Array<ActivityFeedItemVM['content']['leading']>) {
-  const avatars: NonNullable<Extract<InboxLeadingVM, { kind: 'avatars' }>['avatars']> =
-    [];
-  const seen = new Set<string>();
-
-  for (const lead of leads) {
-    if (!lead || lead.kind !== 'avatars') {
-      continue;
-    }
-
-    for (const avatar of lead.avatars) {
-      const avatarKey =
-        avatar.avatar.source === 'upload'
-          ? `upload:${avatar.avatar.url}`
-          : `seed:${avatar.avatar.seed}`;
-      const key = `${avatar.name}:${avatarKey}`;
-      if (seen.has(key)) {
-        continue;
-      }
-      seen.add(key);
-      avatars.push(avatar);
-    }
-  }
-
-  return avatars;
-}
-
 function buildFeedTabs(items: ActivityFeedItemVM[]): ActivityFeedTabVM[] {
   const counts = new Map<InboxTabKeyVM, number>();
   items.forEach((item) => {
@@ -474,13 +262,6 @@ function buildFeedTabs(items: ActivityFeedItemVM[]): ActivityFeedTabVM[] {
 }
 
 function getUnreadCountForItem(item: ActivityFeedItemVM) {
-  if (item.kind === 'group') {
-    return (
-      item.subActivities?.items.filter((subItem) => !subItem.state?.isRead).length ??
-      (!item.state?.isRead ? 1 : 0)
-    );
-  }
-
   return item.state?.isRead ? 0 : 1;
 }
 

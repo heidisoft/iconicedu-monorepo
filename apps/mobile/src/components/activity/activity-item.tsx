@@ -8,12 +8,7 @@ import {
   MessageSquare,
 } from 'lucide-react-native';
 import type { AppColors } from '@/lib/theme';
-import type {
-  ActivityFeedItemVM,
-  ActivityFeedGroupItemVM,
-  ActivityFeedLeafItemVM,
-  InboxIconKeyVM,
-} from '@iconicedu/shared-types';
+import type { ActivityFeedItemVM, InboxIconKeyVM } from '@iconicedu/shared-types';
 import {
   ActivityFeedbackRequest,
   canRenderMobileActivityFeedbackRequest,
@@ -74,13 +69,6 @@ export function toneColorsDark(tone?: string): { bg: string; fg: string } {
 
 export function getIconKey(item: ActivityFeedItemVM): InboxIconKeyVM {
   if (item.content.leading?.kind === 'icon') return item.content.leading.iconKey;
-  if (item.kind === 'group') {
-    const t = (item as ActivityFeedGroupItemVM).grouping?.groupType;
-    if (t === 'payment') return 'CreditCard';
-    if (t === 'class') return 'GraduationCap';
-    if (t === 'message') return 'MessageSquare';
-    return 'Bell';
-  }
   switch (item.verb) {
     case 'message.posted':
     case 'messages.posted':
@@ -355,14 +343,7 @@ export function ActivityItem({
   const time = relativeTime(item.timestamps.occurredAt);
   const isRead = item.state?.isRead ?? false;
   const isExpanded = expandedIds.has(item.ids.id);
-  const isGroup = item.kind === 'group';
-  const subItems = isGroup
-    ? ((item as ActivityFeedGroupItemVM).subActivities?.items ?? [])
-    : [];
-  const subCount = isGroup
-    ? ((item as ActivityFeedGroupItemVM).subActivityCount ?? subItems.length)
-    : 0;
-  const hasExpandedContent = !isGroup && !!item.content.expandedContent;
+  const hasExpandedContent = !!item.content.expandedContent;
   const hasActionBtn = !!item.content.actionButton && !isSubActivity;
   const primary = formatActivityPrimaryHeadline(item, viewerTimezone);
   const { secondary, emphasis } = item.content.headline;
@@ -374,8 +355,7 @@ export function ActivityItem({
 
   const handlePress = () => {
     if (!isRead) onMarkRead(item.ids.id);
-    if (isGroup && subCount > 0) onToggle(item.ids.id);
-    else if (hasExpandedContent) onToggle(item.ids.id);
+    if (hasExpandedContent) onToggle(item.ids.id);
   };
 
   if (shouldRenderFeedbackRequest) {
@@ -560,14 +540,6 @@ export function ActivityItem({
                   </Text>
                 </>
               )}
-              {isGroup && subCount > 0 && (
-                <>
-                  <View style={[s.metaDot, { backgroundColor: colors.textFaint }]} />
-                  <Text style={[s.metaText, { color: colors.textMuted }]}>
-                    {subCount} items {isExpanded ? '▲' : '▼'}
-                  </Text>
-                </>
-              )}
             </View>
           </View>
 
@@ -630,27 +602,6 @@ export function ActivityItem({
               {item.content.actionButton!.label}
             </Text>
           </TouchableOpacity>
-        )}
-
-        {/* Group sub-items */}
-        {isGroup && isExpanded && subItems.length > 0 && (
-          <View style={[s.subItemsWrap, { borderLeftColor: colors.border }]}>
-            {subItems.map((sub: ActivityFeedLeafItemVM) => (
-              <ActivityItem
-                key={sub.ids.id}
-                item={sub}
-                colors={colors}
-                isDark={isDark}
-                s={s}
-                onMarkRead={onMarkRead}
-                expandedIds={expandedIds}
-                onToggle={onToggle}
-                isSubActivity
-                viewerTimezone={viewerTimezone}
-                currentProfileId={currentProfileId}
-              />
-            ))}
-          </View>
         )}
       </Pressable>
     </View>

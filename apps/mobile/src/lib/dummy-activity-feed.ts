@@ -1,5 +1,4 @@
 import type {
-  ActivityFeedGroupItemVM,
   ActivityFeedItemVM,
   ActivityFeedLeafItemVM,
   ActivityFeedVM,
@@ -65,23 +64,7 @@ const MESSAGE_ITEMS: ActivityFeedLeafItemVM[] = [
 ];
 
 const TODAY_ITEMS: ActivityFeedItemVM[] = [
-  {
-    kind: 'group',
-    ids: { id: 'af-group-1', orgId: ORG },
-    timestamps: { occurredAt: hoursAgo(1), createdAt: hoursAgo(1) },
-    tabKey: 'all',
-    audience: { scope: { kind: 'global' }, visibility: 'public' },
-    verb: 'messages.posted',
-    refs: { actor: PRIYA },
-    grouping: { groupType: 'message', groupKey: 'message-group-1' },
-    subActivityCount: MESSAGE_ITEMS.length,
-    subActivities: { items: MESSAGE_ITEMS },
-    content: {
-      leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'info' },
-      headline: { primary: 'New messages', secondary: 'Math Foundations' },
-    },
-    state: { isRead: false, importance: 'normal' },
-  } satisfies ActivityFeedGroupItemVM,
+  ...MESSAGE_ITEMS,
   {
     kind: 'leaf',
     ids: { id: 'af-reschedule-1', orgId: ORG },
