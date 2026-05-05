@@ -71,6 +71,7 @@ describe('cancelClassScheduleSessionAction', () => {
       scheduleId: 'schedule-1',
       occurrenceKey: '2026-03-21T10:00:00.000Z',
       reason: 'Tutor unavailable',
+      suppressNotifications: false,
     });
     expect(revalidatePathMock).toHaveBeenCalledWith('/iconic-academy/class-schedule');
     expect(result).toEqual({
@@ -89,6 +90,7 @@ describe('cancelClassScheduleSessionAction', () => {
       scheduleId: 'schedule-1',
       occurrenceKey: '2026-03-21T10:00:00.000Z',
       reason: null,
+      suppressNotifications: false,
     });
 
     expect(apiPostMock).toHaveBeenCalledWith('/schedules/session/cancel', {
@@ -96,6 +98,7 @@ describe('cancelClassScheduleSessionAction', () => {
       scheduleId: 'schedule-1',
       occurrenceKey: '2026-03-21T10:00:00.000Z',
       reason: null,
+      suppressNotifications: false,
     });
     expect(revalidatePathMock).toHaveBeenCalledWith('/iconic-academy/class-schedule');
     expect(result).toEqual({
@@ -118,5 +121,24 @@ describe('cancelClassScheduleSessionAction', () => {
         occurrenceKey: '2026-03-21T10:00:00.000Z',
       }),
     ).rejects.toThrow('Only staff or owner users can cancel sessions.');
+  });
+
+  it('passes silent cancellation intent to the API', async () => {
+    apiPostMock.mockResolvedValue({ mode: 'recurring' });
+
+    await cancelClassScheduleSessionAction({
+      orgSlug: 'iconic-academy',
+      scheduleId: 'schedule-1',
+      occurrenceKey: '2026-03-21T10:00:00.000Z',
+      suppressNotifications: true,
+    });
+
+    expect(apiPostMock).toHaveBeenCalledWith('/schedules/session/cancel', {
+      orgId: 'org-1',
+      scheduleId: 'schedule-1',
+      occurrenceKey: '2026-03-21T10:00:00.000Z',
+      reason: null,
+      suppressNotifications: true,
+    });
   });
 });

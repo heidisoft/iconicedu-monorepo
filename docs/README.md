@@ -69,6 +69,7 @@ Internal engineers, operators, and AI assistants.
 - [Diagrams](architecture/diagrams.md)
 - [Swimlanes](architecture/swimlanes.md)
 - [Activity Feed Contract](architecture/activity-feed.md)
+- [Event Pipeline Scalability](architecture/event-pipeline-scalability.md)
 
 ### Standards
 

@@ -77,6 +77,17 @@ The source of truth for the live schema is `supabase/migrations/`. The Prisma sc
 | `family_links`        | Guardian → child relationship.                           |
 | `family_link_invites` | Invite flow for linking a guardian to a child's account. |
 
+### Event pipeline
+
+| Table                 | Purpose                                                                                                                                                                                                                       |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `event_outbox`        | Transactional outbox. Every domain event is written here first, guaranteeing at-least-once delivery into the pipeline.                                                                                                        |
+| `event_pipeline_jobs` | Unified job queue. Holds jobs of kinds `activity.generate`, `activity.project`, `notification.prepare`, `notification.deliver`, `reminder.reconcile`, `reminder.dispatch`. Polled by edge functions via pg_cron every minute. |
+| `event_pipeline_logs` | Immutable log of each job execution outcome (`succeeded`, `suppressed`, `retryable_failure`, `fatal_failure`, `canceled`).                                                                                                    |
+| `activity_events`     | Normalised domain events after generation. One row per business event; projection status tracked here.                                                                                                                        |
+| `activity_feed_items` | Per-recipient inbox items projected from `activity_events`. Feeds the activity feed tabs (`all`, `classes`, `payment`, `system`).                                                                                             |
+| `reminder_jobs`       | Scheduled reminder entries (session reminders, etc.). Polled by the `reminders-dispatch` edge function.                                                                                                                       |
+
 ---
 
 ## Key Relationships

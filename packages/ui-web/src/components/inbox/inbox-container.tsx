@@ -338,6 +338,9 @@ export function applyScheduleActivityLocalTime(
   timezone?: string | null,
 ): ActivityFeedItemVM {
   const metadata = activity.metadata as Record<string, unknown> | undefined;
+  if (metadata?.preserveActivitySummary === true) {
+    return activity;
+  }
   if (!metadata?.sessionLocalTime) {
     return activity;
   }

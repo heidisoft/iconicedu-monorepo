@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { ActivityFeedSectionVM } from '@iconicedu/shared-types';
 import {
+  applyScheduleActivityLocalTime,
   applyReadStateToSections,
   buildUnreadTabCounts,
   resolveReadIdsForActivity,
@@ -99,5 +100,25 @@ describe('resolveUnreadIdsForTab', () => {
   it('returns unread ids for the selected tab', () => {
     expect(resolveUnreadIdsForTab(SECTIONS, 'classes')).toEqual(['item-1']);
     expect(resolveUnreadIdsForTab(SECTIONS, 'all')).toEqual(['item-1']);
+  });
+});
+
+describe('applyScheduleActivityLocalTime', () => {
+  it('preserves context-rich API summaries', () => {
+    const item = {
+      ...SECTIONS[0]!.items[0]!,
+      content: {
+        headline: { primary: 'Class session canceled' },
+        summary: 'Algebra I for Priya with Ms. Chen Reason: weather.',
+      },
+      metadata: {
+        preserveActivitySummary: true,
+        sessionLocalTime: true,
+        canceledStartAt: '2026-03-19T22:00:00.000Z',
+        timezone: 'America/New_York',
+      },
+    };
+
+    expect(applyScheduleActivityLocalTime(item, 'America/New_York')).toBe(item);
   });
 });

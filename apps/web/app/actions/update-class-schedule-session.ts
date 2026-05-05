@@ -1,7 +1,6 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import type { LearningSpaceCreatePayload, UserProfileVM } from '@iconicedu/shared-types';
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
 import { getAccountByAuthUserIdInOrg } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { getProfileByAccountId } from '@iconicedu/web/lib/profile/queries/profiles.query';
@@ -10,8 +9,7 @@ import {
   normalizeScheduleFormDate,
   toOccurrenceKeyInTimezone,
 } from '@iconicedu/web/lib/admin/learning-space-schedule-hash';
-import { mapSchedulesToPayload } from '@iconicedu/web/lib/admin/learning-space-form-schedules';
-import { updateLearningSpaceFromPayload } from '@iconicedu/web/lib/admin/learning-space-update';
+import { createApiClient } from '@iconicedu/web/lib/api/http-client';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 import { getLocalDate } from '@iconicedu/utils';
@@ -25,6 +23,7 @@ export type UpdateClassScheduleSessionActionInput = {
   endTime: string;
   timezone: string;
   reason?: string | null;
+  suppressNotifications?: boolean;
 };
 
 export type UpdateClassScheduleSessionActionResult = {
@@ -41,16 +40,6 @@ export type UpdateClassScheduleSessionActionResult = {
 function normalizeReason(reason?: string | null) {
   const trimmed = reason?.trim();
   return trimmed ? trimmed : null;
-}
-
-function mapParticipantsToPayload(selected: UserProfileVM[]) {
-  return selected.map((participant) => ({
-    profileId: participant.ids.id,
-    kind: participant.kind,
-    displayName: participant.profile.displayName,
-    avatarUrl: participant.profile.avatar.url ?? null,
-    themeKey: participant.ui?.themeKey ?? null,
-  }));
 }
 
 function isValidTimeRange(startTime: string, endTime: string) {
@@ -157,95 +146,44 @@ export async function updateClassScheduleSessionAction(
   const isRecurringSchedule = Boolean(targetSchedule.rule);
   const scheduleTimezone =
     targetSchedule.timezone || scheduleRow.timezone || input.timezone;
-  const updatedSchedules = detail.schedules.map((schedule) => {
-    if (schedule.id !== input.scheduleId) {
-      return schedule;
+  const api = createApiClient(supabase);
+  const revalidateScheduleViews = () => {
+    revalidatePath(`/${input.orgSlug}/class-schedule`);
+    if (scheduleRow.source_channel_id) {
+      revalidatePath(`/${input.orgSlug}/s/${scheduleRow.source_channel_id}`);
     }
-
-    if (!isRecurringSchedule) {
-      const startDate = normalizeScheduleFormDate(input.date, input.timezone);
-      if (!startDate) {
-        throw new Error('Invalid session date.');
-      }
-
-      return {
-        ...schedule,
-        startDate,
-        startTime: input.startTime,
-        endTime: input.endTime,
-        timezone: input.timezone,
-      };
-    }
-
-    const originalDate =
-      getLocalDate(input.occurrenceKey, scheduleTimezone) ??
-      input.occurrenceKey.slice(0, 10);
-    const shouldUseBaseOccurrence =
-      originalDate === input.date &&
-      schedule.startTime === input.startTime &&
-      schedule.endTime === input.endTime;
-
-    return {
-      ...schedule,
-      exceptions: schedule.exceptions.filter(
-        (exception) => exception.date !== originalDate,
-      ),
-      overrides: shouldUseBaseOccurrence
-        ? schedule.overrides.filter((override) => override.originalDate !== originalDate)
-        : [
-            ...schedule.overrides.filter(
-              (override) => override.originalDate !== originalDate,
-            ),
-            {
-              id:
-                schedule.overrides.find(
-                  (override) => override.originalDate === originalDate,
-                )?.id ?? `${input.scheduleId}:override:${originalDate}`,
-              originalDate,
-              newDate: input.date,
-              newTime: input.startTime,
-              newEndTime: input.endTime,
-              reason: normalizedReason ?? undefined,
-            },
-          ],
-    };
-  });
-
-  const payload: LearningSpaceCreatePayload = {
-    basics: {
-      title: detail.basics.title,
-      kind: detail.basics.kind,
-      iconKey: detail.basics.iconKey,
-      subject: detail.basics.subject,
-      description: detail.basics.description,
-    },
-    settings: {
-      themeKey: detail.settings.themeKey,
-      uiDefaults: detail.settings.uiDefaults ?? null,
-    },
-    liveSession: detail.liveSession,
-    participants: mapParticipantsToPayload(detail.participants),
-    schedules: mapSchedulesToPayload(updatedSchedules),
   };
 
-  await updateLearningSpaceFromPayload(scheduleRow.source_learning_space_id, payload, {
-    orgId: org.id,
-    actorProfileId: actorProfile.id,
-  });
-
-  revalidatePath(`/${input.orgSlug}/class-schedule`);
-  if (scheduleRow.source_channel_id) {
-    revalidatePath(`/${input.orgSlug}/s/${scheduleRow.source_channel_id}`);
-  }
-
   if (!isRecurringSchedule) {
+    const startDate = normalizeScheduleFormDate(input.date, input.timezone);
+    if (!startDate) {
+      throw new Error('Invalid session date.');
+    }
+    const startAt = toOccurrenceKeyInTimezone(
+      input.date,
+      input.startTime,
+      input.timezone,
+    );
+    const endAt = toOccurrenceKeyInTimezone(input.date, input.endTime, input.timezone);
+    await api.post('/schedules/session/reschedule', {
+      orgId: org.id,
+      scheduleId: input.scheduleId,
+      occurrenceKey: input.occurrenceKey ?? null,
+      startAt,
+      endAt,
+      timezone: input.timezone,
+      reason: normalizedReason,
+      suppressNotifications: input.suppressNotifications === true,
+    });
+    revalidateScheduleViews();
+
     return {
       scheduleId: input.scheduleId,
       occurrenceKey: input.occurrenceKey,
       mode: 'single',
       status: 'scheduled',
-      startAt: toOccurrenceKeyInTimezone(input.date, input.startTime, input.timezone),
-      endAt: toOccurrenceKeyInTimezone(input.date, input.endTime, input.timezone),
+      startAt,
+      endAt,
       timezone: input.timezone,
       reason: normalizedReason,
     };
@@ -258,22 +196,36 @@ export async function updateClassScheduleSessionAction(
     originalDate === input.date &&
     targetSchedule.startTime === input.startTime &&
     targetSchedule.endTime === input.endTime;
+  const startAt = toOccurrenceKeyInTimezone(
+    restoredToBase ? originalDate : input.date,
+    restoredToBase ? targetSchedule.startTime : input.startTime,
+    scheduleTimezone,
+  );
+  const endAt = toOccurrenceKeyInTimezone(
+    restoredToBase ? originalDate : input.date,
+    restoredToBase ? targetSchedule.endTime : input.endTime,
+    scheduleTimezone,
+  );
+
+  await api.post('/schedules/session/reschedule', {
+    orgId: org.id,
+    scheduleId: input.scheduleId,
+    occurrenceKey: input.occurrenceKey ?? null,
+    startAt,
+    endAt,
+    timezone: scheduleTimezone,
+    reason: restoredToBase ? null : normalizedReason,
+    suppressNotifications: input.suppressNotifications === true,
+  });
+  revalidateScheduleViews();
 
   return {
     scheduleId: input.scheduleId,
     occurrenceKey: input.occurrenceKey,
     mode: 'recurring',
     status: restoredToBase ? 'scheduled' : 'rescheduled',
-    startAt: toOccurrenceKeyInTimezone(
-      restoredToBase ? originalDate : input.date,
-      restoredToBase ? targetSchedule.startTime : input.startTime,
-      scheduleTimezone,
-    ),
-    endAt: toOccurrenceKeyInTimezone(
-      restoredToBase ? originalDate : input.date,
-      restoredToBase ? targetSchedule.endTime : input.endTime,
-      scheduleTimezone,
-    ),
+    startAt,
+    endAt,
     timezone: scheduleTimezone,
     reason: restoredToBase ? null : normalizedReason,
   };

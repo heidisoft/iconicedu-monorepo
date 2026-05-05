@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   InternalServerErrorException,
@@ -14,6 +15,7 @@ import type {
   CancelSessionDto,
   DeleteSchedulesDto,
   ReplaceSchedulesDto,
+  RescheduleSessionDto,
   ScheduleRowInput,
 } from '@iconicedu/api/modules/schedules/dto';
 
@@ -205,7 +207,10 @@ export class SchedulesService {
       return { success: true, mode: 'single' };
     }
 
-    const occurrenceKey = dto.occurrenceKey ?? '';
+    const occurrenceKey = dto.occurrenceKey;
+    if (!occurrenceKey) {
+      throw new BadRequestException('occurrenceKey is required for recurring sessions');
+    }
 
     // Delete any existing override for this occurrence
     await supabase
@@ -227,7 +232,11 @@ export class SchedulesService {
     if (existingException) {
       const { error: updateError } = await supabase
         .from('class_schedule_recurrence_exceptions')
-        .update({ reason: dto.reason, updated_at: now })
+        .update({
+          reason: dto.reason,
+          suppress_notifications: dto.suppressNotifications,
+          updated_at: now,
+        })
         .eq('id', existingException.id)
         .eq('org_id', dto.orgId);
 
@@ -243,6 +252,109 @@ export class SchedulesService {
           recurrence_id: recurrenceRow.id,
           occurrence_key: occurrenceKey,
           reason: dto.reason,
+          suppress_notifications: dto.suppressNotifications,
+          created_at: now,
+          updated_at: now,
+        });
+
+      if (insertError) {
+        throw new InternalServerErrorException(insertError.message);
+      }
+    }
+
+    return { success: true, mode: 'recurring' };
+  }
+
+  async rescheduleScheduleSession(
+    accessToken: string,
+    dto: RescheduleSessionDto,
+  ): Promise<{ success: true; mode: 'single' | 'recurring' }> {
+    await this.requireOrgActor(accessToken, dto.orgId);
+    const supabase = createSupabaseServiceClient();
+    const now = new Date().toISOString();
+
+    const { data: recurrenceRow, error: recurrenceError } = await supabase
+      .from('class_schedule_recurrence')
+      .select('id')
+      .eq('org_id', dto.orgId)
+      .eq('schedule_id', dto.scheduleId)
+      .is('deleted_at', null)
+      .maybeSingle<{ id: string }>();
+
+    if (recurrenceError) {
+      throw new InternalServerErrorException(recurrenceError.message);
+    }
+
+    if (!recurrenceRow) {
+      const { error: updateError } = await supabase
+        .from('class_schedules')
+        .update({
+          start_at: dto.startAt,
+          end_at: dto.endAt,
+          timezone: dto.timezone,
+          updated_at: now,
+        })
+        .eq('id', dto.scheduleId)
+        .eq('org_id', dto.orgId)
+        .is('deleted_at', null);
+
+      if (updateError) {
+        throw new InternalServerErrorException(updateError.message);
+      }
+
+      return { success: true, mode: 'single' };
+    }
+
+    const occurrenceKey = dto.occurrenceKey;
+    if (!occurrenceKey) {
+      throw new BadRequestException('occurrenceKey is required for recurring sessions');
+    }
+
+    await supabase
+      .from('class_schedule_recurrence_exceptions')
+      .delete()
+      .eq('org_id', dto.orgId)
+      .eq('recurrence_id', recurrenceRow.id)
+      .eq('occurrence_key', occurrenceKey);
+
+    const patch = {
+      startAt: dto.startAt,
+      endAt: dto.endAt,
+      ...(dto.reason ? { reason: dto.reason } : {}),
+    };
+
+    const { data: existingOverride } = await supabase
+      .from('class_schedule_recurrence_overrides')
+      .select('id')
+      .eq('org_id', dto.orgId)
+      .eq('recurrence_id', recurrenceRow.id)
+      .eq('occurrence_key', occurrenceKey)
+      .maybeSingle<{ id: string }>();
+
+    if (existingOverride) {
+      const { error: updateError } = await supabase
+        .from('class_schedule_recurrence_overrides')
+        .update({
+          patch,
+          suppress_notifications: dto.suppressNotifications,
+          updated_at: now,
+        })
+        .eq('id', existingOverride.id)
+        .eq('org_id', dto.orgId);
+
+      if (updateError) {
+        throw new InternalServerErrorException(updateError.message);
+      }
+    } else {
+      const { error: insertError } = await supabase
+        .from('class_schedule_recurrence_overrides')
+        .insert({
+          id: randomUUID(),
+          org_id: dto.orgId,
+          recurrence_id: recurrenceRow.id,
+          occurrence_key: occurrenceKey,
+          patch,
+          suppress_notifications: dto.suppressNotifications,
           created_at: now,
           updated_at: now,
         });

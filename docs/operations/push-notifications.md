@@ -6,7 +6,7 @@ End-to-end reference for Expo push notifications: how tokens are managed on devi
 
 ## Last Updated
 
-2026-05-04
+2026-05-05
 
 ## Related Docs
 
@@ -75,7 +75,7 @@ Expected runtime flow:
 1. Mobile or web performs a product action through `apps/api`.
 2. The API writes product data; API command code or DB triggers enqueue a canonical `event_outbox` signal.
 3. `events-dispatch` claims `activity.generate` work and writes or reuses the canonical `activity_events` row.
-4. `activity.project` writes `activity_feed_items`/groups and enqueues `notification.prepare`.
+4. `activity.project` writes `activity_feed_items` and enqueues `notification.prepare`.
 5. `notification.prepare` evaluates preferences, suppression, timing, and channels, then enqueues `notification.deliver`.
 6. `notification.deliver` sends the push notification through Expo and logs the outcome.
 

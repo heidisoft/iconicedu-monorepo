@@ -29,6 +29,7 @@ type ProfileAccountRow = {
 type EventPayload = {
   mentionedProfileId?: string;
   threadId?: string;
+  suppressNotifications?: unknown;
 };
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -191,6 +192,22 @@ export async function buildNotificationDecision(input: {
 }) {
   const reasonCodes: NotificationDecisionReason[] = [];
   const policy = getNotificationPolicyConfig(input.event.event_type);
+  const eventPayload = asRecord(input.event.payload) as EventPayload;
+  if (eventPayload.suppressNotifications === true) {
+    return {
+      eventId: input.event.id,
+      recipientProfileId: input.recipientProfileId,
+      prefKey: policy.prefKey,
+      shouldWriteInbox: true,
+      deliveryChannels: [] as NotificationDeliveryChannel[],
+      deliveryTiming: 'immediate' as NotificationDeliveryTiming,
+      runAt: new Date().toISOString(),
+      reasonCodes: ['source_suppressed'] as NotificationDecisionReason[],
+      policy,
+      scopeKind: null,
+      scopeId: null,
+    };
+  }
   const preference = await resolveEffectivePreference({
     supabase: input.supabase,
     event: input.event,

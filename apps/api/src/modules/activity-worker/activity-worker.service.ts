@@ -289,7 +289,9 @@ export class ActivityWorkerService {
 
     const exceptionResponse = await supabase
       .from('class_schedule_recurrence_exceptions')
-      .select('id, recurrence_id, occurrence_key, reason, created_by')
+      .select(
+        'id, recurrence_id, occurrence_key, reason, suppress_notifications, created_by',
+      )
       .eq('org_id', job.org_id)
       .eq('id', job.exception_id)
       .is('deleted_at', null)
@@ -298,6 +300,7 @@ export class ActivityWorkerService {
         recurrence_id: string;
         occurrence_key: string;
         reason: string | null;
+        suppress_notifications: boolean | null;
         created_by: string | null;
       }>();
 
@@ -342,9 +345,11 @@ export class ActivityWorkerService {
         firstSessionTimezone: context.firstSessionTimezone,
         canceledStartAt: exception.occurrence_key,
         canceledReason: exception.reason ?? null,
+        suppressNotifications: exception.suppress_notifications === true,
         timezone: context.timezone ?? 'UTC',
       },
       dedupeKey: `session.canceled:${job.exception_id}`,
+      refreshOnDedupe: true,
       createdBy: actorProfileId,
     });
   }
@@ -359,7 +364,9 @@ export class ActivityWorkerService {
 
     const overrideResponse = await supabase
       .from('class_schedule_recurrence_overrides')
-      .select('id, recurrence_id, occurrence_key, patch, created_by')
+      .select(
+        'id, recurrence_id, occurrence_key, patch, suppress_notifications, created_by',
+      )
       .eq('org_id', job.org_id)
       .eq('id', job.override_id)
       .is('deleted_at', null)
@@ -368,6 +375,7 @@ export class ActivityWorkerService {
         recurrence_id: string;
         occurrence_key: string;
         patch: Record<string, unknown> | null;
+        suppress_notifications: boolean | null;
         created_by: string | null;
       }>();
 
@@ -420,9 +428,11 @@ export class ActivityWorkerService {
           typeof patch.reason === 'string' && patch.reason.trim().length > 0
             ? patch.reason
             : null,
+        suppressNotifications: override.suppress_notifications === true,
         timezone: context.timezone ?? 'UTC',
       },
       dedupeKey: `session.rescheduled:${job.override_id}`,
+      refreshOnDedupe: true,
       createdBy: actorProfileId,
     });
   }

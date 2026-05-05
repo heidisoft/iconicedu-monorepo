@@ -1,5 +1,7 @@
 # Onboarding Tour System
 
+> Status: planned, not yet implemented.
+
 **Status:** Planned  
 **Audience:** Engineers
 

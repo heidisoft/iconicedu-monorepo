@@ -114,7 +114,7 @@ graph TD
     end
 
     subgraph ExtMobile["Mobile Ecosystem"]
-        EXPO55["Expo SDK 55\nExpo Router · SecureStore"]
+        EXPO55["Expo SDK 55\nExpo Router v7 · SecureStore"]
         NATIVEWIND["NativeWind 4.x\nTailwind for RN"]
         RNPRIM["rn-primitives\nHeadless RN components"]
         TANSTACK["TanStack Query\nServer state + cache"]
@@ -132,7 +132,7 @@ graph TD
     WEB --> NEXTJS & SUPAJSSSR
 
     MOBILE --> SHARED & UINATIVE & UTILS & TSCONFIG
-    MOBILE --> EXPO54 & TANSTACK & RN & REANIMATED
+    MOBILE --> EXPO55 & TANSTACK & RN & REANIMATED
 
     API --> PRISMA & NEST & JWT_LIB & TSCONFIG
 

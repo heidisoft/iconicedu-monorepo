@@ -5,6 +5,7 @@ export type CancelSessionDto = {
   scheduleId: string;
   occurrenceKey: string | null;
   reason: string | null;
+  suppressNotifications: boolean;
 };
 
 export function parseCancelSessionDto(input: unknown): CancelSessionDto {
@@ -25,6 +26,10 @@ export function parseCancelSessionDto(input: unknown): CancelSessionDto {
 
   const occurrenceKey = body['occurrenceKey'];
   const reason = body['reason'];
+  const suppressNotifications = body['suppressNotifications'];
+  if (suppressNotifications !== undefined && typeof suppressNotifications !== 'boolean') {
+    throw new BadRequestException('suppressNotifications must be a boolean');
+  }
 
   return {
     orgId: orgId.trim(),
@@ -34,5 +39,6 @@ export function parseCancelSessionDto(input: unknown): CancelSessionDto {
         ? occurrenceKey.trim()
         : null,
     reason: typeof reason === 'string' && reason.trim() ? reason.trim() : null,
+    suppressNotifications: suppressNotifications === true,
   };
 }

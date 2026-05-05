@@ -12,7 +12,8 @@ export type NotificationDecisionReason =
   | 'mention_priority_override'
   | 'presence_active'
   | 'channel_recently_read'
-  | 'critical_override';
+  | 'critical_override'
+  | 'source_suppressed';
 
 export interface NotificationPolicyConfig {
   prefKey: string;
