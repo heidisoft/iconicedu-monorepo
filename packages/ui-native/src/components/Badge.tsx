@@ -18,7 +18,7 @@ const badgeVariants = cva('items-center justify-center rounded-full', {
   },
 });
 
-const badgeTextVariants = cva('text-[10px] font-bold', {
+const badgeTextVariants = cva('text-[11px] font-bold', {
   variants: {
     variant: {
       default: 'text-secondary-foreground',
@@ -52,7 +52,11 @@ export const Badge: React.FC<BadgeProps> = ({
   if (dot) {
     return (
       <View
-        className={cn('h-2 w-2 rounded-full', badgeVariants({ variant }), className)}
+        className={cn(
+          'h-[10px] w-[10px] rounded-full',
+          badgeVariants({ variant }),
+          className,
+        )}
         accessibilityLabel="New notification"
       />
     );

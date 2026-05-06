@@ -41,11 +41,11 @@ export const Input: React.FC<InputProps> = ({
   return (
     <View className={cn('gap-1.5', containerClassName)}>
       {label && (
-        <Text className="text-sm font-medium text-muted-foreground">{label}</Text>
+        <Text className="text-[13px] font-medium text-muted-foreground">{label}</Text>
       )}
       <TextInput
         className={cn(
-          'rounded-xl border px-4 py-3 text-base text-foreground bg-card',
+          'min-h-[48px] rounded-xl border px-4 py-3 text-[15px] text-foreground bg-card',
           focused ? 'border-ring' : 'border-input',
           error && 'border-destructive',
           className,
@@ -57,9 +57,9 @@ export const Input: React.FC<InputProps> = ({
         accessibilityState={{ disabled: rest.editable === false }}
         {...rest}
       />
-      {error && <Text className="text-xs text-destructive">{error}</Text>}
+      {error && <Text className="text-[12px] text-destructive">{error}</Text>}
       {helperText && !error && (
-        <Text className="text-xs text-muted-foreground">{helperText}</Text>
+        <Text className="text-[12px] text-muted-foreground">{helperText}</Text>
       )}
     </View>
   );

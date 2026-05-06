@@ -202,11 +202,11 @@ describe('MessageItem', () => {
     );
 
     expect(StyleSheet.flatten(screen.getByTestId('message-bubble').props.style)).toEqual(
-      expect.objectContaining({ width: '85%', borderRadius: 12 }),
+      expect.objectContaining({ maxWidth: '78%', borderRadius: 18 }),
     );
     expect(
       StyleSheet.flatten(screen.getByTestId('message-text-content').props.style),
-    ).toEqual(expect.objectContaining({ flexWrap: 'wrap', fontSize: 14, width: '100%' }));
+    ).toEqual(expect.objectContaining({ flexWrap: 'wrap', fontSize: 17 }));
   });
 
   it('renders sender name when isGroupStart is true', () => {

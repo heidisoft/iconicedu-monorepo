@@ -733,7 +733,7 @@ export default function HomeScreen() {
                         topic: supportChannel.topic ?? 'Live Support',
                         iconKey: supportChannel.icon_key ?? 'life-buoy',
                         themeKey: supportChannel.themeKey ?? '',
-                        messageUiThemeKey: supportChannel.messageUiThemeKey ?? 'feed',
+                        messageUiThemeKey: supportChannel.messageUiThemeKey ?? 'classic',
                         isLearningSpace: '0',
                         purpose: 'support',
                       },

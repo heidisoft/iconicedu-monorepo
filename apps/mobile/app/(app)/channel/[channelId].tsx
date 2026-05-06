@@ -178,7 +178,7 @@ export default function ChannelConversationScreen() {
   // ── Tab state ──
   const [activeTab, setActiveTab] = useState<ChannelTab>('messages');
   const s = useMemo(() => makeStyles(colors), [colors]);
-  const messageTheme = resolveMobileMessageUiTheme(messageUiThemeKey ?? 'feed');
+  const messageTheme = resolveMobileMessageUiTheme(messageUiThemeKey ?? 'classic');
   const ThemedMessageList = messageTheme.MessageList;
 
   // ── Info sheet state ──

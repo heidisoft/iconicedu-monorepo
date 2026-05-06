@@ -10,6 +10,7 @@ import {
 import { CalendarDays, ChevronDown, CheckCircle2 } from 'lucide-react-native';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
+import { FONT_SIZE, TOUCH_TARGET } from '@/lib/typography';
 import type {
   ArchiveAwareClassScheduleVM,
   ClassScheduleVM,
@@ -597,7 +598,8 @@ function makeStyles(C: AppColors) {
     },
     subTabBtn: {
       paddingHorizontal: 14,
-      paddingVertical: 6,
+      paddingVertical: 10,
+      minHeight: TOUCH_TARGET.sm,
       borderRadius: 20,
       backgroundColor: C.inputBg,
     },
@@ -699,7 +701,7 @@ function makeStyles(C: AppColors) {
       borderRadius: 2.5,
     },
     progressPct: {
-      fontSize: 9,
+      fontSize: FONT_SIZE.xs,
       color: C.textMuted,
       fontWeight: '500',
       minWidth: 24,

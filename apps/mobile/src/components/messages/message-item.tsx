@@ -35,6 +35,12 @@ import type {
   ReactionVM,
 } from '@iconicedu/shared-types';
 import type { AppColors } from '@/lib/theme';
+import {
+  AVATAR_SIZE as AVATAR_TOKENS,
+  FONT_SIZE,
+  LINE_HEIGHT,
+  TOUCH_TARGET,
+} from '@/lib/typography';
 import type { PresenceDisplayStatus } from '@/hooks/use-online-profile-ids';
 import { reportMobileObservedError } from '@/lib/analytics/report-error';
 import { fetchThreadMessages } from '@/lib/api/queries';
@@ -118,7 +124,7 @@ export function getAvatarInfo(message: MessageVM): AvatarInfo {
 
 // ─── Inline avatar (avoids NativeWind sizing issues on Image) ─────────────────
 
-const AVATAR_SIZE = 36;
+const MESSAGE_AVATAR_SIZE = AVATAR_TOKENS.md;
 const AVATAR_COLORS = [
   '#5B8DEF',
   '#E07B54',
@@ -148,7 +154,7 @@ export function MessageAvatar({
   role,
   presence,
   presenceStatus,
-  size = AVATAR_SIZE,
+  size = MESSAGE_AVATAR_SIZE,
   badgeSizeOverride,
 }: {
   name: string;
@@ -580,7 +586,7 @@ function ThreadPill({
         >
           <Text
             style={{
-              fontSize: 10,
+              fontSize: 11,
               lineHeight: 12,
               fontWeight: '700',
               color: colors.teal,
@@ -685,7 +691,7 @@ function ThreadPill({
                     borderColor: colors.pageBg,
                   }}
                 >
-                  <Text style={{ color: '#fff', fontSize: 8, fontWeight: '700' }}>
+                  <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>
                     {getInitials(name)[0]}
                   </Text>
                 </View>
@@ -755,7 +761,7 @@ function InlineUnreadDivider({ count, colors }: { count?: number; colors: AppCol
       >
         <Text
           style={{
-            fontSize: 10,
+            fontSize: 11,
             fontWeight: '700',
             textTransform: 'uppercase',
             letterSpacing: 0.8,
@@ -1376,7 +1382,7 @@ function SessionCompleteBar({
           {message.session.title}
         </Text>
         {!!message.session.endAt && (
-          <Text style={{ fontSize: 10, color: colors.textFaint }}>
+          <Text style={{ fontSize: 11, color: colors.textFaint }}>
             {formatTime(message.session.endAt)}
           </Text>
         )}
@@ -1516,31 +1522,31 @@ function makeStyles(colors: AppColors) {
       flexDirection: 'row',
       alignItems: 'flex-start',
       paddingHorizontal: 8,
-      paddingVertical: 8,
-      gap: 12,
+      paddingVertical: 1,
+      gap: 6,
     },
     rowOwn: { flexDirection: 'row-reverse' },
-    rowGroupStart: { paddingTop: 12 },
+    rowGroupStart: { paddingTop: 8 },
 
     // ── Avatar slot (always 36px to reserve space) ───────────────────────────
-    avatarSlot: { width: 36, flexShrink: 0, alignItems: 'center' },
+    avatarSlot: { width: AVATAR_TOKENS.md, flexShrink: 0, alignItems: 'center' },
 
     // ── Content column ────────────────────────────────────────────────────────
-    contentCol: { flex: 1, alignItems: 'flex-start', gap: 4 },
+    contentCol: { flex: 1, alignItems: 'flex-start', gap: 2 },
     contentColOwn: { alignItems: 'flex-end' },
 
     // ── Name + time row (inside bubble) ──────────────────────────────────────
-    nameRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginBottom: 2 },
+    nameRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginBottom: 3 },
     nameRowOwn: { justifyContent: 'flex-end' },
-    senderName: { fontSize: 14, fontWeight: '700' },
-    msgTime: { fontSize: 11, color: colors.textFaint },
+    senderName: { fontSize: FONT_SIZE.sm, fontWeight: '700' },
+    msgTime: { fontSize: FONT_SIZE.xs, color: colors.textFaint },
 
     // ── Message bubble ────────────────────────────────────────────────────────
     bubble: {
-      width: '85%',
-      borderRadius: 12,
-      paddingHorizontal: 12,
-      paddingVertical: 8,
+      maxWidth: '78%',
+      borderRadius: 18,
+      paddingHorizontal: 14,
+      paddingVertical: 7,
     },
     bubbleOther: {
       backgroundColor: 'rgba(148, 163, 184, 0.16)',
@@ -1551,11 +1557,10 @@ function makeStyles(colors: AppColors) {
 
     // ── Text inside bubble ────────────────────────────────────────────────────
     textContent: {
-      width: '100%',
       flexShrink: 1,
       flexWrap: 'wrap',
-      fontSize: 14,
-      lineHeight: 20,
+      fontSize: FONT_SIZE.xl,
+      lineHeight: LINE_HEIGHT.md,
       color: colors.text,
     },
     textContentOwn: { color: colors.text },
@@ -1573,11 +1578,10 @@ function makeStyles(colors: AppColors) {
       paddingVertical: 8,
     },
     fileCaptionBubble: {
-      width: '85%' as const,
-      maxWidth: '85%' as const,
-      borderRadius: 12,
-      paddingHorizontal: 12,
-      paddingVertical: 8,
+      maxWidth: '78%' as const,
+      borderRadius: 18,
+      paddingHorizontal: 14,
+      paddingVertical: 7,
     },
     // File list: standalone card matching web "max-w-sm rounded-xl border border-border bg-muted/30"
     fileListWrap: {
@@ -1606,9 +1610,9 @@ function makeStyles(colors: AppColors) {
     },
     audioRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     playBtn: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
+      width: TOUCH_TARGET.md,
+      height: TOUCH_TARGET.md,
+      borderRadius: 22,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -1654,9 +1658,9 @@ function makeStyles(colors: AppColors) {
       position: 'absolute' as const,
       top: 12,
       right: 12,
-      width: 32,
-      height: 32,
-      borderRadius: 16,
+      width: TOUCH_TARGET.md,
+      height: TOUCH_TARGET.md,
+      borderRadius: 22,
       backgroundColor: 'rgba(0,0,0,0.5)',
       alignItems: 'center' as const,
       justifyContent: 'center' as const,
@@ -1708,6 +1712,7 @@ function makeStyles(colors: AppColors) {
     attachName: { flex: 1, fontSize: 12, fontWeight: '500' },
     joinBtn: {
       borderRadius: 10,
+      paddingHorizontal: 14,
       paddingVertical: 10,
       alignItems: 'center',
       marginTop: 10,

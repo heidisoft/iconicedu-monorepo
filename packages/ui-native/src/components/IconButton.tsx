@@ -14,9 +14,9 @@ const iconButtonVariants = cva(
         outline: 'border border-border bg-transparent',
       },
       size: {
-        sm: 'h-8 w-8',
-        default: 'h-10 w-10',
-        lg: 'h-12 w-12',
+        sm: 'h-[36px] w-[36px]',
+        default: 'h-[44px] w-[44px]',
+        lg: 'h-[48px] w-[48px]',
       },
     },
     defaultVariants: {
@@ -41,6 +41,7 @@ export const IconButton: React.FC<IconButtonProps> = ({
   label,
   className,
   disabled,
+  hitSlop,
   onPress,
   ...rest
 }) => {
@@ -65,6 +66,9 @@ export const IconButton: React.FC<IconButtonProps> = ({
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled: disabled ?? false }}
+      hitSlop={
+        hitSlop ?? (size === 'sm' ? { top: 4, bottom: 4, left: 4, right: 4 } : undefined)
+      }
       onPress={handlePress}
       {...rest}
     >

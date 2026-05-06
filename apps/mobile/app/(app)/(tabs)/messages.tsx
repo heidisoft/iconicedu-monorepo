@@ -1147,7 +1147,9 @@ export default function MessagesScreen() {
       const avatarCountryName = isDm ? (participants[0]?.country_name ?? '') : '';
       const iconKey = !isDm ? (channel.icon_key ?? '') : '';
       const themeKey = !isDm ? (channel.themeKey ?? '') : '';
-      const messageUiThemeKey = isDm ? 'classic' : (channel.messageUiThemeKey ?? 'feed');
+      const messageUiThemeKey = isDm
+        ? 'classic'
+        : (channel.messageUiThemeKey ?? 'classic');
       const subtitle = isDm ? 'Direct Message' : (channel.description ?? '');
       const studentProfiles = !isDm ? JSON.stringify(channel.student_profiles ?? []) : '';
       const participantProfiles = !isDm

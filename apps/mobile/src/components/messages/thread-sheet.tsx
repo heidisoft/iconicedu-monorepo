@@ -15,6 +15,7 @@ import type { MessageVM } from '@iconicedu/shared-types';
 import { reportMobileObservedError } from '@/lib/analytics/report-error';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
+import { TOUCH_TARGET } from '@/lib/typography';
 import { fetchThreadMessages } from '@/lib/api/queries';
 import { useMarkRead } from '@/hooks/use-mark-read';
 import { MessageItem } from './message-item';
@@ -64,9 +65,9 @@ function makeStyles(C: AppColors) {
     },
     headerTitle: { flex: 1, fontSize: 16, fontWeight: '700', color: C.text },
     closeBtn: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
+      width: TOUCH_TARGET.md,
+      height: TOUCH_TARGET.md,
+      borderRadius: 22,
       backgroundColor: C.inputBg,
       alignItems: 'center',
       justifyContent: 'center',

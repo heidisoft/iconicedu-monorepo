@@ -22,9 +22,9 @@ const buttonVariants = cva(
         outline: 'border border-border bg-transparent',
       },
       size: {
-        sm: 'px-3 py-1.5',
-        default: 'px-4 py-2.5',
-        lg: 'px-6 py-3.5',
+        sm: 'min-h-[44px] px-4',
+        default: 'min-h-[48px] px-5',
+        lg: 'min-h-[52px] px-6',
       },
     },
     defaultVariants: {
@@ -44,9 +44,9 @@ const buttonTextVariants = cva('font-medium', {
       outline: 'text-foreground',
     },
     size: {
-      sm: 'text-xs',
-      default: 'text-sm',
-      lg: 'text-base',
+      sm: 'text-[13px]',
+      default: 'text-[15px]',
+      lg: 'text-[17px]',
     },
   },
   defaultVariants: {

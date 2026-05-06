@@ -23,6 +23,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/providers/theme-provider';
 import { fetchSpaceChannelMetaByChannelId } from '@/lib/api/queries';
+import { FONT_SIZE, TOUCH_TARGET } from '@/lib/typography';
 import type { ClassScheduleVM, ParticipantRoleVM } from '@iconicedu/shared-types';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -693,13 +694,13 @@ const s = StyleSheet.create({
     flexShrink: 0,
   },
   sessionDayExtra: {
-    fontSize: 8,
+    fontSize: FONT_SIZE.badge,
     fontWeight: '700',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
   sessionDayName: {
-    fontSize: 10,
+    fontSize: FONT_SIZE.xs,
     fontWeight: '600',
   },
   sessionDayNum: {
@@ -797,15 +798,15 @@ const s = StyleSheet.create({
     flexShrink: 0,
   },
   iconBtn: {
-    width: 28,
-    height: 28,
+    width: TOUCH_TARGET.sm,
+    height: TOUCH_TARGET.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 14,
+    borderRadius: 18,
     borderWidth: StyleSheet.hairlineWidth,
   },
   cancelBtn: {
-    minHeight: 28,
+    minHeight: TOUCH_TARGET.sm,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 14,
@@ -819,9 +820,10 @@ const s = StyleSheet.create({
   joinBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
+    gap: 6,
+    minHeight: TOUCH_TARGET.sm,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 20,
     borderWidth: StyleSheet.hairlineWidth,
   },
@@ -909,11 +911,11 @@ const s = StyleSheet.create({
     color: '#ffffff',
   },
   modalCloseIconButton: {
-    width: 42,
-    height: 42,
+    width: TOUCH_TARGET.md,
+    height: TOUCH_TARGET.md,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 21,
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: '#e2e8f0',
     backgroundColor: '#f1f5f9',

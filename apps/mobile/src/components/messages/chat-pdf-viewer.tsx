@@ -31,6 +31,7 @@ import {
   X,
 } from 'lucide-react-native';
 import type { AppColors } from '@/lib/theme';
+import { TOUCH_TARGET } from '@/lib/typography';
 import { supabase } from '@/lib/supabase/client';
 import type { AttachmentPayload } from './attachment-sheet';
 
@@ -658,9 +659,9 @@ const styles = StyleSheet.create({
     borderColor: '#fff',
   },
   toolbarIconBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: TOUCH_TARGET.md,
+    height: TOUCH_TARGET.md,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.12)',
@@ -759,9 +760,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   bottomBarButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: TOUCH_TARGET.md,
+    height: TOUCH_TARGET.md,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.12)',
@@ -770,9 +771,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#14b8a6',
   },
   sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: TOUCH_TARGET.md,
+    height: TOUCH_TARGET.md,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#14b8a6',

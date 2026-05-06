@@ -12,6 +12,7 @@ import { GraduationCap, LifeBuoy, MessageSquare } from 'lucide-react-native';
 import type { MessageVM } from '@iconicedu/shared-types';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
+import { FONT_SIZE, LINE_HEIGHT } from '@/lib/typography';
 import { MessageItem } from './message-item';
 import { PendingMessageRow, type PendingUpload } from './pending-message-row';
 
@@ -195,7 +196,7 @@ const sepStyles = StyleSheet.create({
     gap: 8,
   },
   line: { flex: 1, height: 1 },
-  label: { fontSize: 12, fontWeight: '600', paddingHorizontal: 8 },
+  label: { fontSize: FONT_SIZE.sm, fontWeight: '600', paddingHorizontal: 8 },
 });
 
 function UnreadSeparator({ count, colors }: { count?: number; colors: AppColors }) {
@@ -235,7 +236,7 @@ const unreadStyles = StyleSheet.create({
     paddingVertical: 4,
   },
   label: {
-    fontSize: 10,
+    fontSize: FONT_SIZE.xs,
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.8,
@@ -268,9 +269,10 @@ const SKELETON_ROWS: ReadonlyArray<{
   { isOwn: true, isGroupStart: true, bubbleWidth: '36%', lines: 1 },
 ];
 
-// Single-line bubble height = paddingVertical × 2 + lineHeight = 10 + 10 + 22 = 42
-const BUBBLE_LINE_HEIGHT = 22;
-const BUBBLE_PADDING_VERTICAL = 10;
+// Single-line bubble height mirrors iOS Messages: paddingVertical x 2 + lineHeight.
+const BUBBLE_LINE_HEIGHT = LINE_HEIGHT.md;
+const BUBBLE_NAME_HEIGHT = FONT_SIZE.sm;
+const BUBBLE_PADDING_VERTICAL = 7;
 
 function MessageListSkeleton({ colors }: { colors: AppColors }) {
   const opacity = useRef(new Animated.Value(0.5)).current;
@@ -361,21 +363,21 @@ const skelStyles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 3,
-    gap: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 1,
+    gap: 6,
   },
   rowOwn: { flexDirection: 'row-reverse' },
-  rowGroupStart: { paddingTop: 12 },
+  rowGroupStart: { paddingTop: 8 },
   // Avatar slot: same 36px reserved width as in MessageItem
   avatarSlot: { width: 36, flexShrink: 0, alignItems: 'center' },
   avatar: { width: 36, height: 36, borderRadius: 18 },
   // Content column mirrors MessageItem contentCol / contentColOwn
-  contentCol: { flex: 1, alignItems: 'flex-start', gap: 2 },
+  contentCol: { flex: 1, alignItems: 'flex-start', gap: 1 },
   contentColOwn: { alignItems: 'flex-end' },
-  // Name bar: height matches senderName fontSize (14)
-  nameBar: { height: 14, borderRadius: 7, marginBottom: 0 },
-  // Bubble: borderRadius matches MessageItem bubble (18)
+  // Name bar: height matches compact senderName fontSize.
+  nameBar: { height: BUBBLE_NAME_HEIGHT, borderRadius: 6, marginBottom: 1 },
+  // Bubble: borderRadius matches MessageItem bubble.
   bubble: { borderRadius: 18 },
 });
 
@@ -647,7 +649,7 @@ export const MessageList: React.FC<MessageListProps> = ({
       keyExtractor={keyExtractor}
       inverted
       style={{ flex: 1 }}
-      contentContainerStyle={{ paddingVertical: 8, flexGrow: 1 }}
+      contentContainerStyle={{ paddingVertical: 10, flexGrow: 1 }}
       onRefresh={onRefresh}
       refreshing={refreshing}
       onEndReached={onLoadMore}

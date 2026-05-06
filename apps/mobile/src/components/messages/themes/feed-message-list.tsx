@@ -68,6 +68,7 @@ import {
 import { fetchThreadMessages } from '@/lib/api/queries';
 import { useMarkRead } from '@/hooks/use-mark-read';
 import { supabase } from '@/lib/supabase/client';
+import { FONT_SIZE, LINE_HEIGHT, TOUCH_TARGET } from '@/lib/typography';
 
 const CHANNEL_FILES_BUCKET = 'channel-files';
 
@@ -149,8 +150,8 @@ function findUnreadStartMessageId(input: {
 }
 
 const FONT = {
-  body: 15,
-  bodyLine: 22,
+  body: FONT_SIZE.xl,
+  bodyLine: LINE_HEIGHT.md,
   emoji: 36,
   emojiLine: 42,
   title: 14,
@@ -375,7 +376,8 @@ function FeedHeader({
                   onPress={() => onMorePress?.(message)}
                   disabled={!onMorePress}
                   accessibilityLabel="More message actions"
-                  hitSlop={8}
+                  hitSlop={10}
+                  style={styles.headerMoreButton}
                 >
                   <MoreVertical size={21} color="#111827" />
                 </TouchableOpacity>
@@ -1614,6 +1616,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
+  headerMoreButton: {
+    width: TOUCH_TARGET.md,
+    height: TOUCH_TARGET.md,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: -12,
+    marginRight: -12,
+  },
   visibilityBadgeSlot: {
     minHeight: 18,
     alignItems: 'flex-end',
@@ -1729,9 +1740,9 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     width: '100%',
     maxWidth: '100%',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
   },
   otherBubbleCard: {
     backgroundColor: FEED.bubbleOther,
@@ -1752,8 +1763,8 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   commentTextCard: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
   },
   fileCard: {
     overflow: 'hidden',
@@ -1813,9 +1824,9 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   playButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: TOUCH_TARGET.md,
+    height: TOUCH_TARGET.md,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -1840,7 +1851,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   actionsRow: {
-    minHeight: 34,
+    minHeight: TOUCH_TARGET.md,
   },
   commentActionsRow: {
     marginTop: 8,

@@ -455,7 +455,7 @@ export default function SpaceDetailScreen() {
   const resolvedIconKey = spaceMeta?.iconKey ?? iconKey ?? null;
   const resolvedThemeKey = spaceMeta?.themeKey ?? themeKey ?? null;
   const messageTheme = resolveMobileMessageUiTheme(
-    spaceMeta?.messageUiThemeKey ?? messageUiThemeKey ?? 'feed',
+    spaceMeta?.messageUiThemeKey ?? messageUiThemeKey ?? 'classic',
   );
   const ThemedMessageList = messageTheme.MessageList;
   const resolvedLiveJoinUrl =

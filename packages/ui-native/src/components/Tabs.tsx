@@ -40,7 +40,7 @@ const TabPressable: React.FC<TabPressableProps> = ({ item, isActive, onTabPress 
       key={item.key}
       onPress={handlePress}
       className={cn(
-        'flex-row items-center gap-1.5 border-b-2 px-4 pb-3 pt-2',
+        'min-h-[44px] flex-row items-center gap-1.5 border-b-2 px-4 pb-3 pt-2',
         isActive ? 'border-primary' : 'border-transparent',
       )}
       accessibilityRole="tab"
@@ -49,7 +49,7 @@ const TabPressable: React.FC<TabPressableProps> = ({ item, isActive, onTabPress 
     >
       <Text
         className={cn(
-          'text-sm font-medium',
+          'text-[15px] font-medium',
           isActive ? 'text-foreground' : 'text-muted-foreground',
         )}
       >
@@ -57,7 +57,7 @@ const TabPressable: React.FC<TabPressableProps> = ({ item, isActive, onTabPress 
       </Text>
       {item.badge !== undefined && item.badge > 0 && (
         <View className="items-center justify-center rounded-full bg-primary px-1.5 py-0.5">
-          <Text className="text-[10px] font-bold text-primary-foreground">
+          <Text className="text-[11px] font-bold text-primary-foreground">
             {item.badge > 99 ? '99+' : item.badge}
           </Text>
         </View>

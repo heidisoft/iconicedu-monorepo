@@ -25,6 +25,7 @@ import {
 } from 'lucide-react-native';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
+import { TOUCH_TARGET } from '@/lib/typography';
 import type {
   ChannelUiTabKeyVM,
   MessageVM,
@@ -758,9 +759,9 @@ function makeStyles(C: AppColors) {
       color: C.textMuted,
     },
     fileDownloadBtn: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
+      width: TOUCH_TARGET.md,
+      height: TOUCH_TARGET.md,
+      borderRadius: 22,
       backgroundColor: C.inputBg,
       alignItems: 'center',
       justifyContent: 'center',
@@ -853,9 +854,9 @@ function makeStyles(C: AppColors) {
       minWidth: 0,
     },
     memberActionBtn: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
+      width: TOUCH_TARGET.md,
+      height: TOUCH_TARGET.md,
+      borderRadius: 22,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: C.inputBg,

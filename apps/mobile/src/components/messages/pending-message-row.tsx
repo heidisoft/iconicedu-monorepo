@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { FileText, Mic, AlertCircle } from 'lucide-react-native';
 import type { AppColors } from '@/lib/theme';
+import { FONT_SIZE, LINE_HEIGHT } from '@/lib/typography';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -146,8 +147,8 @@ const GALLERY_CELL = 95;
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 1,
   },
   spacer: { flex: 1 },
   bubbleWrapper: {
@@ -202,7 +203,7 @@ const styles = StyleSheet.create({
   },
 
   statusText: {
-    fontSize: 11,
+    fontSize: FONT_SIZE.xs,
     marginTop: 3,
   },
 
@@ -210,13 +211,13 @@ const styles = StyleSheet.create({
   captionBubble: {
     borderRadius: 18,
     paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: 4,
+    paddingVertical: 7,
+    marginBottom: 3,
     maxWidth: IMG_W,
   },
   captionText: {
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: FONT_SIZE.xl,
+    lineHeight: LINE_HEIGHT.md,
     color: '#fff',
   },
 });

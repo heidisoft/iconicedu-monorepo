@@ -18,6 +18,7 @@ import type { AudioStatus } from 'expo-audio';
 import { useTheme } from '@/providers/theme-provider';
 import { RoleNameIndicator } from '@/components/profile/role-name-indicator';
 import type { AppColors } from '@/lib/theme';
+import { FONT_SIZE, ICON_SIZE, TOUCH_TARGET } from '@/lib/typography';
 import type { MessageVM } from '@iconicedu/shared-types';
 import { EmojiPicker } from './emoji-picker';
 import { AttachmentSheet, type AttachmentPayload } from './attachment-sheet';
@@ -167,15 +168,15 @@ function makeStyles(C: AppColors, bottomInset: number, keyboardVisible: boolean)
       backgroundColor: C.card,
     },
     attachFileIcon: {
-      width: 40,
-      height: 40,
+      width: ICON_SIZE['2xl'],
+      height: ICON_SIZE['2xl'],
       borderRadius: 8,
       backgroundColor: C.tealBg,
       alignItems: 'center',
       justifyContent: 'center',
     },
     attachFileName: {
-      fontSize: 13,
+      fontSize: FONT_SIZE.base,
       fontWeight: '500' as const,
       color: C.text,
     },
@@ -199,9 +200,9 @@ function makeStyles(C: AppColors, bottomInset: number, keyboardVisible: boolean)
       backgroundColor: C.card,
     },
     attachAudioPlayBtn: {
-      width: 30,
-      height: 30,
-      borderRadius: 15,
+      width: TOUCH_TARGET.sm,
+      height: TOUCH_TARGET.sm,
+      borderRadius: 18,
       backgroundColor: C.teal,
       alignItems: 'center',
       justifyContent: 'center',
@@ -242,9 +243,9 @@ function makeStyles(C: AppColors, bottomInset: number, keyboardVisible: boolean)
 
     // "+" attachment button — left of pill
     addBtn: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
+      width: TOUCH_TARGET.md,
+      height: TOUCH_TARGET.md,
+      borderRadius: 22,
       backgroundColor: C.card,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: C.border,
@@ -257,9 +258,9 @@ function makeStyles(C: AppColors, bottomInset: number, keyboardVisible: boolean)
       flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
-      minHeight: 40,
+      minHeight: TOUCH_TARGET.md,
       backgroundColor: C.inputBg,
-      borderRadius: 20,
+      borderRadius: 22,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: C.border,
       paddingHorizontal: 14,
@@ -267,7 +268,7 @@ function makeStyles(C: AppColors, bottomInset: number, keyboardVisible: boolean)
     },
     input: {
       flex: 1,
-      fontSize: 15,
+      fontSize: FONT_SIZE.md,
       color: C.text,
       lineHeight: 20,
       paddingVertical: 0,
@@ -279,9 +280,9 @@ function makeStyles(C: AppColors, bottomInset: number, keyboardVisible: boolean)
 
     // Emoji button — right of pill (replaces send when input is empty)
     emojiBtn: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
+      width: TOUCH_TARGET.md,
+      height: TOUCH_TARGET.md,
+      borderRadius: 22,
       backgroundColor: C.card,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: C.border,
@@ -291,9 +292,9 @@ function makeStyles(C: AppColors, bottomInset: number, keyboardVisible: boolean)
 
     // Send button — right of pill
     sendBtn: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
+      width: TOUCH_TARGET.md,
+      height: TOUCH_TARGET.md,
+      borderRadius: 22,
       backgroundColor: C.teal,
       alignItems: 'center',
       justifyContent: 'center',
@@ -571,6 +572,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
                       style={s.attachAudioPlayBtn}
                       onPress={() => handleToggleAudio(a.uri)}
                       activeOpacity={0.8}
+                      hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
                     >
                       {audioPlaying ? (
                         <Pause size={14} color={colors.tealFg} />

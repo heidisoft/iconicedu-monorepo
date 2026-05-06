@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { useTheme } from '@/providers/theme-provider';
+import { FONT_SIZE, LINE_HEIGHT } from '@/lib/typography';
 import { PulseBox } from './pulse-box';
 
 type SkeletonItem =
@@ -21,15 +22,15 @@ const ITEMS: SkeletonItem[] = [
     type: 'message',
     own: false,
     groupStart: true,
-    bubbleWidth: 252,
-    lineWidths: [220, 240, 210, 180],
+    bubbleWidth: 234,
+    lineWidths: [202, 222, 194, 166],
   },
   { type: 'separator', labelWidth: 52 },
   {
     type: 'message',
     own: true,
     groupStart: true,
-    bubbleWidth: 80,
+    bubbleWidth: 86,
     lineWidths: [52],
     reactions: 1,
   },
@@ -37,16 +38,16 @@ const ITEMS: SkeletonItem[] = [
     type: 'message',
     own: false,
     groupStart: true,
-    bubbleWidth: 244,
-    lineWidths: [220, 200, 160],
+    bubbleWidth: 226,
+    lineWidths: [202, 184, 148],
     reactions: 1,
   },
   {
     type: 'message',
     own: true,
     groupStart: true,
-    bubbleWidth: 248,
-    lineWidths: [228, 240, 210, 180],
+    bubbleWidth: 234,
+    lineWidths: [210, 222, 194, 166],
     reactions: 1,
     replyCount: true,
   },
@@ -56,7 +57,7 @@ function MessageSeparatorSkeleton({ labelWidth }: { labelWidth: number }) {
   return (
     <View style={s.separatorRow} testID="message-skeleton-separator">
       <PulseBox width={88} height={1} radius={1} />
-      <PulseBox width={labelWidth} height={18} radius={7} />
+      <PulseBox width={labelWidth} height={LINE_HEIGHT.base} radius={7} />
       <PulseBox width={88} height={1} radius={1} />
     </View>
   );
@@ -85,13 +86,13 @@ function MessageBubbleSkeleton({
           <View style={[s.nameRow, own && s.nameRowOwn]}>
             {own ? (
               <>
-                <PulseBox width={28} height={14} radius={5} />
-                <PulseBox width={42} height={18} radius={6} />
+                <PulseBox width={28} height={FONT_SIZE.base} radius={5} />
+                <PulseBox width={42} height={LINE_HEIGHT.base} radius={6} />
               </>
             ) : (
               <>
-                <PulseBox width={88} height={18} radius={6} />
-                <PulseBox width={36} height={14} radius={5} />
+                <PulseBox width={88} height={LINE_HEIGHT.base} radius={6} />
+                <PulseBox width={36} height={FONT_SIZE.base} radius={5} />
               </>
             )}
           </View>
@@ -108,7 +109,7 @@ function MessageBubbleSkeleton({
             <PulseBox
               key={`${bubbleWidth}-${lineWidth}-${index}`}
               width={lineWidth}
-              height={22}
+              height={LINE_HEIGHT.md}
             />
           ))}
         </View>
@@ -123,7 +124,7 @@ function MessageBubbleSkeleton({
           <View style={[s.replyRow, own && s.replyRowOwn]}>
             <PulseBox width={20} height={20} radius={10} />
             <PulseBox width={20} height={20} radius={10} />
-            <PulseBox width={72} height={14} radius={5} />
+            <PulseBox width={72} height={FONT_SIZE.base} radius={5} />
           </View>
         ) : null}
       </View>
@@ -170,15 +171,15 @@ const s = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 3,
-    gap: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 1,
+    gap: 6,
   },
   rowOwn: {
     flexDirection: 'row-reverse',
   },
   rowGroupStart: {
-    paddingTop: 12,
+    paddingTop: 8,
   },
   avatarSlot: {
     width: 36,
@@ -188,7 +189,7 @@ const s = StyleSheet.create({
   contentCol: {
     flex: 1,
     alignItems: 'flex-start',
-    gap: 4,
+    gap: 2,
   },
   contentColOwn: {
     alignItems: 'flex-end',
@@ -197,7 +198,7 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'baseline',
     gap: 6,
-    marginBottom: 2,
+    marginBottom: 3,
   },
   nameRowOwn: {
     justifyContent: 'flex-end',
@@ -205,8 +206,8 @@ const s = StyleSheet.create({
   bubbleShell: {
     borderRadius: 18,
     paddingHorizontal: 14,
-    paddingVertical: 10,
-    gap: 4,
+    paddingVertical: 7,
+    gap: 3,
   },
   bubbleShellOwn: {
     alignItems: 'flex-end',

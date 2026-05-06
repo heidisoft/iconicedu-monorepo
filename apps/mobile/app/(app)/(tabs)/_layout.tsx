@@ -13,9 +13,10 @@ import { useLearningSpaceChannels } from '@/hooks/use-learning-space-channels';
 import { useSupervisedDirectMessages } from '@/hooks/use-supervised-direct-messages';
 import { useUnreadSync } from '@/hooks/use-unread-sync';
 import { useFamilyView } from '@/providers/family-view-provider';
+import { COMPONENT_HEIGHT } from '@/lib/typography';
 
 // Fixed height for the icon + label content area.
-const TAB_CONTENT_HEIGHT = 57;
+const TAB_CONTENT_HEIGHT = COMPONENT_HEIGHT.bottomTab;
 
 // MD3 recommends ≥8dp of breathing room between navigation items and the
 // system gesture / button bar edge (Material Design 3 — Navigation bar specs).

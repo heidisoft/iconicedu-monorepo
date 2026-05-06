@@ -11,56 +11,48 @@ const ITEMS = [
     metaPrimaryWidth: 0,
     metaSecondaryWidth: 0,
     timeWidth: 58,
-    hasStatus: true,
   },
   {
     titleWidth: 198,
     metaPrimaryWidth: 74,
     metaSecondaryWidth: 122,
     timeWidth: 58,
-    hasStatus: false,
   },
   {
     titleWidth: 198,
     metaPrimaryWidth: 92,
     metaSecondaryWidth: 122,
     timeWidth: 58,
-    hasStatus: false,
   },
   {
     titleWidth: 232,
     metaPrimaryWidth: 74,
     metaSecondaryWidth: 54,
     timeWidth: 58,
-    hasStatus: false,
   },
   {
     titleWidth: 188,
     metaPrimaryWidth: 74,
     metaSecondaryWidth: 54,
     timeWidth: 58,
-    hasStatus: false,
   },
   {
     titleWidth: 138,
     metaPrimaryWidth: 182,
     metaSecondaryWidth: 0,
     timeWidth: 58,
-    hasStatus: false,
   },
   {
     titleWidth: 192,
     metaPrimaryWidth: 88,
     metaSecondaryWidth: 54,
     timeWidth: 58,
-    hasStatus: false,
   },
   {
     titleWidth: 120,
     metaPrimaryWidth: 212,
     metaSecondaryWidth: 0,
     timeWidth: 58,
-    hasStatus: false,
   },
 ];
 
@@ -78,12 +70,6 @@ export function ChannelListSkeleton({ count = 6 }: Props) {
         >
           <View style={s.avatarWrap}>
             <PulseBox width={50} height={50} radius={25} />
-            {item.hasStatus ? (
-              <View
-                style={[s.statusDot, { borderColor: colors.bg }]}
-                testID="channel-skeleton-status-dot"
-              />
-            ) : null}
           </View>
 
           <View style={s.content}>
@@ -132,16 +118,6 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
-  },
-  statusDot: {
-    position: 'absolute',
-    right: 1,
-    bottom: 1,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#6b7280',
-    borderWidth: 3,
   },
   content: { flex: 1, minWidth: 0, justifyContent: 'center', gap: 7, paddingTop: 2 },
   topRow: { flexDirection: 'row', alignItems: 'center' },

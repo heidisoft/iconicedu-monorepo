@@ -34,6 +34,7 @@ import {
 } from 'lucide-react-native';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
+import { COMPONENT_HEIGHT } from '@/lib/typography';
 import { ChannelTopicIconBadge } from '@/lib/learning-space-icons';
 import { PulseBox } from '@/components/skeletons/pulse-box';
 import { RoleAvatarBadge } from '@/components/profile/role-avatar-badge';
@@ -251,11 +252,11 @@ function makeStyles(C: AppColors) {
       zIndex: 2,
     },
     backBtn: {
-      width: 40,
-      height: 44,
+      width: COMPONENT_HEIGHT.btn,
+      height: COMPONENT_HEIGHT.btn,
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: 22,
+      borderRadius: COMPONENT_HEIGHT.btn / 2,
     },
     avatarWrap: { position: 'relative', width: 42, height: 42, flexShrink: 0 },
     avatarCircle: {
@@ -383,17 +384,18 @@ function makeStyles(C: AppColors) {
     titleSkeletonWrap: { gap: 6, paddingTop: 2 },
     actions: { flexDirection: 'row', alignItems: 'center', flexShrink: 0 },
     actionBtn: {
-      width: 40,
-      height: 40,
+      width: COMPONENT_HEIGHT.btn,
+      height: COMPONENT_HEIGHT.btn,
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: 20,
+      borderRadius: COMPONENT_HEIGHT.btn / 2,
     },
     joinPill: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 5,
-      paddingHorizontal: 12,
+      gap: 7,
+      minHeight: COMPONENT_HEIGHT.btn,
+      paddingHorizontal: 14,
       paddingVertical: 7,
       borderRadius: 20,
       backgroundColor: C.tealBg,
@@ -454,6 +456,7 @@ function makeStyles(C: AppColors) {
     },
     modalButton: {
       minWidth: 104,
+      minHeight: COMPONENT_HEIGHT.btn,
       alignItems: 'center',
       justifyContent: 'center',
       flexDirection: 'row',
@@ -481,11 +484,11 @@ function makeStyles(C: AppColors) {
       color: C.tealFg,
     },
     modalCloseIconButton: {
-      width: 42,
-      height: 42,
+      width: COMPONENT_HEIGHT.btn,
+      height: COMPONENT_HEIGHT.btn,
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: 21,
+      borderRadius: COMPONENT_HEIGHT.btn / 2,
       borderWidth: 1,
       borderColor: C.border,
       backgroundColor: C.inputBg,

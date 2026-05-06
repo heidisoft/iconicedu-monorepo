@@ -8,6 +8,7 @@ import {
   MessageSquare,
 } from 'lucide-react-native';
 import type { AppColors } from '@/lib/theme';
+import { AVATAR_SIZE, FONT_SIZE, SPACING, TOUCH_TARGET } from '@/lib/typography';
 import type { ActivityFeedItemVM, InboxIconKeyVM } from '@iconicedu/shared-types';
 import {
   ActivityFeedbackRequest,
@@ -111,8 +112,8 @@ export function makeActivityItemStyles(C: AppColors) {
       backgroundColor: C.card,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: C.border,
-      paddingHorizontal: 16,
-      paddingTop: 16,
+      paddingHorizontal: SPACING[4],
+      paddingTop: SPACING[4],
       paddingBottom: 14,
       overflow: 'hidden',
       minHeight: 80,
@@ -120,11 +121,16 @@ export function makeActivityItemStyles(C: AppColors) {
     itemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
 
     // Avatar
-    avatarWrap: { width: 28, height: 28, flexShrink: 0, marginTop: 2 },
+    avatarWrap: {
+      width: AVATAR_SIZE.sm,
+      height: AVATAR_SIZE.sm,
+      flexShrink: 0,
+      marginTop: 2,
+    },
     avatar: {
-      width: 28,
-      height: 28,
-      borderRadius: 14,
+      width: AVATAR_SIZE.sm,
+      height: AVATAR_SIZE.sm,
+      borderRadius: AVATAR_SIZE.sm / 2,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -141,7 +147,7 @@ export function makeActivityItemStyles(C: AppColors) {
       gap: 5,
       marginBottom: 5,
     },
-    headlineText: { fontSize: 15, lineHeight: 22 },
+    headlineText: { fontSize: FONT_SIZE.md, lineHeight: 22 },
     bold: { fontWeight: '700' },
 
     // Emphasis badge
@@ -182,9 +188,10 @@ export function makeActivityItemStyles(C: AppColors) {
       borderRadius: 20,
       borderWidth: 1,
       paddingHorizontal: 14,
-      paddingVertical: 8,
+      paddingVertical: 10,
+      minHeight: TOUCH_TARGET.md,
     },
-    actionBtnText: { fontSize: 13, fontWeight: '600' },
+    actionBtnText: { fontSize: FONT_SIZE.base, fontWeight: '600' },
 
     // Sub-items container
     subItemsWrap: { marginTop: 10, marginLeft: 42, borderLeftWidth: 2, paddingLeft: 12 },
@@ -214,7 +221,7 @@ export function makeActivityItemStyles(C: AppColors) {
       borderRadius: 16,
       borderWidth: 1,
       paddingHorizontal: 12,
-      paddingVertical: 6,
+      paddingVertical: 8,
     },
   });
 }
