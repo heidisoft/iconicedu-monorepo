@@ -7,6 +7,7 @@ import { fetchOnboardingStatus } from '@/lib/api/queries';
 import { useNotificationHandler } from '@/hooks/use-notification-handler';
 import { usePushRegistration } from '@/hooks/use-push-registration';
 import { PushPermissionSheet } from '@/components/notifications/push-permission-sheet';
+import { DensityProvider } from '@iconicedu/ui-native';
 
 export default function AppLayout() {
   const { session, loading, setOnboardingCompletionStatus } = useAuth();
@@ -61,7 +62,7 @@ export default function AppLayout() {
   if (loading || !session) return null;
 
   return (
-    <>
+    <DensityProvider density="comfortable">
       <Stack
         screenOptions={{
           headerShown: false,
@@ -73,6 +74,6 @@ export default function AppLayout() {
         onEnable={onConsentGranted}
         onDismiss={onConsentDismissed}
       />
-    </>
+    </DensityProvider>
   );
 }

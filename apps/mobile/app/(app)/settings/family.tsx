@@ -169,7 +169,6 @@ export default function FamilyScreen() {
                       )
                     }
                     label={childName}
-                    labelColor={colors.text}
                     hideChevron
                     trailing={
                       <Text style={s.valueText} numberOfLines={1}>

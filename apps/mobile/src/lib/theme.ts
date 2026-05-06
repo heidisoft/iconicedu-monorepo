@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import { APP_LAYOUT, NAV_THEME, THEME } from '@iconicedu/ui-native/theme';
 
 // ─── Platform-canonical dark surfaces ─────────────────────────────────────────
 // One primary dark color per platform, applied uniformly so the nav bar,
@@ -50,6 +51,9 @@ export const darkColors: typeof lightColors = {
   switchTrackOff: '#39393D',
   modalOverlay: 'rgba(0,0,0,0.6)',
 };
+
+export const appLayout = APP_LAYOUT;
+export { NAV_THEME, THEME };
 
 export type AppColors = typeof lightColors;
 export type ThemeMode = 'system' | 'light' | 'dark';

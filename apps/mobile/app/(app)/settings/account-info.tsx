@@ -117,7 +117,6 @@ export default function AccountInfoScreen() {
           <SettingsRow
             icon={<Mail size={20} color={colors.textMuted} />}
             label="Email"
-            labelColor={colors.text}
             hideChevron
             trailing={
               <View style={s.verifiedRow}>
@@ -134,7 +133,6 @@ export default function AccountInfoScreen() {
               <SettingsRow
                 icon={<Phone size={20} color={colors.textMuted} />}
                 label="Phone"
-                labelColor={colors.text}
                 hideChevron
                 trailing={
                   <View style={s.verifiedRow}>
@@ -153,7 +151,6 @@ export default function AccountInfoScreen() {
               <SettingsRow
                 icon={<Phone size={20} color={colors.textMuted} />}
                 label="WhatsApp"
-                labelColor={colors.text}
                 hideChevron
                 trailing={
                   <View style={s.verifiedRow}>
@@ -174,7 +171,6 @@ export default function AccountInfoScreen() {
           <SettingsRow
             icon={<CreditCard size={20} color={colors.textMuted} />}
             label="Role"
-            labelColor={colors.text}
             hideChevron
             trailing={
               <Text style={s.valueText}>
@@ -186,7 +182,6 @@ export default function AccountInfoScreen() {
           <SettingsRow
             icon={<Shield size={20} color={colors.textMuted} />}
             label="Status"
-            labelColor={colors.text}
             hideChevron
             trailing={
               <Text style={s.valueText}>

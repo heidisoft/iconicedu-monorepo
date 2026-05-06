@@ -1,8 +1,15 @@
 import React from 'react';
 import { View, Text, type ViewProps } from 'react-native';
 import { cn } from '@iconicedu/ui-native/lib/utils';
+import {
+  cardClasses,
+  typography,
+  DENSITY_CARD_CLASS,
+  useDensity,
+} from '@iconicedu/ui-native/theme';
 
 export type CardProps = ViewProps & {
+  spacing?: 'compact' | 'default' | 'comfortable';
   className?: string;
   children: React.ReactNode;
 };
@@ -32,14 +39,20 @@ export type CardFooterProps = ViewProps & {
   children: React.ReactNode;
 };
 
-export const Card: React.FC<CardProps> = ({ className, children, ...rest }) => (
-  <View
-    className={cn('rounded-2xl border border-border bg-card p-4', className)}
-    {...rest}
-  >
-    {children}
-  </View>
-);
+export const Card: React.FC<CardProps> = ({ spacing, className, children, ...rest }) => {
+  const contextDensity = useDensity();
+  const resolvedClass = spacing
+    ? cardClasses[spacing]
+    : DENSITY_CARD_CLASS[contextDensity];
+  return (
+    <View
+      className={cn('border border-border bg-card', resolvedClass, className)}
+      {...rest}
+    >
+      {children}
+    </View>
+  );
+};
 
 export const CardHeader: React.FC<CardHeaderProps> = ({
   className,
@@ -52,7 +65,7 @@ export const CardHeader: React.FC<CardHeaderProps> = ({
 );
 
 export const CardTitle: React.FC<CardTitleProps> = ({ className, children }) => (
-  <Text className={cn('text-lg font-semibold text-card-foreground', className)}>
+  <Text className={cn('text-headline font-semibold text-card-foreground', className)}>
     {children}
   </Text>
 );
@@ -60,7 +73,11 @@ export const CardTitle: React.FC<CardTitleProps> = ({ className, children }) => 
 export const CardDescription: React.FC<CardDescriptionProps> = ({
   className,
   children,
-}) => <Text className={cn('text-sm text-muted-foreground', className)}>{children}</Text>;
+}) => (
+  <Text className={cn(typography.meta, 'text-muted-foreground', className)}>
+    {children}
+  </Text>
+);
 
 export const CardContent: React.FC<CardContentProps> = ({
   className,

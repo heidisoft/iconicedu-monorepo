@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text } from 'react-native';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@iconicedu/ui-native/lib/utils';
+import { badgeClasses } from '@iconicedu/ui-native/theme';
 
 const badgeVariants = cva('items-center justify-center rounded-full', {
   variants: {
@@ -18,7 +19,7 @@ const badgeVariants = cva('items-center justify-center rounded-full', {
   },
 });
 
-const badgeTextVariants = cva('text-[11px] font-bold', {
+const badgeTextVariants = cva('text-caption font-bold', {
   variants: {
     variant: {
       default: 'text-secondary-foreground',
@@ -37,6 +38,7 @@ export type BadgeProps = VariantProps<typeof badgeVariants> & {
   count?: number;
   label?: string;
   maxCount?: number;
+  size?: 'sm' | 'default' | 'md';
   dot?: boolean;
   className?: string;
 };
@@ -45,6 +47,7 @@ export const Badge: React.FC<BadgeProps> = ({
   count,
   label,
   variant = 'default',
+  size = 'default',
   maxCount = 99,
   dot = false,
   className,
@@ -74,7 +77,7 @@ export const Badge: React.FC<BadgeProps> = ({
 
   return (
     <View
-      className={cn(badgeVariants({ variant }), 'px-2 py-0.5', className)}
+      className={cn(badgeVariants({ variant }), badgeClasses[size], className)}
       accessibilityLabel={`${displayText} notifications`}
     >
       <Text className={cn(badgeTextVariants({ variant }))}>{displayText}</Text>

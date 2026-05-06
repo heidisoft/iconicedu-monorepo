@@ -1,4 +1,6 @@
 // Components
+export { Typography as AppText } from '@iconicedu/ui-native/components/Text';
+export type { TypographyProps as AppTextProps } from '@iconicedu/ui-native/components/Text';
 export * from '@iconicedu/ui-native/components/SiteLogo';
 export * from '@iconicedu/ui-native/components/SiteLogoFull';
 export * from '@iconicedu/ui-native/components/Button';
@@ -29,8 +31,7 @@ export {
   type UiTrackCapture,
 } from '@iconicedu/ui-native/lib/tracking-context';
 
-// Constants
-export { NAV_THEME } from '@iconicedu/ui-native/lib/constants';
+export * from '@iconicedu/ui-native/theme';
 
 // Deprecated re-exports for backward compatibility
 export { colors } from '@iconicedu/ui-native/constants/colors';

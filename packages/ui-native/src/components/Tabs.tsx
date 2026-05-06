@@ -2,6 +2,7 @@ import React, { useCallback } from 'react';
 import { View, Text, Pressable, ScrollView } from 'react-native';
 import { cn } from '@iconicedu/ui-native/lib/utils';
 import { useUiTracking } from '@iconicedu/ui-native/lib/tracking-context';
+import { tabsClasses } from '@iconicedu/ui-native/theme';
 
 export type TabItem = {
   key: string;
@@ -40,7 +41,8 @@ const TabPressable: React.FC<TabPressableProps> = ({ item, isActive, onTabPress 
       key={item.key}
       onPress={handlePress}
       className={cn(
-        'min-h-[44px] flex-row items-center gap-1.5 border-b-2 px-4 pb-3 pt-2',
+        'flex-row items-center gap-1.5 border-b-2 pb-3 pt-2',
+        tabsClasses.compact,
         isActive ? 'border-primary' : 'border-transparent',
       )}
       accessibilityRole="tab"

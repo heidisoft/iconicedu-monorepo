@@ -138,7 +138,6 @@ export default function ProfileSettingsScreen() {
           <SettingsRow
             icon={<User size={20} color={colors.textMuted} />}
             label="Display Name"
-            labelColor={colors.text}
             hideChevron
             trailing={<Val value={prof?.display_name as string} s={s} />}
           />
@@ -146,7 +145,6 @@ export default function ProfileSettingsScreen() {
           <SettingsRow
             icon={<User size={20} color={colors.textMuted} />}
             label="First Name"
-            labelColor={colors.text}
             hideChevron
             trailing={<Val value={prof?.first_name as string} s={s} />}
           />
@@ -154,7 +152,6 @@ export default function ProfileSettingsScreen() {
           <SettingsRow
             icon={<User size={20} color={colors.textMuted} />}
             label="Last Name"
-            labelColor={colors.text}
             hideChevron
             trailing={<Val value={prof?.last_name as string} s={s} />}
           />
@@ -162,7 +159,6 @@ export default function ProfileSettingsScreen() {
           <SettingsRow
             icon={<CreditCard size={20} color={colors.textMuted} />}
             label="Role"
-            labelColor={colors.text}
             hideChevron
             trailing={<Val value={ROLE_LABELS[kind ?? ''] ?? kind} s={s} />}
           />
@@ -176,7 +172,6 @@ export default function ProfileSettingsScreen() {
               <SettingsRow
                 icon={<CreditCard size={20} color={colors.textMuted} />}
                 label="Bio"
-                labelColor={colors.text}
                 hideChevron
                 trailing={
                   <Text style={[s.valueText, { maxWidth: 200 }]} numberOfLines={4}>

@@ -166,7 +166,6 @@ export default function NotificationsScreen() {
             <SettingsRow
               icon={<Bell size={20} color={colors.textMuted} />}
               label="Allow push notifications"
-              labelColor={colors.text}
               hideChevron
               trailing={
                 <Switch

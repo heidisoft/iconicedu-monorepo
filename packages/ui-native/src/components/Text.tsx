@@ -2,19 +2,20 @@ import React, { useContext } from 'react';
 import { Text, type TextProps } from 'react-native';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn, TextClassContext } from '@iconicedu/ui-native/lib/utils';
+import { typography } from '@iconicedu/ui-native/theme';
 
 const typographyVariants = cva('', {
   variants: {
     variant: {
-      h1: 'text-3xl font-bold text-foreground',
-      h2: 'text-2xl font-semibold text-foreground',
-      h3: 'text-xl font-semibold text-foreground',
-      h4: 'text-lg font-medium text-foreground',
-      body: 'text-[15px] leading-[22px] text-foreground',
-      'body-sm': 'text-[13px] leading-[18px] text-foreground',
-      caption: 'text-[12px] leading-[18px] text-muted-foreground',
-      label: 'text-[13px] font-medium text-muted-foreground',
-      muted: 'text-[13px] text-muted-foreground',
+      h1: 'text-title-lg font-bold text-foreground',
+      h2: 'text-title font-semibold text-foreground',
+      h3: 'text-headline font-semibold text-foreground',
+      h4: `${typography.bodyLarge} font-medium text-foreground`,
+      body: `${typography.body} text-foreground`,
+      'body-sm': `${typography.meta} text-foreground`,
+      caption: `${typography.caption} text-muted-foreground`,
+      label: 'text-meta font-medium text-muted-foreground',
+      muted: 'text-meta text-muted-foreground',
     },
   },
   defaultVariants: {

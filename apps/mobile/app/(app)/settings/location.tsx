@@ -113,7 +113,6 @@ export default function LocationScreen() {
             <SettingsRow
               icon={<MapPin size={20} color={colors.textMuted} />}
               label="Country"
-              labelColor={colors.text}
               hideChevron
               trailing={
                 <Val
@@ -126,7 +125,6 @@ export default function LocationScreen() {
             <SettingsRow
               icon={<MapPin size={20} color={colors.textMuted} />}
               label="Region / State"
-              labelColor={colors.text}
               hideChevron
               trailing={<Val value={prof?.region as string} s={s} />}
             />
@@ -134,7 +132,6 @@ export default function LocationScreen() {
             <SettingsRow
               icon={<MapPin size={20} color={colors.textMuted} />}
               label="City"
-              labelColor={colors.text}
               hideChevron
               trailing={<Val value={prof?.city as string} s={s} />}
             />
@@ -142,7 +139,6 @@ export default function LocationScreen() {
             <SettingsRow
               icon={<MapPin size={20} color={colors.textMuted} />}
               label="Postal Code"
-              labelColor={colors.text}
               hideChevron
               trailing={<Val value={prof?.postal_code as string} s={s} />}
             />

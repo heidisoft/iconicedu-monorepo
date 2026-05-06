@@ -1,7 +1,9 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { ChevronRight } from 'lucide-react-native';
+import { cn } from '@iconicedu/ui-native/lib/utils';
 import { useUiTracking } from '@iconicedu/ui-native/lib/tracking-context';
+import { COMPONENT_HEIGHT, ICON_SIZE, SPACING } from '@iconicedu/ui-native/theme';
 
 export type SettingsRowProps = {
   icon: React.ReactNode;
@@ -10,9 +12,16 @@ export type SettingsRowProps = {
   trailing?: React.ReactNode;
   /** Hide the default chevron. Useful when providing a custom trailing. */
   hideChevron?: boolean;
-  /** Text color for the label. Pass the themed color from useTheme(). */
+  /**
+   * Optional explicit label color override. When omitted, NativeWind `text-foreground`
+   * is used, which automatically adapts to light/dark mode.
+   * Pass only when you need a non-default color (destructive, accent, muted).
+   */
   labelColor?: string;
-  /** Color for the default chevron icon. */
+  /**
+   * Optional explicit chevron color override. When omitted, NativeWind
+   * `text-muted-foreground` is used automatically.
+   */
   chevronColor?: string;
 };
 
@@ -22,8 +31,8 @@ export const SettingsRow: React.FC<SettingsRowProps> = ({
   onPress,
   trailing,
   hideChevron = false,
-  labelColor = '#0f172a',
-  chevronColor = '#94a3b8',
+  labelColor,
+  chevronColor,
 }) => {
   const track = useUiTracking();
 
@@ -47,10 +56,22 @@ export const SettingsRow: React.FC<SettingsRowProps> = ({
       accessibilityLabel={label}
     >
       <View style={styles.iconWrap}>{icon}</View>
-      <Text style={[styles.label, { color: labelColor }]}>{label}</Text>
+      {labelColor ? (
+        <Text style={[styles.label, { color: labelColor }]}>{label}</Text>
+      ) : (
+        <Text className={cn('flex-1 text-body font-medium text-foreground')}>
+          {label}
+        </Text>
+      )}
       <View style={styles.trailing}>
         {trailing}
-        {!hideChevron && !trailing && <ChevronRight size={16} color={chevronColor} />}
+        {!hideChevron &&
+          !trailing &&
+          (chevronColor ? (
+            <ChevronRight size={ICON_SIZE.sm} color={chevronColor} />
+          ) : (
+            <ChevronRight size={ICON_SIZE.sm} className="text-muted-foreground" />
+          ))}
       </View>
     </TouchableOpacity>
   );
@@ -60,13 +81,14 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    minHeight: COMPONENT_HEIGHT.row,
+    paddingVertical: SPACING[3],
+    paddingHorizontal: SPACING[4],
   },
   iconWrap: {
-    width: 30,
+    width: ICON_SIZE['2xl'],
     alignItems: 'center',
-    marginRight: 14,
+    marginRight: SPACING[3],
   },
   label: {
     flex: 1,

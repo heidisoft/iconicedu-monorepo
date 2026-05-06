@@ -1,11 +1,13 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, TextInput, type TextInputProps } from 'react-native';
 import { cn } from '@iconicedu/ui-native/lib/utils';
+import { inputClasses } from '@iconicedu/ui-native/theme';
 
 export type InputProps = TextInputProps & {
   label?: string;
   error?: string;
   helperText?: string;
+  size?: 'sm' | 'default' | 'md' | 'lg';
   className?: string;
   containerClassName?: string;
 };
@@ -14,6 +16,7 @@ export const Input: React.FC<InputProps> = ({
   label,
   error,
   helperText,
+  size = 'default',
   className,
   containerClassName,
   onFocus,
@@ -45,7 +48,8 @@ export const Input: React.FC<InputProps> = ({
       )}
       <TextInput
         className={cn(
-          'min-h-[48px] rounded-xl border px-4 py-3 text-[15px] text-foreground bg-card',
+          inputClasses[size],
+          'bg-card text-foreground',
           focused ? 'border-ring' : 'border-input',
           error && 'border-destructive',
           className,

@@ -3,6 +3,7 @@ import { Pressable, type PressableProps, type GestureResponderEvent } from 'reac
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@iconicedu/ui-native/lib/utils';
 import { useUiTracking } from '@iconicedu/ui-native/lib/tracking-context';
+import { createHitSlop, iconButtonClasses } from '@iconicedu/ui-native/theme';
 
 const iconButtonVariants = cva(
   'items-center justify-center rounded-full active:opacity-70',
@@ -14,9 +15,9 @@ const iconButtonVariants = cva(
         outline: 'border border-border bg-transparent',
       },
       size: {
-        sm: 'h-[36px] w-[36px]',
-        default: 'h-[44px] w-[44px]',
-        lg: 'h-[48px] w-[48px]',
+        sm: iconButtonClasses.sm,
+        default: iconButtonClasses.default,
+        lg: iconButtonClasses.lg,
       },
     },
     defaultVariants: {
@@ -66,9 +67,7 @@ export const IconButton: React.FC<IconButtonProps> = ({
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled: disabled ?? false }}
-      hitSlop={
-        hitSlop ?? (size === 'sm' ? { top: 4, bottom: 4, left: 4, right: 4 } : undefined)
-      }
+      hitSlop={hitSlop ?? (size === 'sm' ? createHitSlop(36) : undefined)}
       onPress={handlePress}
       {...rest}
     >

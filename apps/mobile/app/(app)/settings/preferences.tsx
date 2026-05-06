@@ -139,8 +139,6 @@ export default function PreferencesScreen() {
           <SettingsRow
             icon={<ThemeIcon size={20} color={colors.textMuted} />}
             label="Theme"
-            labelColor={colors.text}
-            chevronColor={colors.textFaint}
             onPress={() => setShowAppearance(true)}
             trailing={<Text style={s.valueText}>{appearanceLabel}</Text>}
           />
@@ -152,7 +150,6 @@ export default function PreferencesScreen() {
           <SettingsRow
             icon={<Clock size={20} color={colors.textMuted} />}
             label="Timezone"
-            labelColor={colors.text}
             hideChevron
             trailing={
               prof?.timezone ? (
@@ -168,7 +165,6 @@ export default function PreferencesScreen() {
           <SettingsRow
             icon={<Globe size={20} color={colors.textMuted} />}
             label="Locale"
-            labelColor={colors.text}
             hideChevron
             trailing={
               prof?.locale ? (
@@ -182,7 +178,6 @@ export default function PreferencesScreen() {
           <SettingsRow
             icon={<Languages size={20} color={colors.textMuted} />}
             label="Languages"
-            labelColor={colors.text}
             hideChevron
             trailing={
               langs?.length ? (

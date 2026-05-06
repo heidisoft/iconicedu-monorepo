@@ -382,8 +382,6 @@ export default function AccountScreen() {
               label={
                 isViewingAsChild ? 'Switch child account' : 'Switch to child account'
               }
-              labelColor={colors.text}
-              chevronColor={colors.textFaint}
               trailing={
                 activeFamilySwitchOption ? (
                   <Text style={s.rowTrailingText} numberOfLines={1}>
@@ -403,16 +401,12 @@ export default function AccountScreen() {
           <SettingsRow
             icon={<User size={20} color={colors.textMuted} />}
             label="Profile"
-            labelColor={colors.text}
-            chevronColor={colors.textFaint}
             onPress={() => router.push('/(app)/settings/profile' as never)}
           />
           <View style={s.divider} />
           <SettingsRow
             icon={<MapPin size={20} color={colors.textMuted} />}
             label="Location"
-            labelColor={colors.text}
-            chevronColor={colors.textFaint}
             onPress={() => router.push('/(app)/settings/location' as never)}
           />
         </View>
@@ -423,32 +417,24 @@ export default function AccountScreen() {
           <SettingsRow
             icon={<Mail size={20} color={colors.textMuted} />}
             label="Contact & Security"
-            labelColor={colors.text}
-            chevronColor={colors.textFaint}
             onPress={() => router.push('/(app)/settings/account-info' as never)}
           />
           <View style={s.divider} />
           <SettingsRow
             icon={<Sun size={20} color={colors.textMuted} />}
             label="Preferences"
-            labelColor={colors.text}
-            chevronColor={colors.textFaint}
             onPress={() => router.push('/(app)/settings/preferences' as never)}
           />
           <View style={s.divider} />
           <SettingsRow
             icon={<Bell size={20} color={colors.textMuted} />}
             label="Notifications"
-            labelColor={colors.text}
-            chevronColor={colors.textFaint}
             onPress={() => router.push('/(app)/settings/notifications' as never)}
           />
           <View style={s.divider} />
           <SettingsRow
             icon={<Shield size={20} color={colors.textMuted} />}
             label="Privacy & Data"
-            labelColor={colors.text}
-            chevronColor={colors.textFaint}
             onPress={() => {}}
           />
         </View>
@@ -461,8 +447,6 @@ export default function AccountScreen() {
               <SettingsRow
                 icon={<Users size={20} color={colors.textMuted} />}
                 label="Family"
-                labelColor={colors.text}
-                chevronColor={colors.textFaint}
                 onPress={() => router.push('/(app)/settings/family' as never)}
               />
             </View>

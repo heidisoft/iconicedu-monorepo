@@ -8,12 +8,19 @@ import {
 } from 'react-native';
 import { cn } from '@iconicedu/ui-native/lib/utils';
 import { useUiTracking } from '@iconicedu/ui-native/lib/tracking-context';
+import {
+  DENSITY_ROW_CLASS,
+  type Density,
+  typography,
+  useDensity,
+} from '@iconicedu/ui-native/theme';
 
 export type ListItemProps = PressableProps & {
   leading?: React.ReactNode;
   title: string;
   subtitle?: string;
   trailing?: React.ReactNode;
+  density?: Density;
   active?: boolean;
   className?: string;
 };
@@ -23,12 +30,15 @@ export const ListItem: React.FC<ListItemProps> = ({
   title,
   subtitle,
   trailing,
+  density,
   active = false,
   className,
   onPress,
   ...rest
 }) => {
   const track = useUiTracking();
+  const contextDensity = useDensity();
+  const resolvedDensity = density ?? contextDensity;
 
   const handlePress = useCallback(
     (e: GestureResponderEvent) => {
@@ -43,7 +53,8 @@ export const ListItem: React.FC<ListItemProps> = ({
   return (
     <Pressable
       className={cn(
-        'flex-row items-center gap-3 rounded-xl px-3 py-2.5 active:bg-accent/50',
+        'flex-row items-center gap-3 rounded-xl active:bg-accent/50',
+        DENSITY_ROW_CLASS[resolvedDensity],
         active && 'bg-accent',
         className,
       )}
@@ -57,7 +68,8 @@ export const ListItem: React.FC<ListItemProps> = ({
       <View className="min-w-0 flex-1 gap-0.5">
         <Text
           className={cn(
-            'text-sm font-medium',
+            typography.body,
+            'font-medium',
             active ? 'text-foreground' : 'text-foreground',
           )}
           numberOfLines={1}
@@ -65,7 +77,10 @@ export const ListItem: React.FC<ListItemProps> = ({
           {title}
         </Text>
         {subtitle && (
-          <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+          <Text
+            className={cn(typography.meta, 'text-muted-foreground')}
+            numberOfLines={1}
+          >
             {subtitle}
           </Text>
         )}
