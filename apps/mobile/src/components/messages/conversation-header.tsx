@@ -34,7 +34,7 @@ import {
 } from 'lucide-react-native';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
-import { COMPONENT_HEIGHT } from '@/lib/typography';
+import { COMPONENT_HEIGHT, FONT_SIZE, LINE_HEIGHT } from '@/lib/typography';
 import { ChannelTopicIconBadge } from '@/lib/learning-space-icons';
 import { PulseBox } from '@/components/skeletons/pulse-box';
 import { RoleAvatarBadge } from '@/components/profile/role-avatar-badge';
@@ -329,7 +329,13 @@ function makeStyles(C: AppColors) {
       justifyContent: 'center',
       gap: 2,
     },
-    title: { fontSize: 16, fontWeight: '700', color: C.text, letterSpacing: -0.2 },
+    title: {
+      fontSize: FONT_SIZE.xl,
+      lineHeight: LINE_HEIGHT.xl,
+      fontWeight: '700',
+      color: C.text,
+      letterSpacing: -0.2,
+    },
     subtitleRow: {
       flexShrink: 1,
       minWidth: 0,

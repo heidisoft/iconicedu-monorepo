@@ -9,18 +9,6 @@ import {
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn, TextClassContext } from '@iconicedu/ui-native/lib/utils';
 import { useUiTracking } from '@iconicedu/ui-native/lib/tracking-context';
-import {
-  buttonClasses,
-  buttonTextClasses,
-  useDensity,
-  type Density,
-} from '@iconicedu/ui-native/theme';
-
-const DENSITY_TO_SIZE: Record<Density, 'sm' | 'default' | 'lg' | 'xl'> = {
-  compact: 'sm',
-  comfortable: 'default',
-  spacious: 'lg',
-};
 
 const buttonVariants = cva(
   'flex-row items-center justify-center rounded-2xl active:opacity-80',
@@ -34,10 +22,9 @@ const buttonVariants = cva(
         outline: 'border border-border bg-transparent',
       },
       size: {
-        sm: buttonClasses.sm,
-        default: buttonClasses.default,
-        lg: buttonClasses.lg,
-        xl: buttonClasses.xl,
+        sm: 'min-h-[44px] px-4',
+        default: 'min-h-[48px] px-5',
+        lg: 'min-h-[52px] px-6',
       },
     },
     defaultVariants: {
@@ -57,10 +44,9 @@ const buttonTextVariants = cva('font-medium', {
       outline: 'text-foreground',
     },
     size: {
-      sm: buttonTextClasses.sm,
-      default: buttonTextClasses.default,
-      lg: buttonTextClasses.lg,
-      xl: buttonTextClasses.xl,
+      sm: 'text-meta',
+      default: 'text-body',
+      lg: 'text-body-lg',
     },
   },
   defaultVariants: {
@@ -86,7 +72,7 @@ export const Button: React.FC<ButtonProps> = ({
   label,
   analyticsLabel,
   variant = 'default',
-  size,
+  size = 'default',
   loading = false,
   disabled = false,
   className,
@@ -95,12 +81,7 @@ export const Button: React.FC<ButtonProps> = ({
   onPress,
   ...rest
 }) => {
-  const contextDensity = useDensity();
-  const resolvedSize = size ?? DENSITY_TO_SIZE[contextDensity];
-  const textClass = cn(
-    buttonTextVariants({ variant, size: resolvedSize }),
-    textClassName,
-  );
+  const textClass = cn(buttonTextVariants({ variant, size }), textClassName);
   const track = useUiTracking();
 
   const handlePress = useCallback(
@@ -122,7 +103,7 @@ export const Button: React.FC<ButtonProps> = ({
     <TextClassContext.Provider value={textClass}>
       <Pressable
         className={cn(
-          buttonVariants({ variant, size: resolvedSize }),
+          buttonVariants({ variant, size }),
           disabled && 'opacity-50',
           className,
         )}
