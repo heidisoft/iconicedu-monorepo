@@ -1,39 +1,35 @@
 import React, { useCallback } from 'react';
-import { Pressable, type PressableProps, type GestureResponderEvent } from 'react-native';
-import { cva, type VariantProps } from 'class-variance-authority';
+import { type GestureResponderEvent } from 'react-native';
+
+import {
+  Button as PrimitiveButton,
+  buttonVariants,
+} from '@iconicedu/ui-native/components/ui/button';
 import { cn } from '@iconicedu/ui-native/lib/utils';
 import { useUiTracking } from '@iconicedu/ui-native/lib/tracking-context';
 import { createHitSlop, iconButtonClasses } from '@iconicedu/ui-native/theme';
 
-const iconButtonVariants = cva(
-  'items-center justify-center rounded-full active:opacity-70',
-  {
-    variants: {
-      variant: {
-        default: 'bg-secondary',
-        ghost: 'bg-transparent',
-        outline: 'border border-border bg-transparent',
-      },
-      size: {
-        sm: iconButtonClasses.sm,
-        default: iconButtonClasses.default,
-        lg: iconButtonClasses.lg,
-      },
-    },
-    defaultVariants: {
-      variant: 'default',
-      size: 'default',
-    },
-  },
-);
+type PrimitiveButtonProps = React.ComponentProps<typeof PrimitiveButton>;
+type IconButtonVariant = 'default' | 'ghost' | 'outline';
+type IconButtonSize = 'sm' | 'default' | 'lg';
 
-export type IconButtonProps = PressableProps &
-  VariantProps<typeof iconButtonVariants> & {
-    icon: React.ReactNode;
-    /** Accessibility label — also used as the analytics event label. */
-    label: string;
-    className?: string;
-  };
+function toPrimitiveVariant(
+  variant?: IconButtonVariant,
+): PrimitiveButtonProps['variant'] {
+  if (variant === 'default') return 'secondary';
+  return variant ?? 'secondary';
+}
+
+export type IconButtonProps = Omit<
+  PrimitiveButtonProps,
+  'variant' | 'size' | 'children'
+> & {
+  icon: React.ReactNode;
+  /** Accessibility label — also used as the analytics event label. */
+  label: string;
+  variant?: IconButtonVariant;
+  size?: IconButtonSize;
+};
 
 export const IconButton: React.FC<IconButtonProps> = ({
   icon,
@@ -57,12 +53,10 @@ export const IconButton: React.FC<IconButtonProps> = ({
   );
 
   return (
-    <Pressable
-      className={cn(
-        iconButtonVariants({ variant, size }),
-        disabled && 'opacity-50',
-        className,
-      )}
+    <PrimitiveButton
+      variant={toPrimitiveVariant(variant)}
+      size="icon"
+      className={cn('rounded-full', iconButtonClasses[size], className)}
       disabled={disabled}
       accessibilityRole="button"
       accessibilityLabel={label}
@@ -72,8 +66,8 @@ export const IconButton: React.FC<IconButtonProps> = ({
       {...rest}
     >
       {icon}
-    </Pressable>
+    </PrimitiveButton>
   );
 };
 
-export { iconButtonVariants };
+export { buttonVariants as iconButtonVariants };

@@ -15,6 +15,7 @@ import Animated, {
 
 function Accordion({
   children,
+  ref,
   ...props
 }: Omit<React.ComponentProps<typeof AccordionPrimitive.Root>, 'asChild'>) {
   return (

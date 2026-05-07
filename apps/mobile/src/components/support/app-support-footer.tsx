@@ -5,6 +5,7 @@ import { useAccount } from '@/hooks/use-account';
 import { useSupportChannel } from '@/hooks/use-support-channel';
 import { SupportFooter } from '@/components/support/support-footer';
 import { PulseBox } from '@/components/skeletons/pulse-box';
+import { COMPONENT_HEIGHT, RADIUS, SPACING } from '@/lib/typography';
 
 export function AppSupportFooter({ isLoading = false }: { isLoading?: boolean }) {
   const router = useRouter();
@@ -18,12 +19,23 @@ export function AppSupportFooter({ isLoading = false }: { isLoading?: boolean })
 
   if (isLoading || supportLoading) {
     return (
-      <View style={{ paddingHorizontal: 18, paddingTop: 18, paddingBottom: 14, gap: 12 }}>
+      <View
+        style={{
+          paddingHorizontal: SPACING[5] - SPACING[1] / 2,
+          paddingTop: SPACING[5] - SPACING[1] / 2,
+          paddingBottom: SPACING[4] - SPACING[1] / 2,
+          gap: SPACING[3],
+        }}
+      >
         <View style={{ alignItems: 'center' }}>
-          <PulseBox width={96} height={12} radius={6} />
+          <PulseBox width={96} height={SPACING[3]} radius={RADIUS.sm - SPACING[1] / 2} />
         </View>
         <View style={{ alignItems: 'center' }}>
-          <PulseBox width={140} height={38} radius={19} />
+          <PulseBox
+            width={140}
+            height={COMPONENT_HEIGHT.btnSm - SPACING[2] + SPACING[1] / 2}
+            radius={(COMPONENT_HEIGHT.btnSm - SPACING[2] + SPACING[1] / 2) / 2}
+          />
         </View>
       </View>
     );

@@ -34,7 +34,15 @@ import {
 } from 'lucide-react-native';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
-import { COMPONENT_HEIGHT, FONT_SIZE, LINE_HEIGHT } from '@/lib/typography';
+import {
+  AVATAR_SIZE,
+  COMPONENT_HEIGHT,
+  FONT_SIZE,
+  ICON_SIZE,
+  LINE_HEIGHT,
+  RADIUS,
+  SPACING,
+} from '@/lib/typography';
 import { ChannelTopicIconBadge } from '@/lib/learning-space-icons';
 import { PulseBox } from '@/components/skeletons/pulse-box';
 import { RoleAvatarBadge } from '@/components/profile/role-avatar-badge';
@@ -236,16 +244,16 @@ function makeStyles(C: AppColors) {
     container: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingHorizontal: 6,
-      paddingVertical: 10,
+      paddingHorizontal: SPACING[2],
+      paddingVertical: SPACING[3],
       backgroundColor: C.pageBg,
-      gap: 4,
+      gap: SPACING[1],
     },
     containerElevated: {
       borderBottomWidth: 1,
       borderBottomColor: C.border,
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: 3 },
+      shadowOffset: { width: 0, height: SPACING[3] / 4 },
       shadowOpacity: Platform.OS === 'ios' ? 0 : 0.08,
       shadowRadius: Platform.OS === 'ios' ? 0 : 6,
       elevation: Platform.OS === 'android' ? 3 : 0,
@@ -258,22 +266,32 @@ function makeStyles(C: AppColors) {
       justifyContent: 'center',
       borderRadius: COMPONENT_HEIGHT.btn / 2,
     },
-    avatarWrap: { position: 'relative', width: 42, height: 42, flexShrink: 0 },
+    avatarWrap: {
+      position: 'relative',
+      width: AVATAR_SIZE.lg,
+      height: AVATAR_SIZE.lg,
+      flexShrink: 0,
+    },
     avatarCircle: {
-      width: 42,
-      height: 42,
-      borderRadius: 21,
+      width: AVATAR_SIZE.lg,
+      height: AVATAR_SIZE.lg,
+      borderRadius: AVATAR_SIZE.lg / 2,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    avatarTxt: { color: '#fff', fontWeight: '700', fontSize: 16, letterSpacing: 0.3 },
+    avatarTxt: {
+      color: '#fff',
+      fontWeight: '700',
+      fontSize: FONT_SIZE.lg,
+      letterSpacing: 0.3,
+    },
     onlineDot: {
       position: 'absolute',
       bottom: 0,
       right: 0,
-      width: 12,
-      height: 12,
-      borderRadius: 6,
+      width: ICON_SIZE.xs,
+      height: ICON_SIZE.xs,
+      borderRadius: ICON_SIZE.xs / 2,
       backgroundColor: '#22c55e',
       borderWidth: 2,
       borderColor: C.pageBg,
@@ -282,22 +300,27 @@ function makeStyles(C: AppColors) {
       position: 'absolute',
       bottom: 0,
       right: 0,
-      width: 12,
-      height: 12,
-      borderRadius: 6,
+      width: ICON_SIZE.xs,
+      height: ICON_SIZE.xs,
+      borderRadius: ICON_SIZE.xs / 2,
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 2,
       borderColor: C.pageBg,
     },
-    groupWrap: { width: 52, height: 52, flexShrink: 0, position: 'relative' },
+    groupWrap: {
+      width: COMPONENT_HEIGHT.btnLg,
+      height: COMPONENT_HEIGHT.btnLg,
+      flexShrink: 0,
+      position: 'relative',
+    },
     groupBack: {
       position: 'absolute',
       right: 0,
       bottom: 0,
-      width: 36,
-      height: 36,
-      borderRadius: 18,
+      width: AVATAR_SIZE.md,
+      height: AVATAR_SIZE.md,
+      borderRadius: AVATAR_SIZE.md / 2,
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 2,
@@ -307,15 +330,15 @@ function makeStyles(C: AppColors) {
       position: 'absolute',
       left: 0,
       top: 0,
-      width: 36,
-      height: 36,
-      borderRadius: 18,
+      width: AVATAR_SIZE.md,
+      height: AVATAR_SIZE.md,
+      borderRadius: AVATAR_SIZE.md / 2,
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 2,
       borderColor: C.pageBg,
     },
-    groupTxt: { color: '#fff', fontWeight: '700', fontSize: 13 },
+    groupTxt: { color: '#fff', fontWeight: '700', fontSize: FONT_SIZE.base },
     groupBadgeFront: {},
     groupBadgeBack: {},
     iconBox: {
@@ -324,10 +347,10 @@ function makeStyles(C: AppColors) {
     titleBlock: {
       flex: 1,
       minWidth: 0,
-      paddingLeft: 8,
-      paddingRight: 8,
+      paddingLeft: SPACING[2],
+      paddingRight: SPACING[2],
       justifyContent: 'center',
-      gap: 2,
+      gap: SPACING[1] / 2,
     },
     title: {
       fontSize: FONT_SIZE.xl,
@@ -340,13 +363,21 @@ function makeStyles(C: AppColors) {
       flexShrink: 1,
       minWidth: 0,
     },
-    subtitleText: { fontSize: 12, lineHeight: 16, color: C.textMuted },
-    subtitleSeparator: { fontSize: 12, lineHeight: 16, color: C.textMuted },
+    subtitleText: {
+      fontSize: FONT_SIZE.sm,
+      lineHeight: LINE_HEIGHT.xs,
+      color: C.textMuted,
+    },
+    subtitleSeparator: {
+      fontSize: FONT_SIZE.sm,
+      lineHeight: LINE_HEIGHT.xs,
+      color: C.textMuted,
+    },
     subtitleGroup: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 5,
-      marginRight: 10,
+      gap: SPACING[1],
+      marginRight: SPACING[3],
     },
     subtitleGroupNames: {
       flexDirection: 'row',
@@ -354,16 +385,20 @@ function makeStyles(C: AppColors) {
       flexShrink: 1,
     },
     subtitleGroupName: {
-      fontSize: 12,
-      lineHeight: 16,
+      fontSize: FONT_SIZE.sm,
+      lineHeight: LINE_HEIGHT.xs,
       color: C.textMuted,
       flexShrink: 1,
     },
-    localTimeText: { fontSize: 12, lineHeight: 16, color: C.textMuted },
+    localTimeText: {
+      fontSize: FONT_SIZE.sm,
+      lineHeight: LINE_HEIGHT.xs,
+      color: C.textMuted,
+    },
     localTimeWrap: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 4,
+      gap: SPACING[1],
       alignSelf: 'center',
     },
     subtitleInlineContent: {
@@ -372,8 +407,8 @@ function makeStyles(C: AppColors) {
       alignSelf: 'flex-start',
     },
     tooltipText: {
-      fontSize: 12,
-      lineHeight: 18,
+      fontSize: FONT_SIZE.sm,
+      lineHeight: LINE_HEIGHT.sm,
       color: '#f8fafc',
     },
     subtitleButton: { alignSelf: 'stretch', minWidth: 0 },
@@ -387,7 +422,7 @@ function makeStyles(C: AppColors) {
       alignItems: 'center',
       alignSelf: 'flex-start',
     },
-    titleSkeletonWrap: { gap: 6, paddingTop: 2 },
+    titleSkeletonWrap: { gap: SPACING[2], paddingTop: SPACING[1] / 2 },
     actions: { flexDirection: 'row', alignItems: 'center', flexShrink: 0 },
     actionBtn: {
       width: COMPONENT_HEIGHT.btn,
@@ -399,66 +434,66 @@ function makeStyles(C: AppColors) {
     joinPill: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 7,
+      gap: SPACING[2],
       minHeight: COMPONENT_HEIGHT.btn,
-      paddingHorizontal: 14,
-      paddingVertical: 7,
-      borderRadius: 20,
+      paddingHorizontal: SPACING[4],
+      paddingVertical: SPACING[2],
+      borderRadius: RADIUS.xl,
       backgroundColor: C.tealBg,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: C.teal,
     },
-    joinPillTxt: { fontSize: 13, fontWeight: '700', color: C.teal },
+    joinPillTxt: { fontSize: FONT_SIZE.base, fontWeight: '700', color: C.teal },
     modalBackdrop: {
       flex: 1,
       justifyContent: 'center',
-      paddingHorizontal: 20,
+      paddingHorizontal: SPACING[5],
       backgroundColor: 'rgba(15, 23, 42, 0.42)',
     },
     modalCard: {
-      gap: 16,
-      borderRadius: 24,
+      gap: SPACING[4],
+      borderRadius: RADIUS.xl,
       borderWidth: 1,
       borderColor: C.border,
       backgroundColor: C.card,
-      padding: 20,
+      padding: SPACING[5],
     },
-    modalHeading: { gap: 8 },
+    modalHeading: { gap: SPACING[2] },
     modalTitle: {
-      fontSize: 18,
+      fontSize: FONT_SIZE.xl,
       fontWeight: '700',
       color: C.text,
     },
     modalDescription: {
-      fontSize: 14,
-      lineHeight: 20,
+      fontSize: FONT_SIZE.base,
+      lineHeight: LINE_HEIGHT.base,
       color: C.textMuted,
     },
     modalLinkBox: {
-      gap: 6,
-      borderRadius: 18,
+      gap: SPACING[2],
+      borderRadius: RADIUS.xl,
       borderWidth: 1,
       borderColor: C.border,
       backgroundColor: C.inputBg,
-      padding: 14,
+      padding: SPACING[4],
     },
     modalLinkLabel: {
-      fontSize: 11,
+      fontSize: FONT_SIZE.xs,
       fontWeight: '700',
       letterSpacing: 1.2,
       textTransform: 'uppercase',
       color: C.textMuted,
     },
     modalLinkValue: {
-      fontSize: 13,
-      lineHeight: 19,
+      fontSize: FONT_SIZE.base,
+      lineHeight: LINE_HEIGHT.base,
       color: C.text,
     },
     modalFooter: {
       flexDirection: 'row',
       justifyContent: 'flex-end',
       flexWrap: 'wrap',
-      gap: 10,
+      gap: SPACING[3],
     },
     modalButton: {
       minWidth: 104,
@@ -466,10 +501,10 @@ function makeStyles(C: AppColors) {
       alignItems: 'center',
       justifyContent: 'center',
       flexDirection: 'row',
-      gap: 8,
-      borderRadius: 18,
-      paddingHorizontal: 14,
-      paddingVertical: 10,
+      gap: SPACING[2],
+      borderRadius: RADIUS.xl,
+      paddingHorizontal: SPACING[4],
+      paddingVertical: SPACING[3],
     },
     modalButtonSecondary: {
       borderWidth: 1,
@@ -480,12 +515,12 @@ function makeStyles(C: AppColors) {
       backgroundColor: C.teal,
     },
     modalButtonSecondaryText: {
-      fontSize: 14,
+      fontSize: FONT_SIZE.base,
       fontWeight: '600',
       color: C.text,
     },
     modalButtonPrimaryText: {
-      fontSize: 14,
+      fontSize: FONT_SIZE.base,
       fontWeight: '700',
       color: C.tealFg,
     },
@@ -736,7 +771,11 @@ export function ConversationHeader({
 
               return (
                 <View key={group.kind} style={s.subtitleGroup}>
-                  <GroupIcon size={12} color={colors.textMuted} strokeWidth={2} />
+                  <GroupIcon
+                    size={ICON_SIZE.xs}
+                    color={colors.textMuted}
+                    strokeWidth={2}
+                  />
                   <View style={s.subtitleGroupNames}>
                     {group.participants.map((participant, index) => (
                       <React.Fragment key={`${participant.kind}-${participant.name}`}>
@@ -801,7 +840,7 @@ export function ConversationHeader({
         ) : null}
         {!!localTimeLabel && (
           <View style={s.localTimeWrap}>
-            <LocalTimeIcon size={12} color={colors.textMuted} strokeWidth={2} />
+            <LocalTimeIcon size={ICON_SIZE.xs} color={colors.textMuted} strokeWidth={2} />
             <Text style={s.localTimeText}>{localTimeLabel}</Text>
           </View>
         )}
@@ -813,7 +852,7 @@ export function ConversationHeader({
     <>
       <View style={[s.container, useElevatedHeader ? s.containerElevated : null]}>
         <TouchableOpacity style={s.backBtn} onPress={onBack} hitSlop={8}>
-          <ChevronLeft size={28} color={colors.text} />
+          <ChevronLeft size={ICON_SIZE.xl} color={colors.text} />
         </TouchableOpacity>
 
         {isDm && secondaryAvatarSeed ? (
@@ -825,7 +864,7 @@ export function ConversationHeader({
             </View>
             <RoleAvatarBadge
               role={secondaryAvatarRole}
-              size={14}
+              size={ICON_SIZE.xs}
               style={s.groupBadgeBack}
             />
             {avatarUrl ? (
@@ -835,7 +874,11 @@ export function ConversationHeader({
                 <Text style={s.groupTxt}>{getInitials(title)}</Text>
               </View>
             )}
-            <RoleAvatarBadge role={avatarRole} size={14} style={s.groupBadgeFront} />
+            <RoleAvatarBadge
+              role={avatarRole}
+              size={ICON_SIZE.xs}
+              style={s.groupBadgeFront}
+            />
           </View>
         ) : isDm ? (
           <View style={s.avatarWrap}>
@@ -847,14 +890,14 @@ export function ConversationHeader({
               </View>
             )}
             {presenceBadge}
-            <RoleAvatarBadge role={avatarRole} size={16} />
+            <RoleAvatarBadge role={avatarRole} size={ICON_SIZE.sm} />
           </View>
         ) : (
           <ChannelTopicIconBadge
             iconKey={iconKey}
-            size={42}
-            iconSize={22}
-            borderRadius={21}
+            size={AVATAR_SIZE.lg}
+            iconSize={ICON_SIZE.lg}
+            borderRadius={AVATAR_SIZE.lg / 2}
             backgroundColor={iconTheme.bg}
             color={iconTheme.fg}
             style={s.iconBox}
@@ -890,16 +933,16 @@ export function ConversationHeader({
                 activeOpacity={0.85}
                 accessibilityLabel="Join live session"
               >
-                <Video size={14} color={colors.teal} />
+                <Video size={ICON_SIZE.xs} color={colors.teal} />
                 <Text style={s.joinPillTxt}>Join</Text>
               </TouchableOpacity>
             ) : onVideo ? (
               <TouchableOpacity style={s.actionBtn} onPress={onVideo} hitSlop={8}>
-                <Video size={20} color={colors.text} />
+                <Video size={ICON_SIZE.md} color={colors.text} />
               </TouchableOpacity>
             ) : null}
             <TouchableOpacity style={s.actionBtn} onPress={onMore} hitSlop={8}>
-              <MoreVertical size={22} color={colors.text} />
+              <MoreVertical size={ICON_SIZE.lg} color={colors.text} />
             </TouchableOpacity>
           </View>
         )}
@@ -931,7 +974,7 @@ export function ConversationHeader({
                 activeOpacity={0.85}
                 accessibilityLabel="Share join link"
               >
-                <Share2 size={16} color={colors.text} />
+                <Share2 size={ICON_SIZE.sm} color={colors.text} />
                 <Text style={s.modalButtonSecondaryText}>Share</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -949,7 +992,7 @@ export function ConversationHeader({
                     : 'Open session'
                 }
               >
-                <Video size={16} color={colors.tealFg} />
+                <Video size={ICON_SIZE.sm} color={colors.tealFg} />
                 <Text style={s.modalButtonPrimaryText}>
                   {externalJoinTarget?.providerLabel
                     ? `Join ${externalJoinTarget.providerLabel}`
@@ -962,7 +1005,7 @@ export function ConversationHeader({
                 activeOpacity={0.85}
                 accessibilityLabel="Close join dialog"
               >
-                <X size={16} color={colors.text} />
+                <X size={ICON_SIZE.sm} color={colors.text} />
               </TouchableOpacity>
             </View>
           </Pressable>

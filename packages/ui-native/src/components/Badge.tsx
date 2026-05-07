@@ -1,46 +1,45 @@
 import React from 'react';
-import { View, Text } from 'react-native';
-import { cva, type VariantProps } from 'class-variance-authority';
+import { View } from 'react-native';
+
+import {
+  Badge as PrimitiveBadge,
+  badgeTextVariants,
+  badgeVariants,
+} from '@iconicedu/ui-native/components/ui/badge';
+import { Text } from '@iconicedu/ui-native/components/ui/text';
 import { cn } from '@iconicedu/ui-native/lib/utils';
 import { badgeClasses } from '@iconicedu/ui-native/theme';
 
-const badgeVariants = cva('items-center justify-center rounded-full', {
-  variants: {
-    variant: {
-      default: 'bg-secondary',
-      success: 'bg-success',
-      warning: 'bg-warning',
-      destructive: 'bg-destructive',
-      info: 'bg-info',
-    },
-  },
-  defaultVariants: {
-    variant: 'default',
-  },
-});
+type PrimitiveBadgeProps = React.ComponentProps<typeof PrimitiveBadge>;
+type PrimitiveVariant = NonNullable<PrimitiveBadgeProps['variant']>;
 
-const badgeTextVariants = cva('text-caption font-bold', {
-  variants: {
-    variant: {
-      default: 'text-secondary-foreground',
-      success: 'text-success-foreground',
-      warning: 'text-warning-foreground',
-      destructive: 'text-destructive-foreground',
-      info: 'text-info-foreground',
-    },
-  },
-  defaultVariants: {
-    variant: 'default',
-  },
-});
+type BadgeVariant = PrimitiveVariant | 'success' | 'warning' | 'error' | 'info';
 
-export type BadgeProps = VariantProps<typeof badgeVariants> & {
+const variantClasses: Partial<Record<BadgeVariant, { badge: string; text: string }>> = {
+  success: { badge: 'bg-success border-transparent', text: 'text-success-foreground' },
+  warning: { badge: 'bg-warning border-transparent', text: 'text-warning-foreground' },
+  error: {
+    badge: 'bg-destructive border-transparent',
+    text: 'text-destructive-foreground',
+  },
+  info: { badge: 'bg-info border-transparent', text: 'text-info-foreground' },
+};
+
+function toPrimitiveVariant(variant?: BadgeVariant): PrimitiveVariant {
+  if (variant === 'error') return 'destructive';
+  if (variant === 'success' || variant === 'warning' || variant === 'info') {
+    return 'secondary';
+  }
+  return variant ?? 'default';
+}
+
+export type BadgeProps = Omit<PrimitiveBadgeProps, 'variant' | 'children'> & {
   count?: number;
   label?: string;
   maxCount?: number;
   size?: 'sm' | 'default' | 'md';
   dot?: boolean;
-  className?: string;
+  variant?: BadgeVariant;
 };
 
 export const Badge: React.FC<BadgeProps> = ({
@@ -51,13 +50,17 @@ export const Badge: React.FC<BadgeProps> = ({
   maxCount = 99,
   dot = false,
   className,
+  ...rest
 }) => {
+  const primitiveVariant = toPrimitiveVariant(variant);
+  const legacyClasses = variantClasses[variant];
+
   if (dot) {
     return (
       <View
         className={cn(
           'h-[10px] w-[10px] rounded-full',
-          badgeVariants({ variant }),
+          legacyClasses?.badge ?? badgeVariants({ variant: primitiveVariant }),
           className,
         )}
         accessibilityLabel="New notification"
@@ -76,12 +79,14 @@ export const Badge: React.FC<BadgeProps> = ({
   if (displayText === undefined) return null;
 
   return (
-    <View
-      className={cn(badgeVariants({ variant }), badgeClasses[size], className)}
+    <PrimitiveBadge
+      variant={primitiveVariant}
+      className={cn(badgeClasses[size], legacyClasses?.badge, className)}
       accessibilityLabel={`${displayText} notifications`}
+      {...rest}
     >
-      <Text className={cn(badgeTextVariants({ variant }))}>{displayText}</Text>
-    </View>
+      <Text className={legacyClasses?.text}>{displayText}</Text>
+    </PrimitiveBadge>
   );
 };
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text } from 'react-native';
 import { useTheme } from '@/providers/theme-provider';
+import { SPACING, typography } from '@/lib/typography';
 
 type TypingIndicatorProps = {
   typingUsers: string[];
@@ -19,8 +20,8 @@ export const TypingIndicator: React.FC<TypingIndicatorProps> = ({ typingUsers })
         : `${typingUsers[0]} and ${typingUsers.length - 1} others are typing…`;
 
   return (
-    <View style={{ paddingHorizontal: 16, paddingVertical: 4 }}>
-      <Text style={{ fontSize: 12, fontStyle: 'italic', color: colors.textFaint }}>
+    <View style={{ paddingHorizontal: SPACING[4], paddingVertical: SPACING[1] }}>
+      <Text style={[typography.meta, { fontStyle: 'italic', color: colors.textFaint }]}>
         {label}
       </Text>
     </View>

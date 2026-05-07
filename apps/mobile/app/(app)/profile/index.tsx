@@ -16,6 +16,16 @@ import { useTheme } from '@/providers/theme-provider';
 import { AppSupportFooter } from '@/components/support/app-support-footer';
 import { createHeaderSurface } from '@/lib/header-surface';
 import type { AppColors } from '@/lib/theme';
+import {
+  AVATAR_SIZE,
+  COMPONENT_HEIGHT,
+  FONT_SIZE,
+  ICON_SIZE,
+  LINE_HEIGHT,
+  RADIUS,
+  SPACING,
+  typography,
+} from '@/lib/typography';
 
 const settingsItems = [
   { label: 'Edit Profile', icon: CircleUserRound },
@@ -42,7 +52,7 @@ export default function ProfileScreen() {
           <Text style={s.navBackTxt}>← Back</Text>
         </TouchableOpacity>
         <Text style={s.navTitle}>Profile</Text>
-        <View style={{ width: 64 }} />
+        <View style={s.navSpacer} />
       </View>
 
       <ScrollView
@@ -70,7 +80,7 @@ export default function ProfileScreen() {
                   pressed && { backgroundColor: colors.inputBg },
                 ]}
               >
-                <item.icon size={18} color={colors.textMuted} />
+                <item.icon size={ICON_SIZE.md} color={colors.textMuted} />
                 <Text style={s.rowLabel}>{item.label}</Text>
                 <Text style={s.rowChevron}>›</Text>
               </Pressable>
@@ -102,68 +112,88 @@ function makeStyles(C: AppColors) {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      paddingHorizontal: 16,
-      paddingVertical: 12,
+      paddingHorizontal: SPACING[4],
+      paddingVertical: SPACING[3],
     },
-    navBack: { paddingHorizontal: 4 },
-    navBackTxt: { fontSize: 15, color: C.teal, fontWeight: '600' },
-    navTitle: { fontSize: 17, fontWeight: '700', color: C.text },
-    content: { paddingHorizontal: 16, paddingTop: 24, paddingBottom: 40, gap: 20 },
-    avatarSection: { alignItems: 'center', gap: 8, paddingBottom: 8 },
+    navBack: { paddingHorizontal: SPACING[1] },
+    navBackTxt: { ...typography.body, color: C.teal, fontWeight: '600' },
+    navTitle: {
+      fontSize: FONT_SIZE.xl,
+      lineHeight: LINE_HEIGHT.xl,
+      fontWeight: '700',
+      color: C.text,
+    },
+    navSpacer: { width: COMPONENT_HEIGHT.rowComfortable },
+    content: {
+      paddingHorizontal: SPACING[4],
+      paddingTop: SPACING[6],
+      paddingBottom: SPACING[10],
+      gap: SPACING[5],
+    },
+    avatarSection: { alignItems: 'center', gap: SPACING[2], paddingBottom: SPACING[2] },
     avatar: {
-      width: 80,
-      height: 80,
-      borderRadius: 40,
+      width: AVATAR_SIZE['2xl'] + SPACING[2],
+      height: AVATAR_SIZE['2xl'] + SPACING[2],
+      borderRadius: (AVATAR_SIZE['2xl'] + SPACING[2]) / 2,
       backgroundColor: C.tealBg,
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 1,
       borderColor: C.border,
     },
-    avatarTxt: { color: C.tealFg, fontWeight: '800', fontSize: 32 },
+    avatarTxt: {
+      color: C.tealFg,
+      fontWeight: '800',
+      fontSize: FONT_SIZE['3xl'] + SPACING[3],
+    },
     displayName: {
-      fontSize: 22,
+      fontSize: FONT_SIZE['2xl'],
+      lineHeight: LINE_HEIGHT['2xl'],
       fontWeight: '800',
       color: C.text,
       letterSpacing: -0.3,
     },
-    email: { fontSize: 14, color: C.textMuted },
+    email: { ...typography.sm, color: C.textMuted },
     card: {
       backgroundColor: C.card,
-      borderRadius: 16,
+      borderRadius: RADIUS.lg,
       borderWidth: 1,
       borderColor: C.border,
       overflow: 'hidden',
     },
     cardHeader: {
-      fontSize: 12,
+      fontSize: FONT_SIZE.sm,
       fontWeight: '600',
       color: C.textFaint,
       textTransform: 'uppercase',
       letterSpacing: 0.8,
-      paddingHorizontal: 16,
-      paddingTop: 14,
-      paddingBottom: 6,
+      paddingHorizontal: SPACING[4],
+      paddingTop: SPACING[4],
+      paddingBottom: SPACING[2],
     },
     row: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 12,
-      paddingHorizontal: 16,
-      paddingVertical: 14,
+      gap: SPACING[3],
+      paddingHorizontal: SPACING[4],
+      paddingVertical: SPACING[4],
     },
-    rowLabel: { flex: 1, fontSize: 15, color: C.text, fontWeight: '500' },
-    rowChevron: { fontSize: 20, color: C.textFaint },
-    divider: { height: 1, backgroundColor: C.border, marginLeft: 56 },
+    rowLabel: { flex: 1, ...typography.body, color: C.text, fontWeight: '500' },
+    rowChevron: { fontSize: FONT_SIZE['2xl'], color: C.textFaint },
+    divider: {
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: C.border,
+      marginLeft: AVATAR_SIZE.xl,
+    },
     signOut: {
       backgroundColor: C.red + '10',
-      borderRadius: 14,
-      paddingVertical: 16,
+      borderRadius: RADIUS.lg,
+      paddingVertical: SPACING[4],
       alignItems: 'center',
       borderWidth: 1,
       borderColor: C.red + '24',
     },
-    signOutTxt: { color: C.red, fontWeight: '700', fontSize: 16 },
-    version: { textAlign: 'center', fontSize: 12, color: C.textFaint },
+    signOutTxt: { color: C.red, fontWeight: '700', fontSize: FONT_SIZE.lg },
+    version: { textAlign: 'center', fontSize: FONT_SIZE.sm, color: C.textFaint },
   });
 }

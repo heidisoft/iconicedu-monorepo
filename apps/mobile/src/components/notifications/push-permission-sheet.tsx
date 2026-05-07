@@ -5,55 +5,67 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BottomSheet } from '@iconicedu/ui-native';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
+import {
+  AVATAR_SIZE,
+  COMPONENT_HEIGHT,
+  FONT_SIZE,
+  ICON_SIZE,
+  LINE_HEIGHT,
+  RADIUS,
+  SPACING,
+  typography,
+} from '@/lib/typography';
 
 function makeStyles(C: AppColors, bottomInset: number) {
   return StyleSheet.create({
     content: {
-      paddingHorizontal: 24,
-      paddingBottom: Math.max(bottomInset, 24),
+      paddingHorizontal: SPACING[6],
+      paddingBottom: Math.max(bottomInset, SPACING[6]),
       alignItems: 'center',
-      gap: 16,
+      gap: SPACING[4],
     },
     iconWrap: {
-      width: 72,
-      height: 72,
-      borderRadius: 36,
+      width: AVATAR_SIZE['2xl'],
+      height: AVATAR_SIZE['2xl'],
+      borderRadius: AVATAR_SIZE['2xl'] / 2,
       backgroundColor: C.tealBg,
       alignItems: 'center',
       justifyContent: 'center',
     },
     title: {
-      fontSize: 20,
+      fontSize: FONT_SIZE['2xl'],
       fontWeight: '700',
       color: C.text,
       textAlign: 'center',
     },
     body: {
-      fontSize: 15,
+      fontSize: FONT_SIZE.md,
       color: C.textMuted,
       textAlign: 'center',
-      lineHeight: 22,
+      lineHeight: LINE_HEIGHT.md,
     },
     btnPrimary: {
       width: '100%',
-      paddingVertical: 14,
-      borderRadius: 12,
+      minHeight: COMPONENT_HEIGHT.btnLg,
+      borderRadius: RADIUS.md,
       backgroundColor: C.teal,
       alignItems: 'center',
+      justifyContent: 'center',
     },
     btnPrimaryLabel: {
-      fontSize: 16,
+      fontSize: FONT_SIZE.lg,
       fontWeight: '700',
       color: C.tealFg,
     },
     btnSecondary: {
       width: '100%',
-      paddingVertical: 14,
-      borderRadius: 12,
+      minHeight: COMPONENT_HEIGHT.btn,
+      borderRadius: RADIUS.md,
       alignItems: 'center',
+      justifyContent: 'center',
     },
     btnSecondaryLabel: {
-      fontSize: 15,
+      ...typography.body,
       color: C.textMuted,
     },
   });
@@ -81,7 +93,7 @@ export function PushPermissionSheet({ visible, onEnable, onDismiss }: Props) {
     >
       <View style={s.content}>
         <View style={s.iconWrap}>
-          <Bell size={32} color={colors.teal} />
+          <Bell size={ICON_SIZE['2xl']} color={colors.teal} />
         </View>
         <Text style={s.title}>Stay in the loop</Text>
         <Text style={s.body}>

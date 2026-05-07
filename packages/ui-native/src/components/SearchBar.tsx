@@ -1,8 +1,15 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, TextInput, Pressable, type TextInputProps } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  type TextInputProps,
+  StyleSheet,
+} from 'react-native';
 import { cn } from '@iconicedu/ui-native/lib/utils';
 import { Search, X } from 'lucide-react-native';
-import { ICON_SIZE, inputClasses, typography } from '@iconicedu/ui-native/theme';
+import { ICON_SIZE, SPACING, inputClasses, typography } from '@iconicedu/ui-native/theme';
 
 export type SearchBarProps = Omit<TextInputProps, 'value' | 'onChangeText'> & {
   value: string;
@@ -31,7 +38,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   return (
     <View className={cn('flex-row items-center gap-2', className)}>
       <View className={cn('flex-1 flex-row items-center bg-muted', inputClasses.default)}>
-        <Search size={ICON_SIZE.sm} color="#a1a1aa" style={{ marginRight: 8 }} />
+        <Search size={ICON_SIZE.sm} color="#a1a1aa" style={styles.searchIcon} />
         <TextInput
           className={cn('flex-1 text-foreground', typography.body)}
           value={value}
@@ -60,3 +67,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  searchIcon: { marginRight: SPACING[2] },
+});

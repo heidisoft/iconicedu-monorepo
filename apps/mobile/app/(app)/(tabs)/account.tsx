@@ -34,6 +34,16 @@ import { useProfile } from '@/hooks/use-profile';
 import type { AppColors } from '@/lib/theme';
 import { createHeaderSurface } from '@/lib/header-surface';
 import { ProfileSkeleton } from '@/components/skeletons';
+import {
+  AVATAR_SIZE,
+  COMPONENT_HEIGHT,
+  FONT_SIZE,
+  ICON_SIZE,
+  LINE_HEIGHT,
+  RADIUS,
+  SPACING,
+  typography,
+} from '@/lib/typography';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -92,12 +102,12 @@ const ROLE_LABELS: Record<string, string> = {
   owner: 'Owner',
 };
 
-const FAMILY_SWITCH_HANDLE_HEIGHT = 28;
-const FAMILY_SWITCH_HEADER_HEIGHT = 76;
-const FAMILY_SWITCH_CARD_PADDING = 36;
-const FAMILY_SWITCH_ROW_HEIGHT = 62;
-const FAMILY_SWITCH_ROW_GAP = 12;
-const FAMILY_SWITCH_BOTTOM_PADDING = 18;
+const FAMILY_SWITCH_HANDLE_HEIGHT = AVATAR_SIZE.xs + SPACING[1];
+const FAMILY_SWITCH_HEADER_HEIGHT = COMPONENT_HEIGHT.header + SPACING[5];
+const FAMILY_SWITCH_CARD_PADDING = SPACING[8] + SPACING[1];
+const FAMILY_SWITCH_ROW_HEIGHT = COMPONENT_HEIGHT.rowComfortable - SPACING[1] / 2;
+const FAMILY_SWITCH_ROW_GAP = SPACING[3];
+const FAMILY_SWITCH_BOTTOM_PADDING = SPACING[5];
 
 function getInitials(name: string): string {
   const trimmed = name.trim();
@@ -114,105 +124,136 @@ function makeStyles(C: AppColors) {
     safe: { flex: 1, backgroundColor: C.pageBg },
     header: {
       ...createHeaderSurface(C.pageBg, C.border),
-      paddingHorizontal: 20,
-      paddingTop: 18,
-      paddingBottom: 10,
+      paddingHorizontal: SPACING[5],
+      paddingTop: SPACING[5],
+      paddingBottom: SPACING[3],
     },
-    pageTitle: { fontSize: 28, fontWeight: '800', color: C.text, letterSpacing: -0.5 },
-    scroll: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 48, gap: 20 },
+    pageTitle: {
+      fontSize: FONT_SIZE['3xl'],
+      lineHeight: LINE_HEIGHT['3xl'],
+      fontWeight: '800',
+      color: C.text,
+      letterSpacing: -0.5,
+    },
+    scroll: {
+      paddingHorizontal: SPACING[4],
+      paddingTop: SPACING[4],
+      paddingBottom: SPACING[12],
+      gap: SPACING[5],
+    },
 
     // Profile card
     profileCard: {
-      borderRadius: 16,
+      borderRadius: RADIUS.lg,
       borderWidth: 1,
       borderColor: C.border,
       backgroundColor: C.card,
       overflow: 'hidden',
     },
-    profileRow: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 18 },
+    profileRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING[4],
+      padding: SPACING[5],
+    },
     avatarWrap: {
-      width: 56,
-      height: 56,
-      borderRadius: 28,
+      width: AVATAR_SIZE.xl,
+      height: AVATAR_SIZE.xl,
+      borderRadius: AVATAR_SIZE.xl / 2,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    avatarTxt: { color: '#ffffff', fontWeight: '800', fontSize: 22 },
-    profileInfo: { flex: 1, gap: 3 },
-    profileName: { fontSize: 17, fontWeight: '700', color: C.text },
-    profileEmail: { fontSize: 13, color: C.textMuted },
-    profileKind: { fontSize: 12, color: C.teal, fontWeight: '600', marginTop: 2 },
+    avatarTxt: { color: '#ffffff', fontWeight: '800', fontSize: FONT_SIZE['2xl'] },
+    profileInfo: { flex: 1, gap: SPACING[1] },
+    profileName: {
+      fontSize: FONT_SIZE.xl,
+      lineHeight: LINE_HEIGHT.xl,
+      fontWeight: '700',
+      color: C.text,
+    },
+    profileEmail: { ...typography.meta, color: C.textMuted },
+    profileKind: {
+      fontSize: FONT_SIZE.sm,
+      color: C.teal,
+      fontWeight: '600',
+      marginTop: SPACING[1] / 2,
+    },
 
     // Section
     sectionLabel: {
-      fontSize: 12,
+      fontSize: FONT_SIZE.sm,
       fontWeight: '700',
       color: C.textFaint,
       textTransform: 'uppercase',
       letterSpacing: 0.8,
-      paddingHorizontal: 4,
-      marginBottom: -8,
+      paddingHorizontal: SPACING[1],
+      marginBottom: -SPACING[2],
     },
     card: {
-      borderRadius: 14,
+      borderRadius: RADIUS.lg,
       borderWidth: 1,
       borderColor: C.border,
       backgroundColor: C.card,
       overflow: 'hidden',
     },
-    divider: { height: 1, backgroundColor: C.border, marginLeft: 60 },
+    divider: {
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: C.border,
+      marginLeft: AVATAR_SIZE.xl + SPACING[1],
+    },
     rowTrailingText: {
-      fontSize: 13,
+      fontSize: FONT_SIZE.base,
       fontWeight: '600',
       color: C.textMuted,
-      maxWidth: 160,
+      maxWidth: COMPONENT_HEIGHT.rowComfortable * 2 + SPACING[8],
     },
     familySwitchSheetContent: {
       paddingBottom: FAMILY_SWITCH_BOTTOM_PADDING,
     },
     familySwitchCard: {
-      padding: 18,
-      gap: 12,
+      padding: SPACING[5],
+      gap: SPACING[3],
     },
     familySwitchHeader: {
-      gap: 4,
+      gap: SPACING[1],
     },
     familySwitchTitle: {
-      fontSize: 18,
+      fontSize: FONT_SIZE.xl,
       fontWeight: '800',
       color: C.text,
     },
     familySwitchSubtitle: {
-      fontSize: 13,
+      fontSize: FONT_SIZE.base,
       color: C.textMuted,
-      lineHeight: 18,
+      lineHeight: LINE_HEIGHT.base,
     },
     familySwitchList: {
-      gap: 12,
+      gap: SPACING[3],
     },
     familySwitchAvatar: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
+      width: AVATAR_SIZE.md,
+      height: AVATAR_SIZE.md,
+      borderRadius: AVATAR_SIZE.md / 2,
       alignItems: 'center',
       justifyContent: 'center',
       overflow: 'hidden',
     },
+    familySwitchAvatarImage: { width: AVATAR_SIZE.md, height: AVATAR_SIZE.md },
     familySwitchAvatarText: {
       color: '#ffffff',
-      fontSize: 14,
+      fontSize: FONT_SIZE.base,
       fontWeight: '800',
     },
     switchOption: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 12,
-      borderRadius: 14,
+      gap: SPACING[3],
+      borderRadius: RADIUS.lg,
       borderWidth: 1,
       borderColor: C.border,
       backgroundColor: C.bg,
-      paddingHorizontal: 14,
-      paddingVertical: 12,
+      paddingHorizontal: SPACING[4],
+      paddingVertical: SPACING[3],
     },
     switchOptionActive: {
       borderColor: C.teal,
@@ -221,18 +262,23 @@ function makeStyles(C: AppColors) {
     switchOptionText: {
       flex: 1,
       minWidth: 0,
-      gap: 2,
+      gap: SPACING[1] / 2,
     },
     switchOptionLabel: {
-      fontSize: 14,
+      fontSize: FONT_SIZE.base,
       fontWeight: '700',
       color: C.text,
     },
     switchOptionSubtext: {
-      fontSize: 12,
+      fontSize: FONT_SIZE.sm,
       color: C.textMuted,
     },
-    version: { textAlign: 'center', fontSize: 12, color: C.textFaint, marginTop: 4 },
+    version: {
+      textAlign: 'center',
+      fontSize: FONT_SIZE.sm,
+      color: C.textFaint,
+      marginTop: SPACING[1],
+    },
   });
 }
 
@@ -378,7 +424,7 @@ export default function AccountScreen() {
         {canSwitchFamilyView ? (
           <View style={s.card}>
             <SettingsRow
-              icon={<ArrowRightLeft size={20} color={colors.textMuted} />}
+              icon={<ArrowRightLeft size={ICON_SIZE.md} color={colors.textMuted} />}
               label={
                 isViewingAsChild ? 'Switch child account' : 'Switch to child account'
               }
@@ -399,13 +445,13 @@ export default function AccountScreen() {
         <Text style={s.sectionLabel}>Personal</Text>
         <View style={s.card}>
           <SettingsRow
-            icon={<User size={20} color={colors.textMuted} />}
+            icon={<User size={ICON_SIZE.md} color={colors.textMuted} />}
             label="Profile"
             onPress={() => router.push('/(app)/settings/profile' as never)}
           />
           <View style={s.divider} />
           <SettingsRow
-            icon={<MapPin size={20} color={colors.textMuted} />}
+            icon={<MapPin size={ICON_SIZE.md} color={colors.textMuted} />}
             label="Location"
             onPress={() => router.push('/(app)/settings/location' as never)}
           />
@@ -415,25 +461,25 @@ export default function AccountScreen() {
         <Text style={s.sectionLabel}>Account</Text>
         <View style={s.card}>
           <SettingsRow
-            icon={<Mail size={20} color={colors.textMuted} />}
+            icon={<Mail size={ICON_SIZE.md} color={colors.textMuted} />}
             label="Contact & Security"
             onPress={() => router.push('/(app)/settings/account-info' as never)}
           />
           <View style={s.divider} />
           <SettingsRow
-            icon={<Sun size={20} color={colors.textMuted} />}
+            icon={<Sun size={ICON_SIZE.md} color={colors.textMuted} />}
             label="Preferences"
             onPress={() => router.push('/(app)/settings/preferences' as never)}
           />
           <View style={s.divider} />
           <SettingsRow
-            icon={<Bell size={20} color={colors.textMuted} />}
+            icon={<Bell size={ICON_SIZE.md} color={colors.textMuted} />}
             label="Notifications"
             onPress={() => router.push('/(app)/settings/notifications' as never)}
           />
           <View style={s.divider} />
           <SettingsRow
-            icon={<Shield size={20} color={colors.textMuted} />}
+            icon={<Shield size={ICON_SIZE.md} color={colors.textMuted} />}
             label="Privacy & Data"
             onPress={() => {}}
           />
@@ -445,7 +491,7 @@ export default function AccountScreen() {
             <Text style={s.sectionLabel}>Family</Text>
             <View style={s.card}>
               <SettingsRow
-                icon={<Users size={20} color={colors.textMuted} />}
+                icon={<Users size={ICON_SIZE.md} color={colors.textMuted} />}
                 label="Family"
                 onPress={() => router.push('/(app)/settings/family' as never)}
               />
@@ -456,7 +502,7 @@ export default function AccountScreen() {
         {/* Sign out */}
         <View style={s.card}>
           <SettingsRow
-            icon={<LogOut size={20} color={colors.red} />}
+            icon={<LogOut size={ICON_SIZE.md} color={colors.red} />}
             label="Sign out"
             onPress={handleSignOut}
             hideChevron
@@ -523,7 +569,7 @@ export default function AccountScreen() {
                       {option.avatarUrl ? (
                         <Image
                           source={{ uri: option.avatarUrl }}
-                          style={{ width: 36, height: 36 }}
+                          style={s.familySwitchAvatarImage}
                         />
                       ) : (
                         <Text
@@ -541,7 +587,9 @@ export default function AccountScreen() {
                         {isSwitching ? 'Switching...' : optionSubtitle}
                       </Text>
                     </View>
-                    {option.isActive ? <Check size={18} color={colors.teal} /> : null}
+                    {option.isActive ? (
+                      <Check size={ICON_SIZE.md} color={colors.teal} />
+                    ) : null}
                   </TouchableOpacity>
                 );
               })}

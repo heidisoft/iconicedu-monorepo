@@ -19,6 +19,16 @@ import {
   makeActivityItemStyles,
 } from '@/components/activity/activity-item';
 import type { AppColors } from '@/lib/theme';
+import {
+  AVATAR_SIZE,
+  COMPONENT_HEIGHT,
+  FONT_SIZE,
+  ICON_SIZE,
+  LINE_HEIGHT,
+  RADIUS,
+  SPACING,
+  typography,
+} from '@/lib/typography';
 import type { ActivityFeedItemVM, InboxTabKeyVM } from '@iconicedu/shared-types';
 
 // ---------------------------------------------------------------------------
@@ -32,19 +42,25 @@ function makeStyles(C: AppColors) {
     // Header
     header: {
       ...createHeaderSurface(C.bg, C.border),
-      paddingHorizontal: 20,
-      paddingTop: 18,
-      paddingBottom: 12,
+      paddingHorizontal: SPACING[5],
+      paddingTop: SPACING[5],
+      paddingBottom: SPACING[3],
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      gap: 12,
+      gap: SPACING[3],
     },
-    title: { fontSize: 30, fontWeight: '800', color: C.text, letterSpacing: -0.5 },
+    title: {
+      fontSize: FONT_SIZE['3xl'],
+      lineHeight: LINE_HEIGHT['3xl'],
+      fontWeight: '800',
+      color: C.text,
+      letterSpacing: -0.5,
+    },
     markAllBtn: {
-      minHeight: 32,
-      paddingHorizontal: 12,
-      borderRadius: 999,
+      minHeight: COMPONENT_HEIGHT.btnSm,
+      paddingHorizontal: SPACING[3],
+      borderRadius: RADIUS.full,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: C.border,
       backgroundColor: C.card,
@@ -55,40 +71,49 @@ function makeStyles(C: AppColors) {
       opacity: 0.45,
     },
     markAllBtnText: {
-      fontSize: 12,
+      fontSize: FONT_SIZE.sm,
       fontWeight: '700',
       color: C.teal,
     },
 
     // Full-width underline tab bar (matches web shadcn Tabs)
-    tabBar: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: C.border },
+    tabBar: {
+      flexDirection: 'row',
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: C.border,
+    },
     tab: {
       flex: 1,
-      paddingVertical: 12,
+      paddingVertical: SPACING[3],
       alignItems: 'center',
-      borderBottomWidth: 2,
+      borderBottomWidth: StyleSheet.hairlineWidth * 2,
       borderBottomColor: 'transparent',
-      marginBottom: -1,
+      marginBottom: -StyleSheet.hairlineWidth,
     },
     tabActive: { borderBottomColor: C.teal },
-    tabInner: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-    tabText: { fontSize: 13, fontWeight: '600', color: C.textFaint },
+    tabInner: { flexDirection: 'row', alignItems: 'center', gap: SPACING[1] },
+    tabText: { ...typography.sm, fontWeight: '600', color: C.textFaint },
     tabTextActive: { color: C.teal },
     tabBadge: {
-      minWidth: 18,
-      height: 18,
-      borderRadius: 9,
+      minWidth: COMPONENT_HEIGHT.tab / 2,
+      height: COMPONENT_HEIGHT.tab / 2,
+      borderRadius: COMPONENT_HEIGHT.tab / 4,
       backgroundColor: '#ef4444',
       alignItems: 'center',
       justifyContent: 'center',
-      paddingHorizontal: 4,
+      paddingHorizontal: SPACING[1],
     },
-    tabBadgeText: { fontSize: 10, fontWeight: '700', color: '#ffffff' },
+    tabBadgeText: { fontSize: FONT_SIZE.xs, fontWeight: '700', color: '#ffffff' },
+    listContent: { paddingTop: SPACING[2], paddingBottom: SPACING[6] },
 
     // Section header
-    sectionHeader: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 8 },
+    sectionHeader: {
+      paddingHorizontal: SPACING[4],
+      paddingTop: SPACING[5],
+      paddingBottom: SPACING[2],
+    },
     sectionLabel: {
-      fontSize: 11,
+      fontSize: FONT_SIZE.xs,
       fontWeight: '700',
       color: C.textFaint,
       textTransform: 'uppercase',
@@ -96,29 +121,29 @@ function makeStyles(C: AppColors) {
     },
 
     // Spacer between cards
-    separator: { height: 8 },
+    separator: { height: SPACING[2] },
 
     // Empty state
     emptyWrap: {
       flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 12,
-      paddingBottom: 60,
+      gap: SPACING[3],
+      paddingBottom: SPACING[12],
     },
     emptyIcon: {
-      width: 72,
-      height: 72,
-      borderRadius: 36,
+      width: AVATAR_SIZE['2xl'],
+      height: AVATAR_SIZE['2xl'],
+      borderRadius: AVATAR_SIZE['2xl'] / 2,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    emptyTitle: { fontSize: 18, fontWeight: '700' },
+    emptyTitle: { fontSize: FONT_SIZE.xl, fontWeight: '700' },
     emptyDesc: {
-      fontSize: 14,
+      fontSize: FONT_SIZE.base,
       textAlign: 'center',
-      paddingHorizontal: 40,
-      lineHeight: 21,
+      paddingHorizontal: SPACING[10],
+      lineHeight: LINE_HEIGHT.base,
     },
   });
 }
@@ -284,7 +309,7 @@ export default function InboxScreen() {
       ) : filteredSections.length === 0 ? (
         <View style={s.emptyWrap}>
           <View style={[s.emptyIcon, { backgroundColor: colors.inputBg }]}>
-            <Bell size={32} color={colors.teal} />
+            <Bell size={ICON_SIZE['2xl']} color={colors.teal} />
           </View>
           <Text style={[s.emptyTitle, { color: colors.text }]}>All caught up</Text>
           <Text style={[s.emptyDesc, { color: colors.textMuted }]}>
@@ -296,7 +321,7 @@ export default function InboxScreen() {
           sections={filteredSections}
           keyExtractor={(item, index) => item?.ids?.id ?? String(index)}
           stickySectionHeadersEnabled={false}
-          contentContainerStyle={{ paddingTop: 8, paddingBottom: 24 }}
+          contentContainerStyle={s.listContent}
           viewabilityConfig={VIEWABILITY_CONFIG}
           onViewableItemsChanged={onViewableItemsChanged}
           refreshControl={

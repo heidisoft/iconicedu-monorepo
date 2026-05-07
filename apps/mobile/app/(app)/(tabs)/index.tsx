@@ -39,6 +39,16 @@ import { AppSupportFooter } from '@/components/support/app-support-footer';
 import { buildHomeMetricSummary, splitHomeSessionsByTimeline } from '@/lib/home-metrics';
 import { fetchOrgSessions, queryKeys } from '@/lib/api/queries';
 import type { AppColors } from '@/lib/theme';
+import {
+  AVATAR_SIZE,
+  COMPONENT_HEIGHT,
+  FONT_SIZE,
+  ICON_SIZE,
+  LINE_HEIGHT,
+  RADIUS,
+  SPACING,
+  typography,
+} from '@/lib/typography';
 
 // ---------------------------------------------------------------------------
 // Avatar color helpers — ui_theme_key → hex, fallback to seed palette
@@ -124,19 +134,24 @@ function getInitials(name: string): string {
   return trimmed[0]?.toUpperCase() ?? 'U';
 }
 
-const FAMILY_SWITCH_HANDLE_HEIGHT = 28;
-const FAMILY_SWITCH_HEADER_HEIGHT = 76;
-const FAMILY_SWITCH_CARD_PADDING = 36;
-const FAMILY_SWITCH_ROW_HEIGHT = 62;
-const FAMILY_SWITCH_ROW_GAP = 12;
-const FAMILY_SWITCH_BOTTOM_PADDING = 18;
+const FAMILY_SWITCH_HANDLE_HEIGHT = ICON_SIZE.xl;
+const FAMILY_SWITCH_HEADER_HEIGHT = COMPONENT_HEIGHT.header + SPACING[5];
+const FAMILY_SWITCH_CARD_PADDING = SPACING[8] + SPACING[1];
+const FAMILY_SWITCH_ROW_HEIGHT = COMPONENT_HEIGHT.rowComfortable - SPACING[1] / 2;
+const FAMILY_SWITCH_ROW_GAP = SPACING[3];
+const FAMILY_SWITCH_BOTTOM_PADDING = SPACING[5];
 
 function makeStyles(C: AppColors) {
   const supportPalette = getSupportPalette(C);
 
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: C.pageBg },
-    scroll: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 32, gap: 22 },
+    scroll: {
+      paddingHorizontal: SPACING[5],
+      paddingTop: SPACING[4],
+      paddingBottom: SPACING[8],
+      gap: SPACING[6],
+    },
     topBar: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -145,78 +160,80 @@ function makeStyles(C: AppColors) {
     topBarLeft: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 10,
+      gap: SPACING[3],
       flexShrink: 1,
       minWidth: 0,
     },
     profileTrigger: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 12,
+      gap: SPACING[3],
       flexShrink: 1,
       minWidth: 0,
     },
     avatar: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
+      width: AVATAR_SIZE.lg,
+      height: AVATAR_SIZE.lg,
+      borderRadius: AVATAR_SIZE.lg / 2,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    avatarTxt: { color: '#ffffff', fontWeight: '800', fontSize: 18 },
+    avatarImage: { width: AVATAR_SIZE.lg, height: AVATAR_SIZE.lg },
+    avatarTxt: { color: '#ffffff', fontWeight: '800', fontSize: FONT_SIZE.xl },
     profileTextWrap: {
-      gap: 2,
+      gap: SPACING[1] / 2,
       flexShrink: 1,
       minWidth: 0,
     },
-    profileName: { fontSize: 15, color: C.text, fontWeight: '700' },
-    profileEmail: { fontSize: 12, color: C.textMuted },
+    profileName: { ...typography.body, color: C.text, fontWeight: '700' },
+    profileEmail: { ...typography.meta, color: C.textMuted },
     familySwitchSheetContent: {
       paddingBottom: FAMILY_SWITCH_BOTTOM_PADDING,
     },
     familySwitchCard: {
-      padding: 18,
-      gap: 12,
+      padding: SPACING[5],
+      gap: SPACING[3],
     },
     familySwitchHeader: {
-      gap: 4,
+      gap: SPACING[1],
     },
     familySwitchTitle: {
-      fontSize: 18,
+      fontSize: FONT_SIZE.xl,
       fontWeight: '800',
       color: C.text,
     },
     familySwitchSubtitle: {
-      fontSize: 13,
+      fontSize: FONT_SIZE.base,
       color: C.textMuted,
-      lineHeight: 18,
+      lineHeight: LINE_HEIGHT.base,
     },
     familySwitchList: {
-      gap: 12,
+      gap: SPACING[3],
     },
     familySwitchAvatar: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
+      width: AVATAR_SIZE.md,
+      height: AVATAR_SIZE.md,
+      borderRadius: AVATAR_SIZE.md / 2,
       alignItems: 'center',
       justifyContent: 'center',
       overflow: 'hidden',
     },
+    familySwitchAvatarImage: { width: AVATAR_SIZE.md, height: AVATAR_SIZE.md },
     familySwitchAvatarText: {
       color: '#ffffff',
-      fontSize: 14,
+      fontSize: FONT_SIZE.base,
       fontWeight: '800',
     },
     switchOption: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 12,
-      borderRadius: 14,
+      gap: SPACING[3],
+      borderRadius: RADIUS.lg,
       borderWidth: 1,
       borderColor: C.border,
       backgroundColor: C.bg,
-      paddingHorizontal: 14,
-      paddingVertical: 12,
+      paddingHorizontal: SPACING[4],
+      paddingVertical: SPACING[3],
     },
     switchOptionActive: {
       borderColor: C.teal,
@@ -225,141 +242,156 @@ function makeStyles(C: AppColors) {
     switchOptionText: {
       flex: 1,
       minWidth: 0,
-      gap: 2,
+      gap: SPACING[1] / 2,
     },
     switchOptionLabel: {
-      fontSize: 14,
+      fontSize: FONT_SIZE.base,
       fontWeight: '700',
       color: C.text,
     },
     switchOptionSubtext: {
-      fontSize: 12,
+      fontSize: FONT_SIZE.sm,
       color: C.textMuted,
     },
-    greetingLine: { fontSize: 15, color: C.textMuted, fontWeight: '500' },
+    greetingLine: { ...typography.body, color: C.textMuted, fontWeight: '500' },
     headlineRow: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      gap: 12,
+      gap: SPACING[3],
     },
     headline: {
-      fontSize: 28,
+      fontSize: FONT_SIZE['3xl'],
       fontWeight: '800',
       color: C.text,
       letterSpacing: -0.5,
-      lineHeight: 34,
+      lineHeight: LINE_HEIGHT['3xl'],
       flex: 1,
     },
     supportBtn: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 5,
-      paddingHorizontal: 10,
-      height: 32,
-      borderRadius: 999,
+      gap: SPACING[1],
+      paddingHorizontal: SPACING[3],
+      height: COMPONENT_HEIGHT.btnSm,
+      borderRadius: RADIUS.full,
       backgroundColor: supportPalette.bg,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: supportPalette.border,
       position: 'relative',
     },
     supportBtnText: {
-      fontSize: 12,
+      fontSize: FONT_SIZE.sm,
       fontWeight: '700',
       color: supportPalette.text,
     },
     supportIconWrap: {
-      width: 14,
-      height: 14,
+      width: ICON_SIZE.xs,
+      height: ICON_SIZE.xs,
       alignItems: 'center',
       justifyContent: 'center',
       position: 'relative',
     },
     sectionLabel: {
-      fontSize: 12,
+      fontSize: FONT_SIZE.sm,
       fontWeight: '700',
       color: C.textFaint,
       textTransform: 'uppercase',
       letterSpacing: 0.8,
     },
-    metricsRow: { gap: 12, paddingRight: 20 },
+    metricsRow: { gap: SPACING[3], paddingRight: SPACING[5] },
     metricCard: {
-      minHeight: 148,
+      minHeight: COMPONENT_HEIGHT.rowComfortable * 2 + SPACING[5],
       backgroundColor: C.card,
-      borderRadius: 14,
+      borderRadius: RADIUS.lg,
       borderWidth: 1,
       borderColor: C.border,
-      padding: 14,
+      padding: SPACING[4],
       justifyContent: 'space-between',
     },
     metricHeader: {
       flexDirection: 'row',
       alignItems: 'flex-start',
       justifyContent: 'space-between',
-      gap: 8,
+      gap: SPACING[2],
     },
     metricTitle: {
       flex: 1,
-      fontSize: 14,
+      fontSize: FONT_SIZE.base,
       fontWeight: '700',
       color: C.text,
-      lineHeight: 18,
+      lineHeight: LINE_HEIGHT.base,
     },
     metricIconWrap: {
-      width: 36,
-      height: 36,
-      borderRadius: 12,
+      width: AVATAR_SIZE.md,
+      height: AVATAR_SIZE.md,
+      borderRadius: RADIUS.md,
       backgroundColor: C.tealBg,
       alignItems: 'center',
       justifyContent: 'center',
     },
     metricValue: {
-      fontSize: 32,
+      fontSize: FONT_SIZE['3xl'] + SPACING[3],
       fontWeight: '800',
       color: C.text,
       letterSpacing: -0.8,
-      lineHeight: 36,
+      lineHeight: LINE_HEIGHT['3xl'] + SPACING[2],
     },
-    metricLabel: { fontSize: 12, color: C.textMuted, lineHeight: 16 },
+    metricLabel: { ...typography.meta, color: C.textMuted },
     activityHeader: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
     },
+    stackXs: { gap: SPACING[2] },
+    stackSm: { gap: SPACING[3] },
+    stackMd: { gap: SPACING[4] },
+    sessionSkeletonRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING[3],
+      paddingHorizontal: SPACING[4],
+      paddingVertical: SPACING[3],
+      borderRadius: RADIUS.md,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: C.border,
+      backgroundColor: C.card,
+    },
+    sessionSkeletonContent: { flex: 1, gap: SPACING[2] },
     emptyWrap: {
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 12,
-      paddingVertical: 18,
+      gap: SPACING[3],
+      paddingVertical: SPACING[5],
     },
     emptyStateCard: {
-      borderRadius: 16,
+      borderRadius: RADIUS.lg,
       borderWidth: 1,
       borderStyle: 'dashed',
       borderColor: C.border,
       backgroundColor: C.card,
-      paddingHorizontal: 8,
+      paddingHorizontal: SPACING[2],
       overflow: 'hidden',
     },
     emptyIcon: {
-      width: 72,
-      height: 72,
-      borderRadius: 36,
+      width: AVATAR_SIZE['2xl'],
+      height: AVATAR_SIZE['2xl'],
+      borderRadius: AVATAR_SIZE['2xl'] / 2,
       alignItems: 'center',
       justifyContent: 'center',
     },
     emptyTitle: {
-      fontSize: 18,
+      fontSize: FONT_SIZE.xl,
       fontWeight: '700',
       color: C.text,
     },
     emptyDesc: {
-      fontSize: 14,
+      fontSize: FONT_SIZE.base,
       color: C.textMuted,
       textAlign: 'center',
-      paddingHorizontal: 40,
-      lineHeight: 21,
+      paddingHorizontal: SPACING[10],
+      lineHeight: LINE_HEIGHT.base,
     },
   });
 }
@@ -667,10 +699,7 @@ export default function HomeScreen() {
                   ]}
                 >
                   {avatarUrl ? (
-                    <Image
-                      source={{ uri: avatarUrl }}
-                      style={{ width: 44, height: 44 }}
-                    />
+                    <Image source={{ uri: avatarUrl }} style={s.avatarImage} />
                   ) : (
                     <Text style={[s.avatarTxt, { color: avatarFg }]}>{initial}</Text>
                   )}
@@ -690,12 +719,11 @@ export default function HomeScreen() {
                 <IconButton
                   variant="outline"
                   size="sm"
-                  className="h-8 w-8 rounded-full"
                   onPress={() => setFamilySwitchOpen(true)}
                   label="Switch family view"
                   icon={
                     <ArrowRightLeft
-                      size={16}
+                      size={ICON_SIZE.sm}
                       color={isViewingAsChild ? colors.teal : colors.textMuted}
                     />
                   }
@@ -708,7 +736,7 @@ export default function HomeScreen() {
 
         {/* Greeting */}
         {homeHeaderLoading ? (
-          <View style={{ gap: 8 }}>
+          <View style={s.stackXs}>
             <PulseBox width={160} height={16} radius={4} />
             <View style={s.headlineRow}>
               <PulseBox width={220} height={34} radius={6} />
@@ -716,7 +744,7 @@ export default function HomeScreen() {
             </View>
           </View>
         ) : (
-          <View style={{ gap: 6 }}>
+          <View style={s.stackXs}>
             <Text style={s.greetingLine}>
               {getGreeting()}, {firstName}
             </Text>
@@ -743,7 +771,7 @@ export default function HomeScreen() {
                   accessibilityLabel="Open live support"
                 >
                   <View style={s.supportIconWrap}>
-                    <LifeBuoy size={14} color={supportPalette.text} />
+                    <LifeBuoy size={ICON_SIZE.xs} color={supportPalette.text} />
                   </View>
                   <Text style={s.supportBtnText}>Support</Text>
                 </TouchableOpacity>
@@ -752,7 +780,7 @@ export default function HomeScreen() {
           </View>
         )}
 
-        <View style={{ gap: 10 }}>
+        <View style={s.stackSm}>
           <Text style={s.sectionLabel}>Overview</Text>
           {overviewLoading ? (
             <ScrollView
@@ -763,13 +791,13 @@ export default function HomeScreen() {
               {[0, 1, 2].map((index) => (
                 <View
                   key={index}
-                  style={[s.metricCard, { width: metricCardWidth, gap: 18 }]}
+                  style={[s.metricCard, { width: metricCardWidth, gap: SPACING[5] }]}
                 >
                   <View style={s.metricHeader}>
                     <PulseBox width={110} height={16} radius={4} />
                     <PulseBox width={36} height={36} radius={12} />
                   </View>
-                  <View style={{ gap: 8 }}>
+                  <View style={s.stackXs}>
                     <PulseBox width={index === 1 ? 42 : 34} height={34} radius={6} />
                     <PulseBox width={90} height={12} radius={4} />
                   </View>
@@ -791,7 +819,7 @@ export default function HomeScreen() {
                 <View style={s.metricHeader}>
                   <Text style={s.metricTitle}>Upcoming Sessions</Text>
                   <View style={s.metricIconWrap}>
-                    <CalendarClock size={18} color={colors.teal} />
+                    <CalendarClock size={ICON_SIZE.md} color={colors.teal} />
                   </View>
                 </View>
                 <View>
@@ -804,7 +832,7 @@ export default function HomeScreen() {
                 <View style={s.metricHeader}>
                   <Text style={s.metricTitle}>Completed Classes</Text>
                   <View style={s.metricIconWrap}>
-                    <CalendarCheck size={18} color={colors.teal} />
+                    <CalendarCheck size={ICON_SIZE.md} color={colors.teal} />
                   </View>
                 </View>
                 <View>
@@ -819,7 +847,7 @@ export default function HomeScreen() {
                 <View style={s.metricHeader}>
                   <Text style={s.metricTitle}>{topMetrics.thirdMetricTitle}</Text>
                   <View style={s.metricIconWrap}>
-                    <ThirdMetricIcon size={18} color={colors.teal} />
+                    <ThirdMetricIcon size={ICON_SIZE.md} color={colors.teal} />
                   </View>
                 </View>
                 <View>
@@ -833,29 +861,16 @@ export default function HomeScreen() {
 
         {/* Upcoming sessions */}
         {(sessionsLoading || refreshing || todaySessions.length > 0) && (
-          <View style={{ gap: 10 }}>
+          <View style={s.stackSm}>
             <View style={s.activityHeader}>
               <Text style={s.sectionLabel}>Today</Text>
             </View>
             {sessionsLoading || refreshing ? (
-              <View style={{ gap: 6 }}>
+              <View style={s.stackXs}>
                 {[0, 1].map((i) => (
-                  <View
-                    key={`today-skeleton-${i}`}
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 10,
-                      paddingHorizontal: 14,
-                      paddingVertical: 10,
-                      borderRadius: 12,
-                      borderWidth: StyleSheet.hairlineWidth,
-                      borderColor: colors.border,
-                      backgroundColor: colors.card,
-                    }}
-                  >
+                  <View key={`today-skeleton-${i}`} style={s.sessionSkeletonRow}>
                     <PulseBox width={44} height={60} radius={10} />
-                    <View style={{ flex: 1, gap: 6 }}>
+                    <View style={s.sessionSkeletonContent}>
                       <PulseBox width={i === 0 ? 140 : 120} height={13} radius={4} />
                       <PulseBox width={80} height={11} radius={4} />
                     </View>
@@ -864,7 +879,7 @@ export default function HomeScreen() {
                 ))}
               </View>
             ) : (
-              <View style={{ gap: 6 }}>
+              <View style={s.stackXs}>
                 {todaySessions.map((session) => (
                   <SessionCard
                     key={session.id}
@@ -878,31 +893,18 @@ export default function HomeScreen() {
         )}
 
         <View
-          style={{ gap: 10 }}
+          style={s.stackSm}
           onLayout={(event) => setThisWeekSectionY(event.nativeEvent.layout.y)}
         >
           <View style={s.activityHeader}>
             <Text style={s.sectionLabel}>This week</Text>
           </View>
           {sessionsLoading || refreshing ? (
-            <View style={{ gap: 6 }}>
+            <View style={s.stackXs}>
               {[0, 1].map((i) => (
-                <View
-                  key={i}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 10,
-                    paddingHorizontal: 14,
-                    paddingVertical: 10,
-                    borderRadius: 12,
-                    borderWidth: StyleSheet.hairlineWidth,
-                    borderColor: colors.border,
-                    backgroundColor: colors.card,
-                  }}
-                >
+                <View key={i} style={s.sessionSkeletonRow}>
                   <PulseBox width={44} height={60} radius={10} />
-                  <View style={{ flex: 1, gap: 6 }}>
+                  <View style={s.sessionSkeletonContent}>
                     <PulseBox width={i === 0 ? 140 : 120} height={13} radius={4} />
                     <PulseBox width={80} height={11} radius={4} />
                   </View>
@@ -911,7 +913,7 @@ export default function HomeScreen() {
               ))}
             </View>
           ) : thisWeekSessions.length > 0 ? (
-            <View style={{ gap: 6 }}>
+            <View style={s.stackXs}>
               {thisWeekSessions.map((session) => (
                 <SessionCard key={session.id} session={session} pressTarget="messages" />
               ))}
@@ -920,7 +922,7 @@ export default function HomeScreen() {
             <View style={s.emptyStateCard}>
               <View style={s.emptyWrap}>
                 <View style={[s.emptyIcon, { backgroundColor: colors.inputBg }]}>
-                  <CalendarDays size={32} color={colors.textMuted} />
+                  <CalendarDays size={ICON_SIZE['2xl']} color={colors.textMuted} />
                 </View>
                 <Text style={s.emptyTitle}>No more sessions this week</Text>
                 <Text style={s.emptyDesc}>
@@ -931,29 +933,16 @@ export default function HomeScreen() {
           )}
         </View>
 
-        <View style={{ gap: 10 }}>
+        <View style={s.stackSm}>
           <View style={s.activityHeader}>
             <Text style={s.sectionLabel}>Next week</Text>
           </View>
           {sessionsLoading || refreshing ? (
-            <View style={{ gap: 6 }}>
+            <View style={s.stackXs}>
               {[0, 1].map((i) => (
-                <View
-                  key={`next-week-skeleton-${i}`}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 10,
-                    paddingHorizontal: 14,
-                    paddingVertical: 10,
-                    borderRadius: 12,
-                    borderWidth: StyleSheet.hairlineWidth,
-                    borderColor: colors.border,
-                    backgroundColor: colors.card,
-                  }}
-                >
+                <View key={`next-week-skeleton-${i}`} style={s.sessionSkeletonRow}>
                   <PulseBox width={44} height={60} radius={10} />
-                  <View style={{ flex: 1, gap: 6 }}>
+                  <View style={s.sessionSkeletonContent}>
                     <PulseBox width={i === 0 ? 140 : 120} height={13} radius={4} />
                     <PulseBox width={80} height={11} radius={4} />
                   </View>
@@ -962,7 +951,7 @@ export default function HomeScreen() {
               ))}
             </View>
           ) : nextWeekSessions.length > 0 ? (
-            <View style={{ gap: 6 }}>
+            <View style={s.stackXs}>
               {nextWeekSessions.map((session) => (
                 <SessionCard
                   key={session.id}
@@ -976,7 +965,7 @@ export default function HomeScreen() {
             <View style={s.emptyStateCard}>
               <View style={s.emptyWrap}>
                 <View style={[s.emptyIcon, { backgroundColor: colors.inputBg }]}>
-                  <CalendarDays size={32} color={colors.textMuted} />
+                  <CalendarDays size={ICON_SIZE['2xl']} color={colors.textMuted} />
                 </View>
                 <Text style={s.emptyTitle}>No sessions next week</Text>
                 <Text style={s.emptyDesc}>
@@ -1042,7 +1031,7 @@ export default function HomeScreen() {
                       {option.avatarUrl ? (
                         <Image
                           source={{ uri: option.avatarUrl }}
-                          style={{ width: 36, height: 36 }}
+                          style={s.familySwitchAvatarImage}
                         />
                       ) : (
                         <Text
@@ -1060,7 +1049,9 @@ export default function HomeScreen() {
                         {isSwitching ? 'Switching...' : optionSubtitle}
                       </Text>
                     </View>
-                    {option.isActive ? <Check size={18} color={colors.teal} /> : null}
+                    {option.isActive ? (
+                      <Check size={ICON_SIZE.md} color={colors.teal} />
+                    ) : null}
                   </TouchableOpacity>
                 );
               })}

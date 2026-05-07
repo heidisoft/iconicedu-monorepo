@@ -1,5 +1,9 @@
-import React, { useState, useCallback } from 'react';
-import { View, Text, TextInput, type TextInputProps } from 'react-native';
+import React from 'react';
+import { View, type TextInputProps } from 'react-native';
+
+import { Input as PrimitiveInput } from '@iconicedu/ui-native/components/ui/input';
+import { Label } from '@iconicedu/ui-native/components/ui/label';
+import { Text } from '@iconicedu/ui-native/components/ui/text';
 import { cn } from '@iconicedu/ui-native/lib/utils';
 import { inputClasses } from '@iconicedu/ui-native/theme';
 
@@ -19,52 +23,20 @@ export const Input: React.FC<InputProps> = ({
   size = 'default',
   className,
   containerClassName,
-  onFocus,
-  onBlur,
   ...rest
-}) => {
-  const [focused, setFocused] = useState(false);
-
-  const handleFocus = useCallback(
-    (e: Parameters<NonNullable<TextInputProps['onFocus']>>[0]) => {
-      setFocused(true);
-      onFocus?.(e);
-    },
-    [onFocus],
-  );
-
-  const handleBlur = useCallback(
-    (e: Parameters<NonNullable<TextInputProps['onBlur']>>[0]) => {
-      setFocused(false);
-      onBlur?.(e);
-    },
-    [onBlur],
-  );
-
-  return (
-    <View className={cn('gap-1.5', containerClassName)}>
-      {label && (
-        <Text className="text-[13px] font-medium text-muted-foreground">{label}</Text>
-      )}
-      <TextInput
-        className={cn(
-          inputClasses[size],
-          'bg-card text-foreground',
-          focused ? 'border-ring' : 'border-input',
-          error && 'border-destructive',
-          className,
-        )}
-        placeholderTextColor="#a1a1aa"
-        onFocus={handleFocus}
-        onBlur={handleBlur}
-        accessibilityLabel={label}
-        accessibilityState={{ disabled: rest.editable === false }}
-        {...rest}
-      />
-      {error && <Text className="text-[12px] text-destructive">{error}</Text>}
-      {helperText && !error && (
-        <Text className="text-[12px] text-muted-foreground">{helperText}</Text>
-      )}
-    </View>
-  );
-};
+}) => (
+  <View className={cn('gap-1.5', containerClassName)}>
+    {label && <Label>{label}</Label>}
+    <PrimitiveInput
+      className={cn(inputClasses[size], error && 'border-destructive', className)}
+      placeholderTextColor="#a1a1aa"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: rest.editable === false }}
+      {...rest}
+    />
+    {error && <Text className="text-destructive text-[12px]">{error}</Text>}
+    {helperText && !error && (
+      <Text className="text-muted-foreground text-[12px]">{helperText}</Text>
+    )}
+  </View>
+);

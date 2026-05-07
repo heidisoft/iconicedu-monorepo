@@ -1,50 +1,39 @@
 import React, { useMemo } from 'react';
-import { View, Text, Image } from 'react-native';
-import { cva, type VariantProps } from 'class-variance-authority';
+import { View } from 'react-native';
 
-import { cn } from '@iconicedu/ui-native/lib/utils';
 import type { PresenceDisplayStatusVM } from '@iconicedu/shared-types';
+import {
+  Avatar as PrimitiveAvatar,
+  AvatarFallback,
+  AvatarImage,
+} from '@iconicedu/ui-native/components/ui/avatar';
+import { Text } from '@iconicedu/ui-native/components/ui/text';
+import { cn } from '@iconicedu/ui-native/lib/utils';
+import { typography } from '@iconicedu/ui-native/theme';
 
-const avatarFrameVariants = cva(
-  'relative rounded-full items-center justify-center overflow-hidden border border-border',
-  {
-    variants: {
-      size: {
-        xs: 'h-6 w-6',
-        sm: 'h-8 w-8',
-        md: 'h-10 w-10',
-        lg: 'h-12 w-12',
-        xl: 'h-16 w-16',
-      },
-    },
-    defaultVariants: {
-      size: 'md',
-    },
-  },
-);
+const avatarSizeClasses = {
+  xs: 'h-[24px] w-[24px]',
+  sm: 'h-[32px] w-[32px]',
+  md: 'h-[36px] w-[36px]',
+  lg: 'h-[44px] w-[44px]',
+  xl: 'h-[56px] w-[56px]',
+} as const;
 
-const avatarTextVariants = cva('font-semibold text-muted-foreground', {
-  variants: {
-    size: {
-      xs: 'text-[10px]',
-      sm: 'text-xs',
-      md: 'text-sm',
-      lg: 'text-base',
-      xl: 'text-xl',
-    },
-  },
-  defaultVariants: {
-    size: 'md',
-  },
-});
+const avatarTextClasses = {
+  xs: 'text-[10px]',
+  sm: typography.caption,
+  md: typography.meta,
+  lg: typography.body,
+  xl: typography.title,
+} as const;
 
-const statusDotSize: Record<string, string> = {
-  xs: 'h-1.5 w-1.5',
-  sm: 'h-2 w-2',
-  md: 'h-2.5 w-2.5',
-  lg: 'h-3 w-3',
-  xl: 'h-4 w-4',
-};
+const statusDotSize = {
+  xs: 'h-[6px] w-[6px]',
+  sm: 'h-[8px] w-[8px]',
+  md: 'h-[10px] w-[10px]',
+  lg: 'h-[12px] w-[12px]',
+  xl: 'h-[14px] w-[14px]',
+} as const;
 
 const statusColors: Record<PresenceDisplayStatusVM, string> = {
   online: 'bg-success',
@@ -61,7 +50,7 @@ function getInitials(name?: string): string {
   return (parts[0]![0]! + parts[parts.length - 1]![0]!).toUpperCase();
 }
 
-type AvatarSize = NonNullable<VariantProps<typeof avatarFrameVariants>['size']>;
+type AvatarSize = keyof typeof avatarSizeClasses;
 
 type AvatarProps = {
   src?: string | null;
@@ -84,16 +73,20 @@ export const Avatar: React.FC<AvatarProps> = ({
   const initials = useMemo(() => getInitials(name), [name]);
 
   return (
-    <View className={cn('relative', className)} accessibilityLabel={label}>
-      <View className={cn(avatarFrameVariants({ size }))}>
-        {src ? (
-          <Image source={{ uri: src }} className="h-full w-full rounded-full" />
-        ) : (
-          <View className="h-full w-full items-center justify-center rounded-full bg-muted">
-            <Text className={cn(avatarTextVariants({ size }))}>{initials}</Text>
-          </View>
-        )}
-      </View>
+    <View className={cn('relative', className)}>
+      <PrimitiveAvatar
+        alt={label}
+        className={cn('border border-border', avatarSizeClasses[size])}
+      >
+        {src ? <AvatarImage source={{ uri: src }} /> : null}
+        <AvatarFallback>
+          <Text
+            className={cn('text-muted-foreground font-semibold', avatarTextClasses[size])}
+          >
+            {initials}
+          </Text>
+        </AvatarFallback>
+      </PrimitiveAvatar>
       {status && status !== 'offline' && (
         <View
           className={cn(

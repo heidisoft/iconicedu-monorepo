@@ -1,4 +1,5 @@
 export {
+  APP_LAYOUT,
   AVATAR_SIZE,
   COMPONENT_HEIGHT,
   FONT_SIZE,

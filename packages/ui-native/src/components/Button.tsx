@@ -1,88 +1,48 @@
 import React, { useCallback } from 'react';
+import { ActivityIndicator, type GestureResponderEvent } from 'react-native';
+
 import {
-  Pressable,
-  Text,
-  ActivityIndicator,
-  type PressableProps,
-  type GestureResponderEvent,
-} from 'react-native';
-import { cva, type VariantProps } from 'class-variance-authority';
-import { cn, TextClassContext } from '@iconicedu/ui-native/lib/utils';
+  Button as PrimitiveButton,
+  buttonTextVariants,
+  buttonVariants,
+} from '@iconicedu/ui-native/components/ui/button';
+import { Text } from '@iconicedu/ui-native/components/ui/text';
 import { useUiTracking } from '@iconicedu/ui-native/lib/tracking-context';
 
-const buttonVariants = cva(
-  'flex-row items-center justify-center rounded-2xl active:opacity-80',
-  {
-    variants: {
-      variant: {
-        default: 'bg-primary',
-        secondary: 'bg-secondary',
-        ghost: 'bg-transparent',
-        destructive: 'bg-destructive',
-        outline: 'border border-border bg-transparent',
-      },
-      size: {
-        sm: 'min-h-[44px] px-4',
-        default: 'min-h-[48px] px-5',
-        lg: 'min-h-[52px] px-6',
-      },
-    },
-    defaultVariants: {
-      variant: 'default',
-      size: 'default',
-    },
-  },
-);
+type PrimitiveButtonProps = React.ComponentProps<typeof PrimitiveButton>;
+type PrimitiveVariant = NonNullable<PrimitiveButtonProps['variant']>;
 
-const buttonTextVariants = cva('font-medium', {
-  variants: {
-    variant: {
-      default: 'text-primary-foreground',
-      secondary: 'text-secondary-foreground',
-      ghost: 'text-muted-foreground',
-      destructive: 'text-destructive-foreground',
-      outline: 'text-foreground',
-    },
-    size: {
-      sm: 'text-meta',
-      default: 'text-body',
-      lg: 'text-body-lg',
-    },
-  },
-  defaultVariants: {
-    variant: 'default',
-    size: 'default',
-  },
-});
+type ButtonVariant = PrimitiveVariant | 'primary';
 
-export type ButtonProps = PressableProps &
-  VariantProps<typeof buttonVariants> & {
-    /** Text label — for backward compat. Prefer children instead. */
-    label?: string;
-    /** When set, fires a 'button_clicked' analytics event with this label on press. */
-    analyticsLabel?: string;
-    loading?: boolean;
-    disabled?: boolean;
-    className?: string;
-    textClassName?: string;
-    children?: React.ReactNode;
-  };
+export type ButtonProps = Omit<PrimitiveButtonProps, 'variant' | 'children'> & {
+  /** Text label — for backward compat. Prefer children instead. */
+  label?: string;
+  /** When set, fires a 'button_clicked' analytics event with this label on press. */
+  analyticsLabel?: string;
+  loading?: boolean;
+  disabled?: boolean;
+  textClassName?: string;
+  variant?: ButtonVariant;
+  children?: React.ReactNode;
+};
+
+function toPrimitiveVariant(variant?: ButtonVariant): PrimitiveVariant {
+  return variant === 'primary' ? 'default' : (variant ?? 'default');
+}
 
 export const Button: React.FC<ButtonProps> = ({
   label,
   analyticsLabel,
   variant = 'default',
-  size = 'default',
   loading = false,
   disabled = false,
-  className,
   textClassName,
   children,
   onPress,
   ...rest
 }) => {
-  const textClass = cn(buttonTextVariants({ variant, size }), textClassName);
   const track = useUiTracking();
+  const primitiveVariant = toPrimitiveVariant(variant);
 
   const handlePress = useCallback(
     (e: GestureResponderEvent) => {
@@ -99,37 +59,26 @@ export const Button: React.FC<ButtonProps> = ({
     [track, analyticsLabel, label, variant, onPress],
   );
 
+  const content = children ?? label;
+
   return (
-    <TextClassContext.Provider value={textClass}>
-      <Pressable
-        className={cn(
-          buttonVariants({ variant, size }),
-          disabled && 'opacity-50',
-          className,
-        )}
-        disabled={disabled || loading}
-        accessibilityRole="button"
-        accessibilityLabel={label}
-        accessibilityState={{ disabled: disabled || loading }}
-        onPress={handlePress}
-        {...rest}
-      >
-        {loading ? (
-          <ActivityIndicator
-            size="small"
-            color={variant === 'ghost' || variant === 'outline' ? '#a1a1aa' : '#ffffff'}
-          />
-        ) : children ? (
-          typeof children === 'string' ? (
-            <Text className={textClass}>{children}</Text>
-          ) : (
-            children
-          )
-        ) : label ? (
-          <Text className={textClass}>{label}</Text>
-        ) : null}
-      </Pressable>
-    </TextClassContext.Provider>
+    <PrimitiveButton
+      variant={primitiveVariant}
+      disabled={disabled || loading}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: disabled || loading }}
+      onPress={handlePress}
+      {...rest}
+    >
+      {loading ? (
+        <ActivityIndicator size="small" />
+      ) : typeof content === 'string' ? (
+        <Text className={textClassName}>{content}</Text>
+      ) : (
+        content
+      )}
+    </PrimitiveButton>
   );
 };
 

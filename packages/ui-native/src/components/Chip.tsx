@@ -1,49 +1,32 @@
 import React, { useCallback } from 'react';
-import {
-  Pressable,
-  Text,
-  type PressableProps,
-  type GestureResponderEvent,
-} from 'react-native';
-import { cva, type VariantProps } from 'class-variance-authority';
+import { type GestureResponderEvent } from 'react-native';
+
+import { Button as PrimitiveButton } from '@iconicedu/ui-native/components/ui/button';
+import { Text } from '@iconicedu/ui-native/components/ui/text';
 import { cn } from '@iconicedu/ui-native/lib/utils';
 import { useUiTracking } from '@iconicedu/ui-native/lib/tracking-context';
+import { typography } from '@iconicedu/ui-native/theme';
 
-const chipVariants = cva(
-  'flex-row items-center gap-1.5 rounded-full px-3 py-1.5 active:opacity-80',
-  {
-    variants: {
-      variant: {
-        default: 'bg-secondary',
-        active: 'bg-primary',
-        outline: 'border border-border bg-transparent',
-      },
-    },
-    defaultVariants: {
-      variant: 'default',
-    },
-  },
-);
+type PrimitiveButtonProps = React.ComponentProps<typeof PrimitiveButton>;
+type ChipVariant = 'default' | 'active' | 'outline';
 
-const chipTextVariants = cva('text-xs font-medium', {
-  variants: {
-    variant: {
-      default: 'text-secondary-foreground',
-      active: 'text-primary-foreground',
-      outline: 'text-muted-foreground',
-    },
-  },
-  defaultVariants: {
-    variant: 'default',
-  },
-});
+const chipClasses: Record<ChipVariant, string> = {
+  default: 'bg-secondary',
+  active: 'bg-primary',
+  outline: 'border border-border bg-transparent',
+};
 
-export type ChipProps = PressableProps &
-  VariantProps<typeof chipVariants> & {
-    label: string;
-    icon?: React.ReactNode;
-    className?: string;
-  };
+const chipTextClasses: Record<ChipVariant, string> = {
+  default: 'text-secondary-foreground',
+  active: 'text-primary-foreground',
+  outline: 'text-muted-foreground',
+};
+
+export type ChipProps = Omit<PrimitiveButtonProps, 'variant' | 'size' | 'children'> & {
+  label: string;
+  icon?: React.ReactNode;
+  variant?: ChipVariant;
+};
 
 export const Chip: React.FC<ChipProps> = ({
   label,
@@ -68,17 +51,23 @@ export const Chip: React.FC<ChipProps> = ({
   );
 
   return (
-    <Pressable
-      className={cn(chipVariants({ variant }), className)}
+    <PrimitiveButton
+      variant={variant === 'outline' ? 'outline' : 'secondary'}
+      size="sm"
+      className={cn(
+        'min-h-[32px] rounded-full px-3 py-1.5',
+        chipClasses[variant],
+        className,
+      )}
       accessibilityRole="button"
       accessibilityLabel={label}
       onPress={onPress ? handlePress : undefined}
       {...rest}
     >
       {icon}
-      <Text className={cn(chipTextVariants({ variant }))}>{label}</Text>
-    </Pressable>
+      <Text className={cn(typography.meta, 'font-medium', chipTextClasses[variant])}>
+        {label}
+      </Text>
+    </PrimitiveButton>
   );
 };
-
-export { chipVariants, chipTextVariants };

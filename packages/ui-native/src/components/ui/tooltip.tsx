@@ -18,18 +18,10 @@ function TooltipContent({
   sideOffset = 4,
   portalHost,
   side = 'top',
-  style,
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Content> & {
   portalHost?: string;
 }) {
-  const contentStyle =
-    Platform.OS !== 'web'
-      ? ([styles.nativeContent, style].filter(Boolean) as React.ComponentProps<
-          typeof TooltipPrimitive.Content
-        >['style'])
-      : style;
-
   return (
     <TooltipPrimitive.Portal hostName={portalHost}>
       <FullWindowOverlay>
@@ -49,7 +41,6 @@ function TooltipContent({
             <TextClassContext.Provider value="text-xs text-primary-foreground">
               <TooltipPrimitive.Content
                 sideOffset={sideOffset}
-                style={contentStyle}
                 className={cn(
                   'bg-primary z-50 rounded-md px-3 py-2 sm:py-1.5',
                   Platform.select({
@@ -73,20 +64,5 @@ function TooltipContent({
     </TooltipPrimitive.Portal>
   );
 }
-
-const styles = StyleSheet.create({
-  nativeContent: {
-    backgroundColor: '#111827',
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    zIndex: 9999,
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-  },
-});
 
 export { Tooltip, TooltipContent, TooltipTrigger };

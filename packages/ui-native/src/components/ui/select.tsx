@@ -152,6 +152,7 @@ function SelectLabel({
 
 function SelectItem({
   className,
+  children,
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Item>) {
   return (

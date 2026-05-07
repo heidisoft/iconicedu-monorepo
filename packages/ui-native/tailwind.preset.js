@@ -48,6 +48,29 @@ module.exports = {
           DEFAULT: 'var(--info)',
           foreground: 'var(--info-foreground)',
         },
+        page: {
+          DEFAULT: 'var(--page-bg)',
+        },
+        teal: {
+          DEFAULT: 'var(--teal)',
+          foreground: 'var(--teal-foreground)',
+          bg: 'var(--teal-bg)',
+        },
+        tab: {
+          DEFAULT: 'var(--tab-bg)',
+          border: 'var(--tab-border)',
+          active: 'var(--tab-active)',
+          inactive: 'var(--tab-inactive)',
+        },
+        app: {
+          input: 'var(--input-bg)',
+          overlay: 'var(--modal-overlay)',
+          switchTrackOff: 'var(--switch-track-off)',
+        },
+        text: {
+          muted: 'var(--text-muted)',
+          faint: 'var(--text-faint)',
+        },
       },
       fontSize: {
         caption: ['11px', { lineHeight: '16px' }],
@@ -58,9 +81,14 @@ module.exports = {
         title: ['20px', { lineHeight: '28px' }],
         'title-lg': ['24px', { lineHeight: '32px' }],
       },
+      fontFamily: {
+        sans: ['Inter', 'System', 'sans-serif'],
+        mono: ['Geist Mono', 'Menlo', 'monospace'],
+      },
       minHeight: {
         touch: '44px',
         control: '48px',
+        'control-lg': '52px',
         cta: '56px',
         'row-compact': '48px',
         row: '56px',
@@ -70,6 +98,7 @@ module.exports = {
       height: {
         touch: '44px',
         control: '48px',
+        'control-lg': '52px',
         cta: '56px',
         bottomTab: '49px',
       },
@@ -79,11 +108,13 @@ module.exports = {
         cta: '56px',
       },
       borderRadius: {
-        sm: '8px',
-        md: '12px',
-        lg: '16px',
-        xl: '20px',
-        '2xl': '16px',
+        sm: '6px',
+        md: '8px',
+        lg: '10px',
+        xl: '14px',
+        '2xl': '18px',
+        '3xl': '22px',
+        '4xl': '26px',
       },
     },
   },

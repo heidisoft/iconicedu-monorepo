@@ -53,9 +53,9 @@ export const ListItem: React.FC<ListItemProps> = ({
   return (
     <Pressable
       className={cn(
-        'flex-row items-center gap-3 rounded-xl active:bg-accent/50',
+        'flex-row items-center gap-3 rounded-lg active:bg-muted/50',
         DENSITY_ROW_CLASS[resolvedDensity],
-        active && 'bg-accent',
+        active && 'bg-muted',
         className,
       )}
       accessibilityRole="button"

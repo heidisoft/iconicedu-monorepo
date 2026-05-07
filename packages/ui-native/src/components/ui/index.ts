@@ -17,6 +17,7 @@ export * from '@iconicedu/ui-native/components/ui/input';
 export * from '@iconicedu/ui-native/components/ui/label';
 export * from '@iconicedu/ui-native/components/ui/menubar';
 export * from '@iconicedu/ui-native/components/ui/popover';
+export * from '@iconicedu/ui-native/components/ui/progress';
 export * from '@iconicedu/ui-native/components/ui/radio-group';
 export * from '@iconicedu/ui-native/components/ui/select';
 export * from '@iconicedu/ui-native/components/ui/separator';

@@ -10,6 +10,7 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
+import { RADIUS, SPACING } from '@iconicedu/ui-native/theme';
 
 const SCREEN_HEIGHT = Dimensions.get('screen').height;
 const DEFAULT_PARTIAL_HEIGHT_RATIO = 0.58;
@@ -46,8 +47,8 @@ const styles = StyleSheet.create({
     top: 0,
     height: SCREEN_HEIGHT,
     backgroundColor: '#ffffff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: RADIUS.xl,
+    borderTopRightRadius: RADIUS.xl,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.15,
@@ -56,13 +57,13 @@ const styles = StyleSheet.create({
   },
   dragArea: {
     width: '100%',
-    paddingVertical: 12,
+    paddingVertical: SPACING[3],
     alignItems: 'center',
   },
   dragHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
+    width: SPACING[10],
+    height: SPACING[1],
+    borderRadius: SPACING[1] / 2,
     backgroundColor: '#cbd5e1',
   },
 });

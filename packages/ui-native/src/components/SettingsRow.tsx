@@ -3,7 +3,12 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { ChevronRight } from 'lucide-react-native';
 import { cn } from '@iconicedu/ui-native/lib/utils';
 import { useUiTracking } from '@iconicedu/ui-native/lib/tracking-context';
-import { COMPONENT_HEIGHT, ICON_SIZE, SPACING } from '@iconicedu/ui-native/theme';
+import {
+  COMPONENT_HEIGHT,
+  FONT_SIZE,
+  ICON_SIZE,
+  SPACING,
+} from '@iconicedu/ui-native/theme';
 
 export type SettingsRowProps = {
   icon: React.ReactNode;
@@ -92,7 +97,7 @@ const styles = StyleSheet.create({
   },
   label: {
     flex: 1,
-    fontSize: 15,
+    fontSize: FONT_SIZE.md,
     fontWeight: '500',
   },
   trailing: {

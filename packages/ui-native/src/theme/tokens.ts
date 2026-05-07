@@ -24,6 +24,19 @@ export const LINE_HEIGHT = {
   '3xl': 28,
 };
 
+export const FONT_FAMILY = {
+  sans: Platform.select({
+    ios: 'System',
+    android: 'sans-serif',
+    default: 'System',
+  }) as string,
+  mono: Platform.select({
+    ios: 'Menlo',
+    android: 'monospace',
+    default: 'monospace',
+  }) as string,
+} as const;
+
 export const TOUCH_TARGET = {
   sm: 44,
   md: 44,
@@ -70,10 +83,13 @@ export const SPACING = {
 } as const;
 
 export const RADIUS = {
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 20,
+  sm: 6,
+  md: 8,
+  lg: 10,
+  xl: 14,
+  '2xl': 18,
+  '3xl': 22,
+  '4xl': 26,
   full: 999,
 } as const;
 
@@ -94,21 +110,23 @@ export const HIT_SLOP = {
 
 export const APP_LAYOUT = {
   listItem: {
-    listPaddingTop: SPACING[2],
-    listPaddingBottom: SPACING[4],
-    marginHorizontal: 0,
-    marginBottom: 0,
+    listPaddingTop: SPACING[4],
+    listPaddingBottom: SPACING[6],
+    marginHorizontal: SPACING[4],
+    marginBottom: SPACING[4],
     paddingHorizontal: SPACING[4],
-    paddingVertical: 11,
-    minHeight: 72,
+    paddingVertical: SPACING[4] + SPACING[1] / 2,
+    minHeight: COMPONENT_HEIGHT.rowComfortable + SPACING[4],
     gap: SPACING[3],
-    contentGap: 2,
+    contentGap: SPACING[1] / 2,
     topRowGap: SPACING[2],
     metaWrapGap: SPACING[2],
-    metaGroupGap: 5,
-    avatarSize: 50,
-    groupAvatarSize: 34,
+    metaGroupGap: SPACING[1],
+    avatarSize: AVATAR_SIZE.lg,
+    groupAvatarSize: SPACING[8] - SPACING[1] / 2,
     badgeSize: 20,
-    tailWidth: 70,
+    tailWidth: SPACING[12] + SPACING[4],
+    separatorHeight: 0,
+    separatorInset: 0,
   },
 } as const;

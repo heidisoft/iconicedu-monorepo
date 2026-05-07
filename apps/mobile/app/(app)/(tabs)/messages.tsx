@@ -34,12 +34,13 @@ import { useSupervisedDirectMessages } from '@/hooks/use-supervised-direct-messa
 import { useFamilyView } from '@/providers/family-view-provider';
 import { useTheme } from '@/providers/theme-provider';
 import { ChannelTopicIconBadge } from '@/lib/learning-space-icons';
-import type { AppColors } from '@/lib/theme';
+import { appLayout, type AppColors } from '@/lib/theme';
 import { createHeaderSurface } from '@/lib/header-surface';
 import {
   FONT_SIZE,
   LINE_HEIGHT,
   COMPONENT_HEIGHT,
+  ICON_SIZE,
   SPACING,
   RADIUS,
   AVATAR_SIZE,
@@ -60,6 +61,7 @@ type ClassroomStudentTab = 'all' | string;
 
 type SectionHeaderItem = { _type: 'section-header'; title: string; id: string };
 type ListRow = ChannelListItem | SectionHeaderItem;
+const MESSAGE_LIST_ITEM = appLayout.listItem;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -279,7 +281,7 @@ function makeStyles(C: AppColors) {
     header: {
       ...createHeaderSurface(C.bg, C.border),
       paddingHorizontal: SPACING[5],
-      paddingTop: 18,
+      paddingTop: SPACING[5],
       paddingBottom: SPACING[3],
     },
     headerRow: {
@@ -288,10 +290,16 @@ function makeStyles(C: AppColors) {
       justifyContent: 'space-between',
       gap: SPACING[3],
     },
-    title: { fontSize: 30, fontWeight: '800', color: C.text, letterSpacing: -0.5 },
+    title: {
+      fontSize: FONT_SIZE['3xl'],
+      lineHeight: LINE_HEIGHT['3xl'],
+      fontWeight: '800',
+      color: C.text,
+      letterSpacing: -0.5,
+    },
     headerAction: {
-      paddingHorizontal: 10,
-      paddingVertical: 6,
+      paddingHorizontal: SPACING[3],
+      paddingVertical: SPACING[2],
       borderRadius: RADIUS.full,
       backgroundColor: C.inputBg,
       borderWidth: StyleSheet.hairlineWidth,
@@ -306,27 +314,31 @@ function makeStyles(C: AppColors) {
       color: C.teal,
     },
 
-    tabBar: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: C.border },
+    tabBar: {
+      flexDirection: 'row',
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: C.border,
+    },
     tab: {
       flex: 1,
       paddingVertical: SPACING[3],
       alignItems: 'center',
-      borderBottomWidth: 2,
+      borderBottomWidth: StyleSheet.hairlineWidth * 2,
       borderBottomColor: 'transparent',
-      marginBottom: -1,
+      marginBottom: -StyleSheet.hairlineWidth,
     },
     tabActive: { borderBottomColor: C.teal },
-    tabInner: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+    tabInner: { flexDirection: 'row', alignItems: 'center', gap: SPACING[1] },
     tabText: { ...typographyStyle.sm, fontWeight: '600', color: C.textFaint },
     tabTextActive: { color: C.teal },
     tabBadge: {
-      minWidth: 18,
-      height: 18,
-      borderRadius: 9,
+      minWidth: COMPONENT_HEIGHT.tab / 2,
+      height: COMPONENT_HEIGHT.tab / 2,
+      borderRadius: COMPONENT_HEIGHT.tab / 4,
       backgroundColor: '#ef4444',
       alignItems: 'center',
       justifyContent: 'center',
-      paddingHorizontal: 4,
+      paddingHorizontal: SPACING[1],
     },
     tabBadgeText: { fontSize: FONT_SIZE.xs, fontWeight: '700', color: '#ffffff' },
     subTabScroll: { maxHeight: COMPONENT_HEIGHT.tabDefault },
@@ -348,31 +360,44 @@ function makeStyles(C: AppColors) {
     subTabText: { ...typographyStyle.sm, fontWeight: '600', color: C.textMuted },
     subTabTextActive: { color: C.teal },
 
+    listContent: {
+      paddingTop: MESSAGE_LIST_ITEM.listPaddingTop,
+      paddingBottom: MESSAGE_LIST_ITEM.listPaddingBottom,
+    },
     itemOuter: {
-      marginHorizontal: SPACING[4],
-      marginBottom: SPACING[4],
+      marginHorizontal: MESSAGE_LIST_ITEM.marginHorizontal,
+      marginBottom: MESSAGE_LIST_ITEM.marginBottom,
     },
     itemWrap: {
       backgroundColor: 'transparent',
-      paddingHorizontal: SPACING[4],
-      paddingVertical: 18,
+      paddingHorizontal: MESSAGE_LIST_ITEM.paddingHorizontal,
+      paddingVertical: MESSAGE_LIST_ITEM.paddingVertical,
       overflow: 'hidden',
+      minHeight: MESSAGE_LIST_ITEM.minHeight,
     },
     itemWrapUnread: {},
-    itemRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING[3] },
-    separator: { height: 0 },
+    itemRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: MESSAGE_LIST_ITEM.gap,
+    },
+    separator: {
+      height: MESSAGE_LIST_ITEM.separatorHeight,
+      marginLeft: MESSAGE_LIST_ITEM.separatorInset,
+      backgroundColor: C.border,
+    },
 
     // ── DM avatar — single person ──────────────────────────────────────────────
     avatarWrap: {
       position: 'relative',
-      width: AVATAR_SIZE.lg,
-      height: AVATAR_SIZE.lg,
+      width: MESSAGE_LIST_ITEM.avatarSize,
+      height: MESSAGE_LIST_ITEM.avatarSize,
       flexShrink: 0,
     },
     avatarCircle: {
-      width: AVATAR_SIZE.lg,
-      height: AVATAR_SIZE.lg,
-      borderRadius: AVATAR_SIZE.lg / 2,
+      width: MESSAGE_LIST_ITEM.avatarSize,
+      height: MESSAGE_LIST_ITEM.avatarSize,
+      borderRadius: MESSAGE_LIST_ITEM.avatarSize / 2,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -386,9 +411,9 @@ function makeStyles(C: AppColors) {
       position: 'absolute',
       bottom: 2,
       right: 2,
-      width: 13,
-      height: 13,
-      borderRadius: 7,
+      width: ICON_SIZE.xs,
+      height: ICON_SIZE.xs,
+      borderRadius: ICON_SIZE.xs / 2,
       backgroundColor: '#22c55e',
       borderWidth: 2,
       borderColor: C.bg,
@@ -397,9 +422,9 @@ function makeStyles(C: AppColors) {
       position: 'absolute',
       bottom: 2,
       right: 2,
-      width: 13,
-      height: 13,
-      borderRadius: 7,
+      width: ICON_SIZE.xs,
+      height: ICON_SIZE.xs,
+      borderRadius: ICON_SIZE.xs / 2,
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 2,
@@ -408,8 +433,8 @@ function makeStyles(C: AppColors) {
 
     // ── DM avatar — group (stacked) ────────────────────────────────────────────
     groupWrap: {
-      width: AVATAR_SIZE.lg,
-      height: AVATAR_SIZE.lg,
+      width: MESSAGE_LIST_ITEM.avatarSize,
+      height: MESSAGE_LIST_ITEM.avatarSize,
       flexShrink: 0,
       position: 'relative',
     },
@@ -417,9 +442,9 @@ function makeStyles(C: AppColors) {
       position: 'absolute',
       right: 0,
       bottom: 0,
-      width: 30,
-      height: 30,
-      borderRadius: 15,
+      width: MESSAGE_LIST_ITEM.groupAvatarSize,
+      height: MESSAGE_LIST_ITEM.groupAvatarSize,
+      borderRadius: MESSAGE_LIST_ITEM.groupAvatarSize / 2,
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 2,
@@ -429,9 +454,9 @@ function makeStyles(C: AppColors) {
       position: 'absolute',
       left: 0,
       top: 0,
-      width: 30,
-      height: 30,
-      borderRadius: 15,
+      width: MESSAGE_LIST_ITEM.groupAvatarSize,
+      height: MESSAGE_LIST_ITEM.groupAvatarSize,
+      borderRadius: MESSAGE_LIST_ITEM.groupAvatarSize / 2,
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 2,
@@ -443,34 +468,38 @@ function makeStyles(C: AppColors) {
 
     // ── Class avatar ──────────────────────────────────────────────────
     channelAvatar: {
-      width: AVATAR_SIZE.lg,
-      height: AVATAR_SIZE.lg,
-      borderRadius: AVATAR_SIZE.lg / 2,
+      width: MESSAGE_LIST_ITEM.avatarSize,
+      height: MESSAGE_LIST_ITEM.avatarSize,
+      borderRadius: MESSAGE_LIST_ITEM.avatarSize / 2,
       alignItems: 'center',
       justifyContent: 'center',
       flexShrink: 0,
       borderWidth: 0,
     },
-    channelEmoji: { fontSize: 24 },
+    channelEmoji: { fontSize: ICON_SIZE.lg },
 
-    content: { flex: 1, minWidth: 0, justifyContent: 'center', gap: 2 },
-    topRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING[2] },
-    rowNameWrap: { flex: 1, minWidth: 0 },
-    rowName: {
-      fontSize: listTypography.title.fontSize,
-      lineHeight: listTypography.title.lineHeight,
-      fontWeight: '700',
-      color: C.text,
+    content: {
+      flex: 1,
+      minWidth: 0,
+      justifyContent: 'center',
+      gap: MESSAGE_LIST_ITEM.contentGap,
     },
+    topRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: MESSAGE_LIST_ITEM.topRowGap,
+    },
+    rowNameWrap: { flex: 1, minWidth: 0 },
+    rowName: { ...listTypography.title, color: C.text },
     rowNameUnread: { fontWeight: '800' },
     rowNameStudentNames: { fontWeight: '600' },
     rowTail: {
-      width: 64,
+      width: MESSAGE_LIST_ITEM.tailWidth,
       alignItems: 'flex-end',
       justifyContent: 'space-between',
       flexShrink: 0,
       alignSelf: 'stretch',
-      paddingVertical: 2,
+      paddingVertical: MESSAGE_LIST_ITEM.contentGap,
     },
     rowTime: { fontSize: FONT_SIZE.sm, color: C.textMuted, fontWeight: '500' },
     rowMeta: { fontSize: FONT_SIZE.sm, color: C.textMuted, lineHeight: LINE_HEIGHT.sm },
@@ -479,13 +508,13 @@ function makeStyles(C: AppColors) {
       flexDirection: 'row',
       alignItems: 'center',
       flexWrap: 'wrap',
-      gap: 8,
+      gap: MESSAGE_LIST_ITEM.metaWrapGap,
       minWidth: 0,
     },
     rowMetaGroup: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 4,
+      gap: MESSAGE_LIST_ITEM.metaGroupGap,
       minWidth: 0,
     },
     rowMetaGroupNames: {
@@ -500,13 +529,13 @@ function makeStyles(C: AppColors) {
       lineHeight: LINE_HEIGHT.sm,
     },
     badge: {
-      minWidth: 20,
-      height: 20,
-      borderRadius: 10,
+      minWidth: MESSAGE_LIST_ITEM.badgeSize,
+      height: MESSAGE_LIST_ITEM.badgeSize,
+      borderRadius: MESSAGE_LIST_ITEM.badgeSize / 2,
       backgroundColor: C.teal,
       alignItems: 'center',
       justifyContent: 'center',
-      paddingHorizontal: 6,
+      paddingHorizontal: SPACING[2],
     },
     badgeTxt: { color: '#ffffff', fontSize: FONT_SIZE.xs, fontWeight: '700' },
 
@@ -514,33 +543,33 @@ function makeStyles(C: AppColors) {
       flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 12,
-      paddingBottom: 60,
+      gap: SPACING[3],
+      paddingBottom: SPACING[12],
     },
     emptyIcon: {
-      width: 72,
-      height: 72,
-      borderRadius: 36,
+      width: AVATAR_SIZE['2xl'],
+      height: AVATAR_SIZE['2xl'],
+      borderRadius: AVATAR_SIZE['2xl'] / 2,
       alignItems: 'center',
       justifyContent: 'center',
     },
     emptyTitle: { fontSize: FONT_SIZE.xl, fontWeight: '700' },
     emptyDesc: {
-      fontSize: 14,
+      fontSize: FONT_SIZE.base,
       textAlign: 'center',
       paddingHorizontal: SPACING[10],
-      lineHeight: 21,
+      lineHeight: LINE_HEIGHT.base,
     },
 
     // ── Supervised badge ───────────────────────────────────────────────────────
     supervisedBadge: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 3,
+      gap: MESSAGE_LIST_ITEM.contentGap,
       backgroundColor: C.tealBg,
-      borderRadius: 6,
-      paddingHorizontal: 6,
-      paddingVertical: 2,
+      borderRadius: RADIUS.sm,
+      paddingHorizontal: SPACING[2],
+      paddingVertical: MESSAGE_LIST_ITEM.contentGap,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: C.teal,
     },
@@ -616,7 +645,7 @@ function DmAvatar({
             <Text style={s.groupTxt}>{getInitials(participantName(back!))}</Text>
           </View>
         )}
-        <RoleAvatarBadge role={back?.kind} size={14} style={s.groupBadgeBack} />
+        <RoleAvatarBadge role={back?.kind} size={ICON_SIZE.xs} style={s.groupBadgeBack} />
         {front!.avatar_url ? (
           <Image
             source={{ uri: front!.avatar_url }}
@@ -628,7 +657,11 @@ function DmAvatar({
             <Text style={s.groupTxt}>{getInitials(participantName(front!))}</Text>
           </View>
         )}
-        <RoleAvatarBadge role={front?.kind} size={14} style={s.groupBadgeFront} />
+        <RoleAvatarBadge
+          role={front?.kind}
+          size={ICON_SIZE.xs}
+          style={s.groupBadgeFront}
+        />
         <PresenceBadge status={presenceStatus ?? 'offline'} s={s} />
       </View>
     );
@@ -652,7 +685,7 @@ function DmAvatar({
         </View>
       )}
       <PresenceBadge status={presenceStatus ?? 'offline'} s={s} />
-      <RoleAvatarBadge role={person?.kind} size={16} />
+      <RoleAvatarBadge role={person?.kind} size={ICON_SIZE.sm} />
     </View>
   );
 }
@@ -793,9 +826,9 @@ function ChannelRow({
           ) : (
             <ChannelTopicIconBadge
               iconKey={item.icon_key}
-              size={AVATAR_SIZE.lg}
-              iconSize={20}
-              borderRadius={AVATAR_SIZE.lg / 2}
+              size={MESSAGE_LIST_ITEM.avatarSize}
+              iconSize={ICON_SIZE.lg}
+              borderRadius={MESSAGE_LIST_ITEM.avatarSize / 2}
               backgroundColor={classAvatarColors.bg}
               color={classAvatarColors.fg}
               style={s.channelAvatar}
@@ -812,7 +845,7 @@ function ChannelRow({
                   containerStyle={s.rowNameWrap}
                   textStyle={[s.rowName, hasUnread && s.rowNameUnread]}
                   numberOfLines={1}
-                  iconSize={13}
+                  iconSize={ICON_SIZE.sm}
                 />
               ) : (
                 <View style={s.rowNameWrap}>
@@ -837,7 +870,11 @@ function ChannelRow({
 
                   return (
                     <View key={group.kind} style={s.rowMetaGroup}>
-                      <GroupIcon size={12} color={colors.textMuted} strokeWidth={2} />
+                      <GroupIcon
+                        size={ICON_SIZE.sm}
+                        color={colors.textMuted}
+                        strokeWidth={2}
+                      />
                       <View style={s.rowMetaGroupNames}>
                         {group.participants.map((participant, index) => (
                           <React.Fragment key={`${participant.kind}-${participant.name}`}>
@@ -1333,7 +1370,7 @@ export default function MessagesScreen() {
       ) : isEmpty ? (
         <View style={s.emptyWrap}>
           <View style={[s.emptyIcon, { backgroundColor: colors.inputBg }]}>
-            <emptyConfig.icon size={32} color={colors.textMuted} />
+            <emptyConfig.icon size={ICON_SIZE['2xl']} color={colors.textMuted} />
           </View>
           <Text style={[s.emptyTitle, { color: colors.text }]}>{emptyConfig.title}</Text>
           <Text style={[s.emptyDesc, { color: colors.textMuted }]}>
@@ -1344,7 +1381,7 @@ export default function MessagesScreen() {
         <FlatList
           data={data}
           keyExtractor={(item) => ('_type' in item ? item.id : item.id)}
-          contentContainerStyle={{ paddingTop: 16, paddingBottom: 24 }}
+          contentContainerStyle={s.listContent}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
