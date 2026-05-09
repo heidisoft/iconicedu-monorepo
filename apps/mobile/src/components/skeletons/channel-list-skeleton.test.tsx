@@ -21,7 +21,7 @@ describe('ChannelListSkeleton', () => {
 
     expect(screen.getByTestId('channel-list-skeleton')).toBeTruthy();
     expect(screen.getAllByTestId('channel-skeleton-row')).toHaveLength(6);
-    expect(screen.getAllByTestId('channel-skeleton-status-dot')).toHaveLength(1);
+    expect(screen.queryByTestId('channel-skeleton-status-dot')).toBeNull();
   });
 
   it('renders custom count of rows', () => {

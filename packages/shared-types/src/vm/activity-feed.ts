@@ -100,7 +100,7 @@ export interface ActivityItemAudienceVM {
 }
 
 export interface ActivityItemRefsVM {
-  actor: ActivityActorVM;
+  actor?: ActivityActorVM | null;
   object?: EntityRefVM;
   target?: EntityRefVM;
 }

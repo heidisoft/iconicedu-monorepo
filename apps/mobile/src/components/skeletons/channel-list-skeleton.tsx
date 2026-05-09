@@ -11,7 +11,7 @@ const ITEMS = [
     metaPrimaryWidth: 0,
     metaSecondaryWidth: 0,
     timeWidth: 58,
-    hasStatus: true,
+    hasStatus: false,
   },
   {
     titleWidth: 198,
