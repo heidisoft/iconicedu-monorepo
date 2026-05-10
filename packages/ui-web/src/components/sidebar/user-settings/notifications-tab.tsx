@@ -48,17 +48,16 @@ const defineNotificationItems = <T extends NotificationSectionItem[]>(items: T) 
 
 const ACTIVITY_SCOPED_VERB_KEYS: ActivityVerbVM[] = [
   'class.session.rescheduled',
-  'class.sessions.rescheduled',
   'class.session.canceled',
-  'class.sessions.canceled',
   'message.posted',
-  'messages.posted',
+  'message.mentioned',
+  'message.thread_reply.posted',
+  'file.uploaded',
+  'image.uploaded',
+  'audio.uploaded',
   'reaction.added',
-  'reactions.added',
   'session.reminder.sent',
-  'sessions.reminder.sent',
   'session.feedback_request.sent',
-  'sessions.feedback_request.sent',
 ];
 
 const ACTIVITY_VERB_CONTEXT_ORDER = [
@@ -101,13 +100,10 @@ function toTitleCaseToken(token: string): string {
 }
 
 function formatActivityVerbLabel(verb: ActivityVerbVM): string {
-  if (verb === 'session.reminder.sent' || verb === 'sessions.reminder.sent') {
+  if (verb === 'session.reminder.sent') {
     return 'Session - Reminders';
   }
-  if (
-    verb === 'session.feedback_request.sent' ||
-    verb === 'sessions.feedback_request.sent'
-  ) {
+  if (verb === 'session.feedback_request.sent') {
     return 'Session - Feedback Request';
   }
 

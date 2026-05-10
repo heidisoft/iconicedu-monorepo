@@ -21,7 +21,7 @@ function makeEvent(): ActivityEventRow {
   return {
     id: 'event-1',
     org_id: 'org-1',
-    event_type: 'session.reminder.sent',
+    event_type: 'message.posted',
     occurred_at: '2026-05-05T12:00:00.000Z',
     source_kind: 'system',
     actor_profile_id: null,
@@ -30,7 +30,8 @@ function makeEvent(): ActivityEventRow {
     target_ref: null,
     payload: {
       title: 'Algebra I',
-      summary: 'Class starts in 30 minutes',
+      senderName: 'Ms. Chen',
+      content: 'Class starts in 30 minutes',
       channelId: 'channel-1',
       channelRouteKind: 'space',
       members: [
@@ -47,7 +48,7 @@ function makeEvent(): ActivityEventRow {
       ],
     },
     audience_rules: [{ kind: 'users_only', userIds: ['guardian-1', 'teacher-1'] }],
-    dedupe_key: 'reminder-1:activity',
+    dedupe_key: 'message.posted:message-1',
     projection_status: 'pending',
     projection_attempts: 0,
     created_at: '2026-05-05T12:00:00.000Z',
@@ -171,10 +172,26 @@ describe('projectActivityEvents context rendering', () => {
     );
 
     expect((guardianRow?.content as Record<string, unknown>).summary).toBe(
-      'Algebra I for Priya with Ms. Chen Class starts in 30 minutes',
+      'Class starts in 30 minutes',
     );
     expect((teacherRow?.content as Record<string, unknown>).summary).toBe(
-      'Algebra I with Priya Class starts in 30 minutes',
+      'Class starts in 30 minutes',
     );
+    expect(
+      (
+        (guardianRow?.content as Record<string, unknown>).headline as Record<
+          string,
+          unknown
+        >
+      ).secondary,
+    ).toBe('sent a message in Algebra I for Priya with Ms. Chen');
+    expect(
+      (
+        (teacherRow?.content as Record<string, unknown>).headline as Record<
+          string,
+          unknown
+        >
+      ).secondary,
+    ).toBe('sent a message in Algebra I with Priya');
   });
 });

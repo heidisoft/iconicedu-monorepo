@@ -3,7 +3,6 @@ import type {
   ActivityFeedVM,
   ActivityFeedTabVM,
   InboxTabKeyVM,
-  ClassSessionFeedbackRow,
 } from '@iconicedu/shared-types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -39,12 +38,7 @@ export async function buildActivityFeedForProfile(
       actor: row.actor_profile_id ? actorProfiles.get(row.actor_profile_id) : null,
     }),
   );
-  const itemsWithFeedback = await attachFeedbackResponses(
-    supabase,
-    orgId,
-    profileId,
-    mappedItems,
-  );
+  const itemsWithFeedback = mappedItems;
 
   const filteredItems =
     activeTab === 'all'
@@ -62,136 +56,6 @@ export async function buildActivityFeedForProfile(
     nextCursor: null,
     unreadCount,
   };
-}
-
-async function attachFeedbackResponses(
-  supabase: SupabaseClient,
-  orgId: string,
-  profileId: string,
-  items: ActivityFeedItemVM[],
-) {
-  if (typeof (supabase as { from?: unknown }).from !== 'function') {
-    return items;
-  }
-
-  const sessionIds = items
-    .filter((item) => item.verb === 'session.feedback_request.sent')
-    .map((item) => item.metadata?.classSessionId)
-    .filter((value): value is string => typeof value === 'string' && value.length > 0);
-  const sourceEventIds = items
-    .filter((item) => item.verb === 'session.feedback_request.sent')
-    .map((item) => item.metadata?.sourceEventId)
-    .filter((value): value is string => typeof value === 'string' && value.length > 0);
-
-  const uniqueSessionIds = Array.from(new Set(sessionIds));
-  const uniqueSourceEventIds = Array.from(new Set(sourceEventIds));
-  if (!uniqueSessionIds.length && !uniqueSourceEventIds.length) {
-    return items;
-  }
-
-  const [sessionResponse, eventResponse] = await Promise.all([
-    uniqueSessionIds.length
-      ? supabase
-          .from('class_session_feedback')
-          .select(
-            'class_session_id, source_event_id, message_id, rating, comment, submitted_at',
-          )
-          .eq('org_id', orgId)
-          .eq('recipient_profile_id', profileId)
-          .in('class_session_id', uniqueSessionIds)
-          .is('deleted_at', null)
-          .returns<
-            Pick<
-              ClassSessionFeedbackRow,
-              | 'class_session_id'
-              | 'source_event_id'
-              | 'message_id'
-              | 'rating'
-              | 'comment'
-              | 'submitted_at'
-            >[]
-          >()
-      : Promise.resolve({ data: [], error: null }),
-    uniqueSourceEventIds.length
-      ? supabase
-          .from('class_session_feedback')
-          .select(
-            'class_session_id, source_event_id, message_id, rating, comment, submitted_at',
-          )
-          .eq('org_id', orgId)
-          .eq('recipient_profile_id', profileId)
-          .in('source_event_id', uniqueSourceEventIds)
-          .is('deleted_at', null)
-          .returns<
-            Pick<
-              ClassSessionFeedbackRow,
-              | 'class_session_id'
-              | 'source_event_id'
-              | 'message_id'
-              | 'rating'
-              | 'comment'
-              | 'submitted_at'
-            >[]
-          >()
-      : Promise.resolve({ data: [], error: null }),
-  ]);
-
-  if (sessionResponse.error) {
-    throw new Error(sessionResponse.error.message);
-  }
-  if (eventResponse.error) {
-    throw new Error(eventResponse.error.message);
-  }
-
-  const mergedRows = [...(sessionResponse.data ?? []), ...(eventResponse.data ?? [])];
-  const feedbackBySessionId = new Map(
-    mergedRows
-      .filter(
-        (row) =>
-          typeof row.class_session_id === 'string' && row.class_session_id.length > 0,
-      )
-      .map((row) => [row.class_session_id, row]),
-  );
-  const feedbackByEventId = new Map(
-    mergedRows
-      .filter(
-        (row) =>
-          typeof row.source_event_id === 'string' && row.source_event_id.length > 0,
-      )
-      .map((row) => [row.source_event_id as string, row]),
-  );
-
-  return items.map((item) => {
-    if (item.verb !== 'session.feedback_request.sent') {
-      return item;
-    }
-
-    const classSessionId = item.metadata?.classSessionId;
-    const sourceEventId = item.metadata?.sourceEventId;
-    const feedback =
-      (typeof classSessionId === 'string'
-        ? feedbackBySessionId.get(classSessionId)
-        : null) ??
-      (typeof sourceEventId === 'string' ? feedbackByEventId.get(sourceEventId) : null);
-    if (!feedback) {
-      return item;
-    }
-
-    return {
-      ...item,
-      metadata: {
-        ...(item.metadata ?? {}),
-        feedbackResponse: {
-          sourceEventId: feedback.source_event_id ?? null,
-          classSessionId: feedback.class_session_id,
-          messageId: feedback.message_id ?? null,
-          rating: feedback.rating,
-          comment: feedback.comment ?? null,
-          submittedAt: feedback.submitted_at,
-        },
-      },
-    };
-  });
 }
 
 export async function buildActivityFeedUnreadCountForProfile(

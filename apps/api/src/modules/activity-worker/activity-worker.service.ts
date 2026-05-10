@@ -6,13 +6,13 @@ import type {
   MessageMentionVM,
 } from '@iconicedu/shared-types';
 
-import { publishActivityEvent } from '@iconicedu/api/lib/activity-feed/activity-publisher';
 import {
   publishReactionAddedActivity,
   publishTextMessagePostSendActivities,
   resolveActivityChannelContext,
   resolveVisibilityAudienceFromMessageRow,
 } from '@iconicedu/api/lib/messages/message-activity';
+import { publishActivityEvent } from '@iconicedu/api/lib/activity-feed/activity-publisher';
 import { type SupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 
 type MessageRow = {
@@ -246,11 +246,15 @@ export class ActivityWorkerService {
 
     const messageResponse = await supabase
       .from('messages')
-      .select('channel_id, sender_profile_id')
+      .select('channel_id, sender_profile_id, type')
       .eq('org_id', job.org_id)
       .eq('id', reaction.message_id)
       .is('deleted_at', null)
-      .maybeSingle<{ channel_id: string | null; sender_profile_id: string | null }>();
+      .maybeSingle<{
+        channel_id: string | null;
+        sender_profile_id: string | null;
+        type: string | null;
+      }>();
 
     if (messageResponse.error) {
       throw new Error(messageResponse.error.message);
@@ -266,6 +270,12 @@ export class ActivityWorkerService {
       orgId: job.org_id,
       reaction,
     });
+    const messagePayload = await this.resolveMessagePayload({
+      supabase,
+      orgId: job.org_id,
+      messageId: reaction.message_id,
+      type: message.type ?? 'text',
+    });
 
     await publishReactionAddedActivity({
       supabase,
@@ -274,166 +284,9 @@ export class ActivityWorkerService {
       senderProfileId: actorProfileId,
       messageId: reaction.message_id,
       messageSenderProfileId: message.sender_profile_id,
+      messagePreview: messagePayload.content,
       emoji: reaction.emoji,
       now: new Date().toISOString(),
-    });
-  }
-
-  private async processSessionCancelJob(
-    job: ActivitySourceJobRow,
-    supabase: SupabaseServiceClient,
-  ) {
-    if (!job.exception_id) {
-      throw new Error('Missing exception_id for session cancel job');
-    }
-
-    const exceptionResponse = await supabase
-      .from('class_schedule_recurrence_exceptions')
-      .select(
-        'id, recurrence_id, occurrence_key, reason, suppress_notifications, created_by',
-      )
-      .eq('org_id', job.org_id)
-      .eq('id', job.exception_id)
-      .is('deleted_at', null)
-      .maybeSingle<{
-        id: string;
-        recurrence_id: string;
-        occurrence_key: string;
-        reason: string | null;
-        suppress_notifications: boolean | null;
-        created_by: string | null;
-      }>();
-
-    if (exceptionResponse.error) {
-      throw new Error(exceptionResponse.error.message);
-    }
-
-    const exception = exceptionResponse.data;
-    if (!exception) {
-      throw new Error(`Session exception not found for activity job ${job.id}`);
-    }
-
-    const context = await this.resolveLearningSpaceContextFromRecurrence({
-      supabase,
-      orgId: job.org_id,
-      recurrenceId: exception.recurrence_id,
-    });
-    const actorProfileId = await this.resolveScheduleActorProfileId({
-      supabase,
-      orgId: job.org_id,
-      actorRef: exception.created_by,
-    });
-
-    await publishActivityEvent({
-      supabase,
-      orgId: job.org_id,
-      eventType: 'class.session.canceled',
-      occurredAt: new Date().toISOString(),
-      sourceKind: 'system',
-      actorProfileId,
-      scope: { kind: 'learning_space', learningSpaceId: context.learningSpaceId },
-      targetRef: { kind: 'learning_space', id: context.learningSpaceId },
-      payload: {
-        learningSpaceId: context.learningSpaceId,
-        channelId: context.channelId,
-        scheduleId: context.scheduleId,
-        title: context.title,
-        activityPhase: 'updated',
-        invitedCount: context.invitedMembers.length,
-        invitedMembers: context.invitedMembers,
-        firstSessionStartAt: context.firstSessionStartAt,
-        firstSessionTimezone: context.firstSessionTimezone,
-        canceledStartAt: exception.occurrence_key,
-        canceledReason: exception.reason ?? null,
-        suppressNotifications: exception.suppress_notifications === true,
-        timezone: context.timezone ?? 'UTC',
-      },
-      dedupeKey: `session.canceled:${job.exception_id}`,
-      refreshOnDedupe: true,
-      createdBy: actorProfileId,
-    });
-  }
-
-  private async processSessionRescheduleJob(
-    job: ActivitySourceJobRow,
-    supabase: SupabaseServiceClient,
-  ) {
-    if (!job.override_id) {
-      throw new Error('Missing override_id for session reschedule job');
-    }
-
-    const overrideResponse = await supabase
-      .from('class_schedule_recurrence_overrides')
-      .select(
-        'id, recurrence_id, occurrence_key, patch, suppress_notifications, created_by',
-      )
-      .eq('org_id', job.org_id)
-      .eq('id', job.override_id)
-      .is('deleted_at', null)
-      .maybeSingle<{
-        id: string;
-        recurrence_id: string;
-        occurrence_key: string;
-        patch: Record<string, unknown> | null;
-        suppress_notifications: boolean | null;
-        created_by: string | null;
-      }>();
-
-    if (overrideResponse.error) {
-      throw new Error(overrideResponse.error.message);
-    }
-
-    const override = overrideResponse.data;
-    if (!override) {
-      throw new Error(`Session override not found for activity job ${job.id}`);
-    }
-
-    const patch = override.patch ?? {};
-    const context = await this.resolveLearningSpaceContextFromRecurrence({
-      supabase,
-      orgId: job.org_id,
-      recurrenceId: override.recurrence_id,
-    });
-    const actorProfileId = await this.resolveScheduleActorProfileId({
-      supabase,
-      orgId: job.org_id,
-      actorRef: override.created_by,
-    });
-
-    await publishActivityEvent({
-      supabase,
-      orgId: job.org_id,
-      eventType: 'class.session.rescheduled',
-      occurredAt: new Date().toISOString(),
-      sourceKind: 'system',
-      actorProfileId,
-      scope: { kind: 'learning_space', learningSpaceId: context.learningSpaceId },
-      targetRef: { kind: 'learning_space', id: context.learningSpaceId },
-      payload: {
-        learningSpaceId: context.learningSpaceId,
-        channelId: context.channelId,
-        scheduleId: context.scheduleId,
-        title: context.title,
-        activityPhase: 'updated',
-        invitedCount: context.invitedMembers.length,
-        invitedMembers: context.invitedMembers,
-        firstSessionStartAt: context.firstSessionStartAt,
-        firstSessionTimezone: context.firstSessionTimezone,
-        rescheduledFromStartAt: override.occurrence_key,
-        rescheduledToStartAt:
-          typeof patch.startAt === 'string' && patch.startAt.trim().length > 0
-            ? patch.startAt
-            : override.occurrence_key,
-        rescheduledReason:
-          typeof patch.reason === 'string' && patch.reason.trim().length > 0
-            ? patch.reason
-            : null,
-        suppressNotifications: override.suppress_notifications === true,
-        timezone: context.timezone ?? 'UTC',
-      },
-      dedupeKey: `session.rescheduled:${job.override_id}`,
-      refreshOnDedupe: true,
-      createdBy: actorProfileId,
     });
   }
 
@@ -469,6 +322,171 @@ export class ActivityWorkerService {
     }
 
     return profileResponse.data.id;
+  }
+
+  private async processSessionCancelJob(
+    job: ActivitySourceJobRow,
+    supabase: SupabaseServiceClient,
+  ) {
+    if (!job.exception_id) {
+      throw new Error('Missing exception_id for session cancel job');
+    }
+
+    const exceptionResponse = await supabase
+      .from('class_schedule_recurrence_exceptions')
+      .select(
+        'id, recurrence_id, occurrence_key, reason, suppress_notifications, created_by, updated_by',
+      )
+      .eq('org_id', job.org_id)
+      .eq('id', job.exception_id)
+      .is('deleted_at', null)
+      .maybeSingle<{
+        id: string;
+        recurrence_id: string;
+        occurrence_key: string;
+        reason: string | null;
+        suppress_notifications?: boolean | null;
+        created_by?: string | null;
+        updated_by?: string | null;
+      }>();
+
+    if (exceptionResponse.error) {
+      throw new Error(exceptionResponse.error.message);
+    }
+    const exception = exceptionResponse.data;
+    if (!exception) {
+      throw new Error(`Schedule exception not found for activity job ${job.id}`);
+    }
+
+    const context = await this.resolveLearningSpaceContextFromRecurrence({
+      supabase,
+      orgId: job.org_id,
+      recurrenceId: exception.recurrence_id,
+    });
+    const actorProfileId = await this.resolveScheduleActorProfileId({
+      supabase,
+      orgId: job.org_id,
+      actorRef: exception.updated_by ?? exception.created_by ?? null,
+    });
+
+    await publishActivityEvent({
+      supabase,
+      orgId: job.org_id,
+      eventType: 'class.session.canceled',
+      sourceKind: actorProfileId ? 'profile' : 'system',
+      actorProfileId,
+      scope: { kind: 'learning_space', learningSpaceId: context.learningSpaceId },
+      objectRef: { kind: 'session', id: exception.occurrence_key },
+      targetRef: { kind: 'learning_space', id: context.learningSpaceId },
+      audienceRules: [{ kind: 'all_in_scope' }],
+      payload: {
+        learningSpaceId: context.learningSpaceId,
+        channelId: context.channelId,
+        scheduleId: context.scheduleId,
+        title: context.title,
+        learningSpaceTitle: context.title,
+        channelRouteKind: 'space',
+        startAt: exception.occurrence_key,
+        occurrenceStart: exception.occurrence_key,
+        canceledStartAt: exception.occurrence_key,
+        canceledReason: exception.reason ?? null,
+        reason: exception.reason ?? null,
+        timezone: context.timezone,
+        firstSessionStartAt: context.firstSessionStartAt,
+        firstSessionTimezone: context.firstSessionTimezone,
+        members: context.invitedMembers,
+        suppressNotifications: exception.suppress_notifications === true,
+      },
+      dedupeKey: `class.session.canceled:${job.org_id}:${exception.id}`,
+      refreshOnDedupe: true,
+      createdBy: actorProfileId,
+    });
+  }
+
+  private async processSessionRescheduleJob(
+    job: ActivitySourceJobRow,
+    supabase: SupabaseServiceClient,
+  ) {
+    if (!job.override_id) {
+      throw new Error('Missing override_id for session reschedule job');
+    }
+
+    const overrideResponse = await supabase
+      .from('class_schedule_recurrence_overrides')
+      .select(
+        'id, recurrence_id, occurrence_key, patch, suppress_notifications, created_by, updated_by',
+      )
+      .eq('org_id', job.org_id)
+      .eq('id', job.override_id)
+      .is('deleted_at', null)
+      .maybeSingle<{
+        id: string;
+        recurrence_id: string;
+        occurrence_key: string;
+        patch: Record<string, unknown> | null;
+        suppress_notifications?: boolean | null;
+        created_by?: string | null;
+        updated_by?: string | null;
+      }>();
+
+    if (overrideResponse.error) {
+      throw new Error(overrideResponse.error.message);
+    }
+    const override = overrideResponse.data;
+    if (!override) {
+      throw new Error(`Schedule override not found for activity job ${job.id}`);
+    }
+
+    const context = await this.resolveLearningSpaceContextFromRecurrence({
+      supabase,
+      orgId: job.org_id,
+      recurrenceId: override.recurrence_id,
+    });
+    const actorProfileId = await this.resolveScheduleActorProfileId({
+      supabase,
+      orgId: job.org_id,
+      actorRef: override.updated_by ?? override.created_by ?? null,
+    });
+    const patch = override.patch ?? {};
+    const newStartAt =
+      typeof patch.startAt === 'string' ? patch.startAt : override.occurrence_key;
+    const newEndAt = typeof patch.endAt === 'string' ? patch.endAt : null;
+    const reason = typeof patch.reason === 'string' ? patch.reason : null;
+
+    await publishActivityEvent({
+      supabase,
+      orgId: job.org_id,
+      eventType: 'class.session.rescheduled',
+      sourceKind: actorProfileId ? 'profile' : 'system',
+      actorProfileId,
+      scope: { kind: 'learning_space', learningSpaceId: context.learningSpaceId },
+      objectRef: { kind: 'session', id: override.occurrence_key },
+      targetRef: { kind: 'learning_space', id: context.learningSpaceId },
+      audienceRules: [{ kind: 'all_in_scope' }],
+      payload: {
+        learningSpaceId: context.learningSpaceId,
+        channelId: context.channelId,
+        scheduleId: context.scheduleId,
+        title: context.title,
+        learningSpaceTitle: context.title,
+        channelRouteKind: 'space',
+        startAt: newStartAt,
+        endAt: newEndAt,
+        occurrenceStart: override.occurrence_key,
+        rescheduledFromStartAt: override.occurrence_key,
+        rescheduledToStartAt: newStartAt,
+        rescheduledReason: reason,
+        reason,
+        timezone: context.timezone,
+        firstSessionStartAt: context.firstSessionStartAt,
+        firstSessionTimezone: context.firstSessionTimezone,
+        members: context.invitedMembers,
+        suppressNotifications: override.suppress_notifications === true,
+      },
+      dedupeKey: `class.session.rescheduled:${job.org_id}:${override.id}`,
+      refreshOnDedupe: true,
+      createdBy: actorProfileId,
+    });
   }
 
   private async resolveScheduleActorProfileId(input: {

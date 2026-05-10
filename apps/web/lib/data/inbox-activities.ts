@@ -11,7 +11,6 @@ import {
 import {
   EDUCATOR_PRIYA_PROFILE,
   STAFF_SUPPORT_PROFILE,
-  SYSTEM_PROFILE,
 } from '@iconicedu/web/lib/data/profiles';
 
 function ts(occurredAt: string, createdAt = occurredAt) {
@@ -79,35 +78,6 @@ const FEED_ITEMS: ActivityFeedItemVM[] = [
       },
     },
     state: unread(true),
-  } satisfies ActivityFeedLeafItemVM,
-  {
-    kind: 'leaf',
-    ids: { id: 'activity-rescheduled-1', orgId: DEMO_ORG_ID },
-    timestamps: ts('2026-03-07T16:00:00.000Z'),
-    tabKey: 'classes',
-    audience: {
-      scope: { kind: 'learning_space', learningSpaceId: LEARNING_SPACE_IDS.math },
-      visibility: 'scope_only',
-    },
-    verb: 'class.session.rescheduled',
-    refs: {
-      actor: SYSTEM_PROFILE,
-      target: { kind: 'learning_space', id: LEARNING_SPACE_IDS.math },
-    },
-    content: {
-      leading: { kind: 'icon', iconKey: 'CalendarCheck', tone: 'info' },
-      headline: {
-        primary: 'Class session rescheduled',
-        secondary: 'Math Foundations',
-      },
-      summary: 'Weekly session moved to Tue Mar 10 at 4:00 PM PT.',
-      actionButton: {
-        label: 'Open class',
-        variant: 'outline',
-        href: `/iconic-academy/s/${CHANNEL_IDS.mathSpace}`,
-      },
-    },
-    state: { importance: 'important', isRead: false },
   } satisfies ActivityFeedLeafItemVM,
 ];
 

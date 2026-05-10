@@ -8,18 +8,17 @@ import type {
 } from '@iconicedu/shared-types/shared/shared';
 
 export type ActivityVerbVM =
-  | 'class.session.rescheduled'
-  | 'class.sessions.rescheduled'
-  | 'class.session.canceled'
-  | 'class.sessions.canceled'
   | 'message.posted'
-  | 'messages.posted'
+  | 'message.mentioned'
+  | 'message.thread_reply.posted'
+  | 'file.uploaded'
+  | 'image.uploaded'
+  | 'audio.uploaded'
   | 'reaction.added'
-  | 'reactions.added'
+  | 'class.session.rescheduled'
+  | 'class.session.canceled'
   | 'session.reminder.sent'
-  | 'sessions.reminder.sent'
-  | 'session.feedback_request.sent'
-  | 'sessions.feedback_request.sent';
+  | 'session.feedback_request.sent';
 
 export type ActivitySourceKindVM =
   | 'profile'
@@ -48,11 +47,20 @@ export type ActivityActorVM = UserProfileVM;
 export type InboxTabKeyVM = 'all' | 'classes' | 'payment' | 'system';
 
 export type InboxIconKeyVM =
+  | 'AtSign'
+  | 'BookImage'
   | 'CalendarCheck'
   | 'CalendarX'
   | 'CreditCard'
+  | 'FileBadge'
+  | 'FileHeadphone'
   | 'GraduationCap'
   | 'MessageSquare'
+  | 'MessageSquareDot'
+  | 'MessageSquareHeart'
+  | 'MessageSquareReply'
+  | 'MessagesSquare'
+  | 'SmilePlus'
   | 'Bell';
 
 export type InboxLeadingVM =
@@ -100,7 +108,7 @@ export interface ActivityItemAudienceVM {
 }
 
 export interface ActivityItemRefsVM {
-  actor: ActivityActorVM;
+  actor?: ActivityActorVM | null;
   object?: EntityRefVM;
   target?: EntityRefVM;
 }

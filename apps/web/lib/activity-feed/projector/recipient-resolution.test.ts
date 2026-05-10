@@ -159,12 +159,12 @@ describe('resolveRecipientsForActivityEvent', () => {
       {
         id: 'event-4',
         org_id: 'org-1',
-        event_type: 'class.session.canceled',
+        event_type: 'message.posted',
         occurred_at: '2026-03-09T10:00:00.000Z',
         source_kind: 'profile',
         actor_profile_id: 'profile-actor',
         scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
-        object_ref: { kind: 'session', id: 'session-1' },
+        object_ref: { kind: 'message', id: 'message-1' },
         target_ref: { kind: 'learning_space', id: 'space-1' },
         payload: {
           learningSpaceId: 'space-1',

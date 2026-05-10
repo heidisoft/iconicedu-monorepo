@@ -86,9 +86,10 @@ function isRecentlyRead(lastReadAt: string | null | undefined, eventOccurredAt: 
 function isMentionEvent(event: ActivityEventRow): boolean {
   const payload = asRecord(event.payload) as EventPayload;
   return (
-    event.event_type === 'message.posted' &&
-    typeof payload.mentionedProfileId === 'string' &&
-    payload.mentionedProfileId.length > 0
+    event.event_type === 'message.mentioned' ||
+    (event.event_type === 'message.posted' &&
+      typeof payload.mentionedProfileId === 'string' &&
+      payload.mentionedProfileId.length > 0)
   );
 }
 

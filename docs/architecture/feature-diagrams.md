@@ -1178,13 +1178,12 @@ sequenceDiagram
     DB-->>WORKER: [{ job_type: session.reminder, ... }]
     WORKER->>DB: UPDATE status=leased, lease_owner, lease_until
     WORKER->>CHANNEL: POST message (type=event-reminder)\nEventReminderMessageVM
-    WORKER->>DB: INSERT ActivityEventRow (session.reminder.sent)
+    WORKER->>DB: UPDATE ReminderJobRow status=succeeded
     WORKER->>DB: UPDATE ReminderJobRow status=succeeded
     WORKER->>DB: INSERT ReminderDispatchLogRow
 
     DB--)MEMBER: Realtime: message-added (event-reminder)
-    DB--)MEMBER: ActivityFeedItem created via projection
-    MEMBER->>MEMBER: Push notification via\nevent_pipeline_jobs notification.deliver
+    DB--)MEMBER: Reminder message visible in channel
 ```
 
 ---
@@ -1427,10 +1426,9 @@ flowchart LR
         REMINDER_JOB["reminder_jobs row\nrun_at = class_time - 30min\nstatus=pending"]
         CRON_TICK["reminders-dispatch edge function\nticks every minute via pg_cron\nSELECT WHERE run_at <= now()"]
         REMINDER_MSG["EventReminderMessage\nposted to channel"]
-        CRON_EVENT["ActivityEventRow\nsession.reminder.sent"]
-        CRON_FEED["ActivityFeedItemRow"]
+        CRON_DONE["ReminderJobRow\nstatus=succeeded"]
 
-        SCHED_CLASS --> REMINDER_JOB --> CRON_TICK --> REMINDER_MSG --> CRON_EVENT --> CRON_FEED
+        SCHED_CLASS --> REMINDER_JOB --> CRON_TICK --> REMINDER_MSG --> CRON_DONE
     end
 
     style RT fill:#d5f5e3,stroke:#82e0aa
@@ -1527,7 +1525,7 @@ block-beta
     block:items:4
         L1["📄 Item: Homework posted\nverb=message.posted\nkind=leaf"]
         L2["📄 Item: Class scheduled tomorrow\nverb=class.session.scheduled\nkind=leaf"]
-        L3["📄 Item: Feedback requested\nverb=session.feedback_request.sent\nkind=leaf"]
+        L3["📄 Item: Message activity\nverb=message.posted\nkind=leaf"]
         space
     end
 ```
@@ -1597,9 +1595,9 @@ sequenceDiagram
     Note over ADMIN,RT: 2. Pre-Session Reminders (Cron)
     WORKER->>DB: Poll ReminderJobRows (run_at <= now())
     WORKER->>DB: INSERT MessageRow (type=event-reminder) in channel
-    WORKER->>DB: INSERT ActivityEventRow (session.reminder.sent)
+    WORKER->>DB: UPDATE ReminderJobRow status=succeeded
     DB--)STUDENT: Realtime: message-added
-    DB--)STUDENT: ActivityFeedItemRow → push notification
+    DB--)STUDENT: Reminder message visible in channel
 
     Note over ADMIN,RT: 3. Live Session
     EDUCATOR->>API: POST /live-sessions/start { channel_id }
@@ -1619,7 +1617,7 @@ sequenceDiagram
     Note over ADMIN,RT: 5. Feedback Request
     WORKER->>DB: Poll ReminderJobRow (session.feedback_request)
     WORKER->>DB: INSERT MessageRow (type=feedback-request) in channel
-    WORKER->>DB: INSERT ActivityEventRow (session.feedback_request.sent)
+    WORKER->>DB: UPDATE ReminderJobRow status=succeeded
     DB--)STUDENT: Realtime: message-added (feedback-request)
 
     STUDENT->>API: POST /feedback { rating, comment }

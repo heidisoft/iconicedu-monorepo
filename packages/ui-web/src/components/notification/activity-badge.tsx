@@ -69,6 +69,10 @@ export function ActivityBadge({ activity, className }: ActivityBadgeProps) {
   }
 
   const actor = activity.refs.actor;
+  if (!actor) {
+    return null;
+  }
+
   const actorName = getProfileDisplayName(actor.profile);
   const actorAvatar = actor.profile.avatar;
 

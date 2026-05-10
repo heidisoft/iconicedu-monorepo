@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import type { ActivityFeedSectionVM } from '@iconicedu/shared-types';
 import {
-  applyScheduleActivityLocalTime,
   applyReadStateToSections,
   buildUnreadTabCounts,
   resolveReadIdsForActivity,
@@ -20,11 +19,11 @@ const SECTIONS: ActivityFeedSectionVM[] = [
           occurredAt: '2026-03-03T12:00:00.000Z',
           createdAt: '2026-03-03T12:00:00.000Z',
         },
-        tabKey: 'classes',
+        tabKey: 'all',
         audience: { scope: { kind: 'global' }, visibility: 'public' },
-        verb: 'class.session.rescheduled',
+        verb: 'message.posted',
         refs: { actor: null as never },
-        content: { headline: { primary: 'Class session rescheduled' } },
+        content: { headline: { primary: 'Message posted' } },
         state: { isRead: false },
       },
       {
@@ -89,7 +88,7 @@ describe('buildUnreadTabCounts', () => {
       ),
     ).toEqual({
       all: 1,
-      classes: 1,
+      classes: 0,
       payment: 0,
       system: 0,
     });
@@ -98,27 +97,7 @@ describe('buildUnreadTabCounts', () => {
 
 describe('resolveUnreadIdsForTab', () => {
   it('returns unread ids for the selected tab', () => {
-    expect(resolveUnreadIdsForTab(SECTIONS, 'classes')).toEqual(['item-1']);
+    expect(resolveUnreadIdsForTab(SECTIONS, 'classes')).toEqual([]);
     expect(resolveUnreadIdsForTab(SECTIONS, 'all')).toEqual(['item-1']);
-  });
-});
-
-describe('applyScheduleActivityLocalTime', () => {
-  it('preserves context-rich API summaries', () => {
-    const item = {
-      ...SECTIONS[0]!.items[0]!,
-      content: {
-        headline: { primary: 'Class session canceled' },
-        summary: 'Algebra I for Priya with Ms. Chen Reason: weather.',
-      },
-      metadata: {
-        preserveActivitySummary: true,
-        sessionLocalTime: true,
-        canceledStartAt: '2026-03-19T22:00:00.000Z',
-        timezone: 'America/New_York',
-      },
-    };
-
-    expect(applyScheduleActivityLocalTime(item, 'America/New_York')).toBe(item);
   });
 });

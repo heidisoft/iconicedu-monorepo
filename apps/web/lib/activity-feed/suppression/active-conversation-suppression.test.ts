@@ -163,7 +163,7 @@ describe('resolveActiveConversationSuppressedRecipients', () => {
       supabase: supabase as never,
       event: {
         org_id: 'org-1',
-        event_type: 'dm.posted',
+        event_type: 'message.posted',
         scope: { kind: 'channel', channelId: 'channel-1' },
         payload: {},
         occurred_at: now,
@@ -193,7 +193,7 @@ describe('resolveActiveConversationSuppressedRecipients', () => {
       supabase: supabase as never,
       event: {
         org_id: 'org-1',
-        event_type: 'dm.posted',
+        event_type: 'message.posted',
         scope: { kind: 'channel', channelId: 'channel-1' },
         payload: {},
         occurred_at: '2026-03-12T10:01:00.000Z',

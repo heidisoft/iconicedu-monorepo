@@ -13,7 +13,7 @@ jest.mock('@iconicedu/api/lib/supabase/session', () => ({
 }));
 
 jest.mock('@iconicedu/api/lib/activity-feed/activity-publisher', () => ({
-  publishActivityEvent: jest.fn(),
+  publishActivityEvent: jest.fn(async () => ({ id: 'activity-event-1' })),
 }));
 
 describe('RemindersService', () => {
@@ -424,8 +424,6 @@ describe('RemindersService', () => {
   });
 
   it('dispatches only precompiled reminder_jobs and does not read schedules', async () => {
-    publishActivityEventMock.mockResolvedValue({ id: 'activity-event-1' } as never);
-
     const claimedJob = {
       id: 'job-1',
       org_id: 'org-1',
@@ -504,115 +502,22 @@ describe('RemindersService', () => {
 
     expect(result.claimed).toBe(1);
     expect(result.succeeded).toBe(1);
+    expect(publishActivityEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'session.reminder.sent',
+        dedupeKey: `${claimedJob.dedupe_key}:activity`,
+        payload: expect.objectContaining({
+          title: 'Algebra',
+          learningSpaceTitle: 'Algebra',
+          channelRouteKind: 'space',
+        }),
+      }),
+    );
     expect(supabase.rpc).toHaveBeenCalledWith('claim_due_reminder_jobs', {
       p_limit: 10,
       p_lease_owner: 'supabase-edge-cron',
       p_lease_seconds: 90,
     });
     expect(supabase.from).not.toHaveBeenCalledWith('class_schedules');
-    expect(publishActivityEventMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        actorProfileId: null,
-        createdBy: 'system-profile-1',
-        payload: expect.objectContaining({
-          reminderOffsetMinutes: 30,
-          timezone: 'America/New_York',
-        }),
-      }),
-    );
-  });
-
-  it('does not mark a reminder job succeeded when activity publishing is suppressed', async () => {
-    publishActivityEventMock.mockResolvedValue(null as never);
-
-    const claimedJob = {
-      id: 'job-1',
-      org_id: 'org-1',
-      job_type: 'session.reminder',
-      target_kind: 'channel',
-      target_id: 'channel-1',
-      source_learning_space_id: 'space-1',
-      source_schedule_id: 'schedule-1',
-      timezone: 'America/New_York',
-      payload: {
-        title: 'Algebra',
-        summary: 'Class starts in 30 minutes',
-        reminderOffsetMinutes: 30,
-        timezone: 'America/New_York',
-        channelId: 'channel-1',
-        learningSpaceId: 'space-1',
-        scheduleId: 'schedule-1',
-        occurrenceStart: '2030-03-06T10:00:00.000Z',
-      },
-      dedupe_key: 'session.reminder:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z:30',
-      attempt_count: 0,
-      max_attempts: 8,
-    };
-
-    const profilesSelectChain = {
-      eq: jest.fn(() => profilesSelectChain),
-      is: jest.fn(() => profilesSelectChain),
-      order: jest.fn(() => profilesSelectChain),
-      limit: jest.fn(() => profilesSelectChain),
-      maybeSingle: jest.fn(async () => ({
-        data: { id: 'system-profile-1' },
-        error: null,
-      })),
-    };
-
-    const reminderJobsUpdateChain = {
-      eq: jest.fn(() => reminderJobsUpdateChain),
-    };
-    const reminderJobsUpdate = jest.fn(() => reminderJobsUpdateChain);
-    const dispatchLogsInsert = jest.fn(async () => ({ error: null }));
-
-    const supabase = {
-      rpc: jest.fn(async () => ({ data: [claimedJob], error: null })),
-      from: jest.fn((table: string) => {
-        switch (table) {
-          case 'profiles':
-            return { select: jest.fn(() => profilesSelectChain) };
-          case 'reminder_jobs':
-            return { update: reminderJobsUpdate };
-          case 'learning_spaces':
-            return {
-              select: jest.fn(() =>
-                makeChain({ data: { status: 'active', archived_at: null }, error: null }),
-              ),
-            };
-          case 'reminder_dispatch_logs':
-            return { insert: dispatchLogsInsert };
-          default:
-            throw new Error(`Unexpected table ${table}`);
-        }
-      }),
-    };
-
-    createSupabaseServiceClientMock.mockReturnValue(supabase as never);
-
-    const service = new RemindersService(analytics as never);
-    const result = await service.dispatchDueReminderJobs({
-      leaseOwner: 'supabase-edge-cron',
-      limit: 10,
-      leaseSeconds: 90,
-    });
-
-    expect(result.succeeded).toBe(0);
-    expect(result.failed).toBe(1);
-    expect(reminderJobsUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        status: 'failed',
-        attempt_count: 1,
-        last_error: 'Activity event suppressed for session.reminder.sent',
-      }),
-    );
-    expect(dispatchLogsInsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        result: 'retryable_failure',
-        details: expect.objectContaining({
-          error: 'Activity event suppressed for session.reminder.sent',
-        }),
-      }),
-    );
   });
 });

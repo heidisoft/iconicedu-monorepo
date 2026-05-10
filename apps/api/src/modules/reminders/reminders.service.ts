@@ -19,7 +19,6 @@ import { getLocalDate, getLocalTime, toUtcFromLocal } from '@iconicedu/utils';
 import { randomUUID } from 'crypto';
 
 import { AnalyticsService } from '@iconicedu/api/analytics/analytics.service';
-import { publishActivityEvent } from '@iconicedu/api/lib/activity-feed/activity-publisher';
 import {
   createSupabaseServiceClient,
   type SupabaseServiceClient,
@@ -27,6 +26,7 @@ import {
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
 import { getRequestContext } from '@iconicedu/api/observability/request-context';
 import { ReminderReconcileService } from '@iconicedu/api/modules/reminders/reminder-reconcile.service';
+import { publishActivityEvent } from '@iconicedu/api/lib/activity-feed/activity-publisher';
 
 const REMINDER_HORIZON_DAYS = 30;
 const DEFAULT_JOB_LIMIT = 100;
@@ -1320,55 +1320,12 @@ export class RemindersService {
       return 'skipped';
     }
 
-    const eventType =
-      job.job_type === 'session.feedback_request'
-        ? 'session.feedback_request.sent'
-        : 'session.reminder.sent';
-
-    const scope: FeedScopeVM = payload.learningSpaceId
-      ? { kind: 'learning_space', learningSpaceId: payload.learningSpaceId }
-      : { kind: 'channel', channelId: payload.channelId };
-
-    const activityEvent = await publishActivityEvent({
-      supabase: supabase as never,
-      orgId: job.org_id,
-      eventType,
-      emitterLabel: 'api:reminders',
-      occurredAt: now,
-      sourceKind: 'system',
-      actorProfileId: null,
-      scope,
-      targetRef: payload.learningSpaceId
-        ? { kind: 'learning_space', id: payload.learningSpaceId }
-        : undefined,
-      payload: {
-        channelId: payload.channelId,
-        learningSpaceId: payload.learningSpaceId ?? null,
-        scheduleId: payload.scheduleId ?? null,
-        occurrenceStart: payload.occurrenceStart ?? payload.startAt ?? now,
-        reminderOffsetMinutes: payload.reminderOffsetMinutes ?? null,
-        timezone: payload.timezone ?? job.timezone ?? 'UTC',
-        invoiceId: payload.invoiceId ?? null,
-        dueAt: payload.dueAt ?? null,
-        title: payload.title,
-        summary: payload.summary ?? null,
-        channelRouteKind:
-          payload.channelRouteKind ?? (payload.learningSpaceId ? 'space' : 'channel'),
-        members: payload.members ?? null,
-      },
-      dedupeKey: `${job.dedupe_key}:activity`,
-      createdBy: systemProfileId,
-    });
-
-    if (!activityEvent) {
-      throw new Error(`Activity event suppressed for ${eventType}`);
-    }
-
     const updateResponse = await supabase
       .from('reminder_jobs')
       .update({
         status: 'succeeded',
         dispatched_at: now,
+        activity_event_id: null,
         lease_owner: null,
         lease_until: null,
         updated_at: now,
@@ -1382,13 +1339,68 @@ export class RemindersService {
       throw new Error(updateResponse.error.message);
     }
 
+    const eventType =
+      job.job_type === 'session.feedback_request'
+        ? 'session.feedback_request.sent'
+        : 'session.reminder.sent';
+    const activityEvent = await publishActivityEvent({
+      supabase,
+      orgId: job.org_id,
+      eventType,
+      sourceKind: 'system',
+      actorProfileId: systemProfileId,
+      scope: payload.learningSpaceId
+        ? { kind: 'learning_space', learningSpaceId: payload.learningSpaceId }
+        : { kind: 'channel', channelId: payload.channelId },
+      objectRef: {
+        kind: 'session',
+        id:
+          payload.scheduleId ??
+          payload.occurrenceStart ??
+          job.source_schedule_id ??
+          job.id,
+      },
+      targetRef: payload.learningSpaceId
+        ? { kind: 'learning_space', id: payload.learningSpaceId }
+        : null,
+      audienceRules: [{ kind: 'all_in_scope' }],
+      payload: {
+        ...payload,
+        title: payload.title,
+        learningSpaceTitle: payload.title,
+        channelRouteKind: payload.channelRouteKind ?? 'space',
+      },
+      dedupeKey: `${job.dedupe_key}:activity`,
+      refreshOnDedupe: true,
+      createdBy: systemProfileId,
+    });
+
+    if (activityEvent?.id) {
+      const eventUpdateResponse = await supabase
+        .from('reminder_jobs')
+        .update({
+          activity_event_id: activityEvent.id,
+          updated_at: now,
+          updated_by: systemProfileId,
+        })
+        .eq('id', job.id)
+        .eq('org_id', job.org_id);
+
+      if (eventUpdateResponse.error) {
+        throw new Error(eventUpdateResponse.error.message);
+      }
+    }
+
     await this.logDispatch({
       supabase,
       orgId: job.org_id,
       jobId: job.id,
       activityEventId: activityEvent?.id ?? null,
       result: 'succeeded',
-      details: { event_type: eventType },
+      details: {
+        activity_event_id: activityEvent?.id ?? null,
+        job_type: job.job_type,
+      },
     });
 
     // Replenish: insert the next job in the chain for this schedule

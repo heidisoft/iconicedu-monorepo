@@ -294,17 +294,37 @@ export function buildPersonalizedSessionCopy(
     recipientRole,
   });
 
-  if (eventType === 'message.posted') {
+  if (
+    eventType === 'message.posted' ||
+    eventType === 'message.mentioned' ||
+    eventType === 'message.thread_reply.posted' ||
+    eventType === 'file.uploaded' ||
+    eventType === 'image.uploaded' ||
+    eventType === 'audio.uploaded'
+  ) {
     const senderName = asString(payload.senderName);
     const content = asString(payload.content).slice(0, 160);
     const contextTitle = getContextTitle(payload);
-    const isMention = Boolean(asOptionalString(payload.mentionedProfileId));
-    const isThreadReply = payload.threadReply === true;
-    const dmMessageKind = asString(payload.dmMessageKind);
+    const isDirect = payload.channelRouteKind === 'dm';
+    const isMention =
+      eventType === 'message.mentioned' ||
+      Boolean(asOptionalString(payload.mentionedProfileId));
+    const isThreadReply =
+      eventType === 'message.thread_reply.posted' || payload.threadReply === true;
+    const dmMessageKind =
+      eventType === 'image.uploaded'
+        ? 'image'
+        : eventType === 'audio.uploaded'
+          ? 'audio'
+          : eventType === 'file.uploaded'
+            ? 'file'
+            : asString(payload.dmMessageKind);
 
     let title: string;
     if (isThreadReply) {
-      if (senderName && contextTitle) {
+      if (senderName && isDirect) {
+        title = `${senderName} replied in your direct message thread`;
+      } else if (senderName && contextTitle) {
         title = `${senderName} replied to a thread in ${contextTitle}`;
       } else if (senderName) {
         title = `${senderName} replied to a thread`;
@@ -312,9 +332,11 @@ export function buildPersonalizedSessionCopy(
         title = 'New reply in a thread';
       }
     } else if (senderName && isMention) {
-      title = contextTitle
-        ? `${senderName} mentioned you in ${contextTitle}`
-        : `${senderName} mentioned you`;
+      title = isDirect
+        ? `${senderName} mentioned you in a direct message`
+        : contextTitle
+          ? `${senderName} mentioned you in ${contextTitle}`
+          : `${senderName} mentioned you`;
     } else if (senderName) {
       const messageLabel =
         dmMessageKind === 'image'
@@ -324,9 +346,21 @@ export function buildPersonalizedSessionCopy(
             : dmMessageKind === 'file'
               ? 'a file'
               : 'a message';
-      title = contextTitle
-        ? `${senderName} sent you ${messageLabel} in ${contextTitle}`
-        : `${senderName} sent you ${messageLabel}`;
+      const action =
+        dmMessageKind === 'file' || dmMessageKind === 'image' ? 'shared' : 'sent';
+      if (isDirect && dmMessageKind === 'file') {
+        title = `${senderName} shared a file with you`;
+      } else if (isDirect && dmMessageKind === 'image') {
+        title = `${senderName} shared an image with you`;
+      } else if (isDirect) {
+        title = `${senderName} sent you ${
+          messageLabel === 'a message' ? 'a direct message' : messageLabel
+        }`;
+      } else if (contextTitle) {
+        title = `${senderName} ${action} ${messageLabel} in ${contextTitle}`;
+      } else {
+        title = `${senderName} ${action} ${messageLabel}`;
+      }
     } else {
       title = 'New message';
     }
@@ -352,42 +386,81 @@ export function buildPersonalizedSessionCopy(
   }
 
   if (eventType === 'class.session.rescheduled') {
-    const fallback = `${classTitle} session rescheduled`;
+    const oldLabel = formatSessionDateTime(
+      firstDefinedString(
+        payload.oldSessionDateTime,
+        payload.rescheduledFromStartAt,
+        payload.previousStartAt,
+        payload.originalStartAt,
+        payload.occurrenceStart,
+      ),
+      payload,
+    );
+    const newLabel = formatSessionDateTime(
+      firstDefinedString(
+        payload.newSessionDateTime,
+        payload.rescheduledToStartAt,
+        payload.newStartAt,
+        payload.startAt,
+        payload.firstSessionStartAt,
+      ),
+      payload,
+    );
     return {
-      title: recipient ? `${sessionAudienceLabel} rescheduled` : fallback,
+      title: `${classTitle} rescheduled`,
       summary:
-        getRescheduledSessionSummary(payload) ??
-        getEventSummary(payload, 'A class session has been rescheduled.'),
-    };
-  }
-
-  if (eventType === 'class.sessions.rescheduled') {
-    const fallback = `${classTitle} sessions rescheduled`;
-    return {
-      title: recipient ? `${sessionAudienceLabel} rescheduled` : fallback,
-      summary:
-        getRescheduledSessionSummary(payload) ??
-        getEventSummary(payload, 'Class sessions have been rescheduled.'),
+        oldLabel && newLabel
+          ? `${oldLabel} was moved to ${newLabel}`
+          : (getRescheduledSessionSummary(payload) ??
+            'A class session has been rescheduled.'),
     };
   }
 
   if (eventType === 'class.session.canceled') {
-    const fallback = `${classTitle} session cancelled`;
+    const sessionLabel = formatSessionDateTime(
+      firstDefinedString(
+        payload.sessionDateTime,
+        payload.canceledStartAt,
+        payload.startAt,
+        payload.occurrenceStart,
+        payload.firstSessionStartAt,
+      ),
+      payload,
+    );
     return {
-      title: recipient ? `${sessionAudienceLabel} cancelled` : fallback,
-      summary:
-        getCanceledSessionSummary(payload) ??
-        getEventSummary(payload, 'A class session has been cancelled.'),
+      title: `${classTitle} canceled`,
+      summary: sessionLabel
+        ? `${sessionLabel} was canceled`
+        : (getCanceledSessionSummary(payload) ?? 'A class session has been canceled.'),
     };
   }
 
-  if (eventType === 'class.sessions.canceled') {
-    const fallback = `${classTitle} sessions cancelled`;
+  if (eventType === 'session.reminder.sent') {
+    const startAt = firstDefinedString(
+      payload.sessionDateTime,
+      payload.startAt,
+      payload.occurrenceStart,
+      payload.firstSessionStartAt,
+    );
+    const startTime = startAt
+      ? formatTime(
+          startAt,
+          resolveViewerTimezone(extractDisplayTimezone(payload)),
+          'withZone',
+        )
+      : undefined;
     return {
-      title: recipient ? `${sessionAudienceLabel} cancelled` : fallback,
-      summary:
-        getCanceledSessionSummary(payload) ??
-        getEventSummary(payload, 'Class sessions have been cancelled.'),
+      title: `${classTitle} starting soon`,
+      summary: startTime
+        ? `${classTitle} starts at ${startTime}`
+        : getEventSummary(payload, `${classTitle} starts soon`),
+    };
+  }
+
+  if (eventType === 'session.feedback_request.sent') {
+    return {
+      title: `Share feedback for ${classTitle}`,
+      summary: 'Tell us how the session went',
     };
   }
 
@@ -405,70 +478,6 @@ export function buildPersonalizedSessionCopy(
 
   if (!recipient) {
     return null;
-  }
-
-  if (eventType === 'session.reminder.sent') {
-    const explicitOffset = payload.reminderOffsetMinutes;
-    const offsetMinutes =
-      typeof explicitOffset === 'number' && Number.isFinite(explicitOffset)
-        ? Math.round(explicitOffset)
-        : undefined;
-
-    if (offsetMinutes === undefined) {
-      return null;
-    }
-
-    const titleSuffix = `${offsetMinutes} min`;
-    const reminderSummary =
-      formatSessionDateTime(
-        firstDefinedString(
-          payload.occurrenceStart,
-          payload.scheduledStartAt,
-          payload.startAt,
-          payload.firstSessionStartAt,
-        ),
-        payload,
-      ) ?? classTitle;
-
-    return {
-      title: `${sessionAudienceLabel} starts in ${titleSuffix}`,
-      summary: reminderSummary,
-    };
-  }
-
-  if (eventType === 'session.feedback_request.sent') {
-    const fallbackTitle = `How was today's class?`;
-    const summary = `Rate today's ${sessionAudienceLabel} session`;
-
-    switch (recipientRole) {
-      case 'child':
-        if (teacherName) {
-          return {
-            title: `How was your class with ${teacherName}?`,
-            summary,
-          };
-        }
-        return { title: fallbackTitle, summary };
-      case 'educator':
-        if (studentLabel) {
-          return {
-            title: `How did ${studentLabel} do in ${classTitle}?`,
-            summary,
-          };
-        }
-        return { title: fallbackTitle, summary };
-      case 'guardian':
-      case 'staff':
-        if (teacherName && studentLabel) {
-          return {
-            title: `How was ${classTitle} for ${studentLabel} with ${teacherName}?`,
-            summary,
-          };
-        }
-        return { title: fallbackTitle, summary };
-      default:
-        return { title: fallbackTitle, summary };
-    }
   }
 
   return null;

@@ -1,18 +1,24 @@
 import React from 'react';
 import { View, Text, Pressable, TouchableOpacity, StyleSheet } from 'react-native';
 import {
+  AtSign,
   Bell,
-  CheckCircle,
+  BookImage,
+  CalendarCheck,
+  CalendarX,
   CreditCard,
+  FileBadge,
+  FileHeadphone,
   GraduationCap,
   MessageSquare,
+  MessageSquareDot,
+  MessageSquareHeart,
+  MessageSquareReply,
+  MessagesSquare,
+  SmilePlus,
 } from 'lucide-react-native';
 import type { AppColors } from '@/lib/theme';
 import type { ActivityFeedItemVM, InboxIconKeyVM } from '@iconicedu/shared-types';
-import {
-  ActivityFeedbackRequest,
-  canRenderMobileActivityFeedbackRequest,
-} from './activity-feedback-request';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -22,12 +28,21 @@ export const ACTIVITY_ICON_MAP: Record<
   InboxIconKeyVM,
   React.ComponentType<{ size: number; color: string }>
 > = {
+  AtSign,
   Bell,
-  CalendarCheck: Bell,
-  CalendarX: Bell,
+  BookImage,
+  CalendarCheck,
+  CalendarX,
   CreditCard,
+  FileBadge,
+  FileHeadphone,
   GraduationCap,
   MessageSquare,
+  MessageSquareDot,
+  MessageSquareHeart,
+  MessageSquareReply,
+  MessagesSquare,
+  SmilePlus,
 };
 
 export const TAB_LABELS: Record<string, string> = {
@@ -71,15 +86,27 @@ export function getIconKey(item: ActivityFeedItemVM): InboxIconKeyVM {
   if (item.content.leading?.kind === 'icon') return item.content.leading.iconKey;
   switch (item.verb) {
     case 'message.posted':
-    case 'messages.posted':
+      return 'MessageSquareDot';
+    case 'message.mentioned':
+      return 'AtSign';
+    case 'message.thread_reply.posted':
+      return 'MessageSquareReply';
+    case 'file.uploaded':
+      return 'FileBadge';
+    case 'image.uploaded':
+      return 'BookImage';
+    case 'audio.uploaded':
+      return 'FileHeadphone';
     case 'reaction.added':
-    case 'reactions.added':
-      return 'MessageSquare';
+      return 'SmilePlus';
     case 'class.session.rescheduled':
-    case 'class.sessions.rescheduled':
+      return 'CalendarCheck';
     case 'class.session.canceled':
-    case 'class.sessions.canceled':
-      return 'GraduationCap';
+      return 'CalendarX';
+    case 'session.reminder.sent':
+      return 'Bell';
+    case 'session.feedback_request.sent':
+      return 'MessageSquareHeart';
     default:
       return 'Bell';
   }
@@ -336,7 +363,6 @@ export function ActivityItem({
   onToggle,
   isSubActivity = false,
   viewerTimezone,
-  currentProfileId,
 }: ActivityItemProps) {
   const iconKey = getIconKey(item);
   const tone =
@@ -351,70 +377,11 @@ export function ActivityItem({
   const primary = formatActivityPrimaryHeadline(item, viewerTimezone);
   const { secondary, emphasis } = item.content.headline;
   const tabLabel = TAB_LABELS[item.tabKey] ?? item.tabKey;
-  const shouldRenderFeedbackRequest =
-    item.kind === 'leaf' &&
-    item.verb === 'session.feedback_request.sent' &&
-    canRenderMobileActivityFeedbackRequest(item);
 
   const handlePress = () => {
     if (!isRead) onMarkRead(item.ids.id);
     if (hasExpandedContent) onToggle(item.ids.id);
   };
-
-  if (shouldRenderFeedbackRequest) {
-    const headerPressStyle = ({ pressed }: { pressed: boolean }) => [
-      isSubActivity ? s.subItemInner : s.itemWrap,
-      pressed && { opacity: 0.7 },
-    ];
-
-    return (
-      <View style={isSubActivity ? undefined : s.itemOuter}>
-        <Pressable onPress={handlePress} style={headerPressStyle}>
-          <View style={s.itemRow}>
-            <View style={isSubActivity ? s.subAvatarWrap : s.avatarWrap}>
-              <View
-                style={[
-                  isSubActivity ? s.subAvatar : s.avatar,
-                  { backgroundColor: iconBg },
-                ]}
-              >
-                <IconComponent size={isSubActivity ? 10 : 11} color={iconFg} />
-              </View>
-            </View>
-
-            <View style={s.content}>
-              <View style={s.headlineRow}>
-                <Text style={[s.headlineText, { color: colors.text }]}>
-                  <Text style={s.bold}>{primary}</Text>
-                  {!!secondary && ` ${secondary}`}
-                </Text>
-              </View>
-
-              <View style={s.metaRow}>
-                <Text style={[s.metaText, { color: colors.textMuted }]}>{time}</Text>
-                {!isSubActivity && !!tabLabel && tabLabel !== 'All' && (
-                  <>
-                    <View style={[s.metaDot, { backgroundColor: colors.textFaint }]} />
-                    <Text style={[s.metaText, { color: colors.textMuted }]}>
-                      {tabLabel}
-                    </Text>
-                  </>
-                )}
-              </View>
-            </View>
-
-            {!isRead && <View style={[s.unreadDot, { backgroundColor: colors.teal }]} />}
-          </View>
-        </Pressable>
-
-        <ActivityFeedbackRequest
-          activity={item}
-          colors={colors}
-          currentProfileId={currentProfileId}
-        />
-      </View>
-    );
-  }
 
   // Sub-activity: full leaf view matching web
   if (isSubActivity) {
@@ -445,7 +412,7 @@ export function ActivityItem({
           {!isRead && <View style={[s.unreadDot, { backgroundColor: colors.teal }]} />}
         </View>
 
-        {!!item.content.summary && !shouldRenderFeedbackRequest && (
+        {!!item.content.summary && (
           <View
             style={[
               s.subPreviewCard,
@@ -458,7 +425,7 @@ export function ActivityItem({
           </View>
         )}
 
-        {hasExpandedContent && isExpanded && !shouldRenderFeedbackRequest && (
+        {hasExpandedContent && isExpanded && (
           <View
             style={[
               s.subPreviewCard,
@@ -471,7 +438,7 @@ export function ActivityItem({
           </View>
         )}
 
-        {hasExpandedContent && !shouldRenderFeedbackRequest && (
+        {hasExpandedContent && (
           <TouchableOpacity
             onPress={() => onToggle(item.ids.id)}
             hitSlop={8}
@@ -483,15 +450,7 @@ export function ActivityItem({
           </TouchableOpacity>
         )}
 
-        {shouldRenderFeedbackRequest && (
-          <ActivityFeedbackRequest
-            activity={item}
-            colors={colors}
-            currentProfileId={currentProfileId}
-          />
-        )}
-
-        {!!item.content.actionButton && !shouldRenderFeedbackRequest && (
+        {!!item.content.actionButton && (
           <TouchableOpacity style={[s.subActionBtn, { borderColor: colors.border }]}>
             <Text style={[s.actionBtnText, { color: colors.text }]}>
               {item.content.actionButton.label}
@@ -550,7 +509,7 @@ export function ActivityItem({
         </View>
 
         {/* Preview card — summary text */}
-        {!!item.content.summary && !shouldRenderFeedbackRequest && (
+        {!!item.content.summary && (
           <View
             style={[
               s.previewCard,
@@ -564,7 +523,7 @@ export function ActivityItem({
         )}
 
         {/* Expanded detail card */}
-        {hasExpandedContent && isExpanded && !shouldRenderFeedbackRequest && (
+        {hasExpandedContent && isExpanded && (
           <View
             style={[
               s.previewCard,
@@ -578,7 +537,7 @@ export function ActivityItem({
         )}
 
         {/* Read more link */}
-        {hasExpandedContent && !shouldRenderFeedbackRequest && (
+        {hasExpandedContent && (
           <TouchableOpacity
             onPress={() => onToggle(item.ids.id)}
             hitSlop={8}
@@ -591,15 +550,7 @@ export function ActivityItem({
         )}
 
         {/* Action button */}
-        {shouldRenderFeedbackRequest && (
-          <ActivityFeedbackRequest
-            activity={item}
-            colors={colors}
-            currentProfileId={currentProfileId}
-          />
-        )}
-
-        {hasActionBtn && !shouldRenderFeedbackRequest && (
+        {hasActionBtn && (
           <TouchableOpacity style={[s.actionBtn, { borderColor: colors.border }]}>
             <Text style={[s.actionBtnText, { color: colors.text }]}>
               {item.content.actionButton!.label}

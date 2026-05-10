@@ -178,7 +178,7 @@ Execution:
    - `session.feedback_request` -> `session.feedback_request.sent`
 6. Create or reuse the activity event through the API-owned activity generation path with `sourceKind='system'`, learning-space/channel scope, payload schedule metadata, and dedupe key `<reminder_jobs.dedupe_key>:activity`.
 7. `activity.project`, `notification.prepare`, and `notification.deliver` jobs turn that event into feed rows and notification delivery through the normal event pipeline.
-8. If the activity event is created, mark the reminder job `succeeded`, set `dispatched_at`, clear lease/error fields, and write a successful `reminder_dispatch_logs` row with the `activity_event_id`.
+8. Mark the reminder job `succeeded`, set `dispatched_at`, clear lease/error fields, and write a successful `reminder_dispatch_logs` row with the `activity_event_id`.
 9. If processing throws, increment `attempt_count`, set `failed` with `next_attempt_at` for retryable errors, or `dead_letter` when non-retryable/max attempts are reached.
 
 Reminder retry behavior uses exponential backoff from 15 seconds capped at 10

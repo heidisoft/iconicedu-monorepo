@@ -8,11 +8,7 @@ const ACTIVE_LIVE_STATUSES = new Set([
   'reviewing_work',
 ]);
 
-const CONVERSATIONAL_EVENT_TYPES = new Set([
-  'dm.posted',
-  'message.posted',
-  'reaction.added',
-]);
+const CONVERSATIONAL_EVENT_TYPES = new Set(['message.posted', 'reaction.added']);
 
 export const ACTIVE_CONVERSATION_SUPPRESSION_WINDOW_MS = 120_000;
 const PRESENCE_STALE_MS = 5 * 60 * 1000;

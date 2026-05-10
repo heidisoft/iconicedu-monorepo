@@ -10,6 +10,7 @@ import type {
 import type { ActivityEventRow } from '@iconicedu/shared-types';
 import type { SupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 import { resolveRecipientsForActivityEvent } from '@iconicedu/api/lib/activity-feed/projector/recipient-resolution';
+import { formatDateTime, formatTime, resolveViewerTimezone } from '@iconicedu/utils';
 
 export type ActivityRenderResult = {
   verb: ActivityVerbVM;
@@ -82,8 +83,10 @@ function getContextTitle(payload: Record<string, unknown>) {
 function getActivityContext(payload: Record<string, unknown>) {
   const context = asRecord(payload.activityContext);
   return {
-    viewerRole: asOptionalString(context.viewerRole),
-    viewerIsAdminStaff: context.viewerIsAdminStaff === true,
+    viewerRole:
+      asOptionalString(context.viewerRole) ?? asOptionalString(payload.viewerRole),
+    viewerIsAdminStaff:
+      context.viewerIsAdminStaff === true || payload.viewerIsAdminStaff === true,
     classTitle:
       asOptionalString(context.classTitle) ??
       asOptionalString(context.contextTitle) ??
@@ -95,6 +98,87 @@ function getActivityContext(payload: Record<string, unknown>) {
     viewerStudentNames: asStringArray(context.viewerStudentNames),
     participantNamesLabel: asOptionalString(context.participantNamesLabel),
   };
+}
+
+function formatCompactNames(names: string[], suffix?: string) {
+  const uniqueNames = Array.from(new Set(names.filter(Boolean)));
+  if (!uniqueNames.length) return undefined;
+  if (uniqueNames.length === 1) return uniqueNames[0];
+
+  const extraCount = uniqueNames.length - 1;
+  const suffixText = suffix ? ` ${extraCount === 1 ? suffix : `${suffix}s`}` : '';
+  return `${uniqueNames[0]} + ${extraCount}${suffixText}`;
+}
+
+function buildRoleContextLabel(payload: Record<string, unknown>) {
+  const context = getActivityContext(payload);
+  const viewerRole = context.viewerRole;
+  const teacherLabel = formatCompactNames(context.teacherNames);
+  const studentNames =
+    viewerRole === 'guardian' && context.viewerStudentNames.length
+      ? context.viewerStudentNames
+      : context.studentNames;
+  const studentLabel = formatCompactNames(
+    studentNames,
+    viewerRole === 'educator' ? 'student' : undefined,
+  );
+  const guardianLabel = formatCompactNames(context.guardianNames);
+
+  if (context.viewerIsAdminStaff || viewerRole === 'staff') {
+    const parts = [
+      guardianLabel ? `Parent: ${guardianLabel}` : undefined,
+      studentLabel ? `Student: ${studentLabel}` : undefined,
+      teacherLabel ? `Teacher: ${teacherLabel}` : undefined,
+    ].filter((part): part is string => Boolean(part));
+    return parts.length ? parts.join(' · ') : undefined;
+  }
+
+  if (viewerRole === 'guardian') {
+    if (studentLabel && teacherLabel) return `For ${studentLabel} with ${teacherLabel}`;
+    if (studentLabel) return `For ${studentLabel}`;
+    if (teacherLabel) return `With ${teacherLabel}`;
+    return undefined;
+  }
+
+  if (viewerRole === 'educator') {
+    return studentLabel ? `With ${studentLabel}` : undefined;
+  }
+
+  if (viewerRole === 'child') {
+    return teacherLabel ? `With ${teacherLabel}` : undefined;
+  }
+
+  if (studentLabel && teacherLabel) return `For ${studentLabel} with ${teacherLabel}`;
+  if (teacherLabel) return `With ${teacherLabel}`;
+  if (studentLabel) return `With ${studentLabel}`;
+  return undefined;
+}
+
+function getDisplayTimezone(payload: Record<string, unknown>) {
+  return resolveViewerTimezone(
+    asOptionalString(payload.viewerTimezone) ??
+      asOptionalString(payload.recipientTimezone) ??
+      asOptionalString(payload.timezone) ??
+      asOptionalString(payload.firstSessionTimezone),
+  );
+}
+
+function formatSessionDateTime(value: unknown, payload: Record<string, unknown>) {
+  if (typeof value !== 'string' || !value.length) return undefined;
+  return formatDateTime(value, getDisplayTimezone(payload), 'natural');
+}
+
+function formatSessionStartTime(value: unknown, payload: Record<string, unknown>) {
+  if (typeof value !== 'string' || !value.length) return undefined;
+  return formatTime(value, getDisplayTimezone(payload), 'withZone');
+}
+
+function firstOptionalString(...values: unknown[]) {
+  for (const value of values) {
+    const normalized = asOptionalString(value);
+    if (normalized) return normalized;
+  }
+  return undefined;
 }
 
 function buildRoleAwareContextLabel(payload: Record<string, unknown>) {
@@ -210,54 +294,6 @@ function sourceAction(
   } satisfies InboxActionButtonVM;
 }
 
-function renderClassUpdateGroup(
-  event: ActivityEventRow,
-  primary: string,
-  tone: 'info' | 'warning',
-): ActivityRenderResult {
-  const payload = asRecord(event.payload);
-  const contextLabel = buildRoleAwareContextLabel(payload);
-  const reason =
-    asOptionalString(payload.rescheduledReason) ??
-    asOptionalString(payload.canceledReason);
-  const eventSummary = asOptionalString(payload.summary);
-  const summaryParts = [
-    contextLabel,
-    eventSummary,
-    reason ? `Reason: ${reason}.` : undefined,
-  ].filter((part): part is string => Boolean(part));
-  return {
-    verb: event.event_type as ActivityVerbVM,
-    leading: {
-      kind: 'icon',
-      iconKey: tone === 'warning' ? 'CalendarX' : 'CalendarCheck',
-      tone,
-    },
-    headline: {
-      primary,
-      secondary: contextLabel ?? getContextTitle(payload),
-      secondaryHref: buildInboxSourceHref(event, payload),
-    },
-    summary: summaryParts.length ? summaryParts.join(' ') : 'Class schedule updated.',
-    actionButton: sourceAction(event, payload, 'outline', 'Open class'),
-    metadata: {
-      ...buildCommonContextMetadata(payload),
-      title: asOptionalString(payload.title),
-      scheduleId: asOptionalString(payload.scheduleId),
-      timezone: asOptionalString(payload.timezone),
-      firstSessionStartAt: asOptionalString(payload.firstSessionStartAt),
-      firstSessionTimezone: asOptionalString(payload.firstSessionTimezone),
-      rescheduledFromStartAt: asOptionalString(payload.rescheduledFromStartAt),
-      rescheduledToStartAt: asOptionalString(payload.rescheduledToStartAt),
-      rescheduledReason: asOptionalString(payload.rescheduledReason),
-      canceledStartAt: asOptionalString(payload.canceledStartAt),
-      canceledReason: asOptionalString(payload.canceledReason),
-      sessionLocalTime: true,
-      preserveActivitySummary: true,
-    },
-  };
-}
-
 function resolveMessageNoun(payload: Record<string, unknown>) {
   const dmMessageKind = asOptionalString(payload.dmMessageKind);
   if (dmMessageKind === 'image') {
@@ -272,45 +308,147 @@ function resolveMessageNoun(payload: Record<string, unknown>) {
   return 'a message';
 }
 
-function renderMessageHeadline(payload: Record<string, unknown>) {
-  const senderName = asString(payload.senderName, 'Someone');
-  const contextTitle = buildRoleAwareContextLabel(payload) ?? getContextTitle(payload);
-  const mention = asOptionalString(payload.mentionedProfileId);
-  const messageNoun = resolveMessageNoun(payload);
+type MessageRenderVariant =
+  | 'message'
+  | 'mention'
+  | 'thread_reply'
+  | 'file'
+  | 'image'
+  | 'audio';
 
-  if (mention) {
-    return {
-      primary: `${senderName} mentioned you in`,
-      secondary: contextTitle,
-    };
-  }
-
-  if (contextTitle) {
-    return {
-      primary: `${senderName} sent you ${messageNoun} in`,
-      secondary: contextTitle,
-    };
-  }
-
-  return {
-    primary: `${senderName} sent you ${messageNoun}`,
-  };
+function getMessagePreview(payload: Record<string, unknown>) {
+  return (
+    asOptionalString(payload.messagePreview) ??
+    asOptionalString(payload.content) ??
+    undefined
+  );
 }
 
-function renderMessageItem(event: ActivityEventRow, verb: ActivityVerbVM) {
+function getFileName(payload: Record<string, unknown>) {
+  return (
+    asOptionalString(payload.fileName) ??
+    asOptionalString(payload.name) ??
+    asOptionalString(payload.content)
+  );
+}
+
+function buildFileDetails(payload: Record<string, unknown>, fallback: string) {
+  const details = [
+    getFileName(payload) ?? fallback,
+    asOptionalString(payload.mimeType),
+    asOptionalString(payload.content),
+  ].filter((part): part is string => Boolean(part));
+  return Array.from(new Set(details)).join('\n');
+}
+
+function renderMessageItem(
+  event: ActivityEventRow,
+  verb: ActivityVerbVM,
+  variant: MessageRenderVariant,
+) {
   const payload = asRecord(event.payload);
-  const contextLabel = buildRoleAwareContextLabel(payload);
+  const senderName = asString(payload.senderName, 'Someone');
+  const contextLabel = buildRoleAwareContextLabel(payload) ?? getContextTitle(payload);
+  const isDirect = payload.channelRouteKind === 'dm';
+  const href = buildInboxSourceHref(event, payload);
+  const fileName = getFileName(payload);
+  const messagePreview = getMessagePreview(payload);
+  const iconKey =
+    variant === 'mention'
+      ? 'AtSign'
+      : variant === 'thread_reply'
+        ? 'MessageSquareReply'
+        : variant === 'file'
+          ? 'FileBadge'
+          : variant === 'image'
+            ? 'BookImage'
+            : variant === 'audio'
+              ? 'FileHeadphone'
+              : isDirect
+                ? 'MessagesSquare'
+                : 'MessageSquareDot';
+  const secondary =
+    variant === 'mention'
+      ? isDirect
+        ? 'mentioned you in a direct message'
+        : contextLabel
+          ? `mentioned you in ${contextLabel}`
+          : 'mentioned you'
+      : variant === 'thread_reply'
+        ? isDirect
+          ? 'replied in your direct message thread'
+          : contextLabel
+            ? `replied in a thread in ${contextLabel}`
+            : 'replied in a thread'
+        : variant === 'file'
+          ? isDirect
+            ? 'shared a file with you'
+            : contextLabel
+              ? `shared a file in ${contextLabel}`
+              : 'shared a file'
+          : variant === 'image'
+            ? isDirect
+              ? 'shared an image with you'
+              : contextLabel
+                ? `shared an image in ${contextLabel}`
+                : 'shared an image'
+            : variant === 'audio'
+              ? isDirect
+                ? 'sent you a voice message'
+                : contextLabel
+                  ? `sent a voice message in ${contextLabel}`
+                  : 'sent a voice message'
+              : isDirect
+                ? 'sent you a direct message'
+                : contextLabel
+                  ? `sent a message in ${contextLabel}`
+                  : `sent ${resolveMessageNoun(payload)}`;
+  const summary =
+    variant === 'file' || variant === 'image' || variant === 'audio'
+      ? fileName
+      : messagePreview;
+  const expandedContent =
+    variant === 'file'
+      ? buildFileDetails(payload, 'File details')
+      : variant === 'image'
+        ? buildFileDetails(payload, 'Image preview')
+        : variant === 'audio'
+          ? buildFileDetails(payload, 'Audio player')
+          : messagePreview;
+  const actionLabel =
+    variant === 'mention'
+      ? isDirect
+        ? 'Reply'
+        : 'View mention'
+      : variant === 'thread_reply'
+        ? 'Open thread'
+        : variant === 'file'
+          ? 'Open file'
+          : variant === 'image'
+            ? 'View image'
+            : variant === 'audio'
+              ? 'Play audio'
+              : isDirect
+                ? 'Reply'
+                : 'Open message';
+
   return {
     verb,
-    leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'info' },
-    headline: renderMessageHeadline(payload),
-    summary: contextLabel ? `Context: ${contextLabel}` : undefined,
-    expandedContent: asOptionalString(payload.content),
-    actionButton: sourceAction(event, payload, 'outline', 'Open messages'),
+    leading: { kind: 'icon', iconKey, tone: 'info' },
+    headline: {
+      primary: senderName,
+      secondary,
+      secondaryHref: href,
+    },
+    summary,
+    preview: summary ? { text: summary } : undefined,
+    expandedContent,
+    actionButton: sourceAction(event, payload, 'outline', actionLabel),
     metadata: {
       ...buildCommonContextMetadata(payload),
       channelId: asOptionalString(payload.channelId),
       messageId: asOptionalString(payload.messageId),
+      fileName,
       threadReply: payload.threadReply === true,
     },
   } satisfies ActivityRenderResult;
@@ -322,24 +460,147 @@ function renderReactionItem(event: ActivityEventRow) {
   const emoji = asString(payload.emoji, '😀');
   const isDirect = payload.channelRouteKind === 'dm';
   const contextLabel = buildRoleAwareContextLabel(payload) ?? getContextTitle(payload);
+  const messagePreview = getMessagePreview(payload);
 
   return {
     verb: 'reaction.added',
-    leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'info' },
+    leading: {
+      kind: 'icon',
+      iconKey: isDirect ? 'MessageSquare' : 'SmilePlus',
+      tone: 'info',
+    },
     headline: {
       primary: isDirect
         ? `${senderName} reacted ${emoji} to your direct message`
-        : `${senderName} reacted ${emoji} to your message in`,
-      secondary: contextLabel,
+        : contextLabel
+          ? `${senderName} reacted ${emoji} to your message in ${contextLabel}`
+          : `${senderName} reacted ${emoji} to your message`,
       secondaryHref: buildInboxSourceHref(event, payload),
     },
-    summary: contextLabel ? `Context: ${contextLabel}` : undefined,
-    actionButton: sourceAction(event, payload),
+    summary: messagePreview ? `Your message: ${messagePreview}` : undefined,
+    preview: messagePreview ? { text: `Your message: ${messagePreview}` } : undefined,
+    expandedContent: messagePreview
+      ? `Original message with reaction context\n${messagePreview}`
+      : 'Original message with reaction context',
+    actionButton: sourceAction(event, payload, 'outline', 'View message'),
     metadata: {
       ...buildCommonContextMetadata(payload),
       channelId: asOptionalString(payload.channelId),
       messageId: asOptionalString(payload.messageId),
       emoji,
+    },
+  } satisfies ActivityRenderResult;
+}
+
+type SessionRenderVariant = 'rescheduled' | 'canceled' | 'reminder' | 'feedback';
+
+function renderSessionItem(event: ActivityEventRow, variant: SessionRenderVariant) {
+  const payload = asRecord(event.payload);
+  const classTitle =
+    getActivityContext(payload).classTitle ?? getContextTitle(payload) ?? 'Class';
+  const roleContext = buildRoleContextLabel(payload);
+  const oldStartAt = firstOptionalString(
+    payload.oldSessionDateTime,
+    payload.rescheduledFromStartAt,
+    payload.previousStartAt,
+    payload.originalStartAt,
+    payload.occurrenceStart,
+  );
+  const newStartAt = firstOptionalString(
+    payload.newSessionDateTime,
+    payload.rescheduledToStartAt,
+    payload.newStartAt,
+    payload.startAt,
+    payload.firstSessionStartAt,
+  );
+  const sessionStartAt = firstOptionalString(
+    payload.sessionDateTime,
+    payload.canceledStartAt,
+    payload.startAt,
+    payload.occurrenceStart,
+    payload.firstSessionStartAt,
+  );
+  const oldLabel = formatSessionDateTime(oldStartAt, payload);
+  const newLabel = formatSessionDateTime(newStartAt, payload);
+  const sessionLabel = formatSessionDateTime(sessionStartAt, payload);
+  const startTimeLabel = formatSessionStartTime(sessionStartAt, payload);
+  const rescheduledReason = firstOptionalString(
+    payload.rescheduledReason,
+    payload.reason,
+  );
+  const canceledReason = firstOptionalString(payload.canceledReason, payload.reason);
+
+  const config = {
+    rescheduled: {
+      verb: 'class.session.rescheduled' as const,
+      iconKey: 'CalendarCheck' as const,
+      tone: 'info' as const,
+      primary: `${classTitle} rescheduled`,
+      summary:
+        oldLabel && newLabel
+          ? `${oldLabel} was moved to ${newLabel}`
+          : newLabel
+            ? `Moved to ${newLabel}`
+            : undefined,
+      expandedContent: rescheduledReason ? `Reason: ${rescheduledReason}` : undefined,
+      actionLabel: 'Open class',
+    },
+    canceled: {
+      verb: 'class.session.canceled' as const,
+      iconKey: 'CalendarX' as const,
+      tone: 'warning' as const,
+      primary: `${classTitle} canceled`,
+      summary: sessionLabel ? `${sessionLabel} was canceled` : undefined,
+      expandedContent: canceledReason ? `Reason: ${canceledReason}` : undefined,
+      actionLabel: 'Open class',
+    },
+    reminder: {
+      verb: 'session.reminder.sent' as const,
+      iconKey: 'Bell' as const,
+      tone: 'info' as const,
+      primary: `${classTitle} starting soon`,
+      summary: startTimeLabel
+        ? `${classTitle} starts at ${startTimeLabel}`
+        : (asOptionalString(payload.summary) ?? `${classTitle} starts soon`),
+      expandedContent:
+        firstOptionalString(payload.joinDetails, payload.outline, payload.sessionNotes) ??
+        'Join details, class outline, or session notes',
+      actionLabel: 'Open class',
+    },
+    feedback: {
+      verb: 'session.feedback_request.sent' as const,
+      iconKey: 'MessageSquareHeart' as const,
+      tone: 'info' as const,
+      primary: `Share feedback for ${classTitle}`,
+      summary: 'Tell us how the session went',
+      expandedContent:
+        firstOptionalString(payload.feedbackPrompt, payload.feedbackDetails) ??
+        'Feedback form or quick rating UI',
+      actionLabel: 'Give feedback',
+    },
+  }[variant];
+
+  return {
+    verb: config.verb,
+    leading: { kind: 'icon', iconKey: config.iconKey, tone: config.tone },
+    headline: {
+      primary: config.primary,
+      secondary: roleContext,
+      secondaryHref: buildInboxSourceHref(event, payload),
+    },
+    summary: config.summary,
+    preview: config.summary ? { text: config.summary } : undefined,
+    expandedContent: config.expandedContent,
+    actionButton: sourceAction(event, payload, 'outline', config.actionLabel),
+    metadata: {
+      ...buildCommonContextMetadata(payload),
+      roleContext,
+      channelId: asOptionalString(payload.channelId),
+      learningSpaceId: asOptionalString(payload.learningSpaceId),
+      scheduleId: asOptionalString(payload.scheduleId),
+      startAt: sessionStartAt,
+      oldStartAt,
+      newStartAt,
     },
   } satisfies ActivityRenderResult;
 }
@@ -356,10 +617,66 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     importance: 'normal',
     notification: {
       defaultChannels: ['push'],
+      timing: 'immediate',
+    },
+    resolveRecipients: DEFAULT_RECIPIENTS,
+    render: (event) => renderMessageItem(event, 'message.posted', 'message'),
+  },
+  'message.mentioned': {
+    eventType: 'message.mentioned',
+    tabKey: 'all',
+    importance: 'important',
+    notification: {
+      defaultChannels: ['push'],
       timing: 'standard',
     },
     resolveRecipients: DEFAULT_RECIPIENTS,
-    render: (event) => renderMessageItem(event, 'message.posted'),
+    render: (event) => renderMessageItem(event, 'message.mentioned', 'mention'),
+  },
+  'message.thread_reply.posted': {
+    eventType: 'message.thread_reply.posted',
+    tabKey: 'all',
+    importance: 'normal',
+    notification: {
+      defaultChannels: ['push'],
+      timing: 'standard',
+    },
+    resolveRecipients: DEFAULT_RECIPIENTS,
+    render: (event) =>
+      renderMessageItem(event, 'message.thread_reply.posted', 'thread_reply'),
+  },
+  'file.uploaded': {
+    eventType: 'file.uploaded',
+    tabKey: 'all',
+    importance: 'normal',
+    notification: {
+      defaultChannels: ['push'],
+      timing: 'standard',
+    },
+    resolveRecipients: DEFAULT_RECIPIENTS,
+    render: (event) => renderMessageItem(event, 'file.uploaded', 'file'),
+  },
+  'image.uploaded': {
+    eventType: 'image.uploaded',
+    tabKey: 'all',
+    importance: 'normal',
+    notification: {
+      defaultChannels: ['push'],
+      timing: 'standard',
+    },
+    resolveRecipients: DEFAULT_RECIPIENTS,
+    render: (event) => renderMessageItem(event, 'image.uploaded', 'image'),
+  },
+  'audio.uploaded': {
+    eventType: 'audio.uploaded',
+    tabKey: 'all',
+    importance: 'normal',
+    notification: {
+      defaultChannels: ['push'],
+      timing: 'standard',
+    },
+    resolveRecipients: DEFAULT_RECIPIENTS,
+    render: (event) => renderMessageItem(event, 'audio.uploaded', 'audio'),
   },
   'reaction.added': {
     eventType: 'reaction.added',
@@ -379,24 +696,9 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     notification: {
       defaultChannels: ['push', 'email'],
       timing: 'immediate',
-      isCritical: true,
     },
     resolveRecipients: DEFAULT_RECIPIENTS,
-    render: (event) => renderClassUpdateGroup(event, 'Class session rescheduled', 'info'),
-  },
-  'class.sessions.rescheduled': {
-    eventType: 'class.sessions.rescheduled',
-    tabKey: 'classes',
-    importance: 'important',
-    notification: {
-      defaultChannels: ['push', 'email'],
-      timing: 'immediate',
-      isCritical: true,
-      prefKey: 'class.session.rescheduled',
-    },
-    resolveRecipients: DEFAULT_RECIPIENTS,
-    render: (event) =>
-      renderClassUpdateGroup(event, 'Class sessions rescheduled', 'info'),
+    render: (event) => renderSessionItem(event, 'rescheduled'),
   },
   'class.session.canceled': {
     eventType: 'class.session.canceled',
@@ -405,98 +707,20 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     notification: {
       defaultChannels: ['push', 'email'],
       timing: 'immediate',
-      isCritical: true,
     },
     resolveRecipients: DEFAULT_RECIPIENTS,
-    render: (event) => renderClassUpdateGroup(event, 'Class session canceled', 'warning'),
-  },
-  'class.sessions.canceled': {
-    eventType: 'class.sessions.canceled',
-    tabKey: 'classes',
-    importance: 'important',
-    notification: {
-      defaultChannels: ['push', 'email'],
-      timing: 'immediate',
-      isCritical: true,
-      prefKey: 'class.session.canceled',
-    },
-    resolveRecipients: DEFAULT_RECIPIENTS,
-    render: (event) =>
-      renderClassUpdateGroup(event, 'Class sessions canceled', 'warning'),
+    render: (event) => renderSessionItem(event, 'canceled'),
   },
   'session.reminder.sent': {
     eventType: 'session.reminder.sent',
     tabKey: 'classes',
     importance: 'normal',
     notification: {
-      defaultChannels: ['push', 'email'],
+      defaultChannels: ['push'],
       timing: 'immediate',
-      isCritical: true,
     },
     resolveRecipients: DEFAULT_RECIPIENTS,
-    render: (event) => {
-      const payload = asRecord(event.payload);
-      const contextLabel = buildRoleAwareContextLabel(payload);
-      const summary = [contextLabel, asOptionalString(payload.summary)]
-        .filter((part): part is string => Boolean(part))
-        .join(' ');
-      return {
-        verb: 'session.reminder.sent',
-        leading: { kind: 'icon', iconKey: 'Bell', tone: 'info' },
-        headline: {
-          primary: 'Class reminder',
-          secondary: contextLabel ?? getContextTitle(payload),
-          secondaryHref: buildInboxSourceHref(event, payload),
-        },
-        summary: summary || asOptionalString(payload.occurrenceStart),
-        actionButton: sourceAction(event, payload, 'default', 'Open class'),
-        metadata: {
-          ...buildCommonContextMetadata(payload),
-          scheduleId: asOptionalString(payload.scheduleId),
-          occurrenceStart: asOptionalString(payload.occurrenceStart),
-          reminderOffsetMinutes: payload.reminderOffsetMinutes,
-          timezone: asOptionalString(payload.timezone),
-          preserveActivitySummary: true,
-        },
-      };
-    },
-  },
-  'sessions.reminder.sent': {
-    eventType: 'sessions.reminder.sent',
-    tabKey: 'classes',
-    importance: 'normal',
-    notification: {
-      defaultChannels: ['push', 'email'],
-      timing: 'immediate',
-      isCritical: true,
-      prefKey: 'session.reminder.sent',
-    },
-    resolveRecipients: DEFAULT_RECIPIENTS,
-    render: (event) => {
-      const payload = asRecord(event.payload);
-      const contextLabel = buildRoleAwareContextLabel(payload);
-      const summary = [contextLabel, asOptionalString(payload.summary)]
-        .filter((part): part is string => Boolean(part))
-        .join(' ');
-      return {
-        verb: 'sessions.reminder.sent',
-        leading: { kind: 'icon', iconKey: 'Bell', tone: 'info' },
-        headline: {
-          primary: 'Class reminders',
-          secondary: contextLabel ?? getContextTitle(payload),
-          secondaryHref: buildInboxSourceHref(event, payload),
-        },
-        summary: summary || asOptionalString(payload.summary),
-        actionButton: sourceAction(event, payload, 'default', 'Open class'),
-        metadata: {
-          ...buildCommonContextMetadata(payload),
-          scheduleId: asOptionalString(payload.scheduleId),
-          occurrenceStart: asOptionalString(payload.occurrenceStart),
-          timezone: asOptionalString(payload.timezone),
-          preserveActivitySummary: true,
-        },
-      };
-    },
+    render: (event) => renderSessionItem(event, 'reminder'),
   },
   'session.feedback_request.sent': {
     eventType: 'session.feedback_request.sent',
@@ -504,90 +728,10 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     importance: 'normal',
     notification: {
       defaultChannels: ['push', 'email'],
-      timing: 'immediate',
+      timing: 'standard',
     },
     resolveRecipients: DEFAULT_RECIPIENTS,
-    render: (event) => {
-      const payload = asRecord(event.payload);
-      const contextLabel = buildRoleAwareContextLabel(payload);
-      const summary = [
-        contextLabel,
-        asOptionalString(payload.summary) ?? 'Share feedback about this session.',
-      ]
-        .filter((part): part is string => Boolean(part))
-        .join(' ');
-      return {
-        verb: 'session.feedback_request.sent',
-        leading: { kind: 'icon', iconKey: 'Bell', tone: 'info' },
-        headline: {
-          primary: 'Class feedback requested',
-          secondary: contextLabel ?? getContextTitle(payload),
-          secondaryHref: buildInboxSourceHref(event, payload),
-        },
-        summary,
-        actionButton: sourceAction(event, payload, 'outline', 'Open class'),
-        metadata: {
-          ...buildCommonContextMetadata(payload),
-          classSessionId: asOptionalString(payload.classSessionId),
-          classroomId: asOptionalString(payload.learningSpaceId),
-          channelId: asOptionalString(payload.channelId),
-          occurrenceStart: asOptionalString(payload.occurrenceStart),
-          timezone: asOptionalString(payload.timezone),
-          feedbackUiEnabled: Boolean(
-            asOptionalString(payload.classSessionId) &&
-            asOptionalString(payload.learningSpaceId) &&
-            asOptionalString(payload.channelId),
-          ),
-          preserveActivitySummary: true,
-        },
-      };
-    },
-  },
-  'sessions.feedback_request.sent': {
-    eventType: 'sessions.feedback_request.sent',
-    tabKey: 'classes',
-    importance: 'normal',
-    notification: {
-      defaultChannels: ['push', 'email'],
-      timing: 'immediate',
-      prefKey: 'session.feedback_request.sent',
-    },
-    resolveRecipients: DEFAULT_RECIPIENTS,
-    render: (event) => {
-      const payload = asRecord(event.payload);
-      const contextLabel = buildRoleAwareContextLabel(payload);
-      const summary = [
-        contextLabel,
-        asOptionalString(payload.summary) ?? 'Share feedback about your recent sessions.',
-      ]
-        .filter((part): part is string => Boolean(part))
-        .join(' ');
-      return {
-        verb: 'sessions.feedback_request.sent',
-        leading: { kind: 'icon', iconKey: 'Bell', tone: 'info' },
-        headline: {
-          primary: 'Class feedback requested',
-          secondary: contextLabel ?? getContextTitle(payload),
-          secondaryHref: buildInboxSourceHref(event, payload),
-        },
-        summary,
-        actionButton: sourceAction(event, payload, 'outline', 'Open class'),
-        metadata: {
-          ...buildCommonContextMetadata(payload),
-          classSessionId: asOptionalString(payload.classSessionId),
-          classroomId: asOptionalString(payload.learningSpaceId),
-          channelId: asOptionalString(payload.channelId),
-          occurrenceStart: asOptionalString(payload.occurrenceStart),
-          timezone: asOptionalString(payload.timezone),
-          feedbackUiEnabled: Boolean(
-            asOptionalString(payload.classSessionId) &&
-            asOptionalString(payload.learningSpaceId) &&
-            asOptionalString(payload.channelId),
-          ),
-          preserveActivitySummary: true,
-        },
-      };
-    },
+    render: (event) => renderSessionItem(event, 'feedback'),
   },
 };
 

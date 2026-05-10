@@ -13,10 +13,16 @@ import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session
 export class NotificationPreferencesService {
   private readonly signupDefaultPreferences = [
     { prefKey: 'message.posted', channels: ['push', 'email'] },
+    { prefKey: 'message.mentioned', channels: ['push', 'email'] },
+    { prefKey: 'message.thread_reply.posted', channels: ['push', 'email'] },
+    { prefKey: 'file.uploaded', channels: ['push', 'email'] },
+    { prefKey: 'image.uploaded', channels: ['push', 'email'] },
+    { prefKey: 'audio.uploaded', channels: ['push', 'email'] },
     { prefKey: 'reaction.added', channels: ['push', 'email'] },
     { prefKey: 'class.session.rescheduled', channels: ['push', 'email'] },
     { prefKey: 'class.session.canceled', channels: ['push', 'email'] },
-    { prefKey: 'session.reminder.sent', channels: ['push', 'email'] },
+    { prefKey: 'session.reminder.sent', channels: ['push'] },
+    { prefKey: 'session.feedback_request.sent', channels: ['push', 'email'] },
   ] as const;
 
   private normalizeChannels(channels: string[]) {

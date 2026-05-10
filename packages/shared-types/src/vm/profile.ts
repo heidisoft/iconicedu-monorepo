@@ -116,11 +116,17 @@ export type NotificationKey =
   | 'digest.weekly'
   | 'digest.urgent_only'
   | 'message.posted'
+  | 'message.mentioned'
+  | 'message.thread_reply.posted'
+  | 'file.uploaded'
+  | 'image.uploaded'
+  | 'audio.uploaded'
+  | 'reaction.added'
   | 'class.session.rescheduled'
   | 'class.session.canceled'
-  | 'session.completed'
   | 'session.reminder.sent'
-  | 'session.feedback_request.sent';
+  | 'session.feedback_request.sent'
+  | 'session.completed';
 
 export type NotificationDefaultsVM = Partial<
   Record<NotificationKey, NotificationPreferenceVM>
