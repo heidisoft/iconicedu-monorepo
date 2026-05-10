@@ -913,11 +913,11 @@ export class MessagesService {
   }): Promise<{ threadId: string | null; threadCreated: boolean }> {
     const sessionSupabase = createSupabaseSessionClient(input.accessToken);
     const serviceSupabase = createSupabaseServiceClient();
-    let threadId = input.requestedThreadId ?? null;
+    let threadId: string | null = null;
     let threadCreated = false;
 
     if (!input.threadParentId) {
-      return { threadId, threadCreated };
+      return { threadId: input.requestedThreadId ?? null, threadCreated };
     }
 
     const parentResponse = await sessionSupabase
@@ -946,6 +946,27 @@ export class MessagesService {
 
     if (parentMessage.thread_id) {
       threadId = parentMessage.thread_id;
+    }
+
+    if (!threadId && input.requestedThreadId) {
+      const requestedThreadResponse = await serviceSupabase
+        .from('threads')
+        .select('id, org_id, channel_id, parent_message_id')
+        .eq('id', input.requestedThreadId)
+        .eq('org_id', input.orgId)
+        .eq('channel_id', input.channelId)
+        .eq('parent_message_id', parentMessage.id)
+        .is('deleted_at', null)
+        .maybeSingle<{
+          id: string;
+          org_id: string;
+          channel_id: string;
+          parent_message_id: string;
+        }>();
+      if (requestedThreadResponse.error) {
+        throw new InternalServerErrorException(requestedThreadResponse.error.message);
+      }
+      threadId = requestedThreadResponse.data?.id ?? null;
     }
 
     if (!threadId) {

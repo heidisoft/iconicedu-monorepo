@@ -408,25 +408,24 @@ export class ReminderReconcileService {
   }> {
     const supabase = this.getSupabase();
 
-    const { data: canceledRows, error: cancelError } = await supabase
+    // Hard-delete all non-succeeded jobs so their dedupe_keys are freed for
+    // re-insertion. Only 'succeeded' rows must be kept — they are idempotency
+    // markers that prevent re-dispatching already-sent reminders. Any other
+    // status (pending, leased, failed, canceled, dead_letter) blocks the
+    // reconciler from re-inserting the same upcoming occurrence.
+    const { data: deletedRows, error: deleteError } = await supabase
       .from('reminder_jobs')
-      .update({
-        status: 'canceled',
-        lease_owner: null,
-        lease_until: null,
-        updated_at: new Date().toISOString(),
-      })
+      .delete()
       .eq('org_id', orgId)
-      .not('status', 'in', '("succeeded","canceled","dead_letter")')
-      .is('deleted_at', null)
+      .not('status', 'in', '("succeeded")')
       .select('id')
       .returns<Array<{ id: string }>>();
 
-    if (cancelError) {
-      throw new InternalServerErrorException(cancelError.message);
+    if (deleteError) {
+      throw new InternalServerErrorException(deleteError.message);
     }
 
-    const canceledCount = (canceledRows ?? []).length;
+    const canceledCount = (deletedRows ?? []).length;
 
     const { data: scheduleRows, error: scheduleError } = await supabase
       .from('class_schedules')
