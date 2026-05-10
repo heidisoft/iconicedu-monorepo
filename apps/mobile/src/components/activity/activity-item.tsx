@@ -6,6 +6,7 @@ import {
   BookImage,
   CalendarCheck,
   CalendarX,
+  CheckCheck,
   CreditCard,
   FileBadge,
   FileHeadphone,
@@ -151,7 +152,7 @@ export function makeActivityItemStyles(C: AppColors) {
     itemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
 
     // Avatar
-    avatarWrap: { width: 28, height: 28, flexShrink: 0, marginTop: 2 },
+    avatarWrap: { width: 28, flexShrink: 0, marginTop: 2, alignItems: 'center', gap: 6 },
     avatar: {
       width: 28,
       height: 28,
@@ -161,7 +162,8 @@ export function makeActivityItemStyles(C: AppColors) {
     },
 
     // Unread dot
-    unreadDot: { width: 9, height: 9, borderRadius: 5, flexShrink: 0, marginTop: 8 },
+    unreadDot: { width: 9, height: 9, borderRadius: 5, flexShrink: 0 },
+    readIcon: { width: 14, height: 14, alignItems: 'center', justifyContent: 'center' },
 
     // Content
     content: { flex: 1 },
@@ -222,7 +224,13 @@ export function makeActivityItemStyles(C: AppColors) {
 
     // Sub-activity: full leaf view
     subItemInner: { paddingVertical: 10 },
-    subAvatarWrap: { width: 24, height: 24, flexShrink: 0, marginTop: 2 },
+    subAvatarWrap: {
+      width: 24,
+      flexShrink: 0,
+      marginTop: 2,
+      alignItems: 'center',
+      gap: 5,
+    },
     subAvatar: {
       width: 24,
       height: 24,
@@ -415,6 +423,22 @@ export function ActivityItem({
             <View style={[s.subAvatar, { backgroundColor: iconBg }]}>
               <IconComponent size={10} color={iconFg} />
             </View>
+            {isRead ? (
+              <View
+                style={s.readIcon}
+                accessibilityLabel="Read"
+                accessibilityRole="image"
+                testID="activity-read-indicator"
+              >
+                <CheckCheck size={12} color={colors.textMuted} />
+              </View>
+            ) : (
+              <View
+                style={[s.unreadDot, { backgroundColor: colors.teal }]}
+                accessibilityLabel="Unread"
+                testID="activity-unread-indicator"
+              />
+            )}
           </View>
 
           <View style={s.content}>
@@ -428,8 +452,6 @@ export function ActivityItem({
               <Text style={[s.metaText, { color: colors.textMuted }]}>{time}</Text>
             </View>
           </View>
-
-          {!isRead && <View style={[s.unreadDot, { backgroundColor: colors.teal }]} />}
         </View>
 
         {hasPreviewText && (
@@ -498,6 +520,22 @@ export function ActivityItem({
             <View style={[s.avatar, { backgroundColor: iconBg }]}>
               <IconComponent size={11} color={iconFg} />
             </View>
+            {isRead ? (
+              <View
+                style={s.readIcon}
+                accessibilityLabel="Read"
+                accessibilityRole="image"
+                testID="activity-read-indicator"
+              >
+                <CheckCheck size={13} color={colors.textMuted} />
+              </View>
+            ) : (
+              <View
+                style={[s.unreadDot, { backgroundColor: colors.teal }]}
+                accessibilityLabel="Unread"
+                testID="activity-unread-indicator"
+              />
+            )}
           </View>
 
           <View style={s.content}>
@@ -526,8 +564,6 @@ export function ActivityItem({
               )}
             </View>
           </View>
-
-          {!isRead && <View style={[s.unreadDot, { backgroundColor: colors.teal }]} />}
         </View>
 
         {/* Preview card — summary text */}

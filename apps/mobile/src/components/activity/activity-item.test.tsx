@@ -139,9 +139,22 @@ describe('ActivityItem', () => {
 
     renderActivity(makeBaseActivity(), { onMarkRead });
 
+    expect(screen.getByLabelText('Unread')).toBeTruthy();
     fireEvent.press(screen.getByText('Priya Sharma'));
 
     expect(onMarkRead).toHaveBeenCalledWith('activity-1');
+  });
+
+  it('shows a read check-check indicator for read activities', () => {
+    const item = {
+      ...makeBaseActivity(),
+      state: { ...makeBaseActivity().state, isRead: true },
+    } as ActivityFeedItemVM;
+
+    renderActivity(item);
+
+    expect(screen.getByLabelText('Read')).toBeTruthy();
+    expect(screen.queryByLabelText('Unread')).toBeNull();
   });
 
   it('only displays Read more when expanded content exists', () => {

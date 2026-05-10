@@ -340,7 +340,7 @@ function makeStyles(C: AppColors) {
 
     itemOuter: {
       marginHorizontal: 16,
-      marginBottom: 16,
+      marginBottom: 22,
     },
     itemWrap: {
       backgroundColor: 'transparent',
