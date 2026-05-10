@@ -64,7 +64,7 @@ function createServiceSupabaseMock() {
                 data: {
                   id: 'rule-2',
                   org_id: 'org-1',
-                  event_type: 'dm.posted',
+                  event_type: 'message.posted',
                   actor_profile_id: null,
                   is_enabled: false,
                   created_at: '2026-03-09T12:00:00.000Z',
@@ -125,7 +125,7 @@ describe('admin activity suppression route', () => {
       actorProfileId: 'profile-admin-1',
     });
     createSupabaseServiceClient.mockReturnValue(createServiceSupabaseMock());
-    listActivityEventDefinitionTypes.mockReturnValue(['message.posted', 'dm.posted']);
+    listActivityEventDefinitionTypes.mockReturnValue(['message.posted']);
   });
 
   it('GET returns suppression rules and a merged verb catalog', async () => {
@@ -153,7 +153,7 @@ describe('admin activity suppression route', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           orgId: 'org-1',
-          eventType: 'dm.posted',
+          eventType: 'message.posted',
           actorProfileId: null,
           isEnabled: false,
         }),
@@ -164,7 +164,7 @@ describe('admin activity suppression route', () => {
     expect(response.status).toBe(200);
     expect(payload.success).toBe(true);
     expect(payload.rule).toMatchObject({
-      eventType: 'dm.posted',
+      eventType: 'message.posted',
       scope: 'org',
       isEnabled: false,
     });

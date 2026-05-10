@@ -680,7 +680,7 @@ describe('sendTextMessageAction', () => {
     expect(publishActivityEvent).not.toHaveBeenCalled();
   });
 
-  it('suppresses dm.posted activity when recipient is actively reading the DM', async () => {
+  it('suppresses message.posted activity when recipient is actively reading the DM', async () => {
     const supabase = {
       auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
       from: vi.fn(),
@@ -765,7 +765,7 @@ describe('sendTextMessageAction', () => {
     expect(publishActivityEvent).not.toHaveBeenCalled();
   });
 
-  it('emits dm.posted for inactive recipients only in group DM', async () => {
+  it('emits message.posted for inactive recipients only in group DM', async () => {
     const supabase = {
       auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
       from: vi.fn(),
@@ -1456,7 +1456,7 @@ describe('sendTextMessageAction', () => {
     expect(result).toEqual({ ids: { id: 'audio-message-1', orgId: 'org-1' } });
   });
 
-  it('emits dm.posted for direct-message file uploads', async () => {
+  it('emits file.uploaded for direct-message file uploads', async () => {
     const supabase = {
       from: vi.fn(),
       storage: {
@@ -1562,7 +1562,7 @@ describe('sendTextMessageAction', () => {
     expect(publishActivityEvent).not.toHaveBeenCalled();
   });
 
-  it('emits dm.posted for direct-message audio uploads', async () => {
+  it('emits audio.uploaded for direct-message audio uploads', async () => {
     const supabase = {
       from: vi.fn(),
       storage: {

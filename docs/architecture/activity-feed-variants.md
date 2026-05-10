@@ -45,11 +45,10 @@ activity definition mirrors.
 
 ## Contract-Only Or Legacy Variants
 
-| Type              | Status                             | Notes                                                                                                                                      |
-| ----------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `messages.posted` | Shared VM contract only            | Present in `ActivityVerbVM` and UI fallback maps, but there is no current API activity event definition for it.                            |
-| `reactions.added` | Shared VM contract only            | Present in `ActivityVerbVM` and UI fallback maps, but there is no current API activity event definition for it.                            |
-| `dm.posted`       | Seed preference / deprecated event | The API worker publishes DM activity as `message.posted` with `channelRouteKind: "dm"`. Do not add new render definitions for `dm.posted`. |
+| Type              | Status                  | Notes                                                                                                           |
+| ----------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `messages.posted` | Shared VM contract only | Present in `ActivityVerbVM` and UI fallback maps, but there is no current API activity event definition for it. |
+| `reactions.added` | Shared VM contract only | Present in `ActivityVerbVM` and UI fallback maps, but there is no current API activity event definition for it. |
 
 ## Source Creation Matrix
 

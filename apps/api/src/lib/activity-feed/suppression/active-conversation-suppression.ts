@@ -9,7 +9,6 @@ const ACTIVE_LIVE_STATUSES = new Set([
 ]);
 
 const CONVERSATIONAL_EVENT_TYPES = new Set([
-  'dm.posted',
   'message.posted',
   'message.mentioned',
   'message.thread_reply.posted',

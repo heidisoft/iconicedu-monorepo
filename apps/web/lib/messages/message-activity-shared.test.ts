@@ -146,7 +146,7 @@ describe('shared message activity helper', () => {
     expect(publishActivityEventMock).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({
-        eventType: 'message.posted',
+        eventType: 'message.mentioned',
         scope: { kind: 'user', userId: 'mentioned-1' },
         payload: expect.objectContaining({
           mentionedProfileId: 'mentioned-1',
@@ -157,7 +157,7 @@ describe('shared message activity helper', () => {
     expect(publishActivityEventMock).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
-        eventType: 'message.posted',
+        eventType: 'message.thread_reply.posted',
         scope: { kind: 'user', userId: 'recipient-1' },
         payload: expect.objectContaining({
           threadId: 'thread-1',
@@ -168,7 +168,7 @@ describe('shared message activity helper', () => {
     );
   });
 
-  it('publishes message.posted for channel file sends', async () => {
+  it('publishes file.uploaded for channel file sends', async () => {
     const supabase = createSupabaseMock({});
     const activityContext: ActivityChannelContext = {
       scope: { kind: 'channel', channelId: 'channel-1' },
@@ -195,7 +195,7 @@ describe('shared message activity helper', () => {
     expect(publishActivityEventMock).toHaveBeenCalledTimes(1);
     expect(publishActivityEventMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        eventType: 'message.posted',
+        eventType: 'file.uploaded',
         payload: expect.objectContaining({
           name: 'Worksheet.pdf',
           fileCount: 2,

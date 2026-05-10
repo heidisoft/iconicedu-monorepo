@@ -27,7 +27,7 @@ function createActivity(): ActivityFeedItemVM {
       scope: { kind: 'personal' },
       visibility: 'visible',
     },
-    verb: 'dm.posted',
+    verb: 'message.posted',
     refs: {
       actor: {
         profileId: 'profile-1',
