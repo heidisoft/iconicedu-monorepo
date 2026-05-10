@@ -306,7 +306,7 @@ export function ActivityItemBase({
 
           {showActionButton && <ActivityWithButton activity={activity} />}
 
-          {previewText && !footer ? (
+          {previewText ? (
             <p className="text-xs text-muted-foreground">{previewText}</p>
           ) : null}
 

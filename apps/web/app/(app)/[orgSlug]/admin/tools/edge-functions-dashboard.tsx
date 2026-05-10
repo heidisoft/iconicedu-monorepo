@@ -19,7 +19,8 @@ import {
 type FunctionKind =
   | 'events-dispatch'
   | 'reminders-dispatch'
-  | 'channel-read-state-repair';
+  | 'channel-read-state-repair'
+  | 'reminder-jobs-reset';
 
 type RunStatus = 'idle' | 'running' | 'success' | 'error';
 
@@ -36,6 +37,7 @@ type FunctionConfig = {
   description: string;
   hasDispatchParams: boolean;
   hasLeaseParams?: boolean;
+  destructive?: boolean;
 };
 
 const FUNCTIONS: FunctionConfig[] = [
@@ -60,6 +62,14 @@ const FUNCTIONS: FunctionConfig[] = [
     description:
       'Recomputes unread counts for all channels across all orgs. Runs daily at 3 AM UTC — use this to force a repair.',
     hasDispatchParams: false,
+  },
+  {
+    kind: 'reminder-jobs-reset',
+    title: 'Reminder Jobs — Reset & Reconcile',
+    description:
+      'Cancels all active (pending/leased/failed) reminder_jobs for this org, then runs the reconciler for every schedule to repopulate fresh jobs. Use after data migrations or when the job table is in a bad state.',
+    hasDispatchParams: false,
+    destructive: true,
   },
 ];
 
@@ -203,9 +213,14 @@ function FunctionCard({ orgId, config }: FunctionCardProps) {
         )}
 
         <div className="flex items-center gap-3">
-          <Button size="sm" onClick={handleRun} disabled={isRunning}>
+          <Button
+            size="sm"
+            variant={config.destructive ? 'destructive' : 'default'}
+            onClick={handleRun}
+            disabled={isRunning}
+          >
             {isRunning && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
-            Run cron job
+            {config.destructive ? 'Reset & reconcile' : 'Run cron job'}
           </Button>
           {result.ranAt && (
             <span className="text-muted-foreground text-xs">

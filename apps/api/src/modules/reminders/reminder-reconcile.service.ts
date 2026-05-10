@@ -401,6 +401,61 @@ export class ReminderReconcileService {
     return { reconciledCount, canceledCount };
   }
 
+  async resetAndReconcileOrgReminderJobs(orgId: string): Promise<{
+    canceledCount: number;
+    reconciledCount: number;
+    scheduleCount: number;
+  }> {
+    const supabase = this.getSupabase();
+
+    const { data: canceledRows, error: cancelError } = await supabase
+      .from('reminder_jobs')
+      .update({
+        status: 'canceled',
+        lease_owner: null,
+        lease_until: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('org_id', orgId)
+      .not('status', 'in', '("succeeded","canceled","dead_letter")')
+      .is('deleted_at', null)
+      .select('id')
+      .returns<Array<{ id: string }>>();
+
+    if (cancelError) {
+      throw new InternalServerErrorException(cancelError.message);
+    }
+
+    const canceledCount = (canceledRows ?? []).length;
+
+    const { data: scheduleRows, error: scheduleError } = await supabase
+      .from('class_schedules')
+      .select('id')
+      .eq('org_id', orgId)
+      .eq('source_kind', 'class_session')
+      .is('deleted_at', null)
+      .returns<Array<{ id: string }>>();
+
+    if (scheduleError) {
+      throw new InternalServerErrorException(scheduleError.message);
+    }
+
+    const scheduleIds = (scheduleRows ?? []).map((r) => r.id);
+    let reconciledCount = 0;
+
+    for (const scheduleId of scheduleIds) {
+      const result = await this.reconcileNextReminderJobForSchedule({
+        orgId,
+        scheduleId,
+      });
+      if (result.action === 'inserted' || result.action === 'kept') {
+        reconciledCount += 1;
+      }
+    }
+
+    return { canceledCount, reconciledCount, scheduleCount: scheduleIds.length };
+  }
+
   // ─── Chain computation ───────────────────────────────────────────────────────
 
   private computeNextJobInChain(
