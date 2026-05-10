@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, StyleSheet, useWindowDimensions } from 'react-native';
-import { Bell } from 'lucide-react-native';
 import { useTheme } from '@/providers/theme-provider';
 import { PulseBox } from './pulse-box';
 
@@ -8,24 +7,18 @@ type Props = { count?: number };
 
 const ROWS = [
   {
-    iconBg: '#fef3c7',
-    iconFg: '#d97706',
     titleWidth: 268,
     contextWidth: 214,
     metaWidth: 128,
     previewLines: [250],
   },
   {
-    iconBg: '#fef3c7',
-    iconFg: '#d97706',
     titleWidth: 262,
     contextWidth: 206,
     metaWidth: 126,
     previewLines: [248],
   },
   {
-    iconBg: '#dbeafe',
-    iconFg: '#2563eb',
     titleWidth: 286,
     contextWidth: 244,
     metaWidth: 126,
@@ -49,11 +42,8 @@ export function ActivityFeedSkeleton({ count = 3 }: Props) {
       {rows.map((row, index) => (
         <View key={index} style={s.itemOuter} testID="activity-skeleton-row">
           <View style={s.itemRow}>
-            <View
-              style={[s.iconCircle, { backgroundColor: row.iconBg }]}
-              testID="activity-skeleton-icon"
-            >
-              <Bell size={16} color={row.iconFg} strokeWidth={2} />
+            <View style={s.iconCircle} testID="activity-skeleton-icon">
+              <PulseBox width={28} height={28} radius={14} />
             </View>
 
             <View style={s.content}>
@@ -99,15 +89,12 @@ export function ActivityFeedSkeleton({ count = 3 }: Props) {
 
 const s = StyleSheet.create({
   wrap: { paddingTop: 30, paddingBottom: 24 },
-  sectionHeader: { paddingHorizontal: 36, paddingBottom: 18 },
-  itemOuter: { paddingHorizontal: 36, marginBottom: 26 },
-  itemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 22 },
+  sectionHeader: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 8 },
+  itemOuter: { marginHorizontal: 16, marginBottom: 8 },
+  itemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   iconCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 28,
+    height: 28,
     flexShrink: 0,
     marginTop: 2,
   },
@@ -117,18 +104,19 @@ const s = StyleSheet.create({
     marginBottom: 8,
   },
   previewCard: {
-    marginTop: 20,
+    marginTop: 10,
+    marginLeft: 42,
     minHeight: 58,
-    borderRadius: 13,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 14,
     justifyContent: 'center',
     gap: 8,
   },
-  readMore: { marginTop: 16 },
+  readMore: { marginTop: 8, marginLeft: 42 },
   actionButton: {
-    marginTop: 18,
+    marginTop: 10,
+    marginLeft: 42,
     width: 110,
     height: 38,
     borderRadius: 19,
