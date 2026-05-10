@@ -160,6 +160,10 @@ export type ReconcileAction = 'inserted' | 'kept' | 'canceled_only' | 'noop';
 export type ReconcileResult = {
   action: ReconcileAction;
   dedupeKey?: string;
+  dedupeKeys?: string[];
+  insertedCount?: number;
+  keptCount?: number;
+  canceledCount?: number;
 };
 
 const CLASS_SCHEDULE_SELECT = `
@@ -255,9 +259,14 @@ export class ReminderReconcileService {
 
     const succeededDedupeKeys = new Set((succeededRows ?? []).map((r) => r.dedupe_key));
 
-    const next = this.computeNextJobInChain(schedule, succeededDedupeKeys, now);
+    const nextJobs = this.computeExpectedJobsForNextOccurrence(
+      schedule,
+      succeededDedupeKeys,
+      now,
+    );
+    const nextDedupeKeys = new Set(nextJobs.map((job) => job.dedupeKey));
 
-    // Check current active job
+    // Check current active jobs
     const { data: activeRows, error: activeError } = await supabase
       .from('reminder_jobs')
       .select('id, dedupe_key')
@@ -265,33 +274,20 @@ export class ReminderReconcileService {
       .eq('source_schedule_id', input.scheduleId)
       .not('status', 'in', '("succeeded","canceled","dead_letter")')
       .is('deleted_at', null)
-      .limit(1)
       .returns<Array<{ id: string; dedupe_key: string }>>();
 
     if (activeError) {
       throw new InternalServerErrorException(activeError.message);
     }
 
-    const activeJob = activeRows?.[0] ?? null;
+    const activeJobs = activeRows ?? [];
+    const activeJobsByDedupe = new Map(activeJobs.map((job) => [job.dedupe_key, job]));
+    const staleActiveJobs = activeJobs.filter(
+      (job) => !nextDedupeKeys.has(job.dedupe_key),
+    );
 
-    if (!next) {
-      // No future job — cancel stale active job if any
-      if (activeJob) {
-        await this.cancelAllActiveJobsForSchedule(
-          supabase,
-          input.orgId,
-          input.scheduleId,
-        );
-      }
-      return { action: 'noop' };
-    }
-
-    if (activeJob?.dedupe_key === next.dedupeKey) {
-      return { action: 'kept', dedupeKey: next.dedupeKey };
-    }
-
-    // Cancel stale active job before inserting the correct one
-    if (activeJob) {
+    // Cancel stale active jobs before inserting the correct set.
+    for (const activeJob of staleActiveJobs) {
       const { error: cancelError } = await supabase
         .from('reminder_jobs')
         .update({
@@ -308,52 +304,76 @@ export class ReminderReconcileService {
       }
     }
 
-    // Build and insert the next job
-    const row2 = this.buildJobRow(input.orgId, input.scheduleId, next);
-    const { data: existingDedupeJob, error: existingDedupeError } = await supabase
-      .from('reminder_jobs')
-      .select('id, status')
-      .eq('org_id', input.orgId)
-      .eq('dedupe_key', next.dedupeKey)
-      .is('deleted_at', null)
-      .maybeSingle<{ id: string; status: string }>();
-
-    if (existingDedupeError) {
-      throw new InternalServerErrorException(existingDedupeError.message);
+    if (!nextJobs.length) {
+      return staleActiveJobs.length
+        ? { action: 'canceled_only', canceledCount: staleActiveJobs.length }
+        : { action: 'noop' };
     }
 
-    if (existingDedupeJob) {
-      if (existingDedupeJob.status === 'succeeded') {
-        return { action: 'kept', dedupeKey: next.dedupeKey };
+    let insertedCount = 0;
+    let keptCount = 0;
+
+    for (const next of nextJobs) {
+      if (activeJobsByDedupe.has(next.dedupeKey)) {
+        keptCount += 1;
+        continue;
       }
 
-      const { error: reactivateError } = await supabase
+      const row2 = this.buildJobRow(input.orgId, input.scheduleId, next);
+      const { data: existingDedupeJob, error: existingDedupeError } = await supabase
         .from('reminder_jobs')
-        .update(row2)
-        .eq('id', existingDedupeJob.id)
-        .eq('org_id', input.orgId);
+        .select('id, status')
+        .eq('org_id', input.orgId)
+        .eq('dedupe_key', next.dedupeKey)
+        .is('deleted_at', null)
+        .maybeSingle<{ id: string; status: string }>();
 
-      if (reactivateError) {
-        throw new InternalServerErrorException(reactivateError.message);
+      if (existingDedupeError) {
+        throw new InternalServerErrorException(existingDedupeError.message);
       }
 
-      return { action: 'inserted', dedupeKey: next.dedupeKey };
-    }
+      if (existingDedupeJob) {
+        if (existingDedupeJob.status === 'succeeded') {
+          keptCount += 1;
+          continue;
+        }
 
-    const { error: insertError } = await supabase.from('reminder_jobs').insert(row2);
+        const { error: reactivateError } = await supabase
+          .from('reminder_jobs')
+          .update(row2)
+          .eq('id', existingDedupeJob.id)
+          .eq('org_id', input.orgId);
 
-    // Conflict on partial unique index means another process already inserted — treat as kept
-    if (insertError) {
-      const isDuplicateActiveJob =
-        insertError.code === '23505' &&
-        insertError.message.includes('reminder_jobs_active_per_schedule_idx');
-      if (isDuplicateActiveJob) {
-        return { action: 'kept', dedupeKey: next.dedupeKey };
+        if (reactivateError) {
+          throw new InternalServerErrorException(reactivateError.message);
+        }
+
+        insertedCount += 1;
+        continue;
       }
-      throw new InternalServerErrorException(insertError.message);
+
+      const { error: insertError } = await supabase.from('reminder_jobs').insert(row2);
+
+      if (insertError) {
+        if (insertError.code === '23505') {
+          keptCount += 1;
+          continue;
+        }
+        throw new InternalServerErrorException(insertError.message);
+      }
+
+      insertedCount += 1;
     }
 
-    return { action: 'inserted', dedupeKey: next.dedupeKey };
+    const dedupeKeys = nextJobs.map((job) => job.dedupeKey);
+    return {
+      action: insertedCount > 0 ? 'inserted' : 'kept',
+      dedupeKey: dedupeKeys[0],
+      dedupeKeys,
+      insertedCount,
+      keptCount,
+      canceledCount: staleActiveJobs.length,
+    };
   }
 
   async reconcileAllSchedulesForLearningSpace(
@@ -487,13 +507,13 @@ export class ReminderReconcileService {
 
   // ─── Chain computation ───────────────────────────────────────────────────────
 
-  private computeNextJobInChain(
+  private computeExpectedJobsForNextOccurrence(
     schedule: ClassScheduleVM,
     succeededDedupeKeys: Set<string>,
     now: Date,
-  ): NextJobDescriptor | null {
+  ): NextJobDescriptor[] {
     if (schedule.source.kind !== 'class_session' || !schedule.source.channelId) {
-      return null;
+      return [];
     }
 
     const rangeStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -522,9 +542,17 @@ export class ReminderReconcileService {
       const learningSpaceId = occ.source.learningSpaceId;
       const occurrenceStartIso = occ.startAt;
 
-      for (const offsetMinutes of SESSION_REMINDER_OFFSETS_MINUTES) {
-        const runAt = new Date(occurrenceStart.getTime() - offsetMinutes * 60 * 1000);
-        if (runAt.getTime() <= now.getTime()) continue;
+      const reminderJobs: NextJobDescriptor[] = [];
+      for (const [index, offsetMinutes] of SESSION_REMINDER_OFFSETS_MINUTES.entries()) {
+        let runAt = new Date(occurrenceStart.getTime() - offsetMinutes * 60 * 1000);
+        const isFinalReminderOffset =
+          index === SESSION_REMINDER_OFFSETS_MINUTES.length - 1;
+        if (runAt.getTime() <= now.getTime()) {
+          if (!isFinalReminderOffset || occurrenceStart.getTime() <= now.getTime()) {
+            continue;
+          }
+          runAt = now;
+        }
         if (this.isJobRunAfterArchiveCutoff(occ, runAt)) continue;
 
         const dedupeKey = this.buildSessionReminderDedupeKey({
@@ -537,7 +565,7 @@ export class ReminderReconcileService {
 
         if (succeededDedupeKeys.has(dedupeKey)) continue;
 
-        return {
+        reminderJobs.push({
           jobType: 'session.reminder',
           offsetMinutes,
           occurrenceStart: occurrenceStartIso,
@@ -545,7 +573,11 @@ export class ReminderReconcileService {
           runAt,
           dedupeKey,
           occurrence: occ,
-        };
+        });
+      }
+
+      if (reminderJobs.length) {
+        return reminderJobs;
       }
 
       // Feedback job
@@ -564,20 +596,22 @@ export class ReminderReconcileService {
         });
 
         if (!succeededDedupeKeys.has(dedupeKey)) {
-          return {
-            jobType: 'session.feedback_request',
-            offsetMinutes: null,
-            occurrenceStart: occurrenceStartIso,
-            occurrenceEnd: occ.endAt,
-            runAt: feedbackRunAt,
-            dedupeKey,
-            occurrence: occ,
-          };
+          return [
+            {
+              jobType: 'session.feedback_request',
+              offsetMinutes: null,
+              occurrenceStart: occurrenceStartIso,
+              occurrenceEnd: occ.endAt,
+              runAt: feedbackRunAt,
+              dedupeKey,
+              occurrence: occ,
+            },
+          ];
         }
       }
     }
 
-    return null;
+    return [];
   }
 
   private buildJobRow(

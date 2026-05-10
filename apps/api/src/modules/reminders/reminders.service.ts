@@ -1329,7 +1329,6 @@ export class RemindersService {
       .update({
         status: 'succeeded',
         dispatched_at: now,
-        activity_event_id: null,
         lease_owner: null,
         lease_until: null,
         updated_at: now,
@@ -1378,22 +1377,6 @@ export class RemindersService {
       refreshOnDedupe: true,
       createdBy: systemProfileId,
     });
-
-    if (activityEvent?.id) {
-      const eventUpdateResponse = await supabase
-        .from('reminder_jobs')
-        .update({
-          activity_event_id: activityEvent.id,
-          updated_at: now,
-          updated_by: systemProfileId,
-        })
-        .eq('id', job.id)
-        .eq('org_id', job.org_id);
-
-      if (eventUpdateResponse.error) {
-        throw new Error(eventUpdateResponse.error.message);
-      }
-    }
 
     await this.logDispatch({
       supabase,
