@@ -452,7 +452,14 @@ function renderMessageItem(
     metadata: {
       ...buildCommonContextMetadata(payload),
       channelId: asOptionalString(payload.channelId),
+      channelRouteKind:
+        payload.channelRouteKind === 'space' ||
+        payload.channelRouteKind === 'dm' ||
+        payload.channelRouteKind === 'channel'
+          ? payload.channelRouteKind
+          : undefined,
       messageId: asOptionalString(payload.messageId),
+      threadId: asOptionalString(payload.threadId),
       fileName,
       threadReply: payload.threadReply === true,
     },
@@ -491,7 +498,14 @@ function renderReactionItem(event: ActivityEventRow) {
     metadata: {
       ...buildCommonContextMetadata(payload),
       channelId: asOptionalString(payload.channelId),
+      channelRouteKind:
+        payload.channelRouteKind === 'space' ||
+        payload.channelRouteKind === 'dm' ||
+        payload.channelRouteKind === 'channel'
+          ? payload.channelRouteKind
+          : undefined,
       messageId: asOptionalString(payload.messageId),
+      threadId: asOptionalString(payload.threadId),
       emoji,
     },
   } satisfies ActivityRenderResult;

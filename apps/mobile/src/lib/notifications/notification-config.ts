@@ -21,7 +21,7 @@ const messageNotificationConfig: NotificationConfig = {
     const targetId = channelId ?? scopeId;
     if (!targetId) return '/(app)/(tabs)/messages';
     const base =
-      channelRouteKind === 'dm'
+      channelRouteKind === 'dm' || scopeKind === 'dm'
         ? `/(app)/dm/${targetId}`
         : scopeKind === 'learning_space'
           ? `/(app)/spaces/${targetId}`
@@ -50,7 +50,7 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationConfig> = {
     getRoute: ({ scopeKind, scopeId, channelId, channelRouteKind }) => {
       const targetId = channelId ?? scopeId;
       if (!targetId) return '/(app)/(tabs)/inbox';
-      if (channelRouteKind === 'dm') {
+      if (channelRouteKind === 'dm' || scopeKind === 'dm') {
         return `/(app)/dm/${targetId}`;
       }
       return scopeKind === 'learning_space'

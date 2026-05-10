@@ -1,5 +1,7 @@
 import {
   cancelRecurringSessionOccurrence,
+  fetchChannelMetaByChannelId,
+  fetchDirectMessageChannelMetaByChannelId,
   fetchSpaceSchedulesByChannelId,
   fetchActivityFeed,
   fetchSupervisedDirectMessages,
@@ -673,6 +675,68 @@ describe('fetchSupervisedDirectMessages', () => {
     await expect(
       fetchSupervisedDirectMessages(SUP_ORG, GUARDIAN_ACCOUNT_ID, GUARDIAN_PROFILE_ID),
     ).rejects.toThrow('Forbidden');
+  });
+});
+
+describe('fetchDirectMessageChannelMetaByChannelId', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('calls the DM metadata API with profile context', async () => {
+    mockApiGet.mockResolvedValue({ id: 'ch-1', kind: 'dm', participants: [] });
+
+    const result = await fetchDirectMessageChannelMetaByChannelId(
+      SUP_ORG,
+      GUARDIAN_PROFILE_ID,
+      GUARDIAN_ACCOUNT_ID,
+      'ch-1',
+    );
+
+    expect(mockApiGet).toHaveBeenCalledWith('/channels/ch-1/dm-meta', {
+      orgId: SUP_ORG,
+      profileId: GUARDIAN_PROFILE_ID,
+      accountId: GUARDIAN_ACCOUNT_ID,
+    });
+    expect(result).toMatchObject({ id: 'ch-1', kind: 'dm' });
+  });
+
+  it('returns null when required identifiers are missing', async () => {
+    await expect(
+      fetchDirectMessageChannelMetaByChannelId('', GUARDIAN_PROFILE_ID, 'acct-1', 'ch-1'),
+    ).resolves.toBeNull();
+
+    expect(mockApiGet).not.toHaveBeenCalled();
+  });
+});
+
+describe('fetchChannelMetaByChannelId', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('calls the channel metadata API with account context', async () => {
+    mockApiGet.mockResolvedValue({ id: 'channel-1', kind: 'channel' });
+
+    const result = await fetchChannelMetaByChannelId(
+      SUP_ORG,
+      GUARDIAN_ACCOUNT_ID,
+      'channel-1',
+    );
+
+    expect(mockApiGet).toHaveBeenCalledWith('/channels/channel-1/meta', {
+      orgId: SUP_ORG,
+      accountId: GUARDIAN_ACCOUNT_ID,
+    });
+    expect(result).toMatchObject({ id: 'channel-1', kind: 'channel' });
+  });
+
+  it('returns null when required identifiers are missing', async () => {
+    await expect(
+      fetchChannelMetaByChannelId('', GUARDIAN_ACCOUNT_ID, 'channel-1'),
+    ).resolves.toBeNull();
+
+    expect(mockApiGet).not.toHaveBeenCalled();
   });
 });
 

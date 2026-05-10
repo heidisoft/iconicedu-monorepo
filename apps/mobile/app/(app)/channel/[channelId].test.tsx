@@ -78,6 +78,12 @@ jest.mock('@/lib/api/queries', () => ({
       channelId,
       accountId,
     ],
+    channelMeta: (channelId: string, orgId: string, accountId: string) => [
+      'channelMeta',
+      channelId,
+      orgId,
+      accountId,
+    ],
     channelMembership: (orgId: string, channelId: string, profileId: string) => [
       'channelMembership',
       orgId,
@@ -85,6 +91,7 @@ jest.mock('@/lib/api/queries', () => ({
       profileId,
     ],
   },
+  fetchChannelMetaByChannelId: jest.fn(async () => null),
   fetchChannelReadState: jest.fn(async () => ({
     lastReadMessageId: null,
     unreadCount: 0,
@@ -165,6 +172,23 @@ describe('ChannelConversationScreen', () => {
     mockUseQuery.mockImplementation(
       ({ queryKey }: { queryKey: [string, ...string[]] }) => {
         switch (queryKey[0]) {
+          case 'channelMeta':
+            return {
+              data: {
+                id: 'channel-1',
+                topic: 'Biology',
+                description: 'General questions',
+                kind: 'channel',
+                icon_key: 'book-open',
+                themeKey: 'teal',
+                messageUiThemeKey: 'feed',
+                is_learning_space: false,
+                is_support: false,
+                student_profiles: [],
+                participant_profiles: [],
+              },
+              isLoading: false,
+            };
           case 'channelReadState':
             return {
               data: {
@@ -208,6 +232,40 @@ describe('ChannelConversationScreen', () => {
       isLearningSpace: '0',
     });
     mockFetchIsChannelMember.mockReturnValue(false);
+    mockUseQuery.mockImplementation(
+      ({ queryKey }: { queryKey: [string, ...string[]] }) => {
+        switch (queryKey[0]) {
+          case 'channelMeta':
+            return {
+              data: {
+                id: 'channel-1',
+                topic: 'Support',
+                description: 'Help desk',
+                kind: 'channel',
+                icon_key: 'life-buoy',
+                themeKey: null,
+                messageUiThemeKey: 'feed',
+                is_learning_space: false,
+                is_support: true,
+                student_profiles: [],
+                participant_profiles: [],
+              },
+              isLoading: false,
+            };
+          case 'channelReadState':
+            return {
+              data: {
+                lastReadMessageId: null,
+                unreadCount: 0,
+              },
+            };
+          case 'channelMembership':
+            return { data: mockFetchIsChannelMember(), isLoading: false };
+          default:
+            return { data: undefined, isLoading: false };
+        }
+      },
+    );
 
     renderScreen();
 
@@ -232,5 +290,24 @@ describe('ChannelConversationScreen', () => {
     renderScreen();
 
     expect(mockRefetch).toHaveBeenCalled();
+  });
+
+  it('hydrates channel header from metadata when opened without route params', () => {
+    mockUseLocalSearchParams.mockReturnValue({
+      channelId: 'channel-1',
+    });
+    mockFetchIsChannelMember.mockReturnValue(true);
+
+    renderScreen();
+
+    expect(mockConversationHeader).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Biology',
+        subtitle: 'General questions',
+        iconKey: 'book-open',
+        themeKey: 'teal',
+        loading: false,
+      }),
+    );
   });
 });

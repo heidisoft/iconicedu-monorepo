@@ -36,6 +36,14 @@ type ChannelListItem = {
   participants?: DmParticipant[];
   is_supervised?: boolean;
   supervised_child_name?: string | null;
+  is_learning_space?: boolean;
+  is_support?: boolean;
+  student_profiles?: Array<{ name: string; themeKey?: string | null }>;
+  participant_profiles?: Array<{
+    name: string;
+    kind: 'educator' | 'guardian' | 'child' | 'staff' | 'system';
+    themeKey?: string | null;
+  }>;
 };
 
 type LastMessageInfo = { text: string | null; at: string | null; sender: string | null };
@@ -504,6 +512,191 @@ export class ChannelsService {
       avatarCity: (targetProfile.city as string | null) ?? null,
       avatarCountryCode: (targetProfile.country_code as string | null) ?? null,
       avatarCountryName: (targetProfile.country_name as string | null) ?? null,
+    };
+  }
+
+  async getDirectMessageChannelMeta(
+    accessToken: string,
+    input: { orgId: string; profileId: string; accountId: string; channelId: string },
+  ): Promise<ChannelListItem | null> {
+    if (!input.orgId || !input.profileId || !input.accountId || !input.channelId) {
+      return null;
+    }
+
+    const directMessages = await this.getDirectMessages(accessToken, {
+      orgId: input.orgId,
+      profileId: input.profileId,
+      accountId: input.accountId,
+    });
+    const directMatch = directMessages.find((channel) => channel.id === input.channelId);
+    if (directMatch) {
+      return directMatch;
+    }
+
+    const supervisedMessages = await this.getSupervisedDirectMessages(accessToken, {
+      orgId: input.orgId,
+      guardianAccountId: input.accountId,
+      guardianProfileId: input.profileId,
+    });
+    return supervisedMessages.find((channel) => channel.id === input.channelId) ?? null;
+  }
+
+  async getChannelMeta(
+    accessToken: string,
+    input: { orgId: string; accountId: string; channelId: string },
+  ): Promise<ChannelListItem | null> {
+    if (!input.orgId || !input.accountId || !input.channelId) {
+      return null;
+    }
+
+    const supabase = createSupabaseSessionClient(accessToken);
+    const { data: channel, error: channelError } = await supabase
+      .from('channels')
+      .select(
+        'id, org_id, topic, description, kind, updated_at, icon_key, ui_theme_key, ui_defaults, purpose',
+      )
+      .eq('org_id', input.orgId)
+      .eq('id', input.channelId)
+      .eq('kind', 'channel')
+      .eq('status', 'active')
+      .is('deleted_at', null)
+      .maybeSingle<{
+        id: string;
+        org_id: string;
+        topic: string | null;
+        description: string | null;
+        kind: string;
+        updated_at: string;
+        icon_key?: string | null;
+        ui_theme_key?: string | null;
+        ui_defaults?: unknown;
+        purpose?: string | null;
+      }>();
+    if (channelError) throw new InternalServerErrorException(channelError.message);
+    if (!channel) return null;
+
+    const { data: spaceLink, error: spaceLinkError } = await supabase
+      .from('learning_space_channels')
+      .select(
+        `
+        learning_space_id,
+        space:learning_spaces!learning_space_id(id, title, icon_key, subject, status, archived_at, deleted_at)
+        `,
+      )
+      .eq('org_id', input.orgId)
+      .eq('channel_id', input.channelId)
+      .eq('is_primary', true)
+      .is('deleted_at', null)
+      .maybeSingle<{
+        learning_space_id: string;
+        space: {
+          id?: string | null;
+          title?: string | null;
+          icon_key?: string | null;
+          subject?: string | null;
+          status?: string | null;
+          archived_at?: string | null;
+          deleted_at?: string | null;
+        } | null;
+      }>();
+    if (spaceLinkError) throw new InternalServerErrorException(spaceLinkError.message);
+
+    const space =
+      spaceLink?.space &&
+      !spaceLink.space.deleted_at &&
+      !spaceLink.space.archived_at &&
+      (spaceLink.space.status === 'active' || spaceLink.space.status === 'paused')
+        ? spaceLink.space
+        : null;
+
+    const participantProfiles: NonNullable<ChannelListItem['participant_profiles']> = [];
+    const studentProfiles: NonNullable<ChannelListItem['student_profiles']> = [];
+    if (space?.id) {
+      const { data: participantRows, error: participantError } = await supabase
+        .from('learning_space_participants')
+        .select(
+          `
+          profile:profiles!profile_id(display_name, first_name, last_name, kind, ui_theme_key)
+          `,
+        )
+        .eq('org_id', input.orgId)
+        .eq('learning_space_id', space.id)
+        .is('deleted_at', null);
+      if (participantError)
+        throw new InternalServerErrorException(participantError.message);
+
+      for (const row of participantRows ?? []) {
+        const profile = Array.isArray(row.profile) ? row.profile[0] : row.profile;
+        if (
+          !profile ||
+          (profile.kind !== 'educator' &&
+            profile.kind !== 'guardian' &&
+            profile.kind !== 'child' &&
+            profile.kind !== 'staff' &&
+            profile.kind !== 'system')
+        ) {
+          continue;
+        }
+
+        const displayName =
+          profile.display_name?.trim() ||
+          [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim();
+        if (!displayName) continue;
+
+        if (
+          !participantProfiles.some(
+            (participant) =>
+              participant.name === displayName && participant.kind === profile.kind,
+          )
+        ) {
+          participantProfiles.push({
+            name: displayName,
+            kind: profile.kind,
+            themeKey: profile.ui_theme_key ?? null,
+          });
+        }
+
+        if (
+          profile.kind === 'child' &&
+          !studentProfiles.some((student) => student.name === displayName)
+        ) {
+          studentProfiles.push({
+            name: displayName,
+            themeKey: profile.ui_theme_key ?? null,
+          });
+        }
+      }
+    }
+
+    const { data: readState, error: readStateError } = await supabase
+      .from('channel_read_state')
+      .select('unread_count')
+      .eq('account_id', input.accountId)
+      .eq('channel_id', input.channelId)
+      .is('thread_id', null)
+      .is('deleted_at', null)
+      .maybeSingle<{ unread_count: number | null }>();
+    if (readStateError) throw new InternalServerErrorException(readStateError.message);
+
+    return {
+      id: channel.id,
+      org_id: channel.org_id,
+      topic: space?.title ?? channel.topic ?? null,
+      description: space?.subject ?? channel.description ?? null,
+      kind: channel.kind,
+      updated_at: channel.updated_at,
+      unread_count: Math.max(0, readState?.unread_count ?? 0),
+      thread_unread_count: 0,
+      last_message_text: null,
+      last_message_at: null,
+      last_message_sender: null,
+      icon_key: space?.icon_key ?? channel.icon_key ?? null,
+      themeKey: channel.ui_theme_key ?? null,
+      messageUiThemeKey: resolveMessageUiThemeKey(channel.ui_defaults) ?? 'feed',
+      is_learning_space: Boolean(space),
+      is_support: channel.purpose === 'support',
+      student_profiles: studentProfiles,
+      participant_profiles: participantProfiles,
     };
   }
 

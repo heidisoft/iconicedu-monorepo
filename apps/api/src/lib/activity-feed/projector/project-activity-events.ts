@@ -3,6 +3,10 @@ import type { ProfileRow } from '@iconicedu/shared-types';
 import type { SupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 
 import { getActivityEventDefinition } from '@iconicedu/api/lib/activity-feed/definitions/activity-definitions';
+import {
+  truncateActivityPreview,
+  truncatePreviewText,
+} from '@iconicedu/api/lib/activity-feed/preview-text';
 import { resolveActivityRenderContext } from '@iconicedu/api/lib/activity-feed/projector/activity-render-context';
 import { resolveActiveConversationSuppressedRecipients } from '@iconicedu/api/lib/activity-feed/suppression/active-conversation-suppression';
 
@@ -178,10 +182,13 @@ async function projectEvent(supabase: SupabaseServiceClient, event: ActivityEven
           }
         : event;
     const rendered = definition.render(recipientEvent);
+    const summary = truncatePreviewText(rendered.summary);
+    const preview = truncateActivityPreview(rendered.preview);
+    const rowSummary = truncatePreviewText(rendered.summary ?? rendered.headline.primary);
     const content = {
       headline: rendered.headline,
-      summary: rendered.summary,
-      preview: rendered.preview,
+      summary,
+      preview,
       actionButton: rendered.actionButton,
       expandedContent: rendered.expandedContent,
       leading: rendered.leading,
@@ -208,8 +215,8 @@ async function projectEvent(supabase: SupabaseServiceClient, event: ActivityEven
       actor_profile_id: event.actor_profile_id ?? null,
       refs,
       content,
-      summary: rendered.summary ?? rendered.headline.primary,
-      preview: rendered.preview ?? null,
+      summary: rowSummary,
+      preview: preview ?? null,
       action_button: rendered.actionButton ?? null,
       expanded_content: rendered.expandedContent ?? null,
       importance: definition.importance ?? 'normal',

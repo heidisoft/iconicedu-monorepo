@@ -37,6 +37,7 @@ export type ChannelListItem = {
   participants?: DmParticipant[];
   is_supervised?: boolean;
   supervised_child_name?: string | null;
+  is_learning_space?: boolean;
   is_support?: boolean;
 };
 

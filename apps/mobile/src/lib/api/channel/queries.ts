@@ -26,6 +26,20 @@ export async function fetchSupervisedDirectMessages(
   });
 }
 
+export async function fetchDirectMessageChannelMetaByChannelId(
+  orgId: string,
+  profileId: string,
+  accountId: string,
+  channelId: string,
+): Promise<ChannelListItem | null> {
+  if (!orgId || !profileId || !accountId || !channelId) return null;
+  return apiGet(`/channels/${channelId}/dm-meta`, {
+    orgId,
+    profileId,
+    accountId,
+  });
+}
+
 export async function findDirectMessageChannelForProfiles(
   orgId: string,
   currentProfileId: string,
@@ -61,6 +75,18 @@ export async function fetchChannels(
   accountId: string,
 ): Promise<ChannelListItem[]> {
   return apiGet('/channels/list', { orgId, accountId });
+}
+
+export async function fetchChannelMetaByChannelId(
+  orgId: string,
+  accountId: string,
+  channelId: string,
+): Promise<ChannelListItem | null> {
+  if (!orgId || !accountId || !channelId) return null;
+  return apiGet(`/channels/${channelId}/meta`, {
+    orgId,
+    accountId,
+  });
 }
 
 export async function fetchIsChannelMember(

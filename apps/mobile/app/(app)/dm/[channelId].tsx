@@ -24,6 +24,7 @@ import {
   buildMessageStoragePath,
   deleteMessage,
   fetchChannelReadState,
+  fetchDirectMessageChannelMetaByChannelId,
   queryKeys,
 } from '@/lib/api/queries';
 import { useTheme } from '@/providers/theme-provider';
@@ -44,6 +45,7 @@ import type { AttachmentPayload } from '@/components/messages/attachment-sheet';
 import type { PendingUpload } from '@/components/messages/pending-message-row';
 import type { PresenceDisplayStatus } from '@/hooks/use-online-profile-ids';
 import { useMarkRead } from '@/hooks/use-mark-read';
+import type { ChannelListItem, DmParticipant } from '@/lib/api/types';
 
 const COUNTRY_LABELS: Record<string, string> = {
   LK: 'Sri Lanka',
@@ -79,40 +81,24 @@ type LocalTimeContext = {
   tooltipLabel: string | null;
 };
 
+function participantName(participant: DmParticipant | null | undefined): string | null {
+  if (!participant) return null;
+  return (
+    participant.display_name?.trim() ||
+    [participant.first_name, participant.last_name].filter(Boolean).join(' ').trim() ||
+    null
+  );
+}
+
+function getDmPartner(meta: ChannelListItem | null | undefined) {
+  return meta?.participants?.[0] ?? null;
+}
+
 export default function DmConversationScreen() {
-  const {
-    channelId,
-    topic,
-    avatarSeed,
-    presenceProfileId,
-    avatarUrl,
-    avatarRole,
-    avatarTimezone,
-    avatarCity,
-    avatarCountryCode,
-    avatarCountryName,
-    subtitle,
-    isSupervisedReadOnly,
-    supervisedChildName,
-    secondaryAvatarRole,
-  } = useLocalSearchParams<{
+  const { channelId } = useLocalSearchParams<{
     channelId: string;
-    topic?: string;
-    avatarSeed?: string;
-    presenceProfileId?: string;
-    avatarUrl?: string;
-    avatarRole?: string;
-    avatarTimezone?: string;
-    avatarCity?: string;
-    avatarCountryCode?: string;
-    avatarCountryName?: string;
-    subtitle?: string;
-    isSupervisedReadOnly?: string;
-    supervisedChildName?: string;
-    secondaryAvatarRole?: string;
   }>();
 
-  const isSupervised = isSupervisedReadOnly === '1';
   const router = useRouter();
   const isFocused = useIsFocused();
   const queryClient = useQueryClient();
@@ -130,15 +116,43 @@ export default function DmConversationScreen() {
     (profileRecord?.display_name as string | undefined)?.trim() ||
     (profileRecord?.first_name as string | undefined)?.trim() ||
     'Me';
+  const { data: dmMeta, isLoading: isLoadingDmMeta } = useQuery({
+    queryKey: queryKeys.directMessageChannelMeta(channelId ?? '', orgId, profileId),
+    queryFn: () =>
+      fetchDirectMessageChannelMetaByChannelId(
+        orgId,
+        profileId,
+        accountId,
+        channelId ?? '',
+      ),
+    enabled: !!channelId && !!orgId && !!profileId && !!accountId,
+    staleTime: 5 * 60 * 1000,
+  });
+  const dmPartner = getDmPartner(dmMeta);
+  const resolvedTopic = participantName(dmPartner) ?? dmMeta?.topic ?? 'Direct Message';
+  const resolvedAvatarSeed = dmPartner?.avatar_seed ?? dmPartner?.id ?? undefined;
+  const resolvedPresenceProfileId = dmPartner?.id ?? '';
+  const resolvedAvatarUrl = dmPartner?.avatar_url ?? undefined;
+  const resolvedAvatarRole = dmPartner?.kind ?? undefined;
+  const resolvedAvatarTimezone = dmPartner?.timezone ?? undefined;
+  const resolvedAvatarCity = dmPartner?.city ?? undefined;
+  const resolvedAvatarCountryCode = dmPartner?.country_code ?? undefined;
+  const resolvedAvatarCountryName = dmPartner?.country_name ?? undefined;
+  const resolvedSubtitle = dmMeta?.description ?? 'Direct Message';
+  const resolvedIsSupervised = dmMeta?.is_supervised === true;
+  const resolvedSupervisedChildName = dmMeta?.supervised_child_name ?? undefined;
   const presenceByProfileId = useOnlineProfileIds(
     orgId,
     profileId,
-    presenceProfileId ? [presenceProfileId] : [],
+    resolvedPresenceProfileId ? [resolvedPresenceProfileId] : [],
   );
-  const headerPresenceStatus = presenceProfileId
-    ? (presenceByProfileId.get(presenceProfileId) ?? null)
+  const headerPresenceStatus = resolvedPresenceProfileId
+    ? (presenceByProfileId.get(resolvedPresenceProfileId) ?? null)
     : null;
-  const headerPresenceSummary = useProfilePresenceSummary(orgId, presenceProfileId ?? '');
+  const headerPresenceSummary = useProfilePresenceSummary(
+    orgId,
+    resolvedPresenceProfileId,
+  );
 
   const formatRelativeLastSeen = useCallback((iso: string | null) => {
     if (!iso) return null;
@@ -249,9 +263,9 @@ export default function DmConversationScreen() {
     [localTimeText],
   );
 
-  const headerSubtitle = isSupervised
-    ? supervisedChildName
-      ? `Supervising ${supervisedChildName}'s conversation`
+  const headerSubtitle = resolvedIsSupervised
+    ? resolvedSupervisedChildName
+      ? `Supervising ${resolvedSupervisedChildName}'s conversation`
       : 'Supervised Inbox'
     : (() => {
         if (headerPresenceSummary.status === 'online') {
@@ -259,23 +273,23 @@ export default function DmConversationScreen() {
         }
         const relative = formatRelativeLastSeen(headerPresenceSummary.lastSeenAt);
         if (!relative) {
-          return subtitle ?? 'Direct Message';
+          return resolvedSubtitle;
         }
         return `Last seen ${relative}`;
       })();
-  const headerLocalTime = isSupervised
+  const headerLocalTime = resolvedIsSupervised
     ? null
     : (() => {
-        const timeText = localTimeText(avatarTimezone);
+        const timeText = localTimeText(resolvedAvatarTimezone);
         return timeText ? timeText : null;
       })();
-  const headerLocalTimeContext = isSupervised
+  const headerLocalTimeContext = resolvedIsSupervised
     ? null
     : buildLocalTimeContext(
-        avatarTimezone,
-        avatarCity,
-        avatarCountryCode,
-        avatarCountryName,
+        resolvedAvatarTimezone,
+        resolvedAvatarCity,
+        resolvedAvatarCountryCode,
+        resolvedAvatarCountryName,
         headerPresenceStatus ?? headerPresenceSummary.status,
       );
 
@@ -588,7 +602,7 @@ export default function DmConversationScreen() {
   const isOwnMessage = (msg: MessageVM) => msg.core.sender.ids.id === profileId;
   const emptyStateCopy = buildMobileChannelEmptyStateCopy({
     channelKind: 'dm',
-    title: topic ?? 'there',
+    title: resolvedTopic,
   });
 
   return (
@@ -597,20 +611,23 @@ export default function DmConversationScreen() {
       edges={['top']}
     >
       <ConversationHeader
-        title={topic ?? 'Direct Message'}
+        title={resolvedTopic}
         subtitle={headerSubtitle}
         localTimeLabel={headerLocalTime}
         localTimeIcon={headerLocalTimeContext?.icon ?? 'clock'}
         kind="dm"
-        avatarSeed={avatarSeed}
-        avatarUrl={avatarUrl || undefined}
-        avatarRole={avatarRole}
+        avatarSeed={resolvedAvatarSeed}
+        avatarUrl={resolvedAvatarUrl || undefined}
+        avatarRole={resolvedAvatarRole}
         presenceStatus={headerPresenceStatus}
         secondaryAvatarSeed={
-          isSupervised && supervisedChildName ? supervisedChildName : undefined
+          resolvedIsSupervised && resolvedSupervisedChildName
+            ? resolvedSupervisedChildName
+            : undefined
         }
-        secondaryAvatarRole={isSupervised ? (secondaryAvatarRole ?? 'child') : undefined}
-        isReadOnly={isSupervised}
+        secondaryAvatarRole={resolvedIsSupervised ? 'child' : undefined}
+        isReadOnly={resolvedIsSupervised}
+        loading={isLoadingDmMeta && !dmMeta}
         onBack={() => router.back()}
         onMore={() => setInfoVisible(true)}
       />
@@ -636,11 +653,11 @@ export default function DmConversationScreen() {
             loading={false}
             refreshing={isRefetching}
             onRefresh={refreshConversation}
-            onMessageLongPress={isSupervised ? undefined : handleLongPress}
-            onReactionToggle={isSupervised ? undefined : handleReactionToggle}
-            onThreadOpen={isSupervised ? undefined : handleThreadOpen}
+            onMessageLongPress={resolvedIsSupervised ? undefined : handleLongPress}
+            onReactionToggle={resolvedIsSupervised ? undefined : handleReactionToggle}
+            onThreadOpen={resolvedIsSupervised ? undefined : handleThreadOpen}
             onProfilePress={setProfileUser}
-            isReadOnly={isSupervised}
+            isReadOnly={resolvedIsSupervised}
             onUnreadViewed={handleUnreadViewed}
             isScreenActive={isFocused}
             emptyTitle={emptyStateCopy.title}
@@ -649,7 +666,7 @@ export default function DmConversationScreen() {
           />
         )}
         <TypingIndicator typingUsers={typingUsers} />
-        {isSupervised ? (
+        {resolvedIsSupervised ? (
           <View
             style={[
               styles.supervisedNotice,
@@ -671,7 +688,7 @@ export default function DmConversationScreen() {
           <MessageInput
             onSend={handleSend}
             onSendAttachment={handleSendAttachment}
-            placeholder={`Message ${topic ?? ''}…`}
+            placeholder={`Message ${resolvedTopic}…`}
             uploading={pendingUploads.some((upload) => !upload.failed)}
             onTypingChange={broadcastTyping}
             onTypingStop={broadcastTypingStop}
@@ -685,11 +702,11 @@ export default function DmConversationScreen() {
       <ChannelInfoSheet
         visible={infoVisible}
         channelId={channelId ?? ''}
-        title={topic ?? 'Direct Message'}
-        subtitle={subtitle}
+        title={resolvedTopic}
+        subtitle={resolvedSubtitle}
         kind="dm"
-        avatarSeed={avatarSeed}
-        avatarRole={avatarRole}
+        avatarSeed={resolvedAvatarSeed}
+        avatarRole={resolvedAvatarRole}
         messages={messages ?? []}
         onClose={() => setInfoVisible(false)}
       />
@@ -706,7 +723,7 @@ export default function DmConversationScreen() {
         visible={actionsVisible}
         message={actionsMessage}
         isOwn={actionsMessage ? isOwnMessage(actionsMessage) : false}
-        isReadOnly={isSupervised}
+        isReadOnly={resolvedIsSupervised}
         onClose={() => setActionsVisible(false)}
         onReact={handleReactionToggle}
         onThread={handleThreadOpen}

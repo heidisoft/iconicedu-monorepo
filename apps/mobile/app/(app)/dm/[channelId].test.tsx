@@ -70,12 +70,19 @@ jest.mock('@/hooks/use-messages', () => ({
 
 jest.mock('@/lib/api/queries', () => ({
   queryKeys: {
+    directMessageChannelMeta: (channelId: string, orgId: string, profileId: string) => [
+      'directMessageChannelMeta',
+      channelId,
+      orgId,
+      profileId,
+    ],
     channelReadState: (channelId: string, accountId: string) => [
       'channelReadState',
       channelId,
       accountId,
     ],
   },
+  fetchDirectMessageChannelMetaByChannelId: jest.fn(async () => null),
   fetchChannelReadState: jest.fn(async () => ({
     lastReadMessageId: null,
     unreadCount: 0,
@@ -150,6 +157,46 @@ function renderScreen() {
   return render(<DmConversationScreen />);
 }
 
+function mockDmMeta(meta: Record<string, unknown> | null) {
+  mockUseQuery.mockImplementation((options: { queryKey?: readonly unknown[] }) => {
+    if (options.queryKey?.[0] === 'directMessageChannelMeta') {
+      return { data: meta, isLoading: false };
+    }
+    return {
+      data: {
+        lastReadMessageId: null,
+        unreadCount: 0,
+      },
+      isLoading: false,
+    };
+  });
+}
+
+function makeDmMeta(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'ch-1',
+    topic: null,
+    description: null,
+    kind: 'dm',
+    participants: [
+      {
+        id: 'partner-1',
+        display_name: 'Alice Chen',
+        first_name: 'Alice',
+        last_name: 'Chen',
+        avatar_seed: 'alice-seed',
+        avatar_url: null,
+        kind: 'educator',
+        timezone: null,
+        city: null,
+        country_code: null,
+        country_name: null,
+      },
+    ],
+    ...overrides,
+  };
+}
+
 describe('DmConversationScreen — supervised read-only mode', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -158,12 +205,17 @@ describe('DmConversationScreen — supervised read-only mode', () => {
       status: 'offline',
       lastSeenAt: null,
     });
-    mockUseQuery.mockReturnValue({
-      data: {
-        lastReadMessageId: null,
-        unreadCount: 0,
-      },
-      isLoading: false,
+    mockUseQuery.mockImplementation((options: { queryKey?: readonly unknown[] }) => {
+      if (options.queryKey?.[0] === 'directMessageChannelMeta') {
+        return { data: null, isLoading: false };
+      }
+      return {
+        data: {
+          lastReadMessageId: null,
+          unreadCount: 0,
+        },
+        isLoading: false,
+      };
     });
   });
 
@@ -194,9 +246,8 @@ describe('DmConversationScreen — supervised read-only mode', () => {
   it('renders read-only notice instead of MessageInput when isSupervisedReadOnly=1', () => {
     mockUseLocalSearchParams.mockReturnValue({
       channelId: 'ch-1',
-      topic: 'Alice',
-      isSupervisedReadOnly: '1',
     });
+    mockDmMeta(makeDmMeta({ is_supervised: true, supervised_child_name: 'Alice' }));
 
     renderScreen();
 
@@ -214,6 +265,45 @@ describe('DmConversationScreen — supervised read-only mode', () => {
     expect(screen.getByText('MessageInput')).toBeTruthy();
   });
 
+  it('hydrates the header from DM metadata when opened without route params', () => {
+    mockUseLocalSearchParams.mockReturnValue({
+      channelId: 'ch-1',
+    });
+    mockDmMeta(
+      makeDmMeta({
+        participants: [
+          {
+            id: 'partner-1',
+            display_name: 'Alice Chen',
+            first_name: 'Alice',
+            last_name: 'Chen',
+            avatar_seed: 'alice-seed',
+            avatar_url: 'https://example.test/alice.png',
+            kind: 'educator',
+            timezone: 'Asia/Colombo',
+            city: 'Colombo',
+            country_name: 'Sri Lanka',
+          },
+        ],
+      }),
+    );
+
+    renderScreen();
+
+    expect(mockConversationHeader).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Alice Chen',
+        avatarSeed: 'alice-seed',
+        avatarUrl: 'https://example.test/alice.png',
+        avatarRole: 'educator',
+        localTimeLabel: expect.stringMatching(/^.+$/),
+      }),
+    );
+    expect(mockUseOnlineProfileIds).toHaveBeenCalledWith('org-1', 'prof-1', [
+      'partner-1',
+    ]);
+  });
+
   it('returns null when channelId is missing', () => {
     mockUseLocalSearchParams.mockReturnValue({});
 
@@ -225,10 +315,8 @@ describe('DmConversationScreen — supervised read-only mode', () => {
   it('passes isReadOnly=true to ConversationHeader when supervised', () => {
     mockUseLocalSearchParams.mockReturnValue({
       channelId: 'ch-1',
-      topic: 'Alice',
-      isSupervisedReadOnly: '1',
-      supervisedChildName: 'Alice',
     });
+    mockDmMeta(makeDmMeta({ is_supervised: true, supervised_child_name: 'Alice' }));
 
     renderScreen();
 
@@ -240,10 +328,8 @@ describe('DmConversationScreen — supervised read-only mode', () => {
   it('passes supervised subtitle to ConversationHeader when supervisedChildName provided', () => {
     mockUseLocalSearchParams.mockReturnValue({
       channelId: 'ch-1',
-      topic: 'Peter',
-      isSupervisedReadOnly: '1',
-      supervisedChildName: 'Senya',
     });
+    mockDmMeta(makeDmMeta({ is_supervised: true, supervised_child_name: 'Senya' }));
 
     renderScreen();
 
@@ -255,10 +341,24 @@ describe('DmConversationScreen — supervised read-only mode', () => {
   it('passes combined title to ConversationHeader when supervised with both names', () => {
     mockUseLocalSearchParams.mockReturnValue({
       channelId: 'ch-1',
-      topic: 'Peter',
-      isSupervisedReadOnly: '1',
-      supervisedChildName: 'Senya',
     });
+    mockDmMeta(
+      makeDmMeta({
+        is_supervised: true,
+        supervised_child_name: 'Senya',
+        participants: [
+          {
+            id: 'partner-1',
+            display_name: 'Peter',
+            first_name: 'Peter',
+            last_name: null,
+            avatar_seed: 'peter-seed',
+            avatar_url: null,
+            kind: 'educator',
+          },
+        ],
+      }),
+    );
 
     renderScreen();
 
@@ -270,10 +370,8 @@ describe('DmConversationScreen — supervised read-only mode', () => {
   it('passes secondaryAvatarSeed to ConversationHeader when supervised', () => {
     mockUseLocalSearchParams.mockReturnValue({
       channelId: 'ch-1',
-      topic: 'Peter',
-      isSupervisedReadOnly: '1',
-      supervisedChildName: 'Senya',
     });
+    mockDmMeta(makeDmMeta({ is_supervised: true, supervised_child_name: 'Senya' }));
 
     renderScreen();
 
@@ -285,11 +383,25 @@ describe('DmConversationScreen — supervised read-only mode', () => {
   it('passes local time and icon context when city and country are available', () => {
     mockUseLocalSearchParams.mockReturnValue({
       channelId: 'ch-1',
-      topic: 'Alice',
-      avatarTimezone: 'Asia/Colombo',
-      avatarCity: 'Colombo',
-      avatarCountryName: 'Sri Lanka',
     });
+    mockDmMeta(
+      makeDmMeta({
+        participants: [
+          {
+            id: 'partner-1',
+            display_name: 'Alice',
+            first_name: 'Alice',
+            last_name: null,
+            avatar_seed: 'alice-seed',
+            avatar_url: null,
+            kind: 'educator',
+            timezone: 'Asia/Colombo',
+            city: 'Colombo',
+            country_name: 'Sri Lanka',
+          },
+        ],
+      }),
+    );
 
     renderScreen();
 
@@ -304,10 +416,24 @@ describe('DmConversationScreen — supervised read-only mode', () => {
   it('passes local time and icon context with just country when city is missing', () => {
     mockUseLocalSearchParams.mockReturnValue({
       channelId: 'ch-1',
-      topic: 'Alice',
-      avatarTimezone: 'Asia/Colombo',
-      avatarCountryCode: 'LK',
     });
+    mockDmMeta(
+      makeDmMeta({
+        participants: [
+          {
+            id: 'partner-1',
+            display_name: 'Alice',
+            first_name: 'Alice',
+            last_name: null,
+            avatar_seed: 'alice-seed',
+            avatar_url: null,
+            kind: 'educator',
+            timezone: 'Asia/Colombo',
+            country_code: 'LK',
+          },
+        ],
+      }),
+    );
 
     renderScreen();
 
@@ -322,9 +448,23 @@ describe('DmConversationScreen — supervised read-only mode', () => {
   it('uses the offline local-time context when presence is offline', () => {
     mockUseLocalSearchParams.mockReturnValue({
       channelId: 'ch-1',
-      topic: 'Alice',
-      avatarTimezone: 'Asia/Colombo',
     });
+    mockDmMeta(
+      makeDmMeta({
+        participants: [
+          {
+            id: 'partner-1',
+            display_name: 'Alice',
+            first_name: 'Alice',
+            last_name: null,
+            avatar_seed: 'alice-seed',
+            avatar_url: null,
+            kind: 'educator',
+            timezone: 'Asia/Colombo',
+          },
+        ],
+      }),
+    );
     mockUseProfilePresenceSummary.mockReturnValue({
       status: 'offline',
       lastSeenAt: null,
@@ -343,9 +483,8 @@ describe('DmConversationScreen — supervised read-only mode', () => {
   it('passes fallback supervised subtitle when supervisedChildName is absent', () => {
     mockUseLocalSearchParams.mockReturnValue({
       channelId: 'ch-1',
-      topic: 'Alice',
-      isSupervisedReadOnly: '1',
     });
+    mockDmMeta(makeDmMeta({ is_supervised: true, supervised_child_name: null }));
 
     renderScreen();
 

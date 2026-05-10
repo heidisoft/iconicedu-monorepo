@@ -4,7 +4,12 @@ import type { ActivityFeedItemVM, ActivityFeedVM } from '@iconicedu/shared-types
 
 const mockMarkRead = jest.fn();
 const mockRefetchFeed = jest.fn(() => Promise.resolve());
+const mockRouterPush = jest.fn();
 let mockFeed: ActivityFeedVM;
+
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ push: mockRouterPush }),
+}));
 
 jest.mock('@/providers/theme-provider', () => ({
   useTheme: () => ({
@@ -54,6 +59,7 @@ jest.mock('lucide-react-native', () => {
     CreditCard: Icon,
     GraduationCap: Icon,
     MessageSquare: Icon,
+    Star: Icon,
   };
 });
 
@@ -64,6 +70,9 @@ function makeActivity(input: {
   tabKey: ActivityFeedItemVM['tabKey'];
   primary: string;
   isRead?: boolean;
+  verb?: ActivityFeedItemVM['verb'];
+  actionLabel?: string;
+  metadata?: Record<string, unknown>;
 }): ActivityFeedItemVM {
   return {
     kind: 'leaf',
@@ -74,14 +83,18 @@ function makeActivity(input: {
     },
     tabKey: input.tabKey,
     audience: { scope: { kind: 'global' }, visibility: 'public' },
-    verb: 'message.posted',
+    verb: input.verb ?? 'message.posted',
     refs: {},
     content: {
       leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'info' },
       headline: { primary: input.primary, secondary: 'sent a message' },
       summary: 'A short preview',
+      actionButton: input.actionLabel
+        ? { label: input.actionLabel, variant: 'outline' }
+        : undefined,
     },
     state: { isRead: input.isRead ?? false, importance: 'normal' },
+    metadata: input.metadata,
   } as ActivityFeedItemVM;
 }
 
@@ -140,5 +153,140 @@ describe('InboxScreen', () => {
     fireEvent.press(screen.getByLabelText('Mark all notifications as read'));
 
     expect(mockMarkRead).toHaveBeenCalledWith(['class-unread']);
+  });
+
+  it('opens the class space from a class notification action', () => {
+    mockFeed = {
+      ...makeFeed(),
+      sections: [
+        {
+          label: 'Today',
+          items: [
+            makeActivity({
+              id: 'class-action',
+              tabKey: 'classes',
+              primary: 'Algebra I',
+              verb: 'class.session.rescheduled',
+              actionLabel: 'Open class',
+              metadata: { channelId: 'space-channel-123' },
+            }),
+          ],
+        },
+      ],
+    };
+
+    render(<InboxScreen />);
+
+    fireEvent.press(screen.getByText('Open class'));
+
+    expect(mockRouterPush).toHaveBeenCalledWith('/(app)/spaces/space-channel-123');
+    expect(mockMarkRead).toHaveBeenCalledWith(['class-action']);
+  });
+
+  it('opens the DM screen from a direct-message reply action', () => {
+    mockFeed = {
+      ...makeFeed(),
+      sections: [
+        {
+          label: 'Today',
+          items: [
+            makeActivity({
+              id: 'dm-action',
+              tabKey: 'all',
+              primary: 'Alice',
+              verb: 'message.posted',
+              actionLabel: 'Reply',
+              metadata: {
+                channelId: 'dm-channel-123',
+                channelRouteKind: 'dm',
+              },
+            }),
+          ],
+        },
+      ],
+    };
+
+    render(<InboxScreen />);
+
+    fireEvent.press(screen.getByText('Reply'));
+
+    expect(mockRouterPush).toHaveBeenCalledWith('/(app)/dm/dm-channel-123');
+    expect(mockMarkRead).toHaveBeenCalledWith(['dm-action']);
+  });
+
+  it('uses the projected href to identify older direct-message actions', () => {
+    mockFeed = {
+      ...makeFeed(),
+      sections: [
+        {
+          label: 'Today',
+          items: [
+            {
+              ...makeActivity({
+                id: 'dm-action',
+                tabKey: 'all',
+                primary: 'Alice',
+                verb: 'message.posted',
+                actionLabel: 'Reply',
+                metadata: { channelId: 'dm-channel-123' },
+              }),
+              content: {
+                ...makeActivity({
+                  id: 'dm-action',
+                  tabKey: 'all',
+                  primary: 'Alice',
+                  actionLabel: 'Reply',
+                }).content,
+                actionButton: {
+                  label: 'Reply',
+                  variant: 'outline',
+                  href: '../dm/dm-channel-123',
+                },
+              },
+            } as ActivityFeedItemVM,
+          ],
+        },
+      ],
+    };
+
+    render(<InboxScreen />);
+
+    fireEvent.press(screen.getByText('Reply'));
+
+    expect(mockRouterPush).toHaveBeenCalledWith('/(app)/dm/dm-channel-123');
+  });
+
+  it('expands feedback requests instead of navigating away', () => {
+    mockFeed = {
+      ...makeFeed(),
+      sections: [
+        {
+          label: 'Today',
+          items: [
+            makeActivity({
+              id: 'feedback-action',
+              tabKey: 'classes',
+              primary: 'Share feedback for Algebra I',
+              verb: 'session.feedback_request.sent',
+              actionLabel: 'Give feedback',
+              metadata: {
+                feedbackUiEnabled: true,
+                sourceEventId: 'event-1',
+                classSessionId: 'session-1',
+                classroomId: 'space-1',
+                channelId: 'space-channel-123',
+              },
+            }),
+          ],
+        },
+      ],
+    };
+
+    render(<InboxScreen />);
+
+    fireEvent.press(screen.getByText('Give feedback'));
+
+    expect(mockRouterPush).not.toHaveBeenCalled();
+    expect(screen.getByText('Rate your session')).toBeTruthy();
   });
 });

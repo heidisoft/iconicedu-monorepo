@@ -19,6 +19,10 @@ import {
 } from 'lucide-react-native';
 import type { AppColors } from '@/lib/theme';
 import type { ActivityFeedItemVM, InboxIconKeyVM } from '@iconicedu/shared-types';
+import {
+  ActivityFeedbackRequest,
+  canRenderMobileActivityFeedbackRequest,
+} from '@/components/activity/activity-feedback-request';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -260,6 +264,7 @@ type ActivityItemProps = {
   onMarkRead: (id: string) => void;
   expandedIds: Set<string>;
   onToggle: (id: string) => void;
+  onActionPress?: (item: ActivityFeedItemVM) => void;
   isSubActivity?: boolean;
   viewerTimezone?: string | null;
   currentProfileId?: string | null;
@@ -361,8 +366,10 @@ export function ActivityItem({
   onMarkRead,
   expandedIds,
   onToggle,
+  onActionPress,
   isSubActivity = false,
   viewerTimezone,
+  currentProfileId,
 }: ActivityItemProps) {
   const iconKey = getIconKey(item);
   const tone =
@@ -378,13 +385,22 @@ export function ActivityItem({
   const expandedContent = item.content.expandedContent?.trim();
   const hasExpandedContent = Boolean(expandedContent);
   const hasActionBtn = !!item.content.actionButton && !isSubActivity;
+  const canShowFeedbackRequest =
+    item.kind === 'leaf' &&
+    item.verb === 'session.feedback_request.sent' &&
+    canRenderMobileActivityFeedbackRequest(item);
   const primary = formatActivityPrimaryHeadline(item, viewerTimezone);
   const { secondary, emphasis } = item.content.headline;
   const tabLabel = TAB_LABELS[item.tabKey] ?? item.tabKey;
 
   const handlePress = () => {
     if (!isRead) onMarkRead(item.ids.id);
-    if (hasExpandedContent) onToggle(item.ids.id);
+    if (hasExpandedContent || canShowFeedbackRequest) onToggle(item.ids.id);
+  };
+
+  const handleActionPress = () => {
+    if (!isRead) onMarkRead(item.ids.id);
+    onActionPress?.(item);
   };
 
   // Sub-activity: full leaf view matching web
@@ -453,7 +469,11 @@ export function ActivityItem({
         )}
 
         {!!item.content.actionButton && (
-          <TouchableOpacity style={[s.subActionBtn, { borderColor: colors.border }]}>
+          <TouchableOpacity
+            style={[s.subActionBtn, { borderColor: colors.border }]}
+            onPress={handleActionPress}
+            accessibilityRole="button"
+          >
             <Text style={[s.actionBtnText, { color: colors.text }]}>
               {item.content.actionButton.label}
             </Text>
@@ -549,9 +569,21 @@ export function ActivityItem({
           </TouchableOpacity>
         )}
 
+        {canShowFeedbackRequest && isExpanded && (
+          <ActivityFeedbackRequest
+            activity={item}
+            colors={colors}
+            currentProfileId={currentProfileId}
+          />
+        )}
+
         {/* Action button */}
         {hasActionBtn && (
-          <TouchableOpacity style={[s.actionBtn, { borderColor: colors.border }]}>
+          <TouchableOpacity
+            style={[s.actionBtn, { borderColor: colors.border }]}
+            onPress={handleActionPress}
+            accessibilityRole="button"
+          >
             <Text style={[s.actionBtnText, { color: colors.text }]}>
               {item.content.actionButton!.label}
             </Text>
