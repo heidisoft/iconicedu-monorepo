@@ -372,7 +372,11 @@ export function ActivityItem({
   const time = relativeTime(item.timestamps.occurredAt);
   const isRead = item.state?.isRead ?? false;
   const isExpanded = expandedIds.has(item.ids.id);
-  const hasExpandedContent = !!item.content.expandedContent;
+  const previewText =
+    item.content.summary?.trim() || item.content.preview?.text?.trim() || '';
+  const hasPreviewText = previewText.length > 0;
+  const expandedContent = item.content.expandedContent?.trim();
+  const hasExpandedContent = Boolean(expandedContent);
   const hasActionBtn = !!item.content.actionButton && !isSubActivity;
   const primary = formatActivityPrimaryHeadline(item, viewerTimezone);
   const { secondary, emphasis } = item.content.headline;
@@ -412,7 +416,7 @@ export function ActivityItem({
           {!isRead && <View style={[s.unreadDot, { backgroundColor: colors.teal }]} />}
         </View>
 
-        {!!item.content.summary && (
+        {hasPreviewText && (
           <View
             style={[
               s.subPreviewCard,
@@ -420,7 +424,7 @@ export function ActivityItem({
             ]}
           >
             <Text style={[s.previewText, { color: colors.text }]} numberOfLines={3}>
-              {item.content.summary}
+              {previewText}
             </Text>
           </View>
         )}
@@ -432,9 +436,7 @@ export function ActivityItem({
               { borderColor: colors.border, backgroundColor: colors.inputBg },
             ]}
           >
-            <Text style={[s.previewText, { color: colors.text }]}>
-              {item.content.expandedContent}
-            </Text>
+            <Text style={[s.previewText, { color: colors.text }]}>{expandedContent}</Text>
           </View>
         )}
 
@@ -509,7 +511,7 @@ export function ActivityItem({
         </View>
 
         {/* Preview card — summary text */}
-        {!!item.content.summary && (
+        {hasPreviewText && (
           <View
             style={[
               s.previewCard,
@@ -517,7 +519,7 @@ export function ActivityItem({
             ]}
           >
             <Text style={[s.previewText, { color: colors.text }]} numberOfLines={4}>
-              {item.content.summary}
+              {previewText}
             </Text>
           </View>
         )}
@@ -530,9 +532,7 @@ export function ActivityItem({
               { borderColor: colors.border, backgroundColor: colors.card },
             ]}
           >
-            <Text style={[s.previewText, { color: colors.text }]}>
-              {item.content.expandedContent}
-            </Text>
+            <Text style={[s.previewText, { color: colors.text }]}>{expandedContent}</Text>
           </View>
         )}
 

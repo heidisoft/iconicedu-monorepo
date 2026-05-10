@@ -120,6 +120,9 @@ const formatRelativeTime = (occurredAt: string) => {
   return `${diffDays}d`;
 };
 
+const getActivityPreviewText = (activity: ActivityFeedItemVM) =>
+  activity.content.summary?.trim() || activity.content.preview?.text?.trim() || '';
+
 export function ActivityItemBase({
   activity,
   onMarkRead,
@@ -149,6 +152,7 @@ export function ActivityItemBase({
     activity.content.headline.secondaryHref ??
     activity.content.actionButton?.href ??
     undefined;
+  const previewText = getActivityPreviewText(activity);
   const rootRef = useRef<HTMLDivElement>(null);
   const autoReadTriggeredRef = useRef(false);
 
@@ -302,8 +306,8 @@ export function ActivityItemBase({
 
           {showActionButton && <ActivityWithButton activity={activity} />}
 
-          {activity.content.summary && !footer ? (
-            <p className="text-xs text-muted-foreground">{activity.content.summary}</p>
+          {previewText && !footer ? (
+            <p className="text-xs text-muted-foreground">{previewText}</p>
           ) : null}
 
           {footer}

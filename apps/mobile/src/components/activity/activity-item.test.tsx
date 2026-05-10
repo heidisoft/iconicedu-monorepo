@@ -1,12 +1,20 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { MessageSquare } from 'lucide-react-native';
+import {
+  Bell,
+  CalendarCheck,
+  CalendarX,
+  MessageSquare,
+  MessageSquareHeart,
+} from 'lucide-react-native';
 
 import type { ActivityFeedItemVM } from '@iconicedu/shared-types';
 
 import {
+  ACTIVITY_ICON_MAP,
   ActivityItem,
   formatActivityPrimaryHeadline,
+  getIconKey,
   makeActivityItemStyles,
 } from './activity-item';
 import { lightColors } from '@/lib/theme';
@@ -82,6 +90,50 @@ describe('ActivityItem', () => {
     expect(screen.getByText('Math Foundations')).toBeTruthy();
   });
 
+  it.each([
+    ['class.session.rescheduled', 'CalendarCheck', CalendarCheck],
+    ['class.session.canceled', 'CalendarX', CalendarX],
+    ['session.reminder.sent', 'Bell', Bell],
+    ['session.feedback_request.sent', 'MessageSquareHeart', MessageSquareHeart],
+  ] as const)('displays the correct icon for %s notifications', (verb, iconKey, Icon) => {
+    const item = {
+      ...makeBaseActivity(),
+      verb,
+      content: {
+        ...makeBaseActivity().content,
+        leading: { kind: 'icon', iconKey, tone: 'info' },
+        headline: {
+          primary: 'Class update',
+          secondary: 'For Rhea with Ms. Denise',
+        },
+      },
+    } as ActivityFeedItemVM;
+
+    const { UNSAFE_getAllByType } = renderActivity(item);
+
+    expect(getIconKey(item)).toBe(iconKey);
+    expect(ACTIVITY_ICON_MAP[iconKey]).toBe(Icon);
+    expect(UNSAFE_getAllByType(Icon).length).toBeGreaterThan(0);
+  });
+
+  it.each([
+    ['class.session.rescheduled', 'CalendarCheck'],
+    ['class.session.canceled', 'CalendarX'],
+    ['session.reminder.sent', 'Bell'],
+    ['session.feedback_request.sent', 'MessageSquareHeart'],
+  ] as const)('falls back to the correct icon key for %s', (verb, iconKey) => {
+    const item = {
+      ...makeBaseActivity(),
+      verb,
+      content: {
+        ...makeBaseActivity().content,
+        leading: undefined,
+      },
+    } as ActivityFeedItemVM;
+
+    expect(getIconKey(item)).toBe(iconKey);
+  });
+
   it('marks unread activities read when the row is pressed', () => {
     const onMarkRead = jest.fn();
 
@@ -90,6 +142,70 @@ describe('ActivityItem', () => {
     fireEvent.press(screen.getByText('Priya Sharma'));
 
     expect(onMarkRead).toHaveBeenCalledWith('activity-1');
+  });
+
+  it('only displays Read more when expanded content exists', () => {
+    const withoutExpandedContent = makeBaseActivity();
+    renderActivity(withoutExpandedContent);
+    expect(screen.queryByText('Read more')).toBeNull();
+  });
+
+  it('hides the preview card when preview text is empty', () => {
+    const item = {
+      ...makeBaseActivity(),
+      content: {
+        ...makeBaseActivity().content,
+        summary: '   ',
+        preview: { text: '   ' },
+      },
+    } as ActivityFeedItemVM;
+
+    renderActivity(item);
+
+    expect(screen.queryByText('A short preview')).toBeNull();
+  });
+
+  it('uses content.preview.text when summary is empty', () => {
+    const item = {
+      ...makeBaseActivity(),
+      content: {
+        ...makeBaseActivity().content,
+        summary: '   ',
+        preview: { text: 'Preview from projected content' },
+      },
+    } as ActivityFeedItemVM;
+
+    renderActivity(item);
+
+    expect(screen.getByText('Preview from projected content')).toBeTruthy();
+  });
+
+  it('does not display Read more for blank expanded content', () => {
+    const item = {
+      ...makeBaseActivity(),
+      content: {
+        ...makeBaseActivity().content,
+        expandedContent: '   ',
+      },
+    } as ActivityFeedItemVM;
+
+    renderActivity(item);
+
+    expect(screen.queryByText('Read more')).toBeNull();
+  });
+
+  it('displays Read more when expanded content is present', () => {
+    const item = {
+      ...makeBaseActivity(),
+      content: {
+        ...makeBaseActivity().content,
+        expandedContent: 'Reason: Teacher conflict',
+      },
+    } as ActivityFeedItemVM;
+
+    renderActivity(item);
+
+    expect(screen.getByText('Read more')).toBeTruthy();
   });
 
   it('does not mark already-read activities read again when the row is pressed', () => {
