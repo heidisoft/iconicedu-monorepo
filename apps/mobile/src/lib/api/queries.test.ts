@@ -1,5 +1,6 @@
 import {
   cancelRecurringSessionOccurrence,
+  fetchChannelMetaByChannelId,
   fetchDirectMessageChannelMetaByChannelId,
   fetchSpaceSchedulesByChannelId,
   fetchActivityFeed,
@@ -703,6 +704,36 @@ describe('fetchDirectMessageChannelMetaByChannelId', () => {
   it('returns null when required identifiers are missing', async () => {
     await expect(
       fetchDirectMessageChannelMetaByChannelId('', GUARDIAN_PROFILE_ID, 'acct-1', 'ch-1'),
+    ).resolves.toBeNull();
+
+    expect(mockApiGet).not.toHaveBeenCalled();
+  });
+});
+
+describe('fetchChannelMetaByChannelId', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('calls the channel metadata API with account context', async () => {
+    mockApiGet.mockResolvedValue({ id: 'channel-1', kind: 'channel' });
+
+    const result = await fetchChannelMetaByChannelId(
+      SUP_ORG,
+      GUARDIAN_ACCOUNT_ID,
+      'channel-1',
+    );
+
+    expect(mockApiGet).toHaveBeenCalledWith('/channels/channel-1/meta', {
+      orgId: SUP_ORG,
+      accountId: GUARDIAN_ACCOUNT_ID,
+    });
+    expect(result).toMatchObject({ id: 'channel-1', kind: 'channel' });
+  });
+
+  it('returns null when required identifiers are missing', async () => {
+    await expect(
+      fetchChannelMetaByChannelId('', GUARDIAN_ACCOUNT_ID, 'channel-1'),
     ).resolves.toBeNull();
 
     expect(mockApiGet).not.toHaveBeenCalled();

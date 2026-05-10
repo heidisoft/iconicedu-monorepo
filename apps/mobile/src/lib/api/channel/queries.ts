@@ -77,6 +77,18 @@ export async function fetchChannels(
   return apiGet('/channels/list', { orgId, accountId });
 }
 
+export async function fetchChannelMetaByChannelId(
+  orgId: string,
+  accountId: string,
+  channelId: string,
+): Promise<ChannelListItem | null> {
+  if (!orgId || !accountId || !channelId) return null;
+  return apiGet(`/channels/${channelId}/meta`, {
+    orgId,
+    accountId,
+  });
+}
+
 export async function fetchIsChannelMember(
   orgId: string,
   channelId: string,

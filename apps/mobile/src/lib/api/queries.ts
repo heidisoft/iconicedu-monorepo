@@ -15,6 +15,7 @@ export {
 } from './account/queries';
 export {
   fetchChannels,
+  fetchChannelMetaByChannelId,
   fetchDirectMessageChannelMetaByChannelId,
   fetchDirectMessages,
   fetchFamilyLinks,

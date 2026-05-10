@@ -9,6 +9,14 @@ describe('NOTIFICATION_REGISTRY', () => {
     expect(route).toBe('/(app)/dm/channel-123');
   });
 
+  it('routes message.posted with a DM scope to the DM screen', () => {
+    const route = NOTIFICATION_REGISTRY['message.posted'].getRoute({
+      scopeKind: 'dm',
+      scopeId: 'channel-123',
+    });
+    expect(route).toBe('/(app)/dm/channel-123');
+  });
+
   it('routes message.posted without a channelId to the Messages tab', () => {
     const route = NOTIFICATION_REGISTRY['message.posted'].getRoute({});
     expect(route).toBe('/(app)/(tabs)/messages');

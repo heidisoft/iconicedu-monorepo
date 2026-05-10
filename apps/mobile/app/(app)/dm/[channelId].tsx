@@ -95,39 +95,10 @@ function getDmPartner(meta: ChannelListItem | null | undefined) {
 }
 
 export default function DmConversationScreen() {
-  const {
-    channelId,
-    topic,
-    avatarSeed,
-    presenceProfileId,
-    avatarUrl,
-    avatarRole,
-    avatarTimezone,
-    avatarCity,
-    avatarCountryCode,
-    avatarCountryName,
-    subtitle,
-    isSupervisedReadOnly,
-    supervisedChildName,
-    secondaryAvatarRole,
-  } = useLocalSearchParams<{
+  const { channelId } = useLocalSearchParams<{
     channelId: string;
-    topic?: string;
-    avatarSeed?: string;
-    presenceProfileId?: string;
-    avatarUrl?: string;
-    avatarRole?: string;
-    avatarTimezone?: string;
-    avatarCity?: string;
-    avatarCountryCode?: string;
-    avatarCountryName?: string;
-    subtitle?: string;
-    isSupervisedReadOnly?: string;
-    supervisedChildName?: string;
-    secondaryAvatarRole?: string;
   }>();
 
-  const isSupervised = isSupervisedReadOnly === '1';
   const router = useRouter();
   const isFocused = useIsFocused();
   const queryClient = useQueryClient();
@@ -158,23 +129,18 @@ export default function DmConversationScreen() {
     staleTime: 5 * 60 * 1000,
   });
   const dmPartner = getDmPartner(dmMeta);
-  const resolvedTopic =
-    topic ?? participantName(dmPartner) ?? dmMeta?.topic ?? 'Direct Message';
-  const resolvedAvatarSeed =
-    avatarSeed ?? dmPartner?.avatar_seed ?? dmPartner?.id ?? undefined;
-  const resolvedPresenceProfileId = presenceProfileId ?? dmPartner?.id ?? '';
-  const resolvedAvatarUrl = avatarUrl ?? dmPartner?.avatar_url ?? undefined;
-  const resolvedAvatarRole = avatarRole ?? dmPartner?.kind ?? undefined;
-  const resolvedAvatarTimezone = avatarTimezone ?? dmPartner?.timezone ?? undefined;
-  const resolvedAvatarCity = avatarCity ?? dmPartner?.city ?? undefined;
-  const resolvedAvatarCountryCode =
-    avatarCountryCode ?? dmPartner?.country_code ?? undefined;
-  const resolvedAvatarCountryName =
-    avatarCountryName ?? dmPartner?.country_name ?? undefined;
-  const resolvedSubtitle = subtitle ?? dmMeta?.description ?? 'Direct Message';
-  const resolvedIsSupervised = isSupervised || dmMeta?.is_supervised === true;
-  const resolvedSupervisedChildName =
-    supervisedChildName ?? dmMeta?.supervised_child_name ?? undefined;
+  const resolvedTopic = participantName(dmPartner) ?? dmMeta?.topic ?? 'Direct Message';
+  const resolvedAvatarSeed = dmPartner?.avatar_seed ?? dmPartner?.id ?? undefined;
+  const resolvedPresenceProfileId = dmPartner?.id ?? '';
+  const resolvedAvatarUrl = dmPartner?.avatar_url ?? undefined;
+  const resolvedAvatarRole = dmPartner?.kind ?? undefined;
+  const resolvedAvatarTimezone = dmPartner?.timezone ?? undefined;
+  const resolvedAvatarCity = dmPartner?.city ?? undefined;
+  const resolvedAvatarCountryCode = dmPartner?.country_code ?? undefined;
+  const resolvedAvatarCountryName = dmPartner?.country_name ?? undefined;
+  const resolvedSubtitle = dmMeta?.description ?? 'Direct Message';
+  const resolvedIsSupervised = dmMeta?.is_supervised === true;
+  const resolvedSupervisedChildName = dmMeta?.supervised_child_name ?? undefined;
   const presenceByProfileId = useOnlineProfileIds(
     orgId,
     profileId,
@@ -659,11 +625,9 @@ export default function DmConversationScreen() {
             ? resolvedSupervisedChildName
             : undefined
         }
-        secondaryAvatarRole={
-          resolvedIsSupervised ? (secondaryAvatarRole ?? 'child') : undefined
-        }
+        secondaryAvatarRole={resolvedIsSupervised ? 'child' : undefined}
         isReadOnly={resolvedIsSupervised}
-        loading={isLoadingDmMeta && !topic}
+        loading={isLoadingDmMeta && !dmMeta}
         onBack={() => router.back()}
         onMore={() => setInfoVisible(true)}
       />

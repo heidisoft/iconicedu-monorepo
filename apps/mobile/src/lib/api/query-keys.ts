@@ -6,6 +6,8 @@ export const queryKeys = {
   directMessageChannelMeta: (channelId: string, orgId: string, profileId: string) =>
     ['directMessageChannelMeta', channelId, orgId, profileId] as const,
   channel: (channelId: string) => ['channel', channelId] as const,
+  channelMeta: (channelId: string, orgId: string, accountId: string) =>
+    ['channelMeta', channelId, orgId, accountId] as const,
   spaceChannelMeta: (channelId: string) => ['spaceChannelMeta', channelId] as const,
   messages: (channelId: string, profileId = '') =>
     ['messages', channelId, profileId] as const,

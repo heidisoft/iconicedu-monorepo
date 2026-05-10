@@ -104,6 +104,7 @@ describe('API activity definitions context rendering', () => {
         title: null,
         activityContext: {},
         content: 'Can we move the lesson?',
+        threadId: 'thread-1',
       }),
     );
 
@@ -116,6 +117,10 @@ describe('API activity definitions context rendering', () => {
     });
     expect(rendered.summary).toBe('Can we move the lesson?');
     expect(rendered.actionButton?.label).toBe('Reply');
+    expect(rendered.metadata).toMatchObject({
+      channelRouteKind: 'dm',
+      threadId: 'thread-1',
+    });
   });
 
   it('renders reactions with original message preview and quiet importance', () => {

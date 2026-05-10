@@ -25,6 +25,7 @@ import {
   uploadChannelFile,
   buildMessageStoragePath,
   deleteMessage,
+  fetchChannelMetaByChannelId,
   fetchChannelReadState,
   fetchIsChannelMember,
   queryKeys,
@@ -56,30 +57,9 @@ type HeaderParticipantProfile = {
 };
 
 export default function ChannelConversationScreen() {
-  const {
-    channelId,
-    topic,
-    iconKey,
-    themeKey,
-    subtitle,
-    studentProfiles,
-    participantProfiles,
-    isLearningSpace,
-    purpose,
-    isStaffObserverReadOnly,
-    messageUiThemeKey,
-  } = useLocalSearchParams<{
+  const { channelId, isStaffObserverReadOnly } = useLocalSearchParams<{
     channelId: string;
-    topic?: string;
-    iconKey?: string;
-    themeKey?: string;
-    subtitle?: string;
-    studentProfiles?: string;
-    participantProfiles?: string;
-    isLearningSpace?: string;
-    purpose?: string;
     isStaffObserverReadOnly?: string;
-    messageUiThemeKey?: string;
   }>();
   const router = useRouter();
   const isFocused = useIsFocused();
@@ -108,12 +88,25 @@ export default function ChannelConversationScreen() {
       .trim() ||
     null;
   const profileKind = (profileRecord?.kind as string | undefined) ?? null;
+  const { data: channelMeta, isLoading: isLoadingChannelMeta } = useQuery({
+    queryKey: queryKeys.channelMeta(channelId ?? '', orgId, accountId),
+    queryFn: () => fetchChannelMetaByChannelId(orgId, accountId, channelId ?? ''),
+    enabled: !!channelId && !!orgId && !!accountId,
+    staleTime: 5 * 60 * 1000,
+  });
+  const resolvedTitle = channelMeta?.topic ?? 'Channel';
+  const resolvedSubtitle = channelMeta?.description?.trim() || null;
+  const isSpaceChannel = channelMeta?.is_learning_space === true;
+  const isSupportChannel = channelMeta?.is_support === true;
+  const headerStudentProfiles = channelMeta?.student_profiles ?? [];
+  const headerParticipantProfiles = channelMeta?.participant_profiles ?? [];
+  const resolvedIconKey = isSupportChannel
+    ? resolveChannelTopicIconKey(channelMeta?.icon_key ?? 'life-buoy')
+    : (channelMeta?.icon_key ?? null);
+  const resolvedThemeKey = channelMeta?.themeKey ?? null;
+  const resolvedMessageUiThemeKey = channelMeta?.messageUiThemeKey ?? 'feed';
   const shouldCheckStaffReadOnly =
-    profileKind === 'staff' &&
-    purpose !== 'support' &&
-    !!channelId &&
-    !!profileId &&
-    !!orgId;
+    profileKind === 'staff' && !isSupportChannel && !!channelId && !!profileId && !!orgId;
   const initialStaffReadOnly = isStaffObserverReadOnly === '1';
 
   const {
@@ -172,13 +165,13 @@ export default function ChannelConversationScreen() {
   }, [channelId, isFocused, orgId, refreshConversation]);
   const isStaffReadOnly =
     profileKind === 'staff' &&
-    purpose !== 'support' &&
+    !isSupportChannel &&
     (initialStaffReadOnly || !isChannelMember);
 
   // ── Tab state ──
   const [activeTab, setActiveTab] = useState<ChannelTab>('messages');
   const s = useMemo(() => makeStyles(colors), [colors]);
-  const messageTheme = resolveMobileMessageUiTheme(messageUiThemeKey ?? 'feed');
+  const messageTheme = resolveMobileMessageUiTheme(resolvedMessageUiThemeKey);
   const ThemedMessageList = messageTheme.MessageList;
 
   // ── Info sheet state ──
@@ -438,73 +431,10 @@ export default function ChannelConversationScreen() {
   );
 
   const handleUnreadViewed = markChannelRead;
-  const headerStudentProfiles = useMemo(() => {
-    if (!studentProfiles) return [] as HeaderStudentProfile[];
-    try {
-      const parsed = JSON.parse(studentProfiles) as unknown;
-      if (!Array.isArray(parsed)) return [];
-      return parsed.flatMap((student) => {
-        if (!student || typeof student !== 'object') return [];
-        const { name, themeKey } = student as {
-          name?: unknown;
-          themeKey?: unknown;
-        };
-        return typeof name === 'string' && name.trim()
-          ? [{ name, themeKey: typeof themeKey === 'string' ? themeKey : null }]
-          : [];
-      });
-    } catch {
-      return [];
-    }
-  }, [studentProfiles]);
-  const headerParticipantProfiles = useMemo(() => {
-    if (!participantProfiles) return [] as HeaderParticipantProfile[];
-    try {
-      const parsed = JSON.parse(participantProfiles) as unknown;
-      if (!Array.isArray(parsed)) return [] as HeaderParticipantProfile[];
-      return parsed.flatMap((value) => {
-        if (!value || typeof value !== 'object') return [];
-        const name =
-          typeof (value as { name?: unknown }).name === 'string'
-            ? (value as { name: string }).name.trim()
-            : '';
-        const candidateKind = (value as { kind?: unknown }).kind;
-        if (
-          !name ||
-          (candidateKind !== 'educator' &&
-            candidateKind !== 'guardian' &&
-            candidateKind !== 'child' &&
-            candidateKind !== 'staff' &&
-            candidateKind !== 'system')
-        ) {
-          return [];
-        }
-        const kind: HeaderParticipantProfile['kind'] = candidateKind;
-        return [
-          {
-            name,
-            kind,
-            themeKey:
-              typeof (value as { themeKey?: unknown }).themeKey === 'string'
-                ? ((value as { themeKey: string }).themeKey ?? null)
-                : null,
-          },
-        ];
-      });
-    } catch {
-      return [] as HeaderParticipantProfile[];
-    }
-  }, [participantProfiles]);
-  const resolvedSubtitle = subtitle?.trim() || null;
-  const isSpaceChannel = isLearningSpace === '1';
-  const resolvedIconKey =
-    purpose === 'support'
-      ? resolveChannelTopicIconKey(iconKey ?? 'life-buoy')
-      : (iconKey ?? null);
   const emptyStateCopy = buildMobileChannelEmptyStateCopy({
     channelKind: isSpaceChannel
       ? 'learning-space'
-      : purpose === 'support'
+      : isSupportChannel
         ? 'support'
         : 'generic',
     currentUserKind: (profileRecord?.kind as string | null | undefined) ?? null,
@@ -517,7 +447,7 @@ export default function ChannelConversationScreen() {
   return (
     <SafeAreaView style={[s.safe, { backgroundColor: colors.pageBg }]} edges={['top']}>
       <ConversationHeader
-        title={topic ?? 'Channel'}
+        title={resolvedTitle}
         subtitle={resolvedSubtitle}
         studentProfiles={headerStudentProfiles}
         participantProfiles={headerParticipantProfiles}
@@ -525,8 +455,9 @@ export default function ChannelConversationScreen() {
         currentProfileKind={profileKind}
         kind={isSpaceChannel ? 'space' : 'channel'}
         iconKey={resolvedIconKey}
-        themeKey={themeKey ?? null}
+        themeKey={resolvedThemeKey}
         isReadOnly={isStaffReadOnly}
+        loading={isLoadingChannelMeta && !channelMeta}
         onBack={() => router.back()}
         onMore={() => setInfoVisible(true)}
       />
@@ -608,7 +539,7 @@ export default function ChannelConversationScreen() {
             <MessageInput
               onSend={handleSend}
               onSendAttachment={handleSendAttachment}
-              placeholder={`Message ${isSpaceChannel ? (topic ?? 'Space') : `#${topic ?? ''}`}…`}
+              placeholder={`Message ${isSpaceChannel ? resolvedTitle : `#${resolvedTitle}`}…`}
               onTypingChange={broadcastTyping}
               onTypingStop={broadcastTypingStop}
               replyTo={threadReplyTarget}
@@ -623,11 +554,11 @@ export default function ChannelConversationScreen() {
       <ChannelInfoSheet
         visible={infoVisible}
         channelId={channelId ?? ''}
-        title={topic ?? 'Channel'}
+        title={resolvedTitle}
         subtitle={resolvedSubtitle}
         kind={isSpaceChannel ? 'space' : 'channel'}
         iconKey={resolvedIconKey}
-        themeKey={themeKey ?? null}
+        themeKey={resolvedThemeKey}
         messages={messages ?? []}
         onClose={() => setInfoVisible(false)}
       />

@@ -95,6 +95,20 @@ export class ChannelsController {
     );
   }
 
+  @Get(':channelId/meta')
+  @UseGuards(AuthGuard)
+  meta(
+    @Req() req: AuthenticatedRequest,
+    @Param('channelId') channelId: string,
+    @Query('orgId') orgId: string,
+    @Query('accountId') accountId: string,
+  ) {
+    return this.channelsService.getChannelMeta(
+      extractBearerToken(req.headers.authorization),
+      { orgId, accountId, channelId },
+    );
+  }
+
   @Get(':channelId/membership')
   @UseGuards(AuthGuard)
   membership(

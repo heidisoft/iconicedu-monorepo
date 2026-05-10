@@ -183,6 +183,79 @@ describe('InboxScreen', () => {
     expect(mockMarkRead).toHaveBeenCalledWith(['class-action']);
   });
 
+  it('opens the DM screen from a direct-message reply action', () => {
+    mockFeed = {
+      ...makeFeed(),
+      sections: [
+        {
+          label: 'Today',
+          items: [
+            makeActivity({
+              id: 'dm-action',
+              tabKey: 'all',
+              primary: 'Alice',
+              verb: 'message.posted',
+              actionLabel: 'Reply',
+              metadata: {
+                channelId: 'dm-channel-123',
+                channelRouteKind: 'dm',
+              },
+            }),
+          ],
+        },
+      ],
+    };
+
+    render(<InboxScreen />);
+
+    fireEvent.press(screen.getByText('Reply'));
+
+    expect(mockRouterPush).toHaveBeenCalledWith('/(app)/dm/dm-channel-123');
+    expect(mockMarkRead).toHaveBeenCalledWith(['dm-action']);
+  });
+
+  it('uses the projected href to identify older direct-message actions', () => {
+    mockFeed = {
+      ...makeFeed(),
+      sections: [
+        {
+          label: 'Today',
+          items: [
+            {
+              ...makeActivity({
+                id: 'dm-action',
+                tabKey: 'all',
+                primary: 'Alice',
+                verb: 'message.posted',
+                actionLabel: 'Reply',
+                metadata: { channelId: 'dm-channel-123' },
+              }),
+              content: {
+                ...makeActivity({
+                  id: 'dm-action',
+                  tabKey: 'all',
+                  primary: 'Alice',
+                  actionLabel: 'Reply',
+                }).content,
+                actionButton: {
+                  label: 'Reply',
+                  variant: 'outline',
+                  href: '../dm/dm-channel-123',
+                },
+              },
+            } as ActivityFeedItemVM,
+          ],
+        },
+      ],
+    };
+
+    render(<InboxScreen />);
+
+    fireEvent.press(screen.getByText('Reply'));
+
+    expect(mockRouterPush).toHaveBeenCalledWith('/(app)/dm/dm-channel-123');
+  });
+
   it('expands feedback requests instead of navigating away', () => {
     mockFeed = {
       ...makeFeed(),

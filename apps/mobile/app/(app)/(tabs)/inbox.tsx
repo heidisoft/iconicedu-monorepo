@@ -233,25 +233,37 @@ export default function InboxScreen() {
           ? scope.channelId
           : scope.kind === 'learning_space'
             ? scope.learningSpaceId
-            : undefined;
+            : scope.kind === 'dm'
+              ? scope.threadId
+              : undefined;
       const channelId =
         typeof metadata.channelId === 'string' && metadata.channelId.length > 0
           ? metadata.channelId
           : scope.kind === 'channel'
             ? scope.channelId
-            : undefined;
+            : scope.kind === 'dm'
+              ? scope.threadId
+              : undefined;
       const threadId =
         typeof metadata.threadId === 'string' && metadata.threadId.length > 0
           ? metadata.threadId
           : null;
+      const actionHref =
+        typeof item.content.actionButton?.href === 'string'
+          ? item.content.actionButton.href
+          : '';
       const channelRouteKind =
         metadata.channelRouteKind === 'space' ||
         metadata.channelRouteKind === 'dm' ||
         metadata.channelRouteKind === 'channel'
           ? metadata.channelRouteKind
-          : item.tabKey === 'classes'
-            ? 'space'
-            : undefined;
+          : scope.kind === 'dm'
+            ? 'dm'
+            : actionHref.includes('/dm/')
+              ? 'dm'
+              : item.tabKey === 'classes'
+                ? 'space'
+                : undefined;
       const route =
         NOTIFICATION_REGISTRY[item.verb]?.getRoute({
           scopeKind,
