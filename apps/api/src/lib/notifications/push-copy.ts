@@ -378,16 +378,6 @@ export function buildPersonalizedSessionCopy(
     };
   }
 
-  if (eventType === 'class.sessions.rescheduled') {
-    const fallback = `${classTitle} sessions rescheduled`;
-    return {
-      title: recipient ? `${sessionAudienceLabel} rescheduled` : fallback,
-      summary:
-        getRescheduledSessionSummary(payload) ??
-        getEventSummary(payload, 'Class sessions have been rescheduled.'),
-    };
-  }
-
   if (eventType === 'class.session.canceled') {
     const fallback = `${classTitle} session cancelled`;
     return {
@@ -395,16 +385,6 @@ export function buildPersonalizedSessionCopy(
       summary:
         getCanceledSessionSummary(payload) ??
         getEventSummary(payload, 'A class session has been cancelled.'),
-    };
-  }
-
-  if (eventType === 'class.sessions.canceled') {
-    const fallback = `${classTitle} sessions cancelled`;
-    return {
-      title: recipient ? `${sessionAudienceLabel} cancelled` : fallback,
-      summary:
-        getCanceledSessionSummary(payload) ??
-        getEventSummary(payload, 'Class sessions have been cancelled.'),
     };
   }
 

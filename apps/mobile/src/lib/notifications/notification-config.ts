@@ -36,18 +36,8 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationConfig> = {
     getRoute: ({ channelId }) =>
       channelId ? `/(app)/spaces/${channelId}?tab=sessions` : '/(app)/(tabs)/schedule',
   },
-  'class.sessions.rescheduled': {
-    label: 'Sessions Rescheduled',
-    getRoute: ({ channelId }) =>
-      channelId ? `/(app)/spaces/${channelId}?tab=sessions` : '/(app)/(tabs)/schedule',
-  },
   'class.session.canceled': {
     label: 'Session Cancelled',
-    getRoute: ({ channelId }) =>
-      channelId ? `/(app)/spaces/${channelId}?tab=sessions` : '/(app)/(tabs)/schedule',
-  },
-  'class.sessions.canceled': {
-    label: 'Sessions Cancelled',
     getRoute: ({ channelId }) =>
       channelId ? `/(app)/spaces/${channelId}?tab=sessions` : '/(app)/(tabs)/schedule',
   },

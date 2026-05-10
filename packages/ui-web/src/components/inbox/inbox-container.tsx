@@ -180,11 +180,7 @@ export function resolveUnreadIdsForTab(
 }
 
 export function isFeedbackRequestActivity(activity: ActivityFeedItemVM) {
-  return (
-    activity.kind === 'leaf' &&
-    (activity.verb === 'session.feedback_request.sent' ||
-      activity.verb === 'sessions.feedback_request.sent')
-  );
+  return activity.kind === 'leaf' && activity.verb === 'session.feedback_request.sent';
 }
 
 export function applySessionParentLocalHeadline(

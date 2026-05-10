@@ -105,17 +105,11 @@ describe('resolveUnreadIdsForTab', () => {
 });
 
 describe('isFeedbackRequestActivity', () => {
-  it('matches single and grouped feedback request activities', () => {
+  it('matches feedback request activities', () => {
     expect(
       isFeedbackRequestActivity({
         ...SECTIONS[0]!.items[0]!,
         verb: 'session.feedback_request.sent',
-      }),
-    ).toBe(true);
-    expect(
-      isFeedbackRequestActivity({
-        ...SECTIONS[0]!.items[0]!,
-        verb: 'sessions.feedback_request.sent',
       }),
     ).toBe(true);
   });

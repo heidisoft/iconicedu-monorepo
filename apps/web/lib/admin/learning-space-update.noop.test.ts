@@ -1017,7 +1017,7 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
     expect(publishActivityEventMock).not.toHaveBeenCalled();
   });
 
-  it('emits plural class.sessions.rescheduled when multiple schedules are rescheduled', async () => {
+  it('does not emit schedule activity when only unchanged multiple schedules are present', async () => {
     const payload: LearningSpaceCreatePayload = {
       basics: {
         title: 'Math Foundations',

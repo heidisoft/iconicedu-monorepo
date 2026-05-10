@@ -70,11 +70,6 @@ describe('NOTIFICATION_REGISTRY', () => {
     expect(route).toBe('/(app)/(tabs)/schedule');
   });
 
-  it('routes class.sessions.rescheduled without a channelId to the schedule tab', () => {
-    const route = NOTIFICATION_REGISTRY['class.sessions.rescheduled'].getRoute({});
-    expect(route).toBe('/(app)/(tabs)/schedule');
-  });
-
   it('routes class.session.rescheduled with a channelId to the classroom sessions tab', () => {
     const route = NOTIFICATION_REGISTRY['class.session.rescheduled'].getRoute({
       channelId: 'ch-2',
@@ -87,11 +82,6 @@ describe('NOTIFICATION_REGISTRY', () => {
       channelId: 'ch-3',
     });
     expect(route).toBe('/(app)/spaces/ch-3?tab=sessions');
-  });
-
-  it('routes class.sessions.canceled without a channelId to the schedule tab', () => {
-    const route = NOTIFICATION_REGISTRY['class.sessions.canceled'].getRoute({});
-    expect(route).toBe('/(app)/(tabs)/schedule');
   });
 
   it('routes session.feedback_request.sent with a channelId to the class space', () => {

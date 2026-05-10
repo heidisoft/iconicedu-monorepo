@@ -439,20 +439,6 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => renderClassUpdateGroup(event, 'Class session rescheduled', 'info'),
   },
-  'class.sessions.rescheduled': {
-    eventType: 'class.sessions.rescheduled',
-    tabKey: 'classes',
-    importance: 'important',
-    notification: {
-      defaultChannels: ['push', 'email'],
-      timing: 'immediate',
-      isCritical: true,
-      prefKey: 'class.session.rescheduled',
-    },
-    resolveRecipients: DEFAULT_RECIPIENTS,
-    render: (event) =>
-      renderClassUpdateGroup(event, 'Class sessions rescheduled', 'info'),
-  },
   'class.session.canceled': {
     eventType: 'class.session.canceled',
     tabKey: 'classes',
@@ -464,20 +450,6 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     },
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => renderClassUpdateGroup(event, 'Class session canceled', 'warning'),
-  },
-  'class.sessions.canceled': {
-    eventType: 'class.sessions.canceled',
-    tabKey: 'classes',
-    importance: 'important',
-    notification: {
-      defaultChannels: ['push', 'email'],
-      timing: 'immediate',
-      isCritical: true,
-      prefKey: 'class.session.canceled',
-    },
-    resolveRecipients: DEFAULT_RECIPIENTS,
-    render: (event) =>
-      renderClassUpdateGroup(event, 'Class sessions canceled', 'warning'),
   },
   'session.reminder.sent': {
     eventType: 'session.reminder.sent',
@@ -516,43 +488,6 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       };
     },
   },
-  'sessions.reminder.sent': {
-    eventType: 'sessions.reminder.sent',
-    tabKey: 'classes',
-    importance: 'normal',
-    notification: {
-      defaultChannels: ['push', 'email'],
-      timing: 'immediate',
-      isCritical: true,
-      prefKey: 'session.reminder.sent',
-    },
-    resolveRecipients: DEFAULT_RECIPIENTS,
-    render: (event) => {
-      const payload = asRecord(event.payload);
-      const contextLabel = buildRoleAwareContextLabel(payload);
-      const summary = [contextLabel, asOptionalString(payload.summary)]
-        .filter((part): part is string => Boolean(part))
-        .join(' ');
-      return {
-        verb: 'sessions.reminder.sent',
-        leading: { kind: 'icon', iconKey: 'Bell', tone: 'info' },
-        headline: {
-          primary: 'Class reminders',
-          secondary: contextLabel ?? getContextTitle(payload),
-          secondaryHref: buildInboxSourceHref(event, payload),
-        },
-        summary: summary || asOptionalString(payload.summary),
-        actionButton: sourceAction(event, payload, 'default', 'Open class'),
-        metadata: {
-          ...buildCommonContextMetadata(payload),
-          scheduleId: asOptionalString(payload.scheduleId),
-          occurrenceStart: asOptionalString(payload.occurrenceStart),
-          timezone: asOptionalString(payload.timezone),
-          preserveActivitySummary: true,
-        },
-      };
-    },
-  },
   'session.feedback_request.sent': {
     eventType: 'session.feedback_request.sent',
     tabKey: 'classes',
@@ -573,52 +508,6 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
         .join(' ');
       return {
         verb: 'session.feedback_request.sent',
-        leading: { kind: 'icon', iconKey: 'Bell', tone: 'info' },
-        headline: {
-          primary: 'Class feedback requested',
-          secondary: contextLabel ?? getContextTitle(payload),
-          secondaryHref: buildInboxSourceHref(event, payload),
-        },
-        summary,
-        actionButton: sourceAction(event, payload, 'outline', 'Open class'),
-        metadata: {
-          ...buildCommonContextMetadata(payload),
-          classSessionId: asOptionalString(payload.classSessionId),
-          classroomId: asOptionalString(payload.learningSpaceId),
-          channelId: asOptionalString(payload.channelId),
-          occurrenceStart: asOptionalString(payload.occurrenceStart),
-          timezone: asOptionalString(payload.timezone),
-          feedbackUiEnabled: Boolean(
-            asOptionalString(payload.classSessionId) &&
-            asOptionalString(payload.learningSpaceId) &&
-            asOptionalString(payload.channelId),
-          ),
-          preserveActivitySummary: true,
-        },
-      };
-    },
-  },
-  'sessions.feedback_request.sent': {
-    eventType: 'sessions.feedback_request.sent',
-    tabKey: 'classes',
-    importance: 'normal',
-    notification: {
-      defaultChannels: ['push', 'email'],
-      timing: 'immediate',
-      prefKey: 'session.feedback_request.sent',
-    },
-    resolveRecipients: DEFAULT_RECIPIENTS,
-    render: (event) => {
-      const payload = asRecord(event.payload);
-      const contextLabel = buildRoleAwareContextLabel(payload);
-      const summary = [
-        contextLabel,
-        asOptionalString(payload.summary) ?? 'Share feedback about your recent sessions.',
-      ]
-        .filter((part): part is string => Boolean(part))
-        .join(' ');
-      return {
-        verb: 'sessions.feedback_request.sent',
         leading: { kind: 'icon', iconKey: 'Bell', tone: 'info' },
         headline: {
           primary: 'Class feedback requested',

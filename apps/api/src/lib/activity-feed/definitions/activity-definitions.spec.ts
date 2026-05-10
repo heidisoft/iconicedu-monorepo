@@ -133,13 +133,9 @@ describe('API activity definitions context rendering', () => {
 
   it.each([
     'class.session.rescheduled',
-    'class.sessions.rescheduled',
     'class.session.canceled',
-    'class.sessions.canceled',
     'session.reminder.sent',
-    'sessions.reminder.sent',
     'session.feedback_request.sent',
-    'sessions.feedback_request.sent',
   ])('adds contextual metadata for %s', (eventType) => {
     const definition = getActivityEventDefinition(eventType);
     expect(definition).toBeDefined();

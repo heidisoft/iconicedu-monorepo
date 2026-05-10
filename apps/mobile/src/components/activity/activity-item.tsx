@@ -73,17 +73,13 @@ export function getIconKey(item: ActivityFeedItemVM): InboxIconKeyVM {
     case 'message.posted':
     case 'message.mentioned':
     case 'message.thread_reply.posted':
-    case 'messages.posted':
     case 'file.uploaded':
     case 'image.uploaded':
     case 'audio.uploaded':
     case 'reaction.added':
-    case 'reactions.added':
       return 'MessageSquare';
     case 'class.session.rescheduled':
-    case 'class.sessions.rescheduled':
     case 'class.session.canceled':
-    case 'class.sessions.canceled':
       return 'GraduationCap';
     default:
       return 'Bell';
@@ -334,8 +330,7 @@ export function formatActivityPrimaryHeadline(
 function isFeedbackRequestActivity(item: ActivityFeedItemVM) {
   return (
     item.kind === 'leaf' &&
-    (item.verb === 'session.feedback_request.sent' ||
-      item.verb === 'sessions.feedback_request.sent') &&
+    item.verb === 'session.feedback_request.sent' &&
     canRenderMobileActivityFeedbackRequest(item)
   );
 }

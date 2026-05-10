@@ -9,22 +9,16 @@ import type {
 
 export type ActivityVerbVM =
   | 'class.session.rescheduled'
-  | 'class.sessions.rescheduled'
   | 'class.session.canceled'
-  | 'class.sessions.canceled'
   | 'message.posted'
   | 'message.mentioned'
   | 'message.thread_reply.posted'
-  | 'messages.posted'
   | 'file.uploaded'
   | 'image.uploaded'
   | 'audio.uploaded'
   | 'reaction.added'
-  | 'reactions.added'
   | 'session.reminder.sent'
-  | 'sessions.reminder.sent'
-  | 'session.feedback_request.sent'
-  | 'sessions.feedback_request.sent';
+  | 'session.feedback_request.sent';
 
 export type ActivitySourceKindVM =
   | 'profile'
