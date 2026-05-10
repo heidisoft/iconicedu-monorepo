@@ -264,7 +264,7 @@ export default function InboxScreen() {
 
       {/* Content */}
       {feedLoading || refreshing ? (
-        <ActivityFeedSkeleton count={4} />
+        <ActivityFeedSkeleton count={3} />
       ) : filteredSections.length === 0 ? (
         <View style={s.emptyWrap}>
           <View style={[s.emptyIcon, { backgroundColor: colors.inputBg }]}>

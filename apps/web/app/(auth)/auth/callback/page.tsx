@@ -8,7 +8,6 @@ import { shouldShowRoleOnboardingDialog } from '@iconicedu/web/app/(auth)/auth/c
 import { RoleOnboardingModal } from '@iconicedu/web/app/(auth)/auth/callback/role-onboarding-modal';
 import { createSupabaseBrowserClient } from '@iconicedu/web/lib/supabase/client';
 import { reportWebObservedError } from '@iconicedu/web/lib/analytics/report-error';
-import { trackAuthTelemetry } from '@iconicedu/web/lib/telemetry/auth-events';
 
 type SupportedOtpType = 'email' | 'invite';
 type AuthCallbackSource = 'self-signup' | null;
@@ -146,7 +145,6 @@ export default function CallbackPage() {
         }
         if (code) {
           await supabase.auth.exchangeCodeForSession(code);
-          await trackAuthTelemetry('auth_success', { method: 'oauth-or-magiclink-code' });
           const onboarding = await activateAccount();
           await applyOnboardingState(onboarding);
           return;
@@ -157,7 +155,6 @@ export default function CallbackPage() {
             access_token: accessToken,
             refresh_token: refreshToken,
           });
-          await trackAuthTelemetry('auth_success', { method: 'token_hash' });
           const onboarding = await activateAccount();
           await applyOnboardingState(onboarding);
           return;
@@ -168,7 +165,6 @@ export default function CallbackPage() {
             token_hash: token,
             type,
           });
-          await trackAuthTelemetry('auth_success', { method: 'otp-token' });
           const onboarding = await activateAccount();
           await applyOnboardingState(onboarding);
           return;
@@ -231,14 +227,6 @@ export default function CallbackPage() {
                   : `/api/onboarding/role${search.toString() ? `?${search.toString()}` : ''}`;
               const body = role === 'student' ? { inviteCode } : { role };
 
-              if (role === 'student') {
-                await trackAuthTelemetry('onboarding_invitecode_submitted', {
-                  success: false,
-                  stage: 'attempt',
-                  orgSlug: roleOnboardingState.orgSlug,
-                });
-              }
-
               const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -252,31 +240,10 @@ export default function CallbackPage() {
               } | null;
 
               if (!response.ok || !payload?.success) {
-                if (role === 'student') {
-                  await trackAuthTelemetry('onboarding_invitecode_submitted', {
-                    success: false,
-                    stage: 'result',
-                    orgSlug: roleOnboardingState.orgSlug,
-                  });
-                }
                 return {
                   success: false,
                   message: payload?.message ?? 'Unable to complete onboarding.',
                 };
-              }
-
-              await trackAuthTelemetry('onboarding_role_selected', {
-                role,
-                orgSlug: roleOnboardingState.orgSlug,
-                intent: roleOnboardingState.intent,
-              });
-
-              if (role === 'student') {
-                await trackAuthTelemetry('onboarding_invitecode_submitted', {
-                  success: true,
-                  stage: 'result',
-                  orgSlug: roleOnboardingState.orgSlug,
-                });
               }
 
               const nextDestination =

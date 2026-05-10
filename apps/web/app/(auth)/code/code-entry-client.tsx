@@ -21,7 +21,6 @@ import {
   InputOTPSlot,
 } from '@iconicedu/ui-web/ui/input-otp';
 import { createSupabaseBrowserClient } from '@iconicedu/web/lib/supabase/client';
-import { trackAuthTelemetry } from '@iconicedu/web/lib/telemetry/auth-events';
 
 import {
   buildAuthEntryPath,
@@ -107,11 +106,6 @@ export default function CodeEntryClient() {
         return;
       }
 
-      await trackAuthTelemetry('auth_success', {
-        method: 'email-otp-code',
-        intent,
-        orgSlug: orgSlug || null,
-      });
       router.replace(`/auth/callback?${callbackParams.toString()}`);
     },
     [callbackParams, email, intent, orgSlug, router, supabase],
@@ -142,12 +136,6 @@ export default function CodeEntryClient() {
     setErrorMessage(null);
     setStatusMessage(null);
 
-    await trackAuthTelemetry('auth_start_email', {
-      intent: orgSlug ? `org-${intent}` : `global-${intent}`,
-      orgSlug: orgSlug || null,
-      stage: 'resend',
-    });
-
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
@@ -161,11 +149,6 @@ export default function CodeEntryClient() {
       return;
     }
 
-    await trackAuthTelemetry('auth_magiclink_sent', {
-      intent: orgSlug ? `org-${intent}` : `global-${intent}`,
-      orgSlug: orgSlug || null,
-      stage: 'resend',
-    });
     setStatusMessage(`We sent a new verification code to ${email}.`);
     setResendCooldown(RESEND_COOLDOWN_SECONDS);
     setIsResending(false);

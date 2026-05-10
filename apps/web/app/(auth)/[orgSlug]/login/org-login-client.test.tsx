@@ -32,10 +32,6 @@ vi.mock('../../../../lib/supabase/client', () => ({
   }),
 }));
 
-vi.mock('../../../../lib/telemetry/auth-events', () => ({
-  trackAuthTelemetry: vi.fn(),
-}));
-
 describe('resolveOrgLoginCallbackUrl', () => {
   it('builds callback URL with org + login intent', () => {
     const callback = resolveOrgLoginCallbackUrl('iconic-academy');

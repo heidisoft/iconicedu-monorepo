@@ -23,10 +23,6 @@ vi.mock('@iconicedu/web/lib/supabase/client', () => ({
   })),
 }));
 
-vi.mock('@iconicedu/web/lib/telemetry/auth-events', () => ({
-  trackAuthTelemetry: vi.fn(),
-}));
-
 import { shouldShowRoleOnboardingDialog } from './page.utils';
 
 describe('shouldShowRoleOnboardingDialog', () => {

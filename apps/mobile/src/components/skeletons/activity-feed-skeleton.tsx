@@ -1,124 +1,127 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, useWindowDimensions } from 'react-native';
 import { useTheme } from '@/providers/theme-provider';
 import { PulseBox } from './pulse-box';
 
 type Props = { count?: number };
 
-export function ActivityFeedSkeleton({ count = 4 }: Props) {
+const ROWS = [
+  {
+    titleWidth: 268,
+    contextWidth: 214,
+    metaWidth: 128,
+    previewLines: [250],
+  },
+  {
+    titleWidth: 262,
+    contextWidth: 206,
+    metaWidth: 126,
+    previewLines: [248],
+  },
+  {
+    titleWidth: 286,
+    contextWidth: 244,
+    metaWidth: 126,
+    previewLines: [276, 92],
+  },
+] as const;
+
+export function ActivityFeedSkeleton({ count = 3 }: Props) {
   const { colors } = useTheme();
-  const itemsPerSection = Math.ceil(count / 2);
+  const { width } = useWindowDimensions();
+  const rows = ROWS.slice(0, Math.max(0, Math.min(count, ROWS.length)));
+  const contentWidth = Math.max(168, width - 126);
+  const clamp = (value: number) => Math.min(value, contentWidth);
 
   return (
-    <View accessibilityLabel="Loading" style={s.wrap}>
-      {Array.from({ length: 2 }).map((_, sectionIdx) => {
-        const startIdx = sectionIdx * itemsPerSection;
-        const endIdx = Math.min(startIdx + itemsPerSection, count);
-        const sectionCount = endIdx - startIdx;
+    <View accessibilityLabel="Loading" style={s.wrap} testID="activity-feed-skeleton">
+      <View style={s.sectionHeader}>
+        <PulseBox width={72} height={14} radius={4} />
+      </View>
 
-        if (sectionCount === 0) return null;
-
-        return (
-          <View key={sectionIdx}>
-            {/* Section header */}
-            <View style={s.sectionHeader}>
-              <PulseBox width={72} height={13} radius={4} />
+      {rows.map((row, index) => (
+        <View key={index} style={s.itemOuter} testID="activity-skeleton-row">
+          <View style={s.itemRow}>
+            <View style={s.iconCircle} testID="activity-skeleton-icon">
+              <PulseBox width={28} height={28} radius={14} />
             </View>
 
-            {/* Section items */}
-            {Array.from({ length: sectionCount }).map((_, i) => {
-              const itemIdx = startIdx + i;
+            <View style={s.content}>
+              <View style={s.headlineBlock}>
+                <PulseBox width={clamp(row.titleWidth)} height={22} radius={5} />
+                <PulseBox width={clamp(row.contextWidth)} height={22} radius={5} />
+              </View>
 
-              return (
-                <View key={itemIdx} style={s.itemOuter}>
-                  <View
-                    style={[
-                      s.card,
-                      {
-                        backgroundColor: colors.card,
-                        borderRadius: 14,
-                        borderWidth: StyleSheet.hairlineWidth,
-                        borderColor: colors.border,
-                      },
-                    ]}
-                  >
-                    <View style={s.itemRow}>
-                      <View style={s.avatarWrap}>
-                        <PulseBox width={28} height={28} radius={14} />
-                      </View>
+              <PulseBox width={clamp(row.metaWidth)} height={20} radius={5} />
 
-                      {/* content — flex: 1 */}
-                      <View style={s.content}>
-                        {/* headlineRow — two lines for multi-line wrapping */}
-                        <View style={s.headlineRow}>
-                          <PulseBox width={240} height={18} radius={4} />
-                          <PulseBox width={160} height={18} radius={4} />
-                        </View>
+              <View
+                style={[
+                  s.previewCard,
+                  {
+                    backgroundColor: colors.card,
+                    borderColor: colors.border,
+                  },
+                ]}
+                testID="activity-skeleton-preview-card"
+              >
+                {row.previewLines.map((width, lineIndex) => (
+                  <PulseBox key={lineIndex} width={clamp(width)} height={22} radius={5} />
+                ))}
+              </View>
 
-                        {/* metaRow — "48 mins ago · 1 items" */}
-                        <PulseBox width={120} height={18} radius={4} />
-                      </View>
-                    </View>
+              <View style={s.readMore}>
+                <PulseBox width={88} height={20} radius={5} />
+              </View>
 
-                    {/* previewCard — always show */}
-                    <View
-                      style={[
-                        s.previewCard,
-                        {
-                          borderRadius: 12,
-                          borderWidth: StyleSheet.hairlineWidth,
-                          borderColor: colors.border,
-                        },
-                      ]}
-                    >
-                      <PulseBox width={220} height={22} radius={4} />
-                    </View>
-
-                    {/* action button — on every other item */}
-                    {itemIdx % 2 === 0 && (
-                      <View style={s.actionButton}>
-                        <PulseBox width={96} height={34} radius={17} />
-                      </View>
-                    )}
-                  </View>
-                </View>
-              );
-            })}
+              <View
+                style={[s.actionButton, { borderColor: colors.border }]}
+                testID="activity-skeleton-action"
+              >
+                <PulseBox width={92} height={18} radius={5} />
+              </View>
+            </View>
           </View>
-        );
-      })}
+        </View>
+      ))}
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  wrap: { paddingTop: 8, paddingBottom: 24 },
+  wrap: { paddingTop: 30, paddingBottom: 24 },
   sectionHeader: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 8 },
   itemOuter: { marginHorizontal: 16, marginBottom: 8 },
-  card: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 14,
-    minHeight: 80,
-    gap: 0,
-  },
   itemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  avatarWrap: { width: 28, height: 28, flexShrink: 0, marginTop: 2 },
+  iconCircle: {
+    width: 28,
+    height: 28,
+    flexShrink: 0,
+    marginTop: 2,
+  },
   content: { flex: 1 },
-  headlineRow: {
-    flexDirection: 'column',
-    alignItems: 'flex-start',
-    gap: 4,
-    marginBottom: 5,
+  headlineBlock: {
+    gap: 5,
+    marginBottom: 8,
   },
   previewCard: {
     marginTop: 10,
     marginLeft: 42,
+    minHeight: 58,
+    borderRadius: 12,
+    borderWidth: 1,
     padding: 14,
-    gap: 6,
+    justifyContent: 'center',
+    gap: 8,
   },
+  readMore: { marginTop: 8, marginLeft: 42 },
   actionButton: {
     marginTop: 10,
     marginLeft: 42,
+    width: 110,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

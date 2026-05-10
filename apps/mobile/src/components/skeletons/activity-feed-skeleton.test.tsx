@@ -16,15 +16,18 @@ describe('ActivityFeedSkeleton', () => {
     expect(screen.getAllByLabelText('Loading').length).toBeGreaterThan(0);
   });
 
-  it('renders default 4 rows with 2 section headers — 24 PulseBox + 1 root = 25 loading nodes', () => {
+  it('renders the notifications content skeleton structure', () => {
     render(<ActivityFeedSkeleton />);
-    // 2 sections × 1 header + items (i=0 → 6, i=1 → 5, i=2 → 6, i=3 → 5 = 22) = 24 + root
-    expect(screen.getAllByLabelText('Loading').length).toBe(25);
+    expect(screen.getByTestId('activity-feed-skeleton')).toBeTruthy();
+    expect(screen.getAllByTestId('activity-skeleton-row')).toHaveLength(3);
+    expect(screen.getAllByTestId('activity-skeleton-icon')).toHaveLength(3);
+    expect(screen.getAllByTestId('activity-skeleton-preview-card')).toHaveLength(3);
+    expect(screen.getAllByTestId('activity-skeleton-action')).toHaveLength(3);
   });
 
-  it('renders custom count with multi-section structure', () => {
+  it('renders custom count with the same row structure', () => {
     render(<ActivityFeedSkeleton count={2} />);
-    // 2 sections × 1 header + items (i=0 section1 → 6, i=1 section2 → 5 = 11) = 13 + root
-    expect(screen.getAllByLabelText('Loading').length).toBe(14);
+    expect(screen.getAllByTestId('activity-skeleton-row')).toHaveLength(2);
+    expect(screen.getAllByTestId('activity-skeleton-action')).toHaveLength(2);
   });
 });

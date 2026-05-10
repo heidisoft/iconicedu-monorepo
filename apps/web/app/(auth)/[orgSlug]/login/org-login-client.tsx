@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 
 import { AuthEntryForm } from '../../shared/auth-entry-form';
 import { createSupabaseBrowserClient } from '../../../../lib/supabase/client';
-import { trackAuthTelemetry } from '../../../../lib/telemetry/auth-events';
 import {
   buildCodeEntryPath,
   shouldCreateUserForIntent,
@@ -96,7 +95,6 @@ export default function OrgLoginClient({
       return;
     }
 
-    await trackAuthTelemetry('auth_start_email', { orgSlug, intent: 'org-login' });
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
@@ -109,7 +107,6 @@ export default function OrgLoginClient({
       return;
     }
 
-    await trackAuthTelemetry('auth_magiclink_sent', { orgSlug, intent: 'org-login' });
     router.replace(
       buildCodeEntryPath({
         email,
@@ -122,10 +119,6 @@ export default function OrgLoginClient({
   const handleOAuthLogin = async (provider: 'apple' | 'google') => {
     setErrorMessage(null);
     setStatusMessage(null);
-    if (provider === 'google') {
-      await trackAuthTelemetry('auth_start_google', { orgSlug, intent: 'org-login' });
-    }
-
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {

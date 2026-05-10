@@ -29,10 +29,6 @@ vi.mock('@iconicedu/web/lib/supabase/client', () => ({
   }),
 }));
 
-vi.mock('@iconicedu/web/lib/telemetry/auth-events', () => ({
-  trackAuthTelemetry: vi.fn(async () => undefined),
-}));
-
 vi.mock('@iconicedu/ui-web/components/branding/site-logo-full', () => ({
   SiteLogoFull: () => <div data-testid="site-logo" />,
 }));

@@ -17,10 +17,6 @@ vi.mock('@iconicedu/web/lib/supabase/client', () => ({
   })),
 }));
 
-vi.mock('@iconicedu/web/lib/telemetry/auth-events', () => ({
-  trackAuthTelemetry: vi.fn(),
-}));
-
 vi.mock('@iconicedu/web/app/(auth)/shared/code-entry-utils', () => ({
   buildCodeEntryPath: vi.fn(),
   shouldCreateUserForIntent: vi.fn(() => true),
