@@ -181,6 +181,11 @@ function firstOptionalString(...values: unknown[]) {
   return undefined;
 }
 
+function joinSecondaryParts(parts: Array<string | undefined>) {
+  const normalized = parts.filter((part): part is string => Boolean(part));
+  return normalized.length ? normalized.join(' · ') : undefined;
+}
+
 function buildRoleAwareContextLabel(payload: Record<string, unknown>) {
   const context = getActivityContext(payload);
   const classTitle = context.classTitle ?? getContextTitle(payload);
@@ -529,18 +534,31 @@ function renderSessionItem(event: ActivityEventRow, variant: SessionRenderVarian
     payload.reason,
   );
   const canceledReason = firstOptionalString(payload.canceledReason, payload.reason);
+  const reminderSessionLabel = formatSessionDateTime(
+    firstOptionalString(
+      payload.sessionDateTime,
+      payload.startAt,
+      payload.occurrenceStart,
+    ),
+    payload,
+  );
 
   const config = {
     rescheduled: {
       verb: 'class.session.rescheduled' as const,
       iconKey: 'CalendarCheck' as const,
       tone: 'info' as const,
-      primary: `${classTitle} rescheduled`,
+      primary: classTitle,
+      secondary: joinSecondaryParts([
+        'session was rescheduled',
+        roleContext,
+        newLabel ? `New time: ${newLabel}` : undefined,
+      ]),
       summary:
         oldLabel && newLabel
-          ? `${oldLabel} was moved to ${newLabel}`
+          ? `${classTitle} session ${oldLabel} was moved to ${newLabel}`
           : newLabel
-            ? `Moved to ${newLabel}`
+            ? `${classTitle} session was moved to ${newLabel}`
             : undefined,
       expandedContent: rescheduledReason ? `Reason: ${rescheduledReason}` : undefined,
       actionLabel: 'Open class',
@@ -549,8 +567,13 @@ function renderSessionItem(event: ActivityEventRow, variant: SessionRenderVarian
       verb: 'class.session.canceled' as const,
       iconKey: 'CalendarX' as const,
       tone: 'warning' as const,
-      primary: `${classTitle} canceled`,
-      summary: sessionLabel ? `${sessionLabel} was canceled` : undefined,
+      primary: classTitle,
+      secondary: sessionLabel
+        ? joinSecondaryParts([`session ${sessionLabel} was canceled`, roleContext])
+        : joinSecondaryParts(['session was canceled', roleContext]),
+      summary: sessionLabel
+        ? `${classTitle} session ${sessionLabel} was canceled`
+        : `${classTitle} session was canceled`,
       expandedContent: canceledReason ? `Reason: ${canceledReason}` : undefined,
       actionLabel: 'Open class',
     },
@@ -558,9 +581,14 @@ function renderSessionItem(event: ActivityEventRow, variant: SessionRenderVarian
       verb: 'session.reminder.sent' as const,
       iconKey: 'Bell' as const,
       tone: 'info' as const,
-      primary: `${classTitle} starting soon`,
-      summary: startTimeLabel
-        ? `${classTitle} starts at ${startTimeLabel}`
+      primary: classTitle,
+      secondary: joinSecondaryParts([
+        'starts soon',
+        roleContext,
+        startTimeLabel ? `Starts at ${startTimeLabel}` : undefined,
+      ]),
+      summary: reminderSessionLabel
+        ? `${classTitle} is scheduled for ${reminderSessionLabel}`
         : (asOptionalString(payload.summary) ?? `${classTitle} starts soon`),
       expandedContent: firstOptionalString(
         payload.joinDetails,
@@ -574,6 +602,10 @@ function renderSessionItem(event: ActivityEventRow, variant: SessionRenderVarian
       iconKey: 'MessageSquareHeart' as const,
       tone: 'info' as const,
       primary: `Share feedback for ${classTitle}`,
+      secondary: joinSecondaryParts([
+        roleContext,
+        'Your feedback helps improve future sessions',
+      ]),
       summary: 'Tell us how the session went',
       expandedContent: firstOptionalString(
         payload.feedbackPrompt,
@@ -588,7 +620,7 @@ function renderSessionItem(event: ActivityEventRow, variant: SessionRenderVarian
     leading: { kind: 'icon', iconKey: config.iconKey, tone: config.tone },
     headline: {
       primary: config.primary,
-      secondary: roleContext,
+      secondary: config.secondary,
       secondaryHref: buildInboxSourceHref(event, payload),
     },
     summary: config.summary,

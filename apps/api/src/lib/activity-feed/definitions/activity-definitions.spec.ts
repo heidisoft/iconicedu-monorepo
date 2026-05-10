@@ -170,9 +170,13 @@ describe('API activity definitions context rendering', () => {
       'CalendarCheck',
     );
     expect(rendered.headline).toMatchObject({
-      primary: 'Algebra I rescheduled',
-      secondary: 'For Priya with Ms. Chen',
+      primary: 'Algebra I',
+      secondary: expect.stringContaining(
+        'session was rescheduled · For Priya with Ms. Chen',
+      ),
     });
+    expect(rendered.headline.secondary).toContain('New time:');
+    expect(rendered.summary).toContain('Algebra I session');
     expect(rendered.summary).toContain('was moved to');
     expect(rendered.expandedContent).toBe('Reason: Teacher conflict');
     expect(rendered.actionButton?.label).toBe('Open class');
@@ -194,8 +198,11 @@ describe('API activity definitions context rendering', () => {
       iconKey: 'CalendarX',
       tone: 'warning',
     });
-    expect(rendered.headline.primary).toBe('Algebra I canceled');
-    expect(rendered.headline.secondary).toBe('For Priya with Ms. Chen');
+    expect(rendered.headline.primary).toBe('Algebra I');
+    expect(rendered.headline.secondary).toContain('session');
+    expect(rendered.headline.secondary).toContain('was canceled');
+    expect(rendered.headline.secondary).toContain('For Priya with Ms. Chen');
+    expect(rendered.summary).toContain('Algebra I session');
     expect(rendered.summary).toContain('was canceled');
   });
 
@@ -220,9 +227,11 @@ describe('API activity definitions context rendering', () => {
       timing: 'immediate',
     });
     expect(reminder.headline).toMatchObject({
-      primary: 'Algebra I starting soon',
-      secondary: 'For Priya with Ms. Chen',
+      primary: 'Algebra I',
+      secondary: expect.stringContaining('starts soon · For Priya with Ms. Chen'),
     });
+    expect(reminder.headline.secondary).toContain('Starts at');
+    expect(reminder.summary).toContain('Algebra I is scheduled for');
     expect(reminder.expandedContent).toBeUndefined();
     expect(reminder.actionButton?.label).toBe('Open class');
 
@@ -237,6 +246,9 @@ describe('API activity definitions context rendering', () => {
       tone: 'info',
     });
     expect(feedback.headline.primary).toBe('Share feedback for Algebra I');
+    expect(feedback.headline.secondary).toBe(
+      'For Priya with Ms. Chen · Your feedback helps improve future sessions',
+    );
     expect(feedback.summary).toBe('Tell us how the session went');
     expect(feedback.expandedContent).toBeUndefined();
     expect(feedback.actionButton?.label).toBe('Give feedback');
@@ -299,7 +311,7 @@ describe('API activity definitions context rendering', () => {
         }),
       );
 
-      expect(rendered.headline.secondary).toBe(expected);
+      expect(rendered.headline.secondary).toContain(expected);
     },
   );
 });

@@ -137,6 +137,19 @@ session.feedback_request:<orgId>:<learningSpaceId>:<channelId>:<occurrenceStart>
 | `max_attempts`                     | `8`                       | Reminder dispatch retry limit                      |
 | Retry backoff                      | 15 s – 10 min exponential | `next_attempt_at` after failure                    |
 
+## Notification Copy
+
+Canonical rendering is owned by
+`apps/api/src/lib/activity-feed/definitions/activity-definitions.ts`; push/email
+delivery copy is derived in `apps/api/src/lib/notifications/push-copy.ts`.
+
+| Variation                        | Event type                      | Primary headline                  | Secondary headline                                                         | Summary / preview                                                             | Expanded content                              | Action button |
+| -------------------------------- | ------------------------------- | --------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | --------------------------------------------- | ------------- |
+| Single class session rescheduled | `class.session.rescheduled`     | `{classTitle}`                    | `session was rescheduled · {roleContext} · New time: {newSessionDateTime}` | `{classTitle} session {oldSessionDateTime} was moved to {newSessionDateTime}` | `Reason: {rescheduledReason}`                 | Open class    |
+| Single class session canceled    | `class.session.canceled`        | `{classTitle}`                    | `session {sessionDateTime} was canceled · {roleContext}`                   | `{classTitle} session {sessionDateTime} was canceled`                         | `Reason: {canceledReason}`                    | Open class    |
+| Single class reminder            | `session.reminder.sent`         | `{classTitle}`                    | `starts soon · {roleContext} · Starts at {sessionStartTime}`               | `{classTitle} is scheduled for {sessionDateTime}`                             | Join details, class outline, or session notes | Open class    |
+| Single class feedback request    | `session.feedback_request.sent` | `Share feedback for {classTitle}` | `{roleContext} · Your feedback helps improve future sessions`              | `Tell us how the session went`                                                | Feedback form or quick rating UI              | Give feedback |
+
 ---
 
 ## Relevant Files

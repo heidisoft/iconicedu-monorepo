@@ -310,6 +310,36 @@ export class ReminderReconcileService {
 
     // Build and insert the next job
     const row2 = this.buildJobRow(input.orgId, input.scheduleId, next);
+    const { data: existingDedupeJob, error: existingDedupeError } = await supabase
+      .from('reminder_jobs')
+      .select('id, status')
+      .eq('org_id', input.orgId)
+      .eq('dedupe_key', next.dedupeKey)
+      .is('deleted_at', null)
+      .maybeSingle<{ id: string; status: string }>();
+
+    if (existingDedupeError) {
+      throw new InternalServerErrorException(existingDedupeError.message);
+    }
+
+    if (existingDedupeJob) {
+      if (existingDedupeJob.status === 'succeeded') {
+        return { action: 'kept', dedupeKey: next.dedupeKey };
+      }
+
+      const { error: reactivateError } = await supabase
+        .from('reminder_jobs')
+        .update(row2)
+        .eq('id', existingDedupeJob.id)
+        .eq('org_id', input.orgId);
+
+      if (reactivateError) {
+        throw new InternalServerErrorException(reactivateError.message);
+      }
+
+      return { action: 'inserted', dedupeKey: next.dedupeKey };
+    }
+
     const { error: insertError } = await supabase.from('reminder_jobs').insert(row2);
 
     // Conflict on partial unique index means another process already inserted — treat as kept

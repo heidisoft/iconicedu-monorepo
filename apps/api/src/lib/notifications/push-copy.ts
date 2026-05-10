@@ -141,6 +141,11 @@ function appendReason(summary: string | undefined, reason: string | undefined) {
   return `${summary} Reason: ${reason}.`;
 }
 
+function joinSummaryParts(parts: Array<string | undefined>) {
+  const normalized = parts.filter((part): part is string => Boolean(part));
+  return normalized.length ? normalized.join(' · ') : undefined;
+}
+
 function formatNamesList(names: string[]) {
   if (!names.length) {
     return undefined;
@@ -407,10 +412,10 @@ export function buildPersonalizedSessionCopy(
       payload,
     );
     return {
-      title: `${classTitle} rescheduled`,
+      title: classTitle,
       summary:
         oldLabel && newLabel
-          ? `${oldLabel} was moved to ${newLabel}`
+          ? `${classTitle} session ${oldLabel} was moved to ${newLabel}`
           : (getRescheduledSessionSummary(payload) ??
             'A class session has been rescheduled.'),
     };
@@ -428,9 +433,9 @@ export function buildPersonalizedSessionCopy(
       payload,
     );
     return {
-      title: `${classTitle} canceled`,
+      title: classTitle,
       summary: sessionLabel
-        ? `${sessionLabel} was canceled`
+        ? `${classTitle} session ${sessionLabel} was canceled`
         : (getCanceledSessionSummary(payload) ?? 'A class session has been canceled.'),
     };
   }
@@ -450,10 +455,12 @@ export function buildPersonalizedSessionCopy(
         )
       : undefined;
     return {
-      title: `${classTitle} starting soon`,
-      summary: startTime
-        ? `${classTitle} starts at ${startTime}`
-        : getEventSummary(payload, `${classTitle} starts soon`),
+      title: classTitle,
+      summary:
+        joinSummaryParts([
+          'starts soon',
+          startTime ? `Starts at ${startTime}` : undefined,
+        ]) ?? getEventSummary(payload, `${classTitle} starts soon`),
     };
   }
 

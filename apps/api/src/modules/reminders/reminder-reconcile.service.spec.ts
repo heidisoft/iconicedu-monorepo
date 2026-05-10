@@ -1,0 +1,163 @@
+import { ReminderReconcileService } from '@iconicedu/api/modules/reminders/reminder-reconcile.service';
+import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
+
+jest.mock('@iconicedu/api/lib/supabase/service', () => ({
+  createSupabaseServiceClient: jest.fn(),
+}));
+
+function makeMaybeSingleChain<T>(result: { data: T; error: null }) {
+  const chain = {
+    select: jest.fn(() => chain),
+    eq: jest.fn(() => chain),
+    is: jest.fn(() => chain),
+    maybeSingle: jest.fn(async () => result),
+  };
+  return chain;
+}
+
+function makeReturnsChain<T>(result: { data: T; error: null }) {
+  const chain = {
+    select: jest.fn(() => chain),
+    eq: jest.fn(() => chain),
+    not: jest.fn(() => chain),
+    is: jest.fn(() => chain),
+    limit: jest.fn(() => chain),
+    returns: jest.fn(async () => result),
+  };
+  return chain;
+}
+
+function makeUpdateChain(result: { error: null }) {
+  const chain = {
+    update: jest.fn(() => chain),
+    eq: jest.fn(() => chain),
+  };
+  return {
+    ...chain,
+    lastEq: chain.eq,
+    result,
+  };
+}
+
+function buildScheduleRow() {
+  return {
+    id: 'schedule-1',
+    org_id: 'org-1',
+    title: 'Algebra',
+    description: null,
+    location: null,
+    meeting_link: null,
+    start_at: '2030-03-06T10:00:00.000Z',
+    end_at: '2030-03-06T11:00:00.000Z',
+    timezone: 'UTC',
+    status: 'scheduled',
+    visibility: 'private',
+    theme_key: null,
+    source_kind: 'class_session',
+    source_learning_space_id: 'space-1',
+    source_channel_id: 'channel-1',
+    source_session_id: null,
+    source_owner_user_id: null,
+    source_created_by_user_id: null,
+    source_related_learning_space_id: null,
+    created_at: '2030-01-01T00:00:00.000Z',
+    created_by: 'profile-1',
+    updated_at: '2030-01-01T00:00:00.000Z',
+    updated_by: 'profile-1',
+    deleted_at: null,
+    deleted_by: null,
+    participants: [
+      {
+        id: 'participant-1',
+        org_id: 'org-1',
+        profile_id: 'profile-1',
+        role: 'child',
+        status: 'active',
+        display_name: 'Alex Student',
+        avatar_url: null,
+        theme_key: null,
+      },
+    ],
+    recurrence: null,
+  };
+}
+
+describe('ReminderReconcileService', () => {
+  const createSupabaseServiceClientMock = jest.mocked(createSupabaseServiceClient);
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('reactivates a non-succeeded job with the next dedupe key', async () => {
+    const scheduleChain = makeMaybeSingleChain({
+      data: buildScheduleRow(),
+      error: null,
+    });
+    const learningSpaceChain = makeMaybeSingleChain({
+      data: { id: 'space-1', status: 'active', archived_at: null },
+      error: null,
+    });
+    const succeededChain = makeReturnsChain({ data: [], error: null });
+    const activeChain = makeReturnsChain({ data: [], error: null });
+    const existingDedupeChain = makeMaybeSingleChain({
+      data: { id: 'existing-reminder-job-1', status: 'canceled' },
+      error: null,
+    });
+    const updateChain = makeUpdateChain({ error: null });
+    updateChain.eq.mockImplementation(() => updateChain);
+    const insert = jest.fn(async () => ({ error: null }));
+
+    const reminderJobsSelect = jest
+      .fn()
+      .mockImplementationOnce(() => succeededChain)
+      .mockImplementationOnce(() => activeChain)
+      .mockImplementationOnce(() => existingDedupeChain);
+    const reminderJobsUpdate = jest.fn((payload: Record<string, unknown>) => {
+      updateChain.update(payload);
+      return updateChain;
+    });
+
+    createSupabaseServiceClientMock.mockReturnValue({
+      from: jest.fn((table: string) => {
+        if (table === 'class_schedules') {
+          return { select: jest.fn(() => scheduleChain) };
+        }
+        if (table === 'learning_spaces') {
+          return { select: jest.fn(() => learningSpaceChain) };
+        }
+        if (table === 'reminder_jobs') {
+          return {
+            select: reminderJobsSelect,
+            update: reminderJobsUpdate,
+            insert,
+          };
+        }
+        throw new Error(`Unexpected table ${table}`);
+      }),
+    } as never);
+
+    const result =
+      await new ReminderReconcileService().reconcileNextReminderJobForSchedule({
+        orgId: 'org-1',
+        scheduleId: 'schedule-1',
+        now: new Date('2030-03-06T09:00:00.000Z'),
+      });
+
+    expect(result).toEqual({
+      action: 'inserted',
+      dedupeKey: 'session.reminder:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z:30',
+    });
+    expect(insert).not.toHaveBeenCalled();
+    expect(reminderJobsUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'pending',
+        dedupe_key:
+          'session.reminder:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z:30',
+        run_at: '2030-03-06T09:30:00.000Z',
+      }),
+    );
+    expect(updateChain.eq).toHaveBeenCalledWith('id', 'existing-reminder-job-1');
+    expect(updateChain.eq).toHaveBeenCalledWith('org_id', 'org-1');
+  });
+});
