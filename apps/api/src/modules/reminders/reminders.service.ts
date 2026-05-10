@@ -506,6 +506,7 @@ export class RemindersService {
     let deadLettered = 0;
 
     for (const job of claimed) {
+      const payload = (job.payload ?? {}) as ReminderJobPayload;
       try {
         const result = await this.processReminderJob(job, supabase);
         if (result === 'skipped') {
@@ -519,6 +520,19 @@ export class RemindersService {
           orgId: job.org_id,
           jobType: job.job_type,
           attemptCount: job.attempt_count + 1,
+          dedupeKey: job.dedupe_key,
+          sourceScheduleId: job.source_schedule_id,
+          sourceLearningSpaceId: job.source_learning_space_id,
+          occurrenceStartAt: job.occurrence_start_at,
+          runAt: job.run_at,
+          targetKind: job.target_kind,
+          targetId: job.target_id,
+          payloadScheduleId: payload.scheduleId ?? null,
+          payloadStartAt: payload.startAt ?? null,
+          payloadOccurrenceStart: payload.occurrenceStart ?? null,
+          payloadReminderOffsetMinutes: payload.reminderOffsetMinutes ?? null,
+          payloadChannelId: payload.channelId ?? null,
+          payloadLearningSpaceId: payload.learningSpaceId ?? null,
           errorMessage: error instanceof Error ? error.message : String(error),
         });
 
@@ -579,6 +593,7 @@ export class RemindersService {
       failed,
       deadLettered,
       durationMs,
+      leaseOwner: input.leaseOwner,
     });
 
     return {
