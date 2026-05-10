@@ -1,5 +1,30 @@
 import { NotificationService } from '@iconicedu/api/modules/events/notification.service';
 
+jest.mock('@iconicedu/api/lib/notifications/decision-engine', () => ({
+  buildNotificationDecision: jest.fn(async ({ event }) => {
+    if (event.payload?.suppressNotifications === true) {
+      return {
+        deliveryChannels: [],
+        deliveryTiming: 'immediate',
+        runAt: '2026-05-05T12:00:00.000Z',
+        reasonCodes: ['source_suppressed'],
+        prefKey: event.event_type,
+        scopeKind: null,
+        scopeId: null,
+      };
+    }
+
+    return {
+      deliveryChannels: ['push'],
+      deliveryTiming: 'immediate',
+      runAt: '2026-05-05T12:00:00.000Z',
+      reasonCodes: [],
+      prefKey: event.event_type,
+      scopeKind: null,
+      scopeId: null,
+    };
+  }),
+}));
 jest.mock('@iconicedu/api/lib/notifications/providers/push-provider', () => ({
   sendPushNotification: jest.fn(),
 }));
@@ -21,6 +46,10 @@ function makeEvent(payload: Record<string, unknown> = {}) {
     source_kind: 'system',
     deleted_at: null,
   };
+}
+
+function longText(length: number) {
+  return Array.from({ length }, (_, index) => String(index % 10)).join('');
 }
 
 function makeSupabase(event: Record<string, unknown>) {
@@ -84,5 +113,28 @@ describe('NotificationService silent source events', () => {
       reason: 'no_longer_eligible',
       reasonCodes: ['source_suppressed'],
     });
+  });
+
+  it('truncates queued notification summaries to 150 characters', async () => {
+    const { supabase, rpc } = makeSupabase(
+      makeEvent({
+        title: 'Long update',
+        content: longText(220),
+      }),
+    );
+    const service = new NotificationService();
+
+    await service.prepareForActivityEvent({
+      supabase: supabase as never,
+      eventId: 'event-1',
+      recipientProfileIds: ['profile-1'],
+    });
+
+    const payload = rpc.mock.calls[0]?.[1]?.p_payload as
+      | Record<string, unknown>
+      | undefined;
+    expect(typeof payload?.summary).toBe('string');
+    expect((payload!.summary as string).length).toBeLessThanOrEqual(150);
+    expect(payload!.summary).toMatch(/\.\.\.$/);
   });
 });

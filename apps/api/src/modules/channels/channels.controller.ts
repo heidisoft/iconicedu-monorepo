@@ -80,6 +80,21 @@ export class ChannelsController {
     );
   }
 
+  @Get(':channelId/dm-meta')
+  @UseGuards(AuthGuard)
+  dmMeta(
+    @Req() req: AuthenticatedRequest,
+    @Param('channelId') channelId: string,
+    @Query('orgId') orgId: string,
+    @Query('profileId') profileId: string,
+    @Query('accountId') accountId: string,
+  ) {
+    return this.channelsService.getDirectMessageChannelMeta(
+      extractBearerToken(req.headers.authorization),
+      { orgId, profileId, accountId, channelId },
+    );
+  }
+
   @Get(':channelId/membership')
   @UseGuards(AuthGuard)
   membership(

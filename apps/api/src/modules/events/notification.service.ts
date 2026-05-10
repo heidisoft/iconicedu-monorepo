@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { ActivityEventRow, EventPipelineJobRow } from '@iconicedu/shared-types';
 
+import { truncatePreviewText } from '@iconicedu/api/lib/activity-feed/preview-text';
 import { buildNotificationDecision } from '@iconicedu/api/lib/notifications/decision-engine';
 import { buildPersonalizedSessionCopy } from '@iconicedu/api/lib/notifications/push-copy';
 import { sendEmailNotification } from '@iconicedu/api/lib/notifications/providers/email-provider';
@@ -82,7 +83,7 @@ export class NotificationService {
         : event.event_type;
     const baseSummary =
       typeof eventPayload.summary === 'string' && eventPayload.summary.trim().length > 0
-        ? eventPayload.summary
+        ? truncatePreviewText(eventPayload.summary)
         : null;
 
     let enqueued = 0;
@@ -118,7 +119,7 @@ export class NotificationService {
             attemptBucket,
             reasonCodes: decision.reasonCodes,
             title: personalized?.title ?? baseTitle,
-            summary: personalized?.summary ?? baseSummary,
+            summary: truncatePreviewText(personalized?.summary ?? baseSummary),
             threadId:
               typeof eventPayload.threadId === 'string' ? eventPayload.threadId : null,
             rawEventPayload: eventPayload,
@@ -193,7 +194,7 @@ export class NotificationService {
         : prefKey;
     const summary =
       typeof payload.summary === 'string' && payload.summary.trim().length > 0
-        ? payload.summary
+        ? truncatePreviewText(payload.summary)
         : null;
     const metadata = {
       ...payload,

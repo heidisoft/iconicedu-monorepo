@@ -8,6 +8,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { Bell } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/providers/theme-provider';
 import { useActivityFeed, useMarkActivityFeedRead } from '@/hooks/use-activity-feed';
@@ -20,6 +21,10 @@ import {
 } from '@/components/activity/activity-item';
 import type { AppColors } from '@/lib/theme';
 import type { ActivityFeedItemVM, InboxTabKeyVM } from '@iconicedu/shared-types';
+import {
+  DEFAULT_NOTIFICATION_ROUTE,
+  NOTIFICATION_REGISTRY,
+} from '@/lib/notifications/notification-config';
 
 // ---------------------------------------------------------------------------
 // Styles
@@ -137,6 +142,7 @@ const FALLBACK_TABS: Array<{ key: InboxTabKeyVM; label: string }> = [
 ];
 
 export default function InboxScreen() {
+  const router = useRouter();
   const { colors, isDark } = useTheme();
   const s = React.useMemo(() => makeStyles(colors), [colors]);
   const activityS = React.useMemo(() => makeActivityItemStyles(colors), [colors]);
@@ -206,6 +212,59 @@ export default function InboxScreen() {
     if (unreadIdsForActiveTab.length === 0) return;
     markRead(unreadIdsForActiveTab);
   }, [markRead, unreadIdsForActiveTab]);
+
+  const handleActivityAction = useCallback(
+    (item: ActivityFeedItemVM) => {
+      if (item.verb === 'session.feedback_request.sent') {
+        setExpandedIds((prev) => new Set(prev).add(item.ids.id));
+        return;
+      }
+
+      const metadata =
+        item.metadata &&
+        typeof item.metadata === 'object' &&
+        !Array.isArray(item.metadata)
+          ? item.metadata
+          : {};
+      const scope = item.audience.scope;
+      const scopeKind = scope.kind;
+      const scopeId =
+        scope.kind === 'channel'
+          ? scope.channelId
+          : scope.kind === 'learning_space'
+            ? scope.learningSpaceId
+            : undefined;
+      const channelId =
+        typeof metadata.channelId === 'string' && metadata.channelId.length > 0
+          ? metadata.channelId
+          : scope.kind === 'channel'
+            ? scope.channelId
+            : undefined;
+      const threadId =
+        typeof metadata.threadId === 'string' && metadata.threadId.length > 0
+          ? metadata.threadId
+          : null;
+      const channelRouteKind =
+        metadata.channelRouteKind === 'space' ||
+        metadata.channelRouteKind === 'dm' ||
+        metadata.channelRouteKind === 'channel'
+          ? metadata.channelRouteKind
+          : item.tabKey === 'classes'
+            ? 'space'
+            : undefined;
+      const route =
+        NOTIFICATION_REGISTRY[item.verb]?.getRoute({
+          scopeKind,
+          scopeId,
+          channelId,
+          threadId,
+          channelRouteKind,
+        }) ?? DEFAULT_NOTIFICATION_ROUTE;
+
+      router.push(route as Parameters<typeof router.push>[0]);
+    },
+    [router],
+  );
 
   // Filter sections by active tab, drop empty
   const filteredSections = useMemo<FeedSection[]>(() => {
@@ -302,6 +361,7 @@ export default function InboxScreen() {
               onMarkRead={onMarkRead}
               expandedIds={expandedIds}
               onToggle={onToggle}
+              onActionPress={handleActivityAction}
               viewerTimezone={profile?.timezone ?? null}
               currentProfileId={profile?.id ?? null}
             />

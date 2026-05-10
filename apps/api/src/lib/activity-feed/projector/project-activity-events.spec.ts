@@ -194,4 +194,28 @@ describe('projectActivityEvents context rendering', () => {
       ).secondary,
     ).toBe('sent a message in Algebra I with Priya');
   });
+
+  it('truncates projected summary and preview text to 150 characters', async () => {
+    const event = makeEvent();
+    event.payload = {
+      ...(event.payload as Record<string, unknown>),
+      content: Array.from({ length: 220 }, (_, index) => String(index % 10)).join(''),
+    };
+    const { supabase, upsertedRows } = makeSupabase(event);
+
+    await projectActivityEvents(supabase, { eventIds: ['event-1'], limit: 1 });
+
+    const row = upsertedRows.find(
+      (upsertedRow) => upsertedRow.recipient_profile_id === 'guardian-1',
+    );
+    const content = row?.content as
+      | { summary?: string; preview?: { text?: string } }
+      | undefined;
+
+    expect(typeof row?.summary).toBe('string');
+    expect((row!.summary as string).length).toBeLessThanOrEqual(150);
+    expect(content?.summary?.length).toBeLessThanOrEqual(150);
+    expect(content?.preview?.text?.length).toBeLessThanOrEqual(150);
+    expect(row!.summary).toMatch(/\.\.\.$/);
+  });
 });

@@ -142,6 +142,8 @@ session.feedback_request:<orgId>:<learningSpaceId>:<channelId>:<occurrenceStart>
 Canonical rendering is owned by
 `apps/api/src/lib/activity-feed/definitions/activity-definitions.ts`; push/email
 delivery copy is derived in `apps/api/src/lib/notifications/push-copy.ts`.
+Summary / preview text is capped at 150 characters before activity projection
+and notification delivery payloads are written.
 
 | Variation                        | Event type                      | Primary headline                  | Secondary headline                                                         | Summary / preview                                                             | Expanded content                              | Action button |
 | -------------------------------- | ------------------------------- | --------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | --------------------------------------------- | ------------- |

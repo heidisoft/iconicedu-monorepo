@@ -41,13 +41,13 @@ type ExpoPushMessage = {
   sound: 'default';
 };
 
-// Maximum length for preview text to avoid oversized Expo payloads that get dropped.
-// Expo has strict payload size limits; keeping preview under 200 chars ensures safe delivery.
-const MAX_PREVIEW_LENGTH = 200;
+// Keep preview/body text short enough for lock-screen scanning and Expo payload safety.
+const MAX_PREVIEW_LENGTH = 150;
 
 function truncateText(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text;
-  return text.substring(0, maxLength - 1) + '…';
+  if (maxLength <= 3) return text.substring(0, maxLength);
+  return `${text.substring(0, maxLength - 3).trimEnd()}...`;
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -275,7 +275,9 @@ export async function sendPushNotification(payload: PushNotificationPayload) {
   const messages: ExpoPushMessage[] = tokens.map(({ token }) => ({
     to: token,
     title: payload.title,
-    body: payload.summary ?? preview ?? undefined,
+    body: payload.summary
+      ? truncateText(payload.summary, MAX_PREVIEW_LENGTH)
+      : (preview ?? undefined),
     ...(badgeCount !== undefined ? { badge: badgeCount } : {}),
     // Required for Android 8+ to route the notification to the correct channel.
     // Must match the channel created by ensureAndroidChannel() in use-push-registration.ts.

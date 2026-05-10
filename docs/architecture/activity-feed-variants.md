@@ -18,7 +18,7 @@ activity definition mirrors.
 | Student session context     | `With {teacherNames}`. Example: `With Ms. Denise + 1`.                                                                                                     |
 | Staff session context       | `Parent: {guardianNames} · Student: {studentNames} · Teacher: {teacherNames}`.                                                                             |
 | Source href                 | Explicit `payload.href`; otherwise `/{orgSlug}/dm/{channelId}`, `/{orgSlug}/c/{channelId}`, or `/{orgSlug}/s/{channelId}` based on route kind/class scope. |
-| Feed preview                | `summary` renders as the preview card. `expandedContent` renders behind read-more behavior.                                                                |
+| Feed preview                | `summary` renders as the preview card and is capped at 150 characters. `expandedContent` renders behind read-more behavior.                                |
 | Icons                       | Feed rows use `content.leading.iconKey` when present, then fall back from `verb`. Web and mobile map icon keys to Lucide icons.                            |
 
 ## Activity Table

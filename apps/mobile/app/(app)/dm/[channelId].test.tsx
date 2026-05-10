@@ -70,12 +70,19 @@ jest.mock('@/hooks/use-messages', () => ({
 
 jest.mock('@/lib/api/queries', () => ({
   queryKeys: {
+    directMessageChannelMeta: (channelId: string, orgId: string, profileId: string) => [
+      'directMessageChannelMeta',
+      channelId,
+      orgId,
+      profileId,
+    ],
     channelReadState: (channelId: string, accountId: string) => [
       'channelReadState',
       channelId,
       accountId,
     ],
   },
+  fetchDirectMessageChannelMetaByChannelId: jest.fn(async () => null),
   fetchChannelReadState: jest.fn(async () => ({
     lastReadMessageId: null,
     unreadCount: 0,
@@ -158,12 +165,17 @@ describe('DmConversationScreen — supervised read-only mode', () => {
       status: 'offline',
       lastSeenAt: null,
     });
-    mockUseQuery.mockReturnValue({
-      data: {
-        lastReadMessageId: null,
-        unreadCount: 0,
-      },
-      isLoading: false,
+    mockUseQuery.mockImplementation((options: { queryKey?: readonly unknown[] }) => {
+      if (options.queryKey?.[0] === 'directMessageChannelMeta') {
+        return { data: null, isLoading: false };
+      }
+      return {
+        data: {
+          lastReadMessageId: null,
+          unreadCount: 0,
+        },
+        isLoading: false,
+      };
     });
   });
 
@@ -212,6 +224,61 @@ describe('DmConversationScreen — supervised read-only mode', () => {
     renderScreen();
 
     expect(screen.getByText('MessageInput')).toBeTruthy();
+  });
+
+  it('hydrates the header from DM metadata when opened without route params', () => {
+    mockUseLocalSearchParams.mockReturnValue({
+      channelId: 'ch-1',
+    });
+    mockUseQuery.mockImplementation((options: { queryKey?: readonly unknown[] }) => {
+      if (options.queryKey?.[0] === 'directMessageChannelMeta') {
+        return {
+          data: {
+            id: 'ch-1',
+            topic: null,
+            description: null,
+            kind: 'dm',
+            participants: [
+              {
+                id: 'partner-1',
+                display_name: 'Alice Chen',
+                first_name: 'Alice',
+                last_name: 'Chen',
+                avatar_seed: 'alice-seed',
+                avatar_url: 'https://example.test/alice.png',
+                kind: 'educator',
+                timezone: 'Asia/Colombo',
+                city: 'Colombo',
+                country_name: 'Sri Lanka',
+              },
+            ],
+          },
+          isLoading: false,
+        };
+      }
+      return {
+        data: {
+          lastReadMessageId: null,
+          unreadCount: 0,
+        },
+        isLoading: false,
+      };
+    });
+
+    renderScreen();
+
+    expect(mockConversationHeader).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Alice Chen',
+        avatarSeed: 'alice-seed',
+        avatarUrl: 'https://example.test/alice.png',
+        avatarRole: 'educator',
+        localTimeLabel: expect.stringMatching(/^.+$/),
+      }),
+    );
+    expect(mockUseOnlineProfileIds).toHaveBeenCalledWith('org-1', 'prof-1', [
+      'partner-1',
+    ]);
   });
 
   it('returns null when channelId is missing', () => {

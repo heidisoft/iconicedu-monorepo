@@ -507,6 +507,32 @@ export class ChannelsService {
     };
   }
 
+  async getDirectMessageChannelMeta(
+    accessToken: string,
+    input: { orgId: string; profileId: string; accountId: string; channelId: string },
+  ): Promise<ChannelListItem | null> {
+    if (!input.orgId || !input.profileId || !input.accountId || !input.channelId) {
+      return null;
+    }
+
+    const directMessages = await this.getDirectMessages(accessToken, {
+      orgId: input.orgId,
+      profileId: input.profileId,
+      accountId: input.accountId,
+    });
+    const directMatch = directMessages.find((channel) => channel.id === input.channelId);
+    if (directMatch) {
+      return directMatch;
+    }
+
+    const supervisedMessages = await this.getSupervisedDirectMessages(accessToken, {
+      orgId: input.orgId,
+      guardianAccountId: input.accountId,
+      guardianProfileId: input.profileId,
+    });
+    return supervisedMessages.find((channel) => channel.id === input.channelId) ?? null;
+  }
+
   async getChannels(
     accessToken: string,
     input: { orgId: string; accountId: string },

@@ -222,6 +222,50 @@ describe('ActivityItem', () => {
     expect(onMarkRead).not.toHaveBeenCalled();
   });
 
+  it('calls the activity action handler when the action button is pressed', () => {
+    const onActionPress = jest.fn();
+    const item = {
+      ...makeBaseActivity(),
+      content: {
+        ...makeBaseActivity().content,
+        actionButton: { label: 'Open class', variant: 'outline' },
+      },
+    } as ActivityFeedItemVM;
+
+    renderActivity(item, { onActionPress });
+
+    fireEvent.press(screen.getByText('Open class'));
+
+    expect(onActionPress).toHaveBeenCalledWith(item);
+  });
+
+  it('expands feedback requests from the Give feedback action', () => {
+    const onActionPress = jest.fn();
+    const item = {
+      ...makeBaseActivity(),
+      verb: 'session.feedback_request.sent',
+      content: {
+        ...makeBaseActivity().content,
+        actionButton: { label: 'Give feedback', variant: 'outline' },
+      },
+      metadata: {
+        feedbackUiEnabled: true,
+        sourceEventId: 'event-1',
+        classSessionId: 'session-1',
+        classroomId: 'space-1',
+        channelId: 'channel-1',
+      },
+    } as ActivityFeedItemVM;
+
+    renderActivity(item, {
+      onActionPress,
+      expandedIds: new Set(['activity-1']),
+      currentProfileId: 'profile-1',
+    });
+
+    expect(screen.getByText('Rate your session')).toBeTruthy();
+  });
+
   it('formats scheduled class session headlines without the timezone suffix', () => {
     const item = {
       ...makeBaseActivity(),
