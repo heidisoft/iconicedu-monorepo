@@ -103,7 +103,10 @@ function mapFeedRow(row: ActivityFeedItemRow): ActivityFeedItemVM {
     refs: { ...refsBase } as ActivityItemRefsVM,
     content,
     state,
-    metadata: row.metadata ?? undefined,
+    metadata: {
+      ...(row.metadata ?? {}),
+      ...(row.source_event_id ? { sourceEventId: row.source_event_id } : {}),
+    },
   } as ActivityFeedItemVM;
 }
 

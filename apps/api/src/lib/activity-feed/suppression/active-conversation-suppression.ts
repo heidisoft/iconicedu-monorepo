@@ -11,6 +11,11 @@ const ACTIVE_LIVE_STATUSES = new Set([
 const CONVERSATIONAL_EVENT_TYPES = new Set([
   'dm.posted',
   'message.posted',
+  'message.mentioned',
+  'message.thread_reply.posted',
+  'file.uploaded',
+  'image.uploaded',
+  'audio.uploaded',
   'reaction.added',
 ]);
 

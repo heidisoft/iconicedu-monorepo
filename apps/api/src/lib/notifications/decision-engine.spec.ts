@@ -119,7 +119,7 @@ describe('buildNotificationDecision', () => {
       event: {
         id: 'event-1',
         org_id: 'org-1',
-        event_type: 'message.posted',
+        event_type: 'message.thread_reply.posted',
         occurred_at: '2026-04-21T11:59:30.000Z',
         payload: { mentionedProfileId: null, threadId: 'thread-1' },
         scope: { kind: 'channel', channelId: 'channel-1' },
@@ -138,7 +138,7 @@ describe('buildNotificationDecision', () => {
     expect(resolveEffectivePreferenceMock).toHaveBeenCalledWith(
       expect.objectContaining({
         defaultChannels: ['push'],
-        prefKey: 'message.posted',
+        prefKey: 'message.thread_reply.posted',
       }),
     );
   });
@@ -154,7 +154,7 @@ describe('buildNotificationDecision', () => {
       event: {
         id: 'event-1',
         org_id: 'org-1',
-        event_type: 'message.posted',
+        event_type: 'message.thread_reply.posted',
         occurred_at: '2026-04-21T11:59:30.000Z',
         payload: { threadId: 'thread-1' },
         scope: { kind: 'channel', channelId: 'channel-1' },

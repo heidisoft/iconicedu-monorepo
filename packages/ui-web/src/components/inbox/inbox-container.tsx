@@ -179,6 +179,14 @@ export function resolveUnreadIdsForTab(
   return Array.from(unreadIds);
 }
 
+export function isFeedbackRequestActivity(activity: ActivityFeedItemVM) {
+  return (
+    activity.kind === 'leaf' &&
+    (activity.verb === 'session.feedback_request.sent' ||
+      activity.verb === 'sessions.feedback_request.sent')
+  );
+}
+
 export function applySessionParentLocalHeadline(
   activity: ActivityFeedItemVM,
   timezone?: string | null,
@@ -614,7 +622,7 @@ export function InboxContainer({
       displayTimezone,
     );
 
-    if (displayActivity.verb === 'session.feedback_request.sent') {
+    if (isFeedbackRequestActivity(displayActivity)) {
       if (!canRenderActivityFeedbackRequest(displayActivity as ActivityFeedLeafItemVM)) {
         return (
           <ActivityBasic

@@ -15,6 +15,21 @@ export type NotificationConfig = {
   }) => string;
 };
 
+const messageNotificationConfig: NotificationConfig = {
+  label: 'New Messages',
+  getRoute: ({ scopeKind, scopeId, channelId, threadId, channelRouteKind }) => {
+    const targetId = channelId ?? scopeId;
+    if (!targetId) return '/(app)/(tabs)/messages';
+    const base =
+      channelRouteKind === 'dm'
+        ? `/(app)/dm/${targetId}`
+        : scopeKind === 'learning_space'
+          ? `/(app)/spaces/${targetId}`
+          : `/(app)/channel/${targetId}`;
+    return threadId ? `${base}?threadId=${threadId}` : base;
+  },
+};
+
 export const NOTIFICATION_REGISTRY: Record<string, NotificationConfig> = {
   'class.session.rescheduled': {
     label: 'Session Rescheduled',
@@ -36,20 +51,12 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationConfig> = {
     getRoute: ({ channelId }) =>
       channelId ? `/(app)/spaces/${channelId}?tab=sessions` : '/(app)/(tabs)/schedule',
   },
-  'message.posted': {
-    label: 'New Messages',
-    getRoute: ({ scopeKind, scopeId, channelId, threadId, channelRouteKind }) => {
-      const targetId = channelId ?? scopeId;
-      if (!targetId) return '/(app)/(tabs)/messages';
-      const base =
-        channelRouteKind === 'dm'
-          ? `/(app)/dm/${targetId}`
-          : scopeKind === 'learning_space'
-            ? `/(app)/spaces/${targetId}`
-            : `/(app)/channel/${targetId}`;
-      return threadId ? `${base}?threadId=${threadId}` : base;
-    },
-  },
+  'message.posted': messageNotificationConfig,
+  'message.mentioned': messageNotificationConfig,
+  'message.thread_reply.posted': messageNotificationConfig,
+  'file.uploaded': messageNotificationConfig,
+  'image.uploaded': messageNotificationConfig,
+  'audio.uploaded': messageNotificationConfig,
   'session.reminder.sent': {
     label: 'Session Reminders',
     getRoute: ({ channelId }) =>

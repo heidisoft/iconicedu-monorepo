@@ -22,14 +22,25 @@ describe('NOTIFICATION_REGISTRY', () => {
     expect(route).toBe('/(app)/channel/channel-456');
   });
 
-  it('routes message.posted thread replies with a thread query param', () => {
-    const route = NOTIFICATION_REGISTRY['message.posted'].getRoute({
+  it('routes message.thread_reply.posted with a thread query param', () => {
+    const route = NOTIFICATION_REGISTRY['message.thread_reply.posted'].getRoute({
       scopeKind: 'learning_space',
       channelId: 'space-123',
       threadId: 'thread-1',
     });
     expect(route).toBe('/(app)/spaces/space-123?threadId=thread-1');
   });
+
+  it.each(['message.mentioned', 'file.uploaded', 'image.uploaded', 'audio.uploaded'])(
+    'routes %s like a message notification',
+    (prefKey) => {
+      const route = NOTIFICATION_REGISTRY[prefKey].getRoute({
+        scopeKind: 'channel',
+        channelId: 'channel-456',
+      });
+      expect(route).toBe('/(app)/channel/channel-456');
+    },
+  );
 
   it('routes reaction.added to the specific channel', () => {
     const route = NOTIFICATION_REGISTRY['reaction.added'].getRoute({

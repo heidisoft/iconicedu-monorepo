@@ -71,7 +71,12 @@ export function getIconKey(item: ActivityFeedItemVM): InboxIconKeyVM {
   if (item.content.leading?.kind === 'icon') return item.content.leading.iconKey;
   switch (item.verb) {
     case 'message.posted':
+    case 'message.mentioned':
+    case 'message.thread_reply.posted':
     case 'messages.posted':
+    case 'file.uploaded':
+    case 'image.uploaded':
+    case 'audio.uploaded':
     case 'reaction.added':
     case 'reactions.added':
       return 'MessageSquare';
@@ -326,6 +331,15 @@ export function formatActivityPrimaryHeadline(
   return `Class session${participantNamesLabel ? ` for ${participantNamesLabel}` : ''} ${localLabel}`;
 }
 
+function isFeedbackRequestActivity(item: ActivityFeedItemVM) {
+  return (
+    item.kind === 'leaf' &&
+    (item.verb === 'session.feedback_request.sent' ||
+      item.verb === 'sessions.feedback_request.sent') &&
+    canRenderMobileActivityFeedbackRequest(item)
+  );
+}
+
 export function ActivityItem({
   item,
   colors,
@@ -351,10 +365,7 @@ export function ActivityItem({
   const primary = formatActivityPrimaryHeadline(item, viewerTimezone);
   const { secondary, emphasis } = item.content.headline;
   const tabLabel = TAB_LABELS[item.tabKey] ?? item.tabKey;
-  const shouldRenderFeedbackRequest =
-    item.kind === 'leaf' &&
-    item.verb === 'session.feedback_request.sent' &&
-    canRenderMobileActivityFeedbackRequest(item);
+  const shouldRenderFeedbackRequest = isFeedbackRequestActivity(item);
 
   const handlePress = () => {
     if (!isRead) onMarkRead(item.ids.id);

@@ -56,7 +56,12 @@ const TONE_CLASSNAMES = {
 const getDefaultIconKey = (activity: ActivityFeedItemVM): InboxIconKeyVM => {
   switch (activity.verb) {
     case 'message.posted':
+    case 'message.mentioned':
+    case 'message.thread_reply.posted':
     case 'messages.posted':
+    case 'file.uploaded':
+    case 'image.uploaded':
+    case 'audio.uploaded':
       return 'MessageSquare';
     case 'reaction.added':
     case 'reactions.added':

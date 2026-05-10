@@ -5,6 +5,7 @@ import {
   applyScheduleActivityLocalTime,
   applyReadStateToSections,
   buildUnreadTabCounts,
+  isFeedbackRequestActivity,
   resolveReadIdsForActivity,
   resolveUnreadIdsForTab,
 } from './inbox-container';
@@ -100,6 +101,27 @@ describe('resolveUnreadIdsForTab', () => {
   it('returns unread ids for the selected tab', () => {
     expect(resolveUnreadIdsForTab(SECTIONS, 'classes')).toEqual(['item-1']);
     expect(resolveUnreadIdsForTab(SECTIONS, 'all')).toEqual(['item-1']);
+  });
+});
+
+describe('isFeedbackRequestActivity', () => {
+  it('matches single and grouped feedback request activities', () => {
+    expect(
+      isFeedbackRequestActivity({
+        ...SECTIONS[0]!.items[0]!,
+        verb: 'session.feedback_request.sent',
+      }),
+    ).toBe(true);
+    expect(
+      isFeedbackRequestActivity({
+        ...SECTIONS[0]!.items[0]!,
+        verb: 'sessions.feedback_request.sent',
+      }),
+    ).toBe(true);
+  });
+
+  it('does not match non-feedback activities', () => {
+    expect(isFeedbackRequestActivity(SECTIONS[0]!.items[0]!)).toBe(false);
   });
 });
 

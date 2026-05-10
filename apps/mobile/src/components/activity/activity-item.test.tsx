@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 import { MessageSquare } from 'lucide-react-native';
 
 import type { ActivityFeedItemVM } from '@iconicedu/shared-types';
@@ -52,17 +52,23 @@ function makeBaseActivity(): ActivityFeedItemVM {
   } as ActivityFeedItemVM;
 }
 
-function renderActivity(item: ActivityFeedItemVM) {
+function renderActivity(
+  item: ActivityFeedItemVM,
+  overrides?: Partial<React.ComponentProps<typeof ActivityItem>>,
+) {
+  const onMarkRead = jest.fn();
+  const onToggle = jest.fn();
   return render(
     <ActivityItem
       item={item}
       colors={lightColors}
       isDark={false}
       s={makeActivityItemStyles(lightColors)}
-      onMarkRead={jest.fn()}
+      onMarkRead={onMarkRead}
       expandedIds={new Set()}
-      onToggle={jest.fn()}
+      onToggle={onToggle}
       viewerTimezone="America/New_York"
+      {...overrides}
     />,
   );
 }
@@ -74,6 +80,30 @@ describe('ActivityItem', () => {
     expect(UNSAFE_getAllByType(MessageSquare).length).toBeGreaterThan(0);
     expect(screen.getByText('Priya Sharma')).toBeTruthy();
     expect(screen.getByText('Math Foundations')).toBeTruthy();
+  });
+
+  it('marks unread activities read when the row is pressed', () => {
+    const onMarkRead = jest.fn();
+
+    renderActivity(makeBaseActivity(), { onMarkRead });
+
+    fireEvent.press(screen.getByText('Priya Sharma'));
+
+    expect(onMarkRead).toHaveBeenCalledWith('activity-1');
+  });
+
+  it('does not mark already-read activities read again when the row is pressed', () => {
+    const onMarkRead = jest.fn();
+    const item = {
+      ...makeBaseActivity(),
+      state: { ...makeBaseActivity().state, isRead: true },
+    } as ActivityFeedItemVM;
+
+    renderActivity(item, { onMarkRead });
+
+    fireEvent.press(screen.getByText('Priya Sharma'));
+
+    expect(onMarkRead).not.toHaveBeenCalled();
   });
 
   it('formats scheduled class session headlines without the timezone suffix', () => {
@@ -125,6 +155,31 @@ describe('ActivityItem', () => {
     const item = {
       ...makeBaseActivity(),
       verb: 'session.feedback_request.sent',
+      content: {
+        headline: {
+          primary: 'Class feedback requested',
+          secondary: "How was Scott S's Math with Ms Barbara session today?",
+        },
+      },
+      metadata: {
+        sourceEventId: '11111111-1111-4111-8111-111111111111',
+        classSessionId: '33333333-3333-4333-8333-333333333333',
+        classroomId: '44444444-4444-4444-8444-444444444444',
+        channelId: '55555555-5555-4555-8555-555555555555',
+        feedbackUiEnabled: true,
+      },
+    } as ActivityFeedItemVM;
+
+    renderActivity(item);
+
+    expect(screen.getByText('Rate your session')).toBeTruthy();
+    expect(screen.getByLabelText('Rate 3 stars')).toBeTruthy();
+  });
+
+  it('renders the feedback widget inline for grouped feedback request activities', () => {
+    const item = {
+      ...makeBaseActivity(),
+      verb: 'sessions.feedback_request.sent',
       content: {
         headline: {
           primary: 'Class feedback requested',

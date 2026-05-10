@@ -368,7 +368,7 @@ export async function publishMentionActivities(input: {
     await publishActivity({
       supabase: input.supabase,
       orgId: input.orgId,
-      eventType: 'message.posted',
+      eventType: 'message.mentioned',
       occurredAt: input.now,
       sourceKind: 'profile',
       actorProfileId: input.senderProfileId,
@@ -472,7 +472,7 @@ export async function publishChannelMessageActivity(input: {
       channelTopic: activityContext.channelTopic ?? null,
       channelRouteKind: activityContext.channelRouteKind,
     },
-    dedupeKey: `${dedupePrefix}:${input.messageId}`,
+    dedupeKey: `${eventType}:${input.messageId}`,
     createdBy: input.senderProfileId,
   });
 }
@@ -609,7 +609,7 @@ export async function publishThreadReplyActivities(input: {
     await publishActivity({
       supabase: input.supabase,
       orgId: input.orgId,
-      eventType: 'message.posted',
+      eventType: 'message.thread_reply.posted',
       occurredAt: input.now,
       sourceKind: 'profile',
       actorProfileId: input.senderProfileId,
@@ -670,8 +670,6 @@ export async function publishFileUploadActivity(input: {
       senderProfileId: input.senderProfileId,
     }));
   const isDmRoute = activityContext.channelRouteKind === 'dm';
-  const eventType = 'message.posted';
-  const dedupePrefix = 'message.posted';
   const activityContent = input.content?.trim() || input.name;
   const dmMessageKind =
     typeof input.mimeType === 'string' && input.mimeType.startsWith('image/')
@@ -679,6 +677,12 @@ export async function publishFileUploadActivity(input: {
       : typeof input.mimeType === 'string' && input.mimeType.startsWith('audio/')
         ? 'audio'
         : 'file';
+  const eventType =
+    dmMessageKind === 'image'
+      ? 'image.uploaded'
+      : dmMessageKind === 'audio'
+        ? 'audio.uploaded'
+        : 'file.uploaded';
   const dmRecipients = isDmRoute
     ? await resolveDmActivityRecipientProfileIds({
         supabase: readSupabase,
@@ -730,7 +734,7 @@ export async function publishFileUploadActivity(input: {
       channelTopic: activityContext.channelTopic ?? null,
       channelRouteKind: activityContext.channelRouteKind,
     },
-    dedupeKey: `${dedupePrefix}:${input.messageId}`,
+    dedupeKey: `${eventType}:${input.messageId}`,
     createdBy: input.senderProfileId,
   });
 }

@@ -361,6 +361,61 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => renderMessageItem(event, 'message.posted'),
   },
+  'message.mentioned': {
+    eventType: 'message.mentioned',
+    tabKey: 'all',
+    importance: 'normal',
+    notification: {
+      defaultChannels: ['push'],
+      timing: 'standard',
+    },
+    resolveRecipients: DEFAULT_RECIPIENTS,
+    render: (event) => renderMessageItem(event, 'message.mentioned'),
+  },
+  'message.thread_reply.posted': {
+    eventType: 'message.thread_reply.posted',
+    tabKey: 'all',
+    importance: 'normal',
+    notification: {
+      defaultChannels: ['push'],
+      timing: 'standard',
+    },
+    resolveRecipients: DEFAULT_RECIPIENTS,
+    render: (event) => renderMessageItem(event, 'message.thread_reply.posted'),
+  },
+  'file.uploaded': {
+    eventType: 'file.uploaded',
+    tabKey: 'all',
+    importance: 'normal',
+    notification: {
+      defaultChannels: ['push'],
+      timing: 'standard',
+    },
+    resolveRecipients: DEFAULT_RECIPIENTS,
+    render: (event) => renderMessageItem(event, 'file.uploaded'),
+  },
+  'image.uploaded': {
+    eventType: 'image.uploaded',
+    tabKey: 'all',
+    importance: 'normal',
+    notification: {
+      defaultChannels: ['push'],
+      timing: 'standard',
+    },
+    resolveRecipients: DEFAULT_RECIPIENTS,
+    render: (event) => renderMessageItem(event, 'image.uploaded'),
+  },
+  'audio.uploaded': {
+    eventType: 'audio.uploaded',
+    tabKey: 'all',
+    importance: 'normal',
+    notification: {
+      defaultChannels: ['push'],
+      timing: 'standard',
+    },
+    resolveRecipients: DEFAULT_RECIPIENTS,
+    render: (event) => renderMessageItem(event, 'audio.uploaded'),
+  },
   'reaction.added': {
     eventType: 'reaction.added',
     tabKey: 'all',

@@ -294,13 +294,30 @@ export function buildPersonalizedSessionCopy(
     recipientRole,
   });
 
-  if (eventType === 'message.posted') {
+  if (
+    eventType === 'message.posted' ||
+    eventType === 'message.mentioned' ||
+    eventType === 'message.thread_reply.posted' ||
+    eventType === 'file.uploaded' ||
+    eventType === 'image.uploaded' ||
+    eventType === 'audio.uploaded'
+  ) {
     const senderName = asString(payload.senderName);
     const content = asString(payload.content).slice(0, 160);
     const contextTitle = getContextTitle(payload);
-    const isMention = Boolean(asOptionalString(payload.mentionedProfileId));
-    const isThreadReply = payload.threadReply === true;
-    const dmMessageKind = asString(payload.dmMessageKind);
+    const isMention =
+      eventType === 'message.mentioned' ||
+      Boolean(asOptionalString(payload.mentionedProfileId));
+    const isThreadReply =
+      eventType === 'message.thread_reply.posted' || payload.threadReply === true;
+    const dmMessageKind =
+      eventType === 'image.uploaded'
+        ? 'image'
+        : eventType === 'audio.uploaded'
+          ? 'audio'
+          : eventType === 'file.uploaded'
+            ? 'file'
+            : asString(payload.dmMessageKind);
 
     let title: string;
     if (isThreadReply) {

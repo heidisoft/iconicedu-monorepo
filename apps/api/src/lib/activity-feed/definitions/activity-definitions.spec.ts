@@ -59,6 +59,28 @@ describe('API activity definitions context rendering', () => {
     expect(rendered.metadata?.viewerStudentNames).toEqual(['Priya']);
   });
 
+  it.each([
+    ['message.mentioned', { mentionedProfileId: 'guardian-1' }],
+    ['message.thread_reply.posted', { threadId: 'thread-1', threadReply: true }],
+    ['file.uploaded', { dmMessageKind: 'file', name: 'worksheet.pdf' }],
+    ['image.uploaded', { dmMessageKind: 'image', name: 'photo.png' }],
+    ['audio.uploaded', { dmMessageKind: 'audio', name: 'voice.webm' }],
+  ] as const)('renders %s with its own projected verb', (eventType, payload) => {
+    const definition = getActivityEventDefinition(eventType);
+    expect(definition).toBeDefined();
+
+    const rendered = definition!.render(
+      makeEvent(eventType, {
+        senderName: 'Ms. Chen',
+        messageId: 'message-1',
+        content: 'Please review the worksheet.',
+        ...payload,
+      }),
+    );
+
+    expect(rendered.verb).toBe(eventType);
+  });
+
   it('renders teacher-facing class context with students', () => {
     const definition = getActivityEventDefinition('session.reminder.sent');
     expect(definition).toBeDefined();

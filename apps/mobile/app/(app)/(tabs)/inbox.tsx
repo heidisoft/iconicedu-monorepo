@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -136,9 +136,6 @@ const FALLBACK_TABS: Array<{ key: InboxTabKeyVM; label: string }> = [
   { key: 'system', label: 'System' },
 ];
 
-// Auto-read: item must be 60% visible for 1500ms
-const VIEWABILITY_CONFIG = { minimumViewTime: 1500, itemVisiblePercentThreshold: 60 };
-
 export default function InboxScreen() {
   const { colors, isDark } = useTheme();
   const s = React.useMemo(() => makeStyles(colors), [colors]);
@@ -169,19 +166,6 @@ export default function InboxScreen() {
 
   // Press-to-read: immediately mark via mutation (optimistic cache update)
   const onMarkRead = useCallback((id: string) => markRead([id]), [markRead]);
-
-  // Auto-read via SectionList viewability — stable ref pattern to avoid re-renders
-  const markReadRef = useRef(markRead);
-  markReadRef.current = markRead;
-
-  const onViewableItemsChanged = useRef(
-    ({ viewableItems }: { viewableItems: Array<{ item: ActivityFeedItemVM }> }) => {
-      const unreadIds = viewableItems
-        .filter(({ item }) => item?.ids?.id && !item.state?.isRead)
-        .map(({ item }) => item.ids.id);
-      if (unreadIds.length) markReadRef.current(unreadIds);
-    },
-  ).current;
 
   const feedSections = useMemo(() => feed?.sections ?? [], [feed?.sections]);
   const feedTabs =
@@ -297,8 +281,6 @@ export default function InboxScreen() {
           keyExtractor={(item, index) => item?.ids?.id ?? String(index)}
           stickySectionHeadersEnabled={false}
           contentContainerStyle={{ paddingTop: 8, paddingBottom: 24 }}
-          viewabilityConfig={VIEWABILITY_CONFIG}
-          onViewableItemsChanged={onViewableItemsChanged}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
