@@ -451,6 +451,10 @@ export class RemindersService {
     );
   }
 
+  async resetAndReconcileOrgReminderJobs(orgId: string) {
+    return this.reminderReconcileService.resetAndReconcileOrgReminderJobs(orgId);
+  }
+
   async cancelLearningSpaceReminderJobs(
     accessToken: string,
     input: { orgId: string; learningSpaceId: string },

@@ -401,6 +401,60 @@ export class ReminderReconcileService {
     return { reconciledCount, canceledCount };
   }
 
+  async resetAndReconcileOrgReminderJobs(orgId: string): Promise<{
+    canceledCount: number;
+    reconciledCount: number;
+    scheduleCount: number;
+  }> {
+    const supabase = this.getSupabase();
+
+    // Hard-delete all non-succeeded jobs so their dedupe_keys are freed for
+    // re-insertion. Only 'succeeded' rows must be kept — they are idempotency
+    // markers that prevent re-dispatching already-sent reminders. Any other
+    // status (pending, leased, failed, canceled, dead_letter) blocks the
+    // reconciler from re-inserting the same upcoming occurrence.
+    const { data: deletedRows, error: deleteError } = await supabase
+      .from('reminder_jobs')
+      .delete()
+      .eq('org_id', orgId)
+      .not('status', 'in', '("succeeded")')
+      .select('id')
+      .returns<Array<{ id: string }>>();
+
+    if (deleteError) {
+      throw new InternalServerErrorException(deleteError.message);
+    }
+
+    const canceledCount = (deletedRows ?? []).length;
+
+    const { data: scheduleRows, error: scheduleError } = await supabase
+      .from('class_schedules')
+      .select('id')
+      .eq('org_id', orgId)
+      .eq('source_kind', 'class_session')
+      .is('deleted_at', null)
+      .returns<Array<{ id: string }>>();
+
+    if (scheduleError) {
+      throw new InternalServerErrorException(scheduleError.message);
+    }
+
+    const scheduleIds = (scheduleRows ?? []).map((r) => r.id);
+    let reconciledCount = 0;
+
+    for (const scheduleId of scheduleIds) {
+      const result = await this.reconcileNextReminderJobForSchedule({
+        orgId,
+        scheduleId,
+      });
+      if (result.action === 'inserted' || result.action === 'kept') {
+        reconciledCount += 1;
+      }
+    }
+
+    return { canceledCount, reconciledCount, scheduleCount: scheduleIds.length };
+  }
+
   // ─── Chain computation ───────────────────────────────────────────────────────
 
   private computeNextJobInChain(

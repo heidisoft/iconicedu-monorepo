@@ -562,9 +562,11 @@ function renderSessionItem(event: ActivityEventRow, variant: SessionRenderVarian
       summary: startTimeLabel
         ? `${classTitle} starts at ${startTimeLabel}`
         : (asOptionalString(payload.summary) ?? `${classTitle} starts soon`),
-      expandedContent:
-        firstOptionalString(payload.joinDetails, payload.outline, payload.sessionNotes) ??
-        'Join details, class outline, or session notes',
+      expandedContent: firstOptionalString(
+        payload.joinDetails,
+        payload.outline,
+        payload.sessionNotes,
+      ),
       actionLabel: 'Open class',
     },
     feedback: {
@@ -573,9 +575,10 @@ function renderSessionItem(event: ActivityEventRow, variant: SessionRenderVarian
       tone: 'info' as const,
       primary: `Share feedback for ${classTitle}`,
       summary: 'Tell us how the session went',
-      expandedContent:
-        firstOptionalString(payload.feedbackPrompt, payload.feedbackDetails) ??
-        'Feedback form or quick rating UI',
+      expandedContent: firstOptionalString(
+        payload.feedbackPrompt,
+        payload.feedbackDetails,
+      ),
       actionLabel: 'Give feedback',
     },
   }[variant];

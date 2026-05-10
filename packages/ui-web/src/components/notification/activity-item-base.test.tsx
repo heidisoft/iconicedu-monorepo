@@ -80,4 +80,52 @@ describe('ActivityItemBase', () => {
       ),
     ).not.toBeNull();
   });
+
+  it('renders preview text when summary is absent', () => {
+    const activity = createActivity();
+    activity.content.summary = undefined;
+    activity.content.preview = { text: 'Preview from projected content' };
+
+    render(<ActivityItemBase activity={activity} onMarkRead={vi.fn()} />);
+
+    expect(screen.getByText('Preview from projected content')).toBeInTheDocument();
+  });
+
+  it('renders preview text even when expanded content footer is present', () => {
+    const activity = createActivity();
+    activity.content.summary = undefined;
+    activity.content.preview = { text: 'Message preview text' };
+
+    render(
+      <ActivityItemBase
+        activity={activity}
+        onMarkRead={vi.fn()}
+        footer={<div>Expanded detail</div>}
+      />,
+    );
+
+    expect(screen.getByText('Message preview text')).toBeInTheDocument();
+    expect(screen.getByText('Expanded detail')).toBeInTheDocument();
+  });
+
+  it('prefers summary over preview text when both are present', () => {
+    const activity = createActivity();
+    activity.content.summary = 'Summary preview';
+    activity.content.preview = { text: 'Projected preview' };
+
+    render(<ActivityItemBase activity={activity} onMarkRead={vi.fn()} />);
+
+    expect(screen.getByText('Summary preview')).toBeInTheDocument();
+    expect(screen.queryByText('Projected preview')).not.toBeInTheDocument();
+  });
+
+  it('hides preview text when summary and preview are blank', () => {
+    const activity = createActivity();
+    activity.content.summary = '   ';
+    activity.content.preview = { text: '   ' };
+
+    render(<ActivityItemBase activity={activity} onMarkRead={vi.fn()} />);
+
+    expect(screen.queryByText('Preview from projected content')).not.toBeInTheDocument();
+  });
 });

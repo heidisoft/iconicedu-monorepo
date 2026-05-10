@@ -7,6 +7,7 @@ const ALLOWED_KINDS = [
   'events-dispatch',
   'reminders-dispatch',
   'channel-read-state-repair',
+  'reminder-jobs-reset',
 ] as const;
 
 type FunctionKind = (typeof ALLOWED_KINDS)[number];
@@ -47,6 +48,8 @@ function resolveInternalToken(kind: FunctionKind) {
       return process.env.INTERNAL_EVENTS_TOKEN?.trim() || '';
     case 'reminders-dispatch':
       return process.env.INTERNAL_REMINDERS_TOKEN?.trim() || '';
+    case 'reminder-jobs-reset':
+      return process.env.INTERNAL_REMINDERS_TOKEN?.trim() || '';
     case 'channel-read-state-repair':
       return '';
   }
@@ -58,6 +61,8 @@ function resolveApiPath(kind: FunctionKind) {
       return '/internal/events/dispatch';
     case 'reminders-dispatch':
       return '/internal/reminders/dispatch';
+    case 'reminder-jobs-reset':
+      return '/internal/reminders/reset-and-reconcile-org';
     case 'channel-read-state-repair':
       return null;
   }
@@ -76,6 +81,10 @@ function asOptionalString(value: unknown) {
 }
 
 function buildCronBridgeBody(kind: FunctionKind, body: AdminToolsDispatchRequest) {
+  if (kind === 'reminder-jobs-reset') {
+    return { orgId: body.orgId };
+  }
+
   const limit = asOptionalPositiveInt(body.limit);
   const leaseSeconds = asOptionalPositiveInt(body.leaseSeconds);
   const leaseOwner = asOptionalString(body.leaseOwner) ?? 'supabase-edge-cron';

@@ -223,6 +223,7 @@ describe('API activity definitions context rendering', () => {
       primary: 'Algebra I starting soon',
       secondary: 'For Priya with Ms. Chen',
     });
+    expect(reminder.expandedContent).toBeUndefined();
     expect(reminder.actionButton?.label).toBe('Open class');
 
     expect(feedbackDefinition?.tabKey).toBe('classes');
@@ -237,7 +238,29 @@ describe('API activity definitions context rendering', () => {
     });
     expect(feedback.headline.primary).toBe('Share feedback for Algebra I');
     expect(feedback.summary).toBe('Tell us how the session went');
+    expect(feedback.expandedContent).toBeUndefined();
     expect(feedback.actionButton?.label).toBe('Give feedback');
+  });
+
+  it('only sets session expanded content when payload content exists', () => {
+    const reminderDefinition = getActivityEventDefinition('session.reminder.sent');
+    const feedbackDefinition = getActivityEventDefinition(
+      'session.feedback_request.sent',
+    );
+
+    const reminder = reminderDefinition!.render(
+      makeEvent('session.reminder.sent', {
+        joinDetails: 'Join with the class Zoom link.',
+      }),
+    );
+    const feedback = feedbackDefinition!.render(
+      makeEvent('session.feedback_request.sent', {
+        feedbackPrompt: 'Rate the session and leave a note.',
+      }),
+    );
+
+    expect(reminder.expandedContent).toBe('Join with the class Zoom link.');
+    expect(feedback.expandedContent).toBe('Rate the session and leave a note.');
   });
 
   it.each([

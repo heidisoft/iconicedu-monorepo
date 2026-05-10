@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -97,5 +98,23 @@ export class RemindersController {
     }
     const dto = parseLearningSpaceRemindersDto(body);
     return this.remindersService.reconcileLearningSpaceReminderJobsInternal(dto);
+  }
+
+  @Post('internal/reminders/reset-and-reconcile-org')
+  async resetAndReconcileOrg(
+    @Headers('authorization') authorization: string | undefined,
+    @Body() body: unknown,
+  ) {
+    const expectedToken = resolveExpectedToken();
+    if (!expectedToken || authorization !== `Bearer ${expectedToken}`) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+    const input =
+      body && typeof body === 'object' ? (body as Record<string, unknown>) : {};
+    const orgId = typeof input.orgId === 'string' ? input.orgId.trim() : '';
+    if (!orgId) {
+      throw new BadRequestException('orgId is required');
+    }
+    return this.remindersService.resetAndReconcileOrgReminderJobs(orgId);
   }
 }
