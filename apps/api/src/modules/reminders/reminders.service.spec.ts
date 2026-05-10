@@ -2,6 +2,7 @@ import { ForbiddenException, Logger } from '@nestjs/common';
 import { RemindersService } from '@iconicedu/api/modules/reminders/reminders.service';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
+import { publishActivityEvent } from '@iconicedu/api/lib/activity-feed/activity-publisher';
 
 jest.mock('@iconicedu/api/lib/supabase/service', () => ({
   createSupabaseServiceClient: jest.fn(),
@@ -11,10 +12,15 @@ jest.mock('@iconicedu/api/lib/supabase/session', () => ({
   createSupabaseSessionClient: jest.fn(),
 }));
 
+jest.mock('@iconicedu/api/lib/activity-feed/activity-publisher', () => ({
+  publishActivityEvent: jest.fn(async () => ({ id: 'activity-event-1' })),
+}));
+
 describe('RemindersService', () => {
   const analytics = { capture: jest.fn() };
   const createSupabaseServiceClientMock = jest.mocked(createSupabaseServiceClient);
   const createSupabaseSessionClientMock = jest.mocked(createSupabaseSessionClient);
+  const publishActivityEventMock = jest.mocked(publishActivityEvent);
   const originalSupabaseUrl = process.env.SUPABASE_URL;
   let loggerLogSpy: jest.SpyInstance;
   let loggerWarnSpy: jest.SpyInstance;
@@ -496,6 +502,17 @@ describe('RemindersService', () => {
 
     expect(result.claimed).toBe(1);
     expect(result.succeeded).toBe(1);
+    expect(publishActivityEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'session.reminder.sent',
+        dedupeKey: `${claimedJob.dedupe_key}:activity`,
+        payload: expect.objectContaining({
+          title: 'Algebra',
+          learningSpaceTitle: 'Algebra',
+          channelRouteKind: 'space',
+        }),
+      }),
+    );
     expect(supabase.rpc).toHaveBeenCalledWith('claim_due_reminder_jobs', {
       p_limit: 10,
       p_lease_owner: 'supabase-edge-cron',

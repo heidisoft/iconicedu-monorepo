@@ -58,6 +58,19 @@ describe('NOTIFICATION_REGISTRY', () => {
     expect(route).toBe('/(app)/dm/dm-123');
   });
 
+  it.each([
+    'class.session.rescheduled',
+    'class.session.canceled',
+    'session.reminder.sent',
+    'session.feedback_request.sent',
+  ])('routes %s to the class space', (prefKey) => {
+    const route = NOTIFICATION_REGISTRY[prefKey].getRoute({
+      scopeKind: 'learning_space',
+      channelId: 'space-channel-123',
+    });
+    expect(route).toBe('/(app)/spaces/space-channel-123');
+  });
+
   it('falls back to DEFAULT_NOTIFICATION_ROUTE for unknown prefKeys', () => {
     expect(DEFAULT_NOTIFICATION_ROUTE).toBe('/(app)/(tabs)/inbox');
   });

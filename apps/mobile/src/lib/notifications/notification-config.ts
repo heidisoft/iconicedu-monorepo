@@ -30,6 +30,14 @@ const messageNotificationConfig: NotificationConfig = {
   },
 };
 
+const classNotificationConfig: NotificationConfig = {
+  label: 'Class Updates',
+  getRoute: ({ scopeKind, scopeId, channelId }) => {
+    const targetId = channelId ?? (scopeKind === 'learning_space' ? scopeId : undefined);
+    return targetId ? `/(app)/spaces/${targetId}` : '/(app)/(tabs)/inbox';
+  },
+};
+
 export const NOTIFICATION_REGISTRY: Record<string, NotificationConfig> = {
   'message.posted': messageNotificationConfig,
   'message.mentioned': messageNotificationConfig,
@@ -50,6 +58,10 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationConfig> = {
         : `/(app)/channel/${targetId}`;
     },
   },
+  'class.session.rescheduled': classNotificationConfig,
+  'class.session.canceled': classNotificationConfig,
+  'session.reminder.sent': classNotificationConfig,
+  'session.feedback_request.sent': classNotificationConfig,
 };
 
 export const DEFAULT_NOTIFICATION_ROUTE = '/(app)/(tabs)/inbox';

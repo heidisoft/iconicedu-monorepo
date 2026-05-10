@@ -4,13 +4,15 @@ import {
   AtSign,
   Bell,
   BookImage,
-  CheckCircle,
+  CalendarCheck,
+  CalendarX,
   CreditCard,
   FileBadge,
   FileHeadphone,
   GraduationCap,
   MessageSquare,
   MessageSquareDot,
+  MessageSquareHeart,
   MessageSquareReply,
   MessagesSquare,
   SmilePlus,
@@ -29,14 +31,15 @@ export const ACTIVITY_ICON_MAP: Record<
   AtSign,
   Bell,
   BookImage,
-  CalendarCheck: Bell,
-  CalendarX: Bell,
+  CalendarCheck,
+  CalendarX,
   CreditCard,
   FileBadge,
   FileHeadphone,
   GraduationCap,
   MessageSquare,
   MessageSquareDot,
+  MessageSquareHeart,
   MessageSquareReply,
   MessagesSquare,
   SmilePlus,
@@ -96,6 +99,14 @@ export function getIconKey(item: ActivityFeedItemVM): InboxIconKeyVM {
       return 'FileHeadphone';
     case 'reaction.added':
       return 'SmilePlus';
+    case 'class.session.rescheduled':
+      return 'CalendarCheck';
+    case 'class.session.canceled':
+      return 'CalendarX';
+    case 'session.reminder.sent':
+      return 'Bell';
+    case 'session.feedback_request.sent':
+      return 'MessageSquareHeart';
     default:
       return 'Bell';
   }

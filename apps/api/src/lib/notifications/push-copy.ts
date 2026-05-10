@@ -385,6 +385,85 @@ export function buildPersonalizedSessionCopy(
     return { title, summary: title };
   }
 
+  if (eventType === 'class.session.rescheduled') {
+    const oldLabel = formatSessionDateTime(
+      firstDefinedString(
+        payload.oldSessionDateTime,
+        payload.rescheduledFromStartAt,
+        payload.previousStartAt,
+        payload.originalStartAt,
+        payload.occurrenceStart,
+      ),
+      payload,
+    );
+    const newLabel = formatSessionDateTime(
+      firstDefinedString(
+        payload.newSessionDateTime,
+        payload.rescheduledToStartAt,
+        payload.newStartAt,
+        payload.startAt,
+        payload.firstSessionStartAt,
+      ),
+      payload,
+    );
+    return {
+      title: `${classTitle} rescheduled`,
+      summary:
+        oldLabel && newLabel
+          ? `${oldLabel} was moved to ${newLabel}`
+          : (getRescheduledSessionSummary(payload) ??
+            'A class session has been rescheduled.'),
+    };
+  }
+
+  if (eventType === 'class.session.canceled') {
+    const sessionLabel = formatSessionDateTime(
+      firstDefinedString(
+        payload.sessionDateTime,
+        payload.canceledStartAt,
+        payload.startAt,
+        payload.occurrenceStart,
+        payload.firstSessionStartAt,
+      ),
+      payload,
+    );
+    return {
+      title: `${classTitle} canceled`,
+      summary: sessionLabel
+        ? `${sessionLabel} was canceled`
+        : (getCanceledSessionSummary(payload) ?? 'A class session has been canceled.'),
+    };
+  }
+
+  if (eventType === 'session.reminder.sent') {
+    const startAt = firstDefinedString(
+      payload.sessionDateTime,
+      payload.startAt,
+      payload.occurrenceStart,
+      payload.firstSessionStartAt,
+    );
+    const startTime = startAt
+      ? formatTime(
+          startAt,
+          resolveViewerTimezone(extractDisplayTimezone(payload)),
+          'withZone',
+        )
+      : undefined;
+    return {
+      title: `${classTitle} starting soon`,
+      summary: startTime
+        ? `${classTitle} starts at ${startTime}`
+        : getEventSummary(payload, `${classTitle} starts soon`),
+    };
+  }
+
+  if (eventType === 'session.feedback_request.sent') {
+    return {
+      title: `Share feedback for ${classTitle}`,
+      summary: 'Tell us how the session went',
+    };
+  }
+
   if (eventType === 'session.completed') {
     const fallback = `${classTitle} is complete`;
     return {

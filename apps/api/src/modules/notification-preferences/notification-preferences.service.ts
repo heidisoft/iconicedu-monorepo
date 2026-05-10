@@ -19,6 +19,10 @@ export class NotificationPreferencesService {
     { prefKey: 'image.uploaded', channels: ['push', 'email'] },
     { prefKey: 'audio.uploaded', channels: ['push', 'email'] },
     { prefKey: 'reaction.added', channels: ['push', 'email'] },
+    { prefKey: 'class.session.rescheduled', channels: ['push', 'email'] },
+    { prefKey: 'class.session.canceled', channels: ['push', 'email'] },
+    { prefKey: 'session.reminder.sent', channels: ['push'] },
+    { prefKey: 'session.feedback_request.sent', channels: ['push', 'email'] },
   ] as const;
 
   private normalizeChannels(channels: string[]) {

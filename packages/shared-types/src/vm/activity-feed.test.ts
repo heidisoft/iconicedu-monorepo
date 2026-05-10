@@ -14,6 +14,10 @@ describe('ActivityVerbVM', () => {
     expectTypeOf<'image.uploaded'>().toMatchTypeOf<ActivityVerbVM>();
     expectTypeOf<'audio.uploaded'>().toMatchTypeOf<ActivityVerbVM>();
     expectTypeOf<'reaction.added'>().toMatchTypeOf<ActivityVerbVM>();
+    expectTypeOf<'class.session.rescheduled'>().toMatchTypeOf<ActivityVerbVM>();
+    expectTypeOf<'class.session.canceled'>().toMatchTypeOf<ActivityVerbVM>();
+    expectTypeOf<'session.reminder.sent'>().toMatchTypeOf<ActivityVerbVM>();
+    expectTypeOf<'session.feedback_request.sent'>().toMatchTypeOf<ActivityVerbVM>();
   });
 
   it('supports activity suppression rule types', () => {

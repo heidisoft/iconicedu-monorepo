@@ -15,6 +15,7 @@ import {
   GraduationCap,
   MessageSquare,
   MessageSquareDot,
+  MessageSquareHeart,
   MessageSquareReply,
   MessagesSquare,
   SmilePlus,
@@ -56,6 +57,7 @@ const INBOX_ICON_MAP: Record<
   GraduationCap,
   MessageSquare,
   MessageSquareDot,
+  MessageSquareHeart,
   MessageSquareReply,
   MessagesSquare,
   SmilePlus,
@@ -85,6 +87,14 @@ const getDefaultIconKey = (activity: ActivityFeedItemVM): InboxIconKeyVM => {
       return 'FileHeadphone';
     case 'reaction.added':
       return 'SmilePlus';
+    case 'class.session.rescheduled':
+      return 'CalendarCheck';
+    case 'class.session.canceled':
+      return 'CalendarX';
+    case 'session.reminder.sent':
+      return 'Bell';
+    case 'session.feedback_request.sent':
+      return 'MessageSquareHeart';
     default:
       return 'Bell';
   }

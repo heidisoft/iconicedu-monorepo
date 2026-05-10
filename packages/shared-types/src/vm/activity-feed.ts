@@ -14,7 +14,11 @@ export type ActivityVerbVM =
   | 'file.uploaded'
   | 'image.uploaded'
   | 'audio.uploaded'
-  | 'reaction.added';
+  | 'reaction.added'
+  | 'class.session.rescheduled'
+  | 'class.session.canceled'
+  | 'session.reminder.sent'
+  | 'session.feedback_request.sent';
 
 export type ActivitySourceKindVM =
   | 'profile'
@@ -53,6 +57,7 @@ export type InboxIconKeyVM =
   | 'GraduationCap'
   | 'MessageSquare'
   | 'MessageSquareDot'
+  | 'MessageSquareHeart'
   | 'MessageSquareReply'
   | 'MessagesSquare'
   | 'SmilePlus'

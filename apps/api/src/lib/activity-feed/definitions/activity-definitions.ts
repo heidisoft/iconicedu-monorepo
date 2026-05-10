@@ -10,6 +10,7 @@ import type {
 import type { ActivityEventRow } from '@iconicedu/shared-types';
 import type { SupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 import { resolveRecipientsForActivityEvent } from '@iconicedu/api/lib/activity-feed/projector/recipient-resolution';
+import { formatDateTime, formatTime, resolveViewerTimezone } from '@iconicedu/utils';
 
 export type ActivityRenderResult = {
   verb: ActivityVerbVM;
@@ -82,8 +83,10 @@ function getContextTitle(payload: Record<string, unknown>) {
 function getActivityContext(payload: Record<string, unknown>) {
   const context = asRecord(payload.activityContext);
   return {
-    viewerRole: asOptionalString(context.viewerRole),
-    viewerIsAdminStaff: context.viewerIsAdminStaff === true,
+    viewerRole:
+      asOptionalString(context.viewerRole) ?? asOptionalString(payload.viewerRole),
+    viewerIsAdminStaff:
+      context.viewerIsAdminStaff === true || payload.viewerIsAdminStaff === true,
     classTitle:
       asOptionalString(context.classTitle) ??
       asOptionalString(context.contextTitle) ??
@@ -95,6 +98,87 @@ function getActivityContext(payload: Record<string, unknown>) {
     viewerStudentNames: asStringArray(context.viewerStudentNames),
     participantNamesLabel: asOptionalString(context.participantNamesLabel),
   };
+}
+
+function formatCompactNames(names: string[], suffix?: string) {
+  const uniqueNames = Array.from(new Set(names.filter(Boolean)));
+  if (!uniqueNames.length) return undefined;
+  if (uniqueNames.length === 1) return uniqueNames[0];
+
+  const extraCount = uniqueNames.length - 1;
+  const suffixText = suffix ? ` ${extraCount === 1 ? suffix : `${suffix}s`}` : '';
+  return `${uniqueNames[0]} + ${extraCount}${suffixText}`;
+}
+
+function buildRoleContextLabel(payload: Record<string, unknown>) {
+  const context = getActivityContext(payload);
+  const viewerRole = context.viewerRole;
+  const teacherLabel = formatCompactNames(context.teacherNames);
+  const studentNames =
+    viewerRole === 'guardian' && context.viewerStudentNames.length
+      ? context.viewerStudentNames
+      : context.studentNames;
+  const studentLabel = formatCompactNames(
+    studentNames,
+    viewerRole === 'educator' ? 'student' : undefined,
+  );
+  const guardianLabel = formatCompactNames(context.guardianNames);
+
+  if (context.viewerIsAdminStaff || viewerRole === 'staff') {
+    const parts = [
+      guardianLabel ? `Parent: ${guardianLabel}` : undefined,
+      studentLabel ? `Student: ${studentLabel}` : undefined,
+      teacherLabel ? `Teacher: ${teacherLabel}` : undefined,
+    ].filter((part): part is string => Boolean(part));
+    return parts.length ? parts.join(' · ') : undefined;
+  }
+
+  if (viewerRole === 'guardian') {
+    if (studentLabel && teacherLabel) return `For ${studentLabel} with ${teacherLabel}`;
+    if (studentLabel) return `For ${studentLabel}`;
+    if (teacherLabel) return `With ${teacherLabel}`;
+    return undefined;
+  }
+
+  if (viewerRole === 'educator') {
+    return studentLabel ? `With ${studentLabel}` : undefined;
+  }
+
+  if (viewerRole === 'child') {
+    return teacherLabel ? `With ${teacherLabel}` : undefined;
+  }
+
+  if (studentLabel && teacherLabel) return `For ${studentLabel} with ${teacherLabel}`;
+  if (teacherLabel) return `With ${teacherLabel}`;
+  if (studentLabel) return `With ${studentLabel}`;
+  return undefined;
+}
+
+function getDisplayTimezone(payload: Record<string, unknown>) {
+  return resolveViewerTimezone(
+    asOptionalString(payload.viewerTimezone) ??
+      asOptionalString(payload.recipientTimezone) ??
+      asOptionalString(payload.timezone) ??
+      asOptionalString(payload.firstSessionTimezone),
+  );
+}
+
+function formatSessionDateTime(value: unknown, payload: Record<string, unknown>) {
+  if (typeof value !== 'string' || !value.length) return undefined;
+  return formatDateTime(value, getDisplayTimezone(payload), 'natural');
+}
+
+function formatSessionStartTime(value: unknown, payload: Record<string, unknown>) {
+  if (typeof value !== 'string' || !value.length) return undefined;
+  return formatTime(value, getDisplayTimezone(payload), 'withZone');
+}
+
+function firstOptionalString(...values: unknown[]) {
+  for (const value of values) {
+    const normalized = asOptionalString(value);
+    if (normalized) return normalized;
+  }
+  return undefined;
 }
 
 function buildRoleAwareContextLabel(payload: Record<string, unknown>) {
@@ -408,6 +492,119 @@ function renderReactionItem(event: ActivityEventRow) {
   } satisfies ActivityRenderResult;
 }
 
+type SessionRenderVariant = 'rescheduled' | 'canceled' | 'reminder' | 'feedback';
+
+function renderSessionItem(event: ActivityEventRow, variant: SessionRenderVariant) {
+  const payload = asRecord(event.payload);
+  const classTitle =
+    getActivityContext(payload).classTitle ?? getContextTitle(payload) ?? 'Class';
+  const roleContext = buildRoleContextLabel(payload);
+  const oldStartAt = firstOptionalString(
+    payload.oldSessionDateTime,
+    payload.rescheduledFromStartAt,
+    payload.previousStartAt,
+    payload.originalStartAt,
+    payload.occurrenceStart,
+  );
+  const newStartAt = firstOptionalString(
+    payload.newSessionDateTime,
+    payload.rescheduledToStartAt,
+    payload.newStartAt,
+    payload.startAt,
+    payload.firstSessionStartAt,
+  );
+  const sessionStartAt = firstOptionalString(
+    payload.sessionDateTime,
+    payload.canceledStartAt,
+    payload.startAt,
+    payload.occurrenceStart,
+    payload.firstSessionStartAt,
+  );
+  const oldLabel = formatSessionDateTime(oldStartAt, payload);
+  const newLabel = formatSessionDateTime(newStartAt, payload);
+  const sessionLabel = formatSessionDateTime(sessionStartAt, payload);
+  const startTimeLabel = formatSessionStartTime(sessionStartAt, payload);
+  const rescheduledReason = firstOptionalString(
+    payload.rescheduledReason,
+    payload.reason,
+  );
+  const canceledReason = firstOptionalString(payload.canceledReason, payload.reason);
+
+  const config = {
+    rescheduled: {
+      verb: 'class.session.rescheduled' as const,
+      iconKey: 'CalendarCheck' as const,
+      tone: 'info' as const,
+      primary: `${classTitle} rescheduled`,
+      summary:
+        oldLabel && newLabel
+          ? `${oldLabel} was moved to ${newLabel}`
+          : newLabel
+            ? `Moved to ${newLabel}`
+            : undefined,
+      expandedContent: rescheduledReason ? `Reason: ${rescheduledReason}` : undefined,
+      actionLabel: 'Open class',
+    },
+    canceled: {
+      verb: 'class.session.canceled' as const,
+      iconKey: 'CalendarX' as const,
+      tone: 'warning' as const,
+      primary: `${classTitle} canceled`,
+      summary: sessionLabel ? `${sessionLabel} was canceled` : undefined,
+      expandedContent: canceledReason ? `Reason: ${canceledReason}` : undefined,
+      actionLabel: 'Open class',
+    },
+    reminder: {
+      verb: 'session.reminder.sent' as const,
+      iconKey: 'Bell' as const,
+      tone: 'info' as const,
+      primary: `${classTitle} starting soon`,
+      summary: startTimeLabel
+        ? `${classTitle} starts at ${startTimeLabel}`
+        : (asOptionalString(payload.summary) ?? `${classTitle} starts soon`),
+      expandedContent:
+        firstOptionalString(payload.joinDetails, payload.outline, payload.sessionNotes) ??
+        'Join details, class outline, or session notes',
+      actionLabel: 'Open class',
+    },
+    feedback: {
+      verb: 'session.feedback_request.sent' as const,
+      iconKey: 'MessageSquareHeart' as const,
+      tone: 'info' as const,
+      primary: `Share feedback for ${classTitle}`,
+      summary: 'Tell us how the session went',
+      expandedContent:
+        firstOptionalString(payload.feedbackPrompt, payload.feedbackDetails) ??
+        'Feedback form or quick rating UI',
+      actionLabel: 'Give feedback',
+    },
+  }[variant];
+
+  return {
+    verb: config.verb,
+    leading: { kind: 'icon', iconKey: config.iconKey, tone: config.tone },
+    headline: {
+      primary: config.primary,
+      secondary: roleContext,
+      secondaryHref: buildInboxSourceHref(event, payload),
+    },
+    summary: config.summary,
+    preview: config.summary ? { text: config.summary } : undefined,
+    expandedContent: config.expandedContent,
+    actionButton: sourceAction(event, payload, 'outline', config.actionLabel),
+    metadata: {
+      ...buildCommonContextMetadata(payload),
+      roleContext,
+      channelId: asOptionalString(payload.channelId),
+      learningSpaceId: asOptionalString(payload.learningSpaceId),
+      scheduleId: asOptionalString(payload.scheduleId),
+      startAt: sessionStartAt,
+      oldStartAt,
+      newStartAt,
+    },
+  } satisfies ActivityRenderResult;
+}
+
 const DEFAULT_RECIPIENTS: ActivityEventDefinition['resolveRecipients'] = async (
   supabase,
   event,
@@ -491,6 +688,50 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     },
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => renderReactionItem(event),
+  },
+  'class.session.rescheduled': {
+    eventType: 'class.session.rescheduled',
+    tabKey: 'classes',
+    importance: 'important',
+    notification: {
+      defaultChannels: ['push', 'email'],
+      timing: 'immediate',
+    },
+    resolveRecipients: DEFAULT_RECIPIENTS,
+    render: (event) => renderSessionItem(event, 'rescheduled'),
+  },
+  'class.session.canceled': {
+    eventType: 'class.session.canceled',
+    tabKey: 'classes',
+    importance: 'important',
+    notification: {
+      defaultChannels: ['push', 'email'],
+      timing: 'immediate',
+    },
+    resolveRecipients: DEFAULT_RECIPIENTS,
+    render: (event) => renderSessionItem(event, 'canceled'),
+  },
+  'session.reminder.sent': {
+    eventType: 'session.reminder.sent',
+    tabKey: 'classes',
+    importance: 'normal',
+    notification: {
+      defaultChannels: ['push'],
+      timing: 'immediate',
+    },
+    resolveRecipients: DEFAULT_RECIPIENTS,
+    render: (event) => renderSessionItem(event, 'reminder'),
+  },
+  'session.feedback_request.sent': {
+    eventType: 'session.feedback_request.sent',
+    tabKey: 'classes',
+    importance: 'normal',
+    notification: {
+      defaultChannels: ['push', 'email'],
+      timing: 'standard',
+    },
+    resolveRecipients: DEFAULT_RECIPIENTS,
+    render: (event) => renderSessionItem(event, 'feedback'),
   },
 };
 

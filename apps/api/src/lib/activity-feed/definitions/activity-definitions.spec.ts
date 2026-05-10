@@ -148,12 +148,135 @@ describe('API activity definitions context rendering', () => {
     );
   });
 
-  it.each([
-    'class.session.rescheduled',
-    'class.session.canceled',
-    'session.reminder.sent',
-    'session.feedback_request.sent',
-  ])('does not define removed activity event %s', (eventType) => {
-    expect(getActivityEventDefinition(eventType)).toBeUndefined();
+  it('renders class session reschedule with parent role context', () => {
+    const definition = getActivityEventDefinition('class.session.rescheduled');
+    expect(definition).toBeDefined();
+
+    const rendered = definition!.render(
+      makeEvent('class.session.rescheduled', {
+        rescheduledFromStartAt: '2026-05-07T14:00:00.000Z',
+        rescheduledToStartAt: '2026-05-08T15:00:00.000Z',
+        rescheduledReason: 'Teacher conflict',
+      }),
+    );
+
+    expect(definition!.tabKey).toBe('classes');
+    expect(definition!.importance).toBe('important');
+    expect(definition!.notification).toMatchObject({
+      defaultChannels: ['push', 'email'],
+      timing: 'immediate',
+    });
+    expect(rendered.leading?.kind === 'icon' ? rendered.leading.iconKey : null).toBe(
+      'CalendarCheck',
+    );
+    expect(rendered.headline).toMatchObject({
+      primary: 'Algebra I rescheduled',
+      secondary: 'For Priya with Ms. Chen',
+    });
+    expect(rendered.summary).toContain('was moved to');
+    expect(rendered.expandedContent).toBe('Reason: Teacher conflict');
+    expect(rendered.actionButton?.label).toBe('Open class');
   });
+
+  it('renders class session canceled with warning tone', () => {
+    const definition = getActivityEventDefinition('class.session.canceled');
+    expect(definition).toBeDefined();
+
+    const rendered = definition!.render(
+      makeEvent('class.session.canceled', {
+        canceledStartAt: '2026-05-07T14:00:00.000Z',
+        canceledReason: 'Holiday',
+      }),
+    );
+
+    expect(rendered.leading).toMatchObject({
+      kind: 'icon',
+      iconKey: 'CalendarX',
+      tone: 'warning',
+    });
+    expect(rendered.headline.primary).toBe('Algebra I canceled');
+    expect(rendered.headline.secondary).toBe('For Priya with Ms. Chen');
+    expect(rendered.summary).toContain('was canceled');
+  });
+
+  it('renders session reminders and feedback requests in the classes tab', () => {
+    const reminderDefinition = getActivityEventDefinition('session.reminder.sent');
+    const feedbackDefinition = getActivityEventDefinition(
+      'session.feedback_request.sent',
+    );
+
+    const reminder = reminderDefinition!.render(
+      makeEvent('session.reminder.sent', {
+        startAt: '2026-05-07T14:00:00.000Z',
+      }),
+    );
+    const feedback = feedbackDefinition!.render(
+      makeEvent('session.feedback_request.sent', {}),
+    );
+
+    expect(reminderDefinition?.tabKey).toBe('classes');
+    expect(reminderDefinition?.notification).toMatchObject({
+      defaultChannels: ['push'],
+      timing: 'immediate',
+    });
+    expect(reminder.headline).toMatchObject({
+      primary: 'Algebra I starting soon',
+      secondary: 'For Priya with Ms. Chen',
+    });
+    expect(reminder.actionButton?.label).toBe('Open class');
+
+    expect(feedbackDefinition?.tabKey).toBe('classes');
+    expect(feedbackDefinition?.notification).toMatchObject({
+      defaultChannels: ['push', 'email'],
+      timing: 'standard',
+    });
+    expect(feedback.leading).toMatchObject({
+      kind: 'icon',
+      iconKey: 'MessageSquareHeart',
+      tone: 'info',
+    });
+    expect(feedback.headline.primary).toBe('Share feedback for Algebra I');
+    expect(feedback.summary).toBe('Tell us how the session went');
+    expect(feedback.actionButton?.label).toBe('Give feedback');
+  });
+
+  it.each([
+    ['guardian', ['Rhea', 'Nico'], ['Ms. Denise'], [], 'For Rhea + 1 with Ms. Denise'],
+    [
+      'educator',
+      ['Rhea', 'Nico', 'Ari', 'Sam'],
+      ['Ms. Denise'],
+      [],
+      'With Rhea + 3 students',
+    ],
+    ['child', ['Rhea'], ['Ms. Denise', 'Mr. Lee'], [], 'With Ms. Denise + 1'],
+    [
+      'staff',
+      ['Rhea', 'Nico', 'Ari'],
+      ['Ms. Denise', 'Mr. Lee'],
+      ['Hesh', 'Maya'],
+      'Parent: Hesh + 1 · Student: Rhea + 2 · Teacher: Ms. Denise + 1',
+    ],
+  ])(
+    'formats %s role context for session events',
+    (viewerRole, studentNames, teacherNames, guardianNames, expected) => {
+      const definition = getActivityEventDefinition('session.reminder.sent');
+      const rendered = definition!.render(
+        makeEvent('session.reminder.sent', {
+          activityContext: {
+            classTitle: 'Piano',
+            contextTitle: 'Piano',
+            viewerRole,
+            viewerIsAdminStaff: viewerRole === 'staff',
+            studentNames,
+            viewerStudentNames: viewerRole === 'guardian' ? studentNames : [],
+            teacherNames,
+            guardianNames,
+          },
+        }),
+      );
+
+      expect(rendered.headline.secondary).toBe(expected);
+    },
+  );
 });

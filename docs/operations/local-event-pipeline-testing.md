@@ -439,16 +439,22 @@ for i in 1 2 3 4; do
 done
 ```
 
-Verify reminder dispatch:
+Verify reminder activity:
 
 ```sql
-select id, job_type, status, dispatched_at, updated_at
-from public.reminder_jobs
+select id, event_type, source_kind, source_id, dedupe_key, projection_status, created_at
+from public.activity_events
+where event_type in ('session.reminder.sent', 'session.feedback_request.sent')
 order by created_at desc
 limit 20;
 
-select id, job_id, status, details, created_at
-from public.reminder_dispatch_logs
+select id, verb, recipient_profile_id, source_event_id, created_at
+from public.activity_feed_items
+where source_event_id in (
+  select id
+  from public.activity_events
+  where event_type in ('session.reminder.sent', 'session.feedback_request.sent')
+)
 order by created_at desc
 limit 20;
 ```
