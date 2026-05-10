@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 
 import { AuthEntryForm } from '@iconicedu/web/app/(auth)/shared/auth-entry-form';
 import { createSupabaseBrowserClient } from '@iconicedu/web/lib/supabase/client';
-import { trackAuthTelemetry } from '@iconicedu/web/lib/telemetry/auth-events';
 import {
   buildCodeEntryPath,
   shouldCreateUserForIntent,
@@ -40,7 +39,6 @@ export default function OrgGetStartedClient({
     setErrorMessage(null);
     setStatusMessage(null);
 
-    await trackAuthTelemetry('auth_start_email', { orgSlug, intent: 'org-get-started' });
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
@@ -53,10 +51,6 @@ export default function OrgGetStartedClient({
       return;
     }
 
-    await trackAuthTelemetry('auth_magiclink_sent', {
-      orgSlug,
-      intent: 'org-get-started',
-    });
     router.replace(
       buildCodeEntryPath({
         email,
@@ -69,13 +63,6 @@ export default function OrgGetStartedClient({
   const handleOAuthLogin = async (provider: 'apple' | 'google') => {
     setErrorMessage(null);
     setStatusMessage(null);
-    if (provider === 'google') {
-      await trackAuthTelemetry('auth_start_google', {
-        orgSlug,
-        intent: 'org-get-started',
-      });
-    }
-
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
