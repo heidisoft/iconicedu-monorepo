@@ -16,12 +16,12 @@ function createActivity(overrides: Partial<ActivityFeedItemVM> = {}): ActivityFe
       occurredAt: '2026-03-13T10:00:00.000Z',
       createdAt: '2026-03-13T10:00:00.000Z',
     },
-    tabKey: 'classes',
+    tabKey: 'all',
     audience: {
       scope: { kind: 'global' },
       visibility: 'public',
     },
-    verb: 'class.session.rescheduled',
+    verb: 'message.posted',
     refs: {
       actor: {
         ids: { id: 'profile-1', orgId: 'org-1', accountId: 'account-1' },
@@ -39,7 +39,7 @@ function createActivity(overrides: Partial<ActivityFeedItemVM> = {}): ActivityFe
     },
     content: {
       headline: {
-        primary: 'Class rescheduled',
+        primary: 'Priya Shah',
       },
     },
     ...overrides,

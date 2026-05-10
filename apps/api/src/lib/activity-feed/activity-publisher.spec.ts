@@ -29,16 +29,16 @@ describe('publishActivityEvent', () => {
     const updateResult = {
       id: 'event-1',
       org_id: 'org-1',
-      event_type: 'class.session.canceled',
+      event_type: 'message.posted',
       occurred_at: '2026-05-05T12:00:00.000Z',
       source_kind: 'system',
       actor_profile_id: 'profile-1',
       scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
       object_ref: null,
       target_ref: { kind: 'learning_space', id: 'space-1' },
-      payload: { canceledReason: 'weather', orgSlug: 'academy' },
+      payload: { content: 'Hello', orgSlug: 'academy' },
       audience_rules: [],
-      dedupe_key: 'session.canceled:exception-1',
+      dedupe_key: 'message.posted:message-1',
       projection_status: 'pending',
       projection_attempts: 0,
       created_at: '2026-05-05T12:00:00.000Z',
@@ -57,14 +57,14 @@ describe('publishActivityEvent', () => {
     const result = await publishActivityEvent({
       supabase,
       orgId: 'org-1',
-      eventType: 'class.session.canceled',
+      eventType: 'message.posted',
       occurredAt: '2026-05-05T12:00:00.000Z',
       sourceKind: 'system',
       actorProfileId: 'profile-1',
       scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
       targetRef: { kind: 'learning_space', id: 'space-1' },
-      payload: { canceledReason: 'weather' },
-      dedupeKey: 'session.canceled:exception-1',
+      payload: { content: 'Hello' },
+      dedupeKey: 'message.posted:message-1',
       refreshOnDedupe: true,
       createdBy: 'profile-1',
     });
@@ -72,7 +72,7 @@ describe('publishActivityEvent', () => {
     expect(result).toEqual(updateResult);
     expect(updateQuery.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        payload: { canceledReason: 'weather', orgSlug: 'academy' },
+        payload: { content: 'Hello', orgSlug: 'academy' },
         projection_status: 'pending',
         last_projection_error: null,
       }),

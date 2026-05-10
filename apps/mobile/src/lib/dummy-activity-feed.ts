@@ -23,8 +23,6 @@ function mkActor(id: string, name: string): UserProfileVM {
 const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
 
 const PRIYA = mkActor('priya-001', 'Priya S.');
-const SYSTEM = mkActor('system-001', 'ICONIC System');
-
 const MESSAGE_ITEMS: ActivityFeedLeafItemVM[] = [
   {
     kind: 'leaf',
@@ -63,27 +61,7 @@ const MESSAGE_ITEMS: ActivityFeedLeafItemVM[] = [
   },
 ];
 
-const TODAY_ITEMS: ActivityFeedItemVM[] = [
-  ...MESSAGE_ITEMS,
-  {
-    kind: 'leaf',
-    ids: { id: 'af-reschedule-1', orgId: ORG },
-    timestamps: { occurredAt: hoursAgo(4), createdAt: hoursAgo(4) },
-    tabKey: 'classes',
-    audience: { scope: { kind: 'global' }, visibility: 'public' },
-    verb: 'class.session.rescheduled',
-    refs: { actor: SYSTEM },
-    content: {
-      leading: { kind: 'icon', iconKey: 'CalendarCheck', tone: 'info' },
-      headline: {
-        primary: 'Class session rescheduled',
-        secondary: 'Math Foundations',
-      },
-      summary: 'Moved to Tuesday at 4:00 PM PT.',
-    },
-    state: { isRead: false, importance: 'important' },
-  } satisfies ActivityFeedLeafItemVM,
-];
+const TODAY_ITEMS: ActivityFeedItemVM[] = [...MESSAGE_ITEMS];
 
 export const DEMO_ACTIVITY_FEED: ActivityFeedVM = {
   activeTab: 'all',
@@ -94,5 +72,5 @@ export const DEMO_ACTIVITY_FEED: ActivityFeedVM = {
     { key: 'system', label: 'System' },
   ],
   sections: [{ label: 'Today', items: TODAY_ITEMS }],
-  unreadCount: 2,
+  unreadCount: 1,
 };

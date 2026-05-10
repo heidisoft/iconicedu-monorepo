@@ -121,11 +121,7 @@ export type NotificationKey =
   | 'file.uploaded'
   | 'image.uploaded'
   | 'audio.uploaded'
-  | 'class.session.rescheduled'
-  | 'class.session.canceled'
-  | 'session.completed'
-  | 'session.reminder.sent'
-  | 'session.feedback_request.sent';
+  | 'session.completed';
 
 export type NotificationDefaultsVM = Partial<
   Record<NotificationKey, NotificationPreferenceVM>

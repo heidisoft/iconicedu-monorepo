@@ -17,25 +17,13 @@ import {
 } from '@iconicedu/ui-web/ui/empty';
 import { ActivityBasic } from '@iconicedu/ui-web/components/notification/activity-basic';
 import { ActivityBasicWithExpandedContent } from '@iconicedu/ui-web/components/notification/activity-basic-with-expanded-content';
-import {
-  ActivityFeedbackRequest,
-  canRenderActivityFeedbackRequest,
-} from '@iconicedu/ui-web/components/notification/activity-feedback-request';
 import type {
   ActivityFeedItemVM,
-  ActivityFeedLeafItemVM,
   ActivityFeedVM,
   ActivityFeedSectionVM,
   ActivityFeedTabVM,
   InboxTabKeyVM,
 } from '@iconicedu/shared-types';
-import {
-  formatScheduleDisplayTimeWithZone,
-  formatScheduleDisplayValue,
-  isSameScheduleDisplayDay,
-  resolveScheduleDisplayTimeZone,
-  type ScheduleDisplayTimeZoneInput,
-} from '@iconicedu/ui-web/lib/schedule-display-timezone';
 
 const INBOX_PAGE_SIZE = 20;
 
@@ -179,295 +167,9 @@ export function resolveUnreadIdsForTab(
   return Array.from(unreadIds);
 }
 
-export function isFeedbackRequestActivity(activity: ActivityFeedItemVM) {
-  return activity.kind === 'leaf' && activity.verb === 'session.feedback_request.sent';
-}
-
-export function applySessionParentLocalHeadline(
-  activity: ActivityFeedItemVM,
-  timezone?: string | null,
-): ActivityFeedItemVM {
-  const metadata = activity.metadata as Record<string, unknown> | undefined;
-  if (!metadata?.sessionGroupLocalTime) {
-    return activity;
-  }
-
-  const occurrenceStart = metadata.occurrenceStart;
-  if (typeof occurrenceStart !== 'string' || occurrenceStart.length === 0) {
-    return activity;
-  }
-
-  const date = new Date(occurrenceStart);
-  if (Number.isNaN(date.getTime())) {
-    return activity;
-  }
-
-  const metadataTimezone =
-    typeof metadata.timezone === 'string' ? metadata.timezone : undefined;
-  const displayTimezone: ScheduleDisplayTimeZoneInput = {
-    viewerTimezone: timezone,
-    scheduleTimezone: metadataTimezone,
-  };
-  const localLabel = formatScheduleDisplayTimeWithZone(date, displayTimezone, {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  })?.replace(',', ' at');
-
-  if (!localLabel) {
-    return activity;
-  }
-
-  const participantNamesLabel =
-    typeof metadata.participantNamesLabel === 'string' &&
-    metadata.participantNamesLabel.length > 0
-      ? metadata.participantNamesLabel
-      : undefined;
-
-  return {
-    ...activity,
-    content: {
-      ...activity.content,
-      headline: {
-        ...activity.content.headline,
-        primary: `Class session${
-          participantNamesLabel ? ` for ${participantNamesLabel}` : ''
-        } ${localLabel}`,
-      },
-    },
-  };
-}
-
-function formatLocalDateTimeLabel(
-  value: string,
-  timezone?: string | null,
-  scheduleTimezone?: string | null,
-) {
-  return formatScheduleDisplayTimeWithZone(
-    value,
-    {
-      viewerTimezone: timezone,
-      scheduleTimezone,
-    },
-    {
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    },
-  )?.replace(',', ' at');
-}
-
-function formatLocalTimeLabel(
-  value: string,
-  timezone?: string | null,
-  scheduleTimezone?: string | null,
-) {
-  return formatScheduleDisplayTimeWithZone(
-    value,
-    {
-      viewerTimezone: timezone,
-      scheduleTimezone,
-    },
-    {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    },
-  );
-}
-
-function formatSchedulePart(
-  value: string,
-  timezone?: ScheduleDisplayTimeZoneInput,
-  options?: Intl.DateTimeFormatOptions,
-) {
-  return formatScheduleDisplayValue(value, timezone, options ?? {});
-}
-
-function formatScheduleDayLabel(value: string, timezone?: ScheduleDisplayTimeZoneInput) {
-  return formatSchedulePart(value, timezone, {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-  });
-}
-
-function formatScheduleTimeLabel(
-  value: string,
-  timezone?: ScheduleDisplayTimeZoneInput,
-  includeZone = false,
-) {
-  if (includeZone) {
-    return formatScheduleDisplayTimeWithZone(value, timezone, {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    });
-  }
-
-  return formatSchedulePart(value, timezone, {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  });
-}
-
-function formatScheduleDateTimeLabel(
-  value: string,
-  timezone?: ScheduleDisplayTimeZoneInput,
-  includeComma = true,
-) {
-  const dayLabel = formatScheduleDayLabel(value, timezone);
-  const timeLabel = formatScheduleTimeLabel(value, timezone, true);
-  if (!dayLabel || !timeLabel) {
-    return null;
-  }
-  return includeComma ? `${dayLabel}, ${timeLabel}` : `${dayLabel} ${timeLabel}`;
-}
-
-function isSameScheduleDay(
-  a: string,
-  b: string,
-  timezone?: ScheduleDisplayTimeZoneInput,
-) {
-  return isSameScheduleDisplayDay(a, b, timezone);
-}
-
-export function applyScheduleActivityLocalTime(
-  activity: ActivityFeedItemVM,
-  timezone?: string | null,
-): ActivityFeedItemVM {
-  const metadata = activity.metadata as Record<string, unknown> | undefined;
-  if (metadata?.preserveActivitySummary === true) {
-    return activity;
-  }
-  if (!metadata?.sessionLocalTime) {
-    return activity;
-  }
-
-  if (activity.verb === 'class.session.rescheduled') {
-    const title =
-      typeof metadata.title === 'string'
-        ? metadata.title
-        : (activity.content.headline.secondary ?? 'Class');
-    const scheduleTimezone =
-      typeof metadata.firstSessionTimezone === 'string'
-        ? metadata.firstSessionTimezone
-        : typeof metadata.timezone === 'string'
-          ? metadata.timezone
-          : undefined;
-    const displayTimezone = {
-      viewerTimezone: timezone,
-      scheduleTimezone,
-    };
-    const fromValue =
-      typeof metadata.rescheduledFromStartAt === 'string'
-        ? metadata.rescheduledFromStartAt
-        : typeof metadata.startAt === 'string'
-          ? metadata.startAt
-          : undefined;
-    const toValue =
-      typeof metadata.rescheduledToStartAt === 'string'
-        ? metadata.rescheduledToStartAt
-        : undefined;
-    const reason =
-      typeof metadata.rescheduledReason === 'string'
-        ? metadata.rescheduledReason
-        : undefined;
-    let summary = activity.content.summary;
-    if (fromValue && toValue) {
-      if (isSameScheduleDay(fromValue, toValue, displayTimezone)) {
-        const dayLabel = formatScheduleDayLabel(fromValue, displayTimezone);
-        const fromTime = formatScheduleTimeLabel(fromValue, displayTimezone);
-        const toTime = formatScheduleTimeLabel(toValue, displayTimezone, true);
-        if (dayLabel && fromTime && toTime) {
-          summary = `Session: ${title} weekly session (${dayLabel}) moved from ${fromTime} to ${toTime}${
-            reason ? ` due to ${reason}` : ''
-          }`;
-        }
-      } else {
-        const fromDateTime = formatScheduleDateTimeLabel(fromValue, displayTimezone);
-        const toDateTime = formatScheduleDateTimeLabel(toValue, displayTimezone);
-        if (fromDateTime && toDateTime) {
-          summary = `Session: ${title} weekly session moved from ${fromDateTime} to ${toDateTime}${
-            reason ? ` due to ${reason}` : ''
-          }`;
-        }
-      }
-    }
-    return {
-      ...activity,
-      content: {
-        ...activity.content,
-        headline: {
-          ...activity.content.headline,
-          primary: 'Class session rescheduled',
-        },
-        summary,
-      },
-    };
-  }
-
-  if (activity.verb === 'class.session.canceled') {
-    const title =
-      typeof metadata.title === 'string'
-        ? metadata.title
-        : (activity.content.headline.secondary ?? 'Class');
-    const scheduleTimezone =
-      typeof metadata.firstSessionTimezone === 'string'
-        ? metadata.firstSessionTimezone
-        : typeof metadata.timezone === 'string'
-          ? metadata.timezone
-          : undefined;
-    const displayTimezone = {
-      viewerTimezone: timezone,
-      scheduleTimezone,
-    };
-    const canceledValue =
-      typeof metadata.canceledStartAt === 'string'
-        ? metadata.canceledStartAt
-        : typeof metadata.startAt === 'string'
-          ? metadata.startAt
-          : undefined;
-    const reason =
-      typeof metadata.canceledReason === 'string' ? metadata.canceledReason : undefined;
-    let summary = activity.content.summary;
-    if (canceledValue) {
-      const canceledDateTime = formatScheduleDateTimeLabel(
-        canceledValue,
-        displayTimezone,
-        false,
-      );
-      if (canceledDateTime) {
-        summary = `Session: ${title} weekly session (${canceledDateTime}) canceled${
-          reason ? ` due to ${reason}` : ''
-        }`;
-      }
-    }
-    return {
-      ...activity,
-      content: {
-        ...activity.content,
-        headline: {
-          ...activity.content.headline,
-          primary: 'Class session cancelled',
-        },
-        summary,
-      },
-    };
-  }
-
-  return activity;
-}
-
 export function InboxContainer({
   feed,
   markReadEndpoint = '/api/activity-feed/read',
-  timezone,
   showMarkAllAsRead = false,
 }: {
   feed: ActivityFeedVM;
@@ -475,7 +177,6 @@ export function InboxContainer({
   timezone?: string | null;
   showMarkAllAsRead?: boolean;
 }) {
-  const displayTimezone = resolveScheduleDisplayTimeZone(timezone);
   const [sections, setSections] = useState(feed.sections);
   const [activeTab, setActiveTab] = useState<InboxTabKeyVM>(feed.activeTab);
   const [visibleItemCount, setVisibleItemCount] = useState(INBOX_PAGE_SIZE);
@@ -613,34 +314,7 @@ export function InboxContainer({
   );
 
   const renderActivity = (activity: ActivityFeedItemVM) => {
-    const displayActivity = applyScheduleActivityLocalTime(
-      applySessionParentLocalHeadline(activity, displayTimezone),
-      displayTimezone,
-    );
-
-    if (isFeedbackRequestActivity(displayActivity)) {
-      if (!canRenderActivityFeedbackRequest(displayActivity as ActivityFeedLeafItemVM)) {
-        return (
-          <ActivityBasic
-            activity={displayActivity}
-            onMarkRead={markAsRead}
-            onAutoRead={autoMarkAsRead}
-          />
-        );
-      }
-
-      return (
-        <ActivityBasicWithExpandedContent
-          activity={displayActivity}
-          onMarkRead={markAsRead}
-          onAutoRead={autoMarkAsRead}
-          showActionButton={false}
-          className="pb-0"
-        >
-          <ActivityFeedbackRequest activity={displayActivity as ActivityFeedLeafItemVM} />
-        </ActivityBasicWithExpandedContent>
-      );
-    }
+    const displayActivity = activity;
 
     if (displayActivity.content.expandedContent) {
       return (

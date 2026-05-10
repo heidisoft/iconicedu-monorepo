@@ -210,54 +210,6 @@ function sourceAction(
   } satisfies InboxActionButtonVM;
 }
 
-function renderClassUpdateGroup(
-  event: ActivityEventRow,
-  primary: string,
-  tone: 'info' | 'warning',
-): ActivityRenderResult {
-  const payload = asRecord(event.payload);
-  const contextLabel = buildRoleAwareContextLabel(payload);
-  const reason =
-    asOptionalString(payload.rescheduledReason) ??
-    asOptionalString(payload.canceledReason);
-  const eventSummary = asOptionalString(payload.summary);
-  const summaryParts = [
-    contextLabel,
-    eventSummary,
-    reason ? `Reason: ${reason}.` : undefined,
-  ].filter((part): part is string => Boolean(part));
-  return {
-    verb: event.event_type as ActivityVerbVM,
-    leading: {
-      kind: 'icon',
-      iconKey: tone === 'warning' ? 'CalendarX' : 'CalendarCheck',
-      tone,
-    },
-    headline: {
-      primary,
-      secondary: contextLabel ?? getContextTitle(payload),
-      secondaryHref: buildInboxSourceHref(event, payload),
-    },
-    summary: summaryParts.length ? summaryParts.join(' ') : 'Class schedule updated.',
-    actionButton: sourceAction(event, payload, 'outline', 'Open class'),
-    metadata: {
-      ...buildCommonContextMetadata(payload),
-      title: asOptionalString(payload.title),
-      scheduleId: asOptionalString(payload.scheduleId),
-      timezone: asOptionalString(payload.timezone),
-      firstSessionStartAt: asOptionalString(payload.firstSessionStartAt),
-      firstSessionTimezone: asOptionalString(payload.firstSessionTimezone),
-      rescheduledFromStartAt: asOptionalString(payload.rescheduledFromStartAt),
-      rescheduledToStartAt: asOptionalString(payload.rescheduledToStartAt),
-      rescheduledReason: asOptionalString(payload.rescheduledReason),
-      canceledStartAt: asOptionalString(payload.canceledStartAt),
-      canceledReason: asOptionalString(payload.canceledReason),
-      sessionLocalTime: true,
-      preserveActivitySummary: true,
-    },
-  };
-}
-
 function resolveMessageNoun(payload: Record<string, unknown>) {
   const dmMessageKind = asOptionalString(payload.dmMessageKind);
   if (dmMessageKind === 'image') {
@@ -272,45 +224,147 @@ function resolveMessageNoun(payload: Record<string, unknown>) {
   return 'a message';
 }
 
-function renderMessageHeadline(payload: Record<string, unknown>) {
-  const senderName = asString(payload.senderName, 'Someone');
-  const contextTitle = buildRoleAwareContextLabel(payload) ?? getContextTitle(payload);
-  const mention = asOptionalString(payload.mentionedProfileId);
-  const messageNoun = resolveMessageNoun(payload);
+type MessageRenderVariant =
+  | 'message'
+  | 'mention'
+  | 'thread_reply'
+  | 'file'
+  | 'image'
+  | 'audio';
 
-  if (mention) {
-    return {
-      primary: `${senderName} mentioned you in`,
-      secondary: contextTitle,
-    };
-  }
-
-  if (contextTitle) {
-    return {
-      primary: `${senderName} sent you ${messageNoun} in`,
-      secondary: contextTitle,
-    };
-  }
-
-  return {
-    primary: `${senderName} sent you ${messageNoun}`,
-  };
+function getMessagePreview(payload: Record<string, unknown>) {
+  return (
+    asOptionalString(payload.messagePreview) ??
+    asOptionalString(payload.content) ??
+    undefined
+  );
 }
 
-function renderMessageItem(event: ActivityEventRow, verb: ActivityVerbVM) {
+function getFileName(payload: Record<string, unknown>) {
+  return (
+    asOptionalString(payload.fileName) ??
+    asOptionalString(payload.name) ??
+    asOptionalString(payload.content)
+  );
+}
+
+function buildFileDetails(payload: Record<string, unknown>, fallback: string) {
+  const details = [
+    getFileName(payload) ?? fallback,
+    asOptionalString(payload.mimeType),
+    asOptionalString(payload.content),
+  ].filter((part): part is string => Boolean(part));
+  return Array.from(new Set(details)).join('\n');
+}
+
+function renderMessageItem(
+  event: ActivityEventRow,
+  verb: ActivityVerbVM,
+  variant: MessageRenderVariant,
+) {
   const payload = asRecord(event.payload);
-  const contextLabel = buildRoleAwareContextLabel(payload);
+  const senderName = asString(payload.senderName, 'Someone');
+  const contextLabel = buildRoleAwareContextLabel(payload) ?? getContextTitle(payload);
+  const isDirect = payload.channelRouteKind === 'dm';
+  const href = buildInboxSourceHref(event, payload);
+  const fileName = getFileName(payload);
+  const messagePreview = getMessagePreview(payload);
+  const iconKey =
+    variant === 'mention'
+      ? 'AtSign'
+      : variant === 'thread_reply'
+        ? 'MessageSquareReply'
+        : variant === 'file'
+          ? 'FileBadge'
+          : variant === 'image'
+            ? 'BookImage'
+            : variant === 'audio'
+              ? 'FileHeadphone'
+              : isDirect
+                ? 'MessagesSquare'
+                : 'MessageSquareDot';
+  const secondary =
+    variant === 'mention'
+      ? isDirect
+        ? 'mentioned you in a direct message'
+        : contextLabel
+          ? `mentioned you in ${contextLabel}`
+          : 'mentioned you'
+      : variant === 'thread_reply'
+        ? isDirect
+          ? 'replied in your direct message thread'
+          : contextLabel
+            ? `replied in a thread in ${contextLabel}`
+            : 'replied in a thread'
+        : variant === 'file'
+          ? isDirect
+            ? 'shared a file with you'
+            : contextLabel
+              ? `shared a file in ${contextLabel}`
+              : 'shared a file'
+          : variant === 'image'
+            ? isDirect
+              ? 'shared an image with you'
+              : contextLabel
+                ? `shared an image in ${contextLabel}`
+                : 'shared an image'
+            : variant === 'audio'
+              ? isDirect
+                ? 'sent you a voice message'
+                : contextLabel
+                  ? `sent a voice message in ${contextLabel}`
+                  : 'sent a voice message'
+              : isDirect
+                ? 'sent you a direct message'
+                : contextLabel
+                  ? `sent a message in ${contextLabel}`
+                  : `sent ${resolveMessageNoun(payload)}`;
+  const summary =
+    variant === 'file' || variant === 'image' || variant === 'audio'
+      ? fileName
+      : messagePreview;
+  const expandedContent =
+    variant === 'file'
+      ? buildFileDetails(payload, 'File details')
+      : variant === 'image'
+        ? buildFileDetails(payload, 'Image preview')
+        : variant === 'audio'
+          ? buildFileDetails(payload, 'Audio player')
+          : messagePreview;
+  const actionLabel =
+    variant === 'mention'
+      ? isDirect
+        ? 'Reply'
+        : 'View mention'
+      : variant === 'thread_reply'
+        ? 'Open thread'
+        : variant === 'file'
+          ? 'Open file'
+          : variant === 'image'
+            ? 'View image'
+            : variant === 'audio'
+              ? 'Play audio'
+              : isDirect
+                ? 'Reply'
+                : 'Open message';
+
   return {
     verb,
-    leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'info' },
-    headline: renderMessageHeadline(payload),
-    summary: contextLabel ? `Context: ${contextLabel}` : undefined,
-    expandedContent: asOptionalString(payload.content),
-    actionButton: sourceAction(event, payload, 'outline', 'Open messages'),
+    leading: { kind: 'icon', iconKey, tone: 'info' },
+    headline: {
+      primary: senderName,
+      secondary,
+      secondaryHref: href,
+    },
+    summary,
+    preview: summary ? { text: summary } : undefined,
+    expandedContent,
+    actionButton: sourceAction(event, payload, 'outline', actionLabel),
     metadata: {
       ...buildCommonContextMetadata(payload),
       channelId: asOptionalString(payload.channelId),
       messageId: asOptionalString(payload.messageId),
+      fileName,
       threadReply: payload.threadReply === true,
     },
   } satisfies ActivityRenderResult;
@@ -322,19 +376,29 @@ function renderReactionItem(event: ActivityEventRow) {
   const emoji = asString(payload.emoji, '😀');
   const isDirect = payload.channelRouteKind === 'dm';
   const contextLabel = buildRoleAwareContextLabel(payload) ?? getContextTitle(payload);
+  const messagePreview = getMessagePreview(payload);
 
   return {
     verb: 'reaction.added',
-    leading: { kind: 'icon', iconKey: 'MessageSquare', tone: 'info' },
+    leading: {
+      kind: 'icon',
+      iconKey: isDirect ? 'MessageSquare' : 'SmilePlus',
+      tone: 'info',
+    },
     headline: {
       primary: isDirect
         ? `${senderName} reacted ${emoji} to your direct message`
-        : `${senderName} reacted ${emoji} to your message in`,
-      secondary: contextLabel,
+        : contextLabel
+          ? `${senderName} reacted ${emoji} to your message in ${contextLabel}`
+          : `${senderName} reacted ${emoji} to your message`,
       secondaryHref: buildInboxSourceHref(event, payload),
     },
-    summary: contextLabel ? `Context: ${contextLabel}` : undefined,
-    actionButton: sourceAction(event, payload),
+    summary: messagePreview ? `Your message: ${messagePreview}` : undefined,
+    preview: messagePreview ? { text: `Your message: ${messagePreview}` } : undefined,
+    expandedContent: messagePreview
+      ? `Original message with reaction context\n${messagePreview}`
+      : 'Original message with reaction context',
+    actionButton: sourceAction(event, payload, 'outline', 'View message'),
     metadata: {
       ...buildCommonContextMetadata(payload),
       channelId: asOptionalString(payload.channelId),
@@ -356,21 +420,21 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     importance: 'normal',
     notification: {
       defaultChannels: ['push'],
-      timing: 'standard',
+      timing: 'immediate',
     },
     resolveRecipients: DEFAULT_RECIPIENTS,
-    render: (event) => renderMessageItem(event, 'message.posted'),
+    render: (event) => renderMessageItem(event, 'message.posted', 'message'),
   },
   'message.mentioned': {
     eventType: 'message.mentioned',
     tabKey: 'all',
-    importance: 'normal',
+    importance: 'important',
     notification: {
       defaultChannels: ['push'],
       timing: 'standard',
     },
     resolveRecipients: DEFAULT_RECIPIENTS,
-    render: (event) => renderMessageItem(event, 'message.mentioned'),
+    render: (event) => renderMessageItem(event, 'message.mentioned', 'mention'),
   },
   'message.thread_reply.posted': {
     eventType: 'message.thread_reply.posted',
@@ -381,7 +445,8 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       timing: 'standard',
     },
     resolveRecipients: DEFAULT_RECIPIENTS,
-    render: (event) => renderMessageItem(event, 'message.thread_reply.posted'),
+    render: (event) =>
+      renderMessageItem(event, 'message.thread_reply.posted', 'thread_reply'),
   },
   'file.uploaded': {
     eventType: 'file.uploaded',
@@ -392,7 +457,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       timing: 'standard',
     },
     resolveRecipients: DEFAULT_RECIPIENTS,
-    render: (event) => renderMessageItem(event, 'file.uploaded'),
+    render: (event) => renderMessageItem(event, 'file.uploaded', 'file'),
   },
   'image.uploaded': {
     eventType: 'image.uploaded',
@@ -403,7 +468,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       timing: 'standard',
     },
     resolveRecipients: DEFAULT_RECIPIENTS,
-    render: (event) => renderMessageItem(event, 'image.uploaded'),
+    render: (event) => renderMessageItem(event, 'image.uploaded', 'image'),
   },
   'audio.uploaded': {
     eventType: 'audio.uploaded',
@@ -414,7 +479,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
       timing: 'standard',
     },
     resolveRecipients: DEFAULT_RECIPIENTS,
-    render: (event) => renderMessageItem(event, 'audio.uploaded'),
+    render: (event) => renderMessageItem(event, 'audio.uploaded', 'audio'),
   },
   'reaction.added': {
     eventType: 'reaction.added',
@@ -426,112 +491,6 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     },
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => renderReactionItem(event),
-  },
-  'class.session.rescheduled': {
-    eventType: 'class.session.rescheduled',
-    tabKey: 'classes',
-    importance: 'important',
-    notification: {
-      defaultChannels: ['push', 'email'],
-      timing: 'immediate',
-      isCritical: true,
-    },
-    resolveRecipients: DEFAULT_RECIPIENTS,
-    render: (event) => renderClassUpdateGroup(event, 'Class session rescheduled', 'info'),
-  },
-  'class.session.canceled': {
-    eventType: 'class.session.canceled',
-    tabKey: 'classes',
-    importance: 'important',
-    notification: {
-      defaultChannels: ['push', 'email'],
-      timing: 'immediate',
-      isCritical: true,
-    },
-    resolveRecipients: DEFAULT_RECIPIENTS,
-    render: (event) => renderClassUpdateGroup(event, 'Class session canceled', 'warning'),
-  },
-  'session.reminder.sent': {
-    eventType: 'session.reminder.sent',
-    tabKey: 'classes',
-    importance: 'normal',
-    notification: {
-      defaultChannels: ['push', 'email'],
-      timing: 'immediate',
-      isCritical: true,
-    },
-    resolveRecipients: DEFAULT_RECIPIENTS,
-    render: (event) => {
-      const payload = asRecord(event.payload);
-      const contextLabel = buildRoleAwareContextLabel(payload);
-      const summary = [contextLabel, asOptionalString(payload.summary)]
-        .filter((part): part is string => Boolean(part))
-        .join(' ');
-      return {
-        verb: 'session.reminder.sent',
-        leading: { kind: 'icon', iconKey: 'Bell', tone: 'info' },
-        headline: {
-          primary: 'Class reminder',
-          secondary: contextLabel ?? getContextTitle(payload),
-          secondaryHref: buildInboxSourceHref(event, payload),
-        },
-        summary: summary || asOptionalString(payload.occurrenceStart),
-        actionButton: sourceAction(event, payload, 'default', 'Open class'),
-        metadata: {
-          ...buildCommonContextMetadata(payload),
-          scheduleId: asOptionalString(payload.scheduleId),
-          occurrenceStart: asOptionalString(payload.occurrenceStart),
-          reminderOffsetMinutes: payload.reminderOffsetMinutes,
-          timezone: asOptionalString(payload.timezone),
-          preserveActivitySummary: true,
-        },
-      };
-    },
-  },
-  'session.feedback_request.sent': {
-    eventType: 'session.feedback_request.sent',
-    tabKey: 'classes',
-    importance: 'normal',
-    notification: {
-      defaultChannels: ['push', 'email'],
-      timing: 'immediate',
-    },
-    resolveRecipients: DEFAULT_RECIPIENTS,
-    render: (event) => {
-      const payload = asRecord(event.payload);
-      const contextLabel = buildRoleAwareContextLabel(payload);
-      const summary = [
-        contextLabel,
-        asOptionalString(payload.summary) ?? 'Share feedback about this session.',
-      ]
-        .filter((part): part is string => Boolean(part))
-        .join(' ');
-      return {
-        verb: 'session.feedback_request.sent',
-        leading: { kind: 'icon', iconKey: 'Bell', tone: 'info' },
-        headline: {
-          primary: 'Class feedback requested',
-          secondary: contextLabel ?? getContextTitle(payload),
-          secondaryHref: buildInboxSourceHref(event, payload),
-        },
-        summary,
-        actionButton: sourceAction(event, payload, 'outline', 'Open class'),
-        metadata: {
-          ...buildCommonContextMetadata(payload),
-          classSessionId: asOptionalString(payload.classSessionId),
-          classroomId: asOptionalString(payload.learningSpaceId),
-          channelId: asOptionalString(payload.channelId),
-          occurrenceStart: asOptionalString(payload.occurrenceStart),
-          timezone: asOptionalString(payload.timezone),
-          feedbackUiEnabled: Boolean(
-            asOptionalString(payload.classSessionId) &&
-            asOptionalString(payload.learningSpaceId) &&
-            asOptionalString(payload.channelId),
-          ),
-          preserveActivitySummary: true,
-        },
-      };
-    },
   },
 };
 

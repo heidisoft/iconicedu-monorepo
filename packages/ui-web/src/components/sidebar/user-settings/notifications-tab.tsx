@@ -47,8 +47,6 @@ type ScopedNotificationPreference = {
 const defineNotificationItems = <T extends NotificationSectionItem[]>(items: T) => items;
 
 const ACTIVITY_SCOPED_VERB_KEYS: ActivityVerbVM[] = [
-  'class.session.rescheduled',
-  'class.session.canceled',
   'message.posted',
   'message.mentioned',
   'message.thread_reply.posted',
@@ -56,8 +54,6 @@ const ACTIVITY_SCOPED_VERB_KEYS: ActivityVerbVM[] = [
   'image.uploaded',
   'audio.uploaded',
   'reaction.added',
-  'session.reminder.sent',
-  'session.feedback_request.sent',
 ];
 
 const ACTIVITY_VERB_CONTEXT_ORDER = [
@@ -100,13 +96,6 @@ function toTitleCaseToken(token: string): string {
 }
 
 function formatActivityVerbLabel(verb: ActivityVerbVM): string {
-  if (verb === 'session.reminder.sent') {
-    return 'Session - Reminders';
-  }
-  if (verb === 'session.feedback_request.sent') {
-    return 'Session - Feedback Request';
-  }
-
   return verb
     .split('.')
     .map((segment) =>

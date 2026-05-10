@@ -338,9 +338,17 @@ export async function publishMentionActivities(input: {
   content: string;
   mentions: MessageMentionVM[];
   now: string;
+  activityContext?: ActivityChannelContext;
   visibilityAllowedProfileIds?: Set<string> | null;
 }) {
   const readSupabase = input.readSupabase ?? input.supabase;
+  const activityContext =
+    input.activityContext ??
+    (await resolveActivityChannelContext({
+      supabase: readSupabase,
+      orgId: input.orgId,
+      channelId: input.channelId,
+    }));
   const recipientIds = await resolveMentionRecipientIds({
     supabase: readSupabase,
     orgId: input.orgId,
@@ -382,6 +390,10 @@ export async function publishMentionActivities(input: {
         senderName,
         content: input.content,
         threadReply: false,
+        learningSpaceId: activityContext.learningSpaceId ?? null,
+        learningSpaceTitle: activityContext.learningSpaceTitle ?? null,
+        channelTopic: activityContext.channelTopic ?? null,
+        channelRouteKind: activityContext.channelRouteKind,
       },
       dedupeKey: `message.mention:${input.messageId}:${recipientId}`,
       createdBy: input.senderProfileId,
@@ -487,6 +499,7 @@ export async function publishReactionAddedActivity(input: {
   senderName?: string;
   messageId: string;
   messageSenderProfileId: string;
+  messagePreview?: string | null;
   emoji: string;
   now: string;
 }) {
@@ -504,15 +517,8 @@ export async function publishReactionAddedActivity(input: {
       senderProfileId: input.senderProfileId,
     }));
   const isDmRoute = activityContext.channelRouteKind === 'dm';
-  const recipientIds = isDmRoute
-    ? await resolveDmActivityRecipientProfileIds({
-        supabase: readSupabase,
-        orgId: input.orgId,
-        channelId: input.channelId,
-        senderProfileId: input.senderProfileId,
-        now: input.now,
-      })
-    : input.messageSenderProfileId !== input.senderProfileId
+  const recipientIds =
+    input.messageSenderProfileId !== input.senderProfileId
       ? [input.messageSenderProfileId]
       : [];
   const publishActivity = input.publishActivity ?? publishActivityEvent;
@@ -539,6 +545,7 @@ export async function publishReactionAddedActivity(input: {
       messageId: input.messageId,
       senderName,
       emoji: input.emoji,
+      messagePreview: input.messagePreview ?? null,
       channelTopic: activityContext.channelTopic ?? null,
       channelRouteKind: activityContext.channelRouteKind,
       learningSpaceId: activityContext.learningSpaceId ?? null,
@@ -786,6 +793,7 @@ export async function publishTextMessagePostSendActivities(input: {
       content: input.content,
       mentions: input.mentions,
       now: input.now,
+      activityContext,
       visibilityAllowedProfileIds,
     });
   }

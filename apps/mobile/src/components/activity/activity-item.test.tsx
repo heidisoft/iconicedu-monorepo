@@ -150,29 +150,4 @@ describe('ActivityItem', () => {
       'Class reminder',
     );
   });
-
-  it('renders the feedback widget inline for feedback request activities', () => {
-    const item = {
-      ...makeBaseActivity(),
-      verb: 'session.feedback_request.sent',
-      content: {
-        headline: {
-          primary: 'Class feedback requested',
-          secondary: "How was Scott S's Math with Ms Barbara session today?",
-        },
-      },
-      metadata: {
-        sourceEventId: '11111111-1111-4111-8111-111111111111',
-        classSessionId: '33333333-3333-4333-8333-333333333333',
-        classroomId: '44444444-4444-4444-8444-444444444444',
-        channelId: '55555555-5555-4555-8555-555555555555',
-        feedbackUiEnabled: true,
-      },
-    } as ActivityFeedItemVM;
-
-    renderActivity(item);
-
-    expect(screen.getByText('Rate your session')).toBeTruthy();
-    expect(screen.getByLabelText('Rate 3 stars')).toBeTruthy();
-  });
 });

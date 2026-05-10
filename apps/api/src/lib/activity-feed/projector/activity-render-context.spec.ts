@@ -32,7 +32,7 @@ function makeEvent(): ActivityEventRow {
   return {
     id: 'event-1',
     org_id: 'org-1',
-    event_type: 'session.reminder.sent',
+    event_type: 'message.posted',
     occurred_at: '2026-05-05T12:00:00.000Z',
     source_kind: 'system',
     actor_profile_id: null,

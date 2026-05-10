@@ -305,6 +305,7 @@ export function buildPersonalizedSessionCopy(
     const senderName = asString(payload.senderName);
     const content = asString(payload.content).slice(0, 160);
     const contextTitle = getContextTitle(payload);
+    const isDirect = payload.channelRouteKind === 'dm';
     const isMention =
       eventType === 'message.mentioned' ||
       Boolean(asOptionalString(payload.mentionedProfileId));
@@ -321,7 +322,9 @@ export function buildPersonalizedSessionCopy(
 
     let title: string;
     if (isThreadReply) {
-      if (senderName && contextTitle) {
+      if (senderName && isDirect) {
+        title = `${senderName} replied in your direct message thread`;
+      } else if (senderName && contextTitle) {
         title = `${senderName} replied to a thread in ${contextTitle}`;
       } else if (senderName) {
         title = `${senderName} replied to a thread`;
@@ -329,9 +332,11 @@ export function buildPersonalizedSessionCopy(
         title = 'New reply in a thread';
       }
     } else if (senderName && isMention) {
-      title = contextTitle
-        ? `${senderName} mentioned you in ${contextTitle}`
-        : `${senderName} mentioned you`;
+      title = isDirect
+        ? `${senderName} mentioned you in a direct message`
+        : contextTitle
+          ? `${senderName} mentioned you in ${contextTitle}`
+          : `${senderName} mentioned you`;
     } else if (senderName) {
       const messageLabel =
         dmMessageKind === 'image'
@@ -341,9 +346,21 @@ export function buildPersonalizedSessionCopy(
             : dmMessageKind === 'file'
               ? 'a file'
               : 'a message';
-      title = contextTitle
-        ? `${senderName} sent you ${messageLabel} in ${contextTitle}`
-        : `${senderName} sent you ${messageLabel}`;
+      const action =
+        dmMessageKind === 'file' || dmMessageKind === 'image' ? 'shared' : 'sent';
+      if (isDirect && dmMessageKind === 'file') {
+        title = `${senderName} shared a file with you`;
+      } else if (isDirect && dmMessageKind === 'image') {
+        title = `${senderName} shared an image with you`;
+      } else if (isDirect) {
+        title = `${senderName} sent you ${
+          messageLabel === 'a message' ? 'a direct message' : messageLabel
+        }`;
+      } else if (contextTitle) {
+        title = `${senderName} ${action} ${messageLabel} in ${contextTitle}`;
+      } else {
+        title = `${senderName} ${action} ${messageLabel}`;
+      }
     } else {
       title = 'New message';
     }
@@ -368,26 +385,6 @@ export function buildPersonalizedSessionCopy(
     return { title, summary: title };
   }
 
-  if (eventType === 'class.session.rescheduled') {
-    const fallback = `${classTitle} session rescheduled`;
-    return {
-      title: recipient ? `${sessionAudienceLabel} rescheduled` : fallback,
-      summary:
-        getRescheduledSessionSummary(payload) ??
-        getEventSummary(payload, 'A class session has been rescheduled.'),
-    };
-  }
-
-  if (eventType === 'class.session.canceled') {
-    const fallback = `${classTitle} session cancelled`;
-    return {
-      title: recipient ? `${sessionAudienceLabel} cancelled` : fallback,
-      summary:
-        getCanceledSessionSummary(payload) ??
-        getEventSummary(payload, 'A class session has been cancelled.'),
-    };
-  }
-
   if (eventType === 'session.completed') {
     const fallback = `${classTitle} is complete`;
     return {
@@ -402,70 +399,6 @@ export function buildPersonalizedSessionCopy(
 
   if (!recipient) {
     return null;
-  }
-
-  if (eventType === 'session.reminder.sent') {
-    const explicitOffset = payload.reminderOffsetMinutes;
-    const offsetMinutes =
-      typeof explicitOffset === 'number' && Number.isFinite(explicitOffset)
-        ? Math.round(explicitOffset)
-        : undefined;
-
-    if (offsetMinutes === undefined) {
-      return null;
-    }
-
-    const titleSuffix = `${offsetMinutes} min`;
-    const reminderSummary =
-      formatSessionDateTime(
-        firstDefinedString(
-          payload.occurrenceStart,
-          payload.scheduledStartAt,
-          payload.startAt,
-          payload.firstSessionStartAt,
-        ),
-        payload,
-      ) ?? classTitle;
-
-    return {
-      title: `${sessionAudienceLabel} starts in ${titleSuffix}`,
-      summary: reminderSummary,
-    };
-  }
-
-  if (eventType === 'session.feedback_request.sent') {
-    const fallbackTitle = `How was today's class?`;
-    const summary = `Rate today's ${sessionAudienceLabel} session`;
-
-    switch (recipientRole) {
-      case 'child':
-        if (teacherName) {
-          return {
-            title: `How was your class with ${teacherName}?`,
-            summary,
-          };
-        }
-        return { title: fallbackTitle, summary };
-      case 'educator':
-        if (studentLabel) {
-          return {
-            title: `How did ${studentLabel} do in ${classTitle}?`,
-            summary,
-          };
-        }
-        return { title: fallbackTitle, summary };
-      case 'guardian':
-      case 'staff':
-        if (teacherName && studentLabel) {
-          return {
-            title: `How was ${classTitle} for ${studentLabel} with ${teacherName}?`,
-            summary,
-          };
-        }
-        return { title: fallbackTitle, summary };
-      default:
-        return { title: fallbackTitle, summary };
-    }
   }
 
   return null;

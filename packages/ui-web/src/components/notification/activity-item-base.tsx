@@ -3,13 +3,21 @@
 import type React from 'react';
 import { useEffect, useRef } from 'react';
 import {
+  AtSign,
   Bell,
+  BookImage,
   CalendarCheck,
   CalendarX,
   Check,
   CreditCard,
+  FileBadge,
+  FileHeadphone,
   GraduationCap,
   MessageSquare,
+  MessageSquareDot,
+  MessageSquareReply,
+  MessagesSquare,
+  SmilePlus,
 } from 'lucide-react';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { cn } from '@iconicedu/ui-web/lib/utils';
@@ -37,12 +45,20 @@ const INBOX_ICON_MAP: Record<
   InboxIconKeyVM,
   React.ComponentType<{ className?: string }>
 > = {
+  AtSign,
   Bell,
+  BookImage,
   CalendarCheck,
   CalendarX,
   CreditCard,
+  FileBadge,
+  FileHeadphone,
   GraduationCap,
   MessageSquare,
+  MessageSquareDot,
+  MessageSquareReply,
+  MessagesSquare,
+  SmilePlus,
 };
 
 const TONE_CLASSNAMES = {
@@ -56,19 +72,19 @@ const TONE_CLASSNAMES = {
 const getDefaultIconKey = (activity: ActivityFeedItemVM): InboxIconKeyVM => {
   switch (activity.verb) {
     case 'message.posted':
+      return 'MessageSquareDot';
     case 'message.mentioned':
+      return 'AtSign';
     case 'message.thread_reply.posted':
+      return 'MessageSquareReply';
     case 'file.uploaded':
+      return 'FileBadge';
     case 'image.uploaded':
+      return 'BookImage';
     case 'audio.uploaded':
-      return 'MessageSquare';
+      return 'FileHeadphone';
     case 'reaction.added':
-      return 'Bell';
-    case 'class.session.rescheduled':
-      return 'CalendarCheck';
-    case 'class.session.canceled':
-      return 'CalendarX';
-
+      return 'SmilePlus';
     default:
       return 'Bell';
   }

@@ -845,7 +845,7 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
     expect(publishActivityEventMock).not.toHaveBeenCalled();
   });
 
-  it('emits class.session.canceled for added exceptions even when base schedule also changes', async () => {
+  it('does not emit activity for added exceptions when base schedule also changes', async () => {
     const payload: LearningSpaceCreatePayload = {
       basics: {
         title: 'Math Foundations',

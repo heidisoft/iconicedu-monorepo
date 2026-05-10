@@ -95,7 +95,7 @@ describe('buildNotificationDecision', () => {
       event: {
         id: 'event-1',
         org_id: 'org-1',
-        event_type: 'class.session.rescheduled',
+        event_type: 'message.posted',
         occurred_at: '2026-04-21T11:59:30.000Z',
         payload: { suppressNotifications: true },
         scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
@@ -166,7 +166,7 @@ describe('buildNotificationDecision', () => {
     expect(result.reasonCodes).toContain('channel_recently_read');
   });
 
-  it('uses immediate critical policy and push/email defaults for session reminders', async () => {
+  it('uses immediate push defaults for message posts', async () => {
     const { client } = createSupabaseMock({
       channelLastReadAt: null,
       threadLastReadAt: null,
@@ -177,7 +177,7 @@ describe('buildNotificationDecision', () => {
       event: {
         id: 'event-1',
         org_id: 'org-1',
-        event_type: 'session.reminder.sent',
+        event_type: 'message.posted',
         occurred_at: '2026-04-21T11:59:30.000Z',
         payload: { channelId: 'channel-1' },
         scope: { kind: 'channel', channelId: 'channel-1' },
@@ -186,15 +186,15 @@ describe('buildNotificationDecision', () => {
     });
 
     expect(result.policy).toMatchObject({
-      prefKey: 'session.reminder.sent',
-      critical: true,
+      prefKey: 'message.posted',
+      critical: false,
       defaultDelaySeconds: 0,
     });
     expect(result.deliveryTiming).toBe('immediate');
     expect(resolveEffectivePreferenceMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        defaultChannels: ['push', 'email'],
-        prefKey: 'session.reminder.sent',
+        defaultChannels: ['push'],
+        prefKey: 'message.posted',
       }),
     );
   });

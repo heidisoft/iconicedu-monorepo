@@ -19,7 +19,6 @@ import { getLocalDate, getLocalTime, toUtcFromLocal } from '@iconicedu/utils';
 import { randomUUID } from 'crypto';
 
 import { AnalyticsService } from '@iconicedu/api/analytics/analytics.service';
-import { publishActivityEvent } from '@iconicedu/api/lib/activity-feed/activity-publisher';
 import {
   createSupabaseServiceClient,
   type SupabaseServiceClient,
@@ -1320,50 +1319,6 @@ export class RemindersService {
       return 'skipped';
     }
 
-    const eventType =
-      job.job_type === 'session.feedback_request'
-        ? 'session.feedback_request.sent'
-        : 'session.reminder.sent';
-
-    const scope: FeedScopeVM = payload.learningSpaceId
-      ? { kind: 'learning_space', learningSpaceId: payload.learningSpaceId }
-      : { kind: 'channel', channelId: payload.channelId };
-
-    const activityEvent = await publishActivityEvent({
-      supabase: supabase as never,
-      orgId: job.org_id,
-      eventType,
-      emitterLabel: 'api:reminders',
-      occurredAt: now,
-      sourceKind: 'system',
-      actorProfileId: null,
-      scope,
-      targetRef: payload.learningSpaceId
-        ? { kind: 'learning_space', id: payload.learningSpaceId }
-        : undefined,
-      payload: {
-        channelId: payload.channelId,
-        learningSpaceId: payload.learningSpaceId ?? null,
-        scheduleId: payload.scheduleId ?? null,
-        occurrenceStart: payload.occurrenceStart ?? payload.startAt ?? now,
-        reminderOffsetMinutes: payload.reminderOffsetMinutes ?? null,
-        timezone: payload.timezone ?? job.timezone ?? 'UTC',
-        invoiceId: payload.invoiceId ?? null,
-        dueAt: payload.dueAt ?? null,
-        title: payload.title,
-        summary: payload.summary ?? null,
-        channelRouteKind:
-          payload.channelRouteKind ?? (payload.learningSpaceId ? 'space' : 'channel'),
-        members: payload.members ?? null,
-      },
-      dedupeKey: `${job.dedupe_key}:activity`,
-      createdBy: systemProfileId,
-    });
-
-    if (!activityEvent) {
-      throw new Error(`Activity event suppressed for ${eventType}`);
-    }
-
     const updateResponse = await supabase
       .from('reminder_jobs')
       .update({
@@ -1386,9 +1341,11 @@ export class RemindersService {
       supabase,
       orgId: job.org_id,
       jobId: job.id,
-      activityEventId: activityEvent?.id ?? null,
       result: 'succeeded',
-      details: { event_type: eventType },
+      details: {
+        activity_event_skipped: true,
+        job_type: job.job_type,
+      },
     });
 
     // Replenish: insert the next job in the chain for this schedule

@@ -8,17 +8,13 @@ import type {
 } from '@iconicedu/shared-types/shared/shared';
 
 export type ActivityVerbVM =
-  | 'class.session.rescheduled'
-  | 'class.session.canceled'
   | 'message.posted'
   | 'message.mentioned'
   | 'message.thread_reply.posted'
   | 'file.uploaded'
   | 'image.uploaded'
   | 'audio.uploaded'
-  | 'reaction.added'
-  | 'session.reminder.sent'
-  | 'session.feedback_request.sent';
+  | 'reaction.added';
 
 export type ActivitySourceKindVM =
   | 'profile'
@@ -47,11 +43,19 @@ export type ActivityActorVM = UserProfileVM;
 export type InboxTabKeyVM = 'all' | 'classes' | 'payment' | 'system';
 
 export type InboxIconKeyVM =
+  | 'AtSign'
+  | 'BookImage'
   | 'CalendarCheck'
   | 'CalendarX'
   | 'CreditCard'
+  | 'FileBadge'
+  | 'FileHeadphone'
   | 'GraduationCap'
   | 'MessageSquare'
+  | 'MessageSquareDot'
+  | 'MessageSquareReply'
+  | 'MessagesSquare'
+  | 'SmilePlus'
   | 'Bell';
 
 export type InboxLeadingVM =

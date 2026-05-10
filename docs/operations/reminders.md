@@ -159,8 +159,7 @@ Preview branches created by `.github/workflows/ci.yml` run this automatically af
 5. Verify DB updates:
    - `event_pipeline_jobs` `reminder.reconcile` status transitions
    - `reminder_jobs.status` transitions
-   - `activity_events` created for reminder/feedback events
-   - `activity_feed_items` and notification delivery jobs created by projection.
+   - `reminder_dispatch_logs` rows explaining succeeded, skipped, failed, or dead-lettered jobs.
 
 ## 6. Reminder Dispatch Details
 
@@ -171,15 +170,11 @@ Execution:
 
 1. Claim due work with `claim_due_reminder_jobs(p_limit, p_lease_owner, p_lease_seconds)`.
 2. The RPC leases eligible `pending` or `failed` rows whose `run_at`/`next_attempt_at` is due and whose previous lease expired.
-3. For each claimed job, load payload metadata and resolve the org system profile.
+3. For each claimed job, load payload metadata.
 4. If the source classroom is archived before the job's `run_at`, mark the job `canceled`, clear lease fields, and write a `reminder_dispatch_logs` row with `idempotent_hit`.
-5. Map job type to activity event:
-   - `session.reminder` -> `session.reminder.sent`
-   - `session.feedback_request` -> `session.feedback_request.sent`
-6. Create or reuse the activity event through the API-owned activity generation path with `sourceKind='system'`, learning-space/channel scope, payload schedule metadata, and dedupe key `<reminder_jobs.dedupe_key>:activity`.
-7. `activity.project`, `notification.prepare`, and `notification.deliver` jobs turn that event into feed rows and notification delivery through the normal event pipeline.
-8. If the activity event is created, mark the reminder job `succeeded`, set `dispatched_at`, clear lease/error fields, and write a successful `reminder_dispatch_logs` row with the `activity_event_id`.
-9. If processing throws, increment `attempt_count`, set `failed` with `next_attempt_at` for retryable errors, or `dead_letter` when non-retryable/max attempts are reached.
+5. Reminder and feedback-request jobs no longer create activity events or feed rows.
+6. Mark the reminder job `succeeded`, set `dispatched_at`, clear lease/error fields, and write a successful `reminder_dispatch_logs` row with `activity_event_skipped`.
+7. If processing throws, increment `attempt_count`, set `failed` with `next_attempt_at` for retryable errors, or `dead_letter` when non-retryable/max attempts are reached.
 
 Reminder retry behavior uses exponential backoff from 15 seconds capped at 10
 minutes, with `max_attempts=8` by default. Dispatch counters are captured to

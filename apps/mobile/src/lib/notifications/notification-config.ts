@@ -31,32 +31,12 @@ const messageNotificationConfig: NotificationConfig = {
 };
 
 export const NOTIFICATION_REGISTRY: Record<string, NotificationConfig> = {
-  'class.session.rescheduled': {
-    label: 'Session Rescheduled',
-    getRoute: ({ channelId }) =>
-      channelId ? `/(app)/spaces/${channelId}?tab=sessions` : '/(app)/(tabs)/schedule',
-  },
-  'class.session.canceled': {
-    label: 'Session Cancelled',
-    getRoute: ({ channelId }) =>
-      channelId ? `/(app)/spaces/${channelId}?tab=sessions` : '/(app)/(tabs)/schedule',
-  },
   'message.posted': messageNotificationConfig,
   'message.mentioned': messageNotificationConfig,
   'message.thread_reply.posted': messageNotificationConfig,
   'file.uploaded': messageNotificationConfig,
   'image.uploaded': messageNotificationConfig,
   'audio.uploaded': messageNotificationConfig,
-  'session.reminder.sent': {
-    label: 'Session Reminders',
-    getRoute: ({ channelId }) =>
-      channelId ? `/(app)/spaces/${channelId}` : '/(app)/(tabs)/schedule',
-  },
-  'session.feedback_request.sent': {
-    label: 'Session Feedback',
-    getRoute: ({ channelId }) =>
-      channelId ? `/(app)/spaces/${channelId}` : '/(app)/(tabs)/schedule',
-  },
   'reaction.added': {
     label: 'Reactions',
     getRoute: ({ scopeKind, scopeId, channelId, channelRouteKind }) => {

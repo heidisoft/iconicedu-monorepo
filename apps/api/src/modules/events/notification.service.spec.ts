@@ -14,7 +14,7 @@ function makeEvent(payload: Record<string, unknown> = {}) {
   return {
     id: 'event-1',
     org_id: 'org-1',
-    event_type: 'class.session.rescheduled',
+    event_type: 'message.posted',
     occurred_at: '2026-05-05T12:00:00.000Z',
     payload,
     scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
@@ -75,7 +75,7 @@ describe('NotificationService silent source events', () => {
             activityEventId: 'event-1',
             recipientProfileId: 'profile-1',
             deliveryChannel: 'push',
-            prefKey: 'class.session.rescheduled',
+            prefKey: 'message.posted',
           },
         } as never,
       }),

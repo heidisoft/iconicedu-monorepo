@@ -54,18 +54,25 @@ describe('API activity definitions context rendering', () => {
       }),
     );
 
-    expect(rendered.headline.secondary).toBe('Algebra I for Priya with Ms. Chen');
-    expect(rendered.summary).toBe('Context: Algebra I for Priya with Ms. Chen');
+    expect(rendered.headline.primary).toBe('Ms. Chen');
+    expect(rendered.headline.secondary).toBe(
+      'sent a message in Algebra I for Priya with Ms. Chen',
+    );
+    expect(rendered.summary).toBe('Please review the worksheet.');
     expect(rendered.metadata?.viewerStudentNames).toEqual(['Priya']);
   });
 
   it.each([
-    ['message.mentioned', { mentionedProfileId: 'guardian-1' }],
-    ['message.thread_reply.posted', { threadId: 'thread-1', threadReply: true }],
-    ['file.uploaded', { dmMessageKind: 'file', name: 'worksheet.pdf' }],
-    ['image.uploaded', { dmMessageKind: 'image', name: 'photo.png' }],
-    ['audio.uploaded', { dmMessageKind: 'audio', name: 'voice.webm' }],
-  ] as const)('renders %s with its own projected verb', (eventType, payload) => {
+    ['message.mentioned', { mentionedProfileId: 'guardian-1' }, 'AtSign'],
+    [
+      'message.thread_reply.posted',
+      { threadId: 'thread-1', threadReply: true },
+      'MessageSquareReply',
+    ],
+    ['file.uploaded', { dmMessageKind: 'file', name: 'worksheet.pdf' }, 'FileBadge'],
+    ['image.uploaded', { dmMessageKind: 'image', name: 'photo.png' }, 'BookImage'],
+    ['audio.uploaded', { dmMessageKind: 'audio', name: 'voice.webm' }, 'FileHeadphone'],
+  ] as const)('renders %s with its own projected verb', (eventType, payload, iconKey) => {
     const definition = getActivityEventDefinition(eventType);
     expect(definition).toBeDefined();
 
@@ -79,56 +86,66 @@ describe('API activity definitions context rendering', () => {
     );
 
     expect(rendered.verb).toBe(eventType);
+    expect(rendered.leading?.kind === 'icon' ? rendered.leading.iconKey : null).toBe(
+      iconKey,
+    );
   });
 
-  it('renders teacher-facing class context with students', () => {
-    const definition = getActivityEventDefinition('session.reminder.sent');
+  it('renders direct messages with direct-message copy and reply action', () => {
+    const definition = getActivityEventDefinition('message.posted');
     expect(definition).toBeDefined();
 
     const rendered = definition!.render(
-      makeEvent('session.reminder.sent', {
-        summary: 'Class starts in 30 minutes',
-        reminderOffsetMinutes: 30,
-        activityContext: {
-          classTitle: 'Algebra I',
-          teacherNames: ['Ms. Chen'],
-          studentNames: ['Priya', 'Mateo'],
-          guardianNames: ['Anika Rao'],
-          viewerRole: 'educator',
-          viewerIsAdminStaff: false,
-        },
+      makeEvent('message.posted', {
+        senderName: 'Priya',
+        channelRouteKind: 'dm',
+        channelTopic: null,
+        learningSpaceTitle: null,
+        title: null,
+        activityContext: {},
+        content: 'Can we move the lesson?',
       }),
     );
 
-    expect(rendered.headline.secondary).toBe('Algebra I with Priya and Mateo');
-    expect(rendered.summary).toBe(
-      'Algebra I with Priya and Mateo Class starts in 30 minutes',
+    expect(rendered.leading?.kind === 'icon' ? rendered.leading.iconKey : null).toBe(
+      'MessagesSquare',
     );
-    expect(rendered.metadata?.preserveActivitySummary).toBe(true);
+    expect(rendered.headline).toMatchObject({
+      primary: 'Priya',
+      secondary: 'sent you a direct message',
+    });
+    expect(rendered.summary).toBe('Can we move the lesson?');
+    expect(rendered.actionButton?.label).toBe('Reply');
   });
 
-  it('renders admin/staff context with parents, students, teacher, and class', () => {
-    const definition = getActivityEventDefinition('class.session.canceled');
+  it('renders reactions with original message preview and quiet importance', () => {
+    const definition = getActivityEventDefinition('reaction.added');
     expect(definition).toBeDefined();
 
     const rendered = definition!.render(
-      makeEvent('class.session.canceled', {
-        canceledReason: 'weather',
-        activityContext: {
-          classTitle: 'Algebra I',
-          teacherNames: ['Ms. Chen'],
-          studentNames: ['Priya', 'Mateo'],
-          guardianNames: ['Anika Rao'],
-          viewerRole: 'staff',
-          viewerIsAdminStaff: true,
-        },
+      makeEvent('reaction.added', {
+        senderName: 'Priya',
+        emoji: '👍',
+        messagePreview: 'Thanks for the update.',
       }),
     );
 
-    expect(rendered.headline.secondary).toBe(
-      'Algebra I: Priya and Mateo, parents Anika Rao, teacher Ms. Chen',
+    expect(definition!.importance).toBe('normal');
+    expect(rendered.leading?.kind === 'icon' ? rendered.leading.iconKey : null).toBe(
+      'SmilePlus',
     );
-    expect(rendered.summary).toContain('Reason: weather.');
+    expect(rendered.headline.primary).toBe(
+      'Priya reacted 👍 to your message in Algebra I for Priya with Ms. Chen',
+    );
+    expect(rendered.summary).toBe('Your message: Thanks for the update.');
+    expect(rendered.actionButton?.label).toBe('View message');
+  });
+
+  it('marks mentions as important and message posts as immediate push', () => {
+    expect(getActivityEventDefinition('message.mentioned')?.importance).toBe('important');
+    expect(getActivityEventDefinition('message.posted')?.notification?.timing).toBe(
+      'immediate',
+    );
   });
 
   it.each([
@@ -136,14 +153,7 @@ describe('API activity definitions context rendering', () => {
     'class.session.canceled',
     'session.reminder.sent',
     'session.feedback_request.sent',
-  ])('adds contextual metadata for %s', (eventType) => {
-    const definition = getActivityEventDefinition(eventType);
-    expect(definition).toBeDefined();
-
-    const rendered = definition!.render(makeEvent(eventType, {}));
-
-    expect(rendered.metadata?.classTitle).toBe('Algebra I');
-    expect(rendered.metadata?.teacherNames).toEqual(['Ms. Chen']);
-    expect(rendered.metadata?.studentNames).toEqual(['Priya', 'Mateo']);
+  ])('does not define removed activity event %s', (eventType) => {
+    expect(getActivityEventDefinition(eventType)).toBeUndefined();
   });
 });

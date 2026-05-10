@@ -6,15 +6,14 @@ import type {
 } from '@iconicedu/shared-types/vm/activity-feed';
 
 describe('ActivityVerbVM', () => {
-  it('accepts singular and plural activity verbs', () => {
+  it('accepts supported activity verbs', () => {
     expectTypeOf<'message.posted'>().toMatchTypeOf<ActivityVerbVM>();
     expectTypeOf<'message.mentioned'>().toMatchTypeOf<ActivityVerbVM>();
     expectTypeOf<'message.thread_reply.posted'>().toMatchTypeOf<ActivityVerbVM>();
     expectTypeOf<'file.uploaded'>().toMatchTypeOf<ActivityVerbVM>();
     expectTypeOf<'image.uploaded'>().toMatchTypeOf<ActivityVerbVM>();
     expectTypeOf<'audio.uploaded'>().toMatchTypeOf<ActivityVerbVM>();
-    expectTypeOf<'class.session.rescheduled'>().toMatchTypeOf<ActivityVerbVM>();
-    expectTypeOf<'session.feedback_request.sent'>().toMatchTypeOf<ActivityVerbVM>();
+    expectTypeOf<'reaction.added'>().toMatchTypeOf<ActivityVerbVM>();
   });
 
   it('supports activity suppression rule types', () => {
