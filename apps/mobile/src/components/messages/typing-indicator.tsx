@@ -20,7 +20,7 @@ export const TypingIndicator: React.FC<TypingIndicatorProps> = ({ typingUsers })
 
   return (
     <View style={{ paddingHorizontal: 16, paddingVertical: 4 }}>
-      <Text style={{ fontSize: 12, fontStyle: 'italic', color: colors.textFaint }}>
+      <Text style={{ fontSize: 13, fontStyle: 'italic', color: colors.textFaint }}>
         {label}
       </Text>
     </View>

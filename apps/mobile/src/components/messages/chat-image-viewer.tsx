@@ -786,7 +786,7 @@ const styles = StyleSheet.create({
   },
   annotationHint: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
   },
   bottomBarActions: {
@@ -848,12 +848,12 @@ const styles = StyleSheet.create({
   },
   errorTitle: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
   },
   errorBody: {
     color: 'rgba(255,255,255,0.75)',
-    fontSize: 14,
+    fontSize: 15,
     textAlign: 'center',
     lineHeight: 20,
   },
@@ -866,7 +866,7 @@ const styles = StyleSheet.create({
   },
   retryButtonText: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
   },
   footerNotice: {
@@ -882,7 +882,7 @@ const styles = StyleSheet.create({
   },
   footerNoticeText: {
     color: '#fff',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '500',
   },
 });

@@ -106,8 +106,8 @@ function makeStyles(C: AppColors) {
       paddingVertical: 12,
     },
     navBack: { paddingHorizontal: 4 },
-    navBackTxt: { fontSize: 15, color: C.teal, fontWeight: '600' },
-    navTitle: { fontSize: 17, fontWeight: '700', color: C.text },
+    navBackTxt: { fontSize: 16, color: C.teal, fontWeight: '600' },
+    navTitle: { fontSize: 19, fontWeight: '700', color: C.text },
     content: { paddingHorizontal: 16, paddingTop: 24, paddingBottom: 40, gap: 20 },
     avatarSection: { alignItems: 'center', gap: 8, paddingBottom: 8 },
     avatar: {
@@ -120,14 +120,14 @@ function makeStyles(C: AppColors) {
       borderWidth: 1,
       borderColor: C.border,
     },
-    avatarTxt: { color: C.tealFg, fontWeight: '800', fontSize: 32 },
+    avatarTxt: { color: C.tealFg, fontWeight: '800', fontSize: 34 },
     displayName: {
-      fontSize: 22,
+      fontSize: 24,
       fontWeight: '800',
       color: C.text,
-      letterSpacing: -0.3,
+      letterSpacing: 0,
     },
-    email: { fontSize: 14, color: C.textMuted },
+    email: { fontSize: 15, color: C.textMuted },
     card: {
       backgroundColor: C.card,
       borderRadius: 16,
@@ -136,11 +136,11 @@ function makeStyles(C: AppColors) {
       overflow: 'hidden',
     },
     cardHeader: {
-      fontSize: 12,
+      fontSize: 13,
       fontWeight: '600',
       color: C.textFaint,
       textTransform: 'uppercase',
-      letterSpacing: 0.8,
+      letterSpacing: 0.5,
       paddingHorizontal: 16,
       paddingTop: 14,
       paddingBottom: 6,
@@ -152,7 +152,7 @@ function makeStyles(C: AppColors) {
       paddingHorizontal: 16,
       paddingVertical: 14,
     },
-    rowLabel: { flex: 1, fontSize: 15, color: C.text, fontWeight: '500' },
+    rowLabel: { flex: 1, fontSize: 16, color: C.text, fontWeight: '500' },
     rowChevron: { fontSize: 20, color: C.textFaint },
     divider: { height: 1, backgroundColor: C.border, marginLeft: 56 },
     signOut: {
@@ -163,7 +163,7 @@ function makeStyles(C: AppColors) {
       borderWidth: 1,
       borderColor: C.red + '24',
     },
-    signOutTxt: { color: C.red, fontWeight: '700', fontSize: 16 },
-    version: { textAlign: 'center', fontSize: 12, color: C.textFaint },
+    signOutTxt: { color: C.red, fontWeight: '700', fontSize: 17 },
+    version: { textAlign: 'center', fontSize: 13, color: C.textFaint },
   });
 }

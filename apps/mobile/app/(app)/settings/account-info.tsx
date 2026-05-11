@@ -39,7 +39,7 @@ function makeStyles(C: AppColors) {
     navBack: { padding: 8, borderRadius: 8 },
     navTitle: {
       flex: 1,
-      fontSize: 17,
+      fontSize: 19,
       fontWeight: '700',
       color: C.text,
       textAlign: 'center',
@@ -47,11 +47,11 @@ function makeStyles(C: AppColors) {
     },
     scroll: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 48, gap: 6 },
     sectionLabel: {
-      fontSize: 12,
+      fontSize: 13,
       fontWeight: '700',
       color: C.textFaint,
       textTransform: 'uppercase',
-      letterSpacing: 0.8,
+      letterSpacing: 0.5,
       paddingHorizontal: 4,
       paddingTop: 14,
       paddingBottom: 6,
@@ -64,11 +64,11 @@ function makeStyles(C: AppColors) {
       overflow: 'hidden',
     },
     divider: { height: 1, backgroundColor: C.border, marginLeft: 60 },
-    valueText: { fontSize: 13, color: C.textMuted, maxWidth: 160, textAlign: 'right' },
+    valueText: { fontSize: 14, color: C.textMuted, maxWidth: 160, textAlign: 'right' },
     verifiedRow: { alignItems: 'flex-end', gap: 3 },
     verifiedBadge: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-    verifiedTxt: { fontSize: 11, fontWeight: '600', color: '#16a34a' },
-    unverifiedTxt: { fontSize: 11, color: C.textFaint },
+    verifiedTxt: { fontSize: 12, fontWeight: '600', color: '#16a34a' },
+    unverifiedTxt: { fontSize: 12, color: C.textFaint },
   });
 }
 

@@ -242,7 +242,7 @@ const avatarStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  initials: { color: '#fff', fontSize: 13, fontWeight: '700', letterSpacing: 0.3 },
+  initials: { color: '#fff', fontSize: 14, fontWeight: '700', letterSpacing: 0 },
   presenceBadge: {
     position: 'absolute',
     right: -1,
@@ -447,10 +447,10 @@ export function SocialBar({
               paddingVertical: 5,
             }}
           >
-            <Text style={{ fontSize: 14 }}>{r.emoji}</Text>
+            <Text style={{ fontSize: 15 }}>{r.emoji}</Text>
             <Text
               style={{
-                fontSize: 12,
+                fontSize: 13,
                 color: r.reactedByMe ? colors.teal : colors.text,
                 fontWeight: '600',
               }}
@@ -560,7 +560,7 @@ function ThreadPill({
       {/* Reply count */}
       <Text
         style={{
-          fontSize: 12,
+          fontSize: 13,
           color: expanded ? colors.teal : colors.textMuted,
           fontWeight: '600',
         }}
@@ -580,8 +580,8 @@ function ThreadPill({
         >
           <Text
             style={{
-              fontSize: 10,
-              lineHeight: 12,
+              fontSize: 11,
+              lineHeight: 13,
               fontWeight: '700',
               color: colors.teal,
               textTransform: 'uppercase',
@@ -607,8 +607,8 @@ function ThreadPill({
         >
           <Text
             style={{
-              fontSize: 11,
-              lineHeight: 13,
+              fontSize: 12,
+              lineHeight: 14,
               fontWeight: '700',
               color: colors.tealFg,
             }}
@@ -685,7 +685,7 @@ function ThreadPill({
                     borderColor: colors.pageBg,
                   }}
                 >
-                  <Text style={{ color: '#fff', fontSize: 8, fontWeight: '700' }}>
+                  <Text style={{ color: '#fff', fontSize: 9, fontWeight: '700' }}>
                     {getInitials(name)[0]}
                   </Text>
                 </View>
@@ -755,10 +755,10 @@ function InlineUnreadDivider({ count, colors }: { count?: number; colors: AppCol
       >
         <Text
           style={{
-            fontSize: 10,
+            fontSize: 11,
             fontWeight: '700',
             textTransform: 'uppercase',
-            letterSpacing: 0.8,
+            letterSpacing: 0.5,
             color: colors.textMuted,
           }}
         >
@@ -806,7 +806,7 @@ export function VisibilityBadge({
         </View>
       </TooltipTrigger>
       <TooltipContent sideOffset={6} className="rounded-full px-2.5 py-1">
-        <Text style={{ fontSize: 11, fontWeight: '600', color: '#f8fafc' }}>{label}</Text>
+        <Text style={{ fontSize: 12, fontWeight: '600', color: '#f8fafc' }}>{label}</Text>
       </TooltipContent>
     </Tooltip>
   );
@@ -869,17 +869,17 @@ function InlineReply({
             role={senderRole}
             iconSize={12}
             textStyle={{
-              fontSize: 13,
+              fontSize: 14,
               fontWeight: '700',
               color: nameColor,
             }}
           />
-          <Text style={{ fontSize: 11, color: colors.textFaint }}>{time}</Text>
+          <Text style={{ fontSize: 12, color: colors.textFaint }}>{time}</Text>
         </View>
         <FormattedText
           text={text}
           mentions={mentions}
-          style={{ fontSize: 14, color: colors.text, lineHeight: 20 }}
+          style={{ fontSize: 15, color: colors.text, lineHeight: 20 }}
         />
       </View>
     </View>
@@ -921,7 +921,7 @@ export function ThreadReplyButton({
     >
       <CornerUpLeft size={14} color={colors.textMuted} />
       {label ? (
-        <Text style={{ color: colors.textMuted, fontSize: 13, fontWeight: '600' }}>
+        <Text style={{ color: colors.textMuted, fontSize: 14, fontWeight: '600' }}>
           {label}
         </Text>
       ) : null}
@@ -1084,10 +1084,10 @@ function ProgressCard({
             marginBottom: 6,
           }}
         >
-          <Text style={{ color: colors.textMuted, fontSize: 13 }}>
+          <Text style={{ color: colors.textMuted, fontSize: 14 }}>
             Before: {progress.previousValue}%
           </Text>
-          <Text style={{ color: colors.teal, fontSize: 13, fontWeight: '700' }}>
+          <Text style={{ color: colors.teal, fontSize: 14, fontWeight: '700' }}>
             Now: {progress.currentValue}%
           </Text>
         </View>
@@ -1103,13 +1103,13 @@ function ProgressCard({
           />
         </View>
         {!!progress.targetValue && (
-          <Text style={{ color: colors.textFaint, fontSize: 11, marginTop: 4 }}>
+          <Text style={{ color: colors.textFaint, fontSize: 12, marginTop: 4 }}>
             Target: {progress.targetValue}%
           </Text>
         )}
       </View>
       <View style={[s.improvementBadge, { backgroundColor: colors.tealBg }]}>
-        <Text style={{ color: colors.teal, fontWeight: '700', fontSize: 13 }}>
+        <Text style={{ color: colors.teal, fontWeight: '700', fontSize: 14 }}>
           +{progress.improvement} improvement
         </Text>
       </View>
@@ -1149,7 +1149,7 @@ function EventCard({
           style={[s.joinBtn, { backgroundColor: colors.teal }]}
           onPress={() => Linking.openURL(event.meetingLink!).catch(() => null)}
         >
-          <Text style={{ color: colors.tealFg, fontWeight: '700', fontSize: 13 }}>
+          <Text style={{ color: colors.tealFg, fontWeight: '700', fontSize: 14 }}>
             Join Meeting
           </Text>
         </TouchableOpacity>
@@ -1186,7 +1186,7 @@ function HomeworkCard({
         {homework.assignmentTitle}
       </Text>
       <View style={[s.statusBadge, { backgroundColor: statusColor + '22' }]}>
-        <Text style={{ color: statusColor, fontWeight: '600', fontSize: 12 }}>
+        <Text style={{ color: statusColor, fontWeight: '600', fontSize: 13 }}>
           {statusLabel}
         </Text>
       </View>
@@ -1291,7 +1291,7 @@ function SessionBookingCard({
         {session.durationMinutes ? ` · ${session.durationMinutes} min` : ''}
       </Text>
       <View style={[s.statusBadge, { backgroundColor: statusColor + '22' }]}>
-        <Text style={{ color: statusColor, fontWeight: '600', fontSize: 12 }}>
+        <Text style={{ color: statusColor, fontWeight: '600', fontSize: 13 }}>
           {statusLabel}
         </Text>
       </View>
@@ -1300,7 +1300,7 @@ function SessionBookingCard({
           style={[s.joinBtn, { backgroundColor: colors.teal }]}
           onPress={() => Linking.openURL(session.meetingLink!).catch(() => null)}
         >
-          <Text style={{ color: colors.tealFg, fontWeight: '700', fontSize: 13 }}>
+          <Text style={{ color: colors.tealFg, fontWeight: '700', fontSize: 14 }}>
             Join Meeting
           </Text>
         </TouchableOpacity>
@@ -1332,7 +1332,7 @@ function PaymentReminderCard({
         {payment.currency} {payment.amount.toLocaleString()}
       </Text>
       <View style={[s.statusBadge, { backgroundColor: statusColor + '22' }]}>
-        <Text style={{ color: statusColor, fontWeight: '600', fontSize: 12 }}>
+        <Text style={{ color: statusColor, fontWeight: '600', fontSize: 13 }}>
           {statusLabel}
         </Text>
       </View>
@@ -1376,7 +1376,7 @@ function SessionCompleteBar({
           {message.session.title}
         </Text>
         {!!message.session.endAt && (
-          <Text style={{ fontSize: 10, color: colors.textFaint }}>
+          <Text style={{ fontSize: 11, color: colors.textFaint }}>
             {formatTime(message.session.endAt)}
           </Text>
         )}
@@ -1446,7 +1446,7 @@ function LiveSessionStartedCard({
       <View style={{ gap: 4 }}>
         <Text
           style={{
-            fontSize: 14,
+            fontSize: 15,
             fontWeight: '600',
             color: ended ? colors.textMuted : colors.text,
           }}
@@ -1455,14 +1455,14 @@ function LiveSessionStartedCard({
         </Text>
         {!!liveSession && (
           <>
-            <Text style={{ fontSize: 14, color: colors.textMuted }}>
+            <Text style={{ fontSize: 15, color: colors.textMuted }}>
               {liveSession.startedByDisplayName}{' '}
               {ended
                 ? `ended this ${liveSession.provider ?? ''} live session.`
                 : `started this ${liveSession.provider ?? ''} live session.`}
             </Text>
             {!!liveSession.occurrenceLabel && (
-              <Text style={{ fontSize: 12, color: colors.textMuted }}>
+              <Text style={{ fontSize: 13, color: colors.textMuted }}>
                 For {liveSession.occurrenceLabel}
               </Text>
             )}
@@ -1495,7 +1495,7 @@ function LiveSessionStartedCard({
         <Video size={16} color={ended ? colors.textMuted : colors.tealFg} />
         <Text
           style={{
-            fontSize: 13,
+            fontSize: 14,
             fontWeight: '600',
             color: ended ? colors.textMuted : colors.tealFg,
           }}
@@ -1532,8 +1532,8 @@ function makeStyles(colors: AppColors) {
     // ── Name + time row (inside bubble) ──────────────────────────────────────
     nameRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginBottom: 2 },
     nameRowOwn: { justifyContent: 'flex-end' },
-    senderName: { fontSize: 14, fontWeight: '700' },
-    msgTime: { fontSize: 11, color: colors.textFaint },
+    senderName: { fontSize: 15, fontWeight: '700' },
+    msgTime: { fontSize: 12, color: colors.textFaint },
 
     // ── Message bubble ────────────────────────────────────────────────────────
     bubble: {
@@ -1554,7 +1554,7 @@ function makeStyles(colors: AppColors) {
       width: '100%',
       flexShrink: 1,
       flexWrap: 'wrap',
-      fontSize: 14,
+      fontSize: 15,
       lineHeight: 20,
       color: colors.text,
     },
@@ -1673,8 +1673,8 @@ function makeStyles(colors: AppColors) {
     },
     linkCardImg: { width: '100%', height: '100%' },
     linkCardBody: { padding: 12 },
-    linkCardTitle: { fontSize: 14, fontWeight: '600', marginBottom: 4 },
-    linkCardDesc: { fontSize: 12, lineHeight: 17 },
+    linkCardTitle: { fontSize: 15, fontWeight: '600', marginBottom: 4 },
+    linkCardDesc: { fontSize: 13, lineHeight: 17 },
     linkCardMeta: {
       flexDirection: 'row' as const,
       alignItems: 'center' as const,
@@ -1682,21 +1682,21 @@ function makeStyles(colors: AppColors) {
       marginTop: 8,
     },
     linkCardFavicon: { width: 12, height: 12 },
-    linkCardSite: { fontSize: 12, flex: 1 },
+    linkCardSite: { fontSize: 13, flex: 1 },
 
     // ── Structured cards (self-contained, no outer bubble) ────────────────────
     card: { borderWidth: 1, borderRadius: 16, padding: 14, gap: 4 },
     cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
-    cardHeaderLabel: { fontSize: 13, fontWeight: '700', flex: 1 },
+    cardHeaderLabel: { fontSize: 14, fontWeight: '700', flex: 1 },
     subjectTag: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2 },
-    subjectTagText: { fontSize: 11, fontWeight: '600' },
-    cardTitle: { fontSize: 16, fontWeight: '700', marginBottom: 2 },
-    cardDesc: { fontSize: 13, lineHeight: 19 },
+    subjectTagText: { fontSize: 12, fontWeight: '600' },
+    cardTitle: { fontSize: 17, fontWeight: '700', marginBottom: 2 },
+    cardDesc: { fontSize: 14, lineHeight: 19 },
     cardMeta: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
     metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
-    metaChip: { fontSize: 12 },
-    sectionLabel: { fontSize: 12, fontWeight: '700', marginBottom: 4 },
-    listItem: { fontSize: 13, lineHeight: 20 },
+    metaChip: { fontSize: 13 },
+    sectionLabel: { fontSize: 13, fontWeight: '700', marginBottom: 4 },
+    listItem: { fontSize: 14, lineHeight: 19 },
     attachRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -1705,7 +1705,7 @@ function makeStyles(colors: AppColors) {
       paddingTop: 8,
       marginTop: 8,
     },
-    attachName: { flex: 1, fontSize: 12, fontWeight: '500' },
+    attachName: { flex: 1, fontSize: 13, fontWeight: '500' },
     joinBtn: {
       borderRadius: 10,
       paddingVertical: 10,
@@ -1748,7 +1748,7 @@ function makeStyles(colors: AppColors) {
       justifyContent: 'center',
     },
     sessionCompleteTitle: {
-      fontSize: 12,
+      fontSize: 13,
       fontWeight: '600',
       textAlign: 'center',
       maxWidth: 160,
@@ -2371,13 +2371,13 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text
-                    style={{ fontSize: 13, fontWeight: '500', color: colors.text }}
+                    style={{ fontSize: 14, fontWeight: '500', color: colors.text }}
                     numberOfLines={1}
                   >
                     {att.name}
                   </Text>
                   {!!att.size && (
-                    <Text style={{ fontSize: 11, marginTop: 1, color: colors.textMuted }}>
+                    <Text style={{ fontSize: 12, marginTop: 1, color: colors.textMuted }}>
                       {formatFileSize(att.size)}
                     </Text>
                   )}
@@ -2438,7 +2438,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
         {/* Inner card matches web: rounded-2xl border border-border bg-card px-3 py-3 */}
         <View style={[s.audioCard, { borderColor: cardBorder, backgroundColor: cardBg }]}>
           {isUnsupportedOnIOS && (
-            <Text style={{ fontSize: 11, color: '#f59e0b', marginBottom: 6 }}>
+            <Text style={{ fontSize: 12, color: '#f59e0b', marginBottom: 6 }}>
               ⚠ This audio format is not supported on iPhone
             </Text>
           )}
@@ -2472,10 +2472,10 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             <View style={{ flex: 1, gap: 4 }}>
               {/* Time row: currentTime left / duration right */}
               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Text style={{ fontSize: 11, color: timeColor }}>
+                <Text style={{ fontSize: 12, color: timeColor }}>
                   {fmtMs(audioPositionMs)}
                 </Text>
-                <Text style={{ fontSize: 11, color: timeColor }}>{fmtMs(totalMs)}</Text>
+                <Text style={{ fontSize: 12, color: timeColor }}>{fmtMs(totalMs)}</Text>
               </View>
               {/* Waveform: bars before progress point are highlighted, rest are inactive */}
               <View style={s.waveformRow}>

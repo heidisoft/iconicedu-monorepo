@@ -684,24 +684,24 @@ const styles = StyleSheet.create({
   },
   helperText: {
     color: '#fff',
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',
   },
   helperSubtext: {
     color: 'rgba(255,255,255,0.65)',
-    fontSize: 13,
+    fontSize: 14,
     textAlign: 'center',
     lineHeight: 20,
   },
   errorTitle: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
   },
   errorBody: {
     color: 'rgba(255,255,255,0.75)',
-    fontSize: 14,
+    fontSize: 15,
     textAlign: 'center',
     lineHeight: 20,
   },
@@ -717,7 +717,7 @@ const styles = StyleSheet.create({
   },
   retryButtonText: {
     color: '#fff',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
   },
   // Bottom bar — identical structure to chat-image-viewer
@@ -745,12 +745,12 @@ const styles = StyleSheet.create({
   },
   pageIndicator: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
   },
   filenameLabel: {
     color: 'rgba(255,255,255,0.75)',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '500',
   },
   bottomBarActions: {
@@ -793,7 +793,7 @@ const styles = StyleSheet.create({
   },
   footerNoticeText: {
     color: '#fff',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '500',
   },
 });

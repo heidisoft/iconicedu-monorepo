@@ -195,7 +195,7 @@ const sepStyles = StyleSheet.create({
     gap: 8,
   },
   line: { flex: 1, height: 1 },
-  label: { fontSize: 12, fontWeight: '600', paddingHorizontal: 8 },
+  label: { fontSize: 13, fontWeight: '600', paddingHorizontal: 8 },
 });
 
 function UnreadSeparator({ count, colors }: { count?: number; colors: AppColors }) {
@@ -235,10 +235,10 @@ const unreadStyles = StyleSheet.create({
     paddingVertical: 4,
   },
   label: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: 0.8,
+    letterSpacing: 0.5,
   },
 });
 
@@ -730,13 +730,13 @@ const emptyStyles = StyleSheet.create({
     justifyContent: 'center',
   },
   title: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
     textAlign: 'center',
   },
   description: {
-    fontSize: 14,
-    lineHeight: 21,
+    fontSize: 15,
+    lineHeight: 20,
     textAlign: 'center',
   },
 });

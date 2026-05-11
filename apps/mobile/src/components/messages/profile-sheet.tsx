@@ -294,12 +294,12 @@ const s = StyleSheet.create({
   },
   largeAvatarInitials: {
     color: '#fff',
-    fontSize: 28,
+    fontSize: 30,
     fontWeight: '700',
-    letterSpacing: 0.3,
+    letterSpacing: 0,
   },
   displayName: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '700',
     textAlign: 'center',
   },
@@ -312,10 +312,10 @@ const s = StyleSheet.create({
     borderRadius: 12,
   },
   presenceEmoji: {
-    fontSize: 14,
+    fontSize: 15,
   },
   presenceText: {
-    fontSize: 13,
+    fontSize: 14,
     maxWidth: 200,
   },
   roleBadge: {
@@ -324,7 +324,7 @@ const s = StyleSheet.create({
     borderRadius: 12,
   },
   roleText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
   },
   separator: {
@@ -336,7 +336,7 @@ const s = StyleSheet.create({
     paddingTop: 8,
   },
   aboutTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
   },
   aboutRow: {
@@ -351,10 +351,10 @@ const s = StyleSheet.create({
     flex: 1,
   },
   aboutLabel: {
-    fontSize: 12,
+    fontSize: 13,
   },
   aboutValue: {
-    fontSize: 14,
+    fontSize: 15,
     marginTop: 1,
   },
 });

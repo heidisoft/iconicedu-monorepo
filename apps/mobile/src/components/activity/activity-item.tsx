@@ -174,7 +174,7 @@ export function makeActivityItemStyles(C: AppColors) {
       gap: 5,
       marginBottom: 5,
     },
-    headlineText: { fontSize: 15, lineHeight: 22 },
+    headlineText: { fontSize: 16, lineHeight: 22 },
     bold: { fontWeight: '700' },
 
     // Emphasis badge
@@ -186,11 +186,11 @@ export function makeActivityItemStyles(C: AppColors) {
       paddingVertical: 3,
       borderRadius: 8,
     },
-    badgeText: { fontSize: 13, fontWeight: '600' },
+    badgeText: { fontSize: 14, fontWeight: '600' },
 
     // Meta row
     metaRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-    metaText: { fontSize: 13 },
+    metaText: { fontSize: 14 },
     metaDot: { width: 3, height: 3, borderRadius: 2 },
 
     // Preview card (summary / expanded content)
@@ -201,11 +201,11 @@ export function makeActivityItemStyles(C: AppColors) {
       borderWidth: 1,
       padding: 14,
     },
-    previewText: { fontSize: 14, lineHeight: 22 },
+    previewText: { fontSize: 15, lineHeight: 20 },
 
     // Read more
     readMoreBtn: { marginTop: 8, marginLeft: 42 },
-    readMoreText: { fontSize: 13, fontWeight: '600' },
+    readMoreText: { fontSize: 14, fontWeight: '600' },
 
     // Action button
     actionBtn: {
@@ -217,7 +217,7 @@ export function makeActivityItemStyles(C: AppColors) {
       paddingHorizontal: 14,
       paddingVertical: 8,
     },
-    actionBtnText: { fontSize: 13, fontWeight: '600' },
+    actionBtnText: { fontSize: 14, fontWeight: '600' },
 
     // Sub-items container
     subItemsWrap: { marginTop: 10, marginLeft: 42, borderLeftWidth: 2, paddingLeft: 12 },

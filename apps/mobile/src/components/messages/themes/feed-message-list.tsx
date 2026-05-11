@@ -150,15 +150,15 @@ function findUnreadStartMessageId(input: {
 
 const FONT = {
   body: 15,
-  bodyLine: 22,
+  bodyLine: 20,
   emoji: 36,
   emojiLine: 42,
   title: 14,
-  titleLine: 18,
+  titleLine: 17,
   meta: 13,
-  metaLine: 18,
+  metaLine: 16,
   small: 12,
-  smallLine: 16,
+  smallLine: 15,
 };
 
 type FeedMessageListProps = MessageListProps;
@@ -671,13 +671,13 @@ function FeedFileAttachments({
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text
-                  style={{ color: colors.text, fontSize: 13, fontWeight: '600' }}
+                  style={{ color: colors.text, fontSize: 14, fontWeight: '600' }}
                   numberOfLines={1}
                 >
                   {attachment.name}
                 </Text>
                 {!!attachment.size && (
-                  <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 1 }}>
+                  <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 1 }}>
                     {formatFileSize(attachment.size)}
                   </Text>
                 )}
@@ -1722,7 +1722,7 @@ const styles = StyleSheet.create({
   },
   overflowText: {
     color: '#FFFFFF',
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '800',
   },
   textCard: {
@@ -1789,17 +1789,17 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   linkTitle: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
   },
   linkDescription: {
     marginTop: 3,
-    fontSize: 12,
-    lineHeight: 17,
+    fontSize: 13,
+    lineHeight: 18,
   },
   linkSite: {
     marginTop: 6,
-    fontSize: 11,
+    fontSize: 12,
   },
   audioCard: {
     borderWidth: StyleSheet.hairlineWidth,
@@ -1825,12 +1825,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   audioTime: {
-    fontSize: 11,
+    fontSize: 12,
   },
   unsupportedAudioText: {
     marginBottom: 8,
     color: '#f59e0b',
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
   },
   waveformRow: {
@@ -1892,7 +1892,7 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     color: FEED.text,
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '700',
     textAlign: 'center',
   },

@@ -265,7 +265,7 @@ function makeStyles(C: AppColors) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    avatarTxt: { color: '#fff', fontWeight: '700', fontSize: 16, letterSpacing: 0.3 },
+    avatarTxt: { color: '#fff', fontWeight: '700', fontSize: 17, letterSpacing: 0 },
     onlineDot: {
       position: 'absolute',
       bottom: 0,
@@ -314,7 +314,7 @@ function makeStyles(C: AppColors) {
       borderWidth: 2,
       borderColor: C.pageBg,
     },
-    groupTxt: { color: '#fff', fontWeight: '700', fontSize: 13 },
+    groupTxt: { color: '#fff', fontWeight: '700', fontSize: 14 },
     groupBadgeFront: {},
     groupBadgeBack: {},
     iconBox: {
@@ -328,13 +328,13 @@ function makeStyles(C: AppColors) {
       justifyContent: 'center',
       gap: 2,
     },
-    title: { fontSize: 16, fontWeight: '700', color: C.text, letterSpacing: -0.2 },
+    title: { fontSize: 17, fontWeight: '700', color: C.text, letterSpacing: 0 },
     subtitleRow: {
       flexShrink: 1,
       minWidth: 0,
     },
-    subtitleText: { fontSize: 12, lineHeight: 16, color: C.textMuted },
-    subtitleSeparator: { fontSize: 12, lineHeight: 16, color: C.textMuted },
+    subtitleText: { fontSize: 13, lineHeight: 17, color: C.textMuted },
+    subtitleSeparator: { fontSize: 13, lineHeight: 17, color: C.textMuted },
     subtitleGroup: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -347,12 +347,12 @@ function makeStyles(C: AppColors) {
       flexShrink: 1,
     },
     subtitleGroupName: {
-      fontSize: 12,
-      lineHeight: 16,
+      fontSize: 13,
+      lineHeight: 17,
       color: C.textMuted,
       flexShrink: 1,
     },
-    localTimeText: { fontSize: 12, lineHeight: 16, color: C.textMuted },
+    localTimeText: { fontSize: 13, lineHeight: 17, color: C.textMuted },
     localTimeWrap: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -365,8 +365,8 @@ function makeStyles(C: AppColors) {
       alignSelf: 'flex-start',
     },
     tooltipText: {
-      fontSize: 12,
-      lineHeight: 18,
+      fontSize: 13,
+      lineHeight: 19,
       color: '#f8fafc',
     },
     subtitleButton: { alignSelf: 'stretch', minWidth: 0 },
@@ -400,7 +400,7 @@ function makeStyles(C: AppColors) {
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: C.teal,
     },
-    joinPillTxt: { fontSize: 13, fontWeight: '700', color: C.teal },
+    joinPillTxt: { fontSize: 14, fontWeight: '700', color: C.teal },
     modalBackdrop: {
       flex: 1,
       justifyContent: 'center',
@@ -417,12 +417,12 @@ function makeStyles(C: AppColors) {
     },
     modalHeading: { gap: 8 },
     modalTitle: {
-      fontSize: 18,
+      fontSize: 20,
       fontWeight: '700',
       color: C.text,
     },
     modalDescription: {
-      fontSize: 14,
+      fontSize: 15,
       lineHeight: 20,
       color: C.textMuted,
     },
@@ -435,14 +435,14 @@ function makeStyles(C: AppColors) {
       padding: 14,
     },
     modalLinkLabel: {
-      fontSize: 11,
+      fontSize: 12,
       fontWeight: '700',
-      letterSpacing: 1.2,
+      letterSpacing: 0.5,
       textTransform: 'uppercase',
       color: C.textMuted,
     },
     modalLinkValue: {
-      fontSize: 13,
+      fontSize: 14,
       lineHeight: 19,
       color: C.text,
     },
@@ -471,12 +471,12 @@ function makeStyles(C: AppColors) {
       backgroundColor: C.teal,
     },
     modalButtonSecondaryText: {
-      fontSize: 14,
+      fontSize: 15,
       fontWeight: '600',
       color: C.text,
     },
     modalButtonPrimaryText: {
-      fontSize: 14,
+      fontSize: 15,
       fontWeight: '700',
       color: C.tealFg,
     },

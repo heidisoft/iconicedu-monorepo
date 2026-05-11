@@ -63,14 +63,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   title: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '600',
     color: '#18181b',
     marginBottom: 12,
     textAlign: 'center',
   },
   body: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#71717a',
     textAlign: 'center',
     lineHeight: 20,
@@ -85,6 +85,6 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#042f2e',
     fontWeight: '600',
-    fontSize: 14,
+    fontSize: 15,
   },
 });

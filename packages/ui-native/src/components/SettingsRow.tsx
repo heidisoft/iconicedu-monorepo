@@ -70,7 +70,7 @@ const styles = StyleSheet.create({
   },
   label: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '500',
   },
   trailing: {

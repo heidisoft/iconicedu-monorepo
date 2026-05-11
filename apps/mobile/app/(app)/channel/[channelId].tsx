@@ -609,7 +609,7 @@ function makeStyles(_colors: {
       borderBottomColor: 'transparent',
     },
     tabLabel: {
-      fontSize: 13,
+      fontSize: 14,
       fontWeight: '600',
     },
   });

@@ -627,7 +627,7 @@ const makeStyles = (_colors: { border: string; teal: string; textMuted: string }
       borderBottomColor: 'transparent',
     },
     tabLabel: {
-      fontSize: 13,
+      fontSize: 14,
       fontWeight: '600',
     },
   });

@@ -605,7 +605,7 @@ function makeStyles(C: AppColors) {
       backgroundColor: C.teal,
     },
     subTabLabel: {
-      fontSize: 13,
+      fontSize: 14,
       fontWeight: '600',
       color: C.textMuted,
     },
@@ -623,16 +623,16 @@ function makeStyles(C: AppColors) {
       paddingBottom: 60,
     },
     emptyTitle: {
-      fontSize: 16,
+      fontSize: 17,
       fontWeight: '600',
       color: C.text,
       textAlign: 'center',
     },
     emptySubtitle: {
-      fontSize: 13,
+      fontSize: 14,
       color: C.textMuted,
       textAlign: 'center',
-      lineHeight: 19,
+      lineHeight: 20,
     },
 
     // Month section
@@ -659,12 +659,12 @@ function makeStyles(C: AppColors) {
       gap: 6,
     },
     monthTitle: {
-      fontSize: 14,
+      fontSize: 15,
       fontWeight: '700',
       color: C.text,
     },
     monthMeta: {
-      fontSize: 12,
+      fontSize: 13,
       color: C.textMuted,
       marginTop: 1,
     },
@@ -675,7 +675,7 @@ function makeStyles(C: AppColors) {
       borderRadius: 99,
     },
     currentMonthBadgeTxt: {
-      fontSize: 9,
+      fontSize: 10,
       fontWeight: '700',
       color: C.teal,
     },
@@ -699,7 +699,7 @@ function makeStyles(C: AppColors) {
       borderRadius: 2.5,
     },
     progressPct: {
-      fontSize: 9,
+      fontSize: 10,
       color: C.textMuted,
       fontWeight: '500',
       minWidth: 24,

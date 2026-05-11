@@ -118,7 +118,7 @@ function makeStyles(C: AppColors) {
       paddingTop: 18,
       paddingBottom: 10,
     },
-    pageTitle: { fontSize: 28, fontWeight: '800', color: C.text, letterSpacing: -0.5 },
+    pageTitle: { fontSize: 30, fontWeight: '800', color: C.text, letterSpacing: 0 },
     scroll: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 48, gap: 20 },
 
     // Profile card
@@ -137,19 +137,19 @@ function makeStyles(C: AppColors) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    avatarTxt: { color: '#ffffff', fontWeight: '800', fontSize: 22 },
+    avatarTxt: { color: '#ffffff', fontWeight: '800', fontSize: 24 },
     profileInfo: { flex: 1, gap: 3 },
-    profileName: { fontSize: 17, fontWeight: '700', color: C.text },
-    profileEmail: { fontSize: 13, color: C.textMuted },
-    profileKind: { fontSize: 12, color: C.teal, fontWeight: '600', marginTop: 2 },
+    profileName: { fontSize: 19, fontWeight: '700', color: C.text },
+    profileEmail: { fontSize: 14, color: C.textMuted },
+    profileKind: { fontSize: 13, color: C.teal, fontWeight: '600', marginTop: 2 },
 
     // Section
     sectionLabel: {
-      fontSize: 12,
+      fontSize: 13,
       fontWeight: '700',
       color: C.textFaint,
       textTransform: 'uppercase',
-      letterSpacing: 0.8,
+      letterSpacing: 0.5,
       paddingHorizontal: 4,
       marginBottom: -8,
     },
@@ -162,7 +162,7 @@ function makeStyles(C: AppColors) {
     },
     divider: { height: 1, backgroundColor: C.border, marginLeft: 60 },
     rowTrailingText: {
-      fontSize: 13,
+      fontSize: 14,
       fontWeight: '600',
       color: C.textMuted,
       maxWidth: 160,
@@ -178,12 +178,12 @@ function makeStyles(C: AppColors) {
       gap: 4,
     },
     familySwitchTitle: {
-      fontSize: 18,
+      fontSize: 20,
       fontWeight: '800',
       color: C.text,
     },
     familySwitchSubtitle: {
-      fontSize: 13,
+      fontSize: 14,
       color: C.textMuted,
       lineHeight: 18,
     },
@@ -200,7 +200,7 @@ function makeStyles(C: AppColors) {
     },
     familySwitchAvatarText: {
       color: '#ffffff',
-      fontSize: 14,
+      fontSize: 15,
       fontWeight: '800',
     },
     switchOption: {
@@ -224,15 +224,15 @@ function makeStyles(C: AppColors) {
       gap: 2,
     },
     switchOptionLabel: {
-      fontSize: 14,
+      fontSize: 15,
       fontWeight: '700',
       color: C.text,
     },
     switchOptionSubtext: {
-      fontSize: 12,
+      fontSize: 13,
       color: C.textMuted,
     },
-    version: { textAlign: 'center', fontSize: 12, color: C.textFaint, marginTop: 4 },
+    version: { textAlign: 'center', fontSize: 13, color: C.textFaint, marginTop: 4 },
   });
 }
 

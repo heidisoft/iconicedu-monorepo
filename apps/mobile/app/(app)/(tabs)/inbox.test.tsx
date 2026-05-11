@@ -55,6 +55,7 @@ jest.mock('lucide-react-native', () => {
   const Icon = ({ size }: { size?: number }) => <Text>{`icon-${size ?? 0}`}</Text>;
   return {
     Bell: Icon,
+    CheckCheck: Icon,
     CheckCircle: Icon,
     CreditCard: Icon,
     GraduationCap: Icon,

@@ -22,7 +22,7 @@ function makeStyles(C: AppColors) {
     navBack: { padding: 8, borderRadius: 8 },
     navTitle: {
       flex: 1,
-      fontSize: 17,
+      fontSize: 19,
       fontWeight: '700',
       color: C.text,
       textAlign: 'center',
@@ -30,11 +30,11 @@ function makeStyles(C: AppColors) {
     },
     scroll: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 48, gap: 6 },
     sectionLabel: {
-      fontSize: 12,
+      fontSize: 13,
       fontWeight: '700',
       color: C.textFaint,
       textTransform: 'uppercase',
-      letterSpacing: 0.8,
+      letterSpacing: 0.5,
       paddingHorizontal: 4,
       paddingTop: 14,
       paddingBottom: 6,
@@ -47,8 +47,8 @@ function makeStyles(C: AppColors) {
       overflow: 'hidden',
     },
     divider: { height: 1, backgroundColor: C.border, marginLeft: 60 },
-    valueText: { fontSize: 13, color: C.textMuted, maxWidth: 160, textAlign: 'right' },
-    emptyValue: { fontSize: 13, color: C.textFaint, fontStyle: 'italic' },
+    valueText: { fontSize: 14, color: C.textMuted, maxWidth: 160, textAlign: 'right' },
+    emptyValue: { fontSize: 14, color: C.textFaint, fontStyle: 'italic' },
     emptyCard: { padding: 24, alignItems: 'center', gap: 8 },
     emptyIconWrap: {
       width: 56,
@@ -58,8 +58,8 @@ function makeStyles(C: AppColors) {
       justifyContent: 'center',
       backgroundColor: C.inputBg,
     },
-    emptyTitle: { fontSize: 15, fontWeight: '600', color: C.text },
-    emptyDesc: { fontSize: 13, color: C.textMuted, textAlign: 'center' },
+    emptyTitle: { fontSize: 16, fontWeight: '600', color: C.text },
+    emptyDesc: { fontSize: 14, color: C.textMuted, textAlign: 'center' },
   });
 }
 

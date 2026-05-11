@@ -198,11 +198,11 @@ const styles = StyleSheet.create({
   },
   fileName: {
     flex: 1,
-    fontSize: 13,
+    fontSize: 14,
   },
 
   statusText: {
-    fontSize: 11,
+    fontSize: 12,
     marginTop: 3,
   },
 
@@ -215,7 +215,7 @@ const styles = StyleSheet.create({
     maxWidth: IMG_W,
   },
   captionText: {
-    fontSize: 15,
+    fontSize: 16,
     lineHeight: 22,
     color: '#fff',
   },

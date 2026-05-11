@@ -196,12 +196,12 @@ function makeStyles(C: AppColors) {
       justifyContent: 'center',
     },
     menuLabel: {
-      fontSize: 16,
+      fontSize: 17,
       fontWeight: '500',
       color: C.text,
     },
     menuSub: {
-      fontSize: 12,
+      fontSize: 13,
       color: C.textMuted,
       marginTop: 1,
     },
@@ -218,14 +218,14 @@ function makeStyles(C: AppColors) {
       paddingBottom: 16,
     },
     recordingTimer: {
-      fontSize: 40,
+      fontSize: 42,
       fontWeight: '200',
       color: C.text,
       marginBottom: 8,
-      letterSpacing: 2,
+      letterSpacing: 0.5,
     },
     recordingHint: {
-      fontSize: 13,
+      fontSize: 14,
       color: C.textMuted,
       marginBottom: 32,
     },
@@ -250,7 +250,7 @@ function makeStyles(C: AppColors) {
       paddingHorizontal: 20,
     },
     cancelRecordingTxt: {
-      fontSize: 14,
+      fontSize: 15,
       color: C.textMuted,
     },
   });

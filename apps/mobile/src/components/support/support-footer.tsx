@@ -75,11 +75,11 @@ function makeStyles(C: AppColors) {
       marginBottom: 10,
     },
     eyebrow: {
-      fontSize: 12,
+      fontSize: 13,
       fontWeight: '700',
       color: C.textFaint,
       textTransform: 'uppercase',
-      letterSpacing: 0.8,
+      letterSpacing: 0.5,
     },
     ctaRow: {
       flexDirection: 'row',
@@ -98,7 +98,7 @@ function makeStyles(C: AppColors) {
       borderColor: supportPalette.border,
     },
     supportBtnText: {
-      fontSize: 13,
+      fontSize: 14,
       fontWeight: '700',
       color: supportPalette.text,
     },

@@ -44,9 +44,9 @@ const buttonTextVariants = cva('font-medium', {
       outline: 'text-foreground',
     },
     size: {
-      sm: 'text-xs',
-      default: 'text-sm',
-      lg: 'text-base',
+      sm: 'text-sm',
+      default: 'text-base',
+      lg: 'text-lg',
     },
   },
   defaultVariants: {

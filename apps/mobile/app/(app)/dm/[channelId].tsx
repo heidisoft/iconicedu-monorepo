@@ -675,7 +675,7 @@ export default function DmConversationScreen() {
           >
             <Text
               style={{
-                fontSize: 13,
+                fontSize: 14,
                 color: colors.teal,
                 textAlign: 'center',
                 fontWeight: '600',

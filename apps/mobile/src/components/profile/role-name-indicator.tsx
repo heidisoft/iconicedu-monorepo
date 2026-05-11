@@ -103,7 +103,7 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   tooltipText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
   },
 });

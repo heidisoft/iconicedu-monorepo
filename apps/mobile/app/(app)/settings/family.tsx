@@ -31,7 +31,7 @@ function makeStyles(C: AppColors) {
     navBack: { padding: 8, borderRadius: 8 },
     navTitle: {
       flex: 1,
-      fontSize: 17,
+      fontSize: 19,
       fontWeight: '700',
       color: C.text,
       textAlign: 'center',
@@ -39,11 +39,11 @@ function makeStyles(C: AppColors) {
     },
     scroll: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 48, gap: 6 },
     sectionLabel: {
-      fontSize: 12,
+      fontSize: 13,
       fontWeight: '700',
       color: C.textFaint,
       textTransform: 'uppercase',
-      letterSpacing: 0.8,
+      letterSpacing: 0.5,
       paddingHorizontal: 4,
       paddingTop: 14,
       paddingBottom: 6,
@@ -56,7 +56,7 @@ function makeStyles(C: AppColors) {
       overflow: 'hidden',
     },
     divider: { height: 1, backgroundColor: C.border, marginLeft: 60 },
-    valueText: { fontSize: 13, color: C.textMuted, maxWidth: 140, textAlign: 'right' },
+    valueText: { fontSize: 14, color: C.textMuted, maxWidth: 140, textAlign: 'right' },
     loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     emptyCard: { padding: 28, alignItems: 'center', gap: 10 },
     emptyIconWrap: {
@@ -67,8 +67,8 @@ function makeStyles(C: AppColors) {
       justifyContent: 'center',
       backgroundColor: C.inputBg,
     },
-    emptyTitle: { fontSize: 16, fontWeight: '700', color: C.text },
-    emptyDesc: { fontSize: 13, color: C.textMuted, textAlign: 'center', lineHeight: 20 },
+    emptyTitle: { fontSize: 17, fontWeight: '700', color: C.text },
+    emptyDesc: { fontSize: 14, color: C.textMuted, textAlign: 'center', lineHeight: 19 },
     childAvatar: {
       width: 36,
       height: 36,
@@ -77,8 +77,8 @@ function makeStyles(C: AppColors) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    childInitial: { fontSize: 15, fontWeight: '700', color: C.teal },
-    hint: { fontSize: 12, color: C.textFaint, paddingHorizontal: 4 },
+    childInitial: { fontSize: 16, fontWeight: '700', color: C.teal },
+    hint: { fontSize: 13, color: C.textFaint, paddingHorizontal: 4 },
   });
 }
 

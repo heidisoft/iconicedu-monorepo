@@ -417,9 +417,9 @@ function makeStyles(colors: AppColors) {
       gap: 12,
     },
     kicker: {
-      fontSize: 11,
+      fontSize: 12,
       fontWeight: '700',
-      letterSpacing: 1,
+      letterSpacing: 0.5,
       textTransform: 'uppercase',
       color: colors.textMuted,
     },
@@ -427,7 +427,7 @@ function makeStyles(colors: AppColors) {
       paddingVertical: 2,
     },
     editButtonText: {
-      fontSize: 12,
+      fontSize: 13,
       fontWeight: '600',
     },
     starRow: {
@@ -453,8 +453,8 @@ function makeStyles(colors: AppColors) {
       borderRadius: 10,
       paddingHorizontal: 12,
       paddingVertical: 10,
-      fontSize: 13,
-      lineHeight: 19,
+      fontSize: 14,
+      lineHeight: 20,
       textAlignVertical: 'top',
     },
     submittedCard: {
@@ -463,16 +463,16 @@ function makeStyles(colors: AppColors) {
       paddingVertical: 10,
     },
     submittedTitle: {
-      fontSize: 13,
+      fontSize: 14,
       fontWeight: '700',
     },
     supportText: {
-      fontSize: 12,
-      lineHeight: 18,
+      fontSize: 13,
+      lineHeight: 19,
     },
     errorText: {
-      fontSize: 12,
-      lineHeight: 18,
+      fontSize: 13,
+      lineHeight: 19,
       color: '#dc2626',
     },
   });

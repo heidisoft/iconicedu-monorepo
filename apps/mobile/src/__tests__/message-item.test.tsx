@@ -206,7 +206,7 @@ describe('MessageItem', () => {
     );
     expect(
       StyleSheet.flatten(screen.getByTestId('message-text-content').props.style),
-    ).toEqual(expect.objectContaining({ flexWrap: 'wrap', fontSize: 14, width: '100%' }));
+    ).toEqual(expect.objectContaining({ flexWrap: 'wrap', fontSize: 15, width: '100%' }));
   });
 
   it('renders sender name when isGroupStart is true', () => {

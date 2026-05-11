@@ -240,7 +240,7 @@ function makeStyles(C: AppColors) {
         backgroundColor: C.inputBg,
       },
       backArrow: { fontSize: 20, color: C.teal },
-      stepLabel: { fontSize: 13, color: C.textFaint, fontWeight: '500' as const },
+      stepLabel: { fontSize: 14, color: C.textFaint, fontWeight: '500' as const },
 
       progressTrack: {
         height: 4,
@@ -266,14 +266,14 @@ function makeStyles(C: AppColors) {
       },
       badgeEmoji: { fontSize: 30 },
       heading: {
-        fontSize: 24,
+        fontSize: 26,
         fontWeight: '700' as const,
         color: C.text,
         textAlign: 'center' as const,
         marginBottom: 6,
       },
       sub: {
-        fontSize: 14,
+        fontSize: 15,
         color: C.textMuted,
         textAlign: 'center' as const,
         marginBottom: 28,
@@ -281,7 +281,7 @@ function makeStyles(C: AppColors) {
       },
 
       label: {
-        fontSize: 12,
+        fontSize: 13,
         fontWeight: '600' as const,
         color: C.textMuted,
         letterSpacing: 0.5,
@@ -291,7 +291,7 @@ function makeStyles(C: AppColors) {
       labelOptional: {
         fontWeight: '400' as const,
         textTransform: 'none' as const,
-        fontSize: 11,
+        fontSize: 12,
       },
 
       inputWrap: {
@@ -305,9 +305,9 @@ function makeStyles(C: AppColors) {
         marginBottom: 16,
         minHeight: 52,
       },
-      input: { flex: 1, fontSize: 16, color: C.text, paddingVertical: 14 },
+      input: { flex: 1, fontSize: 17, color: C.text, paddingVertical: 14 },
       inputHint: {
-        fontSize: 12,
+        fontSize: 13,
         color: C.textFaint,
         marginTop: -10,
         marginBottom: 16,
@@ -326,7 +326,7 @@ function makeStyles(C: AppColors) {
         gap: 8,
         marginBottom: 12,
       },
-      searchInput: { flex: 1, fontSize: 14, color: C.text },
+      searchInput: { flex: 1, fontSize: 15, color: C.text },
 
       listItem: {
         flexDirection: 'row' as const,
@@ -340,9 +340,9 @@ function makeStyles(C: AppColors) {
         borderColor: C.border,
       },
       listItemSelected: { backgroundColor: C.tealBg, borderColor: C.teal },
-      listItemTxt: { flex: 1, fontSize: 15, color: C.text },
+      listItemTxt: { flex: 1, fontSize: 16, color: C.text },
       listItemSelectedTxt: { color: C.teal, fontWeight: '600' as const },
-      listCheck: { fontSize: 15, color: C.teal },
+      listCheck: { fontSize: 16, color: C.teal },
       listFlag: { fontSize: 20, marginRight: 10 },
       listChevron: { fontSize: 18, color: C.textFaint },
 
@@ -357,7 +357,7 @@ function makeStyles(C: AppColors) {
         borderColor: C.border,
       },
       tabBtnActive: { backgroundColor: C.tealBg, borderColor: C.teal },
-      tabTxt: { fontSize: 14, fontWeight: '600' as const, color: C.textMuted },
+      tabTxt: { fontSize: 15, fontWeight: '600' as const, color: C.textMuted },
       tabTxtActive: { color: C.teal },
 
       chipsRow: {
@@ -374,16 +374,16 @@ function makeStyles(C: AppColors) {
         borderRadius: 20,
         borderWidth: 1,
       },
-      chipTxt: { fontSize: 14, fontWeight: '500' as const },
+      chipTxt: { fontSize: 15, fontWeight: '500' as const },
 
       sectionLabel: {
-        fontSize: 13,
+        fontSize: 14,
         fontWeight: '700' as const,
         color: C.text,
         marginBottom: 10,
         marginTop: 4,
       },
-      sectionHint: { fontSize: 12, color: C.textFaint, marginBottom: 12 },
+      sectionHint: { fontSize: 13, color: C.textFaint, marginBottom: 12 },
 
       dayRow: {
         flexDirection: 'row' as const,
@@ -408,8 +408,8 @@ function makeStyles(C: AppColors) {
         justifyContent: 'center' as const,
       },
       dayToggleActive: { backgroundColor: C.teal, borderColor: C.teal },
-      dayToggleTxt: { fontSize: 13, color: '#ffffff', fontWeight: '700' as const },
-      dayLabel: { flex: 1, fontSize: 15, color: C.text, fontWeight: '500' as const },
+      dayToggleTxt: { fontSize: 14, color: '#ffffff', fontWeight: '700' as const },
+      dayLabel: { flex: 1, fontSize: 16, color: C.text, fontWeight: '500' as const },
       dayLabelActive: { color: C.teal },
       timeRow: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 8 },
       timeInput: {
@@ -419,12 +419,12 @@ function makeStyles(C: AppColors) {
         borderColor: C.teal,
         paddingHorizontal: 10,
         paddingVertical: 6,
-        fontSize: 13,
+        fontSize: 14,
         color: C.text,
         width: 60,
         textAlign: 'center' as const,
       },
-      timeSep: { fontSize: 13, color: C.textMuted },
+      timeSep: { fontSize: 14, color: C.textMuted },
 
       numberInputRow: {
         flexDirection: 'row' as const,
@@ -438,11 +438,11 @@ function makeStyles(C: AppColors) {
         minHeight: 52,
         gap: 10,
       },
-      numberInput: { flex: 1, fontSize: 16, color: C.text, paddingVertical: 14 },
-      numberUnit: { fontSize: 14, color: C.textMuted },
+      numberInput: { flex: 1, fontSize: 17, color: C.text, paddingVertical: 14 },
+      numberUnit: { fontSize: 15, color: C.textMuted },
 
       errorTxt: {
-        fontSize: 13,
+        fontSize: 14,
         color: '#ef4444',
         textAlign: 'center' as const,
         marginBottom: 12,
@@ -461,9 +461,9 @@ function makeStyles(C: AppColors) {
         alignItems: 'center' as const,
       },
       btnDim: { opacity: 0.4 },
-      btnTxt: { color: C.tealFg, fontSize: 16, fontWeight: '700' as const },
+      btnTxt: { color: C.tealFg, fontSize: 17, fontWeight: '700' as const },
       skipBtn: { alignItems: 'center' as const, paddingVertical: 6 },
-      skipTxt: { fontSize: 14, color: C.textFaint },
+      skipTxt: { fontSize: 15, color: C.textFaint },
     }),
   };
 }
@@ -916,7 +916,7 @@ function EducatorProfileStep({
               ]}
               onPress={() => toggleSubject(subject)}
             >
-              {sel && <Text style={{ color: colors.teal, fontSize: 13 }}>✓ </Text>}
+              {sel && <Text style={{ color: colors.teal, fontSize: 14 }}>✓ </Text>}
               <Text style={[s.chipTxt, { color: sel ? colors.teal : colors.textMuted }]}>
                 {subject}
               </Text>
@@ -1019,7 +1019,7 @@ function EducatorAvailabilityStep({
               ]}
               onPress={() => toggleClassType(ct.id)}
             >
-              {sel && <Text style={{ color: colors.teal, fontSize: 13 }}>✓ </Text>}
+              {sel && <Text style={{ color: colors.teal, fontSize: 14 }}>✓ </Text>}
               <Text style={[s.chipTxt, { color: sel ? colors.teal : colors.textMuted }]}>
                 {ct.label}
               </Text>

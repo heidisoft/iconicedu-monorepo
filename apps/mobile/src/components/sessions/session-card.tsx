@@ -693,17 +693,17 @@ const s = StyleSheet.create({
     flexShrink: 0,
   },
   sessionDayExtra: {
-    fontSize: 8,
+    fontSize: 9,
     fontWeight: '700',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
   sessionDayName: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '600',
   },
   sessionDayNum: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '700',
     lineHeight: 20,
   },
@@ -718,7 +718,7 @@ const s = StyleSheet.create({
     flexWrap: 'wrap',
   },
   sessionLabel: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
   },
   sessionTimeRow: {
@@ -728,7 +728,7 @@ const s = StyleSheet.create({
     gap: 3,
   },
   sessionTimeTxt: {
-    fontSize: 11,
+    fontSize: 12,
   },
   sessionParticipantWrap: {
     flexDirection: 'row',
@@ -751,19 +751,19 @@ const s = StyleSheet.create({
     minWidth: 0,
   },
   sessionParticipantName: {
-    fontSize: 11,
-    lineHeight: 16,
+    fontSize: 12,
+    lineHeight: 17,
     color: '#64748b',
     fontWeight: '600',
   },
   sessionOriginalTimeTxt: {
-    fontSize: 11,
+    fontSize: 12,
   },
   sessionOriginalTimeStrike: {
     textDecorationLine: 'line-through',
   },
   sessionReasonTxt: {
-    fontSize: 11,
+    fontSize: 12,
     fontStyle: 'italic',
   },
   liveBadge: {
@@ -773,7 +773,7 @@ const s = StyleSheet.create({
   },
   liveBadgeText: {
     color: '#fff',
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.5,
   },
@@ -787,7 +787,7 @@ const s = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   variantBadgeText: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '500',
   },
   sessionActions: {
@@ -813,7 +813,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 10,
   },
   cancelBtnTxt: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
   },
   joinBtn: {
@@ -826,7 +826,7 @@ const s = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   joinBtnTxt: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
   },
   modalBackdrop: {
@@ -845,12 +845,12 @@ const s = StyleSheet.create({
   },
   modalHeading: { gap: 8 },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
     color: '#0f172a',
   },
   modalDescription: {
-    fontSize: 14,
+    fontSize: 15,
     lineHeight: 20,
     color: '#64748b',
   },
@@ -863,14 +863,14 @@ const s = StyleSheet.create({
     padding: 14,
   },
   modalLinkLabel: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
-    letterSpacing: 1.2,
+    letterSpacing: 0.5,
     textTransform: 'uppercase',
     color: '#64748b',
   },
   modalLinkValue: {
-    fontSize: 13,
+    fontSize: 14,
     lineHeight: 19,
     color: '#0f172a',
   },
@@ -899,12 +899,12 @@ const s = StyleSheet.create({
     backgroundColor: '#14b8a6',
   },
   modalButtonSecondaryText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
     color: '#0f172a',
   },
   modalButtonPrimaryText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
     color: '#ffffff',
   },

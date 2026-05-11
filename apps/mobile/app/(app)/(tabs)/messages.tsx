@@ -278,7 +278,7 @@ function makeStyles(C: AppColors) {
       justifyContent: 'space-between',
       gap: 12,
     },
-    title: { fontSize: 30, fontWeight: '800', color: C.text, letterSpacing: -0.5 },
+    title: { fontSize: 30, fontWeight: '800', color: C.text, letterSpacing: 0 },
     headerAction: {
       paddingHorizontal: 10,
       paddingVertical: 6,
@@ -291,7 +291,7 @@ function makeStyles(C: AppColors) {
       opacity: 0.45,
     },
     headerActionText: {
-      fontSize: 12,
+      fontSize: 13,
       fontWeight: '700',
       color: C.teal,
     },
@@ -307,7 +307,7 @@ function makeStyles(C: AppColors) {
     },
     tabActive: { borderBottomColor: C.teal },
     tabInner: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-    tabText: { fontSize: 13, fontWeight: '600', color: C.textFaint },
+    tabText: { fontSize: 14, fontWeight: '600', color: C.textFaint },
     tabTextActive: { color: C.teal },
     tabBadge: {
       minWidth: 18,
@@ -318,7 +318,7 @@ function makeStyles(C: AppColors) {
       justifyContent: 'center',
       paddingHorizontal: 4,
     },
-    tabBadgeText: { fontSize: 10, fontWeight: '700', color: '#ffffff' },
+    tabBadgeText: { fontSize: 11, fontWeight: '700', color: '#ffffff' },
     subTabScroll: { maxHeight: 44 },
     subTabContent: { paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
     subTab: {
@@ -335,7 +335,7 @@ function makeStyles(C: AppColors) {
       backgroundColor: C.tealBg,
       borderColor: C.teal,
     },
-    subTabText: { fontSize: 13, fontWeight: '600', color: C.textMuted },
+    subTabText: { fontSize: 14, fontWeight: '600', color: C.textMuted },
     subTabTextActive: { color: C.teal },
 
     itemOuter: {
@@ -361,7 +361,7 @@ function makeStyles(C: AppColors) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    avatarTxt: { color: '#fff', fontWeight: '700', fontSize: 16, letterSpacing: 0.3 },
+    avatarTxt: { color: '#fff', fontWeight: '700', fontSize: 17, letterSpacing: 0 },
     onlineDot: {
       position: 'absolute',
       bottom: 2,
@@ -412,7 +412,7 @@ function makeStyles(C: AppColors) {
       borderWidth: 2,
       borderColor: C.bg,
     },
-    groupTxt: { color: '#fff', fontWeight: '700', fontSize: 12 },
+    groupTxt: { color: '#fff', fontWeight: '700', fontSize: 13 },
     groupBadgeFront: {},
     groupBadgeBack: {},
 
@@ -431,7 +431,7 @@ function makeStyles(C: AppColors) {
     content: { flex: 1, minWidth: 0, justifyContent: 'center', gap: 2 },
     topRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     rowNameWrap: { flex: 1, minWidth: 0 },
-    rowName: { fontSize: 15, fontWeight: '700', color: C.text },
+    rowName: { fontSize: 16, fontWeight: '700', color: C.text },
     rowNameUnread: { fontWeight: '800' },
     rowNameStudentNames: { fontWeight: '600' },
     rowTail: {
@@ -442,8 +442,8 @@ function makeStyles(C: AppColors) {
       alignSelf: 'stretch',
       paddingVertical: 2,
     },
-    rowTime: { fontSize: 12, color: C.textMuted, fontWeight: '500' },
-    rowMeta: { fontSize: 12, color: C.textMuted, lineHeight: 18 },
+    rowTime: { fontSize: 13, color: C.textMuted, fontWeight: '500' },
+    rowMeta: { fontSize: 13, color: C.textMuted, lineHeight: 17 },
     rowMetaName: { fontWeight: '600' },
     rowMetaWrap: {
       flexDirection: 'row',
@@ -464,7 +464,7 @@ function makeStyles(C: AppColors) {
       flexShrink: 1,
       minWidth: 0,
     },
-    rowPreview: { fontSize: 12, color: C.textMuted, lineHeight: 18 },
+    rowPreview: { fontSize: 13, color: C.textMuted, lineHeight: 17 },
     badge: {
       minWidth: 20,
       height: 20,
@@ -474,7 +474,7 @@ function makeStyles(C: AppColors) {
       justifyContent: 'center',
       paddingHorizontal: 6,
     },
-    badgeTxt: { color: '#ffffff', fontSize: 11, fontWeight: '700' },
+    badgeTxt: { color: '#ffffff', fontSize: 12, fontWeight: '700' },
 
     emptyWrap: {
       flex: 1,
@@ -490,12 +490,12 @@ function makeStyles(C: AppColors) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    emptyTitle: { fontSize: 18, fontWeight: '700' },
+    emptyTitle: { fontSize: 20, fontWeight: '700' },
     emptyDesc: {
-      fontSize: 14,
+      fontSize: 15,
       textAlign: 'center',
       paddingHorizontal: 40,
-      lineHeight: 21,
+      lineHeight: 20,
     },
 
     // ── Supervised badge ───────────────────────────────────────────────────────
@@ -510,15 +510,15 @@ function makeStyles(C: AppColors) {
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: C.teal,
     },
-    supervisedBadgeTxt: { fontSize: 10, fontWeight: '700', color: C.teal },
+    supervisedBadgeTxt: { fontSize: 11, fontWeight: '700', color: C.teal },
 
     // ── Section header ─────────────────────────────────────────────────────────
     sectionHeaderWrap: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 8 },
     sectionHeaderTxt: {
-      fontSize: 11,
+      fontSize: 12,
       fontWeight: '700',
       color: C.textFaint,
-      letterSpacing: 0.8,
+      letterSpacing: 0.5,
       textTransform: 'uppercase',
     },
   });
