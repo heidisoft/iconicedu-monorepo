@@ -7,7 +7,6 @@ import { submitActivityFeedFeedback } from '@/lib/api/activity-feed/feedback';
 
 const EDIT_WINDOW_MS = 60_000;
 const COMMENT_AUTOSAVE_MS = 600;
-const COMMENT_SAVED_COLLAPSE_MS = 1800;
 
 type ActivityFeedbackRequestProps = {
   activity: ActivityFeedLeafItemVM;
@@ -129,7 +128,6 @@ export function ActivityFeedbackRequest({
       !initialFeedback.submittedAt,
   );
   const commentAutosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const commentCollapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setRating(initialFeedback.rating);
@@ -151,9 +149,6 @@ export function ActivityFeedbackRequest({
     return () => {
       if (commentAutosaveTimerRef.current) {
         clearTimeout(commentAutosaveTimerRef.current);
-      }
-      if (commentCollapseTimerRef.current) {
-        clearTimeout(commentCollapseTimerRef.current);
       }
     };
   }, []);
@@ -237,9 +232,7 @@ export function ActivityFeedbackRequest({
         setSubmittedAt(nextSubmittedAt);
         setIsEditing(false);
         setIsEditWindowOpen(true);
-        if (nextRating >= 5) {
-          setIsCommentOpen(false);
-        }
+        setIsCommentOpen(Boolean(options?.keepCommentOpen && nextRating < 5));
       } catch (submitError) {
         setError(
           submitError instanceof Error
@@ -276,7 +269,6 @@ export function ActivityFeedbackRequest({
 
     setError(null);
     setRating(value);
-    setIsCommentOpen(value < 5);
     await submitFeedback(
       value,
       value < 5 ? (normalizedDraftComment ?? undefined) : undefined,
@@ -292,8 +284,22 @@ export function ActivityFeedbackRequest({
     setError(null);
   };
 
+  const handleSaveComment = async () => {
+    if (isSubmitting || isCommentSaving || rating < 1) {
+      return;
+    }
+
+    if (hasPendingCommentChanges || !submittedAt) {
+      await submitFeedback(rating, normalizedDraftComment ?? undefined);
+      return;
+    }
+
+    setIsEditing(false);
+    setIsCommentOpen(false);
+  };
+
   useEffect(() => {
-    if (!shouldShowCommentBox || !submittedAt || isSubmitting) {
+    if (!shouldShowCommentBox || !submittedAt || isSubmitting || isCommentSaving) {
       return;
     }
 
@@ -321,49 +327,12 @@ export function ActivityFeedbackRequest({
     };
   }, [
     hasPendingCommentChanges,
+    isCommentSaving,
     isSubmitting,
     normalizedDraftComment,
     rating,
     shouldShowCommentBox,
     submitFeedback,
-    submittedAt,
-  ]);
-
-  useEffect(() => {
-    if (
-      !hasLowRating ||
-      !submittedAt ||
-      isEditing ||
-      !isCommentOpen ||
-      isSubmitting ||
-      isCommentSaving ||
-      hasPendingCommentChanges
-    ) {
-      return;
-    }
-
-    if (commentCollapseTimerRef.current) {
-      clearTimeout(commentCollapseTimerRef.current);
-    }
-
-    commentCollapseTimerRef.current = setTimeout(() => {
-      commentCollapseTimerRef.current = null;
-      setIsCommentOpen(false);
-    }, COMMENT_SAVED_COLLAPSE_MS);
-
-    return () => {
-      if (commentCollapseTimerRef.current) {
-        clearTimeout(commentCollapseTimerRef.current);
-        commentCollapseTimerRef.current = null;
-      }
-    };
-  }, [
-    hasLowRating,
-    hasPendingCommentChanges,
-    isCommentOpen,
-    isCommentSaving,
-    isEditing,
-    isSubmitting,
     submittedAt,
   ]);
 
@@ -378,12 +347,12 @@ export function ActivityFeedbackRequest({
         {isSubmitted && isEditWindowOpen ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Edit feedback"
+            accessibilityLabel="Edit rating"
             onPress={handleResetRating}
             style={styles.editButton}
           >
             <Text style={[styles.editButtonText, { color: colors.teal }]}>
-              Edit feedback
+              Edit rating
             </Text>
           </Pressable>
         ) : null}
@@ -422,6 +391,23 @@ export function ActivityFeedbackRequest({
 
       {shouldShowCommentBox ? (
         <View style={styles.commentWrap}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Submit feedback"
+            disabled={isSubmitting || isCommentSaving}
+            onPress={() => void handleSaveComment()}
+            style={({ pressed }) => [
+              styles.saveButton,
+              {
+                backgroundColor: colors.teal,
+                opacity: isSubmitting || isCommentSaving ? 0.6 : pressed ? 0.85 : 1,
+              },
+            ]}
+          >
+            <Text style={styles.saveButtonText}>
+              {isSubmitting || isCommentSaving ? 'Saving...' : 'Submit feedback'}
+            </Text>
+          </Pressable>
           <TextInput
             value={comment}
             onChangeText={(value) => {
@@ -447,9 +433,7 @@ export function ActivityFeedbackRequest({
               ? 'Saving comment...'
               : hasPendingCommentChanges
                 ? 'Saving shortly...'
-                : submittedAt
-                  ? 'Feedback saved. You can leave this screen now.'
-                  : 'Rating saved. Comments save automatically.'}
+                : 'Rating saved. Comments save automatically.'}
           </Text>
         </View>
       ) : null}
@@ -458,9 +442,6 @@ export function ActivityFeedbackRequest({
         <View style={[styles.submittedCard, { backgroundColor: colors.inputBg }]}>
           <Text style={[styles.submittedTitle, { color: colors.text }]}>
             Thank you for your feedback.
-          </Text>
-          <Text style={[styles.submittedDescription, { color: colors.textMuted }]}>
-            Saved. You can leave this screen now.
           </Text>
         </View>
       ) : null}
@@ -535,19 +516,28 @@ function makeStyles(colors: AppColors) {
       lineHeight: 20,
       textAlignVertical: 'top',
     },
+    saveButton: {
+      minHeight: 36,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      alignSelf: 'stretch',
+    },
+    saveButtonText: {
+      color: '#ffffff',
+      fontSize: 13,
+      fontWeight: '700',
+    },
     submittedCard: {
       borderRadius: 10,
       paddingHorizontal: 12,
       paddingVertical: 10,
-      gap: 4,
     },
     submittedTitle: {
       fontSize: 14,
       fontWeight: '700',
-    },
-    submittedDescription: {
-      fontSize: 13,
-      lineHeight: 18,
     },
     supportText: {
       fontSize: 13,

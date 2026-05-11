@@ -11,6 +11,7 @@ import type {
   ActivityItemRefsVM,
   ActivityItemStateVM,
   ActivityFeedItemRow,
+  ActivityFeedLeafItemVM,
   UserProfileVM,
 } from '@iconicedu/shared-types';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
@@ -59,6 +60,51 @@ type RawActivityActorProfile = {
   avatar_seed: string | null;
   kind?: string | null;
 };
+
+type RawClassSessionFeedbackRow = {
+  source_event_id: string | null;
+  message_id: string | null;
+  class_session_id: string;
+  classroom_id: string;
+  channel_id: string;
+  occurrence_start_at: string | null;
+  rating: number;
+  comment: string | null;
+  submitted_at: string;
+};
+
+function asRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+
+  return value as Record<string, unknown>;
+}
+
+function getFeedbackClassSessionId(item: ActivityFeedItemVM) {
+  const metadata = asRecord(item.metadata);
+  if (typeof metadata.classSessionId === 'string') return metadata.classSessionId;
+  if (typeof metadata.scheduleId === 'string') return metadata.scheduleId;
+  return null;
+}
+
+function isNonEmptyString(value: string | null): value is string {
+  return typeof value === 'string' && value.length > 0;
+}
+
+function mapFeedbackResponse(row: RawClassSessionFeedbackRow) {
+  return {
+    sourceEventId: row.source_event_id,
+    messageId: row.message_id,
+    classSessionId: row.class_session_id,
+    classroomId: row.classroom_id,
+    channelId: row.channel_id,
+    occurrenceStartAt: row.occurrence_start_at,
+    rating: row.rating,
+    comment: row.comment,
+    submittedAt: row.submitted_at,
+  };
+}
 
 function mapFeedRow(row: ActivityFeedItemRow): ActivityFeedItemVM {
   const contentBase = (row.content ?? {}) as Partial<ActivityItemContentVM>;
@@ -111,6 +157,39 @@ function mapFeedRow(row: ActivityFeedItemRow): ActivityFeedItemVM {
 
 @Injectable()
 export class ActivityFeedQueryService {
+  private async loadFeedbackResponses(
+    accessToken: string,
+    orgId: string,
+    profileId: string,
+    items: ActivityFeedItemVM[],
+  ): Promise<Map<string, RawClassSessionFeedbackRow>> {
+    const feedbackClassSessionIds = Array.from(
+      new Set(
+        items
+          .filter((item) => item.kind === 'leaf')
+          .filter((item) => item.verb === 'session.feedback_request.sent')
+          .map(getFeedbackClassSessionId)
+          .filter(isNonEmptyString),
+      ),
+    );
+    if (!feedbackClassSessionIds.length) return new Map();
+
+    const supabase = createSupabaseSessionClient(accessToken);
+    const { data, error } = await supabase
+      .from('class_session_feedback')
+      .select(
+        'source_event_id, message_id, class_session_id, classroom_id, channel_id, occurrence_start_at, rating, comment, submitted_at',
+      )
+      .eq('org_id', orgId)
+      .eq('recipient_profile_id', profileId)
+      .is('deleted_at', null)
+      .in('class_session_id', feedbackClassSessionIds)
+      .returns<RawClassSessionFeedbackRow[]>();
+    if (error) throw new InternalServerErrorException(error.message);
+
+    return new Map((data ?? []).map((row) => [row.class_session_id, row]));
+  }
+
   private async loadActivityFeedActors(
     accessToken: string,
     orgId: string,
@@ -219,7 +298,31 @@ export class ActivityFeedQueryService {
       } as ActivityFeedItemVM;
     });
 
-    const feedbackItems = mappedItems;
+    const feedbackResponses = await this.loadFeedbackResponses(
+      accessToken,
+      orgId,
+      profileId,
+      mappedItems,
+    );
+    const feedbackItems = mappedItems.map((item) => {
+      if (item.kind !== 'leaf' || item.verb !== 'session.feedback_request.sent') {
+        return item;
+      }
+
+      const feedbackClassSessionId = getFeedbackClassSessionId(item);
+      if (!feedbackClassSessionId) return item;
+
+      const feedbackResponse = feedbackResponses.get(feedbackClassSessionId);
+      if (!feedbackResponse) return item;
+
+      return {
+        ...item,
+        metadata: {
+          ...(item.metadata ?? {}),
+          feedbackResponse: mapFeedbackResponse(feedbackResponse),
+        },
+      } as ActivityFeedLeafItemVM;
+    });
     const sections = this.buildFeedSections(feedbackItems);
     const tabs = this.buildFeedTabs(feedbackItems);
     const unreadCount = feedbackItems.filter((item) => !item.state?.isRead).length;

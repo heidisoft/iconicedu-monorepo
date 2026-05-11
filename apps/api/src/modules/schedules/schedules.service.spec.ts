@@ -27,6 +27,8 @@ describe('SchedulesService authorization', () => {
       select: jest.fn(() => chain),
       eq: jest.fn(() => chain),
       is: jest.fn(() => chain),
+      order: jest.fn(() => chain),
+      limit: jest.fn(() => chain),
       maybeSingle: jest.fn(async () => ({ data: result, error: null })),
       returns: jest.fn(async () => ({ data: result, error: null })),
     };
@@ -82,6 +84,38 @@ describe('SchedulesService authorization', () => {
     await expect(requireOrgActorWithRoles(['guardian'])).rejects.toThrow(
       ForbiddenException,
     );
+  });
+
+  it('falls back to the account profile when active_profile_id is missing', async () => {
+    createSupabaseSessionClientMock.mockReturnValue({
+      auth: {
+        getUser: jest.fn(async () => ({
+          data: { user: { id: 'auth-user-1' } },
+          error: null,
+        })),
+      },
+    } as never);
+    createSupabaseServiceClientMock
+      .mockReturnValueOnce(
+        makeSingleResult({ id: 'account-1', active_profile_id: null }) as never,
+      )
+      .mockReturnValueOnce(makeSingleResult([{ role_key: 'staff' }]) as never)
+      .mockReturnValueOnce(makeSingleResult({ id: 'profile-fallback' }) as never);
+
+    const service = new SchedulesService();
+    const actor = await (
+      service as unknown as {
+        requireOrgActor(
+          accessToken: string,
+          orgId: string,
+        ): Promise<{ accountId: string; profileId: string | null }>;
+      }
+    ).requireOrgActor('token-1', 'org-1');
+
+    expect(actor).toEqual({
+      accountId: 'account-1',
+      profileId: 'profile-fallback',
+    });
   });
 
   it('reschedules recurring sessions by deleting cancellations and upserting overrides', async () => {
@@ -264,7 +298,12 @@ describe('SchedulesService authorization', () => {
       cascadeSchedules: [],
     });
     createSupabaseServiceClientMock
-      .mockReturnValueOnce(makeSingleResult({ id: 'account-1' }) as never)
+      .mockReturnValueOnce(
+        makeSingleResult({
+          id: 'account-1',
+          active_profile_id: 'profile-staff',
+        }) as never,
+      )
       .mockReturnValueOnce(makeSingleResult([{ role_key: 'staff' }]) as never)
       .mockReturnValueOnce(mainClient as never);
 
@@ -346,7 +385,12 @@ describe('SchedulesService authorization', () => {
       cascadeRecurrences: [{ id: 'recurrence-old' }],
     });
     createSupabaseServiceClientMock
-      .mockReturnValueOnce(makeSingleResult({ id: 'account-1' }) as never)
+      .mockReturnValueOnce(
+        makeSingleResult({
+          id: 'account-1',
+          active_profile_id: 'profile-staff',
+        }) as never,
+      )
       .mockReturnValueOnce(makeSingleResult([{ role_key: 'staff' }]) as never)
       .mockReturnValueOnce(mainClient as never);
 

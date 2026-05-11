@@ -1,13 +1,18 @@
 import type {
   ActivityFeedItemVM,
+  ActivityFeedLeafItemVM,
   ActivityFeedVM,
   ActivityFeedTabVM,
+  ClassSessionFeedbackRow,
   InboxTabKeyVM,
 } from '@iconicedu/shared-types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { mapActivityFeedItemRow } from '@iconicedu/web/lib/activity-feed/mappers/activity-feed.mapper';
-import { getActivityFeedItemsByOrg } from '@iconicedu/web/lib/activity-feed/queries/activity-feed.query';
+import {
+  getActivityFeedItemsByOrg,
+  getClassSessionFeedbackByProfileAndSessions,
+} from '@iconicedu/web/lib/activity-feed/queries/activity-feed.query';
 import { buildUserProfileFromRow } from '@iconicedu/web/lib/profile/builders/user-profile.builder';
 import { getProfilesByIds } from '@iconicedu/web/lib/profile/queries/profiles.query';
 
@@ -21,6 +26,52 @@ const FEED_TABS: Array<{ key: InboxTabKeyVM; label: string }> = [
 type BuildActivityFeedOptions = {
   activeTab?: InboxTabKeyVM;
 };
+
+type ClassSessionFeedbackSummary = Pick<
+  ClassSessionFeedbackRow,
+  | 'source_event_id'
+  | 'message_id'
+  | 'class_session_id'
+  | 'classroom_id'
+  | 'channel_id'
+  | 'occurrence_start_at'
+  | 'rating'
+  | 'comment'
+  | 'submitted_at'
+>;
+
+function asRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+
+  return value as Record<string, unknown>;
+}
+
+function getFeedbackClassSessionId(item: ActivityFeedItemVM) {
+  const metadata = asRecord(item.metadata);
+  if (typeof metadata.classSessionId === 'string') return metadata.classSessionId;
+  if (typeof metadata.scheduleId === 'string') return metadata.scheduleId;
+  return null;
+}
+
+function isNonEmptyString(value: string | null): value is string {
+  return typeof value === 'string' && value.length > 0;
+}
+
+function mapFeedbackResponse(row: ClassSessionFeedbackSummary) {
+  return {
+    sourceEventId: row.source_event_id,
+    messageId: row.message_id,
+    classSessionId: row.class_session_id,
+    classroomId: row.classroom_id,
+    channelId: row.channel_id,
+    occurrenceStartAt: row.occurrence_start_at,
+    rating: row.rating,
+    comment: row.comment,
+    submittedAt: row.submitted_at,
+  };
+}
 
 export async function buildActivityFeedForProfile(
   supabase: SupabaseClient,
@@ -38,7 +89,31 @@ export async function buildActivityFeedForProfile(
       actor: row.actor_profile_id ? actorProfiles.get(row.actor_profile_id) : null,
     }),
   );
-  const itemsWithFeedback = mappedItems;
+  const feedbackResponses = await loadFeedbackResponses(
+    supabase,
+    orgId,
+    profileId,
+    mappedItems,
+  );
+  const itemsWithFeedback = mappedItems.map((item) => {
+    if (item.kind !== 'leaf' || item.verb !== 'session.feedback_request.sent') {
+      return item;
+    }
+
+    const feedbackClassSessionId = getFeedbackClassSessionId(item);
+    if (!feedbackClassSessionId) return item;
+
+    const feedbackResponse = feedbackResponses.get(feedbackClassSessionId);
+    if (!feedbackResponse) return item;
+
+    return {
+      ...item,
+      metadata: {
+        ...(item.metadata ?? {}),
+        feedbackResponse: mapFeedbackResponse(feedbackResponse),
+      },
+    } as ActivityFeedLeafItemVM;
+  });
 
   const filteredItems =
     activeTab === 'all'
@@ -56,6 +131,34 @@ export async function buildActivityFeedForProfile(
     nextCursor: null,
     unreadCount,
   };
+}
+
+async function loadFeedbackResponses(
+  supabase: SupabaseClient,
+  orgId: string,
+  profileId: string,
+  items: ActivityFeedItemVM[],
+) {
+  const feedbackClassSessionIds = Array.from(
+    new Set(
+      items
+        .filter((item) => item.kind === 'leaf')
+        .filter((item) => item.verb === 'session.feedback_request.sent')
+        .map(getFeedbackClassSessionId)
+        .filter(isNonEmptyString),
+    ),
+  );
+  if (!profileId || !feedbackClassSessionIds.length) {
+    return new Map<string, ClassSessionFeedbackSummary>();
+  }
+
+  const feedbackResponse = await getClassSessionFeedbackByProfileAndSessions(
+    supabase,
+    orgId,
+    profileId,
+    feedbackClassSessionIds,
+  );
+  return new Map((feedbackResponse.data ?? []).map((row) => [row.class_session_id, row]));
 }
 
 export async function buildActivityFeedUnreadCountForProfile(

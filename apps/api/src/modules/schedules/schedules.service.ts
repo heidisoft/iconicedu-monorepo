@@ -464,10 +464,33 @@ export class SchedulesService {
       throw new ForbiddenException('Forbidden');
     }
 
+    const profileId =
+      account.active_profile_id ??
+      (await this.resolveFallbackActorProfileId(orgId, account.id)) ??
+      account.id;
+
     return {
       accountId: account.id,
-      profileId: account.active_profile_id,
+      profileId,
     };
+  }
+
+  private async resolveFallbackActorProfileId(orgId: string, accountId: string) {
+    const { data, error } = await createSupabaseServiceClient()
+      .from('profiles')
+      .select('id')
+      .eq('org_id', orgId)
+      .eq('account_id', accountId)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle<{ id: string }>();
+
+    if (error) {
+      throw new InternalServerErrorException(error.message);
+    }
+
+    return data?.id ?? null;
   }
 
   private async cascadeDeleteSchedulesForLearningSpace(

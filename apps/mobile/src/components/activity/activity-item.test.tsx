@@ -314,14 +314,19 @@ describe('ActivityItem', () => {
     expect(screen.queryByText('Feedback is unavailable for this session.')).toBeNull();
   });
 
-  it('collapses saved low-rating feedback after showing that it is safe to leave', async () => {
+  it('autosaves low-rating comments and uses a button to collapse to the submitted state', async () => {
     jest.useFakeTimers();
-    mockSubmitActivityFeedFeedback.mockResolvedValue({
-      submittedAt: new Date().toISOString(),
-      rating: 4,
-      comment: null,
-    });
-
+    mockSubmitActivityFeedFeedback
+      .mockResolvedValueOnce({
+        submittedAt: '2026-04-02T12:05:00.000Z',
+        rating: 4,
+        comment: null,
+      })
+      .mockResolvedValueOnce({
+        submittedAt: '2026-04-02T12:06:00.000Z',
+        rating: 4,
+        comment: 'Helpful, but a little fast.',
+      });
     const item = {
       ...makeBaseActivity(),
       verb: 'session.feedback_request.sent',
@@ -342,24 +347,39 @@ describe('ActivityItem', () => {
       currentProfileId: 'profile-1',
     });
 
+    fireEvent.press(screen.getByLabelText('Rate 4 stars'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Submit feedback')).toBeTruthy();
+    });
+
+    fireEvent.changeText(
+      screen.getByPlaceholderText('Tell us what could be better...'),
+      'Helpful, but a little fast.',
+    );
+
     await act(async () => {
-      fireEvent.press(screen.getByLabelText('Rate 4 stars'));
+      jest.advanceTimersByTime(600);
     });
 
     await waitFor(() => {
-      expect(
-        screen.getByText('Feedback saved. You can leave this screen now.'),
-      ).toBeTruthy();
+      expect(mockSubmitActivityFeedFeedback).toHaveBeenCalledTimes(2);
     });
+    expect(screen.getByText('Rating saved. Comments save automatically.')).toBeTruthy();
 
-    act(() => {
-      jest.advanceTimersByTime(1800);
-    });
+    fireEvent.press(screen.getByText('Submit feedback'));
 
     await waitFor(() => {
-      expect(screen.getByText('Saved. You can leave this screen now.')).toBeTruthy();
-      expect(screen.getByText('Edit feedback')).toBeTruthy();
+      expect(screen.getByText('Thank you for your feedback.')).toBeTruthy();
     });
+    expect(screen.queryByPlaceholderText('Tell us what could be better...')).toBeNull();
+    expect(mockSubmitActivityFeedFeedback).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        rating: 4,
+        comment: 'Helpful, but a little fast.',
+        recipientProfileId: 'profile-1',
+      }),
+    );
   });
 
   it('formats scheduled class session headlines without the timezone suffix', () => {
