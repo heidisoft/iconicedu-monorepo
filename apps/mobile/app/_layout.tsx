@@ -11,6 +11,7 @@ import { useAuth } from '@/providers/auth-provider';
 import { ScreenTracker } from '@/components/analytics/screen-tracker';
 import { AppLifecycleTracker } from '@/components/analytics/app-lifecycle-tracker';
 import { PresenceTracker } from '@/components/presence/presence-tracker';
+import { useAppUpdate } from '@/hooks/use-app-update';
 
 function SpinnerScreen() {
   const { colors } = useTheme();
@@ -29,6 +30,7 @@ const styles = StyleSheet.create({
 function RootContent() {
   const { isDark } = useTheme();
   const { loading } = useAuth();
+  useAppUpdate();
 
   if (loading) {
     return <SpinnerScreen />;

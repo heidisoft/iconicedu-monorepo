@@ -14,8 +14,12 @@
       "backgroundColor": "#ffffff"
     },
     "platforms": ["ios", "android"],
+    "runtimeVersion": "1.0.0",
     "updates": {
-      "enabled": true
+      "enabled": true,
+      "url": "https://u.expo.dev/82adc837-03b9-4b58-93d5-93759e99417a",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 3000
     },
     "ios": {
       "supportsTablet": true,
@@ -40,6 +44,7 @@
       ]
     },
     "plugins": [
+      "expo-updates",
       "react-native-edge-to-edge",
       "expo-router",
       "expo-secure-store",

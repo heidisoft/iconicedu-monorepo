@@ -136,6 +136,17 @@ export default [
   },
   {
     files: [
+      'apps/mobile/**/*.{ts,tsx,js,jsx}',
+      'packages/ui-native/**/*.{ts,tsx,js,jsx}',
+    ],
+    languageOptions: {
+      globals: {
+        __DEV__: 'readonly',
+      },
+    },
+  },
+  {
+    files: [
       '**/*.test.{ts,tsx,js,jsx}',
       '**/*.spec.{ts,tsx,js,jsx}',
       '**/__tests__/**/*.{ts,tsx,js,jsx}',

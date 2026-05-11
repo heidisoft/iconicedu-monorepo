@@ -32,6 +32,8 @@
     "eas:submit:ios": "eas submit --platform ios",
     "eas:submit:android": "eas submit --platform android",
     "eas:update": "eas update",
+    "eas:update:production": "eas update --channel production",
+    "eas:update:preview": "eas update --channel preview",
     "export:bundle": "EXPO_NO_TELEMETRY=1 npx expo export --platform android --output-dir .expo/dist"
   },
   "dependencies": {
@@ -58,6 +60,7 @@
     "expo-sharing": "~55.0.11",
     "expo-splash-screen": "~55.0.10",
     "expo-status-bar": "~55.0.4",
+    "expo-updates": "~55.0.21",
     "expo-web-browser": "~55.0.9",
     "nativewind": "^4.2.1",
     "posthog-react-native": "^4.37.1",

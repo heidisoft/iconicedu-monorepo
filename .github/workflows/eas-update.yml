@@ -1,0 +1,46 @@
+name: 'EAS Update'
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/mobile/**'
+      - 'packages/shared-types/**'
+      - 'packages/utils/**'
+      - 'packages/ui-native/**'
+
+jobs:
+  eas-update:
+    name: 'Publish OTA Update'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.19.0'
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '10.33.0'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build shared packages
+        run: pnpm build:packages
+
+      - name: Publish EAS Update (production)
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          npm install -g eas-cli --silent
+          cd apps/mobile
+          eas update \
+            --channel production \
+            --message "Auto update from ${GITHUB_SHA::8}" \
+            --non-interactive
