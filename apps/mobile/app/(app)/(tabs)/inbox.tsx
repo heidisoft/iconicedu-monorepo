@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { Bell } from 'lucide-react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/providers/theme-provider';
 import { useActivityFeed, useMarkActivityFeedRead } from '@/hooks/use-activity-feed';
@@ -143,6 +143,7 @@ const FALLBACK_TABS: Array<{ key: InboxTabKeyVM; label: string }> = [
 
 export default function InboxScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ activityId?: string | string[] }>();
   const { colors, isDark } = useTheme();
   const s = React.useMemo(() => makeStyles(colors), [colors]);
   const activityS = React.useMemo(() => makeActivityItemStyles(colors), [colors]);
@@ -154,6 +155,11 @@ export default function InboxScreen() {
   const [activeTab, setActiveTab] = useState<InboxTabKeyVM>('all');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [refreshing, setRefreshing] = useState(false);
+  const sectionListRef = useRef<SectionList<ActivityFeedItemVM, FeedSection>>(null);
+  const lastScrolledTargetRef = useRef<string | null>(null);
+  const targetActivityId = Array.isArray(params.activityId)
+    ? params.activityId[0]
+    : params.activityId;
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -212,6 +218,29 @@ export default function InboxScreen() {
     if (unreadIdsForActiveTab.length === 0) return;
     markRead(unreadIdsForActiveTab);
   }, [markRead, unreadIdsForActiveTab]);
+
+  useEffect(() => {
+    if (!targetActivityId) return;
+
+    const targetItem = feedSections
+      .flatMap((section) => section.items)
+      .find((item) => item.ids.id === targetActivityId);
+
+    if (!targetItem) return;
+
+    if (activeTab !== 'all' && activeTab !== targetItem.tabKey) {
+      setActiveTab(targetItem.tabKey);
+    }
+
+    if (targetItem.verb === 'session.feedback_request.sent') {
+      setExpandedIds((prev) => {
+        if (prev.has(targetActivityId)) return prev;
+        const next = new Set(prev);
+        next.add(targetActivityId);
+        return next;
+      });
+    }
+  }, [activeTab, feedSections, targetActivityId]);
 
   const handleActivityAction = useCallback(
     (item: ActivityFeedItemVM) => {
@@ -290,6 +319,35 @@ export default function InboxScreen() {
       .filter((section) => section.data.length > 0);
   }, [feedSections, activeTab]);
 
+  useEffect(() => {
+    if (!targetActivityId || feedLoading || filteredSections.length === 0) return;
+
+    const sectionIndex = filteredSections.findIndex((section) =>
+      section.data.some((item) => item.ids.id === targetActivityId),
+    );
+    if (sectionIndex < 0) return;
+
+    const itemIndex = filteredSections[sectionIndex].data.findIndex(
+      (item) => item.ids.id === targetActivityId,
+    );
+    if (itemIndex < 0) return;
+
+    const scrollKey = `${activeTab}:${targetActivityId}`;
+    if (lastScrolledTargetRef.current === scrollKey) return;
+    lastScrolledTargetRef.current = scrollKey;
+
+    const timer = setTimeout(() => {
+      sectionListRef.current?.scrollToLocation({
+        sectionIndex,
+        itemIndex,
+        animated: true,
+        viewPosition: 0.15,
+      });
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [activeTab, feedLoading, filteredSections, targetActivityId]);
+
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       {/* Header */}
@@ -348,6 +406,7 @@ export default function InboxScreen() {
         </View>
       ) : (
         <SectionList<ActivityFeedItemVM, FeedSection>
+          ref={sectionListRef}
           sections={filteredSections}
           keyExtractor={(item, index) => item?.ids?.id ?? String(index)}
           stickySectionHeadersEnabled={false}

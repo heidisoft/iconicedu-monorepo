@@ -390,6 +390,32 @@ export function buildPersonalizedSessionCopy(
     return { title, summary: title };
   }
 
+  if (eventType === 'class.schedule.created') {
+    const startLabel = formatSessionDateTime(
+      firstDefinedString(payload.startAt, payload.firstSessionStartAt),
+      payload,
+    );
+    return {
+      title: classTitle,
+      summary: startLabel
+        ? `${classTitle} has a new schedule starting ${startLabel}`
+        : `${classTitle} has a new schedule`,
+    };
+  }
+
+  if (eventType === 'class.schedule.ended') {
+    const endLabel = formatSessionDateTime(
+      firstDefinedString(payload.recurrenceUntil, payload.until, payload.endAt),
+      payload,
+    );
+    return {
+      title: classTitle,
+      summary: endLabel
+        ? `${classTitle} schedule now ends ${endLabel}`
+        : `${classTitle} schedule has an end date`,
+    };
+  }
+
   if (eventType === 'class.session.rescheduled') {
     const oldLabel = formatSessionDateTime(
       firstDefinedString(

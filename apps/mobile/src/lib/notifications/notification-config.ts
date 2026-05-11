@@ -12,6 +12,7 @@ export type NotificationConfig = {
     channelId?: string;
     threadId?: string | null;
     channelRouteKind?: string;
+    activityFeedItemId?: string | null;
   }) => string;
 };
 
@@ -38,6 +39,14 @@ const classNotificationConfig: NotificationConfig = {
   },
 };
 
+const feedbackNotificationConfig: NotificationConfig = {
+  label: 'Feedback Requests',
+  getRoute: ({ activityFeedItemId }) =>
+    activityFeedItemId
+      ? `/(app)/(tabs)/inbox?activityId=${encodeURIComponent(activityFeedItemId)}`
+      : '/(app)/(tabs)/inbox',
+};
+
 export const NOTIFICATION_REGISTRY: Record<string, NotificationConfig> = {
   'message.posted': messageNotificationConfig,
   'message.mentioned': messageNotificationConfig,
@@ -58,10 +67,12 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationConfig> = {
         : `/(app)/channel/${targetId}`;
     },
   },
+  'class.schedule.created': classNotificationConfig,
+  'class.schedule.ended': classNotificationConfig,
   'class.session.rescheduled': classNotificationConfig,
   'class.session.canceled': classNotificationConfig,
   'session.reminder.sent': classNotificationConfig,
-  'session.feedback_request.sent': classNotificationConfig,
+  'session.feedback_request.sent': feedbackNotificationConfig,
 };
 
 export const DEFAULT_NOTIFICATION_ROUTE = '/(app)/(tabs)/inbox';

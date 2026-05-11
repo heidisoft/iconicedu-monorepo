@@ -122,6 +122,8 @@ export type NotificationKey =
   | 'image.uploaded'
   | 'audio.uploaded'
   | 'reaction.added'
+  | 'class.schedule.created'
+  | 'class.schedule.ended'
   | 'class.session.rescheduled'
   | 'class.session.canceled'
   | 'session.reminder.sent'

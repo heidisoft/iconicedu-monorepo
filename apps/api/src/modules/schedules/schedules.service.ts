@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
+import { publishActivityEvent } from '@iconicedu/api/lib/activity-feed/activity-publisher';
 import {
   createSupabaseServiceClient,
   type SupabaseServiceClient,
@@ -35,6 +36,26 @@ const CLASS_SCHEDULE_SELECT = `
     overrides:class_schedule_recurrence_overrides(id, occurrence_key, patch)
   )
 `;
+
+type ExistingScheduleCompareRow = {
+  id: string;
+  start_at: string;
+  end_at: string;
+  timezone: string | null;
+  recurrence: Array<{
+    frequency: string | null;
+    interval: number | null;
+    count: number | null;
+    until: string | null;
+    timezone: string | null;
+    byday: string[] | null;
+  }> | null;
+};
+
+type InsertedScheduleActivityInput = {
+  scheduleId: string;
+  schedule: ScheduleRowInput;
+};
 
 @Injectable()
 export class SchedulesService {
@@ -84,6 +105,11 @@ export class SchedulesService {
     await this.requireOrgActor(accessToken, dto.orgId);
     const supabase = createSupabaseServiceClient();
     const now = new Date().toISOString();
+    const previousSchedules = await this.loadExistingSchedulesForActivityComparison(
+      supabase,
+      dto.orgId,
+      dto.learningSpaceId,
+    );
 
     // Delete existing schedules for the learning space
     await this.cascadeDeleteSchedulesForLearningSpace(
@@ -150,6 +176,16 @@ export class SchedulesService {
         );
       }
     }
+
+    await this.publishScheduleReplacementActivities({
+      supabase,
+      dto,
+      previousSchedules,
+      insertedSchedules: scheduleIds.map((scheduleId, index) => ({
+        scheduleId,
+        schedule: dto.schedules[index]!,
+      })),
+    });
 
     return { scheduleIds };
   }
@@ -487,6 +523,148 @@ export class SchedulesService {
       .eq('org_id', orgId)
       .in('id', scheduleIds);
     if (e5) throw new InternalServerErrorException(e5.message);
+  }
+
+  private async loadExistingSchedulesForActivityComparison(
+    supabase: SupabaseServiceClient,
+    orgId: string,
+    learningSpaceId: string,
+  ) {
+    const { data, error } = await supabase
+      .from('class_schedules')
+      .select(
+        `
+          id, start_at, end_at, timezone,
+          recurrence:class_schedule_recurrence(
+            frequency, interval, count, until, timezone, byday
+          )
+        `,
+      )
+      .eq('org_id', orgId)
+      .eq('source_learning_space_id', learningSpaceId)
+      .eq('source_kind', 'class_session')
+      .is('deleted_at', null)
+      .returns<ExistingScheduleCompareRow[]>();
+
+    if (error) {
+      throw new InternalServerErrorException(error.message);
+    }
+
+    return data ?? [];
+  }
+
+  private buildScheduleActivitySignature(
+    schedule:
+      | ScheduleRowInput
+      | Pick<
+          ExistingScheduleCompareRow,
+          'start_at' | 'end_at' | 'timezone' | 'recurrence'
+        >,
+  ) {
+    const isInput = 'startAt' in schedule;
+    const recurrence = isInput ? schedule.recurrence : (schedule.recurrence?.[0] ?? null);
+    return JSON.stringify({
+      startAt: isInput ? schedule.startAt : schedule.start_at,
+      endAt: isInput ? schedule.endAt : schedule.end_at,
+      timezone: isInput ? schedule.timezone : (schedule.timezone ?? null),
+      recurrence: recurrence
+        ? {
+            frequency: recurrence.frequency,
+            interval: recurrence.interval ?? null,
+            timezone: recurrence.timezone ?? null,
+            byday: [...(recurrence.byday ?? [])].sort(),
+          }
+        : null,
+    });
+  }
+
+  private getScheduleRecurrenceUntil(
+    schedule: ScheduleRowInput | ExistingScheduleCompareRow,
+  ) {
+    if ('startAt' in schedule) {
+      return schedule.recurrence?.until ?? null;
+    }
+    return schedule.recurrence?.[0]?.until ?? null;
+  }
+
+  private async publishScheduleReplacementActivities(input: {
+    supabase: SupabaseServiceClient;
+    dto: ReplaceSchedulesDto;
+    previousSchedules: ExistingScheduleCompareRow[];
+    insertedSchedules: InsertedScheduleActivityInput[];
+  }) {
+    const previousBySignature = new Map<string, ExistingScheduleCompareRow[]>();
+    for (const previous of input.previousSchedules) {
+      const signature = this.buildScheduleActivitySignature(previous);
+      previousBySignature.set(signature, [
+        ...(previousBySignature.get(signature) ?? []),
+        previous,
+      ]);
+    }
+
+    for (const inserted of input.insertedSchedules) {
+      const signature = this.buildScheduleActivitySignature(inserted.schedule);
+      const matchedPrevious = previousBySignature.get(signature)?.shift() ?? null;
+      if (!matchedPrevious) {
+        await this.publishScheduleActivity(
+          input.supabase,
+          input.dto,
+          inserted,
+          'created',
+        );
+        continue;
+      }
+
+      const previousUntil = this.getScheduleRecurrenceUntil(matchedPrevious);
+      const nextUntil = this.getScheduleRecurrenceUntil(inserted.schedule);
+      if (nextUntil && (!previousUntil || nextUntil !== previousUntil)) {
+        await this.publishScheduleActivity(input.supabase, input.dto, inserted, 'ended');
+      }
+    }
+  }
+
+  private async publishScheduleActivity(
+    supabase: SupabaseServiceClient,
+    dto: ReplaceSchedulesDto,
+    inserted: InsertedScheduleActivityInput,
+    kind: 'created' | 'ended',
+  ) {
+    const recurrenceUntil = inserted.schedule.recurrence?.until ?? null;
+
+    await publishActivityEvent({
+      supabase,
+      orgId: dto.orgId,
+      eventType: kind === 'created' ? 'class.schedule.created' : 'class.schedule.ended',
+      sourceKind: 'profile',
+      actorProfileId: dto.createdBy,
+      scope: { kind: 'learning_space', learningSpaceId: dto.learningSpaceId },
+      objectRef: { kind: 'schedule', id: inserted.scheduleId },
+      targetRef: { kind: 'learning_space', id: dto.learningSpaceId },
+      audienceRules: [{ kind: 'all_in_scope' }],
+      payload: {
+        learningSpaceId: dto.learningSpaceId,
+        channelId: dto.channelId,
+        scheduleId: inserted.scheduleId,
+        title: dto.title,
+        learningSpaceTitle: dto.title,
+        channelRouteKind: 'space',
+        startAt: inserted.schedule.startAt,
+        endAt: inserted.schedule.endAt,
+        timezone: inserted.schedule.timezone,
+        recurrenceUntil,
+        until: recurrenceUntil,
+        members: dto.participants.map((participant) => ({
+          profileId: participant.profileId,
+          displayName: participant.displayName,
+          avatarUrl: participant.avatarUrl,
+          themeKey: participant.themeKey,
+          role: participant.kind,
+          kind: participant.kind,
+        })),
+      },
+      dedupeKey: `class.schedule.${kind}:${dto.orgId}:${inserted.scheduleId}`,
+      createdBy: dto.createdBy,
+    });
   }
 
   private async insertScheduleParticipants(

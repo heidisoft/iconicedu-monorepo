@@ -6,9 +6,11 @@ const mockMarkRead = jest.fn();
 const mockRefetchFeed = jest.fn(() => Promise.resolve());
 const mockRouterPush = jest.fn();
 let mockFeed: ActivityFeedVM;
+let mockSearchParams: Record<string, unknown>;
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockRouterPush }),
+  useLocalSearchParams: () => mockSearchParams,
 }));
 
 jest.mock('@/providers/theme-provider', () => ({
@@ -129,6 +131,7 @@ describe('InboxScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockFeed = makeFeed();
+    mockSearchParams = {};
   });
 
   it('does not mark notifications read just by rendering the tab', () => {
@@ -257,7 +260,7 @@ describe('InboxScreen', () => {
     expect(mockRouterPush).toHaveBeenCalledWith('/(app)/dm/dm-channel-123');
   });
 
-  it('expands feedback requests instead of navigating away', () => {
+  it('shows feedback requests inline instead of navigating away', () => {
     mockFeed = {
       ...makeFeed(),
       sections: [
@@ -285,9 +288,42 @@ describe('InboxScreen', () => {
 
     render(<InboxScreen />);
 
-    fireEvent.press(screen.getByText('Give feedback'));
-
-    expect(mockRouterPush).not.toHaveBeenCalled();
     expect(screen.getByText('Rate your session')).toBeTruthy();
+    expect(screen.queryByText('Give feedback')).toBeNull();
+    expect(mockRouterPush).not.toHaveBeenCalled();
+  });
+
+  it('opens a pushed feedback notification on the target activity item', () => {
+    mockSearchParams = { activityId: 'feedback-action' };
+    mockFeed = {
+      ...makeFeed(),
+      sections: [
+        {
+          label: 'Today',
+          items: [
+            makeActivity({
+              id: 'feedback-action',
+              tabKey: 'classes',
+              primary: 'Share feedback for Algebra I',
+              verb: 'session.feedback_request.sent',
+              actionLabel: 'Give feedback',
+              metadata: {
+                feedbackUiEnabled: true,
+                sourceEventId: 'event-1',
+                classSessionId: 'session-1',
+                classroomId: 'space-1',
+                channelId: 'space-channel-123',
+              },
+            }),
+          ],
+        },
+      ],
+    };
+
+    render(<InboxScreen />);
+
+    expect(screen.getByText('Share feedback for Algebra I')).toBeTruthy();
+    expect(screen.getByText('Rate your session')).toBeTruthy();
+    expect(mockRouterPush).not.toHaveBeenCalled();
   });
 });

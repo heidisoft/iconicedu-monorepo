@@ -45,11 +45,24 @@ function getFeedbackMetadata(activity: ActivityFeedLeafItemVM): FeedbackMetadata
       typeof metadata.sourceEventId === 'string' ? metadata.sourceEventId : null,
     messageId: typeof metadata.messageId === 'string' ? metadata.messageId : null,
     classSessionId:
-      typeof metadata.classSessionId === 'string' ? metadata.classSessionId : null,
-    classroomId: typeof metadata.classroomId === 'string' ? metadata.classroomId : null,
+      typeof metadata.classSessionId === 'string'
+        ? metadata.classSessionId
+        : typeof metadata.scheduleId === 'string'
+          ? metadata.scheduleId
+          : null,
+    classroomId:
+      typeof metadata.classroomId === 'string'
+        ? metadata.classroomId
+        : typeof metadata.learningSpaceId === 'string'
+          ? metadata.learningSpaceId
+          : null,
     channelId: typeof metadata.channelId === 'string' ? metadata.channelId : null,
     occurrenceStart:
-      typeof metadata.occurrenceStart === 'string' ? metadata.occurrenceStart : null,
+      typeof metadata.occurrenceStart === 'string'
+        ? metadata.occurrenceStart
+        : typeof metadata.startAt === 'string'
+          ? metadata.startAt
+          : null,
     feedbackUiEnabled: metadata.feedbackUiEnabled !== false,
   };
 }

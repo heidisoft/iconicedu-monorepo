@@ -89,6 +89,7 @@ export function useNotificationHandler() {
               channelId: data.channelId,
               threadId: data.threadId,
               channelRouteKind: data.channelRouteKind,
+              activityFeedItemId: data.activityFeedItemId,
             })
           : DEFAULT_NOTIFICATION_ROUTE;
         router.push(route as Parameters<typeof router.push>[0]);

@@ -70,13 +70,29 @@ describe('NOTIFICATION_REGISTRY', () => {
     'class.session.rescheduled',
     'class.session.canceled',
     'session.reminder.sent',
-    'session.feedback_request.sent',
   ])('routes %s to the class space', (prefKey) => {
     const route = NOTIFICATION_REGISTRY[prefKey].getRoute({
       scopeKind: 'learning_space',
       channelId: 'space-channel-123',
     });
     expect(route).toBe('/(app)/spaces/space-channel-123');
+  });
+
+  it('routes feedback requests to the specific inbox activity when present', () => {
+    const route = NOTIFICATION_REGISTRY['session.feedback_request.sent'].getRoute({
+      activityFeedItemId: 'feed item 123',
+      scopeKind: 'learning_space',
+      channelId: 'space-channel-123',
+    });
+    expect(route).toBe('/(app)/(tabs)/inbox?activityId=feed%20item%20123');
+  });
+
+  it('routes feedback requests to inbox when no activity id is present', () => {
+    const route = NOTIFICATION_REGISTRY['session.feedback_request.sent'].getRoute({
+      scopeKind: 'learning_space',
+      channelId: 'space-channel-123',
+    });
+    expect(route).toBe('/(app)/(tabs)/inbox');
   });
 
   it('falls back to DEFAULT_NOTIFICATION_ROUTE for unknown prefKeys', () => {

@@ -15,6 +15,8 @@ export type ActivityVerbVM =
   | 'image.uploaded'
   | 'audio.uploaded'
   | 'reaction.added'
+  | 'class.schedule.created'
+  | 'class.schedule.ended'
   | 'class.session.rescheduled'
   | 'class.session.canceled'
   | 'session.reminder.sent'
@@ -61,6 +63,7 @@ export type InboxIconKeyVM =
   | 'MessageSquareReply'
   | 'MessagesSquare'
   | 'SmilePlus'
+  | 'Star'
   | 'Bell';
 
 export type InboxLeadingVM =

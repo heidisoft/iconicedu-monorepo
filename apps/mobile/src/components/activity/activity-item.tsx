@@ -17,6 +17,7 @@ import {
   MessageSquareReply,
   MessagesSquare,
   SmilePlus,
+  Star,
 } from 'lucide-react-native';
 import type { AppColors } from '@/lib/theme';
 import type { ActivityFeedItemVM, InboxIconKeyVM } from '@iconicedu/shared-types';
@@ -48,6 +49,7 @@ export const ACTIVITY_ICON_MAP: Record<
   MessageSquareReply,
   MessagesSquare,
   SmilePlus,
+  Star,
 };
 
 export const TAB_LABELS: Record<string, string> = {
@@ -104,6 +106,10 @@ export function getIconKey(item: ActivityFeedItemVM): InboxIconKeyVM {
       return 'FileHeadphone';
     case 'reaction.added':
       return 'SmilePlus';
+    case 'class.schedule.created':
+      return 'CalendarCheck';
+    case 'class.schedule.ended':
+      return 'CalendarX';
     case 'class.session.rescheduled':
       return 'CalendarCheck';
     case 'class.session.canceled':
@@ -111,7 +117,7 @@ export function getIconKey(item: ActivityFeedItemVM): InboxIconKeyVM {
     case 'session.reminder.sent':
       return 'Bell';
     case 'session.feedback_request.sent':
-      return 'MessageSquareHeart';
+      return 'Star';
     default:
       return 'Bell';
   }
@@ -397,13 +403,15 @@ export function ActivityItem({
     item.kind === 'leaf' &&
     item.verb === 'session.feedback_request.sent' &&
     canRenderMobileActivityFeedbackRequest(item);
+  const shouldShowPreviewText = hasPreviewText && !canShowFeedbackRequest;
+  const shouldShowActionButton = hasActionBtn && !canShowFeedbackRequest;
   const primary = formatActivityPrimaryHeadline(item, viewerTimezone);
   const { secondary, emphasis } = item.content.headline;
   const tabLabel = TAB_LABELS[item.tabKey] ?? item.tabKey;
 
   const handlePress = () => {
     if (!isRead) onMarkRead(item.ids.id);
-    if (hasExpandedContent || canShowFeedbackRequest) onToggle(item.ids.id);
+    if (hasExpandedContent) onToggle(item.ids.id);
   };
 
   const handleActionPress = () => {
@@ -567,7 +575,7 @@ export function ActivityItem({
         </View>
 
         {/* Preview card — summary text */}
-        {hasPreviewText && (
+        {shouldShowPreviewText && (
           <View
             style={[
               s.previewCard,
@@ -578,6 +586,14 @@ export function ActivityItem({
               {previewText}
             </Text>
           </View>
+        )}
+
+        {canShowFeedbackRequest && (
+          <ActivityFeedbackRequest
+            activity={item}
+            colors={colors}
+            currentProfileId={currentProfileId}
+          />
         )}
 
         {/* Expanded detail card */}
@@ -605,16 +621,8 @@ export function ActivityItem({
           </TouchableOpacity>
         )}
 
-        {canShowFeedbackRequest && isExpanded && (
-          <ActivityFeedbackRequest
-            activity={item}
-            colors={colors}
-            currentProfileId={currentProfileId}
-          />
-        )}
-
         {/* Action button */}
-        {hasActionBtn && (
+        {shouldShowActionButton && (
           <TouchableOpacity
             style={[s.actionBtn, { borderColor: colors.border }]}
             onPress={handleActionPress}

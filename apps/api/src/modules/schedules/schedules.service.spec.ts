@@ -1,6 +1,7 @@
 import { ForbiddenException } from '@nestjs/common';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
+import { publishActivityEvent } from '@iconicedu/api/lib/activity-feed/activity-publisher';
 import { SchedulesService } from '@iconicedu/api/modules/schedules/schedules.service';
 
 jest.mock('@iconicedu/api/lib/supabase/service', () => ({
@@ -11,9 +12,14 @@ jest.mock('@iconicedu/api/lib/supabase/session', () => ({
   createSupabaseSessionClient: jest.fn(),
 }));
 
+jest.mock('@iconicedu/api/lib/activity-feed/activity-publisher', () => ({
+  publishActivityEvent: jest.fn(async () => null),
+}));
+
 describe('SchedulesService authorization', () => {
   const createSupabaseServiceClientMock = jest.mocked(createSupabaseServiceClient);
   const createSupabaseSessionClientMock = jest.mocked(createSupabaseSessionClient);
+  const publishActivityEventMock = jest.mocked(publishActivityEvent);
 
   function makeSingleResult<T>(result: T) {
     const chain = {
@@ -217,4 +223,195 @@ describe('SchedulesService authorization', () => {
       },
     ]);
   });
+
+  it('publishes a schedule-created activity when a new learning-space schedule is added', async () => {
+    createSupabaseSessionClientMock.mockReturnValue({
+      auth: {
+        getUser: jest.fn(async () => ({
+          data: { user: { id: 'auth-user-1' } },
+          error: null,
+        })),
+      },
+    } as never);
+
+    const mainClient = makeReplaceSchedulesClient({
+      previousSchedules: [],
+      cascadeSchedules: [],
+    });
+    createSupabaseServiceClientMock
+      .mockReturnValueOnce(makeSingleResult({ id: 'account-1' }) as never)
+      .mockReturnValueOnce(makeSingleResult([{ role_key: 'staff' }]) as never)
+      .mockReturnValueOnce(mainClient as never);
+
+    const service = new SchedulesService();
+    await service.replaceSchedulesForLearningSpace('token-1', {
+      orgId: 'org-1',
+      learningSpaceId: 'space-1',
+      channelId: 'channel-1',
+      createdBy: 'profile-staff',
+      title: 'Algebra I',
+      description: null,
+      themeKey: null,
+      participants: [
+        {
+          profileId: 'student-1',
+          kind: 'child',
+          displayName: 'Priya',
+          avatarUrl: null,
+          themeKey: null,
+        },
+      ],
+      schedules: [
+        {
+          startAt: '2030-03-06T10:00:00.000Z',
+          endAt: '2030-03-06T11:00:00.000Z',
+          timezone: 'America/New_York',
+          recurrence: null,
+        },
+      ],
+    });
+
+    expect(publishActivityEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orgId: 'org-1',
+        eventType: 'class.schedule.created',
+        actorProfileId: 'profile-staff',
+        scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+        audienceRules: [{ kind: 'all_in_scope' }],
+        payload: expect.objectContaining({
+          learningSpaceId: 'space-1',
+          channelId: 'channel-1',
+          title: 'Algebra I',
+          startAt: '2030-03-06T10:00:00.000Z',
+        }),
+      }),
+    );
+  });
+
+  it('publishes a schedule-ended activity when an end date is added to an existing recurrence', async () => {
+    createSupabaseSessionClientMock.mockReturnValue({
+      auth: {
+        getUser: jest.fn(async () => ({
+          data: { user: { id: 'auth-user-1' } },
+          error: null,
+        })),
+      },
+    } as never);
+
+    const mainClient = makeReplaceSchedulesClient({
+      previousSchedules: [
+        {
+          id: 'schedule-old',
+          start_at: '2030-03-06T10:00:00.000Z',
+          end_at: '2030-03-06T11:00:00.000Z',
+          timezone: 'America/New_York',
+          recurrence: [
+            {
+              frequency: 'weekly',
+              interval: 1,
+              count: null,
+              until: null,
+              timezone: 'America/New_York',
+              byday: ['WE'],
+            },
+          ],
+        },
+      ],
+      cascadeSchedules: [{ id: 'schedule-old' }],
+      cascadeRecurrences: [{ id: 'recurrence-old' }],
+    });
+    createSupabaseServiceClientMock
+      .mockReturnValueOnce(makeSingleResult({ id: 'account-1' }) as never)
+      .mockReturnValueOnce(makeSingleResult([{ role_key: 'staff' }]) as never)
+      .mockReturnValueOnce(mainClient as never);
+
+    const service = new SchedulesService();
+    await service.replaceSchedulesForLearningSpace('token-1', {
+      orgId: 'org-1',
+      learningSpaceId: 'space-1',
+      channelId: 'channel-1',
+      createdBy: 'profile-staff',
+      title: 'Algebra I',
+      description: null,
+      themeKey: null,
+      participants: [],
+      schedules: [
+        {
+          startAt: '2030-03-06T10:00:00.000Z',
+          endAt: '2030-03-06T11:00:00.000Z',
+          timezone: 'America/New_York',
+          recurrence: {
+            frequency: 'weekly',
+            interval: 1,
+            count: null,
+            until: '2030-05-01T00:00:00.000Z',
+            timezone: 'America/New_York',
+            rawRrule: null,
+            bysecond: null,
+            byminute: null,
+            byhour: null,
+            byday: ['WE'],
+            bymonthday: null,
+            byyearday: null,
+            byweekno: null,
+            bymonth: null,
+            bysetpos: null,
+            wkst: null,
+            exceptions: [],
+            overrides: [],
+          },
+        },
+      ],
+    });
+
+    expect(publishActivityEventMock).toHaveBeenCalledTimes(1);
+    expect(publishActivityEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'class.schedule.ended',
+        payload: expect.objectContaining({
+          recurrenceUntil: '2030-05-01T00:00:00.000Z',
+          until: '2030-05-01T00:00:00.000Z',
+        }),
+      }),
+    );
+  });
 });
+
+function makeReplaceSchedulesClient(input: {
+  previousSchedules: unknown[];
+  cascadeSchedules: unknown[];
+  cascadeRecurrences?: unknown[];
+}) {
+  let classSchedulesSelectCount = 0;
+  return {
+    from: jest.fn((table: string) => {
+      const query = {
+        select: jest.fn(() => {
+          classSchedulesSelectCount += table === 'class_schedules' ? 1 : 0;
+          return query;
+        }),
+        eq: jest.fn(() => query),
+        is: jest.fn(() => query),
+        in: jest.fn(() => query),
+        delete: jest.fn(() => query),
+        insert: jest.fn(() => Promise.resolve({ data: null, error: null })),
+        returns: jest.fn(async () => {
+          if (table === 'class_schedules') {
+            return {
+              data:
+                classSchedulesSelectCount === 1
+                  ? input.previousSchedules
+                  : input.cascadeSchedules,
+              error: null,
+            };
+          }
+          if (table === 'class_schedule_recurrence') {
+            return { data: input.cascadeRecurrences ?? [], error: null };
+          }
+          return { data: [], error: null };
+        }),
+      };
+      return query;
+    }),
+  };
+}
