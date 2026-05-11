@@ -45,7 +45,7 @@ function makeStyles(C: AppColors) {
       justifyContent: 'space-between',
       gap: 12,
     },
-    title: { fontSize: 30, fontWeight: '800', color: C.text, letterSpacing: -0.5 },
+    title: { fontSize: 30, fontWeight: '800', color: C.text, letterSpacing: 0 },
     markAllBtn: {
       minHeight: 32,
       paddingHorizontal: 12,
@@ -60,7 +60,7 @@ function makeStyles(C: AppColors) {
       opacity: 0.45,
     },
     markAllBtnText: {
-      fontSize: 12,
+      fontSize: 13,
       fontWeight: '700',
       color: C.teal,
     },
@@ -77,7 +77,7 @@ function makeStyles(C: AppColors) {
     },
     tabActive: { borderBottomColor: C.teal },
     tabInner: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-    tabText: { fontSize: 13, fontWeight: '600', color: C.textFaint },
+    tabText: { fontSize: 14, fontWeight: '600', color: C.textFaint },
     tabTextActive: { color: C.teal },
     tabBadge: {
       minWidth: 18,
@@ -88,16 +88,16 @@ function makeStyles(C: AppColors) {
       justifyContent: 'center',
       paddingHorizontal: 4,
     },
-    tabBadgeText: { fontSize: 10, fontWeight: '700', color: '#ffffff' },
+    tabBadgeText: { fontSize: 11, fontWeight: '700', color: '#ffffff' },
 
     // Section header
     sectionHeader: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 8 },
     sectionLabel: {
-      fontSize: 11,
+      fontSize: 12,
       fontWeight: '700',
       color: C.textFaint,
       textTransform: 'uppercase',
-      letterSpacing: 1,
+      letterSpacing: 0.5,
     },
 
     // Spacer between cards
@@ -118,12 +118,12 @@ function makeStyles(C: AppColors) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    emptyTitle: { fontSize: 18, fontWeight: '700' },
+    emptyTitle: { fontSize: 20, fontWeight: '700' },
     emptyDesc: {
-      fontSize: 14,
+      fontSize: 15,
       textAlign: 'center',
       paddingHorizontal: 40,
-      lineHeight: 21,
+      lineHeight: 20,
     },
   });
 }

@@ -39,7 +39,7 @@ function makeStyles(C: AppColors) {
     navBack: { padding: 8, borderRadius: 8 },
     navTitle: {
       flex: 1,
-      fontSize: 17,
+      fontSize: 19,
       fontWeight: '700',
       color: C.text,
       textAlign: 'center',
@@ -47,11 +47,11 @@ function makeStyles(C: AppColors) {
     },
     scroll: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 48, gap: 6 },
     sectionLabel: {
-      fontSize: 12,
+      fontSize: 13,
       fontWeight: '700',
       color: C.textFaint,
       textTransform: 'uppercase',
-      letterSpacing: 0.8,
+      letterSpacing: 0.5,
       paddingHorizontal: 4,
       paddingTop: 14,
       paddingBottom: 6,
@@ -64,8 +64,8 @@ function makeStyles(C: AppColors) {
       overflow: 'hidden',
     },
     divider: { height: 1, backgroundColor: C.border, marginLeft: 60 },
-    valueText: { fontSize: 13, color: C.textMuted, maxWidth: 160, textAlign: 'right' },
-    emptyValue: { fontSize: 13, color: C.textFaint, fontStyle: 'italic' },
+    valueText: { fontSize: 14, color: C.textMuted, maxWidth: 160, textAlign: 'right' },
+    emptyValue: { fontSize: 14, color: C.textFaint, fontStyle: 'italic' },
     avatarSection: { alignItems: 'center', paddingVertical: 24, gap: 10 },
     avatar: {
       width: 80,
@@ -75,9 +75,9 @@ function makeStyles(C: AppColors) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    avatarTxt: { color: C.tealFg, fontWeight: '800', fontSize: 32 },
-    avatarName: { fontSize: 20, fontWeight: '800', color: C.text, letterSpacing: -0.3 },
-    avatarSub: { fontSize: 13, color: C.teal, fontWeight: '600' },
+    avatarTxt: { color: C.tealFg, fontWeight: '800', fontSize: 34 },
+    avatarName: { fontSize: 22, fontWeight: '800', color: C.text, letterSpacing: 0 },
+    avatarSub: { fontSize: 14, color: C.teal, fontWeight: '600' },
   });
 }
 

@@ -26,20 +26,20 @@ function makeStyles(C: AppColors) {
     content: { flex: 1, paddingHorizontal: 24, paddingTop: 24, gap: 20 },
 
     back: { alignSelf: 'flex-start', marginBottom: 8 },
-    backTxt: { fontSize: 15, fontWeight: '600', color: C.textMuted },
+    backTxt: { fontSize: 16, fontWeight: '600', color: C.textMuted },
 
     heading: {
-      fontSize: 36,
+      fontSize: 34,
       fontWeight: '800',
       color: C.text,
-      lineHeight: 44,
-      letterSpacing: -0.5,
+      lineHeight: 42,
+      letterSpacing: 0,
     },
-    sub: { fontSize: 15, color: C.textMuted, lineHeight: 23 },
+    sub: { fontSize: 16, color: C.textMuted, lineHeight: 22 },
     email: { color: C.text, fontWeight: '600' },
 
     field: { gap: 6 },
-    label: { fontSize: 13, fontWeight: '500', color: C.textMuted },
+    label: { fontSize: 14, fontWeight: '500', color: C.textMuted },
     codeInput: {
       backgroundColor: C.inputBg,
       borderWidth: 1.5,
@@ -50,11 +50,11 @@ function makeStyles(C: AppColors) {
       fontSize: 28,
       fontWeight: '700',
       color: C.text,
-      letterSpacing: 14,
+      letterSpacing: 10,
       textAlign: 'center',
     },
     codeInputErr: { borderColor: C.red },
-    errorTxt: { fontSize: 12, color: C.red, marginTop: 2 },
+    errorTxt: { fontSize: 13, color: C.red, marginTop: 2 },
 
     cta: {
       backgroundColor: C.teal,
@@ -63,11 +63,11 @@ function makeStyles(C: AppColors) {
       alignItems: 'center',
     },
     ctaDim: { opacity: 0.45 },
-    ctaTxt: { color: C.tealFg, fontSize: 16, fontWeight: '700', letterSpacing: 0.2 },
+    ctaTxt: { color: C.tealFg, fontSize: 17, fontWeight: '700', letterSpacing: 0 },
 
     resendRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
-    resendHint: { fontSize: 14, color: C.textFaint },
-    resendLink: { fontSize: 14, fontWeight: '700', color: C.text },
+    resendHint: { fontSize: 15, color: C.textFaint },
+    resendLink: { fontSize: 15, fontWeight: '700', color: C.text },
   });
 }
 

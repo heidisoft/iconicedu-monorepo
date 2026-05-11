@@ -22,10 +22,10 @@ function makeStyles(C: AppColors) {
       gap: 12,
     },
     title: {
-      fontSize: 28,
+      fontSize: 30,
       fontWeight: '800',
       color: C.text,
-      letterSpacing: -0.5,
+      letterSpacing: 0,
     },
     listContent: {
       paddingHorizontal: 12,

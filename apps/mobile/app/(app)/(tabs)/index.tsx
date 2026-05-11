@@ -163,14 +163,14 @@ function makeStyles(C: AppColors) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    avatarTxt: { color: '#ffffff', fontWeight: '800', fontSize: 18 },
+    avatarTxt: { color: '#ffffff', fontWeight: '800', fontSize: 20 },
     profileTextWrap: {
       gap: 2,
       flexShrink: 1,
       minWidth: 0,
     },
-    profileName: { fontSize: 15, color: C.text, fontWeight: '700' },
-    profileEmail: { fontSize: 12, color: C.textMuted },
+    profileName: { fontSize: 16, color: C.text, fontWeight: '700' },
+    profileEmail: { fontSize: 13, color: C.textMuted },
     familySwitchSheetContent: {
       paddingBottom: FAMILY_SWITCH_BOTTOM_PADDING,
     },
@@ -182,12 +182,12 @@ function makeStyles(C: AppColors) {
       gap: 4,
     },
     familySwitchTitle: {
-      fontSize: 18,
+      fontSize: 20,
       fontWeight: '800',
       color: C.text,
     },
     familySwitchSubtitle: {
-      fontSize: 13,
+      fontSize: 14,
       color: C.textMuted,
       lineHeight: 18,
     },
@@ -204,7 +204,7 @@ function makeStyles(C: AppColors) {
     },
     familySwitchAvatarText: {
       color: '#ffffff',
-      fontSize: 14,
+      fontSize: 15,
       fontWeight: '800',
     },
     switchOption: {
@@ -228,15 +228,15 @@ function makeStyles(C: AppColors) {
       gap: 2,
     },
     switchOptionLabel: {
-      fontSize: 14,
+      fontSize: 15,
       fontWeight: '700',
       color: C.text,
     },
     switchOptionSubtext: {
-      fontSize: 12,
+      fontSize: 13,
       color: C.textMuted,
     },
-    greetingLine: { fontSize: 15, color: C.textMuted, fontWeight: '500' },
+    greetingLine: { fontSize: 16, color: C.textMuted, fontWeight: '500' },
     headlineRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -244,11 +244,11 @@ function makeStyles(C: AppColors) {
       gap: 12,
     },
     headline: {
-      fontSize: 28,
+      fontSize: 30,
       fontWeight: '800',
       color: C.text,
-      letterSpacing: -0.5,
-      lineHeight: 34,
+      letterSpacing: 0,
+      lineHeight: 36,
       flex: 1,
     },
     supportBtn: {
@@ -265,7 +265,7 @@ function makeStyles(C: AppColors) {
       position: 'relative',
     },
     supportBtnText: {
-      fontSize: 12,
+      fontSize: 13,
       fontWeight: '700',
       color: supportPalette.text,
     },
@@ -277,11 +277,11 @@ function makeStyles(C: AppColors) {
       position: 'relative',
     },
     sectionLabel: {
-      fontSize: 12,
+      fontSize: 13,
       fontWeight: '700',
       color: C.textFaint,
       textTransform: 'uppercase',
-      letterSpacing: 0.8,
+      letterSpacing: 0.5,
     },
     metricsRow: { gap: 12, paddingRight: 20 },
     metricCard: {
@@ -301,7 +301,7 @@ function makeStyles(C: AppColors) {
     },
     metricTitle: {
       flex: 1,
-      fontSize: 14,
+      fontSize: 15,
       fontWeight: '700',
       color: C.text,
       lineHeight: 18,
@@ -315,13 +315,13 @@ function makeStyles(C: AppColors) {
       justifyContent: 'center',
     },
     metricValue: {
-      fontSize: 32,
+      fontSize: 34,
       fontWeight: '800',
       color: C.text,
-      letterSpacing: -0.8,
-      lineHeight: 36,
+      letterSpacing: 0,
+      lineHeight: 38,
     },
-    metricLabel: { fontSize: 12, color: C.textMuted, lineHeight: 16 },
+    metricLabel: { fontSize: 13, color: C.textMuted, lineHeight: 17 },
     activityHeader: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -350,16 +350,16 @@ function makeStyles(C: AppColors) {
       justifyContent: 'center',
     },
     emptyTitle: {
-      fontSize: 18,
+      fontSize: 20,
       fontWeight: '700',
       color: C.text,
     },
     emptyDesc: {
-      fontSize: 14,
+      fontSize: 15,
       color: C.textMuted,
       textAlign: 'center',
       paddingHorizontal: 40,
-      lineHeight: 21,
+      lineHeight: 20,
     },
   });
 }

@@ -102,13 +102,13 @@ function makeStyles(C: AppColors, bottomInset: number, keyboardVisible: boolean)
     },
     replyInfo: { flex: 1 },
     replySender: {
-      fontSize: 12,
+      fontSize: 13,
       fontWeight: '600',
       color: C.teal,
       marginBottom: 1,
     },
     replyText: {
-      fontSize: 12,
+      fontSize: 13,
       color: C.textMuted,
     },
 
@@ -175,12 +175,12 @@ function makeStyles(C: AppColors, bottomInset: number, keyboardVisible: boolean)
       justifyContent: 'center',
     },
     attachFileName: {
-      fontSize: 13,
+      fontSize: 14,
       fontWeight: '500' as const,
       color: C.text,
     },
     attachFileSize: {
-      fontSize: 11,
+      fontSize: 12,
       marginTop: 1,
       color: C.textMuted,
     },
@@ -207,12 +207,12 @@ function makeStyles(C: AppColors, bottomInset: number, keyboardVisible: boolean)
       justifyContent: 'center',
     },
     attachAudioLabel: {
-      fontSize: 12,
+      fontSize: 13,
       fontWeight: '500',
       color: C.text,
     },
     attachAudioMeta: {
-      fontSize: 11,
+      fontSize: 12,
       color: C.textMuted,
     },
 
@@ -267,9 +267,9 @@ function makeStyles(C: AppColors, bottomInset: number, keyboardVisible: boolean)
     },
     input: {
       flex: 1,
-      fontSize: 15,
+      fontSize: 16,
       color: C.text,
-      lineHeight: 20,
+      lineHeight: 22,
       paddingVertical: 0,
       minHeight: DEFAULT_INPUT_HEIGHT,
       maxHeight: MAX_INPUT_HEIGHT,

@@ -6,10 +6,10 @@ import { cn, TextClassContext } from '@iconicedu/ui-native/lib/utils';
 const typographyVariants = cva('', {
   variants: {
     variant: {
-      h1: 'text-3xl font-bold text-foreground',
-      h2: 'text-2xl font-semibold text-foreground',
-      h3: 'text-xl font-semibold text-foreground',
-      h4: 'text-lg font-medium text-foreground',
+      h1: 'text-4xl font-bold text-foreground',
+      h2: 'text-3xl font-semibold text-foreground',
+      h3: 'text-2xl font-semibold text-foreground',
+      h4: 'text-xl font-medium text-foreground',
       body: 'text-base text-foreground',
       'body-sm': 'text-sm text-foreground',
       caption: 'text-xs text-muted-foreground',

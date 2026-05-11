@@ -62,7 +62,7 @@ function makeStyles(C: AppColors) {
       borderBottomWidth: 1,
       borderBottomColor: C.border,
     },
-    headerTitle: { flex: 1, fontSize: 16, fontWeight: '700', color: C.text },
+    headerTitle: { flex: 1, fontSize: 17, fontWeight: '700', color: C.text },
     closeBtn: {
       width: 32,
       height: 32,
@@ -71,7 +71,7 @@ function makeStyles(C: AppColors) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    closeTxt: { fontSize: 16, color: C.textMuted },
+    closeTxt: { fontSize: 17, color: C.textMuted },
     parentSection: {
       borderBottomWidth: 1,
       borderBottomColor: C.border,
@@ -79,7 +79,7 @@ function makeStyles(C: AppColors) {
       paddingVertical: 4,
     },
     repliesHeader: {
-      fontSize: 13,
+      fontSize: 14,
       fontWeight: '600',
       color: C.textMuted,
       paddingHorizontal: 16,
@@ -93,7 +93,7 @@ function makeStyles(C: AppColors) {
       justifyContent: 'center',
       paddingVertical: 32,
     },
-    emptyTxt: { fontSize: 13, color: C.textFaint },
+    emptyTxt: { fontSize: 14, color: C.textFaint },
   });
 }
 

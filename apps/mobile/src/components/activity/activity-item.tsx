@@ -6,6 +6,7 @@ import {
   BookImage,
   CalendarCheck,
   CalendarX,
+  CheckCheck,
   CreditCard,
   FileBadge,
   FileHeadphone,
@@ -151,7 +152,7 @@ export function makeActivityItemStyles(C: AppColors) {
     itemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
 
     // Avatar
-    avatarWrap: { width: 28, height: 28, flexShrink: 0, marginTop: 2 },
+    avatarWrap: { width: 28, flexShrink: 0, marginTop: 2, alignItems: 'center', gap: 6 },
     avatar: {
       width: 28,
       height: 28,
@@ -161,7 +162,8 @@ export function makeActivityItemStyles(C: AppColors) {
     },
 
     // Unread dot
-    unreadDot: { width: 9, height: 9, borderRadius: 5, flexShrink: 0, marginTop: 8 },
+    unreadDot: { width: 9, height: 9, borderRadius: 5, flexShrink: 0 },
+    readIcon: { width: 14, height: 14, alignItems: 'center', justifyContent: 'center' },
 
     // Content
     content: { flex: 1 },
@@ -172,7 +174,7 @@ export function makeActivityItemStyles(C: AppColors) {
       gap: 5,
       marginBottom: 5,
     },
-    headlineText: { fontSize: 15, lineHeight: 22 },
+    headlineText: { fontSize: 16, lineHeight: 22 },
     bold: { fontWeight: '700' },
 
     // Emphasis badge
@@ -184,11 +186,11 @@ export function makeActivityItemStyles(C: AppColors) {
       paddingVertical: 3,
       borderRadius: 8,
     },
-    badgeText: { fontSize: 13, fontWeight: '600' },
+    badgeText: { fontSize: 14, fontWeight: '600' },
 
     // Meta row
     metaRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-    metaText: { fontSize: 13 },
+    metaText: { fontSize: 14 },
     metaDot: { width: 3, height: 3, borderRadius: 2 },
 
     // Preview card (summary / expanded content)
@@ -199,11 +201,11 @@ export function makeActivityItemStyles(C: AppColors) {
       borderWidth: 1,
       padding: 14,
     },
-    previewText: { fontSize: 14, lineHeight: 22 },
+    previewText: { fontSize: 15, lineHeight: 20 },
 
     // Read more
     readMoreBtn: { marginTop: 8, marginLeft: 42 },
-    readMoreText: { fontSize: 13, fontWeight: '600' },
+    readMoreText: { fontSize: 14, fontWeight: '600' },
 
     // Action button
     actionBtn: {
@@ -215,14 +217,20 @@ export function makeActivityItemStyles(C: AppColors) {
       paddingHorizontal: 14,
       paddingVertical: 8,
     },
-    actionBtnText: { fontSize: 13, fontWeight: '600' },
+    actionBtnText: { fontSize: 14, fontWeight: '600' },
 
     // Sub-items container
     subItemsWrap: { marginTop: 10, marginLeft: 42, borderLeftWidth: 2, paddingLeft: 12 },
 
     // Sub-activity: full leaf view
     subItemInner: { paddingVertical: 10 },
-    subAvatarWrap: { width: 24, height: 24, flexShrink: 0, marginTop: 2 },
+    subAvatarWrap: {
+      width: 24,
+      flexShrink: 0,
+      marginTop: 2,
+      alignItems: 'center',
+      gap: 5,
+    },
     subAvatar: {
       width: 24,
       height: 24,
@@ -415,6 +423,22 @@ export function ActivityItem({
             <View style={[s.subAvatar, { backgroundColor: iconBg }]}>
               <IconComponent size={10} color={iconFg} />
             </View>
+            {isRead ? (
+              <View
+                style={s.readIcon}
+                accessibilityLabel="Read"
+                accessibilityRole="image"
+                testID="activity-read-indicator"
+              >
+                <CheckCheck size={12} color={colors.textMuted} />
+              </View>
+            ) : (
+              <View
+                style={[s.unreadDot, { backgroundColor: colors.teal }]}
+                accessibilityLabel="Unread"
+                testID="activity-unread-indicator"
+              />
+            )}
           </View>
 
           <View style={s.content}>
@@ -428,8 +452,6 @@ export function ActivityItem({
               <Text style={[s.metaText, { color: colors.textMuted }]}>{time}</Text>
             </View>
           </View>
-
-          {!isRead && <View style={[s.unreadDot, { backgroundColor: colors.teal }]} />}
         </View>
 
         {hasPreviewText && (
@@ -498,6 +520,22 @@ export function ActivityItem({
             <View style={[s.avatar, { backgroundColor: iconBg }]}>
               <IconComponent size={11} color={iconFg} />
             </View>
+            {isRead ? (
+              <View
+                style={s.readIcon}
+                accessibilityLabel="Read"
+                accessibilityRole="image"
+                testID="activity-read-indicator"
+              >
+                <CheckCheck size={13} color={colors.textMuted} />
+              </View>
+            ) : (
+              <View
+                style={[s.unreadDot, { backgroundColor: colors.teal }]}
+                accessibilityLabel="Unread"
+                testID="activity-unread-indicator"
+              />
+            )}
           </View>
 
           <View style={s.content}>
@@ -526,8 +564,6 @@ export function ActivityItem({
               )}
             </View>
           </View>
-
-          {!isRead && <View style={[s.unreadDot, { backgroundColor: colors.teal }]} />}
         </View>
 
         {/* Preview card — summary text */}

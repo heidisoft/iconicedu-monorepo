@@ -152,8 +152,8 @@ function makeStyles(C: AppColors) {
       paddingVertical: 15,
     },
     actionIcon: { fontSize: 20, width: 28, textAlign: 'center' },
-    actionLabel: { fontSize: 16, color: C.text },
-    savedLabel: { fontSize: 16, color: C.teal, fontWeight: '600' },
+    actionLabel: { fontSize: 17, color: C.text },
+    savedLabel: { fontSize: 17, color: C.teal, fontWeight: '600' },
     destructive: { color: '#ef4444' },
     divider: {
       height: StyleSheet.hairlineWidth,

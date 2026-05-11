@@ -215,17 +215,17 @@ function makeStyles(C: AppColors) {
 
       logo: { alignSelf: 'center', marginBottom: 16 },
       heading: {
-        fontSize: 28,
+        fontSize: 30,
         fontWeight: '700',
         color: C.text,
-        lineHeight: 36,
-        letterSpacing: -0.3,
+        lineHeight: 38,
+        letterSpacing: 0,
         textAlign: 'center',
       },
-      sub: { fontSize: 15, color: C.textMuted, lineHeight: 23, textAlign: 'center' },
+      sub: { fontSize: 16, color: C.textMuted, lineHeight: 22, textAlign: 'center' },
 
       field: { gap: 6 },
-      label: { fontSize: 13, fontWeight: '500', color: C.textMuted },
+      label: { fontSize: 14, fontWeight: '500', color: C.textMuted },
       inputRow: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -238,7 +238,7 @@ function makeStyles(C: AppColors) {
       inputErr: { borderColor: C.red },
       input: {
         flex: 1,
-        fontSize: 15,
+        fontSize: 16,
         color: C.text,
         paddingVertical: 14,
         letterSpacing: 0,
@@ -251,8 +251,8 @@ function makeStyles(C: AppColors) {
         alignItems: 'center',
         justifyContent: 'center',
       },
-      clearX: { color: '#ffffff', fontSize: 17, lineHeight: 21, marginTop: -1 },
-      errorTxt: { fontSize: 12, color: C.red, marginTop: 2 },
+      clearX: { color: '#ffffff', fontSize: 18, lineHeight: 21, marginTop: -1 },
+      errorTxt: { fontSize: 13, color: C.red, marginTop: 2 },
 
       cta: {
         backgroundColor: C.teal,
@@ -264,11 +264,11 @@ function makeStyles(C: AppColors) {
         gap: 8,
       },
       ctaDim: { opacity: 0.6 },
-      ctaTxt: { color: C.tealFg, fontSize: 16, fontWeight: '700', letterSpacing: 0.2 },
+      ctaTxt: { color: C.tealFg, fontSize: 17, fontWeight: '700', letterSpacing: 0 },
 
       divRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
       divLine: { flex: 1, height: 1, backgroundColor: C.border },
-      divTxt: { fontSize: 13, color: C.textFaint },
+      divTxt: { fontSize: 14, color: C.textFaint },
 
       social: {
         flexDirection: 'row',
@@ -281,18 +281,18 @@ function makeStyles(C: AppColors) {
         paddingVertical: 14,
         backgroundColor: C.card,
       },
-      socialTxt: { fontSize: 15, fontWeight: '600', color: C.text },
+      socialTxt: { fontSize: 16, fontWeight: '600', color: C.text },
 
-      noAcct: { fontSize: 13, color: C.textMuted, textAlign: 'center', lineHeight: 20 },
+      noAcct: { fontSize: 14, color: C.textMuted, textAlign: 'center', lineHeight: 19 },
       noAcctLink: { color: C.teal, fontWeight: '600' },
 
       terms: {
         paddingHorizontal: 24,
         paddingBottom: 24,
-        fontSize: 12,
+        fontSize: 13,
         color: C.textFaint,
         textAlign: 'center',
-        lineHeight: 18,
+        lineHeight: 19,
       },
       termsLink: { color: C.text, fontWeight: '700' },
     }),

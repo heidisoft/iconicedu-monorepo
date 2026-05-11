@@ -209,7 +209,7 @@ function makeStyles(C: AppColors) {
     // Section label (inside grid)
     sectionLabel: {
       width: '100%',
-      fontSize: 11,
+      fontSize: 12,
       fontWeight: '600',
       color: C.textMuted,
       paddingHorizontal: 8,
@@ -243,7 +243,7 @@ function makeStyles(C: AppColors) {
       justifyContent: 'center',
     },
     emptyRecentTxt: {
-      fontSize: 13,
+      fontSize: 14,
       color: C.textFaint,
     },
   });

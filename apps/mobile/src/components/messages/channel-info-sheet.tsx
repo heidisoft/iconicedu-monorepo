@@ -570,7 +570,7 @@ function makeStyles(C: AppColors) {
     },
     headerTitle: {
       flex: 1,
-      fontSize: 17,
+      fontSize: 19,
       fontWeight: '600',
       color: C.text,
     },
@@ -612,8 +612,8 @@ function makeStyles(C: AppColors) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    avatarTxt: { color: '#fff', fontWeight: '700', fontSize: 28 },
-    avatarTxtCompact: { color: '#fff', fontWeight: '700', fontSize: 22 },
+    avatarTxt: { color: '#fff', fontWeight: '700', fontSize: 30 },
+    avatarTxtCompact: { color: '#fff', fontWeight: '700', fontSize: 24 },
     iconBox: {
       width: 72,
       height: 72,
@@ -628,14 +628,14 @@ function makeStyles(C: AppColors) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    heroName: { fontSize: 22, fontWeight: '700', color: C.text, textAlign: 'center' },
+    heroName: { fontSize: 24, fontWeight: '700', color: C.text, textAlign: 'center' },
     heroNameCompact: {
-      fontSize: 18,
+      fontSize: 20,
       fontWeight: '700',
       color: C.text,
       textAlign: 'center',
     },
-    heroSub: { fontSize: 14, color: C.textMuted, textAlign: 'center' },
+    heroSub: { fontSize: 15, color: C.textMuted, textAlign: 'center' },
 
     // ── Info rows (DM only) ───────────────────────────────────────────────────
     section: {
@@ -659,10 +659,10 @@ function makeStyles(C: AppColors) {
       backgroundColor: C.border,
       marginLeft: 16,
     },
-    rowIcon: { fontSize: 18, width: 24, textAlign: 'center' },
-    rowLabel: { flex: 1, fontSize: 14, color: C.textMuted },
+    rowIcon: { fontSize: 20, width: 24, textAlign: 'center' },
+    rowLabel: { flex: 1, fontSize: 15, color: C.textMuted },
     rowValue: {
-      fontSize: 14,
+      fontSize: 15,
       fontWeight: '600',
       color: C.text,
       maxWidth: 200,
@@ -689,7 +689,7 @@ function makeStyles(C: AppColors) {
       borderBottomColor: C.teal,
     },
     tabLabel: {
-      fontSize: 11,
+      fontSize: 12,
       color: C.textMuted,
       fontWeight: '500',
     },
@@ -715,16 +715,16 @@ function makeStyles(C: AppColors) {
       marginBottom: 4,
     },
     emptyTitle: {
-      fontSize: 16,
+      fontSize: 17,
       fontWeight: '600',
       color: C.text,
       textAlign: 'center',
     },
     emptySubtitle: {
-      fontSize: 13,
+      fontSize: 14,
       color: C.textMuted,
       textAlign: 'center',
-      lineHeight: 19,
+      lineHeight: 20,
     },
 
     // ── Files tab ─────────────────────────────────────────────────────────────
@@ -749,12 +749,12 @@ function makeStyles(C: AppColors) {
       gap: 2,
     },
     fileName: {
-      fontSize: 14,
+      fontSize: 15,
       fontWeight: '600',
       color: C.text,
     },
     fileMeta: {
-      fontSize: 12,
+      fontSize: 13,
       color: C.textMuted,
     },
     fileDownloadBtn: {
@@ -786,7 +786,7 @@ function makeStyles(C: AppColors) {
     savedAvatarTxt: {
       color: '#fff',
       fontWeight: '700',
-      fontSize: 13,
+      fontSize: 14,
     },
     savedBody: {
       flex: 1,
@@ -797,18 +797,18 @@ function makeStyles(C: AppColors) {
       marginBottom: 2,
     },
     savedSenderName: {
-      fontSize: 14,
+      fontSize: 15,
       fontWeight: '600',
       color: C.text,
     },
     savedDate: {
-      fontSize: 11,
+      fontSize: 12,
       color: C.textMuted,
     },
     savedPreview: {
-      fontSize: 13,
+      fontSize: 14,
       color: C.textMuted,
-      lineHeight: 18,
+      lineHeight: 19,
     },
 
     // ── Members tab ───────────────────────────────────────────────────────────
@@ -819,7 +819,7 @@ function makeStyles(C: AppColors) {
       borderBottomColor: C.border,
     },
     membersCount: {
-      fontSize: 13,
+      fontSize: 14,
       fontWeight: '600',
       color: C.textMuted,
     },
@@ -842,10 +842,10 @@ function makeStyles(C: AppColors) {
     memberAvatarTxt: {
       color: '#fff',
       fontWeight: '700',
-      fontSize: 15,
+      fontSize: 16,
     },
     memberName: {
-      fontSize: 15,
+      fontSize: 16,
       color: C.text,
     },
     memberInfo: {
@@ -871,7 +871,7 @@ function makeStyles(C: AppColors) {
       borderColor: C.border,
     },
     memberSelfBadgeText: {
-      fontSize: 11,
+      fontSize: 12,
       fontWeight: '600',
       color: C.textMuted,
     },

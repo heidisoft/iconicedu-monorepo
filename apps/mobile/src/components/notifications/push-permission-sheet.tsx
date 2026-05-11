@@ -23,13 +23,13 @@ function makeStyles(C: AppColors, bottomInset: number) {
       justifyContent: 'center',
     },
     title: {
-      fontSize: 20,
+      fontSize: 22,
       fontWeight: '700',
       color: C.text,
       textAlign: 'center',
     },
     body: {
-      fontSize: 15,
+      fontSize: 16,
       color: C.textMuted,
       textAlign: 'center',
       lineHeight: 22,
@@ -42,7 +42,7 @@ function makeStyles(C: AppColors, bottomInset: number) {
       alignItems: 'center',
     },
     btnPrimaryLabel: {
-      fontSize: 16,
+      fontSize: 17,
       fontWeight: '700',
       color: C.tealFg,
     },
@@ -53,7 +53,7 @@ function makeStyles(C: AppColors, bottomInset: number) {
       alignItems: 'center',
     },
     btnSecondaryLabel: {
-      fontSize: 15,
+      fontSize: 16,
       color: C.textMuted,
     },
   });

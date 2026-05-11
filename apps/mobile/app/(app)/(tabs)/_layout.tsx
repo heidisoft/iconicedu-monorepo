@@ -101,7 +101,7 @@ function SideRail({ state, navigation, inboxUnreadCount }: SideRailProps) {
                   <Text
                     style={{
                       color: '#fff',
-                      fontSize: 10,
+                      fontSize: 11,
                       fontWeight: '700',
                     }}
                   >
@@ -216,7 +216,7 @@ export default function TabsLayout() {
         tabBarActiveTintColor: colors.tabActive,
         tabBarInactiveTintColor: colors.tabInactive,
         tabBarLabelStyle: {
-          fontSize: 11,
+          fontSize: 12,
           fontWeight: '600',
         },
       }}
@@ -242,7 +242,7 @@ export default function TabsLayout() {
           tabBarBadgeStyle: {
             backgroundColor: '#ef4444',
             color: '#fff',
-            fontSize: 10,
+            fontSize: 11,
             fontWeight: '700',
           },
         }}
@@ -261,7 +261,7 @@ export default function TabsLayout() {
           tabBarBadgeStyle: {
             backgroundColor: '#ef4444',
             color: '#fff',
-            fontSize: 10,
+            fontSize: 11,
             fontWeight: '700',
           },
         }}

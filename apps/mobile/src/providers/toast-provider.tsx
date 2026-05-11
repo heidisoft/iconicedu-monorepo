@@ -57,11 +57,11 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   title: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
   },
   message: {
-    fontSize: 13,
+    fontSize: 14,
     lineHeight: 18,
     marginTop: 2,
   },
