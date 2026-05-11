@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { Bell, CalendarCheck, CalendarX, MessageSquare, Star } from 'lucide-react-native';
 
 import type { ActivityFeedItemVM } from '@iconicedu/shared-types';
@@ -12,6 +12,13 @@ import {
   makeActivityItemStyles,
 } from './activity-item';
 import { lightColors } from '@/lib/theme';
+
+const mockSubmitActivityFeedFeedback = jest.fn();
+
+jest.mock('@/lib/api/activity-feed/feedback', () => ({
+  submitActivityFeedFeedback: (...args: unknown[]) =>
+    mockSubmitActivityFeedFeedback(...args),
+}));
 
 function makeBaseActivity(): ActivityFeedItemVM {
   return {
@@ -76,6 +83,11 @@ function renderActivity(
 }
 
 describe('ActivityItem', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+    mockSubmitActivityFeedFeedback.mockReset();
+  });
+
   it('renders the activity row without inline avatars', () => {
     const { UNSAFE_getAllByType } = renderActivity(makeBaseActivity());
 
@@ -300,6 +312,54 @@ describe('ActivityItem', () => {
 
     expect(screen.getByText('Rate your session')).toBeTruthy();
     expect(screen.queryByText('Feedback is unavailable for this session.')).toBeNull();
+  });
+
+  it('collapses saved low-rating feedback after showing that it is safe to leave', async () => {
+    jest.useFakeTimers();
+    mockSubmitActivityFeedFeedback.mockResolvedValue({
+      submittedAt: new Date().toISOString(),
+      rating: 4,
+      comment: null,
+    });
+
+    const item = {
+      ...makeBaseActivity(),
+      verb: 'session.feedback_request.sent',
+      content: {
+        ...makeBaseActivity().content,
+        summary: 'Tell us how the session went',
+      },
+      metadata: {
+        feedbackUiEnabled: true,
+        sourceEventId: 'event-1',
+        classSessionId: 'session-1',
+        classroomId: 'space-1',
+        channelId: 'channel-1',
+      },
+    } as ActivityFeedItemVM;
+
+    renderActivity(item, {
+      currentProfileId: 'profile-1',
+    });
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Rate 4 stars'));
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Feedback saved. You can leave this screen now.'),
+      ).toBeTruthy();
+    });
+
+    act(() => {
+      jest.advanceTimersByTime(1800);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Saved. You can leave this screen now.')).toBeTruthy();
+      expect(screen.getByText('Edit feedback')).toBeTruthy();
+    });
   });
 
   it('formats scheduled class session headlines without the timezone suffix', () => {

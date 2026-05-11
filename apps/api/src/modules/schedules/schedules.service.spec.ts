@@ -43,15 +43,23 @@ describe('SchedulesService authorization', () => {
       },
     } as never);
     createSupabaseServiceClientMock
-      .mockReturnValueOnce(makeSingleResult({ id: 'account-1' }) as never)
+      .mockReturnValueOnce(
+        makeSingleResult({
+          id: 'account-1',
+          active_profile_id: 'profile-staff',
+        }) as never,
+      )
       .mockReturnValueOnce(
         makeSingleResult(roleKeys.map((role_key) => ({ role_key }))) as never,
       );
 
     const service = new SchedulesService();
-    await (
+    return (
       service as unknown as {
-        requireOrgActor(accessToken: string, orgId: string): Promise<void>;
+        requireOrgActor(
+          accessToken: string,
+          orgId: string,
+        ): Promise<{ accountId: string; profileId: string | null }>;
       }
     ).requireOrgActor('token-1', 'org-1');
   }
@@ -63,7 +71,10 @@ describe('SchedulesService authorization', () => {
   it.each(['owner', 'admin', 'staff'])(
     'allows %s to manage learning-space schedules',
     async (roleKey) => {
-      await expect(requireOrgActorWithRoles([roleKey])).resolves.toBeUndefined();
+      await expect(requireOrgActorWithRoles([roleKey])).resolves.toEqual({
+        accountId: 'account-1',
+        profileId: 'profile-staff',
+      });
     },
   );
 
@@ -116,7 +127,12 @@ describe('SchedulesService authorization', () => {
       }),
     };
     createSupabaseServiceClientMock
-      .mockReturnValueOnce(makeSingleResult({ id: 'account-1' }) as never)
+      .mockReturnValueOnce(
+        makeSingleResult({
+          id: 'account-1',
+          active_profile_id: 'profile-staff',
+        }) as never,
+      )
       .mockReturnValueOnce(makeSingleResult([{ role_key: 'staff' }]) as never)
       .mockReturnValueOnce(mainClient as never);
 
@@ -149,6 +165,8 @@ describe('SchedulesService authorization', () => {
             reason: 'Family requested a change',
           },
           suppress_notifications: true,
+          created_by: 'profile-staff',
+          updated_by: 'profile-staff',
         }),
       },
     ]);
@@ -194,7 +212,12 @@ describe('SchedulesService authorization', () => {
       }),
     };
     createSupabaseServiceClientMock
-      .mockReturnValueOnce(makeSingleResult({ id: 'account-1' }) as never)
+      .mockReturnValueOnce(
+        makeSingleResult({
+          id: 'account-1',
+          active_profile_id: 'profile-staff',
+        }) as never,
+      )
       .mockReturnValueOnce(makeSingleResult([{ role_key: 'staff' }]) as never)
       .mockReturnValueOnce(mainClient as never);
 
@@ -219,6 +242,8 @@ describe('SchedulesService authorization', () => {
           occurrence_key: '2026-03-21T14:00:00.000Z',
           reason: 'Weather',
           suppress_notifications: true,
+          created_by: 'profile-staff',
+          updated_by: 'profile-staff',
         }),
       },
     ]);

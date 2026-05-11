@@ -210,7 +210,7 @@ export class SchedulesService {
     accessToken: string,
     dto: CancelSessionDto,
   ): Promise<{ success: true; mode: 'single' | 'recurring' }> {
-    await this.requireOrgActor(accessToken, dto.orgId);
+    const actor = await this.requireOrgActor(accessToken, dto.orgId);
     const supabase = createSupabaseServiceClient();
     const now = new Date().toISOString();
 
@@ -231,7 +231,11 @@ export class SchedulesService {
       // Non-recurring: update status
       const { error: updateError } = await supabase
         .from('class_schedules')
-        .update({ status: 'cancelled', updated_at: now })
+        .update({
+          status: 'cancelled',
+          updated_at: now,
+          updated_by: actor.profileId,
+        })
         .eq('id', dto.scheduleId)
         .eq('org_id', dto.orgId)
         .is('deleted_at', null);
@@ -272,6 +276,7 @@ export class SchedulesService {
           reason: dto.reason,
           suppress_notifications: dto.suppressNotifications,
           updated_at: now,
+          updated_by: actor.profileId,
         })
         .eq('id', existingException.id)
         .eq('org_id', dto.orgId);
@@ -290,7 +295,9 @@ export class SchedulesService {
           reason: dto.reason,
           suppress_notifications: dto.suppressNotifications,
           created_at: now,
+          created_by: actor.profileId,
           updated_at: now,
+          updated_by: actor.profileId,
         });
 
       if (insertError) {
@@ -305,7 +312,7 @@ export class SchedulesService {
     accessToken: string,
     dto: RescheduleSessionDto,
   ): Promise<{ success: true; mode: 'single' | 'recurring' }> {
-    await this.requireOrgActor(accessToken, dto.orgId);
+    const actor = await this.requireOrgActor(accessToken, dto.orgId);
     const supabase = createSupabaseServiceClient();
     const now = new Date().toISOString();
 
@@ -329,6 +336,7 @@ export class SchedulesService {
           end_at: dto.endAt,
           timezone: dto.timezone,
           updated_at: now,
+          updated_by: actor.profileId,
         })
         .eq('id', dto.scheduleId)
         .eq('org_id', dto.orgId)
@@ -374,6 +382,7 @@ export class SchedulesService {
           patch,
           suppress_notifications: dto.suppressNotifications,
           updated_at: now,
+          updated_by: actor.profileId,
         })
         .eq('id', existingOverride.id)
         .eq('org_id', dto.orgId);
@@ -392,7 +401,9 @@ export class SchedulesService {
           patch,
           suppress_notifications: dto.suppressNotifications,
           created_at: now,
+          created_by: actor.profileId,
           updated_at: now,
+          updated_by: actor.profileId,
         });
 
       if (insertError) {
@@ -418,11 +429,11 @@ export class SchedulesService {
 
     const { data: account, error: accountError } = await createSupabaseServiceClient()
       .from('accounts')
-      .select('id')
+      .select('id, active_profile_id')
       .eq('auth_user_id', user.id)
       .eq('org_id', orgId)
       .is('deleted_at', null)
-      .maybeSingle<{ id: string }>();
+      .maybeSingle<{ id: string; active_profile_id: string | null }>();
 
     if (accountError) {
       throw new InternalServerErrorException(accountError.message);
@@ -452,6 +463,11 @@ export class SchedulesService {
     if (!canManageSchedules) {
       throw new ForbiddenException('Forbidden');
     }
+
+    return {
+      accountId: account.id,
+      profileId: account.active_profile_id,
+    };
   }
 
   private async cascadeDeleteSchedulesForLearningSpace(

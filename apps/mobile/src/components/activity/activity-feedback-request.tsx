@@ -7,6 +7,7 @@ import { submitActivityFeedFeedback } from '@/lib/api/activity-feed/feedback';
 
 const EDIT_WINDOW_MS = 60_000;
 const COMMENT_AUTOSAVE_MS = 600;
+const COMMENT_SAVED_COLLAPSE_MS = 1800;
 
 type ActivityFeedbackRequestProps = {
   activity: ActivityFeedLeafItemVM;
@@ -122,7 +123,13 @@ export function ActivityFeedbackRequest({
     resolveEditWindowOpen(initialFeedback.submittedAt),
   );
   const [isCommentSaving, setIsCommentSaving] = useState(false);
+  const [isCommentOpen, setIsCommentOpen] = useState(
+    initialFeedback.rating > 0 &&
+      initialFeedback.rating < 5 &&
+      !initialFeedback.submittedAt,
+  );
   const commentAutosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const commentCollapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setRating(initialFeedback.rating);
@@ -133,12 +140,20 @@ export function ActivityFeedbackRequest({
     setIsEditing(false);
     setIsEditWindowOpen(resolveEditWindowOpen(initialFeedback.submittedAt));
     setIsCommentSaving(false);
+    setIsCommentOpen(
+      initialFeedback.rating > 0 &&
+        initialFeedback.rating < 5 &&
+        !initialFeedback.submittedAt,
+    );
   }, [initialFeedback]);
 
   useEffect(() => {
     return () => {
       if (commentAutosaveTimerRef.current) {
         clearTimeout(commentAutosaveTimerRef.current);
+      }
+      if (commentCollapseTimerRef.current) {
+        clearTimeout(commentCollapseTimerRef.current);
       }
     };
   }, []);
@@ -176,7 +191,9 @@ export function ActivityFeedbackRequest({
     Boolean(metadata.classSessionId) &&
     Boolean(metadata.classroomId) &&
     Boolean(metadata.channelId);
-  const shouldShowCommentBox = canSubmit && rating > 0 && rating < 5;
+  const hasLowRating = canSubmit && rating > 0 && rating < 5;
+  const shouldShowCommentBox =
+    hasLowRating && (isEditing || !submittedAt || isCommentOpen);
   const isSubmitted = Boolean(submittedAt) && !isEditing && !shouldShowCommentBox;
   const normalizedDraftComment = normalizeComment(comment);
   const normalizedSavedComment = normalizeComment(lastSavedComment);
@@ -220,6 +237,9 @@ export function ActivityFeedbackRequest({
         setSubmittedAt(nextSubmittedAt);
         setIsEditing(false);
         setIsEditWindowOpen(true);
+        if (nextRating >= 5) {
+          setIsCommentOpen(false);
+        }
       } catch (submitError) {
         setError(
           submitError instanceof Error
@@ -256,6 +276,7 @@ export function ActivityFeedbackRequest({
 
     setError(null);
     setRating(value);
+    setIsCommentOpen(value < 5);
     await submitFeedback(
       value,
       value < 5 ? (normalizedDraftComment ?? undefined) : undefined,
@@ -267,6 +288,7 @@ export function ActivityFeedbackRequest({
 
   const handleResetRating = () => {
     setIsEditing(true);
+    setIsCommentOpen(rating > 0 && rating < 5);
     setError(null);
   };
 
@@ -307,6 +329,44 @@ export function ActivityFeedbackRequest({
     submittedAt,
   ]);
 
+  useEffect(() => {
+    if (
+      !hasLowRating ||
+      !submittedAt ||
+      isEditing ||
+      !isCommentOpen ||
+      isSubmitting ||
+      isCommentSaving ||
+      hasPendingCommentChanges
+    ) {
+      return;
+    }
+
+    if (commentCollapseTimerRef.current) {
+      clearTimeout(commentCollapseTimerRef.current);
+    }
+
+    commentCollapseTimerRef.current = setTimeout(() => {
+      commentCollapseTimerRef.current = null;
+      setIsCommentOpen(false);
+    }, COMMENT_SAVED_COLLAPSE_MS);
+
+    return () => {
+      if (commentCollapseTimerRef.current) {
+        clearTimeout(commentCollapseTimerRef.current);
+        commentCollapseTimerRef.current = null;
+      }
+    };
+  }, [
+    hasLowRating,
+    hasPendingCommentChanges,
+    isCommentOpen,
+    isCommentSaving,
+    isEditing,
+    isSubmitting,
+    submittedAt,
+  ]);
+
   if (!metadata.feedbackUiEnabled) {
     return null;
   }
@@ -318,12 +378,12 @@ export function ActivityFeedbackRequest({
         {isSubmitted && isEditWindowOpen ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Edit rating"
+            accessibilityLabel="Edit feedback"
             onPress={handleResetRating}
             style={styles.editButton}
           >
             <Text style={[styles.editButtonText, { color: colors.teal }]}>
-              Edit rating
+              Edit feedback
             </Text>
           </Pressable>
         ) : null}
@@ -387,7 +447,9 @@ export function ActivityFeedbackRequest({
               ? 'Saving comment...'
               : hasPendingCommentChanges
                 ? 'Saving shortly...'
-                : 'Rating saved. Comments save automatically.'}
+                : submittedAt
+                  ? 'Feedback saved. You can leave this screen now.'
+                  : 'Rating saved. Comments save automatically.'}
           </Text>
         </View>
       ) : null}
@@ -396,6 +458,9 @@ export function ActivityFeedbackRequest({
         <View style={[styles.submittedCard, { backgroundColor: colors.inputBg }]}>
           <Text style={[styles.submittedTitle, { color: colors.text }]}>
             Thank you for your feedback.
+          </Text>
+          <Text style={[styles.submittedDescription, { color: colors.textMuted }]}>
+            Saved. You can leave this screen now.
           </Text>
         </View>
       ) : null}
@@ -474,10 +539,15 @@ function makeStyles(colors: AppColors) {
       borderRadius: 10,
       paddingHorizontal: 12,
       paddingVertical: 10,
+      gap: 4,
     },
     submittedTitle: {
       fontSize: 14,
       fontWeight: '700',
+    },
+    submittedDescription: {
+      fontSize: 13,
+      lineHeight: 18,
     },
     supportText: {
       fontSize: 13,
