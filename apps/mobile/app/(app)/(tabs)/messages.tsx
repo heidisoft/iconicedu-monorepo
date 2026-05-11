@@ -431,7 +431,7 @@ function makeStyles(C: AppColors) {
     content: { flex: 1, minWidth: 0, justifyContent: 'center', gap: 2 },
     topRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     rowNameWrap: { flex: 1, minWidth: 0 },
-    rowName: { fontSize: 16, fontWeight: '700', color: C.text },
+    rowName: { fontSize: 17, fontWeight: '700', color: C.text },
     rowNameUnread: { fontWeight: '800' },
     rowNameStudentNames: { fontWeight: '600' },
     rowTail: {
