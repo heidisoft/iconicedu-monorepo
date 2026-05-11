@@ -1,12 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react-native';
-import {
-  Bell,
-  CalendarCheck,
-  CalendarX,
-  MessageSquare,
-  MessageSquareHeart,
-} from 'lucide-react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { Bell, CalendarCheck, CalendarX, MessageSquare, Star } from 'lucide-react-native';
 
 import type { ActivityFeedItemVM } from '@iconicedu/shared-types';
 
@@ -18,6 +12,13 @@ import {
   makeActivityItemStyles,
 } from './activity-item';
 import { lightColors } from '@/lib/theme';
+
+const mockSubmitActivityFeedFeedback = jest.fn();
+
+jest.mock('@/lib/api/activity-feed/feedback', () => ({
+  submitActivityFeedFeedback: (...args: unknown[]) =>
+    mockSubmitActivityFeedFeedback(...args),
+}));
 
 function makeBaseActivity(): ActivityFeedItemVM {
   return {
@@ -82,6 +83,11 @@ function renderActivity(
 }
 
 describe('ActivityItem', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+    mockSubmitActivityFeedFeedback.mockReset();
+  });
+
   it('renders the activity row without inline avatars', () => {
     const { UNSAFE_getAllByType } = renderActivity(makeBaseActivity());
 
@@ -94,7 +100,7 @@ describe('ActivityItem', () => {
     ['class.session.rescheduled', 'CalendarCheck', CalendarCheck],
     ['class.session.canceled', 'CalendarX', CalendarX],
     ['session.reminder.sent', 'Bell', Bell],
-    ['session.feedback_request.sent', 'MessageSquareHeart', MessageSquareHeart],
+    ['session.feedback_request.sent', 'Star', Star],
   ] as const)('displays the correct icon for %s notifications', (verb, iconKey, Icon) => {
     const item = {
       ...makeBaseActivity(),
@@ -120,7 +126,7 @@ describe('ActivityItem', () => {
     ['class.session.rescheduled', 'CalendarCheck'],
     ['class.session.canceled', 'CalendarX'],
     ['session.reminder.sent', 'Bell'],
-    ['session.feedback_request.sent', 'MessageSquareHeart'],
+    ['session.feedback_request.sent', 'Star'],
   ] as const)('falls back to the correct icon key for %s', (verb, iconKey) => {
     const item = {
       ...makeBaseActivity(),
@@ -252,13 +258,14 @@ describe('ActivityItem', () => {
     expect(onActionPress).toHaveBeenCalledWith(item);
   });
 
-  it('expands feedback requests from the Give feedback action', () => {
+  it('renders feedback requests in the preview position without an action button', () => {
     const onActionPress = jest.fn();
     const item = {
       ...makeBaseActivity(),
       verb: 'session.feedback_request.sent',
       content: {
         ...makeBaseActivity().content,
+        summary: 'Tell us how the session went',
         actionButton: { label: 'Give feedback', variant: 'outline' },
       },
       metadata: {
@@ -272,11 +279,107 @@ describe('ActivityItem', () => {
 
     renderActivity(item, {
       onActionPress,
-      expandedIds: new Set(['activity-1']),
       currentProfileId: 'profile-1',
     });
 
     expect(screen.getByText('Rate your session')).toBeTruthy();
+    expect(screen.queryByText('Tell us how the session went')).toBeNull();
+    expect(screen.queryByText('Give feedback')).toBeNull();
+  });
+
+  it('allows feedback requests that use schedule and learning space metadata aliases', () => {
+    const item = {
+      ...makeBaseActivity(),
+      verb: 'session.feedback_request.sent',
+      content: {
+        ...makeBaseActivity().content,
+        summary: 'Tell us how the session went',
+        actionButton: { label: 'Give feedback', variant: 'outline' },
+      },
+      metadata: {
+        feedbackUiEnabled: true,
+        sourceEventId: 'event-1',
+        scheduleId: 'session-1',
+        learningSpaceId: 'space-1',
+        channelId: 'channel-1',
+        startAt: '2026-03-19T22:00:00.000Z',
+      },
+    } as ActivityFeedItemVM;
+
+    renderActivity(item, {
+      currentProfileId: 'profile-1',
+    });
+
+    expect(screen.getByText('Rate your session')).toBeTruthy();
+    expect(screen.queryByText('Feedback is unavailable for this session.')).toBeNull();
+  });
+
+  it('autosaves low-rating comments and uses a button to collapse to the submitted state', async () => {
+    jest.useFakeTimers();
+    mockSubmitActivityFeedFeedback
+      .mockResolvedValueOnce({
+        submittedAt: '2026-04-02T12:05:00.000Z',
+        rating: 4,
+        comment: null,
+      })
+      .mockResolvedValueOnce({
+        submittedAt: '2026-04-02T12:06:00.000Z',
+        rating: 4,
+        comment: 'Helpful, but a little fast.',
+      });
+    const item = {
+      ...makeBaseActivity(),
+      verb: 'session.feedback_request.sent',
+      content: {
+        ...makeBaseActivity().content,
+        summary: 'Tell us how the session went',
+      },
+      metadata: {
+        feedbackUiEnabled: true,
+        sourceEventId: 'event-1',
+        classSessionId: 'session-1',
+        classroomId: 'space-1',
+        channelId: 'channel-1',
+      },
+    } as ActivityFeedItemVM;
+
+    renderActivity(item, {
+      currentProfileId: 'profile-1',
+    });
+
+    fireEvent.press(screen.getByLabelText('Rate 4 stars'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Submit feedback')).toBeTruthy();
+    });
+
+    fireEvent.changeText(
+      screen.getByPlaceholderText('Tell us what could be better...'),
+      'Helpful, but a little fast.',
+    );
+
+    await act(async () => {
+      jest.advanceTimersByTime(600);
+    });
+
+    await waitFor(() => {
+      expect(mockSubmitActivityFeedFeedback).toHaveBeenCalledTimes(2);
+    });
+    expect(screen.getByText('Rating saved. Comments save automatically.')).toBeTruthy();
+
+    fireEvent.press(screen.getByText('Submit feedback'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Thank you for your feedback.')).toBeTruthy();
+    });
+    expect(screen.queryByPlaceholderText('Tell us what could be better...')).toBeNull();
+    expect(mockSubmitActivityFeedFeedback).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        rating: 4,
+        comment: 'Helpful, but a little fast.',
+        recipientProfileId: 'profile-1',
+      }),
+    );
   });
 
   it('formats scheduled class session headlines without the timezone suffix', () => {

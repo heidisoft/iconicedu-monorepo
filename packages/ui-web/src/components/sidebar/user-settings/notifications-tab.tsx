@@ -47,6 +47,8 @@ type ScopedNotificationPreference = {
 const defineNotificationItems = <T extends NotificationSectionItem[]>(items: T) => items;
 
 const ACTIVITY_SCOPED_VERB_KEYS: ActivityVerbVM[] = [
+  'class.schedule.created',
+  'class.schedule.ended',
   'class.session.rescheduled',
   'class.session.canceled',
   'message.posted',

@@ -366,7 +366,12 @@ export class ActivityWorkerService {
     const actorProfileId = await this.resolveScheduleActorProfileId({
       supabase,
       orgId: job.org_id,
-      actorRef: exception.updated_by ?? exception.created_by ?? null,
+      actorRef:
+        exception.updated_by ??
+        exception.created_by ??
+        job.updated_by ??
+        job.created_by ??
+        null,
     });
 
     await publishActivityEvent({
@@ -445,7 +450,12 @@ export class ActivityWorkerService {
     const actorProfileId = await this.resolveScheduleActorProfileId({
       supabase,
       orgId: job.org_id,
-      actorRef: override.updated_by ?? override.created_by ?? null,
+      actorRef:
+        override.updated_by ??
+        override.created_by ??
+        job.updated_by ??
+        job.created_by ??
+        null,
     });
     const patch = override.patch ?? {};
     const newStartAt =

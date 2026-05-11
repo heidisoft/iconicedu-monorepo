@@ -41,6 +41,7 @@ export interface ConnectionVM<T> {
 
 export type EntityRefVM =
   | { kind: 'learning_space'; id: UUID }
+  | { kind: 'schedule'; id: UUID }
   | { kind: 'session'; id: UUID }
   | { kind: 'homework'; id: UUID }
   | { kind: 'summary'; id: UUID }

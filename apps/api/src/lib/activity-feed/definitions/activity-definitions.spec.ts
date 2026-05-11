@@ -223,7 +223,10 @@ describe('API activity definitions context rendering', () => {
       }),
     );
     const feedback = feedbackDefinition!.render(
-      makeEvent('session.feedback_request.sent', {}),
+      makeEvent('session.feedback_request.sent', {
+        scheduleId: 'schedule-1',
+        occurrenceStart: '2026-05-07T14:00:00.000Z',
+      }),
     );
 
     expect(reminderDefinition?.tabKey).toBe('classes');
@@ -247,7 +250,7 @@ describe('API activity definitions context rendering', () => {
     });
     expect(feedback.leading).toMatchObject({
       kind: 'icon',
-      iconKey: 'MessageSquareHeart',
+      iconKey: 'Star',
       tone: 'info',
     });
     expect(feedback.headline.primary).toBe('Share feedback for Algebra I');
@@ -257,6 +260,16 @@ describe('API activity definitions context rendering', () => {
     expect(feedback.summary).toBe('Tell us how the session went');
     expect(feedback.expandedContent).toBeUndefined();
     expect(feedback.actionButton?.label).toBe('Give feedback');
+    expect(feedback.metadata).toMatchObject({
+      sourceEventId: 'event-session.feedback_request.sent',
+      classSessionId: 'schedule-1',
+      classroomId: 'space-1',
+      channelId: 'channel-1',
+      learningSpaceId: 'space-1',
+      scheduleId: 'schedule-1',
+      occurrenceStart: '2026-05-07T14:00:00.000Z',
+      feedbackUiEnabled: true,
+    });
   });
 
   it('only sets session expanded content when payload content exists', () => {

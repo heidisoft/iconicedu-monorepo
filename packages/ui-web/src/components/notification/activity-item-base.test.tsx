@@ -128,4 +128,55 @@ describe('ActivityItemBase', () => {
 
     expect(screen.queryByText('Preview from projected content')).not.toBeInTheDocument();
   });
+
+  it('renders feedback rating controls in the preview slot for feedback requests', () => {
+    const activity = {
+      ...createActivity(),
+      kind: 'leaf',
+      verb: 'session.feedback_request.sent',
+      content: {
+        ...createActivity().content,
+        summary: 'Tell us how the session went',
+      },
+      metadata: {
+        feedbackUiEnabled: true,
+        sourceEventId: 'event-1',
+        classSessionId: 'session-1',
+        classroomId: 'space-1',
+        channelId: 'channel-1',
+      },
+    } as ActivityFeedItemVM;
+
+    render(<ActivityItemBase activity={activity} onMarkRead={vi.fn()} />);
+
+    expect(screen.getByText('Rate your session')).toBeInTheDocument();
+    expect(screen.queryByText('Tell us how the session went')).not.toBeInTheDocument();
+  });
+
+  it('allows feedback requests that use schedule and learning space metadata aliases', () => {
+    const activity = {
+      ...createActivity(),
+      kind: 'leaf',
+      verb: 'session.feedback_request.sent',
+      content: {
+        ...createActivity().content,
+        summary: 'Tell us how the session went',
+      },
+      metadata: {
+        feedbackUiEnabled: true,
+        sourceEventId: 'event-1',
+        scheduleId: 'session-1',
+        learningSpaceId: 'space-1',
+        channelId: 'channel-1',
+        startAt: '2026-03-19T22:00:00.000Z',
+      },
+    } as ActivityFeedItemVM;
+
+    render(<ActivityItemBase activity={activity} onMarkRead={vi.fn()} />);
+
+    expect(screen.getByText('Rate your session')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Feedback is unavailable for this session.'),
+    ).not.toBeInTheDocument();
+  });
 });

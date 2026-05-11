@@ -157,6 +157,36 @@ describe('useNotificationHandler', () => {
     });
   });
 
+  it('routes feedback request taps to the specific inbox activity', async () => {
+    renderHook(() => useNotificationHandler());
+
+    await waitFor(() => {
+      expect(mockAddNotificationResponseReceivedListener).toHaveBeenCalled();
+    });
+
+    const listener = mockAddNotificationResponseReceivedListener.mock.calls[0][0];
+    listener({
+      notification: {
+        request: {
+          content: {
+            data: {
+              prefKey: 'session.feedback_request.sent',
+              activityFeedItemId: 'feed-1',
+              orgId: 'org-1',
+            },
+          },
+        },
+      },
+    });
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith('/(app)/(tabs)/inbox?activityId=feed-1');
+      expect(mockMarkActivityFeedRead).toHaveBeenCalledWith('org-1', 'profile-1', [
+        'feed-1',
+      ]);
+    });
+  });
+
   it('does not register notification listeners when running in Expo Go', async () => {
     mockConstants.appOwnership = 'expo';
 

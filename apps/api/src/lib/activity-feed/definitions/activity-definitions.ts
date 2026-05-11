@@ -511,7 +511,70 @@ function renderReactionItem(event: ActivityEventRow) {
   } satisfies ActivityRenderResult;
 }
 
+type ScheduleRenderVariant = 'created' | 'ended';
 type SessionRenderVariant = 'rescheduled' | 'canceled' | 'reminder' | 'feedback';
+
+function renderScheduleItem(event: ActivityEventRow, variant: ScheduleRenderVariant) {
+  const payload = asRecord(event.payload);
+  const classTitle =
+    getActivityContext(payload).classTitle ?? getContextTitle(payload) ?? 'Class';
+  const roleContext = buildRoleContextLabel(payload);
+  const startAt = firstOptionalString(payload.startAt, payload.firstSessionStartAt);
+  const endAt = firstOptionalString(payload.recurrenceUntil, payload.until);
+  const startLabel = formatSessionDateTime(startAt, payload);
+  const endLabel = formatSessionDateTime(endAt, payload);
+
+  const config = {
+    created: {
+      verb: 'class.schedule.created' as const,
+      iconKey: 'CalendarCheck' as const,
+      tone: 'info' as const,
+      secondary: joinSecondaryParts([
+        'new schedule added',
+        roleContext,
+        startLabel ? `Starts ${startLabel}` : undefined,
+      ]),
+      summary: startLabel
+        ? `${classTitle} has a new schedule starting ${startLabel}`
+        : `${classTitle} has a new schedule`,
+    },
+    ended: {
+      verb: 'class.schedule.ended' as const,
+      iconKey: 'CalendarX' as const,
+      tone: 'warning' as const,
+      secondary: joinSecondaryParts([
+        'schedule end date set',
+        roleContext,
+        endLabel ? `Ends ${endLabel}` : undefined,
+      ]),
+      summary: endLabel
+        ? `${classTitle} schedule now ends ${endLabel}`
+        : `${classTitle} schedule has an end date`,
+    },
+  }[variant];
+
+  return {
+    verb: config.verb,
+    leading: { kind: 'icon', iconKey: config.iconKey, tone: config.tone },
+    headline: {
+      primary: classTitle,
+      secondary: config.secondary,
+      secondaryHref: buildInboxSourceHref(event, payload),
+    },
+    summary: config.summary,
+    preview: { text: config.summary },
+    actionButton: sourceAction(event, payload, 'outline', 'Open class'),
+    metadata: {
+      ...buildCommonContextMetadata(payload),
+      roleContext,
+      channelId: asOptionalString(payload.channelId),
+      learningSpaceId: asOptionalString(payload.learningSpaceId),
+      scheduleId: asOptionalString(payload.scheduleId),
+      startAt,
+      endAt,
+    },
+  } satisfies ActivityRenderResult;
+}
 
 function renderSessionItem(event: ActivityEventRow, variant: SessionRenderVariant) {
   const payload = asRecord(event.payload);
@@ -613,7 +676,7 @@ function renderSessionItem(event: ActivityEventRow, variant: SessionRenderVarian
     },
     feedback: {
       verb: 'session.feedback_request.sent' as const,
-      iconKey: 'MessageSquareHeart' as const,
+      iconKey: 'Star' as const,
       tone: 'info' as const,
       primary: `Share feedback for ${classTitle}`,
       secondary: joinSecondaryParts([
@@ -644,6 +707,26 @@ function renderSessionItem(event: ActivityEventRow, variant: SessionRenderVarian
     metadata: {
       ...buildCommonContextMetadata(payload),
       roleContext,
+      ...(variant === 'feedback'
+        ? {
+            sourceEventId: event.id,
+            classSessionId: firstOptionalString(
+              payload.classSessionId,
+              payload.sourceSessionId,
+              payload.scheduleId,
+            ),
+            classroomId: firstOptionalString(
+              payload.classroomId,
+              payload.learningSpaceId,
+            ),
+            occurrenceStart: firstOptionalString(
+              payload.occurrenceStart,
+              payload.startAt,
+              sessionStartAt,
+            ),
+            feedbackUiEnabled: payload.feedbackUiEnabled !== false,
+          }
+        : {}),
       channelId: asOptionalString(payload.channelId),
       learningSpaceId: asOptionalString(payload.learningSpaceId),
       scheduleId: asOptionalString(payload.scheduleId),
@@ -737,6 +820,28 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     },
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => renderReactionItem(event),
+  },
+  'class.schedule.created': {
+    eventType: 'class.schedule.created',
+    tabKey: 'classes',
+    importance: 'important',
+    notification: {
+      defaultChannels: ['push', 'email'],
+      timing: 'immediate',
+    },
+    resolveRecipients: DEFAULT_RECIPIENTS,
+    render: (event) => renderScheduleItem(event, 'created'),
+  },
+  'class.schedule.ended': {
+    eventType: 'class.schedule.ended',
+    tabKey: 'classes',
+    importance: 'important',
+    notification: {
+      defaultChannels: ['push', 'email'],
+      timing: 'immediate',
+    },
+    resolveRecipients: DEFAULT_RECIPIENTS,
+    render: (event) => renderScheduleItem(event, 'ended'),
   },
   'class.session.rescheduled': {
     eventType: 'class.session.rescheduled',

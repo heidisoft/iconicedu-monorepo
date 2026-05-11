@@ -14,6 +14,8 @@ describe('ActivityVerbVM', () => {
     expectTypeOf<'image.uploaded'>().toMatchTypeOf<ActivityVerbVM>();
     expectTypeOf<'audio.uploaded'>().toMatchTypeOf<ActivityVerbVM>();
     expectTypeOf<'reaction.added'>().toMatchTypeOf<ActivityVerbVM>();
+    expectTypeOf<'class.schedule.created'>().toMatchTypeOf<ActivityVerbVM>();
+    expectTypeOf<'class.schedule.ended'>().toMatchTypeOf<ActivityVerbVM>();
     expectTypeOf<'class.session.rescheduled'>().toMatchTypeOf<ActivityVerbVM>();
     expectTypeOf<'class.session.canceled'>().toMatchTypeOf<ActivityVerbVM>();
     expectTypeOf<'session.reminder.sent'>().toMatchTypeOf<ActivityVerbVM>();

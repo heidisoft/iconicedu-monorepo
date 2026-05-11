@@ -1,5 +1,5 @@
 import React from 'react';
-import { Linking, Share } from 'react-native';
+import { Linking, Share, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { SessionCard, type ClassSession } from './session-card';
 
@@ -107,6 +107,28 @@ describe('SessionCard', () => {
     render(<SessionCard session={baseSession} />);
     expect(screen.getByText('Mar · Week 2')).toBeTruthy();
     expect(screen.getByText('2:30 PM')).toBeTruthy();
+  });
+
+  it('keeps the default session tile title size', () => {
+    render(<SessionCard session={baseSession} />);
+
+    expect(
+      StyleSheet.flatten(screen.getByText('Mar · Week 2').props.style),
+    ).toMatchObject({
+      fontSize: 14,
+      fontWeight: '600',
+    });
+  });
+
+  it('can match the message list session title style', () => {
+    render(<SessionCard session={baseSession} titleVariant="message-list" />);
+
+    expect(
+      StyleSheet.flatten(screen.getByText('Mar · Week 2').props.style),
+    ).toMatchObject({
+      fontSize: 17,
+      fontWeight: '700',
+    });
   });
 
   it('renders grouped educator and student names with icons', () => {

@@ -19,10 +19,15 @@ import {
   MessageSquareReply,
   MessagesSquare,
   SmilePlus,
+  Star,
 } from 'lucide-react';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 import { ActivityBadge } from '@iconicedu/ui-web/components/notification/activity-badge';
+import {
+  ActivityFeedbackRequest,
+  canRenderActivityFeedbackRequest,
+} from '@iconicedu/ui-web/components/notification/activity-feedback-request';
 import { ActivityWithButton } from '@iconicedu/ui-web/components/notification/activity-with-button';
 import type { ActivityFeedItemVM, InboxIconKeyVM } from '@iconicedu/shared-types';
 
@@ -61,6 +66,7 @@ const INBOX_ICON_MAP: Record<
   MessageSquareReply,
   MessagesSquare,
   SmilePlus,
+  Star,
 };
 
 const TONE_CLASSNAMES = {
@@ -87,6 +93,10 @@ const getDefaultIconKey = (activity: ActivityFeedItemVM): InboxIconKeyVM => {
       return 'FileHeadphone';
     case 'reaction.added':
       return 'SmilePlus';
+    case 'class.schedule.created':
+      return 'CalendarCheck';
+    case 'class.schedule.ended':
+      return 'CalendarX';
     case 'class.session.rescheduled':
       return 'CalendarCheck';
     case 'class.session.canceled':
@@ -94,7 +104,7 @@ const getDefaultIconKey = (activity: ActivityFeedItemVM): InboxIconKeyVM => {
     case 'session.reminder.sent':
       return 'Bell';
     case 'session.feedback_request.sent':
-      return 'MessageSquareHeart';
+      return 'Star';
     default:
       return 'Bell';
   }
@@ -153,6 +163,10 @@ export function ActivityItemBase({
     activity.content.actionButton?.href ??
     undefined;
   const previewText = getActivityPreviewText(activity);
+  const canShowFeedbackRequest =
+    activity.kind === 'leaf' &&
+    activity.verb === 'session.feedback_request.sent' &&
+    canRenderActivityFeedbackRequest(activity);
   const rootRef = useRef<HTMLDivElement>(null);
   const autoReadTriggeredRef = useRef(false);
 
@@ -306,7 +320,9 @@ export function ActivityItemBase({
 
           {showActionButton && <ActivityWithButton activity={activity} />}
 
-          {previewText ? (
+          {canShowFeedbackRequest ? (
+            <ActivityFeedbackRequest activity={activity} />
+          ) : previewText ? (
             <p className="text-xs text-muted-foreground">{previewText}</p>
           ) : null}
 

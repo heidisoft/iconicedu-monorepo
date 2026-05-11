@@ -870,6 +870,7 @@ export default function HomeScreen() {
                     key={session.id}
                     session={session}
                     pressTarget="messages"
+                    titleVariant="message-list"
                   />
                 ))}
               </View>
@@ -913,7 +914,12 @@ export default function HomeScreen() {
           ) : thisWeekSessions.length > 0 ? (
             <View style={{ gap: 6 }}>
               {thisWeekSessions.map((session) => (
-                <SessionCard key={session.id} session={session} pressTarget="messages" />
+                <SessionCard
+                  key={session.id}
+                  session={session}
+                  pressTarget="messages"
+                  titleVariant="message-list"
+                />
               ))}
             </View>
           ) : (
@@ -968,6 +974,7 @@ export default function HomeScreen() {
                   key={session.id}
                   session={session}
                   pressTarget="messages"
+                  titleVariant="message-list"
                   showJoinButton={false}
                 />
               ))}

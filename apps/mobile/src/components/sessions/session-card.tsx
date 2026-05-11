@@ -193,6 +193,7 @@ const hairline = StyleSheet.hairlineWidth;
 export function SessionCard({
   session,
   style,
+  titleVariant = 'default',
   showJoinButton = true,
   joinEnabled = true,
   pressTarget = 'sessions',
@@ -201,6 +202,7 @@ export function SessionCard({
 }: {
   session: ClassSession;
   style?: ViewStyle;
+  titleVariant?: 'default' | 'message-list';
   showJoinButton?: boolean;
   joinEnabled?: boolean;
   pressTarget?: 'sessions' | 'messages';
@@ -353,10 +355,16 @@ export function SessionCard({
 
         {/* Info */}
         <View style={s.sessionInfo}>
-          <View style={s.sessionTitleRow}>
+          <View
+            style={[
+              s.sessionTitleRow,
+              titleVariant === 'message-list' && s.sessionTitleRowMessageList,
+            ]}
+          >
             <Text
               style={[
                 s.sessionLabel,
+                titleVariant === 'message-list' && s.sessionLabelMessageList,
                 { color: colors.text },
                 (isDisabled || isPast) && { color: colors.textMuted },
               ]}
@@ -717,9 +725,16 @@ const s = StyleSheet.create({
     gap: 4,
     flexWrap: 'wrap',
   },
+  sessionTitleRowMessageList: {
+    marginBottom: 2,
+  },
   sessionLabel: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  sessionLabelMessageList: {
+    fontSize: 17,
+    fontWeight: '700',
   },
   sessionTimeRow: {
     flexDirection: 'row',
