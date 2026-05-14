@@ -1,4 +1,11 @@
-import type { ClassScheduleVM, UserProfileVM } from '@iconicedu/shared-types';
+import type {
+  ClassScheduleVM,
+  ClassScheduleParticipantVM,
+  ClassSchedulePatchVM,
+  EventSourceVM,
+  RecurrenceVM,
+  UserProfileVM,
+} from '@iconicedu/shared-types';
 import {
   getResolvedScheduleDisplayMonthKey,
   getScheduleDisplayStartOfDay,
@@ -9,9 +16,7 @@ import {
   toMonthGroups,
   type ClassSession,
 } from '@iconicedu/ui-web/components/messages/tabs/messages-schedule-tab.utils';
-import { buildClassSchedulesByOrg } from '@iconicedu/web/lib/schedules/builders/class-schedule.builder';
-import { getLearningSpacesByOrg } from '@iconicedu/web/lib/spaces/queries/learning-spaces.query';
-import { getLearningSpaceParticipantsByLearningSpaceIds } from '@iconicedu/web/lib/spaces/queries/learning-space-relations.query';
+import { createApiClient } from '@iconicedu/web/lib/api/http-client';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 export type DashboardInfographicRole = 'parents' | 'students' | 'tutors';
@@ -296,6 +301,127 @@ function countActiveUpcomingSessions(
   return section.items.filter((item) => item.session.status !== 'cancelled').length;
 }
 
+type ApiSpaceRow = {
+  id: string;
+  status: string | null;
+  subject: string | null;
+  title: string | null;
+};
+
+function mapApiSpaceRow(row: Record<string, unknown>): ApiSpaceRow {
+  return {
+    id: row.id as string,
+    status: (row.status as string | null) ?? null,
+    subject: (row.subject as string | null) ?? null,
+    title: (row.title as string | null) ?? null,
+  };
+}
+
+function mapApiScheduleRow(row: Record<string, unknown>): ClassScheduleVM {
+  const orgId = row.org_id as string;
+  const recurrenceRows = row.recurrence as Record<string, unknown>[] | null;
+  const recurrenceRow = recurrenceRows?.[0];
+
+  const recurrence: RecurrenceVM | undefined = recurrenceRow
+    ? {
+        ids: { id: recurrenceRow.id as string, orgId },
+        rule: {
+          frequency: recurrenceRow.frequency as RecurrenceVM['rule']['frequency'],
+          interval: (recurrenceRow.interval as number | null) ?? undefined,
+          byWeekday:
+            (recurrenceRow.byday as
+              | string[]
+              | null as RecurrenceVM['rule']['byWeekday']) ?? undefined,
+          count: (recurrenceRow.count as number | null) ?? undefined,
+          until: (recurrenceRow.until as string | null) ?? undefined,
+          timezone: (recurrenceRow.timezone as string | null) ?? undefined,
+        },
+        exceptions: ((recurrenceRow.exceptions as Record<string, unknown>[]) ?? []).map(
+          (ex) => ({
+            occurrenceKey: ex.occurrence_key as string,
+            reason: (ex.reason as string | null) ?? undefined,
+          }),
+        ),
+        overrides: ((recurrenceRow.overrides as Record<string, unknown>[]) ?? []).map(
+          (ov) => ({
+            occurrenceKey: ov.occurrence_key as string,
+            patch: ov.patch as ClassSchedulePatchVM,
+          }),
+        ),
+      }
+    : undefined;
+
+  const sourceLearningSpace = row.source_learning_space as {
+    archived_at?: string | null;
+    status?: string | null;
+  } | null;
+  const sourceKind = row.source_kind as string;
+
+  let source: EventSourceVM;
+  if (sourceKind === 'class_session') {
+    source = {
+      kind: 'class_session',
+      learningSpaceId: row.source_learning_space_id as string,
+      channelId: (row.source_channel_id as string | null) ?? undefined,
+      sessionId: (row.source_session_id as string | null) ?? undefined,
+      archivedAt: sourceLearningSpace?.archived_at ?? null,
+      learningSpaceStatus: sourceLearningSpace?.status ?? null,
+    };
+  } else if (sourceKind === 'availability_block') {
+    source = {
+      kind: 'availability_block',
+      ownerUserId: row.source_owner_user_id as string,
+    };
+  } else {
+    source = {
+      kind: 'manual',
+      createdByUserId: row.source_created_by_user_id as string,
+      relatedTo: row.source_related_learning_space_id
+        ? { kind: 'learning_space', id: row.source_related_learning_space_id as string }
+        : undefined,
+    };
+  }
+
+  const participants: ClassScheduleParticipantVM[] = (
+    (row.participants as Record<string, unknown>[]) ?? []
+  ).map((p) => ({
+    ids: { id: p.profile_id as string, orgId },
+    role: p.role as ClassScheduleParticipantVM['role'],
+    status: (p.status as ClassScheduleParticipantVM['status'] | null) ?? undefined,
+    displayName: (p.display_name as string | null) ?? undefined,
+    avatarUrl: (p.avatar_url as string | null) ?? null,
+    themeKey: (p.theme_key as ClassScheduleParticipantVM['themeKey'] | null) ?? undefined,
+  }));
+
+  return {
+    ids: { id: row.id as string, orgId },
+    title: row.title as string,
+    description: (row.description as string | null) ?? null,
+    location: (row.location as string | null) ?? null,
+    meetingLink: (row.meeting_link as string | null) ?? null,
+    startAt: row.start_at as string,
+    endAt: row.end_at as string,
+    timezone: (row.timezone as string | null) ?? undefined,
+    status: row.status as ClassScheduleVM['status'],
+    visibility: row.visibility as ClassScheduleVM['visibility'],
+    themeKey: (row.theme_key as ClassScheduleVM['themeKey'] | null) ?? undefined,
+    participants,
+    source,
+    recurrence,
+    audit: {
+      createdAt: row.created_at as string,
+      createdBy: row.created_by as string,
+      updatedAt: (row.updated_at as string | null) ?? undefined,
+      updatedBy: (row.updated_by as string | null) ?? undefined,
+    },
+  };
+}
+
+function getLearningSpaceIdFromSchedule(schedule: ClassScheduleVM): string | null {
+  if (schedule.source.kind !== 'class_session') return null;
+  return 'learningSpaceId' in schedule.source ? schedule.source.learningSpaceId : null;
+}
+
 async function buildActiveRoleMetrics(input: {
   supabase: SupabaseClient;
   orgId: string;
@@ -314,32 +440,21 @@ async function buildActiveRoleMetrics(input: {
     return {
       metrics: cloneZeroMetrics(),
       upcomingSessionsPage: {
-        today: {
-          items: [],
-          total: 0,
-          pageSize: input.pageSize,
-          totalPages: 1,
-        },
-        thisWeek: {
-          items: [],
-          total: 0,
-          pageSize: input.pageSize,
-          totalPages: 1,
-        },
-        nextWeek: {
-          items: [],
-          total: 0,
-          pageSize: input.pageSize,
-          totalPages: 1,
-        },
+        today: { items: [], total: 0, pageSize: input.pageSize, totalPages: 1 },
+        thisWeek: { items: [], total: 0, pageSize: input.pageSize, totalPages: 1 },
+        nextWeek: { items: [], total: 0, pageSize: input.pageSize, totalPages: 1 },
       },
     };
   }
 
-  const [schedules, learningSpaceResponse] = await Promise.all([
-    buildClassSchedulesByOrg(input.supabase, input.orgId),
-    getLearningSpacesByOrg(input.supabase, input.orgId),
+  const apiClient = createApiClient(input.supabase);
+  const [rawSchedules, rawSpaces] = await Promise.all([
+    apiClient.get<Record<string, unknown>[]>('/schedules', { orgId: input.orgId }),
+    apiClient.get<Record<string, unknown>[]>('/spaces', { orgId: input.orgId }),
   ]);
+
+  const schedules = (rawSchedules ?? []).map(mapApiScheduleRow);
+  const allSpaces = (rawSpaces ?? []).map(mapApiSpaceRow);
 
   const scopedSchedules = input.isStaffView
     ? schedules.filter((schedule) => schedule.source.kind === 'class_session')
@@ -353,24 +468,9 @@ async function buildActiveRoleMetrics(input: {
     return {
       metrics: cloneZeroMetrics(),
       upcomingSessionsPage: {
-        today: {
-          items: [],
-          total: 0,
-          pageSize: input.pageSize,
-          totalPages: 1,
-        },
-        thisWeek: {
-          items: [],
-          total: 0,
-          pageSize: input.pageSize,
-          totalPages: 1,
-        },
-        nextWeek: {
-          items: [],
-          total: 0,
-          pageSize: input.pageSize,
-          totalPages: 1,
-        },
+        today: { items: [], total: 0, pageSize: input.pageSize, totalPages: 1 },
+        thisWeek: { items: [], total: 0, pageSize: input.pageSize, totalPages: 1 },
+        nextWeek: { items: [], total: 0, pageSize: input.pageSize, totalPages: 1 },
       },
     };
   }
@@ -403,52 +503,38 @@ async function buildActiveRoleMetrics(input: {
   const completedClassesThisMonth =
     monthProgressStatsByKey.get(currentMonthKey)?.completedCount ?? 0;
 
-  const learningSpaces = learningSpaceResponse.data ?? [];
-  const activeLearningSpaces = learningSpaces.filter(
-    (space) => space.status === 'active',
-  );
-  const learningSpaceIds = activeLearningSpaces.map((space) => space.id);
+  const activeLearningSpaces = allSpaces.filter((space) => space.status === 'active');
+  const activeLearningSpaceIds = new Set(activeLearningSpaces.map((space) => space.id));
 
   const activeSubjects = input.isStaffView
     ? activeLearningSpaces
         .map((space) => space.title?.trim())
         .filter((title): title is string => Boolean(title))
-    : await (async () => {
-        const participantsResponse = await getLearningSpaceParticipantsByLearningSpaceIds(
-          input.supabase,
-          input.orgId,
-          learningSpaceIds,
-        );
-
-        const participantSpaceIds = new Set(
-          (participantsResponse.data ?? [])
-            .filter((row) => input.scopedProfileIds.has(row.profile_id))
-            .map((row) => row.learning_space_id),
-        );
-
-        return Array.from(
-          new Set(
-            activeLearningSpaces
-              .filter((space) => participantSpaceIds.has(space.id))
-              .map((space) => space.subject?.trim())
-              .filter((subject): subject is string => Boolean(subject)),
-          ),
-        );
-      })();
+    : Array.from(
+        new Set(
+          scopedSchedules.flatMap((schedule) => {
+            const learningSpaceId = getLearningSpaceIdFromSchedule(schedule);
+            if (!learningSpaceId || !activeLearningSpaceIds.has(learningSpaceId)) {
+              return [];
+            }
+            const space = activeLearningSpaces.find(
+              (candidate) => candidate.id === learningSpaceId,
+            );
+            const subject = space?.subject?.trim();
+            return subject ? [subject] : [];
+          }),
+        ),
+      );
 
   const activeStudentsCount =
     input.activeRole === 'tutors'
       ? (() => {
-          const activeLearningSpaceIdSet = new Set(learningSpaceIds);
           const activeStudentIds = new Set<string>();
 
           scopedSchedules.forEach((schedule) => {
-            if (schedule.source.kind !== 'class_session') {
-              return;
-            }
-            if (!activeLearningSpaceIdSet.has(schedule.source.learningSpaceId)) {
-              return;
-            }
+            if (schedule.source.kind !== 'class_session') return;
+            const learningSpaceId = getLearningSpaceIdFromSchedule(schedule);
+            if (!learningSpaceId || !activeLearningSpaceIds.has(learningSpaceId)) return;
 
             schedule.participants.forEach((participant) => {
               if (participant.role === 'child') {
