@@ -197,6 +197,12 @@ export interface MonthProgressStats {
   completedCount: number;
 }
 
+export interface ScheduleDisplayRange {
+  rangeStart: Date;
+  rangeEnd: Date;
+  timezone?: string | null;
+}
+
 function isScheduleCompletedForProgress(schedule: DisplaySchedule, now: Date): boolean {
   if (schedule.status === 'completed') {
     return true;
@@ -246,23 +252,66 @@ function getRecurringDisplayRange(schedules: ClassScheduleVM[], now: Date) {
   };
 }
 
+function startOfDisplayMonth(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function endOfDisplayMonth(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
+}
+
+export function getScheduleDisplayMonthRange(
+  inputs: Array<Date | string>,
+  timezone?: string | null,
+): ScheduleDisplayRange {
+  const displayDates = inputs
+    .map((input) => toScheduleDisplayDate(input, timezone) ?? new Date(input))
+    .filter((date) => Number.isFinite(date.getTime()));
+
+  const dates = displayDates.length ? displayDates : [new Date()];
+  const min = dates.reduce((currentMin, date) => (date < currentMin ? date : currentMin));
+  const max = dates.reduce((currentMax, date) => (date > currentMax ? date : currentMax));
+
+  return {
+    rangeStart: startOfDisplayMonth(min),
+    rangeEnd: endOfDisplayMonth(max),
+    timezone,
+  };
+}
+
 export function expandSchedulesForDisplay(
   schedules: ClassScheduleVM[],
   now = new Date(),
+  range?: ScheduleDisplayRange,
 ): DisplaySchedule[] {
   const recurring = schedules.filter((schedule) => schedule.recurrence);
   const nonRecurring = schedules.filter((schedule) => !schedule.recurrence);
-  const normalizedNonRecurring: DisplaySchedule[] = nonRecurring.map((schedule) => ({
-    ...schedule,
-    description: null,
-    uiState: { kind: 'default' },
-  }));
+  const rangeStart = range?.rangeStart;
+  const rangeEnd = range?.rangeEnd;
+  const normalizedNonRecurring: DisplaySchedule[] = nonRecurring
+    .filter((schedule) => {
+      if (!rangeStart || !rangeEnd) return true;
+      const scheduleStart = getScheduleDisplayStartOfDay(
+        schedule.startAt,
+        getScheduleDisplayTimezoneInput(schedule, range.timezone),
+      ).getTime();
+      return scheduleStart >= rangeStart.getTime() && scheduleStart <= rangeEnd.getTime();
+    })
+    .map((schedule) => ({
+      ...schedule,
+      description: null,
+      uiState: { kind: 'default' },
+    }));
   if (!recurring.length) {
     return applyArchiveCutoffToDisplaySchedules(normalizedNonRecurring);
   }
 
-  const { rangeStart, rangeEnd } = getRecurringDisplayRange(schedules, now);
-  const expandedRecurring = expandRecurringEvents(recurring, rangeStart, rangeEnd);
+  const displayRange = range ?? getRecurringDisplayRange(schedules, now);
+  const expandedRecurring = expandRecurringEvents(
+    recurring,
+    displayRange.rangeStart,
+    displayRange.rangeEnd,
+  );
   const recurringById = new Map(recurring.map((item) => [item.ids.id, item]));
   const normalizedRecurring: DisplaySchedule[] = expandedRecurring.map((schedule) => {
     if (schedule.uiState?.kind) {
@@ -323,8 +372,9 @@ export function expandSchedulesForDisplay(
 export function splitSchedulesByTimeline(
   schedules: ClassScheduleVM[],
   now = new Date(),
+  range?: ScheduleDisplayRange,
 ): ScheduleBuckets {
-  const expandedSchedules = expandSchedulesForDisplay(schedules, now);
+  const expandedSchedules = expandSchedulesForDisplay(schedules, now, range);
   const nowMs = now.getTime();
   const upcoming: DisplaySchedule[] = [];
   const past: DisplaySchedule[] = [];

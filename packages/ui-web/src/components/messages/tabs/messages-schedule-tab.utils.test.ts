@@ -13,6 +13,7 @@ import {
   groupSchedulesByMonth,
   formatScheduleStatus,
   formatScheduleWeekTitle,
+  getScheduleDisplayMonthRange,
   splitSchedulesByTimeline,
   takeMonthGroups,
   toMonthGroups,
@@ -322,6 +323,49 @@ describe('messages-schedule-tab.utils', () => {
           item.startAt.startsWith('2026-01-01T10:00:00.000Z'),
       ),
     ).toBe(true);
+  });
+
+  it('can read multiple schedules from an explicit month range after an older recurrence ended', () => {
+    const dailyEnded = {
+      ...buildSchedule('daily-ended', '2026-03-01T10:00:00.000Z'),
+      recurrence: {
+        ids: { id: 'daily-ended-rec', orgId: 'org-1' },
+        rule: {
+          frequency: 'daily' as const,
+          interval: 1,
+          until: '2026-03-05T23:59:59.000Z',
+        },
+      },
+    };
+    const weeklyReplacement = {
+      ...buildSchedule('weekly-replacement', '2026-03-11T12:00:00.000Z'),
+      recurrence: {
+        ids: { id: 'weekly-replacement-rec', orgId: 'org-1' },
+        rule: {
+          frequency: 'weekly' as const,
+          interval: 1,
+          byWeekday: ['WE', 'FR'],
+        },
+      },
+    };
+    const oneOffInMonth = buildSchedule('one-off-march', '2026-03-14T10:00:00.000Z');
+    const oneOffOutOfMonth = buildSchedule('one-off-april', '2026-04-01T10:00:00.000Z');
+    const range = getScheduleDisplayMonthRange([new Date('2026-03-13T12:00:00.000Z')]);
+
+    const { upcoming } = splitSchedulesByTimeline(
+      [dailyEnded, weeklyReplacement, oneOffInMonth, oneOffOutOfMonth],
+      new Date('2026-03-13T09:00:00.000Z'),
+      range,
+    );
+
+    expect(upcoming.map((item) => item.ids.id)).toEqual([
+      'weekly-replacement__2026-03-13T12:00:00.000Z',
+      'one-off-march',
+      'weekly-replacement__2026-03-18T12:00:00.000Z',
+      'weekly-replacement__2026-03-20T12:00:00.000Z',
+      'weekly-replacement__2026-03-25T12:00:00.000Z',
+      'weekly-replacement__2026-03-27T12:00:00.000Z',
+    ]);
   });
 
   it('groups schedules by month in encounter order', () => {

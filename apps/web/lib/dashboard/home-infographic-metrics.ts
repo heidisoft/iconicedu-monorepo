@@ -10,6 +10,7 @@ import {
   getResolvedScheduleDisplayMonthKey,
   getScheduleDisplayStartOfDay,
   getScheduleDisplayStartOfWeek,
+  getScheduleDisplayMonthRange,
   getMonthProgressStatsByKey,
   groupSchedulesByMonth,
   splitSchedulesByTimeline,
@@ -475,15 +476,24 @@ async function buildActiveRoleMetrics(input: {
     };
   }
 
-  const timelineBuckets = splitSchedulesByTimeline(scopedSchedules, input.now);
   const displayNow = getScheduleDisplayStartOfDay(input.now, input.timezone ?? null);
   const weekStartDate = getScheduleDisplayStartOfWeek(displayNow, input.timezone ?? null);
   const weekStartMs = weekStartDate.getTime();
-  const nextWeekEndMs = (() => {
+  const nextWeekEndDate = (() => {
     const nextWeekEnd = endOfWeekSunday(weekStartDate);
     nextWeekEnd.setDate(nextWeekEnd.getDate() + 7);
-    return nextWeekEnd.getTime();
+    return nextWeekEnd;
   })();
+  const nextWeekEndMs = nextWeekEndDate.getTime();
+  const scheduleReadRange = getScheduleDisplayMonthRange(
+    [input.now, nextWeekEndDate],
+    input.timezone ?? null,
+  );
+  const timelineBuckets = splitSchedulesByTimeline(
+    scopedSchedules,
+    input.now,
+    scheduleReadRange,
+  );
   const upcomingSchedulesThisAndNextWeek = timelineBuckets.upcoming.filter((schedule) => {
     const scheduleDayMs = getScheduleDisplayStartOfDay(
       schedule.startAt,

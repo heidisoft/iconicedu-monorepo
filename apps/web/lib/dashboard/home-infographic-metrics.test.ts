@@ -742,4 +742,85 @@ describe('buildDashboardHomeInfographicMetrics', () => {
       ),
     ).toBe(true);
   });
+
+  it('counts upcoming one-off and replacement recurring rules after an older rule ended', async () => {
+    const endedRule = buildRawSchedule({
+      id: 'ended-daily-rule',
+      start_at: '2026-03-09T15:00:00.000Z',
+      end_at: '2026-03-09T16:00:00.000Z',
+      recurrence: [
+        {
+          id: 'rec-ended-daily',
+          org_id: 'org-1',
+          frequency: 'daily',
+          interval: 1,
+          count: null,
+          until: '2026-03-12T23:59:59.000Z',
+          timezone: 'UTC',
+          byday: null,
+          exceptions: [],
+          overrides: [],
+        },
+      ] satisfies RawRecurrence[],
+    });
+
+    const replacementRules = [
+      buildRawSchedule({
+        id: 'replacement-weekly-rule',
+        start_at: '2026-03-11T17:00:00.000Z',
+        end_at: '2026-03-11T18:00:00.000Z',
+        recurrence: [
+          {
+            id: 'rec-replacement-weekly',
+            org_id: 'org-1',
+            frequency: 'weekly',
+            interval: 1,
+            count: null,
+            until: null,
+            timezone: 'UTC',
+            byday: ['WE', 'FR'],
+            exceptions: [],
+            overrides: [],
+          },
+        ] satisfies RawRecurrence[],
+      }),
+      buildRawSchedule({
+        id: 'one-off-this-week',
+        start_at: '2026-03-14T15:00:00.000Z',
+        end_at: '2026-03-14T16:00:00.000Z',
+        recurrence: null,
+      }),
+    ];
+
+    mockApi(
+      [endedRule, ...replacementRules],
+      [{ id: 'space-1', status: 'active', subject: 'Math', title: null }],
+    );
+
+    const result = await buildDashboardHomeInfographicMetrics({
+      supabase: {} as never,
+      orgId: 'org-1',
+      orgSlug: 'iconic-academy',
+      now: NOW,
+      currentUserProfile: {
+        kind: 'child',
+        ids: { id: 'child-1', orgId: 'org-1', accountId: 'account-c1' },
+      } as never,
+    });
+
+    expect(result.metricsByRole.students.upcomingSessionsThisWeek).toBe(2);
+    expect(result.upcomingSessionsPage.today.items).toHaveLength(1);
+    expect(result.upcomingSessionsPage.thisWeek.items).toHaveLength(1);
+    expect(result.upcomingSessionsPage.nextWeek.items).toHaveLength(2);
+    expect(
+      result.upcomingSessionsPage.today.items.some((item) =>
+        item.session.id.includes('ended-daily-rule'),
+      ),
+    ).toBe(false);
+    expect(
+      result.upcomingSessionsPage.today.items.some((item) =>
+        item.session.id.includes('replacement-weekly-rule'),
+      ),
+    ).toBe(true);
+  });
 });
