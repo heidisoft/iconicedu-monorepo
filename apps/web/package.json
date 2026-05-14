@@ -30,7 +30,7 @@
     "@vercel/speed-insights": "^1.0.12",
     "flags": "^4.0.3",
     "jotai": "^2.18.0",
-    "next": "^15.5.15",
+    "next": "^15.5.18",
     "posthog-js": "^1.359.1",
     "react": "19.2.4",
     "react-dom": "19.2.4"
