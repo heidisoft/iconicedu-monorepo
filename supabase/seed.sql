@@ -202,27 +202,6 @@ ON CONFLICT DO NOTHING;
 
 
 --
--- Data for Name: auth_telemetry_events; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-INSERT INTO "public"."auth_telemetry_events" ("id", "org_id", "account_id", "auth_user_id", "event_key", "payload", "created_at") VALUES
-('b86a464c-2b31-4c5b-bef1-b2dff5ea1f30', '6d121c93-6deb-4130-8fb0-fb449999d21b', NULL, '209ad23e-3d3f-4e3e-890f-93f4ad490598', 'auth_success', '{"method": "token_hash"}', '2026-03-20 20:53:08.44497+00'),
-('a761c49d-5d7e-4ece-af38-68196454176a', '6d121c93-6deb-4130-8fb0-fb449999d21b', NULL, '694261dd-b89c-4a1f-bde5-d1b4700d8430', 'auth_success', '{"method": "token_hash"}', '2026-03-20 20:57:09.87773+00'),
-('588e3540-d4fb-4987-a28f-0a1892baf042', '6d121c93-6deb-4130-8fb0-fb449999d21b', NULL, '926b4c7c-df46-4ee1-9250-1fd0797239b8', 'auth_success', '{"method": "token_hash"}', '2026-03-20 20:59:13.827644+00'),
-('2cd88f42-18ff-4bcb-8242-38b12e4ad634', '6d121c93-6deb-4130-8fb0-fb449999d21b', NULL, '052935b9-f628-4bd6-9536-6e07030ad564', 'auth_success', '{"method": "token_hash"}', '2026-03-20 21:02:50.021523+00'),
-('30f9c970-c37e-431c-9feb-3cc9350e1f49', '6d121c93-6deb-4130-8fb0-fb449999d21b', NULL, 'd51bba27-0c02-4f5e-895f-34c76044aa76', 'auth_success', '{"method": "token_hash"}', '2026-03-20 21:06:49.59816+00'),
-('70a4e984-165f-4c82-84b5-88d3f797c53b', '6d121c93-6deb-4130-8fb0-fb449999d21b', 'e11bc035-57c9-4c7f-8190-a598edd44e48', '052935b9-f628-4bd6-9536-6e07030ad564', 'auth_success', '{"method": "token_hash"}', '2026-03-21 00:25:35.72115+00'),
-('c97b2191-0503-4a15-962a-8d83dc4db979', '6d121c93-6deb-4130-8fb0-fb449999d21b', '66bd5628-af1e-4bf4-9263-e0f097d388bd', '209ad23e-3d3f-4e3e-890f-93f4ad490598', 'auth_success', '{"method": "token_hash"}', '2026-03-21 07:54:51.283152+00'),
-('e633d06e-8279-4cf5-b9b8-29eab29005c4', '6d121c93-6deb-4130-8fb0-fb449999d21b', '66bd5628-af1e-4bf4-9263-e0f097d388bd', '209ad23e-3d3f-4e3e-890f-93f4ad490598', 'auth_success', '{"method": "token_hash"}', '2026-03-21 08:17:10.530084+00'),
-('a56855ae-b711-481b-815f-a3333d451550', '6d121c93-6deb-4130-8fb0-fb449999d21b', 'efb4fd26-82fa-45b8-a27c-f717a1749c87', 'd51bba27-0c02-4f5e-895f-34c76044aa76', 'auth_success', '{"method": "token_hash"}', '2026-03-21 08:41:07.85424+00'),
-('51f195e6-6b28-4fef-96e1-87deb768b001', '6d121c93-6deb-4130-8fb0-fb449999d21b', 'efb4fd26-82fa-45b8-a27c-f717a1749c87', 'd51bba27-0c02-4f5e-895f-34c76044aa76', 'auth_success', '{"method": "token_hash"}', '2026-03-21 08:42:13.58243+00'),
-('ef4a676c-8609-4602-9dc3-065749bc6eaa', '6d121c93-6deb-4130-8fb0-fb449999d21b', '66bd5628-af1e-4bf4-9263-e0f097d388bd', '209ad23e-3d3f-4e3e-890f-93f4ad490598', 'auth_success', '{"method": "token_hash"}', '2026-03-21 09:05:19.003422+00'),
-('7d3439b4-07e3-4ad9-a54f-c110fd00d6a2', '6d121c93-6deb-4130-8fb0-fb449999d21b', '66bd5628-af1e-4bf4-9263-e0f097d388bd', '209ad23e-3d3f-4e3e-890f-93f4ad490598', 'auth_success', '{"method": "token_hash"}', '2026-03-21 09:06:17.433665+00')
-ON CONFLICT DO NOTHING;
-
-
-
---
 -- Data for Name: channels; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
