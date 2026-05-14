@@ -83,14 +83,71 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSessionExpiryMessage(null);
   }, []);
 
+  const clearLocalSession = useCallback(async () => {
+    setSession(null);
+    onboardingCompleteRef.current = null;
+    backgroundedAtRef.current = null;
+    analytics.reset();
+    try {
+      await supabase.auth.signOut({ scope: 'local' });
+    } catch (error) {
+      reportObservedError({
+        error,
+        source: 'mobile.auth.clear_local_session',
+        message: 'Failed to clear local Supabase session',
+      });
+    }
+  }, [analytics]);
+
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
-      setSession(s);
-      if (s?.user) {
-        analytics.identify(s.user.id, { email: s.user.email });
+    let cancelled = false;
+
+    async function bootstrapSession() {
+      try {
+        const {
+          data: { session: s },
+        } = await supabase.auth.getSession();
+
+        if (!s) {
+          if (!cancelled) {
+            setSession(null);
+            setLoading(false);
+          }
+          return;
+        }
+
+        const {
+          data: { user },
+          error,
+        } = await supabase.auth.getUser();
+
+        if (error || !user) {
+          if (!cancelled) {
+            await clearLocalSession();
+            setLoading(false);
+          }
+          return;
+        }
+
+        if (!cancelled) {
+          setSession({ ...s, user });
+          analytics.identify(user.id, { email: user.email });
+          setLoading(false);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          reportObservedError({
+            error,
+            source: 'mobile.auth.bootstrap_session',
+            message: 'Failed to bootstrap mobile auth session',
+          });
+          await clearLocalSession();
+          setLoading(false);
+        }
       }
-      setLoading(false);
-    });
+    }
+
+    void bootstrapSession();
 
     const {
       data: { subscription },
@@ -105,8 +162,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    return () => subscription.unsubscribe();
-  }, [analytics]);
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
+  }, [analytics, clearLocalSession]);
 
   const signOutForExpiredIncompleteOnboarding = useCallback(async () => {
     analytics.capture(AnalyticsEvent.INCOMPLETE_ONBOARDING_REAUTH_TRIGGERED, {

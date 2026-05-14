@@ -8,6 +8,10 @@ import { AnalyticsEvent } from '@iconicedu/utils';
 const mockGetSession = jest.fn().mockResolvedValue({
   data: { session: null },
 });
+const mockGetUser = jest.fn().mockResolvedValue({
+  data: { user: null },
+  error: null,
+});
 const mockOnAuthStateChange = jest.fn().mockReturnValue({
   data: { subscription: { unsubscribe: jest.fn() } },
 });
@@ -44,11 +48,12 @@ jest.mock('../lib/supabase/client', () => ({
   supabase: {
     auth: {
       getSession: () => mockGetSession(),
+      getUser: () => mockGetUser(),
       onAuthStateChange: (cb: unknown) => mockOnAuthStateChange(cb),
       signInWithOtp: (params: unknown) => mockSignInWithOtp(params),
       verifyOtp: (params: unknown) => mockVerifyOtp(params),
       setSession: (params: unknown) => mockSetSession(params),
-      signOut: () => mockSignOut(),
+      signOut: (params?: unknown) => mockSignOut(params),
     },
     from: (table: unknown) => mockFrom(table),
   },
@@ -74,6 +79,10 @@ describe('AuthProvider', () => {
     });
     mockVerifyOtp.mockResolvedValue({
       data: { session: null, user: null },
+      error: null,
+    });
+    mockGetUser.mockResolvedValue({
+      data: { user: null },
       error: null,
     });
   });
@@ -164,6 +173,10 @@ describe('AuthProvider', () => {
     mockGetSession.mockResolvedValueOnce({
       data: { session: { user: { id: 'user-1', email: 'iconicedudev+test@gmail.com' } } },
     });
+    mockGetUser.mockResolvedValueOnce({
+      data: { user: { id: 'user-1', email: 'iconicedudev+test@gmail.com' } },
+      error: null,
+    });
 
     const { result } = renderHook(() => useAuth(), { wrapper });
     await waitFor(() => {
@@ -198,6 +211,10 @@ describe('AuthProvider', () => {
     mockGetSession.mockResolvedValueOnce({
       data: { session: { user: { id: 'user-1', email: 'iconicedudev+test@gmail.com' } } },
     });
+    mockGetUser.mockResolvedValueOnce({
+      data: { user: { id: 'user-1', email: 'iconicedudev+test@gmail.com' } },
+      error: null,
+    });
 
     const { result } = renderHook(() => useAuth(), { wrapper });
     await waitFor(() => {
@@ -226,6 +243,10 @@ describe('AuthProvider', () => {
     mockGetSession.mockResolvedValueOnce({
       data: { session: { user: { id: 'user-1', email: 'iconicedudev+test@gmail.com' } } },
     });
+    mockGetUser.mockResolvedValueOnce({
+      data: { user: { id: 'user-1', email: 'iconicedudev+test@gmail.com' } },
+      error: null,
+    });
 
     const { result } = renderHook(() => useAuth(), { wrapper });
     await waitFor(() => {
@@ -248,5 +269,25 @@ describe('AuthProvider', () => {
 
     expect(mockSignOut).not.toHaveBeenCalled();
     nowSpy.mockRestore();
+  });
+
+  it('clears a cached session when Supabase Auth no longer recognizes it', async () => {
+    mockGetSession.mockResolvedValueOnce({
+      data: { session: { user: { id: 'user-1', email: 'iconicedudev+test@gmail.com' } } },
+    });
+    mockGetUser.mockResolvedValueOnce({
+      data: { user: null },
+      error: { message: 'Auth session missing!' },
+    });
+
+    const { result } = renderHook(() => useAuth(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.session).toBeNull();
+    expect(result.current.user).toBeNull();
+    expect(mockSignOut).toHaveBeenCalledWith({ scope: 'local' });
   });
 });
