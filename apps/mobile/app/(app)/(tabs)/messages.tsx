@@ -339,14 +339,16 @@ function makeStyles(C: AppColors) {
     subTabTextActive: { color: C.teal },
 
     itemOuter: {
-      marginHorizontal: 16,
-      marginBottom: 22,
+      marginHorizontal: 0,
+      marginBottom: 0,
     },
     itemWrap: {
       backgroundColor: 'transparent',
-      paddingHorizontal: 16,
-      paddingVertical: 18,
+      paddingHorizontal: 20,
+      paddingVertical: 16,
       overflow: 'hidden',
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: 'transparent',
     },
     itemWrapUnread: {},
     itemRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
@@ -640,6 +642,7 @@ function SectionHeader({
 function ChannelRow({
   item,
   onPress,
+  showTopBorder,
   presenceByProfileId,
   currentProfileName,
   currentProfileKind,
@@ -648,6 +651,7 @@ function ChannelRow({
 }: {
   item: ChannelListItem;
   onPress: () => void;
+  showTopBorder: boolean;
   presenceByProfileId: Map<string, PresenceDisplayStatus>;
   currentProfileName?: string | null;
   currentProfileKind?: string | null;
@@ -739,6 +743,7 @@ function ChannelRow({
         onPress={onPress}
         style={({ pressed }) => [
           s.itemWrap,
+          showTopBorder && { borderTopColor: colors.border },
           hasUnread && s.itemWrapUnread,
           pressed && { backgroundColor: colors.inputBg },
         ]}
@@ -894,7 +899,6 @@ export default function MessagesScreen() {
     ((profile as Record<string, unknown> | undefined)?.kind as string | undefined) ??
     null;
   const isParentView = profileKind === 'guardian';
-  const isStudentView = profileKind === 'child';
 
   const {
     data: dms,
@@ -1121,7 +1125,7 @@ export default function MessagesScreen() {
   const isEmpty = data.length === 0 || (data.length === 1 && '_type' in data[0]!);
 
   const renderItem = useCallback(
-    ({ item }: { item: ListRow }) => {
+    ({ item, index }: { item: ListRow; index: number }) => {
       if ('_type' in item && item._type === 'section-header') {
         return <SectionHeader title={item.title} s={s} />;
       }
@@ -1162,6 +1166,7 @@ export default function MessagesScreen() {
       return (
         <ChannelRow
           item={channel}
+          showTopBorder={index > 0}
           presenceByProfileId={presenceByProfileId}
           currentProfileName={currentProfileName}
           currentProfileKind={profileKind}
@@ -1202,7 +1207,7 @@ export default function MessagesScreen() {
         />
       );
     },
-    [s, colors, router, presenceByProfileId],
+    [s, colors, router, presenceByProfileId, currentProfileName, profileKind],
   );
 
   return (
