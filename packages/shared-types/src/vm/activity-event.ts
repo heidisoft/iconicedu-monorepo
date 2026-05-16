@@ -133,6 +133,46 @@ export interface PaymentReminderSentActivityEventPayload {
   channelRouteKind?: 'space' | 'dm' | 'channel' | null;
 }
 
+export interface SessionCompletionCheckMember {
+  profileId: UUID;
+  role?: string | null;
+  displayName?: string | null;
+  avatarUrl?: string | null;
+  themeKey?: string | null;
+}
+
+export interface SessionCompletionCheckSentActivityEventPayload {
+  channelId: UUID;
+  learningSpaceId?: UUID | null;
+  scheduleId?: UUID | null;
+  occurrenceStart: ISODateTime;
+  title: string;
+  summary?: string | null;
+  channelRouteKind?: 'space' | 'dm' | 'channel' | null;
+  members?: SessionCompletionCheckMember[] | null;
+  feedbackUiEnabled: boolean;
+}
+
+export interface SessionCompletionCheckBatchSentActivityEventPayload {
+  sessions: SessionCompletionCheckSentActivityEventPayload[];
+  sessionCount: number;
+}
+
+export interface SessionCompletionDisputeReportedActivityEventPayload {
+  channelId?: UUID | null;
+  learningSpaceId?: UUID | null;
+  scheduleId?: UUID | null;
+  occurrenceStart: ISODateTime;
+  title: string;
+  reportedByProfileId: UUID;
+  reportedByDisplayName: string;
+  reportedByRole: string;
+  disputeCategory: string;
+  disputeReason?: string | null;
+  rescheduleRequested: boolean;
+  recipientRole: 'educator' | 'staff';
+}
+
 export interface MessageActivityEventPayload {
   channelId: UUID;
   messageId: UUID;

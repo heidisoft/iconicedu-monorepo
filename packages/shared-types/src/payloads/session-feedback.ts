@@ -1,4 +1,4 @@
-import type { UUID } from '@iconicedu/shared-types/shared/shared';
+import type { ISODateTime, UUID } from '@iconicedu/shared-types/shared/shared';
 
 export type SubmitSessionFeedbackInput = {
   orgId: UUID;
@@ -10,4 +10,15 @@ export type SubmitSessionFeedbackInput = {
   messageId?: UUID | null;
   sourceEventId?: UUID | null;
   occurrenceStartAt?: string | null;
+};
+
+export type SubmitCompletionVoteInput = {
+  orgId: UUID;
+  scheduleId: UUID;
+  occurrenceKey: ISODateTime;
+  role: string;
+  status: 'confirmed' | 'disputed';
+  disputeCategory?: string | null;
+  disputeReason?: string | null;
+  rescheduleRequested?: boolean;
 };

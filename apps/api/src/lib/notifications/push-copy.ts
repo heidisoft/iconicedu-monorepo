@@ -497,6 +497,33 @@ export function buildPersonalizedSessionCopy(
     };
   }
 
+  if (eventType === 'session.completion_check.sent') {
+    return {
+      title: `Did ${classTitle} take place?`,
+      summary: 'Tap to confirm whether the class happened',
+    };
+  }
+
+  if (eventType === 'session.completion_check.batch.sent') {
+    const sessionCount =
+      typeof payload.sessionCount === 'number' ? payload.sessionCount : 0;
+    return {
+      title: `${sessionCount} classes ended — how did they go?`,
+      summary: 'Tap to confirm whether each class took place',
+    };
+  }
+
+  if (eventType === 'session.completion.dispute_reported') {
+    const reportedByName =
+      typeof payload.reportedByDisplayName === 'string'
+        ? payload.reportedByDisplayName
+        : 'Someone';
+    return {
+      title: `${reportedByName} reported ${classTitle} didn't happen`,
+      summary: 'Tap to review and reschedule if needed',
+    };
+  }
+
   if (eventType === 'session.completed') {
     const fallback = `${classTitle} is complete`;
     return {

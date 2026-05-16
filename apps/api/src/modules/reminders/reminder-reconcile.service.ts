@@ -21,7 +21,7 @@ import {
 
 const DEFAULT_MAX_ATTEMPTS = 8;
 const SESSION_REMINDER_OFFSETS_MINUTES = [30, 5] as const;
-const SESSION_FEEDBACK_OFFSET_MINUTES = 15;
+const SESSION_COMPLETION_CHECK_OFFSET_MINUTES = 10;
 // Wide enough to find the next occurrence without over-expanding
 const RECONCILE_HORIZON_DAYS = 365;
 
@@ -146,7 +146,7 @@ type ReminderJobPayload = {
 };
 
 type NextJobDescriptor = {
-  jobType: 'session.reminder' | 'session.feedback_request';
+  jobType: 'session.reminder' | 'session.completion_check';
   offsetMinutes: number | null;
   occurrenceStart: string;
   occurrenceEnd: string;
@@ -580,15 +580,15 @@ export class ReminderReconcileService {
         return reminderJobs;
       }
 
-      // Feedback job
-      const feedbackRunAt = new Date(
-        feedbackBase.getTime() + SESSION_FEEDBACK_OFFSET_MINUTES * 60 * 1000,
+      // Completion check job (replaces feedback request)
+      const completionCheckRunAt = new Date(
+        feedbackBase.getTime() + SESSION_COMPLETION_CHECK_OFFSET_MINUTES * 60 * 1000,
       );
       if (
-        feedbackRunAt.getTime() > now.getTime() &&
-        !this.isJobRunAfterArchiveCutoff(occ, feedbackRunAt)
+        completionCheckRunAt.getTime() > now.getTime() &&
+        !this.isJobRunAfterArchiveCutoff(occ, completionCheckRunAt)
       ) {
-        const dedupeKey = this.buildSessionFeedbackDedupeKey({
+        const dedupeKey = this.buildSessionCompletionCheckDedupeKey({
           orgId: occ.ids.orgId,
           learningSpaceId,
           channelId,
@@ -598,11 +598,11 @@ export class ReminderReconcileService {
         if (!succeededDedupeKeys.has(dedupeKey)) {
           return [
             {
-              jobType: 'session.feedback_request',
+              jobType: 'session.completion_check',
               offsetMinutes: null,
               occurrenceStart: occurrenceStartIso,
               occurrenceEnd: occ.endAt,
-              runAt: feedbackRunAt,
+              runAt: completionCheckRunAt,
               dedupeKey,
               occurrence: occ,
             },
@@ -808,14 +808,14 @@ export class ReminderReconcileService {
     return `session.reminder:${input.orgId}:${learningSpaceId}:${input.channelId}:${input.occurrenceStart}:${input.offsetMinutes}`;
   }
 
-  private buildSessionFeedbackDedupeKey(input: {
+  private buildSessionCompletionCheckDedupeKey(input: {
     orgId: string;
     learningSpaceId?: string | null;
     channelId: string;
     occurrenceStart: string;
   }) {
     const learningSpaceId = input.learningSpaceId ?? 'unknown-space';
-    return `session.feedback_request:${input.orgId}:${learningSpaceId}:${input.channelId}:${input.occurrenceStart}`;
+    return `session.completion_check:${input.orgId}:${learningSpaceId}:${input.channelId}:${input.occurrenceStart}`;
   }
 
   private getScheduleTimezone(event: Pick<ClassScheduleVM, 'timezone' | 'recurrence'>) {

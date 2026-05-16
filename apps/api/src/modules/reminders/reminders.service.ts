@@ -26,6 +26,7 @@ import {
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
 import { getRequestContext } from '@iconicedu/api/observability/request-context';
 import { ReminderReconcileService } from '@iconicedu/api/modules/reminders/reminder-reconcile.service';
+import { CompletionCheckDispatcherService } from '@iconicedu/api/modules/reminders/completion-check-dispatcher.service';
 import { publishActivityEvent } from '@iconicedu/api/lib/activity-feed/activity-publisher';
 
 const REMINDER_HORIZON_DAYS = 30;
@@ -35,7 +36,7 @@ const DEFAULT_MAX_ATTEMPTS = 8;
 const RETRY_BASE_MS = 15_000;
 const RETRY_MAX_MS = 10 * 60_000;
 const SESSION_REMINDER_OFFSETS_MINUTES = [30, 5] as const;
-const SESSION_FEEDBACK_OFFSET_MINUTES = 15;
+const SESSION_COMPLETION_CHECK_OFFSET_MINUTES = 10;
 
 function resolveSupabaseHost() {
   const supabaseUrl = process.env.SUPABASE_URL?.trim();
@@ -196,6 +197,7 @@ export class RemindersService {
   constructor(
     private readonly analytics: AnalyticsService,
     private readonly reminderReconcileService: ReminderReconcileService,
+    private readonly completionCheckDispatcher: CompletionCheckDispatcherService,
   ) {}
 
   /**
@@ -316,32 +318,32 @@ export class RemindersService {
         });
       }
 
-      const feedbackDedupe = this.buildSessionFeedbackDedupeKey({
+      const completionCheckDedupe = this.buildSessionCompletionCheckDedupeKey({
         orgId: input.orgId,
         learningSpaceId: occurrence.source.learningSpaceId,
         channelId: occurrence.source.channelId,
         occurrenceStart: occurrence.startAt,
       });
-      const feedbackRunAt = new Date(
-        feedbackBaseTime.getTime() + SESSION_FEEDBACK_OFFSET_MINUTES * 60 * 1000,
+      const completionCheckRunAt = new Date(
+        feedbackBaseTime.getTime() + SESSION_COMPLETION_CHECK_OFFSET_MINUTES * 60 * 1000,
       );
-      if (this.isJobRunAfterArchiveCutoff(occurrence, feedbackRunAt)) {
+      if (this.isJobRunAfterArchiveCutoff(occurrence, completionCheckRunAt)) {
         continue;
       }
 
-      dedupeKeys.add(feedbackDedupe);
+      dedupeKeys.add(completionCheckDedupe);
       rows.push({
         org_id: input.orgId,
-        job_type: 'session.feedback_request',
+        job_type: 'session.completion_check',
         target_kind: 'channel',
         target_id: occurrence.source.channelId,
         source_learning_space_id: occurrence.source.learningSpaceId,
         source_schedule_id: normalizedScheduleId,
         occurrence_start_at: occurrence.startAt,
-        run_at: feedbackRunAt.toISOString(),
+        run_at: completionCheckRunAt.toISOString(),
         timezone: occurrence.timezone ?? 'UTC',
         payload: { ...payload },
-        dedupe_key: feedbackDedupe,
+        dedupe_key: completionCheckDedupe,
         status: 'pending',
         max_attempts: DEFAULT_MAX_ATTEMPTS,
         created_at: createdAt,
@@ -394,7 +396,7 @@ export class RemindersService {
       .select('id, dedupe_key')
       .eq('org_id', input.orgId)
       .eq('source_learning_space_id', input.learningSpaceId)
-      .in('job_type', ['session.reminder', 'session.feedback_request'])
+      .in('job_type', ['session.reminder', 'session.completion_check'])
       .in('status', ['pending', 'leased', 'failed'])
       .is('deleted_at', null)
       .returns<Array<{ id: string; dedupe_key: string }>>();
@@ -874,14 +876,14 @@ export class RemindersService {
     return `session.reminder:${input.orgId}:${learningSpaceId}:${input.channelId}:${input.occurrenceStart}:${input.offsetMinutes}`;
   }
 
-  private buildSessionFeedbackDedupeKey(input: {
+  private buildSessionCompletionCheckDedupeKey(input: {
     orgId: string;
     learningSpaceId?: string | null;
     channelId: string;
     occurrenceStart: string;
   }) {
     const learningSpaceId = input.learningSpaceId ?? 'unknown-space';
-    return `session.feedback_request:${input.orgId}:${learningSpaceId}:${input.channelId}:${input.occurrenceStart}`;
+    return `session.completion_check:${input.orgId}:${learningSpaceId}:${input.channelId}:${input.occurrenceStart}`;
   }
 
   private getScheduleTimezone(event: Pick<ClassScheduleVM, 'timezone' | 'recurrence'>) {
@@ -1357,50 +1359,59 @@ export class RemindersService {
       throw new Error(updateResponse.error.message);
     }
 
-    const eventType =
-      job.job_type === 'session.feedback_request'
-        ? 'session.feedback_request.sent'
-        : 'session.reminder.sent';
-    const activityEvent = await publishActivityEvent({
-      supabase,
-      orgId: job.org_id,
-      eventType,
-      sourceKind: 'system',
-      actorProfileId: systemProfileId,
-      scope: payload.learningSpaceId
-        ? { kind: 'learning_space', learningSpaceId: payload.learningSpaceId }
-        : { kind: 'channel', channelId: payload.channelId },
-      objectRef: {
-        kind: 'session',
-        id:
-          payload.scheduleId ??
-          payload.occurrenceStart ??
-          job.source_schedule_id ??
-          job.id,
-      },
-      targetRef: payload.learningSpaceId
-        ? { kind: 'learning_space', id: payload.learningSpaceId }
-        : null,
-      audienceRules: [{ kind: 'all_in_scope' }],
-      payload: {
-        ...payload,
-        title: payload.title,
-        learningSpaceTitle: payload.title,
-        channelRouteKind: payload.channelRouteKind ?? 'space',
-      },
-      dedupeKey: `${job.dedupe_key}:activity`,
-      refreshOnDedupe: true,
-      createdBy: systemProfileId,
-    });
+    let activityEventId: string | null = null;
+
+    if (job.job_type === 'session.completion_check') {
+      const dispatchedIds = await this.completionCheckDispatcher.dispatchCompletionCheck({
+        supabase,
+        job,
+        payload,
+        systemProfileId,
+      });
+      activityEventId = dispatchedIds[0] ?? null;
+    } else {
+      const activityEvent = await publishActivityEvent({
+        supabase,
+        orgId: job.org_id,
+        eventType: 'session.reminder.sent',
+        sourceKind: 'system',
+        actorProfileId: systemProfileId,
+        scope: payload.learningSpaceId
+          ? { kind: 'learning_space', learningSpaceId: payload.learningSpaceId }
+          : { kind: 'channel', channelId: payload.channelId },
+        objectRef: {
+          kind: 'session',
+          id:
+            payload.scheduleId ??
+            payload.occurrenceStart ??
+            job.source_schedule_id ??
+            job.id,
+        },
+        targetRef: payload.learningSpaceId
+          ? { kind: 'learning_space', id: payload.learningSpaceId }
+          : null,
+        audienceRules: [{ kind: 'all_in_scope' }],
+        payload: {
+          ...payload,
+          title: payload.title,
+          learningSpaceTitle: payload.title,
+          channelRouteKind: payload.channelRouteKind ?? 'space',
+        },
+        dedupeKey: `${job.dedupe_key}:activity`,
+        refreshOnDedupe: true,
+        createdBy: systemProfileId,
+      });
+      activityEventId = activityEvent?.id ?? null;
+    }
 
     await this.logDispatch({
       supabase,
       orgId: job.org_id,
       jobId: job.id,
-      activityEventId: activityEvent?.id ?? null,
+      activityEventId,
       result: 'succeeded',
       details: {
-        activity_event_id: activityEvent?.id ?? null,
+        activity_event_id: activityEventId,
         job_type: job.job_type,
       },
     });

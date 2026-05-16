@@ -20,7 +20,10 @@ export type ActivityVerbVM =
   | 'class.session.rescheduled'
   | 'class.session.canceled'
   | 'session.reminder.sent'
-  | 'session.feedback_request.sent';
+  | 'session.feedback_request.sent'
+  | 'session.completion_check.sent'
+  | 'session.completion_check.batch.sent'
+  | 'session.completion.dispute_reported';
 
 export type ActivitySourceKindVM =
   | 'profile'
@@ -64,7 +67,9 @@ export type InboxIconKeyVM =
   | 'MessagesSquare'
   | 'SmilePlus'
   | 'Star'
-  | 'Bell';
+  | 'Bell'
+  | 'CheckCircle2'
+  | 'AlertCircle';
 
 export type InboxLeadingVM =
   | {
