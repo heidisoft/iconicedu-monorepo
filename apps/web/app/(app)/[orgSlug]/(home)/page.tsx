@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import React, { Suspense } from 'react';
 import { DashboardHeader, DashboardHomeSkeleton } from '@iconicedu/ui-web';
 
-import { HomePageContent } from './home-page-content';
+import { HomePageContent } from '../home-page-content';
 
 export const metadata: Metadata = {
   title: 'Home',
