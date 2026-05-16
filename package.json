@@ -103,7 +103,21 @@
       "react-test-renderer": "19.2.4",
       "baseline-browser-mapping": "^2.10.20"
     },
-    "patchedDependencies": {}
+    "patchedDependencies": {},
+    "ignoredBuiltDependencies": [
+      "@nestjs/core",
+      "@scarf/scarf",
+      "core-js",
+      "protobufjs"
+    ],
+    "onlyBuiltDependencies": [
+      "@parcel/watcher",
+      "@prisma/engines",
+      "esbuild",
+      "prisma",
+      "sharp",
+      "unrs-resolver"
+    ]
   },
   "workspaces": [
     "apps/*",
