@@ -8,7 +8,10 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import type { SubmitSessionFeedbackInput } from '@iconicedu/shared-types';
+import type {
+  SubmitCompletionVoteInput,
+  SubmitSessionFeedbackInput,
+} from '@iconicedu/shared-types';
 import { AuthGuard } from '@iconicedu/api/modules/auth/auth.guard';
 import { ActivityFeedService } from '@iconicedu/api/modules/activity-feed/activity-feed.service';
 import { ActivityFeedQueryService } from '@iconicedu/api/modules/activity-feed/activity-feed-query.service';
@@ -55,6 +58,18 @@ export class ActivityFeedController {
       `submitFeedback authUserId=${req.user.id} orgId=${body.orgId} recipientProfileId=${body.recipientProfileId ?? 'none'} rating=${body.rating} sourceEventId=${body.sourceEventId ?? 'none'} messageId=${body.messageId ?? 'none'}`,
     );
     return this.activityFeedService.submitFeedback(req.user.id, body);
+  }
+
+  @Post('session-completion-vote')
+  @UseGuards(AuthGuard)
+  submitCompletionVote(
+    @Req() req: AuthenticatedRequest,
+    @Body() body: SubmitCompletionVoteInput,
+  ) {
+    this.logger.log(
+      `submitCompletionVote authUserId=${req.user.id} orgId=${body.orgId} scheduleId=${body.scheduleId} status=${body.status}`,
+    );
+    return this.activityFeedService.submitCompletionVote(req.user.id, body);
   }
 
   @Post('read')

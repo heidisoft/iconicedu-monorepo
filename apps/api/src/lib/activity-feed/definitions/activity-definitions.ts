@@ -887,6 +887,159 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => renderSessionItem(event, 'feedback'),
   },
+  'session.completion_check.sent': {
+    eventType: 'session.completion_check.sent',
+    tabKey: 'classes',
+    importance: 'normal',
+    notification: {
+      prefKey: 'session.completion_check.sent',
+      defaultChannels: ['push', 'email'],
+      timing: 'standard',
+    },
+    resolveRecipients: DEFAULT_RECIPIENTS,
+    render: (event) => {
+      const payload = asRecord(event.payload);
+      const classTitle =
+        getActivityContext(payload).classTitle ?? getContextTitle(payload) ?? 'Class';
+      const sessionStartAt = firstOptionalString(
+        payload.occurrenceStart,
+        payload.startAt,
+      );
+      const sessionLabel = formatSessionDateTime(sessionStartAt, payload);
+      return {
+        verb: 'session.completion_check.sent',
+        leading: { kind: 'icon', iconKey: 'CheckCircle2', tone: 'success' },
+        headline: {
+          primary: classTitle,
+          secondary: sessionLabel
+            ? `Did the ${sessionLabel} session happen?`
+            : 'Did this class take place?',
+          secondaryHref: buildInboxSourceHref(event, payload),
+        },
+        summary: `Please confirm whether ${classTitle} took place`,
+        preview: { text: `Please confirm whether ${classTitle} took place` },
+        actionButton: undefined,
+        metadata: {
+          ...buildCommonContextMetadata(payload),
+          sourceEventId: event.id,
+          classSessionId: firstOptionalString(payload.scheduleId, payload.classSessionId),
+          classroomId: firstOptionalString(payload.learningSpaceId, payload.classroomId),
+          channelId: asOptionalString(payload.channelId),
+          learningSpaceId: asOptionalString(payload.learningSpaceId),
+          scheduleId: asOptionalString(payload.scheduleId),
+          occurrenceStart: firstOptionalString(payload.occurrenceStart, payload.startAt),
+          feedbackUiEnabled: payload.feedbackUiEnabled !== false,
+          completionCheckUiEnabled: true,
+          members: payload.members ?? [],
+        },
+      } satisfies ActivityRenderResult;
+    },
+  },
+  'session.completion_check.batch.sent': {
+    eventType: 'session.completion_check.batch.sent',
+    tabKey: 'classes',
+    importance: 'normal',
+    notification: {
+      prefKey: 'session.completion_check.sent',
+      defaultChannels: ['push', 'email'],
+      timing: 'standard',
+    },
+    resolveRecipients: DEFAULT_RECIPIENTS,
+    render: (event) => {
+      const payload = asRecord(event.payload);
+      const sessionCount =
+        typeof payload.sessionCount === 'number' ? payload.sessionCount : 0;
+      return {
+        verb: 'session.completion_check.batch.sent',
+        leading: { kind: 'icon', iconKey: 'CheckCircle2', tone: 'success' },
+        headline: {
+          primary: `${sessionCount} classes ended`,
+          secondary: 'Please confirm how each one went',
+        },
+        summary: `You have ${sessionCount} classes that need confirmation`,
+        preview: { text: `You have ${sessionCount} classes that need confirmation` },
+        actionButton: undefined,
+        metadata: {
+          completionCheckUiEnabled: true,
+          sessions: payload.sessions ?? [],
+          sessionCount,
+        },
+      } satisfies ActivityRenderResult;
+    },
+  },
+  'session.completion.dispute_reported': {
+    eventType: 'session.completion.dispute_reported',
+    tabKey: 'classes',
+    importance: 'important',
+    notification: {
+      prefKey: 'session.completion.dispute_reported',
+      defaultChannels: ['push', 'email'],
+      timing: 'immediate',
+    },
+    resolveRecipients: DEFAULT_RECIPIENTS,
+    render: (event) => {
+      const payload = asRecord(event.payload);
+      const classTitle =
+        getActivityContext(payload).classTitle ?? getContextTitle(payload) ?? 'Class';
+      const reportedByName = asOptionalString(payload.reportedByDisplayName) ?? 'Someone';
+      const disputeCategory =
+        asOptionalString(payload.disputeCategory) ?? 'unknown issue';
+      const recipientRole = asOptionalString(payload.recipientRole);
+      const isStaff = recipientRole === 'staff';
+      const educatorNames = asOptionalString(payload.educatorNames);
+      const sessionStartAt = firstOptionalString(
+        payload.occurrenceStart,
+        payload.startAt,
+      );
+      const sessionLabel = formatSessionDateTime(sessionStartAt, payload);
+
+      const categoryLabel: Record<string, string> = {
+        teacher_absent: 'Teacher absent',
+        student_absent: 'Student absent',
+        technical_issue: 'Technical issue',
+        other: 'Other issue',
+      };
+      const categoryText = categoryLabel[disputeCategory] ?? disputeCategory;
+
+      const secondaryParts = [
+        sessionLabel ? `${sessionLabel}` : undefined,
+        categoryText,
+        isStaff && educatorNames ? `Educator: ${educatorNames}` : undefined,
+      ]
+        .filter(Boolean)
+        .join(' · ');
+
+      const actionLabel = isStaff ? 'View class' : 'Reschedule session';
+
+      return {
+        verb: 'session.completion.dispute_reported',
+        leading: { kind: 'icon', iconKey: 'AlertCircle', tone: 'warning' },
+        headline: {
+          primary: `${reportedByName} reported ${classTitle} didn't happen`,
+          secondary: secondaryParts || undefined,
+          secondaryHref: buildInboxSourceHref(event, payload),
+        },
+        summary: `${reportedByName} reported that ${classTitle} did not take place · ${categoryText}`,
+        preview: {
+          text: `${reportedByName} reported that ${classTitle} did not take place`,
+        },
+        actionButton: sourceAction(event, payload, 'outline', actionLabel),
+        metadata: {
+          ...buildCommonContextMetadata(payload),
+          channelId: asOptionalString(payload.channelId),
+          learningSpaceId: asOptionalString(payload.learningSpaceId),
+          scheduleId: asOptionalString(payload.scheduleId),
+          occurrenceStart: firstOptionalString(payload.occurrenceStart),
+          reportedByProfileId: asOptionalString(payload.reportedByProfileId),
+          reportedByRole: asOptionalString(payload.reportedByRole),
+          disputeCategory,
+          disputeReason: asOptionalString(payload.disputeReason),
+          rescheduleRequested: payload.rescheduleRequested === true,
+          recipientRole,
+        },
+      } satisfies ActivityRenderResult;
+    },
+  },
 };
 
 export const ActivityEventCatalog = ACTIVITY_EVENT_DEFINITIONS;

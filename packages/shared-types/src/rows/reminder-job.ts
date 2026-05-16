@@ -3,7 +3,7 @@ import type { ISODateTime, UUID } from '../shared/shared';
 export interface ReminderJobRow {
   id: UUID;
   org_id: UUID;
-  job_type: 'session.reminder' | 'session.feedback_request';
+  job_type: 'session.reminder' | 'session.feedback_request' | 'session.completion_check';
   target_kind: 'channel' | 'dm' | 'user_scope';
   target_id: UUID;
   source_learning_space_id?: UUID | null;

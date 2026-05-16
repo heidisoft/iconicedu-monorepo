@@ -6,8 +6,12 @@ import {
   NotFoundException,
   InternalServerErrorException,
 } from '@nestjs/common';
-import type { SubmitSessionFeedbackInput } from '@iconicedu/shared-types';
+import type {
+  SubmitCompletionVoteInput,
+  SubmitSessionFeedbackInput,
+} from '@iconicedu/shared-types';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
+import { publishActivityEvent } from '@iconicedu/api/lib/activity-feed/activity-publisher';
 
 type SubmitSessionFeedbackRequest = SubmitSessionFeedbackInput & {
   recipientProfileId?: string | null;
@@ -294,6 +298,261 @@ export class ActivityFeedService {
         submittedAt: upsertResponse.data.submitted_at,
       },
     };
+  }
+
+  async submitCompletionVote(authUserId: string, body: SubmitCompletionVoteInput) {
+    const VALID_STATUSES = ['confirmed', 'disputed'] as const;
+    const VALID_CATEGORIES = [
+      'teacher_absent',
+      'student_absent',
+      'technical_issue',
+      'other',
+    ] as const;
+
+    if (!body?.orgId || !body.scheduleId || !body.occurrenceKey || !body.role) {
+      throw new BadRequestException('Missing required fields');
+    }
+    if (!isUuid(body.orgId)) throw new BadRequestException('Invalid orgId');
+    if (!isUuid(body.scheduleId)) throw new BadRequestException('Invalid scheduleId');
+    if (!VALID_STATUSES.includes(body.status as (typeof VALID_STATUSES)[number])) {
+      throw new BadRequestException('Invalid status');
+    }
+    if (
+      body.status === 'disputed' &&
+      !VALID_CATEGORIES.includes(
+        body.disputeCategory as (typeof VALID_CATEGORIES)[number],
+      )
+    ) {
+      throw new BadRequestException('disputeCategory required when status is disputed');
+    }
+
+    const disputeReason = body.disputeReason?.trim() ?? null;
+    if (disputeReason && disputeReason.length > 500) {
+      throw new BadRequestException('disputeReason is too long');
+    }
+
+    const supabase = createSupabaseServiceClient();
+
+    // Resolve caller account
+    const { data: account, error: accountError } = await supabase
+      .from('accounts')
+      .select('id, org_id')
+      .eq('auth_user_id', authUserId)
+      .eq('org_id', body.orgId)
+      .is('deleted_at', null)
+      .limit(1)
+      .maybeSingle<AccountRow>();
+
+    if (accountError) throw new InternalServerErrorException(accountError.message);
+    if (!account) throw new NotFoundException('Account not found');
+
+    const profileId = await this.resolveActiveProfileId(account.id, body.orgId);
+
+    // Verify caller is a participant of this session
+    const { data: participant, error: participantError } = await supabase
+      .from('class_schedule_participants')
+      .select('id, role')
+      .eq('org_id', body.orgId)
+      .eq('schedule_id', body.scheduleId)
+      .eq('profile_id', profileId)
+      .is('deleted_at', null)
+      .maybeSingle<{ id: string; role: string }>();
+
+    if (participantError)
+      throw new InternalServerErrorException(participantError.message);
+    if (!participant) throw new ForbiddenException('Not a participant of this session');
+
+    const now = new Date().toISOString();
+
+    // Upsert vote
+    const { error: voteError } = await supabase
+      .from('class_session_completion_votes')
+      .upsert(
+        {
+          org_id: body.orgId,
+          schedule_id: body.scheduleId,
+          occurrence_key: body.occurrenceKey,
+          profile_id: profileId,
+          role: participant.role,
+          status: body.status,
+          dispute_category:
+            body.status === 'disputed' ? (body.disputeCategory ?? null) : null,
+          dispute_reason: body.status === 'disputed' ? (disputeReason ?? null) : null,
+          reschedule_requested:
+            body.status === 'disputed' ? (body.rescheduleRequested ?? false) : false,
+          voted_at: now,
+          updated_at: now,
+          updated_by: profileId,
+          deleted_at: null,
+        },
+        { onConflict: 'org_id,schedule_id,occurrence_key,profile_id' },
+      );
+
+    if (voteError) throw new InternalServerErrorException(voteError.message);
+
+    this.logger.log(
+      `completion vote saved scheduleId=${body.scheduleId} profileId=${profileId} status=${body.status}`,
+    );
+
+    if (body.status === 'confirmed') {
+      return { feedbackEnabled: true };
+    }
+
+    // Disputed: fan out to educators and staff
+    await this.publishDisputeNotifications({
+      supabase,
+      orgId: body.orgId,
+      scheduleId: body.scheduleId,
+      occurrenceKey: body.occurrenceKey,
+      reportedByProfileId: profileId,
+      reportedByRole: participant.role,
+      disputeCategory: body.disputeCategory ?? 'other',
+      disputeReason: disputeReason ?? null,
+      rescheduleRequested: body.rescheduleRequested ?? false,
+    });
+
+    return { feedbackEnabled: false };
+  }
+
+  private async publishDisputeNotifications(input: {
+    supabase: ReturnType<typeof createSupabaseServiceClient>;
+    orgId: string;
+    scheduleId: string;
+    occurrenceKey: string;
+    reportedByProfileId: string;
+    reportedByRole: string;
+    disputeCategory: string;
+    disputeReason: string | null;
+    rescheduleRequested: boolean;
+  }) {
+    const {
+      supabase,
+      orgId,
+      scheduleId,
+      occurrenceKey,
+      reportedByProfileId,
+      reportedByRole,
+      disputeCategory,
+      disputeReason,
+      rescheduleRequested,
+    } = input;
+
+    // Load session details + participants
+    const { data: session } = await supabase
+      .from('class_schedules')
+      .select(
+        `id, title, source_channel_id, source_learning_space_id,
+         participants:class_schedule_participants(profile_id, role, display_name)`,
+      )
+      .eq('id', scheduleId)
+      .eq('org_id', orgId)
+      .is('deleted_at', null)
+      .maybeSingle<{
+        id: string;
+        title: string;
+        source_channel_id: string | null;
+        source_learning_space_id: string | null;
+        participants: Array<{
+          profile_id: string;
+          role: string;
+          display_name: string | null;
+        }>;
+      }>();
+
+    if (!session) {
+      this.logger.warn(
+        `publishDisputeNotifications: session not found scheduleId=${scheduleId}`,
+      );
+      return;
+    }
+
+    // Load the reporter's display name
+    const { data: reporterProfile } = await supabase
+      .from('profiles')
+      .select('display_name')
+      .eq('id', reportedByProfileId)
+      .eq('org_id', orgId)
+      .is('deleted_at', null)
+      .maybeSingle<{ display_name: string | null }>();
+
+    const reportedByDisplayName = reporterProfile?.display_name ?? 'Unknown';
+
+    const channelId = session.source_channel_id ?? '';
+    const learningSpaceId = session.source_learning_space_id ?? null;
+
+    const basePayload = {
+      channelId,
+      learningSpaceId,
+      scheduleId,
+      occurrenceStart: occurrenceKey,
+      title: session.title,
+      reportedByProfileId,
+      reportedByDisplayName,
+      reportedByRole,
+      disputeCategory,
+      disputeReason,
+      rescheduleRequested,
+    };
+
+    const scope = learningSpaceId
+      ? { kind: 'learning_space' as const, learningSpaceId }
+      : { kind: 'channel' as const, channelId };
+
+    // Educator participants
+    const educatorIds = session.participants
+      .filter((p) => p.role === 'educator')
+      .map((p) => p.profile_id);
+
+    if (educatorIds.length > 0) {
+      await publishActivityEvent({
+        supabase,
+        orgId,
+        eventType: 'session.completion.dispute_reported',
+        sourceKind: 'system',
+        scope,
+        objectRef: { kind: 'session', id: scheduleId },
+        audienceRules: [{ kind: 'users_only', userIds: educatorIds }],
+        payload: { ...basePayload, recipientRole: 'educator' },
+        dedupeKey: `dispute:${scheduleId}:${occurrenceKey}:educator:${reportedByProfileId}`,
+        refreshOnDedupe: true,
+      });
+    }
+
+    // All active staff in this org
+    const { data: staffProfiles } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('org_id', orgId)
+      .eq('kind', 'staff')
+      .is('deleted_at', null)
+      .returns<Array<{ id: string }>>();
+
+    const staffIds = (staffProfiles ?? []).map((p) => p.id);
+
+    if (staffIds.length > 0) {
+      // Load educator display names to enrich the staff headline
+      const educatorNames = session.participants
+        .filter((p) => p.role === 'educator')
+        .map((p) => p.display_name ?? 'Unknown')
+        .join(', ');
+
+      await publishActivityEvent({
+        supabase,
+        orgId,
+        eventType: 'session.completion.dispute_reported',
+        sourceKind: 'system',
+        scope,
+        objectRef: { kind: 'session', id: scheduleId },
+        audienceRules: [{ kind: 'users_only', userIds: staffIds }],
+        payload: {
+          ...basePayload,
+          recipientRole: 'staff',
+          educatorNames,
+        },
+        dedupeKey: `dispute:${scheduleId}:${occurrenceKey}:staff:${reportedByProfileId}`,
+        refreshOnDedupe: true,
+      });
+    }
   }
 
   private async resolveActiveProfileId(accountId: string, orgId: string) {

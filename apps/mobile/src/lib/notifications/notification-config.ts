@@ -73,6 +73,9 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationConfig> = {
   'class.session.canceled': classNotificationConfig,
   'session.reminder.sent': classNotificationConfig,
   'session.feedback_request.sent': feedbackNotificationConfig,
+  'session.completion_check.sent': feedbackNotificationConfig,
+  'session.completion_check.batch.sent': feedbackNotificationConfig,
+  'session.completion.dispute_reported': feedbackNotificationConfig,
 };
 
 export const DEFAULT_NOTIFICATION_ROUTE = '/(app)/(tabs)/inbox';

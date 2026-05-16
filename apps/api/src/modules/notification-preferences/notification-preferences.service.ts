@@ -25,6 +25,8 @@ export class NotificationPreferencesService {
     { prefKey: 'class.session.canceled', channels: ['push', 'email'] },
     { prefKey: 'session.reminder.sent', channels: ['push'] },
     { prefKey: 'session.feedback_request.sent', channels: ['push', 'email'] },
+    { prefKey: 'session.completion_check.sent', channels: ['push', 'email'] },
+    { prefKey: 'session.completion.dispute_reported', channels: ['push', 'email'] },
   ] as const;
 
   private normalizeChannels(channels: string[]) {

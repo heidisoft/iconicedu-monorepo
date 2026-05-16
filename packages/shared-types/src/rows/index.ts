@@ -5,6 +5,7 @@ export * from './activity-feed';
 export * from './activity-source-job';
 export * from './base';
 export * from './channel';
+export * from './class-session-completion-vote';
 export * from './class-session-feedback';
 export * from './class-schedule';
 export * from './educator-availability';

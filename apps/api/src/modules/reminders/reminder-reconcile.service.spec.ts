@@ -31,6 +31,8 @@ function makeUpdateChain(result: { error: null }) {
   const chain = {
     update: jest.fn(() => chain),
     eq: jest.fn(() => chain),
+    not: jest.fn(() => chain),
+    is: jest.fn(async () => result),
   };
   return {
     ...chain,
@@ -359,4 +361,67 @@ describe('ReminderReconcileService', () => {
       }),
     );
   });
+
+  it.each(['completed', 'rescheduled'])(
+    'cancels active reminders without scheduling new jobs when the schedule is %s',
+    async (status) => {
+      const scheduleChain = makeMaybeSingleChain({
+        data: {
+          ...buildScheduleRow(),
+          status,
+        },
+        error: null,
+      });
+      const learningSpaceChain = makeMaybeSingleChain({
+        data: { id: 'space-1', status: 'active', archived_at: null },
+        error: null,
+      });
+      const updateChain = makeUpdateChain({ error: null });
+      const reminderJobsUpdate = jest.fn((payload: Record<string, unknown>) => {
+        updateChain.update(payload);
+        return updateChain;
+      });
+
+      createSupabaseServiceClientMock.mockReturnValue({
+        from: jest.fn((table: string) => {
+          if (table === 'class_schedules') {
+            return { select: jest.fn(() => scheduleChain) };
+          }
+          if (table === 'learning_spaces') {
+            return { select: jest.fn(() => learningSpaceChain) };
+          }
+          if (table === 'reminder_jobs') {
+            return {
+              update: reminderJobsUpdate,
+            };
+          }
+          throw new Error(`Unexpected table ${table}`);
+        }),
+      } as never);
+
+      const result =
+        await new ReminderReconcileService().reconcileNextReminderJobForSchedule({
+          orgId: 'org-1',
+          scheduleId: 'schedule-1',
+          now: new Date('2030-03-06T09:00:00.000Z'),
+        });
+
+      expect(result).toEqual({ action: 'canceled_only' });
+      expect(reminderJobsUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: 'canceled',
+          lease_owner: null,
+          lease_until: null,
+        }),
+      );
+      expect(updateChain.eq).toHaveBeenCalledWith('org_id', 'org-1');
+      expect(updateChain.eq).toHaveBeenCalledWith('source_schedule_id', 'schedule-1');
+      expect(updateChain.not).toHaveBeenCalledWith(
+        'status',
+        'in',
+        '("succeeded","canceled","dead_letter")',
+      );
+      expect(updateChain.is).toHaveBeenCalledWith('deleted_at', null);
+    },
+  );
 });

@@ -3,12 +3,14 @@
 import type React from 'react';
 import { useEffect, useRef } from 'react';
 import {
+  AlertCircle,
   AtSign,
   Bell,
   BookImage,
   CalendarCheck,
   CalendarX,
   Check,
+  CheckCircle2,
   CreditCard,
   FileBadge,
   FileHeadphone,
@@ -28,6 +30,12 @@ import {
   ActivityFeedbackRequest,
   canRenderActivityFeedbackRequest,
 } from '@iconicedu/ui-web/components/notification/activity-feedback-request';
+import {
+  ActivityCompletionCheck,
+  canRenderActivityCompletionCheck,
+} from '@iconicedu/ui-web/components/notification/activity-completion-check';
+import { ActivityCompletionCheckBatch } from '@iconicedu/ui-web/components/notification/activity-completion-check-batch';
+import { ActivityDisputeReport } from '@iconicedu/ui-web/components/notification/activity-dispute-report';
 import { ActivityWithButton } from '@iconicedu/ui-web/components/notification/activity-with-button';
 import type { ActivityFeedItemVM, InboxIconKeyVM } from '@iconicedu/shared-types';
 
@@ -51,11 +59,13 @@ const INBOX_ICON_MAP: Record<
   InboxIconKeyVM,
   React.ComponentType<{ className?: string }>
 > = {
+  AlertCircle,
   AtSign,
   Bell,
   BookImage,
   CalendarCheck,
   CalendarX,
+  CheckCircle2,
   CreditCard,
   FileBadge,
   FileHeadphone,
@@ -105,6 +115,11 @@ const getDefaultIconKey = (activity: ActivityFeedItemVM): InboxIconKeyVM => {
       return 'Bell';
     case 'session.feedback_request.sent':
       return 'Star';
+    case 'session.completion_check.sent':
+    case 'session.completion_check.batch.sent':
+      return 'CheckCircle2';
+    case 'session.completion.dispute_reported':
+      return 'AlertCircle';
     default:
       return 'Bell';
   }
@@ -167,6 +182,14 @@ export function ActivityItemBase({
     activity.kind === 'leaf' &&
     activity.verb === 'session.feedback_request.sent' &&
     canRenderActivityFeedbackRequest(activity);
+  const canShowCompletionCheck =
+    activity.kind === 'leaf' &&
+    activity.verb === 'session.completion_check.sent' &&
+    canRenderActivityCompletionCheck(activity);
+  const canShowCompletionCheckBatch =
+    activity.kind === 'leaf' && activity.verb === 'session.completion_check.batch.sent';
+  const canShowDisputeReport =
+    activity.kind === 'leaf' && activity.verb === 'session.completion.dispute_reported';
   const rootRef = useRef<HTMLDivElement>(null);
   const autoReadTriggeredRef = useRef(false);
 
@@ -322,6 +345,12 @@ export function ActivityItemBase({
 
           {canShowFeedbackRequest ? (
             <ActivityFeedbackRequest activity={activity} />
+          ) : canShowCompletionCheckBatch ? (
+            <ActivityCompletionCheckBatch activity={activity} />
+          ) : canShowCompletionCheck ? (
+            <ActivityCompletionCheck activity={activity} />
+          ) : canShowDisputeReport ? (
+            <ActivityDisputeReport activity={activity} />
           ) : previewText ? (
             <p className="text-xs text-muted-foreground">{previewText}</p>
           ) : null}

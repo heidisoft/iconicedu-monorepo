@@ -1,12 +1,14 @@
 import React from 'react';
 import { View, Text, Pressable, TouchableOpacity, StyleSheet } from 'react-native';
 import {
+  AlertCircle,
   AtSign,
   Bell,
   BookImage,
   CalendarCheck,
   CalendarX,
   CheckCheck,
+  CheckCircle2,
   CreditCard,
   FileBadge,
   FileHeadphone,
@@ -25,6 +27,8 @@ import {
   ActivityFeedbackRequest,
   canRenderMobileActivityFeedbackRequest,
 } from '@/components/activity/activity-feedback-request';
+import { ActivityCompletionCheck } from '@/components/activity/activity-completion-check';
+import { ActivityCompletionCheckBatch } from '@/components/activity/activity-completion-check-batch';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -37,8 +41,10 @@ export const ACTIVITY_ICON_MAP: Record<
   AtSign,
   Bell,
   BookImage,
+  AlertCircle,
   CalendarCheck,
   CalendarX,
+  CheckCircle2,
   CreditCard,
   FileBadge,
   FileHeadphone,
@@ -403,8 +409,13 @@ export function ActivityItem({
     item.kind === 'leaf' &&
     item.verb === 'session.feedback_request.sent' &&
     canRenderMobileActivityFeedbackRequest(item);
-  const shouldShowPreviewText = hasPreviewText && !canShowFeedbackRequest;
-  const shouldShowActionButton = hasActionBtn && !canShowFeedbackRequest;
+  const canShowCompletionCheck =
+    item.kind === 'leaf' &&
+    (item.verb === 'session.completion_check.sent' ||
+      item.verb === 'session.completion_check.batch.sent');
+  const hidesDefaultContent = canShowFeedbackRequest || canShowCompletionCheck;
+  const shouldShowPreviewText = hasPreviewText && !hidesDefaultContent;
+  const shouldShowActionButton = hasActionBtn && !hidesDefaultContent;
   const primary = formatActivityPrimaryHeadline(item, viewerTimezone);
   const { secondary, emphasis } = item.content.headline;
   const tabLabel = TAB_LABELS[item.tabKey] ?? item.tabKey;
@@ -595,6 +606,22 @@ export function ActivityItem({
             currentProfileId={currentProfileId}
           />
         )}
+
+        {canShowCompletionCheck &&
+          item.kind === 'leaf' &&
+          (item.verb === 'session.completion_check.batch.sent' ? (
+            <ActivityCompletionCheckBatch
+              activity={item}
+              colors={colors}
+              currentProfileId={currentProfileId}
+            />
+          ) : (
+            <ActivityCompletionCheck
+              activity={item}
+              colors={colors}
+              currentProfileId={currentProfileId}
+            />
+          ))}
 
         {/* Expanded detail card */}
         {hasExpandedContent && isExpanded && (

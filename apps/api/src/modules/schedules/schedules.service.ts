@@ -513,6 +513,24 @@ export class SchedulesService {
     const scheduleIds = (existingSchedules ?? []).map((r) => r.id);
     if (!scheduleIds.length) return;
 
+    // Cancel active reminder jobs before source_schedule_id is nulled by the FK.
+    const { error: cancelJobsError } = await supabase
+      .from('reminder_jobs')
+      .update({
+        status: 'canceled',
+        lease_owner: null,
+        lease_until: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('org_id', orgId)
+      .in('source_schedule_id', scheduleIds)
+      .not('status', 'in', '("succeeded","canceled","dead_letter")')
+      .is('deleted_at', null);
+
+    if (cancelJobsError) {
+      throw new InternalServerErrorException(cancelJobsError.message);
+    }
+
     const { data: recurrenceRows, error: recurrenceError } = await supabase
       .from('class_schedule_recurrence')
       .select('id')
