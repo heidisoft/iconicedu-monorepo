@@ -181,7 +181,7 @@ describe('RemindersService', () => {
     return { supabase, reminderJobsTable };
   }
 
-  it('compiles two class reminders and one feedback request for a learning space', async () => {
+  it('compiles two class reminders and one completion check for a learning space', async () => {
     const { supabase, reminderJobsTable } = makeCompileSupabase();
     createSupabaseServiceClientMock.mockReturnValue(supabase as never);
 
@@ -212,11 +212,11 @@ describe('RemindersService', () => {
     ]);
     expect(reminderRows[0]?.dedupe_key).toContain(':30');
     expect(reminderRows[1]?.dedupe_key).toContain(':5');
-    const feedbackRow = compiledRows.find(
-      (row) => row.job_type === 'session.feedback_request',
+    const completionCheckRow = compiledRows.find(
+      (row) => row.job_type === 'session.completion_check',
     );
-    expect(feedbackRow?.run_at).toBe('2030-03-06T11:15:00.000Z');
-    expect(feedbackRow?.payload.members?.[0]).toMatchObject({
+    expect(completionCheckRow?.run_at).toBe('2030-03-06T11:10:00.000Z');
+    expect(completionCheckRow?.payload.members?.[0]).toMatchObject({
       profileId: 'profile-1',
       role: 'child',
     });
@@ -243,7 +243,7 @@ describe('RemindersService', () => {
     expect(loggerWarnSpy).toHaveBeenCalledWith(expect.stringContaining('accountFound'));
   });
 
-  it('falls back to start time when end time is invalid for feedback scheduling', async () => {
+  it('falls back to start time when end time is invalid for completion check scheduling', async () => {
     const { reminderJobsTable, supabase } = makeCompileSupabase({
       scheduleRows: [buildScheduleRow({ end_at: 'not-a-date' })],
     });
@@ -260,8 +260,8 @@ describe('RemindersService', () => {
       run_at: string;
     }>;
     expect(
-      compiledRows.find((row) => row.job_type === 'session.feedback_request')?.run_at,
-    ).toBe('2030-03-06T10:15:00.000Z');
+      compiledRows.find((row) => row.job_type === 'session.completion_check')?.run_at,
+    ).toBe('2030-03-06T10:10:00.000Z');
   });
 
   it('does not reactivate succeeded reminder jobs when schedule ids change', async () => {
@@ -280,7 +280,7 @@ describe('RemindersService', () => {
         },
         {
           dedupe_key:
-            'session.feedback_request:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z',
+            'session.completion_check:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z',
           status: 'succeeded',
         },
       ],
@@ -321,7 +321,7 @@ describe('RemindersService', () => {
       job_type: string;
     }>;
     expect(compiledRows.some((row) => row.job_type === 'session.reminder')).toBe(false);
-    expect(compiledRows.some((row) => row.job_type === 'session.feedback_request')).toBe(
+    expect(compiledRows.some((row) => row.job_type === 'session.completion_check')).toBe(
       true,
     );
   });
@@ -340,7 +340,7 @@ describe('RemindersService', () => {
         {
           id: 'stale-after-archive',
           dedupe_key:
-            'session.feedback_request:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z',
+            'session.completion_check:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z',
         },
       ],
     });
