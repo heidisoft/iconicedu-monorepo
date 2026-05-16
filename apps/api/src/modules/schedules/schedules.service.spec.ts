@@ -444,12 +444,60 @@ describe('SchedulesService authorization', () => {
       }),
     );
   });
+
+  it('cancels active reminder jobs before deleting learning-space schedules', async () => {
+    createSupabaseSessionClientMock.mockReturnValue({
+      auth: {
+        getUser: jest.fn(async () => ({
+          data: { user: { id: 'auth-user-1' } },
+          error: null,
+        })),
+      },
+    } as never);
+
+    const operations: Array<{ table: string; action: string; payload?: unknown }> = [];
+    const mainClient = makeReplaceSchedulesClient({
+      previousSchedules: [{ id: 'schedule-old' }],
+      cascadeSchedules: [],
+      operations,
+    });
+    createSupabaseServiceClientMock
+      .mockReturnValueOnce(
+        makeSingleResult({
+          id: 'account-1',
+          active_profile_id: 'profile-staff',
+        }) as never,
+      )
+      .mockReturnValueOnce(makeSingleResult([{ role_key: 'staff' }]) as never)
+      .mockReturnValueOnce(mainClient as never);
+
+    const service = new SchedulesService();
+    await service.deleteSchedulesForLearningSpace('token-1', {
+      orgId: 'org-1',
+      learningSpaceId: 'space-1',
+    });
+
+    expect(operations).toEqual([
+      {
+        table: 'reminder_jobs',
+        action: 'update',
+        payload: expect.objectContaining({
+          status: 'canceled',
+          lease_owner: null,
+          lease_until: null,
+        }),
+      },
+      { table: 'class_schedule_participants', action: 'delete' },
+      { table: 'class_schedules', action: 'delete' },
+    ]);
+  });
 });
 
 function makeReplaceSchedulesClient(input: {
   previousSchedules: unknown[];
   cascadeSchedules: unknown[];
   cascadeRecurrences?: unknown[];
+  operations?: Array<{ table: string; action: string; payload?: unknown }>;
 }) {
   let classSchedulesSelectCount = 0;
   return {
@@ -462,8 +510,16 @@ function makeReplaceSchedulesClient(input: {
         eq: jest.fn(() => query),
         is: jest.fn(() => query),
         in: jest.fn(() => query),
-        delete: jest.fn(() => query),
+        not: jest.fn(() => query),
+        delete: jest.fn(() => {
+          input.operations?.push({ table, action: 'delete' });
+          return query;
+        }),
         insert: jest.fn(() => Promise.resolve({ data: null, error: null })),
+        update: jest.fn((payload: unknown) => {
+          input.operations?.push({ table, action: 'update', payload });
+          return query;
+        }),
         returns: jest.fn(async () => {
           if (table === 'class_schedules') {
             return {

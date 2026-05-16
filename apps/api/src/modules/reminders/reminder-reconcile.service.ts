@@ -233,6 +233,8 @@ export class ReminderReconcileService {
     const shouldCancel =
       !enrichedRow ||
       enrichedRow.status === 'cancelled' ||
+      enrichedRow.status === 'completed' ||
+      enrichedRow.status === 'rescheduled' ||
       enrichedRow.source_learning_space?.status === 'archived' ||
       Boolean(enrichedRow.source_learning_space?.archived_at);
 
