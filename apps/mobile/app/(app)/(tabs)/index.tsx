@@ -494,6 +494,7 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [familySwitchOpen, setFamilySwitchOpen] = useState(false);
   const [switchingProfileId, setSwitchingProfileId] = useState<string | null>(null);
+  const [todaySectionY, setTodaySectionY] = useState(0);
   const [thisWeekSectionY, setThisWeekSectionY] = useState(0);
   const sessionBuckets = React.useMemo(
     () =>
@@ -564,11 +565,13 @@ export default function HomeScreen() {
     refetchSupportChannel,
   ]);
   const handleUpcomingSessionsPress = useCallback(() => {
+    const targetY = todaySessions.length > 0 ? todaySectionY : thisWeekSectionY;
+
     scrollRef.current?.scrollTo({
-      y: Math.max(thisWeekSectionY - 16, 0),
+      y: Math.max(targetY - 16, 0),
       animated: true,
     });
-  }, [thisWeekSectionY]);
+  }, [thisWeekSectionY, todaySectionY, todaySessions.length]);
   const canShowFamilySwitcher =
     familySwitchOptions.length > 1 &&
     profileData?.kind &&
@@ -836,7 +839,10 @@ export default function HomeScreen() {
 
         {/* Upcoming sessions */}
         {showTodaySection && (
-          <View style={{ gap: 10 }}>
+          <View
+            style={{ gap: 10 }}
+            onLayout={(event) => setTodaySectionY(event.nativeEvent.layout.y)}
+          >
             <View style={s.activityHeader}>
               <Text style={s.sectionLabel}>Today</Text>
             </View>
