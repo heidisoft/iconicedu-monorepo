@@ -266,6 +266,55 @@ describe('buildHomeMetricSummary', () => {
     expect(result).toHaveLength(1);
     expect(result[0]?.isToday).toBe(true);
   });
+
+  it('counts a Sunday session this week when loaded on Sunday before the session', () => {
+    const result = buildHomeMetricSummary({
+      schedules: [
+        makeSchedule({
+          id: 'sunday-session',
+          learningSpaceId: 'space-math',
+          startAt: '2026-05-17T19:00:00Z',
+          endAt: '2026-05-17T20:00:00Z',
+          participants: [
+            { id: 'child-1', role: 'child' },
+            { id: 'teacher-1', role: 'educator' },
+          ],
+        }),
+      ],
+      learningSpaces: LEARNING_SPACES,
+      profileKind: 'child',
+      profileId: 'child-1',
+      now: new Date('2026-05-17T13:00:00Z'),
+      timezone: 'America/New_York',
+    });
+
+    expect(result.upcomingSessionsThisWeek).toBe(1);
+  });
+
+  it('does not count a past-week Sunday session when the viewer is early Monday in their timezone', () => {
+    const result = buildHomeMetricSummary({
+      schedules: [
+        makeSchedule({
+          id: 'sunday-session',
+          learningSpaceId: 'space-math',
+          startAt: '2026-05-17T19:00:00Z',
+          endAt: '2026-05-18T05:30:00Z',
+          participants: [
+            { id: 'child-1', role: 'child' },
+            { id: 'teacher-1', role: 'educator' },
+          ],
+        }),
+      ],
+      learningSpaces: LEARNING_SPACES,
+      profileKind: 'child',
+      profileId: 'child-1',
+      now: new Date('2026-05-18T04:30:00Z'),
+      timezone: 'America/New_York',
+    });
+
+    // It is now Monday in the viewer's timezone; the Sunday session is from last week
+    expect(result.upcomingSessionsThisWeek).toBe(0);
+  });
 });
 
 describe('buildHomeUpcomingSessions', () => {

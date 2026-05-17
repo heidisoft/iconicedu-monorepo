@@ -336,8 +336,7 @@ function buildHomeScopedSchedules(input: {
   });
   const now = input.now ?? new Date();
   const viewerTimezone = normalizeTimezone(input.timezone) ?? 'UTC';
-  const displayNow = getScheduleDisplayStartOfDay(now, viewerTimezone);
-  const weekStartDate = getScheduleDisplayStartOfWeek(displayNow, viewerTimezone);
+  const weekStartDate = getScheduleDisplayStartOfWeek(now, viewerTimezone);
   const weekStartMs = weekStartDate.getTime();
   const nextWeekEndMs = (() => {
     const nextWeekEnd = endOfWeekSunday(weekStartDate);

@@ -494,6 +494,7 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [familySwitchOpen, setFamilySwitchOpen] = useState(false);
   const [switchingProfileId, setSwitchingProfileId] = useState<string | null>(null);
+  const [todaySectionY, setTodaySectionY] = useState(0);
   const [thisWeekSectionY, setThisWeekSectionY] = useState(0);
   const sessionBuckets = React.useMemo(
     () =>
@@ -506,6 +507,9 @@ export default function HomeScreen() {
   const todaySessions = sessionBuckets.today;
   const thisWeekSessions = sessionBuckets.thisWeek;
   const nextWeekSessions = sessionBuckets.nextWeek;
+  const showTodaySection = sessionsLoading || refreshing || todaySessions.length > 0;
+  const showThisWeekSection =
+    sessionsLoading || refreshing || thisWeekSessions.length > 0;
   const homeHeaderLoading =
     refreshing || accountLoading || profileLoading || supportLoading;
   const overviewLoading =
@@ -561,11 +565,13 @@ export default function HomeScreen() {
     refetchSupportChannel,
   ]);
   const handleUpcomingSessionsPress = useCallback(() => {
+    const targetY = todaySessions.length > 0 ? todaySectionY : thisWeekSectionY;
+
     scrollRef.current?.scrollTo({
-      y: Math.max(thisWeekSectionY - 16, 0),
+      y: Math.max(targetY - 16, 0),
       animated: true,
     });
-  }, [thisWeekSectionY]);
+  }, [thisWeekSectionY, todaySectionY, todaySessions.length]);
   const canShowFamilySwitcher =
     familySwitchOptions.length > 1 &&
     profileData?.kind &&
@@ -832,8 +838,11 @@ export default function HomeScreen() {
         </View>
 
         {/* Upcoming sessions */}
-        {(sessionsLoading || refreshing || todaySessions.length > 0) && (
-          <View style={{ gap: 10 }}>
+        {showTodaySection && (
+          <View
+            style={{ gap: 10 }}
+            onLayout={(event) => setTodaySectionY(event.nativeEvent.layout.y)}
+          >
             <View style={s.activityHeader}>
               <Text style={s.sectionLabel}>Today</Text>
             </View>
@@ -878,64 +887,54 @@ export default function HomeScreen() {
           </View>
         )}
 
-        <View
-          style={{ gap: 10 }}
-          onLayout={(event) => setThisWeekSectionY(event.nativeEvent.layout.y)}
-        >
-          <View style={s.activityHeader}>
-            <Text style={s.sectionLabel}>This week</Text>
-          </View>
-          {sessionsLoading || refreshing ? (
-            <View style={{ gap: 6 }}>
-              {[0, 1].map((i) => (
-                <View
-                  key={i}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 10,
-                    paddingHorizontal: 14,
-                    paddingVertical: 10,
-                    borderRadius: 12,
-                    borderWidth: StyleSheet.hairlineWidth,
-                    borderColor: colors.border,
-                    backgroundColor: colors.card,
-                  }}
-                >
-                  <PulseBox width={44} height={60} radius={10} />
-                  <View style={{ flex: 1, gap: 6 }}>
-                    <PulseBox width={i === 0 ? 140 : 120} height={13} radius={4} />
-                    <PulseBox width={80} height={11} radius={4} />
+        {showThisWeekSection && (
+          <View
+            style={{ gap: 10 }}
+            onLayout={(event) => setThisWeekSectionY(event.nativeEvent.layout.y)}
+          >
+            <View style={s.activityHeader}>
+              <Text style={s.sectionLabel}>This week</Text>
+            </View>
+            {sessionsLoading || refreshing ? (
+              <View style={{ gap: 6 }}>
+                {[0, 1].map((i) => (
+                  <View
+                    key={i}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 10,
+                      paddingHorizontal: 14,
+                      paddingVertical: 10,
+                      borderRadius: 12,
+                      borderWidth: StyleSheet.hairlineWidth,
+                      borderColor: colors.border,
+                      backgroundColor: colors.card,
+                    }}
+                  >
+                    <PulseBox width={44} height={60} radius={10} />
+                    <View style={{ flex: 1, gap: 6 }}>
+                      <PulseBox width={i === 0 ? 140 : 120} height={13} radius={4} />
+                      <PulseBox width={80} height={11} radius={4} />
+                    </View>
+                    <PulseBox width={50} height={26} radius={20} />
                   </View>
-                  <PulseBox width={50} height={26} radius={20} />
-                </View>
-              ))}
-            </View>
-          ) : thisWeekSessions.length > 0 ? (
-            <View style={{ gap: 6 }}>
-              {thisWeekSessions.map((session) => (
-                <SessionCard
-                  key={session.id}
-                  session={session}
-                  pressTarget="messages"
-                  titleVariant="message-list"
-                />
-              ))}
-            </View>
-          ) : (
-            <View style={s.emptyStateCard}>
-              <View style={s.emptyWrap}>
-                <View style={[s.emptyIcon, { backgroundColor: colors.inputBg }]}>
-                  <CalendarDays size={32} color={colors.textMuted} />
-                </View>
-                <Text style={s.emptyTitle}>No more sessions this week</Text>
-                <Text style={s.emptyDesc}>
-                  Sessions later this week will appear here.
-                </Text>
+                ))}
               </View>
-            </View>
-          )}
-        </View>
+            ) : (
+              <View style={{ gap: 6 }}>
+                {thisWeekSessions.map((session) => (
+                  <SessionCard
+                    key={session.id}
+                    session={session}
+                    pressTarget="messages"
+                    titleVariant="message-list"
+                  />
+                ))}
+              </View>
+            )}
+          </View>
+        )}
 
         <View style={{ gap: 10 }}>
           <View style={s.activityHeader}>

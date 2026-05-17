@@ -743,6 +743,72 @@ describe('buildDashboardHomeInfographicMetrics', () => {
     ).toBe(true);
   });
 
+  it('counts a Sunday session this week when the server is loaded on Sunday before the session', async () => {
+    mockApi(
+      [
+        buildRawSchedule({
+          id: 'sunday-session',
+          start_at: '2026-05-17T19:00:00.000Z',
+          end_at: '2026-05-17T20:00:00.000Z',
+          recurrence: null,
+        }),
+      ],
+      [{ id: 'space-1', status: 'active', subject: 'Math', title: null }],
+    );
+
+    const result = await buildDashboardHomeInfographicMetrics({
+      supabase: {} as never,
+      orgId: 'org-1',
+      orgSlug: 'iconic-academy',
+      now: new Date('2026-05-17T13:00:00.000Z'),
+      timezone: 'America/New_York',
+      currentUserProfile: {
+        kind: 'child',
+        ids: { id: 'child-1', orgId: 'org-1', accountId: 'account-c1' },
+        prefs: { timezone: 'America/New_York' },
+      } as never,
+    });
+
+    expect(result.metricsByRole.students.upcomingSessionsThisWeek).toBe(1);
+    expect(result.upcomingSessionsPage.today.items).toHaveLength(1);
+    expect(result.upcomingSessionsPage.thisWeek.items).toHaveLength(0);
+    expect(result.upcomingSessionsPage.nextWeek.items).toHaveLength(0);
+  });
+
+  it('does not count a past-week Sunday session as next-week when the viewer is early Monday in their timezone', async () => {
+    mockApi(
+      [
+        buildRawSchedule({
+          id: 'sunday-session',
+          start_at: '2026-05-17T19:00:00.000Z',
+          end_at: '2026-05-18T05:30:00.000Z',
+          recurrence: null,
+        }),
+      ],
+      [{ id: 'space-1', status: 'active', subject: 'Math', title: null }],
+    );
+
+    // now = Monday 12:30am EDT (4:30am UTC) — viewer is in the new week but UTC was already Monday
+    const result = await buildDashboardHomeInfographicMetrics({
+      supabase: {} as never,
+      orgId: 'org-1',
+      orgSlug: 'iconic-academy',
+      now: new Date('2026-05-18T04:30:00.000Z'),
+      timezone: 'America/New_York',
+      currentUserProfile: {
+        kind: 'child',
+        ids: { id: 'child-1', orgId: 'org-1', accountId: 'account-c1' },
+        prefs: { timezone: 'America/New_York' },
+      } as never,
+    });
+
+    // The Sunday session belongs to the previous week and must not appear in any upcoming bucket
+    expect(result.upcomingSessionsPage.today.items).toHaveLength(0);
+    expect(result.upcomingSessionsPage.thisWeek.items).toHaveLength(0);
+    expect(result.upcomingSessionsPage.nextWeek.items).toHaveLength(0);
+    expect(result.metricsByRole.students.upcomingSessionsThisWeek).toBe(0);
+  });
+
   it('counts upcoming one-off and replacement recurring rules after an older rule ended', async () => {
     const endedRule = buildRawSchedule({
       id: 'ended-daily-rule',

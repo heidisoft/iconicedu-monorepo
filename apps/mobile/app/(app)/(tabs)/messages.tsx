@@ -338,6 +338,11 @@ function makeStyles(C: AppColors) {
     subTabText: { fontSize: 14, fontWeight: '600', color: C.textMuted },
     subTabTextActive: { color: C.teal },
 
+    listContent: {
+      paddingHorizontal: 16,
+      paddingTop: 8,
+      paddingBottom: 16,
+    },
     itemOuter: {
       marginHorizontal: 0,
       marginBottom: 0,
@@ -346,19 +351,19 @@ function makeStyles(C: AppColors) {
       position: 'relative',
       backgroundColor: 'transparent',
       paddingHorizontal: 0,
-      paddingVertical: 14,
+      paddingVertical: 18,
       overflow: 'hidden',
     },
     itemWrapUnread: {},
-    itemDivider: {
-      position: 'absolute',
-      top: 0,
-      right: 0,
-      left: 62,
+    itemRow: { minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: 12 },
+    separator: {
+      height: 8,
+      justifyContent: 'center',
+    },
+    separatorLine: {
+      marginLeft: 62,
       height: StyleSheet.hairlineWidth,
     },
-    itemRow: { minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: 12 },
-    separator: { height: 0 },
 
     // ── DM avatar — single person ──────────────────────────────────────────────
     avatarWrap: { position: 'relative', width: 50, height: 50, flexShrink: 0 },
@@ -648,7 +653,6 @@ function SectionHeader({
 function ChannelRow({
   item,
   onPress,
-  showTopBorder,
   presenceByProfileId,
   currentProfileName,
   currentProfileKind,
@@ -657,7 +661,6 @@ function ChannelRow({
 }: {
   item: ChannelListItem;
   onPress: () => void;
-  showTopBorder: boolean;
   presenceByProfileId: Map<string, PresenceDisplayStatus>;
   currentProfileName?: string | null;
   currentProfileKind?: string | null;
@@ -753,9 +756,6 @@ function ChannelRow({
           pressed && { backgroundColor: colors.inputBg },
         ]}
       >
-        {showTopBorder ? (
-          <View style={[s.itemDivider, { backgroundColor: colors.border }]} />
-        ) : null}
         <View style={s.itemRow}>
           {/* Avatar */}
           {isDm ? (
@@ -1133,7 +1133,7 @@ export default function MessagesScreen() {
   const isEmpty = data.length === 0 || (data.length === 1 && '_type' in data[0]!);
 
   const renderItem = useCallback(
-    ({ item, index }: { item: ListRow; index: number }) => {
+    ({ item }: { item: ListRow }) => {
       if ('_type' in item && item._type === 'section-header') {
         return <SectionHeader title={item.title} s={s} />;
       }
@@ -1174,7 +1174,6 @@ export default function MessagesScreen() {
       return (
         <ChannelRow
           item={channel}
-          showTopBorder={index > 0}
           presenceByProfileId={presenceByProfileId}
           currentProfileName={currentProfileName}
           currentProfileKind={profileKind}
@@ -1317,11 +1316,7 @@ export default function MessagesScreen() {
         <FlatList
           data={data}
           keyExtractor={(item) => ('_type' in item ? item.id : item.id)}
-          contentContainerStyle={{
-            paddingHorizontal: 16,
-            paddingTop: 8,
-            paddingBottom: 16,
-          }}
+          contentContainerStyle={s.listContent}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -1329,7 +1324,11 @@ export default function MessagesScreen() {
               tintColor={colors.teal}
             />
           }
-          ItemSeparatorComponent={() => <View style={s.separator} />}
+          ItemSeparatorComponent={() => (
+            <View style={s.separator}>
+              <View style={[s.separatorLine, { backgroundColor: colors.border }]} />
+            </View>
+          )}
           renderItem={renderItem}
         />
       )}
