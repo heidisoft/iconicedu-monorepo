@@ -19,7 +19,10 @@ import {
   BriefcaseBusiness,
   ExternalLink,
   FileText,
+  GraduationCap,
+  LifeBuoy,
   MoreVertical,
+  MessageSquare,
   Pause,
   Play,
   Presentation,
@@ -1349,6 +1352,7 @@ export const FeedMessageList: React.FC<FeedMessageListProps> = ({
   isScreenActive = true,
   emptyTitle,
   emptyDescription,
+  emptyIcon,
   lastReadMessageId,
   lastReadAt,
   unreadCount,
@@ -1493,6 +1497,15 @@ export const FeedMessageList: React.FC<FeedMessageListProps> = ({
 
   const emptyNode: ReactNode = (
     <View style={[styles.emptyWrap, { backgroundColor: colors.pageBg }]}>
+      <View style={[styles.emptyIconWrap, { backgroundColor: colors.inputBg }]}>
+        {emptyIcon === 'life-buoy' ? (
+          <LifeBuoy size={28} color={colors.teal} />
+        ) : emptyIcon === 'graduation-cap' ? (
+          <GraduationCap size={28} color={colors.teal} />
+        ) : (
+          <MessageSquare size={28} color={colors.teal} />
+        )}
+      </View>
       <Text style={[styles.emptyTitle, { color: colors.text }]}>
         {emptyTitle ?? 'Start the conversation'}
       </Text>
@@ -1927,20 +1940,27 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 32,
+    paddingHorizontal: 32,
+    gap: 12,
     backgroundColor: FEED.page,
+  },
+  emptyIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyTitle: {
     color: FEED.text,
-    fontSize: 17,
+    fontSize: 20,
     fontWeight: '700',
     textAlign: 'center',
   },
   emptyDescription: {
-    marginTop: 8,
     color: FEED.muted,
-    fontSize: FONT.meta,
-    lineHeight: FONT.metaLine,
+    fontSize: 15,
+    lineHeight: 20,
     textAlign: 'center',
   },
   loadingWrap: {

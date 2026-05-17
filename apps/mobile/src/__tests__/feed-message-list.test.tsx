@@ -205,6 +205,37 @@ describe('FeedMessageList', () => {
     expect(screen.getByText('Tutor')).toBeTruthy();
   });
 
+  it('matches the classic DM empty-state text scale', () => {
+    render(
+      <FeedMessageList
+        messages={[]}
+        currentProfileId="profile-current"
+        emptyTitle="No messages yet"
+        emptyDescription="Looks like you have not started a conversation yet."
+      />,
+    );
+
+    expect(StyleSheet.flatten(screen.getByText('No messages yet').props.style)).toEqual(
+      expect.objectContaining({
+        fontSize: 20,
+        fontWeight: '700',
+        textAlign: 'center',
+      }),
+    );
+    expect(
+      StyleSheet.flatten(
+        screen.getByText('Looks like you have not started a conversation yet.').props
+          .style,
+      ),
+    ).toEqual(
+      expect.objectContaining({
+        fontSize: 15,
+        lineHeight: 20,
+        textAlign: 'center',
+      }),
+    );
+  });
+
   it('uses the mobile DM bubble colors for feed text cards', () => {
     render(
       <FeedMessageList
