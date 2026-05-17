@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
+import type { AppColors } from '@/lib/theme';
 import { useTheme } from '@/providers/theme-provider';
 import { PulseBox } from './pulse-box';
 
@@ -71,11 +72,8 @@ export function ChannelListSkeleton({ count = 6 }: Props) {
   return (
     <View accessibilityLabel="Loading" style={s.wrap} testID="channel-list-skeleton">
       {items.map((item, i) => (
-        <View
-          key={i}
-          style={[s.row, i === 0 ? undefined : { borderTopColor: colors.border }]}
-          testID="channel-skeleton-row"
-        >
+        <View key={i} style={s.row} testID="channel-skeleton-row">
+          {i > 0 ? <View style={dividerStyle(colors)} /> : null}
           <View style={s.avatarWrap}>
             <PulseBox width={50} height={50} radius={25} />
             {item.hasStatus ? (
@@ -88,20 +86,20 @@ export function ChannelListSkeleton({ count = 6 }: Props) {
 
           <View style={s.content}>
             <View style={s.topRow}>
-              <PulseBox width={item.titleWidth} height={20} radius={6} />
+              <PulseBox width={item.titleWidth} height={18} radius={6} />
             </View>
             {item.metaPrimaryWidth > 0 ? (
               <View style={s.metaRow}>
-                <PulseBox width={item.metaPrimaryWidth} height={15} radius={5} />
+                <PulseBox width={item.metaPrimaryWidth} height={14} radius={5} />
                 {item.metaSecondaryWidth > 0 ? (
                   <>
                     <View style={[s.metaDot, { backgroundColor: colors.border }]} />
-                    <PulseBox width={item.metaSecondaryWidth} height={15} radius={5} />
+                    <PulseBox width={item.metaSecondaryWidth} height={14} radius={5} />
                   </>
                 ) : null}
               </View>
             ) : (
-              <PulseBox width={118} height={15} radius={5} />
+              <PulseBox width={118} height={14} radius={5} />
             )}
           </View>
 
@@ -114,16 +112,27 @@ export function ChannelListSkeleton({ count = 6 }: Props) {
   );
 }
 
+function dividerStyle(colors: AppColors) {
+  return [s.divider, { backgroundColor: colors.border }];
+}
+
 const s = StyleSheet.create({
-  wrap: { paddingTop: 8, paddingBottom: 24 },
+  wrap: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 16 },
   row: {
+    position: 'relative',
+    minHeight: 62,
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 14,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'transparent',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 0,
+    paddingVertical: 14,
+  },
+  divider: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    left: 62,
+    height: StyleSheet.hairlineWidth,
   },
   avatarWrap: {
     width: 50,
@@ -143,14 +152,16 @@ const s = StyleSheet.create({
     backgroundColor: '#6b7280',
     borderWidth: 3,
   },
-  content: { flex: 1, minWidth: 0, justifyContent: 'center', gap: 7, paddingTop: 2 },
-  topRow: { flexDirection: 'row', alignItems: 'center' },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 7, minHeight: 15 },
+  content: { flex: 1, minWidth: 0, justifyContent: 'center', gap: 3 },
+  topRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 7, minHeight: 18 },
   metaDot: { width: 4, height: 4, borderRadius: 2 },
   rowTail: {
     width: 58,
     alignItems: 'flex-end',
+    justifyContent: 'space-between',
     flexShrink: 0,
-    paddingTop: 4,
+    alignSelf: 'stretch',
+    paddingVertical: 2,
   },
 });

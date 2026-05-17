@@ -6,8 +6,7 @@ import React, {
   useMemo,
   useCallback,
 } from 'react';
-import { useColorScheme } from 'react-native';
-import { colorScheme as nwColorScheme } from 'react-native-css-interop';
+import { useColorScheme as useNativeWindColorScheme } from 'react-native-css-interop';
 import * as SecureStore from 'expo-secure-store';
 import { lightColors, darkColors, type AppColors, type ThemeMode } from '@/lib/theme';
 
@@ -31,7 +30,8 @@ const ThemeContext = createContext<ThemeContextType>({
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [mode, setModeState] = useState<ThemeMode>('system');
-  const systemScheme: 'light' | 'dark' = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const { colorScheme: nativeWindColorScheme, setColorScheme: setNativeWindColorScheme } =
+    useNativeWindColorScheme();
 
   // Load persisted preference on mount. We render immediately with 'system'
   // mode (the default) so the native window background is never exposed as a
@@ -46,16 +46,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       .catch(() => {});
   }, []);
 
-  const colorScheme: 'light' | 'dark' = mode === 'system' ? systemScheme : mode;
+  const colorScheme: 'light' | 'dark' =
+    nativeWindColorScheme === 'dark' ? 'dark' : 'light';
   const isDark = colorScheme === 'dark';
   const colors = isDark ? darkColors : lightColors;
 
-  // Pass 'system' when in system mode so NativeWind doesn't call
-  // Appearance.setColorScheme() with a fixed value — that override blocks
-  // OS-level trait-change notifications and breaks useColorScheme() live updates.
+  // Keep NativeWind class styles and ThemeContext colors on the same effective
+  // color scheme. Use css-interop directly because NativeWind's wrapper can
+  // throw before the compiled darkMode flag is available in Expo startup.
   useEffect(() => {
-    nwColorScheme.set(mode === 'system' ? 'system' : mode);
-  }, [mode]);
+    setNativeWindColorScheme(mode);
+  }, [mode, setNativeWindColorScheme]);
 
   const setMode = useCallback((newMode: ThemeMode) => {
     setModeState(newMode);

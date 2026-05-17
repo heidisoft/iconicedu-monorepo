@@ -28,7 +28,7 @@ function makeStyles(C: AppColors) {
       letterSpacing: 0,
     },
     listContent: {
-      paddingHorizontal: 12,
+      paddingHorizontal: 16,
       paddingTop: 8,
       paddingBottom: 32,
     },

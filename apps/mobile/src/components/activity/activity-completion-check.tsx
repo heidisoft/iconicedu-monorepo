@@ -12,7 +12,8 @@ type Step =
   | 'submitting_confirm'
   | 'submitting_dispute'
   | 'confirmed'
-  | 'disputed';
+  | 'disputed'
+  | 'already_responded';
 
 type DisputeCategory = 'teacher_absent' | 'student_absent' | 'technical_issue' | 'other';
 type CompletionVoteStatus = 'confirmed' | 'disputed';
@@ -52,8 +53,7 @@ type Props = {
 };
 
 function getInitialStep(status: CompletionVoteStatus | null): Step {
-  if (status === 'confirmed') return 'confirmed';
-  if (status === 'disputed') return 'disputed';
+  if (status === 'confirmed' || status === 'disputed') return 'already_responded';
   return 'prompt';
 }
 
@@ -78,7 +78,11 @@ export function ActivityCompletionCheck({
 
   useEffect(() => {
     if (metadata.completionVoteStatus) {
-      setStep(getInitialStep(metadata.completionVoteStatus));
+      setStep((prev) => {
+        // After a fresh in-session submit (confirmed/disputed), don't revert to already_responded
+        if (prev === 'confirmed' || prev === 'disputed') return prev;
+        return getInitialStep(metadata.completionVoteStatus);
+      });
     }
   }, [metadata.completionVoteStatus]);
 
@@ -207,6 +211,74 @@ export function ActivityCompletionCheck({
       <View style={[styles.card, { backgroundColor: colors.inputBg }]}>
         <Text style={[styles.submittedText, { color: colors.textMuted }]}>
           {"Got it — we've notified the educator and admin team."}
+        </Text>
+      </View>
+    );
+  }
+
+  if (step === 'already_responded') {
+    const wasConfirmed = metadata.completionVoteStatus === 'confirmed';
+    return (
+      <View style={styles.card}>
+        <Text style={[styles.question, { color: colors.textMuted }]}>
+          Did this class take place?
+        </Text>
+        <View style={styles.buttonRow}>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Yes, the class happened"
+            disabled
+            activeOpacity={1}
+            style={[
+              styles.yesButton,
+              {
+                backgroundColor: wasConfirmed ? colors.teal : colors.inputBg,
+                borderWidth: wasConfirmed ? 0 : 1,
+                borderColor: colors.border,
+                opacity: wasConfirmed ? 1 : 0.4,
+              },
+            ]}
+          >
+            <CheckCircle2
+              size={16}
+              color={wasConfirmed ? colors.tealFg : colors.textMuted}
+            />
+            <Text
+              style={[
+                styles.yesButtonText,
+                { color: wasConfirmed ? colors.tealFg : colors.textMuted },
+              ]}
+            >
+              Yes, it happened
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="No, the class did not happen"
+            disabled
+            activeOpacity={1}
+            style={[
+              styles.noButton,
+              {
+                borderColor: !wasConfirmed ? colors.teal : colors.border,
+                backgroundColor: colors.inputBg,
+                opacity: !wasConfirmed ? 1 : 0.4,
+              },
+            ]}
+          >
+            <XCircle size={16} color={!wasConfirmed ? colors.teal : colors.textMuted} />
+            <Text
+              style={[
+                styles.noButtonText,
+                { color: !wasConfirmed ? colors.teal : colors.textMuted },
+              ]}
+            >
+              {"No, it didn't"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+        <Text style={[styles.alreadyRespondedText, { color: colors.textFaint }]}>
+          {"You've already responded"}
         </Text>
       </View>
     );
@@ -454,6 +526,11 @@ function makeStyles(colors: AppColors) {
     submittedText: {
       fontSize: 13,
       lineHeight: 19,
+    },
+    alreadyRespondedText: {
+      fontSize: 12,
+      lineHeight: 16,
+      fontStyle: 'italic',
     },
     errorText: {
       fontSize: 13,

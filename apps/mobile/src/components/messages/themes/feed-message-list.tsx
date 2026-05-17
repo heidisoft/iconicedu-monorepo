@@ -277,17 +277,21 @@ function FeedText({
   mentions,
   size = FONT.body,
   lineHeight = FONT.bodyLine,
+  color,
+  mentionColor,
 }: {
   text: string;
   mentions?: MessageMentionVM[];
   size?: number;
   lineHeight?: number;
+  color: string;
+  mentionColor: string;
 }) {
   return (
-    <Text style={[styles.feedText, { fontSize: size, lineHeight }]}>
+    <Text style={[styles.feedText, { color, fontSize: size, lineHeight }]}>
       {buildSegments(text, mentions).map((segment, index) =>
         segment.kind === 'mention' ? (
-          <Text key={index} style={{ color: FEED.blue, fontWeight: '700' }}>
+          <Text key={index} style={{ color: mentionColor, fontWeight: '700' }}>
             {segment.value}
           </Text>
         ) : (
@@ -346,16 +350,24 @@ function FeedHeader({
               accessibilityLabel={`${senderName} profile name`}
             >
               <Text
-                style={[styles.senderName, compact && styles.commentSenderName]}
+                style={[
+                  styles.senderName,
+                  { color: colors.text },
+                  compact && styles.commentSenderName,
+                ]}
                 numberOfLines={1}
               >
                 {senderName}
               </Text>
             </TouchableOpacity>
             <View style={styles.roleRow}>
-              <RoleIcon size={13} color={FEED.muted} strokeWidth={2} />
+              <RoleIcon size={13} color={colors.textMuted} strokeWidth={2} />
               <Text
-                style={[styles.roleText, compact && styles.commentRoleText]}
+                style={[
+                  styles.roleText,
+                  { color: colors.textMuted },
+                  compact && styles.commentRoleText,
+                ]}
                 numberOfLines={1}
               >
                 {getRoleLabel(message.core.sender.kind)}
@@ -364,7 +376,10 @@ function FeedHeader({
           </View>
           <View style={styles.headerRight}>
             <View style={styles.headerTimeRow}>
-              <Text style={styles.timestamp} numberOfLines={1}>
+              <Text
+                style={[styles.timestamp, { color: colors.textMuted }]}
+                numberOfLines={1}
+              >
                 {compact
                   ? formatRelative(message.core.createdAt)
                   : formatFeedDate(message.core.createdAt)}
@@ -377,7 +392,7 @@ function FeedHeader({
                   accessibilityLabel="More message actions"
                   hitSlop={8}
                 >
-                  <MoreVertical size={21} color="#111827" />
+                  <MoreVertical size={21} color={colors.text} />
                 </TouchableOpacity>
               )}
             </View>
@@ -906,6 +921,7 @@ function FeedContentCard({
   compact?: boolean;
   isOwn?: boolean;
 }) {
+  const { colors } = useTheme();
   let text = getMessageText(message);
   if (message.core.type === 'link-preview') {
     const link = (message as LinkPreviewMessageVM).link;
@@ -928,6 +944,8 @@ function FeedContentCard({
           mentions={getMentions(message)}
           size={emojiOnly ? FONT.emoji : undefined}
           lineHeight={emojiOnly ? FONT.emojiLine : undefined}
+          color={colors.text}
+          mentionColor={colors.teal}
         />
       </View>
     </View>
@@ -989,6 +1007,7 @@ function FeedComment({
   isReadOnly?: boolean;
   presenceStatus?: PresenceDisplayStatus | null;
 }) {
+  const { colors } = useTheme();
   const senderName = message.core.sender.profile.displayName;
   const { url, seed } = getAvatarInfo(message);
   const handleProfilePress = () => onProfilePress?.(message.core.sender);
@@ -1035,15 +1054,24 @@ function FeedComment({
                 disabled={!onProfilePress}
                 accessibilityLabel={`${senderName} profile name`}
               >
-                <Text style={styles.commentSenderName} numberOfLines={1}>
+                <Text
+                  style={[styles.commentSenderName, { color: colors.text }]}
+                  numberOfLines={1}
+                >
                   {senderName}
                 </Text>
               </TouchableOpacity>
-              <Text style={styles.commentRoleText} numberOfLines={1}>
+              <Text
+                style={[styles.commentRoleText, { color: colors.textMuted }]}
+                numberOfLines={1}
+              >
                 {getRoleLabel(message.core.sender.kind)}
               </Text>
             </View>
-            <Text style={styles.commentTimestamp} numberOfLines={1}>
+            <Text
+              style={[styles.commentTimestamp, { color: colors.textMuted }]}
+              numberOfLines={1}
+            >
               {formatRelative(message.core.createdAt)}
             </Text>
             <TouchableOpacity
@@ -1053,11 +1081,16 @@ function FeedComment({
               accessibilityLabel="More message actions"
               hitSlop={8}
             >
-              <MoreVertical size={18} color="#111827" />
+              <MoreVertical size={18} color={colors.text} />
             </TouchableOpacity>
           </View>
           <View style={styles.commentTextWrap}>
-            <FeedText text={getMessageText(message)} mentions={getMentions(message)} />
+            <FeedText
+              text={getMessageText(message)}
+              mentions={getMentions(message)}
+              color={colors.text}
+              mentionColor={colors.teal}
+            />
           </View>
         </View>
         <FeedActions
@@ -1213,11 +1246,16 @@ function FeedPost({
   return (
     <Pressable
       testID="feed-message-post"
-      style={styles.post}
+      style={[styles.post, { borderColor: colors.border, backgroundColor: colors.card }]}
       onLongPress={() => onLongPress?.(message)}
       delayLongPress={350}
     >
-      {showUnreadDot ? <View testID="feed-unread-dot" style={styles.unreadDot} /> : null}
+      {showUnreadDot ? (
+        <View
+          testID="feed-unread-dot"
+          style={[styles.unreadDot, { backgroundColor: colors.teal }]}
+        />
+      ) : null}
       <FeedHeader
         message={message}
         presenceStatus={senderPresenceStatus}
@@ -1256,7 +1294,7 @@ function FeedPost({
         {threadExpanded ? (
           <View style={styles.commentsWrap}>
             {threadLoading ? (
-              <ActivityIndicator size="small" color={FEED.blue} />
+              <ActivityIndicator size="small" color={colors.teal} />
             ) : (
               <>
                 {threadReplies.map((reply) => (
@@ -1265,7 +1303,7 @@ function FeedPost({
                     threadReplies[inlineUnreadStartIndex]?.ids.id === reply.ids.id ? (
                       <View
                         testID="feed-thread-unread-dot"
-                        style={styles.threadUnreadDot}
+                        style={[styles.threadUnreadDot, { backgroundColor: colors.teal }]}
                       />
                     ) : null}
                     <FeedComment
@@ -1454,9 +1492,11 @@ export const FeedMessageList: React.FC<FeedMessageListProps> = ({
   );
 
   const emptyNode: ReactNode = (
-    <View style={styles.emptyWrap}>
-      <Text style={styles.emptyTitle}>{emptyTitle ?? 'Start the conversation'}</Text>
-      <Text style={styles.emptyDescription}>
+    <View style={[styles.emptyWrap, { backgroundColor: colors.pageBg }]}>
+      <Text style={[styles.emptyTitle, { color: colors.text }]}>
+        {emptyTitle ?? 'Start the conversation'}
+      </Text>
+      <Text style={[styles.emptyDescription, { color: colors.textMuted }]}>
         {emptyDescription ?? 'Share an update or question to begin the discussion.'}
       </Text>
     </View>
@@ -1471,7 +1511,7 @@ export const FeedMessageList: React.FC<FeedMessageListProps> = ({
       <View>
         {loading ? (
           <View style={styles.loadingWrap}>
-            <ActivityIndicator size="small" color={FEED.blue} />
+            <ActivityIndicator size="small" color={colors.teal} />
           </View>
         ) : null}
         {pendingUploads?.length ? (
