@@ -387,7 +387,7 @@ export function ActivityFeedbackRequest({
               ]}
             >
               <Star
-                size={16}
+                size={18}
                 color={isActive ? '#f59e0b' : colors.textMuted}
                 fill={isActive ? '#f59e0b' : 'transparent'}
               />
@@ -494,12 +494,12 @@ function makeStyles(colors: AppColors) {
     starRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 8,
+      gap: 7,
     },
     starButton: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
+      width: 36,
+      height: 36,
+      borderRadius: 18,
       borderWidth: 1,
       alignItems: 'center',
       justifyContent: 'center',
