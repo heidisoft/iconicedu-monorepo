@@ -476,8 +476,7 @@ async function buildActiveRoleMetrics(input: {
     };
   }
 
-  const displayNow = getScheduleDisplayStartOfDay(input.now, input.timezone ?? null);
-  const weekStartDate = getScheduleDisplayStartOfWeek(displayNow, input.timezone ?? null);
+  const weekStartDate = getScheduleDisplayStartOfWeek(input.now, input.timezone ?? null);
   const weekStartMs = weekStartDate.getTime();
   const nextWeekEndDate = (() => {
     const nextWeekEnd = endOfWeekSunday(weekStartDate);
