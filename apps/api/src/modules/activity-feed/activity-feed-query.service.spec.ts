@@ -106,4 +106,91 @@ describe('ActivityFeedQueryService', () => {
       },
     });
   });
+
+  it('hydrates saved completion votes onto completion check activity items', async () => {
+    const activityRows = [
+      {
+        id: 'activity-1',
+        org_id: 'org-1',
+        recipient_profile_id: 'profile-1',
+        source_event_id: 'event-1',
+        kind: 'notification',
+        occurred_at: '2026-05-05T12:00:00.000Z',
+        created_at: '2026-05-05T12:00:00.000Z',
+        tab_key: 'classes',
+        audience: { scope: { kind: 'global' }, visibility: 'public' },
+        verb: 'session.completion_check.sent',
+        actor_profile_id: null,
+        refs: {},
+        content: {
+          headline: { primary: 'Did Algebra I happen?' },
+          summary: 'Confirm whether the class took place',
+        },
+        summary: 'Confirm whether the class took place',
+        preview: null,
+        action_button: null,
+        expanded_content: null,
+        importance: 'normal',
+        is_read: false,
+        read_at: null,
+        dedupe_key: 'completion-1',
+        metadata: {
+          sourceEventId: 'event-1',
+          scheduleId: 'schedule-1',
+          occurrenceStart: '2026-05-05T11:00:00.000Z',
+          learningSpaceId: 'space-1',
+          channelId: 'channel-1',
+          completionCheckUiEnabled: true,
+        },
+        updated_at: '2026-05-05T12:00:00.000Z',
+        deleted_at: null,
+      },
+    ];
+    const completionVoteRows = [
+      {
+        schedule_id: 'schedule-1',
+        occurrence_key: '2026-05-05T11:00:00.000Z',
+        profile_id: 'profile-1',
+        role: 'guardian',
+        status: 'disputed',
+        dispute_category: 'teacher_absent',
+        dispute_reason: 'Teacher did not join',
+        reschedule_requested: true,
+        voted_at: '2026-05-05T12:10:00.000Z',
+      },
+    ];
+    const activityQuery = makeQuery(activityRows);
+    const completionVoteQuery = makeQuery(completionVoteRows);
+    const from = jest.fn((table: string) => {
+      if (table === 'activity_feed_items') return activityQuery;
+      if (table === 'class_session_completion_votes') return completionVoteQuery;
+      throw new Error(`Unexpected table ${table}`);
+    });
+    createSupabaseSessionClientMock.mockReturnValue({ from } as never);
+
+    const service = new ActivityFeedQueryService();
+    const feed = await service.fetchFeed('token-1', 'org-1', 'profile-1');
+
+    expect(completionVoteQuery.in).toHaveBeenCalledWith('schedule_id', ['schedule-1']);
+    expect(completionVoteQuery.in).toHaveBeenCalledWith('occurrence_key', [
+      '2026-05-05T11:00:00.000Z',
+    ]);
+    expect(feed.sections[0]?.items[0]).toMatchObject({
+      kind: 'leaf',
+      verb: 'session.completion_check.sent',
+      metadata: {
+        completionVote: {
+          scheduleId: 'schedule-1',
+          occurrenceKey: '2026-05-05T11:00:00.000Z',
+          profileId: 'profile-1',
+          role: 'guardian',
+          status: 'disputed',
+          disputeCategory: 'teacher_absent',
+          disputeReason: 'Teacher did not join',
+          rescheduleRequested: true,
+          votedAt: '2026-05-05T12:10:00.000Z',
+        },
+      },
+    });
+  });
 });

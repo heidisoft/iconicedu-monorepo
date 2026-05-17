@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, XCircle } from 'lucide-react';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { Textarea } from '@iconicedu/ui-web/ui/textarea';
@@ -10,6 +10,7 @@ import type { ActivityFeedLeafItemVM } from '@iconicedu/shared-types';
 
 type Step = 'prompt' | 'dispute_form' | 'submitting' | 'confirmed' | 'disputed';
 type DisputeCategory = 'teacher_absent' | 'student_absent' | 'technical_issue' | 'other';
+type CompletionVoteStatus = 'confirmed' | 'disputed';
 
 const DISPUTE_CATEGORIES: { key: DisputeCategory; label: string }[] = [
   { key: 'teacher_absent', label: 'Teacher absent' },
@@ -20,12 +21,21 @@ const DISPUTE_CATEGORIES: { key: DisputeCategory; label: string }[] = [
 
 function getMetadata(activity: ActivityFeedLeafItemVM) {
   const m = (activity.metadata ?? {}) as Record<string, unknown>;
+  const vote =
+    m.completionVote && typeof m.completionVote === 'object'
+      ? (m.completionVote as Record<string, unknown>)
+      : null;
+  const completionVoteStatus =
+    vote?.status === 'confirmed' || vote?.status === 'disputed'
+      ? (vote.status as CompletionVoteStatus)
+      : null;
   return {
     orgId: typeof m.orgId === 'string' ? m.orgId : activity.ids.orgId,
     scheduleId: typeof m.scheduleId === 'string' ? m.scheduleId : null,
     occurrenceStart: typeof m.occurrenceStart === 'string' ? m.occurrenceStart : null,
     role: typeof m.roleContext === 'string' ? m.roleContext : 'child',
     feedbackUiEnabled: m.feedbackUiEnabled !== false,
+    completionVoteStatus,
   };
 }
 
@@ -43,15 +53,29 @@ export function canRenderActivityCompletionCheck(activity: ActivityFeedLeafItemV
   );
 }
 
+function getInitialStep(status: CompletionVoteStatus | null): Step {
+  if (status === 'confirmed') return 'confirmed';
+  if (status === 'disputed') return 'disputed';
+  return 'prompt';
+}
+
 export function ActivityCompletionCheck({ activity, onVoteSubmit }: Props) {
   const metadata = useMemo(() => getMetadata(activity), [activity]);
-  const [step, setStep] = useState<Step>('prompt');
+  const [step, setStep] = useState<Step>(() =>
+    getInitialStep(metadata.completionVoteStatus),
+  );
   const [disputeCategory, setDisputeCategory] = useState<DisputeCategory | null>(null);
   const [disputeReason, setDisputeReason] = useState('');
   const [rescheduleRequested, setRescheduleRequested] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const canSubmit = Boolean(metadata.scheduleId && metadata.occurrenceStart);
+
+  useEffect(() => {
+    if (metadata.completionVoteStatus) {
+      setStep(getInitialStep(metadata.completionVoteStatus));
+    }
+  }, [metadata.completionVoteStatus]);
 
   const handleConfirm = useCallback(async () => {
     if (!canSubmit) return;

@@ -117,6 +117,8 @@ describe('RemindersService', () => {
     scheduleRows?: unknown[];
     existingRows?: Array<{ dedupe_key: string; status: string }>;
     staleRows?: Array<{ id: string; dedupe_key: string }>;
+    deletedRows?: Array<{ id: string }>;
+    legacyFeedbackRows?: Array<{ id: string }>;
   }) {
     const accountChain = makeChain({
       data: input?.account === undefined ? { id: 'account-1' } : input.account,
@@ -155,10 +157,27 @@ describe('RemindersService', () => {
       eq: jest.fn(() => staleUpdateChain),
       in: jest.fn(() => staleUpdateChain),
     };
+    let deleteCallCount = 0;
+    const deleteChain = {
+      eq: jest.fn(() => deleteChain),
+      not: jest.fn(() => deleteChain),
+      select: jest.fn(() => deleteChain),
+      returns: jest.fn(async () => {
+        deleteCallCount += 1;
+        return {
+          data:
+            deleteCallCount === 1
+              ? (input?.deletedRows ?? [])
+              : (input?.legacyFeedbackRows ?? []),
+          error: null,
+        };
+      }),
+    };
     const reminderJobsTable = {
       select: jest.fn((columns?: string) =>
         String(columns ?? '').includes('status') ? existingChain : staleChain,
       ),
+      delete: jest.fn(() => deleteChain),
       upsert: jest.fn(async () => ({ error: null })),
       update: jest.fn(() => staleUpdateChain),
     };
@@ -381,6 +400,37 @@ describe('RemindersService', () => {
     expect(compiledRows.map((row) => row.job_type)).toEqual([
       'session.reminder',
       'session.reminder',
+    ]);
+  });
+
+  it('resets queued org reminder jobs, removes legacy feedback jobs, and precompiles completion checks', async () => {
+    const { reminderJobsTable, supabase } = makeCompileSupabase({
+      deletedRows: [{ id: 'queued-job-1' }, { id: 'dead-letter-job-1' }],
+      legacyFeedbackRows: [{ id: 'legacy-feedback-job-1' }],
+    });
+    createSupabaseServiceClientMock.mockReturnValue(supabase as never);
+
+    const service = new RemindersService(analytics as never);
+    const result = await service.resetAndReconcileOrgReminderJobs('org-1');
+
+    expect(result).toEqual({
+      canceledCount: 2,
+      legacyFeedbackDeletedCount: 1,
+      staleCanceledCount: 0,
+      compiledCount: 3,
+      reconciledCount: 1,
+      scheduleCount: 1,
+      learningSpaceCount: 1,
+    });
+    expect(reminderJobsTable.delete).toHaveBeenCalledTimes(2);
+    expect(reminderJobsTable.upsert).toHaveBeenCalledTimes(1);
+    const compiledRows = reminderJobsTable.upsert.mock.calls[0]?.[0] as Array<{
+      job_type: string;
+    }>;
+    expect(compiledRows.map((row) => row.job_type)).toEqual([
+      'session.reminder',
+      'session.reminder',
+      'session.completion_check',
     ]);
   });
 

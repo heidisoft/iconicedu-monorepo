@@ -378,6 +378,200 @@ export function formatActivityPrimaryHeadline(
   return `Class session${participantNamesLabel ? ` for ${participantNamesLabel}` : ''} ${localLabel}`;
 }
 
+type ActivityIconComponent = React.ComponentType<{ size: number; color: string }>;
+
+type ActivityHeaderRowProps = {
+  colors: AppColors;
+  s: ActivityItemStyles;
+  IconComponent: ActivityIconComponent;
+  iconBg: string;
+  iconFg: string;
+  isRead: boolean;
+  isSubActivity: boolean;
+  primary: string;
+  secondary?: string;
+  emphasis?: string;
+  time: string;
+  tabLabel?: string;
+};
+
+function ActivityStatusRail({
+  colors,
+  s,
+  IconComponent,
+  iconBg,
+  iconFg,
+  isRead,
+  isSubActivity,
+}: Pick<
+  ActivityHeaderRowProps,
+  'colors' | 's' | 'IconComponent' | 'iconBg' | 'iconFg' | 'isRead' | 'isSubActivity'
+>) {
+  return (
+    <View style={isSubActivity ? s.subAvatarWrap : s.avatarWrap}>
+      <View style={[isSubActivity ? s.subAvatar : s.avatar, { backgroundColor: iconBg }]}>
+        <IconComponent size={isSubActivity ? 10 : 11} color={iconFg} />
+      </View>
+      {isRead ? (
+        <View
+          style={s.readIcon}
+          accessibilityLabel="Read"
+          accessibilityRole="image"
+          testID="activity-read-indicator"
+        >
+          <CheckCheck size={isSubActivity ? 12 : 13} color={colors.textMuted} />
+        </View>
+      ) : (
+        <View
+          style={[s.unreadDot, { backgroundColor: colors.teal }]}
+          accessibilityLabel="Unread"
+          testID="activity-unread-indicator"
+        />
+      )}
+    </View>
+  );
+}
+
+function ActivityHeaderRow({
+  colors,
+  s,
+  IconComponent,
+  iconBg,
+  iconFg,
+  isRead,
+  isSubActivity,
+  primary,
+  secondary,
+  emphasis,
+  time,
+  tabLabel,
+}: ActivityHeaderRowProps) {
+  const showEmphasis = !isSubActivity && Boolean(emphasis);
+  const showTab = !isSubActivity && Boolean(tabLabel && tabLabel !== 'All');
+
+  return (
+    <View style={s.itemRow}>
+      <ActivityStatusRail
+        colors={colors}
+        s={s}
+        IconComponent={IconComponent}
+        iconBg={iconBg}
+        iconFg={iconFg}
+        isRead={isRead}
+        isSubActivity={isSubActivity}
+      />
+
+      <View style={s.content}>
+        <View style={s.headlineRow}>
+          <Text style={[s.headlineText, { color: colors.text }]}>
+            <Text style={s.bold}>{primary}</Text>
+            {!!secondary && ` ${secondary}`}
+          </Text>
+          {showEmphasis ? (
+            <View style={[s.badge, { backgroundColor: iconBg }]}>
+              <IconComponent size={9} color={iconFg} />
+              <Text style={[s.badgeText, { color: iconFg }]}>{emphasis}</Text>
+            </View>
+          ) : null}
+        </View>
+
+        <View style={s.metaRow}>
+          <Text style={[s.metaText, { color: colors.textMuted }]}>{time}</Text>
+          {showTab ? (
+            <>
+              <View style={[s.metaDot, { backgroundColor: colors.textFaint }]} />
+              <Text style={[s.metaText, { color: colors.textMuted }]}>{tabLabel}</Text>
+            </>
+          ) : null}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function ActivityPreviewCard({
+  children,
+  colors,
+  isSubActivity,
+  numberOfLines,
+  s,
+}: {
+  children: React.ReactNode;
+  colors: AppColors;
+  isSubActivity: boolean;
+  numberOfLines?: number;
+  s: ActivityItemStyles;
+}) {
+  return (
+    <View
+      style={[
+        isSubActivity ? s.subPreviewCard : s.previewCard,
+        {
+          borderColor: colors.border,
+          backgroundColor: isSubActivity ? colors.inputBg : colors.card,
+        },
+      ]}
+    >
+      <Text style={[s.previewText, { color: colors.text }]} numberOfLines={numberOfLines}>
+        {children}
+      </Text>
+    </View>
+  );
+}
+
+function ActivityReadMoreButton({
+  colors,
+  isExpanded,
+  isSubActivity,
+  onPress,
+  s,
+}: {
+  colors: AppColors;
+  isExpanded: boolean;
+  isSubActivity: boolean;
+  onPress: () => void;
+  s: ActivityItemStyles;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      hitSlop={8}
+      style={isSubActivity ? s.subReadMoreBtn : s.readMoreBtn}
+    >
+      <Text style={[s.readMoreText, { color: colors.teal }]}>
+        {isExpanded ? 'Show less' : 'Read more'}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+function ActivityActionButton({
+  colors,
+  isSubActivity,
+  label,
+  onPress,
+  s,
+}: {
+  colors: AppColors;
+  isSubActivity: boolean;
+  label: string;
+  onPress: () => void;
+  s: ActivityItemStyles;
+}) {
+  return (
+    <TouchableOpacity
+      style={[
+        isSubActivity ? s.subActionBtn : s.actionBtn,
+        { borderColor: colors.border },
+      ]}
+      onPress={onPress}
+      accessibilityRole="button"
+    >
+      <Text style={[s.actionBtnText, { color: colors.text }]}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
 export function ActivityItem({
   item,
   colors,
@@ -437,88 +631,51 @@ export function ActivityItem({
         onPress={handlePress}
         style={({ pressed }) => [s.subItemInner, pressed && { opacity: 0.7 }]}
       >
-        <View style={s.itemRow}>
-          <View style={s.subAvatarWrap}>
-            <View style={[s.subAvatar, { backgroundColor: iconBg }]}>
-              <IconComponent size={10} color={iconFg} />
-            </View>
-            {isRead ? (
-              <View
-                style={s.readIcon}
-                accessibilityLabel="Read"
-                accessibilityRole="image"
-                testID="activity-read-indicator"
-              >
-                <CheckCheck size={12} color={colors.textMuted} />
-              </View>
-            ) : (
-              <View
-                style={[s.unreadDot, { backgroundColor: colors.teal }]}
-                accessibilityLabel="Unread"
-                testID="activity-unread-indicator"
-              />
-            )}
-          </View>
-
-          <View style={s.content}>
-            <View style={s.headlineRow}>
-              <Text style={[s.headlineText, { color: colors.text }]}>
-                <Text style={s.bold}>{primary}</Text>
-                {!!secondary && ` ${secondary}`}
-              </Text>
-            </View>
-            <View style={s.metaRow}>
-              <Text style={[s.metaText, { color: colors.textMuted }]}>{time}</Text>
-            </View>
-          </View>
-        </View>
+        <ActivityHeaderRow
+          colors={colors}
+          s={s}
+          IconComponent={IconComponent}
+          iconBg={iconBg}
+          iconFg={iconFg}
+          isRead={isRead}
+          isSubActivity
+          primary={primary}
+          secondary={secondary}
+          emphasis={emphasis}
+          time={time}
+          tabLabel={tabLabel}
+        />
 
         {hasPreviewText && (
-          <View
-            style={[
-              s.subPreviewCard,
-              { borderColor: colors.border, backgroundColor: colors.inputBg },
-            ]}
-          >
-            <Text style={[s.previewText, { color: colors.text }]} numberOfLines={3}>
-              {previewText}
-            </Text>
-          </View>
+          <ActivityPreviewCard colors={colors} isSubActivity numberOfLines={3} s={s}>
+            {previewText}
+          </ActivityPreviewCard>
         )}
 
         {hasExpandedContent && isExpanded && (
-          <View
-            style={[
-              s.subPreviewCard,
-              { borderColor: colors.border, backgroundColor: colors.inputBg },
-            ]}
-          >
-            <Text style={[s.previewText, { color: colors.text }]}>{expandedContent}</Text>
-          </View>
+          <ActivityPreviewCard colors={colors} isSubActivity s={s}>
+            {expandedContent}
+          </ActivityPreviewCard>
         )}
 
         {hasExpandedContent && (
-          <TouchableOpacity
+          <ActivityReadMoreButton
+            colors={colors}
+            isExpanded={isExpanded}
+            isSubActivity
             onPress={() => onToggle(item.ids.id)}
-            hitSlop={8}
-            style={s.subReadMoreBtn}
-          >
-            <Text style={[s.readMoreText, { color: colors.teal }]}>
-              {isExpanded ? 'Show less' : 'Read more'}
-            </Text>
-          </TouchableOpacity>
+            s={s}
+          />
         )}
 
         {!!item.content.actionButton && (
-          <TouchableOpacity
-            style={[s.subActionBtn, { borderColor: colors.border }]}
+          <ActivityActionButton
+            colors={colors}
+            isSubActivity
+            label={item.content.actionButton.label}
             onPress={handleActionPress}
-            accessibilityRole="button"
-          >
-            <Text style={[s.actionBtnText, { color: colors.text }]}>
-              {item.content.actionButton.label}
-            </Text>
-          </TouchableOpacity>
+            s={s}
+          />
         )}
       </Pressable>
     );
@@ -534,69 +691,31 @@ export function ActivityItem({
         ]}
       >
         {/* Row: avatar + content + unread dot */}
-        <View style={s.itemRow}>
-          <View style={s.avatarWrap}>
-            <View style={[s.avatar, { backgroundColor: iconBg }]}>
-              <IconComponent size={11} color={iconFg} />
-            </View>
-            {isRead ? (
-              <View
-                style={s.readIcon}
-                accessibilityLabel="Read"
-                accessibilityRole="image"
-                testID="activity-read-indicator"
-              >
-                <CheckCheck size={13} color={colors.textMuted} />
-              </View>
-            ) : (
-              <View
-                style={[s.unreadDot, { backgroundColor: colors.teal }]}
-                accessibilityLabel="Unread"
-                testID="activity-unread-indicator"
-              />
-            )}
-          </View>
-
-          <View style={s.content}>
-            <View style={s.headlineRow}>
-              <Text style={[s.headlineText, { color: colors.text }]}>
-                <Text style={s.bold}>{primary}</Text>
-                {!!secondary && ` ${secondary}`}
-              </Text>
-              {!!emphasis && (
-                <View style={[s.badge, { backgroundColor: iconBg }]}>
-                  <IconComponent size={9} color={iconFg} />
-                  <Text style={[s.badgeText, { color: iconFg }]}>{emphasis}</Text>
-                </View>
-              )}
-            </View>
-
-            <View style={s.metaRow}>
-              <Text style={[s.metaText, { color: colors.textMuted }]}>{time}</Text>
-              {!!tabLabel && tabLabel !== 'All' && (
-                <>
-                  <View style={[s.metaDot, { backgroundColor: colors.textFaint }]} />
-                  <Text style={[s.metaText, { color: colors.textMuted }]}>
-                    {tabLabel}
-                  </Text>
-                </>
-              )}
-            </View>
-          </View>
-        </View>
+        <ActivityHeaderRow
+          colors={colors}
+          s={s}
+          IconComponent={IconComponent}
+          iconBg={iconBg}
+          iconFg={iconFg}
+          isRead={isRead}
+          isSubActivity={false}
+          primary={primary}
+          secondary={secondary}
+          emphasis={emphasis}
+          time={time}
+          tabLabel={tabLabel}
+        />
 
         {/* Preview card — summary text */}
         {shouldShowPreviewText && (
-          <View
-            style={[
-              s.previewCard,
-              { borderColor: colors.border, backgroundColor: colors.card },
-            ]}
+          <ActivityPreviewCard
+            colors={colors}
+            isSubActivity={false}
+            numberOfLines={4}
+            s={s}
           >
-            <Text style={[s.previewText, { color: colors.text }]} numberOfLines={4}>
-              {previewText}
-            </Text>
-          </View>
+            {previewText}
+          </ActivityPreviewCard>
         )}
 
         {canShowFeedbackRequest && (
@@ -625,40 +744,31 @@ export function ActivityItem({
 
         {/* Expanded detail card */}
         {hasExpandedContent && isExpanded && (
-          <View
-            style={[
-              s.previewCard,
-              { borderColor: colors.border, backgroundColor: colors.card },
-            ]}
-          >
-            <Text style={[s.previewText, { color: colors.text }]}>{expandedContent}</Text>
-          </View>
+          <ActivityPreviewCard colors={colors} isSubActivity={false} s={s}>
+            {expandedContent}
+          </ActivityPreviewCard>
         )}
 
         {/* Read more link */}
         {hasExpandedContent && (
-          <TouchableOpacity
+          <ActivityReadMoreButton
+            colors={colors}
+            isExpanded={isExpanded}
+            isSubActivity={false}
             onPress={() => onToggle(item.ids.id)}
-            hitSlop={8}
-            style={s.readMoreBtn}
-          >
-            <Text style={[s.readMoreText, { color: colors.teal }]}>
-              {isExpanded ? 'Show less' : 'Read more'}
-            </Text>
-          </TouchableOpacity>
+            s={s}
+          />
         )}
 
         {/* Action button */}
         {shouldShowActionButton && (
-          <TouchableOpacity
-            style={[s.actionBtn, { borderColor: colors.border }]}
+          <ActivityActionButton
+            colors={colors}
+            isSubActivity={false}
+            label={item.content.actionButton!.label}
             onPress={handleActionPress}
-            accessibilityRole="button"
-          >
-            <Text style={[s.actionBtnText, { color: colors.text }]}>
-              {item.content.actionButton!.label}
-            </Text>
-          </TouchableOpacity>
+            s={s}
+          />
         )}
       </Pressable>
     </View>
