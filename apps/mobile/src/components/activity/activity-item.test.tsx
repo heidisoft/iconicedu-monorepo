@@ -365,7 +365,8 @@ describe('ActivityItem', () => {
     await waitFor(() => {
       expect(mockSubmitActivityFeedFeedback).toHaveBeenCalledTimes(2);
     });
-    expect(screen.getByText('Rating saved. Comments save automatically.')).toBeTruthy();
+    expect(screen.getByText('Submit feedback')).toBeTruthy();
+    expect(screen.queryByText('Rating saved. Comments save automatically.')).toBeNull();
 
     fireEvent.press(screen.getByText('Submit feedback'));
 

@@ -70,6 +70,7 @@ import { supabase } from '@/lib/supabase/client';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@iconicedu/ui-native';
 import { RoleAvatarBadge } from '@/components/profile/role-avatar-badge';
 import { RoleNameIndicator } from '@/components/profile/role-name-indicator';
+import { useTheme } from '@/providers/theme-provider';
 import { ChatImageViewer, type ChatImageViewerItem } from './chat-image-viewer';
 import { ChatPdfViewer } from './chat-pdf-viewer';
 import type { AttachmentPayload } from './attachment-sheet';
@@ -326,16 +327,17 @@ function FormattedText({
   text,
   mentions,
   style,
-  isOwn,
+  isOwn: _isOwn,
 }: {
   text: string;
   mentions?: MessageMentionVM[];
   style?: StyleProp<TextStyle>;
   isOwn?: boolean;
 }) {
+  const { colors } = useTheme();
   const segs = buildFmtSegments(text, mentions);
-  const mentionBg = '#e0f2fe';
-  const mentionColor = '#0369a1';
+  const mentionBg = colors.tealBg;
+  const mentionColor = colors.teal;
   return (
     <Text testID="message-text-content" style={style}>
       {segs.map((seg, i) => {

@@ -359,18 +359,16 @@ export function ActivityFeedbackRequest({ activity }: ActivityFeedbackRequestPro
             placeholder="Tell us what could be better..."
             className="min-h-[112px] text-xs placeholder:text-xs"
           />
-          <div className="flex items-center justify-end gap-3">
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => void handleSubmit()}
-              disabled={isSubmitting}
-              data-action-button="true"
-              className="text-xs"
-            >
-              Submit feedback
-            </Button>
-          </div>
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => void handleSubmit()}
+            disabled={isSubmitting}
+            data-action-button="true"
+            className="w-full text-xs"
+          >
+            Submit feedback
+          </Button>
         </div>
       ) : null}
 

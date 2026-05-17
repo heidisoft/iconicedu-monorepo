@@ -12,6 +12,9 @@ type SessionEntry = {
   title: string;
   channelId: string;
   learningSpaceId?: string | null;
+  completionVote?: {
+    status?: 'confirmed' | 'disputed';
+  } | null;
 };
 
 function getSessions(activity: ActivityFeedLeafItemVM): SessionEntry[] {
@@ -32,7 +35,18 @@ type Props = {
 export function ActivityCompletionCheckBatch({ activity }: Props) {
   const sessions = useMemo(() => getSessions(activity), [activity]);
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
-  const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
+  const [resolvedIds, setResolvedIds] = useState<Set<string>>(
+    () =>
+      new Set(
+        sessions
+          .filter(
+            (session) =>
+              session.completionVote?.status === 'confirmed' ||
+              session.completionVote?.status === 'disputed',
+          )
+          .map((session) => session.scheduleId),
+      ),
+  );
 
   if (sessions.length === 0) return null;
 
@@ -67,6 +81,7 @@ export function ActivityCompletionCheckBatch({ activity }: Props) {
             learningSpaceId: session.learningSpaceId ?? null,
             feedbackUiEnabled: true,
             completionCheckUiEnabled: true,
+            completionVote: session.completionVote ?? null,
           },
         };
 

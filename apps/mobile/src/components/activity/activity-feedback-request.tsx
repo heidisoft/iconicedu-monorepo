@@ -1,5 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { Star } from 'lucide-react-native';
 import type { ActivityFeedLeafItemVM } from '@iconicedu/shared-types';
 import type { AppColors } from '@/lib/theme';
@@ -380,7 +387,7 @@ export function ActivityFeedbackRequest({
               ]}
             >
               <Star
-                size={16}
+                size={18}
                 color={isActive ? '#f59e0b' : colors.textMuted}
                 fill={isActive ? '#f59e0b' : 'transparent'}
               />
@@ -391,23 +398,6 @@ export function ActivityFeedbackRequest({
 
       {shouldShowCommentBox ? (
         <View style={styles.commentWrap}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Submit feedback"
-            disabled={isSubmitting || isCommentSaving}
-            onPress={() => void handleSaveComment()}
-            style={({ pressed }) => [
-              styles.saveButton,
-              {
-                backgroundColor: colors.teal,
-                opacity: isSubmitting || isCommentSaving ? 0.6 : pressed ? 0.85 : 1,
-              },
-            ]}
-          >
-            <Text style={styles.saveButtonText}>
-              {isSubmitting || isCommentSaving ? 'Saving...' : 'Submit feedback'}
-            </Text>
-          </Pressable>
           <TextInput
             value={comment}
             onChangeText={(value) => {
@@ -428,13 +418,24 @@ export function ActivityFeedbackRequest({
               },
             ]}
           />
-          <Text style={[styles.supportText, { color: colors.textMuted }]}>
-            {isCommentSaving
-              ? 'Saving comment...'
-              : hasPendingCommentChanges
-                ? 'Saving shortly...'
-                : 'Rating saved. Comments save automatically.'}
-          </Text>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Submit feedback"
+            disabled={isSubmitting || isCommentSaving}
+            onPress={() => void handleSaveComment()}
+            activeOpacity={0.8}
+            style={[
+              styles.saveButton,
+              {
+                backgroundColor: colors.teal,
+                opacity: isSubmitting || isCommentSaving ? 0.7 : 1,
+              },
+            ]}
+          >
+            <Text style={styles.saveButtonText}>
+              {isSubmitting || isCommentSaving ? 'Saving...' : 'Submit feedback'}
+            </Text>
+          </TouchableOpacity>
         </View>
       ) : null}
 
@@ -461,11 +462,12 @@ function makeStyles(colors: AppColors) {
   return StyleSheet.create({
     card: {
       marginTop: 10,
-      marginLeft: 42,
       borderRadius: 12,
       borderWidth: 1,
       borderColor: colors.border,
       backgroundColor: colors.card,
+      alignSelf: 'stretch',
+      width: '100%',
       padding: 14,
       gap: 10,
     },
@@ -492,12 +494,12 @@ function makeStyles(colors: AppColors) {
     starRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 8,
+      gap: 7,
     },
     starButton: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
+      width: 36,
+      height: 36,
+      borderRadius: 18,
       borderWidth: 1,
       alignItems: 'center',
       justifyContent: 'center',
@@ -517,13 +519,10 @@ function makeStyles(colors: AppColors) {
       textAlignVertical: 'top',
     },
     saveButton: {
-      minHeight: 36,
       borderRadius: 10,
+      paddingVertical: 10,
       alignItems: 'center',
       justifyContent: 'center',
-      paddingHorizontal: 14,
-      paddingVertical: 8,
-      alignSelf: 'stretch',
     },
     saveButtonText: {
       color: '#ffffff',

@@ -213,7 +213,15 @@ export class RemindersService {
     input: { orgId: string; learningSpaceId: string },
   ) {
     await this.requireOrgActor(accessToken, input.orgId);
-    const supabase = this.getSupabase();
+    return this.compileLearningSpaceReminderJobsForOrg(input);
+  }
+
+  private async compileLearningSpaceReminderJobsForOrg(input: {
+    orgId: string;
+    learningSpaceId: string;
+    supabase?: SupabaseServiceClient;
+  }) {
+    const supabase = input.supabase ?? this.getSupabase();
     const schedules = await this.buildClassSchedulesByOrg(supabase, input.orgId);
     const relevant = schedules.filter(
       (schedule) =>
@@ -454,7 +462,73 @@ export class RemindersService {
   }
 
   async resetAndReconcileOrgReminderJobs(orgId: string) {
-    return this.reminderReconcileService.resetAndReconcileOrgReminderJobs(orgId);
+    const supabase = this.getSupabase();
+
+    const { data: deletedRows, error: deleteError } = await supabase
+      .from('reminder_jobs')
+      .delete()
+      .eq('org_id', orgId)
+      .not('status', 'in', '("succeeded")')
+      .select('id')
+      .returns<Array<{ id: string }>>();
+
+    if (deleteError) {
+      throw new InternalServerErrorException(deleteError.message);
+    }
+
+    const { data: legacyFeedbackRows, error: legacyFeedbackError } = await supabase
+      .from('reminder_jobs')
+      .delete()
+      .eq('org_id', orgId)
+      .eq('job_type', 'session.feedback_request')
+      .select('id')
+      .returns<Array<{ id: string }>>();
+
+    if (legacyFeedbackError) {
+      throw new InternalServerErrorException(legacyFeedbackError.message);
+    }
+
+    const { data: scheduleRows, error: scheduleError } = await supabase
+      .from('class_schedules')
+      .select('id, source_learning_space_id')
+      .eq('org_id', orgId)
+      .eq('source_kind', 'class_session')
+      .is('deleted_at', null)
+      .returns<Array<{ id: string; source_learning_space_id: string | null }>>();
+
+    if (scheduleError) {
+      throw new InternalServerErrorException(scheduleError.message);
+    }
+
+    const learningSpaceIds = Array.from(
+      new Set(
+        (scheduleRows ?? [])
+          .map((row) => row.source_learning_space_id)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    );
+
+    let compiledCount = 0;
+    let staleCanceledCount = 0;
+    for (const learningSpaceId of learningSpaceIds) {
+      const result = await this.compileLearningSpaceReminderJobsForOrg({
+        orgId,
+        learningSpaceId,
+        supabase,
+      });
+      compiledCount += result.compiledCount;
+      staleCanceledCount += result.canceledCount;
+    }
+
+    return {
+      canceledCount: (deletedRows ?? []).length,
+      legacyFeedbackDeletedCount: (legacyFeedbackRows ?? []).length,
+      staleCanceledCount,
+      compiledCount,
+      reconciledCount: learningSpaceIds.length,
+      scheduleCount: (scheduleRows ?? []).length,
+      learningSpaceCount: learningSpaceIds.length,
+    };
   }
 
   async cancelLearningSpaceReminderJobs(

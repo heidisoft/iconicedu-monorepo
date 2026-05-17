@@ -73,6 +73,18 @@ type RawClassSessionFeedbackRow = {
   submitted_at: string;
 };
 
+type RawClassSessionCompletionVoteRow = {
+  schedule_id: string;
+  occurrence_key: string;
+  profile_id: string;
+  role: string;
+  status: 'confirmed' | 'disputed';
+  dispute_category: string | null;
+  dispute_reason: string | null;
+  reschedule_requested: boolean;
+  voted_at: string;
+};
+
 function asRecord(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return {};
@@ -88,8 +100,22 @@ function getFeedbackClassSessionId(item: ActivityFeedItemVM) {
   return null;
 }
 
+function getCompletionScheduleId(item: ActivityFeedItemVM) {
+  const metadata = asRecord(item.metadata);
+  return typeof metadata.scheduleId === 'string' ? metadata.scheduleId : null;
+}
+
+function getCompletionOccurrenceStart(item: ActivityFeedItemVM) {
+  const metadata = asRecord(item.metadata);
+  return typeof metadata.occurrenceStart === 'string' ? metadata.occurrenceStart : null;
+}
+
 function isNonEmptyString(value: string | null): value is string {
   return typeof value === 'string' && value.length > 0;
+}
+
+function completionVoteKey(scheduleId: string, occurrenceStart: string) {
+  return `${scheduleId}:${occurrenceStart}`;
 }
 
 function mapFeedbackResponse(row: RawClassSessionFeedbackRow) {
@@ -103,6 +129,20 @@ function mapFeedbackResponse(row: RawClassSessionFeedbackRow) {
     rating: row.rating,
     comment: row.comment,
     submittedAt: row.submitted_at,
+  };
+}
+
+function mapCompletionVote(row: RawClassSessionCompletionVoteRow) {
+  return {
+    scheduleId: row.schedule_id,
+    occurrenceKey: row.occurrence_key,
+    profileId: row.profile_id,
+    role: row.role,
+    status: row.status,
+    disputeCategory: row.dispute_category,
+    disputeReason: row.dispute_reason,
+    rescheduleRequested: row.reschedule_requested,
+    votedAt: row.voted_at,
   };
 }
 
@@ -157,6 +197,47 @@ function mapFeedRow(row: ActivityFeedItemRow): ActivityFeedItemVM {
 
 @Injectable()
 export class ActivityFeedQueryService {
+  private collectCompletionTargets(items: ActivityFeedItemVM[]) {
+    const targets = new Map<string, { scheduleId: string; occurrenceStart: string }>();
+
+    items
+      .filter((item) => item.kind === 'leaf')
+      .filter(
+        (item) =>
+          item.verb === 'session.completion_check.sent' ||
+          item.verb === 'session.completion_check.batch.sent',
+      )
+      .forEach((item) => {
+        if (item.verb === 'session.completion_check.sent') {
+          const scheduleId = getCompletionScheduleId(item);
+          const occurrenceStart = getCompletionOccurrenceStart(item);
+          if (scheduleId && occurrenceStart) {
+            targets.set(completionVoteKey(scheduleId, occurrenceStart), {
+              scheduleId,
+              occurrenceStart,
+            });
+          }
+          return;
+        }
+
+        const metadata = asRecord(item.metadata);
+        if (!Array.isArray(metadata.sessions)) return;
+        metadata.sessions.forEach((session) => {
+          const sessionRecord = asRecord(session);
+          const scheduleId = sessionRecord.scheduleId;
+          const occurrenceStart = sessionRecord.occurrenceStart;
+          if (typeof scheduleId === 'string' && typeof occurrenceStart === 'string') {
+            targets.set(completionVoteKey(scheduleId, occurrenceStart), {
+              scheduleId,
+              occurrenceStart,
+            });
+          }
+        });
+      });
+
+    return Array.from(targets.values());
+  }
+
   private async loadFeedbackResponses(
     accessToken: string,
     orgId: string,
@@ -188,6 +269,42 @@ export class ActivityFeedQueryService {
     if (error) throw new InternalServerErrorException(error.message);
 
     return new Map((data ?? []).map((row) => [row.class_session_id, row]));
+  }
+
+  private async loadCompletionVotes(
+    accessToken: string,
+    orgId: string,
+    profileId: string,
+    items: ActivityFeedItemVM[],
+  ): Promise<Map<string, RawClassSessionCompletionVoteRow>> {
+    const targets = this.collectCompletionTargets(items);
+    if (!targets.length) return new Map();
+
+    const scheduleIds = Array.from(new Set(targets.map((target) => target.scheduleId)));
+    const occurrenceStarts = Array.from(
+      new Set(targets.map((target) => target.occurrenceStart)),
+    );
+
+    const supabase = createSupabaseSessionClient(accessToken);
+    const { data, error } = await supabase
+      .from('class_session_completion_votes')
+      .select(
+        'schedule_id, occurrence_key, profile_id, role, status, dispute_category, dispute_reason, reschedule_requested, voted_at',
+      )
+      .eq('org_id', orgId)
+      .eq('profile_id', profileId)
+      .is('deleted_at', null)
+      .in('schedule_id', scheduleIds)
+      .in('occurrence_key', occurrenceStarts)
+      .returns<RawClassSessionCompletionVoteRow[]>();
+    if (error) throw new InternalServerErrorException(error.message);
+
+    return new Map(
+      (data ?? []).map((row) => [
+        completionVoteKey(row.schedule_id, row.occurrence_key),
+        row,
+      ]),
+    );
   }
 
   private async loadActivityFeedActors(
@@ -323,9 +440,70 @@ export class ActivityFeedQueryService {
         },
       } as ActivityFeedLeafItemVM;
     });
-    const sections = this.buildFeedSections(feedbackItems);
-    const tabs = this.buildFeedTabs(feedbackItems);
-    const unreadCount = feedbackItems.filter((item) => !item.state?.isRead).length;
+    const completionVotes = await this.loadCompletionVotes(
+      accessToken,
+      orgId,
+      profileId,
+      feedbackItems,
+    );
+    const hydratedItems = feedbackItems.map((item) => {
+      if (
+        item.kind !== 'leaf' ||
+        (item.verb !== 'session.completion_check.sent' &&
+          item.verb !== 'session.completion_check.batch.sent')
+      ) {
+        return item;
+      }
+
+      if (item.verb === 'session.completion_check.sent') {
+        const scheduleId = getCompletionScheduleId(item);
+        const occurrenceStart = getCompletionOccurrenceStart(item);
+        if (!scheduleId || !occurrenceStart) return item;
+
+        const vote = completionVotes.get(completionVoteKey(scheduleId, occurrenceStart));
+        if (!vote) return item;
+
+        return {
+          ...item,
+          metadata: {
+            ...(item.metadata ?? {}),
+            completionVote: mapCompletionVote(vote),
+          },
+        } as ActivityFeedLeafItemVM;
+      }
+
+      const metadata = asRecord(item.metadata);
+      if (!Array.isArray(metadata.sessions)) return item;
+
+      return {
+        ...item,
+        metadata: {
+          ...(item.metadata ?? {}),
+          sessions: metadata.sessions.map((session) => {
+            const sessionRecord = asRecord(session);
+            const scheduleId = sessionRecord.scheduleId;
+            const occurrenceStart = sessionRecord.occurrenceStart;
+            if (typeof scheduleId !== 'string' || typeof occurrenceStart !== 'string') {
+              return session;
+            }
+
+            const vote = completionVotes.get(
+              completionVoteKey(scheduleId, occurrenceStart),
+            );
+            if (!vote) return session;
+
+            return {
+              ...sessionRecord,
+              completionVote: mapCompletionVote(vote),
+            };
+          }),
+        },
+      } as ActivityFeedLeafItemVM;
+    });
+
+    const sections = this.buildFeedSections(hydratedItems);
+    const tabs = this.buildFeedTabs(hydratedItems);
+    const unreadCount = hydratedItems.filter((item) => !item.state?.isRead).length;
 
     return {
       activeTab: 'all',

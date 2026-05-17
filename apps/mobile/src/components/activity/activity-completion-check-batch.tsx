@@ -11,6 +11,9 @@ type SessionEntry = {
   title: string;
   channelId: string;
   learningSpaceId?: string | null;
+  completionVote?: {
+    status?: 'confirmed' | 'disputed';
+  } | null;
 };
 
 function getSessions(activity: ActivityFeedLeafItemVM): SessionEntry[] {
@@ -39,8 +42,22 @@ export function ActivityCompletionCheckBatch({
   const sessions = useMemo(() => getSessions(activity), [activity]);
 
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
-  const [confirmedIds, setConfirmedIds] = useState<Set<string>>(new Set());
-  const [disputedIds, setDisputedIds] = useState<Set<string>>(new Set());
+  const [confirmedIds, setConfirmedIds] = useState<Set<string>>(
+    () =>
+      new Set(
+        sessions
+          .filter((session) => session.completionVote?.status === 'confirmed')
+          .map((session) => session.scheduleId),
+      ),
+  );
+  const [disputedIds, setDisputedIds] = useState<Set<string>>(
+    () =>
+      new Set(
+        sessions
+          .filter((session) => session.completionVote?.status === 'disputed')
+          .map((session) => session.scheduleId),
+      ),
+  );
 
   const resolvedCount = confirmedIds.size + disputedIds.size;
 
@@ -84,6 +101,7 @@ export function ActivityCompletionCheckBatch({
             learningSpaceId: session.learningSpaceId ?? null,
             feedbackUiEnabled: true,
             completionCheckUiEnabled: true,
+            completionVote: session.completionVote ?? null,
           },
         };
 
@@ -136,6 +154,25 @@ export function ActivityCompletionCheckBatch({
                 activity={syntheticActivity}
                 colors={colors}
                 currentProfileId={currentProfileId}
+                onCompletionSubmit={(status) => {
+                  if (status === 'confirmed') {
+                    setConfirmedIds((current) =>
+                      new Set(current).add(session.scheduleId),
+                    );
+                    setDisputedIds((current) => {
+                      const next = new Set(current);
+                      next.delete(session.scheduleId);
+                      return next;
+                    });
+                  } else {
+                    setDisputedIds((current) => new Set(current).add(session.scheduleId));
+                    setConfirmedIds((current) => {
+                      const next = new Set(current);
+                      next.delete(session.scheduleId);
+                      return next;
+                    });
+                  }
+                }}
               />
             ) : null}
           </View>

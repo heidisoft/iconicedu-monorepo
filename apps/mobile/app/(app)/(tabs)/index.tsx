@@ -136,7 +136,7 @@ function makeStyles(C: AppColors) {
 
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: C.pageBg },
-    scroll: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 32, gap: 22 },
+    scroll: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 32, gap: 22 },
     topBar: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -283,7 +283,7 @@ function makeStyles(C: AppColors) {
       textTransform: 'uppercase',
       letterSpacing: 0.5,
     },
-    metricsRow: { gap: 12, paddingRight: 20 },
+    metricsRow: { gap: 12, paddingRight: 16 },
     metricCard: {
       minHeight: 148,
       backgroundColor: C.card,

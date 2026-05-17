@@ -343,33 +343,39 @@ function makeStyles(C: AppColors) {
       marginBottom: 0,
     },
     itemWrap: {
+      position: 'relative',
       backgroundColor: 'transparent',
-      paddingHorizontal: 20,
-      paddingVertical: 16,
+      paddingHorizontal: 0,
+      paddingVertical: 14,
       overflow: 'hidden',
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: 'transparent',
     },
     itemWrapUnread: {},
-    itemRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    itemDivider: {
+      position: 'absolute',
+      top: 0,
+      right: 0,
+      left: 62,
+      height: StyleSheet.hairlineWidth,
+    },
+    itemRow: { minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: 12 },
     separator: { height: 0 },
 
     // ── DM avatar — single person ──────────────────────────────────────────────
-    avatarWrap: { position: 'relative', width: 44, height: 44, flexShrink: 0 },
+    avatarWrap: { position: 'relative', width: 50, height: 50, flexShrink: 0 },
     avatarCircle: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
+      width: 50,
+      height: 50,
+      borderRadius: 25,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    avatarTxt: { color: '#fff', fontWeight: '700', fontSize: 17, letterSpacing: 0 },
+    avatarTxt: { color: '#fff', fontWeight: '700', fontSize: 18, letterSpacing: 0 },
     onlineDot: {
       position: 'absolute',
-      bottom: 2,
-      right: 2,
-      width: 13,
-      height: 13,
+      bottom: 1,
+      right: 1,
+      width: 14,
+      height: 14,
       borderRadius: 7,
       backgroundColor: '#22c55e',
       borderWidth: 2,
@@ -377,10 +383,10 @@ function makeStyles(C: AppColors) {
     },
     statusBadge: {
       position: 'absolute',
-      bottom: 2,
-      right: 2,
-      width: 13,
-      height: 13,
+      bottom: 1,
+      right: 1,
+      width: 14,
+      height: 14,
       borderRadius: 7,
       alignItems: 'center',
       justifyContent: 'center',
@@ -389,14 +395,14 @@ function makeStyles(C: AppColors) {
     },
 
     // ── DM avatar — group (stacked) ────────────────────────────────────────────
-    groupWrap: { width: 44, height: 44, flexShrink: 0, position: 'relative' },
+    groupWrap: { width: 50, height: 50, flexShrink: 0, position: 'relative' },
     groupBack: {
       position: 'absolute',
       right: 0,
       bottom: 0,
-      width: 30,
-      height: 30,
-      borderRadius: 15,
+      width: 34,
+      height: 34,
+      borderRadius: 17,
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 2,
@@ -406,38 +412,38 @@ function makeStyles(C: AppColors) {
       position: 'absolute',
       left: 0,
       top: 0,
-      width: 30,
-      height: 30,
-      borderRadius: 15,
+      width: 34,
+      height: 34,
+      borderRadius: 17,
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 2,
       borderColor: C.bg,
     },
-    groupTxt: { color: '#fff', fontWeight: '700', fontSize: 13 },
+    groupTxt: { color: '#fff', fontWeight: '700', fontSize: 14 },
     groupBadgeFront: {},
     groupBadgeBack: {},
 
     // ── Class avatar ──────────────────────────────────────────────────
     channelAvatar: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
+      width: 50,
+      height: 50,
+      borderRadius: 25,
       alignItems: 'center',
       justifyContent: 'center',
       flexShrink: 0,
       borderWidth: 0,
     },
-    channelEmoji: { fontSize: 24 },
+    channelEmoji: { fontSize: 25 },
 
-    content: { flex: 1, minWidth: 0, justifyContent: 'center', gap: 2 },
+    content: { flex: 1, minWidth: 0, justifyContent: 'center', gap: 3 },
     topRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     rowNameWrap: { flex: 1, minWidth: 0 },
     rowName: { fontSize: 17, fontWeight: '700', color: C.text },
     rowNameUnread: { fontWeight: '800' },
     rowNameStudentNames: { fontWeight: '600' },
     rowTail: {
-      width: 64,
+      width: 58,
       alignItems: 'flex-end',
       justifyContent: 'space-between',
       flexShrink: 0,
@@ -466,7 +472,7 @@ function makeStyles(C: AppColors) {
       flexShrink: 1,
       minWidth: 0,
     },
-    rowPreview: { fontSize: 13, color: C.textMuted, lineHeight: 17 },
+    rowPreview: { fontSize: 14, color: C.textMuted, lineHeight: 18 },
     badge: {
       minWidth: 20,
       height: 20,
@@ -515,7 +521,7 @@ function makeStyles(C: AppColors) {
     supervisedBadgeTxt: { fontSize: 11, fontWeight: '700', color: C.teal },
 
     // ── Section header ─────────────────────────────────────────────────────────
-    sectionHeaderWrap: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 8 },
+    sectionHeaderWrap: { paddingHorizontal: 0, paddingTop: 18, paddingBottom: 7 },
     sectionHeaderTxt: {
       fontSize: 12,
       fontWeight: '700',
@@ -743,11 +749,13 @@ function ChannelRow({
         onPress={onPress}
         style={({ pressed }) => [
           s.itemWrap,
-          showTopBorder && { borderTopColor: colors.border },
           hasUnread && s.itemWrapUnread,
           pressed && { backgroundColor: colors.inputBg },
         ]}
       >
+        {showTopBorder ? (
+          <View style={[s.itemDivider, { backgroundColor: colors.border }]} />
+        ) : null}
         <View style={s.itemRow}>
           {/* Avatar */}
           {isDm ? (
@@ -760,9 +768,9 @@ function ChannelRow({
           ) : (
             <ChannelTopicIconBadge
               iconKey={item.icon_key}
-              size={44}
-              iconSize={20}
-              borderRadius={22}
+              size={50}
+              iconSize={22}
+              borderRadius={25}
               backgroundColor={classAvatarColors.bg}
               color={classAvatarColors.fg}
               style={s.channelAvatar}
@@ -1309,7 +1317,11 @@ export default function MessagesScreen() {
         <FlatList
           data={data}
           keyExtractor={(item) => ('_type' in item ? item.id : item.id)}
-          contentContainerStyle={{ paddingTop: 16, paddingBottom: 24 }}
+          contentContainerStyle={{
+            paddingHorizontal: 16,
+            paddingTop: 8,
+            paddingBottom: 16,
+          }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
