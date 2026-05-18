@@ -58,6 +58,18 @@ describe('buildAdminMenuSections', () => {
     expect(sections.map((section) => section.title)).not.toContain('Reports');
   });
 
+  it('does not include activity feed audit when the flag is off', () => {
+    const sections = buildAdminMenuSections('/iconic-academy', {
+      includeActivityFeedAudit: false,
+    });
+    const activitySection = sections.find((section) => section.title === 'Activity');
+
+    expect(activitySection?.links.map((link) => link.title)).not.toContain(
+      'Activity feed',
+    );
+    expect(activitySection?.links.map((link) => link.title)).toContain('Activity logs');
+  });
+
   it('includes reports by default', () => {
     const sections = buildAdminMenuSections('/iconic-academy');
 

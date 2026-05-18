@@ -92,6 +92,22 @@ export const enableAdminReports = flag<boolean, { profileId?: string | null }>({
   },
 });
 
+export const enableAdminActivityFeedAudit = flag<boolean, { profileId?: string | null }>({
+  key: 'enable-admin-activity-feed-audit',
+  description: 'Enables the admin audit view for generated activity feed items.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: 'enable-admin-activity-feed-audit',
+      profileId: entities?.profileId,
+    });
+  },
+});
+
 export const enableClassScheduleStaffCancel = flag<
   boolean,
   { profileId?: string | null }
@@ -130,6 +146,7 @@ export const enableClassScheduleStaffEdit = flag<boolean, { profileId?: string |
 });
 
 export const webFlags = {
+  enableAdminActivityFeedAudit,
   enableAdminReports,
   enableChannelCommunications,
   enableClassScheduleStaffCancel,

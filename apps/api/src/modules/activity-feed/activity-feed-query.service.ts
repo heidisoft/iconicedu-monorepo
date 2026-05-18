@@ -1,5 +1,14 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import type {
+  AdminActivityFeedAuditVM,
+  AdminActivityFeedDeliveryChannelVM,
+  AdminActivityFeedItemVM,
+  AdminActivityFeedPipelineJobVM,
+  AdminActivityFeedReminderJobVM,
   ActivityFeedVM,
   ActivityFeedItemVM,
   ActivityFeedSectionVM,
@@ -13,6 +22,11 @@ import type {
   ActivityFeedItemRow,
   ActivityFeedLeafItemVM,
   UserProfileVM,
+  ChannelRow,
+  EventPipelineJobRow,
+  ProfileRow,
+  ReminderDispatchLogRow,
+  ReminderJobRow,
 } from '@iconicedu/shared-types';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
@@ -85,6 +99,85 @@ type RawClassSessionCompletionVoteRow = {
   reschedule_requested: boolean;
   voted_at: string;
 };
+
+type AdminAccountRoleContext = {
+  accountId: string;
+};
+
+type RawAdminAccountRow = {
+  id: string;
+};
+
+type RawRoleRow = {
+  role_key: string | null;
+};
+
+const ADMIN_ACTIVITY_FEED_LIMIT = 500;
+
+function toDisplayName(profile?: ProfileRow | null): string {
+  if (!profile) return 'Unknown user';
+  const displayName = profile.display_name?.trim();
+  if (displayName) return displayName;
+  const firstName = profile.first_name?.trim() ?? '';
+  const lastName = profile.last_name?.trim() ?? '';
+  if (firstName && lastName) return `${firstName} ${lastName.charAt(0).toUpperCase()}.`;
+  return firstName || 'Unknown user';
+}
+
+function getString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0 ? value : null;
+}
+
+function resolveChannelId(row: ActivityFeedItemRow): string | null {
+  const metadata = asRecord(row.metadata);
+  const metadataChannelId = getString(metadata.channelId);
+  if (metadataChannelId) return metadataChannelId;
+
+  const audience = asRecord(row.audience);
+  const scope = asRecord(audience.scope);
+  const scopedChannelId = getString(scope.channelId);
+  if (scopedChannelId) return scopedChannelId;
+
+  const refs = asRecord(row.refs);
+  const objectRef = asRecord(refs.object);
+  const targetRef = asRecord(refs.target);
+  if (getString(objectRef.kind) === 'channel') return getString(objectRef.id);
+  if (getString(targetRef.kind) === 'channel') return getString(targetRef.id);
+  return null;
+}
+
+function describeScope(row: ActivityFeedItemRow, channel?: ChannelRow | null) {
+  const audience = asRecord(row.audience);
+  const scope = asRecord(audience.scope);
+  const label = getString(scope.label);
+  if (label) return label;
+
+  const kind = getString(scope.kind);
+  if (kind === 'channel') return channel?.topic?.trim() || 'Channel';
+  if (kind === 'learning_space') {
+    return getString(asRecord(row.metadata).classTitle) ?? 'Learning space';
+  }
+  if (kind === 'dm') return 'Direct message';
+  if (kind === 'user') return 'User';
+  return kind ?? 'Global';
+}
+
+function toAdminActor(profile?: ProfileRow | null) {
+  if (!profile) return null;
+  return {
+    profileId: profile.id,
+    displayName: toDisplayName(profile),
+    kind: profile.kind ?? null,
+  };
+}
+
+function resolveDeliveryChannel(job: EventPipelineJobRow) {
+  return getString(job.payload?.deliveryChannel);
+}
+
+function getNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
 
 function asRecord(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -198,6 +291,339 @@ function mapFeedRow(row: ActivityFeedItemRow): ActivityFeedItemVM {
 
 @Injectable()
 export class ActivityFeedQueryService {
+  private async requireAdminRole(
+    authUserId: string,
+    orgId: string,
+  ): Promise<AdminAccountRoleContext> {
+    const supabase = createSupabaseServiceClient();
+    const { data: account, error: accountError } = await supabase
+      .from('accounts')
+      .select('id')
+      .eq('auth_user_id', authUserId)
+      .eq('org_id', orgId)
+      .is('deleted_at', null)
+      .maybeSingle<RawAdminAccountRow>();
+
+    if (accountError) throw new InternalServerErrorException(accountError.message);
+    if (!account) throw new ForbiddenException('Not a member of this organization');
+
+    const { data: roles, error: rolesError } = await supabase
+      .from('user_roles')
+      .select('role_key')
+      .eq('account_id', account.id)
+      .eq('org_id', orgId)
+      .is('deleted_at', null)
+      .returns<RawRoleRow[]>();
+
+    if (rolesError) throw new InternalServerErrorException(rolesError.message);
+
+    const isAdmin = (roles ?? []).some(
+      (role) => role.role_key === 'owner' || role.role_key === 'admin',
+    );
+    if (!isAdmin) throw new ForbiddenException('Forbidden');
+
+    return { accountId: account.id };
+  }
+
+  private async loadAdminProfiles(orgId: string, profileIds: string[]) {
+    const ids = Array.from(new Set(profileIds.filter(Boolean)));
+    if (!ids.length) return new Map<string, ProfileRow>();
+
+    const { data, error } = await createSupabaseServiceClient()
+      .from('profiles')
+      .select(
+        'id,org_id,account_id,kind,display_name,first_name,last_name,avatar_source,avatar_url,status,created_at,updated_at',
+      )
+      .eq('org_id', orgId)
+      .in('id', ids)
+      .is('deleted_at', null)
+      .returns<ProfileRow[]>();
+
+    if (error) throw new InternalServerErrorException(error.message);
+    return new Map((data ?? []).map((profile) => [profile.id, profile]));
+  }
+
+  private async loadAdminChannels(orgId: string, channelIds: string[]) {
+    const ids = Array.from(new Set(channelIds.filter(Boolean)));
+    if (!ids.length) return new Map<string, ChannelRow>();
+
+    const { data, error } = await createSupabaseServiceClient()
+      .from('channels')
+      .select('id,org_id,kind,topic,visibility,purpose,status,created_at,updated_at')
+      .eq('org_id', orgId)
+      .in('id', ids)
+      .is('deleted_at', null)
+      .returns<ChannelRow[]>();
+
+    if (error) throw new InternalServerErrorException(error.message);
+    return new Map((data ?? []).map((channel) => [channel.id, channel]));
+  }
+
+  private async loadAdminPipelineJobs(orgId: string, sourceEventIds: string[]) {
+    const ids = Array.from(new Set(sourceEventIds.filter(Boolean)));
+    if (!ids.length) return new Map<string, EventPipelineJobRow[]>();
+
+    const { data, error } = await createSupabaseServiceClient()
+      .from('event_pipeline_jobs')
+      .select('*')
+      .eq('org_id', orgId)
+      .in('source_id', ids)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: true })
+      .returns<EventPipelineJobRow[]>();
+
+    if (error) throw new InternalServerErrorException(error.message);
+
+    const byEvent = new Map<string, EventPipelineJobRow[]>();
+    (data ?? []).forEach((job) => {
+      if (!job.source_id) return;
+      const jobs = byEvent.get(job.source_id) ?? [];
+      jobs.push(job);
+      byEvent.set(job.source_id, jobs);
+    });
+
+    return byEvent;
+  }
+
+  private mapAdminDeliveryChannels(
+    jobs: EventPipelineJobRow[],
+    recipientProfileId: string,
+  ): AdminActivityFeedDeliveryChannelVM[] {
+    return jobs
+      .filter((job) => job.job_kind === 'notification.deliver')
+      .filter((job) => getString(job.payload?.recipientProfileId) === recipientProfileId)
+      .map((job) => ({
+        channel: resolveDeliveryChannel(job) ?? 'unknown',
+        status: job.status,
+        createdAt: job.created_at,
+        lastError: job.last_error ?? null,
+      }));
+  }
+
+  private mapAdminPipelineJobs(jobs: EventPipelineJobRow[]) {
+    return jobs.map(
+      (job): AdminActivityFeedPipelineJobVM => ({
+        id: job.id,
+        kind: job.job_kind,
+        status: job.status,
+        attemptCount: job.attempt_count,
+        runAt: job.run_at,
+        createdAt: job.created_at,
+        nextAttemptAt: job.next_attempt_at ?? null,
+        lastError: job.last_error ?? null,
+      }),
+    );
+  }
+
+  private async loadAdminReminderJobs(orgId: string, sourceEventIds: string[]) {
+    const ids = Array.from(new Set(sourceEventIds.filter(Boolean)));
+    if (!ids.length) return new Map<string, AdminActivityFeedReminderJobVM[]>();
+
+    const { data: logs, error: logsError } = await createSupabaseServiceClient()
+      .from('reminder_dispatch_logs')
+      .select('*')
+      .eq('org_id', orgId)
+      .in('activity_event_id', ids)
+      .is('deleted_at', null)
+      .returns<ReminderDispatchLogRow[]>();
+
+    if (logsError) throw new InternalServerErrorException(logsError.message);
+
+    const reminderJobIds = Array.from(
+      new Set((logs ?? []).map((log) => log.reminder_job_id).filter(Boolean)),
+    );
+    if (!reminderJobIds.length) {
+      return new Map<string, AdminActivityFeedReminderJobVM[]>();
+    }
+
+    const { data: jobs, error: jobsError } = await createSupabaseServiceClient()
+      .from('reminder_jobs')
+      .select('*')
+      .eq('org_id', orgId)
+      .in('id', reminderJobIds)
+      .is('deleted_at', null)
+      .returns<ReminderJobRow[]>();
+
+    if (jobsError) throw new InternalServerErrorException(jobsError.message);
+
+    const jobsById = new Map((jobs ?? []).map((job) => [job.id, job]));
+    const byEvent = new Map<string, AdminActivityFeedReminderJobVM[]>();
+    (logs ?? []).forEach((log) => {
+      if (!log.activity_event_id) return;
+      const job = jobsById.get(log.reminder_job_id);
+      if (!job) return;
+
+      const payload = asRecord(job.payload);
+      const reminders = byEvent.get(log.activity_event_id) ?? [];
+      reminders.push({
+        id: job.id,
+        jobType: job.job_type,
+        status: job.status,
+        targetKind: job.target_kind,
+        targetId: job.target_id,
+        runAt: job.run_at,
+        occurrenceStartAt: job.occurrence_start_at ?? null,
+        reminderOffsetMinutes: getNumber(payload.reminderOffsetMinutes),
+        attemptCount: job.attempt_count,
+        dispatchedAt: job.dispatched_at ?? null,
+        lastError: job.last_error ?? null,
+        dispatchResult: log.result ?? null,
+      });
+      byEvent.set(log.activity_event_id, reminders);
+    });
+
+    return byEvent;
+  }
+
+  private buildAdminVerbSummaries(items: AdminActivityFeedItemVM[]) {
+    const summary = new Map<
+      string,
+      {
+        count: number;
+        unreadCount: number;
+        recipients: Set<string>;
+        channels: Set<string>;
+        latestOccurredAt: string;
+      }
+    >();
+
+    items.forEach((item) => {
+      const current = summary.get(item.verb) ?? {
+        count: 0,
+        unreadCount: 0,
+        recipients: new Set<string>(),
+        channels: new Set<string>(),
+        latestOccurredAt: item.occurredAt,
+      };
+      current.count += 1;
+      if (!item.isRead) current.unreadCount += 1;
+      current.recipients.add(item.recipient.profileId);
+      if (item.channel?.channelId) current.channels.add(item.channel.channelId);
+      if (
+        new Date(item.occurredAt).getTime() > new Date(current.latestOccurredAt).getTime()
+      ) {
+        current.latestOccurredAt = item.occurredAt;
+      }
+      summary.set(item.verb, current);
+    });
+
+    return Array.from(summary.entries())
+      .map(([verb, value]) => ({
+        verb,
+        count: value.count,
+        unreadCount: value.unreadCount,
+        recipientCount: value.recipients.size,
+        channelCount: value.channels.size,
+        latestOccurredAt: value.latestOccurredAt,
+      }))
+      .sort(
+        (left, right) => right.count - left.count || left.verb.localeCompare(right.verb),
+      );
+  }
+
+  async fetchAdminActivityFeedAudit(
+    authUserId: string,
+    orgId: string,
+    options: { limit?: number } = {},
+  ): Promise<AdminActivityFeedAuditVM> {
+    await this.requireAdminRole(authUserId, orgId);
+
+    const limit = Math.min(Math.max(options.limit ?? ADMIN_ACTIVITY_FEED_LIMIT, 1), 1000);
+    const { data, error } = await createSupabaseServiceClient()
+      .from('activity_feed_items')
+      .select(ACTIVITY_FEED_ITEM_SELECT)
+      .eq('org_id', orgId)
+      .is('deleted_at', null)
+      .order('occurred_at', { ascending: false })
+      .limit(limit)
+      .returns<ActivityFeedItemRow[]>();
+
+    if (error) throw new InternalServerErrorException(error.message);
+
+    const rows = data ?? [];
+    const profileIds = rows.flatMap((row) => [
+      row.recipient_profile_id,
+      row.actor_profile_id ?? '',
+    ]);
+    const channelIds = rows.map(resolveChannelId).filter(isNonEmptyString);
+    const sourceEventIds = rows
+      .map((row) => row.source_event_id ?? null)
+      .filter(isNonEmptyString);
+
+    const [profilesById, channelsById, pipelineJobsByEventId, reminderJobsByEventId] =
+      await Promise.all([
+        this.loadAdminProfiles(orgId, profileIds),
+        this.loadAdminChannels(orgId, channelIds),
+        this.loadAdminPipelineJobs(orgId, sourceEventIds),
+        this.loadAdminReminderJobs(orgId, sourceEventIds),
+      ]);
+
+    const items = rows.map((row): AdminActivityFeedItemVM => {
+      const recipientProfile = profilesById.get(row.recipient_profile_id);
+      const actorProfile = row.actor_profile_id
+        ? profilesById.get(row.actor_profile_id)
+        : null;
+      const channelId = resolveChannelId(row);
+      const channel = channelId ? channelsById.get(channelId) : null;
+      const pipelineJobs = row.source_event_id
+        ? (pipelineJobsByEventId.get(row.source_event_id) ?? [])
+        : [];
+      const reminderJobs = row.source_event_id
+        ? (reminderJobsByEventId.get(row.source_event_id) ?? [])
+        : [];
+
+      return {
+        id: row.id,
+        sourceEventId: row.source_event_id ?? null,
+        verb: row.verb,
+        tabKey: row.tab_key,
+        summary:
+          row.summary ?? getString(asRecord(row.content).summary) ?? 'Activity update',
+        recipient: toAdminActor(recipientProfile) ?? {
+          profileId: row.recipient_profile_id,
+          displayName: 'Unknown user',
+          kind: null,
+        },
+        actor: toAdminActor(actorProfile),
+        channel: channelId
+          ? {
+              channelId,
+              label: channel?.topic?.trim() || channelId,
+              kind: channel?.kind ?? null,
+            }
+          : null,
+        scopeLabel: describeScope(row, channel),
+        importance: row.importance ?? null,
+        isRead: row.is_read ?? false,
+        occurredAt: row.occurred_at,
+        createdAt: row.created_at,
+        dedupeKey: row.dedupe_key ?? null,
+        deliveryChannels: this.mapAdminDeliveryChannels(
+          pipelineJobs,
+          row.recipient_profile_id,
+        ),
+        pipelineJobs: this.mapAdminPipelineJobs(pipelineJobs),
+        reminderJobs,
+      };
+    });
+
+    return {
+      generatedAt: new Date().toISOString(),
+      totalCount: items.length,
+      unreadCount: items.filter((item) => !item.isRead).length,
+      pipelineJobCount: Array.from(pipelineJobsByEventId.values()).reduce(
+        (total, jobs) => total + jobs.length,
+        0,
+      ),
+      reminderJobCount: Array.from(reminderJobsByEventId.values()).reduce(
+        (total, jobs) => total + jobs.length,
+        0,
+      ),
+      verbSummaries: this.buildAdminVerbSummaries(items),
+      items,
+    };
+  }
+
   private collectCompletionTargets(items: ActivityFeedItemVM[]) {
     const targets = new Map<string, { scheduleId: string; occurrenceStart: string }>();
 
