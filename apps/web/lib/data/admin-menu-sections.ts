@@ -2,8 +2,19 @@ import type { AdminMenuSectionVM } from '@iconicedu/shared-types';
 
 export function buildAdminMenuSections(
   basePath: string,
-  options: { includeReports?: boolean } = {},
+  options: { includeActivityFeedAudit?: boolean; includeReports?: boolean } = {},
 ): AdminMenuSectionVM[] {
+  const activityLinks = [
+    ...(options.includeActivityFeedAudit === false
+      ? []
+      : [{ title: 'Activity feed', url: `${basePath}/admin/activity/feed` }]),
+    { title: 'Activity logs', url: `${basePath}/admin/activity/logs` },
+    {
+      title: 'Inbox & notifications',
+      url: `${basePath}/admin/activity/inbox`,
+    },
+  ];
+
   const sections: AdminMenuSectionVM[] = [
     {
       title: 'Users',
@@ -32,14 +43,7 @@ export function buildAdminMenuSections(
     {
       title: 'Activity',
       iconKey: 'activity',
-      links: [
-        { title: 'Activity feed', url: `${basePath}/admin/activity/feed` },
-        { title: 'Activity logs', url: `${basePath}/admin/activity/logs` },
-        {
-          title: 'Inbox & notifications',
-          url: `${basePath}/admin/activity/inbox`,
-        },
-      ],
+      links: activityLinks,
     },
     {
       title: 'Moderation',

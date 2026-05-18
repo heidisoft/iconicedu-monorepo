@@ -47,6 +47,20 @@ export class ActivityFeedController {
     );
   }
 
+  @Get('admin/audit')
+  @UseGuards(AuthGuard)
+  getAdminAudit(
+    @Req() req: AuthenticatedRequest,
+    @Query('orgId') orgId: string,
+    @Query('limit') limit?: string,
+  ) {
+    extractBearerToken(req.headers.authorization);
+    const parsedLimit = limit ? Number(limit) : undefined;
+    return this.activityFeedQueryService.fetchAdminActivityFeedAudit(req.user.id, orgId, {
+      limit: Number.isFinite(parsedLimit) ? parsedLimit : undefined,
+    });
+  }
+
   @Post('feedback')
   @UseGuards(AuthGuard)
   submitFeedback(
