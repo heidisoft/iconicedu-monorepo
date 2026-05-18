@@ -83,15 +83,6 @@ function resolveAvatarColor(
   return { bg: AVATAR_SEED_COLORS[h % AVATAR_SEED_COLORS.length]!, fg: '#ffffff' };
 }
 
-const ROLE_LABELS: Record<string, string> = {
-  educator: 'Educator',
-  guardian: 'Parent / Guardian',
-  child: 'Student',
-  staff: 'Staff',
-  admin: 'Admin',
-  owner: 'Owner',
-};
-
 const FAMILY_SWITCH_HANDLE_HEIGHT = 28;
 const FAMILY_SWITCH_HEADER_HEIGHT = 76;
 const FAMILY_SWITCH_CARD_PADDING = 36;
@@ -141,7 +132,6 @@ function makeStyles(C: AppColors) {
     profileInfo: { flex: 1, gap: 3 },
     profileName: { fontSize: 19, fontWeight: '700', color: C.text },
     profileEmail: { fontSize: 14, color: C.textMuted },
-    profileKind: { fontSize: 13, color: C.teal, fontWeight: '600', marginTop: 2 },
 
     // Section
     sectionLabel: {
@@ -365,11 +355,6 @@ export default function AccountScreen() {
             <View style={s.profileInfo}>
               <Text style={s.profileName}>{displayName}</Text>
               <Text style={s.profileEmail}>{user?.email ?? ''}</Text>
-              {!!profileKind && (
-                <Text style={s.profileKind}>
-                  {ROLE_LABELS[profileKind] ?? profileKind}
-                </Text>
-              )}
             </View>
           </View>
         </View>
