@@ -23,6 +23,10 @@ import {
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/providers/theme-provider';
 import { fetchSpaceChannelMetaByChannelId } from '@/lib/api/queries';
+import {
+  MESSAGE_TITLE_FONT_SIZE,
+  MESSAGE_TITLE_FONT_WEIGHT,
+} from '@/lib/message-title-typography';
 import type { ClassScheduleVM, ParticipantRoleVM } from '@iconicedu/shared-types';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -733,8 +737,8 @@ const s = StyleSheet.create({
     fontWeight: '600',
   },
   sessionLabelMessageList: {
-    fontSize: 17,
-    fontWeight: '700',
+    fontSize: MESSAGE_TITLE_FONT_SIZE,
+    fontWeight: MESSAGE_TITLE_FONT_WEIGHT,
   },
   sessionTimeRow: {
     flexDirection: 'row',
