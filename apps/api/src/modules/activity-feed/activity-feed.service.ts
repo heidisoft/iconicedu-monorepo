@@ -398,7 +398,7 @@ export class ActivityFeedService {
       return { feedbackEnabled: true };
     }
 
-    // Disputed: fan out to educators and staff
+    // Disputed: fan out to staff
     await this.publishDisputeNotifications({
       supabase,
       orgId: body.orgId,
@@ -497,26 +497,6 @@ export class ActivityFeedService {
     const scope = learningSpaceId
       ? { kind: 'learning_space' as const, learningSpaceId }
       : { kind: 'channel' as const, channelId };
-
-    // Educator participants
-    const educatorIds = session.participants
-      .filter((p) => p.role === 'educator')
-      .map((p) => p.profile_id);
-
-    if (educatorIds.length > 0) {
-      await publishActivityEvent({
-        supabase,
-        orgId,
-        eventType: 'session.completion.dispute_reported',
-        sourceKind: 'system',
-        scope,
-        objectRef: { kind: 'session', id: scheduleId },
-        audienceRules: [{ kind: 'users_only', userIds: educatorIds }],
-        payload: { ...basePayload, recipientRole: 'educator' },
-        dedupeKey: `dispute:${scheduleId}:${occurrenceKey}:educator:${reportedByProfileId}`,
-        refreshOnDedupe: true,
-      });
-    }
 
     // All active staff in this org
     const { data: staffProfiles } = await supabase
