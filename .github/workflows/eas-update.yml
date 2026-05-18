@@ -34,13 +34,213 @@ jobs:
       - name: Build shared packages
         run: pnpm build:packages
 
+      - name: Install EAS CLI
+        run: npm install -g eas-cli --silent
+
+      - name: Resolve production Supabase credentials
+        id: supabase-creds
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_ID: ${{ vars.SUPABASE_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${SUPABASE_PROJECT_ID}" ]]; then
+            echo "::error::SUPABASE_PROJECT_ID is not configured."
+            exit 1
+          fi
+
+          ANON_KEY=$(curl -sf \
+            -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
+            "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_ID}/api-keys" \
+            | jq -r '.[] | select(.name=="anon") | .api_key')
+
+          if [[ -z "${ANON_KEY}" || "${ANON_KEY}" == "null" ]]; then
+            echo "::error::Could not resolve anon API key for Supabase project ref '${SUPABASE_PROJECT_ID}'."
+            exit 1
+          fi
+
+          echo "::add-mask::${ANON_KEY}"
+          echo "api_url=https://${SUPABASE_PROJECT_ID}.supabase.co" >> "$GITHUB_OUTPUT"
+          echo "anon_key=${ANON_KEY}" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve production app URLs
+        id: app-urls
+        env:
+          RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
+          RAILWAY_PROJECT_ID: ${{ vars.RAILWAY_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+          VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+        run: |
+          set -euo pipefail
+
+          REPO_NAME="${{ github.event.repository.name }}"
+          RAILWAY_SERVICE_NAME="${REPO_NAME}"
+          RAILWAY_ENVIRONMENT="production"
+          RAILWAY_GQL="https://backboard.railway.app/graphql/v2"
+
+          railway_api() {
+            local body="$1"
+            local resp
+            resp=$(curl -sf \
+              -H "Authorization: Bearer ${RAILWAY_API_TOKEN}" \
+              -H "Content-Type: application/json" \
+              "${RAILWAY_GQL}" \
+              -d "${body}") || {
+              echo "::error::Railway API HTTP request failed."
+              exit 1
+            }
+            local errs
+            errs=$(echo "${resp}" | jq -r 'if .errors then .errors | map(.message) | join(", ") else empty end')
+            if [[ -n "${errs}" ]]; then
+              echo "::error::Railway GQL error: ${errs}"
+              exit 1
+            fi
+            echo "${resp}"
+          }
+
+          ENV_RESP=$(railway_api "$(jq -n --arg pid "${RAILWAY_PROJECT_ID}" \
+            '{query:"query environments($projectId: String!) { environments(projectId: $projectId) { edges { node { id name } } } }", variables:{projectId:$pid}}')")
+          ENV_ID=$(echo "${ENV_RESP}" | jq -r --arg name "${RAILWAY_ENVIRONMENT}" \
+            '.data.environments.edges[]? | select(.node.name==$name) | .node.id // empty')
+
+          if [[ -z "${ENV_ID}" ]]; then
+            echo "::error::Railway environment '${RAILWAY_ENVIRONMENT}' not found."
+            exit 1
+          fi
+
+          PROJECT_RESP=$(railway_api "$(jq -n --arg pid "${RAILWAY_PROJECT_ID}" \
+            '{query:"query project($id: String!) { project(id: $id) { services { edges { node { id name } } } } }", variables:{id:$pid}}')")
+          SERVICE_ID=$(echo "${PROJECT_RESP}" | jq -r --arg name "${RAILWAY_SERVICE_NAME}" \
+            '.data.project.services.edges[]? | select(.node.name==$name) | .node.id // empty')
+
+          if [[ -z "${SERVICE_ID}" ]]; then
+            echo "::error::Railway service '${RAILWAY_SERVICE_NAME}' not found in project."
+            exit 1
+          fi
+
+          DOMAIN_RESP=$(railway_api "$(jq -n \
+            --arg pid "${RAILWAY_PROJECT_ID}" \
+            --arg eid "${ENV_ID}" \
+            --arg sid "${SERVICE_ID}" \
+            '{query:"query domains($projectId: String!, $environmentId: String!, $serviceId: String!) { domains(projectId: $projectId, environmentId: $environmentId, serviceId: $serviceId) { serviceDomains { domain } customDomains { domain } } }", variables:{projectId:$pid, environmentId:$eid, serviceId:$sid}}')")
+          API_HOST=$(echo "${DOMAIN_RESP}" | jq -r '
+            [
+              .data.domains.serviceDomains[]?.domain,
+              .data.domains.customDomains[]?.domain
+            ]
+            | map(select(type == "string" and length > 0))
+            | .[0] // empty')
+
+          if [[ -z "${API_HOST}" ]]; then
+            echo "::error::Unable to resolve a Railway URL for environment '${RAILWAY_ENVIRONMENT}' and service '${RAILWAY_SERVICE_NAME}'."
+            exit 1
+          fi
+
+          PROJECT_ID="${VERCEL_PROJECT_ID:-}"
+          ORG_ID="${VERCEL_ORG_ID:-}"
+          TEAM_AMP=""
+          TEAM_Q=""
+
+          if [[ -z "${PROJECT_ID}" ]]; then
+            echo "::error::Missing VERCEL_PROJECT_ID."
+            exit 1
+          fi
+
+          if [[ -z "${ORG_ID}" ]]; then
+            echo "::error::Missing VERCEL_ORG_ID."
+            exit 1
+          fi
+
+          case "${ORG_ID}" in
+            team_*)
+              TEAM_AMP="&teamId=${ORG_ID}"
+              TEAM_Q="?teamId=${ORG_ID}"
+              ;;
+            user_*) ;;
+            *)
+              echo "::error::VERCEL_ORG_ID must start with team_ or user_."
+              exit 1
+              ;;
+          esac
+
+          PROJECT_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${VERCEL_TOKEN}" \
+            "https://api.vercel.com/v9/projects/${PROJECT_ID}${TEAM_Q}")
+          if [[ "${PROJECT_STATUS}" != "200" ]]; then
+            echo "::error::Vercel project preflight failed (HTTP ${PROJECT_STATUS})."
+            exit 1
+          fi
+
+          WEB_URL=$(curl -sf \
+            -H "Authorization: Bearer ${VERCEL_TOKEN}" \
+            "https://api.vercel.com/v6/deployments?projectId=${PROJECT_ID}&target=production&limit=1&meta-githubCommitRef=main${TEAM_AMP}" \
+            | jq -r '.deployments[0].url // ""')
+
+          if [[ -z "${WEB_URL}" ]]; then
+            echo "::error::Unable to resolve a Vercel production deployment URL for main."
+            exit 1
+          fi
+
+          if [[ "${WEB_URL}" != https://* ]]; then
+            WEB_URL="https://${WEB_URL}"
+          fi
+
+          echo "api_url=https://${API_HOST}" >> "$GITHUB_OUTPUT"
+          echo "web_url=${WEB_URL}" >> "$GITHUB_OUTPUT"
+
+      - name: Sync EAS production env
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          SUPABASE_URL: ${{ steps.supabase-creds.outputs.api_url }}
+          SUPABASE_ANON_KEY: ${{ steps.supabase-creds.outputs.anon_key }}
+          API_URL: ${{ steps.app-urls.outputs.api_url }}
+          WEB_URL: ${{ steps.app-urls.outputs.web_url }}
+          POSTHOG_KEY: ${{ secrets.POSTHOG_KEY }}
+          POSTHOG_HOST: ${{ vars.POSTHOG_HOST || 'https://t.iconicedu.lk' }}
+        run: |
+          set -euo pipefail
+
+          cd apps/mobile
+
+          upsert_eas_env() {
+            local name="$1"
+            local value="$2"
+            local visibility="$3"
+
+            if [[ -z "${value}" ]]; then
+              echo "::error::Missing value for ${name}."
+              exit 1
+            fi
+
+            eas env:create production \
+              --name "${name}" \
+              --value "${value}" \
+              --visibility "${visibility}" \
+              --scope project \
+              --force \
+              --non-interactive
+          }
+
+          upsert_eas_env "EXPO_PUBLIC_SUPABASE_URL" "${SUPABASE_URL}" "plaintext"
+          upsert_eas_env "EXPO_PUBLIC_SUPABASE_ANON_KEY" "${SUPABASE_ANON_KEY}" "sensitive"
+          upsert_eas_env "EXPO_PUBLIC_API_URL" "${API_URL}" "plaintext"
+          upsert_eas_env "EXPO_PUBLIC_WEB_URL" "${WEB_URL}" "plaintext"
+          upsert_eas_env "EXPO_PUBLIC_APP_ENV" "production" "plaintext"
+          upsert_eas_env "EXPO_PUBLIC_POSTHOG_HOST" "${POSTHOG_HOST}" "plaintext"
+
+          if [[ -n "${POSTHOG_KEY}" ]]; then
+            upsert_eas_env "EXPO_PUBLIC_POSTHOG_KEY" "${POSTHOG_KEY}" "sensitive"
+          fi
+
       - name: Publish EAS Update (production)
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
-          npm install -g eas-cli --silent
           cd apps/mobile
           eas update \
             --channel production \
+            --environment production \
             --message "Auto update from ${GITHUB_SHA::8}" \
             --non-interactive
