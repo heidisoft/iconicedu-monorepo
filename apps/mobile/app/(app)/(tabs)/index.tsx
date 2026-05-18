@@ -36,7 +36,11 @@ import { useFamilyView } from '@/providers/family-view-provider';
 import { PulseBox } from '@/components/skeletons/pulse-box';
 import { SessionCard } from '@/components/sessions/session-card';
 import { AppSupportFooter } from '@/components/support/app-support-footer';
-import { buildHomeMetricSummary, splitHomeSessionsByTimeline } from '@/lib/home-metrics';
+import {
+  buildHomeMetricSummary,
+  buildHomeUpcomingSessionsMetricDisplay,
+  splitHomeSessionsByTimeline,
+} from '@/lib/home-metrics';
 import { fetchOrgSessions, queryKeys } from '@/lib/api/queries';
 import type { AppColors } from '@/lib/theme';
 
@@ -507,6 +511,10 @@ export default function HomeScreen() {
   const todaySessions = sessionBuckets.today;
   const thisWeekSessions = sessionBuckets.thisWeek;
   const nextWeekSessions = sessionBuckets.nextWeek;
+  const upcomingSessionsMetric = buildHomeUpcomingSessionsMetricDisplay({
+    upcomingSessionsThisWeek: topMetrics.upcomingSessionsThisWeek,
+    nextWeekSessions,
+  });
   const showTodaySection = sessionsLoading || refreshing || todaySessions.length > 0;
   const showThisWeekSection =
     sessionsLoading || refreshing || thisWeekSessions.length > 0;
@@ -801,8 +809,8 @@ export default function HomeScreen() {
                   </View>
                 </View>
                 <View>
-                  <Text style={s.metricValue}>{topMetrics.upcomingSessionsThisWeek}</Text>
-                  <Text style={s.metricLabel}>This week</Text>
+                  <Text style={s.metricValue}>{upcomingSessionsMetric.value}</Text>
+                  <Text style={s.metricLabel}>{upcomingSessionsMetric.label}</Text>
                 </View>
               </TouchableOpacity>
 

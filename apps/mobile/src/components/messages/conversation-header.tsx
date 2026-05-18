@@ -35,6 +35,10 @@ import {
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 import { ChannelTopicIconBadge } from '@/lib/learning-space-icons';
+import {
+  MESSAGE_TITLE_FONT_SIZE,
+  MESSAGE_TITLE_FONT_WEIGHT,
+} from '@/lib/message-title-typography';
 import { PulseBox } from '@/components/skeletons/pulse-box';
 import { RoleAvatarBadge } from '@/components/profile/role-avatar-badge';
 import { RoleNameIndicator } from '@/components/profile/role-name-indicator';
@@ -328,7 +332,12 @@ function makeStyles(C: AppColors) {
       justifyContent: 'center',
       gap: 2,
     },
-    title: { fontSize: 17, fontWeight: '700', color: C.text, letterSpacing: 0 },
+    title: {
+      fontSize: MESSAGE_TITLE_FONT_SIZE,
+      fontWeight: MESSAGE_TITLE_FONT_WEIGHT,
+      color: C.text,
+      letterSpacing: 0,
+    },
     subtitleRow: {
       flexShrink: 1,
       minWidth: 0,

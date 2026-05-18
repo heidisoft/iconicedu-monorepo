@@ -2,6 +2,10 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { Animated, Linking, Share } from 'react-native';
 import { ConversationHeader } from './conversation-header';
+import {
+  MESSAGE_TITLE_FONT_SIZE,
+  MESSAGE_TITLE_FONT_WEIGHT,
+} from '@/lib/message-title-typography';
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────────
 
@@ -115,6 +119,14 @@ describe('ConversationHeader', () => {
   it('renders title', () => {
     render(<ConversationHeader {...baseProps} />);
     expect(screen.getByText('Alice')).toBeTruthy();
+    expect(screen.getByText('Alice').props.style).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          fontSize: MESSAGE_TITLE_FONT_SIZE,
+          fontWeight: MESSAGE_TITLE_FONT_WEIGHT,
+        }),
+      ]),
+    );
   });
 
   it('renders the staff indicator next to staff titles', () => {

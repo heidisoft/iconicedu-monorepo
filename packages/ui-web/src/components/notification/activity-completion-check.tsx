@@ -8,7 +8,13 @@ import { cn } from '@iconicedu/ui-web/lib/utils';
 import { ActivityFeedbackRequest } from '@iconicedu/ui-web/components/notification/activity-feedback-request';
 import type { ActivityFeedLeafItemVM } from '@iconicedu/shared-types';
 
-type Step = 'prompt' | 'dispute_form' | 'submitting' | 'confirmed' | 'disputed';
+type Step =
+  | 'prompt'
+  | 'dispute_form'
+  | 'submitting'
+  | 'confirmed'
+  | 'disputed'
+  | 'already_responded';
 type DisputeCategory = 'teacher_absent' | 'student_absent' | 'technical_issue' | 'other';
 type CompletionVoteStatus = 'confirmed' | 'disputed';
 
@@ -54,8 +60,7 @@ export function canRenderActivityCompletionCheck(activity: ActivityFeedLeafItemV
 }
 
 function getInitialStep(status: CompletionVoteStatus | null): Step {
-  if (status === 'confirmed') return 'confirmed';
-  if (status === 'disputed') return 'disputed';
+  if (status === 'confirmed' || status === 'disputed') return 'already_responded';
   return 'prompt';
 }
 
@@ -73,7 +78,10 @@ export function ActivityCompletionCheck({ activity, onVoteSubmit }: Props) {
 
   useEffect(() => {
     if (metadata.completionVoteStatus) {
-      setStep(getInitialStep(metadata.completionVoteStatus));
+      setStep((prev) => {
+        if (prev === 'confirmed' || prev === 'disputed') return prev;
+        return getInitialStep(metadata.completionVoteStatus);
+      });
     }
   }, [metadata.completionVoteStatus]);
 
@@ -180,6 +188,14 @@ export function ActivityCompletionCheck({ activity, onVoteSubmit }: Props) {
           </Button>
         </div>
         {error ? <p className="mt-2 text-xs text-rose-600">{error}</p> : null}
+      </div>
+    );
+  }
+
+  if (step === 'already_responded') {
+    return (
+      <div className="w-full rounded-xl border border-border/80 bg-muted/40 p-4 text-xs text-muted-foreground md:max-w-[420px]">
+        You&apos;ve already responded — thanks for letting us know!
       </div>
     );
   }

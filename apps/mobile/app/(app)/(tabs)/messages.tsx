@@ -34,6 +34,10 @@ import { useSupervisedDirectMessages } from '@/hooks/use-supervised-direct-messa
 import { useFamilyView } from '@/providers/family-view-provider';
 import { useTheme } from '@/providers/theme-provider';
 import { ChannelTopicIconBadge } from '@/lib/learning-space-icons';
+import {
+  MESSAGE_TITLE_FONT_SIZE,
+  MESSAGE_TITLE_FONT_WEIGHT,
+} from '@/lib/message-title-typography';
 import type { AppColors } from '@/lib/theme';
 import { createHeaderSurface } from '@/lib/header-surface';
 import {
@@ -444,7 +448,11 @@ function makeStyles(C: AppColors) {
     content: { flex: 1, minWidth: 0, justifyContent: 'center', gap: 3 },
     topRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     rowNameWrap: { flex: 1, minWidth: 0 },
-    rowName: { fontSize: 17, fontWeight: '700', color: C.text },
+    rowName: {
+      fontSize: MESSAGE_TITLE_FONT_SIZE,
+      fontWeight: MESSAGE_TITLE_FONT_WEIGHT,
+      color: C.text,
+    },
     rowNameUnread: { fontWeight: '800' },
     rowNameStudentNames: { fontWeight: '600' },
     rowTail: {

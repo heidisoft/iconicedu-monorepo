@@ -148,6 +148,19 @@ export function DashboardHomeInfographicSection({
       total: upcomingSessionsPage.nextWeek.total,
     },
   ].filter((section) => section.items.length > 0);
+  const activeNextWeekSessionCount = upcomingSessionsPage.nextWeek.items.filter(
+    (item) => item.session.status !== 'cancelled',
+  ).length;
+  const upcomingSessionsMetric =
+    topMetrics.upcomingSessionsThisWeek > 0
+      ? {
+          value: topMetrics.upcomingSessionsThisWeek,
+          label: 'This week',
+        }
+      : {
+          value: activeNextWeekSessionCount,
+          label: 'Next week',
+        };
 
   const openFamilySettings = () => {
     window.dispatchEvent(
@@ -190,9 +203,11 @@ export function DashboardHomeInfographicSection({
               </div>
             </div>
             <p className="mt-2 text-4xl font-semibold tracking-tight">
-              {topMetrics.upcomingSessionsThisWeek}
+              {upcomingSessionsMetric.value}
             </p>
-            <p className="mt-1 text-sm text-muted-foreground">This week</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {upcomingSessionsMetric.label}
+            </p>
           </div>
         </article>
 

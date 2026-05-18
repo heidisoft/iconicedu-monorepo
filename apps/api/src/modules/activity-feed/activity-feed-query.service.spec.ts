@@ -1,11 +1,17 @@
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
+import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 import { ActivityFeedQueryService } from '@iconicedu/api/modules/activity-feed/activity-feed-query.service';
 
 jest.mock('@iconicedu/api/lib/supabase/session', () => ({
   createSupabaseSessionClient: jest.fn(),
 }));
 
+jest.mock('@iconicedu/api/lib/supabase/service', () => ({
+  createSupabaseServiceClient: jest.fn(),
+}));
+
 const createSupabaseSessionClientMock = jest.mocked(createSupabaseSessionClient);
+const createSupabaseServiceClientMock = jest.mocked(createSupabaseServiceClient);
 
 function makeQuery<T>(rows: T[]) {
   const query = {
@@ -161,12 +167,16 @@ describe('ActivityFeedQueryService', () => {
     ];
     const activityQuery = makeQuery(activityRows);
     const completionVoteQuery = makeQuery(completionVoteRows);
-    const from = jest.fn((table: string) => {
+    const sessionFrom = jest.fn((table: string) => {
       if (table === 'activity_feed_items') return activityQuery;
-      if (table === 'class_session_completion_votes') return completionVoteQuery;
-      throw new Error(`Unexpected table ${table}`);
+      throw new Error(`Unexpected session table ${table}`);
     });
-    createSupabaseSessionClientMock.mockReturnValue({ from } as never);
+    const serviceFrom = jest.fn((table: string) => {
+      if (table === 'class_session_completion_votes') return completionVoteQuery;
+      throw new Error(`Unexpected service table ${table}`);
+    });
+    createSupabaseSessionClientMock.mockReturnValue({ from: sessionFrom } as never);
+    createSupabaseServiceClientMock.mockReturnValue({ from: serviceFrom } as never);
 
     const service = new ActivityFeedQueryService();
     const feed = await service.fetchFeed('token-1', 'org-1', 'profile-1');

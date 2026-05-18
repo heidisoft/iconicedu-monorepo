@@ -217,68 +217,10 @@ export function ActivityCompletionCheck({
   }
 
   if (step === 'already_responded') {
-    const wasConfirmed = metadata.completionVoteStatus === 'confirmed';
     return (
-      <View style={styles.card}>
-        <Text style={[styles.question, { color: colors.textMuted }]}>
-          Did this class take place?
-        </Text>
-        <View style={styles.buttonRow}>
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel="Yes, the class happened"
-            disabled
-            activeOpacity={1}
-            style={[
-              styles.yesButton,
-              {
-                backgroundColor: wasConfirmed ? colors.teal : colors.inputBg,
-                borderWidth: wasConfirmed ? 0 : 1,
-                borderColor: colors.border,
-                opacity: wasConfirmed ? 1 : 0.4,
-              },
-            ]}
-          >
-            <CheckCircle2
-              size={16}
-              color={wasConfirmed ? colors.tealFg : colors.textMuted}
-            />
-            <Text
-              style={[
-                styles.yesButtonText,
-                { color: wasConfirmed ? colors.tealFg : colors.textMuted },
-              ]}
-            >
-              Yes, it happened
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel="No, the class did not happen"
-            disabled
-            activeOpacity={1}
-            style={[
-              styles.noButton,
-              {
-                borderColor: !wasConfirmed ? colors.teal : colors.border,
-                backgroundColor: colors.inputBg,
-                opacity: !wasConfirmed ? 1 : 0.4,
-              },
-            ]}
-          >
-            <XCircle size={16} color={!wasConfirmed ? colors.teal : colors.textMuted} />
-            <Text
-              style={[
-                styles.noButtonText,
-                { color: !wasConfirmed ? colors.teal : colors.textMuted },
-              ]}
-            >
-              {"No, it didn't"}
-            </Text>
-          </TouchableOpacity>
-        </View>
-        <Text style={[styles.alreadyRespondedText, { color: colors.textFaint }]}>
-          {"You've already responded"}
+      <View style={[styles.card, { backgroundColor: colors.inputBg }]}>
+        <Text style={[styles.submittedText, { color: colors.textMuted }]}>
+          {"You've already responded — thanks for letting us know!"}
         </Text>
       </View>
     );

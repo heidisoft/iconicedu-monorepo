@@ -369,6 +369,37 @@ describe('DashboardHomeInfographicSection', () => {
     expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument();
   });
 
+  it('shows next week count in the upcoming sessions tile when this week is empty', () => {
+    render(
+      <DashboardHomeInfographicSection
+        orgSlug="iconic-academy"
+        topMetrics={{
+          upcomingSessionsThisWeek: 0,
+          completedClassesThisMonth: 0,
+          activeSubjectsCount: 0,
+          activeSubjectsLabel: 'No active subjects yet',
+        }}
+        upcomingSessionsPage={{
+          today: { items: [], total: 0, pageSize: 3, totalPages: 1 },
+          thisWeek: { items: [], total: 0, pageSize: 3, totalPages: 1 },
+          nextWeek: {
+            items: sessionItems.filter((item) => item.weekBucket === 'next-week'),
+            total: 1,
+            pageSize: 3,
+            totalPages: 1,
+          },
+        }}
+        calendarHref="/iconic-academy/class-schedule"
+        notificationsHref="/iconic-academy/notifications"
+        browseHref="/iconic-academy/s"
+      />,
+    );
+
+    expect(screen.getAllByText('Upcoming Sessions').length).toBeGreaterThan(1);
+    expect(screen.getByText('1')).toBeInTheDocument();
+    expect(screen.getAllByText('Next week').length).toBeGreaterThan(1);
+  });
+
   it('keeps explore classes as link for non-parent/student roles', () => {
     render(
       <DashboardHomeInfographicSection
