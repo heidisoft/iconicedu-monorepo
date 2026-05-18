@@ -18,6 +18,11 @@ export type HomeMetricSummary = {
   thirdMetricLabel: string;
 };
 
+export type HomeUpcomingSessionsMetricDisplay = {
+  value: number;
+  label: 'This week' | 'Next week';
+};
+
 export type LearningSpaceSummary = {
   id: string;
   status?: string | null;
@@ -312,6 +317,24 @@ export function splitHomeSessionsByTimeline(input: {
     },
     { today: [], thisWeek: [], nextWeek: [] },
   );
+}
+
+export function buildHomeUpcomingSessionsMetricDisplay(input: {
+  upcomingSessionsThisWeek: number;
+  nextWeekSessions: Array<Pick<ClassSession, 'status'>>;
+}): HomeUpcomingSessionsMetricDisplay {
+  if (input.upcomingSessionsThisWeek > 0) {
+    return {
+      value: input.upcomingSessionsThisWeek,
+      label: 'This week',
+    };
+  }
+
+  return {
+    value: input.nextWeekSessions.filter((session) => session.status !== 'cancelled')
+      .length,
+    label: 'Next week',
+  };
 }
 
 function buildHomeScopedSchedules(input: {

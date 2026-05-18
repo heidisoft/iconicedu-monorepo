@@ -15,6 +15,7 @@ import type {
   UserProfileVM,
 } from '@iconicedu/shared-types';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
+import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 import { buildSenderProfile } from '@iconicedu/api/lib/mobile-data/message-mappers';
 
 const ACTIVITY_FEED_ITEM_SELECT = [
@@ -272,7 +273,6 @@ export class ActivityFeedQueryService {
   }
 
   private async loadCompletionVotes(
-    accessToken: string,
     orgId: string,
     profileId: string,
     items: ActivityFeedItemVM[],
@@ -285,7 +285,7 @@ export class ActivityFeedQueryService {
       new Set(targets.map((target) => target.occurrenceStart)),
     );
 
-    const supabase = createSupabaseSessionClient(accessToken);
+    const supabase = createSupabaseServiceClient();
     const { data, error } = await supabase
       .from('class_session_completion_votes')
       .select(
@@ -441,7 +441,6 @@ export class ActivityFeedQueryService {
       } as ActivityFeedLeafItemVM;
     });
     const completionVotes = await this.loadCompletionVotes(
-      accessToken,
       orgId,
       profileId,
       feedbackItems,

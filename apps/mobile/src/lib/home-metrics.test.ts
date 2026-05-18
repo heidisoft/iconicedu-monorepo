@@ -3,6 +3,7 @@ import type { ClassSession } from '@/components/sessions/session-card';
 
 import {
   buildHomeUpcomingSessions,
+  buildHomeUpcomingSessionsMetricDisplay,
   buildHomeMetricSummary,
   splitHomeSessionsByTimeline,
   type LearningSpaceSummary,
@@ -54,9 +55,10 @@ const LEARNING_SPACES: LearningSpaceSummary[] = [
 
 function makeSession(input: {
   id: string;
-  startAt: string;
-  endAt: string;
+  startAt?: string;
+  endAt?: string;
   isToday?: boolean;
+  status?: ClassSession['status'];
 }): ClassSession {
   return {
     id: input.id,
@@ -69,7 +71,7 @@ function makeSession(input: {
     isToday: input.isToday ?? false,
     isLive: false,
     isPast: false,
-    status: 'scheduled',
+    status: input.status ?? 'scheduled',
     meetingLink: null,
     channelId: null,
     students: [],
@@ -78,8 +80,8 @@ function makeSession(input: {
     reason: null,
     originalTime: null,
     originalDate: null,
-    startAt: input.startAt,
-    endAt: input.endAt,
+    startAt: input.startAt ?? '2026-03-30T16:00:00Z',
+    endAt: input.endAt ?? '2026-03-30T17:00:00Z',
   };
 }
 
@@ -155,6 +157,34 @@ describe('buildHomeMetricSummary', () => {
     });
 
     expect(result.upcomingSessionsThisWeek).toBe(1);
+  });
+
+  it('shows next week count when the weekly homepage metric is zero', () => {
+    expect(
+      buildHomeUpcomingSessionsMetricDisplay({
+        upcomingSessionsThisWeek: 0,
+        nextWeekSessions: [
+          makeSession({ id: 'next-week-1', status: 'scheduled' }),
+          makeSession({ id: 'next-week-2', status: 'cancelled' }),
+          makeSession({ id: 'next-week-3', status: 'scheduled' }),
+        ],
+      }),
+    ).toEqual({
+      value: 2,
+      label: 'Next week',
+    });
+  });
+
+  it('keeps this week count when the weekly homepage metric is nonzero', () => {
+    expect(
+      buildHomeUpcomingSessionsMetricDisplay({
+        upcomingSessionsThisWeek: 1,
+        nextWeekSessions: [makeSession({ id: 'next-week-1', status: 'scheduled' })],
+      }),
+    ).toEqual({
+      value: 1,
+      label: 'This week',
+    });
   });
 
   it('builds educator metrics with active students', () => {
