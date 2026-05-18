@@ -16,15 +16,6 @@ import { useProfile } from '@/hooks/use-profile';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 
-const ROLE_LABELS: Record<string, string> = {
-  educator: 'Educator',
-  guardian: 'Parent / Guardian',
-  child: 'Student',
-  staff: 'Staff',
-  admin: 'Admin',
-  owner: 'Owner',
-};
-
 function makeStyles(C: AppColors) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: C.pageBg },
@@ -77,7 +68,6 @@ function makeStyles(C: AppColors) {
     },
     avatarTxt: { color: C.tealFg, fontWeight: '800', fontSize: 34 },
     avatarName: { fontSize: 22, fontWeight: '800', color: C.text, letterSpacing: 0 },
-    avatarSub: { fontSize: 14, color: C.teal, fontWeight: '600' },
   });
 }
 
@@ -105,7 +95,6 @@ export default function ProfileSettingsScreen() {
     'User';
   const initial = displayName[0]?.toUpperCase() ?? 'U';
   const avatarUrl = prof?.avatar_url as string | null | undefined;
-  const kind = prof?.kind as string | undefined;
 
   return (
     <SafeAreaView style={s.safe}>
@@ -129,7 +118,6 @@ export default function ProfileSettingsScreen() {
             </View>
           )}
           <Text style={s.avatarName}>{displayName}</Text>
-          {!!kind && <Text style={s.avatarSub}>{ROLE_LABELS[kind] ?? kind}</Text>}
         </View>
 
         {/* Identity */}
@@ -157,14 +145,6 @@ export default function ProfileSettingsScreen() {
             labelColor={colors.text}
             hideChevron
             trailing={<Val value={prof?.last_name as string} s={s} />}
-          />
-          <View style={s.divider} />
-          <SettingsRow
-            icon={<CreditCard size={20} color={colors.textMuted} />}
-            label="Role"
-            labelColor={colors.text}
-            hideChevron
-            trailing={<Val value={ROLE_LABELS[kind ?? ''] ?? kind} s={s} />}
           />
         </View>
 
