@@ -68,3 +68,28 @@ describe('buildPersonalizedSessionCopy session reminders', () => {
     expect(copy?.summary).toContain('Algebra with Ms. Chen');
   });
 });
+
+describe('buildPersonalizedSessionCopy completion checks', () => {
+  it('uses polite confirmation copy with lesson context', () => {
+    const copy = buildPersonalizedSessionCopy(
+      'session.completion_check.sent',
+      {
+        title: 'Algebra',
+        activityContext: {
+          viewerRole: 'guardian',
+          classTitle: 'Algebra',
+          teacherNames: ['Ms. Chen'],
+          studentNames: ['Priya'],
+          viewerStudentNames: ['Priya'],
+        },
+      },
+      'guardian-1',
+    );
+
+    expect(copy?.title).toBe(
+      'Please take a moment to confirm the lesson for Priya with Ms. Chen',
+    );
+    expect(copy?.summary).toContain("How did Priya's class with Ms. Chen go?");
+    expect(copy?.summary).toContain('If we do not hear back within 3 days');
+  });
+});

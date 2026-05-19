@@ -12,6 +12,7 @@ import type { SupabaseServiceClient } from '@iconicedu/api/lib/supabase/service'
 import { resolveRecipientsForActivityEvent } from '@iconicedu/api/lib/activity-feed/projector/recipient-resolution';
 import { formatDateTime, resolveViewerTimezone } from '@iconicedu/utils';
 import { formatSessionReminderStartCopy } from '@iconicedu/api/lib/notifications/session-reminder-copy';
+import { buildSessionCompletionCopy } from '@iconicedu/api/lib/notifications/session-completion-copy';
 
 export type ActivityRenderResult = {
   verb: ActivityVerbVM;
@@ -901,18 +902,17 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
         payload.startAt,
       );
       const sessionLabel = formatSessionDateTime(sessionStartAt, payload);
+      const completionCopy = buildSessionCompletionCopy(payload);
       return {
         verb: 'session.completion_check.sent',
         leading: { kind: 'icon', iconKey: 'CheckCircle2', tone: 'success' },
         headline: {
-          primary: classTitle,
-          secondary: sessionLabel
-            ? `Did the ${sessionLabel} session happen?`
-            : 'Did this class take place?',
+          primary: completionCopy.promptTitle,
+          secondary: sessionLabel ? `${classTitle} · ${sessionLabel}` : classTitle,
           secondaryHref: buildInboxSourceHref(event, payload),
         },
-        summary: `Please confirm whether ${classTitle} took place`,
-        preview: { text: `Please confirm whether ${classTitle} took place` },
+        summary: completionCopy.promptBody,
+        preview: { text: completionCopy.promptBody },
         actionButton: undefined,
         metadata: {
           ...buildCommonContextMetadata(payload),
@@ -925,6 +925,8 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
           occurrenceStart: firstOptionalString(payload.occurrenceStart, payload.startAt),
           feedbackUiEnabled: payload.feedbackUiEnabled !== false,
           completionCheckUiEnabled: true,
+          completionPromptTitle: completionCopy.promptTitle,
+          completionPromptBody: completionCopy.promptBody,
           members: payload.members ?? [],
         },
       } satisfies ActivityRenderResult;

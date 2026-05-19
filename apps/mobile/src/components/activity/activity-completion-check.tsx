@@ -40,6 +40,14 @@ function getMetadata(activity: ActivityFeedLeafItemVM) {
     scheduleId: typeof m.scheduleId === 'string' ? m.scheduleId : null,
     occurrenceStart: typeof m.occurrenceStart === 'string' ? m.occurrenceStart : null,
     role: typeof m.roleContext === 'string' ? m.roleContext : 'child',
+    promptTitle:
+      typeof m.completionPromptTitle === 'string'
+        ? m.completionPromptTitle
+        : 'Please take a moment to confirm your lesson',
+    promptBody:
+      typeof m.completionPromptBody === 'string'
+        ? m.completionPromptBody
+        : 'How did your class go? Confirm the lesson, share feedback, or let us know if something did not go as planned.',
     feedbackUiEnabled: m.feedbackUiEnabled !== false,
     completionVoteStatus,
   };
@@ -141,7 +149,10 @@ export function ActivityCompletionCheck({
     return (
       <View style={styles.card}>
         <Text style={[styles.question, { color: colors.textMuted }]}>
-          Did this class take place?
+          {metadata.promptTitle}
+        </Text>
+        <Text style={[styles.promptBody, { color: colors.textMuted }]}>
+          {metadata.promptBody}
         </Text>
         <View style={styles.buttonRow}>
           <TouchableOpacity
@@ -356,6 +367,10 @@ function makeStyles(colors: AppColors) {
       fontWeight: '700',
       textTransform: 'uppercase',
       letterSpacing: 1.4,
+    },
+    promptBody: {
+      fontSize: 13,
+      lineHeight: 19,
     },
     buttonRow: {
       flexDirection: 'row',

@@ -1,5 +1,6 @@
 import { formatDateTime, formatTime, resolveViewerTimezone } from '@iconicedu/utils';
 import { formatSessionReminderStartCopy } from '@iconicedu/api/lib/notifications/session-reminder-copy';
+import { buildSessionCompletionCopy } from '@iconicedu/api/lib/notifications/session-completion-copy';
 
 type SessionMember = Record<string, unknown> & {
   profileId?: string;
@@ -542,10 +543,7 @@ export function buildPersonalizedSessionCopy(
   }
 
   if (eventType === 'session.completion_check.sent') {
-    return {
-      title: `Did ${classTitle} take place?`,
-      summary: 'Tap to confirm whether the class happened',
-    };
+    return buildSessionCompletionCopy(payload);
   }
 
   if (eventType === 'session.completion_check.batch.sent') {
