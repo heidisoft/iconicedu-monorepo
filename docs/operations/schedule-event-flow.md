@@ -91,7 +91,7 @@ activity_feed_items + push notifications
    `'canceled_only'`.
 3. Expand all occurrences across a 365-day horizon (`RECONCILE_HORIZON_DAYS`).
 4. For each non-cancelled occurrence compute candidate jobs:
-   - `session.reminder` at **−30 min** and **−5 min** before session start
+   - `session.reminder` at **−12 hours** and **−30 min** before session start
    - `session.feedback_request` at **+15 min** after session end (falls back to
      +15 min after start if end time is invalid)
 5. Skip occurrences whose jobs already have a `succeeded` dedupe key.
@@ -130,7 +130,7 @@ session.feedback_request:<orgId>:<learningSpaceId>:<channelId>:<occurrenceStart>
 
 | Constant                           | Value                     | Meaning                                            |
 | ---------------------------------- | ------------------------- | -------------------------------------------------- |
-| `SESSION_REMINDER_OFFSETS_MINUTES` | `[30, 5]`                 | Minutes before session start to fire reminders     |
+| `SESSION_REMINDER_OFFSETS_MINUTES` | `[720, 30]`               | Minutes before session start to fire reminders     |
 | `SESSION_FEEDBACK_OFFSET_MINUTES`  | `15`                      | Minutes after session end to fire feedback request |
 | `RECONCILE_HORIZON_DAYS`           | `365`                     | Look-ahead window for recurring event expansion    |
 | `reminder.reconcile` job priority  | `40`                      | Higher priority than `activity.generate` (50)      |
@@ -145,12 +145,12 @@ delivery copy is derived in `apps/api/src/lib/notifications/push-copy.ts`.
 Summary / preview text is capped at 150 characters before activity projection
 and notification delivery payloads are written.
 
-| Variation                        | Event type                      | Primary headline                  | Secondary headline                                                         | Summary / preview                                                             | Expanded content                              | Action button |
-| -------------------------------- | ------------------------------- | --------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | --------------------------------------------- | ------------- |
-| Single class session rescheduled | `class.session.rescheduled`     | `{classTitle}`                    | `session was rescheduled · {roleContext} · New time: {newSessionDateTime}` | `{classTitle} session {oldSessionDateTime} was moved to {newSessionDateTime}` | `Reason: {rescheduledReason}`                 | Open class    |
-| Single class session canceled    | `class.session.canceled`        | `{classTitle}`                    | `session {sessionDateTime} was canceled · {roleContext}`                   | `{classTitle} session {sessionDateTime} was canceled`                         | `Reason: {canceledReason}`                    | Open class    |
-| Single class reminder            | `session.reminder.sent`         | `{classTitle}`                    | `starts soon · {roleContext} · Starts at {sessionStartTime}`               | `{classTitle} is scheduled for {sessionDateTime}`                             | Join details, class outline, or session notes | Open class    |
-| Single class feedback request    | `session.feedback_request.sent` | `Share feedback for {classTitle}` | `{roleContext} · Your feedback helps improve future sessions`              | `Tell us how the session went`                                                | Feedback form or quick rating UI              | Give feedback |
+| Variation                        | Event type                      | Primary headline                  | Secondary headline                                                          | Summary / preview                                                             | Expanded content                              | Action button |
+| -------------------------------- | ------------------------------- | --------------------------------- | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | --------------------------------------------- | ------------- |
+| Single class session rescheduled | `class.session.rescheduled`     | `{classTitle}`                    | `session was rescheduled · {roleContext} · New time: {newSessionDateTime}`  | `{classTitle} session {oldSessionDateTime} was moved to {newSessionDateTime}` | `Reason: {rescheduledReason}`                 | Open class    |
+| Single class session canceled    | `class.session.canceled`        | `{classTitle}`                    | `session {sessionDateTime} was canceled · {roleContext}`                    | `{classTitle} session {sessionDateTime} was canceled`                         | `Reason: {canceledReason}`                    | Open class    |
+| Single class reminder            | `session.reminder.sent`         | `{classTitle}`                    | `Class session starts today/tomorrow at {sessionStartTime} · {roleContext}` | `Class session starts today/tomorrow at {sessionStartTime}`                   | Join details, class outline, or session notes | Open class    |
+| Single class feedback request    | `session.feedback_request.sent` | `Share feedback for {classTitle}` | `{roleContext} · Your feedback helps improve future sessions`               | `Tell us how the session went`                                                | Feedback form or quick rating UI              | Give feedback |
 
 ---
 

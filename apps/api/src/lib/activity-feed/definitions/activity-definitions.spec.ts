@@ -236,10 +236,12 @@ describe('API activity definitions context rendering', () => {
     });
     expect(reminder.headline).toMatchObject({
       primary: 'Algebra I',
-      secondary: expect.stringContaining('starts soon · For Priya with Ms. Chen'),
+      secondary: expect.stringContaining(
+        'Class session starts Thursday, May 7 at 2:00 PM',
+      ),
     });
-    expect(reminder.headline.secondary).toContain('Starts at');
-    expect(reminder.summary).toContain('Algebra I is scheduled for');
+    expect(reminder.headline.secondary).toContain('For Priya with Ms. Chen');
+    expect(reminder.summary).toContain('Class session starts Thursday, May 7');
     expect(reminder.expandedContent).toBeUndefined();
     expect(reminder.actionButton?.label).toBe('Open class');
 

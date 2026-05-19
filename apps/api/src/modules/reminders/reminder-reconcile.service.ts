@@ -20,7 +20,7 @@ import {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const DEFAULT_MAX_ATTEMPTS = 8;
-const SESSION_REMINDER_OFFSETS_MINUTES = [30, 5] as const;
+const SESSION_REMINDER_OFFSETS_MINUTES = [720, 30] as const;
 const SESSION_COMPLETION_CHECK_OFFSET_MINUTES = 10;
 // Wide enough to find the next occurrence without over-expanding
 const RECONCILE_HORIZON_DAYS = 365;
@@ -655,7 +655,7 @@ export class ReminderReconcileService {
       next.jobType === 'session.reminder'
         ? {
             ...basePayload,
-            summary: `Class starts in ${next.offsetMinutes} minutes`,
+            summary: this.formatStartsInSummary(next.offsetMinutes ?? 0),
             reminderOffsetMinutes: next.offsetMinutes,
           }
         : {
@@ -797,6 +797,14 @@ export class ReminderReconcileService {
     const archiveMs = new Date(archivedAt).getTime();
     if (!Number.isFinite(archiveMs)) return false;
     return runAt.getTime() > archiveMs;
+  }
+
+  private formatStartsInSummary(offsetMinutes: number) {
+    if (offsetMinutes >= 60 && offsetMinutes % 60 === 0) {
+      const hours = offsetMinutes / 60;
+      return `Class starts in ${hours} ${hours === 1 ? 'hour' : 'hours'}`;
+    }
+    return `Class starts in ${offsetMinutes} minutes`;
   }
 
   private buildSessionReminderDedupeKey(input: {

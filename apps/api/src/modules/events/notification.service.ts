@@ -1,7 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import type { ActivityEventRow, EventPipelineJobRow } from '@iconicedu/shared-types';
+import type {
+  ActivityEventRow,
+  EventPipelineJobRow,
+  ProfileRow,
+} from '@iconicedu/shared-types';
 
 import { truncatePreviewText } from '@iconicedu/api/lib/activity-feed/preview-text';
+import { resolveActivityRenderContext } from '@iconicedu/api/lib/activity-feed/projector/activity-render-context';
 import { buildNotificationDecision } from '@iconicedu/api/lib/notifications/decision-engine';
 import { buildPersonalizedSessionCopy } from '@iconicedu/api/lib/notifications/push-copy';
 import { sendEmailNotification } from '@iconicedu/api/lib/notifications/providers/email-provider';
@@ -53,6 +58,29 @@ async function tryResolveActivityFeedItemId(input: {
   }
 }
 
+async function loadRecipientProfiles(input: {
+  supabase: SupabaseServiceClient;
+  orgId: string;
+  recipientProfileIds: string[];
+}) {
+  if (!input.recipientProfileIds.length) {
+    return new Map<string, ProfileRow>();
+  }
+
+  const response = await input.supabase
+    .from('profiles')
+    .select('*')
+    .eq('org_id', input.orgId)
+    .in('id', input.recipientProfileIds)
+    .is('deleted_at', null)
+    .returns<ProfileRow[]>();
+  if (response.error) {
+    throw new Error(response.error.message);
+  }
+
+  return new Map((response.data ?? []).map((profile) => [profile.id, profile]));
+}
+
 @Injectable()
 export class NotificationService {
   async prepareForActivityEvent(input: {
@@ -77,6 +105,12 @@ export class NotificationService {
 
     const event = eventResponse.data;
     const eventPayload = event.payload ?? {};
+    const recipientProfileIds = input.recipientProfileIds ?? [];
+    const recipientProfiles = await loadRecipientProfiles({
+      supabase: input.supabase,
+      orgId: event.org_id,
+      recipientProfileIds,
+    });
     const baseTitle =
       typeof eventPayload.title === 'string' && eventPayload.title.trim().length > 0
         ? eventPayload.title
@@ -87,10 +121,38 @@ export class NotificationService {
         : null;
 
     let enqueued = 0;
-    for (const recipientProfileId of input.recipientProfileIds ?? []) {
+    for (const recipientProfileId of recipientProfileIds) {
+      const recipientProfile = recipientProfiles.get(recipientProfileId);
+      const activityContext = recipientProfile
+        ? await resolveActivityRenderContext({
+            supabase: input.supabase,
+            event,
+            recipientProfile,
+          })
+        : null;
+      const eventPayloadForRecipient =
+        eventPayload && typeof eventPayload === 'object' && !Array.isArray(eventPayload)
+          ? {
+              ...eventPayload,
+              viewerTimezone:
+                recipientProfile?.timezone ??
+                (eventPayload as Record<string, unknown>).viewerTimezone ??
+                null,
+              recipientTimezone:
+                recipientProfile?.timezone ??
+                (eventPayload as Record<string, unknown>).recipientTimezone ??
+                null,
+              viewerRole:
+                activityContext?.viewerRole ??
+                (eventPayload as Record<string, unknown>).viewerRole ??
+                null,
+              viewerRoleKeys: activityContext?.viewerRoleKeys ?? [],
+              activityContext,
+            }
+          : eventPayload;
       const personalized = buildPersonalizedSessionCopy(
         event.event_type,
-        eventPayload,
+        eventPayloadForRecipient,
         recipientProfileId,
       );
       const decision = await buildNotificationDecision({
@@ -119,10 +181,10 @@ export class NotificationService {
             attemptBucket,
             reasonCodes: decision.reasonCodes,
             title: personalized?.title ?? baseTitle,
-            summary: truncatePreviewText(personalized?.summary ?? baseSummary),
+            summary: personalized?.summary ?? baseSummary,
             threadId:
               typeof eventPayload.threadId === 'string' ? eventPayload.threadId : null,
-            rawEventPayload: eventPayload,
+            rawEventPayload: eventPayloadForRecipient,
           },
           p_outbox_id: null,
           p_source_kind: 'activity_event',

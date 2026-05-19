@@ -62,16 +62,16 @@ The Expo message sent to APNs / FCM has this structure:
 
 > On tap → class space if `channelId` is present, otherwise Schedule tab.
 
-| Event                           | Title                                             | Body                                                 |
-| ------------------------------- | ------------------------------------------------- | ---------------------------------------------------- |
-| `class.session.scheduled`       | `{classTitle} session scheduled`                  | Payload summary or schedule fallback                 |
-| `class.sessions.scheduled`      | `{classTitle} sessions scheduled`                 | Payload summary                                      |
-| `session.started` ⚡            | `{classTitle} is live now`                        | Join-now fallback or payload summary                 |
-| `session.reminder.sent`         | `{classTitle} starting soon`                      | `{classTitle} starts at {time}` (timezone-aware)     |
-| `session.feedback_request.sent` | `Share feedback for {classTitle}`                 | `Tell us how the session went`                       |
-| `class.session.rescheduled`     | `{classTitle} rescheduled`                        | `{oldDateTime} was moved to {newDateTime}`           |
-| `class.session.canceled`        | `{classTitle} canceled`                           | `{sessionDateTime} was canceled` (+ optional reason) |
-| `session.completed`             | `{audienceLabel} is complete` (role-personalised) | Generic completion text                              |
+| Event                           | Title                                             | Body                                                                       |
+| ------------------------------- | ------------------------------------------------- | -------------------------------------------------------------------------- |
+| `class.session.scheduled`       | `{classTitle} session scheduled`                  | Payload summary or schedule fallback                                       |
+| `class.sessions.scheduled`      | `{classTitle} sessions scheduled`                 | Payload summary                                                            |
+| `session.started` ⚡            | `{classTitle} is live now`                        | Join-now fallback or payload summary                                       |
+| `session.reminder.sent`         | `{classTitle}`                                    | `Class session starts today/tomorrow at {time}` (recipient timezone-aware) |
+| `session.feedback_request.sent` | `Share feedback for {classTitle}`                 | `Tell us how the session went`                                             |
+| `class.session.rescheduled`     | `{classTitle} rescheduled`                        | `{oldDateTime} was moved to {newDateTime}`                                 |
+| `class.session.canceled`        | `{classTitle} canceled`                           | `{sessionDateTime} was canceled` (+ optional reason)                       |
+| `session.completed`             | `{audienceLabel} is complete` (role-personalised) | Generic completion text                                                    |
 
 ### Payment & System
 
