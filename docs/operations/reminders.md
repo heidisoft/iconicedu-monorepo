@@ -25,7 +25,7 @@ The API endpoint performs lease-based due-job claiming and dispatching.
 
 Current class-session timing behavior:
 
-- `session.reminder` jobs: 30 minutes and 5 minutes before session start.
+- `session.reminder` jobs: 12 hours and 30 minutes before session start.
 - `session.feedback_request` jobs: 15 minutes after session end
   (falls back to 15 minutes after start if end time is invalid).
 
@@ -191,7 +191,7 @@ analytics as `claimed`, `succeeded`, `skipped`, `failed`, and `deadLettered`.
 - Keep `limit` conservative (`100` to start).
 - Use alerting if no successful invocation > 5 minutes.
 - Because jobs are lease-claimed and idempotent, overlapping ticks are safe.
-- 1-minute cron cadence is expected so 30m/5m reminders and +15m feedback fire on time.
+- 1-minute cron cadence is expected so 12h/30m reminders and +15m feedback fire on time.
 
 ## 8. Dispatch URL Sanity Check
 

@@ -236,10 +236,12 @@ describe('API activity definitions context rendering', () => {
     });
     expect(reminder.headline).toMatchObject({
       primary: 'Algebra I',
-      secondary: expect.stringContaining('starts soon · For Priya with Ms. Chen'),
+      secondary: expect.stringContaining(
+        'Class session starts Thursday, May 7 at 2:00 PM',
+      ),
     });
-    expect(reminder.headline.secondary).toContain('Starts at');
-    expect(reminder.summary).toContain('Algebra I is scheduled for');
+    expect(reminder.headline.secondary).toContain('For Priya with Ms. Chen');
+    expect(reminder.summary).toContain('Class session starts Thursday, May 7');
     expect(reminder.expandedContent).toBeUndefined();
     expect(reminder.actionButton?.label).toBe('Open class');
 
@@ -269,6 +271,28 @@ describe('API activity definitions context rendering', () => {
       scheduleId: 'schedule-1',
       occurrenceStart: '2026-05-07T14:00:00.000Z',
       feedbackUiEnabled: true,
+    });
+  });
+
+  it('renders polite completion check copy with lesson context metadata', () => {
+    const definition = getActivityEventDefinition('session.completion_check.sent');
+    const rendered = definition!.render(
+      makeEvent('session.completion_check.sent', {
+        occurrenceStart: '2026-05-07T14:00:00.000Z',
+      }),
+    );
+
+    expect(rendered.headline.primary).toBe(
+      'Please take a moment to confirm the lesson for Priya with Ms. Chen',
+    );
+    expect(rendered.summary).toContain("How did Priya's class with Ms. Chen go?");
+    expect(rendered.summary).toContain('credits can be released to the teacher');
+    expect(rendered.metadata).toMatchObject({
+      completionPromptTitle:
+        'Please take a moment to confirm the lesson for Priya with Ms. Chen',
+      completionPromptBody: expect.stringContaining(
+        "How did Priya's class with Ms. Chen go?",
+      ),
     });
   });
 

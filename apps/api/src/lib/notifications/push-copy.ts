@@ -1,4 +1,6 @@
 import { formatDateTime, formatTime, resolveViewerTimezone } from '@iconicedu/utils';
+import { formatSessionReminderStartCopy } from '@iconicedu/api/lib/notifications/session-reminder-copy';
+import { buildSessionCompletionCopy } from '@iconicedu/api/lib/notifications/session-completion-copy';
 
 type SessionMember = Record<string, unknown> & {
   profileId?: string;
@@ -25,6 +27,14 @@ function asString(value: unknown, fallback = ''): string {
 
 function asOptionalString(value: unknown): string | undefined {
   return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+function asStringArray(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter(
+        (entry): entry is string => typeof entry === 'string' && entry.length > 0,
+      )
+    : [];
 }
 
 function firstDefinedString(...values: Array<unknown>): string | undefined {
@@ -141,11 +151,6 @@ function appendReason(summary: string | undefined, reason: string | undefined) {
   return `${summary} Reason: ${reason}.`;
 }
 
-function joinSummaryParts(parts: Array<string | undefined>) {
-  const normalized = parts.filter((part): part is string => Boolean(part));
-  return normalized.length ? normalized.join(' · ') : undefined;
-}
-
 function formatNamesList(names: string[]) {
   if (!names.length) {
     return undefined;
@@ -166,20 +171,54 @@ function getRoleLabel(member: SessionMember | undefined) {
   return asString(member?.role);
 }
 
+function getActivityContext(payload: Record<string, unknown>) {
+  const context = asRecord(payload.activityContext);
+  return {
+    viewerRole:
+      asOptionalString(context.viewerRole) ?? asOptionalString(payload.viewerRole),
+    viewerIsAdminStaff:
+      context.viewerIsAdminStaff === true || payload.viewerIsAdminStaff === true,
+    classTitle:
+      asOptionalString(context.classTitle) ??
+      asOptionalString(context.contextTitle) ??
+      getClassTitle(payload),
+    teacherNames: asStringArray(context.teacherNames),
+    studentNames: asStringArray(context.studentNames),
+    viewerStudentNames: asStringArray(context.viewerStudentNames),
+  };
+}
+
 function buildSessionAudienceLabel(input: {
   classTitle: string;
-  teacherName?: string;
+  teacherLabel?: string;
   studentLabel?: string;
   recipientRole?: string;
+  viewerIsAdminStaff?: boolean;
 }) {
-  const { classTitle, teacherName, studentLabel, recipientRole } = input;
+  const { classTitle, teacherLabel, studentLabel, recipientRole, viewerIsAdminStaff } =
+    input;
 
-  if (recipientRole === 'guardian' || recipientRole === 'staff') {
-    if (studentLabel && teacherName) {
-      return `${classTitle} for ${studentLabel} with ${teacherName}`;
+  if (viewerIsAdminStaff || recipientRole === 'staff') {
+    if (studentLabel && teacherLabel) {
+      return `${classTitle} for ${studentLabel} with ${teacherLabel}`;
     }
     if (studentLabel) {
       return `${classTitle} for ${studentLabel}`;
+    }
+    if (teacherLabel) {
+      return `${classTitle} with ${teacherLabel}`;
+    }
+  }
+
+  if (recipientRole === 'guardian') {
+    if (studentLabel && teacherLabel) {
+      return `${classTitle} for ${studentLabel} with ${teacherLabel}`;
+    }
+    if (studentLabel) {
+      return `${classTitle} for ${studentLabel}`;
+    }
+    if (teacherLabel) {
+      return `${classTitle} with ${teacherLabel}`;
     }
   }
 
@@ -191,13 +230,13 @@ function buildSessionAudienceLabel(input: {
   }
 
   if (recipientRole === 'child') {
-    if (teacherName) {
-      return `${classTitle} with ${teacherName}`;
+    if (teacherLabel) {
+      return `${classTitle} with ${teacherLabel}`;
     }
   }
 
-  if (teacherName) {
-    return `${classTitle} with ${teacherName}`;
+  if (teacherLabel) {
+    return `${classTitle} with ${teacherLabel}`;
   }
 
   return classTitle;
@@ -284,19 +323,33 @@ export function buildPersonalizedSessionCopy(
   );
   const educators = members.filter((member) => asString(member.role) === 'educator');
   const students = members.filter((member) => asString(member.role) === 'child');
-  const teacherName = asOptionalString(educators[0]?.displayName);
-  const studentLabel = formatNamesList(
-    students
-      .map((member) => asOptionalString(member.displayName))
-      .filter((value): value is string => Boolean(value)),
-  );
-  const recipientRole = getRoleLabel(recipient);
-  const classTitle = getClassTitle(payload, 'Class');
+  const activityContext = getActivityContext(payload);
+  const teacherLabel =
+    formatNamesList(activityContext.teacherNames) ??
+    formatNamesList(
+      educators
+        .map((member) => asOptionalString(member.displayName))
+        .filter((value): value is string => Boolean(value)),
+    );
+  const recipientRole = activityContext.viewerRole ?? getRoleLabel(recipient);
+  const contextStudentNames =
+    recipientRole === 'guardian' && activityContext.viewerStudentNames.length
+      ? activityContext.viewerStudentNames
+      : activityContext.studentNames;
+  const studentLabel =
+    formatNamesList(contextStudentNames) ??
+    formatNamesList(
+      students
+        .map((member) => asOptionalString(member.displayName))
+        .filter((value): value is string => Boolean(value)),
+    );
+  const classTitle = activityContext.classTitle ?? getClassTitle(payload, 'Class');
   const sessionAudienceLabel = buildSessionAudienceLabel({
     classTitle,
-    teacherName,
+    teacherLabel,
     studentLabel,
     recipientRole,
+    viewerIsAdminStaff: activityContext.viewerIsAdminStaff,
   });
 
   if (
@@ -473,20 +526,12 @@ export function buildPersonalizedSessionCopy(
       payload.occurrenceStart,
       payload.firstSessionStartAt,
     );
-    const startTime = startAt
-      ? formatTime(
-          startAt,
-          resolveViewerTimezone(extractDisplayTimezone(payload)),
-          'withZone',
-        )
-      : undefined;
+    const reminderStartCopy = formatSessionReminderStartCopy({ startAt, payload });
     return {
-      title: classTitle,
-      summary:
-        joinSummaryParts([
-          'starts soon',
-          startTime ? `Starts at ${startTime}` : undefined,
-        ]) ?? getEventSummary(payload, `${classTitle} starts soon`),
+      title: sessionAudienceLabel,
+      summary: reminderStartCopy
+        ? `${reminderStartCopy} · ${sessionAudienceLabel}`
+        : getEventSummary(payload, `${sessionAudienceLabel} session reminder`),
     };
   }
 
@@ -498,10 +543,7 @@ export function buildPersonalizedSessionCopy(
   }
 
   if (eventType === 'session.completion_check.sent') {
-    return {
-      title: `Did ${classTitle} take place?`,
-      summary: 'Tap to confirm whether the class happened',
-    };
+    return buildSessionCompletionCopy(payload);
   }
 
   if (eventType === 'session.completion_check.batch.sent') {

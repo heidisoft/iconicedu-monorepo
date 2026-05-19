@@ -35,7 +35,7 @@ const DEFAULT_LEASE_SECONDS = 120;
 const DEFAULT_MAX_ATTEMPTS = 8;
 const RETRY_BASE_MS = 15_000;
 const RETRY_MAX_MS = 10 * 60_000;
-const SESSION_REMINDER_OFFSETS_MINUTES = [30, 5] as const;
+const SESSION_REMINDER_OFFSETS_MINUTES = [720, 30] as const;
 const SESSION_COMPLETION_CHECK_OFFSET_MINUTES = 10;
 
 function resolveSupabaseHost() {
@@ -936,6 +936,10 @@ export class RemindersService {
   }
 
   private formatStartsInSummary(offsetMinutes: number) {
+    if (offsetMinutes >= 60 && offsetMinutes % 60 === 0) {
+      const hours = offsetMinutes / 60;
+      return `Class starts in ${hours} ${hours === 1 ? 'hour' : 'hours'}`;
+    }
     return `Class starts in ${offsetMinutes} minutes`;
   }
 

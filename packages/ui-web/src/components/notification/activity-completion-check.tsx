@@ -40,6 +40,14 @@ function getMetadata(activity: ActivityFeedLeafItemVM) {
     scheduleId: typeof m.scheduleId === 'string' ? m.scheduleId : null,
     occurrenceStart: typeof m.occurrenceStart === 'string' ? m.occurrenceStart : null,
     role: typeof m.roleContext === 'string' ? m.roleContext : 'child',
+    promptTitle:
+      typeof m.completionPromptTitle === 'string'
+        ? m.completionPromptTitle
+        : 'Please take a moment to confirm your lesson',
+    promptBody:
+      typeof m.completionPromptBody === 'string'
+        ? m.completionPromptBody
+        : 'How did your class go? Confirm the lesson, share feedback, or let us know if something did not go as planned.',
     feedbackUiEnabled: m.feedbackUiEnabled !== false,
     completionVoteStatus,
   };
@@ -160,7 +168,10 @@ export function ActivityCompletionCheck({ activity, onVoteSubmit }: Props) {
     return (
       <div className="w-full rounded-xl border border-border/80 bg-background/95 p-4 md:max-w-[420px]">
         <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-          Did this class take place?
+          {metadata.promptTitle}
+        </p>
+        <p className="mt-2 text-sm leading-5 text-muted-foreground">
+          {metadata.promptBody}
         </p>
         <div className="mt-3 flex gap-2">
           <Button

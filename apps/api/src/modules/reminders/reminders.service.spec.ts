@@ -222,15 +222,15 @@ describe('RemindersService', () => {
       .filter((row) => row.job_type === 'session.reminder')
       .sort((a, b) => a.run_at.localeCompare(b.run_at));
     expect(reminderRows.map((row) => row.run_at)).toEqual([
+      '2030-03-05T22:00:00.000Z',
       '2030-03-06T09:30:00.000Z',
-      '2030-03-06T09:55:00.000Z',
     ]);
     expect(reminderRows.map((row) => row.payload.summary)).toEqual([
+      'Class starts in 12 hours',
       'Class starts in 30 minutes',
-      'Class starts in 5 minutes',
     ]);
-    expect(reminderRows[0]?.dedupe_key).toContain(':30');
-    expect(reminderRows[1]?.dedupe_key).toContain(':5');
+    expect(reminderRows[0]?.dedupe_key).toContain(':720');
+    expect(reminderRows[1]?.dedupe_key).toContain(':30');
     const completionCheckRow = compiledRows.find(
       (row) => row.job_type === 'session.completion_check',
     );
@@ -287,6 +287,11 @@ describe('RemindersService', () => {
     const { reminderJobsTable, supabase } = makeCompileSupabase({
       scheduleRows: [buildScheduleRow({ id: 'schedule-2' })],
       existingRows: [
+        {
+          dedupe_key:
+            'session.reminder:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z:720',
+          status: 'succeeded',
+        },
         {
           dedupe_key:
             'session.reminder:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z:30',

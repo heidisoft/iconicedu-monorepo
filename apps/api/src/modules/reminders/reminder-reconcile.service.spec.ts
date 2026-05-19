@@ -91,7 +91,7 @@ describe('ReminderReconcileService', () => {
     jest.clearAllMocks();
   });
 
-  it('reconciles the 30-minute and 5-minute reminder jobs for the next session', async () => {
+  it('reconciles the 12-hour and 30-minute reminder jobs for the next session', async () => {
     const scheduleChain = makeMaybeSingleChain({
       data: buildScheduleRow(),
       error: null,
@@ -102,11 +102,11 @@ describe('ReminderReconcileService', () => {
     });
     const succeededChain = makeReturnsChain({ data: [], error: null });
     const activeChain = makeReturnsChain({ data: [], error: null });
-    const existingThirtyMinuteDedupeChain = makeMaybeSingleChain({
+    const existingTwelveHourDedupeChain = makeMaybeSingleChain({
       data: { id: 'existing-reminder-job-1', status: 'canceled' },
       error: null,
     });
-    const existingFiveMinuteDedupeChain = makeMaybeSingleChain({
+    const existingThirtyMinuteDedupeChain = makeMaybeSingleChain({
       data: null,
       error: null,
     });
@@ -118,8 +118,8 @@ describe('ReminderReconcileService', () => {
       .fn()
       .mockImplementationOnce(() => succeededChain)
       .mockImplementationOnce(() => activeChain)
-      .mockImplementationOnce(() => existingThirtyMinuteDedupeChain)
-      .mockImplementationOnce(() => existingFiveMinuteDedupeChain);
+      .mockImplementationOnce(() => existingTwelveHourDedupeChain)
+      .mockImplementationOnce(() => existingThirtyMinuteDedupeChain);
     const reminderJobsUpdate = jest.fn((payload: Record<string, unknown>) => {
       updateChain.update(payload);
       return updateChain;
@@ -148,15 +148,15 @@ describe('ReminderReconcileService', () => {
       await new ReminderReconcileService().reconcileNextReminderJobForSchedule({
         orgId: 'org-1',
         scheduleId: 'schedule-1',
-        now: new Date('2030-03-06T09:00:00.000Z'),
+        now: new Date('2030-03-05T21:00:00.000Z'),
       });
 
     expect(result).toEqual({
       action: 'inserted',
-      dedupeKey: 'session.reminder:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z:30',
+      dedupeKey: 'session.reminder:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z:720',
       dedupeKeys: [
+        'session.reminder:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z:720',
         'session.reminder:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z:30',
-        'session.reminder:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z:5',
       ],
       insertedCount: 2,
       keptCount: 0,
@@ -165,23 +165,24 @@ describe('ReminderReconcileService', () => {
     expect(insert).toHaveBeenCalledWith(
       expect.objectContaining({
         status: 'pending',
-        dedupe_key: 'session.reminder:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z:5',
-        run_at: '2030-03-06T09:55:00.000Z',
+        dedupe_key:
+          'session.reminder:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z:30',
+        run_at: '2030-03-06T09:30:00.000Z',
       }),
     );
     expect(reminderJobsUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         status: 'pending',
         dedupe_key:
-          'session.reminder:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z:30',
-        run_at: '2030-03-06T09:30:00.000Z',
+          'session.reminder:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z:720',
+        run_at: '2030-03-05T22:00:00.000Z',
       }),
     );
     expect(updateChain.eq).toHaveBeenCalledWith('id', 'existing-reminder-job-1');
     expect(updateChain.eq).toHaveBeenCalledWith('org_id', 'org-1');
   });
 
-  it('schedules the 5-minute reminder immediately when the class is five minutes away', async () => {
+  it('schedules the 30-minute reminder immediately when the class is five minutes away', async () => {
     const scheduleChain = makeMaybeSingleChain({
       data: {
         ...buildScheduleRow(),
@@ -235,8 +236,10 @@ describe('ReminderReconcileService', () => {
 
     expect(result).toEqual({
       action: 'inserted',
-      dedupeKey: 'session.reminder:org-1:space-1:channel-1:2030-03-06T10:05:00.000Z:5',
-      dedupeKeys: ['session.reminder:org-1:space-1:channel-1:2030-03-06T10:05:00.000Z:5'],
+      dedupeKey: 'session.reminder:org-1:space-1:channel-1:2030-03-06T10:05:00.000Z:30',
+      dedupeKeys: [
+        'session.reminder:org-1:space-1:channel-1:2030-03-06T10:05:00.000Z:30',
+      ],
       insertedCount: 1,
       keptCount: 0,
       canceledCount: 0,
@@ -244,11 +247,12 @@ describe('ReminderReconcileService', () => {
     expect(insert).toHaveBeenCalledWith(
       expect.objectContaining({
         status: 'pending',
-        dedupe_key: 'session.reminder:org-1:space-1:channel-1:2030-03-06T10:05:00.000Z:5',
+        dedupe_key:
+          'session.reminder:org-1:space-1:channel-1:2030-03-06T10:05:00.000Z:30',
         run_at: '2030-03-06T10:00:00.000Z',
         payload: expect.objectContaining({
-          reminderOffsetMinutes: 5,
-          summary: 'Class starts in 5 minutes',
+          reminderOffsetMinutes: 30,
+          summary: 'Class starts in 30 minutes',
         }),
       }),
     );
@@ -273,16 +277,16 @@ describe('ReminderReconcileService', () => {
         {
           id: 'old-reminder-job-1',
           dedupe_key:
-            'session.reminder:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z:30',
+            'session.reminder:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z:5',
         },
       ],
       error: null,
     });
-    const existingThirtyMinuteDedupeChain = makeMaybeSingleChain({
+    const existingTwelveHourDedupeChain = makeMaybeSingleChain({
       data: null,
       error: null,
     });
-    const existingFiveMinuteDedupeChain = makeMaybeSingleChain({
+    const existingThirtyMinuteDedupeChain = makeMaybeSingleChain({
       data: null,
       error: null,
     });
@@ -294,8 +298,8 @@ describe('ReminderReconcileService', () => {
       .fn()
       .mockImplementationOnce(() => succeededChain)
       .mockImplementationOnce(() => activeChain)
-      .mockImplementationOnce(() => existingThirtyMinuteDedupeChain)
-      .mockImplementationOnce(() => existingFiveMinuteDedupeChain);
+      .mockImplementationOnce(() => existingTwelveHourDedupeChain)
+      .mockImplementationOnce(() => existingThirtyMinuteDedupeChain);
     const reminderJobsUpdate = jest.fn((payload: Record<string, unknown>) => {
       updateChain.update(payload);
       return updateChain;
@@ -324,15 +328,15 @@ describe('ReminderReconcileService', () => {
       await new ReminderReconcileService().reconcileNextReminderJobForSchedule({
         orgId: 'org-1',
         scheduleId: 'schedule-1',
-        now: new Date('2030-03-06T10:00:00.000Z'),
+        now: new Date('2030-03-05T22:00:00.000Z'),
       });
 
     expect(result).toEqual({
       action: 'inserted',
-      dedupeKey: 'session.reminder:org-1:space-1:channel-1:2030-03-06T11:00:00.000Z:30',
+      dedupeKey: 'session.reminder:org-1:space-1:channel-1:2030-03-06T11:00:00.000Z:720',
       dedupeKeys: [
+        'session.reminder:org-1:space-1:channel-1:2030-03-06T11:00:00.000Z:720',
         'session.reminder:org-1:space-1:channel-1:2030-03-06T11:00:00.000Z:30',
-        'session.reminder:org-1:space-1:channel-1:2030-03-06T11:00:00.000Z:5',
       ],
       insertedCount: 2,
       keptCount: 0,
@@ -350,14 +354,15 @@ describe('ReminderReconcileService', () => {
     expect(insert).toHaveBeenCalledWith(
       expect.objectContaining({
         dedupe_key:
-          'session.reminder:org-1:space-1:channel-1:2030-03-06T11:00:00.000Z:30',
-        run_at: '2030-03-06T10:30:00.000Z',
+          'session.reminder:org-1:space-1:channel-1:2030-03-06T11:00:00.000Z:720',
+        run_at: '2030-03-05T23:00:00.000Z',
       }),
     );
     expect(insert).toHaveBeenCalledWith(
       expect.objectContaining({
-        dedupe_key: 'session.reminder:org-1:space-1:channel-1:2030-03-06T11:00:00.000Z:5',
-        run_at: '2030-03-06T10:55:00.000Z',
+        dedupe_key:
+          'session.reminder:org-1:space-1:channel-1:2030-03-06T11:00:00.000Z:30',
+        run_at: '2030-03-06T10:30:00.000Z',
       }),
     );
   });
