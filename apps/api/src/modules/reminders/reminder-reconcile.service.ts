@@ -583,13 +583,17 @@ export class ReminderReconcileService {
       }
 
       // Completion check job (replaces feedback request)
-      const completionCheckRunAt = new Date(
+      let completionCheckRunAt = new Date(
         feedbackBase.getTime() + SESSION_COMPLETION_CHECK_OFFSET_MINUTES * 60 * 1000,
       );
       if (
-        completionCheckRunAt.getTime() > now.getTime() &&
+        !Number.isNaN(completionCheckRunAt.getTime()) &&
         !this.isJobRunAfterArchiveCutoff(occ, completionCheckRunAt)
       ) {
+        if (completionCheckRunAt.getTime() <= now.getTime()) {
+          completionCheckRunAt = now;
+        }
+
         const dedupeKey = this.buildSessionCompletionCheckDedupeKey({
           orgId: occ.ids.orgId,
           learningSpaceId,
