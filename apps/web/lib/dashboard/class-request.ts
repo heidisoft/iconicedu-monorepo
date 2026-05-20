@@ -52,6 +52,79 @@ export function buildDashboardClassRequestMessage(input: {
   ].join('\n');
 }
 
+export async function listClassRequestRecipientProfiles(input: {
+  supabase: SupabaseClient;
+  orgId: string;
+}): Promise<ProfileRow[]> {
+  const staffProfilesQuery = input.supabase
+    .from('profiles')
+    .select('*')
+    .eq('org_id', input.orgId)
+    .eq('kind', 'staff')
+    .is('deleted_at', null)
+    .returns<ProfileRow[]>();
+
+  const roleAccountsQuery = input.supabase
+    .from('user_roles')
+    .select('account_id')
+    .eq('org_id', input.orgId)
+    .in('role_key', ['owner', 'admin', 'staff'])
+    .is('deleted_at', null)
+    .returns<Array<{ account_id: string }>>();
+
+  const primaryRoleAccountsQuery = input.supabase
+    .from('accounts')
+    .select('id')
+    .eq('org_id', input.orgId)
+    .in('primary_role', ['owner', 'admin', 'staff'])
+    .is('deleted_at', null)
+    .returns<Array<{ id: string }>>();
+
+  const [staffProfilesResponse, roleAccountsResponse, primaryRoleAccountsResponse] =
+    await Promise.all([staffProfilesQuery, roleAccountsQuery, primaryRoleAccountsQuery]);
+
+  if (staffProfilesResponse.error) {
+    throw new Error(staffProfilesResponse.error.message);
+  }
+  if (roleAccountsResponse.error) {
+    throw new Error(roleAccountsResponse.error.message);
+  }
+  if (primaryRoleAccountsResponse.error) {
+    throw new Error(primaryRoleAccountsResponse.error.message);
+  }
+
+  const roleAccountIds = Array.from(
+    new Set([
+      ...(roleAccountsResponse.data ?? []).map((row) => row.account_id),
+      ...(primaryRoleAccountsResponse.data ?? []).map((row) => row.id),
+    ]),
+  );
+
+  const roleProfilesResponse = roleAccountIds.length
+    ? await input.supabase
+        .from('profiles')
+        .select('*')
+        .eq('org_id', input.orgId)
+        .in('account_id', roleAccountIds)
+        .is('deleted_at', null)
+        .returns<ProfileRow[]>()
+    : { data: [] as ProfileRow[], error: null };
+
+  if (roleProfilesResponse.error) {
+    throw new Error(roleProfilesResponse.error.message);
+  }
+
+  const byId = new Map<string, ProfileRow>();
+  for (const profile of [
+    ...(staffProfilesResponse.data ?? []),
+    ...(roleProfilesResponse.data ?? []),
+  ]) {
+    byId.set(profile.id, profile);
+  }
+
+  return Array.from(byId.values());
+}
+
 async function findExistingClassRequestChannel(input: {
   supabase: SupabaseClient;
   orgId: string;

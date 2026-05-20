@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildDashboardClassRequestMessage,
   createPrivateClassRequestChannel,
+  listClassRequestRecipientProfiles,
 } from './class-request';
 
 describe('dashboard class request helpers', () => {
@@ -200,6 +201,77 @@ describe('dashboard class request helpers', () => {
         channel_id: 'existing-channel-1',
         profile_id: 'staff-2',
       }),
+    ]);
+  });
+
+  it('lists staff plus admin and owner role profiles as class request recipients', async () => {
+    const profileResponses = [
+      { data: [{ id: 'staff-profile-1' }], error: null },
+      {
+        data: [{ id: 'admin-profile-1' }, { id: 'staff-profile-1' }],
+        error: null,
+      },
+    ];
+    const supabase = {
+      from: (table: string) => {
+        if (table === 'profiles') {
+          const chain = {
+            eq: () => chain,
+            in: () => chain,
+            is: () => chain,
+            returns: async () => profileResponses.shift() ?? { data: [], error: null },
+          };
+          return {
+            select: () => chain,
+          };
+        }
+
+        if (table === 'user_roles') {
+          return {
+            select: () => ({
+              eq: () => ({
+                in: () => ({
+                  is: () => ({
+                    returns: async () => ({
+                      data: [{ account_id: 'admin-account-1' }],
+                      error: null,
+                    }),
+                  }),
+                }),
+              }),
+            }),
+          };
+        }
+
+        if (table === 'accounts') {
+          return {
+            select: () => ({
+              eq: () => ({
+                in: () => ({
+                  is: () => ({
+                    returns: async () => ({
+                      data: [{ id: 'owner-account-1' }],
+                      error: null,
+                    }),
+                  }),
+                }),
+              }),
+            }),
+          };
+        }
+
+        throw new Error(`Unexpected table: ${table}`);
+      },
+    } as never;
+
+    const recipients = await listClassRequestRecipientProfiles({
+      supabase,
+      orgId: 'org-1',
+    });
+
+    expect(recipients.map((profile) => profile.id)).toEqual([
+      'staff-profile-1',
+      'admin-profile-1',
     ]);
   });
 });
