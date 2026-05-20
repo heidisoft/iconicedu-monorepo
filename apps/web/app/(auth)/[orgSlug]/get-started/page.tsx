@@ -20,10 +20,13 @@ export const metadata: Metadata = {
 
 export default async function OrgGetStartedPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ orgSlug: string }>;
+  searchParams: Promise<{ email?: string }>;
 }) {
   const { orgSlug } = await params;
+  const { email: initialEmail } = await searchParams;
   const serviceSupabase = createSupabaseServiceClient();
   const org = await buildOrgBySlug(serviceSupabase, orgSlug);
 
@@ -55,7 +58,11 @@ export default async function OrgGetStartedPage({
   return (
     <div className="bg-background flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
       <div className="w-full max-w-sm">
-        <OrgGetStartedClient orgSlug={org.slug} orgName={org.name} />
+        <OrgGetStartedClient
+          orgSlug={org.slug}
+          orgName={org.name}
+          initialEmail={initialEmail}
+        />
       </div>
     </div>
   );

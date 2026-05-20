@@ -24,6 +24,7 @@ type AuthEntryFormProps = React.ComponentProps<'div'> & {
   introText: string;
   trustLine: string;
   onEmailLogin?: (email: string) => Promise<void> | void;
+  onEmailChange?: (email: string) => void;
   onOAuthLogin?: (provider: OAuthProvider) => Promise<void> | void;
   statusMessage?: string | null;
   errorMessage?: React.ReactNode | null;
@@ -33,6 +34,7 @@ type AuthEntryFormProps = React.ComponentProps<'div'> & {
   footerLinkLabel?: string;
   footerLinkHref?: string;
   footerLinkIntro?: string;
+  initialEmail?: string;
 };
 
 export function getOAuthButtonLabel(
@@ -63,6 +65,7 @@ export function AuthEntryForm({
   introText,
   trustLine,
   onEmailLogin,
+  onEmailChange,
   onOAuthLogin,
   statusMessage,
   errorMessage,
@@ -72,9 +75,10 @@ export function AuthEntryForm({
   footerLinkLabel,
   footerLinkHref,
   footerLinkIntro,
+  initialEmail = '',
   ...props
 }: AuthEntryFormProps) {
-  const [email, setEmail] = React.useState('');
+  const [email, setEmail] = React.useState(initialEmail);
   const [isEmailSubmitting, setIsEmailSubmitting] = React.useState(false);
   const [oauthSubmittingProvider, setOauthSubmittingProvider] =
     React.useState<OAuthProvider | null>(null);
@@ -145,7 +149,10 @@ export function AuthEntryForm({
               placeholder="m@example.com"
               required
               value={email}
-              onChange={(event) => setEmail(event.target.value)}
+              onChange={(event) => {
+                setEmail(event.target.value);
+                onEmailChange?.(event.target.value);
+              }}
             />
             {errorMessage || statusMessage ? (
               <div

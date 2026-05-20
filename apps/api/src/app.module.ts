@@ -20,6 +20,7 @@ import { EventsModule } from '@iconicedu/api/modules/events/events.module';
 import { PresenceModule } from '@iconicedu/api/modules/presence/presence.module';
 import { SpacesModule } from '@iconicedu/api/modules/spaces/spaces.module';
 import { SchedulesModule } from '@iconicedu/api/modules/schedules/schedules.module';
+import { OnboardingModule } from '@iconicedu/api/modules/onboarding/onboarding.module';
 import { GlobalExceptionFilter } from '@iconicedu/api/observability/global-exception.filter';
 import { RequestLoggingInterceptor } from '@iconicedu/api/observability/request-logging.interceptor';
 
@@ -45,6 +46,7 @@ import { RequestLoggingInterceptor } from '@iconicedu/api/observability/request-
     PresenceModule,
     SpacesModule,
     SchedulesModule,
+    OnboardingModule,
   ],
   providers: [
     {

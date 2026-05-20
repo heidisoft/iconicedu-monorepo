@@ -58,7 +58,10 @@ describe('org get-started page', () => {
     getAccountByAuthUserIdInOrgMock.mockResolvedValueOnce({ data: null });
 
     await expect(
-      Page({ params: Promise.resolve({ orgSlug: 'iconic-academy' }) }),
+      Page({
+        params: Promise.resolve({ orgSlug: 'iconic-academy' }),
+        searchParams: Promise.resolve({}),
+      }),
     ).rejects.toThrow('NEXT_REDIRECT');
 
     expect(redirectMock).toHaveBeenCalledWith(

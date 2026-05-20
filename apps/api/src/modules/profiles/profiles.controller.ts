@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Param, Put, Query, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Put,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from '@iconicedu/api/modules/auth/auth.guard';
 import { ProfilesService } from '@iconicedu/api/modules/profiles/profiles.service';
 import {
@@ -34,6 +44,34 @@ export class ProfilesController {
     return this.profilesService.activeForAccount(
       extractBearerToken(req.headers.authorization),
       accountId,
+    );
+  }
+
+  @Post('children')
+  @UseGuards(AuthGuard)
+  createChildProfile(
+    @Req() req: AuthenticatedRequest,
+    @Body()
+    body: {
+      orgId: string;
+      displayName: string;
+      firstName: string;
+      lastName: string;
+      gradeLevel: string;
+      birthYear: number;
+      email?: string | null;
+      timezone?: string | null;
+      city?: string | null;
+      region?: string | null;
+      countryCode?: string | null;
+      countryName?: string | null;
+      postalCode?: string | null;
+      themeKey?: string | null;
+    },
+  ) {
+    return this.profilesService.createChildProfile(
+      extractBearerToken(req.headers.authorization),
+      body,
     );
   }
 

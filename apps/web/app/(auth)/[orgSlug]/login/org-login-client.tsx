@@ -46,6 +46,7 @@ export default function OrgLoginClient({
   const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
   const [statusMessage, setStatusMessage] = React.useState<string | null>(null);
   const [errorMessage, setErrorMessage] = React.useState<React.ReactNode | null>(null);
+  const [currentEmail, setCurrentEmail] = React.useState('');
 
   React.useEffect(() => {
     document.cookie =
@@ -74,13 +75,11 @@ export default function OrgLoginClient({
 
     if (!eligibilityResponse.ok || !eligibilityBody?.eligible) {
       if (shouldPromptOrgSignUp(eligibilityBody)) {
+        const getStartedHref = `/${orgSlug}/get-started${email ? `?email=${encodeURIComponent(email)}` : ''}`;
         setErrorMessage(
           <>
             No account was found for this organization. Please{' '}
-            <Link
-              href={`/${orgSlug}/get-started`}
-              className="underline underline-offset-4"
-            >
+            <Link href={getStartedHref} className="underline underline-offset-4">
               sign up
             </Link>{' '}
             to continue.
@@ -134,6 +133,7 @@ export default function OrgLoginClient({
   return (
     <AuthEntryForm
       onEmailLogin={handleEmailLogin}
+      onEmailChange={setCurrentEmail}
       onOAuthLogin={handleOAuthLogin}
       statusMessage={statusMessage}
       errorMessage={errorMessage}
@@ -149,7 +149,7 @@ export default function OrgLoginClient({
       submitLoadingLabel="Sending verification code..."
       footerLinkIntro="New to ICONIC Academy?"
       footerLinkLabel="Get started here"
-      footerLinkHref={`/${orgSlug}/get-started`}
+      footerLinkHref={`/${orgSlug}/get-started${currentEmail ? `?email=${encodeURIComponent(currentEmail)}` : ''}`}
     />
   );
 }
