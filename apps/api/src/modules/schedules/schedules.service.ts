@@ -12,6 +12,7 @@ import {
   createSupabaseServiceClient,
   type SupabaseServiceClient,
 } from '@iconicedu/api/lib/supabase/service';
+import { ReminderReconcileService } from '@iconicedu/api/modules/reminders/reminder-reconcile.service';
 import type {
   CancelSessionDto,
   DeleteSchedulesDto,
@@ -57,8 +58,34 @@ type InsertedScheduleActivityInput = {
   schedule: ScheduleRowInput;
 };
 
+type RescheduleActivityContext = {
+  scheduleId: string;
+  title: string;
+  startAt: string;
+  endAt: string;
+  timezone: string | null;
+  learningSpaceId: string | null;
+  channelId: string | null;
+  members: Array<{
+    profileId: string;
+    role: string | null;
+    displayName: string | null;
+    avatarUrl: string | null;
+    themeKey: string | null;
+  }>;
+};
+
+type ScheduleOverrideLookupRow = {
+  id: string;
+  patch: Record<string, unknown> | null;
+  updated_at: string | null;
+  created_at: string | null;
+};
+
 @Injectable()
 export class SchedulesService {
+  constructor(private readonly reminderReconcileService?: ReminderReconcileService) {}
+
   // ─── Read endpoints ──────────────────────────────────────────────────────────
 
   async list(accessToken: string, input: { orgId: string; channelId?: string }) {
@@ -315,6 +342,11 @@ export class SchedulesService {
     const actor = await this.requireOrgActor(accessToken, dto.orgId);
     const supabase = createSupabaseServiceClient();
     const now = new Date().toISOString();
+    const activityContext = await this.loadRescheduleActivityContext(
+      supabase,
+      dto.orgId,
+      dto.scheduleId,
+    );
 
     const { data: recurrenceRow, error: recurrenceError } = await supabase
       .from('class_schedule_recurrence')
@@ -329,6 +361,9 @@ export class SchedulesService {
     }
 
     if (!recurrenceRow) {
+      const oldStartAt = activityContext?.startAt ?? null;
+      const oldEndAt = activityContext?.endAt ?? null;
+
       const { error: updateError } = await supabase
         .from('class_schedules')
         .update({
@@ -345,6 +380,21 @@ export class SchedulesService {
       if (updateError) {
         throw new InternalServerErrorException(updateError.message);
       }
+
+      await this.publishSessionRescheduledActivity({
+        supabase,
+        orgId: dto.orgId,
+        actorProfileId: actor.profileId,
+        context: activityContext,
+        oldStartAt,
+        oldEndAt,
+        newStartAt: dto.startAt,
+        newEndAt: dto.endAt,
+        reason: dto.reason,
+        suppressNotifications: dto.suppressNotifications,
+        dedupeKey: `class.session.rescheduled:${dto.orgId}:${dto.scheduleId}:${oldStartAt ?? dto.startAt}`,
+      });
+      await this.reconcileRemindersForSchedule(dto.orgId, dto.scheduleId);
 
       return { success: true, mode: 'single' };
     }
@@ -367,13 +417,18 @@ export class SchedulesService {
       ...(dto.reason ? { reason: dto.reason } : {}),
     };
 
-    const { data: existingOverride } = await supabase
-      .from('class_schedule_recurrence_overrides')
-      .select('id')
-      .eq('org_id', dto.orgId)
-      .eq('recurrence_id', recurrenceRow.id)
-      .eq('occurrence_key', occurrenceKey)
-      .maybeSingle<{ id: string }>();
+    const existingOverrides = await this.loadActiveOverridesForOccurrence({
+      supabase,
+      orgId: dto.orgId,
+      recurrenceId: recurrenceRow.id,
+      occurrenceKey,
+    });
+    const existingOverride = existingOverrides[0] ?? null;
+    const duplicateOverrideIds = existingOverrides
+      .slice(1)
+      .map((override) => override.id);
+
+    const overrideId = existingOverride?.id ?? randomUUID();
 
     if (existingOverride) {
       const { error: updateError } = await supabase
@@ -394,7 +449,7 @@ export class SchedulesService {
       const { error: insertError } = await supabase
         .from('class_schedule_recurrence_overrides')
         .insert({
-          id: randomUUID(),
+          id: overrideId,
           org_id: dto.orgId,
           recurrence_id: recurrenceRow.id,
           occurrence_key: occurrenceKey,
@@ -410,6 +465,38 @@ export class SchedulesService {
         throw new InternalServerErrorException(insertError.message);
       }
     }
+
+    if (duplicateOverrideIds.length) {
+      await this.deleteDuplicateOverrides({
+        supabase,
+        orgId: dto.orgId,
+        duplicateOverrideIds,
+      });
+    }
+
+    const oldStartAt =
+      typeof existingOverride?.patch?.startAt === 'string'
+        ? existingOverride.patch.startAt
+        : occurrenceKey;
+    const oldEndAt =
+      typeof existingOverride?.patch?.endAt === 'string'
+        ? existingOverride.patch.endAt
+        : this.shiftOccurrenceEnd(occurrenceKey, activityContext);
+
+    await this.publishSessionRescheduledActivity({
+      supabase,
+      orgId: dto.orgId,
+      actorProfileId: actor.profileId,
+      context: activityContext,
+      oldStartAt,
+      oldEndAt,
+      newStartAt: dto.startAt,
+      newEndAt: dto.endAt,
+      reason: dto.reason,
+      suppressNotifications: dto.suppressNotifications,
+      dedupeKey: `class.session.rescheduled:${dto.orgId}:${overrideId}`,
+    });
+    await this.reconcileRemindersForSchedule(dto.orgId, dto.scheduleId);
 
     return { success: true, mode: 'recurring' };
   }
@@ -491,6 +578,196 @@ export class SchedulesService {
     }
 
     return data?.id ?? null;
+  }
+
+  private async loadActiveOverridesForOccurrence(input: {
+    supabase: SupabaseServiceClient;
+    orgId: string;
+    recurrenceId: string;
+    occurrenceKey: string;
+  }) {
+    const { data, error } = await input.supabase
+      .from('class_schedule_recurrence_overrides')
+      .select('id, patch, updated_at, created_at')
+      .eq('org_id', input.orgId)
+      .eq('recurrence_id', input.recurrenceId)
+      .eq('occurrence_key', input.occurrenceKey)
+      .is('deleted_at', null)
+      .order('updated_at', { ascending: false })
+      .order('created_at', { ascending: false })
+      .returns<ScheduleOverrideLookupRow[]>();
+
+    if (error) {
+      throw new InternalServerErrorException(error.message);
+    }
+
+    return data ?? [];
+  }
+
+  private async deleteDuplicateOverrides(input: {
+    supabase: SupabaseServiceClient;
+    orgId: string;
+    duplicateOverrideIds: string[];
+  }) {
+    const { error } = await input.supabase
+      .from('class_schedule_recurrence_overrides')
+      .delete()
+      .eq('org_id', input.orgId)
+      .in('id', input.duplicateOverrideIds);
+
+    if (error) {
+      throw new InternalServerErrorException(error.message);
+    }
+  }
+
+  private async loadRescheduleActivityContext(
+    supabase: SupabaseServiceClient,
+    orgId: string,
+    scheduleId: string,
+  ): Promise<RescheduleActivityContext | null> {
+    const { data, error } = await supabase
+      .from('class_schedules')
+      .select(
+        `
+          id, title, start_at, end_at, timezone,
+          source_learning_space_id, source_channel_id,
+          participants:class_schedule_participants(
+            profile_id, role, display_name, avatar_url, theme_key
+          )
+        `,
+      )
+      .eq('org_id', orgId)
+      .eq('id', scheduleId)
+      .is('deleted_at', null)
+      .maybeSingle<{
+        id: string;
+        title: string;
+        start_at: string;
+        end_at: string;
+        timezone: string | null;
+        source_learning_space_id: string | null;
+        source_channel_id: string | null;
+        participants: Array<{
+          profile_id: string;
+          role: string | null;
+          display_name: string | null;
+          avatar_url: string | null;
+          theme_key: string | null;
+        }> | null;
+      }>();
+
+    if (error) {
+      throw new InternalServerErrorException(error.message);
+    }
+    if (!data) {
+      return null;
+    }
+
+    return {
+      scheduleId: data.id,
+      title: data.title,
+      startAt: data.start_at,
+      endAt: data.end_at,
+      timezone: data.timezone,
+      learningSpaceId: data.source_learning_space_id,
+      channelId: data.source_channel_id,
+      members: (data.participants ?? []).map((participant) => ({
+        profileId: participant.profile_id,
+        role: participant.role,
+        displayName: participant.display_name,
+        avatarUrl: participant.avatar_url,
+        themeKey: participant.theme_key,
+      })),
+    };
+  }
+
+  private async publishSessionRescheduledActivity(input: {
+    supabase: SupabaseServiceClient;
+    orgId: string;
+    actorProfileId: string | null;
+    context: RescheduleActivityContext | null;
+    oldStartAt: string | null;
+    oldEndAt: string | null;
+    newStartAt: string;
+    newEndAt: string;
+    reason: string | null;
+    suppressNotifications: boolean;
+    dedupeKey: string;
+  }) {
+    if (!input.context?.learningSpaceId || !input.context.channelId) {
+      return;
+    }
+
+    await publishActivityEvent({
+      supabase: input.supabase,
+      orgId: input.orgId,
+      eventType: 'class.session.rescheduled',
+      sourceKind: input.actorProfileId ? 'profile' : 'system',
+      actorProfileId: input.actorProfileId,
+      scope: {
+        kind: 'learning_space',
+        learningSpaceId: input.context.learningSpaceId,
+      },
+      objectRef: {
+        kind: 'session',
+        id: input.oldStartAt ?? input.newStartAt,
+      },
+      targetRef: { kind: 'learning_space', id: input.context.learningSpaceId },
+      audienceRules: [{ kind: 'all_in_scope' }],
+      payload: {
+        learningSpaceId: input.context.learningSpaceId,
+        channelId: input.context.channelId,
+        scheduleId: input.context.scheduleId,
+        title: input.context.title,
+        learningSpaceTitle: input.context.title,
+        channelRouteKind: 'space',
+        startAt: input.newStartAt,
+        endAt: input.newEndAt,
+        occurrenceStart: input.oldStartAt,
+        rescheduledFromStartAt: input.oldStartAt,
+        rescheduledFromEndAt: input.oldEndAt,
+        rescheduledToStartAt: input.newStartAt,
+        rescheduledToEndAt: input.newEndAt,
+        rescheduledReason: input.reason,
+        reason: input.reason,
+        timezone: input.context.timezone,
+        firstSessionStartAt: input.newStartAt,
+        firstSessionTimezone: input.context.timezone,
+        members: input.context.members,
+        suppressNotifications: input.suppressNotifications,
+      },
+      dedupeKey: input.dedupeKey,
+      refreshOnDedupe: true,
+      createdBy: input.actorProfileId,
+    });
+  }
+
+  private async reconcileRemindersForSchedule(orgId: string, scheduleId: string) {
+    await this.reminderReconcileService?.reconcileNextReminderJobForSchedule({
+      orgId,
+      scheduleId,
+    });
+  }
+
+  private shiftOccurrenceEnd(
+    occurrenceStartAt: string,
+    context: RescheduleActivityContext | null,
+  ) {
+    if (!context) {
+      return null;
+    }
+    const baseStart = new Date(context.startAt).getTime();
+    const baseEnd = new Date(context.endAt).getTime();
+    const occurrenceStart = new Date(occurrenceStartAt).getTime();
+    if (
+      Number.isNaN(baseStart) ||
+      Number.isNaN(baseEnd) ||
+      Number.isNaN(occurrenceStart)
+    ) {
+      return null;
+    }
+
+    return new Date(occurrenceStart + (baseEnd - baseStart)).toISOString();
   }
 
   private async cascadeDeleteSchedulesForLearningSpace(

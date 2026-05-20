@@ -60,6 +60,7 @@ describe('ActivityFeedQueryService', () => {
         metadata: {
           sourceEventId: 'event-1',
           scheduleId: 'schedule-1',
+          occurrenceStart: '2026-05-05T11:00:00.000Z',
           learningSpaceId: 'space-1',
           channelId: 'channel-1',
           feedbackUiEnabled: true,
@@ -69,6 +70,17 @@ describe('ActivityFeedQueryService', () => {
       },
     ];
     const feedbackRows = [
+      {
+        source_event_id: 'event-old',
+        message_id: null,
+        class_session_id: 'schedule-1',
+        classroom_id: 'space-1',
+        channel_id: 'channel-1',
+        occurrence_start_at: '2026-05-04T11:00:00.000Z',
+        rating: 2,
+        comment: 'Different occurrence',
+        submitted_at: '2026-05-04T12:10:00.000Z',
+      },
       {
         source_event_id: 'event-1',
         message_id: null,
@@ -155,7 +167,7 @@ describe('ActivityFeedQueryService', () => {
     const completionVoteRows = [
       {
         schedule_id: 'schedule-1',
-        occurrence_key: '2026-05-05T11:00:00.000Z',
+        occurrence_key: '2026-05-05T11:00:00+00:00',
         profile_id: 'profile-1',
         role: 'guardian',
         status: 'disputed',

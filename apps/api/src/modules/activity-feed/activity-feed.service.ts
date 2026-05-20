@@ -26,6 +26,12 @@ type ProfileRow = {
   id: string;
   account_id: string;
   org_id: string;
+  kind?: string | null;
+};
+
+type CompletionParticipant = {
+  id: string;
+  role: string;
 };
 
 const UUID_PATTERN =
@@ -314,6 +320,9 @@ export class ActivityFeedService {
     }
     if (!isUuid(body.orgId)) throw new BadRequestException('Invalid orgId');
     if (!isUuid(body.scheduleId)) throw new BadRequestException('Invalid scheduleId');
+    if (body.recipientProfileId && !isUuid(body.recipientProfileId)) {
+      throw new BadRequestException('Invalid recipientProfileId');
+    }
     if (!VALID_STATUSES.includes(body.status as (typeof VALID_STATUSES)[number])) {
       throw new BadRequestException('Invalid status');
     }
@@ -346,20 +355,23 @@ export class ActivityFeedService {
     if (accountError) throw new InternalServerErrorException(accountError.message);
     if (!account) throw new NotFoundException('Account not found');
 
-    const profileId = await this.resolveActiveProfileId(account.id, body.orgId);
+    const recipientProfileId =
+      body.recipientProfileId?.trim() ||
+      (await this.resolveActiveProfileId(account.id, body.orgId));
+    const recipientProfile = await this.resolvePermittedProfile(
+      account,
+      body.orgId,
+      recipientProfileId,
+    );
 
-    // Verify caller is a participant of this session
-    const { data: participant, error: participantError } = await supabase
-      .from('class_schedule_participants')
-      .select('id, role')
-      .eq('org_id', body.orgId)
-      .eq('schedule_id', body.scheduleId)
-      .eq('profile_id', profileId)
-      .is('deleted_at', null)
-      .maybeSingle<{ id: string; role: string }>();
+    const participant = await this.resolveCompletionVoteParticipant({
+      supabase,
+      orgId: body.orgId,
+      scheduleId: body.scheduleId,
+      profileId: recipientProfile.id,
+      accountId: account.id,
+    });
 
-    if (participantError)
-      throw new InternalServerErrorException(participantError.message);
     if (!participant) throw new ForbiddenException('Not a participant of this session');
 
     const now = new Date().toISOString();
@@ -372,7 +384,7 @@ export class ActivityFeedService {
           org_id: body.orgId,
           schedule_id: body.scheduleId,
           occurrence_key: body.occurrenceKey,
-          profile_id: profileId,
+          profile_id: recipientProfile.id,
           role: participant.role,
           status: body.status,
           dispute_category:
@@ -382,7 +394,7 @@ export class ActivityFeedService {
             body.status === 'disputed' ? (body.rescheduleRequested ?? false) : false,
           voted_at: now,
           updated_at: now,
-          updated_by: profileId,
+          updated_by: recipientProfile.id,
           deleted_at: null,
         },
         { onConflict: 'org_id,schedule_id,occurrence_key,profile_id' },
@@ -391,7 +403,7 @@ export class ActivityFeedService {
     if (voteError) throw new InternalServerErrorException(voteError.message);
 
     this.logger.log(
-      `completion vote saved scheduleId=${body.scheduleId} profileId=${profileId} status=${body.status}`,
+      `completion vote saved scheduleId=${body.scheduleId} profileId=${recipientProfile.id} status=${body.status}`,
     );
 
     if (body.status === 'confirmed') {
@@ -404,7 +416,7 @@ export class ActivityFeedService {
       orgId: body.orgId,
       scheduleId: body.scheduleId,
       occurrenceKey: body.occurrenceKey,
-      reportedByProfileId: profileId,
+      reportedByProfileId: recipientProfile.id,
       reportedByRole: participant.role,
       disputeCategory: body.disputeCategory ?? 'other',
       disputeReason: disputeReason ?? null,
@@ -533,6 +545,103 @@ export class ActivityFeedService {
         refreshOnDedupe: true,
       });
     }
+  }
+
+  private async resolveCompletionVoteParticipant(input: {
+    supabase: ReturnType<typeof createSupabaseServiceClient>;
+    orgId: string;
+    scheduleId: string;
+    profileId: string;
+    accountId: string;
+  }): Promise<CompletionParticipant | null> {
+    const { data: directParticipant, error: participantError } = await input.supabase
+      .from('class_schedule_participants')
+      .select('id, role')
+      .eq('org_id', input.orgId)
+      .eq('schedule_id', input.scheduleId)
+      .eq('profile_id', input.profileId)
+      .is('deleted_at', null)
+      .maybeSingle<CompletionParticipant>();
+
+    if (participantError) {
+      throw new InternalServerErrorException(participantError.message);
+    }
+    if (directParticipant) {
+      return directParticipant;
+    }
+
+    const { data: profile, error: profileError } = await input.supabase
+      .from('profiles')
+      .select('id, account_id, org_id, kind')
+      .eq('org_id', input.orgId)
+      .eq('id', input.profileId)
+      .is('deleted_at', null)
+      .maybeSingle<ProfileRow>();
+
+    if (profileError) {
+      throw new InternalServerErrorException(profileError.message);
+    }
+    if (profile?.kind !== 'guardian') {
+      return null;
+    }
+
+    const { data: familyLinks, error: familyLinksError } = await input.supabase
+      .from('family_links')
+      .select('child_account_id')
+      .eq('org_id', input.orgId)
+      .eq('guardian_account_id', input.accountId)
+      .is('deleted_at', null)
+      .returns<Array<{ child_account_id: string }>>();
+
+    if (familyLinksError) {
+      throw new InternalServerErrorException(familyLinksError.message);
+    }
+
+    const childAccountIds = Array.from(
+      new Set((familyLinks ?? []).map((link) => link.child_account_id).filter(Boolean)),
+    );
+    if (!childAccountIds.length) {
+      return null;
+    }
+
+    const { data: childProfiles, error: childProfilesError } = await input.supabase
+      .from('profiles')
+      .select('id')
+      .eq('org_id', input.orgId)
+      .in('account_id', childAccountIds)
+      .eq('kind', 'child')
+      .is('deleted_at', null)
+      .returns<Array<{ id: string }>>();
+
+    if (childProfilesError) {
+      throw new InternalServerErrorException(childProfilesError.message);
+    }
+
+    const childProfileIds = Array.from(
+      new Set(
+        (childProfiles ?? []).map((childProfile) => childProfile.id).filter(Boolean),
+      ),
+    );
+    if (!childProfileIds.length) {
+      return null;
+    }
+
+    const { data: childParticipant, error: childParticipantError } = await input.supabase
+      .from('class_schedule_participants')
+      .select('id')
+      .eq('org_id', input.orgId)
+      .eq('schedule_id', input.scheduleId)
+      .in('profile_id', childProfileIds)
+      .eq('role', 'child')
+      .is('deleted_at', null)
+      .limit(1)
+      .maybeSingle<{ id: string }>();
+
+    if (childParticipantError) {
+      throw new InternalServerErrorException(childParticipantError.message);
+    }
+
+    return childParticipant ? { id: childParticipant.id, role: 'guardian' } : null;
   }
 
   private async resolveActiveProfileId(accountId: string, orgId: string) {

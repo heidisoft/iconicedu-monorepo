@@ -194,6 +194,13 @@ function getFeedbackClassSessionId(item: ActivityFeedItemVM) {
   return null;
 }
 
+function getFeedbackOccurrenceStart(item: ActivityFeedItemVM) {
+  const metadata = asRecord(item.metadata);
+  if (typeof metadata.occurrenceStart === 'string') return metadata.occurrenceStart;
+  if (typeof metadata.startAt === 'string') return metadata.startAt;
+  return null;
+}
+
 function getCompletionScheduleId(item: ActivityFeedItemVM) {
   const metadata = asRecord(item.metadata);
   return typeof metadata.scheduleId === 'string' ? metadata.scheduleId : null;
@@ -208,8 +215,23 @@ function isNonEmptyString(value: string | null): value is string {
   return typeof value === 'string' && value.length > 0;
 }
 
+function normalizeOccurrenceKey(value: string | null) {
+  if (!value) return 'none';
+  const timestamp = new Date(value).getTime();
+  return Number.isNaN(timestamp) ? value : new Date(timestamp).toISOString();
+}
+
+function normalizeOccurrenceValue(value: string) {
+  const timestamp = new Date(value).getTime();
+  return Number.isNaN(timestamp) ? value : new Date(timestamp).toISOString();
+}
+
 function completionVoteKey(scheduleId: string, occurrenceStart: string) {
-  return `${scheduleId}:${occurrenceStart}`;
+  return `${scheduleId}:${normalizeOccurrenceKey(occurrenceStart)}`;
+}
+
+function feedbackResponseKey(classSessionId: string, occurrenceStart: string | null) {
+  return `${classSessionId}:${normalizeOccurrenceKey(occurrenceStart)}`;
 }
 
 function mapFeedbackResponse(row: RawClassSessionFeedbackRow) {
@@ -229,7 +251,7 @@ function mapFeedbackResponse(row: RawClassSessionFeedbackRow) {
 function mapCompletionVote(row: RawClassSessionCompletionVoteRow) {
   return {
     scheduleId: row.schedule_id,
-    occurrenceKey: row.occurrence_key,
+    occurrenceKey: normalizeOccurrenceValue(row.occurrence_key),
     profileId: row.profile_id,
     role: row.role,
     status: row.status,
@@ -695,7 +717,19 @@ export class ActivityFeedQueryService {
       .returns<RawClassSessionFeedbackRow[]>();
     if (error) throw new InternalServerErrorException(error.message);
 
-    return new Map((data ?? []).map((row) => [row.class_session_id, row]));
+    const responses = new Map<string, RawClassSessionFeedbackRow>();
+    (data ?? []).forEach((row) => {
+      responses.set(
+        feedbackResponseKey(row.class_session_id, row.occurrence_start_at),
+        row,
+      );
+
+      if (!responses.has(row.class_session_id)) {
+        responses.set(row.class_session_id, row);
+      }
+    });
+
+    return responses;
   }
 
   private async loadCompletionVotes(
@@ -855,7 +889,12 @@ export class ActivityFeedQueryService {
       const feedbackClassSessionId = getFeedbackClassSessionId(item);
       if (!feedbackClassSessionId) return item;
 
-      const feedbackResponse = feedbackResponses.get(feedbackClassSessionId);
+      const feedbackOccurrenceStart = getFeedbackOccurrenceStart(item);
+      const feedbackResponse =
+        feedbackResponses.get(
+          feedbackResponseKey(feedbackClassSessionId, feedbackOccurrenceStart),
+        ) ??
+        (feedbackOccurrenceStart ? null : feedbackResponses.get(feedbackClassSessionId));
       if (!feedbackResponse) return item;
 
       return {

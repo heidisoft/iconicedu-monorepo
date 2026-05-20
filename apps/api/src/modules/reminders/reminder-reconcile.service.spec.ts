@@ -367,6 +367,83 @@ describe('ReminderReconcileService', () => {
     );
   });
 
+  it('schedules a due completion check immediately when the rescheduled class already ended', async () => {
+    const scheduleChain = makeMaybeSingleChain({
+      data: {
+        ...buildScheduleRow(),
+        start_at: '2030-03-06T09:00:00.000Z',
+        end_at: '2030-03-06T10:00:00.000Z',
+      },
+      error: null,
+    });
+    const learningSpaceChain = makeMaybeSingleChain({
+      data: { id: 'space-1', status: 'active', archived_at: null },
+      error: null,
+    });
+    const succeededChain = makeReturnsChain({ data: [], error: null });
+    const activeChain = makeReturnsChain({ data: [], error: null });
+    const existingDedupeChain = makeMaybeSingleChain({
+      data: null,
+      error: null,
+    });
+    const insert = jest.fn(async () => ({ error: null }));
+
+    const reminderJobsSelect = jest
+      .fn()
+      .mockImplementationOnce(() => succeededChain)
+      .mockImplementationOnce(() => activeChain)
+      .mockImplementationOnce(() => existingDedupeChain);
+
+    createSupabaseServiceClientMock.mockReturnValue({
+      from: jest.fn((table: string) => {
+        if (table === 'class_schedules') {
+          return { select: jest.fn(() => scheduleChain) };
+        }
+        if (table === 'learning_spaces') {
+          return { select: jest.fn(() => learningSpaceChain) };
+        }
+        if (table === 'reminder_jobs') {
+          return {
+            select: reminderJobsSelect,
+            insert,
+          };
+        }
+        throw new Error(`Unexpected table ${table}`);
+      }),
+    } as never);
+
+    const result =
+      await new ReminderReconcileService().reconcileNextReminderJobForSchedule({
+        orgId: 'org-1',
+        scheduleId: 'schedule-1',
+        now: new Date('2030-03-06T10:30:00.000Z'),
+      });
+
+    expect(result).toEqual({
+      action: 'inserted',
+      dedupeKey:
+        'session.completion_check:org-1:space-1:channel-1:2030-03-06T09:00:00.000Z',
+      dedupeKeys: [
+        'session.completion_check:org-1:space-1:channel-1:2030-03-06T09:00:00.000Z',
+      ],
+      insertedCount: 1,
+      keptCount: 0,
+      canceledCount: 0,
+    });
+    expect(insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'pending',
+        job_type: 'session.completion_check',
+        dedupe_key:
+          'session.completion_check:org-1:space-1:channel-1:2030-03-06T09:00:00.000Z',
+        run_at: '2030-03-06T10:30:00.000Z',
+        payload: expect.objectContaining({
+          summary: 'How was your class?',
+        }),
+      }),
+    );
+  });
+
   it.each(['completed', 'rescheduled'])(
     'cancels active reminders without scheduling new jobs when the schedule is %s',
     async (status) => {

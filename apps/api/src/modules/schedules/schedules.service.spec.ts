@@ -135,6 +135,8 @@ describe('SchedulesService authorization', () => {
           select: jest.fn(() => query),
           eq: jest.fn(() => query),
           is: jest.fn(() => query),
+          order: jest.fn(() => query),
+          in: jest.fn(() => query),
           delete: jest.fn(() => {
             operations.push({ table, action: 'delete' });
             return query;
@@ -151,10 +153,13 @@ describe('SchedulesService authorization', () => {
             if (table === 'class_schedule_recurrence') {
               return { data: { id: 'recurrence-1' }, error: null };
             }
-            if (table === 'class_schedule_recurrence_overrides') {
-              return { data: null, error: null };
-            }
             return { data: null, error: null };
+          }),
+          returns: jest.fn(async () => {
+            if (table === 'class_schedule_recurrence_overrides') {
+              return { data: [], error: null };
+            }
+            return { data: [], error: null };
           }),
         };
         return query;
@@ -203,6 +208,373 @@ describe('SchedulesService authorization', () => {
           updated_by: 'profile-staff',
         }),
       },
+    ]);
+  });
+
+  it('publishes a reschedule activity and reconciles reminders for one-off sessions', async () => {
+    createSupabaseSessionClientMock.mockReturnValue({
+      auth: {
+        getUser: jest.fn(async () => ({
+          data: { user: { id: 'auth-user-1' } },
+          error: null,
+        })),
+      },
+    } as never);
+
+    const reconcileNextReminderJobForSchedule = jest.fn(async () => ({
+      action: 'inserted',
+    }));
+    const mainClient = {
+      from: jest.fn((table: string) => {
+        const query = {
+          select: jest.fn(() => query),
+          eq: jest.fn(() => query),
+          is: jest.fn(() => query),
+          update: jest.fn(() => query),
+          maybeSingle: jest.fn(async () => {
+            if (table === 'class_schedules') {
+              return {
+                data: {
+                  id: 'schedule-1',
+                  title: 'Algebra I',
+                  start_at: '2030-03-06T10:00:00.000Z',
+                  end_at: '2030-03-06T11:00:00.000Z',
+                  timezone: 'America/New_York',
+                  source_learning_space_id: 'space-1',
+                  source_channel_id: 'channel-1',
+                  participants: [
+                    {
+                      profile_id: 'student-1',
+                      role: 'child',
+                      display_name: 'Priya',
+                      avatar_url: null,
+                      theme_key: null,
+                    },
+                  ],
+                },
+                error: null,
+              };
+            }
+            if (table === 'class_schedule_recurrence') {
+              return { data: null, error: null };
+            }
+            return { data: null, error: null };
+          }),
+        };
+        return query;
+      }),
+    };
+    createSupabaseServiceClientMock
+      .mockReturnValueOnce(
+        makeSingleResult({
+          id: 'account-1',
+          active_profile_id: 'profile-staff',
+        }) as never,
+      )
+      .mockReturnValueOnce(makeSingleResult([{ role_key: 'staff' }]) as never)
+      .mockReturnValueOnce(mainClient as never);
+
+    const service = new SchedulesService({
+      reconcileNextReminderJobForSchedule,
+    } as never);
+
+    await expect(
+      service.rescheduleScheduleSession('token-1', {
+        orgId: 'org-1',
+        scheduleId: 'schedule-1',
+        occurrenceKey: null,
+        startAt: '2030-03-06T10:05:00.000Z',
+        endAt: '2030-03-06T11:05:00.000Z',
+        timezone: 'America/New_York',
+        reason: 'Traffic delay',
+        suppressNotifications: true,
+      }),
+    ).resolves.toEqual({ success: true, mode: 'single' });
+
+    expect(publishActivityEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'class.session.rescheduled',
+        actorProfileId: 'profile-staff',
+        scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+        audienceRules: [{ kind: 'all_in_scope' }],
+        dedupeKey: 'class.session.rescheduled:org-1:schedule-1:2030-03-06T10:00:00.000Z',
+        refreshOnDedupe: true,
+        payload: expect.objectContaining({
+          title: 'Algebra I',
+          channelId: 'channel-1',
+          learningSpaceId: 'space-1',
+          rescheduledFromStartAt: '2030-03-06T10:00:00.000Z',
+          rescheduledFromEndAt: '2030-03-06T11:00:00.000Z',
+          rescheduledToStartAt: '2030-03-06T10:05:00.000Z',
+          rescheduledToEndAt: '2030-03-06T11:05:00.000Z',
+          rescheduledReason: 'Traffic delay',
+          timezone: 'America/New_York',
+          suppressNotifications: true,
+          members: [
+            {
+              profileId: 'student-1',
+              role: 'child',
+              displayName: 'Priya',
+              avatarUrl: null,
+              themeKey: null,
+            },
+          ],
+        }),
+      }),
+    );
+    expect(reconcileNextReminderJobForSchedule).toHaveBeenCalledWith({
+      orgId: 'org-1',
+      scheduleId: 'schedule-1',
+    });
+  });
+
+  it('uses the recurring override dedupe key for immediate reschedule activity', async () => {
+    createSupabaseSessionClientMock.mockReturnValue({
+      auth: {
+        getUser: jest.fn(async () => ({
+          data: { user: { id: 'auth-user-1' } },
+          error: null,
+        })),
+      },
+    } as never);
+
+    const reconcileNextReminderJobForSchedule = jest.fn(async () => ({
+      action: 'inserted',
+    }));
+    const mainClient = {
+      from: jest.fn((table: string) => {
+        const query = {
+          select: jest.fn(() => query),
+          eq: jest.fn(() => query),
+          is: jest.fn(() => query),
+          delete: jest.fn(() => query),
+          order: jest.fn(() => query),
+          insert: jest.fn(() => Promise.resolve({ data: null, error: null })),
+          update: jest.fn(() => query),
+          maybeSingle: jest.fn(async () => {
+            if (table === 'class_schedules') {
+              return {
+                data: {
+                  id: 'schedule-1',
+                  title: 'Algebra I',
+                  start_at: '2030-03-06T10:00:00.000Z',
+                  end_at: '2030-03-06T11:00:00.000Z',
+                  timezone: 'America/New_York',
+                  source_learning_space_id: 'space-1',
+                  source_channel_id: 'channel-1',
+                  participants: [],
+                },
+                error: null,
+              };
+            }
+            if (table === 'class_schedule_recurrence') {
+              return { data: { id: 'recurrence-1' }, error: null };
+            }
+            return { data: null, error: null };
+          }),
+          returns: jest.fn(async () => {
+            if (table === 'class_schedule_recurrence_overrides') {
+              return {
+                data: [
+                  {
+                    id: 'override-1',
+                    patch: {
+                      startAt: '2030-03-13T10:30:00.000Z',
+                      endAt: '2030-03-13T11:30:00.000Z',
+                    },
+                    updated_at: '2030-03-01T00:00:00.000Z',
+                    created_at: '2030-03-01T00:00:00.000Z',
+                  },
+                ],
+                error: null,
+              };
+            }
+            return { data: [], error: null };
+          }),
+        };
+        return query;
+      }),
+    };
+    createSupabaseServiceClientMock
+      .mockReturnValueOnce(
+        makeSingleResult({
+          id: 'account-1',
+          active_profile_id: 'profile-staff',
+        }) as never,
+      )
+      .mockReturnValueOnce(makeSingleResult([{ role_key: 'staff' }]) as never)
+      .mockReturnValueOnce(mainClient as never);
+
+    const service = new SchedulesService({
+      reconcileNextReminderJobForSchedule,
+    } as never);
+
+    await expect(
+      service.rescheduleScheduleSession('token-1', {
+        orgId: 'org-1',
+        scheduleId: 'schedule-1',
+        occurrenceKey: '2030-03-13T10:00:00.000Z',
+        startAt: '2030-03-13T11:00:00.000Z',
+        endAt: '2030-03-13T12:00:00.000Z',
+        timezone: 'America/New_York',
+        reason: null,
+        suppressNotifications: false,
+      }),
+    ).resolves.toEqual({ success: true, mode: 'recurring' });
+
+    expect(publishActivityEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'class.session.rescheduled',
+        dedupeKey: 'class.session.rescheduled:org-1:override-1',
+        refreshOnDedupe: true,
+        payload: expect.objectContaining({
+          rescheduledFromStartAt: '2030-03-13T10:30:00.000Z',
+          rescheduledFromEndAt: '2030-03-13T11:30:00.000Z',
+          rescheduledToStartAt: '2030-03-13T11:00:00.000Z',
+          rescheduledToEndAt: '2030-03-13T12:00:00.000Z',
+          suppressNotifications: false,
+        }),
+      }),
+    );
+    expect(reconcileNextReminderJobForSchedule).toHaveBeenCalledWith({
+      orgId: 'org-1',
+      scheduleId: 'schedule-1',
+    });
+  });
+
+  it('updates one recurring override and deletes duplicate overrides for the same occurrence', async () => {
+    createSupabaseSessionClientMock.mockReturnValue({
+      auth: {
+        getUser: jest.fn(async () => ({
+          data: { user: { id: 'auth-user-1' } },
+          error: null,
+        })),
+      },
+    } as never);
+
+    const operations: Array<{ table: string; action: string; payload?: unknown }> = [];
+    const mainClient = {
+      from: jest.fn((table: string) => {
+        const query = {
+          select: jest.fn(() => query),
+          eq: jest.fn(() => query),
+          is: jest.fn(() => query),
+          in: jest.fn(() => query),
+          order: jest.fn(() => query),
+          delete: jest.fn(() => {
+            operations.push({ table, action: 'delete' });
+            return query;
+          }),
+          insert: jest.fn((payload: unknown) => {
+            operations.push({ table, action: 'insert', payload });
+            return Promise.resolve({ data: null, error: null });
+          }),
+          update: jest.fn((payload: unknown) => {
+            operations.push({ table, action: 'update', payload });
+            return query;
+          }),
+          maybeSingle: jest.fn(async () => {
+            if (table === 'class_schedules') {
+              return {
+                data: {
+                  id: 'schedule-1',
+                  title: 'Algebra I',
+                  start_at: '2030-03-06T10:00:00.000Z',
+                  end_at: '2030-03-06T11:00:00.000Z',
+                  timezone: 'America/New_York',
+                  source_learning_space_id: 'space-1',
+                  source_channel_id: 'channel-1',
+                  participants: [],
+                },
+                error: null,
+              };
+            }
+            if (table === 'class_schedule_recurrence') {
+              return { data: { id: 'recurrence-1' }, error: null };
+            }
+            return { data: null, error: null };
+          }),
+          returns: jest.fn(async () => {
+            if (table === 'class_schedule_recurrence_overrides') {
+              return {
+                data: [
+                  {
+                    id: 'override-keep',
+                    patch: {
+                      startAt: '2030-03-13T10:30:00.000Z',
+                      endAt: '2030-03-13T11:30:00.000Z',
+                    },
+                    updated_at: '2030-03-02T00:00:00.000Z',
+                    created_at: '2030-03-02T00:00:00.000Z',
+                  },
+                  {
+                    id: 'override-delete-a',
+                    patch: {
+                      startAt: '2030-03-13T10:15:00.000Z',
+                      endAt: '2030-03-13T11:15:00.000Z',
+                    },
+                    updated_at: '2030-03-01T00:00:00.000Z',
+                    created_at: '2030-03-01T00:00:00.000Z',
+                  },
+                  {
+                    id: 'override-delete-b',
+                    patch: null,
+                    updated_at: '2030-02-28T00:00:00.000Z',
+                    created_at: '2030-02-28T00:00:00.000Z',
+                  },
+                ],
+                error: null,
+              };
+            }
+            return { data: [], error: null };
+          }),
+        };
+        return query;
+      }),
+    };
+    createSupabaseServiceClientMock
+      .mockReturnValueOnce(
+        makeSingleResult({
+          id: 'account-1',
+          active_profile_id: 'profile-staff',
+        }) as never,
+      )
+      .mockReturnValueOnce(makeSingleResult([{ role_key: 'staff' }]) as never)
+      .mockReturnValueOnce(mainClient as never);
+
+    const service = new SchedulesService({
+      reconcileNextReminderJobForSchedule: jest.fn(async () => ({ action: 'inserted' })),
+    } as never);
+
+    await expect(
+      service.rescheduleScheduleSession('token-1', {
+        orgId: 'org-1',
+        scheduleId: 'schedule-1',
+        occurrenceKey: '2030-03-13T10:00:00.000Z',
+        startAt: '2030-03-13T11:00:00.000Z',
+        endAt: '2030-03-13T12:00:00.000Z',
+        timezone: 'America/New_York',
+        reason: 'Teacher conflict',
+        suppressNotifications: false,
+      }),
+    ).resolves.toEqual({ success: true, mode: 'recurring' });
+
+    expect(operations).toEqual([
+      { table: 'class_schedule_recurrence_exceptions', action: 'delete' },
+      {
+        table: 'class_schedule_recurrence_overrides',
+        action: 'update',
+        payload: expect.objectContaining({
+          patch: {
+            startAt: '2030-03-13T11:00:00.000Z',
+            endAt: '2030-03-13T12:00:00.000Z',
+            reason: 'Teacher conflict',
+          },
+          suppress_notifications: false,
+          updated_by: 'profile-staff',
+        }),
+      },
+      { table: 'class_schedule_recurrence_overrides', action: 'delete' },
     ]);
   });
 

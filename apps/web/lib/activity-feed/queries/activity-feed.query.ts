@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type {
   ActivityFeedItemRow,
   ActivityFeedSectionRow,
+  ClassSessionCompletionVoteRow,
   ClassSessionFeedbackRow,
 } from '@iconicedu/shared-types';
 
@@ -85,6 +86,39 @@ export async function getClassSessionFeedbackByProfileAndSessions(
         | 'rating'
         | 'comment'
         | 'submitted_at'
+      >[]
+    >();
+}
+
+export async function getClassSessionCompletionVotesByProfileAndTargets(
+  supabase: SupabaseClient,
+  orgId: string,
+  profileId: string,
+  scheduleIds: string[],
+  occurrenceKeys: string[],
+) {
+  return supabase
+    .from('class_session_completion_votes')
+    .select(
+      'schedule_id, occurrence_key, profile_id, role, status, dispute_category, dispute_reason, reschedule_requested, voted_at',
+    )
+    .eq('org_id', orgId)
+    .eq('profile_id', profileId)
+    .is('deleted_at', null)
+    .in('schedule_id', scheduleIds)
+    .in('occurrence_key', occurrenceKeys)
+    .returns<
+      Pick<
+        ClassSessionCompletionVoteRow,
+        | 'schedule_id'
+        | 'occurrence_key'
+        | 'profile_id'
+        | 'role'
+        | 'status'
+        | 'dispute_category'
+        | 'dispute_reason'
+        | 'reschedule_requested'
+        | 'voted_at'
       >[]
     >();
 }

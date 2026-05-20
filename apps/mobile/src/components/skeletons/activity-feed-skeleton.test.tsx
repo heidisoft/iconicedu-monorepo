@@ -22,12 +22,13 @@ describe('ActivityFeedSkeleton', () => {
     expect(screen.getAllByTestId('activity-skeleton-row')).toHaveLength(3);
     expect(screen.getAllByTestId('activity-skeleton-icon')).toHaveLength(3);
     expect(screen.getAllByTestId('activity-skeleton-preview-card')).toHaveLength(3);
-    expect(screen.getAllByTestId('activity-skeleton-action')).toHaveLength(3);
+    expect(screen.queryAllByTestId('activity-skeleton-action')).toHaveLength(0);
   });
 
   it('renders custom count with the same row structure', () => {
     render(<ActivityFeedSkeleton count={2} />);
     expect(screen.getAllByTestId('activity-skeleton-row')).toHaveLength(2);
-    expect(screen.getAllByTestId('activity-skeleton-action')).toHaveLength(2);
+    expect(screen.getAllByTestId('activity-skeleton-preview-card')).toHaveLength(2);
+    expect(screen.queryAllByTestId('activity-skeleton-action')).toHaveLength(0);
   });
 });

@@ -44,7 +44,10 @@ export async function POST(request: Request) {
     const api = createApiClient(supabase);
     const response = await api.post<{ feedbackEnabled: boolean }>(
       '/activity-feed/session-completion-vote',
-      body,
+      {
+        ...body,
+        recipientProfileId: body.recipientProfileId ?? actor.profile.id,
+      },
     );
     return NextResponse.json(response);
   } catch (error) {
