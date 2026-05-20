@@ -14,10 +14,15 @@ import {
 import { lightColors } from '@/lib/theme';
 
 const mockSubmitActivityFeedFeedback = jest.fn();
+const mockSubmitCompletionVote = jest.fn();
 
 jest.mock('@/lib/api/activity-feed/feedback', () => ({
   submitActivityFeedFeedback: (...args: unknown[]) =>
     mockSubmitActivityFeedFeedback(...args),
+}));
+
+jest.mock('@/lib/api/activity-feed/completion-vote', () => ({
+  submitCompletionVote: (...args: unknown[]) => mockSubmitCompletionVote(...args),
 }));
 
 function makeBaseActivity(): ActivityFeedItemVM {
@@ -86,6 +91,7 @@ describe('ActivityItem', () => {
   afterEach(() => {
     jest.useRealTimers();
     mockSubmitActivityFeedFeedback.mockReset();
+    mockSubmitCompletionVote.mockReset();
   });
 
   it('renders the activity row without inline avatars', () => {
@@ -426,5 +432,84 @@ describe('ActivityItem', () => {
     expect(formatActivityPrimaryHeadline(item, 'America/New_York')).toBe(
       'Class reminder',
     );
+  });
+
+  it('tracks completion check batch responses by occurrence start', () => {
+    const item = {
+      ...makeBaseActivity(),
+      verb: 'session.completion_check.batch.sent',
+      content: {
+        ...makeBaseActivity().content,
+        headline: { primary: 'Confirm your lessons' },
+      },
+      metadata: {
+        sessions: [
+          {
+            scheduleId: 'schedule-1',
+            occurrenceStart: '2026-03-19T22:00:00.000Z',
+            title: 'Math Foundations',
+            channelId: 'channel-1',
+            learningSpaceId: 'space-1',
+            completionVote: { status: 'confirmed' },
+          },
+          {
+            scheduleId: 'schedule-1',
+            occurrenceStart: '2026-03-20T22:00:00.000Z',
+            title: 'Math Foundations',
+            channelId: 'channel-1',
+            learningSpaceId: 'space-1',
+          },
+        ],
+      },
+    } as ActivityFeedItemVM;
+
+    renderActivity(item);
+    mockSubmitCompletionVote.mockResolvedValue({ feedbackEnabled: true });
+
+    expect(screen.getByText('1 of 2 confirmed')).toBeTruthy();
+
+    fireEvent.press(screen.getByLabelText('Math Foundations — resolved'));
+    expect(
+      screen.getByText("You've already responded — thanks for letting us know!"),
+    ).toBeTruthy();
+
+    fireEvent.press(screen.getByLabelText('Math Foundations — needs confirmation'));
+    expect(screen.getByText('Confirm Lesson')).toBeTruthy();
+  });
+
+  it('submits completion votes for the current inbox profile', async () => {
+    mockSubmitCompletionVote.mockResolvedValue({ feedbackEnabled: true });
+    const item = {
+      ...makeBaseActivity(),
+      verb: 'session.completion_check.sent',
+      content: {
+        ...makeBaseActivity().content,
+        headline: { primary: 'Confirm your lesson' },
+      },
+      metadata: {
+        orgId: 'org-1',
+        scheduleId: 'schedule-1',
+        occurrenceStart: '2026-03-19T22:00:00.000Z',
+        roleContext: 'guardian',
+        completionCheckUiEnabled: true,
+      },
+    } as ActivityFeedItemVM;
+
+    renderActivity(item, { currentProfileId: 'profile-1' });
+
+    fireEvent.press(screen.getByText('Confirm Lesson'));
+
+    await waitFor(() => {
+      expect(mockSubmitCompletionVote).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orgId: 'org-1',
+          scheduleId: 'schedule-1',
+          occurrenceKey: '2026-03-19T22:00:00.000Z',
+          role: 'guardian',
+          status: 'confirmed',
+          recipientProfileId: 'profile-1',
+        }),
+      );
+    });
   });
 });

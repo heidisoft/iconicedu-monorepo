@@ -183,7 +183,7 @@ export function ActivityCompletionCheck({ activity, onVoteSubmit }: Props) {
             className="flex-1 gap-1.5"
           >
             <CheckCircle2 className="size-3.5" />
-            {isLoading ? 'Saving...' : 'Yes, it happened'}
+            {isLoading ? 'Saving...' : 'Confirm Lesson'}
           </Button>
           <Button
             type="button"
@@ -195,7 +195,7 @@ export function ActivityCompletionCheck({ activity, onVoteSubmit }: Props) {
             className="flex-1 gap-1.5"
           >
             <XCircle className="size-3.5" />
-            No, it didn&apos;t
+            Report a Problem
           </Button>
         </div>
         {error ? <p className="mt-2 text-xs text-rose-600">{error}</p> : null}

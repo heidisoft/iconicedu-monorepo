@@ -154,7 +154,7 @@ describe('ActivityFeedService', () => {
         }
         if (table === 'profiles') {
           profilesCallCount += 1;
-          return profilesCallCount === 1 ? guardianProfileChain : childProfilesChain;
+          return profilesCallCount <= 2 ? guardianProfileChain : childProfilesChain;
         }
         if (table === 'family_links') return familyLinksChain;
         if (table === 'class_session_completion_votes') return votesChain;
@@ -180,6 +180,69 @@ describe('ActivityFeedService', () => {
         schedule_id: scheduleId,
         profile_id: guardianProfileId,
         role: 'guardian',
+        status: 'confirmed',
+      }),
+      { onConflict: 'org_id,schedule_id,occurrence_key,profile_id' },
+    );
+  });
+
+  it('stores completion votes on the requested recipient profile when provided', async () => {
+    const orgId = '00000000-0000-4000-8000-000000000001';
+    const scheduleId = '00000000-0000-4000-8000-000000000002';
+    const childProfileId = '00000000-0000-4000-8000-000000000004';
+    const guardianAccountId = '00000000-0000-4000-8000-000000000005';
+    const childAccountId = '00000000-0000-4000-8000-000000000006';
+
+    const authAccountChain = makeChain({
+      data: { id: guardianAccountId, org_id: orgId },
+    });
+    const requestedProfileChain = makeChain({
+      data: {
+        id: childProfileId,
+        account_id: childAccountId,
+        org_id: orgId,
+      },
+    });
+    const familyLinkChain = makeChain({
+      data: { child_account_id: childAccountId },
+    });
+    const directParticipantChain = makeChain({
+      data: { id: 'participant-child-1', role: 'child' },
+    });
+    const votesChain = makeChain({ data: null });
+
+    const tableCalls: string[] = [];
+    const supabase = {
+      from: jest.fn((table: string) => {
+        tableCalls.push(table);
+        if (table === 'accounts') return authAccountChain;
+        if (table === 'profiles') return requestedProfileChain;
+        if (table === 'family_links') return familyLinkChain;
+        if (table === 'class_schedule_participants') return directParticipantChain;
+        if (table === 'class_session_completion_votes') return votesChain;
+        throw new Error(`Unexpected table: ${table}`);
+      }),
+    };
+    createSupabaseServiceClientMock.mockReturnValue(supabase as never);
+
+    const service = new ActivityFeedService();
+    await service.submitCompletionVote('auth-user-1', {
+      orgId,
+      scheduleId,
+      occurrenceKey: '2030-03-06T10:00:00.000Z',
+      role: 'guardian',
+      status: 'confirmed',
+      recipientProfileId: childProfileId,
+    });
+
+    expect(tableCalls.filter((table) => table === 'accounts')).toHaveLength(1);
+    expect(familyLinkChain.eq).toHaveBeenCalledWith('child_account_id', childAccountId);
+    expect(votesChain.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        org_id: orgId,
+        schedule_id: scheduleId,
+        profile_id: childProfileId,
+        role: 'child',
         status: 'confirmed',
       }),
       { onConflict: 'org_id,schedule_id,occurrence_key,profile_id' },

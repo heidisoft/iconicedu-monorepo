@@ -105,6 +105,7 @@ export function ActivityCompletionCheck({
         occurrenceKey: metadata.occurrenceStart!,
         role: metadata.role,
         status: 'confirmed',
+        recipientProfileId: currentProfileId ?? null,
       });
       setStep('confirmed');
       onCompletionSubmit?.('confirmed');
@@ -112,7 +113,7 @@ export function ActivityCompletionCheck({
       setError(err instanceof Error ? err.message : 'Failed to submit');
       setStep('prompt');
     }
-  }, [canSubmit, metadata, onCompletionSubmit]);
+  }, [canSubmit, currentProfileId, metadata, onCompletionSubmit]);
 
   const handleDisputeSubmit = useCallback(async () => {
     if (!canSubmit || !disputeCategory) return;
@@ -125,6 +126,7 @@ export function ActivityCompletionCheck({
         occurrenceKey: metadata.occurrenceStart!,
         role: metadata.role,
         status: 'disputed',
+        recipientProfileId: currentProfileId ?? null,
         disputeCategory,
         disputeReason: disputeReason.trim() || null,
         rescheduleRequested,
@@ -137,6 +139,7 @@ export function ActivityCompletionCheck({
     }
   }, [
     canSubmit,
+    currentProfileId,
     disputeCategory,
     disputeReason,
     metadata,
@@ -157,7 +160,7 @@ export function ActivityCompletionCheck({
         <View style={styles.buttonRow}>
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel="Yes, the class happened"
+            accessibilityLabel="Confirm lesson"
             disabled={isLoading}
             onPress={() => void handleConfirm()}
             activeOpacity={0.8}
@@ -168,12 +171,12 @@ export function ActivityCompletionCheck({
           >
             <CheckCircle2 size={16} color={colors.tealFg} />
             <Text style={styles.yesButtonText}>
-              {isLoading ? 'Saving...' : 'Yes, it happened'}
+              {isLoading ? 'Saving...' : 'Confirm Lesson'}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel="No, the class did not happen"
+            accessibilityLabel="Report a problem"
             disabled={isLoading}
             onPress={() => setStep('dispute_form')}
             activeOpacity={0.8}
@@ -188,7 +191,7 @@ export function ActivityCompletionCheck({
           >
             <XCircle size={16} color={colors.textMuted} />
             <Text style={[styles.noButtonText, { color: colors.textMuted }]}>
-              {"No, it didn't"}
+              Report a Problem
             </Text>
           </TouchableOpacity>
         </View>

@@ -4,13 +4,17 @@ import { buildActivityFeedForProfile } from '@iconicedu/web/lib/activity-feed/bu
 
 const getActivityFeedItemsByOrg = vi.fn();
 const getClassSessionFeedbackByProfileAndSessions = vi.fn();
+const getClassSessionCompletionVotesByProfileAndTargets = vi.fn();
 const getProfilesByIds = vi.fn();
 const buildUserProfileFromRow = vi.fn();
+const createSupabaseServiceClient = vi.fn();
 
 vi.mock('@iconicedu/web/lib/activity-feed/queries/activity-feed.query', () => ({
   getActivityFeedItemsByOrg: (...args: unknown[]) => getActivityFeedItemsByOrg(...args),
   getClassSessionFeedbackByProfileAndSessions: (...args: unknown[]) =>
     getClassSessionFeedbackByProfileAndSessions(...args),
+  getClassSessionCompletionVotesByProfileAndTargets: (...args: unknown[]) =>
+    getClassSessionCompletionVotesByProfileAndTargets(...args),
 }));
 
 vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
@@ -19,6 +23,10 @@ vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
 
 vi.mock('@iconicedu/web/lib/profile/builders/user-profile.builder', () => ({
   buildUserProfileFromRow: (...args: unknown[]) => buildUserProfileFromRow(...args),
+}));
+
+vi.mock('@iconicedu/web/lib/supabase/service', () => ({
+  createSupabaseServiceClient: () => createSupabaseServiceClient(),
 }));
 
 describe('buildActivityFeedForProfile', () => {
@@ -36,6 +44,8 @@ describe('buildActivityFeedForProfile', () => {
       },
     });
     getClassSessionFeedbackByProfileAndSessions.mockResolvedValue({ data: [] });
+    getClassSessionCompletionVotesByProfileAndTargets.mockResolvedValue({ data: [] });
+    createSupabaseServiceClient.mockReturnValue({ from: vi.fn() });
   });
 
   it('requests inbox rows scoped to the current recipient profile', async () => {
@@ -96,6 +106,7 @@ describe('buildActivityFeedForProfile', () => {
           metadata: {
             sourceEventId: 'event-1',
             scheduleId: 'schedule-1',
+            occurrenceStart: '2026-03-03T11:00:00.000Z',
             learningSpaceId: 'space-1',
             channelId: 'channel-1',
             feedbackUiEnabled: true,
@@ -106,6 +117,17 @@ describe('buildActivityFeedForProfile', () => {
     });
     getClassSessionFeedbackByProfileAndSessions.mockResolvedValue({
       data: [
+        {
+          source_event_id: 'event-old',
+          message_id: null,
+          class_session_id: 'schedule-1',
+          classroom_id: 'space-1',
+          channel_id: 'channel-1',
+          occurrence_start_at: '2026-03-02T11:00:00.000Z',
+          rating: 2,
+          comment: 'Different occurrence',
+          submitted_at: '2026-03-02T12:10:00.000Z',
+        },
         {
           source_event_id: 'event-1',
           message_id: null,
@@ -143,6 +165,159 @@ describe('buildActivityFeedForProfile', () => {
           submittedAt: '2026-03-03T12:10:00.000Z',
         },
       },
+    });
+  });
+
+  it('hydrates saved completion votes for single completion checks', async () => {
+    getActivityFeedItemsByOrg.mockResolvedValue({
+      data: [
+        {
+          id: 'completion-item',
+          org_id: 'org-1',
+          recipient_profile_id: 'profile-1',
+          source_event_id: 'event-1',
+          kind: 'leaf',
+          occurred_at: '2026-03-03T12:00:00.000Z',
+          created_at: '2026-03-03T12:00:00.000Z',
+          tab_key: 'classes',
+          audience: {
+            scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+            visibility: 'scope_only',
+          },
+          verb: 'session.completion_check.sent',
+          actor_profile_id: null,
+          refs: {},
+          content: { headline: { primary: 'Confirm your lesson' } },
+          metadata: {
+            scheduleId: 'schedule-1',
+            occurrenceStart: '2026-03-03T11:00:00.000Z',
+            learningSpaceId: 'space-1',
+            channelId: 'channel-1',
+            completionCheckUiEnabled: true,
+          },
+          updated_at: '2026-03-03T12:00:00.000Z',
+        },
+      ],
+    });
+    getClassSessionCompletionVotesByProfileAndTargets.mockResolvedValue({
+      data: [
+        {
+          schedule_id: 'schedule-1',
+          occurrence_key: '2026-03-03T11:00:00+00:00',
+          profile_id: 'profile-1',
+          role: 'guardian',
+          status: 'confirmed',
+          dispute_category: null,
+          dispute_reason: null,
+          reschedule_requested: false,
+          voted_at: '2026-03-03T12:10:00.000Z',
+        },
+      ],
+    });
+
+    const feed = await buildActivityFeedForProfile({} as never, 'org-1', 'profile-1');
+
+    expect(createSupabaseServiceClient).toHaveBeenCalledTimes(1);
+    expect(getClassSessionCompletionVotesByProfileAndTargets).toHaveBeenCalledWith(
+      expect.anything(),
+      'org-1',
+      'profile-1',
+      ['schedule-1'],
+      ['2026-03-03T11:00:00.000Z'],
+    );
+    expect(feed.sections[0]?.items[0]).toMatchObject({
+      verb: 'session.completion_check.sent',
+      metadata: {
+        completionVote: {
+          scheduleId: 'schedule-1',
+          occurrenceKey: '2026-03-03T11:00:00.000Z',
+          profileId: 'profile-1',
+          role: 'guardian',
+          status: 'confirmed',
+          disputeCategory: null,
+          disputeReason: null,
+          rescheduleRequested: false,
+          votedAt: '2026-03-03T12:10:00.000Z',
+        },
+      },
+    });
+  });
+
+  it('hydrates saved completion votes into batch completion check sessions by occurrence', async () => {
+    getActivityFeedItemsByOrg.mockResolvedValue({
+      data: [
+        {
+          id: 'completion-batch-item',
+          org_id: 'org-1',
+          recipient_profile_id: 'profile-1',
+          source_event_id: 'event-1',
+          kind: 'leaf',
+          occurred_at: '2026-03-03T12:00:00.000Z',
+          created_at: '2026-03-03T12:00:00.000Z',
+          tab_key: 'classes',
+          audience: {
+            scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+            visibility: 'scope_only',
+          },
+          verb: 'session.completion_check.batch.sent',
+          actor_profile_id: null,
+          refs: {},
+          content: { headline: { primary: 'Confirm your lessons' } },
+          metadata: {
+            sessions: [
+              {
+                scheduleId: 'schedule-1',
+                occurrenceStart: '2026-03-03T11:00:00.000Z',
+                title: 'Math Foundations',
+                channelId: 'channel-1',
+                learningSpaceId: 'space-1',
+              },
+              {
+                scheduleId: 'schedule-1',
+                occurrenceStart: '2026-03-04T11:00:00.000Z',
+                title: 'Math Foundations',
+                channelId: 'channel-1',
+                learningSpaceId: 'space-1',
+              },
+            ],
+          },
+          updated_at: '2026-03-03T12:00:00.000Z',
+        },
+      ],
+    });
+    getClassSessionCompletionVotesByProfileAndTargets.mockResolvedValue({
+      data: [
+        {
+          schedule_id: 'schedule-1',
+          occurrence_key: '2026-03-04T11:00:00+00:00',
+          profile_id: 'profile-1',
+          role: 'guardian',
+          status: 'confirmed',
+          dispute_category: null,
+          dispute_reason: null,
+          reschedule_requested: false,
+          voted_at: '2026-03-04T12:10:00.000Z',
+        },
+      ],
+    });
+
+    const feed = await buildActivityFeedForProfile({} as never, 'org-1', 'profile-1');
+    const item = feed.sections[0]?.items[0];
+    const sessions = (item?.metadata as { sessions?: Array<Record<string, unknown>> })
+      ?.sessions;
+
+    expect(getClassSessionCompletionVotesByProfileAndTargets).toHaveBeenCalledWith(
+      expect.anything(),
+      'org-1',
+      'profile-1',
+      ['schedule-1'],
+      ['2026-03-03T11:00:00.000Z', '2026-03-04T11:00:00.000Z'],
+    );
+    expect(sessions?.[0]?.completionVote).toBeUndefined();
+    expect(sessions?.[1]?.completionVote).toMatchObject({
+      scheduleId: 'schedule-1',
+      occurrenceKey: '2026-03-04T11:00:00.000Z',
+      status: 'confirmed',
     });
   });
 

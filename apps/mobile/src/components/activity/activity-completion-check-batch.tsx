@@ -16,6 +16,10 @@ type SessionEntry = {
   } | null;
 };
 
+function getSessionResponseKey(session: SessionEntry) {
+  return session.occurrenceStart;
+}
+
 function getSessions(activity: ActivityFeedLeafItemVM): SessionEntry[] {
   const m = (activity.metadata ?? {}) as Record<string, unknown>;
   if (!Array.isArray(m.sessions)) return [];
@@ -47,7 +51,7 @@ export function ActivityCompletionCheckBatch({
       new Set(
         sessions
           .filter((session) => session.completionVote?.status === 'confirmed')
-          .map((session) => session.scheduleId),
+          .map(getSessionResponseKey),
       ),
   );
   const [disputedIds, setDisputedIds] = useState<Set<string>>(
@@ -55,7 +59,7 @@ export function ActivityCompletionCheckBatch({
       new Set(
         sessions
           .filter((session) => session.completionVote?.status === 'disputed')
-          .map((session) => session.scheduleId),
+          .map(getSessionResponseKey),
       ),
   );
 
@@ -86,8 +90,9 @@ export function ActivityCompletionCheckBatch({
 
       {sessions.map((session, index) => {
         const isExpanded = expandedIndex === index;
-        const isConfirmed = confirmedIds.has(session.scheduleId);
-        const isDisputed = disputedIds.has(session.scheduleId);
+        const sessionResponseKey = getSessionResponseKey(session);
+        const isConfirmed = confirmedIds.has(sessionResponseKey);
+        const isDisputed = disputedIds.has(sessionResponseKey);
         const isResolved = isConfirmed || isDisputed;
 
         // Build a synthetic activity item for the single-session component
@@ -106,7 +111,7 @@ export function ActivityCompletionCheckBatch({
         };
 
         return (
-          <View key={session.scheduleId}>
+          <View key={`${session.scheduleId}:${session.occurrenceStart}`}>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`${session.title} — ${isResolved ? 'resolved' : 'needs confirmation'}`}
@@ -157,18 +162,18 @@ export function ActivityCompletionCheckBatch({
                 onCompletionSubmit={(status) => {
                   if (status === 'confirmed') {
                     setConfirmedIds((current) =>
-                      new Set(current).add(session.scheduleId),
+                      new Set(current).add(sessionResponseKey),
                     );
                     setDisputedIds((current) => {
                       const next = new Set(current);
-                      next.delete(session.scheduleId);
+                      next.delete(sessionResponseKey);
                       return next;
                     });
                   } else {
-                    setDisputedIds((current) => new Set(current).add(session.scheduleId));
+                    setDisputedIds((current) => new Set(current).add(sessionResponseKey));
                     setConfirmedIds((current) => {
                       const next = new Set(current);
-                      next.delete(session.scheduleId);
+                      next.delete(sessionResponseKey);
                       return next;
                     });
                   }

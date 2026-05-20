@@ -320,6 +320,9 @@ export class ActivityFeedService {
     }
     if (!isUuid(body.orgId)) throw new BadRequestException('Invalid orgId');
     if (!isUuid(body.scheduleId)) throw new BadRequestException('Invalid scheduleId');
+    if (body.recipientProfileId && !isUuid(body.recipientProfileId)) {
+      throw new BadRequestException('Invalid recipientProfileId');
+    }
     if (!VALID_STATUSES.includes(body.status as (typeof VALID_STATUSES)[number])) {
       throw new BadRequestException('Invalid status');
     }
@@ -352,13 +355,20 @@ export class ActivityFeedService {
     if (accountError) throw new InternalServerErrorException(accountError.message);
     if (!account) throw new NotFoundException('Account not found');
 
-    const profileId = await this.resolveActiveProfileId(account.id, body.orgId);
+    const recipientProfileId =
+      body.recipientProfileId?.trim() ||
+      (await this.resolveActiveProfileId(account.id, body.orgId));
+    const recipientProfile = await this.resolvePermittedProfile(
+      account,
+      body.orgId,
+      recipientProfileId,
+    );
 
     const participant = await this.resolveCompletionVoteParticipant({
       supabase,
       orgId: body.orgId,
       scheduleId: body.scheduleId,
-      profileId,
+      profileId: recipientProfile.id,
       accountId: account.id,
     });
 
@@ -374,7 +384,7 @@ export class ActivityFeedService {
           org_id: body.orgId,
           schedule_id: body.scheduleId,
           occurrence_key: body.occurrenceKey,
-          profile_id: profileId,
+          profile_id: recipientProfile.id,
           role: participant.role,
           status: body.status,
           dispute_category:
@@ -384,7 +394,7 @@ export class ActivityFeedService {
             body.status === 'disputed' ? (body.rescheduleRequested ?? false) : false,
           voted_at: now,
           updated_at: now,
-          updated_by: profileId,
+          updated_by: recipientProfile.id,
           deleted_at: null,
         },
         { onConflict: 'org_id,schedule_id,occurrence_key,profile_id' },
@@ -393,7 +403,7 @@ export class ActivityFeedService {
     if (voteError) throw new InternalServerErrorException(voteError.message);
 
     this.logger.log(
-      `completion vote saved scheduleId=${body.scheduleId} profileId=${profileId} status=${body.status}`,
+      `completion vote saved scheduleId=${body.scheduleId} profileId=${recipientProfile.id} status=${body.status}`,
     );
 
     if (body.status === 'confirmed') {
@@ -406,7 +416,7 @@ export class ActivityFeedService {
       orgId: body.orgId,
       scheduleId: body.scheduleId,
       occurrenceKey: body.occurrenceKey,
-      reportedByProfileId: profileId,
+      reportedByProfileId: recipientProfile.id,
       reportedByRole: participant.role,
       disputeCategory: body.disputeCategory ?? 'other',
       disputeReason: disputeReason ?? null,

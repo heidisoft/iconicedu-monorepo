@@ -17,6 +17,10 @@ type SessionEntry = {
   } | null;
 };
 
+function getSessionResponseKey(session: SessionEntry) {
+  return session.occurrenceStart;
+}
+
 function getSessions(activity: ActivityFeedLeafItemVM): SessionEntry[] {
   const m = (activity.metadata ?? {}) as Record<string, unknown>;
   if (!Array.isArray(m.sessions)) return [];
@@ -44,7 +48,7 @@ export function ActivityCompletionCheckBatch({ activity }: Props) {
               session.completionVote?.status === 'confirmed' ||
               session.completionVote?.status === 'disputed',
           )
-          .map((session) => session.scheduleId),
+          .map(getSessionResponseKey),
       ),
   );
 
@@ -69,7 +73,8 @@ export function ActivityCompletionCheckBatch({ activity }: Props) {
 
       {sessions.map((session, index) => {
         const isExpanded = expandedIndex === index;
-        const isResolved = resolvedIds.has(session.scheduleId);
+        const sessionResponseKey = getSessionResponseKey(session);
+        const isResolved = resolvedIds.has(sessionResponseKey);
 
         const syntheticActivity: ActivityFeedLeafItemVM = {
           ...activity,
@@ -86,7 +91,10 @@ export function ActivityCompletionCheckBatch({ activity }: Props) {
         };
 
         return (
-          <div key={session.scheduleId} className="border-t border-border/80">
+          <div
+            key={`${session.scheduleId}:${session.occurrenceStart}`}
+            className="border-t border-border/80"
+          >
             <button
               type="button"
               onClick={() => setExpandedIndex(isExpanded ? null : index)}
@@ -122,7 +130,7 @@ export function ActivityCompletionCheckBatch({ activity }: Props) {
                 <ActivityCompletionCheck
                   activity={syntheticActivity}
                   onVoteSubmit={() =>
-                    setResolvedIds((prev) => new Set([...prev, session.scheduleId]))
+                    setResolvedIds((prev) => new Set([...prev, sessionResponseKey]))
                   }
                 />
               </div>

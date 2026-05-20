@@ -1,6 +1,6 @@
 /* @vitest-environment jsdom */
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ActivityItemBase } from './activity-item-base';
@@ -178,5 +178,49 @@ describe('ActivityItemBase', () => {
     expect(
       screen.queryByText('Feedback is unavailable for this session.'),
     ).not.toBeInTheDocument();
+  });
+
+  it('tracks completion check batch responses by occurrence start', () => {
+    const activity = {
+      ...createActivity(),
+      kind: 'leaf',
+      verb: 'session.completion_check.batch.sent',
+      content: {
+        ...createActivity().content,
+        headline: { primary: 'Confirm your lessons' },
+      },
+      metadata: {
+        sessions: [
+          {
+            scheduleId: 'schedule-1',
+            occurrenceStart: '2026-03-19T22:00:00.000Z',
+            title: 'Math Foundations',
+            channelId: 'channel-1',
+            learningSpaceId: 'space-1',
+            completionVote: { status: 'confirmed' },
+          },
+          {
+            scheduleId: 'schedule-1',
+            occurrenceStart: '2026-03-20T22:00:00.000Z',
+            title: 'Math Foundations',
+            channelId: 'channel-1',
+            learningSpaceId: 'space-1',
+          },
+        ],
+      },
+    } as ActivityFeedItemVM;
+
+    render(<ActivityItemBase activity={activity} onMarkRead={vi.fn()} />);
+
+    expect(screen.getByText('1 of 2 confirmed')).toBeInTheDocument();
+
+    const sessionButtons = screen.getAllByRole('button', { name: /Math Foundations/ });
+    fireEvent.click(sessionButtons[0]!);
+    expect(
+      screen.getByText("You've already responded — thanks for letting us know!"),
+    ).toBeInTheDocument();
+
+    fireEvent.click(sessionButtons[1]!);
+    expect(screen.getByText('Confirm Lesson')).toBeInTheDocument();
   });
 });

@@ -18,6 +18,7 @@ export type SubmitCompletionVoteInput = {
   occurrenceKey: ISODateTime;
   role: string;
   status: 'confirmed' | 'disputed';
+  recipientProfileId?: UUID | null;
   disputeCategory?: string | null;
   disputeReason?: string | null;
   rescheduleRequested?: boolean;
