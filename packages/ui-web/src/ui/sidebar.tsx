@@ -26,6 +26,7 @@ const SIDEBAR_WIDTH = '18rem';
 const SIDEBAR_WIDTH_MOBILE = '18rem';
 const SIDEBAR_WIDTH_ICON = '3rem';
 const SIDEBAR_KEYBOARD_SHORTCUT = 'b';
+const SIDEBAR_MOBILE_BREAKPOINT = 768;
 
 type SidebarContextProps = {
   state: 'expanded' | 'collapsed';
@@ -85,7 +86,14 @@ function SidebarProvider({
 
   // Helper to toggle the sidebar.
   const toggleSidebar = React.useCallback(() => {
-    return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open);
+    const shouldUseMobileSidebar =
+      typeof window === 'undefined'
+        ? isMobile
+        : window.matchMedia(`(max-width: ${SIDEBAR_MOBILE_BREAKPOINT - 1}px)`).matches;
+
+    return shouldUseMobileSidebar
+      ? setOpenMobile((open) => !open)
+      : setOpen((open) => !open);
   }, [isMobile, setOpen, setOpenMobile]);
 
   // Adds a keyboard shortcut to toggle the sidebar.
@@ -170,7 +178,7 @@ function Sidebar({
     );
   }
 
-  if (isMobile) {
+  if (isMobile || openMobile) {
     return (
       <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
         <SheetContent

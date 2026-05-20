@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@iconicedu/api/modules/auth/auth.guard';
 import {
   extractBearerToken,
@@ -9,6 +9,14 @@ import { OnboardingService } from '@iconicedu/api/modules/onboarding/onboarding.
 @Controller()
 export class OnboardingController {
   constructor(private readonly onboardingService: OnboardingService) {}
+
+  @Get('onboarding/status')
+  @UseGuards(AuthGuard)
+  status(@Req() req: AuthenticatedRequest) {
+    return this.onboardingService.getStatus(
+      extractBearerToken(req.headers.authorization),
+    );
+  }
 
   @Post('onboarding/role')
   @UseGuards(AuthGuard)

@@ -46,6 +46,14 @@ const INVALID_SUBJECT_KEY_CHARS = /[^a-z0-9-]+/g;
 const MULTI_HYPHENS = /-{2,}/g;
 const EDGE_HYPHENS = /^-+|-+$/g;
 const FEED_MESSAGE_UI_THEME_KEY = 'feed';
+const MOBILE_ALLOWED_ROLES = new Set([
+  'educator',
+  'guardian',
+  'child',
+  'staff',
+  'admin',
+  'system',
+]);
 
 function parseRole(value: unknown): RoleChoice | null {
   return value === 'parent' ||
@@ -192,6 +200,207 @@ export class OnboardingService {
   constructor(
     private readonly notificationPreferencesService: NotificationPreferencesService,
   ) {}
+
+  async getStatus(accessToken: string) {
+    const { user, serviceSupabase } = await this.requireUser(accessToken);
+
+    const { data: accountByAuthId, error: accountError } = await serviceSupabase
+      .from('accounts')
+      .select('id, org_id, onboarding_completed_at, primary_role, phone_e164')
+      .eq('auth_user_id', user.id)
+      .is('deleted_at', null)
+      .maybeSingle<
+        Pick<
+          AccountRow,
+          'id' | 'org_id' | 'onboarding_completed_at' | 'primary_role' | 'phone_e164'
+        >
+      >();
+
+    if (accountError) throw new InternalServerErrorException(accountError.message);
+
+    let account = accountByAuthId;
+
+    if (!account && user.email) {
+      const normalizedEmail = user.email.trim().toLowerCase();
+      const { data: accountByEmail, error: accountByEmailError } = await serviceSupabase
+        .from('accounts')
+        .select('id, org_id, onboarding_completed_at, primary_role, phone_e164')
+        .eq('email', normalizedEmail)
+        .is('deleted_at', null)
+        .maybeSingle<
+          Pick<
+            AccountRow,
+            'id' | 'org_id' | 'onboarding_completed_at' | 'primary_role' | 'phone_e164'
+          >
+        >();
+
+      if (accountByEmailError) {
+        throw new InternalServerErrorException(accountByEmailError.message);
+      }
+
+      if (accountByEmail) {
+        const updatedAccount = await this.updateAccountAuthUserId(
+          serviceSupabase,
+          accountByEmail.id,
+          user.id,
+        );
+        account = updatedAccount
+          ? {
+              id: updatedAccount.id,
+              org_id: updatedAccount.org_id,
+              onboarding_completed_at: updatedAccount.onboarding_completed_at ?? null,
+              primary_role: updatedAccount.primary_role ?? null,
+              phone_e164: updatedAccount.phone_e164 ?? null,
+            }
+          : accountByEmail;
+      }
+    }
+
+    if (!account) {
+      throw new BadRequestException(
+        'No account found for this user. Please contact your administrator.',
+      );
+    }
+
+    let profileId: string | null = null;
+    let profileKind: string | null = null;
+    let firstName = '';
+    let lastName = '';
+    let timezone = '';
+    let city = '';
+    let region = '';
+    let postalCode = '';
+    let countryCode = '';
+
+    const { data: profile, error: profileError } = await serviceSupabase
+      .from('profiles')
+      .select(
+        'id, kind, first_name, last_name, timezone, city, region, postal_code, country_code',
+      )
+      .eq('account_id', account.id)
+      .eq('org_id', account.org_id)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle<
+        Pick<
+          ProfileRow,
+          | 'id'
+          | 'kind'
+          | 'first_name'
+          | 'last_name'
+          | 'timezone'
+          | 'city'
+          | 'region'
+          | 'postal_code'
+          | 'country_code'
+        >
+      >();
+
+    if (profileError) throw new InternalServerErrorException(profileError.message);
+
+    if (profile) {
+      profileId = profile.id;
+      profileKind = profile.kind ?? null;
+      firstName = profile.first_name ?? '';
+      lastName = profile.last_name ?? '';
+      timezone = profile.timezone ?? '';
+      city = profile.city ?? '';
+      region = profile.region ?? '';
+      postalCode = profile.postal_code ?? '';
+      countryCode = profile.country_code ?? '';
+    }
+
+    const kind = profileKind ?? account.primary_role ?? null;
+    const hasName = !!firstName.trim() && !!lastName.trim();
+    const hasTimezone = !!timezone.trim() && timezone.trim() !== 'UTC';
+    const hasLocation = !!city.trim() && !!region.trim();
+    const requiresPhone = kind !== 'child';
+    const hasPhone = !!account.phone_e164?.trim();
+
+    let hasRoleData = true;
+    if (kind === 'child' && profileId) {
+      const { data: gradeRows, error: gradeError } = await serviceSupabase
+        .from('child_profile_grade_level')
+        .select('grade_id')
+        .eq('profile_id', profileId)
+        .limit(1);
+      if (gradeError) throw new InternalServerErrorException(gradeError.message);
+      hasRoleData = (gradeRows?.length ?? 0) > 0;
+    } else if (kind === 'educator' && profileId) {
+      const [subjectRowsResponse, gradeRowsResponse] = await Promise.all([
+        serviceSupabase
+          .from('educator_profile_subjects')
+          .select('subject')
+          .eq('profile_id', profileId)
+          .limit(1),
+        serviceSupabase
+          .from('educator_profile_grade_levels')
+          .select('grade_id')
+          .eq('profile_id', profileId)
+          .limit(1),
+      ]);
+      if (subjectRowsResponse.error) {
+        throw new InternalServerErrorException(subjectRowsResponse.error.message);
+      }
+      if (gradeRowsResponse.error) {
+        throw new InternalServerErrorException(gradeRowsResponse.error.message);
+      }
+      hasRoleData =
+        (subjectRowsResponse.data?.length ?? 0) > 0 &&
+        (gradeRowsResponse.data?.length ?? 0) > 0;
+    }
+
+    let hasAvailability = kind !== 'educator';
+    if (kind === 'educator' && profileId) {
+      const { data: availabilityRows, error: availabilityError } = await serviceSupabase
+        .from('educator_availabilities')
+        .select('profile_id')
+        .eq('profile_id', profileId)
+        .limit(1);
+      if (availabilityError) {
+        throw new InternalServerErrorException(availabilityError.message);
+      }
+      hasAvailability = (availabilityRows?.length ?? 0) > 0;
+    }
+
+    const isComplete =
+      hasName &&
+      hasTimezone &&
+      hasLocation &&
+      (!requiresPhone || hasPhone) &&
+      hasRoleData &&
+      hasAvailability;
+
+    return {
+      isComplete,
+      isRoleAllowed: kind === null || MOBILE_ALLOWED_ROLES.has(kind),
+      profileId,
+      accountId: account.id,
+      orgId: account.org_id,
+      primaryRole: account.primary_role ?? null,
+      profileKind,
+      flags: {
+        hasName,
+        hasTimezone,
+        hasLocation,
+        hasPhone,
+        requiresPhone,
+        hasRoleData,
+        hasAvailability,
+      },
+      prefill: {
+        firstName,
+        lastName,
+        phone: account.phone_e164 ?? '',
+        timezone,
+        city,
+        region,
+        postalCode,
+        countryCode,
+      },
+    };
+  }
 
   async completeRole(
     accessToken: string,
