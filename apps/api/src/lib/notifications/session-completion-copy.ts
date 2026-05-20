@@ -177,8 +177,8 @@ export function buildSessionCompletionCopy(
   const context = getCompletionContext(payload);
   const lessonSubject = buildLessonSubject(context);
   const questionSubject = buildQuestionSubject(context);
-  const title = `Please take a moment to confirm ${lessonSubject}`;
-  const promptBody = `How did ${questionSubject} go? Confirm the lesson, share feedback, or let us know if something did not go as planned. If we do not hear back within 3 days, the lesson will be confirmed automatically so credits can be released to the teacher.`;
+  const title = `Confirm ${lessonSubject}`;
+  const promptBody = `How did ${questionSubject} go? Confirm, leave feedback, or report a problem. After 3 days, we will auto-confirm and release credits to the teacher.`;
 
   return {
     title,
