@@ -11,11 +11,9 @@ describe('buildSessionCompletionCopy', () => {
       },
     });
 
-    expect(copy.title).toBe(
-      'Please take a moment to confirm the lesson for Priya with Ms. Chen',
-    );
+    expect(copy.title).toBe('Confirm the lesson for Priya with Ms. Chen');
     expect(copy.summary).toContain("How did Priya's class with Ms. Chen go?");
-    expect(copy.summary).toContain('credits can be released to the teacher');
+    expect(copy.summary).toContain('release credits to the teacher');
   });
 
   it('asks tutors to confirm the lesson with the student', () => {
@@ -27,7 +25,7 @@ describe('buildSessionCompletionCopy', () => {
       },
     });
 
-    expect(copy.title).toBe('Please take a moment to confirm your lesson with Priya');
+    expect(copy.title).toBe('Confirm your lesson with Priya');
     expect(copy.summary).toContain('How did your class with Priya go?');
   });
 
@@ -40,7 +38,7 @@ describe('buildSessionCompletionCopy', () => {
       },
     });
 
-    expect(copy.title).toBe('Please take a moment to confirm your lesson with Ms. Chen');
+    expect(copy.title).toBe('Confirm your lesson with Ms. Chen');
     expect(copy.summary).toContain('How did your class with Ms. Chen go?');
   });
 });

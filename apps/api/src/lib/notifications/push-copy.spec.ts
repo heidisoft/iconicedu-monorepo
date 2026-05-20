@@ -86,10 +86,8 @@ describe('buildPersonalizedSessionCopy completion checks', () => {
       'guardian-1',
     );
 
-    expect(copy?.title).toBe(
-      'Please take a moment to confirm the lesson for Priya with Ms. Chen',
-    );
+    expect(copy?.title).toBe('Confirm the lesson for Priya with Ms. Chen');
     expect(copy?.summary).toContain("How did Priya's class with Ms. Chen go?");
-    expect(copy?.summary).toContain('If we do not hear back within 3 days');
+    expect(copy?.summary).toContain('After 3 days');
   });
 });

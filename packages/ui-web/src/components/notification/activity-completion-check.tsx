@@ -43,11 +43,11 @@ function getMetadata(activity: ActivityFeedLeafItemVM) {
     promptTitle:
       typeof m.completionPromptTitle === 'string'
         ? m.completionPromptTitle
-        : 'Please take a moment to confirm your lesson',
+        : 'Confirm your lesson',
     promptBody:
       typeof m.completionPromptBody === 'string'
         ? m.completionPromptBody
-        : 'How did your class go? Confirm the lesson, share feedback, or let us know if something did not go as planned.',
+        : 'How did your class go? Confirm, leave feedback, or report a problem.',
     feedbackUiEnabled: m.feedbackUiEnabled !== false,
     completionVoteStatus,
   };
