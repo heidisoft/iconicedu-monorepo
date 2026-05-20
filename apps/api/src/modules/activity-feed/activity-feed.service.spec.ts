@@ -1,12 +1,18 @@
 import { ActivityFeedService } from '@iconicedu/api/modules/activity-feed/activity-feed.service';
 import { publishActivityEvent } from '@iconicedu/api/lib/activity-feed/activity-publisher';
+import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 
 jest.mock('@iconicedu/api/lib/activity-feed/activity-publisher', () => ({
   publishActivityEvent: jest.fn(async () => ({ id: 'activity-event-1' })),
 }));
 
+jest.mock('@iconicedu/api/lib/supabase/service', () => ({
+  createSupabaseServiceClient: jest.fn(),
+}));
+
 describe('ActivityFeedService', () => {
   const publishActivityEventMock = jest.mocked(publishActivityEvent);
+  const createSupabaseServiceClientMock = jest.mocked(createSupabaseServiceClient);
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -16,9 +22,12 @@ describe('ActivityFeedService', () => {
     const chain = {
       select: jest.fn(() => chain),
       eq: jest.fn(() => chain),
+      in: jest.fn(() => chain),
       is: jest.fn(() => chain),
+      limit: jest.fn(() => chain),
       maybeSingle: jest.fn(async () => result),
       returns: jest.fn(async () => result),
+      upsert: jest.fn(async () => ({ error: null })),
     };
     return chain;
   }
@@ -89,6 +98,91 @@ describe('ActivityFeedService', () => {
         }),
         dedupeKey: 'dispute:schedule-1:2030-03-01T10:00:00.000Z:staff:student-1',
       }),
+    );
+  });
+
+  it('allows linked guardians to submit completion votes for their child session', async () => {
+    const orgId = '00000000-0000-4000-8000-000000000001';
+    const scheduleId = '00000000-0000-4000-8000-000000000002';
+    const guardianProfileId = '00000000-0000-4000-8000-000000000003';
+    const childProfileId = '00000000-0000-4000-8000-000000000004';
+    const guardianAccountId = '00000000-0000-4000-8000-000000000005';
+    const childAccountId = '00000000-0000-4000-8000-000000000006';
+
+    const authAccountChain = makeChain({
+      data: { id: guardianAccountId, org_id: orgId },
+    });
+    const activeProfileChain = makeChain({
+      data: { active_profile_id: guardianProfileId },
+    });
+    const directParticipantChain = makeChain({ data: null });
+    const guardianProfileChain = makeChain({
+      data: {
+        id: guardianProfileId,
+        account_id: guardianAccountId,
+        org_id: orgId,
+        kind: 'guardian',
+      },
+    });
+    const familyLinksChain = makeChain({
+      data: [{ child_account_id: childAccountId }],
+    });
+    const childProfilesChain = makeChain({
+      data: [{ id: childProfileId }],
+    });
+    const childParticipantChain = makeChain({
+      data: { id: 'participant-child-1' },
+    });
+    const votesChain = makeChain({ data: null });
+
+    const tableCalls: string[] = [];
+    let accountCallCount = 0;
+    let participantCallCount = 0;
+    let profilesCallCount = 0;
+    const supabase = {
+      from: jest.fn((table: string) => {
+        tableCalls.push(table);
+        if (table === 'accounts') {
+          accountCallCount += 1;
+          return accountCallCount === 1 ? authAccountChain : activeProfileChain;
+        }
+        if (table === 'class_schedule_participants') {
+          participantCallCount += 1;
+          return participantCallCount === 1
+            ? directParticipantChain
+            : childParticipantChain;
+        }
+        if (table === 'profiles') {
+          profilesCallCount += 1;
+          return profilesCallCount === 1 ? guardianProfileChain : childProfilesChain;
+        }
+        if (table === 'family_links') return familyLinksChain;
+        if (table === 'class_session_completion_votes') return votesChain;
+        throw new Error(`Unexpected table: ${table}`);
+      }),
+    };
+    createSupabaseServiceClientMock.mockReturnValue(supabase as never);
+
+    const service = new ActivityFeedService();
+    await service.submitCompletionVote('auth-user-1', {
+      orgId,
+      scheduleId,
+      occurrenceKey: '2030-03-06T10:00:00.000Z',
+      role: 'guardian',
+      status: 'confirmed',
+    });
+
+    expect(tableCalls).toContain('family_links');
+    expect(childParticipantChain.in).toHaveBeenCalledWith('profile_id', [childProfileId]);
+    expect(votesChain.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        org_id: orgId,
+        schedule_id: scheduleId,
+        profile_id: guardianProfileId,
+        role: 'guardian',
+        status: 'confirmed',
+      }),
+      { onConflict: 'org_id,schedule_id,occurrence_key,profile_id' },
     );
   });
 });

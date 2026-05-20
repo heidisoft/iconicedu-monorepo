@@ -41,6 +41,37 @@ type SessionRow = {
   }>;
 };
 
+type CompletionCheckMember = NonNullable<ReminderJobPayload['members']>[number];
+
+type ProfileSummaryRow = {
+  id: string;
+  account_id: string;
+  kind: string | null;
+  display_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  avatar_url: string | null;
+  ui_theme_key: string | null;
+};
+
+type FamilyLinkSummaryRow = {
+  guardian_account_id: string;
+  child_account_id: string;
+};
+
+function unique(values: string[]) {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+
+function buildDisplayName(profile: ProfileSummaryRow) {
+  const fullName = [profile.first_name, profile.last_name]
+    .filter((value): value is string => Boolean(value?.trim()))
+    .join(' ')
+    .trim();
+
+  return profile.display_name?.trim() || fullName || null;
+}
+
 @Injectable()
 export class CompletionCheckDispatcherService {
   private readonly logger = new Logger(CompletionCheckDispatcherService.name);
@@ -92,7 +123,11 @@ export class CompletionCheckDispatcherService {
     const activityEventIds: string[] = [];
 
     // Partition members by role
-    const guardians = members.filter((m) => m.role === 'guardian');
+    const guardians = await this.resolveGuardianMembersForCompletionCheck({
+      supabase,
+      orgId: job.org_id,
+      members,
+    });
     const nonGuardians = members.filter((m) => m.role !== 'guardian');
 
     // Dispatch individual events for non-guardians (educators, students, staff)
@@ -295,5 +330,99 @@ export class CompletionCheckDispatcherService {
     });
 
     return event?.id ? [event.id] : [];
+  }
+
+  private async resolveGuardianMembersForCompletionCheck(input: {
+    supabase: SupabaseServiceClient;
+    orgId: string;
+    members: CompletionCheckMember[];
+  }): Promise<CompletionCheckMember[]> {
+    const explicitGuardians = input.members.filter(
+      (member) => member.role === 'guardian',
+    );
+    const explicitGuardianIds = new Set(
+      explicitGuardians.map((member) => member.profileId),
+    );
+    const childProfileIds = unique(
+      input.members
+        .filter((member) => member.role === 'child')
+        .map((member) => member.profileId),
+    );
+
+    if (!childProfileIds.length) {
+      return explicitGuardians;
+    }
+
+    const childProfilesResponse = await input.supabase
+      .from('profiles')
+      .select('id, account_id, kind')
+      .eq('org_id', input.orgId)
+      .in('id', childProfileIds)
+      .is('deleted_at', null)
+      .returns<Array<{ id: string; account_id: string; kind: string | null }>>();
+
+    if (childProfilesResponse.error) {
+      throw new Error(childProfilesResponse.error.message);
+    }
+
+    const childAccountIds = unique(
+      (childProfilesResponse.data ?? [])
+        .filter((profile) => profile.kind === 'child')
+        .map((profile) => profile.account_id),
+    );
+
+    if (!childAccountIds.length) {
+      return explicitGuardians;
+    }
+
+    const familyLinksResponse = await input.supabase
+      .from('family_links')
+      .select('guardian_account_id, child_account_id')
+      .eq('org_id', input.orgId)
+      .in('child_account_id', childAccountIds)
+      .is('deleted_at', null)
+      .returns<FamilyLinkSummaryRow[]>();
+
+    if (familyLinksResponse.error) {
+      throw new Error(familyLinksResponse.error.message);
+    }
+
+    const guardianAccountIds = unique(
+      (familyLinksResponse.data ?? []).map((link) => link.guardian_account_id),
+    );
+
+    if (!guardianAccountIds.length) {
+      return explicitGuardians;
+    }
+
+    const guardianProfilesResponse = await input.supabase
+      .from('profiles')
+      .select(
+        'id, account_id, kind, display_name, first_name, last_name, avatar_url, ui_theme_key',
+      )
+      .eq('org_id', input.orgId)
+      .in('account_id', guardianAccountIds)
+      .is('deleted_at', null)
+      .returns<ProfileSummaryRow[]>();
+
+    if (guardianProfilesResponse.error) {
+      throw new Error(guardianProfilesResponse.error.message);
+    }
+
+    const linkedGuardians = (guardianProfilesResponse.data ?? [])
+      .filter(
+        (profile) => profile.kind === 'guardian' && !explicitGuardianIds.has(profile.id),
+      )
+      .map(
+        (profile): CompletionCheckMember => ({
+          profileId: profile.id,
+          role: 'guardian',
+          displayName: buildDisplayName(profile),
+          avatarUrl: profile.avatar_url,
+          themeKey: profile.ui_theme_key,
+        }),
+      );
+
+    return [...explicitGuardians, ...linkedGuardians];
   }
 }

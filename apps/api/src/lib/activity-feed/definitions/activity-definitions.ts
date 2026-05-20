@@ -925,6 +925,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
           occurrenceStart: firstOptionalString(payload.occurrenceStart, payload.startAt),
           feedbackUiEnabled: payload.feedbackUiEnabled !== false,
           completionCheckUiEnabled: true,
+          roleContext: getActivityContext(payload).viewerRole,
           completionPromptTitle: completionCopy.promptTitle,
           completionPromptBody: completionCopy.promptBody,
           members: payload.members ?? [],
@@ -958,6 +959,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
         actionButton: undefined,
         metadata: {
           completionCheckUiEnabled: true,
+          roleContext: getActivityContext(payload).viewerRole,
           sessions: payload.sessions ?? [],
           sessionCount,
         },
