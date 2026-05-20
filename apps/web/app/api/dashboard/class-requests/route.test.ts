@@ -11,8 +11,8 @@ const buildOrgBySlugMock = vi.fn();
 const resolveEffectiveProfileForAuthUserInOrgMock = vi.fn();
 const buildUserProfileByIdMock = vi.fn();
 const getProfilesByIdsMock = vi.fn();
-const getProfilesByKindMock = vi.fn();
 const createPrivateClassRequestChannelMock = vi.fn();
+const listClassRequestRecipientProfilesMock = vi.fn();
 const createSupabaseServiceClientMock = vi.fn();
 const sendTextMessageActionMock = vi.fn();
 const listActiveOrgSubjectCatalogMock = vi.fn();
@@ -42,7 +42,6 @@ vi.mock('@iconicedu/web/lib/family-view/effective-profile', () => ({
 
 vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
   getProfilesByIds: (...args: unknown[]) => getProfilesByIdsMock(...args),
-  getProfilesByKind: (...args: unknown[]) => getProfilesByKindMock(...args),
 }));
 
 vi.mock('@iconicedu/web/lib/profile/builders/user-profile.builder', () => ({
@@ -63,6 +62,8 @@ vi.mock('@iconicedu/web/lib/dashboard/class-request', async () => {
     ...actual,
     createPrivateClassRequestChannel: (...args: unknown[]) =>
       createPrivateClassRequestChannelMock(...args),
+    listClassRequestRecipientProfiles: (...args: unknown[]) =>
+      listClassRequestRecipientProfilesMock(...args),
   };
 });
 
@@ -98,8 +99,8 @@ describe('POST /api/dashboard/class-requests', () => {
     resolveEffectiveProfileForAuthUserInOrgMock.mockReset();
     buildUserProfileByIdMock.mockReset();
     getProfilesByIdsMock.mockReset();
-    getProfilesByKindMock.mockReset();
     createPrivateClassRequestChannelMock.mockReset();
+    listClassRequestRecipientProfilesMock.mockReset();
     createSupabaseServiceClientMock.mockReset();
     sendTextMessageActionMock.mockReset();
     listActiveOrgSubjectCatalogMock.mockReset();
@@ -142,9 +143,7 @@ describe('POST /api/dashboard/class-requests', () => {
         { id: 'child-2', display_name: 'Tevin Morgan' },
       ],
     });
-    getProfilesByKindMock.mockResolvedValue({
-      data: [{ id: 'staff-1' }],
-    });
+    listClassRequestRecipientProfilesMock.mockResolvedValue([{ id: 'staff-1' }]);
     createPrivateClassRequestChannelMock.mockResolvedValue({ channelId: 'channel-1' });
   });
 
@@ -212,6 +211,7 @@ describe('POST /api/dashboard/class-requests', () => {
         orgId: 'org-1',
         topic: expect.stringContaining('Class Request'),
         requesterProfile: expect.objectContaining({ id: 'guardian-1' }),
+        staffProfiles: [{ id: 'staff-1' }],
       }),
     );
     expect(sendTextMessageActionMock).toHaveBeenCalledWith(

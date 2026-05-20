@@ -7,5 +7,6 @@ import { NotificationPreferencesService } from '@iconicedu/api/modules/notificat
   imports: [AuthModule],
   controllers: [NotificationPreferencesController],
   providers: [NotificationPreferencesService],
+  exports: [NotificationPreferencesService],
 })
 export class NotificationPreferencesModule {}

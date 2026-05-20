@@ -5,15 +5,13 @@ import { requireAuthedUser } from '@iconicedu/web/lib/auth/requireAuthedUser';
 import {
   buildDashboardClassRequestMessage,
   createPrivateClassRequestChannel,
+  listClassRequestRecipientProfiles,
   type DashboardClassRequestPayload,
 } from '@iconicedu/web/lib/dashboard/class-request';
 import { resolveEffectiveProfileForAuthUserInOrg } from '@iconicedu/web/lib/family-view/effective-profile';
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
 import { buildUserProfileById } from '@iconicedu/web/lib/profile/builders/user-profile.builder';
-import {
-  getProfilesByIds,
-  getProfilesByKind,
-} from '@iconicedu/web/lib/profile/queries/profiles.query';
+import { getProfilesByIds } from '@iconicedu/web/lib/profile/queries/profiles.query';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { listActiveOrgSubjectCatalog } from '@iconicedu/web/lib/subjects/queries/org-subject-catalog.query';
@@ -172,8 +170,10 @@ export async function POST(request: Request) {
       );
     }
 
-    const staffProfilesResponse = await getProfilesByKind(supabase, org.id, 'staff');
-    const staffProfiles = staffProfilesResponse.data ?? [];
+    const staffProfiles = await listClassRequestRecipientProfiles({
+      supabase: serviceSupabase,
+      orgId: org.id,
+    });
 
     const now = new Date();
     const nowIso = now.toISOString();

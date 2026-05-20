@@ -13,6 +13,7 @@ import {
 type OrgGetStartedClientProps = {
   orgSlug: string;
   orgName: string;
+  initialEmail?: string;
 };
 
 export function resolveOrgGetStartedCallbackUrl(orgSlug: string): string {
@@ -29,6 +30,7 @@ export function resolveOrgGetStartedCallbackUrl(orgSlug: string): string {
 export default function OrgGetStartedClient({
   orgSlug,
   orgName,
+  initialEmail,
 }: OrgGetStartedClientProps) {
   const router = useRouter();
   const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
@@ -81,6 +83,7 @@ export default function OrgGetStartedClient({
       onOAuthLogin={handleOAuthLogin}
       statusMessage={statusMessage}
       errorMessage={errorMessage}
+      initialEmail={initialEmail}
       title={`Get started with ${orgName}`}
       subtitle="Create your secure account with your email or Google and complete onboarding in a few guided steps."
       introText=""
