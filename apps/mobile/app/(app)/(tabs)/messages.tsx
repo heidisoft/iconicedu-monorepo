@@ -361,7 +361,7 @@ function makeStyles(C: AppColors) {
     itemWrapUnread: {},
     itemRow: { minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: 12 },
     separator: {
-      height: 8,
+      height: 12,
       justifyContent: 'center',
     },
     separatorLine: {
@@ -458,7 +458,7 @@ function makeStyles(C: AppColors) {
     rowTail: {
       width: 58,
       alignItems: 'flex-end',
-      justifyContent: 'space-between',
+      justifyContent: 'center',
       flexShrink: 0,
       alignSelf: 'stretch',
       paddingVertical: 2,
