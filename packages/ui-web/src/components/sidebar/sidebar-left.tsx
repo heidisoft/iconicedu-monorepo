@@ -622,7 +622,21 @@ export function SidebarLeft({
     }
     return null;
   }, [activePath]);
-  const { isMobile } = useSidebar();
+  const { isMobile, setOpenMobile } = useSidebar();
+  React.useEffect(() => {
+    if (!onboardingStatus?.currentStep) {
+      return;
+    }
+
+    const shouldOpenMobileSidebar =
+      typeof window === 'undefined'
+        ? isMobile
+        : window.matchMedia('(max-width: 767px)').matches;
+
+    if (shouldOpenMobileSidebar) {
+      setOpenMobile(true);
+    }
+  }, [isMobile, onboardingStatus?.currentStep, setOpenMobile]);
   type FamilySwitchOptionLike = {
     profileId: string;
     kind: UserProfileVM['kind'];

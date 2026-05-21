@@ -36,7 +36,7 @@ vi.mock('@iconicedu/ui-web/ui/sidebar', () => {
     SidebarMenuAction: ({ children, ...props }: { children?: React.ReactNode }) =>
       React.createElement('button', props, children),
     SidebarSeparator: passthrough,
-    useSidebar: () => ({ isMobile: false, state: 'expanded' }),
+    useSidebar: () => ({ isMobile: false, state: 'expanded', setOpenMobile: vi.fn() }),
   };
 });
 
