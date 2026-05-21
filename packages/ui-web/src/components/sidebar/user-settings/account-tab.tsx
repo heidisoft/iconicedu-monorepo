@@ -1,6 +1,11 @@
 import * as React from 'react';
-import { AsYouType, parsePhoneNumberFromString } from 'libphonenumber-js';
-import { BadgeCheck, Info, Mail, MessageCircle, Phone } from 'lucide-react';
+import {
+  AsYouType,
+  parsePhoneNumberFromString,
+  getCountryCallingCode,
+} from 'libphonenumber-js';
+import type { CountryCode } from 'libphonenumber-js';
+import { BadgeCheck, ChevronDown, Info, Mail, MessageCircle, Phone } from 'lucide-react';
 
 import type { UserAccountVM } from '@iconicedu/shared-types';
 import { Badge } from '@iconicedu/ui-web/ui/badge';
@@ -11,12 +16,65 @@ import {
   InputGroupInput,
 } from '@iconicedu/ui-web/ui/input-group';
 import { Label } from '@iconicedu/ui-web/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@iconicedu/ui-web/ui/select';
 import { Switch } from '@iconicedu/ui-web/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@iconicedu/ui-web/ui/tooltip';
 import { UserSettingsTabSection } from '@iconicedu/ui-web/components/sidebar/user-settings/components/user-settings-tab-section';
 import { Checkbox } from '@iconicedu/ui-web/ui/checkbox';
 import { BorderBeam } from '@iconicedu/ui-web/ui/border-beam';
 import { getPhoneValidationError } from '@iconicedu/ui-web/components/sidebar/user-settings/account-tab.utils';
+
+const DIAL_COUNTRIES: Array<{ code: CountryCode; flag: string; label: string }> = [
+  { code: 'LK', flag: '🇱🇰', label: 'Sri Lanka (+94)' },
+  { code: 'IN', flag: '🇮🇳', label: 'India (+91)' },
+  { code: 'AU', flag: '🇦🇺', label: 'Australia (+61)' },
+  { code: 'GB', flag: '🇬🇧', label: 'United Kingdom (+44)' },
+  { code: 'US', flag: '🇺🇸', label: 'United States (+1)' },
+  { code: 'CA', flag: '🇨🇦', label: 'Canada (+1)' },
+  { code: 'NZ', flag: '🇳🇿', label: 'New Zealand (+64)' },
+  { code: 'SG', flag: '🇸🇬', label: 'Singapore (+65)' },
+  { code: 'AE', flag: '🇦🇪', label: 'UAE (+971)' },
+  { code: 'SA', flag: '🇸🇦', label: 'Saudi Arabia (+966)' },
+  { code: 'PK', flag: '🇵🇰', label: 'Pakistan (+92)' },
+  { code: 'BD', flag: '🇧🇩', label: 'Bangladesh (+880)' },
+  { code: 'MY', flag: '🇲🇾', label: 'Malaysia (+60)' },
+  { code: 'KE', flag: '🇰🇪', label: 'Kenya (+254)' },
+  { code: 'NG', flag: '🇳🇬', label: 'Nigeria (+234)' },
+  { code: 'ZA', flag: '🇿🇦', label: 'South Africa (+27)' },
+  { code: 'FR', flag: '🇫🇷', label: 'France (+33)' },
+  { code: 'DE', flag: '🇩🇪', label: 'Germany (+49)' },
+  { code: 'TR', flag: '🇹🇷', label: 'Turkey (+90)' },
+  { code: 'BR', flag: '🇧🇷', label: 'Brazil (+55)' },
+  { code: 'JP', flag: '🇯🇵', label: 'Japan (+81)' },
+  { code: 'CN', flag: '🇨🇳', label: 'China (+86)' },
+  { code: 'PH', flag: '🇵🇭', label: 'Philippines (+63)' },
+  { code: 'OM', flag: '🇴🇲', label: 'Oman (+968)' },
+  { code: 'QA', flag: '🇶🇦', label: 'Qatar (+974)' },
+];
+
+const DEFAULT_COUNTRY: CountryCode = 'US';
+
+function detectCountryFromE164(e164: string | null | undefined): CountryCode {
+  if (!e164) return DEFAULT_COUNTRY;
+  const parsed = parsePhoneNumberFromString(e164);
+  const country = parsed?.country;
+  if (country && DIAL_COUNTRIES.some((c) => c.code === country)) {
+    return country as CountryCode;
+  }
+  return DEFAULT_COUNTRY;
+}
+
+function toNationalNumber(e164: string | null | undefined, country: CountryCode): string {
+  if (!e164) return '';
+  const parsed = parsePhoneNumberFromString(e164, country);
+  return parsed ? parsed.formatNational() : e164;
+}
 
 export type AccountSectionKey = 'email' | 'phone' | 'whatsapp';
 
@@ -55,15 +113,26 @@ export function AccountTab({
   lockSections = false,
   isChildAccount = false,
 }: AccountTabProps) {
-  const [phoneValue, setPhoneValue] = React.useState('');
-  const [, setIsPhoneFocused] = React.useState(false);
+  const [phoneCountry, setPhoneCountry] = React.useState<CountryCode>(() =>
+    detectCountryFromE164(contacts?.phoneE164),
+  );
+  const [phoneLocal, setPhoneLocal] = React.useState(() =>
+    toNationalNumber(contacts?.phoneE164, detectCountryFromE164(contacts?.phoneE164)),
+  );
   const [phoneError, setPhoneError] = React.useState<string | null>(null);
-  const [whatsappValue, setWhatsappValue] = React.useState('');
+  const [whatsappCountry, setWhatsappCountry] = React.useState<CountryCode>(() =>
+    detectCountryFromE164(contacts?.whatsappE164 ?? contacts?.phoneE164),
+  );
+  const [whatsappLocal, setWhatsappLocal] = React.useState(() => {
+    const src = contacts?.whatsappE164 ?? contacts?.phoneE164 ?? '';
+    const country = detectCountryFromE164(src || null);
+    return toNationalNumber(src || null, country);
+  });
   const [isWhatsappFocused, setIsWhatsappFocused] = React.useState(false);
   const [whatsappError, setWhatsappError] = React.useState<string | null>(null);
   const phoneInputRef = React.useRef<HTMLInputElement | null>(null);
-  const formatPhoneInput = React.useCallback((value: string) => {
-    return new AsYouType().input(value);
+  const formatLocal = React.useCallback((value: string, country: CountryCode) => {
+    return new AsYouType(country).input(value);
   }, []);
   const [isPhoneSaving, setIsPhoneSaving] = React.useState(false);
   const [isWhatsappSaving, setIsWhatsappSaving] = React.useState(false);
@@ -71,11 +140,13 @@ export function AccountTab({
   const emailError = !email.trim() ? 'Email is required.' : null;
   const emailVerified = Boolean(contacts?.emailVerified);
   const emailVerifiedAt = contacts?.emailVerifiedAt ?? null;
+  const phoneValue = phoneLocal;
+  const whatsappValue = whatsappLocal;
   const formattedPhoneFromContacts = contacts?.phoneE164
-    ? formatPhoneInput(contacts.phoneE164)
+    ? toNationalNumber(contacts.phoneE164, phoneCountry)
     : '';
   const formattedWhatsappFromContacts = contacts?.whatsappE164
-    ? formatPhoneInput(contacts.whatsappE164)
+    ? toNationalNumber(contacts.whatsappE164, whatsappCountry)
     : '';
   const renderVerificationBadge = (isVerified: boolean, verifiedAt?: string | null) =>
     isVerified ? (
@@ -96,10 +167,8 @@ export function AccountTab({
     );
   const phoneInputValue = phoneValue;
   const whatsappInputValue = whatsappValue;
-  const phoneDisplay =
-    phoneInputValue.trim() || formattedPhoneFromContacts || 'Not provided';
-  const whatsappDisplay =
-    whatsappInputValue.trim() || formattedWhatsappFromContacts || 'Not provided';
+  const phoneDisplay = formattedPhoneFromContacts || 'Not provided';
+  const whatsappDisplay = formattedWhatsappFromContacts || 'Not provided';
   const shouldScrollToPhone = !phoneInputValue.trim();
   const isPhoneSaveDisabled = isPhoneSaving || !onAccountUpdate || !accountId || !orgId;
   const isWhatsappSaveDisabled =
@@ -110,8 +179,9 @@ export function AccountTab({
     if (!usePhoneForWhatsapp || !phoneInputValue.trim()) {
       return;
     }
-    setWhatsappValue(phoneInputValue);
-  }, [phoneInputValue, usePhoneForWhatsapp]);
+    setWhatsappLocal(phoneInputValue);
+    setWhatsappCountry(phoneCountry);
+  }, [phoneInputValue, phoneCountry, usePhoneForWhatsapp]);
   const [whatsappOpen, setWhatsappOpen] = React.useState(false);
   const [emailInputValue, setEmailInputValue] = React.useState(email);
   const [, setIsEmailFocused] = React.useState(false);
@@ -127,8 +197,10 @@ export function AccountTab({
   const phoneDisabled = shouldLockSections && !isPhoneSectionActive;
   const whatsappDisabled = shouldLockSections && !isWhatsappSectionActive;
   React.useEffect(() => {
-    setPhoneValue(formatPhoneInput(contacts?.phoneE164 ?? ''));
-  }, [contacts?.phoneE164, formatPhoneInput]);
+    const country = detectCountryFromE164(contacts?.phoneE164);
+    setPhoneCountry(country);
+    setPhoneLocal(toNationalNumber(contacts?.phoneE164, country));
+  }, [contacts?.phoneE164]);
 
   React.useEffect(() => {
     if (!scrollToRequired || !shouldScrollToPhone) {
@@ -154,9 +226,11 @@ export function AccountTab({
       return;
     }
 
-    const nextValue = shouldUsePhone ? contactPhone : contactWhatsapp;
-    setWhatsappValue(formatPhoneInput(nextValue));
-  }, [contacts?.phoneE164, contacts?.whatsappE164, formatPhoneInput, isWhatsappFocused]);
+    const src = shouldUsePhone ? contactPhone : contactWhatsapp;
+    const country = detectCountryFromE164(src || null);
+    setWhatsappCountry(country);
+    setWhatsappLocal(toNationalNumber(src || null, country));
+  }, [contacts?.phoneE164, contacts?.whatsappE164, isWhatsappFocused]);
 
   React.useEffect(() => {
     setShowPhoneActionBeam(
@@ -168,9 +242,12 @@ export function AccountTab({
     if (!onAccountUpdate || !accountId || !orgId) {
       return;
     }
-    const trimmedPhone = phoneInputValue.trim();
-    const parsed = trimmedPhone ? parsePhoneNumberFromString(trimmedPhone) : undefined;
-    const validationError = getPhoneValidationError(phoneInputValue, {
+    const trimmedLocal = phoneInputValue.trim();
+    const parsed = trimmedLocal
+      ? parsePhoneNumberFromString(trimmedLocal, phoneCountry)
+      : undefined;
+    const composedForValidation = parsed?.number ?? trimmedLocal;
+    const validationError = getPhoneValidationError(composedForValidation, {
       required: !isChildAccount,
     });
     if (validationError) {
@@ -194,6 +271,7 @@ export function AccountTab({
     orgId,
     onAccountUpdate,
     phoneInputValue,
+    phoneCountry,
     usePhoneForWhatsapp,
     isChildAccount,
   ]);
@@ -202,9 +280,12 @@ export function AccountTab({
     if (!onAccountUpdate || !accountId || !orgId) {
       return;
     }
-    const parsed = parsePhoneNumberFromString(whatsappInputValue);
-    if (whatsappInputValue.trim() && !parsed?.isValid()) {
-      setWhatsappError('Enter a valid international number (e.g. +1 415 555 0100).');
+    const trimmedLocal = whatsappInputValue.trim();
+    const parsed = trimmedLocal
+      ? parsePhoneNumberFromString(trimmedLocal, whatsappCountry)
+      : undefined;
+    if (trimmedLocal && !parsed?.isValid()) {
+      setWhatsappError('Enter a valid number for the selected country.');
       return;
     }
     setIsWhatsappSaving(true);
@@ -217,7 +298,7 @@ export function AccountTab({
     } finally {
       setIsWhatsappSaving(false);
     }
-  }, [accountId, orgId, onAccountUpdate, whatsappInputValue]);
+  }, [accountId, orgId, onAccountUpdate, whatsappInputValue, whatsappCountry]);
 
   return (
     <div className="space-y-8 w-full">
@@ -335,30 +416,70 @@ export function AccountTab({
                     />
                   ) : null}
                   <InputGroup>
+                    <InputGroupAddon align="inline-start" className="pl-1 pr-0">
+                      <Select
+                        value={phoneCountry}
+                        onValueChange={(v) => {
+                          setPhoneCountry(v as CountryCode);
+                          setPhoneLocal('');
+                          if (phoneError) setPhoneError(null);
+                          setTimeout(() => phoneInputRef.current?.focus(), 0);
+                        }}
+                      >
+                        <SelectTrigger
+                          className="h-7 gap-1 border-0 bg-transparent px-2 shadow-none focus:ring-0 text-sm font-medium"
+                          aria-label="Country dial code"
+                        >
+                          <SelectValue>
+                            <span className="flex items-center gap-1.5">
+                              <span>
+                                {
+                                  DIAL_COUNTRIES.find((c) => c.code === phoneCountry)
+                                    ?.flag
+                                }
+                              </span>
+                              <span className="text-muted-foreground">
+                                +{getCountryCallingCode(phoneCountry)}
+                              </span>
+                              <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                            </span>
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent className="max-h-64">
+                          {DIAL_COUNTRIES.map((c) => (
+                            <SelectItem key={c.code} value={c.code}>
+                              <span className="flex items-center gap-2">
+                                <span>{c.flag}</span>
+                                <span>{c.label}</span>
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <span className="text-border mx-1 select-none">|</span>
+                    </InputGroupAddon>
                     <InputGroupInput
                       id="settings-account-phone"
                       value={phoneInputValue}
                       ref={phoneInputRef}
                       aria-label="Phone"
                       required
-                      placeholder="+1 415 555 0100"
-                      onFocus={() => setIsPhoneFocused(true)}
+                      placeholder="71 234 5678"
                       onBlur={() => {
-                        setIsPhoneFocused(false);
-                        const formatted = formatPhoneInput(phoneInputValue);
-                        if (formatted) {
-                          setPhoneValue(formatted);
-                        }
-                        const validationError = getPhoneValidationError(phoneInputValue, {
-                          required: !isChildAccount,
-                        });
+                        const formatted = formatLocal(phoneInputValue, phoneCountry);
+                        if (formatted) setPhoneLocal(formatted);
+                        const parsed = phoneInputValue.trim()
+                          ? parsePhoneNumberFromString(phoneInputValue, phoneCountry)
+                          : undefined;
+                        const validationError = getPhoneValidationError(
+                          parsed?.number ?? phoneInputValue,
+                          { required: !isChildAccount },
+                        );
                         setPhoneError(validationError);
                       }}
                       onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
-                        setPhoneValue(formatPhoneInput(event.target.value));
-                        if (phoneError) {
-                          setPhoneError(null);
-                        }
+                        setPhoneLocal(formatLocal(event.target.value, phoneCountry));
+                        if (phoneError) setPhoneError(null);
                       }}
                     />
                     <InputGroupAddon align="inline-end">
@@ -370,8 +491,7 @@ export function AccountTab({
                   </InputGroup>
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  We’ll send a verification code by text. Include your country code (e.g.
-                  +1, +44, +61).
+                  We&apos;ll send a verification code by text.
                 </div>
                 {phoneError ? (
                   <div className="text-xs text-destructive">{phoneError}</div>
@@ -441,33 +561,72 @@ export function AccountTab({
               <div className="space-y-2 sm:col-span-2">
                 <Label htmlFor="settings-account-whatsapp">WhatsApp</Label>
                 <div className="relative rounded-full">
-                  {whatsappOpen && !whatsappInputValue.trim() && !isWhatsappFocused ? (
-                    <span className="pointer-events-none absolute inset-0" />
-                  ) : null}
                   <InputGroup>
+                    <InputGroupAddon align="inline-start" className="pl-1 pr-0">
+                      <Select
+                        value={whatsappCountry}
+                        onValueChange={(v) => {
+                          if (usePhoneForWhatsapp) return;
+                          setWhatsappCountry(v as CountryCode);
+                          setWhatsappLocal('');
+                          if (whatsappError) setWhatsappError(null);
+                        }}
+                      >
+                        <SelectTrigger
+                          className="h-7 gap-1 border-0 bg-transparent px-2 shadow-none focus:ring-0 text-sm font-medium"
+                          aria-label="Country dial code"
+                          disabled={usePhoneForWhatsapp}
+                        >
+                          <SelectValue>
+                            <span className="flex items-center gap-1.5">
+                              <span>
+                                {
+                                  DIAL_COUNTRIES.find((c) => c.code === whatsappCountry)
+                                    ?.flag
+                                }
+                              </span>
+                              <span className="text-muted-foreground">
+                                +{getCountryCallingCode(whatsappCountry)}
+                              </span>
+                              <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                            </span>
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent className="max-h-64">
+                          {DIAL_COUNTRIES.map((c) => (
+                            <SelectItem key={c.code} value={c.code}>
+                              <span className="flex items-center gap-2">
+                                <span>{c.flag}</span>
+                                <span>{c.label}</span>
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <span className="text-border mx-1 select-none">|</span>
+                    </InputGroupAddon>
                     <InputGroupInput
                       id="settings-account-whatsapp"
                       value={whatsappInputValue}
                       aria-label="WhatsApp"
                       required={false}
-                      placeholder="+1 415 555 0100"
+                      placeholder="71 234 5678"
                       disabled={usePhoneForWhatsapp}
                       onFocus={() => setIsWhatsappFocused(true)}
                       onBlur={() => {
                         setIsWhatsappFocused(false);
-                        const formatted = formatPhoneInput(whatsappInputValue);
-                        if (formatted) {
-                          setWhatsappValue(formatted);
-                        }
+                        const formatted = formatLocal(
+                          whatsappInputValue,
+                          whatsappCountry,
+                        );
+                        if (formatted) setWhatsappLocal(formatted);
                       }}
                       onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
-                        if (usePhoneForWhatsapp) {
-                          return;
-                        }
-                        setWhatsappValue(formatPhoneInput(event.target.value));
-                        if (whatsappError) {
-                          setWhatsappError(null);
-                        }
+                        if (usePhoneForWhatsapp) return;
+                        setWhatsappLocal(
+                          formatLocal(event.target.value, whatsappCountry),
+                        );
+                        if (whatsappError) setWhatsappError(null);
                       }}
                     />
                     <InputGroupAddon align="inline-end">
@@ -478,8 +637,7 @@ export function AccountTab({
                     </InputGroupAddon>
                   </InputGroup>
                   <div className="text-xs text-muted-foreground">
-                    We’ll send a verification code by text. Include your country code
-                    (e.g. +1, +44, +61).
+                    We&apos;ll send a verification code by WhatsApp.
                   </div>
                   {whatsappError ? (
                     <div className="text-xs text-destructive">{whatsappError}</div>
