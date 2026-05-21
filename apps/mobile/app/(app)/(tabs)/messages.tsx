@@ -928,7 +928,7 @@ export default function MessagesScreen() {
   } = useLearningSpaceChannels(orgId, myProfileId, accountId, profileKind);
   const {
     data: supervisedDms,
-    isPending: supervisedLoading,
+    isLoading: supervisedLoading,
     refetch: refetchSupervised,
   } = useSupervisedDirectMessages(orgId, guardianAccountId, guardianProfileId);
 
