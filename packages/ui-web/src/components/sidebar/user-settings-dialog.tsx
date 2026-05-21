@@ -308,6 +308,7 @@ export function UserSettingsDialog({
       drawerHeaderClassName="items-start"
       containerClassName="h-full"
       dialogShowCloseButton={!shouldBlockOnboarding}
+      drawerProps={{ dismissible: !shouldBlockOnboarding }}
       bodyClassName={cn(isMobile ? 'px-4 pb-4' : 'px-6 pb-6')}
     >
       {content}

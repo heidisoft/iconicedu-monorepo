@@ -13,13 +13,16 @@ import {
 } from '@iconicedu/ui-web/ui/dialog';
 import {
   Drawer,
+  DrawerClose,
   DrawerContent,
   DrawerDescription,
   DrawerHeader,
   DrawerTitle,
   DrawerTrigger,
 } from '@iconicedu/ui-web/ui/drawer';
+import { Button } from '@iconicedu/ui-web/ui/button';
 import { useIsMobile } from '@iconicedu/ui-web/hooks/use-mobile';
+import { XIcon } from 'lucide-react';
 
 type ResponsiveDialogProps = {
   open: boolean;
@@ -124,6 +127,14 @@ export function ResponsiveDialog({
               children
             ),
           )}
+          {dialogShowCloseButton ? (
+            <DrawerClose data-slot="drawer-close" asChild>
+              <Button variant="ghost" className="absolute top-4 right-4" size="icon-sm">
+                <XIcon />
+                <span className="sr-only">Close</span>
+              </Button>
+            </DrawerClose>
+          ) : null}
         </DrawerContent>
       </Drawer>
     );
