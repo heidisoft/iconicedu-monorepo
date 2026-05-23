@@ -159,15 +159,19 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
           VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+          CONFIGURED_API_URL: ${{ vars.API_URL || secrets.API_URL }}
+          CONFIGURED_WEB_URL: ${{ vars.WEB_URL || secrets.WEB_URL }}
         run: |
           set -euo pipefail
 
           REPO_NAME="${{ github.event.repository.name }}"
           TARGET_BRANCH="${BRANCH_NAME}"
           RAILWAY_SERVICE_NAME="${REPO_NAME}"
+          USE_PRODUCTION_URLS=false
 
           if [[ "${BUILD_KIND}" == "production" || "${TARGET_BRANCH}" == "main" ]]; then
             RAILWAY_ENVIRONMENT="production"
+            USE_PRODUCTION_URLS=true
           else
             if [[ -z "${PR_NUMBER:-}" ]]; then
               echo "::error::PR number is required to resolve preview Railway and Vercel URLs for branch '${TARGET_BRANCH}'."
@@ -176,6 +180,19 @@ jobs:
             RAILWAY_ENVIRONMENT="${REPO_NAME}-pr-${PR_NUMBER}"
           fi
 
+          normalize_url() {
+            local url="$1"
+            if [[ -z "${url}" ]]; then
+              return 0
+            fi
+            url="${url%/}"
+            if [[ "${url}" != http://* && "${url}" != https://* ]]; then
+              url="https://${url}"
+            fi
+            echo "${url}"
+          }
+
+          API_URL=$(normalize_url "${CONFIGURED_API_URL:-}")
           RAILWAY_GQL="https://backboard.railway.app/graphql/v2"
 
           railway_api() {
@@ -198,51 +215,64 @@ jobs:
             echo "${resp}"
           }
 
-          ENV_RESP=$(railway_api "$(jq -n --arg pid "${RAILWAY_PROJECT_ID}" \
-            '{query:"query environments($projectId: String!) { environments(projectId: $projectId) { edges { node { id name } } } }", variables:{projectId:$pid}}')")
-          ENV_ID=$(echo "${ENV_RESP}" | jq -r --arg name "${RAILWAY_ENVIRONMENT}" \
-            '.data.environments.edges[]? | select(.node.name==$name) | .node.id // empty')
+          if [[ -n "${API_URL}" && "${USE_PRODUCTION_URLS}" == "true" ]]; then
+            echo "Using configured production API_URL."
+          else
+            ENV_RESP=$(railway_api "$(jq -n --arg pid "${RAILWAY_PROJECT_ID}" \
+              '{query:"query environments($projectId: String!) { environments(projectId: $projectId) { edges { node { id name } } } }", variables:{projectId:$pid}}')")
+            ENV_ID=$(echo "${ENV_RESP}" | jq -r --arg name "${RAILWAY_ENVIRONMENT}" \
+              '.data.environments.edges[]? | select(.node.name==$name) | .node.id // empty')
 
-          if [[ -z "${ENV_ID}" ]]; then
-            echo "::error::Railway environment '${RAILWAY_ENVIRONMENT}' not found."
-            exit 1
+            if [[ -z "${ENV_ID}" ]]; then
+              echo "::error::Railway environment '${RAILWAY_ENVIRONMENT}' not found."
+              exit 1
+            fi
+
+            PROJECT_RESP=$(railway_api "$(jq -n --arg pid "${RAILWAY_PROJECT_ID}" \
+              '{query:"query project($id: String!) { project(id: $id) { services { edges { node { id name } } } } }", variables:{id:$pid}}')")
+            SERVICE_ID=$(echo "${PROJECT_RESP}" | jq -r --arg name "${RAILWAY_SERVICE_NAME}" \
+              '.data.project.services.edges[]? | select(.node.name==$name) | .node.id // empty')
+
+            if [[ -z "${SERVICE_ID}" ]]; then
+              echo "::error::Railway service '${RAILWAY_SERVICE_NAME}' not found in project."
+              exit 1
+            fi
+
+            DOMAIN_RESP=$(railway_api "$(jq -n \
+              --arg pid "${RAILWAY_PROJECT_ID}" \
+              --arg eid "${ENV_ID}" \
+              --arg sid "${SERVICE_ID}" \
+              '{query:"query domains($projectId: String!, $environmentId: String!, $serviceId: String!) { domains(projectId: $projectId, environmentId: $environmentId, serviceId: $serviceId) { serviceDomains { domain } customDomains { domain } } }", variables:{projectId:$pid, environmentId:$eid, serviceId:$sid}}')")
+            API_HOST=$(echo "${DOMAIN_RESP}" | jq -r '
+              [
+                .data.domains.serviceDomains[]?.domain,
+                .data.domains.customDomains[]?.domain
+              ]
+              | map(select(type == "string" and length > 0))
+              | .[0] // empty')
+
+            if [[ -z "${API_HOST}" ]]; then
+              echo "::error::Unable to resolve a Railway URL for environment '${RAILWAY_ENVIRONMENT}' and service '${RAILWAY_SERVICE_NAME}'."
+              exit 1
+            fi
+
+            API_URL="https://${API_HOST}"
           fi
 
-          PROJECT_RESP=$(railway_api "$(jq -n --arg pid "${RAILWAY_PROJECT_ID}" \
-            '{query:"query project($id: String!) { project(id: $id) { services { edges { node { id name } } } } }", variables:{id:$pid}}')")
-          SERVICE_ID=$(echo "${PROJECT_RESP}" | jq -r --arg name "${RAILWAY_SERVICE_NAME}" \
-            '.data.project.services.edges[]? | select(.node.name==$name) | .node.id // empty')
-
-          if [[ -z "${SERVICE_ID}" ]]; then
-            echo "::error::Railway service '${RAILWAY_SERVICE_NAME}' not found in project."
-            exit 1
-          fi
-
-          DOMAIN_RESP=$(railway_api "$(jq -n \
-            --arg pid "${RAILWAY_PROJECT_ID}" \
-            --arg eid "${ENV_ID}" \
-            --arg sid "${SERVICE_ID}" \
-            '{query:"query domains($projectId: String!, $environmentId: String!, $serviceId: String!) { domains(projectId: $projectId, environmentId: $environmentId, serviceId: $serviceId) { serviceDomains { domain } customDomains { domain } } }", variables:{projectId:$pid, environmentId:$eid, serviceId:$sid}}')")
-          API_HOST=$(echo "${DOMAIN_RESP}" | jq -r '
-            [
-              .data.domains.serviceDomains[]?.domain,
-              .data.domains.customDomains[]?.domain
-            ]
-            | map(select(type == "string" and length > 0))
-            | .[0] // empty')
-
-          if [[ -z "${API_HOST}" ]]; then
-            echo "::error::Unable to resolve a Railway URL for environment '${RAILWAY_ENVIRONMENT}' and service '${RAILWAY_SERVICE_NAME}'."
-            exit 1
-          fi
-
-          API_URL="https://${API_HOST}"
-          if [[ "${BUILD_KIND}" == "production" ]]; then
+          if [[ "${USE_PRODUCTION_URLS}" == "true" ]]; then
             VERCEL_TARGET="production"
             VERCEL_COMMIT_REF="main"
           else
             VERCEL_TARGET="preview"
             VERCEL_COMMIT_REF="${TARGET_BRANCH}"
+          fi
+
+          WEB_URL=$(normalize_url "${CONFIGURED_WEB_URL:-}")
+          if [[ -n "${WEB_URL}" && "${USE_PRODUCTION_URLS}" == "true" ]]; then
+            echo "Using configured production WEB_URL."
+            echo "api_url=${API_URL}" >> "$GITHUB_OUTPUT"
+            echo "web_url=${WEB_URL}" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
 
           PROJECT_ID="${VERCEL_PROJECT_ID:-}"
@@ -290,9 +320,7 @@ jobs:
             exit 1
           fi
 
-          if [[ "${WEB_URL}" != https://* ]]; then
-            WEB_URL="https://${WEB_URL}"
-          fi
+          WEB_URL=$(normalize_url "${WEB_URL}")
 
           echo "api_url=${API_URL}" >> "$GITHUB_OUTPUT"
           echo "web_url=${WEB_URL}" >> "$GITHUB_OUTPUT"
