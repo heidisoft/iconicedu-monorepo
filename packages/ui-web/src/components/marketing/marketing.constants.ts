@@ -68,15 +68,15 @@ export const FOOTER_LINK_GROUPS = [
   {
     title: 'Platform',
     links: [
-      { label: 'Programs', href: '#subjects' },
-      { label: 'How It Works', href: '#how-it-works' },
+      { label: 'Programs', href: '/regions/global-online' },
+      { label: 'How It Works', href: '/#how-it-works' },
       { label: 'Become a Tutor', href: '/iconic-academy/login' },
     ],
   },
   {
     title: 'Company',
     links: [
-      { label: 'About', href: '#about' },
+      { label: 'About', href: '/#about' },
       { label: 'Contact', href: '/contact' },
       { label: 'Pricing', href: '/pricing' },
     ],

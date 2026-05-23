@@ -145,12 +145,30 @@ export const enableClassScheduleStaffEdit = flag<boolean, { profileId?: string |
   },
 });
 
+export const enableMarketingSitePages = flag<boolean, { profileId?: string | null }>({
+  key: 'enable-marketing-site-pages',
+  description:
+    'Enables standard marketing pages and regional microsite routes while content is staged.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: 'enable-marketing-site-pages',
+      profileId: entities?.profileId,
+    });
+  },
+});
+
 export const webFlags = {
   enableAdminActivityFeedAudit,
   enableAdminReports,
   enableChannelCommunications,
   enableClassScheduleStaffCancel,
   enableClassScheduleStaffEdit,
+  enableMarketingSitePages,
   enableMessageTypeComposer,
 } as const;
 

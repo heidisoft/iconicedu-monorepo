@@ -65,7 +65,7 @@ describe('marketing sections', () => {
     );
     expect(screen.getByRole('link', { name: 'Programs' })).toHaveAttribute(
       'href',
-      '#subjects',
+      '/regions/global-online',
     );
   });
 });

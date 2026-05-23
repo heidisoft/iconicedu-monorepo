@@ -3,11 +3,11 @@ import { SiteLogoFull } from '@iconicedu/ui-web/components/branding/site-logo-fu
 import { ThemeToggle } from '@iconicedu/ui-web/components/theme-toggle';
 
 const NAV_ITEMS = [
-  { label: 'Home', href: '#home' },
-  { label: 'Subjects', href: '#subjects' },
-  { label: 'How It Works', href: '#how-it-works' },
-  { label: 'For Parents', href: '#for-parents' },
-  { label: 'About', href: '#about' },
+  { label: 'Home', href: '/' },
+  { label: 'Subjects', href: '/#subjects' },
+  { label: 'How It Works', href: '/#how-it-works' },
+  { label: 'For Parents', href: '/#for-parents' },
+  { label: 'About', href: '/#about' },
 ] as const;
 
 type MarketingHeaderProps = {

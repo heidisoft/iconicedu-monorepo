@@ -49,6 +49,8 @@
       "expo-router",
       "expo-secure-store",
       "expo-splash-screen",
+      "expo-camera",
+      "expo-image-picker",
       "expo-sharing",
       "expo-web-browser",
       "expo-audio",

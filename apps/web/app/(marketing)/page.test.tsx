@@ -42,7 +42,7 @@ describe('marketing home page', () => {
     expect(screen.getByText('Competition Prep')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Programs' })).toHaveAttribute(
       'href',
-      '#subjects',
+      '/regions/global-online',
     );
     expect(screen.getByRole('link', { name: 'Privacy' })).toHaveAttribute(
       'href',

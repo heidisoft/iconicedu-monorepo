@@ -12,6 +12,7 @@ import {
   enableChannelCommunications,
   enableClassScheduleStaffCancel,
   enableClassScheduleStaffEdit,
+  enableMarketingSitePages,
   enableMessageTypeComposer,
   getFlagsProviderData,
   isVercelFlagsSdkConfigured,
@@ -63,6 +64,12 @@ describe('web flags', () => {
     expect(enableClassScheduleStaffEdit.key).toBe('enable-class-schedule-staff-edit');
     expect(enableClassScheduleStaffEdit.defaultValue).toBe(false);
     expect(webFlags.enableClassScheduleStaffEdit).toBe(enableClassScheduleStaffEdit);
+  });
+
+  it('declares the marketing site pages flag with stable metadata', () => {
+    expect(enableMarketingSitePages.key).toBe('enable-marketing-site-pages');
+    expect(enableMarketingSitePages.defaultValue).toBe(false);
+    expect(webFlags.enableMarketingSitePages).toBe(enableMarketingSitePages);
   });
 
   it('does not require FLAGS env to load the catalog', () => {
@@ -126,6 +133,7 @@ describe('web flags', () => {
     expect(JSON.stringify(providerData)).toContain('enable-channel-communications');
     expect(JSON.stringify(providerData)).toContain('enable-class-schedule-staff-cancel');
     expect(JSON.stringify(providerData)).toContain('enable-class-schedule-staff-edit');
+    expect(JSON.stringify(providerData)).toContain('enable-marketing-site-pages');
     expect(JSON.stringify(providerData)).toContain('enable-message-type-composer');
   });
 });
