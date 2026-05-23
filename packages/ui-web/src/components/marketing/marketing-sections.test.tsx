@@ -38,9 +38,9 @@ describe('marketing sections', () => {
   it('renders trust stats section cards', () => {
     render(<MarketingTrustStatsSection />);
 
-    expect(screen.getByText('4.9/5')).toBeInTheDocument();
+    expect(screen.getByText('$12/h+')).toBeInTheDocument();
     expect(
-      screen.getByText('Trusted by parents who see real results'),
+      screen.getByText('Affordable class sessions with global tutor options'),
     ).toBeInTheDocument();
   });
 
@@ -65,7 +65,7 @@ describe('marketing sections', () => {
     );
     expect(screen.getByRole('link', { name: 'Programs' })).toHaveAttribute(
       'href',
-      '/regions/global-online',
+      '/subjects',
     );
   });
 });

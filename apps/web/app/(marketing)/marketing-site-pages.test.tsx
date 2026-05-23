@@ -10,6 +10,15 @@ import CookiesPage, {
 import PricingPage, {
   metadata as pricingMetadata,
 } from '@iconicedu/web/app/(marketing)/pricing/page';
+import AboutPage, {
+  metadata as aboutMetadata,
+} from '@iconicedu/web/app/(marketing)/about/page';
+import ForParentsPage, {
+  metadata as forParentsMetadata,
+} from '@iconicedu/web/app/(marketing)/for-parents/page';
+import HowItWorksPage, {
+  metadata as howItWorksMetadata,
+} from '@iconicedu/web/app/(marketing)/how-it-works/page';
 import PrivacyPage, {
   metadata as privacyMetadata,
 } from '@iconicedu/web/app/(marketing)/privacy/page';
@@ -20,6 +29,9 @@ import RegionalPage, {
 import TermsPage, {
   metadata as termsMetadata,
 } from '@iconicedu/web/app/(marketing)/terms/page';
+import SubjectsPage, {
+  metadata as subjectsMetadata,
+} from '@iconicedu/web/app/(marketing)/subjects/page';
 
 const enableMarketingSitePagesRunMock = vi.fn(async () => true);
 const notFoundMock = vi.fn(() => {
@@ -94,12 +106,47 @@ describe('marketing site standard pages', () => {
       title: 'Program pricing built around each learner',
       canonical: '/pricing',
     },
+    {
+      name: 'subjects',
+      Page: SubjectsPage,
+      metadata: subjectsMetadata,
+      title: 'Academic help and enrichment for every kind of learner',
+      canonical: '/subjects',
+      expectedText: 'Subject support should feel practical, not overwhelming',
+    },
+    {
+      name: 'how it works',
+      Page: HowItWorksPage,
+      metadata: howItWorksMetadata,
+      title: 'Simple online learning with support families can understand',
+      canonical: '/how-it-works',
+      expectedText: 'A calmer path from inquiry to learning',
+    },
+    {
+      name: 'for parents',
+      Page: ForParentsPage,
+      metadata: forParentsMetadata,
+      title: 'Built for parents who want clarity, care, and affordability',
+      canonical: '/for-parents',
+      expectedText: 'Parents deserve to feel informed',
+    },
+    {
+      name: 'about',
+      Page: AboutPage,
+      metadata: aboutMetadata,
+      title: 'A mission-driven learning platform for more families',
+      canonical: '/about',
+      expectedText: 'Professional, but personal',
+    },
   ])(
     'renders the $name page when enabled',
-    async ({ Page, metadata, title, canonical }) => {
+    async ({ Page, metadata, title, canonical, expectedText }) => {
       render(await Page());
 
       expect(screen.getByRole('heading', { name: title })).toBeInTheDocument();
+      if (expectedText) {
+        expect(screen.getByText(expectedText)).toBeInTheDocument();
+      }
       expect(metadata.alternates?.canonical).toBe(canonical);
       expect(metadata.description).toBeTruthy();
       expect(enableMarketingSitePagesRunMock).toHaveBeenCalledWith({

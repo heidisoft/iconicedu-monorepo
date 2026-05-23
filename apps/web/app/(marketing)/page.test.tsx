@@ -40,13 +40,11 @@ describe('marketing home page', () => {
 
     expect(screen.getByText('Math')).toBeInTheDocument();
     expect(screen.getByText('Competition Prep')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Programs' })).toHaveAttribute(
+    expect(screen.getAllByText('Affordable learning options').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Parent-first communication').length).toBeGreaterThan(0);
+    expect(screen.getByRole('link', { name: 'Explore and sign up' })).toHaveAttribute(
       'href',
-      '/regions/global-online',
-    );
-    expect(screen.getByRole('link', { name: 'Privacy' })).toHaveAttribute(
-      'href',
-      '/privacy',
+      '/acme/login',
     );
   });
 });

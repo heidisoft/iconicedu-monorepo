@@ -1,6 +1,6 @@
-import { MarketingFooterSection } from './marketing-footer-section';
 import { MarketingHeroSection } from './marketing-hero-section';
 import { MarketingHowItWorksSection } from './marketing-how-it-works-section';
+import { MarketingMissionSection } from './marketing-mission-section';
 import { MarketingSubjectsSection } from './marketing-subjects-section';
 import { MarketingTrustStatsSection } from './marketing-trust-stats-section';
 
@@ -16,8 +16,8 @@ export function MarketingHomePage({
       <MarketingHeroSection loginHref={loginHref} />
       <MarketingSubjectsSection />
       <MarketingTrustStatsSection />
+      <MarketingMissionSection />
       <MarketingHowItWorksSection loginHref={loginHref} />
-      <MarketingFooterSection loginHref={loginHref} />
     </div>
   );
 }
