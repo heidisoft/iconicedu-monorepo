@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { MarketingHeader } from '@iconicedu/ui-web';
+import { MarketingFooterSection, MarketingHeader } from '@iconicedu/ui-web';
 import { ChatWidgetScript } from '@iconicedu/web/components/chat-widget-script';
 import { getAccountByAuthUserId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { resolveDefaultOrgLoginPath } from '@iconicedu/web/lib/org/resolve-auth-path';
@@ -35,6 +35,7 @@ export default async function SiteLayout({ children }: { children: ReactNode }) 
         dashboardHref={dashboardHref}
       />
       <main>{children}</main>
+      <MarketingFooterSection loginHref={loginHref} />
     </>
   );
 }

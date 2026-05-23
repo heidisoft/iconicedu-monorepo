@@ -41,42 +41,218 @@ export const LEARNING_AREAS = [
 ] as const;
 
 export const TRUST_STATS = [
-  { value: '4.9/5', label: 'Trusted by parents who see real results' },
-  { value: '100+', label: 'Students and educators from around the world.' },
-  { value: '24/7', label: 'Flexible scheduling options' },
+  { value: '$12/h+', label: 'Affordable class sessions with global tutor options' },
+  { value: '1:1 + groups', label: 'Flexible support for different family budgets' },
+  { value: 'Global', label: 'Caring teachers across regions and specialties' },
 ] as const;
 
 export const CORE_BENEFITS = [
   {
-    title: 'Personalized 1-1 support',
+    title: 'Affordable learning options',
     description:
-      'Match your child with tutors that fit their level, pace, and learning goals.',
+      'Choose from 1-on-1 tutoring, small-group classes, and subject-based support that fits your goals and budget.',
   },
   {
-    title: 'Progress you can actually track',
+    title: 'Parent-first communication',
     description:
-      'Follow milestones, assignments, and outcomes with a parent-friendly experience.',
+      'Stay close to class updates, messages, reminders, and progress visibility without chasing for answers.',
   },
   {
-    title: 'Built for modern education',
+    title: 'Flexible online learning',
     description:
-      'Live sessions, structured classes, and messaging in one secure platform.',
+      'Live online sessions help students learn comfortably from home around busy family schedules.',
   },
 ] as const;
+
+export const MISSION_PILLARS = [
+  {
+    title: 'Affordable learning options',
+    description:
+      'Quality education should not be limited to families who can afford expensive tutoring. ICONIC Academy offers flexible options including 1-on-1 tutoring, small-group classes, and subject-based support.',
+  },
+  {
+    title: 'Built for a wider audience',
+    description:
+      'We serve students from different backgrounds, grade levels, learning needs, and family budgets, whether they are catching up, staying on grade level, preparing for exams, or exploring enrichment topics.',
+  },
+  {
+    title: 'Personalized support',
+    description:
+      'Students are not treated like numbers. Tutors focus on each child’s learning goals, confidence, pace, and progress.',
+  },
+  {
+    title: 'Parent-first communication',
+    description:
+      'Parents should always understand what is happening in their child’s learning journey through updates, messages, reminders, and progress visibility.',
+  },
+  {
+    title: 'Flexible online learning',
+    description:
+      'Students can learn from home with live online sessions that fit family schedules, making tutoring easier for busy parents and more comfortable for students.',
+  },
+  {
+    title: 'Global access to caring teachers',
+    description:
+      'ICONIC Academy connects families with qualified tutors from different locations, helping make high-quality support more affordable and available.',
+  },
+] as const;
+
+export const MAIN_MENU_PAGE_CONTENT = {
+  subjects: {
+    eyebrow: 'Subjects',
+    title: 'Academic help and enrichment for every kind of learner',
+    intro:
+      'ICONIC Academy supports core academics, exam preparation, creative enrichment, and future-ready skills through flexible 1-on-1 and small-group learning.',
+    sections: [
+      {
+        title: 'Core school support',
+        body: 'Math, ELA, reading, science, homework help, and study skills for students who need to catch up, stay confident, or strengthen foundations.',
+      },
+      {
+        title: 'Enrichment and future skills',
+        body: 'Coding, robotics, STEM, creative writing, debate, financial literacy, entrepreneurship, music, arts, and other programs for curious learners.',
+      },
+      {
+        title: 'Exam and competition preparation',
+        body: 'Focused support for test prep, academic competitions, debate, chess, writing, and advanced subject readiness.',
+      },
+    ],
+    highlights: [
+      'Core academics: math, ELA, reading, science, social studies, and homework support.',
+      'Enrichment: coding, robotics, creative writing, music, art, debate, chess, and financial literacy.',
+      'Language-sensitive support for ELA with native English speakers when regional fluency matters.',
+      'Affordable global tutoring options for families who need consistent help without premium pricing.',
+    ],
+    bestFor: [
+      'Students who need to catch up after learning gaps or school transitions.',
+      'Learners who are on grade level but need confidence, structure, or accountability.',
+      'Advanced students exploring STEM, competition prep, writing, debate, or creative subjects.',
+      'Families who want one platform for academic support and enrichment.',
+    ],
+    closingTitle: 'Subject support should feel practical, not overwhelming',
+    closingBody:
+      'Families can begin with one subject and expand over time as goals change. ICONIC Academy keeps the path flexible so students can get help where they need it now, then grow into deeper enrichment when they are ready.',
+  },
+  howItWorks: {
+    eyebrow: 'How it works',
+    title: 'Simple online learning with support families can understand',
+    intro:
+      'Families tell us what their child needs, and ICONIC Academy helps match the right learning path, educator, schedule, and communication rhythm.',
+    sections: [
+      {
+        title: 'Share your child’s goals',
+        body: 'Start with the student’s grade level, learning needs, subject goals, schedule, and budget so we can recommend a practical path.',
+      },
+      {
+        title: 'Choose a learning format',
+        body: 'Families can explore 1-on-1 tutoring, small-group classes, subject-based support, or specialized programs depending on the learner’s needs.',
+      },
+      {
+        title: 'Stay connected as learning happens',
+        body: 'Parents can follow updates, reminders, messages, and progress visibility so they are not left guessing between sessions.',
+      },
+    ],
+    highlights: [
+      'Start with a family-friendly conversation about grade level, goals, schedule, and budget.',
+      'Match the learner with a tutor profile, subject focus, and session format that fits.',
+      'Begin online sessions from home with reminders and communication built into the experience.',
+      'Adjust the plan as the child progresses, needs change, or families want more support.',
+    ],
+    bestFor: [
+      'Busy parents who want tutoring without complicated coordination.',
+      'Families comparing 1-on-1 support, small-group learning, and subject-based help.',
+      'Students who need a consistent rhythm and a teacher who understands their pace.',
+      'Parents who want visibility between sessions instead of vague updates.',
+    ],
+    closingTitle: 'A calmer path from inquiry to learning',
+    closingBody:
+      'The goal is to remove friction for parents and help students start with confidence. ICONIC Academy keeps the process clear: understand the learner, recommend a fit, begin sessions, and keep families informed.',
+  },
+  forParents: {
+    eyebrow: 'For parents',
+    title: 'Built for parents who want clarity, care, and affordability',
+    intro:
+      'ICONIC Academy is designed to help families find dependable support without making tutoring feel complicated, intimidating, or out of reach.',
+    sections: [
+      {
+        title: 'Clear communication',
+        body: 'Parents should know what their child is learning, where they are improving, and what needs attention next.',
+      },
+      {
+        title: 'Flexible choices',
+        body: 'Affordable global tutoring, native-speaker instruction, small-group options, and specialized programs help families choose what fits.',
+      },
+      {
+        title: 'Confidence for students',
+        body: 'Tutors focus on each child’s pace, confidence, learning gaps, and strengths so support feels personal instead of generic.',
+      },
+    ],
+    highlights: [
+      'Class updates help parents understand what happened and what comes next.',
+      'Messages and reminders make it easier to coordinate learning around real family schedules.',
+      'Progress visibility helps families see effort, consistency, and improvement over time.',
+      'Affordable options help parents choose support without feeling locked into one expensive model.',
+    ],
+    bestFor: [
+      'Parents who want a trustworthy partner in their child’s learning journey.',
+      'Families balancing school, activities, work schedules, and different time zones.',
+      'Guardians who need clear communication before committing to long-term tutoring.',
+      'Students who learn better when parents and teachers stay aligned.',
+    ],
+    closingTitle: 'Parents deserve to feel informed',
+    closingBody:
+      'A child’s education should not feel like a black box. ICONIC Academy is built around parent-first communication so families can make decisions with clarity, not guesswork.',
+  },
+  about: {
+    eyebrow: 'About ICONIC Academy',
+    title: 'A mission-driven learning platform for more families',
+    intro:
+      'ICONIC Academy exists to make high-quality online learning more accessible, warm, and personal for students across regions and backgrounds.',
+    sections: [
+      {
+        title: 'Our mission',
+        body: 'We believe every child deserves caring academic support, not only families who can afford premium tutoring marketplaces.',
+      },
+      {
+        title: 'Our approach',
+        body: 'We combine global educator access, regional subject expertise, personalized learning, and parent-first communication.',
+      },
+      {
+        title: 'Our promise',
+        body: 'We aim to be trustworthy, affordable, modern, and human: professional enough for parents to trust, warm enough for students to feel safe.',
+      },
+    ],
+    highlights: [
+      'We believe quality education should be reachable for more families, not only those who can afford expensive tutoring.',
+      'We connect students with caring educators across regions, subjects, languages, and specialty levels.',
+      'We design for parents as much as students, because families need communication and confidence.',
+      'We support both foundational learning and enrichment so students can catch up, keep up, and move ahead.',
+    ],
+    bestFor: [
+      'Families looking for a warm, modern alternative to impersonal tutoring marketplaces.',
+      'Students who need patient support, confidence building, and flexible online sessions.',
+      'Parents who value affordability, trust, and clear communication.',
+      'Regional communities that need specialized programs shaped around local learning needs.',
+    ],
+    closingTitle: 'Professional, but personal',
+    closingBody:
+      'ICONIC Academy is designed to feel dependable and organized without becoming cold or corporate. The mission is simple: make high-quality learning support easier to access, easier to understand, and easier to trust.',
+  },
+} as const;
 
 export const FOOTER_LINK_GROUPS = [
   {
     title: 'Platform',
     links: [
-      { label: 'Programs', href: '#subjects' },
-      { label: 'How It Works', href: '#how-it-works' },
+      { label: 'Programs', href: '/subjects' },
+      { label: 'How It Works', href: '/how-it-works' },
       { label: 'Become a Tutor', href: '/iconic-academy/login' },
     ],
   },
   {
     title: 'Company',
     links: [
-      { label: 'About', href: '#about' },
+      { label: 'About', href: '/about' },
       { label: 'Contact', href: '/contact' },
       { label: 'Pricing', href: '/pricing' },
     ],

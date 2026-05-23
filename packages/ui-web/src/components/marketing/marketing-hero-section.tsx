@@ -19,9 +19,9 @@ export function MarketingHeroSection({
         <div className="mb-12 text-center">
           <MarketingHeroHeadline />
           <p className="mx-auto mb-10 max-w-2xl text-lg text-muted-foreground">
-            Personalized learning paths for K-12 students. Help your child gain
-            confidence, master new skills, and build a lifelong love of learning at their
-            own pace.
+            Warm, affordable online tutoring for families who want real support without
+            making learning feel stressful or out of reach. Choose personalized 1-on-1
+            tutoring, small-group classes, and subject-based help that fits your child.
           </p>
           <div className="mx-auto max-w-3xl rounded-3xl border border-border/60 bg-primary/25 p-8 shadow-sm dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:shadow-emerald-950/20 md:p-12">
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
