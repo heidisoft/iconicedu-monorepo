@@ -6,6 +6,7 @@ import React, {
   useMemo,
   useCallback,
 } from 'react';
+import { useColorScheme as useSystemColorScheme } from 'react-native';
 import { useColorScheme as useNativeWindColorScheme } from 'react-native-css-interop';
 import * as SecureStore from 'expo-secure-store';
 import { lightColors, darkColors, type AppColors, type ThemeMode } from '@/lib/theme';
@@ -30,8 +31,8 @@ const ThemeContext = createContext<ThemeContextType>({
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [mode, setModeState] = useState<ThemeMode>('system');
-  const { colorScheme: nativeWindColorScheme, setColorScheme: setNativeWindColorScheme } =
-    useNativeWindColorScheme();
+  const systemScheme = useSystemColorScheme();
+  const { setColorScheme: setNativeWindColorScheme } = useNativeWindColorScheme();
 
   // Load persisted preference on mount. We render immediately with 'system'
   // mode (the default) so the native window background is never exposed as a
@@ -46,14 +47,23 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       .catch(() => {});
   }, []);
 
+  // Derive colorScheme directly from mode + the real system scheme (synchronous,
+  // always correct on first render). Never read it back from css-interop's stored
+  // value, which starts as null and causes a light→dark flip on startup.
   const colorScheme: 'light' | 'dark' =
-    nativeWindColorScheme === 'dark' ? 'dark' : 'light';
+    mode === 'dark'
+      ? 'dark'
+      : mode === 'light'
+        ? 'light'
+        : systemScheme === 'dark'
+          ? 'dark'
+          : 'light';
   const isDark = colorScheme === 'dark';
   const colors = isDark ? darkColors : lightColors;
 
-  // Keep NativeWind class styles and ThemeContext colors on the same effective
-  // color scheme. Use css-interop directly because NativeWind's wrapper can
-  // throw before the compiled darkMode flag is available in Expo startup.
+  // Keep NativeWind className-based dark styles in sync with the resolved scheme.
+  // Use css-interop directly because NativeWind's wrapper can throw before the
+  // compiled darkMode flag is available in Expo startup.
   useEffect(() => {
     setNativeWindColorScheme(mode);
   }, [mode, setNativeWindColorScheme]);
