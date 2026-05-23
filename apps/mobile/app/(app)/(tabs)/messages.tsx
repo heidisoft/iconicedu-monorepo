@@ -344,7 +344,7 @@ function makeStyles(C: AppColors) {
 
     listContent: {
       paddingHorizontal: 16,
-      paddingTop: 8,
+      paddingTop: 14,
       paddingBottom: 16,
     },
     itemOuter: {
@@ -361,7 +361,7 @@ function makeStyles(C: AppColors) {
     itemWrapUnread: {},
     itemRow: { minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: 12 },
     separator: {
-      height: 12,
+      height: 16,
       justifyContent: 'center',
     },
     separatorLine: {
@@ -725,6 +725,7 @@ function ChannelRow({
   const time = formatListTime(item.last_message_at ?? item.updated_at);
   const unread = (item.unread_count ?? 0) + (item.thread_unread_count ?? 0);
   const hasUnread = unread > 0;
+  const isClassroom = !isDm && !item.is_support;
   const studentProfiles = !isDm ? (item.student_profiles ?? []) : [];
   const participantProfiles = !isDm ? (item.participant_profiles ?? []) : [];
   const classThemeKey = !isDm ? (item.themeKey ?? null) : null;
@@ -745,14 +746,12 @@ function ChannelRow({
     currentProfileName,
     currentProfileKind,
   });
-  const dmPreviewText =
+  const messagePreviewText = text ? (!isDm && sender ? `${sender}: ${text}` : text) : '';
+  const previewText =
     item.is_supervised && item.supervised_child_name
       ? `Viewing ${item.supervised_child_name}'s conversation`
-      : text
-        ? !isDm && sender
-          ? `${sender}: ${text}`
-          : text
-        : (item.description ?? '');
+      : messagePreviewText || (isClassroom ? '' : (item.description ?? ''));
+  const previewLines = isClassroom ? 1 : 2;
 
   return (
     <View style={s.itemOuter}>
@@ -850,9 +849,9 @@ function ChannelRow({
                 })}
               </View>
             ) : null}
-            {isDm && dmPreviewText ? (
-              <Text style={s.rowPreview} numberOfLines={1}>
-                {dmPreviewText}
+            {previewText ? (
+              <Text style={s.rowPreview} numberOfLines={previewLines}>
+                {previewText}
               </Text>
             ) : null}
           </View>
