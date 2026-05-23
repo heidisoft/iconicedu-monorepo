@@ -8,12 +8,20 @@ const mockNativeWindSet = jest.fn();
 let mockNativeWindScheme: 'light' | 'dark' = 'dark';
 let mockNativeWindMode: 'light' | 'dark' | 'system' = 'system';
 let mockNativeWindListeners: Array<() => void> = [];
+let mockSystemScheme: 'light' | 'dark' = 'dark';
+let mockSystemListeners: Array<() => void> = [];
 
 function mockNotifyNativeWind() {
   mockNativeWindListeners.forEach((listener) => listener());
 }
 
+function mockNotifySystemScheme() {
+  mockSystemListeners.forEach((listener) => listener());
+}
+
 function mockSetSystemScheme(scheme: 'light' | 'dark') {
+  mockSystemScheme = scheme;
+  mockNotifySystemScheme();
   mockNativeWindScheme = scheme;
   if (mockNativeWindMode === 'system') {
     mockNotifyNativeWind();
@@ -24,6 +32,29 @@ jest.mock('expo-secure-store', () => ({
   getItemAsync: (...args: unknown[]) => mockGetItemAsync(...args),
   setItemAsync: (...args: unknown[]) => mockSetItemAsync(...args),
 }));
+
+jest.mock('react-native', () => {
+  const React = jest.requireActual<typeof import('react')>('react');
+  const ReactNative = jest.requireActual<typeof import('react-native')>('react-native');
+  const MockReactNative = Object.create(ReactNative) as typeof ReactNative;
+  const useMockColorScheme = () =>
+    React.useSyncExternalStore(
+      (listener: () => void) => {
+        mockSystemListeners.push(listener);
+        return () => {
+          mockSystemListeners = mockSystemListeners.filter((entry) => entry !== listener);
+        };
+      },
+      () => mockSystemScheme,
+      () => mockSystemScheme,
+    );
+
+  Object.defineProperty(MockReactNative, 'useColorScheme', {
+    value: useMockColorScheme,
+  });
+
+  return MockReactNative;
+});
 
 jest.mock('react-native-css-interop', () => ({
   useColorScheme: () => {
@@ -75,6 +106,8 @@ describe('ThemeProvider', () => {
     mockNativeWindScheme = 'dark';
     mockNativeWindMode = 'system';
     mockNativeWindListeners = [];
+    mockSystemScheme = 'dark';
+    mockSystemListeners = [];
     mockGetItemAsync.mockResolvedValue(null);
     mockSetItemAsync.mockResolvedValue(undefined);
   });
@@ -96,6 +129,7 @@ describe('ThemeProvider', () => {
   });
 
   it('updates when the OS appearance changes while following system mode', async () => {
+    mockSystemScheme = 'light';
     mockNativeWindScheme = 'light';
 
     render(
@@ -141,6 +175,7 @@ describe('ThemeProvider', () => {
 
   it('ignores OS appearance changes when a stored explicit theme is selected', async () => {
     mockGetItemAsync.mockResolvedValue('light');
+    mockSystemScheme = 'dark';
     mockNativeWindScheme = 'dark';
 
     render(
