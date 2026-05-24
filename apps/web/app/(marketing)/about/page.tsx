@@ -8,7 +8,7 @@ import {
 export const metadata: Metadata = {
   title: 'About | ICONIC Academy',
   description:
-    'Learn about ICONIC Academy’s mission to make trustworthy, warm, affordable online learning available to more families.',
+    'Learn about ICONIC Academy’s mission to make trustworthy, curriculum-aware, affordable online learning available to more families.',
   alternates: { canonical: '/about' },
 };
 

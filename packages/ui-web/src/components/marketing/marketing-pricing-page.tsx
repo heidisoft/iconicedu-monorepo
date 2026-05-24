@@ -5,21 +5,22 @@ type MarketingPricingPageProps = {
 const PRICING_PATHS = [
   {
     title: 'Global tutor network',
-    body: 'Class sessions start from $12/hour with experienced tutors from Sri Lanka, India, and other countries, giving families flexible options across budgets, time zones, and specialties.',
+    body: 'Class sessions start from $12/hour with experienced global tutors, giving families flexible options across budgets, time zones, curricula, and specialties.',
   },
   {
-    title: 'Native-speaker subject expertise',
-    body: 'For language-heavy subjects like ELA, we match learners with native English speakers from the USA, Australia, and the UK when regional fluency, curriculum familiarity, and accent exposure matter.',
+    title: 'USA curriculum expertise',
+    body: 'For state standards, ELA, writing, and region-specific expectations, we can match learners with USA-based and native English-speaking tutors when curriculum familiarity matters.',
   },
   {
     title: 'Specialty-level matching',
-    body: 'Pricing reflects the subject, educator background, learner level, and program intensity, from foundational support to advanced enrichment and competition preparation.',
+    body: 'Pricing reflects the subject, educator background, learner level, and program intensity, from foundational support to advanced enrichment, competition preparation, and deeper challenge.',
   },
 ] as const;
 
 const DIFFERENTIATORS = [
   'Regional educator matching instead of one generic tutor pool',
-  'Options for both affordable global tutoring and native-speaker instruction',
+  'Options for both affordable global tutoring and USA-based instruction',
+  'Curriculum coverage aligned to school goals and state standards where applicable',
   'Support across academics, enrichment, test prep, coding, debate, chess, and STEM',
   'Flexible scheduling for families working across countries and time zones',
   'Parent-visible learning progress and program guidance before long-term commitments',
@@ -38,9 +39,9 @@ export function MarketingPricingPage({
           </h1>
           <p className="mt-5 max-w-3xl text-lg text-muted-foreground">
             ICONIC Academy pricing depends on program type, educator match, frequency,
-            region, and student goals. Class sessions start from $12/hour, with global
-            tutor options and native-speaker specialists available for language and
-            region-specific learning needs.
+            region, curriculum needs, and student goals. Class sessions start from
+            $12/hour, with global tutor options and USA-based specialists available for
+            state standards, language-heavy subjects, and advanced learning needs.
           </p>
         </div>
       </section>
@@ -68,8 +69,8 @@ export function MarketingPricingPage({
             </h2>
             <p className="mt-4 text-sm leading-7 text-muted-foreground">
               Many tutoring marketplaces optimize for quick booking. ICONIC Academy
-              focuses on fit: the right educator background, the right language exposure,
-              the right regional expertise, and the right level of academic challenge for
+              focuses on fit: the right educator background, curriculum familiarity,
+              language exposure, regional expertise, and level of academic challenge for
               each learner.
             </p>
           </div>
@@ -90,7 +91,7 @@ export function MarketingPricingPage({
             <p className="text-lg font-semibold">Request program details</p>
             <p className="text-sm text-muted-foreground">
               Sign in or get started so the team can recommend tutor options by budget,
-              learner goals, language needs, and regional expertise.
+              learner goals, curriculum needs, language needs, and regional expertise.
             </p>
           </div>
           <a

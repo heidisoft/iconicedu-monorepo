@@ -1,4 +1,5 @@
 import { FOOTER_LINK_GROUPS } from './marketing.constants';
+import { MarketingStoreBadges } from './marketing-store-badges';
 
 type MarketingFooterSectionProps = {
   loginHref?: string;
@@ -17,6 +18,9 @@ export function MarketingFooterSection({
               Elite 1-on-1 education designed for measurable academic success. Where
               strong foundations create brighter futures.
             </p>
+            <div className="mt-4">
+              <MarketingStoreBadges />
+            </div>
           </div>
           {FOOTER_LINK_GROUPS.map((group) => (
             <div key={group.title}>
