@@ -12,14 +12,20 @@ describe('marketing sections', () => {
     const { container } = render(<MarketingHeroSection loginHref="/acme/login" />);
 
     expect(
-      screen.getByRole('heading', { name: /It's time to unlock your .* potential/i }),
+      screen.getByRole('heading', {
+        name: 'Personalized K-12 tutoring for school success, confidence, and future-ready skills',
+      }),
     ).toBeInTheDocument();
     expect(container.querySelector('section#home')).toHaveClass('from-emerald-50/70');
     expect(screen.getByTestId('hero-background')).toBeInTheDocument();
     expect(screen.getByTestId('hero-pattern-cluster')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Start your journey now' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Find the right tutor' })).toHaveAttribute(
       'href',
       '/acme/login',
+    );
+    expect(screen.getByRole('link', { name: 'Explore programs' })).toHaveAttribute(
+      'href',
+      '/subjects',
     );
   });
 
@@ -30,7 +36,7 @@ describe('marketing sections', () => {
       screen.getByRole('region', { name: 'Hero subjects carousel' }),
     ).toBeInTheDocument();
     expect(screen.getByText('Math')).toBeInTheDocument();
-    expect(screen.getByText('Competition Prep')).toBeInTheDocument();
+    expect(screen.getByText('Financial Literacy')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Previous slide' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Next slide' })).toBeInTheDocument();
   });
@@ -38,17 +44,17 @@ describe('marketing sections', () => {
   it('renders trust stats section cards', () => {
     render(<MarketingTrustStatsSection />);
 
-    expect(screen.getByText('$12/h+')).toBeInTheDocument();
-    expect(
-      screen.getByText('Affordable class sessions with global tutor options'),
-    ).toBeInTheDocument();
+    expect(screen.getByText('4.9/5')).toBeInTheDocument();
+    expect(screen.getByText('Parent satisfaction')).toBeInTheDocument();
+    expect(screen.getByText('Parent-visible progress')).toBeInTheDocument();
   });
 
   it('renders how-it-works section content', () => {
     render(<MarketingHowItWorksSection loginHref="/acme/login" />);
 
+    expect(screen.getByText('Why families choose ICONIC Academy')).toBeInTheDocument();
     expect(
-      screen.getByText('One platform for students, parents, and educators'),
+      screen.getByText('Experienced tutors, not random matching'),
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Explore and sign up' })).toHaveAttribute(
       'href',

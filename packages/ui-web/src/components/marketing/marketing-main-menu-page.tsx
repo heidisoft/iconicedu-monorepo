@@ -6,6 +6,10 @@ type MarketingMainMenuPageContent = {
     title: string;
     body: string;
   }[];
+  categoryGroups?: readonly {
+    title: string;
+    subjects: readonly string[];
+  }[];
   highlights?: readonly string[];
   bestFor?: readonly string[];
   closingTitle?: string;
@@ -83,6 +87,33 @@ export function MarketingMainMenuPage({
                 </ul>
               </article>
             )}
+          </div>
+        )}
+        {content.categoryGroups && (
+          <div className="mx-auto mt-10 max-w-5xl">
+            <p className="text-sm font-semibold uppercase text-primary">
+              Program categories
+            </p>
+            <div className="mt-4 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+              {content.categoryGroups.map((group) => (
+                <article
+                  key={group.title}
+                  className="rounded-lg border border-border/70 bg-card px-6 py-5 shadow-sm"
+                >
+                  <h2 className="text-lg font-semibold">{group.title}</h2>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {group.subjects.map((subject) => (
+                      <span
+                        key={subject}
+                        className="rounded-full border border-border/60 bg-background px-3 py-1 text-xs text-muted-foreground"
+                      >
+                        {subject}
+                      </span>
+                    ))}
+                  </div>
+                </article>
+              ))}
+            </div>
           </div>
         )}
         {(content.closingTitle || content.closingBody) && (

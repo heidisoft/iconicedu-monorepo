@@ -6,9 +6,9 @@ import {
 } from '../_lib/marketing-site-pages';
 
 export const metadata: Metadata = {
-  title: 'Subjects | ICONIC Academy',
+  title: 'Programs | ICONIC Academy',
   description:
-    'Explore ICONIC Academy subjects, full-curriculum support, state standards support where applicable, enrichment, coding, STEM, debate, and test prep.',
+    'Explore ICONIC Academy programs, from core academics and test prep to coding, debate, chess, music, art, and future-ready enrichment.',
   alternates: { canonical: '/subjects' },
 };
 

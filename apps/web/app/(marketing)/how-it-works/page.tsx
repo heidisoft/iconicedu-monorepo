@@ -1,5 +1,10 @@
 import type { Metadata } from 'next';
-import { MAIN_MENU_PAGE_CONTENT, MarketingMainMenuPage } from '@iconicedu/ui-web';
+import {
+  MAIN_MENU_PAGE_CONTENT,
+  MarketingMainMenuPage,
+  MarketingSuccessPathSection,
+  MarketingUsCurriculumSection,
+} from '@iconicedu/ui-web';
 import {
   assertMarketingSitePagesEnabled,
   resolveMarketingLoginHref,
@@ -17,9 +22,13 @@ export default async function HowItWorksPage() {
   const loginHref = await resolveMarketingLoginHref();
 
   return (
-    <MarketingMainMenuPage
-      content={MAIN_MENU_PAGE_CONTENT.howItWorks}
-      loginHref={loginHref}
-    />
+    <>
+      <MarketingMainMenuPage
+        content={MAIN_MENU_PAGE_CONTENT.howItWorks}
+        loginHref={loginHref}
+      />
+      <MarketingSuccessPathSection />
+      <MarketingUsCurriculumSection />
+    </>
   );
 }

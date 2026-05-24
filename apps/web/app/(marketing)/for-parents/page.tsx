@@ -12,7 +12,7 @@ import {
 export const metadata: Metadata = {
   title: 'For Parents | ICONIC Academy',
   description:
-    'ICONIC Academy gives parents clear communication, USA and global tutor options, curriculum-aware support, and visibility into student progress.',
+    'Tutoring that keeps parents informed with session updates, school-aligned support, flexible schedules, and affordable USA-based or global tutor options.',
   alternates: { canonical: '/for-parents' },
 };
 

@@ -97,7 +97,7 @@ export function MarketingStoreBadges({
     <div
       className={
         layout === 'inline'
-          ? 'flex flex-col items-start gap-3 sm:flex-row sm:flex-wrap'
+          ? 'flex flex-row flex-wrap items-start gap-3'
           : 'flex flex-col items-start gap-3'
       }
     >

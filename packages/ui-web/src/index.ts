@@ -69,6 +69,8 @@ export * from '@iconicedu/ui-web/components/marketing/marketing-header';
 export * from '@iconicedu/ui-web/components/marketing/marketing-footer-section';
 export * from '@iconicedu/ui-web/components/marketing/marketing-home-page';
 export * from '@iconicedu/ui-web/components/marketing/marketing-mobile-app-section';
+export * from '@iconicedu/ui-web/components/marketing/marketing-success-path-section';
+export * from '@iconicedu/ui-web/components/marketing/marketing-us-curriculum-section';
 export * from '@iconicedu/ui-web/components/marketing/marketing-contact-page';
 export * from '@iconicedu/ui-web/components/marketing/marketing-info-page';
 export * from '@iconicedu/ui-web/components/marketing/marketing-pricing-page';

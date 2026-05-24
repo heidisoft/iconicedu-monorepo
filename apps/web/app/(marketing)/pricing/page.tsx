@@ -8,7 +8,7 @@ import {
 export const metadata: Metadata = {
   title: 'Pricing | ICONIC Academy',
   description:
-    'Explore ICONIC Academy tutoring options starting from $12/hour, with global tutors, USA-based specialists, curriculum support, and advanced learner options.',
+    'Explore flexible ICONIC Academy tutoring plans, including global tutor support from $12/hour, USA curriculum options, enrichment programs, and custom learning paths.',
   alternates: { canonical: '/pricing' },
 };
 

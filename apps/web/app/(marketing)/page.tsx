@@ -4,18 +4,18 @@ import { resolveDefaultOrgLoginPath } from '@iconicedu/web/lib/org/resolve-auth-
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 
 export const metadata: Metadata = {
-  title: 'Personalized Online Tutoring for K-12',
+  title: 'Personalized K-12 Tutoring and Enrichment',
   description:
-    'Explore K-12 tutoring with experienced USA and global tutors, full-curriculum support, state standards support where applicable, and advanced learner enrichment.',
+    'ICONIC Academy helps K-12 students succeed in school and beyond with experienced tutors, curriculum-aligned support, and affordable enrichment programs.',
   openGraph: {
-    title: 'ICONIC Academy | Personalized Online Tutoring for K-12',
+    title: 'ICONIC Academy | Personalized K-12 Tutoring and Enrichment',
     description:
-      'Explore K-12 tutoring with experienced USA and global tutors, full-curriculum support, state standards support where applicable, and advanced learner enrichment.',
+      'ICONIC Academy helps K-12 students succeed in school and beyond with experienced tutors, curriculum-aligned support, and affordable enrichment programs.',
   },
   twitter: {
-    title: 'ICONIC Academy | Personalized Online Tutoring for K-12',
+    title: 'ICONIC Academy | Personalized K-12 Tutoring and Enrichment',
     description:
-      'Explore K-12 tutoring with experienced USA and global tutors, full-curriculum support, state standards support where applicable, and advanced learner enrichment.',
+      'ICONIC Academy helps K-12 students succeed in school and beyond with experienced tutors, curriculum-aligned support, and affordable enrichment programs.',
   },
 };
 
