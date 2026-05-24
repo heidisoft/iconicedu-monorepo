@@ -1,9 +1,9 @@
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { SiteLogoFull } from '@iconicedu/ui-web/components/branding/site-logo-full';
 import { ThemeToggle } from '@iconicedu/ui-web/components/theme-toggle';
+import { Menu } from 'lucide-react';
 
 const NAV_ITEMS = [
-  { label: 'Tutoring', href: '/' },
   { label: 'Programs', href: '/subjects' },
   { label: 'How It Works', href: '/how-it-works' },
   { label: 'For Parents', href: '/for-parents' },
@@ -50,11 +50,32 @@ export function MarketingHeader({
           <Button
             variant={'outline'}
             asChild
-            className="rounded-full px-6 bg-transparent border-emerald-500/70 text-emerald-700 hover:bg-emerald-100/70 hover:border-emerald-500"
+            className="rounded-full px-4 bg-transparent border-emerald-500/70 text-emerald-700 hover:bg-emerald-100/70 hover:border-emerald-500 sm:px-6"
           >
             <a href={ctaHref}>{ctaLabel}</a>
           </Button>
           <ThemeToggle />
+          <details className="group relative md:hidden">
+            <summary
+              aria-label="Open menu"
+              className="inline-flex size-9 cursor-pointer list-none items-center justify-center rounded-4xl border border-emerald-500/70 bg-transparent text-emerald-700 transition-colors hover:border-emerald-500 hover:bg-emerald-100/70 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden"
+            >
+              <Menu className="size-4" aria-hidden="true" />
+            </summary>
+            <div className="absolute right-0 top-12 w-56 overflow-hidden rounded-2xl border border-emerald-100/80 bg-background shadow-lg ring-1 ring-black/5 dark:border-emerald-800/60">
+              <div className="flex flex-col py-2">
+                {NAV_ITEMS.map((item) => (
+                  <a
+                    key={item.label}
+                    href={item.href}
+                    className="px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-emerald-50 hover:text-primary dark:hover:bg-emerald-950/50"
+                  >
+                    {item.label}
+                  </a>
+                ))}
+              </div>
+            </div>
+          </details>
         </div>
       </nav>
     </header>

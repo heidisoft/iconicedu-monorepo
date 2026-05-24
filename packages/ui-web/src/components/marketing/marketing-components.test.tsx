@@ -31,24 +31,25 @@ describe('marketing components', () => {
     expect(
       screen.getByRole('button', { name: 'Toggle theme (current: system)' }),
     ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Tutoring' })).toHaveAttribute('href', '/');
-    expect(screen.getByRole('link', { name: 'Programs' })).toHaveAttribute(
+    expect(container.querySelector('[aria-label="Open menu"]')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Tutoring' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: 'Programs' })[0]).toHaveAttribute(
       'href',
       '/subjects',
     );
-    expect(screen.getByRole('link', { name: 'How It Works' })).toHaveAttribute(
+    expect(screen.getAllByRole('link', { name: 'How It Works' })[0]).toHaveAttribute(
       'href',
       '/how-it-works',
     );
-    expect(screen.getByRole('link', { name: 'For Parents' })).toHaveAttribute(
+    expect(screen.getAllByRole('link', { name: 'For Parents' })[0]).toHaveAttribute(
       'href',
       '/for-parents',
     );
-    expect(screen.getByRole('link', { name: 'Pricing' })).toHaveAttribute(
+    expect(screen.getAllByRole('link', { name: 'Pricing' })[0]).toHaveAttribute(
       'href',
       '/pricing',
     );
-    expect(screen.getByRole('link', { name: 'Contact' })).toHaveAttribute(
+    expect(screen.getAllByRole('link', { name: 'Contact' })[0]).toHaveAttribute(
       'href',
       '/contact',
     );
