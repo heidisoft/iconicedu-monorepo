@@ -25,8 +25,13 @@ describe('marketing home page', () => {
 
     expect(
       screen.getByRole('heading', {
-        name: 'Personalized K-12 tutoring for school success, confidence, and future-ready skills',
+        name: "It's time to unlock your child's potential in",
       }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Personalized K-12 tutoring for school success, confidence, and future-ready skills.',
+      ),
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Find the right tutor' })).toHaveAttribute(
       'href',
