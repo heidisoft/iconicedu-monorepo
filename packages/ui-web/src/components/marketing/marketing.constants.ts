@@ -1,32 +1,16 @@
 export const HERO_SUBJECTS = [
   { icon: '📐', label: 'Math' },
   { icon: '📚', label: 'ELA' },
-  { icon: '♟️', label: 'Chess' },
   { icon: '🧪', label: 'Science' },
-  { icon: '🔬', label: 'Biology' },
-  { icon: '⚛️', label: 'Chemistry' },
-  { icon: '🌌', label: 'Physics' },
-  { icon: '🎤', label: 'Debate' },
-  { icon: '🧠', label: 'Critical Thinking' },
-  { icon: '💡', label: 'Creative Writing' },
-  { icon: '💻', label: 'Coding' },
-  { icon: '🤖', label: 'Robotics' },
-  { icon: '📈', label: 'Entrepreneurship' },
-  { icon: '💰', label: 'Financial Literacy' },
-  { icon: '🏛️', label: 'Social Studies' },
-  { icon: '📜', label: 'History' },
-  { icon: '🎼', label: 'Music' },
-  { icon: '🎹', label: 'Piano' },
-  { icon: '🎸', label: 'Guitar' },
-  { icon: '🖌️', label: 'Arts and Crafts' },
-  { icon: '🖍️', label: 'Drawing' },
-  { icon: '📷', label: 'Photography' },
-  { icon: '🎬', label: 'Video Editing' },
-  { icon: '🎭', label: 'Drama' },
-  { icon: '🧘', label: 'Mindfulness' },
-  { icon: '🧬', label: 'STEM' },
+  { icon: '📖', label: 'Reading' },
+  { icon: '✍️', label: 'Writing' },
   { icon: '🎯', label: 'Test Prep' },
-  { icon: '🏆', label: 'Competition Prep' },
+  { icon: '💻', label: 'Coding' },
+  { icon: '🎤', label: 'Debate' },
+  { icon: '♟️', label: 'Chess' },
+  { icon: '🎼', label: 'Music' },
+  { icon: '🎨', label: 'Art' },
+  { icon: '💰', label: 'Financial Literacy' },
 ] as const;
 
 export const LEARNING_AREAS = [
@@ -41,9 +25,26 @@ export const LEARNING_AREAS = [
 ] as const;
 
 export const TRUST_STATS = [
-  { value: '$12/h+', label: 'Affordable class sessions with global tutor options' },
-  { value: '1:1 + groups', label: 'Flexible support for different family budgets' },
-  { value: 'USA + global', label: 'Experienced tutors across curricula and standards' },
+  {
+    value: '4.9/5',
+    label: 'Parent satisfaction',
+    description: 'Based on early family feedback',
+  },
+  {
+    value: '100+',
+    label: 'Learners and educators served',
+    description: 'Across academic and enrichment programs',
+  },
+  {
+    value: 'Flexible scheduling',
+    label: 'Evening, weekend, and global time-zone options',
+    description: '',
+  },
+  {
+    value: 'Parent-visible progress',
+    label: 'Session updates, reminders, and tutor communication in one place',
+    description: '',
+  },
 ] as const;
 
 export const MOBILE_APP_LINKS = [
@@ -61,20 +62,63 @@ export const MOBILE_APP_LINKS = [
 
 export const CORE_BENEFITS = [
   {
-    title: 'Affordable learning options',
+    title: 'Experienced tutors, not random matching',
     description:
-      'Choose from 1-on-1 tutoring, small-group classes, and subject-based support that fits your goals and budget.',
+      'We match students with tutors based on grade level, subject, curriculum, learning pace, and family goals.',
   },
   {
-    title: 'Parent-first communication',
+    title: 'Support for every U.S. state',
     description:
-      'Stay close to class updates, messages, reminders, and progress visibility without chasing for answers.',
+      'We help families across the USA by aligning tutoring to state standards, school expectations, assignments, and grade-level skills where applicable.',
   },
   {
-    title: 'Curriculum-aligned learning',
+    title: 'Academic + enrichment in one place',
     description:
-      'Lessons connect to full classroom curriculum, state standards where applicable, and stretch goals for students ready for more.',
+      'Students can get help with Math, ELA, Science, Reading, Writing, Homework, Test Prep, Coding, Debate, Chess, Music, Art, Financial Literacy, Entrepreneurship, and more.',
   },
+  {
+    title: 'Affordable options for more families',
+    description:
+      'Choose from global tutor options, USA-based tutors, native English-speaking tutors, 1-on-1 lessons, or small-group classes.',
+  },
+  {
+    title: 'Parents stay informed',
+    description:
+      'Families can follow class links, reminders, tutor messages, reschedules, and progress updates through the ICONIC app.',
+  },
+] as const;
+
+export const SUCCESS_PATH_STEPS = [
+  {
+    title: 'Understand the learner',
+    body: 'We start with grade level, school curriculum, strengths, gaps, schedule, and parent goals.',
+  },
+  {
+    title: 'Match the right tutor',
+    body: 'We recommend a tutor based on subject expertise, teaching style, curriculum familiarity, and learning needs.',
+  },
+  {
+    title: 'Build strong foundations',
+    body: 'Students work on the skills they need now: homework, missing concepts, reading, writing, math fluency, or test readiness.',
+  },
+  {
+    title: 'Grow confidence and independence',
+    body: 'Tutors help students explain their thinking, ask better questions, and become more confident learners.',
+  },
+  {
+    title: 'Move ahead with enrichment',
+    body: 'When students are ready, they can explore coding, debate, chess, creative writing, STEM, entrepreneurship, financial literacy, music, art, and competition prep.',
+  },
+] as const;
+
+export const US_CURRICULUM_STANDARDS = [
+  'New York State Next Generation Learning Standards',
+  'Common Core-aligned standards',
+  'Florida B.E.S.T. Standards',
+  'Texas TEKS',
+  'California Common Core State Standards',
+  'New Jersey Student Learning Standards',
+  'State test preparation and school-specific goals',
 ] as const;
 
 export const MISSION_PILLARS = [
@@ -104,22 +148,99 @@ export const MISSION_PILLARS = [
       'Students can learn from home with live online sessions that fit family schedules, making tutoring easier for busy parents and more comfortable for students.',
   },
   {
-    title: 'USA and global tutor access',
+    title: 'Experienced, carefully selected tutors',
     description:
-      'ICONIC Academy connects families with experienced tutors from the USA and around the world, helping make curriculum-aware support more affordable and available.',
+      'Certified teachers and experienced subject tutors are available across academic, enrichment, and advanced learning programs.',
+  },
+] as const;
+
+export const PROGRAM_CATEGORIES = [
+  {
+    title: 'Core Academics',
+    subjects: [
+      'Math',
+      'ELA',
+      'Reading',
+      'Writing',
+      'Grammar',
+      'Science',
+      'Social Studies',
+      'Homework Help',
+      'Study Skills',
+    ],
+  },
+  {
+    title: 'Advanced Math & Science',
+    subjects: [
+      'Algebra',
+      'Geometry',
+      'Pre-Algebra',
+      'Precalculus',
+      'Biology',
+      'Chemistry',
+      'Physics',
+      'Earth Science',
+      'STEM Projects',
+    ],
+  },
+  {
+    title: 'Test Prep',
+    subjects: [
+      'State exams',
+      'SHSAT',
+      'SAT',
+      'ACT',
+      'ISEE',
+      'SSAT',
+      'Regents',
+      'AP support',
+      'Competition math',
+      'Spelling Bee',
+      'Debate tournaments',
+    ],
+  },
+  {
+    title: 'Future-Ready Skills',
+    subjects: [
+      'Coding',
+      'Robotics',
+      'AI basics',
+      'Web development',
+      'Game design',
+      'Financial literacy',
+      'Entrepreneurship',
+      'Public speaking',
+      'Critical thinking',
+    ],
+  },
+  {
+    title: 'Creative & Extracurricular',
+    subjects: [
+      'Chess',
+      'Debate',
+      'Creative writing',
+      'Drawing',
+      'Arts and crafts',
+      'Music',
+      'Piano',
+      'Guitar',
+      'Drama',
+      'Photography',
+      'Digital Media & Video Editing',
+    ],
   },
 ] as const;
 
 export const MAIN_MENU_PAGE_CONTENT = {
   subjects: {
-    eyebrow: 'Subjects',
+    eyebrow: 'Programs',
     title: 'Academic help and enrichment for every kind of learner',
     intro:
-      'ICONIC Academy supports the full school curriculum, state standards where applicable, exam preparation, creative enrichment, and future-ready skills through flexible 1-on-1 and small-group learning.',
+      'From school support to enrichment, ICONIC Academy helps students catch up, keep up, and move ahead. Families can begin with one subject and expand into a full learning path as goals change.',
     sections: [
       {
         title: 'Full curriculum support',
-        body: 'Math, ELA, reading, science, social studies, homework help, and study skills for students who need to catch up, stay confident, or strengthen foundations.',
+        body: 'Math, ELA, reading, writing, science, social studies, homework help, and study skills for students who need to catch up, stay confident, or strengthen foundations.',
       },
       {
         title: 'Standards and school goals',
@@ -127,11 +248,12 @@ export const MAIN_MENU_PAGE_CONTENT = {
       },
       {
         title: 'Enrichment and advanced challenge',
-        body: 'Coding, robotics, STEM, creative writing, debate, financial literacy, entrepreneurship, music, arts, competitions, and advanced subject readiness for curious learners.',
+        body: 'Coding, robotics, AI basics, STEM projects, creative writing, debate, financial literacy, entrepreneurship, music, art, competitions, and advanced subject readiness for curious learners.',
       },
     ],
+    categoryGroups: PROGRAM_CATEGORIES,
     highlights: [
-      'Core academics: math, ELA, reading, science, social studies, and homework support.',
+      'Core academics: math, ELA, reading, writing, science, social studies, and homework support.',
       'Full-curriculum coverage connected to grade-level skills, assignments, and state standards where applicable.',
       'Enrichment: coding, robotics, creative writing, music, art, debate, chess, and financial literacy.',
       'Language-sensitive support for ELA with USA-based and native English-speaking tutors when regional fluency matters.',
@@ -184,21 +306,25 @@ export const MAIN_MENU_PAGE_CONTENT = {
   },
   forParents: {
     eyebrow: 'For parents',
-    title: 'Built for parents who want clarity, care, and affordability',
+    title: 'Tutoring that keeps parents informed — not guessing',
     intro:
-      'ICONIC Academy is designed to help families find dependable support without making tutoring feel complicated, intimidating, or out of reach.',
+      'ICONIC Academy helps parents understand what their child is learning, how tutoring connects to school, and what support makes sense for the family budget and schedule.',
     sections: [
       {
-        title: 'Clear communication',
-        body: 'Parents should know what their child is learning, where they are improving, and what needs attention next.',
+        title: 'Is my child actually improving?',
+        body: 'Get session updates, tutor notes, and next-step guidance.',
       },
       {
-        title: 'Flexible choices',
-        body: 'Affordable global tutoring, USA-based instruction, native-speaker support, small-group options, and specialized programs help families choose what fits.',
+        title: 'Is this aligned with school?',
+        body: 'Tutors can connect lessons to homework, grade-level skills, state standards, and upcoming tests.',
       },
       {
-        title: 'Confidence for students',
-        body: 'Tutors focus on each child’s pace, confidence, curriculum gaps, strengths, and need for challenge so support feels personal instead of generic.',
+        title: 'Can I afford consistent support?',
+        body: 'Choose global tutors, USA-based tutors, small groups, or 1-on-1 programs based on your budget.',
+      },
+      {
+        title: 'Can we fit this into our schedule?',
+        body: 'Flexible scheduling helps families balance school, work, activities, and time zones.',
       },
     ],
     highlights: [
@@ -260,6 +386,9 @@ export const FOOTER_LINK_GROUPS = [
     title: 'Platform',
     links: [
       { label: 'Programs', href: '/subjects' },
+      { label: 'Online Tutoring', href: '/programs/online-tutoring' },
+      { label: 'U.S. Curriculum Support', href: '/programs/us-curriculum-support' },
+      { label: 'Tutoring Across the USA', href: '/locations/usa' },
       { label: 'How It Works', href: '/how-it-works' },
       { label: 'Become a Tutor', href: '/iconic-academy/login' },
     ],
@@ -283,9 +412,38 @@ export const FOOTER_LINK_GROUPS = [
 ] as const;
 
 export const TRUST_INDICATORS = [
-  { icon: '✓', text: 'Full Curriculum Coverage' },
-  { icon: '✓', text: 'State Standards Support' },
-  { icon: '✓', text: 'USA & Global Tutors' },
+  { icon: '✓', text: '1-on-1 and small-group options' },
+  { icon: '✓', text: 'USA-based and global tutors' },
+  { icon: '✓', text: 'Flexible scheduling' },
+  { icon: '✓', text: 'Parent updates after sessions' },
+] as const;
+
+export const MARKETING_FAQS = [
+  {
+    question: 'Does ICONIC Academy support students across the USA?',
+    answer:
+      'Yes. ICONIC Academy supports K-12 students across the United States with online tutoring that can connect to school assignments, grade-level skills, and state standards where applicable.',
+  },
+  {
+    question: 'What subjects and programs are available?',
+    answer:
+      'Families can find support for math, ELA, reading, writing, science, social studies, homework help, test prep, coding, debate, chess, music, art, financial literacy, entrepreneurship, and more.',
+  },
+  {
+    question: 'Can tutoring match my child’s school curriculum?',
+    answer:
+      'Tutors can align support to homework, grade-level expectations, school goals, and state standards where applicable. We keep the claim practical: support is curriculum-aware, not a promise that every curriculum is covered perfectly.',
+  },
+  {
+    question: 'Are affordable tutoring options available?',
+    answer:
+      'Yes. Families can explore affordable global tutor options, USA-based tutors, native English-speaking tutors, 1-on-1 lessons, small-group classes, and custom learning plans.',
+  },
+  {
+    question: 'How do parents stay informed?',
+    answer:
+      'Parents can follow upcoming sessions, reminders, class links, tutor messages, reschedule updates, and progress notes through ICONIC Academy communication tools and mobile apps.',
+  },
 ] as const;
 
 export const TYPE_SPEED_MS = 80;

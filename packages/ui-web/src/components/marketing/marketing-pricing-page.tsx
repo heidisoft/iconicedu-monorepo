@@ -4,16 +4,20 @@ type MarketingPricingPageProps = {
 
 const PRICING_PATHS = [
   {
-    title: 'Global tutor network',
-    body: 'Class sessions start from $12/hour with experienced global tutors, giving families flexible options across budgets, time zones, curricula, and specialties.',
+    title: 'Global Tutor Plan',
+    body: 'Affordable academic support from experienced tutors. Best for homework help, foundations, practice, and consistency. Starting from $12/hour.',
   },
   {
-    title: 'USA curriculum expertise',
-    body: 'For state standards, ELA, writing, and region-specific expectations, we can match learners with USA-based and native English-speaking tutors when curriculum familiarity matters.',
+    title: 'USA Curriculum Plan',
+    body: 'USA-based or native English-speaking tutors for ELA, writing, state standards, and school-specific expectations. Best for students in U.S. schools.',
   },
   {
-    title: 'Specialty-level matching',
-    body: 'Pricing reflects the subject, educator background, learner level, and program intensity, from foundational support to advanced enrichment, competition preparation, and deeper challenge.',
+    title: 'Advanced & Enrichment Plan',
+    body: 'Specialized tutors for coding, robotics, debate, chess, music, competition prep, and advanced academics. Best for students ready to move ahead.',
+  },
+  {
+    title: 'Custom Learning Plan',
+    body: 'For families who need multiple subjects, sibling support, flexible scheduling, or a long-term academic path.',
   },
 ] as const;
 
@@ -35,7 +39,7 @@ export function MarketingPricingPage({
         <div className="mx-auto max-w-5xl">
           <p className="text-sm font-semibold uppercase text-primary">Pricing</p>
           <h1 className="mt-4 text-4xl font-semibold tracking-normal sm:text-5xl">
-            Program pricing built around each learner
+            Flexible tutoring options for every family
           </h1>
           <p className="mt-5 max-w-3xl text-lg text-muted-foreground">
             ICONIC Academy pricing depends on program type, educator match, frequency,
@@ -47,7 +51,7 @@ export function MarketingPricingPage({
       </section>
 
       <section className="px-4 py-14 sm:px-6 lg:px-8">
-        <div className="mx-auto grid max-w-5xl gap-5 md:grid-cols-3">
+        <div className="mx-auto grid max-w-5xl gap-5 md:grid-cols-2">
           {PRICING_PATHS.map((item) => (
             <article
               key={item.title}

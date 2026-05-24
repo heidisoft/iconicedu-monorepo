@@ -4,19 +4,34 @@ import {
   assertMarketingSitePagesEnabled,
   resolveMarketingLoginHref,
 } from '../_lib/marketing-site-pages';
+import {
+  breadcrumbJsonLd,
+  createMarketingMetadata,
+  PUBLIC_MARKETING_PAGES,
+  webPageJsonLd,
+} from '../seo';
+import { StructuredData } from '../structured-data';
 
-export const metadata: Metadata = {
-  title: 'Privacy Policy | ICONIC Academy',
-  description:
-    'Learn how ICONIC Academy handles personal information for families, learners, educators, and platform visitors.',
-  alternates: { canonical: '/privacy' },
-};
+const pageSeo = PUBLIC_MARKETING_PAGES.find((page) => page.path === '/privacy')!;
+
+export const metadata: Metadata = createMarketingMetadata(pageSeo);
 
 export default async function PrivacyPage() {
   await assertMarketingSitePagesEnabled();
   const loginHref = await resolveMarketingLoginHref();
 
   return (
-    <MarketingInfoPage content={MARKETING_INFO_PAGES.privacy} loginHref={loginHref} />
+    <>
+      <StructuredData
+        data={[
+          webPageJsonLd(pageSeo),
+          breadcrumbJsonLd([
+            { name: 'Home', path: '/' },
+            { name: 'Privacy Policy', path: '/privacy' },
+          ]),
+        ]}
+      />
+      <MarketingInfoPage content={MARKETING_INFO_PAGES.privacy} loginHref={loginHref} />
+    </>
   );
 }

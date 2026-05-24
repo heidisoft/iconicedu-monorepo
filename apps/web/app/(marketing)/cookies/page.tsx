@@ -4,19 +4,34 @@ import {
   assertMarketingSitePagesEnabled,
   resolveMarketingLoginHref,
 } from '../_lib/marketing-site-pages';
+import {
+  breadcrumbJsonLd,
+  createMarketingMetadata,
+  PUBLIC_MARKETING_PAGES,
+  webPageJsonLd,
+} from '../seo';
+import { StructuredData } from '../structured-data';
 
-export const metadata: Metadata = {
-  title: 'Cookie Policy | ICONIC Academy',
-  description:
-    'Understand how ICONIC Academy uses cookies and similar technologies across the website and platform.',
-  alternates: { canonical: '/cookies' },
-};
+const pageSeo = PUBLIC_MARKETING_PAGES.find((page) => page.path === '/cookies')!;
+
+export const metadata: Metadata = createMarketingMetadata(pageSeo);
 
 export default async function CookiesPage() {
   await assertMarketingSitePagesEnabled();
   const loginHref = await resolveMarketingLoginHref();
 
   return (
-    <MarketingInfoPage content={MARKETING_INFO_PAGES.cookies} loginHref={loginHref} />
+    <>
+      <StructuredData
+        data={[
+          webPageJsonLd(pageSeo),
+          breadcrumbJsonLd([
+            { name: 'Home', path: '/' },
+            { name: 'Cookie Policy', path: '/cookies' },
+          ]),
+        ]}
+      />
+      <MarketingInfoPage content={MARKETING_INFO_PAGES.cookies} loginHref={loginHref} />
+    </>
   );
 }

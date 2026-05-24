@@ -4,17 +4,34 @@ import {
   assertMarketingSitePagesEnabled,
   resolveMarketingLoginHref,
 } from '../_lib/marketing-site-pages';
+import {
+  breadcrumbJsonLd,
+  createMarketingMetadata,
+  PUBLIC_MARKETING_PAGES,
+  webPageJsonLd,
+} from '../seo';
+import { StructuredData } from '../structured-data';
 
-export const metadata: Metadata = {
-  title: 'Pricing | ICONIC Academy',
-  description:
-    'Explore ICONIC Academy tutoring options starting from $12/hour, with global tutors, USA-based specialists, curriculum support, and advanced learner options.',
-  alternates: { canonical: '/pricing' },
-};
+const pageSeo = PUBLIC_MARKETING_PAGES.find((page) => page.path === '/pricing')!;
+
+export const metadata: Metadata = createMarketingMetadata(pageSeo);
 
 export default async function PricingPage() {
   await assertMarketingSitePagesEnabled();
   const loginHref = await resolveMarketingLoginHref();
 
-  return <MarketingPricingPage loginHref={loginHref} />;
+  return (
+    <>
+      <StructuredData
+        data={[
+          webPageJsonLd(pageSeo),
+          breadcrumbJsonLd([
+            { name: 'Home', path: '/' },
+            { name: 'Pricing', path: '/pricing' },
+          ]),
+        ]}
+      />
+      <MarketingPricingPage loginHref={loginHref} />
+    </>
+  );
 }

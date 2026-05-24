@@ -31,20 +31,28 @@ describe('marketing components', () => {
     expect(
       screen.getByRole('button', { name: 'Toggle theme (current: system)' }),
     ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('href', '/');
-    expect(screen.getByRole('link', { name: 'Subjects' })).toHaveAttribute(
+    expect(container.querySelector('[aria-label="Open menu"]')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Tutoring' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: 'Programs' })[0]).toHaveAttribute(
       'href',
       '/subjects',
     );
-    expect(screen.getByRole('link', { name: 'How It Works' })).toHaveAttribute(
+    expect(screen.getAllByRole('link', { name: 'How It Works' })[0]).toHaveAttribute(
       'href',
       '/how-it-works',
     );
-    expect(screen.getByRole('link', { name: 'For Parents' })).toHaveAttribute(
+    expect(screen.getAllByRole('link', { name: 'For Parents' })[0]).toHaveAttribute(
       'href',
       '/for-parents',
     );
-    expect(screen.getByRole('link', { name: 'About' })).toHaveAttribute('href', '/about');
+    expect(screen.getAllByRole('link', { name: 'Pricing' })[0]).toHaveAttribute(
+      'href',
+      '/pricing',
+    );
+    expect(screen.getAllByRole('link', { name: 'Contact' })[0]).toHaveAttribute(
+      'href',
+      '/contact',
+    );
     expect(screen.getByRole('link', { name: 'Log In' })).toHaveAttribute(
       'href',
       '/acme/login',
@@ -64,11 +72,20 @@ describe('marketing components', () => {
     render(<MarketingHomePage loginHref="/acme/login" />);
 
     expect(
-      screen.getByRole('heading', { name: /It's time to unlock your .* potential/i }),
+      screen.getByRole('heading', {
+        name: "It's time to unlock your child's potential in",
+      }),
     ).toBeInTheDocument();
-    expect(screen.getAllByText('Affordable learning options').length).toBeGreaterThan(0);
-    expect(screen.getByText('Built for a wider audience')).toBeInTheDocument();
-    expect(screen.getByText('USA and global tutor access')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Personalized K-12 tutoring for school success, confidence, and future-ready skills.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Why families choose ICONIC Academy')).toBeInTheDocument();
+    expect(
+      screen.getByText('Support for students across every U.S. state'),
+    ).toBeInTheDocument();
+    expect(screen.getByText("A clear path for your child's success")).toBeInTheDocument();
     expect(screen.getByText('Mobile apps')).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: 'Download on the App Store' }),
@@ -80,14 +97,14 @@ describe('marketing components', () => {
       'href',
       'https://play.google.com/store/apps/details?id=com.heidisoft.iconicedu',
     );
-    expect(screen.getByRole('link', { name: 'Start your journey now' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Find the right tutor' })).toHaveAttribute(
       'href',
       '/acme/login',
     );
-    expect(screen.getAllByRole('link', { name: 'Become a Tutor' })).toHaveLength(1);
-    for (const link of screen.getAllByRole('link', { name: 'Become a Tutor' })) {
-      expect(link).toHaveAttribute('href', '/acme/login');
-    }
+    expect(screen.getByRole('link', { name: 'Explore programs' })).toHaveAttribute(
+      'href',
+      '/subjects',
+    );
   });
 
   it('renders mobile store links in the footer', () => {
@@ -115,10 +132,10 @@ describe('marketing components', () => {
 
     expect(
       screen.getByRole('heading', {
-        name: 'Built for parents who want clarity, care, and affordability',
+        name: 'Tutoring that keeps parents informed — not guessing',
       }),
     ).toBeInTheDocument();
-    expect(screen.getByText('Clear communication')).toBeInTheDocument();
+    expect(screen.getByText('Is my child actually improving?')).toBeInTheDocument();
     expect(
       screen.getByText(/Class updates help parents understand/i),
     ).toBeInTheDocument();
@@ -165,20 +182,20 @@ describe('marketing components', () => {
     render(<MarketingPricingPage loginHref="/acme/login" />);
 
     expect(
-      screen.getByRole('heading', { name: 'Program pricing built around each learner' }),
+      screen.getByRole('heading', { name: 'Flexible tutoring options for every family' }),
     ).toBeInTheDocument();
     expect(
       screen.getAllByText(/Class sessions start from \$12\/hour/i).length,
     ).toBeGreaterThan(0);
-    expect(screen.getByText('Global tutor network')).toBeInTheDocument();
-    expect(screen.getByText('USA curriculum expertise')).toBeInTheDocument();
+    expect(screen.getByText('Global Tutor Plan')).toBeInTheDocument();
+    expect(screen.getByText('USA Curriculum Plan')).toBeInTheDocument();
     expect(
       screen.getByRole('heading', {
         name: 'Regional specialization without losing global flexibility',
       }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/USA-based and native English-speaking tutors/i),
+      screen.getByText(/USA-based or native English-speaking tutors/i),
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Request details' })).toHaveAttribute(
       'href',

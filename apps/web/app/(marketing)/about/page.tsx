@@ -4,19 +4,37 @@ import {
   assertMarketingSitePagesEnabled,
   resolveMarketingLoginHref,
 } from '../_lib/marketing-site-pages';
+import {
+  breadcrumbJsonLd,
+  createMarketingMetadata,
+  PUBLIC_MARKETING_PAGES,
+  webPageJsonLd,
+} from '../seo';
+import { StructuredData } from '../structured-data';
 
-export const metadata: Metadata = {
-  title: 'About | ICONIC Academy',
-  description:
-    'Learn about ICONIC Academy’s mission to make trustworthy, curriculum-aware, affordable online learning available to more families.',
-  alternates: { canonical: '/about' },
-};
+const pageSeo = PUBLIC_MARKETING_PAGES.find((page) => page.path === '/about')!;
+
+export const metadata: Metadata = createMarketingMetadata(pageSeo);
 
 export default async function AboutPage() {
   await assertMarketingSitePagesEnabled();
   const loginHref = await resolveMarketingLoginHref();
 
   return (
-    <MarketingMainMenuPage content={MAIN_MENU_PAGE_CONTENT.about} loginHref={loginHref} />
+    <>
+      <StructuredData
+        data={[
+          webPageJsonLd(pageSeo),
+          breadcrumbJsonLd([
+            { name: 'Home', path: '/' },
+            { name: 'About', path: '/about' },
+          ]),
+        ]}
+      />
+      <MarketingMainMenuPage
+        content={MAIN_MENU_PAGE_CONTENT.about}
+        loginHref={loginHref}
+      />
+    </>
   );
 }

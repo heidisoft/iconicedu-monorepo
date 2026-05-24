@@ -37,12 +37,14 @@ vi.mock('@iconicedu/web/lib/org/resolve-dashboard-path', () => ({
 
 describe('marketing layout metadata', () => {
   it('defines SEO metadata for the marketing page', () => {
-    expect(metadata.title).toBe('ICONIC Academy | Personalized Online Tutoring for K-12');
-    expect(metadata.description).toContain('personalized online tutoring');
+    expect(metadata.title).toBe(
+      'Online K-12 Tutoring, Test Prep, and Enrichment | ICONIC Academy',
+    );
+    expect(metadata.description).toContain('online K-12 tutoring');
     expect(metadata.alternates?.canonical).toBe('/');
     expect(metadata.openGraph?.type).toBe('website');
     expect(metadata.twitter?.card).toBe('summary_large_image');
-    expect(metadata.robots).toEqual({ index: true, follow: true });
+    expect(metadata.robots).toMatchObject({ index: true, follow: true });
   });
 
   it('renders global marketing header and footer around pages', async () => {
@@ -51,7 +53,7 @@ describe('marketing layout metadata', () => {
     render(await SiteLayout({ children: React.createElement('div', null, 'Page body') }));
 
     expect(screen.getByText('Page body')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Subjects' })).toHaveAttribute(
+    expect(screen.getAllByRole('link', { name: 'Programs' })[0]).toHaveAttribute(
       'href',
       '/subjects',
     );
@@ -63,7 +65,7 @@ describe('marketing layout metadata', () => {
       'href',
       '/privacy',
     );
-    expect(screen.getByRole('link', { name: 'Programs' })).toHaveAttribute(
+    expect(screen.getAllByRole('link', { name: 'Programs' })[1]).toHaveAttribute(
       'href',
       '/subjects',
     );

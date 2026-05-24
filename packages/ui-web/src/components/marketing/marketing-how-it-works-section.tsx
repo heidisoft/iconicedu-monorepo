@@ -15,14 +15,15 @@ export function MarketingHowItWorksSection({
       <div className="rounded-3xl border border-border/60 bg-card/60 p-6 sm:p-8">
         <div className="max-w-3xl">
           <h2 className="text-3xl font-bold tracking-tight">
-            One platform for students, parents, and educators
+            Why families choose ICONIC Academy
           </h2>
           <p className="mt-3 text-foreground/80">
-            From first lesson to measurable outcomes, ICONIC Academy helps families stay
-            aligned and students stay motivated.
+            ICONIC Academy helps K-12 students succeed in school and beyond with
+            experienced tutors, curriculum-aligned support, and enrichment programs
+            families can actually afford.
           </p>
         </div>
-        <div className="mt-6 grid gap-4 md:grid-cols-3">
+        <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {CORE_BENEFITS.map((benefit) => (
             <article
               key={benefit.title}

@@ -4,17 +4,34 @@ import {
   assertMarketingSitePagesEnabled,
   resolveMarketingLoginHref,
 } from '../_lib/marketing-site-pages';
+import {
+  breadcrumbJsonLd,
+  createMarketingMetadata,
+  PUBLIC_MARKETING_PAGES,
+  webPageJsonLd,
+} from '../seo';
+import { StructuredData } from '../structured-data';
 
-export const metadata: Metadata = {
-  title: 'Contact | ICONIC Academy',
-  description:
-    'Contact ICONIC Academy about tutoring programs, USA or global tutor options, curriculum needs, advanced learner support, or family support.',
-  alternates: { canonical: '/contact' },
-};
+const pageSeo = PUBLIC_MARKETING_PAGES.find((page) => page.path === '/contact')!;
+
+export const metadata: Metadata = createMarketingMetadata(pageSeo);
 
 export default async function ContactPage() {
   await assertMarketingSitePagesEnabled();
   const loginHref = await resolveMarketingLoginHref();
 
-  return <MarketingContactPage loginHref={loginHref} />;
+  return (
+    <>
+      <StructuredData
+        data={[
+          webPageJsonLd(pageSeo),
+          breadcrumbJsonLd([
+            { name: 'Home', path: '/' },
+            { name: 'Contact', path: '/contact' },
+          ]),
+        ]}
+      />
+      <MarketingContactPage loginHref={loginHref} />
+    </>
+  );
 }
