@@ -8,7 +8,7 @@ import {
 export const metadata: Metadata = {
   title: 'Subjects | ICONIC Academy',
   description:
-    'Explore ICONIC Academy subjects, from core academics and homework help to enrichment, coding, STEM, debate, and test prep.',
+    'Explore ICONIC Academy subjects, full-curriculum support, state standards support where applicable, enrichment, coding, STEM, debate, and test prep.',
   alternates: { canonical: '/subjects' },
 };
 

@@ -8,7 +8,7 @@ import {
 export const metadata: Metadata = {
   title: 'How It Works | ICONIC Academy',
   description:
-    'See how ICONIC Academy helps families choose online tutoring, small-group classes, parent communication, and flexible learning support.',
+    'See how ICONIC Academy helps families choose curriculum-aware tutoring, USA or global tutors, small-group classes, and flexible learning support.',
   alternates: { canonical: '/how-it-works' },
 };
 

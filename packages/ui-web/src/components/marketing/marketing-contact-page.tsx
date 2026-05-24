@@ -14,9 +14,9 @@ export function MarketingContactPage({
             Talk with ICONIC Academy
           </h1>
           <p className="mt-5 max-w-3xl text-lg text-muted-foreground">
-            Reach out about tutoring programs, regional learning needs, educator
-            opportunities, or account support. This first version uses direct inquiry
-            links only.
+            Reach out about tutoring programs, USA-based or global tutor options,
+            curriculum needs, advanced learner support, educator opportunities, or account
+            support.
           </p>
         </div>
       </section>
@@ -26,7 +26,7 @@ export function MarketingContactPage({
           {[
             {
               title: 'Program inquiries',
-              body: 'Ask about tutoring, enrichment, test prep, or regional program options.',
+              body: 'Ask about tutoring, full-curriculum support, enrichment, test prep, state standards, or regional program options.',
               href: 'mailto:hello@iconicedu.com?subject=Program%20inquiry',
               label: 'hello@iconicedu.com',
             },
@@ -38,7 +38,7 @@ export function MarketingContactPage({
             },
             {
               title: 'Educator interest',
-              body: 'Learn how experienced educators can connect with ICONIC Academy.',
+              body: 'Learn how experienced USA-based and global educators can connect with ICONIC Academy.',
               href: 'mailto:hello@iconicedu.com?subject=Educator%20interest',
               label: 'Contact our team',
             },

@@ -6,16 +6,16 @@ import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 export const metadata: Metadata = {
   title: 'Personalized Online Tutoring for K-12',
   description:
-    'Explore personalized online tutoring, flexible scheduling, and expert educators for K-12 learners.',
+    'Explore K-12 tutoring with experienced USA and global tutors, full-curriculum support, state standards support where applicable, and advanced learner enrichment.',
   openGraph: {
     title: 'ICONIC Academy | Personalized Online Tutoring for K-12',
     description:
-      'Explore personalized online tutoring, flexible scheduling, and expert educators for K-12 learners.',
+      'Explore K-12 tutoring with experienced USA and global tutors, full-curriculum support, state standards support where applicable, and advanced learner enrichment.',
   },
   twitter: {
     title: 'ICONIC Academy | Personalized Online Tutoring for K-12',
     description:
-      'Explore personalized online tutoring, flexible scheduling, and expert educators for K-12 learners.',
+      'Explore K-12 tutoring with experienced USA and global tutors, full-curriculum support, state standards support where applicable, and advanced learner enrichment.',
   },
 };
 

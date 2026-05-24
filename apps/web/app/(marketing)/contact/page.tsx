@@ -8,7 +8,7 @@ import {
 export const metadata: Metadata = {
   title: 'Contact | ICONIC Academy',
   description:
-    'Contact ICONIC Academy about tutoring programs, regional learning options, educator interest, or family support.',
+    'Contact ICONIC Academy about tutoring programs, USA or global tutor options, curriculum needs, advanced learner support, or family support.',
   alternates: { canonical: '/contact' },
 };
 

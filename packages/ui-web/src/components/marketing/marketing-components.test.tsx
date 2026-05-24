@@ -3,6 +3,7 @@ import { vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
 import { MarketingContactPage } from './marketing-contact-page';
+import { MarketingFooterSection } from './marketing-footer-section';
 import { MarketingHeader } from './marketing-header';
 import { MarketingHomePage } from './marketing-home-page';
 import { MarketingInfoPage } from './marketing-info-page';
@@ -67,7 +68,18 @@ describe('marketing components', () => {
     ).toBeInTheDocument();
     expect(screen.getAllByText('Affordable learning options').length).toBeGreaterThan(0);
     expect(screen.getByText('Built for a wider audience')).toBeInTheDocument();
-    expect(screen.getByText('Global access to caring teachers')).toBeInTheDocument();
+    expect(screen.getByText('USA and global tutor access')).toBeInTheDocument();
+    expect(screen.getByText('Mobile apps')).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Download on the App Store' }),
+    ).toHaveAttribute(
+      'href',
+      'https://apps.apple.com/us/app/iconic-academy/id6762158186',
+    );
+    expect(screen.getByRole('link', { name: 'Get it on Google Play' })).toHaveAttribute(
+      'href',
+      'https://play.google.com/store/apps/details?id=com.heidisoft.iconicedu',
+    );
     expect(screen.getByRole('link', { name: 'Start your journey now' })).toHaveAttribute(
       'href',
       '/acme/login',
@@ -76,6 +88,21 @@ describe('marketing components', () => {
     for (const link of screen.getAllByRole('link', { name: 'Become a Tutor' })) {
       expect(link).toHaveAttribute('href', '/acme/login');
     }
+  });
+
+  it('renders mobile store links in the footer', () => {
+    render(<MarketingFooterSection loginHref="/acme/login" />);
+
+    expect(
+      screen.getByRole('link', { name: 'Download on the App Store' }),
+    ).toHaveAttribute(
+      'href',
+      'https://apps.apple.com/us/app/iconic-academy/id6762158186',
+    );
+    expect(screen.getByRole('link', { name: 'Get it on Google Play' })).toHaveAttribute(
+      'href',
+      'https://play.google.com/store/apps/details?id=com.heidisoft.iconicedu',
+    );
   });
 
   it('renders main menu content pages', () => {
@@ -144,14 +171,14 @@ describe('marketing components', () => {
       screen.getAllByText(/Class sessions start from \$12\/hour/i).length,
     ).toBeGreaterThan(0);
     expect(screen.getByText('Global tutor network')).toBeInTheDocument();
-    expect(screen.getByText('Native-speaker subject expertise')).toBeInTheDocument();
+    expect(screen.getByText('USA curriculum expertise')).toBeInTheDocument();
     expect(
       screen.getByRole('heading', {
         name: 'Regional specialization without losing global flexibility',
       }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/native English speakers from the USA, Australia, and the UK/i),
+      screen.getByText(/USA-based and native English-speaking tutors/i),
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Request details' })).toHaveAttribute(
       'href',
