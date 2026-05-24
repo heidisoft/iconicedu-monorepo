@@ -7,7 +7,6 @@ import React, {
   useCallback,
 } from 'react';
 import { useColorScheme as useSystemColorScheme } from 'react-native';
-import { useColorScheme as useNativeWindColorScheme } from 'react-native-css-interop';
 import * as SecureStore from 'expo-secure-store';
 import { lightColors, darkColors, type AppColors, type ThemeMode } from '@/lib/theme';
 
@@ -32,7 +31,6 @@ const ThemeContext = createContext<ThemeContextType>({
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [mode, setModeState] = useState<ThemeMode>('system');
   const systemScheme = useSystemColorScheme();
-  const { setColorScheme: setNativeWindColorScheme } = useNativeWindColorScheme();
 
   // Load persisted preference on mount. We render immediately with 'system'
   // mode (the default) so the native window background is never exposed as a
@@ -60,13 +58,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
           : 'light';
   const isDark = colorScheme === 'dark';
   const colors = isDark ? darkColors : lightColors;
-
-  // Keep NativeWind className-based dark styles in sync with the resolved scheme.
-  // Use css-interop directly because NativeWind's wrapper can throw before the
-  // compiled darkMode flag is available in Expo startup.
-  useEffect(() => {
-    setNativeWindColorScheme(mode);
-  }, [mode, setNativeWindColorScheme]);
 
   const setMode = useCallback((newMode: ThemeMode) => {
     setModeState(newMode);
