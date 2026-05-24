@@ -386,7 +386,9 @@ export const FOOTER_LINK_GROUPS = [
     title: 'Platform',
     links: [
       { label: 'Programs', href: '/subjects' },
-      { label: 'U.S. Curriculum Support', href: '/how-it-works#us-curriculum' },
+      { label: 'Online Tutoring', href: '/programs/online-tutoring' },
+      { label: 'U.S. Curriculum Support', href: '/programs/us-curriculum-support' },
+      { label: 'Tutoring Across the USA', href: '/locations/usa' },
       { label: 'How It Works', href: '/how-it-works' },
       { label: 'Become a Tutor', href: '/iconic-academy/login' },
     ],
@@ -414,6 +416,34 @@ export const TRUST_INDICATORS = [
   { icon: '✓', text: 'USA-based and global tutors' },
   { icon: '✓', text: 'Flexible scheduling' },
   { icon: '✓', text: 'Parent updates after sessions' },
+] as const;
+
+export const MARKETING_FAQS = [
+  {
+    question: 'Does ICONIC Academy support students across the USA?',
+    answer:
+      'Yes. ICONIC Academy supports K-12 students across the United States with online tutoring that can connect to school assignments, grade-level skills, and state standards where applicable.',
+  },
+  {
+    question: 'What subjects and programs are available?',
+    answer:
+      'Families can find support for math, ELA, reading, writing, science, social studies, homework help, test prep, coding, debate, chess, music, art, financial literacy, entrepreneurship, and more.',
+  },
+  {
+    question: 'Can tutoring match my child’s school curriculum?',
+    answer:
+      'Tutors can align support to homework, grade-level expectations, school goals, and state standards where applicable. We keep the claim practical: support is curriculum-aware, not a promise that every curriculum is covered perfectly.',
+  },
+  {
+    question: 'Are affordable tutoring options available?',
+    answer:
+      'Yes. Families can explore affordable global tutor options, USA-based tutors, native English-speaking tutors, 1-on-1 lessons, small-group classes, and custom learning plans.',
+  },
+  {
+    question: 'How do parents stay informed?',
+    answer:
+      'Parents can follow upcoming sessions, reminders, class links, tutor messages, reschedule updates, and progress notes through ICONIC Academy communication tools and mobile apps.',
+  },
 ] as const;
 
 export const TYPE_SPEED_MS = 80;

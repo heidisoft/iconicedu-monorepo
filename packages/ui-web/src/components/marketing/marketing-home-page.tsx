@@ -1,3 +1,4 @@
+import { MarketingFaqSection } from './marketing-faq-section';
 import { MarketingHeroSection } from './marketing-hero-section';
 import { MarketingHowItWorksSection } from './marketing-how-it-works-section';
 import { MarketingMissionSection } from './marketing-mission-section';
@@ -24,6 +25,7 @@ export function MarketingHomePage({
       <MarketingSuccessPathSection />
       <MarketingMobileAppSection />
       <MarketingMissionSection />
+      <MarketingFaqSection />
     </div>
   );
 }

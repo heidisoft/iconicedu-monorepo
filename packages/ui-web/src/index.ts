@@ -66,6 +66,7 @@ export * from '@iconicedu/ui-web/components/dashboard/dashboard-page-loading';
 export * from '@iconicedu/ui-web/components/class-request/class-request-action';
 export * from '@iconicedu/ui-web/components/empty';
 export * from '@iconicedu/ui-web/components/marketing/marketing-header';
+export * from '@iconicedu/ui-web/components/marketing/marketing-faq-section';
 export * from '@iconicedu/ui-web/components/marketing/marketing-footer-section';
 export * from '@iconicedu/ui-web/components/marketing/marketing-home-page';
 export * from '@iconicedu/ui-web/components/marketing/marketing-mobile-app-section';

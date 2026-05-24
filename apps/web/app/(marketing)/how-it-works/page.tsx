@@ -9,13 +9,17 @@ import {
   assertMarketingSitePagesEnabled,
   resolveMarketingLoginHref,
 } from '../_lib/marketing-site-pages';
+import {
+  breadcrumbJsonLd,
+  createMarketingMetadata,
+  PUBLIC_MARKETING_PAGES,
+  webPageJsonLd,
+} from '../seo';
+import { StructuredData } from '../structured-data';
 
-export const metadata: Metadata = {
-  title: 'How It Works | ICONIC Academy',
-  description:
-    'See how ICONIC Academy helps families choose curriculum-aware tutoring, USA or global tutors, small-group classes, and flexible learning support.',
-  alternates: { canonical: '/how-it-works' },
-};
+const pageSeo = PUBLIC_MARKETING_PAGES.find((page) => page.path === '/how-it-works')!;
+
+export const metadata: Metadata = createMarketingMetadata(pageSeo);
 
 export default async function HowItWorksPage() {
   await assertMarketingSitePagesEnabled();
@@ -23,6 +27,15 @@ export default async function HowItWorksPage() {
 
   return (
     <>
+      <StructuredData
+        data={[
+          webPageJsonLd(pageSeo),
+          breadcrumbJsonLd([
+            { name: 'Home', path: '/' },
+            { name: 'How It Works', path: '/how-it-works' },
+          ]),
+        ]}
+      />
       <MarketingMainMenuPage
         content={MAIN_MENU_PAGE_CONTENT.howItWorks}
         loginHref={loginHref}

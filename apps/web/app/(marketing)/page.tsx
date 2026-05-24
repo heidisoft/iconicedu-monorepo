@@ -2,26 +2,33 @@ import type { Metadata } from 'next';
 import { MarketingHomePage } from '@iconicedu/ui-web';
 import { resolveDefaultOrgLoginPath } from '@iconicedu/web/lib/org/resolve-auth-path';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
+import {
+  breadcrumbJsonLd,
+  createMarketingMetadata,
+  faqJsonLd,
+  PUBLIC_MARKETING_PAGES,
+  webPageJsonLd,
+} from './seo';
+import { StructuredData } from './structured-data';
 
-export const metadata: Metadata = {
-  title: 'Personalized K-12 Tutoring and Enrichment',
-  description:
-    'ICONIC Academy helps K-12 students succeed in school and beyond with experienced tutors, curriculum-aligned support, and affordable enrichment programs.',
-  openGraph: {
-    title: 'ICONIC Academy | Personalized K-12 Tutoring and Enrichment',
-    description:
-      'ICONIC Academy helps K-12 students succeed in school and beyond with experienced tutors, curriculum-aligned support, and affordable enrichment programs.',
-  },
-  twitter: {
-    title: 'ICONIC Academy | Personalized K-12 Tutoring and Enrichment',
-    description:
-      'ICONIC Academy helps K-12 students succeed in school and beyond with experienced tutors, curriculum-aligned support, and affordable enrichment programs.',
-  },
-};
+const homeSeo = PUBLIC_MARKETING_PAGES[0];
+
+export const metadata: Metadata = createMarketingMetadata(homeSeo);
 
 export default async function HomePage() {
   const supabase = await createSupabaseServerClient();
   const loginHref = await resolveDefaultOrgLoginPath(supabase);
 
-  return <MarketingHomePage loginHref={loginHref} />;
+  return (
+    <>
+      <StructuredData
+        data={[
+          webPageJsonLd(homeSeo),
+          faqJsonLd(),
+          breadcrumbJsonLd([{ name: 'Home', path: '/' }]),
+        ]}
+      />
+      <MarketingHomePage loginHref={loginHref} />
+    </>
+  );
 }

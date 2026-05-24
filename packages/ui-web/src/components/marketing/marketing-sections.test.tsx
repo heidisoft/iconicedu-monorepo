@@ -13,8 +13,13 @@ describe('marketing sections', () => {
 
     expect(
       screen.getByRole('heading', {
-        name: 'Personalized K-12 tutoring for school success, confidence, and future-ready skills',
+        name: "It's time to unlock your child's potential in",
       }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Personalized K-12 tutoring for school success, confidence, and future-ready skills.',
+      ),
     ).toBeInTheDocument();
     expect(container.querySelector('section#home')).toHaveClass('from-emerald-50/70');
     expect(screen.getByTestId('hero-background')).toBeInTheDocument();

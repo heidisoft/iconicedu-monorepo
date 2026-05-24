@@ -1,48 +1,6 @@
-'use client';
-
-import { useEffect, useMemo, useState } from 'react';
-import { HERO_SUBJECTS, HOLD_MS, TYPE_SPEED_MS } from './marketing.constants';
+import { MarketingHeroSubjectTicker } from './marketing-hero-subject-ticker';
 
 export function MarketingHeroHeadline() {
-  const [currentSubject, setCurrentSubject] = useState(0);
-  const [displayedText, setDisplayedText] = useState('');
-
-  const fullText = useMemo(
-    () => `${HERO_SUBJECTS[currentSubject].icon} ${HERO_SUBJECTS[currentSubject].label}`,
-    [currentSubject],
-  );
-
-  useEffect(() => {
-    let typeTimer: ReturnType<typeof setInterval> | undefined;
-    let holdTimer: ReturnType<typeof setTimeout> | undefined;
-    let charIndex = 0;
-
-    setDisplayedText('');
-
-    typeTimer = setInterval(() => {
-      charIndex += 1;
-      setDisplayedText(fullText.slice(0, charIndex));
-
-      if (charIndex >= fullText.length) {
-        if (typeTimer) {
-          clearInterval(typeTimer);
-        }
-        holdTimer = setTimeout(() => {
-          setCurrentSubject((prev) => (prev + 1) % HERO_SUBJECTS.length);
-        }, HOLD_MS);
-      }
-    }, TYPE_SPEED_MS);
-
-    return () => {
-      if (typeTimer) {
-        clearInterval(typeTimer);
-      }
-      if (holdTimer) {
-        clearTimeout(holdTimer);
-      }
-    };
-  }, [fullText]);
-
   return (
     <div className="text-center">
       <div className="mb-8">
@@ -50,20 +8,21 @@ export function MarketingHeroHeadline() {
           <span className="block text-foreground">It&apos;s time to</span>
           <span className="mt-2 flex flex-wrap items-center justify-center gap-3 md:gap-4">
             <span className="text-foreground">unlock your</span>
-            <span className="text-2xl md:text-5xl inline-flex items-center gap-2 rounded-4xl bg-primary/15 px-4 py-1 text-primary border border-border/60 dark:border-emerald-900/50">
-              <span>🎓</span>
+            <span className="inline-flex items-center gap-2 rounded-4xl border border-border/60 bg-primary/15 px-4 py-1 text-2xl text-primary dark:border-emerald-900/50 md:text-5xl">
+              <span aria-hidden="true">🎓</span>
               <span className="font-semibold text-primary">child&apos;s</span>
             </span>
           </span>
           <span className="mt-2 block">potential in</span>
         </h1>
+        <p className="sr-only">
+          Personalized K-12 tutoring for school success, confidence, and future-ready
+          skills.
+        </p>
       </div>
 
       <div className="mb-12 flex min-h-28 items-center justify-center">
-        <h2 className="flex min-h-28 items-center text-4xl font-bold text-primary md:text-6xl">
-          {displayedText}
-          <span className="ml-1 animate-pulse">|</span>
-        </h2>
+        <MarketingHeroSubjectTicker />
       </div>
     </div>
   );

@@ -26,6 +26,14 @@ import RegionalPage, {
   generateMetadata as generateRegionalMetadata,
   generateStaticParams,
 } from '@iconicedu/web/app/(marketing)/regions/[regionSlug]/page';
+import ProgramPage, {
+  generateMetadata as generateProgramMetadata,
+  generateStaticParams as generateProgramStaticParams,
+} from '@iconicedu/web/app/(marketing)/programs/[programSlug]/page';
+import LocationPage, {
+  generateMetadata as generateLocationMetadata,
+  generateStaticParams as generateLocationStaticParams,
+} from '@iconicedu/web/app/(marketing)/locations/[locationSlug]/page';
 import TermsPage, {
   metadata as termsMetadata,
 } from '@iconicedu/web/app/(marketing)/terms/page';
@@ -103,7 +111,7 @@ describe('marketing site standard pages', () => {
       name: 'pricing',
       Page: PricingPage,
       metadata: pricingMetadata,
-      title: 'Program pricing built around each learner',
+      title: 'Flexible tutoring options for every family',
       canonical: '/pricing',
     },
     {
@@ -126,7 +134,7 @@ describe('marketing site standard pages', () => {
       name: 'for parents',
       Page: ForParentsPage,
       metadata: forParentsMetadata,
-      title: 'Built for parents who want clarity, care, and affordability',
+      title: 'Tutoring that keeps parents informed — not guessing',
       canonical: '/for-parents',
       expectedText: 'Parents deserve to feel informed',
     },
@@ -227,5 +235,78 @@ describe('marketing regional microsite page', () => {
     });
 
     expect(generateStaticParams()).toEqual([{ regionSlug: 'global-online' }]);
+  });
+});
+
+describe('marketing program and location landing pages', () => {
+  beforeEach(() => {
+    enableMarketingSitePagesRunMock.mockReset();
+    enableMarketingSitePagesRunMock.mockResolvedValue(true);
+    notFoundMock.mockClear();
+    createSupabaseServerClientMock.mockClear();
+    resolveDefaultOrgLoginPathMock.mockClear();
+    resolveDefaultOrgLoginPathMock.mockResolvedValue('/acme/login');
+  });
+
+  it('renders an online tutoring program landing page', async () => {
+    render(
+      await ProgramPage({
+        params: Promise.resolve({ programSlug: 'online-tutoring' }),
+      }),
+    );
+
+    expect(
+      screen.getByRole('heading', {
+        name: 'Online K-12 tutoring for school success and confidence',
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('What support can include')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Find the right tutor' })).toHaveAttribute(
+      'href',
+      '/acme/login',
+    );
+  });
+
+  it('defines program metadata and static params', async () => {
+    await expect(
+      generateProgramMetadata({
+        params: Promise.resolve({ programSlug: 'math-tutoring' }),
+      }),
+    ).resolves.toMatchObject({
+      title: 'Online Math Tutoring | ICONIC Academy',
+      alternates: { canonical: '/programs/math-tutoring' },
+    });
+
+    expect(generateProgramStaticParams()).toContainEqual({
+      programSlug: 'online-tutoring',
+    });
+  });
+
+  it('renders a USA location landing page', async () => {
+    render(
+      await LocationPage({
+        params: Promise.resolve({ locationSlug: 'usa' }),
+      }),
+    );
+
+    expect(
+      screen.getByRole('heading', {
+        name: 'Online tutoring for families across the USA',
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Curriculum-aware support')).toBeInTheDocument();
+  });
+
+  it('defines location metadata and static params', async () => {
+    await expect(
+      generateLocationMetadata({
+        params: Promise.resolve({ locationSlug: 'texas' }),
+      }),
+    ).resolves.toMatchObject({
+      title: 'Online Tutoring in Texas | ICONIC Academy',
+      alternates: { canonical: '/locations/texas' },
+    });
+
+    expect(generateLocationStaticParams()).toContainEqual({ locationSlug: 'usa' });
   });
 });

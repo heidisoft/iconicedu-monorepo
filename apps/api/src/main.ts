@@ -18,7 +18,7 @@ async function bootstrap() {
   );
 
   const config = new DocumentBuilder()
-    .setTitle('ICONIC EDU API')
+    .setTitle('ICONIC Academy API')
     .setDescription('Backend for web and mobile clients')
     .setVersion('0.1.0')
     .addBearerAuth()

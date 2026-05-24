@@ -24,9 +24,11 @@ describe('marketing home page', () => {
     render(await HomePage());
 
     expect(
-      screen.getByRole('heading', { name: /It's time to unlock your .* potential/i }),
+      screen.getByRole('heading', {
+        name: 'Personalized K-12 tutoring for school success, confidence, and future-ready skills',
+      }),
     ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Start your journey now' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Find the right tutor' })).toHaveAttribute(
       'href',
       '/acme/login',
     );
@@ -39,9 +41,12 @@ describe('marketing home page', () => {
     render(await HomePage());
 
     expect(screen.getByText('Math')).toBeInTheDocument();
-    expect(screen.getByText('Competition Prep')).toBeInTheDocument();
+    expect(screen.getByText('Financial Literacy')).toBeInTheDocument();
     expect(screen.getAllByText('Affordable learning options').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Parent-first communication').length).toBeGreaterThan(0);
+    expect(
+      screen.getByText('Questions families ask before starting online tutoring'),
+    ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Explore and sign up' })).toHaveAttribute(
       'href',
       '/acme/login',
