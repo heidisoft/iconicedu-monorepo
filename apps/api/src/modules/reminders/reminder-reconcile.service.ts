@@ -22,22 +22,32 @@ import {
 const DEFAULT_MAX_ATTEMPTS = 8;
 const SESSION_REMINDER_OFFSETS_MINUTES = [720, 30] as const;
 const SESSION_COMPLETION_CHECK_OFFSET_MINUTES = 10;
-const BUSINESS_HOURS_START = 9; // 9am inclusive
-const BUSINESS_HOURS_END = 17; // 5pm exclusive upper-bound for local-hour check
+const REMINDER_DELIVERY_WINDOW_START_HOUR = 9;
+const REMINDER_DELIVERY_WINDOW_END_HOUR = 18;
+const REMINDER_DELIVERY_WINDOW_START_TIME = '09:00';
+const REMINDER_DELIVERY_WINDOW_END_TIME = '18:00';
 
-function clampToBusinessWindow(runAt: Date, timezone: string): Date {
+function clampToReminderDeliveryWindow(runAt: Date, timezone: string): Date {
   const tz = timezone || 'UTC';
   const isoUtc = runAt.toISOString();
   const localTime = getLocalTime(isoUtc, tz);
   if (!localTime) return runAt;
 
   const hour = parseInt(localTime.split(':')[0] ?? '0', 10);
-  if (hour >= BUSINESS_HOURS_START && hour < BUSINESS_HOURS_END) return runAt;
+  if (
+    hour >= REMINDER_DELIVERY_WINDOW_START_HOUR &&
+    hour < REMINDER_DELIVERY_WINDOW_END_HOUR
+  ) {
+    return runAt;
+  }
 
   const localDate = getLocalDate(isoUtc, tz);
   if (!localDate) return runAt;
 
-  const targetTime = hour < BUSINESS_HOURS_START ? '09:00' : '17:00';
+  const targetTime =
+    hour < REMINDER_DELIVERY_WINDOW_START_HOUR
+      ? REMINDER_DELIVERY_WINDOW_START_TIME
+      : REMINDER_DELIVERY_WINDOW_END_TIME;
   const clamped = toUtcFromLocal(localDate, targetTime, tz);
   return clamped ? new Date(clamped) : runAt;
 }
@@ -567,7 +577,7 @@ export class ReminderReconcileService {
       for (const [index, offsetMinutes] of SESSION_REMINDER_OFFSETS_MINUTES.entries()) {
         let runAt = new Date(occurrenceStart.getTime() - offsetMinutes * 60 * 1000);
         if (offsetMinutes === 720) {
-          runAt = clampToBusinessWindow(runAt, occ.timezone ?? 'UTC');
+          runAt = clampToReminderDeliveryWindow(runAt, occ.timezone ?? 'UTC');
         }
         const isFinalReminderOffset =
           index === SESSION_REMINDER_OFFSETS_MINUTES.length - 1;
