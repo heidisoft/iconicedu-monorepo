@@ -143,6 +143,7 @@ export type ConversationHeaderProps = {
   onCall?: () => void;
   onVideo?: () => void;
   onMore?: () => void;
+  onAvatarPress?: () => void;
   liveJoinUrl?: string | null;
   secondaryAvatarSeed?: string | null;
   secondaryAvatarRole?: string | null;
@@ -625,6 +626,7 @@ export function ConversationHeader({
   onCall: _onCall,
   onVideo,
   onMore,
+  onAvatarPress,
   liveJoinUrl,
   secondaryAvatarSeed,
   secondaryAvatarRole,
@@ -817,7 +819,14 @@ export function ConversationHeader({
         </TouchableOpacity>
 
         {isDm && secondaryAvatarSeed ? (
-          <View style={s.groupWrap}>
+          <TouchableOpacity
+            style={s.groupWrap}
+            onPress={onAvatarPress}
+            disabled={!onAvatarPress}
+            activeOpacity={0.75}
+            accessibilityRole={onAvatarPress ? 'button' : undefined}
+            accessibilityLabel={onAvatarPress ? `Open ${title} profile` : undefined}
+          >
             <View
               style={[s.groupBack, { backgroundColor: avatarColor(secondaryAvatarSeed) }]}
             >
@@ -836,9 +845,16 @@ export function ConversationHeader({
               </View>
             )}
             <RoleAvatarBadge role={avatarRole} size={14} style={s.groupBadgeFront} />
-          </View>
+          </TouchableOpacity>
         ) : isDm ? (
-          <View style={s.avatarWrap}>
+          <TouchableOpacity
+            style={s.avatarWrap}
+            onPress={onAvatarPress}
+            disabled={!onAvatarPress}
+            activeOpacity={0.75}
+            accessibilityRole={onAvatarPress ? 'button' : undefined}
+            accessibilityLabel={onAvatarPress ? `Open ${title} profile` : undefined}
+          >
             {avatarUrl ? (
               <Image source={{ uri: avatarUrl }} style={s.avatarCircle} />
             ) : (
@@ -848,7 +864,7 @@ export function ConversationHeader({
             )}
             {presenceBadge}
             <RoleAvatarBadge role={avatarRole} size={16} />
-          </View>
+          </TouchableOpacity>
         ) : (
           <ChannelTopicIconBadge
             iconKey={iconKey}

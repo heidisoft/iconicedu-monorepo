@@ -262,6 +262,7 @@ function buildMemberProfile(input: {
   role?: string | null;
   bio?: string | null;
   email?: string | null;
+  timezone?: string | null;
 }): UserProfileVM {
   const now = new Date(0).toISOString();
   return {
@@ -279,7 +280,7 @@ function buildMemberProfile(input: {
       email: input.email ?? null,
       avatar: { source: 'seed', seed: input.avatarSeed ?? input.id, url: null },
     },
-    prefs: {},
+    prefs: { timezone: input.timezone ?? null },
     meta: { createdAt: now, updatedAt: now },
   } as UserProfileVM;
 }
@@ -1129,6 +1130,7 @@ export function ChannelInfoSheet({
             role: member.role,
             bio: member.bio,
             email: member.email,
+            timezone: member.timezone,
           }),
         }));
 

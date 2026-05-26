@@ -3,6 +3,7 @@ export type DmParticipant = {
   display_name: string | null;
   first_name: string | null;
   last_name: string | null;
+  account_id?: string | null;
   avatar_url: string | null;
   avatar_seed: string | null;
   timezone?: string | null;

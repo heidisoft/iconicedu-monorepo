@@ -24,6 +24,7 @@ export type RawMessageRow = {
     avatar_url: string | null;
     avatar_seed: string | null;
     kind?: string | null;
+    timezone?: string | null;
   } | null;
 };
 
@@ -46,7 +47,7 @@ export function buildSenderProfile(
         ? { source: 'url' as const, url: sender.avatar_url }
         : { source: 'seed' as const, seed: sender.avatar_seed ?? sender.id },
     },
-    prefs: {},
+    prefs: { timezone: sender.timezone ?? null },
     meta: { createdAt: '', updatedAt: '' },
   } as unknown as UserProfileVM;
 }
@@ -78,6 +79,7 @@ export function mapRowToMessageVM(
       avatar_url: null,
       avatar_seed: row.sender_profile_id,
       kind: null,
+      timezone: null,
     },
     row.org_id,
   );

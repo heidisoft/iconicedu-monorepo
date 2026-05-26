@@ -916,6 +916,7 @@ describe('mapRowToMessageVM', () => {
           avatar_url: null,
           avatar_seed: 'profile-1',
           kind: 'educator',
+          timezone: null,
         },
       } as RawMessageRow,
       {
@@ -931,6 +932,34 @@ describe('mapRowToMessageVM', () => {
     expect((message as { content?: { text?: string } }).content?.text).toBe(
       'Audio caption text.',
     );
+  });
+
+  it('maps sender timezone into the profile preview VM', () => {
+    const message = mapRowToMessageVM(
+      {
+        id: 'msg-text-1',
+        org_id: 'org-1',
+        channel_id: 'channel-1',
+        sender_profile_id: 'profile-1',
+        type: 'text',
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+        sender: {
+          id: 'profile-1',
+          display_name: 'Tutor One',
+          first_name: null,
+          last_name: null,
+          avatar_url: null,
+          avatar_seed: 'profile-1',
+          kind: 'educator',
+          timezone: 'Asia/Colombo',
+        },
+      } as RawMessageRow,
+      { text: 'Hello' },
+      [],
+    );
+
+    expect(message.core.sender.prefs?.timezone).toBe('Asia/Colombo');
   });
 });
 

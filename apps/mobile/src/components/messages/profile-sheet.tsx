@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useQuery } from '@tanstack/react-query';
 import {
   Users,
   FileText,
@@ -17,6 +18,16 @@ import {
   BookOpen,
   GraduationCap,
   Clock,
+  Clock3,
+  Presentation,
+  ShieldUser,
+  User,
+  BriefcaseBusiness,
+  Sunrise,
+  Sun,
+  Sunset,
+  MoonStar,
+  CircleOff,
   Award,
   Megaphone,
   Calendar,
@@ -31,6 +42,13 @@ import type { UserProfileVM, ChildProfileVM, GradeLevel } from '@iconicedu/share
 import { gradeLabel, normalizeCountryCode } from '@iconicedu/shared-types';
 import { useTheme } from '@/providers/theme-provider';
 import { avatarBgColor, getInitials } from './message-item';
+import { RoleNameIndicator } from '@/components/profile/role-name-indicator';
+import { apiGet } from '@/lib/api/http-client';
+import {
+  formatLocalTimeText,
+  type LocalTimePresenceStatus,
+  resolveLocalTimeIconKey,
+} from '@/lib/local-time-context';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -40,6 +58,30 @@ type AboutField = {
   value: string;
   Icon: LucideIcon;
 };
+
+type ProfilePresenceRow = {
+  profile_id: string;
+  display_status?: string | null;
+  last_seen_at?: string | null;
+};
+
+type ProfilePresenceSummary = {
+  displayStatus?: string | null;
+  lastSeenAt?: string | null;
+};
+
+function normalizePresenceStatus(value?: string | null): LocalTimePresenceStatus {
+  if (
+    value === 'online' ||
+    value === 'busy' ||
+    value === 'idle' ||
+    value === 'away' ||
+    value === 'offline'
+  ) {
+    return value;
+  }
+  return null;
+}
 
 function roleLabelFromKind(kind: UserProfileVM['kind']): string {
   switch (kind) {
@@ -55,6 +97,23 @@ function roleLabelFromKind(kind: UserProfileVM['kind']): string {
       return 'System';
     default:
       return 'Member';
+  }
+}
+
+function roleIconFromKind(kind: UserProfileVM['kind']): LucideIcon {
+  switch (kind) {
+    case 'educator':
+      return Presentation;
+    case 'guardian':
+      return ShieldUser;
+    case 'child':
+      return User;
+    case 'staff':
+      return BriefcaseBusiness;
+    case 'system':
+      return Sparkles;
+    default:
+      return Users;
   }
 }
 
@@ -74,22 +133,63 @@ function getChildrenNames(user: UserProfileVM): string[] {
   return [];
 }
 
-function formatLocalTime(timezone?: string | null): string | null {
-  const value = timezone?.trim();
-  if (!value) return null;
-  try {
-    return new Intl.DateTimeFormat(undefined, {
-      weekday: 'short',
-      hour: 'numeric',
-      minute: '2-digit',
-      timeZone: value,
-    }).format(new Date());
-  } catch {
-    return null;
+function localTimeIconFromKey(
+  key: ReturnType<typeof resolveLocalTimeIconKey>,
+): LucideIcon {
+  switch (key) {
+    case 'morning':
+      return Sunrise;
+    case 'day':
+      return Sun;
+    case 'evening':
+      return Sunset;
+    case 'off-hours':
+      return MoonStar;
+    case 'offline':
+      return CircleOff;
+    case 'clock':
+    default:
+      return Clock3;
   }
 }
 
-function buildAboutFields(user: UserProfileVM): AboutField[] {
+function formatRelativeLastSeen(iso?: string | null): string | null {
+  if (!iso) return null;
+  const timestamp = new Date(iso).getTime();
+  if (Number.isNaN(timestamp)) return null;
+
+  const diffMs = Math.max(0, Date.now() - timestamp);
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 5) return `${weeks}w ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo ago`;
+  const years = Math.floor(days / 365);
+  return `${years}y ago`;
+}
+
+function buildLastSeenLabel(
+  user: UserProfileVM,
+  presence?: ProfilePresenceSummary | null,
+): string | null {
+  const displayStatus = presence?.displayStatus ?? user.presence?.displayStatus ?? null;
+  if (displayStatus === 'online') return 'Online now';
+  const relative = formatRelativeLastSeen(
+    presence?.lastSeenAt ?? user.presence?.lastSeenAt,
+  );
+  return relative ? `Last seen ${relative}` : null;
+}
+
+function buildAboutFields(
+  user: UserProfileVM,
+  presence?: ProfilePresenceSummary | null,
+): AboutField[] {
   const countryCode = normalizeCountryCode(user.location?.countryCode);
   const fields: AboutField[] = [];
 
@@ -103,12 +203,23 @@ function buildAboutFields(user: UserProfileVM): AboutField[] {
     fields.push({ key, label, value: value.trim(), Icon });
   };
 
-  push('role', 'Role', roleLabelFromKind(user.kind), Users);
   push('bio', 'Bio', user.profile.bio, FileText);
   push('email', 'Email', user.profile.email ?? user.accountEmail ?? null, Mail);
   push('location', 'Location', buildLocationLabel(user), MapPin);
-  push('timezone', 'Timezone', user.prefs?.timezone, Globe);
-  push('localTime', 'Current local time', formatLocalTime(user.prefs?.timezone), Clock);
+  push(
+    'localTime',
+    'Current local time',
+    formatLocalTimeText(user.prefs?.timezone),
+    localTimeIconFromKey(
+      resolveLocalTimeIconKey({
+        timezone: user.prefs?.timezone,
+        presenceStatus: normalizePresenceStatus(
+          presence?.displayStatus ?? user.presence?.displayStatus ?? null,
+        ),
+      }),
+    ),
+  );
+  push('lastSeen', 'Last seen', buildLastSeenLabel(user, presence), Clock);
   push('languages', 'Languages', user.prefs?.languagesSpoken?.join(', '), Globe);
 
   if (user.kind === 'educator') {
@@ -218,12 +329,33 @@ export function ProfileSheet({
 }: ProfileSheetProps) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const profileId = user?.ids.id ?? '';
+  const orgId = user?.ids.orgId ?? '';
+  const presenceQuery = useQuery({
+    queryKey: ['profile-preview-presence', orgId, profileId],
+    queryFn: async () => {
+      const rows = await apiGet<ProfilePresenceRow[]>('/presence', {
+        orgId,
+        profileIds: profileId,
+      });
+      const row = rows[0] ?? null;
+      return row
+        ? {
+            displayStatus: row.display_status ?? null,
+            lastSeenAt: row.last_seen_at ?? null,
+          }
+        : null;
+    },
+    enabled: visible && Boolean(orgId && profileId),
+    staleTime: 30 * 1000,
+  });
 
   if (!user) return null;
 
   const displayName = user.profile.displayName;
   const roleLabel = roleLabelFromKind(user.kind);
-  const aboutFields = buildAboutFields(user);
+  const RoleIcon = roleIconFromKind(user.kind);
+  const aboutFields = buildAboutFields(user, presenceQuery.data);
   const hasPresence = user.presence?.state?.emoji || user.presence?.state?.text;
 
   return (
@@ -238,7 +370,14 @@ export function ProfileSheet({
         {/* Header */}
         <View style={s.header}>
           <LargeAvatar user={user} />
-          <Text style={[s.displayName, { color: colors.text }]}>{displayName}</Text>
+          <RoleNameIndicator
+            name={displayName}
+            role={user.kind}
+            iconSize={16}
+            textStyle={[s.displayName, { color: colors.text }]}
+            containerStyle={s.displayNameWrap}
+            numberOfLines={2}
+          />
 
           {hasPresence && (
             <View style={[s.presenceBadge, { backgroundColor: colors.card }]}>
@@ -257,6 +396,7 @@ export function ProfileSheet({
           )}
 
           <View style={[s.roleBadge, { backgroundColor: colors.card }]}>
+            <RoleIcon size={14} color={colors.textMuted} strokeWidth={2} />
             <Text style={[s.roleText, { color: colors.textMuted }]}>{roleLabel}</Text>
           </View>
 
@@ -274,9 +414,7 @@ export function ProfileSheet({
               accessibilityLabel={`Message ${displayName}`}
               onPress={onMessagePress}
             >
-              <View style={[s.messageActionIcon, { backgroundColor: colors.inputBg }]}>
-                <MessageCircle size={18} color={colors.text} />
-              </View>
+              <MessageCircle size={18} color={colors.text} />
               <Text style={[s.messageActionText, { color: colors.text }]}>Message</Text>
             </TouchableOpacity>
           ) : null}
@@ -338,6 +476,10 @@ const s = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
   },
+  displayNameWrap: {
+    justifyContent: 'center',
+    maxWidth: '100%',
+  },
   presenceBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -354,6 +496,9 @@ const s = StyleSheet.create({
     maxWidth: 200,
   },
   roleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
@@ -374,13 +519,6 @@ const s = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 14,
     paddingVertical: 8,
-  },
-  messageActionIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   messageActionText: {
     fontSize: 14,

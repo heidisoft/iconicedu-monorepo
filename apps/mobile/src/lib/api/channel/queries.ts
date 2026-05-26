@@ -135,6 +135,7 @@ export type ChannelMemberProfileItem = {
   accountId: string | null;
   bio: string | null;
   email: string | null;
+  timezone: string | null;
 };
 
 export async function fetchChannelMembers(

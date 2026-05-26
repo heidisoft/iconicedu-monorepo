@@ -14,6 +14,7 @@ type DmParticipant = {
   display_name: string | null;
   first_name: string | null;
   last_name: string | null;
+  account_id?: string | null;
   avatar_url: string | null;
   avatar_seed: string | null;
   timezone?: string | null;
@@ -61,6 +62,7 @@ type ChannelMemberProfileItem = {
   accountId: string | null;
   bio: string | null;
   email: string | null;
+  timezone: string | null;
 };
 
 type ChannelMemberProfileRow = {
@@ -74,6 +76,7 @@ type ChannelMemberProfileRow = {
         avatar_seed?: string | null;
         kind?: string | null;
         bio?: string | null;
+        timezone?: string | null;
       }
     | Array<{
         account_id?: string | null;
@@ -83,6 +86,7 @@ type ChannelMemberProfileRow = {
         avatar_seed?: string | null;
         kind?: string | null;
         bio?: string | null;
+        timezone?: string | null;
       }>
     | null;
 };
@@ -151,6 +155,7 @@ function addChannelMemberProfileRows(
       accountId: profile.account_id ? String(profile.account_id) : null,
       bio: profile.bio ? String(profile.bio) : null,
       email: null,
+      timezone: profile.timezone ? String(profile.timezone) : null,
     });
   }
 }
@@ -319,7 +324,7 @@ export class ChannelsService {
       supabase
         .from('channel_members')
         .select(
-          'channel_id, profile_id, profile:profiles!profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed, timezone, city, country_code, country_name, kind)',
+          'channel_id, profile_id, profile:profiles!profile_id(id, account_id, display_name, first_name, last_name, avatar_url, avatar_seed, timezone, city, country_code, country_name, kind)',
         )
         .in('channel_id', channelIds)
         .is('deleted_at', null),
@@ -482,7 +487,7 @@ export class ChannelsService {
         supabase
           .from('channel_members')
           .select(
-            'channel_id, profile_id, profile:profiles!profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed, timezone, city, country_code, country_name, kind)',
+            'channel_id, profile_id, profile:profiles!profile_id(id, account_id, display_name, first_name, last_name, avatar_url, avatar_seed, timezone, city, country_code, country_name, kind)',
           )
           .in('channel_id', channelIds)
           .is('deleted_at', null),
@@ -1063,7 +1068,8 @@ export class ChannelsService {
           last_name,
           avatar_seed,
           kind,
-          bio
+          bio,
+          timezone
         )
         `,
       )
@@ -1092,7 +1098,8 @@ export class ChannelsService {
               last_name,
               avatar_seed,
               kind,
-              bio
+              bio,
+              timezone
             )
             `,
         )

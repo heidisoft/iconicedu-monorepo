@@ -44,45 +44,11 @@ import { MessageBubblesSkeleton } from '@/components/skeletons';
 import { buildMobileChannelEmptyStateCopy } from '@/lib/message-empty-state';
 import type { AttachmentPayload } from '@/components/messages/attachment-sheet';
 import type { PendingUpload } from '@/components/messages/pending-message-row';
-import type { PresenceDisplayStatus } from '@/hooks/use-online-profile-ids';
 import { useMarkRead } from '@/hooks/use-mark-read';
 import type { ChannelListItem, DmParticipant } from '@/lib/api/types';
 import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
 import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
-
-const COUNTRY_LABELS: Record<string, string> = {
-  LK: 'Sri Lanka',
-  IN: 'India',
-  AU: 'Australia',
-  GB: 'United Kingdom',
-  US: 'United States',
-  CA: 'Canada',
-  NZ: 'New Zealand',
-  SG: 'Singapore',
-  AE: 'UAE',
-  SA: 'Saudi Arabia',
-  PK: 'Pakistan',
-  BD: 'Bangladesh',
-  MY: 'Malaysia',
-  KE: 'Kenya',
-  NG: 'Nigeria',
-  ZA: 'South Africa',
-  FR: 'France',
-  DE: 'Germany',
-  TR: 'Turkey',
-  BR: 'Brazil',
-  JP: 'Japan',
-  CN: 'China',
-  PH: 'Philippines',
-  OM: 'Oman',
-  QA: 'Qatar',
-};
-
-type LocalTimeContext = {
-  icon: 'clock' | 'morning' | 'day' | 'evening' | 'off-hours' | 'offline';
-  descriptor: string | null;
-  tooltipLabel: string | null;
-};
+import { buildLocalTimeContext, formatLocalTimeText } from '@/lib/local-time-context';
 
 function participantName(participant: DmParticipant | null | undefined): string | null {
   if (!participant) return null;
@@ -97,10 +63,77 @@ function getDmPartner(meta: ChannelListItem | null | undefined) {
   return meta?.participants?.[0] ?? null;
 }
 
+function normalizeProfileKind(value?: string | null): UserProfileVM['kind'] {
+  if (
+    value === 'educator' ||
+    value === 'guardian' ||
+    value === 'child' ||
+    value === 'staff' ||
+    value === 'system'
+  ) {
+    return value;
+  }
+  return 'staff';
+}
+
+function buildDmPartnerProfile(input: {
+  partner: DmParticipant;
+  orgId: string;
+  presenceStatus?: string | null;
+  lastSeenAt?: string | null;
+}): UserProfileVM | null {
+  const name = participantName(input.partner);
+  if (!name) return null;
+
+  const now = new Date(0).toISOString();
+  return {
+    ids: {
+      id: input.partner.id,
+      orgId: input.orgId,
+      accountId: input.partner.account_id ?? input.partner.id,
+    },
+    kind: normalizeProfileKind(input.partner.kind),
+    profile: {
+      displayName: name,
+      firstName: input.partner.first_name ?? null,
+      lastName: input.partner.last_name ?? null,
+      avatar: input.partner.avatar_url
+        ? { source: 'upload', url: input.partner.avatar_url }
+        : { source: 'seed', seed: input.partner.avatar_seed ?? input.partner.id },
+    },
+    prefs: { timezone: input.partner.timezone ?? null },
+    presence: {
+      state: {},
+      liveStatus: input.presenceStatus === 'offline' ? 'offline' : 'online',
+      displayStatus:
+        input.presenceStatus === 'online' ||
+        input.presenceStatus === 'busy' ||
+        input.presenceStatus === 'idle' ||
+        input.presenceStatus === 'away' ||
+        input.presenceStatus === 'offline'
+          ? input.presenceStatus
+          : undefined,
+      lastSeenAt: input.lastSeenAt ?? null,
+      presenceLoaded: Boolean(input.presenceStatus || input.lastSeenAt),
+    },
+    location: {
+      city: input.partner.city ?? null,
+      countryCode: input.partner.country_code ?? null,
+      countryName: input.partner.country_name ?? null,
+    },
+    meta: { createdAt: now, updatedAt: now },
+  } as UserProfileVM;
+}
+
 export default function DmConversationScreen() {
-  const { channelId } = useLocalSearchParams<{
-    channelId: string;
-  }>();
+  const { channelId, avatarTimezone, avatarCity, avatarCountryCode, avatarCountryName } =
+    useLocalSearchParams<{
+      channelId: string;
+      avatarTimezone?: string;
+      avatarCity?: string;
+      avatarCountryCode?: string;
+      avatarCountryName?: string;
+    }>();
 
   const router = useRouter();
   const isFocused = useIsFocused();
@@ -140,10 +173,12 @@ export default function DmConversationScreen() {
   const resolvedPresenceProfileId = dmPartner?.id ?? '';
   const resolvedAvatarUrl = dmPartner?.avatar_url ?? undefined;
   const resolvedAvatarRole = dmPartner?.kind ?? undefined;
-  const resolvedAvatarTimezone = dmPartner?.timezone ?? undefined;
-  const resolvedAvatarCity = dmPartner?.city ?? undefined;
-  const resolvedAvatarCountryCode = dmPartner?.country_code ?? undefined;
-  const resolvedAvatarCountryName = dmPartner?.country_name ?? undefined;
+  const resolvedAvatarTimezone = dmPartner?.timezone ?? avatarTimezone ?? undefined;
+  const resolvedAvatarCity = dmPartner?.city ?? avatarCity ?? undefined;
+  const resolvedAvatarCountryCode =
+    dmPartner?.country_code ?? avatarCountryCode ?? undefined;
+  const resolvedAvatarCountryName =
+    dmPartner?.country_name ?? avatarCountryName ?? undefined;
   const resolvedSubtitle = dmMeta?.description ?? 'Direct Message';
   const resolvedIsSupervised = dmMeta?.is_supervised === true;
   const resolvedSupervisedChildName = dmMeta?.supervised_child_name ?? undefined;
@@ -178,97 +213,6 @@ export default function DmConversationScreen() {
     return `${years}y ago`;
   }, []);
 
-  const localTimeText = useCallback((timezone: string | undefined) => {
-    const tz = timezone?.trim();
-    if (!tz) return null;
-    try {
-      return new Intl.DateTimeFormat(undefined, {
-        hour: 'numeric',
-        minute: '2-digit',
-        timeZone: tz,
-      }).format(new Date());
-    } catch {
-      return null;
-    }
-  }, []);
-
-  const buildLocalTimeContext = useCallback(
-    (
-      timezone: string | undefined,
-      city: string | undefined,
-      countryCode: string | undefined,
-      countryName: string | undefined,
-      presenceStatus: PresenceDisplayStatus | null,
-    ): LocalTimeContext | null => {
-      const timeText = localTimeText(timezone);
-      if (!timeText) return null;
-
-      const tz = timezone?.trim();
-      let hour: number | null = null;
-      if (tz) {
-        try {
-          const hourText = new Intl.DateTimeFormat('en-US', {
-            hour: 'numeric',
-            hour12: false,
-            timeZone: tz,
-          }).format(new Date());
-          const parsedHour = Number.parseInt(hourText, 10);
-          hour = Number.isFinite(parsedHour) ? parsedHour : null;
-        } catch {
-          hour = null;
-        }
-      }
-
-      const normalizedCity = city?.trim() ?? '';
-      const normalizedCountryName = countryName?.trim() ?? '';
-      const normalizedCountryCode = countryCode?.trim().toUpperCase() ?? '';
-      const normalizedCountry =
-        normalizedCountryName ||
-        (normalizedCountryCode ? (COUNTRY_LABELS[normalizedCountryCode] ?? '') : '');
-      const locationLabel =
-        normalizedCity && normalizedCountry
-          ? `${normalizedCity}, ${normalizedCountry}`
-          : normalizedCity || normalizedCountry || null;
-
-      let icon: LocalTimeContext['icon'] = 'clock';
-      let descriptor: string | null = null;
-
-      if (presenceStatus === 'offline') {
-        icon = 'offline';
-        descriptor = 'They may be offline right now';
-      } else if (hour !== null) {
-        if (hour >= 5 && hour < 9) {
-          icon = 'morning';
-          descriptor = 'It is morning there';
-        } else if (hour >= 9 && hour < 18) {
-          icon = 'day';
-          descriptor = 'It is daytime there';
-        } else if (hour >= 18 && hour < 21) {
-          icon = 'evening';
-          descriptor = 'It is evening there';
-        } else {
-          icon = 'off-hours';
-          descriptor = 'It may be off hours there';
-        }
-      }
-
-      const tooltipLines = [`Current time: ${timeText}`];
-      if (locationLabel) {
-        tooltipLines.push(`Location: ${locationLabel}`);
-      }
-      if (descriptor) {
-        tooltipLines.push(descriptor);
-      }
-
-      return {
-        icon,
-        descriptor,
-        tooltipLabel: tooltipLines.join('\n'),
-      };
-    },
-    [localTimeText],
-  );
-
   const headerSubtitle = resolvedIsSupervised
     ? resolvedSupervisedChildName
       ? `Supervising ${resolvedSupervisedChildName}'s conversation`
@@ -286,18 +230,27 @@ export default function DmConversationScreen() {
   const headerLocalTime = resolvedIsSupervised
     ? null
     : (() => {
-        const timeText = localTimeText(resolvedAvatarTimezone);
+        const timeText = formatLocalTimeText(resolvedAvatarTimezone);
         return timeText ? timeText : null;
       })();
   const headerLocalTimeContext = resolvedIsSupervised
     ? null
-    : buildLocalTimeContext(
-        resolvedAvatarTimezone,
-        resolvedAvatarCity,
-        resolvedAvatarCountryCode,
-        resolvedAvatarCountryName,
-        headerPresenceStatus ?? headerPresenceSummary.status,
-      );
+    : buildLocalTimeContext({
+        timezone: resolvedAvatarTimezone,
+        city: resolvedAvatarCity,
+        countryCode: resolvedAvatarCountryCode,
+        countryName: resolvedAvatarCountryName,
+        presenceStatus: headerPresenceStatus ?? headerPresenceSummary.status,
+      });
+  const headerPartnerProfile =
+    dmPartner && orgId
+      ? buildDmPartnerProfile({
+          partner: dmPartner,
+          orgId,
+          presenceStatus: headerPresenceStatus ?? headerPresenceSummary.status,
+          lastSeenAt: headerPresenceSummary.lastSeenAt,
+        })
+      : null;
 
   const {
     data: messages,
@@ -684,6 +637,9 @@ export default function DmConversationScreen() {
         loading={isLoadingDmMeta && !dmMeta}
         onBack={() => router.back()}
         onMore={() => setInfoVisible(true)}
+        onAvatarPress={
+          headerPartnerProfile ? () => setProfileUser(headerPartnerProfile) : undefined
+        }
       />
       <KeyboardAvoidingView
         style={[styles.flex, { backgroundColor: colors.pageBg }]}
