@@ -15,6 +15,7 @@ export {
 } from './account/queries';
 export {
   fetchChannels,
+  fetchChannelMembers,
   fetchChannelMetaByChannelId,
   fetchDirectMessageChannelMetaByChannelId,
   fetchDirectMessages,
@@ -24,6 +25,7 @@ export {
   fetchProfilesByAccountIds,
   fetchSupervisedDirectMessages,
   findDirectMessageChannelForProfiles,
+  ensureDirectMessageChannelForProfiles,
 } from './channel/queries';
 export {
   buildMessageStoragePath,

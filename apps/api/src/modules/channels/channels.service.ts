@@ -1,7 +1,12 @@
+import { randomUUID } from 'crypto';
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '@iconicedu/api/prisma/prisma.service';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
+import {
+  apiFeatureFlagKeys,
+  evaluateApiBooleanFlag,
+} from '@iconicedu/api/lib/flags/posthog-openfeature';
 import { ThreadsService } from '@iconicedu/api/modules/threads/threads.service';
 
 type DmParticipant = {
@@ -9,6 +14,7 @@ type DmParticipant = {
   display_name: string | null;
   first_name: string | null;
   last_name: string | null;
+  account_id?: string | null;
   avatar_url: string | null;
   avatar_seed: string | null;
   timezone?: string | null;
@@ -16,6 +22,7 @@ type DmParticipant = {
   country_code?: string | null;
   country_name?: string | null;
   kind?: string | null;
+  ui_theme_key?: string | null;
 };
 
 type ChannelListItem = {
@@ -48,6 +55,59 @@ type ChannelListItem = {
 
 type LastMessageInfo = { text: string | null; at: string | null; sender: string | null };
 
+type ChannelMemberProfileItem = {
+  id: string;
+  name: string;
+  avatarSeed: string | null;
+  themeKey: string | null;
+  role: string | null;
+  accountId: string | null;
+  bio: string | null;
+  email: string | null;
+  timezone: string | null;
+};
+
+type ChannelMemberProfileRow = {
+  profile_id: string | null;
+  profile:
+    | {
+        account_id?: string | null;
+        display_name?: string | null;
+        first_name?: string | null;
+        last_name?: string | null;
+        avatar_seed?: string | null;
+        kind?: string | null;
+        bio?: string | null;
+        timezone?: string | null;
+        ui_theme_key?: string | null;
+      }
+    | Array<{
+        account_id?: string | null;
+        display_name?: string | null;
+        first_name?: string | null;
+        last_name?: string | null;
+        avatar_seed?: string | null;
+        kind?: string | null;
+        bio?: string | null;
+        timezone?: string | null;
+        ui_theme_key?: string | null;
+      }>
+    | null;
+};
+
+type DirectMessageChannelResult = {
+  channelId: string;
+  topic: string;
+  avatarSeed: string | null;
+  avatarUrl: string | null;
+  avatarRole: string | null;
+  avatarTimezone: string | null;
+  avatarCity: string | null;
+  avatarCountryCode: string | null;
+  avatarCountryName: string | null;
+  avatarThemeKey: string | null;
+};
+
 const PREVIEW_LABELS: Record<string, string> = {
   image: 'Image',
   file: 'File',
@@ -69,6 +129,80 @@ function resolveMessageUiThemeKey(uiDefaults: unknown): 'classic' | 'feed' | nul
   }
   const value = (uiDefaults as { messageUiThemeKey?: unknown }).messageUiThemeKey;
   return value === 'classic' || value === 'feed' ? value : null;
+}
+
+function isDmChannelUniqueConflict(error: { code?: string; message?: string }) {
+  return (
+    error.code === '23505' &&
+    ((error.message ?? '').includes('channels_org_dm_key_uniq') ||
+      (error.message ?? '').includes('duplicate key value'))
+  );
+}
+
+function addChannelMemberProfileRows(
+  rows: ChannelMemberProfileRow[] | null | undefined,
+  output: Map<string, ChannelMemberProfileItem>,
+) {
+  for (const row of rows ?? []) {
+    const profile = Array.isArray(row.profile) ? row.profile[0] : row.profile;
+    if (!row.profile_id || !profile || output.has(row.profile_id)) continue;
+
+    const name =
+      profile.display_name?.trim() ||
+      [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim();
+    if (!name) continue;
+
+    output.set(row.profile_id, {
+      id: String(row.profile_id),
+      name,
+      avatarSeed: profile.avatar_seed ? String(profile.avatar_seed) : name,
+      role: profile.kind ? String(profile.kind) : null,
+      accountId: profile.account_id ? String(profile.account_id) : null,
+      bio: profile.bio ? String(profile.bio) : null,
+      email: null,
+      timezone: profile.timezone ? String(profile.timezone) : null,
+      themeKey: profile.ui_theme_key ? String(profile.ui_theme_key) : null,
+    });
+  }
+}
+
+function buildDirectMessageChannelResult(
+  channelId: string,
+  targetProfile: {
+    id: string;
+    display_name?: string | null;
+    first_name?: string | null;
+    last_name?: string | null;
+    avatar_url?: string | null;
+    avatar_seed?: string | null;
+    timezone?: string | null;
+    city?: string | null;
+    country_code?: string | null;
+    country_name?: string | null;
+    kind?: string | null;
+    ui_theme_key?: string | null;
+  },
+): DirectMessageChannelResult {
+  const topic =
+    targetProfile.display_name?.trim() ||
+    [targetProfile.first_name, targetProfile.last_name]
+      .filter(Boolean)
+      .join(' ')
+      .trim() ||
+    'Direct Message';
+
+  return {
+    channelId,
+    topic,
+    avatarSeed: targetProfile.avatar_seed ?? targetProfile.id,
+    avatarUrl: targetProfile.avatar_url ?? null,
+    avatarRole: targetProfile.kind ?? null,
+    avatarTimezone: targetProfile.timezone ?? null,
+    avatarCity: targetProfile.city ?? null,
+    avatarCountryCode: targetProfile.country_code ?? null,
+    avatarCountryName: targetProfile.country_name ?? null,
+    avatarThemeKey: targetProfile.ui_theme_key ?? null,
+  };
 }
 
 @Injectable()
@@ -198,7 +332,7 @@ export class ChannelsService {
       supabase
         .from('channel_members')
         .select(
-          'channel_id, profile_id, profile:profiles!profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed, timezone, city, country_code, country_name, kind)',
+          'channel_id, profile_id, profile:profiles!profile_id(id, account_id, display_name, first_name, last_name, avatar_url, avatar_seed, timezone, city, country_code, country_name, kind, ui_theme_key)',
         )
         .in('channel_id', channelIds)
         .is('deleted_at', null),
@@ -361,7 +495,7 @@ export class ChannelsService {
         supabase
           .from('channel_members')
           .select(
-            'channel_id, profile_id, profile:profiles!profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed, timezone, city, country_code, country_name, kind)',
+            'channel_id, profile_id, profile:profiles!profile_id(id, account_id, display_name, first_name, last_name, avatar_url, avatar_seed, timezone, city, country_code, country_name, kind, ui_theme_key)',
           )
           .in('channel_id', channelIds)
           .is('deleted_at', null),
@@ -429,7 +563,7 @@ export class ChannelsService {
   async findDirectMessageChannel(
     accessToken: string,
     input: { orgId: string; profileId: string; otherProfileId: string },
-  ) {
+  ): Promise<DirectMessageChannelResult | null> {
     if (
       !input.orgId ||
       !input.profileId ||
@@ -484,7 +618,7 @@ export class ChannelsService {
       supabase
         .from('profiles')
         .select(
-          'id, display_name, first_name, last_name, avatar_url, avatar_seed, timezone, city, country_code, country_name, kind',
+          'id, display_name, first_name, last_name, avatar_url, avatar_seed, timezone, city, country_code, country_name, kind, ui_theme_key',
         )
         .eq('id', input.otherProfileId)
         .is('deleted_at', null)
@@ -495,24 +629,147 @@ export class ChannelsService {
 
     const channel = channels?.[0];
     if (!channel || !targetProfile) return null;
-    const topic =
-      targetProfile.display_name?.trim() ||
-      [targetProfile.first_name, targetProfile.last_name]
-        .filter(Boolean)
-        .join(' ')
-        .trim() ||
-      'Direct Message';
-    return {
-      channelId: channel.id,
-      topic,
-      avatarSeed: (targetProfile.avatar_seed as string | null) ?? targetProfile.id,
-      avatarUrl: (targetProfile.avatar_url as string | null) ?? null,
-      avatarRole: (targetProfile.kind as string | null) ?? null,
-      avatarTimezone: (targetProfile.timezone as string | null) ?? null,
-      avatarCity: (targetProfile.city as string | null) ?? null,
-      avatarCountryCode: (targetProfile.country_code as string | null) ?? null,
-      avatarCountryName: (targetProfile.country_name as string | null) ?? null,
-    };
+    return buildDirectMessageChannelResult(channel.id, targetProfile);
+  }
+
+  async ensureDirectMessageChannel(
+    accessToken: string,
+    input: { orgId: string; profileId: string; otherProfileId: string },
+  ): Promise<DirectMessageChannelResult | null> {
+    if (
+      !input.orgId ||
+      !input.profileId ||
+      !input.otherProfileId ||
+      input.profileId === input.otherProfileId
+    ) {
+      return null;
+    }
+
+    const existing = await this.findDirectMessageChannel(accessToken, input);
+    if (existing) return existing;
+
+    const canCreateDirectMessage = await evaluateApiBooleanFlag({
+      flagKey: apiFeatureFlagKeys.enableMobileDirectMessageStart,
+      distinctId: input.profileId,
+      personProperties: {
+        profileId: input.profileId,
+        orgId: input.orgId,
+      },
+    });
+    if (!canCreateDirectMessage) return null;
+
+    const supabase = createSupabaseSessionClient(accessToken);
+    const [
+      { data: currentProfile, error: currentProfileError },
+      { data: targetProfile, error: targetProfileError },
+    ] = await Promise.all([
+      supabase
+        .from('profiles')
+        .select('id, org_id')
+        .eq('id', input.profileId)
+        .eq('org_id', input.orgId)
+        .is('deleted_at', null)
+        .maybeSingle<{ id: string; org_id: string }>(),
+      supabase
+        .from('profiles')
+        .select(
+          'id, org_id, display_name, first_name, last_name, avatar_url, avatar_seed, timezone, city, country_code, country_name, kind, ui_theme_key',
+        )
+        .eq('id', input.otherProfileId)
+        .eq('org_id', input.orgId)
+        .is('deleted_at', null)
+        .maybeSingle<{
+          id: string;
+          org_id: string;
+          display_name: string | null;
+          first_name: string | null;
+          last_name: string | null;
+          avatar_url: string | null;
+          avatar_seed: string | null;
+          timezone?: string | null;
+          city?: string | null;
+          country_code?: string | null;
+          country_name?: string | null;
+          kind?: string | null;
+          ui_theme_key?: string | null;
+        }>(),
+    ]);
+
+    if (currentProfileError) {
+      throw new InternalServerErrorException(currentProfileError.message);
+    }
+    if (targetProfileError) {
+      throw new InternalServerErrorException(targetProfileError.message);
+    }
+    if (!currentProfile || !targetProfile) return null;
+
+    const dmKey = `dm:${[input.profileId, input.otherProfileId].sort().join('-')}`;
+    const now = new Date().toISOString();
+    const channelId = randomUUID();
+    const writeSupabase = createSupabaseServiceClient();
+    const { error: channelError } = await writeSupabase.from('channels').insert({
+      id: channelId,
+      org_id: input.orgId,
+      kind: 'dm',
+      topic: 'Direct message',
+      description: null,
+      icon_key: null,
+      visibility: 'private',
+      purpose: 'general',
+      status: 'active',
+      dm_key: dmKey,
+      posting_policy_kind: 'members-only',
+      allow_threads: true,
+      allow_reactions: true,
+      ui_defaults: {
+        messageUiThemeKey: 'classic',
+        defaultRightPanelOpen: false,
+        defaultRightPanelKey: 'channel_info',
+        infoPanel: {
+          showHeader: false,
+          showDetails: false,
+          showMedia: false,
+          showMembers: false,
+          showQuickActions: false,
+          showHiddenQuickActions: false,
+        },
+      },
+      created_by_profile_id: input.profileId,
+      created_at: now,
+      created_by: input.profileId,
+      updated_at: now,
+      updated_by: input.profileId,
+    });
+
+    if (channelError) {
+      if (isDmChannelUniqueConflict(channelError)) {
+        return this.findDirectMessageChannel(accessToken, input);
+      }
+      throw new InternalServerErrorException(channelError.message);
+    }
+
+    const memberRows = Array.from(new Set([input.profileId, input.otherProfileId])).map(
+      (profileId) => ({
+        id: randomUUID(),
+        org_id: input.orgId,
+        channel_id: channelId,
+        profile_id: profileId,
+        joined_at: now,
+        role_in_channel: null,
+        created_at: now,
+        created_by: input.profileId,
+        updated_at: now,
+        updated_by: input.profileId,
+      }),
+    );
+    const { error: memberError } = await writeSupabase
+      .from('channel_members')
+      .insert(memberRows);
+    if (memberError) {
+      throw new InternalServerErrorException(memberError.message);
+    }
+
+    return buildDirectMessageChannelResult(channelId, targetProfile);
   }
 
   async getDirectMessageChannelMeta(
@@ -765,6 +1022,113 @@ export class ChannelsService {
       .maybeSingle();
     if (error) throw new InternalServerErrorException(error.message);
     return { isMember: Boolean(data) };
+  }
+
+  async getChannelMembers(
+    accessToken: string,
+    input: { orgId: string; channelId: string; profileId: string },
+  ): Promise<ChannelMemberProfileItem[]> {
+    if (!input.orgId || !input.channelId || !input.profileId) return [];
+
+    const sessionSupabase = createSupabaseSessionClient(accessToken);
+    const serviceSupabase = createSupabaseServiceClient();
+
+    const { data: spaceLink, error: spaceLinkError } = await serviceSupabase
+      .from('learning_space_channels')
+      .select('learning_space_id')
+      .eq('org_id', input.orgId)
+      .eq('channel_id', input.channelId)
+      .eq('is_primary', true)
+      .is('deleted_at', null)
+      .maybeSingle<{ learning_space_id: string | null }>();
+    if (spaceLinkError) throw new InternalServerErrorException(spaceLinkError.message);
+    const learningSpaceId = spaceLink?.learning_space_id ?? null;
+
+    const membership = await this.getMembership(accessToken, input);
+    let isAuthorized = membership.isMember;
+
+    if (!isAuthorized && learningSpaceId) {
+      const { data: participant, error: participantError } = await sessionSupabase
+        .from('learning_space_participants')
+        .select('id')
+        .eq('org_id', input.orgId)
+        .eq('learning_space_id', learningSpaceId)
+        .eq('profile_id', input.profileId)
+        .is('deleted_at', null)
+        .maybeSingle<{ id: string }>();
+      if (participantError)
+        throw new InternalServerErrorException(participantError.message);
+      isAuthorized = Boolean(participant);
+    }
+
+    if (!isAuthorized) return [];
+
+    const membersByProfileId = new Map<string, ChannelMemberProfileItem>();
+
+    const { data: channelRows, error: channelMembersError } = await serviceSupabase
+      .from('channel_members')
+      .select(
+        `
+        profile_id,
+        profile:profiles!profile_id(
+          account_id,
+          display_name,
+          first_name,
+          last_name,
+          avatar_seed,
+          kind,
+          bio,
+          timezone,
+          ui_theme_key
+        )
+        `,
+      )
+      .eq('org_id', input.orgId)
+      .eq('channel_id', input.channelId)
+      .is('deleted_at', null)
+      .order('joined_at', { ascending: true });
+
+    if (channelMembersError)
+      throw new InternalServerErrorException(channelMembersError.message);
+    addChannelMemberProfileRows(
+      channelRows as ChannelMemberProfileRow[],
+      membersByProfileId,
+    );
+
+    if (learningSpaceId) {
+      const { data: participantRows, error: participantRowsError } = await serviceSupabase
+        .from('learning_space_participants')
+        .select(
+          `
+            profile_id,
+            profile:profiles!profile_id(
+              account_id,
+              display_name,
+              first_name,
+              last_name,
+              avatar_seed,
+              kind,
+              bio,
+              timezone,
+              ui_theme_key
+            )
+            `,
+        )
+        .eq('org_id', input.orgId)
+        .eq('learning_space_id', learningSpaceId)
+        .is('deleted_at', null);
+
+      if (participantRowsError)
+        throw new InternalServerErrorException(participantRowsError.message);
+      addChannelMemberProfileRows(
+        participantRows as ChannelMemberProfileRow[],
+        membersByProfileId,
+      );
+    }
+
+    return [...membersByProfileId.values()].sort((left, right) =>
+      left.name.localeCompare(right.name),
+    );
   }
 
   async getReadState(

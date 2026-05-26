@@ -43,16 +43,7 @@ import { PulseBox } from '@/components/skeletons/pulse-box';
 import { RoleAvatarBadge } from '@/components/profile/role-avatar-badge';
 import { RoleNameIndicator } from '@/components/profile/role-name-indicator';
 import type { PresenceDisplayStatus } from '@/hooks/use-online-profile-ids';
-
-const AVATAR_COLORS = [
-  '#5B8DEF',
-  '#E07B54',
-  '#6CC070',
-  '#A86CC1',
-  '#E0A854',
-  '#54B8C4',
-  '#E06C8A',
-];
+import { profileAvatarColors } from '@/lib/profile-avatar-colors';
 
 const THEME_KEY_COLORS: Record<string, { bg: string; fg: string }> = {
   slate: { bg: '#64748b', fg: '#ffffff' },
@@ -78,12 +69,6 @@ const THEME_KEY_COLORS: Record<string, { bg: string; fg: string }> = {
   pink: { bg: '#ec4899', fg: '#ffffff' },
   rose: { bg: '#f43f5e', fg: '#ffffff' },
 };
-
-function avatarColor(seed: string): string {
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
-  return AVATAR_COLORS[h % AVATAR_COLORS.length];
-}
 
 function getInitials(name: string): string {
   const words = name.trim().split(/\s+/);
@@ -135,6 +120,7 @@ export type ConversationHeaderProps = {
     | null;
   kind: 'dm' | 'channel' | 'space';
   avatarSeed?: string | null;
+  avatarThemeKey?: string | null;
   avatarUrl?: string | null;
   avatarRole?: string | null;
   iconKey?: string | null;
@@ -145,6 +131,7 @@ export type ConversationHeaderProps = {
   onMore?: () => void;
   liveJoinUrl?: string | null;
   secondaryAvatarSeed?: string | null;
+  secondaryAvatarThemeKey?: string | null;
   secondaryAvatarRole?: string | null;
   presenceStatus?: PresenceDisplayStatus | null;
   isReadOnly?: boolean;
@@ -617,6 +604,7 @@ export function ConversationHeader({
   localTimeIcon,
   kind,
   avatarSeed,
+  avatarThemeKey,
   avatarUrl,
   avatarRole,
   iconKey,
@@ -627,6 +615,7 @@ export function ConversationHeader({
   onMore,
   liveJoinUrl,
   secondaryAvatarSeed,
+  secondaryAvatarThemeKey,
   secondaryAvatarRole,
   presenceStatus,
   isReadOnly = false,
@@ -642,6 +631,13 @@ export function ConversationHeader({
   const isDm = kind === 'dm';
   const useElevatedHeader = kind !== 'space';
   const seed = avatarSeed ?? title;
+  const avatarColors = profileAvatarColors({ seed, themeKey: avatarThemeKey });
+  const secondaryAvatarColors = secondaryAvatarSeed
+    ? profileAvatarColors({
+        seed: secondaryAvatarSeed,
+        themeKey: secondaryAvatarThemeKey,
+      })
+    : null;
   const iconTheme =
     !isDm && themeKey && THEME_KEY_COLORS[themeKey]
       ? THEME_KEY_COLORS[themeKey]
@@ -809,6 +805,26 @@ export function ConversationHeader({
     </View>
   );
 
+  const titleContent = loading ? (
+    <View style={s.titleSkeletonWrap}>
+      <PulseBox width={148} height={16} radius={5} />
+      <PulseBox width={96} height={12} radius={5} />
+    </View>
+  ) : (
+    <>
+      <RoleNameIndicator
+        name={secondaryAvatarSeed ? `${secondaryAvatarSeed} <> ${title}` : title}
+        role={avatarRole}
+        iconSize={14}
+        textStyle={s.title}
+        numberOfLines={1}
+      />
+      {hasSubtitleMeta && subtitleContent}
+    </>
+  );
+  const identityPress = onMore;
+  const identityLabel = `Open ${title} details`;
+
   return (
     <>
       <View style={[s.container, useElevatedHeader ? s.containerElevated : null]}>
@@ -817,11 +833,28 @@ export function ConversationHeader({
         </TouchableOpacity>
 
         {isDm && secondaryAvatarSeed ? (
-          <View style={s.groupWrap}>
+          <TouchableOpacity
+            style={s.groupWrap}
+            onPress={identityPress}
+            disabled={!identityPress}
+            activeOpacity={0.75}
+            accessibilityRole={identityPress ? 'button' : undefined}
+            accessibilityLabel={identityPress ? identityLabel : undefined}
+          >
             <View
-              style={[s.groupBack, { backgroundColor: avatarColor(secondaryAvatarSeed) }]}
+              style={[
+                s.groupBack,
+                { backgroundColor: secondaryAvatarColors?.bg ?? avatarColors.bg },
+              ]}
             >
-              <Text style={s.groupTxt}>{getInitials(secondaryAvatarSeed)}</Text>
+              <Text
+                style={[
+                  s.groupTxt,
+                  { color: secondaryAvatarColors?.fg ?? avatarColors.fg },
+                ]}
+              >
+                {getInitials(secondaryAvatarSeed)}
+              </Text>
             </View>
             <RoleAvatarBadge
               role={secondaryAvatarRole}
@@ -831,55 +864,68 @@ export function ConversationHeader({
             {avatarUrl ? (
               <Image source={{ uri: avatarUrl }} style={s.groupFront} />
             ) : (
-              <View style={[s.groupFront, { backgroundColor: avatarColor(seed) }]}>
-                <Text style={s.groupTxt}>{getInitials(title)}</Text>
+              <View style={[s.groupFront, { backgroundColor: avatarColors.bg }]}>
+                <Text style={[s.groupTxt, { color: avatarColors.fg }]}>
+                  {getInitials(title)}
+                </Text>
               </View>
             )}
             <RoleAvatarBadge role={avatarRole} size={14} style={s.groupBadgeFront} />
-          </View>
+          </TouchableOpacity>
         ) : isDm ? (
-          <View style={s.avatarWrap}>
+          <TouchableOpacity
+            style={s.avatarWrap}
+            onPress={identityPress}
+            disabled={!identityPress}
+            activeOpacity={0.75}
+            accessibilityRole={identityPress ? 'button' : undefined}
+            accessibilityLabel={identityPress ? identityLabel : undefined}
+          >
             {avatarUrl ? (
               <Image source={{ uri: avatarUrl }} style={s.avatarCircle} />
             ) : (
-              <View style={[s.avatarCircle, { backgroundColor: avatarColor(seed) }]}>
-                <Text style={s.avatarTxt}>{getInitials(title)}</Text>
+              <View style={[s.avatarCircle, { backgroundColor: avatarColors.bg }]}>
+                <Text style={[s.avatarTxt, { color: avatarColors.fg }]}>
+                  {getInitials(title)}
+                </Text>
               </View>
             )}
             {presenceBadge}
             <RoleAvatarBadge role={avatarRole} size={16} />
-          </View>
+          </TouchableOpacity>
         ) : (
-          <ChannelTopicIconBadge
-            iconKey={iconKey}
-            size={42}
-            iconSize={22}
-            borderRadius={21}
-            backgroundColor={iconTheme.bg}
-            color={iconTheme.fg}
-            style={s.iconBox}
-          />
+          <TouchableOpacity
+            onPress={identityPress}
+            disabled={!identityPress}
+            activeOpacity={0.75}
+            accessibilityRole={identityPress ? 'button' : undefined}
+            accessibilityLabel={identityPress ? identityLabel : undefined}
+          >
+            <ChannelTopicIconBadge
+              iconKey={iconKey}
+              size={42}
+              iconSize={22}
+              borderRadius={21}
+              backgroundColor={iconTheme.bg}
+              color={iconTheme.fg}
+              style={s.iconBox}
+            />
+          </TouchableOpacity>
         )}
 
-        <View style={s.titleBlock}>
-          {loading ? (
-            <View style={s.titleSkeletonWrap}>
-              <PulseBox width={148} height={16} radius={5} />
-              <PulseBox width={96} height={12} radius={5} />
-            </View>
-          ) : (
-            <>
-              <RoleNameIndicator
-                name={secondaryAvatarSeed ? `${secondaryAvatarSeed} <> ${title}` : title}
-                role={avatarRole}
-                iconSize={14}
-                textStyle={s.title}
-                numberOfLines={1}
-              />
-              {hasSubtitleMeta && subtitleContent}
-            </>
-          )}
-        </View>
+        {identityPress ? (
+          <TouchableOpacity
+            style={s.titleBlock}
+            onPress={identityPress}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel={identityLabel}
+          >
+            {titleContent}
+          </TouchableOpacity>
+        ) : (
+          <View style={s.titleBlock}>{titleContent}</View>
+        )}
 
         {!isReadOnly && (
           <View style={s.actions}>

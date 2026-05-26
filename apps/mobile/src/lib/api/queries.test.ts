@@ -1,7 +1,9 @@
 import {
   cancelRecurringSessionOccurrence,
+  fetchChannelMembers,
   fetchChannelMetaByChannelId,
   fetchDirectMessageChannelMetaByChannelId,
+  ensureDirectMessageChannelForProfiles,
   fetchSpaceSchedulesByChannelId,
   fetchActivityFeed,
   fetchSupervisedDirectMessages,
@@ -710,6 +712,78 @@ describe('fetchDirectMessageChannelMetaByChannelId', () => {
   });
 });
 
+describe('fetchChannelMembers', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('loads channel members through the API', async () => {
+    mockApiGet.mockResolvedValue([
+      {
+        id: 'profile-2',
+        name: 'Tutor Jane',
+        avatarSeed: 'jane-seed',
+        role: 'educator',
+        accountId: 'account-2',
+        bio: null,
+        email: null,
+      },
+    ]);
+
+    const result = await fetchChannelMembers(SUP_ORG, 'channel-1', GUARDIAN_PROFILE_ID);
+
+    expect(mockApiGet).toHaveBeenCalledWith('/channels/channel-1/members', {
+      orgId: SUP_ORG,
+      profileId: GUARDIAN_PROFILE_ID,
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0]!.name).toBe('Tutor Jane');
+  });
+
+  it('returns an empty list when required identifiers are missing', async () => {
+    await expect(fetchChannelMembers(SUP_ORG, '', GUARDIAN_PROFILE_ID)).resolves.toEqual(
+      [],
+    );
+
+    expect(mockApiGet).not.toHaveBeenCalled();
+  });
+});
+
+describe('ensureDirectMessageChannelForProfiles', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('posts to the ensure DM API with both profile ids', async () => {
+    mockApiPost.mockResolvedValue({ channelId: 'dm-1', topic: 'Avery' });
+
+    const result = await ensureDirectMessageChannelForProfiles(
+      SUP_ORG,
+      GUARDIAN_PROFILE_ID,
+      'prof-teacher-1',
+    );
+
+    expect(mockApiPost).toHaveBeenCalledWith('/channels/ensure-dm', {
+      orgId: SUP_ORG,
+      profileId: GUARDIAN_PROFILE_ID,
+      otherProfileId: 'prof-teacher-1',
+    });
+    expect(result).toMatchObject({ channelId: 'dm-1', topic: 'Avery' });
+  });
+
+  it('returns null without calling the API when the target is the current profile', async () => {
+    await expect(
+      ensureDirectMessageChannelForProfiles(
+        SUP_ORG,
+        GUARDIAN_PROFILE_ID,
+        GUARDIAN_PROFILE_ID,
+      ),
+    ).resolves.toBeNull();
+
+    expect(mockApiPost).not.toHaveBeenCalled();
+  });
+});
+
 describe('fetchChannelMetaByChannelId', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -842,6 +916,7 @@ describe('mapRowToMessageVM', () => {
           avatar_url: null,
           avatar_seed: 'profile-1',
           kind: 'educator',
+          timezone: null,
         },
       } as RawMessageRow,
       {
@@ -857,6 +932,34 @@ describe('mapRowToMessageVM', () => {
     expect((message as { content?: { text?: string } }).content?.text).toBe(
       'Audio caption text.',
     );
+  });
+
+  it('maps sender timezone into the profile preview VM', () => {
+    const message = mapRowToMessageVM(
+      {
+        id: 'msg-text-1',
+        org_id: 'org-1',
+        channel_id: 'channel-1',
+        sender_profile_id: 'profile-1',
+        type: 'text',
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+        sender: {
+          id: 'profile-1',
+          display_name: 'Tutor One',
+          first_name: null,
+          last_name: null,
+          avatar_url: null,
+          avatar_seed: 'profile-1',
+          kind: 'educator',
+          timezone: 'Asia/Colombo',
+        },
+      } as RawMessageRow,
+      { text: 'Hello' },
+      [],
+    );
+
+    expect(message.core.sender.prefs?.timezone).toBe('Asia/Colombo');
   });
 });
 

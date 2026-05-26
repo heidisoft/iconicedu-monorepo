@@ -1,1 +1,1 @@
-pnpm exec turbo run lint typecheck test --affected
+pnpm prepush:check

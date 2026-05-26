@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { useRouter } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase/client';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -35,7 +36,15 @@ import { ChannelTopicIconBadge } from '@/lib/learning-space-icons';
 import { RoleNameIndicator } from '@/components/profile/role-name-indicator';
 import { useAccount } from '@/hooks/use-account';
 import { useProfile } from '@/hooks/use-profile';
-import { findDirectMessageChannelForProfiles } from '@/lib/api/queries';
+import {
+  ensureDirectMessageChannelForProfiles,
+  fetchChannelMembers,
+  findDirectMessageChannelForProfiles,
+  queryKeys,
+} from '@/lib/api/queries';
+import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
+import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
+import { profileAvatarColors, profileAvatarBg } from '@/lib/profile-avatar-colors';
 import { BottomSheet } from '@iconicedu/ui-native';
 
 const CHANNEL_FILES_BUCKET = 'channel-files';
@@ -45,45 +54,8 @@ const PARTIAL_HEIGHT_RATIO = 0.58;
 
 // ─── Avatar helpers ────────────────────────────────────────────────────────────
 
-const AVATAR_COLORS = [
-  '#5B8DEF',
-  '#E07B54',
-  '#6CC070',
-  '#A86CC1',
-  '#E0A854',
-  '#54B8C4',
-  '#E06C8A',
-];
-
-const THEME_AVATAR_COLORS: Record<string, { bg: string; fg: string }> = {
-  slate: { bg: '#64748b', fg: '#ffffff' },
-  gray: { bg: '#6b7280', fg: '#ffffff' },
-  zinc: { bg: '#71717a', fg: '#ffffff' },
-  neutral: { bg: '#737373', fg: '#ffffff' },
-  stone: { bg: '#78716c', fg: '#ffffff' },
-  red: { bg: '#ef4444', fg: '#ffffff' },
-  orange: { bg: '#f97316', fg: '#ffffff' },
-  amber: { bg: '#f59e0b', fg: '#1f2937' },
-  yellow: { bg: '#eab308', fg: '#1f2937' },
-  lime: { bg: '#84cc16', fg: '#1f2937' },
-  green: { bg: '#22c55e', fg: '#ffffff' },
-  emerald: { bg: '#10b981', fg: '#ffffff' },
-  teal: { bg: '#14b8a6', fg: '#ffffff' },
-  cyan: { bg: '#06b6d4', fg: '#ffffff' },
-  sky: { bg: '#0ea5e9', fg: '#ffffff' },
-  blue: { bg: '#3b82f6', fg: '#ffffff' },
-  indigo: { bg: '#6366f1', fg: '#ffffff' },
-  violet: { bg: '#8b5cf6', fg: '#ffffff' },
-  purple: { bg: '#a855f7', fg: '#ffffff' },
-  fuchsia: { bg: '#d946ef', fg: '#ffffff' },
-  pink: { bg: '#ec4899', fg: '#ffffff' },
-  rose: { bg: '#f43f5e', fg: '#ffffff' },
-};
-
-function avatarColor(seed: string): string {
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
-  return AVATAR_COLORS[h % AVATAR_COLORS.length]!;
+function avatarColor(seed: string, themeKey?: string | null): string {
+  return profileAvatarBg(seed, themeKey);
 }
 
 function getInitials(name: string): string {
@@ -97,12 +69,17 @@ function themeAvatarColor(
   fallbackBg?: string,
   fallbackFg?: string,
 ): { bg: string; fg: string } {
-  return (
-    (themeKey && THEME_AVATAR_COLORS[themeKey]) || {
-      bg: fallbackBg || '#f8fafc',
-      fg: fallbackFg || '#0f172a',
-    }
-  );
+  if (themeKey) {
+    return profileAvatarColors({
+      seed: themeKey,
+      themeKey,
+      fallbackFg: fallbackFg || '#0f172a',
+    });
+  }
+  return {
+    bg: fallbackBg || '#f8fafc',
+    fg: fallbackFg || '#0f172a',
+  };
 }
 
 // ─── Sender name helper ────────────────────────────────────────────────────────
@@ -162,6 +139,7 @@ function extractSaved(messages: MessageVM[]): Array<{
   id: string;
   senderName: string;
   senderRole?: string | null;
+  senderThemeKey?: string | null;
   preview: string;
   createdAt: string;
 }> {
@@ -171,6 +149,7 @@ function extractSaved(messages: MessageVM[]): Array<{
       id: m.ids.id,
       senderName: getSenderName(m.core.sender),
       senderRole: m.core.sender.kind,
+      senderThemeKey: m.core.sender.ui?.themeKey ?? null,
       preview: getMessagePreview(m),
       createdAt: m.core.createdAt,
     }))
@@ -183,18 +162,41 @@ function extractMembers(
     id: string;
     name: string;
     avatarSeed?: string | null;
+    themeKey?: string | null;
     role?: string | null;
+    profile?: UserProfileVM | null;
   }> | null,
-): Array<{ id: string; name: string; seed: string; role?: string | null }> {
+): Array<{
+  id: string;
+  name: string;
+  seed: string;
+  role?: string | null;
+  themeKey?: string | null;
+  profile?: UserProfileVM | null;
+}> {
   const map = new Map<
     string,
-    { id: string; name: string; seed: string; role?: string | null }
+    {
+      id: string;
+      name: string;
+      seed: string;
+      role?: string | null;
+      themeKey?: string | null;
+      profile?: UserProfileVM | null;
+    }
   >();
   for (const msg of messages) {
     const s = msg.core.sender;
     if (!map.has(s.ids.id)) {
       const name = getSenderName(s);
-      map.set(s.ids.id, { id: s.ids.id, name, seed: name, role: s.kind });
+      map.set(s.ids.id, {
+        id: s.ids.id,
+        name,
+        seed: name,
+        role: s.kind,
+        themeKey: s.ui?.themeKey ?? null,
+        profile: s,
+      });
     }
   }
   if (extraMembers) {
@@ -205,11 +207,60 @@ function extractMembers(
           name: m.name,
           seed: m.avatarSeed ?? m.name,
           role: m.role,
+          themeKey: m.themeKey ?? m.profile?.ui?.themeKey ?? null,
+          profile: m.profile ?? null,
         });
       }
     }
   }
   return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function normalizeMemberProfileKind(value?: string | null): UserProfileVM['kind'] {
+  if (
+    value === 'educator' ||
+    value === 'guardian' ||
+    value === 'child' ||
+    value === 'staff' ||
+    value === 'system'
+  ) {
+    return value;
+  }
+  return 'staff';
+}
+
+function buildMemberProfile(input: {
+  id: string;
+  orgId: string;
+  accountId?: string | null;
+  name: string;
+  avatarSeed?: string | null;
+  themeKey?: string | null;
+  role?: string | null;
+  bio?: string | null;
+  email?: string | null;
+  timezone?: string | null;
+}): UserProfileVM {
+  const now = new Date(0).toISOString();
+  return {
+    ids: {
+      id: input.id,
+      orgId: input.orgId,
+      accountId: input.accountId || input.id,
+    },
+    kind: normalizeMemberProfileKind(input.role),
+    profile: {
+      displayName: input.name,
+      firstName: null,
+      lastName: null,
+      bio: input.bio ?? null,
+      email: input.email ?? null,
+      avatar: { source: 'seed', seed: input.avatarSeed ?? input.id, url: null },
+    },
+    prefs: { timezone: input.timezone ?? null },
+    ui: { themeKey: input.themeKey ?? null },
+    meta: { createdAt: now, updatedAt: now },
+  } as UserProfileVM;
 }
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -227,6 +278,7 @@ export type ChannelInfoSheetProps = {
   subtitle?: string | null;
   kind: 'dm' | 'channel' | 'space';
   avatarSeed?: string | null;
+  avatarThemeKey?: string | null;
   avatarRole?: string | null;
   iconKey?: string | null;
   themeKey?: string | null;
@@ -236,10 +288,12 @@ export type ChannelInfoSheetProps = {
     id: string;
     name: string;
     avatarSeed?: string | null;
+    themeKey?: string | null;
     role?: string | null;
   }> | null;
   messages?: MessageVM[];
   onClose: () => void;
+  onProfilePress?: (user: UserProfileVM) => void;
 };
 
 // ─── Tab definitions ───────────────────────────────────────────────────────────
@@ -392,16 +446,25 @@ type TabContentProps = {
     id: string;
     senderName: string;
     senderRole?: string | null;
+    senderThemeKey?: string | null;
     preview: string;
     createdAt: string;
   }>;
-  memberItems: Array<{ id: string; name: string; seed: string; role?: string | null }>;
+  memberItems: Array<{
+    id: string;
+    name: string;
+    seed: string;
+    role?: string | null;
+    themeKey?: string | null;
+    profile?: UserProfileVM | null;
+  }>;
   colors: AppColors;
   s: ReturnType<typeof makeStyles>;
   memberCount?: number | null;
   isFullScreen: boolean;
   currentProfileId?: string | null;
   onMemberMessage?: (memberId: string, memberName: string) => void;
+  onProfilePress?: (user: UserProfileVM) => void;
 };
 
 function TabContent({
@@ -417,6 +480,7 @@ function TabContent({
   isFullScreen,
   currentProfileId,
   onMemberMessage,
+  onProfilePress,
 }: TabContentProps) {
   if (activeTab === 'files') {
     if (filesLoading) {
@@ -461,12 +525,17 @@ function TabContent({
     return (
       <ScrollView showsVerticalScrollIndicator={false} scrollEnabled={isFullScreen}>
         {savedItems.map((item) => {
-          const color = avatarColor(item.senderName);
+          const avatarColors = profileAvatarColors({
+            seed: item.senderName,
+            themeKey: item.senderThemeKey,
+          });
           return (
             <View key={item.id} style={s.savedItem}>
               <View style={{ width: 40, height: 40, position: 'relative' }}>
-                <View style={[s.savedAvatar, { backgroundColor: color }]}>
-                  <Text style={s.savedAvatarTxt}>{getInitials(item.senderName)}</Text>
+                <View style={[s.savedAvatar, { backgroundColor: avatarColors.bg }]}>
+                  <Text style={[s.savedAvatarTxt, { color: avatarColors.fg }]}>
+                    {getInitials(item.senderName)}
+                  </Text>
                 </View>
               </View>
               <View style={s.savedBody}>
@@ -516,19 +585,58 @@ function TabContent({
       </View>
       {memberItems.map((member) => (
         <View key={member.id} style={s.memberRow}>
-          <View style={{ width: 36, height: 36, position: 'relative' }}>
-            <View style={[s.memberAvatar, { backgroundColor: avatarColor(member.seed) }]}>
-              <Text style={s.memberAvatarTxt}>{getInitials(member.name)}</Text>
+          <TouchableOpacity
+            style={{ width: 36, height: 36, position: 'relative' }}
+            onPress={() => {
+              if (member.profile) {
+                onProfilePress?.(member.profile);
+              }
+            }}
+            disabled={!member.profile || !onProfilePress}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel={`Open ${member.name} profile`}
+          >
+            <View
+              style={[
+                s.memberAvatar,
+                { backgroundColor: avatarColor(member.seed, member.themeKey) },
+              ]}
+            >
+              <Text
+                style={[
+                  s.memberAvatarTxt,
+                  {
+                    color: profileAvatarColors({
+                      seed: member.seed,
+                      themeKey: member.themeKey,
+                    }).fg,
+                  },
+                ]}
+              >
+                {getInitials(member.name)}
+              </Text>
             </View>
-          </View>
-          <View style={s.memberInfo}>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={s.memberInfo}
+            onPress={() => {
+              if (member.profile) {
+                onProfilePress?.(member.profile);
+              }
+            }}
+            disabled={!member.profile || !onProfilePress}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel={`Open ${member.name} profile`}
+          >
             <RoleNameIndicator
               name={member.name}
               role={member.role}
               textStyle={s.memberName}
               iconSize={12}
             />
-          </View>
+          </TouchableOpacity>
           {currentProfileId && member.id === currentProfileId ? (
             <View style={s.memberSelfBadge}>
               <Text style={s.memberSelfBadgeText}>You</Text>
@@ -887,6 +995,7 @@ export function ChannelInfoSheet({
   subtitle,
   kind,
   avatarSeed,
+  avatarThemeKey,
   avatarRole,
   iconKey,
   themeKey,
@@ -895,9 +1004,11 @@ export function ChannelInfoSheet({
   members,
   messages = [],
   onClose,
+  onProfilePress,
 }: ChannelInfoSheetProps) {
   const { colors } = useTheme();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { data: account } = useAccount();
   const { data: profile } = useProfile();
   const s = useMemo(() => makeStyles(colors), [colors]);
@@ -905,6 +1016,9 @@ export function ChannelInfoSheet({
   const orgId = account?.org_id ?? '';
   const currentProfileId =
     ((profile as Record<string, unknown> | undefined)?.id as string | undefined) ?? '';
+  const enableMobileDirectMessageStart = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.enableMobileDirectMessageStart,
+  );
 
   const [activeTab, setActiveTab] = useState<ChannelTab>('files');
   const [channelUiDefaults, setChannelUiDefaults] =
@@ -912,6 +1026,7 @@ export function ChannelInfoSheet({
 
   const isDm = kind === 'dm';
   const seed = avatarSeed ?? title;
+  const heroAvatarColors = profileAvatarColors({ seed, themeKey: avatarThemeKey });
   const typeLabel = isDm ? 'Direct Message' : kind === 'space' ? 'Class' : 'Channel';
   const iconTheme = !isDm
     ? themeAvatarColor(themeKey, colors.inputBg, colors.text)
@@ -927,7 +1042,14 @@ export function ChannelInfoSheet({
   const [fileItems, setFileItems] = useState<FileItem[]>([]);
   const [filesLoading, setFilesLoading] = useState(false);
   const [loadedMembers, setLoadedMembers] = useState<
-    Array<{ id: string; name: string; avatarSeed?: string | null; role?: string | null }>
+    Array<{
+      id: string;
+      name: string;
+      avatarSeed?: string | null;
+      themeKey?: string | null;
+      role?: string | null;
+      profile?: UserProfileVM | null;
+    }>
   >([]);
   const [membersLoading, setMembersLoading] = useState(false);
 
@@ -1000,37 +1122,26 @@ export function ChannelInfoSheet({
 
     (async () => {
       try {
-        const { data, error } = await supabase
-          .from('channel_members')
-          .select(
-            `
-            profile_id,
-            profile:profiles!profile_id(display_name, first_name, last_name, avatar_seed, kind)
-          `,
-          )
-          .eq('channel_id', channelId)
-          .is('deleted_at', null);
-
-        if (error) throw error;
-
-        const nextMembers = (data ?? [])
-          .flatMap((row) => {
-            const profile = Array.isArray(row.profile) ? row.profile[0] : row.profile;
-            if (!profile) return [];
-            const name =
-              profile.display_name?.trim() ||
-              [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim();
-            if (!name) return [];
-            return [
-              {
-                id: String(row.profile_id),
-                name,
-                avatarSeed: profile.avatar_seed ? String(profile.avatar_seed) : name,
-                role: profile.kind ? String(profile.kind) : null,
-              },
-            ];
-          })
-          .sort((a, b) => a.name.localeCompare(b.name));
+        const memberRows = await fetchChannelMembers(orgId, channelId, currentProfileId);
+        const nextMembers = memberRows.map((member) => ({
+          id: member.id,
+          name: member.name,
+          avatarSeed: member.avatarSeed ?? member.name,
+          themeKey: member.themeKey ?? null,
+          role: member.role,
+          profile: buildMemberProfile({
+            id: member.id,
+            orgId,
+            accountId: member.accountId,
+            name: member.name,
+            avatarSeed: member.avatarSeed ?? member.name,
+            themeKey: member.themeKey,
+            role: member.role,
+            bio: member.bio,
+            email: member.email,
+            timezone: member.timezone,
+          }),
+        }));
 
         setLoadedMembers(nextMembers);
       } catch {
@@ -1039,7 +1150,7 @@ export function ChannelInfoSheet({
         setMembersLoading(false);
       }
     })();
-  }, [visible, channelId]);
+  }, [channelId, currentProfileId, orgId, visible]);
 
   useEffect(() => {
     if (!visible || !channelId || isDm) {
@@ -1098,19 +1209,26 @@ export function ChannelInfoSheet({
       }
 
       try {
-        const dm = await findDirectMessageChannelForProfiles(
-          orgId,
-          currentProfileId,
-          memberId,
-        );
+        const dm = enableMobileDirectMessageStart
+          ? await ensureDirectMessageChannelForProfiles(orgId, currentProfileId, memberId)
+          : await findDirectMessageChannelForProfiles(orgId, currentProfileId, memberId);
         if (!dm) {
           Alert.alert(
-            'No direct message',
-            `No direct message exists with ${memberName} yet.`,
+            enableMobileDirectMessageStart
+              ? 'Unable to open direct message'
+              : 'No direct message',
+            enableMobileDirectMessageStart
+              ? `Cannot message ${memberName}.`
+              : `No direct message exists with ${memberName} yet.`,
           );
           return;
         }
 
+        if (enableMobileDirectMessageStart) {
+          void queryClient.invalidateQueries({
+            queryKey: queryKeys.directMessages(orgId, currentProfileId),
+          });
+        }
         onClose();
         router.push({
           pathname: '/(app)/dm/[channelId]',
@@ -1120,6 +1238,7 @@ export function ChannelInfoSheet({
             avatarSeed: dm.avatarSeed ?? '',
             avatarUrl: dm.avatarUrl ?? '',
             avatarRole: dm.avatarRole ?? '',
+            avatarThemeKey: dm.avatarThemeKey ?? '',
             avatarTimezone: dm.avatarTimezone ?? '',
             avatarCity: dm.avatarCity ?? '',
             avatarCountryCode: dm.avatarCountryCode ?? '',
@@ -1130,7 +1249,14 @@ export function ChannelInfoSheet({
         Alert.alert('Unable to open direct message', 'Please try again.');
       }
     },
-    [currentProfileId, onClose, orgId, router],
+    [
+      currentProfileId,
+      enableMobileDirectMessageStart,
+      onClose,
+      orgId,
+      queryClient,
+      router,
+    ],
   );
 
   return (
@@ -1151,8 +1277,10 @@ export function ChannelInfoSheet({
             {/* Hero */}
             <View style={s.hero}>
               <View style={{ width: 72, height: 72, position: 'relative' }}>
-                <View style={[s.avatarCircle, { backgroundColor: avatarColor(seed) }]}>
-                  <Text style={s.avatarTxt}>{getInitials(title)}</Text>
+                <View style={[s.avatarCircle, { backgroundColor: heroAvatarColors.bg }]}>
+                  <Text style={[s.avatarTxt, { color: heroAvatarColors.fg }]}>
+                    {getInitials(title)}
+                  </Text>
                 </View>
               </View>
               <RoleNameIndicator
@@ -1251,6 +1379,7 @@ export function ChannelInfoSheet({
                   isFullScreen={isExpanded}
                   currentProfileId={currentProfileId}
                   onMemberMessage={handleMemberMessage}
+                  onProfilePress={onProfilePress}
                 />
               ) : (
                 <EmptyTabState

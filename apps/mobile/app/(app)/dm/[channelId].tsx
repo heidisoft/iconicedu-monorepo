@@ -25,6 +25,7 @@ import {
   deleteMessage,
   fetchChannelReadState,
   fetchDirectMessageChannelMetaByChannelId,
+  ensureDirectMessageChannelForProfiles,
   queryKeys,
 } from '@/lib/api/queries';
 import { useTheme } from '@/providers/theme-provider';
@@ -43,43 +44,11 @@ import { MessageBubblesSkeleton } from '@/components/skeletons';
 import { buildMobileChannelEmptyStateCopy } from '@/lib/message-empty-state';
 import type { AttachmentPayload } from '@/components/messages/attachment-sheet';
 import type { PendingUpload } from '@/components/messages/pending-message-row';
-import type { PresenceDisplayStatus } from '@/hooks/use-online-profile-ids';
 import { useMarkRead } from '@/hooks/use-mark-read';
 import type { ChannelListItem, DmParticipant } from '@/lib/api/types';
-
-const COUNTRY_LABELS: Record<string, string> = {
-  LK: 'Sri Lanka',
-  IN: 'India',
-  AU: 'Australia',
-  GB: 'United Kingdom',
-  US: 'United States',
-  CA: 'Canada',
-  NZ: 'New Zealand',
-  SG: 'Singapore',
-  AE: 'UAE',
-  SA: 'Saudi Arabia',
-  PK: 'Pakistan',
-  BD: 'Bangladesh',
-  MY: 'Malaysia',
-  KE: 'Kenya',
-  NG: 'Nigeria',
-  ZA: 'South Africa',
-  FR: 'France',
-  DE: 'Germany',
-  TR: 'Turkey',
-  BR: 'Brazil',
-  JP: 'Japan',
-  CN: 'China',
-  PH: 'Philippines',
-  OM: 'Oman',
-  QA: 'Qatar',
-};
-
-type LocalTimeContext = {
-  icon: 'clock' | 'morning' | 'day' | 'evening' | 'off-hours' | 'offline';
-  descriptor: string | null;
-  tooltipLabel: string | null;
-};
+import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
+import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
+import { buildLocalTimeContext, formatLocalTimeText } from '@/lib/local-time-context';
 
 function participantName(participant: DmParticipant | null | undefined): string | null {
   if (!participant) return null;
@@ -95,8 +64,20 @@ function getDmPartner(meta: ChannelListItem | null | undefined) {
 }
 
 export default function DmConversationScreen() {
-  const { channelId } = useLocalSearchParams<{
+  const {
+    channelId,
+    avatarThemeKey,
+    avatarTimezone,
+    avatarCity,
+    avatarCountryCode,
+    avatarCountryName,
+  } = useLocalSearchParams<{
     channelId: string;
+    avatarThemeKey?: string;
+    avatarTimezone?: string;
+    avatarCity?: string;
+    avatarCountryCode?: string;
+    avatarCountryName?: string;
   }>();
 
   const router = useRouter();
@@ -105,6 +86,9 @@ export default function DmConversationScreen() {
   const { data: account } = useAccount();
   const { data: profile } = useProfile();
   const { colors } = useTheme();
+  const enableMobileDirectMessageStart = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.enableMobileDirectMessageStart,
+  );
   const ThemedMessageList = resolveMobileMessageUiTheme('classic').MessageList;
 
   const orgId = account?.org_id ?? '';
@@ -134,10 +118,13 @@ export default function DmConversationScreen() {
   const resolvedPresenceProfileId = dmPartner?.id ?? '';
   const resolvedAvatarUrl = dmPartner?.avatar_url ?? undefined;
   const resolvedAvatarRole = dmPartner?.kind ?? undefined;
-  const resolvedAvatarTimezone = dmPartner?.timezone ?? undefined;
-  const resolvedAvatarCity = dmPartner?.city ?? undefined;
-  const resolvedAvatarCountryCode = dmPartner?.country_code ?? undefined;
-  const resolvedAvatarCountryName = dmPartner?.country_name ?? undefined;
+  const resolvedAvatarThemeKey = dmPartner?.ui_theme_key ?? avatarThemeKey ?? undefined;
+  const resolvedAvatarTimezone = dmPartner?.timezone ?? avatarTimezone ?? undefined;
+  const resolvedAvatarCity = dmPartner?.city ?? avatarCity ?? undefined;
+  const resolvedAvatarCountryCode =
+    dmPartner?.country_code ?? avatarCountryCode ?? undefined;
+  const resolvedAvatarCountryName =
+    dmPartner?.country_name ?? avatarCountryName ?? undefined;
   const resolvedSubtitle = dmMeta?.description ?? 'Direct Message';
   const resolvedIsSupervised = dmMeta?.is_supervised === true;
   const resolvedSupervisedChildName = dmMeta?.supervised_child_name ?? undefined;
@@ -172,97 +159,6 @@ export default function DmConversationScreen() {
     return `${years}y ago`;
   }, []);
 
-  const localTimeText = useCallback((timezone: string | undefined) => {
-    const tz = timezone?.trim();
-    if (!tz) return null;
-    try {
-      return new Intl.DateTimeFormat(undefined, {
-        hour: 'numeric',
-        minute: '2-digit',
-        timeZone: tz,
-      }).format(new Date());
-    } catch {
-      return null;
-    }
-  }, []);
-
-  const buildLocalTimeContext = useCallback(
-    (
-      timezone: string | undefined,
-      city: string | undefined,
-      countryCode: string | undefined,
-      countryName: string | undefined,
-      presenceStatus: PresenceDisplayStatus | null,
-    ): LocalTimeContext | null => {
-      const timeText = localTimeText(timezone);
-      if (!timeText) return null;
-
-      const tz = timezone?.trim();
-      let hour: number | null = null;
-      if (tz) {
-        try {
-          const hourText = new Intl.DateTimeFormat('en-US', {
-            hour: 'numeric',
-            hour12: false,
-            timeZone: tz,
-          }).format(new Date());
-          const parsedHour = Number.parseInt(hourText, 10);
-          hour = Number.isFinite(parsedHour) ? parsedHour : null;
-        } catch {
-          hour = null;
-        }
-      }
-
-      const normalizedCity = city?.trim() ?? '';
-      const normalizedCountryName = countryName?.trim() ?? '';
-      const normalizedCountryCode = countryCode?.trim().toUpperCase() ?? '';
-      const normalizedCountry =
-        normalizedCountryName ||
-        (normalizedCountryCode ? (COUNTRY_LABELS[normalizedCountryCode] ?? '') : '');
-      const locationLabel =
-        normalizedCity && normalizedCountry
-          ? `${normalizedCity}, ${normalizedCountry}`
-          : normalizedCity || normalizedCountry || null;
-
-      let icon: LocalTimeContext['icon'] = 'clock';
-      let descriptor: string | null = null;
-
-      if (presenceStatus === 'offline') {
-        icon = 'offline';
-        descriptor = 'They may be offline right now';
-      } else if (hour !== null) {
-        if (hour >= 5 && hour < 9) {
-          icon = 'morning';
-          descriptor = 'It is morning there';
-        } else if (hour >= 9 && hour < 18) {
-          icon = 'day';
-          descriptor = 'It is daytime there';
-        } else if (hour >= 18 && hour < 21) {
-          icon = 'evening';
-          descriptor = 'It is evening there';
-        } else {
-          icon = 'off-hours';
-          descriptor = 'It may be off hours there';
-        }
-      }
-
-      const tooltipLines = [`Current time: ${timeText}`];
-      if (locationLabel) {
-        tooltipLines.push(`Location: ${locationLabel}`);
-      }
-      if (descriptor) {
-        tooltipLines.push(descriptor);
-      }
-
-      return {
-        icon,
-        descriptor,
-        tooltipLabel: tooltipLines.join('\n'),
-      };
-    },
-    [localTimeText],
-  );
-
   const headerSubtitle = resolvedIsSupervised
     ? resolvedSupervisedChildName
       ? `Supervising ${resolvedSupervisedChildName}'s conversation`
@@ -280,18 +176,18 @@ export default function DmConversationScreen() {
   const headerLocalTime = resolvedIsSupervised
     ? null
     : (() => {
-        const timeText = localTimeText(resolvedAvatarTimezone);
+        const timeText = formatLocalTimeText(resolvedAvatarTimezone);
         return timeText ? timeText : null;
       })();
   const headerLocalTimeContext = resolvedIsSupervised
     ? null
-    : buildLocalTimeContext(
-        resolvedAvatarTimezone,
-        resolvedAvatarCity,
-        resolvedAvatarCountryCode,
-        resolvedAvatarCountryName,
-        headerPresenceStatus ?? headerPresenceSummary.status,
-      );
+    : buildLocalTimeContext({
+        timezone: resolvedAvatarTimezone,
+        city: resolvedAvatarCity,
+        countryCode: resolvedAvatarCountryCode,
+        countryName: resolvedAvatarCountryName,
+        presenceStatus: headerPresenceStatus ?? headerPresenceSummary.status,
+      });
 
   const {
     data: messages,
@@ -343,6 +239,54 @@ export default function DmConversationScreen() {
   // ── Profile sheet state ──
   const [profileUser, setProfileUser] = useState<UserProfileVM | null>(null);
   const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
+
+  const handleProfileMessagePress = useCallback(
+    async (user: UserProfileVM) => {
+      if (
+        !enableMobileDirectMessageStart ||
+        !orgId ||
+        !profileId ||
+        !user.ids.id ||
+        user.ids.id === profileId
+      ) {
+        return;
+      }
+
+      try {
+        const dm = await ensureDirectMessageChannelForProfiles(
+          orgId,
+          profileId,
+          user.ids.id,
+        );
+        if (!dm) {
+          Alert.alert('Unable to open direct message', 'Please try again.');
+          return;
+        }
+
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.directMessages(orgId, profileId),
+        });
+        setProfileUser(null);
+        router.push({
+          pathname: '/(app)/dm/[channelId]',
+          params: {
+            channelId: dm.channelId,
+            topic: dm.topic,
+            avatarSeed: dm.avatarSeed ?? '',
+            avatarUrl: dm.avatarUrl ?? '',
+            avatarRole: dm.avatarRole ?? '',
+            avatarTimezone: dm.avatarTimezone ?? '',
+            avatarCity: dm.avatarCity ?? '',
+            avatarCountryCode: dm.avatarCountryCode ?? '',
+            avatarCountryName: dm.avatarCountryName ?? '',
+          },
+        } as never);
+      } catch {
+        Alert.alert('Unable to open direct message', 'Please try again.');
+      }
+    },
+    [enableMobileDirectMessageStart, orgId, profileId, queryClient, router],
+  );
 
   // ── Long-press actions sheet state ──
   const [actionsMessage, setActionsMessage] = useState<MessageVM | null>(null);
@@ -617,6 +561,7 @@ export default function DmConversationScreen() {
         localTimeIcon={headerLocalTimeContext?.icon ?? 'clock'}
         kind="dm"
         avatarSeed={resolvedAvatarSeed}
+        avatarThemeKey={resolvedAvatarThemeKey}
         avatarUrl={resolvedAvatarUrl || undefined}
         avatarRole={resolvedAvatarRole}
         presenceStatus={headerPresenceStatus}
@@ -706,9 +651,14 @@ export default function DmConversationScreen() {
         subtitle={resolvedSubtitle}
         kind="dm"
         avatarSeed={resolvedAvatarSeed}
+        avatarThemeKey={resolvedAvatarThemeKey}
         avatarRole={resolvedAvatarRole}
         messages={messages ?? []}
         onClose={() => setInfoVisible(false)}
+        onProfilePress={(user) => {
+          setInfoVisible(false);
+          setProfileUser(user);
+        }}
       />
 
       {/* Profile sheet */}
@@ -716,6 +666,13 @@ export default function DmConversationScreen() {
         visible={!!profileUser}
         user={profileUser}
         onClose={() => setProfileUser(null)}
+        onMessagePress={
+          enableMobileDirectMessageStart &&
+          profileUser &&
+          profileUser.ids.id !== profileId
+            ? () => handleProfileMessagePress(profileUser)
+            : undefined
+        }
       />
 
       {/* Long-press actions sheet */}

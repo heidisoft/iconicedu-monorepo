@@ -26,7 +26,7 @@ export class ThreadsService {
       supabase
         .from('thread_participants')
         .select(
-          'thread_id, profile:profiles!profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed, kind)',
+          'thread_id, profile:profiles!profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed, kind, timezone, ui_theme_key)',
         )
         .eq('org_id', input.orgId)
         .eq('thread_id', input.threadId)

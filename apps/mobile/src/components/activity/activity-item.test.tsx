@@ -321,7 +321,6 @@ describe('ActivityItem', () => {
   });
 
   it('autosaves low-rating comments and uses a button to collapse to the submitted state', async () => {
-    jest.useFakeTimers();
     mockSubmitActivityFeedFeedback
       .mockResolvedValueOnce({
         submittedAt: '2026-04-02T12:05:00.000Z',
@@ -359,18 +358,33 @@ describe('ActivityItem', () => {
       expect(screen.getByText('Submit feedback')).toBeTruthy();
     });
 
-    fireEvent.changeText(
-      screen.getByPlaceholderText('Tell us what could be better...'),
-      'Helpful, but a little fast.',
-    );
+    const realSetTimeout = global.setTimeout;
+    const setTimeoutSpy = jest
+      .spyOn(global, 'setTimeout')
+      .mockImplementation(((
+        handler: TimerHandler,
+        timeout?: number,
+        ...args: unknown[]
+      ) =>
+        realSetTimeout(
+          handler,
+          timeout === 600 ? 0 : timeout,
+          ...args,
+        )) as typeof setTimeout);
+    try {
+      fireEvent.changeText(
+        screen.getByPlaceholderText('Tell us what could be better...'),
+        'Helpful, but a little fast.',
+      );
 
-    await act(async () => {
-      jest.advanceTimersByTime(600);
-    });
+      await act(async () => {
+        await new Promise((resolve) => realSetTimeout(resolve, 0));
+      });
+    } finally {
+      setTimeoutSpy.mockRestore();
+    }
 
-    await waitFor(() => {
-      expect(mockSubmitActivityFeedFeedback).toHaveBeenCalledTimes(2);
-    });
+    expect(mockSubmitActivityFeedFeedback).toHaveBeenCalledTimes(2);
     expect(screen.getByText('Submit feedback')).toBeTruthy();
     expect(screen.queryByText('Rating saved. Comments save automatically.')).toBeNull();
 

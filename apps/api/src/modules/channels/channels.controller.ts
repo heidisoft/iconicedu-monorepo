@@ -67,6 +67,27 @@ export class ChannelsController {
     );
   }
 
+  @Post('ensure-dm')
+  @UseGuards(AuthGuard)
+  ensureDm(
+    @Req() req: AuthenticatedRequest,
+    @Body()
+    body: {
+      orgId?: string;
+      profileId?: string;
+      otherProfileId?: string;
+    },
+  ) {
+    return this.channelsService.ensureDirectMessageChannel(
+      extractBearerToken(req.headers.authorization),
+      {
+        orgId: body.orgId ?? '',
+        profileId: body.profileId ?? '',
+        otherProfileId: body.otherProfileId ?? '',
+      },
+    );
+  }
+
   @Get('list')
   @UseGuards(AuthGuard)
   list(
@@ -118,6 +139,20 @@ export class ChannelsController {
     @Query('profileId') profileId: string,
   ) {
     return this.channelsService.getMembership(
+      extractBearerToken(req.headers.authorization),
+      { orgId, channelId, profileId },
+    );
+  }
+
+  @Get(':channelId/members')
+  @UseGuards(AuthGuard)
+  members(
+    @Req() req: AuthenticatedRequest,
+    @Param('channelId') channelId: string,
+    @Query('orgId') orgId: string,
+    @Query('profileId') profileId: string,
+  ) {
+    return this.channelsService.getChannelMembers(
       extractBearerToken(req.headers.authorization),
       { orgId, channelId, profileId },
     );

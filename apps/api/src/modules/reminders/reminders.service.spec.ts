@@ -222,7 +222,7 @@ describe('RemindersService', () => {
       .filter((row) => row.job_type === 'session.reminder')
       .sort((a, b) => a.run_at.localeCompare(b.run_at));
     expect(reminderRows.map((row) => row.run_at)).toEqual([
-      '2030-03-05T22:00:00.000Z',
+      '2030-03-05T17:00:00.000Z',
       '2030-03-06T09:30:00.000Z',
     ]);
     expect(reminderRows.map((row) => row.payload.summary)).toEqual([

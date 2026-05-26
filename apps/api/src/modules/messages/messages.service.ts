@@ -33,7 +33,7 @@ import {
 
 const BASE_MESSAGE_SELECT = `
   id, org_id, channel_id, sender_profile_id, visibility_type, visibility_user_ids, type, created_at, updated_at, thread_parent_id,
-  sender:profiles!sender_profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed, kind)
+  sender:profiles!sender_profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed, kind, timezone, ui_theme_key)
 `;
 
 const TYPE_TABLE: Record<string, string> = {
@@ -783,7 +783,7 @@ export class MessagesService {
       supabase
         .from('thread_participants')
         .select(
-          'thread_id, profile:profiles!profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed, kind)',
+          'thread_id, profile:profiles!profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed, kind, timezone, ui_theme_key)',
         )
         .in('thread_id', threadIds)
         .is('deleted_at', null),

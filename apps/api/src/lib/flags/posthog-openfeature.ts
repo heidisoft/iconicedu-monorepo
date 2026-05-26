@@ -1,4 +1,3 @@
-import 'server-only';
 import { OpenFeature } from '@openfeature/server-sdk';
 import type {
   EvaluationContext,
@@ -7,10 +6,14 @@ import type {
   Provider,
   ResolutionDetails,
 } from '@openfeature/server-sdk';
-import { resolveAppUrl } from '@iconicedu/web/lib/config/app-url';
+import { platformFeatureFlagKeys } from '@iconicedu/shared-types';
 
-type EvaluatePosthogBooleanFlagInput = {
-  flagKey: string;
+export const apiFeatureFlagKeys = platformFeatureFlagKeys;
+
+type ApiFeatureFlagKey = (typeof apiFeatureFlagKeys)[keyof typeof apiFeatureFlagKeys];
+
+type EvaluateApiBooleanFlagInput = {
+  flagKey: ApiFeatureFlagKey;
   distinctId: string;
   personProperties?: Record<string, string | number | boolean | null>;
   timeoutMs?: number;
@@ -18,44 +21,62 @@ type EvaluatePosthogBooleanFlagInput = {
 
 const DEFAULT_POSTHOG_HOST = 'https://t.iconicedu.lk';
 const DEFAULT_TIMEOUT_MS = 2500;
-const PROVIDER_NAME = 'iconicedu-posthog-openfeature-provider';
+const PROVIDER_NAME = 'iconicedu-api-posthog-openfeature-provider';
 
 function getPosthogHost() {
-  return (
-    process.env.POSTHOG_HOST ??
-    process.env.NEXT_PUBLIC_POSTHOG_HOST ??
-    DEFAULT_POSTHOG_HOST
-  ).trim();
+  return (process.env.POSTHOG_HOST ?? DEFAULT_POSTHOG_HOST).trim();
 }
 
 function getPosthogKey() {
-  return (process.env.POSTHOG_KEY ?? process.env.NEXT_PUBLIC_POSTHOG_KEY ?? '').trim();
+  return (process.env.POSTHOG_KEY ?? '').trim();
 }
 
-function isLocalWebEnvironment() {
-  if (process.env.NODE_ENV !== 'development') {
-    return false;
-  }
-  const hostname = new URL(resolveAppUrl()).hostname;
-  return hostname === 'localhost' || hostname === '127.0.0.1';
+function isLocalOrPreviewApiEnvironment() {
+  const appEnv = (
+    process.env.APP_ENV ??
+    process.env.API_ENV ??
+    process.env.NODE_ENV ??
+    ''
+  )
+    .trim()
+    .toLowerCase();
+  const vercelEnv = (process.env.VERCEL_ENV ?? process.env.NEXT_PUBLIC_VERCEL_ENV ?? '')
+    .trim()
+    .toLowerCase();
+  const localUrlCandidates = [
+    process.env.SUPABASE_URL,
+    process.env.DATABASE_URL,
+    process.env.DIRECT_URL,
+  ]
+    .map((value) => value?.trim().toLowerCase() ?? '')
+    .filter(Boolean);
+  const hasLocalServiceUrl = localUrlCandidates.some(
+    (value) =>
+      value.includes('localhost') ||
+      value.includes('127.0.0.1') ||
+      value.includes('host.docker.internal'),
+  );
+
+  return (
+    appEnv === 'local' ||
+    appEnv === 'preview' ||
+    (appEnv === 'development' && process.env.CI !== 'true') ||
+    vercelEnv === 'preview' ||
+    hasLocalServiceUrl
+  );
 }
 
 function getFeatureFlagValue(payload: unknown, flagKey: string) {
-  if (!payload || typeof payload !== 'object') {
-    return undefined;
-  }
+  if (!payload || typeof payload !== 'object') return undefined;
 
   const candidate = payload as {
     featureFlags?: Record<string, unknown>;
     feature_flags?: Record<string, unknown>;
   };
-
   const featureFlags = candidate.featureFlags ?? candidate.feature_flags;
-  if (!featureFlags || typeof featureFlags !== 'object') {
-    return undefined;
-  }
+  if (!featureFlags || typeof featureFlags !== 'object') return undefined;
 
-  return (featureFlags as Record<string, unknown>)[flagKey];
+  return featureFlags[flagKey];
 }
 
 function coerceBooleanFlagValue(value: unknown, defaultValue: boolean) {
@@ -78,7 +99,7 @@ class PosthogOpenFeatureProvider implements Provider {
     const apiKey = getPosthogKey();
     const host = getPosthogHost();
 
-    if (!distinctId || !flagKey.trim() || !apiKey || !host || isLocalWebEnvironment()) {
+    if (!distinctId || !flagKey.trim() || !apiKey || !host) {
       return { value: defaultValue, reason: 'DEFAULT' };
     }
 
@@ -90,9 +111,7 @@ class PosthogOpenFeatureProvider implements Provider {
     try {
       const response = await fetch(`${host.replace(/\/$/, '')}/decide/?v=3`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           api_key: apiKey,
           distinct_id: distinctId,
@@ -103,7 +122,6 @@ class PosthogOpenFeatureProvider implements Provider {
               ? context.personProperties
               : {},
         }),
-        cache: 'no-store',
         signal: controller.signal,
       });
 
@@ -159,15 +177,14 @@ function getOpenFeatureClient() {
   return OpenFeature.getClient('posthog');
 }
 
-export async function evaluatePosthogBooleanFlag(
-  input: EvaluatePosthogBooleanFlagInput,
+export async function evaluateApiBooleanFlag(
+  input: EvaluateApiBooleanFlagInput,
 ): Promise<boolean> {
   const distinctId = input.distinctId.trim();
-  const flagKey = input.flagKey.trim();
-  if (!distinctId || !flagKey) return false;
+  if (!distinctId) return false;
+  if (isLocalOrPreviewApiEnvironment()) return true;
 
-  const client = getOpenFeatureClient();
-  return client.getBooleanValue(flagKey, false, {
+  return getOpenFeatureClient().getBooleanValue(input.flagKey, false, {
     targetingKey: distinctId,
     personProperties: input.personProperties ?? {},
     timeoutMs: input.timeoutMs ?? DEFAULT_TIMEOUT_MS,

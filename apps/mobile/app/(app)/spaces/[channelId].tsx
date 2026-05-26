@@ -23,6 +23,7 @@ import {
   sendFilesMessage,
   uploadChannelFile,
   buildMessageStoragePath,
+  ensureDirectMessageChannelForProfiles,
   fetchIsChannelMember,
   fetchSpaceChannelMetaByChannelId,
   fetchChannelReadState,
@@ -44,6 +45,8 @@ import { buildMobileChannelEmptyStateCopy } from '@/lib/message-empty-state';
 import { reportMobileObservedError } from '@/lib/analytics/report-error';
 import type { MessageVM, UserProfileVM } from '@iconicedu/shared-types';
 import { useMarkRead } from '@/hooks/use-mark-read';
+import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
+import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
 
 type PendingUpload = {
   id: string;
@@ -83,6 +86,9 @@ export default function SpaceDetailScreen() {
   const { data: account } = useAccount();
   const { data: profile } = useProfile();
   const { colors } = useTheme();
+  const enableMobileDirectMessageStart = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.enableMobileDirectMessageStart,
+  );
 
   const orgId = account?.org_id ?? '';
   const accountId =
@@ -202,6 +208,54 @@ export default function SpaceDetailScreen() {
 
   // ── Profile sheet state ──
   const [profileUser, setProfileUser] = useState<UserProfileVM | null>(null);
+
+  const handleProfileMessagePress = useCallback(
+    async (user: UserProfileVM) => {
+      if (
+        !enableMobileDirectMessageStart ||
+        !orgId ||
+        !profileId ||
+        !user.ids.id ||
+        user.ids.id === profileId
+      ) {
+        return;
+      }
+
+      try {
+        const dm = await ensureDirectMessageChannelForProfiles(
+          orgId,
+          profileId,
+          user.ids.id,
+        );
+        if (!dm) {
+          Alert.alert('Unable to open direct message', 'Please try again.');
+          return;
+        }
+
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.directMessages(orgId, profileId),
+        });
+        setProfileUser(null);
+        router.push({
+          pathname: '/(app)/dm/[channelId]',
+          params: {
+            channelId: dm.channelId,
+            topic: dm.topic,
+            avatarSeed: dm.avatarSeed ?? '',
+            avatarUrl: dm.avatarUrl ?? '',
+            avatarRole: dm.avatarRole ?? '',
+            avatarTimezone: dm.avatarTimezone ?? '',
+            avatarCity: dm.avatarCity ?? '',
+            avatarCountryCode: dm.avatarCountryCode ?? '',
+            avatarCountryName: dm.avatarCountryName ?? '',
+          },
+        } as never);
+      } catch {
+        Alert.alert('Unable to open direct message', 'Please try again.');
+      }
+    },
+    [enableMobileDirectMessageStart, orgId, profileId, queryClient, router],
+  );
 
   // ── Long-press actions sheet state ──
   const [actionsMessage, setActionsMessage] = useState<MessageVM | null>(null);
@@ -584,6 +638,10 @@ export default function SpaceDetailScreen() {
         themeKey={resolvedThemeKey}
         messages={messages ?? []}
         onClose={() => setInfoVisible(false)}
+        onProfilePress={(user) => {
+          setInfoVisible(false);
+          setProfileUser(user);
+        }}
       />
 
       {/* Profile sheet */}
@@ -591,6 +649,13 @@ export default function SpaceDetailScreen() {
         visible={!!profileUser}
         user={profileUser}
         onClose={() => setProfileUser(null)}
+        onMessagePress={
+          enableMobileDirectMessageStart &&
+          profileUser &&
+          profileUser.ids.id !== profileId
+            ? () => handleProfileMessagePress(profileUser)
+            : undefined
+        }
       />
 
       {/* Long-press actions sheet */}
