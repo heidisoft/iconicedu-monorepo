@@ -48,6 +48,7 @@ import {
 import { ChannelListSkeleton } from '@/components/skeletons';
 import { RoleAvatarBadge } from '@/components/profile/role-avatar-badge';
 import { RoleNameIndicator } from '@/components/profile/role-name-indicator';
+import { profileAvatarColors } from '@/lib/profile-avatar-colors';
 
 type Tab = 'all' | 'dms' | 'channels';
 type ClassroomStudentTab = 'all' | string;
@@ -87,21 +88,6 @@ function participantName(p: DmParticipant): string {
 function getDmPresenceProfileId(item: ChannelListItem): string | null {
   const participantId = item.participants?.[0]?.id?.trim();
   return participantId || null;
-}
-
-const AVATAR_COLORS = [
-  '#5B8DEF',
-  '#E07B54',
-  '#6CC070',
-  '#A86CC1',
-  '#E0A854',
-  '#54B8C4',
-  '#E06C8A',
-];
-function avatarColor(id: string): string {
-  let h = 0;
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
-  return AVATAR_COLORS[h % AVATAR_COLORS.length];
 }
 
 const THEME_TEXT_COLORS: Record<string, string> = {
@@ -595,8 +581,30 @@ function DmAvatar({
             accessibilityLabel={participantName(back!)}
           />
         ) : (
-          <View style={[s.groupBack, { backgroundColor: avatarColor(back!.id) }]}>
-            <Text style={s.groupTxt}>{getInitials(participantName(back!))}</Text>
+          <View
+            style={[
+              s.groupBack,
+              {
+                backgroundColor: profileAvatarColors({
+                  seed: back!.avatar_seed ?? back!.id,
+                  themeKey: back!.ui_theme_key,
+                }).bg,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                s.groupTxt,
+                {
+                  color: profileAvatarColors({
+                    seed: back!.avatar_seed ?? back!.id,
+                    themeKey: back!.ui_theme_key,
+                  }).fg,
+                },
+              ]}
+            >
+              {getInitials(participantName(back!))}
+            </Text>
           </View>
         )}
         <RoleAvatarBadge role={back?.kind} size={14} style={s.groupBadgeBack} />
@@ -607,8 +615,30 @@ function DmAvatar({
             accessibilityLabel={participantName(front!)}
           />
         ) : (
-          <View style={[s.groupFront, { backgroundColor: avatarColor(front!.id) }]}>
-            <Text style={s.groupTxt}>{getInitials(participantName(front!))}</Text>
+          <View
+            style={[
+              s.groupFront,
+              {
+                backgroundColor: profileAvatarColors({
+                  seed: front!.avatar_seed ?? front!.id,
+                  themeKey: front!.ui_theme_key,
+                }).bg,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                s.groupTxt,
+                {
+                  color: profileAvatarColors({
+                    seed: front!.avatar_seed ?? front!.id,
+                    themeKey: front!.ui_theme_key,
+                  }).fg,
+                },
+              ]}
+            >
+              {getInitials(participantName(front!))}
+            </Text>
           </View>
         )}
         <RoleAvatarBadge role={front?.kind} size={14} style={s.groupBadgeFront} />
@@ -619,7 +649,10 @@ function DmAvatar({
 
   const person = participants[0];
   const name = person ? participantName(person) : null;
-  const color = avatarColor(person?.id ?? fallbackId);
+  const avatarColors = profileAvatarColors({
+    seed: person?.avatar_seed ?? person?.id ?? fallbackId,
+    themeKey: person?.ui_theme_key,
+  });
 
   return (
     <View style={s.avatarWrap}>
@@ -630,8 +663,10 @@ function DmAvatar({
           accessibilityLabel={name ?? undefined}
         />
       ) : (
-        <View style={[s.avatarCircle, { backgroundColor: color }]}>
-          <Text style={s.avatarTxt}>{getInitials(name)}</Text>
+        <View style={[s.avatarCircle, { backgroundColor: avatarColors.bg }]}>
+          <Text style={[s.avatarTxt, { color: avatarColors.fg }]}>
+            {getInitials(name)}
+          </Text>
         </View>
       )}
       <PresenceBadge status={presenceStatus ?? 'offline'} s={s} />
@@ -1160,6 +1195,7 @@ export default function MessagesScreen() {
       const presenceProfileId = isDm ? getDmPresenceProfileId(channel) : '';
       const avatarUrl = isDm ? (participants[0]?.avatar_url ?? '') : '';
       const avatarRole = isDm ? (participants[0]?.kind ?? '') : '';
+      const avatarThemeKey = isDm ? (participants[0]?.ui_theme_key ?? '') : '';
       const avatarTimezone = isDm ? (participants[0]?.timezone ?? '') : '';
       const avatarCity = isDm ? (participants[0]?.city ?? '') : '';
       const avatarCountryCode = isDm ? (participants[0]?.country_code ?? '') : '';
@@ -1196,6 +1232,7 @@ export default function MessagesScreen() {
                 presenceProfileId,
                 avatarUrl,
                 avatarRole,
+                avatarThemeKey,
                 avatarTimezone,
                 avatarCity,
                 avatarCountryCode,

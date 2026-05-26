@@ -44,6 +44,7 @@ import {
 } from '@/lib/api/queries';
 import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
 import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
+import { profileAvatarColors, profileAvatarBg } from '@/lib/profile-avatar-colors';
 import { BottomSheet } from '@iconicedu/ui-native';
 
 const CHANNEL_FILES_BUCKET = 'channel-files';
@@ -53,45 +54,8 @@ const PARTIAL_HEIGHT_RATIO = 0.58;
 
 // ─── Avatar helpers ────────────────────────────────────────────────────────────
 
-const AVATAR_COLORS = [
-  '#5B8DEF',
-  '#E07B54',
-  '#6CC070',
-  '#A86CC1',
-  '#E0A854',
-  '#54B8C4',
-  '#E06C8A',
-];
-
-const THEME_AVATAR_COLORS: Record<string, { bg: string; fg: string }> = {
-  slate: { bg: '#64748b', fg: '#ffffff' },
-  gray: { bg: '#6b7280', fg: '#ffffff' },
-  zinc: { bg: '#71717a', fg: '#ffffff' },
-  neutral: { bg: '#737373', fg: '#ffffff' },
-  stone: { bg: '#78716c', fg: '#ffffff' },
-  red: { bg: '#ef4444', fg: '#ffffff' },
-  orange: { bg: '#f97316', fg: '#ffffff' },
-  amber: { bg: '#f59e0b', fg: '#1f2937' },
-  yellow: { bg: '#eab308', fg: '#1f2937' },
-  lime: { bg: '#84cc16', fg: '#1f2937' },
-  green: { bg: '#22c55e', fg: '#ffffff' },
-  emerald: { bg: '#10b981', fg: '#ffffff' },
-  teal: { bg: '#14b8a6', fg: '#ffffff' },
-  cyan: { bg: '#06b6d4', fg: '#ffffff' },
-  sky: { bg: '#0ea5e9', fg: '#ffffff' },
-  blue: { bg: '#3b82f6', fg: '#ffffff' },
-  indigo: { bg: '#6366f1', fg: '#ffffff' },
-  violet: { bg: '#8b5cf6', fg: '#ffffff' },
-  purple: { bg: '#a855f7', fg: '#ffffff' },
-  fuchsia: { bg: '#d946ef', fg: '#ffffff' },
-  pink: { bg: '#ec4899', fg: '#ffffff' },
-  rose: { bg: '#f43f5e', fg: '#ffffff' },
-};
-
-function avatarColor(seed: string): string {
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
-  return AVATAR_COLORS[h % AVATAR_COLORS.length]!;
+function avatarColor(seed: string, themeKey?: string | null): string {
+  return profileAvatarBg(seed, themeKey);
 }
 
 function getInitials(name: string): string {
@@ -105,12 +69,17 @@ function themeAvatarColor(
   fallbackBg?: string,
   fallbackFg?: string,
 ): { bg: string; fg: string } {
-  return (
-    (themeKey && THEME_AVATAR_COLORS[themeKey]) || {
-      bg: fallbackBg || '#f8fafc',
-      fg: fallbackFg || '#0f172a',
-    }
-  );
+  if (themeKey) {
+    return profileAvatarColors({
+      seed: themeKey,
+      themeKey,
+      fallbackFg: fallbackFg || '#0f172a',
+    });
+  }
+  return {
+    bg: fallbackBg || '#f8fafc',
+    fg: fallbackFg || '#0f172a',
+  };
 }
 
 // ─── Sender name helper ────────────────────────────────────────────────────────
@@ -170,6 +139,7 @@ function extractSaved(messages: MessageVM[]): Array<{
   id: string;
   senderName: string;
   senderRole?: string | null;
+  senderThemeKey?: string | null;
   preview: string;
   createdAt: string;
 }> {
@@ -179,6 +149,7 @@ function extractSaved(messages: MessageVM[]): Array<{
       id: m.ids.id,
       senderName: getSenderName(m.core.sender),
       senderRole: m.core.sender.kind,
+      senderThemeKey: m.core.sender.ui?.themeKey ?? null,
       preview: getMessagePreview(m),
       createdAt: m.core.createdAt,
     }))
@@ -191,6 +162,7 @@ function extractMembers(
     id: string;
     name: string;
     avatarSeed?: string | null;
+    themeKey?: string | null;
     role?: string | null;
     profile?: UserProfileVM | null;
   }> | null,
@@ -199,6 +171,7 @@ function extractMembers(
   name: string;
   seed: string;
   role?: string | null;
+  themeKey?: string | null;
   profile?: UserProfileVM | null;
 }> {
   const map = new Map<
@@ -208,6 +181,7 @@ function extractMembers(
       name: string;
       seed: string;
       role?: string | null;
+      themeKey?: string | null;
       profile?: UserProfileVM | null;
     }
   >();
@@ -220,6 +194,7 @@ function extractMembers(
         name,
         seed: name,
         role: s.kind,
+        themeKey: s.ui?.themeKey ?? null,
         profile: s,
       });
     }
@@ -232,6 +207,7 @@ function extractMembers(
           name: m.name,
           seed: m.avatarSeed ?? m.name,
           role: m.role,
+          themeKey: m.themeKey ?? m.profile?.ui?.themeKey ?? null,
           profile: m.profile ?? null,
         });
       }
@@ -259,6 +235,7 @@ function buildMemberProfile(input: {
   accountId?: string | null;
   name: string;
   avatarSeed?: string | null;
+  themeKey?: string | null;
   role?: string | null;
   bio?: string | null;
   email?: string | null;
@@ -281,6 +258,7 @@ function buildMemberProfile(input: {
       avatar: { source: 'seed', seed: input.avatarSeed ?? input.id, url: null },
     },
     prefs: { timezone: input.timezone ?? null },
+    ui: { themeKey: input.themeKey ?? null },
     meta: { createdAt: now, updatedAt: now },
   } as UserProfileVM;
 }
@@ -300,6 +278,7 @@ export type ChannelInfoSheetProps = {
   subtitle?: string | null;
   kind: 'dm' | 'channel' | 'space';
   avatarSeed?: string | null;
+  avatarThemeKey?: string | null;
   avatarRole?: string | null;
   iconKey?: string | null;
   themeKey?: string | null;
@@ -309,6 +288,7 @@ export type ChannelInfoSheetProps = {
     id: string;
     name: string;
     avatarSeed?: string | null;
+    themeKey?: string | null;
     role?: string | null;
   }> | null;
   messages?: MessageVM[];
@@ -466,6 +446,7 @@ type TabContentProps = {
     id: string;
     senderName: string;
     senderRole?: string | null;
+    senderThemeKey?: string | null;
     preview: string;
     createdAt: string;
   }>;
@@ -474,6 +455,7 @@ type TabContentProps = {
     name: string;
     seed: string;
     role?: string | null;
+    themeKey?: string | null;
     profile?: UserProfileVM | null;
   }>;
   colors: AppColors;
@@ -543,12 +525,17 @@ function TabContent({
     return (
       <ScrollView showsVerticalScrollIndicator={false} scrollEnabled={isFullScreen}>
         {savedItems.map((item) => {
-          const color = avatarColor(item.senderName);
+          const avatarColors = profileAvatarColors({
+            seed: item.senderName,
+            themeKey: item.senderThemeKey,
+          });
           return (
             <View key={item.id} style={s.savedItem}>
               <View style={{ width: 40, height: 40, position: 'relative' }}>
-                <View style={[s.savedAvatar, { backgroundColor: color }]}>
-                  <Text style={s.savedAvatarTxt}>{getInitials(item.senderName)}</Text>
+                <View style={[s.savedAvatar, { backgroundColor: avatarColors.bg }]}>
+                  <Text style={[s.savedAvatarTxt, { color: avatarColors.fg }]}>
+                    {getInitials(item.senderName)}
+                  </Text>
                 </View>
               </View>
               <View style={s.savedBody}>
@@ -610,8 +597,25 @@ function TabContent({
             accessibilityRole="button"
             accessibilityLabel={`Open ${member.name} profile`}
           >
-            <View style={[s.memberAvatar, { backgroundColor: avatarColor(member.seed) }]}>
-              <Text style={s.memberAvatarTxt}>{getInitials(member.name)}</Text>
+            <View
+              style={[
+                s.memberAvatar,
+                { backgroundColor: avatarColor(member.seed, member.themeKey) },
+              ]}
+            >
+              <Text
+                style={[
+                  s.memberAvatarTxt,
+                  {
+                    color: profileAvatarColors({
+                      seed: member.seed,
+                      themeKey: member.themeKey,
+                    }).fg,
+                  },
+                ]}
+              >
+                {getInitials(member.name)}
+              </Text>
             </View>
           </TouchableOpacity>
           <TouchableOpacity
@@ -991,6 +995,7 @@ export function ChannelInfoSheet({
   subtitle,
   kind,
   avatarSeed,
+  avatarThemeKey,
   avatarRole,
   iconKey,
   themeKey,
@@ -1021,6 +1026,7 @@ export function ChannelInfoSheet({
 
   const isDm = kind === 'dm';
   const seed = avatarSeed ?? title;
+  const heroAvatarColors = profileAvatarColors({ seed, themeKey: avatarThemeKey });
   const typeLabel = isDm ? 'Direct Message' : kind === 'space' ? 'Class' : 'Channel';
   const iconTheme = !isDm
     ? themeAvatarColor(themeKey, colors.inputBg, colors.text)
@@ -1040,6 +1046,7 @@ export function ChannelInfoSheet({
       id: string;
       name: string;
       avatarSeed?: string | null;
+      themeKey?: string | null;
       role?: string | null;
       profile?: UserProfileVM | null;
     }>
@@ -1120,6 +1127,7 @@ export function ChannelInfoSheet({
           id: member.id,
           name: member.name,
           avatarSeed: member.avatarSeed ?? member.name,
+          themeKey: member.themeKey ?? null,
           role: member.role,
           profile: buildMemberProfile({
             id: member.id,
@@ -1127,6 +1135,7 @@ export function ChannelInfoSheet({
             accountId: member.accountId,
             name: member.name,
             avatarSeed: member.avatarSeed ?? member.name,
+            themeKey: member.themeKey,
             role: member.role,
             bio: member.bio,
             email: member.email,
@@ -1229,6 +1238,7 @@ export function ChannelInfoSheet({
             avatarSeed: dm.avatarSeed ?? '',
             avatarUrl: dm.avatarUrl ?? '',
             avatarRole: dm.avatarRole ?? '',
+            avatarThemeKey: dm.avatarThemeKey ?? '',
             avatarTimezone: dm.avatarTimezone ?? '',
             avatarCity: dm.avatarCity ?? '',
             avatarCountryCode: dm.avatarCountryCode ?? '',
@@ -1267,8 +1277,10 @@ export function ChannelInfoSheet({
             {/* Hero */}
             <View style={s.hero}>
               <View style={{ width: 72, height: 72, position: 'relative' }}>
-                <View style={[s.avatarCircle, { backgroundColor: avatarColor(seed) }]}>
-                  <Text style={s.avatarTxt}>{getInitials(title)}</Text>
+                <View style={[s.avatarCircle, { backgroundColor: heroAvatarColors.bg }]}>
+                  <Text style={[s.avatarTxt, { color: heroAvatarColors.fg }]}>
+                    {getInitials(title)}
+                  </Text>
                 </View>
               </View>
               <RoleNameIndicator

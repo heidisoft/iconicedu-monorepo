@@ -22,6 +22,7 @@ type DmParticipant = {
   country_code?: string | null;
   country_name?: string | null;
   kind?: string | null;
+  ui_theme_key?: string | null;
 };
 
 type ChannelListItem = {
@@ -58,6 +59,7 @@ type ChannelMemberProfileItem = {
   id: string;
   name: string;
   avatarSeed: string | null;
+  themeKey: string | null;
   role: string | null;
   accountId: string | null;
   bio: string | null;
@@ -77,6 +79,7 @@ type ChannelMemberProfileRow = {
         kind?: string | null;
         bio?: string | null;
         timezone?: string | null;
+        ui_theme_key?: string | null;
       }
     | Array<{
         account_id?: string | null;
@@ -87,6 +90,7 @@ type ChannelMemberProfileRow = {
         kind?: string | null;
         bio?: string | null;
         timezone?: string | null;
+        ui_theme_key?: string | null;
       }>
     | null;
 };
@@ -101,6 +105,7 @@ type DirectMessageChannelResult = {
   avatarCity: string | null;
   avatarCountryCode: string | null;
   avatarCountryName: string | null;
+  avatarThemeKey: string | null;
 };
 
 const PREVIEW_LABELS: Record<string, string> = {
@@ -156,6 +161,7 @@ function addChannelMemberProfileRows(
       bio: profile.bio ? String(profile.bio) : null,
       email: null,
       timezone: profile.timezone ? String(profile.timezone) : null,
+      themeKey: profile.ui_theme_key ? String(profile.ui_theme_key) : null,
     });
   }
 }
@@ -174,6 +180,7 @@ function buildDirectMessageChannelResult(
     country_code?: string | null;
     country_name?: string | null;
     kind?: string | null;
+    ui_theme_key?: string | null;
   },
 ): DirectMessageChannelResult {
   const topic =
@@ -194,6 +201,7 @@ function buildDirectMessageChannelResult(
     avatarCity: targetProfile.city ?? null,
     avatarCountryCode: targetProfile.country_code ?? null,
     avatarCountryName: targetProfile.country_name ?? null,
+    avatarThemeKey: targetProfile.ui_theme_key ?? null,
   };
 }
 
@@ -324,7 +332,7 @@ export class ChannelsService {
       supabase
         .from('channel_members')
         .select(
-          'channel_id, profile_id, profile:profiles!profile_id(id, account_id, display_name, first_name, last_name, avatar_url, avatar_seed, timezone, city, country_code, country_name, kind)',
+          'channel_id, profile_id, profile:profiles!profile_id(id, account_id, display_name, first_name, last_name, avatar_url, avatar_seed, timezone, city, country_code, country_name, kind, ui_theme_key)',
         )
         .in('channel_id', channelIds)
         .is('deleted_at', null),
@@ -487,7 +495,7 @@ export class ChannelsService {
         supabase
           .from('channel_members')
           .select(
-            'channel_id, profile_id, profile:profiles!profile_id(id, account_id, display_name, first_name, last_name, avatar_url, avatar_seed, timezone, city, country_code, country_name, kind)',
+            'channel_id, profile_id, profile:profiles!profile_id(id, account_id, display_name, first_name, last_name, avatar_url, avatar_seed, timezone, city, country_code, country_name, kind, ui_theme_key)',
           )
           .in('channel_id', channelIds)
           .is('deleted_at', null),
@@ -610,7 +618,7 @@ export class ChannelsService {
       supabase
         .from('profiles')
         .select(
-          'id, display_name, first_name, last_name, avatar_url, avatar_seed, timezone, city, country_code, country_name, kind',
+          'id, display_name, first_name, last_name, avatar_url, avatar_seed, timezone, city, country_code, country_name, kind, ui_theme_key',
         )
         .eq('id', input.otherProfileId)
         .is('deleted_at', null)
@@ -665,7 +673,7 @@ export class ChannelsService {
       supabase
         .from('profiles')
         .select(
-          'id, org_id, display_name, first_name, last_name, avatar_url, avatar_seed, timezone, city, country_code, country_name, kind',
+          'id, org_id, display_name, first_name, last_name, avatar_url, avatar_seed, timezone, city, country_code, country_name, kind, ui_theme_key',
         )
         .eq('id', input.otherProfileId)
         .eq('org_id', input.orgId)
@@ -683,6 +691,7 @@ export class ChannelsService {
           country_code?: string | null;
           country_name?: string | null;
           kind?: string | null;
+          ui_theme_key?: string | null;
         }>(),
     ]);
 
@@ -1069,7 +1078,8 @@ export class ChannelsService {
           avatar_seed,
           kind,
           bio,
-          timezone
+          timezone,
+          ui_theme_key
         )
         `,
       )
@@ -1099,7 +1109,8 @@ export class ChannelsService {
               avatar_seed,
               kind,
               bio,
-              timezone
+              timezone,
+              ui_theme_key
             )
             `,
         )

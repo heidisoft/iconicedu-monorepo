@@ -63,77 +63,22 @@ function getDmPartner(meta: ChannelListItem | null | undefined) {
   return meta?.participants?.[0] ?? null;
 }
 
-function normalizeProfileKind(value?: string | null): UserProfileVM['kind'] {
-  if (
-    value === 'educator' ||
-    value === 'guardian' ||
-    value === 'child' ||
-    value === 'staff' ||
-    value === 'system'
-  ) {
-    return value;
-  }
-  return 'staff';
-}
-
-function buildDmPartnerProfile(input: {
-  partner: DmParticipant;
-  orgId: string;
-  presenceStatus?: string | null;
-  lastSeenAt?: string | null;
-}): UserProfileVM | null {
-  const name = participantName(input.partner);
-  if (!name) return null;
-
-  const now = new Date(0).toISOString();
-  return {
-    ids: {
-      id: input.partner.id,
-      orgId: input.orgId,
-      accountId: input.partner.account_id ?? input.partner.id,
-    },
-    kind: normalizeProfileKind(input.partner.kind),
-    profile: {
-      displayName: name,
-      firstName: input.partner.first_name ?? null,
-      lastName: input.partner.last_name ?? null,
-      avatar: input.partner.avatar_url
-        ? { source: 'upload', url: input.partner.avatar_url }
-        : { source: 'seed', seed: input.partner.avatar_seed ?? input.partner.id },
-    },
-    prefs: { timezone: input.partner.timezone ?? null },
-    presence: {
-      state: {},
-      liveStatus: input.presenceStatus === 'offline' ? 'offline' : 'online',
-      displayStatus:
-        input.presenceStatus === 'online' ||
-        input.presenceStatus === 'busy' ||
-        input.presenceStatus === 'idle' ||
-        input.presenceStatus === 'away' ||
-        input.presenceStatus === 'offline'
-          ? input.presenceStatus
-          : undefined,
-      lastSeenAt: input.lastSeenAt ?? null,
-      presenceLoaded: Boolean(input.presenceStatus || input.lastSeenAt),
-    },
-    location: {
-      city: input.partner.city ?? null,
-      countryCode: input.partner.country_code ?? null,
-      countryName: input.partner.country_name ?? null,
-    },
-    meta: { createdAt: now, updatedAt: now },
-  } as UserProfileVM;
-}
-
 export default function DmConversationScreen() {
-  const { channelId, avatarTimezone, avatarCity, avatarCountryCode, avatarCountryName } =
-    useLocalSearchParams<{
-      channelId: string;
-      avatarTimezone?: string;
-      avatarCity?: string;
-      avatarCountryCode?: string;
-      avatarCountryName?: string;
-    }>();
+  const {
+    channelId,
+    avatarThemeKey,
+    avatarTimezone,
+    avatarCity,
+    avatarCountryCode,
+    avatarCountryName,
+  } = useLocalSearchParams<{
+    channelId: string;
+    avatarThemeKey?: string;
+    avatarTimezone?: string;
+    avatarCity?: string;
+    avatarCountryCode?: string;
+    avatarCountryName?: string;
+  }>();
 
   const router = useRouter();
   const isFocused = useIsFocused();
@@ -173,6 +118,7 @@ export default function DmConversationScreen() {
   const resolvedPresenceProfileId = dmPartner?.id ?? '';
   const resolvedAvatarUrl = dmPartner?.avatar_url ?? undefined;
   const resolvedAvatarRole = dmPartner?.kind ?? undefined;
+  const resolvedAvatarThemeKey = dmPartner?.ui_theme_key ?? avatarThemeKey ?? undefined;
   const resolvedAvatarTimezone = dmPartner?.timezone ?? avatarTimezone ?? undefined;
   const resolvedAvatarCity = dmPartner?.city ?? avatarCity ?? undefined;
   const resolvedAvatarCountryCode =
@@ -242,15 +188,6 @@ export default function DmConversationScreen() {
         countryName: resolvedAvatarCountryName,
         presenceStatus: headerPresenceStatus ?? headerPresenceSummary.status,
       });
-  const headerPartnerProfile =
-    dmPartner && orgId
-      ? buildDmPartnerProfile({
-          partner: dmPartner,
-          orgId,
-          presenceStatus: headerPresenceStatus ?? headerPresenceSummary.status,
-          lastSeenAt: headerPresenceSummary.lastSeenAt,
-        })
-      : null;
 
   const {
     data: messages,
@@ -624,6 +561,7 @@ export default function DmConversationScreen() {
         localTimeIcon={headerLocalTimeContext?.icon ?? 'clock'}
         kind="dm"
         avatarSeed={resolvedAvatarSeed}
+        avatarThemeKey={resolvedAvatarThemeKey}
         avatarUrl={resolvedAvatarUrl || undefined}
         avatarRole={resolvedAvatarRole}
         presenceStatus={headerPresenceStatus}
@@ -637,9 +575,6 @@ export default function DmConversationScreen() {
         loading={isLoadingDmMeta && !dmMeta}
         onBack={() => router.back()}
         onMore={() => setInfoVisible(true)}
-        onAvatarPress={
-          headerPartnerProfile ? () => setProfileUser(headerPartnerProfile) : undefined
-        }
       />
       <KeyboardAvoidingView
         style={[styles.flex, { backgroundColor: colors.pageBg }]}
@@ -716,6 +651,7 @@ export default function DmConversationScreen() {
         subtitle={resolvedSubtitle}
         kind="dm"
         avatarSeed={resolvedAvatarSeed}
+        avatarThemeKey={resolvedAvatarThemeKey}
         avatarRole={resolvedAvatarRole}
         messages={messages ?? []}
         onClose={() => setInfoVisible(false)}

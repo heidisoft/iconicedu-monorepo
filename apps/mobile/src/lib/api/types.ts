@@ -11,6 +11,7 @@ export type DmParticipant = {
   country_code?: string | null;
   country_name?: string | null;
   kind?: string | null;
+  ui_theme_key?: string | null;
 };
 
 export type ChannelListItem = {

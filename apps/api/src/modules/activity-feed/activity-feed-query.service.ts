@@ -781,7 +781,7 @@ export class ActivityFeedQueryService {
     const { data, error } = await supabase
       .from('profiles')
       .select(
-        'id, display_name, first_name, last_name, avatar_url, avatar_seed, kind, timezone',
+        'id, display_name, first_name, last_name, avatar_url, avatar_seed, kind, timezone, ui_theme_key',
       )
       .eq('org_id', orgId)
       .in('id', actorIds)

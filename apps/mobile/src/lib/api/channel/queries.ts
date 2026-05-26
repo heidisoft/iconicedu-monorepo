@@ -8,6 +8,7 @@ export type DirectMessageChannelOpenResult = {
   avatarSeed: string | null;
   avatarUrl: string | null;
   avatarRole: string | null;
+  avatarThemeKey: string | null;
   avatarTimezone: string | null;
   avatarCity: string | null;
   avatarCountryCode: string | null;
@@ -131,6 +132,7 @@ export type ChannelMemberProfileItem = {
   id: string;
   name: string;
   avatarSeed: string | null;
+  themeKey: string | null;
   role: string | null;
   accountId: string | null;
   bio: string | null;

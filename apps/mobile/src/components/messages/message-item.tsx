@@ -71,6 +71,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@iconicedu/ui-native';
 import { RoleAvatarBadge } from '@/components/profile/role-avatar-badge';
 import { RoleNameIndicator } from '@/components/profile/role-name-indicator';
 import { useTheme } from '@/providers/theme-provider';
+import { profileAvatarColors } from '@/lib/profile-avatar-colors';
 import { ChatImageViewer, type ChatImageViewerItem } from './chat-image-viewer';
 import { ChatPdfViewer } from './chat-pdf-viewer';
 import type { AttachmentPayload } from './attachment-sheet';
@@ -120,20 +121,8 @@ export function getAvatarInfo(message: MessageVM): AvatarInfo {
 // ─── Inline avatar (avoids NativeWind sizing issues on Image) ─────────────────
 
 const AVATAR_SIZE = 36;
-const AVATAR_COLORS = [
-  '#5B8DEF',
-  '#E07B54',
-  '#6CC070',
-  '#A86CC1',
-  '#E0A854',
-  '#54B8C4',
-  '#E06C8A',
-];
-
-export function avatarBgColor(seed: string): string {
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
-  return AVATAR_COLORS[h % AVATAR_COLORS.length];
+export function avatarBgColor(seed: string, themeKey?: string | null): string {
+  return profileAvatarColors({ seed, themeKey }).bg;
 }
 
 export function getInitials(name: string): string {
@@ -149,6 +138,7 @@ export function MessageAvatar({
   role,
   presence,
   presenceStatus,
+  themeKey,
   size = AVATAR_SIZE,
   badgeSizeOverride,
 }: {
@@ -158,6 +148,7 @@ export function MessageAvatar({
   role?: string | null;
   presence?: MessageVM['core']['sender']['presence'];
   presenceStatus?: PresenceDisplayStatus | null;
+  themeKey?: string | null;
   size?: number;
   badgeSizeOverride?: number;
 }) {
@@ -167,6 +158,7 @@ export function MessageAvatar({
   const resolvedPresenceStatus =
     presenceStatus ?? presence?.displayStatus ?? presence?.liveStatus ?? null;
   const presenceColor = getAvatarPresenceColor(resolvedPresenceStatus);
+  const avatarColors = profileAvatarColors({ seed, themeKey });
   const presenceSize = Math.max(10, Math.round(size * 0.28));
   const presenceBadge = presenceColor ? (
     <View
@@ -206,11 +198,16 @@ export function MessageAvatar({
             width: size,
             height: size,
             borderRadius: radius,
-            backgroundColor: avatarBgColor(seed),
+            backgroundColor: avatarColors.bg,
           },
         ]}
       >
-        <Text style={[avatarStyles.initials, { fontSize: initialsSize }]}>
+        <Text
+          style={[
+            avatarStyles.initials,
+            { color: avatarColors.fg, fontSize: initialsSize },
+          ]}
+        >
           {getInitials(name)}
         </Text>
       </View>
@@ -628,6 +625,7 @@ function ThreadPill({
             const avatarProfile = p.profile as {
               avatar?: { source?: string; url?: string | null; seed?: string | null };
               kind?: string | null;
+              ui?: { themeKey?: string | null } | null;
             };
             const src =
               avatarProfile.avatar?.source === 'url'
@@ -637,6 +635,10 @@ function ThreadPill({
               avatarProfile.avatar?.source === 'seed'
                 ? (avatarProfile.avatar.seed ?? p.ids.id)
                 : p.ids.id;
+            const avatarColors = profileAvatarColors({
+              seed,
+              themeKey: avatarProfile.ui?.themeKey,
+            });
             return src ? (
               <View
                 key={p.ids.id}
@@ -680,14 +682,16 @@ function ThreadPill({
                     width: 20,
                     height: 20,
                     borderRadius: 10,
-                    backgroundColor: avatarBgColor(seed),
+                    backgroundColor: avatarColors.bg,
                     alignItems: 'center',
                     justifyContent: 'center',
                     borderWidth: 1.5,
                     borderColor: colors.pageBg,
                   }}
                 >
-                  <Text style={{ color: '#fff', fontSize: 9, fontWeight: '700' }}>
+                  <Text
+                    style={{ color: avatarColors.fg, fontSize: 9, fontWeight: '700' }}
+                  >
                     {getInitials(name)[0]}
                   </Text>
                 </View>
@@ -843,6 +847,7 @@ function InlineReply({
   const time = formatTime(message.core.createdAt);
   const { url: src, seed } = getAvatarInfo(message);
   const senderRole = message.core.sender.kind;
+  const senderThemeKey = message.core.sender.ui?.themeKey;
   const text = (message as { content?: { text?: string } }).content?.text ?? '';
   const mentions = (message as { content?: { mentions?: MessageMentionVM[] } }).content
     ?.mentions;
@@ -854,6 +859,7 @@ function InlineReply({
         src={src}
         seed={seed}
         role={senderRole}
+        themeKey={senderThemeKey}
         size={28}
         badgeSizeOverride={12}
       />
@@ -2680,6 +2686,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                 src={avatarUrl}
                 seed={avatarSeed}
                 role={senderRole}
+                themeKey={message.core.sender.ui?.themeKey}
               />
             </Pressable>
           )}
@@ -2849,6 +2856,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                 src={avatarUrl}
                 seed={avatarSeed}
                 role={senderRole}
+                themeKey={message.core.sender.ui?.themeKey}
               />
             </Pressable>
           )}

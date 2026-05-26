@@ -44,6 +44,7 @@ import { useTheme } from '@/providers/theme-provider';
 import { avatarBgColor, getInitials } from './message-item';
 import { RoleNameIndicator } from '@/components/profile/role-name-indicator';
 import { apiGet } from '@/lib/api/http-client';
+import { profileAvatarColors } from '@/lib/profile-avatar-colors';
 import {
   formatLocalTimeText,
   type LocalTimePresenceStatus,
@@ -298,6 +299,7 @@ function LargeAvatar({ user }: { user: UserProfileVM }) {
       ? (avatar.url ?? null)
       : null;
   const seed = avatar?.source === 'seed' ? (avatar.seed ?? user.ids.id) : user.ids.id;
+  const avatarColors = profileAvatarColors({ seed, themeKey: user.ui?.themeKey });
 
   if (url) {
     return (
@@ -306,8 +308,12 @@ function LargeAvatar({ user }: { user: UserProfileVM }) {
   }
 
   return (
-    <View style={[s.largeAvatar, { backgroundColor: avatarBgColor(seed) }]}>
-      <Text style={s.largeAvatarInitials}>{getInitials(name)}</Text>
+    <View
+      style={[s.largeAvatar, { backgroundColor: avatarBgColor(seed, user.ui?.themeKey) }]}
+    >
+      <Text style={[s.largeAvatarInitials, { color: avatarColors.fg }]}>
+        {getInitials(name)}
+      </Text>
     </View>
   );
 }
