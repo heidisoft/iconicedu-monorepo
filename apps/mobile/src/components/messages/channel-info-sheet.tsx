@@ -38,6 +38,7 @@ import { useAccount } from '@/hooks/use-account';
 import { useProfile } from '@/hooks/use-profile';
 import {
   ensureDirectMessageChannelForProfiles,
+  fetchChannelMembers,
   findDirectMessageChannelForProfiles,
   queryKeys,
 } from '@/lib/api/queries';
@@ -191,17 +192,36 @@ function extractMembers(
     name: string;
     avatarSeed?: string | null;
     role?: string | null;
+    profile?: UserProfileVM | null;
   }> | null,
-): Array<{ id: string; name: string; seed: string; role?: string | null }> {
+): Array<{
+  id: string;
+  name: string;
+  seed: string;
+  role?: string | null;
+  profile?: UserProfileVM | null;
+}> {
   const map = new Map<
     string,
-    { id: string; name: string; seed: string; role?: string | null }
+    {
+      id: string;
+      name: string;
+      seed: string;
+      role?: string | null;
+      profile?: UserProfileVM | null;
+    }
   >();
   for (const msg of messages) {
     const s = msg.core.sender;
     if (!map.has(s.ids.id)) {
       const name = getSenderName(s);
-      map.set(s.ids.id, { id: s.ids.id, name, seed: name, role: s.kind });
+      map.set(s.ids.id, {
+        id: s.ids.id,
+        name,
+        seed: name,
+        role: s.kind,
+        profile: s,
+      });
     }
   }
   if (extraMembers) {
@@ -212,11 +232,56 @@ function extractMembers(
           name: m.name,
           seed: m.avatarSeed ?? m.name,
           role: m.role,
+          profile: m.profile ?? null,
         });
       }
     }
   }
   return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function normalizeMemberProfileKind(value?: string | null): UserProfileVM['kind'] {
+  if (
+    value === 'educator' ||
+    value === 'guardian' ||
+    value === 'child' ||
+    value === 'staff' ||
+    value === 'system'
+  ) {
+    return value;
+  }
+  return 'staff';
+}
+
+function buildMemberProfile(input: {
+  id: string;
+  orgId: string;
+  accountId?: string | null;
+  name: string;
+  avatarSeed?: string | null;
+  role?: string | null;
+  bio?: string | null;
+  email?: string | null;
+}): UserProfileVM {
+  const now = new Date(0).toISOString();
+  return {
+    ids: {
+      id: input.id,
+      orgId: input.orgId,
+      accountId: input.accountId || input.id,
+    },
+    kind: normalizeMemberProfileKind(input.role),
+    profile: {
+      displayName: input.name,
+      firstName: null,
+      lastName: null,
+      bio: input.bio ?? null,
+      email: input.email ?? null,
+      avatar: { source: 'seed', seed: input.avatarSeed ?? input.id, url: null },
+    },
+    prefs: {},
+    meta: { createdAt: now, updatedAt: now },
+  } as UserProfileVM;
 }
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -247,6 +312,7 @@ export type ChannelInfoSheetProps = {
   }> | null;
   messages?: MessageVM[];
   onClose: () => void;
+  onProfilePress?: (user: UserProfileVM) => void;
 };
 
 // ─── Tab definitions ───────────────────────────────────────────────────────────
@@ -402,13 +468,20 @@ type TabContentProps = {
     preview: string;
     createdAt: string;
   }>;
-  memberItems: Array<{ id: string; name: string; seed: string; role?: string | null }>;
+  memberItems: Array<{
+    id: string;
+    name: string;
+    seed: string;
+    role?: string | null;
+    profile?: UserProfileVM | null;
+  }>;
   colors: AppColors;
   s: ReturnType<typeof makeStyles>;
   memberCount?: number | null;
   isFullScreen: boolean;
   currentProfileId?: string | null;
   onMemberMessage?: (memberId: string, memberName: string) => void;
+  onProfilePress?: (user: UserProfileVM) => void;
 };
 
 function TabContent({
@@ -424,6 +497,7 @@ function TabContent({
   isFullScreen,
   currentProfileId,
   onMemberMessage,
+  onProfilePress,
 }: TabContentProps) {
   if (activeTab === 'files') {
     if (filesLoading) {
@@ -523,19 +597,41 @@ function TabContent({
       </View>
       {memberItems.map((member) => (
         <View key={member.id} style={s.memberRow}>
-          <View style={{ width: 36, height: 36, position: 'relative' }}>
+          <TouchableOpacity
+            style={{ width: 36, height: 36, position: 'relative' }}
+            onPress={() => {
+              if (member.profile) {
+                onProfilePress?.(member.profile);
+              }
+            }}
+            disabled={!member.profile || !onProfilePress}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel={`Open ${member.name} profile`}
+          >
             <View style={[s.memberAvatar, { backgroundColor: avatarColor(member.seed) }]}>
               <Text style={s.memberAvatarTxt}>{getInitials(member.name)}</Text>
             </View>
-          </View>
-          <View style={s.memberInfo}>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={s.memberInfo}
+            onPress={() => {
+              if (member.profile) {
+                onProfilePress?.(member.profile);
+              }
+            }}
+            disabled={!member.profile || !onProfilePress}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel={`Open ${member.name} profile`}
+          >
             <RoleNameIndicator
               name={member.name}
               role={member.role}
               textStyle={s.memberName}
               iconSize={12}
             />
-          </View>
+          </TouchableOpacity>
           {currentProfileId && member.id === currentProfileId ? (
             <View style={s.memberSelfBadge}>
               <Text style={s.memberSelfBadgeText}>You</Text>
@@ -902,6 +998,7 @@ export function ChannelInfoSheet({
   members,
   messages = [],
   onClose,
+  onProfilePress,
 }: ChannelInfoSheetProps) {
   const { colors } = useTheme();
   const router = useRouter();
@@ -938,7 +1035,13 @@ export function ChannelInfoSheet({
   const [fileItems, setFileItems] = useState<FileItem[]>([]);
   const [filesLoading, setFilesLoading] = useState(false);
   const [loadedMembers, setLoadedMembers] = useState<
-    Array<{ id: string; name: string; avatarSeed?: string | null; role?: string | null }>
+    Array<{
+      id: string;
+      name: string;
+      avatarSeed?: string | null;
+      role?: string | null;
+      profile?: UserProfileVM | null;
+    }>
   >([]);
   const [membersLoading, setMembersLoading] = useState(false);
 
@@ -1011,37 +1114,23 @@ export function ChannelInfoSheet({
 
     (async () => {
       try {
-        const { data, error } = await supabase
-          .from('channel_members')
-          .select(
-            `
-            profile_id,
-            profile:profiles!profile_id(display_name, first_name, last_name, avatar_seed, kind)
-          `,
-          )
-          .eq('channel_id', channelId)
-          .is('deleted_at', null);
-
-        if (error) throw error;
-
-        const nextMembers = (data ?? [])
-          .flatMap((row) => {
-            const profile = Array.isArray(row.profile) ? row.profile[0] : row.profile;
-            if (!profile) return [];
-            const name =
-              profile.display_name?.trim() ||
-              [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim();
-            if (!name) return [];
-            return [
-              {
-                id: String(row.profile_id),
-                name,
-                avatarSeed: profile.avatar_seed ? String(profile.avatar_seed) : name,
-                role: profile.kind ? String(profile.kind) : null,
-              },
-            ];
-          })
-          .sort((a, b) => a.name.localeCompare(b.name));
+        const memberRows = await fetchChannelMembers(orgId, channelId, currentProfileId);
+        const nextMembers = memberRows.map((member) => ({
+          id: member.id,
+          name: member.name,
+          avatarSeed: member.avatarSeed ?? member.name,
+          role: member.role,
+          profile: buildMemberProfile({
+            id: member.id,
+            orgId,
+            accountId: member.accountId,
+            name: member.name,
+            avatarSeed: member.avatarSeed ?? member.name,
+            role: member.role,
+            bio: member.bio,
+            email: member.email,
+          }),
+        }));
 
         setLoadedMembers(nextMembers);
       } catch {
@@ -1050,7 +1139,7 @@ export function ChannelInfoSheet({
         setMembersLoading(false);
       }
     })();
-  }, [visible, channelId]);
+  }, [channelId, currentProfileId, orgId, visible]);
 
   useEffect(() => {
     if (!visible || !channelId || isDm) {
@@ -1276,6 +1365,7 @@ export function ChannelInfoSheet({
                   isFullScreen={isExpanded}
                   currentProfileId={currentProfileId}
                   onMemberMessage={handleMemberMessage}
+                  onProfilePress={onProfilePress}
                 />
               ) : (
                 <EmptyTabState

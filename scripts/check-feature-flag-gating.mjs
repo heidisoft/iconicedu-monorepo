@@ -19,6 +19,9 @@ function isFeatureBearingFile(filePath) {
   if (filePath === 'apps/web/flags.ts') {
     return false;
   }
+  if (filePath.startsWith('apps/web/lib/flags/')) {
+    return false;
+  }
   if (filePath.startsWith('apps/web/lib/config/')) {
     return false;
   }

@@ -1,5 +1,6 @@
 import {
   cancelRecurringSessionOccurrence,
+  fetchChannelMembers,
   fetchChannelMetaByChannelId,
   fetchDirectMessageChannelMetaByChannelId,
   ensureDirectMessageChannelForProfiles,
@@ -706,6 +707,43 @@ describe('fetchDirectMessageChannelMetaByChannelId', () => {
     await expect(
       fetchDirectMessageChannelMetaByChannelId('', GUARDIAN_PROFILE_ID, 'acct-1', 'ch-1'),
     ).resolves.toBeNull();
+
+    expect(mockApiGet).not.toHaveBeenCalled();
+  });
+});
+
+describe('fetchChannelMembers', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('loads channel members through the API', async () => {
+    mockApiGet.mockResolvedValue([
+      {
+        id: 'profile-2',
+        name: 'Tutor Jane',
+        avatarSeed: 'jane-seed',
+        role: 'educator',
+        accountId: 'account-2',
+        bio: null,
+        email: null,
+      },
+    ]);
+
+    const result = await fetchChannelMembers(SUP_ORG, 'channel-1', GUARDIAN_PROFILE_ID);
+
+    expect(mockApiGet).toHaveBeenCalledWith('/channels/channel-1/members', {
+      orgId: SUP_ORG,
+      profileId: GUARDIAN_PROFILE_ID,
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0]!.name).toBe('Tutor Jane');
+  });
+
+  it('returns an empty list when required identifiers are missing', async () => {
+    await expect(fetchChannelMembers(SUP_ORG, '', GUARDIAN_PROFILE_ID)).resolves.toEqual(
+      [],
+    );
 
     expect(mockApiGet).not.toHaveBeenCalled();
   });

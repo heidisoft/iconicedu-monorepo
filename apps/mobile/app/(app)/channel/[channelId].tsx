@@ -607,6 +607,10 @@ export default function ChannelConversationScreen() {
         themeKey={resolvedThemeKey}
         messages={messages ?? []}
         onClose={() => setInfoVisible(false)}
+        onProfilePress={(user) => {
+          setInfoVisible(false);
+          setProfileUser(user);
+        }}
       />
 
       {/* Profile sheet */}

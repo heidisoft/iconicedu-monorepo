@@ -127,6 +127,28 @@ export async function fetchIsChannelMember(
   return response.isMember;
 }
 
+export type ChannelMemberProfileItem = {
+  id: string;
+  name: string;
+  avatarSeed: string | null;
+  role: string | null;
+  accountId: string | null;
+  bio: string | null;
+  email: string | null;
+};
+
+export async function fetchChannelMembers(
+  orgId: string,
+  channelId: string,
+  profileId: string,
+): Promise<ChannelMemberProfileItem[]> {
+  if (!orgId || !channelId || !profileId) return [];
+  return apiGet(`/channels/${channelId}/members`, {
+    orgId,
+    profileId,
+  });
+}
+
 export async function fetchNotificationPreferences(orgId: string, profileId: string) {
   const data = await apiGet<Array<Record<string, unknown>>>('/notification-preferences', {
     orgId,

@@ -144,6 +144,20 @@ export class ChannelsController {
     );
   }
 
+  @Get(':channelId/members')
+  @UseGuards(AuthGuard)
+  members(
+    @Req() req: AuthenticatedRequest,
+    @Param('channelId') channelId: string,
+    @Query('orgId') orgId: string,
+    @Query('profileId') profileId: string,
+  ) {
+    return this.channelsService.getChannelMembers(
+      extractBearerToken(req.headers.authorization),
+      { orgId, channelId, profileId },
+    );
+  }
+
   @Get(':channelId/read-state')
   @UseGuards(AuthGuard)
   getReadState(

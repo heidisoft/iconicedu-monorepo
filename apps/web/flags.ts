@@ -1,4 +1,5 @@
 import { flag, getProviderData as getCodeProviderData } from 'flags/next';
+import { platformFeatureFlagKeys } from '@iconicedu/shared-types';
 import { resolveAppUrl } from '@iconicedu/web/lib/config/app-url';
 
 function isLocalOrPreviewEnvironment() {
@@ -71,6 +72,26 @@ export const enableMessageTypeComposer = flag<boolean, { profileId?: string | nu
   async decide({ entities }) {
     return evaluateWebBooleanFlag({
       flagKey: 'enable-message-type-composer',
+      profileId: entities?.profileId,
+    });
+  },
+});
+
+export const enableMobileDirectMessageStart = flag<
+  boolean,
+  { profileId?: string | null }
+>({
+  key: platformFeatureFlagKeys.enableMobileDirectMessageStart,
+  description:
+    'Allows mobile users to start direct message conversations from profile previews and channel member rows.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: platformFeatureFlagKeys.enableMobileDirectMessageStart,
       profileId: entities?.profileId,
     });
   },
@@ -170,6 +191,7 @@ export const webFlags = {
   enableClassScheduleStaffEdit,
   enableMarketingSitePages,
   enableMessageTypeComposer,
+  enableMobileDirectMessageStart,
 } as const;
 
 export type WebFlagKey = keyof typeof webFlags;

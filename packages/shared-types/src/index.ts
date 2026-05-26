@@ -7,6 +7,7 @@ export * from './shared/working-hours';
 export * from './shared/subjects';
 export * from './shared/channel-icons';
 export * from './shared/learning-space-icons';
+export * from './shared/feature-flags';
 export * from './vm/class-schedule';
 export * from './vm/channel';
 export * from './vm/activity-feed';

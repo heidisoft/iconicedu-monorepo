@@ -14,6 +14,7 @@ import {
   enableClassScheduleStaffEdit,
   enableMarketingSitePages,
   enableMessageTypeComposer,
+  enableMobileDirectMessageStart,
   getFlagsProviderData,
   isVercelFlagsSdkConfigured,
   webFlags,
@@ -52,6 +53,12 @@ describe('web flags', () => {
     expect(enableMessageTypeComposer.key).toBe('enable-message-type-composer');
     expect(enableMessageTypeComposer.defaultValue).toBe(false);
     expect(webFlags.enableMessageTypeComposer).toBe(enableMessageTypeComposer);
+  });
+
+  it('declares the mobile direct message start flag with stable metadata', () => {
+    expect(enableMobileDirectMessageStart.key).toBe('enable-mobile-direct-message-start');
+    expect(enableMobileDirectMessageStart.defaultValue).toBe(false);
+    expect(webFlags.enableMobileDirectMessageStart).toBe(enableMobileDirectMessageStart);
   });
 
   it('declares the class schedule cancel flag with stable metadata', () => {
@@ -135,5 +142,6 @@ describe('web flags', () => {
     expect(JSON.stringify(providerData)).toContain('enable-class-schedule-staff-edit');
     expect(JSON.stringify(providerData)).toContain('enable-marketing-site-pages');
     expect(JSON.stringify(providerData)).toContain('enable-message-type-composer');
+    expect(JSON.stringify(providerData)).toContain('enable-mobile-direct-message-start');
   });
 });

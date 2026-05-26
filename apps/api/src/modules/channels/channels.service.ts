@@ -53,6 +53,40 @@ type ChannelListItem = {
 
 type LastMessageInfo = { text: string | null; at: string | null; sender: string | null };
 
+type ChannelMemberProfileItem = {
+  id: string;
+  name: string;
+  avatarSeed: string | null;
+  role: string | null;
+  accountId: string | null;
+  bio: string | null;
+  email: string | null;
+};
+
+type ChannelMemberProfileRow = {
+  profile_id: string | null;
+  profile:
+    | {
+        account_id?: string | null;
+        display_name?: string | null;
+        first_name?: string | null;
+        last_name?: string | null;
+        avatar_seed?: string | null;
+        kind?: string | null;
+        bio?: string | null;
+      }
+    | Array<{
+        account_id?: string | null;
+        display_name?: string | null;
+        first_name?: string | null;
+        last_name?: string | null;
+        avatar_seed?: string | null;
+        kind?: string | null;
+        bio?: string | null;
+      }>
+    | null;
+};
+
 type DirectMessageChannelResult = {
   channelId: string;
   topic: string;
@@ -94,6 +128,31 @@ function isDmChannelUniqueConflict(error: { code?: string; message?: string }) {
     ((error.message ?? '').includes('channels_org_dm_key_uniq') ||
       (error.message ?? '').includes('duplicate key value'))
   );
+}
+
+function addChannelMemberProfileRows(
+  rows: ChannelMemberProfileRow[] | null | undefined,
+  output: Map<string, ChannelMemberProfileItem>,
+) {
+  for (const row of rows ?? []) {
+    const profile = Array.isArray(row.profile) ? row.profile[0] : row.profile;
+    if (!row.profile_id || !profile || output.has(row.profile_id)) continue;
+
+    const name =
+      profile.display_name?.trim() ||
+      [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim();
+    if (!name) continue;
+
+    output.set(row.profile_id, {
+      id: String(row.profile_id),
+      name,
+      avatarSeed: profile.avatar_seed ? String(profile.avatar_seed) : name,
+      role: profile.kind ? String(profile.kind) : null,
+      accountId: profile.account_id ? String(profile.account_id) : null,
+      bio: profile.bio ? String(profile.bio) : null,
+      email: null,
+    });
+  }
 }
 
 function buildDirectMessageChannelResult(
@@ -949,6 +1008,109 @@ export class ChannelsService {
       .maybeSingle();
     if (error) throw new InternalServerErrorException(error.message);
     return { isMember: Boolean(data) };
+  }
+
+  async getChannelMembers(
+    accessToken: string,
+    input: { orgId: string; channelId: string; profileId: string },
+  ): Promise<ChannelMemberProfileItem[]> {
+    if (!input.orgId || !input.channelId || !input.profileId) return [];
+
+    const sessionSupabase = createSupabaseSessionClient(accessToken);
+    const serviceSupabase = createSupabaseServiceClient();
+
+    const { data: spaceLink, error: spaceLinkError } = await serviceSupabase
+      .from('learning_space_channels')
+      .select('learning_space_id')
+      .eq('org_id', input.orgId)
+      .eq('channel_id', input.channelId)
+      .eq('is_primary', true)
+      .is('deleted_at', null)
+      .maybeSingle<{ learning_space_id: string | null }>();
+    if (spaceLinkError) throw new InternalServerErrorException(spaceLinkError.message);
+    const learningSpaceId = spaceLink?.learning_space_id ?? null;
+
+    const membership = await this.getMembership(accessToken, input);
+    let isAuthorized = membership.isMember;
+
+    if (!isAuthorized && learningSpaceId) {
+      const { data: participant, error: participantError } = await sessionSupabase
+        .from('learning_space_participants')
+        .select('id')
+        .eq('org_id', input.orgId)
+        .eq('learning_space_id', learningSpaceId)
+        .eq('profile_id', input.profileId)
+        .is('deleted_at', null)
+        .maybeSingle<{ id: string }>();
+      if (participantError)
+        throw new InternalServerErrorException(participantError.message);
+      isAuthorized = Boolean(participant);
+    }
+
+    if (!isAuthorized) return [];
+
+    const membersByProfileId = new Map<string, ChannelMemberProfileItem>();
+
+    const { data: channelRows, error: channelMembersError } = await serviceSupabase
+      .from('channel_members')
+      .select(
+        `
+        profile_id,
+        profile:profiles!profile_id(
+          account_id,
+          display_name,
+          first_name,
+          last_name,
+          avatar_seed,
+          kind,
+          bio
+        )
+        `,
+      )
+      .eq('org_id', input.orgId)
+      .eq('channel_id', input.channelId)
+      .is('deleted_at', null)
+      .order('joined_at', { ascending: true });
+
+    if (channelMembersError)
+      throw new InternalServerErrorException(channelMembersError.message);
+    addChannelMemberProfileRows(
+      channelRows as ChannelMemberProfileRow[],
+      membersByProfileId,
+    );
+
+    if (learningSpaceId) {
+      const { data: participantRows, error: participantRowsError } = await serviceSupabase
+        .from('learning_space_participants')
+        .select(
+          `
+            profile_id,
+            profile:profiles!profile_id(
+              account_id,
+              display_name,
+              first_name,
+              last_name,
+              avatar_seed,
+              kind,
+              bio
+            )
+            `,
+        )
+        .eq('org_id', input.orgId)
+        .eq('learning_space_id', learningSpaceId)
+        .is('deleted_at', null);
+
+      if (participantRowsError)
+        throw new InternalServerErrorException(participantRowsError.message);
+      addChannelMemberProfileRows(
+        participantRows as ChannelMemberProfileRow[],
+        membersByProfileId,
+      );
+    }
+
+    return [...membersByProfileId.values()].sort((left, right) =>
+      left.name.localeCompare(right.name),
+    );
   }
 
   async getReadState(

@@ -763,6 +763,10 @@ export default function DmConversationScreen() {
         avatarRole={resolvedAvatarRole}
         messages={messages ?? []}
         onClose={() => setInfoVisible(false)}
+        onProfilePress={(user) => {
+          setInfoVisible(false);
+          setProfileUser(user);
+        }}
       />
 
       {/* Profile sheet */}

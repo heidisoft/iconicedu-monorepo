@@ -6,10 +6,9 @@ import type {
   Provider,
   ResolutionDetails,
 } from '@openfeature/server-sdk';
+import { platformFeatureFlagKeys } from '@iconicedu/shared-types';
 
-export const apiFeatureFlagKeys = {
-  enableMobileDirectMessageStart: 'enable-mobile-direct-message-start',
-} as const;
+export const apiFeatureFlagKeys = platformFeatureFlagKeys;
 
 type ApiFeatureFlagKey = (typeof apiFeatureFlagKeys)[keyof typeof apiFeatureFlagKeys];
 
@@ -44,12 +43,26 @@ function isLocalOrPreviewApiEnvironment() {
   const vercelEnv = (process.env.VERCEL_ENV ?? process.env.NEXT_PUBLIC_VERCEL_ENV ?? '')
     .trim()
     .toLowerCase();
+  const localUrlCandidates = [
+    process.env.SUPABASE_URL,
+    process.env.DATABASE_URL,
+    process.env.DIRECT_URL,
+  ]
+    .map((value) => value?.trim().toLowerCase() ?? '')
+    .filter(Boolean);
+  const hasLocalServiceUrl = localUrlCandidates.some(
+    (value) =>
+      value.includes('localhost') ||
+      value.includes('127.0.0.1') ||
+      value.includes('host.docker.internal'),
+  );
 
   return (
     appEnv === 'local' ||
     appEnv === 'preview' ||
     (appEnv === 'development' && process.env.CI !== 'true') ||
-    vercelEnv === 'preview'
+    vercelEnv === 'preview' ||
+    hasLocalServiceUrl
   );
 }
 

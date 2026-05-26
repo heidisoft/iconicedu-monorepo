@@ -1,6 +1,6 @@
-export const mobileFeatureFlagKeys = {
-  enableMobileDirectMessageStart: 'enable-mobile-direct-message-start',
-} as const;
+import { platformFeatureFlagKeys } from '@iconicedu/shared-types';
+
+export const mobileFeatureFlagKeys = platformFeatureFlagKeys;
 
 export type MobileFeatureFlagKey =
   (typeof mobileFeatureFlagKeys)[keyof typeof mobileFeatureFlagKeys];

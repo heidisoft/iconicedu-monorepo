@@ -13,6 +13,9 @@ describe('evaluateApiBooleanFlag', () => {
     delete process.env.VERCEL_ENV;
     delete process.env.NEXT_PUBLIC_VERCEL_ENV;
     delete process.env.CI;
+    delete process.env.SUPABASE_URL;
+    delete process.env.DATABASE_URL;
+    delete process.env.DIRECT_URL;
   });
 
   it('returns the PostHog flag value through OpenFeature', async () => {
@@ -45,6 +48,19 @@ describe('evaluateApiBooleanFlag', () => {
         distinctId: 'profile-1',
       }),
     ).resolves.toBe(false);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('defaults on when local service URLs are configured', async () => {
+    process.env.SUPABASE_URL = 'http://127.0.0.1:54321';
+    const fetchSpy = jest.spyOn(global, 'fetch');
+
+    await expect(
+      evaluateApiBooleanFlag({
+        flagKey: apiFeatureFlagKeys.enableMobileDirectMessageStart,
+        distinctId: 'profile-1',
+      }),
+    ).resolves.toBe(true);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
