@@ -148,7 +148,7 @@ describe('ReminderReconcileService', () => {
       await new ReminderReconcileService().reconcileNextReminderJobForSchedule({
         orgId: 'org-1',
         scheduleId: 'schedule-1',
-        now: new Date('2030-03-05T21:00:00.000Z'),
+        now: new Date('2030-03-05T16:00:00.000Z'),
       });
 
     expect(result).toEqual({
@@ -175,7 +175,7 @@ describe('ReminderReconcileService', () => {
         status: 'pending',
         dedupe_key:
           'session.reminder:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z:720',
-        run_at: '2030-03-05T22:00:00.000Z',
+        run_at: '2030-03-05T17:00:00.000Z',
       }),
     );
     expect(updateChain.eq).toHaveBeenCalledWith('id', 'existing-reminder-job-1');
@@ -328,7 +328,7 @@ describe('ReminderReconcileService', () => {
       await new ReminderReconcileService().reconcileNextReminderJobForSchedule({
         orgId: 'org-1',
         scheduleId: 'schedule-1',
-        now: new Date('2030-03-05T22:00:00.000Z'),
+        now: new Date('2030-03-05T16:00:00.000Z'),
       });
 
     expect(result).toEqual({
@@ -355,7 +355,7 @@ describe('ReminderReconcileService', () => {
       expect.objectContaining({
         dedupe_key:
           'session.reminder:org-1:space-1:channel-1:2030-03-06T11:00:00.000Z:720',
-        run_at: '2030-03-05T23:00:00.000Z',
+        run_at: '2030-03-05T17:00:00.000Z',
       }),
     );
     expect(insert).toHaveBeenCalledWith(
