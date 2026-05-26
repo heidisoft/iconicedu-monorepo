@@ -32,6 +32,7 @@
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.1.9",
     "@nestjs/swagger": "^11.2.3",
+    "@openfeature/server-sdk": "^1.21.0",
     "@prisma/adapter-pg": "^7.0.1",
     "@prisma/client": "^7.0.1",
     "class-transformer": "^0.5.1",

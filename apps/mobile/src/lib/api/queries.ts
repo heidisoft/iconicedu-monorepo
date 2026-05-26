@@ -24,6 +24,7 @@ export {
   fetchProfilesByAccountIds,
   fetchSupervisedDirectMessages,
   findDirectMessageChannelForProfiles,
+  ensureDirectMessageChannelForProfiles,
 } from './channel/queries';
 export {
   buildMessageStoragePath,

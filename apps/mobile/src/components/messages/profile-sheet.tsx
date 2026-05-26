@@ -1,5 +1,12 @@
 import React from 'react';
-import { View, Text, Image, StyleSheet, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  Image,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Users,
@@ -16,6 +23,7 @@ import {
   School,
   Heart,
   Sparkles,
+  MessageCircle,
 } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import { BottomSheet } from '@iconicedu/ui-native';
@@ -199,9 +207,15 @@ type ProfileSheetProps = {
   visible: boolean;
   user: UserProfileVM | null;
   onClose: () => void;
+  onMessagePress?: () => void;
 };
 
-export function ProfileSheet({ visible, user, onClose }: ProfileSheetProps) {
+export function ProfileSheet({
+  visible,
+  user,
+  onClose,
+  onMessagePress,
+}: ProfileSheetProps) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
 
@@ -245,6 +259,27 @@ export function ProfileSheet({ visible, user, onClose }: ProfileSheetProps) {
           <View style={[s.roleBadge, { backgroundColor: colors.card }]}>
             <Text style={[s.roleText, { color: colors.textMuted }]}>{roleLabel}</Text>
           </View>
+
+          {onMessagePress ? (
+            <TouchableOpacity
+              style={[
+                s.messageAction,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: colors.border,
+                },
+              ]}
+              activeOpacity={0.75}
+              accessibilityRole="button"
+              accessibilityLabel={`Message ${displayName}`}
+              onPress={onMessagePress}
+            >
+              <View style={[s.messageActionIcon, { backgroundColor: colors.inputBg }]}>
+                <MessageCircle size={18} color={colors.text} />
+              </View>
+              <Text style={[s.messageActionText, { color: colors.text }]}>Message</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
 
         {/* Separator */}
@@ -326,6 +361,30 @@ const s = StyleSheet.create({
   roleText: {
     fontSize: 13,
     fontWeight: '600',
+  },
+  messageAction: {
+    marginTop: 4,
+    minWidth: 104,
+    minHeight: 44,
+    borderRadius: 22,
+    borderWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  messageActionIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  messageActionText: {
+    fontSize: 14,
+    fontWeight: '700',
   },
   separator: {
     height: StyleSheet.hairlineWidth,

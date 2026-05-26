@@ -1,6 +1,18 @@
-import { apiGet } from '@/lib/api/http-client';
+import { apiGet, apiPost } from '@/lib/api/http-client';
 import { supabase } from '@/lib/supabase/client';
-import type { ChannelListItem, DmParticipant } from '@/lib/api/types';
+import type { ChannelListItem } from '@/lib/api/types';
+
+export type DirectMessageChannelOpenResult = {
+  channelId: string;
+  topic: string;
+  avatarSeed: string | null;
+  avatarUrl: string | null;
+  avatarRole: string | null;
+  avatarTimezone: string | null;
+  avatarCity: string | null;
+  avatarCountryCode: string | null;
+  avatarCountryName: string | null;
+};
 
 export async function fetchDirectMessages(
   orgId: string,
@@ -44,17 +56,7 @@ export async function findDirectMessageChannelForProfiles(
   orgId: string,
   currentProfileId: string,
   targetProfileId: string,
-): Promise<{
-  channelId: string;
-  topic: string;
-  avatarSeed: string | null;
-  avatarUrl: string | null;
-  avatarRole: string | null;
-  avatarTimezone: string | null;
-  avatarCity: string | null;
-  avatarCountryCode: string | null;
-  avatarCountryName: string | null;
-} | null> {
+): Promise<DirectMessageChannelOpenResult | null> {
   if (
     !orgId ||
     !currentProfileId ||
@@ -64,6 +66,26 @@ export async function findDirectMessageChannelForProfiles(
     return null;
   }
   return apiGet('/channels/find-dm', {
+    orgId,
+    profileId: currentProfileId,
+    otherProfileId: targetProfileId,
+  });
+}
+
+export async function ensureDirectMessageChannelForProfiles(
+  orgId: string,
+  currentProfileId: string,
+  targetProfileId: string,
+): Promise<DirectMessageChannelOpenResult | null> {
+  if (
+    !orgId ||
+    !currentProfileId ||
+    !targetProfileId ||
+    currentProfileId === targetProfileId
+  ) {
+    return null;
+  }
+  return apiPost('/channels/ensure-dm', {
     orgId,
     profileId: currentProfileId,
     otherProfileId: targetProfileId,

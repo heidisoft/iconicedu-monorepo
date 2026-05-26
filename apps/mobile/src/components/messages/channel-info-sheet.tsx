@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { useRouter } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase/client';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -35,7 +36,13 @@ import { ChannelTopicIconBadge } from '@/lib/learning-space-icons';
 import { RoleNameIndicator } from '@/components/profile/role-name-indicator';
 import { useAccount } from '@/hooks/use-account';
 import { useProfile } from '@/hooks/use-profile';
-import { findDirectMessageChannelForProfiles } from '@/lib/api/queries';
+import {
+  ensureDirectMessageChannelForProfiles,
+  findDirectMessageChannelForProfiles,
+  queryKeys,
+} from '@/lib/api/queries';
+import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
+import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
 import { BottomSheet } from '@iconicedu/ui-native';
 
 const CHANNEL_FILES_BUCKET = 'channel-files';
@@ -898,6 +905,7 @@ export function ChannelInfoSheet({
 }: ChannelInfoSheetProps) {
   const { colors } = useTheme();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { data: account } = useAccount();
   const { data: profile } = useProfile();
   const s = useMemo(() => makeStyles(colors), [colors]);
@@ -905,6 +913,9 @@ export function ChannelInfoSheet({
   const orgId = account?.org_id ?? '';
   const currentProfileId =
     ((profile as Record<string, unknown> | undefined)?.id as string | undefined) ?? '';
+  const enableMobileDirectMessageStart = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.enableMobileDirectMessageStart,
+  );
 
   const [activeTab, setActiveTab] = useState<ChannelTab>('files');
   const [channelUiDefaults, setChannelUiDefaults] =
@@ -1098,19 +1109,26 @@ export function ChannelInfoSheet({
       }
 
       try {
-        const dm = await findDirectMessageChannelForProfiles(
-          orgId,
-          currentProfileId,
-          memberId,
-        );
+        const dm = enableMobileDirectMessageStart
+          ? await ensureDirectMessageChannelForProfiles(orgId, currentProfileId, memberId)
+          : await findDirectMessageChannelForProfiles(orgId, currentProfileId, memberId);
         if (!dm) {
           Alert.alert(
-            'No direct message',
-            `No direct message exists with ${memberName} yet.`,
+            enableMobileDirectMessageStart
+              ? 'Unable to open direct message'
+              : 'No direct message',
+            enableMobileDirectMessageStart
+              ? `Cannot message ${memberName}.`
+              : `No direct message exists with ${memberName} yet.`,
           );
           return;
         }
 
+        if (enableMobileDirectMessageStart) {
+          void queryClient.invalidateQueries({
+            queryKey: queryKeys.directMessages(orgId, currentProfileId),
+          });
+        }
         onClose();
         router.push({
           pathname: '/(app)/dm/[channelId]',
@@ -1130,7 +1148,14 @@ export function ChannelInfoSheet({
         Alert.alert('Unable to open direct message', 'Please try again.');
       }
     },
-    [currentProfileId, onClose, orgId, router],
+    [
+      currentProfileId,
+      enableMobileDirectMessageStart,
+      onClose,
+      orgId,
+      queryClient,
+      router,
+    ],
   );
 
   return (

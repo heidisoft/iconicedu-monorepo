@@ -2,6 +2,7 @@ import {
   cancelRecurringSessionOccurrence,
   fetchChannelMetaByChannelId,
   fetchDirectMessageChannelMetaByChannelId,
+  ensureDirectMessageChannelForProfiles,
   fetchSpaceSchedulesByChannelId,
   fetchActivityFeed,
   fetchSupervisedDirectMessages,
@@ -707,6 +708,41 @@ describe('fetchDirectMessageChannelMetaByChannelId', () => {
     ).resolves.toBeNull();
 
     expect(mockApiGet).not.toHaveBeenCalled();
+  });
+});
+
+describe('ensureDirectMessageChannelForProfiles', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('posts to the ensure DM API with both profile ids', async () => {
+    mockApiPost.mockResolvedValue({ channelId: 'dm-1', topic: 'Avery' });
+
+    const result = await ensureDirectMessageChannelForProfiles(
+      SUP_ORG,
+      GUARDIAN_PROFILE_ID,
+      'prof-teacher-1',
+    );
+
+    expect(mockApiPost).toHaveBeenCalledWith('/channels/ensure-dm', {
+      orgId: SUP_ORG,
+      profileId: GUARDIAN_PROFILE_ID,
+      otherProfileId: 'prof-teacher-1',
+    });
+    expect(result).toMatchObject({ channelId: 'dm-1', topic: 'Avery' });
+  });
+
+  it('returns null without calling the API when the target is the current profile', async () => {
+    await expect(
+      ensureDirectMessageChannelForProfiles(
+        SUP_ORG,
+        GUARDIAN_PROFILE_ID,
+        GUARDIAN_PROFILE_ID,
+      ),
+    ).resolves.toBeNull();
+
+    expect(mockApiPost).not.toHaveBeenCalled();
   });
 });
 

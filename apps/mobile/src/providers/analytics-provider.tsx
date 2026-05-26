@@ -4,6 +4,10 @@ import Constants from 'expo-constants';
 import { PostHogProvider, usePostHog } from 'posthog-react-native';
 import type { AnalyticsClient } from '@iconicedu/utils';
 import { createNoopAnalytics, setGlobalErrorReporter } from '@iconicedu/utils';
+import {
+  MobileFeatureFlagsProvider,
+  type MobileFeatureFlagClient,
+} from './mobile-feature-flags-provider';
 
 const POSTHOG_KEY: string =
   (Constants.expoConfig?.extra?.['posthogKey'] as string | undefined) ??
@@ -35,6 +39,7 @@ const AnalyticsContext = createContext<AnalyticsClient>(createNoopAnalytics());
  */
 function AnalyticsBridge({ children }: { children: React.ReactNode }) {
   const ph = usePostHog();
+  const featureFlagClient = ph as MobileFeatureFlagClient;
 
   const client = useMemo<AnalyticsClient>(
     () => ({
@@ -71,7 +76,11 @@ function AnalyticsBridge({ children }: { children: React.ReactNode }) {
     };
   }, [ph]);
 
-  return <AnalyticsContext.Provider value={client}>{children}</AnalyticsContext.Provider>;
+  return (
+    <MobileFeatureFlagsProvider client={featureFlagClient}>
+      <AnalyticsContext.Provider value={client}>{children}</AnalyticsContext.Provider>
+    </MobileFeatureFlagsProvider>
+  );
 }
 
 /**
@@ -88,9 +97,11 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
   if (!POSTHOG_KEY || POSTHOG_DISABLED_LOCALLY) {
     // No key configured — use noop in dev/CI to avoid crashing.
     return (
-      <AnalyticsContext.Provider value={createNoopAnalytics()}>
-        {children}
-      </AnalyticsContext.Provider>
+      <MobileFeatureFlagsProvider client={null}>
+        <AnalyticsContext.Provider value={createNoopAnalytics()}>
+          {children}
+        </AnalyticsContext.Provider>
+      </MobileFeatureFlagsProvider>
     );
   }
 

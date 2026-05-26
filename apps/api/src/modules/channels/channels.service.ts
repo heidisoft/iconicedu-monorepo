@@ -1,7 +1,12 @@
+import { randomUUID } from 'crypto';
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '@iconicedu/api/prisma/prisma.service';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
+import {
+  apiFeatureFlagKeys,
+  evaluateApiBooleanFlag,
+} from '@iconicedu/api/lib/flags/posthog-openfeature';
 import { ThreadsService } from '@iconicedu/api/modules/threads/threads.service';
 
 type DmParticipant = {
@@ -48,6 +53,18 @@ type ChannelListItem = {
 
 type LastMessageInfo = { text: string | null; at: string | null; sender: string | null };
 
+type DirectMessageChannelResult = {
+  channelId: string;
+  topic: string;
+  avatarSeed: string | null;
+  avatarUrl: string | null;
+  avatarRole: string | null;
+  avatarTimezone: string | null;
+  avatarCity: string | null;
+  avatarCountryCode: string | null;
+  avatarCountryName: string | null;
+};
+
 const PREVIEW_LABELS: Record<string, string> = {
   image: 'Image',
   file: 'File',
@@ -69,6 +86,51 @@ function resolveMessageUiThemeKey(uiDefaults: unknown): 'classic' | 'feed' | nul
   }
   const value = (uiDefaults as { messageUiThemeKey?: unknown }).messageUiThemeKey;
   return value === 'classic' || value === 'feed' ? value : null;
+}
+
+function isDmChannelUniqueConflict(error: { code?: string; message?: string }) {
+  return (
+    error.code === '23505' &&
+    ((error.message ?? '').includes('channels_org_dm_key_uniq') ||
+      (error.message ?? '').includes('duplicate key value'))
+  );
+}
+
+function buildDirectMessageChannelResult(
+  channelId: string,
+  targetProfile: {
+    id: string;
+    display_name?: string | null;
+    first_name?: string | null;
+    last_name?: string | null;
+    avatar_url?: string | null;
+    avatar_seed?: string | null;
+    timezone?: string | null;
+    city?: string | null;
+    country_code?: string | null;
+    country_name?: string | null;
+    kind?: string | null;
+  },
+): DirectMessageChannelResult {
+  const topic =
+    targetProfile.display_name?.trim() ||
+    [targetProfile.first_name, targetProfile.last_name]
+      .filter(Boolean)
+      .join(' ')
+      .trim() ||
+    'Direct Message';
+
+  return {
+    channelId,
+    topic,
+    avatarSeed: targetProfile.avatar_seed ?? targetProfile.id,
+    avatarUrl: targetProfile.avatar_url ?? null,
+    avatarRole: targetProfile.kind ?? null,
+    avatarTimezone: targetProfile.timezone ?? null,
+    avatarCity: targetProfile.city ?? null,
+    avatarCountryCode: targetProfile.country_code ?? null,
+    avatarCountryName: targetProfile.country_name ?? null,
+  };
 }
 
 @Injectable()
@@ -429,7 +491,7 @@ export class ChannelsService {
   async findDirectMessageChannel(
     accessToken: string,
     input: { orgId: string; profileId: string; otherProfileId: string },
-  ) {
+  ): Promise<DirectMessageChannelResult | null> {
     if (
       !input.orgId ||
       !input.profileId ||
@@ -495,24 +557,146 @@ export class ChannelsService {
 
     const channel = channels?.[0];
     if (!channel || !targetProfile) return null;
-    const topic =
-      targetProfile.display_name?.trim() ||
-      [targetProfile.first_name, targetProfile.last_name]
-        .filter(Boolean)
-        .join(' ')
-        .trim() ||
-      'Direct Message';
-    return {
-      channelId: channel.id,
-      topic,
-      avatarSeed: (targetProfile.avatar_seed as string | null) ?? targetProfile.id,
-      avatarUrl: (targetProfile.avatar_url as string | null) ?? null,
-      avatarRole: (targetProfile.kind as string | null) ?? null,
-      avatarTimezone: (targetProfile.timezone as string | null) ?? null,
-      avatarCity: (targetProfile.city as string | null) ?? null,
-      avatarCountryCode: (targetProfile.country_code as string | null) ?? null,
-      avatarCountryName: (targetProfile.country_name as string | null) ?? null,
-    };
+    return buildDirectMessageChannelResult(channel.id, targetProfile);
+  }
+
+  async ensureDirectMessageChannel(
+    accessToken: string,
+    input: { orgId: string; profileId: string; otherProfileId: string },
+  ): Promise<DirectMessageChannelResult | null> {
+    if (
+      !input.orgId ||
+      !input.profileId ||
+      !input.otherProfileId ||
+      input.profileId === input.otherProfileId
+    ) {
+      return null;
+    }
+
+    const existing = await this.findDirectMessageChannel(accessToken, input);
+    if (existing) return existing;
+
+    const canCreateDirectMessage = await evaluateApiBooleanFlag({
+      flagKey: apiFeatureFlagKeys.enableMobileDirectMessageStart,
+      distinctId: input.profileId,
+      personProperties: {
+        profileId: input.profileId,
+        orgId: input.orgId,
+      },
+    });
+    if (!canCreateDirectMessage) return null;
+
+    const supabase = createSupabaseSessionClient(accessToken);
+    const [
+      { data: currentProfile, error: currentProfileError },
+      { data: targetProfile, error: targetProfileError },
+    ] = await Promise.all([
+      supabase
+        .from('profiles')
+        .select('id, org_id')
+        .eq('id', input.profileId)
+        .eq('org_id', input.orgId)
+        .is('deleted_at', null)
+        .maybeSingle<{ id: string; org_id: string }>(),
+      supabase
+        .from('profiles')
+        .select(
+          'id, org_id, display_name, first_name, last_name, avatar_url, avatar_seed, timezone, city, country_code, country_name, kind',
+        )
+        .eq('id', input.otherProfileId)
+        .eq('org_id', input.orgId)
+        .is('deleted_at', null)
+        .maybeSingle<{
+          id: string;
+          org_id: string;
+          display_name: string | null;
+          first_name: string | null;
+          last_name: string | null;
+          avatar_url: string | null;
+          avatar_seed: string | null;
+          timezone?: string | null;
+          city?: string | null;
+          country_code?: string | null;
+          country_name?: string | null;
+          kind?: string | null;
+        }>(),
+    ]);
+
+    if (currentProfileError) {
+      throw new InternalServerErrorException(currentProfileError.message);
+    }
+    if (targetProfileError) {
+      throw new InternalServerErrorException(targetProfileError.message);
+    }
+    if (!currentProfile || !targetProfile) return null;
+
+    const dmKey = `dm:${[input.profileId, input.otherProfileId].sort().join('-')}`;
+    const now = new Date().toISOString();
+    const channelId = randomUUID();
+    const writeSupabase = createSupabaseServiceClient();
+    const { error: channelError } = await writeSupabase.from('channels').insert({
+      id: channelId,
+      org_id: input.orgId,
+      kind: 'dm',
+      topic: 'Direct message',
+      description: null,
+      icon_key: null,
+      visibility: 'private',
+      purpose: 'general',
+      status: 'active',
+      dm_key: dmKey,
+      posting_policy_kind: 'members-only',
+      allow_threads: true,
+      allow_reactions: true,
+      ui_defaults: {
+        messageUiThemeKey: 'classic',
+        defaultRightPanelOpen: false,
+        defaultRightPanelKey: 'channel_info',
+        infoPanel: {
+          showHeader: false,
+          showDetails: false,
+          showMedia: false,
+          showMembers: false,
+          showQuickActions: false,
+          showHiddenQuickActions: false,
+        },
+      },
+      created_by_profile_id: input.profileId,
+      created_at: now,
+      created_by: input.profileId,
+      updated_at: now,
+      updated_by: input.profileId,
+    });
+
+    if (channelError) {
+      if (isDmChannelUniqueConflict(channelError)) {
+        return this.findDirectMessageChannel(accessToken, input);
+      }
+      throw new InternalServerErrorException(channelError.message);
+    }
+
+    const memberRows = Array.from(new Set([input.profileId, input.otherProfileId])).map(
+      (profileId) => ({
+        id: randomUUID(),
+        org_id: input.orgId,
+        channel_id: channelId,
+        profile_id: profileId,
+        joined_at: now,
+        role_in_channel: null,
+        created_at: now,
+        created_by: input.profileId,
+        updated_at: now,
+        updated_by: input.profileId,
+      }),
+    );
+    const { error: memberError } = await writeSupabase
+      .from('channel_members')
+      .insert(memberRows);
+    if (memberError) {
+      throw new InternalServerErrorException(memberError.message);
+    }
+
+    return buildDirectMessageChannelResult(channelId, targetProfile);
   }
 
   async getDirectMessageChannelMeta(

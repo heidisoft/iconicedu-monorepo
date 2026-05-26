@@ -67,6 +67,27 @@ export class ChannelsController {
     );
   }
 
+  @Post('ensure-dm')
+  @UseGuards(AuthGuard)
+  ensureDm(
+    @Req() req: AuthenticatedRequest,
+    @Body()
+    body: {
+      orgId?: string;
+      profileId?: string;
+      otherProfileId?: string;
+    },
+  ) {
+    return this.channelsService.ensureDirectMessageChannel(
+      extractBearerToken(req.headers.authorization),
+      {
+        orgId: body.orgId ?? '',
+        profileId: body.profileId ?? '',
+        otherProfileId: body.otherProfileId ?? '',
+      },
+    );
+  }
+
   @Get('list')
   @UseGuards(AuthGuard)
   list(

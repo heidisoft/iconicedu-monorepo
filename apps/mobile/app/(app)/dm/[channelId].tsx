@@ -25,6 +25,7 @@ import {
   deleteMessage,
   fetchChannelReadState,
   fetchDirectMessageChannelMetaByChannelId,
+  ensureDirectMessageChannelForProfiles,
   queryKeys,
 } from '@/lib/api/queries';
 import { useTheme } from '@/providers/theme-provider';
@@ -46,6 +47,8 @@ import type { PendingUpload } from '@/components/messages/pending-message-row';
 import type { PresenceDisplayStatus } from '@/hooks/use-online-profile-ids';
 import { useMarkRead } from '@/hooks/use-mark-read';
 import type { ChannelListItem, DmParticipant } from '@/lib/api/types';
+import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
+import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
 
 const COUNTRY_LABELS: Record<string, string> = {
   LK: 'Sri Lanka',
@@ -105,6 +108,9 @@ export default function DmConversationScreen() {
   const { data: account } = useAccount();
   const { data: profile } = useProfile();
   const { colors } = useTheme();
+  const enableMobileDirectMessageStart = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.enableMobileDirectMessageStart,
+  );
   const ThemedMessageList = resolveMobileMessageUiTheme('classic').MessageList;
 
   const orgId = account?.org_id ?? '';
@@ -343,6 +349,54 @@ export default function DmConversationScreen() {
   // ── Profile sheet state ──
   const [profileUser, setProfileUser] = useState<UserProfileVM | null>(null);
   const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
+
+  const handleProfileMessagePress = useCallback(
+    async (user: UserProfileVM) => {
+      if (
+        !enableMobileDirectMessageStart ||
+        !orgId ||
+        !profileId ||
+        !user.ids.id ||
+        user.ids.id === profileId
+      ) {
+        return;
+      }
+
+      try {
+        const dm = await ensureDirectMessageChannelForProfiles(
+          orgId,
+          profileId,
+          user.ids.id,
+        );
+        if (!dm) {
+          Alert.alert('Unable to open direct message', 'Please try again.');
+          return;
+        }
+
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.directMessages(orgId, profileId),
+        });
+        setProfileUser(null);
+        router.push({
+          pathname: '/(app)/dm/[channelId]',
+          params: {
+            channelId: dm.channelId,
+            topic: dm.topic,
+            avatarSeed: dm.avatarSeed ?? '',
+            avatarUrl: dm.avatarUrl ?? '',
+            avatarRole: dm.avatarRole ?? '',
+            avatarTimezone: dm.avatarTimezone ?? '',
+            avatarCity: dm.avatarCity ?? '',
+            avatarCountryCode: dm.avatarCountryCode ?? '',
+            avatarCountryName: dm.avatarCountryName ?? '',
+          },
+        } as never);
+      } catch {
+        Alert.alert('Unable to open direct message', 'Please try again.');
+      }
+    },
+    [enableMobileDirectMessageStart, orgId, profileId, queryClient, router],
+  );
 
   // ── Long-press actions sheet state ──
   const [actionsMessage, setActionsMessage] = useState<MessageVM | null>(null);
@@ -716,6 +770,13 @@ export default function DmConversationScreen() {
         visible={!!profileUser}
         user={profileUser}
         onClose={() => setProfileUser(null)}
+        onMessagePress={
+          enableMobileDirectMessageStart &&
+          profileUser &&
+          profileUser.ids.id !== profileId
+            ? () => handleProfileMessagePress(profileUser)
+            : undefined
+        }
       />
 
       {/* Long-press actions sheet */}
