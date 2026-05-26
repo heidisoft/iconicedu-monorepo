@@ -23,5 +23,8 @@
   "files.watcherExclude": {
     "**/node_modules/**": true,
     "**/.next/**": true
+  },
+  "chat.tools.terminal.autoApprove": {
+    "pnpm": true
   }
 }
