@@ -39,6 +39,7 @@ export type PublicPageSeo = {
   path: string;
   title: string;
   description: string;
+  keywords?: readonly string[];
   priority: number;
   changeFrequency: 'weekly' | 'monthly' | 'yearly';
 };
@@ -58,7 +59,13 @@ export type LocationLandingPage = PublicPageSeo & {
   h1: string;
   summary: string;
   standards: readonly string[];
+  exams: readonly string[];
   support: readonly string[];
+  audience: string;
+  relatedLocations?: readonly {
+    label: string;
+    href: string;
+  }[];
 };
 
 export function getSiteUrl() {
@@ -91,12 +98,13 @@ export function createMarketingMetadata(page: PublicPageSeo): Metadata {
   const title = page.title.includes(BRAND_NAME)
     ? page.title
     : `${page.title} | ${BRAND_NAME}`;
+  const keywords = [...new Set([...DEFAULT_KEYWORDS, ...(page.keywords ?? [])])];
 
   return {
     metadataBase: new URL(getSiteUrl()),
     title,
     description: page.description,
-    keywords: DEFAULT_KEYWORDS,
+    keywords,
     alternates: { canonical: page.path },
     openGraph: {
       type: 'website',
@@ -470,11 +478,27 @@ export const LOCATION_LANDING_PAGES: LocationLandingPage[] = [
     h1: 'Online tutoring for families across the USA',
     summary:
       'ICONIC Academy supports K-12 students across the United States with live online tutoring, homework help, test prep, and enrichment programs.',
+    keywords: [
+      'online tutoring USA',
+      'US curriculum tutoring',
+      'state standards tutoring',
+      'K-12 tutor United States',
+    ],
     standards: US_CURRICULUM_STANDARDS,
+    exams: ['State exams', 'SAT', 'ACT', 'AP support', 'ISEE', 'SSAT'],
     support: [
       'USA-based and global tutor options',
       'State standards where applicable',
       'Flexible scheduling for evening, weekend, and time-zone needs',
+    ],
+    audience:
+      'Families in U.S. schools who want online tutoring connected to homework, grade-level expectations, state standards, and test preparation where applicable.',
+    relatedLocations: [
+      { label: 'New York', href: '/locations/new-york' },
+      { label: 'New York City', href: '/locations/new-york-city' },
+      { label: 'California', href: '/locations/california' },
+      { label: 'Texas', href: '/locations/texas' },
+      { label: 'Florida', href: '/locations/florida' },
     ],
   },
   {
@@ -482,21 +506,77 @@ export const LOCATION_LANDING_PAGES: LocationLandingPage[] = [
     path: '/locations/new-york',
     title: 'Online Tutoring in New York',
     description:
-      'Online tutoring for New York students with support for school assignments, grade-level skills, New York State standards where applicable, Regents, SHSAT, and enrichment.',
+      'Online tutoring for New York State students with support for school assignments, grade-level skills, New York State standards, Regents, state tests, and enrichment.',
     priority: 0.65,
     changeFrequency: 'monthly',
-    h1: 'Online tutoring for students in New York',
+    h1: 'Online tutoring for students across New York State',
     summary:
-      'Families in New York can use ICONIC Academy for K-12 academic support, test prep, homework help, and enrichment from home.',
+      'Families across New York State can use ICONIC Academy for K-12 academic support, Regents readiness, homework help, and enrichment from home.',
+    keywords: [
+      'online tutoring New York',
+      'New York Regents tutoring',
+      'New York State standards tutoring',
+      'NY state test prep',
+    ],
     standards: [
       'New York State Next Generation Learning Standards',
-      'Regents support',
-      'SHSAT prep',
+      'New York State learning standards where applicable',
+      'School-specific goals and assignments',
     ],
+    exams: ['Regents support', 'New York state test preparation', 'SAT and ACT support'],
     support: [
       'Math, ELA, science, reading, and writing',
       'State test preparation',
       'Enrichment and advanced challenge',
+    ],
+    audience:
+      'New York families looking for curriculum-aware online tutoring beyond one city-specific admissions path.',
+    relatedLocations: [
+      { label: 'New York City SHSAT prep', href: '/locations/new-york-city' },
+      { label: 'USA tutoring', href: '/locations/usa' },
+      { label: 'New Jersey', href: '/locations/new-jersey' },
+    ],
+  },
+  {
+    slug: 'new-york-city',
+    path: '/locations/new-york-city',
+    title: 'Online Tutoring in New York City',
+    description:
+      'Online tutoring for NYC students with SHSAT prep, specialized high school readiness, middle school math and ELA, Regents support where relevant, and enrichment.',
+    priority: 0.7,
+    changeFrequency: 'monthly',
+    h1: 'Online tutoring and SHSAT prep for New York City students',
+    summary:
+      'ICONIC Academy helps NYC families prepare for specialized high school admissions, strengthen middle school math and ELA, and stay on track with school assignments.',
+    keywords: [
+      'SHSAT prep online',
+      'NYC tutoring',
+      'specialized high school admissions tutoring',
+      'New York City math tutor',
+      'NYC ELA tutor',
+    ],
+    standards: [
+      'New York State Next Generation Learning Standards',
+      'NYC school assignments and grade-level expectations',
+      'Middle school math and ELA foundations',
+    ],
+    exams: [
+      'SHSAT prep',
+      'Specialized high school readiness',
+      'Regents support where relevant',
+      'New York state test preparation',
+    ],
+    support: [
+      'Targeted SHSAT math and verbal practice',
+      'Middle school math, reading, writing, and study habits',
+      'High school readiness and advanced enrichment',
+    ],
+    audience:
+      'NYC families comparing online support for SHSAT preparation, specialized high school goals, and school-aligned academic help.',
+    relatedLocations: [
+      { label: 'New York State', href: '/locations/new-york' },
+      { label: 'New Jersey', href: '/locations/new-jersey' },
+      { label: 'Test prep', href: '/programs/test-prep' },
     ],
   },
   {
@@ -510,15 +590,24 @@ export const LOCATION_LANDING_PAGES: LocationLandingPage[] = [
     h1: 'Online tutoring for students in New Jersey',
     summary:
       'ICONIC Academy helps New Jersey families find flexible K-12 tutoring, homework support, test prep, and enrichment programs online.',
-    standards: [
-      'New Jersey Student Learning Standards',
-      'State test preparation',
-      'School-specific goals',
+    keywords: [
+      'online tutoring New Jersey',
+      'New Jersey Student Learning Standards tutoring',
+      'New Jersey test prep',
     ],
+    standards: ['New Jersey Student Learning Standards', 'School-specific goals'],
+    exams: ['State test preparation', 'SAT and ACT support', 'ISEE and SSAT support'],
     support: [
       'Core academic tutoring',
       'Reading, writing, and math foundations',
       'Advanced and enrichment programs',
+    ],
+    audience:
+      'New Jersey families who want flexible online tutoring connected to school expectations and grade-level skills where applicable.',
+    relatedLocations: [
+      { label: 'New York City', href: '/locations/new-york-city' },
+      { label: 'New York', href: '/locations/new-york' },
+      { label: 'USA tutoring', href: '/locations/usa' },
     ],
   },
   {
@@ -532,15 +621,29 @@ export const LOCATION_LANDING_PAGES: LocationLandingPage[] = [
     h1: 'Online tutoring for students in California',
     summary:
       'ICONIC Academy supports California K-12 learners with online tutoring, school-aligned help, test prep, and enrichment programs.',
+    keywords: [
+      'online tutoring California',
+      'California Common Core tutoring',
+      'California math tutor',
+      'California ELA tutor',
+    ],
     standards: [
       'California Common Core State Standards',
       'School assignments',
       'Grade-level readiness',
     ],
+    exams: ['State test preparation', 'SAT and ACT support', 'AP support'],
     support: [
       'Math, ELA, science, reading, and writing',
       'Flexible online sessions',
       'Coding, debate, chess, art, and music enrichment',
+    ],
+    audience:
+      'California families who want online academic support that can connect to school assignments, grade-level skills, and enrichment.',
+    relatedLocations: [
+      { label: 'USA tutoring', href: '/locations/usa' },
+      { label: 'Texas', href: '/locations/texas' },
+      { label: 'Online tutoring', href: '/programs/online-tutoring' },
     ],
   },
   {
@@ -554,11 +657,24 @@ export const LOCATION_LANDING_PAGES: LocationLandingPage[] = [
     h1: 'Online tutoring for students in Texas',
     summary:
       'Families in Texas can use ICONIC Academy for online academic support, test prep, homework help, and enrichment programs.',
-    standards: ['Texas TEKS', 'State test preparation', 'School-specific goals'],
+    keywords: ['online tutoring Texas', 'Texas TEKS tutoring', 'STAAR tutoring'],
+    standards: ['Texas TEKS', 'School-specific goals', 'Grade-level readiness'],
+    exams: [
+      'State test preparation',
+      'STAAR-aligned practice where applicable',
+      'SAT and ACT support',
+    ],
     support: [
       'Core academic tutoring',
       'Test prep and study skills',
       'Future-ready enrichment programs',
+    ],
+    audience:
+      'Texas families looking for online tutoring connected to TEKS, school assignments, and test readiness where applicable.',
+    relatedLocations: [
+      { label: 'USA tutoring', href: '/locations/usa' },
+      { label: 'Florida', href: '/locations/florida' },
+      { label: 'California', href: '/locations/california' },
     ],
   },
   {
@@ -572,15 +688,630 @@ export const LOCATION_LANDING_PAGES: LocationLandingPage[] = [
     h1: 'Online tutoring for students in Florida',
     summary:
       'ICONIC Academy helps Florida families access online tutoring, curriculum-aware support, flexible scheduling, and enrichment programs.',
-    standards: [
-      'Florida B.E.S.T. Standards',
-      'State test preparation',
-      'Grade-level skills',
+    keywords: [
+      'online tutoring Florida',
+      'Florida B.E.S.T. Standards tutoring',
+      'Florida test prep',
     ],
+    standards: ['Florida B.E.S.T. Standards', 'Grade-level skills'],
+    exams: ['State test preparation', 'SAT and ACT support', 'AP support'],
     support: [
       'Math, ELA, science, reading, and writing',
       'Homework help and test prep',
       'Coding, robotics, debate, and creative enrichment',
+    ],
+    audience:
+      'Florida families who want online tutoring that can connect to school work, B.E.S.T. Standards, and flexible scheduling.',
+    relatedLocations: [
+      { label: 'USA tutoring', href: '/locations/usa' },
+      { label: 'Texas', href: '/locations/texas' },
+      { label: 'Online tutoring', href: '/programs/online-tutoring' },
+    ],
+  },
+  {
+    slug: 'australia',
+    path: '/locations/australia',
+    title: 'Online Tutoring in Australia',
+    description:
+      'Online tutoring for Australian students with Australian Curriculum support, NAPLAN practice, ATAR pathway awareness, HSC, VCE, QCE, WACE, SACE, and enrichment.',
+    priority: 0.75,
+    changeFrequency: 'monthly',
+    h1: 'Online tutoring for students across Australia',
+    summary:
+      'ICONIC Academy supports Australian families with live online tutoring for school confidence, homework, NAPLAN readiness, senior pathway preparation, and enrichment.',
+    keywords: [
+      'online tutoring Australia',
+      'Australian Curriculum tutoring',
+      'NAPLAN tutoring',
+      'ATAR tutoring',
+      'HSC VCE QCE WACE SACE tutoring',
+    ],
+    standards: [
+      'Australian Curriculum',
+      'State and territory syllabus expectations where applicable',
+      'School-specific goals and assignments',
+    ],
+    exams: ['NAPLAN', 'ATAR pathway support', 'HSC', 'VCE', 'QCE', 'WACE', 'SACE'],
+    support: [
+      'Maths, English, science, reading, and writing',
+      'Homework help, study skills, and exam practice',
+      'Flexible scheduling across Australian time zones',
+    ],
+    audience:
+      'Australian families who want online tutoring connected to classroom expectations, NAPLAN, and senior secondary pathways where applicable.',
+    relatedLocations: [
+      { label: 'New South Wales', href: '/locations/new-south-wales' },
+      { label: 'Victoria', href: '/locations/victoria' },
+      { label: 'Queensland', href: '/locations/queensland' },
+      { label: 'Western Australia', href: '/locations/western-australia' },
+      { label: 'South Australia', href: '/locations/south-australia' },
+    ],
+  },
+  {
+    slug: 'new-south-wales',
+    path: '/locations/new-south-wales',
+    title: 'Online Tutoring in New South Wales',
+    description:
+      'Online tutoring for NSW students with Australian Curriculum awareness, NSW syllabus support, NAPLAN practice, HSC readiness, homework help, and enrichment.',
+    priority: 0.62,
+    changeFrequency: 'monthly',
+    h1: 'Online tutoring for students in New South Wales',
+    summary:
+      'Families in NSW can use ICONIC Academy for curriculum-aware tutoring, homework support, HSC preparation, NAPLAN readiness, and enrichment from home.',
+    keywords: [
+      'online tutoring NSW',
+      'HSC tutoring',
+      'NAPLAN tutor NSW',
+      'Sydney online tutor',
+    ],
+    standards: [
+      'Australian Curriculum',
+      'NSW syllabus support where applicable',
+      'School-specific goals',
+    ],
+    exams: ['NAPLAN', 'HSC', 'ATAR pathway support'],
+    support: [
+      'Maths and English foundations',
+      'Science and senior subject support',
+      'Study planning and exam practice',
+    ],
+    audience:
+      'NSW families looking for online tutoring connected to school assignments, NAPLAN, and HSC goals where applicable.',
+    relatedLocations: [
+      { label: 'Australia', href: '/locations/australia' },
+      { label: 'Victoria', href: '/locations/victoria' },
+      { label: 'Queensland', href: '/locations/queensland' },
+    ],
+  },
+  {
+    slug: 'victoria',
+    path: '/locations/victoria',
+    title: 'Online Tutoring in Victoria',
+    description:
+      'Online tutoring for Victorian students with Australian Curriculum awareness, Victorian curriculum support, NAPLAN practice, VCE readiness, homework help, and enrichment.',
+    priority: 0.62,
+    changeFrequency: 'monthly',
+    h1: 'Online tutoring for students in Victoria',
+    summary:
+      'ICONIC Academy helps Victorian families with online Maths, English, science, homework help, NAPLAN practice, VCE support, and enrichment.',
+    keywords: [
+      'online tutoring Victoria',
+      'VCE tutoring',
+      'NAPLAN tutor Victoria',
+      'Melbourne online tutor',
+    ],
+    standards: [
+      'Australian Curriculum',
+      'Victorian curriculum support where applicable',
+      'School-specific goals',
+    ],
+    exams: ['NAPLAN', 'VCE', 'ATAR pathway support'],
+    support: [
+      'Maths, English, and science tutoring',
+      'Homework routines and study skills',
+      'Senior subject readiness',
+    ],
+    audience:
+      'Victorian families who want flexible online tutoring connected to school goals, NAPLAN, and VCE preparation where applicable.',
+    relatedLocations: [
+      { label: 'Australia', href: '/locations/australia' },
+      { label: 'New South Wales', href: '/locations/new-south-wales' },
+      { label: 'South Australia', href: '/locations/south-australia' },
+    ],
+  },
+  {
+    slug: 'queensland',
+    path: '/locations/queensland',
+    title: 'Online Tutoring in Queensland',
+    description:
+      'Online tutoring for Queensland students with Australian Curriculum awareness, QCAA/QCE pathway support, NAPLAN practice, homework help, and enrichment.',
+    priority: 0.62,
+    changeFrequency: 'monthly',
+    h1: 'Online tutoring for students in Queensland',
+    summary:
+      'Queensland families can find online academic support for school assignments, NAPLAN practice, QCE readiness, study skills, and enrichment.',
+    keywords: [
+      'online tutoring Queensland',
+      'QCE tutoring',
+      'NAPLAN tutor Queensland',
+      'Brisbane online tutor',
+    ],
+    standards: [
+      'Australian Curriculum',
+      'Queensland syllabus support where applicable',
+      'School-specific goals',
+    ],
+    exams: ['NAPLAN', 'QCE', 'ATAR pathway support'],
+    support: [
+      'Core academic tutoring',
+      'Study skills and exam practice',
+      'STEM, coding, and enrichment',
+    ],
+    audience:
+      'Queensland families looking for online tutoring connected to classroom learning, QCE pathways, and NAPLAN where applicable.',
+    relatedLocations: [
+      { label: 'Australia', href: '/locations/australia' },
+      { label: 'New South Wales', href: '/locations/new-south-wales' },
+      { label: 'Western Australia', href: '/locations/western-australia' },
+    ],
+  },
+  {
+    slug: 'western-australia',
+    path: '/locations/western-australia',
+    title: 'Online Tutoring in Western Australia',
+    description:
+      'Online tutoring for Western Australia students with Australian Curriculum awareness, WACE support, NAPLAN practice, homework help, and enrichment.',
+    priority: 0.6,
+    changeFrequency: 'monthly',
+    h1: 'Online tutoring for students in Western Australia',
+    summary:
+      'ICONIC Academy supports WA students online with core subject tutoring, NAPLAN readiness, WACE pathway support, study skills, and enrichment.',
+    keywords: [
+      'online tutoring Western Australia',
+      'WACE tutoring',
+      'NAPLAN tutor WA',
+      'Perth online tutor',
+    ],
+    standards: [
+      'Australian Curriculum',
+      'Western Australia curriculum support where applicable',
+      'School-specific goals',
+    ],
+    exams: ['NAPLAN', 'WACE', 'ATAR pathway support'],
+    support: [
+      'Maths, English, science, and writing',
+      'Homework help and study planning',
+      'Flexible online scheduling for WA families',
+    ],
+    audience:
+      'Western Australia families who want online tutoring connected to school goals, NAPLAN, WACE, and senior pathway readiness where applicable.',
+    relatedLocations: [
+      { label: 'Australia', href: '/locations/australia' },
+      { label: 'Queensland', href: '/locations/queensland' },
+      { label: 'South Australia', href: '/locations/south-australia' },
+    ],
+  },
+  {
+    slug: 'south-australia',
+    path: '/locations/south-australia',
+    title: 'Online Tutoring in South Australia',
+    description:
+      'Online tutoring for South Australia students with Australian Curriculum awareness, SACE support, NAPLAN practice, homework help, and enrichment.',
+    priority: 0.6,
+    changeFrequency: 'monthly',
+    h1: 'Online tutoring for students in South Australia',
+    summary:
+      'South Australian families can use ICONIC Academy for live online tutoring, NAPLAN practice, SACE pathway support, study skills, and enrichment.',
+    keywords: [
+      'online tutoring South Australia',
+      'SACE tutoring',
+      'NAPLAN tutor South Australia',
+      'Adelaide online tutor',
+    ],
+    standards: [
+      'Australian Curriculum',
+      'South Australia curriculum support where applicable',
+      'School-specific goals',
+    ],
+    exams: ['NAPLAN', 'SACE', 'ATAR pathway support'],
+    support: [
+      'Maths and English foundations',
+      'Science, writing, and study support',
+      'Senior pathway readiness',
+    ],
+    audience:
+      'South Australian families who want online tutoring connected to school assignments, NAPLAN, and SACE goals where applicable.',
+    relatedLocations: [
+      { label: 'Australia', href: '/locations/australia' },
+      { label: 'Victoria', href: '/locations/victoria' },
+      { label: 'Western Australia', href: '/locations/western-australia' },
+    ],
+  },
+  {
+    slug: 'united-kingdom',
+    path: '/locations/united-kingdom',
+    title: 'Online Tutoring in the UK',
+    description:
+      'Online tutoring for UK students with National Curriculum awareness, Key Stages, SATs, 11 plus, GCSE, IGCSE, A Levels, homework help, and enrichment.',
+    priority: 0.75,
+    changeFrequency: 'monthly',
+    h1: 'Online tutoring for students across the UK',
+    summary:
+      'ICONIC Academy supports UK families with online Maths, English, science, homework help, exam preparation, and enrichment shaped around each learner.',
+    keywords: [
+      'online tutoring UK',
+      'GCSE tutor',
+      'A Level tutor',
+      '11 plus tutoring',
+      'Key Stage tutoring',
+    ],
+    standards: [
+      'National Curriculum',
+      'Key Stages 1-5',
+      'School-specific goals and exam-board expectations where applicable',
+    ],
+    exams: ['SATs', '11+', 'GCSE', 'IGCSE', 'A Levels'],
+    support: [
+      'Maths, English, science, reading, and writing',
+      'Exam practice and study planning',
+      'Native English-speaking tutor options where language fluency matters',
+    ],
+    audience:
+      'UK families looking for curriculum-aware online tutoring for school confidence, Key Stage progress, admissions preparation, GCSEs, IGCSEs, or A Levels.',
+    relatedLocations: [
+      { label: 'Online tutoring', href: '/programs/online-tutoring' },
+      { label: 'Test prep', href: '/programs/test-prep' },
+      { label: 'New Zealand', href: '/locations/new-zealand' },
+    ],
+  },
+  {
+    slug: 'new-zealand',
+    path: '/locations/new-zealand',
+    title: 'Online Tutoring in New Zealand',
+    description:
+      'Online tutoring for New Zealand students with New Zealand Curriculum support, NCEA Levels 1-3, NZ Scholarship, homework help, study skills, and enrichment.',
+    priority: 0.68,
+    changeFrequency: 'monthly',
+    h1: 'Online tutoring for students in New Zealand',
+    summary:
+      'ICONIC Academy helps New Zealand families with flexible online tutoring for school assignments, NCEA readiness, confidence, and enrichment.',
+    keywords: [
+      'online tutoring New Zealand',
+      'NCEA tutoring',
+      'NZ Scholarship tutoring',
+      'Auckland online tutor',
+    ],
+    standards: [
+      'New Zealand Curriculum',
+      'School-specific goals and assignments',
+      'Senior secondary subject expectations where applicable',
+    ],
+    exams: ['NCEA Levels 1-3', 'NZ Scholarship', 'School assessments'],
+    support: [
+      'Maths, English, science, and writing',
+      'NCEA study planning and practice',
+      'Flexible online sessions across New Zealand time zones',
+    ],
+    audience:
+      'New Zealand families who want online tutoring connected to school goals, NCEA preparation, and enrichment where applicable.',
+    relatedLocations: [
+      { label: 'Australia', href: '/locations/australia' },
+      { label: 'United Kingdom', href: '/locations/united-kingdom' },
+      { label: 'Online tutoring', href: '/programs/online-tutoring' },
+    ],
+  },
+  {
+    slug: 'italy',
+    path: '/locations/italy',
+    title: 'Online Tutoring in Italy',
+    description:
+      'Online tutoring for students in Italy with primary and secondary school support, INVALSI readiness, Esame di Stato or maturita preparation, English, maths, and science tutoring.',
+    priority: 0.62,
+    changeFrequency: 'monthly',
+    h1: 'Online tutoring for students in Italy',
+    summary:
+      'ICONIC Academy supports families in Italy with online tutoring for school confidence, English language development, maths, science, INVALSI practice, and exam readiness.',
+    keywords: [
+      'online tutoring Italy',
+      'INVALSI tutoring',
+      'maturita tutoring',
+      'English tutor Italy',
+      'maths tutor Italy',
+    ],
+    standards: [
+      'Italian primary and secondary school support',
+      'School-specific goals and assignments',
+      'International curriculum support where applicable',
+    ],
+    exams: ['INVALSI', 'Esame di Stato / maturita', 'School assessments'],
+    support: [
+      'English, maths, science, reading, and writing',
+      'Homework routines and study skills',
+      'Exam practice and confidence building',
+    ],
+    audience:
+      'Families in Italy looking for online tutoring in English, maths, science, school assignments, and exam preparation where applicable.',
+    relatedLocations: [
+      { label: 'United Kingdom', href: '/locations/united-kingdom' },
+      { label: 'UAE', href: '/locations/uae' },
+      { label: 'Online tutoring', href: '/programs/online-tutoring' },
+    ],
+  },
+  {
+    slug: 'uae',
+    path: '/locations/uae',
+    title: 'Online Tutoring in the UAE',
+    description:
+      'Online tutoring for UAE students with MoE, British, IB, American, and CBSE curriculum-aware support plus IGCSE, A Level, SAT, IELTS, TOEFL, and EmSAT preparation where applicable.',
+    priority: 0.7,
+    changeFrequency: 'monthly',
+    h1: 'Online tutoring for students in the UAE',
+    summary:
+      'ICONIC Academy supports UAE families across international and national school pathways with flexible online tutoring, exam practice, homework help, and enrichment.',
+    keywords: [
+      'online tutoring UAE',
+      'Dubai tutor online',
+      'EmSAT tutoring',
+      'IGCSE tutor UAE',
+      'CBSE tutor UAE',
+    ],
+    standards: [
+      'UAE MoE curriculum support where applicable',
+      'British, IB, American, and CBSE pathways',
+      'School-specific goals and assignments',
+    ],
+    exams: ['EmSAT', 'IGCSE', 'A Level', 'SAT', 'IELTS', 'TOEFL', 'IB assessments'],
+    support: [
+      'Maths, English, science, and writing',
+      'International school homework support',
+      'Exam practice and study planning',
+    ],
+    audience:
+      'UAE families comparing online tutors for national, British, IB, American, CBSE, admissions, or English-language exam goals.',
+    relatedLocations: [
+      { label: 'Qatar', href: '/locations/qatar' },
+      { label: 'United Kingdom', href: '/locations/united-kingdom' },
+      { label: 'Online tutoring', href: '/programs/online-tutoring' },
+    ],
+  },
+  {
+    slug: 'canada',
+    path: '/locations/canada',
+    title: 'Online Tutoring in Canada',
+    description:
+      'Online tutoring for Canadian students with provincial curriculum support, EQAO, OSSLT, BC literacy and numeracy graduation assessments, Alberta PATs and diploma exams, homework help, and enrichment.',
+    priority: 0.75,
+    changeFrequency: 'monthly',
+    h1: 'Online tutoring for students across Canada',
+    summary:
+      'ICONIC Academy supports Canadian families with online tutoring connected to provincial expectations, school assignments, test readiness, and enrichment where applicable.',
+    keywords: [
+      'online tutoring Canada',
+      'Canadian curriculum tutoring',
+      'EQAO tutoring',
+      'OSSLT tutoring',
+      'provincial exam tutoring Canada',
+    ],
+    standards: [
+      'Provincial curriculum expectations',
+      'School-specific goals and assignments',
+      'English and French-language school support where applicable',
+    ],
+    exams: [
+      'EQAO',
+      'OSSLT',
+      'BC literacy and numeracy graduation assessments',
+      'Alberta PATs',
+      'Alberta diploma exams',
+    ],
+    support: [
+      'Math, English, science, reading, and writing',
+      'Provincial assessment readiness',
+      'Homework help and study skills',
+    ],
+    audience:
+      'Canadian families who want online tutoring connected to provincial curriculum, school assignments, and assessment readiness where applicable.',
+    relatedLocations: [
+      { label: 'Ontario', href: '/locations/ontario' },
+      { label: 'British Columbia', href: '/locations/british-columbia' },
+      { label: 'Alberta', href: '/locations/alberta' },
+    ],
+  },
+  {
+    slug: 'ontario',
+    path: '/locations/ontario',
+    title: 'Online Tutoring in Ontario',
+    description:
+      'Online tutoring for Ontario students with Ontario Curriculum support, EQAO, OSSLT, math, English, science, French support where applicable, homework help, and enrichment.',
+    priority: 0.65,
+    changeFrequency: 'monthly',
+    h1: 'Online tutoring for students in Ontario',
+    summary:
+      'Ontario families can use ICONIC Academy for curriculum-aware online tutoring, EQAO readiness, OSSLT support, homework help, and enrichment.',
+    keywords: [
+      'online tutoring Ontario',
+      'Ontario Curriculum tutoring',
+      'EQAO tutoring',
+      'OSSLT tutoring',
+      'Toronto online tutor',
+    ],
+    standards: [
+      'Ontario Curriculum',
+      'School-specific goals and assignments',
+      'English and French-language support where applicable',
+    ],
+    exams: ['EQAO', 'OSSLT', 'School assessments'],
+    support: [
+      'Math, English, science, and writing',
+      'Reading foundations and study skills',
+      'Assessment practice and confidence building',
+    ],
+    audience:
+      'Ontario families looking for online tutoring connected to Ontario Curriculum expectations, EQAO, OSSLT, and school goals where applicable.',
+    relatedLocations: [
+      { label: 'Canada', href: '/locations/canada' },
+      { label: 'British Columbia', href: '/locations/british-columbia' },
+      { label: 'Alberta', href: '/locations/alberta' },
+    ],
+  },
+  {
+    slug: 'british-columbia',
+    path: '/locations/british-columbia',
+    title: 'Online Tutoring in British Columbia',
+    description:
+      'Online tutoring for BC students with British Columbia curriculum support, literacy and numeracy graduation assessment readiness, homework help, study skills, and enrichment.',
+    priority: 0.63,
+    changeFrequency: 'monthly',
+    h1: 'Online tutoring for students in British Columbia',
+    summary:
+      'ICONIC Academy helps BC families with flexible online tutoring for school assignments, literacy, numeracy, science, study skills, and graduation assessment readiness.',
+    keywords: [
+      'online tutoring British Columbia',
+      'BC curriculum tutoring',
+      'BC literacy assessment tutor',
+      'BC numeracy assessment tutor',
+      'Vancouver online tutor',
+    ],
+    standards: [
+      'British Columbia curriculum support',
+      'School-specific goals and assignments',
+      'Grade-level literacy and numeracy expectations',
+    ],
+    exams: [
+      'BC literacy graduation assessment',
+      'BC numeracy graduation assessment',
+      'School assessments',
+    ],
+    support: [
+      'Math, English, science, and writing',
+      'Literacy and numeracy foundations',
+      'Homework routines and study planning',
+    ],
+    audience:
+      'British Columbia families who want online tutoring connected to classroom goals, literacy and numeracy skills, and graduation assessment readiness where applicable.',
+    relatedLocations: [
+      { label: 'Canada', href: '/locations/canada' },
+      { label: 'Ontario', href: '/locations/ontario' },
+      { label: 'Alberta', href: '/locations/alberta' },
+    ],
+  },
+  {
+    slug: 'alberta',
+    path: '/locations/alberta',
+    title: 'Online Tutoring in Alberta',
+    description:
+      'Online tutoring for Alberta students with Alberta curriculum support, Provincial Achievement Tests, diploma exams, homework help, study skills, and enrichment.',
+    priority: 0.63,
+    changeFrequency: 'monthly',
+    h1: 'Online tutoring for students in Alberta',
+    summary:
+      'Alberta families can use ICONIC Academy for online academic support, PAT readiness, diploma exam preparation, homework help, and enrichment.',
+    keywords: [
+      'online tutoring Alberta',
+      'Alberta curriculum tutoring',
+      'Alberta PAT tutoring',
+      'Alberta diploma exam tutor',
+      'Calgary online tutor',
+    ],
+    standards: [
+      'Alberta curriculum support',
+      'School-specific goals and assignments',
+      'Grade-level readiness',
+    ],
+    exams: [
+      'Provincial Achievement Tests',
+      'Alberta diploma exams',
+      'School assessments',
+    ],
+    support: [
+      'Math, English, science, and writing',
+      'Exam practice and study planning',
+      'Foundations, confidence, and enrichment',
+    ],
+    audience:
+      'Alberta families looking for online tutoring connected to school expectations, PATs, diploma exams, and subject confidence where applicable.',
+    relatedLocations: [
+      { label: 'Canada', href: '/locations/canada' },
+      { label: 'British Columbia', href: '/locations/british-columbia' },
+      { label: 'Ontario', href: '/locations/ontario' },
+    ],
+  },
+  {
+    slug: 'japan',
+    path: '/locations/japan',
+    title: 'Online Tutoring in Japan',
+    description:
+      'Online tutoring for students in Japan with Japanese school support, English tutoring, EIKEN preparation, entrance exam readiness, international curriculum support, and enrichment.',
+    priority: 0.62,
+    changeFrequency: 'monthly',
+    h1: 'Online tutoring for students in Japan',
+    summary:
+      'ICONIC Academy supports families in Japan with online English, maths, science, study skills, EIKEN preparation, school entrance readiness, and international curriculum support.',
+    keywords: [
+      'online tutoring Japan',
+      'EIKEN tutoring',
+      'English tutor Japan',
+      'Japan entrance exam tutoring',
+      'international school tutor Japan',
+    ],
+    standards: [
+      'Japanese school support where applicable',
+      'International curriculum support',
+      'School-specific goals and assignments',
+    ],
+    exams: [
+      'EIKEN',
+      'School entrance exam readiness',
+      'International school assessments',
+    ],
+    support: [
+      'English language development, reading, and writing',
+      'Maths, science, and homework help',
+      'Study habits and confidence building',
+    ],
+    audience:
+      'Families in Japan looking for online support in English, school subjects, entrance readiness, EIKEN, or international curriculum goals.',
+    relatedLocations: [
+      { label: 'Australia', href: '/locations/australia' },
+      { label: 'UAE', href: '/locations/uae' },
+      { label: 'Online tutoring', href: '/programs/online-tutoring' },
+    ],
+  },
+  {
+    slug: 'qatar',
+    path: '/locations/qatar',
+    title: 'Online Tutoring in Qatar',
+    description:
+      'Online tutoring for Qatar students with national and international curriculum-aware support including British, IB, American, CBSE, IGCSE, A Level, SAT, IELTS, and TOEFL preparation where applicable.',
+    priority: 0.65,
+    changeFrequency: 'monthly',
+    h1: 'Online tutoring for students in Qatar',
+    summary:
+      'ICONIC Academy supports Qatar families with flexible online tutoring for international school pathways, national curriculum goals, homework help, exam practice, and enrichment.',
+    keywords: [
+      'online tutoring Qatar',
+      'Doha online tutor',
+      'IGCSE tutor Qatar',
+      'A Level tutor Qatar',
+      'CBSE tutor Qatar',
+    ],
+    standards: [
+      'Qatar national curriculum support where applicable',
+      'British, IB, American, and CBSE pathways',
+      'School-specific goals and assignments',
+    ],
+    exams: ['IGCSE', 'A Level', 'SAT', 'IELTS', 'TOEFL', 'IB assessments'],
+    support: [
+      'Maths, English, science, and writing',
+      'International school homework support',
+      'Study planning and exam practice',
+    ],
+    audience:
+      'Qatar families comparing online tutoring for national, British, IB, American, CBSE, admissions, or English-language exam goals.',
+    relatedLocations: [
+      { label: 'UAE', href: '/locations/uae' },
+      { label: 'United Kingdom', href: '/locations/united-kingdom' },
+      { label: 'Online tutoring', href: '/programs/online-tutoring' },
     ],
   },
 ];
@@ -620,6 +1351,14 @@ export function organizationJsonLd() {
     description: BRAND_POSITIONING,
     areaServed: [
       { '@type': 'Country', name: 'United States' },
+      { '@type': 'Country', name: 'Australia' },
+      { '@type': 'Country', name: 'United Kingdom' },
+      { '@type': 'Country', name: 'New Zealand' },
+      { '@type': 'Country', name: 'Italy' },
+      { '@type': 'Country', name: 'United Arab Emirates' },
+      { '@type': 'Country', name: 'Canada' },
+      { '@type': 'Country', name: 'Japan' },
+      { '@type': 'Country', name: 'Qatar' },
       { '@type': 'Place', name: 'Global online communities' },
     ],
     sameAs: [
@@ -682,7 +1421,18 @@ export function serviceJsonLd(page: ProgramLandingPage) {
     description: page.description,
     provider: { '@id': absoluteUrl('/#organization') },
     serviceType: 'Online tutoring and enrichment',
-    areaServed: ['United States', 'Global online communities'],
+    areaServed: [
+      'United States',
+      'Australia',
+      'United Kingdom',
+      'New Zealand',
+      'Italy',
+      'United Arab Emirates',
+      'Canada',
+      'Japan',
+      'Qatar',
+      'Global online communities',
+    ],
     audience: {
       '@type': 'EducationalAudience',
       educationalRole: 'student',

@@ -29,10 +29,13 @@ export function GET() {
     '- Creative and extracurricular learning: chess, debate, creative writing, drawing, arts and crafts, music, piano, guitar, drama, photography, and digital media',
     '',
     '## Locations Served',
-    'ICONIC Academy supports families across the United States and global online communities. Location pages are only for online tutoring availability, not physical centers.',
-    ...LOCATION_LANDING_PAGES.map(
-      (location) =>
+    'ICONIC Academy supports families across the United States, Australia, the UK, New Zealand, Italy, UAE, Canada, Japan, Qatar, and global online communities. Location pages are only for online tutoring availability, not physical centers.',
+    ...LOCATION_LANDING_PAGES.map((location) =>
+      [
         `- ${location.title}: ${absoluteUrl(location.path)} — ${location.description}`,
+        `  Curriculum and exams: ${[...location.standards, ...location.exams].join(', ')}`,
+        `  Common needs: ${location.support.join(', ')}`,
+      ].join('\n'),
     ),
     '',
     '## U.S. Curriculum Support',

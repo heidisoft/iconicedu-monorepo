@@ -294,7 +294,13 @@ describe('marketing program and location landing pages', () => {
         name: 'Online tutoring for families across the USA',
       }),
     ).toBeInTheDocument();
-    expect(screen.getByText('Curriculum-aware support')).toBeInTheDocument();
+    expect(screen.getByText('Curriculum and exams')).toBeInTheDocument();
+    expect(screen.getByText('Who this helps')).toBeInTheDocument();
+    expect(screen.getByText('Common tutoring needs')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Explore programs' })).toHaveAttribute(
+      'href',
+      '/subjects',
+    );
   });
 
   it('defines location metadata and static params', async () => {
@@ -308,5 +314,98 @@ describe('marketing program and location landing pages', () => {
     });
 
     expect(generateLocationStaticParams()).toContainEqual({ locationSlug: 'usa' });
+    expect(generateLocationStaticParams()).toContainEqual({
+      locationSlug: 'australia',
+    });
+    expect(generateLocationStaticParams()).toContainEqual({
+      locationSlug: 'new-york-city',
+    });
+    expect(generateLocationStaticParams()).toContainEqual({
+      locationSlug: 'ontario',
+    });
+  });
+
+  it('renders regional curriculum and exam details for international pages', async () => {
+    render(
+      await LocationPage({
+        params: Promise.resolve({ locationSlug: 'australia' }),
+      }),
+    );
+
+    expect(
+      screen.getByRole('heading', {
+        name: 'Online tutoring for students across Australia',
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Australian Curriculum')).toBeInTheDocument();
+    expect(screen.getByText('NAPLAN')).toBeInTheDocument();
+    expect(screen.getByText('HSC')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'New South Wales' })).toHaveAttribute(
+      'href',
+      '/locations/new-south-wales',
+    );
+  });
+
+  it('renders UK and Canada exam terms families search for', async () => {
+    const { unmount } = render(
+      await LocationPage({
+        params: Promise.resolve({ locationSlug: 'united-kingdom' }),
+      }),
+    );
+
+    expect(screen.getByText('National Curriculum')).toBeInTheDocument();
+    expect(screen.getByText('GCSE')).toBeInTheDocument();
+    expect(screen.getByText('A Levels')).toBeInTheDocument();
+
+    unmount();
+
+    render(
+      await LocationPage({
+        params: Promise.resolve({ locationSlug: 'canada' }),
+      }),
+    );
+
+    expect(screen.getByText('Provincial curriculum expectations')).toBeInTheDocument();
+    expect(screen.getByText('EQAO')).toBeInTheDocument();
+    expect(screen.getByText('OSSLT')).toBeInTheDocument();
+    expect(
+      screen.getByText('BC literacy and numeracy graduation assessments'),
+    ).toBeInTheDocument();
+  });
+
+  it('renders a NYC-specific SHSAT location page', async () => {
+    render(
+      await LocationPage({
+        params: Promise.resolve({ locationSlug: 'new-york-city' }),
+      }),
+    );
+
+    expect(
+      screen.getByRole('heading', {
+        name: 'Online tutoring and SHSAT prep for New York City students',
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('SHSAT prep')).toBeInTheDocument();
+    expect(screen.getByText('Specialized high school readiness')).toBeInTheDocument();
+  });
+
+  it('defines metadata for representative regional location pages', async () => {
+    await expect(
+      generateLocationMetadata({
+        params: Promise.resolve({ locationSlug: 'australia' }),
+      }),
+    ).resolves.toMatchObject({
+      title: 'Online Tutoring in Australia | ICONIC Academy',
+      alternates: { canonical: '/locations/australia' },
+    });
+
+    await expect(
+      generateLocationMetadata({
+        params: Promise.resolve({ locationSlug: 'new-york-city' }),
+      }),
+    ).resolves.toMatchObject({
+      title: 'Online Tutoring in New York City | ICONIC Academy',
+      alternates: { canonical: '/locations/new-york-city' },
+    });
   });
 });
