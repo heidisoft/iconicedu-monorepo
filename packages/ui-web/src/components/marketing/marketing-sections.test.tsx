@@ -78,5 +78,8 @@ describe('marketing sections', () => {
       'href',
       '/subjects',
     );
+    expect(
+      screen.getByText('New York, NY, USA · Colombo, Sri Lanka'),
+    ).toBeInTheDocument();
   });
 });
