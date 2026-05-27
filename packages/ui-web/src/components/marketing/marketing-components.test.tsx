@@ -111,6 +111,17 @@ describe('marketing components', () => {
     render(<MarketingFooterSection loginHref="/acme/login" />);
 
     expect(
+      screen.getByText('New York, NY, USA · Colombo, Sri Lanka'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '+1 (929) 900-1264' })).toHaveAttribute(
+      'href',
+      'tel:+19299001264',
+    );
+    expect(screen.getByRole('link', { name: '+94 70 170 7926' })).toHaveAttribute(
+      'href',
+      'https://wa.me/94701707926',
+    );
+    expect(
       screen.getByRole('link', { name: 'Download on the App Store' }),
     ).toHaveAttribute(
       'href',
@@ -176,6 +187,17 @@ describe('marketing components', () => {
       'href',
       '/acme/login',
     );
+    expect(screen.getByRole('link', { name: '+1 (929) 900-1264' })).toHaveAttribute(
+      'href',
+      'tel:+19299001264',
+    );
+    expect(screen.getByRole('link', { name: '+94 70 170 7926' })).toHaveAttribute(
+      'href',
+      'https://wa.me/94701707926',
+    );
+    expect(
+      screen.getByText('New York, NY, USA · Colombo, Sri Lanka'),
+    ).toBeInTheDocument();
   });
 
   it('renders pricing page with request details cta', () => {

@@ -1,4 +1,4 @@
-import { FOOTER_LINK_GROUPS } from './marketing.constants';
+import { FOOTER_LINK_GROUPS, MARKETING_CONTACT_DETAILS } from './marketing.constants';
 import { MarketingStoreBadges } from './marketing-store-badges';
 
 type MarketingFooterSectionProps = {
@@ -18,6 +18,26 @@ export function MarketingFooterSection({
               Elite 1-on-1 education designed for measurable academic success. Where
               strong foundations create brighter futures.
             </p>
+            <address className="mt-4 space-y-1 text-sm not-italic text-foreground/75">
+              <p>{MARKETING_CONTACT_DETAILS.locations.join(' · ')}</p>
+              <p>
+                <a
+                  href={MARKETING_CONTACT_DETAILS.phone.href}
+                  className="transition hover:text-foreground"
+                >
+                  {MARKETING_CONTACT_DETAILS.phone.label}
+                </a>
+              </p>
+              <p>
+                WhatsApp:{' '}
+                <a
+                  href={MARKETING_CONTACT_DETAILS.whatsapp.href}
+                  className="transition hover:text-foreground"
+                >
+                  {MARKETING_CONTACT_DETAILS.whatsapp.label}
+                </a>
+              </p>
+            </address>
             <div className="mt-4">
               <MarketingStoreBadges />
             </div>

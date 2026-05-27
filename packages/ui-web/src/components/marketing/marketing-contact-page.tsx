@@ -1,3 +1,5 @@
+import { MARKETING_CONTACT_DETAILS } from './marketing.constants';
+
 type MarketingContactPageProps = {
   loginHref?: string;
 };
@@ -59,6 +61,39 @@ export function MarketingContactPage({
               </a>
             </article>
           ))}
+        </div>
+
+        <div className="mx-auto mt-8 grid max-w-5xl gap-5 rounded-lg border border-border/70 bg-card px-6 py-6 shadow-sm md:grid-cols-3">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-wide text-foreground/70">
+              Call
+            </p>
+            <a
+              href={MARKETING_CONTACT_DETAILS.phone.href}
+              className="mt-2 inline-flex text-base font-semibold text-foreground transition hover:text-primary"
+            >
+              {MARKETING_CONTACT_DETAILS.phone.label}
+            </a>
+          </div>
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-wide text-foreground/70">
+              WhatsApp
+            </p>
+            <a
+              href={MARKETING_CONTACT_DETAILS.whatsapp.href}
+              className="mt-2 inline-flex text-base font-semibold text-foreground transition hover:text-primary"
+            >
+              {MARKETING_CONTACT_DETAILS.whatsapp.label}
+            </a>
+          </div>
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-wide text-foreground/70">
+              Locations
+            </p>
+            <p className="mt-2 text-base font-semibold text-foreground">
+              {MARKETING_CONTACT_DETAILS.locations.join(' · ')}
+            </p>
+          </div>
         </div>
       </section>
     </div>

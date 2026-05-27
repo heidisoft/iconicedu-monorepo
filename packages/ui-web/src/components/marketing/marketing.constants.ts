@@ -60,6 +60,18 @@ export const MOBILE_APP_LINKS = [
   },
 ] as const;
 
+export const MARKETING_CONTACT_DETAILS = {
+  phone: {
+    label: '+1 (929) 900-1264',
+    href: 'tel:+19299001264',
+  },
+  whatsapp: {
+    label: '+94 70 170 7926',
+    href: 'https://wa.me/94701707926',
+  },
+  locations: ['New York, NY, USA', 'Colombo, Sri Lanka'],
+} as const;
+
 export const CORE_BENEFITS = [
   {
     title: 'Experienced tutors, not random matching',
