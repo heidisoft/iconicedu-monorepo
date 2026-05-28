@@ -156,7 +156,7 @@ export async function POST(request: Request) {
     if (!account) {
       const destination = requestedOrgSlug
         ? `/${requestedOrgSlug}/get-started`
-        : '/get-started';
+        : '/i/get-started';
       return NextResponse.json({
         status: 'needs_org_setup',
         onboarding: {
@@ -173,7 +173,7 @@ export async function POST(request: Request) {
         onboarding: {
           requiresOrgSetup: true,
           requiresRoleSelection: false,
-          destination: '/get-started',
+          destination: '/i/get-started',
         },
       });
     }
@@ -195,7 +195,7 @@ export async function POST(request: Request) {
       if (intent === 'get-started') {
         onboarding.destination = requestedOrgSlug
           ? `/${requestedOrgSlug}/get-started`
-          : '/get-started';
+          : '/i/get-started';
       } else {
         onboarding.requiresRoleSelection = false;
         onboarding.destination = await resolveOrgLoginPath(

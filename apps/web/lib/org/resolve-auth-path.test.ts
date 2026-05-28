@@ -44,10 +44,10 @@ describe('resolveDefaultOrgGetStartedPath', () => {
     );
   });
 
-  it('returns fallback when no default org exists', async () => {
+  it('defaults to the /i org get-started path when no org exists', async () => {
     mockGetDefaultOrg.mockResolvedValueOnce({ data: null });
     await expect(resolveDefaultOrgGetStartedPath({} as never)).resolves.toBe(
-      '/get-started',
+      '/i/get-started',
     );
   });
 });
@@ -59,7 +59,9 @@ describe('resolveOrgLoginPath', () => {
   });
 
   it('returns fallback when dashboard path falls back', async () => {
-    mockResolveOrgDashboardPath.mockResolvedValueOnce('/get-started');
-    await expect(resolveOrgLoginPath({} as never, 'org-1')).resolves.toBe('/get-started');
+    mockResolveOrgDashboardPath.mockResolvedValueOnce('/i/get-started');
+    await expect(resolveOrgLoginPath({} as never, 'org-1')).resolves.toBe(
+      '/i/get-started',
+    );
   });
 });

@@ -21,7 +21,7 @@ type MarketingHeaderProps = {
 export function MarketingHeader({
   isAuthenticated = false,
   loginHref = '/iconic-academy/login',
-  dashboardHref = '/get-started',
+  dashboardHref = '/i/get-started',
 }: MarketingHeaderProps) {
   const ctaLabel = isAuthenticated ? 'Dashboard' : 'Log In';
   const ctaHref = isAuthenticated ? dashboardHref : loginHref;

@@ -19,7 +19,7 @@ describe('dashboard class request helpers', () => {
     });
 
     expect(message).toContain('Requested by: Riley Morgan');
-    expect(message).toContain('Request type: Trial class');
+    expect(message).toContain('Request type: Free trial class');
     expect(message).toContain('Student(s): Maya Morgan');
     expect(message).toContain('Subject(s): Math, Robotics');
     expect(message).toContain('Learning goals:\nFractions and algebra basics');

@@ -7,9 +7,9 @@ type MarketingLowFrictionStartSectionProps = {
 
 const START_OPTIONS = [
   {
-    title: 'Request a trial class',
+    title: 'Request a free trial class',
     body: 'Start with a low-commitment class to check tutor fit, teaching style, and schedule.',
-    cta: 'Request trial class',
+    cta: 'Request free trial class',
     icon: CalendarCheck,
   },
   {
@@ -40,8 +40,8 @@ export function MarketingLowFrictionStartSection({
             Begin with the level of support that feels right
           </h2>
           <p className="mt-4 text-base leading-7 text-muted-foreground">
-            Families can request a trial class, start with a free learning match call, or
-            ask for urgent homework help before choosing a regular tutoring plan.
+            Families can request a free trial class, start with a free learning match
+            call, or ask for urgent homework help before choosing a regular tutoring plan.
           </p>
         </div>
 

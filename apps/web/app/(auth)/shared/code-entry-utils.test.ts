@@ -41,8 +41,8 @@ describe('buildAuthEntryPath', () => {
     );
   });
 
-  it('falls back to global get started path', () => {
-    expect(buildAuthEntryPath('get-started')).toBe('/get-started');
+  it('falls back to the default org get started path', () => {
+    expect(buildAuthEntryPath('get-started')).toBe('/i/get-started');
   });
 });
 

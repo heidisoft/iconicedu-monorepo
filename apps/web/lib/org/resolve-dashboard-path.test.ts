@@ -19,11 +19,11 @@ describe('resolveOrgDashboardPath', () => {
     expect(path).toBe('/iconic-academy');
   });
 
-  it('falls back to /get-started when org cannot be resolved', async () => {
+  it('falls back to /i/get-started when org cannot be resolved', async () => {
     mockBuildOrgById.mockResolvedValueOnce(null);
 
     const path = await resolveOrgDashboardPath({} as never, 'org-1');
 
-    expect(path).toBe('/get-started');
+    expect(path).toBe('/i/get-started');
   });
 });

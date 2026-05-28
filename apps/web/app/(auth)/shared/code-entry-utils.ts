@@ -28,7 +28,7 @@ export function buildAuthEntryPath(intent: AuthIntent, orgSlug?: string | null):
     return intent === 'login' ? `/${orgSlug}/login` : `/${orgSlug}/get-started`;
   }
 
-  return '/get-started';
+  return intent === 'login' ? '/i/login' : '/i/get-started';
 }
 
 export function getEmailOtpType(_intent: AuthIntent): 'email' {

@@ -196,7 +196,7 @@ describe('POST /api/accounts/activate', () => {
     expect(response.status).toBe(200);
     expect(body.status).toBe('needs_org_setup');
     expect(body.onboarding.requiresOrgSetup).toBe(true);
-    expect(body.onboarding.destination).toBe('/get-started');
+    expect(body.onboarding.destination).toBe('/i/get-started');
   });
 
   it('returns org-scoped get-started destination for org login intent', async () => {
