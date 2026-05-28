@@ -46,7 +46,7 @@ const notFoundMock = vi.fn(() => {
   throw new Error('NEXT_NOT_FOUND');
 });
 const createSupabaseServerClientMock = vi.fn(async () => ({}));
-const resolveDefaultOrgLoginPathMock = vi.fn(async () => '/acme/login');
+const resolveDefaultOrgGetStartedPathMock = vi.fn(async () => '/acme/get-started');
 
 vi.mock('next/navigation', () => ({
   notFound: () => notFoundMock(),
@@ -64,8 +64,8 @@ vi.mock('@iconicedu/web/lib/supabase/server', () => ({
 }));
 
 vi.mock('@iconicedu/web/lib/org/resolve-auth-path', () => ({
-  resolveDefaultOrgLoginPath: (...args: unknown[]) =>
-    resolveDefaultOrgLoginPathMock(...args),
+  resolveDefaultOrgGetStartedPath: (...args: unknown[]) =>
+    resolveDefaultOrgGetStartedPathMock(...args),
 }));
 
 describe('marketing site standard pages', () => {
@@ -74,8 +74,8 @@ describe('marketing site standard pages', () => {
     enableMarketingSitePagesRunMock.mockResolvedValue(true);
     notFoundMock.mockClear();
     createSupabaseServerClientMock.mockClear();
-    resolveDefaultOrgLoginPathMock.mockClear();
-    resolveDefaultOrgLoginPathMock.mockResolvedValue('/acme/login');
+    resolveDefaultOrgGetStartedPathMock.mockClear();
+    resolveDefaultOrgGetStartedPathMock.mockResolvedValue('/acme/get-started');
   });
 
   it.each([
@@ -160,7 +160,7 @@ describe('marketing site standard pages', () => {
       expect(enableMarketingSitePagesRunMock).toHaveBeenCalledWith({
         identify: { profileId: null },
       });
-      expect(resolveDefaultOrgLoginPathMock).toHaveBeenCalledWith({});
+      expect(resolveDefaultOrgGetStartedPathMock).toHaveBeenCalledWith({});
     },
   );
 
@@ -170,7 +170,7 @@ describe('marketing site standard pages', () => {
     await expect(PrivacyPage()).rejects.toThrow('NEXT_NOT_FOUND');
 
     expect(notFoundMock).toHaveBeenCalled();
-    expect(resolveDefaultOrgLoginPathMock).not.toHaveBeenCalled();
+    expect(resolveDefaultOrgGetStartedPathMock).not.toHaveBeenCalled();
   });
 });
 
@@ -180,8 +180,8 @@ describe('marketing regional microsite page', () => {
     enableMarketingSitePagesRunMock.mockResolvedValue(true);
     notFoundMock.mockClear();
     createSupabaseServerClientMock.mockClear();
-    resolveDefaultOrgLoginPathMock.mockClear();
-    resolveDefaultOrgLoginPathMock.mockResolvedValue('/acme/login');
+    resolveDefaultOrgGetStartedPathMock.mockClear();
+    resolveDefaultOrgGetStartedPathMock.mockResolvedValue('/acme/get-started');
   });
 
   it('renders a known regional microsite when enabled', async () => {
@@ -244,8 +244,8 @@ describe('marketing program and location landing pages', () => {
     enableMarketingSitePagesRunMock.mockResolvedValue(true);
     notFoundMock.mockClear();
     createSupabaseServerClientMock.mockClear();
-    resolveDefaultOrgLoginPathMock.mockClear();
-    resolveDefaultOrgLoginPathMock.mockResolvedValue('/acme/login');
+    resolveDefaultOrgGetStartedPathMock.mockClear();
+    resolveDefaultOrgGetStartedPathMock.mockResolvedValue('/acme/get-started');
   });
 
   it('renders an online tutoring program landing page', async () => {
@@ -263,8 +263,11 @@ describe('marketing program and location landing pages', () => {
     expect(screen.getByText('What support can include')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Find the right tutor' })).toHaveAttribute(
       'href',
-      '/acme/login',
+      '/acme/get-started',
     );
+    expect(screen.getByText('Request a trial class')).toBeInTheDocument();
+    expect(screen.getByText('Book a free learning match call')).toBeInTheDocument();
+    expect(screen.getByText('Need homework help this week?')).toBeInTheDocument();
   });
 
   it('defines program metadata and static params', async () => {
@@ -412,6 +415,7 @@ describe('marketing program and location landing pages', () => {
       'href',
       '/programs',
     );
+    expect(screen.getByText('Request a trial class')).toBeInTheDocument();
   });
 
   it('defines location metadata and static params', async () => {

@@ -10,6 +10,7 @@ describe('dashboard class request helpers', () => {
   it('builds class request message with custom other subject', () => {
     const message = buildDashboardClassRequestMessage({
       requesterName: 'Riley Morgan',
+      requestIntent: 'trial-class',
       studentNames: ['Maya Morgan'],
       subjects: ['Math', 'Other'],
       otherSubject: 'Robotics',
@@ -18,6 +19,7 @@ describe('dashboard class request helpers', () => {
     });
 
     expect(message).toContain('Requested by: Riley Morgan');
+    expect(message).toContain('Request type: Trial class');
     expect(message).toContain('Student(s): Maya Morgan');
     expect(message).toContain('Subject(s): Math, Robotics');
     expect(message).toContain('Learning goals:\nFractions and algebra basics');
@@ -119,12 +121,27 @@ describe('dashboard class request helpers', () => {
   it('omits learning goals section when not provided', () => {
     const message = buildDashboardClassRequestMessage({
       requesterName: 'Riley Morgan',
+      requestIntent: 'ongoing-tutoring',
       studentNames: ['Maya Morgan'],
       subjects: ['Math'],
       specialRequirements: null,
     });
 
     expect(message).not.toContain('Learning goals:');
+  });
+
+  it('includes urgent homework details in the staff message', () => {
+    const message = buildDashboardClassRequestMessage({
+      requesterName: 'Riley Morgan',
+      requestIntent: 'urgent-homework-help',
+      studentNames: ['Maya Morgan'],
+      subjects: ['Math'],
+      learningGoals: 'Geometry worksheet due Friday at 3pm',
+      specialRequirements: null,
+    });
+
+    expect(message).toContain('Request type: Urgent homework help');
+    expect(message).toContain('Geometry worksheet due Friday at 3pm');
   });
 
   it('reuses existing class-request channel and appends missing staff members only', async () => {

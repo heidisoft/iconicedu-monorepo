@@ -86,6 +86,9 @@ describe('marketing components', () => {
       screen.getByText('Support for students across every U.S. state'),
     ).toBeInTheDocument();
     expect(screen.getByText("A clear path for your child's success")).toBeInTheDocument();
+    expect(screen.getByText('Request a trial class')).toBeInTheDocument();
+    expect(screen.getByText('Book a free learning match call')).toBeInTheDocument();
+    expect(screen.getByText('Need homework help this week?')).toBeInTheDocument();
     expect(screen.getByText('Mobile apps')).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: 'Download on the App Store' }),
@@ -187,6 +190,9 @@ describe('marketing components', () => {
       'href',
       '/acme/login',
     );
+    expect(screen.getByText('Request a trial class')).toBeInTheDocument();
+    expect(screen.getByText('Book a free learning match call')).toBeInTheDocument();
+    expect(screen.getByText('Need homework help this week?')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '+1 (929) 900-1264' })).toHaveAttribute(
       'href',
       'tel:+19299001264',
@@ -223,6 +229,9 @@ describe('marketing components', () => {
       'href',
       '/acme/login',
     );
+    expect(screen.getByText('Request a trial class')).toBeInTheDocument();
+    expect(screen.getByText('Book a free learning match call')).toBeInTheDocument();
+    expect(screen.getByText('Need homework help this week?')).toBeInTheDocument();
   });
 
   it('renders regional microsite content', () => {

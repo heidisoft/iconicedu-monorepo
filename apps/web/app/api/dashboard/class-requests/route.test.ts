@@ -177,6 +177,7 @@ describe('POST /api/dashboard/class-requests', () => {
         method: 'POST',
         body: JSON.stringify({
           orgSlug: 'iconic-academy',
+          requestIntent: 'ongoing-tutoring',
           studentProfileIds: ['child-1'],
           subjects: ['Math'],
           learningGoals: 'Build stronger algebra fundamentals',
@@ -197,6 +198,7 @@ describe('POST /api/dashboard/class-requests', () => {
         method: 'POST',
         body: JSON.stringify({
           orgSlug: 'iconic-academy',
+          requestIntent: 'trial-class',
           studentProfileIds: ['child-1', 'child-2'],
           subjects: ['Math', 'Other'],
           otherSubject: 'Robotics',
@@ -219,7 +221,7 @@ describe('POST /api/dashboard/class-requests', () => {
         orgId: 'org-1',
         channelId: 'channel-1',
         senderProfileId: 'guardian-1',
-        content: expect.stringContaining('Class Request'),
+        content: expect.stringContaining('Request type: Trial class'),
       }),
     );
 
@@ -236,6 +238,7 @@ describe('POST /api/dashboard/class-requests', () => {
         method: 'POST',
         body: JSON.stringify({
           orgSlug: 'iconic-academy',
+          requestIntent: 'urgent-homework-help',
           studentProfileIds: ['child-1'],
           subjects: ['Math'],
           learningGoals: '',

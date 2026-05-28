@@ -1,9 +1,16 @@
 import { US_CURRICULUM_STANDARDS } from './marketing.constants';
+import {
+  MARKETING_INSET_CARD_CLASS,
+  MARKETING_PANEL_CLASS,
+  MARKETING_SECTION_CLASS,
+} from './marketing-layout';
 
 export function MarketingUsCurriculumSection() {
   return (
-    <section id="us-curriculum" className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-      <div className="grid gap-8 rounded-3xl border border-border/60 bg-card/60 p-6 sm:p-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+    <section id="us-curriculum" className={MARKETING_SECTION_CLASS}>
+      <div
+        className={`grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-start ${MARKETING_PANEL_CLASS}`}
+      >
         <div>
           <p className="text-sm font-semibold uppercase text-primary">
             U.S. curriculum support
@@ -20,10 +27,7 @@ export function MarketingUsCurriculumSection() {
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           {US_CURRICULUM_STANDARDS.map((standard) => (
-            <div
-              key={standard}
-              className="rounded-lg border border-border/60 bg-background px-4 py-3 text-sm leading-6 text-muted-foreground"
-            >
+            <div key={standard} className={MARKETING_INSET_CARD_CLASS}>
               {standard}
             </div>
           ))}

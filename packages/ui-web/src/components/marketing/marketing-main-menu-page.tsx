@@ -1,3 +1,15 @@
+import type { ReactNode } from 'react';
+
+import { MarketingLowFrictionStartSection } from './marketing-low-friction-start-section';
+import {
+  MARKETING_CARD_CLASS,
+  MARKETING_ACTION_CARD_CLASS,
+  MARKETING_HERO_BAND_CLASS,
+  MARKETING_INSET_CARD_CLASS,
+  MARKETING_LEAD_CONTAINER_CLASS,
+  MARKETING_SECTION_CLASS,
+} from './marketing-layout';
+
 type MarketingMainMenuPageContent = {
   eyebrow: string;
   title: string;
@@ -19,16 +31,18 @@ type MarketingMainMenuPageContent = {
 type MarketingMainMenuPageProps = {
   content: MarketingMainMenuPageContent;
   loginHref?: string;
+  beforeLowFrictionStart?: ReactNode;
 };
 
 export function MarketingMainMenuPage({
   content,
-  loginHref = '/iconic-academy/login',
+  loginHref = '/iconic-academy/get-started',
+  beforeLowFrictionStart,
 }: MarketingMainMenuPageProps) {
   return (
     <div className="bg-background text-foreground">
-      <section className="border-b border-border/60 bg-emerald-50/60 px-4 py-16 dark:bg-emerald-950/20 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-5xl">
+      <section className={MARKETING_HERO_BAND_CLASS}>
+        <div className={MARKETING_LEAD_CONTAINER_CLASS}>
           <p className="text-sm font-semibold uppercase text-primary">
             {content.eyebrow}
           </p>
@@ -39,13 +53,10 @@ export function MarketingMainMenuPage({
         </div>
       </section>
 
-      <section className="px-4 py-14 sm:px-6 lg:px-8">
-        <div className="mx-auto grid max-w-5xl gap-5 md:grid-cols-3">
+      <section className={MARKETING_SECTION_CLASS}>
+        <div className="mx-auto grid max-w-7xl gap-5 md:grid-cols-3">
           {content.sections.map((section) => (
-            <article
-              key={section.title}
-              className="rounded-lg border border-border/70 bg-card px-6 py-5 shadow-sm"
-            >
+            <article key={section.title} className={MARKETING_CARD_CLASS}>
               <h2 className="text-xl font-semibold">{section.title}</h2>
               <p className="mt-3 text-sm leading-7 text-muted-foreground">
                 {section.body}
@@ -54,18 +65,15 @@ export function MarketingMainMenuPage({
           ))}
         </div>
         {(content.highlights || content.bestFor) && (
-          <div className="mx-auto mt-10 grid max-w-5xl gap-5 lg:grid-cols-2">
+          <div className="mx-auto mt-10 grid max-w-7xl gap-5 lg:grid-cols-2">
             {content.highlights && (
-              <article className="rounded-lg border border-border/70 bg-card px-6 py-6 shadow-sm">
+              <article className={MARKETING_CARD_CLASS}>
                 <p className="text-sm font-semibold uppercase text-primary">
                   What families can expect
                 </p>
                 <ul className="mt-4 grid gap-3">
                   {content.highlights.map((item) => (
-                    <li
-                      key={item}
-                      className="rounded-lg border border-border/60 bg-background px-4 py-3 text-sm leading-6 text-muted-foreground"
-                    >
+                    <li key={item} className={MARKETING_INSET_CARD_CLASS}>
                       {item}
                     </li>
                   ))}
@@ -73,14 +81,11 @@ export function MarketingMainMenuPage({
               </article>
             )}
             {content.bestFor && (
-              <article className="rounded-lg border border-border/70 bg-card px-6 py-6 shadow-sm">
+              <article className={MARKETING_CARD_CLASS}>
                 <p className="text-sm font-semibold uppercase text-primary">Best for</p>
                 <ul className="mt-4 grid gap-3">
                   {content.bestFor.map((item) => (
-                    <li
-                      key={item}
-                      className="rounded-lg border border-border/60 bg-background px-4 py-3 text-sm leading-6 text-muted-foreground"
-                    >
+                    <li key={item} className={MARKETING_INSET_CARD_CLASS}>
                       {item}
                     </li>
                   ))}
@@ -90,16 +95,13 @@ export function MarketingMainMenuPage({
           </div>
         )}
         {content.categoryGroups && (
-          <div className="mx-auto mt-10 max-w-5xl">
+          <div className="mx-auto mt-10 max-w-7xl">
             <p className="text-sm font-semibold uppercase text-primary">
               Program categories
             </p>
             <div className="mt-4 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
               {content.categoryGroups.map((group) => (
-                <article
-                  key={group.title}
-                  className="rounded-lg border border-border/70 bg-card px-6 py-5 shadow-sm"
-                >
+                <article key={group.title} className={MARKETING_CARD_CLASS}>
                   <h2 className="text-lg font-semibold">{group.title}</h2>
                   <div className="mt-4 flex flex-wrap gap-2">
                     {group.subjects.map((subject) => (
@@ -117,7 +119,9 @@ export function MarketingMainMenuPage({
           </div>
         )}
         {(content.closingTitle || content.closingBody) && (
-          <div className="mx-auto mt-10 max-w-5xl rounded-lg border border-border/70 bg-emerald-50/60 px-6 py-6 dark:bg-emerald-950/20">
+          <div
+            className={`mx-auto mt-10 max-w-7xl ${MARKETING_ACTION_CARD_CLASS} bg-emerald-50/60 dark:bg-emerald-950/20`}
+          >
             {content.closingTitle && (
               <h2 className="text-2xl font-semibold">{content.closingTitle}</h2>
             )}
@@ -128,7 +132,9 @@ export function MarketingMainMenuPage({
             )}
           </div>
         )}
-        <div className="mx-auto mt-10 flex max-w-5xl flex-col gap-4 rounded-lg border border-border/70 bg-card px-6 py-6 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+        <div
+          className={`mx-auto mt-10 flex max-w-7xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between ${MARKETING_ACTION_CARD_CLASS}`}
+        >
           <div>
             <p className="text-lg font-semibold">Find the right learning path</p>
             <p className="text-sm text-muted-foreground">
@@ -144,6 +150,8 @@ export function MarketingMainMenuPage({
           </a>
         </div>
       </section>
+      {beforeLowFrictionStart}
+      <MarketingLowFrictionStartSection loginHref={loginHref} />
     </div>
   );
 }

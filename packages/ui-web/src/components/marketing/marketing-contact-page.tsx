@@ -1,16 +1,24 @@
 import { MARKETING_CONTACT_DETAILS } from './marketing.constants';
+import {
+  MARKETING_CARD_CLASS,
+  MARKETING_ACTION_CARD_CLASS,
+  MARKETING_HERO_BAND_CLASS,
+  MARKETING_LEAD_CONTAINER_CLASS,
+  MARKETING_SECTION_CLASS,
+} from './marketing-layout';
+import { MarketingLowFrictionStartSection } from './marketing-low-friction-start-section';
 
 type MarketingContactPageProps = {
   loginHref?: string;
 };
 
 export function MarketingContactPage({
-  loginHref = '/iconic-academy/login',
+  loginHref = '/iconic-academy/get-started',
 }: MarketingContactPageProps) {
   return (
     <div className="bg-background text-foreground">
-      <section className="border-b border-border/60 bg-emerald-50/60 px-4 py-16 dark:bg-emerald-950/20 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-5xl">
+      <section className={MARKETING_HERO_BAND_CLASS}>
+        <div className={MARKETING_LEAD_CONTAINER_CLASS}>
           <p className="text-sm font-semibold uppercase text-primary">Contact</p>
           <h1 className="mt-4 text-4xl font-semibold tracking-normal sm:text-5xl">
             Talk with ICONIC Academy
@@ -23,8 +31,8 @@ export function MarketingContactPage({
         </div>
       </section>
 
-      <section className="px-4 py-14 sm:px-6 lg:px-8">
-        <div className="mx-auto grid max-w-5xl gap-5 md:grid-cols-3">
+      <section className={MARKETING_SECTION_CLASS}>
+        <div className="mx-auto grid max-w-7xl gap-5 md:grid-cols-3">
           {[
             {
               title: 'Program inquiries',
@@ -45,10 +53,7 @@ export function MarketingContactPage({
               label: 'Contact our team',
             },
           ].map((item) => (
-            <article
-              key={item.title}
-              className="rounded-lg border border-border/70 bg-card px-6 py-5 shadow-sm"
-            >
+            <article key={item.title} className={MARKETING_CARD_CLASS}>
               <h2 className="text-xl font-semibold">{item.title}</h2>
               <p className="mt-3 min-h-20 text-sm leading-7 text-muted-foreground">
                 {item.body}
@@ -63,7 +68,9 @@ export function MarketingContactPage({
           ))}
         </div>
 
-        <div className="mx-auto mt-8 grid max-w-5xl gap-5 rounded-lg border border-border/70 bg-card px-6 py-6 shadow-sm md:grid-cols-3">
+        <div
+          className={`mx-auto mt-8 grid max-w-7xl gap-5 md:grid-cols-3 ${MARKETING_ACTION_CARD_CLASS}`}
+        >
           <div>
             <p className="text-sm font-semibold uppercase tracking-wide text-foreground/70">
               Call
@@ -96,6 +103,7 @@ export function MarketingContactPage({
           </div>
         </div>
       </section>
+      <MarketingLowFrictionStartSection loginHref={loginHref} />
     </div>
   );
 }

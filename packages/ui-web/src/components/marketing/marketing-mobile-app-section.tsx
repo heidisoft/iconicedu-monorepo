@@ -1,4 +1,5 @@
 import { MarketingStoreBadges } from './marketing-store-badges';
+import { MARKETING_PANEL_CLASS, MARKETING_SECTION_CLASS } from './marketing-layout';
 
 const MOBILE_SCREENSHOTS = [
   {
@@ -26,8 +27,10 @@ function MobileScreenshotCard({ src, alt }: (typeof MOBILE_SCREENSHOTS)[number])
 
 export function MarketingMobileAppSection() {
   return (
-    <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-      <div className="grid gap-8 rounded-3xl border border-border/60 bg-card/60 p-6 sm:p-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+    <section className={MARKETING_SECTION_CLASS}>
+      <div
+        className={`grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center ${MARKETING_PANEL_CLASS}`}
+      >
         <div>
           <p className="text-sm font-semibold uppercase text-primary">Mobile apps</p>
           <h2 className="mt-3 text-3xl font-bold tracking-normal">

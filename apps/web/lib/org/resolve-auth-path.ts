@@ -14,6 +14,17 @@ export async function resolveDefaultOrgLoginPath(
   return fallbackPath;
 }
 
+export async function resolveDefaultOrgGetStartedPath(
+  supabase: SupabaseClient,
+  fallbackPath = '/get-started',
+): Promise<string> {
+  const defaultOrgResponse = await getDefaultOrg(supabase);
+  if (defaultOrgResponse.data?.slug) {
+    return `/${defaultOrgResponse.data.slug}/get-started`;
+  }
+  return fallbackPath;
+}
+
 export async function resolveOrgLoginPath(
   supabase: SupabaseClient,
   orgId: string,

@@ -2,6 +2,7 @@ import { Button } from '@iconicedu/ui-web/ui/button';
 import { SiteLogoFull } from '@iconicedu/ui-web/components/branding/site-logo-full';
 import { ThemeToggle } from '@iconicedu/ui-web/components/theme-toggle';
 import { Menu } from 'lucide-react';
+import { MARKETING_CONTAINER_CLASS } from './marketing-layout';
 
 const NAV_ITEMS = [
   { label: 'Programs', href: '/programs' },
@@ -27,7 +28,9 @@ export function MarketingHeader({
 
   return (
     <header className="sticky top-0 z-50 border-b border-emerald-100/70 bg-emerald-50/70 backdrop-blur dark:border-emerald-800/55 dark:bg-emerald-950/30">
-      <nav className="mx-auto flex max-w-7xl items-center justify-between px-4 py-5 sm:px-6 lg:px-8">
+      <nav
+        className={`${MARKETING_CONTAINER_CLASS} flex items-center justify-between py-5`}
+      >
         <a href="/" className="flex items-center gap-2 text-xl font-bold text-foreground">
           <span className="flex items-center justify-center rounded-lg">
             <SiteLogoFull className="h-10 w-auto sm:h-12" />

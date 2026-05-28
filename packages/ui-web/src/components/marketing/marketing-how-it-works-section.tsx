@@ -1,18 +1,23 @@
 import { CORE_BENEFITS } from './marketing.constants';
+import {
+  MARKETING_CARD_CLASS,
+  MARKETING_CONTAINER_CLASS,
+  MARKETING_PANEL_CLASS,
+} from './marketing-layout';
 
 type MarketingHowItWorksSectionProps = {
   loginHref?: string;
 };
 
 export function MarketingHowItWorksSection({
-  loginHref = '/iconic-academy/login',
+  loginHref = '/iconic-academy/get-started',
 }: MarketingHowItWorksSectionProps) {
   return (
     <section
       id="how-it-works"
-      className="mx-auto max-w-7xl px-4 pb-12 pt-4 sm:px-6 md:pb-16 lg:px-8"
+      className={`${MARKETING_CONTAINER_CLASS} pb-12 pt-4 md:pb-16`}
     >
-      <div className="rounded-3xl border border-border/60 bg-card/60 p-6 sm:p-8">
+      <div className={MARKETING_PANEL_CLASS}>
         <div className="max-w-3xl">
           <h2 className="text-3xl font-bold tracking-tight">
             Why families choose ICONIC Academy
@@ -27,7 +32,7 @@ export function MarketingHowItWorksSection({
           {CORE_BENEFITS.map((benefit) => (
             <article
               key={benefit.title}
-              className="rounded-2xl border border-border/60 bg-background p-5"
+              className={`${MARKETING_CARD_CLASS} rounded-2xl border-border/60 bg-background p-5`}
             >
               <h3 className="text-lg font-semibold">{benefit.title}</h3>
               <p className="mt-2 text-sm text-foreground/75">{benefit.description}</p>

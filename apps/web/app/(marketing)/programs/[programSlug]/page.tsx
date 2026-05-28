@@ -2,6 +2,14 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import {
+  MarketingLowFrictionStartSection,
+  MARKETING_CARD_CLASS,
+  MARKETING_HERO_BAND_CLASS,
+  MARKETING_INSET_CARD_CLASS,
+  MARKETING_LEAD_CONTAINER_CLASS,
+  MARKETING_SECTION_CLASS,
+} from '@iconicedu/ui-web';
+import {
   assertMarketingSitePagesEnabled,
   resolveMarketingLoginHref,
 } from '../../_lib/marketing-site-pages';
@@ -66,8 +74,8 @@ export default async function ProgramPage({ params }: ProgramPageProps) {
           ]),
         ]}
       />
-      <section className="border-b border-border/60 bg-emerald-50/60 px-4 py-16 dark:bg-emerald-950/20 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-5xl">
+      <section className={MARKETING_HERO_BAND_CLASS}>
+        <div className={MARKETING_LEAD_CONTAINER_CLASS}>
           <p className="text-sm font-semibold uppercase text-primary">
             Online tutoring program
           </p>
@@ -94,22 +102,19 @@ export default async function ProgramPage({ params }: ProgramPageProps) {
         </div>
       </section>
 
-      <section className="px-4 py-14 sm:px-6 lg:px-8">
-        <div className="mx-auto grid max-w-5xl gap-5 lg:grid-cols-3">
-          <article className="rounded-lg border border-border/70 bg-card px-6 py-6 shadow-sm">
+      <section className={MARKETING_SECTION_CLASS}>
+        <div className="mx-auto grid max-w-7xl gap-5 lg:grid-cols-3">
+          <article className={MARKETING_CARD_CLASS}>
             <h2 className="text-xl font-semibold">Who this helps</h2>
             <p className="mt-3 text-sm leading-7 text-muted-foreground">
               {program.audience}
             </p>
           </article>
-          <article className="rounded-lg border border-border/70 bg-card px-6 py-6 shadow-sm lg:col-span-2">
+          <article className={`${MARKETING_CARD_CLASS} lg:col-span-2`}>
             <h2 className="text-xl font-semibold">What support can include</h2>
             <ul className="mt-4 grid gap-3 md:grid-cols-2">
               {program.support.map((item) => (
-                <li
-                  key={item}
-                  className="rounded-lg border border-border/60 bg-background px-4 py-3 text-sm leading-6 text-muted-foreground"
-                >
+                <li key={item} className={MARKETING_INSET_CARD_CLASS}>
                   {item}
                 </li>
               ))}
@@ -117,8 +122,8 @@ export default async function ProgramPage({ params }: ProgramPageProps) {
           </article>
         </div>
 
-        <div className="mx-auto mt-8 grid max-w-5xl gap-5 lg:grid-cols-2">
-          <article className="rounded-lg border border-border/70 bg-card px-6 py-6 shadow-sm">
+        <div className="mx-auto mt-8 grid max-w-7xl gap-5 lg:grid-cols-2">
+          <article className={MARKETING_CARD_CLASS}>
             <h2 className="text-xl font-semibold">Student outcomes</h2>
             <ul className="mt-4 grid gap-3">
               {program.outcomes.map((item) => (
@@ -128,7 +133,7 @@ export default async function ProgramPage({ params }: ProgramPageProps) {
               ))}
             </ul>
           </article>
-          <article className="rounded-lg border border-border/70 bg-card px-6 py-6 shadow-sm">
+          <article className={MARKETING_CARD_CLASS}>
             <h2 className="text-xl font-semibold">Related subjects</h2>
             <div className="mt-4 flex flex-wrap gap-2">
               {program.relatedSubjects.map((subject) => (
@@ -143,6 +148,7 @@ export default async function ProgramPage({ params }: ProgramPageProps) {
           </article>
         </div>
       </section>
+      <MarketingLowFrictionStartSection loginHref={loginHref} />
     </div>
   );
 }
