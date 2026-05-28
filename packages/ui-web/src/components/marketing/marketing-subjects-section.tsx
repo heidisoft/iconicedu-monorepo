@@ -6,10 +6,11 @@ import {
   CarouselPrevious,
 } from '@iconicedu/ui-web/ui/carousel';
 import { HERO_SUBJECTS } from './marketing.constants';
+import { MARKETING_CONTAINER_CLASS } from './marketing-layout';
 
 export function MarketingSubjectsSection() {
   return (
-    <section id="subjects" className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
+    <section id="subjects" className={`${MARKETING_CONTAINER_CLASS} py-4`}>
       <div className="rounded-[2.75rem] border border-border/60 bg-secondary/25 px-3 py-3 sm:px-5 sm:py-4">
         <Carousel
           opts={{ align: 'start', loop: true }}

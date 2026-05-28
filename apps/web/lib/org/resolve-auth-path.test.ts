@@ -14,6 +14,7 @@ vi.mock('@iconicedu/web/lib/org/resolve-dashboard-path', () => ({
 }));
 
 import {
+  resolveDefaultOrgGetStartedPath,
   resolveDefaultOrgLoginPath,
   resolveOrgLoginPath,
 } from '@iconicedu/web/lib/org/resolve-auth-path';
@@ -32,6 +33,22 @@ describe('resolveDefaultOrgLoginPath', () => {
   it('defaults to the /i org login path when no org exists', async () => {
     mockGetDefaultOrg.mockResolvedValueOnce({ data: null });
     await expect(resolveDefaultOrgLoginPath({} as never)).resolves.toBe('/i/login');
+  });
+});
+
+describe('resolveDefaultOrgGetStartedPath', () => {
+  it('returns default org get-started path when org exists', async () => {
+    mockGetDefaultOrg.mockResolvedValueOnce({ data: { slug: 'acme' } });
+    await expect(resolveDefaultOrgGetStartedPath({} as never)).resolves.toBe(
+      '/acme/get-started',
+    );
+  });
+
+  it('returns fallback when no default org exists', async () => {
+    mockGetDefaultOrg.mockResolvedValueOnce({ data: null });
+    await expect(resolveDefaultOrgGetStartedPath({} as never)).resolves.toBe(
+      '/get-started',
+    );
   });
 });
 

@@ -1,8 +1,9 @@
 import { TRUST_STATS } from './marketing.constants';
+import { MARKETING_COMPACT_SECTION_CLASS } from './marketing-layout';
 
 export function MarketingTrustStatsSection() {
   return (
-    <section id="for-parents" className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <section id="for-parents" className={MARKETING_COMPACT_SECTION_CLASS}>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {TRUST_STATS.map((item) => (
           <div

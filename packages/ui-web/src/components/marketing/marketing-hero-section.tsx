@@ -1,5 +1,6 @@
 import { MarketingHeroHeadline } from './marketing-hero-headline';
 import { MarketingHeroPatternBackground } from './marketing-hero-pattern-background';
+import { MARKETING_CONTAINER_CLASS } from './marketing-layout';
 import { TRUST_INDICATORS } from './marketing.constants';
 
 type MarketingHeroSectionProps = {
@@ -7,15 +8,15 @@ type MarketingHeroSectionProps = {
 };
 
 export function MarketingHeroSection({
-  loginHref = '/iconic-academy/login',
+  loginHref = '/iconic-academy/get-started',
 }: MarketingHeroSectionProps) {
   return (
     <section
       id="home"
-      className="relative overflow-hidden bg-gradient-to-b from-emerald-50/70 via-background to-background px-4 pb-16 pt-0 dark:from-emerald-950/25 dark:via-background dark:to-background"
+      className="relative overflow-hidden bg-gradient-to-b from-emerald-50/70 via-background to-background pb-16 pt-0 dark:from-emerald-950/25 dark:via-background dark:to-background"
     >
       <MarketingHeroPatternBackground />
-      <div className="relative z-10 mx-auto max-w-6xl pt-20">
+      <div className={`${MARKETING_CONTAINER_CLASS} relative z-10 pt-20`}>
         <div className="mb-12 text-center">
           <MarketingHeroHeadline />
           <p className="mx-auto mb-10 max-w-2xl text-lg text-muted-foreground">

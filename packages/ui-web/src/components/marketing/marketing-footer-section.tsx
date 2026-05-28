@@ -1,4 +1,5 @@
 import { FOOTER_LINK_GROUPS, MARKETING_CONTACT_DETAILS } from './marketing.constants';
+import { MARKETING_SECTION_CLASS } from './marketing-layout';
 import { MarketingStoreBadges } from './marketing-store-badges';
 
 type MarketingFooterSectionProps = {
@@ -10,7 +11,7 @@ export function MarketingFooterSection({
 }: MarketingFooterSectionProps) {
   return (
     <footer id="about" className="border-t border-border/60 bg-card/40">
-      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+      <div className={MARKETING_SECTION_CLASS}>
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <p className="text-lg font-semibold">ICONIC Academy</p>

@@ -4,7 +4,7 @@ import { render, screen } from '@testing-library/react';
 import HomePage from '@iconicedu/web/app/(marketing)/page';
 
 const createSupabaseServerClientMock = vi.fn();
-const resolveDefaultOrgLoginPathMock = vi.fn();
+const resolveDefaultOrgGetStartedPathMock = vi.fn();
 
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
   createSupabaseServerClient: (...args: unknown[]) =>
@@ -12,14 +12,14 @@ vi.mock('@iconicedu/web/lib/supabase/server', () => ({
 }));
 
 vi.mock('@iconicedu/web/lib/org/resolve-auth-path', () => ({
-  resolveDefaultOrgLoginPath: (...args: unknown[]) =>
-    resolveDefaultOrgLoginPathMock(...args),
+  resolveDefaultOrgGetStartedPath: (...args: unknown[]) =>
+    resolveDefaultOrgGetStartedPathMock(...args),
 }));
 
 describe('marketing home page', () => {
   it('renders the tutor discovery hero and primary CTA', async () => {
     createSupabaseServerClientMock.mockResolvedValueOnce({ auth: { getUser: vi.fn() } });
-    resolveDefaultOrgLoginPathMock.mockResolvedValueOnce('/acme/login');
+    resolveDefaultOrgGetStartedPathMock.mockResolvedValueOnce('/acme/get-started');
 
     render(await HomePage());
 
@@ -35,13 +35,13 @@ describe('marketing home page', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Find the right tutor' })).toHaveAttribute(
       'href',
-      '/acme/login',
+      '/acme/get-started',
     );
   });
 
   it('shows learning area pills and footer navigation links', async () => {
     createSupabaseServerClientMock.mockResolvedValueOnce({ auth: { getUser: vi.fn() } });
-    resolveDefaultOrgLoginPathMock.mockResolvedValueOnce('/acme/login');
+    resolveDefaultOrgGetStartedPathMock.mockResolvedValueOnce('/acme/get-started');
 
     render(await HomePage());
 
@@ -54,7 +54,7 @@ describe('marketing home page', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Explore and sign up' })).toHaveAttribute(
       'href',
-      '/acme/login',
+      '/acme/get-started',
     );
   });
 });

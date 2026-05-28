@@ -1,6 +1,7 @@
 import { MarketingFaqSection } from './marketing-faq-section';
 import { MarketingHeroSection } from './marketing-hero-section';
 import { MarketingHowItWorksSection } from './marketing-how-it-works-section';
+import { MarketingLowFrictionStartSection } from './marketing-low-friction-start-section';
 import { MarketingMissionSection } from './marketing-mission-section';
 import { MarketingMobileAppSection } from './marketing-mobile-app-section';
 import { MarketingSuccessPathSection } from './marketing-success-path-section';
@@ -13,7 +14,7 @@ type MarketingHomePageProps = {
 };
 
 export function MarketingHomePage({
-  loginHref = '/iconic-academy/login',
+  loginHref = '/iconic-academy/get-started',
 }: MarketingHomePageProps) {
   return (
     <div className="bg-background text-foreground">
@@ -21,6 +22,7 @@ export function MarketingHomePage({
       <MarketingSubjectsSection />
       <MarketingTrustStatsSection />
       <MarketingHowItWorksSection loginHref={loginHref} />
+      <MarketingLowFrictionStartSection loginHref={loginHref} />
       <MarketingUsCurriculumSection />
       <MarketingSuccessPathSection />
       <MarketingMobileAppSection />

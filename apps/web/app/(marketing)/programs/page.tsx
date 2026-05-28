@@ -1,5 +1,10 @@
 import type { Metadata } from 'next';
-import { MAIN_MENU_PAGE_CONTENT, MarketingMainMenuPage } from '@iconicedu/ui-web';
+import {
+  MAIN_MENU_PAGE_CONTENT,
+  MARKETING_CARD_CLASS,
+  MARKETING_CONTAINER_CLASS,
+  MarketingMainMenuPage,
+} from '@iconicedu/ui-web';
 import {
   assertMarketingSitePagesEnabled,
   resolveMarketingLoginHref,
@@ -35,23 +40,25 @@ export default async function ProgramsPage() {
       <MarketingMainMenuPage
         content={MAIN_MENU_PAGE_CONTENT.subjects}
         loginHref={loginHref}
+        beforeLowFrictionStart={
+          <section className={`${MARKETING_CONTAINER_CLASS} pb-4`}>
+            <div className={MARKETING_CARD_CLASS}>
+              <h2 className="text-2xl font-semibold">Popular tutoring pages</h2>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {PROGRAM_LANDING_PAGES.map((program) => (
+                  <a
+                    key={program.path}
+                    href={program.path}
+                    className="rounded-full border border-border/60 bg-background px-3 py-1.5 text-sm text-muted-foreground transition hover:text-foreground"
+                  >
+                    {program.title}
+                  </a>
+                ))}
+              </div>
+            </div>
+          </section>
+        }
       />
-      <section className="px-4 pb-14 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-5xl rounded-lg border border-border/70 bg-card px-6 py-6 shadow-sm">
-          <h2 className="text-2xl font-semibold">Popular tutoring pages</h2>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {PROGRAM_LANDING_PAGES.map((program) => (
-              <a
-                key={program.path}
-                href={program.path}
-                className="rounded-full border border-border/60 bg-background px-3 py-1.5 text-sm text-muted-foreground transition hover:text-foreground"
-              >
-                {program.title}
-              </a>
-            ))}
-          </div>
-        </div>
-      </section>
     </>
   );
 }

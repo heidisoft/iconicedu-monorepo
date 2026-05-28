@@ -1,9 +1,13 @@
 import { randomUUID } from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import type { ProfileRow } from '@iconicedu/shared-types';
+import type { ClassRequestIntent, ProfileRow } from '@iconicedu/shared-types';
 import { withInfoPanelDisabled } from '@iconicedu/web/lib/channels/ui-defaults';
-import { OTHER_SUBJECT_OPTION, STANDARD_SUBJECT_OPTIONS } from '@iconicedu/shared-types';
+import {
+  CLASS_REQUEST_INTENT_LABELS,
+  OTHER_SUBJECT_OPTION,
+  STANDARD_SUBJECT_OPTIONS,
+} from '@iconicedu/shared-types';
 
 export const DASHBOARD_CLASS_REQUEST_SUBJECT_OPTIONS = [
   ...STANDARD_SUBJECT_OPTIONS,
@@ -14,6 +18,7 @@ const CLASS_REQUEST_CHANNEL_PURPOSE = 'chass-requests';
 
 export type DashboardClassRequestPayload = {
   orgSlug: string;
+  requestIntent: ClassRequestIntent;
   studentProfileIds: string[];
   subjects: string[];
   otherSubject?: string | null;
@@ -23,6 +28,7 @@ export type DashboardClassRequestPayload = {
 
 export function buildDashboardClassRequestMessage(input: {
   requesterName: string;
+  requestIntent: ClassRequestIntent;
   studentNames: string[];
   subjects: string[];
   otherSubject?: string | null;
@@ -41,6 +47,7 @@ export function buildDashboardClassRequestMessage(input: {
     'Class Request',
     '',
     `Requested by: ${input.requesterName}`,
+    `Request type: ${CLASS_REQUEST_INTENT_LABELS[input.requestIntent]}`,
     `Student(s): ${input.studentNames.join(', ')}`,
     `Subject(s): ${normalizedSubjects.join(', ')}`,
     ...(input.learningGoals?.trim()

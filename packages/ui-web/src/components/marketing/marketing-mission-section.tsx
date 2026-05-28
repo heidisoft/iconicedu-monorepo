@@ -1,8 +1,9 @@
 import { MISSION_PILLARS } from './marketing.constants';
+import { MARKETING_CARD_CLASS, MARKETING_SECTION_CLASS } from './marketing-layout';
 
 export function MarketingMissionSection() {
   return (
-    <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+    <section className={MARKETING_SECTION_CLASS}>
       <div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
         <div>
           <p className="text-sm font-semibold uppercase text-primary">
@@ -19,10 +20,7 @@ export function MarketingMissionSection() {
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           {MISSION_PILLARS.map((pillar) => (
-            <article
-              key={pillar.title}
-              className="rounded-lg border border-border/70 bg-card px-5 py-5 shadow-sm"
-            >
+            <article key={pillar.title} className={MARKETING_CARD_CLASS}>
               <h3 className="text-lg font-semibold">{pillar.title}</h3>
               <p className="mt-3 text-sm leading-7 text-muted-foreground">
                 {pillar.description}

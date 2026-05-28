@@ -15,7 +15,7 @@ import { getProfilesByIds } from '@iconicedu/web/lib/profile/queries/profiles.qu
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { listActiveOrgSubjectCatalog } from '@iconicedu/web/lib/subjects/queries/org-subject-catalog.query';
-import { OTHER_SUBJECT_OPTION } from '@iconicedu/shared-types';
+import { isClassRequestIntent, OTHER_SUBJECT_OPTION } from '@iconicedu/shared-types';
 
 const OTHER_SUBJECT = OTHER_SUBJECT_OPTION;
 
@@ -26,6 +26,7 @@ function parsePayload(body: unknown): DashboardClassRequestPayload | null {
 
   const payload = body as Record<string, unknown>;
   const orgSlug = typeof payload.orgSlug === 'string' ? payload.orgSlug.trim() : '';
+  const requestIntent = payload.requestIntent;
   const studentProfileIds = Array.isArray(payload.studentProfileIds)
     ? payload.studentProfileIds.filter((id): id is string => typeof id === 'string')
     : [];
@@ -41,12 +42,18 @@ function parsePayload(body: unknown): DashboardClassRequestPayload | null {
       ? payload.specialRequirements.trim()
       : null;
 
-  if (!orgSlug || !studentProfileIds.length || !subjects.length) {
+  if (
+    !orgSlug ||
+    !isClassRequestIntent(requestIntent) ||
+    !studentProfileIds.length ||
+    !subjects.length
+  ) {
     return null;
   }
 
   return {
     orgSlug,
+    requestIntent,
     studentProfileIds,
     subjects,
     otherSubject,
@@ -191,6 +198,7 @@ export async function POST(request: Request) {
 
     const messageText = buildDashboardClassRequestMessage({
       requesterName: requesterProfile.display_name?.trim() || 'Unknown requester',
+      requestIntent: payload.requestIntent,
       studentNames: selectedStudents
         .map((student) => student.display_name?.trim())
         .filter((name): name is string => Boolean(name)),

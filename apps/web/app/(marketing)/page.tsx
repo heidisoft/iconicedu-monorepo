@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { MarketingHomePage } from '@iconicedu/ui-web';
-import { resolveDefaultOrgLoginPath } from '@iconicedu/web/lib/org/resolve-auth-path';
+import { resolveDefaultOrgGetStartedPath } from '@iconicedu/web/lib/org/resolve-auth-path';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import {
   breadcrumbJsonLd,
@@ -17,7 +17,7 @@ export const metadata: Metadata = createMarketingMetadata(homeSeo);
 
 export default async function HomePage() {
   const supabase = await createSupabaseServerClient();
-  const loginHref = await resolveDefaultOrgLoginPath(supabase);
+  const loginHref = await resolveDefaultOrgGetStartedPath(supabase);
 
   return (
     <>

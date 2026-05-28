@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { enableMarketingSitePages } from '@iconicedu/web/flags';
-import { resolveDefaultOrgLoginPath } from '@iconicedu/web/lib/org/resolve-auth-path';
+import { resolveDefaultOrgGetStartedPath } from '@iconicedu/web/lib/org/resolve-auth-path';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 
 export async function assertMarketingSitePagesEnabled() {
@@ -14,5 +14,5 @@ export async function assertMarketingSitePagesEnabled() {
 
 export async function resolveMarketingLoginHref() {
   const supabase = await createSupabaseServerClient();
-  return resolveDefaultOrgLoginPath(supabase);
+  return resolveDefaultOrgGetStartedPath(supabase);
 }
