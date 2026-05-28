@@ -1,6 +1,6 @@
 export const MARKETING_CONTAINER_CLASS = 'mx-auto max-w-7xl px-4 sm:px-6 lg:px-8';
 
-export const MARKETING_LEAD_CONTAINER_CLASS = 'mx-auto max-w-5xl';
+export const MARKETING_LEAD_CONTAINER_CLASS = 'mx-auto max-w-6xl';
 
 export const MARKETING_SECTION_CLASS = `${MARKETING_CONTAINER_CLASS} py-10`;
 
