@@ -13,7 +13,7 @@ export function GET() {
     '',
     BRAND_POSITIONING,
     '',
-    'ICONIC Academy serves K-12 students and families across the USA and global online communities with live online tutoring, test prep, homework help, and enrichment programs.',
+    'ICONIC Academy serves K-12 students and families across the USA, Australia, the UK, New Zealand, Italy, UAE, Canada, Japan, Qatar, and global online communities with live online tutoring, test prep, homework help, and enrichment programs.',
     '',
     'Important public pages:',
     ...PUBLIC_MARKETING_PAGES.filter((page) => page.priority >= 0.7).map(

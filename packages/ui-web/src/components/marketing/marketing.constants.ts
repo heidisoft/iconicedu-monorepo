@@ -397,7 +397,7 @@ export const FOOTER_LINK_GROUPS = [
   {
     title: 'Platform',
     links: [
-      { label: 'Programs', href: '/subjects' },
+      { label: 'Programs', href: '/programs' },
       { label: 'Online Tutoring', href: '/programs/online-tutoring' },
       { label: 'U.S. Curriculum Support', href: '/programs/us-curriculum-support' },
       { label: 'Tutoring Across the USA', href: '/locations/usa' },

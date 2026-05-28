@@ -55,7 +55,7 @@ describe('marketing layout metadata', () => {
     expect(screen.getByText('Page body')).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: 'Programs' })[0]).toHaveAttribute(
       'href',
-      '/subjects',
+      '/programs',
     );
     expect(screen.getByRole('link', { name: 'Log In' })).toHaveAttribute(
       'href',
@@ -67,7 +67,7 @@ describe('marketing layout metadata', () => {
     );
     expect(screen.getAllByRole('link', { name: 'Programs' })[1]).toHaveAttribute(
       'href',
-      '/subjects',
+      '/programs',
     );
   });
 });

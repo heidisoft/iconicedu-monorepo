@@ -81,21 +81,27 @@ export default async function LocationPage({ params }: LocationPageProps) {
               Find the right tutor
             </a>
             <Link
-              href="/programs/us-curriculum-support"
+              href="/programs"
               className="inline-flex min-h-11 items-center justify-center rounded-full border border-border bg-background px-6 text-sm font-semibold transition hover:bg-muted"
             >
-              U.S. curriculum support
+              Explore programs
             </Link>
           </div>
         </div>
       </section>
 
       <section className="px-4 py-14 sm:px-6 lg:px-8">
-        <div className="mx-auto grid max-w-5xl gap-5 lg:grid-cols-2">
+        <div className="mx-auto grid max-w-5xl gap-5 lg:grid-cols-3">
           <article className="rounded-lg border border-border/70 bg-card px-6 py-6 shadow-sm">
-            <h2 className="text-xl font-semibold">Curriculum-aware support</h2>
+            <h2 className="text-xl font-semibold">Who this helps</h2>
+            <p className="mt-3 text-sm leading-7 text-muted-foreground">
+              {location.audience}
+            </p>
+          </article>
+          <article className="rounded-lg border border-border/70 bg-card px-6 py-6 shadow-sm">
+            <h2 className="text-xl font-semibold">Curriculum and exams</h2>
             <ul className="mt-4 grid gap-3">
-              {location.standards.map((item) => (
+              {[...location.standards, ...location.exams].map((item) => (
                 <li
                   key={item}
                   className="rounded-lg border border-border/60 bg-background px-4 py-3 text-sm leading-6 text-muted-foreground"
@@ -106,7 +112,7 @@ export default async function LocationPage({ params }: LocationPageProps) {
             </ul>
           </article>
           <article className="rounded-lg border border-border/70 bg-card px-6 py-6 shadow-sm">
-            <h2 className="text-xl font-semibold">What families can expect</h2>
+            <h2 className="text-xl font-semibold">Common tutoring needs</h2>
             <ul className="mt-4 grid gap-3">
               {location.support.map((item) => (
                 <li
@@ -119,6 +125,23 @@ export default async function LocationPage({ params }: LocationPageProps) {
             </ul>
           </article>
         </div>
+
+        {location.relatedLocations?.length ? (
+          <div className="mx-auto mt-8 max-w-5xl rounded-lg border border-border/70 bg-card px-6 py-6 shadow-sm">
+            <h2 className="text-xl font-semibold">Related locations</h2>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {location.relatedLocations.map((relatedLocation) => (
+                <Link
+                  key={relatedLocation.href}
+                  href={relatedLocation.href}
+                  className="rounded-full border border-border/60 bg-background px-3 py-1 text-xs font-medium text-muted-foreground transition hover:bg-muted"
+                >
+                  {relatedLocation.label}
+                </Link>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </section>
     </div>
   );

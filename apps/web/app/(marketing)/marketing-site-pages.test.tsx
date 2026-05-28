@@ -37,9 +37,9 @@ import LocationPage, {
 import TermsPage, {
   metadata as termsMetadata,
 } from '@iconicedu/web/app/(marketing)/terms/page';
-import SubjectsPage, {
-  metadata as subjectsMetadata,
-} from '@iconicedu/web/app/(marketing)/subjects/page';
+import ProgramsPage, {
+  metadata as programsMetadata,
+} from '@iconicedu/web/app/(marketing)/programs/page';
 
 const enableMarketingSitePagesRunMock = vi.fn(async () => true);
 const notFoundMock = vi.fn(() => {
@@ -115,11 +115,11 @@ describe('marketing site standard pages', () => {
       canonical: '/pricing',
     },
     {
-      name: 'subjects',
-      Page: SubjectsPage,
-      metadata: subjectsMetadata,
+      name: 'programs',
+      Page: ProgramsPage,
+      metadata: programsMetadata,
       title: 'Academic help and enrichment for every kind of learner',
-      canonical: '/subjects',
+      canonical: '/programs',
       expectedText: 'Subject support should feel practical, not overwhelming',
     },
     {
@@ -280,6 +280,117 @@ describe('marketing program and location landing pages', () => {
     expect(generateProgramStaticParams()).toContainEqual({
       programSlug: 'online-tutoring',
     });
+    expect(generateProgramStaticParams()).toContainEqual({
+      programSlug: 'australia-curriculum-naplan-atar-support',
+    });
+    expect(generateProgramStaticParams()).toContainEqual({
+      programSlug: 'uk-curriculum-gcse-a-level-support',
+    });
+    expect(generateProgramStaticParams()).toContainEqual({
+      programSlug: 'canada-provincial-curriculum-eqao-osslt-support',
+    });
+  });
+
+  it('renders regional curriculum program pages', async () => {
+    render(
+      await ProgramPage({
+        params: Promise.resolve({
+          programSlug: 'australia-curriculum-naplan-atar-support',
+        }),
+      }),
+    );
+
+    expect(
+      screen.getByRole('heading', {
+        name: 'Australian Curriculum, NAPLAN, and senior pathway tutoring',
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Australian Curriculum and state syllabus awareness where applicable',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText('NAPLAN').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('ATAR').length).toBeGreaterThan(0);
+  });
+
+  it('renders UK and Canada regional program search terms', async () => {
+    const { unmount } = render(
+      await ProgramPage({
+        params: Promise.resolve({
+          programSlug: 'uk-curriculum-gcse-a-level-support',
+        }),
+      }),
+    );
+
+    expect(
+      screen.getByText('SATs, 11+, GCSE, IGCSE, and A Level practice'),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText('GCSE').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('A Levels').length).toBeGreaterThan(0);
+
+    unmount();
+
+    render(
+      await ProgramPage({
+        params: Promise.resolve({
+          programSlug: 'canada-provincial-curriculum-eqao-osslt-support',
+        }),
+      }),
+    );
+
+    expect(
+      screen.getByText(/EQAO, OSSLT, BC literacy and numeracy assessments/i),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText('EQAO').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('OSSLT').length).toBeGreaterThan(0);
+  });
+
+  it('renders the reworked U.S. curriculum program page', async () => {
+    render(
+      await ProgramPage({
+        params: Promise.resolve({ programSlug: 'us-curriculum-support' }),
+      }),
+    );
+
+    expect(
+      screen.getByRole('heading', {
+        name: 'U.S. curriculum, DOE, and school-aligned tutoring support',
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('State DOE and district expectations where applicable'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Public, private, charter, and homeschool assignment support'),
+    ).toBeInTheDocument();
+  });
+
+  it('defines metadata for regional program pages', async () => {
+    await expect(
+      generateProgramMetadata({
+        params: Promise.resolve({
+          programSlug: 'uk-curriculum-gcse-a-level-support',
+        }),
+      }),
+    ).resolves.toMatchObject({
+      title: 'UK Curriculum, GCSE, and A Level Support | ICONIC Academy',
+      alternates: { canonical: '/programs/uk-curriculum-gcse-a-level-support' },
+    });
+
+    await expect(
+      generateProgramMetadata({
+        params: Promise.resolve({
+          programSlug: 'qatar-curriculum-igcse-a-level-support',
+        }),
+      }),
+    ).resolves.toMatchObject({
+      title:
+        'Qatar Curriculum, IGCSE, A Level, and International School Support | ICONIC Academy',
+      alternates: {
+        canonical: '/programs/qatar-curriculum-igcse-a-level-support',
+      },
+    });
   });
 
   it('renders a USA location landing page', async () => {
@@ -294,7 +405,13 @@ describe('marketing program and location landing pages', () => {
         name: 'Online tutoring for families across the USA',
       }),
     ).toBeInTheDocument();
-    expect(screen.getByText('Curriculum-aware support')).toBeInTheDocument();
+    expect(screen.getByText('Curriculum and exams')).toBeInTheDocument();
+    expect(screen.getByText('Who this helps')).toBeInTheDocument();
+    expect(screen.getByText('Common tutoring needs')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Explore programs' })).toHaveAttribute(
+      'href',
+      '/programs',
+    );
   });
 
   it('defines location metadata and static params', async () => {
@@ -308,5 +425,156 @@ describe('marketing program and location landing pages', () => {
     });
 
     expect(generateLocationStaticParams()).toContainEqual({ locationSlug: 'usa' });
+    expect(generateLocationStaticParams()).toContainEqual({
+      locationSlug: 'australia',
+    });
+    expect(generateLocationStaticParams()).toContainEqual({
+      locationSlug: 'new-york-city',
+    });
+    expect(generateLocationStaticParams()).toContainEqual({
+      locationSlug: 'ontario',
+    });
+    expect(generateLocationStaticParams()).toContainEqual({
+      locationSlug: 'massachusetts',
+    });
+    expect(generateLocationStaticParams()).toContainEqual({
+      locationSlug: 'georgia',
+    });
+    expect(generateLocationStaticParams()).toContainEqual({
+      locationSlug: 'washington',
+    });
+  });
+
+  it('renders state-level DOE and public-private school support details', async () => {
+    render(
+      await LocationPage({
+        params: Promise.resolve({ locationSlug: 'massachusetts' }),
+      }),
+    );
+
+    expect(
+      screen.getByRole('heading', {
+        name: 'Online tutoring for students in Massachusetts',
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Massachusetts Department of Elementary and Secondary Education guidance',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Massachusetts Curriculum Frameworks')).toBeInTheDocument();
+    expect(screen.getByText('MCAS readiness')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Homework help for public, private, charter, and homeschool students',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText('MCAS readiness practice').length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText(
+        'Gifted, magnet, honors, and accelerated program readiness where available',
+      ).length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText(
+        'Private school entrance, ISEE/SSAT, SAT/ACT, and AP support where applicable',
+      ).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it('renders regional curriculum and exam details for international pages', async () => {
+    render(
+      await LocationPage({
+        params: Promise.resolve({ locationSlug: 'australia' }),
+      }),
+    );
+
+    expect(
+      screen.getByRole('heading', {
+        name: 'Online tutoring for students across Australia',
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Australian Curriculum')).toBeInTheDocument();
+    expect(screen.getByText('NAPLAN')).toBeInTheDocument();
+    expect(screen.getByText('HSC')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'New South Wales' })).toHaveAttribute(
+      'href',
+      '/locations/new-south-wales',
+    );
+  });
+
+  it('renders UK and Canada exam terms families search for', async () => {
+    const { unmount } = render(
+      await LocationPage({
+        params: Promise.resolve({ locationSlug: 'united-kingdom' }),
+      }),
+    );
+
+    expect(screen.getByText('National Curriculum')).toBeInTheDocument();
+    expect(screen.getByText('GCSE')).toBeInTheDocument();
+    expect(screen.getByText('A Levels')).toBeInTheDocument();
+
+    unmount();
+
+    render(
+      await LocationPage({
+        params: Promise.resolve({ locationSlug: 'canada' }),
+      }),
+    );
+
+    expect(screen.getByText('Provincial curriculum expectations')).toBeInTheDocument();
+    expect(screen.getByText('EQAO')).toBeInTheDocument();
+    expect(screen.getByText('OSSLT')).toBeInTheDocument();
+    expect(
+      screen.getByText('BC literacy and numeracy graduation assessments'),
+    ).toBeInTheDocument();
+  });
+
+  it('renders a NYC-specific SHSAT location page', async () => {
+    render(
+      await LocationPage({
+        params: Promise.resolve({ locationSlug: 'new-york-city' }),
+      }),
+    );
+
+    expect(
+      screen.getByRole('heading', {
+        name: 'Online tutoring and SHSAT prep for New York City students',
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('SHSAT prep')).toBeInTheDocument();
+    expect(
+      screen.getByText('Mark Twain I.S. 239 talent test and audition readiness'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Specialized high school readiness')).toBeInTheDocument();
+  });
+
+  it('defines metadata for representative regional location pages', async () => {
+    await expect(
+      generateLocationMetadata({
+        params: Promise.resolve({ locationSlug: 'australia' }),
+      }),
+    ).resolves.toMatchObject({
+      title: 'Online Tutoring in Australia | ICONIC Academy',
+      alternates: { canonical: '/locations/australia' },
+    });
+
+    await expect(
+      generateLocationMetadata({
+        params: Promise.resolve({ locationSlug: 'new-york-city' }),
+      }),
+    ).resolves.toMatchObject({
+      title: 'Online Tutoring in New York City | ICONIC Academy',
+      alternates: { canonical: '/locations/new-york-city' },
+    });
+
+    await expect(
+      generateLocationMetadata({
+        params: Promise.resolve({ locationSlug: 'georgia' }),
+      }),
+    ).resolves.toMatchObject({
+      title: 'Online Tutoring in Georgia | ICONIC Academy',
+      alternates: { canonical: '/locations/georgia' },
+    });
   });
 });

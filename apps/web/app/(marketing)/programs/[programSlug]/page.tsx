@@ -61,7 +61,7 @@ export default async function ProgramPage({ params }: ProgramPageProps) {
           courseJsonLd(program),
           breadcrumbJsonLd([
             { name: 'Home', path: '/' },
-            { name: 'Programs', path: '/subjects' },
+            { name: 'Programs', path: '/programs' },
             { name: program.title, path: program.path },
           ]),
         ]}
@@ -85,7 +85,7 @@ export default async function ProgramPage({ params }: ProgramPageProps) {
               Find the right tutor
             </a>
             <Link
-              href="/subjects"
+              href="/programs"
               className="inline-flex min-h-11 items-center justify-center rounded-full border border-border bg-background px-6 text-sm font-semibold transition hover:bg-muted"
             >
               Explore all programs
