@@ -50,7 +50,7 @@ export default function CallbackPage() {
     const callbackSource = resolveCallbackSource(searchParams.get('source'));
     const fallbackAuthPath = requestedOrgSlug
       ? `/${requestedOrgSlug}/login`
-      : '/get-started';
+      : '/i/get-started';
 
     const hashParams = new URLSearchParams(
       window.location.hash.startsWith('#')

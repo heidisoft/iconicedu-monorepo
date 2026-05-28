@@ -117,7 +117,7 @@ function getRequestIntentHelperCopy(
 ) {
   switch (requestIntent) {
     case 'trial-class':
-      return 'Trial classes are useful for checking tutor fit, teaching style, and schedule before committing to regular tutoring.';
+      return 'Free trial classes are useful for checking tutor fit, teaching style, and schedule before committing to regular tutoring.';
     case 'learning-match-call':
       return 'Consultation calls help us match curriculum, schedule, learner needs, and the right tutoring plan before class starts.';
     case 'urgent-homework-help':

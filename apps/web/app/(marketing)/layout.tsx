@@ -16,7 +16,7 @@ export default async function SiteLayout({ children }: { children: ReactNode }) 
     data: { user },
   } = await supabase.auth.getUser();
   const loginHref = await resolveDefaultOrgLoginPath(supabase);
-  let dashboardHref = '/get-started';
+  let dashboardHref = '/i/get-started';
 
   if (user?.id) {
     const accountResponse = await getAccountByAuthUserId(supabase, user.id);

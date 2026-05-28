@@ -942,7 +942,7 @@ export class OnboardingService {
   private async resolveOrgDashboardPath(
     supabase: SupabaseClient,
     orgId: string,
-    fallbackPath = '/get-started',
+    fallbackPath = '/i/get-started',
   ) {
     const org = await this.getOrgById(supabase, orgId);
     return org?.slug ? `/${org.slug}` : fallbackPath;
@@ -951,7 +951,7 @@ export class OnboardingService {
   private async resolveOrgLoginPath(
     supabase: SupabaseClient,
     orgId: string,
-    fallbackPath = '/get-started',
+    fallbackPath = '/i/get-started',
   ) {
     const dashboardPath = await this.resolveOrgDashboardPath(
       supabase,

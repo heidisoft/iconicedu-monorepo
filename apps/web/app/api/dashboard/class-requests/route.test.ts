@@ -221,7 +221,7 @@ describe('POST /api/dashboard/class-requests', () => {
         orgId: 'org-1',
         channelId: 'channel-1',
         senderProfileId: 'guardian-1',
-        content: expect.stringContaining('Request type: Trial class'),
+        content: expect.stringContaining('Request type: Free trial class'),
       }),
     );
 

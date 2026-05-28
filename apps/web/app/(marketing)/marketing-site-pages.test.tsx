@@ -265,7 +265,7 @@ describe('marketing program and location landing pages', () => {
       'href',
       '/acme/get-started',
     );
-    expect(screen.getByText('Request a trial class')).toBeInTheDocument();
+    expect(screen.getByText('Request a free trial class')).toBeInTheDocument();
     expect(screen.getByText('Book a free learning match call')).toBeInTheDocument();
     expect(screen.getByText('Need homework help this week?')).toBeInTheDocument();
   });
@@ -415,7 +415,7 @@ describe('marketing program and location landing pages', () => {
       'href',
       '/programs',
     );
-    expect(screen.getByText('Request a trial class')).toBeInTheDocument();
+    expect(screen.getByText('Request a free trial class')).toBeInTheDocument();
   });
 
   it('defines location metadata and static params', async () => {

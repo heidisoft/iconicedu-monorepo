@@ -1,7 +1,7 @@
 export const CLASS_REQUEST_INTENT_OPTIONS = [
   {
     value: 'trial-class',
-    label: 'Trial class',
+    label: 'Free trial class',
     description: 'Check tutor fit, teaching style, and schedule before regular classes.',
   },
   {
