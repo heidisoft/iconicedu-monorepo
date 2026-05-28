@@ -19,7 +19,20 @@ describe('LoginForm', () => {
     expect(
       screen.getByRole('button', { name: 'Continue with Google' }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Continue with Apple' }),
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Send secure link' })).toBeInTheDocument();
+  });
+
+  it('calls the OAuth login handler with the selected provider', async () => {
+    const onOAuthLogin = vi.fn();
+    const user = userEvent.setup();
+    render(<LoginForm onOAuthLogin={onOAuthLogin} />);
+
+    await user.click(screen.getByRole('button', { name: 'Continue with Apple' }));
+
+    expect(onOAuthLogin).toHaveBeenCalledWith('apple');
   });
 
   it('renders a prominent message state container', () => {

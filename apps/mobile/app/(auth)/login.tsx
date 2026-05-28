@@ -10,8 +10,8 @@ import {
   Pressable,
   ScrollView,
   ActivityIndicator,
-  Linking,
 } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, {
@@ -197,6 +197,21 @@ function GoogleIcon() {
   );
 }
 
+function AppleIcon({ color }: { color: string }) {
+  return (
+    <Svg width={20} height={20} viewBox="7 5 12.5 15">
+      <Path
+        d="M17.05 12.58c-.03-2.06 1.68-3.05 1.76-3.1-1-.46-2.04-.52-2.47-.53-1.05-.11-2.06.62-2.59.62-.54 0-1.37-.61-2.25-.59-1.16.02-2.23.67-2.83 1.71-1.21 2.1-.31 5.2.87 6.9.58.83 1.26 1.77 2.17 1.73.87-.03 1.2-.56 2.25-.56 1.05 0 1.35.56 2.27.54.94-.02 1.53-.85 2.1-1.69.66-.96.93-1.89.94-1.94-.02-.01-1.81-.69-1.83-2.74z"
+        fill={color}
+      />
+      <Path
+        d="M15.65 7.84c.48-.58.8-1.38.71-2.18-.69.03-1.53.46-2.03 1.04-.44.51-.83 1.33-.73 2.11.78.06 1.57-.39 2.05-.97z"
+        fill={color}
+      />
+    </Svg>
+  );
+}
+
 // ─── Styles ────────────────────────────────────────────────────────────────────
 
 function makeStyles(C: AppColors) {
@@ -285,6 +300,8 @@ function makeStyles(C: AppColors) {
 
       noAcct: { fontSize: 14, color: C.textMuted, textAlign: 'center', lineHeight: 19 },
       noAcctLink: { color: C.teal, fontWeight: '600' },
+      appleSocial: { backgroundColor: C.text, borderColor: C.text },
+      appleSocialTxt: { color: C.bg },
 
       terms: {
         paddingHorizontal: 24,
@@ -305,11 +322,14 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [googleError, setGoogleError] = useState<string | null>(null);
+  const [appleError, setAppleError] = useState<string | null>(null);
   const {
     signInWithOtp,
     signInWithGoogle,
+    signInWithApple,
     sessionExpiryMessage,
     clearSessionExpiryMessage,
   } = useAuth();
@@ -327,39 +347,105 @@ export default function LoginScreen() {
       setError('Please enter your email address');
       return;
     }
-    setLoading(true);
-    setError(null);
-    clearSessionExpiryMessage();
-    analytics.capture(AnalyticsEvent.LOGIN_OTP_REQUESTED, { method: 'email' });
-    const { error: signInError } = await signInWithOtp(email.trim());
-    if (signInError) {
+    try {
+      setLoading(true);
+      setError(null);
+      clearSessionExpiryMessage();
+      analytics.capture(AnalyticsEvent.LOGIN_OTP_REQUESTED, { method: 'email' });
+      const { error: signInError } = await signInWithOtp(email.trim());
+      if (signInError) {
+        analytics.capture(AnalyticsEvent.LOGIN_ERROR, {
+          method: 'email',
+          error: signInError,
+        });
+        setError(signInError);
+        return;
+      }
+      router.push({ pathname: '/(auth)/otp', params: { email: email.trim() } });
+    } catch (loginError) {
+      const message =
+        loginError instanceof Error
+          ? loginError.message
+          : 'Could not send your sign-in code. Please try again.';
       analytics.capture(AnalyticsEvent.LOGIN_ERROR, {
         method: 'email',
-        error: signInError,
+        error: message,
       });
-      setError(signInError);
+      setError(message);
+    } finally {
       setLoading(false);
-      return;
     }
-    setLoading(false);
-    router.push({ pathname: '/(auth)/otp', params: { email: email.trim() } });
   }, [analytics, clearSessionExpiryMessage, email, router, signInWithOtp]);
 
   const handleGoogle = useCallback(async () => {
-    setGoogleLoading(true);
-    setGoogleError(null);
-    clearSessionExpiryMessage();
-    analytics.capture(AnalyticsEvent.LOGIN_GOOGLE_STARTED);
-    const { error: googleErr } = await signInWithGoogle();
-    if (googleErr) {
+    try {
+      setGoogleLoading(true);
+      setGoogleError(null);
+      clearSessionExpiryMessage();
+      analytics.capture(AnalyticsEvent.LOGIN_GOOGLE_STARTED);
+      const { error: googleErr } = await signInWithGoogle();
+      if (googleErr) {
+        analytics.capture(AnalyticsEvent.LOGIN_ERROR, {
+          method: 'google',
+          error: googleErr,
+        });
+        setGoogleError(googleErr);
+      }
+    } catch (googleErr) {
+      const message =
+        googleErr instanceof Error
+          ? googleErr.message
+          : 'Could not complete Google sign-in. Please try again.';
       analytics.capture(AnalyticsEvent.LOGIN_ERROR, {
         method: 'google',
-        error: googleErr,
+        error: message,
       });
-      setGoogleError(googleErr);
+      setGoogleError(message);
+    } finally {
+      setGoogleLoading(false);
     }
-    setGoogleLoading(false);
   }, [analytics, clearSessionExpiryMessage, signInWithGoogle]);
+
+  const handleApple = useCallback(async () => {
+    try {
+      setAppleLoading(true);
+      setAppleError(null);
+      clearSessionExpiryMessage();
+      analytics.capture(AnalyticsEvent.LOGIN_APPLE_STARTED);
+      const { error: appleErr } = await signInWithApple();
+      if (appleErr) {
+        analytics.capture(AnalyticsEvent.LOGIN_ERROR, {
+          method: 'apple',
+          error: appleErr,
+        });
+        setAppleError(appleErr);
+      }
+    } catch (appleErr) {
+      const message =
+        appleErr instanceof Error
+          ? appleErr.message
+          : 'Could not complete Apple sign-in. Please try again.';
+      analytics.capture(AnalyticsEvent.LOGIN_ERROR, {
+        method: 'apple',
+        error: message,
+      });
+      setAppleError(message);
+    } finally {
+      setAppleLoading(false);
+    }
+  }, [analytics, clearSessionExpiryMessage, signInWithApple]);
+
+  const openSignup = useCallback(async () => {
+    try {
+      await WebBrowser.openBrowserAsync('https://www.iconicedu.com/i/get-started', {
+        presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
+      });
+    } catch {
+      setError('Could not open account registration. Please try again.');
+    }
+  }, []);
+
+  const socialLoading = googleLoading || appleLoading;
 
   return (
     <SafeAreaView style={s.safe}>
@@ -405,7 +491,7 @@ export default function LoginScreen() {
                 autoComplete="email"
                 placeholder="you@example.com"
                 placeholderTextColor={s.placeholderColor}
-                editable={!loading}
+                editable={!loading && !socialLoading}
                 returnKeyType="done"
                 onSubmitEditing={handleLogin}
               />
@@ -430,7 +516,7 @@ export default function LoginScreen() {
           <TouchableOpacity
             style={[s.cta, loading ? s.ctaDim : undefined]}
             onPress={handleLogin}
-            disabled={loading}
+            disabled={loading || socialLoading}
             activeOpacity={0.85}
           >
             {loading && <ActivityIndicator size="small" color={colors.tealFg} />}
@@ -449,7 +535,7 @@ export default function LoginScreen() {
             style={[s.social, googleLoading ? s.ctaDim : undefined]}
             activeOpacity={0.8}
             onPress={handleGoogle}
-            disabled={googleLoading}
+            disabled={loading || socialLoading}
           >
             {googleLoading ? (
               <ActivityIndicator size="small" color={colors.textMuted} />
@@ -460,13 +546,26 @@ export default function LoginScreen() {
           </TouchableOpacity>
           {googleError && <Text style={s.errorTxt}>{googleError}</Text>}
 
+          {/* Apple */}
+          <TouchableOpacity
+            style={[s.social, s.appleSocial, appleLoading ? s.ctaDim : undefined]}
+            activeOpacity={0.8}
+            onPress={handleApple}
+            disabled={loading || socialLoading}
+          >
+            {appleLoading ? (
+              <ActivityIndicator size="small" color={colors.bg} />
+            ) : (
+              <AppleIcon color={colors.bg} />
+            )}
+            <Text style={[s.socialTxt, s.appleSocialTxt]}>Continue with Apple</Text>
+          </TouchableOpacity>
+          {appleError && <Text style={s.errorTxt}>{appleError}</Text>}
+
           {/* No account helper */}
           <Text style={s.noAcct}>
             {"Don't have an account? Visit "}
-            <Text
-              style={s.noAcctLink}
-              onPress={() => Linking.openURL('https://www.iconicedu.com')}
-            >
+            <Text style={s.noAcctLink} onPress={openSignup}>
               www.iconicedu.com
             </Text>
             {' to sign up.'}

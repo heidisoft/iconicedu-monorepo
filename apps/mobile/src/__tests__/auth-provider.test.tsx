@@ -16,17 +16,26 @@ const mockOnAuthStateChange = jest.fn().mockReturnValue({
   data: { subscription: { unsubscribe: jest.fn() } },
 });
 const mockSignInWithOtp = jest.fn().mockResolvedValue({ error: null });
+const mockSignInWithOAuth = jest.fn().mockResolvedValue({
+  data: { url: 'https://auth.example.test/oauth' },
+  error: null,
+});
 const mockVerifyOtp = jest.fn().mockResolvedValue({
   data: { session: null, user: null },
   error: null,
 });
 const mockSetSession = jest.fn().mockResolvedValue({ error: null });
 const mockSignOut = jest.fn().mockResolvedValue({});
+const mockOpenAuthSessionAsync = jest.fn().mockResolvedValue({
+  type: 'success',
+  url: 'iconicedu://auth-callback#access_token=access-token&refresh_token=refresh-token',
+});
 const mockMaybeSingle = jest.fn().mockResolvedValue({ data: null, error: null });
 const mockEq = jest.fn(() => ({ maybeSingle: mockMaybeSingle }));
 const mockSelect = jest.fn(() => ({ eq: mockEq }));
 const mockFrom = jest.fn(() => ({ select: mockSelect }));
 const mockActivateAccount = jest.fn().mockResolvedValue(undefined);
+const mockFetchUserAccount = jest.fn().mockResolvedValue({ org_id: 'org-1' });
 const mockCapture = jest.fn();
 let appStateChangeListener: ((state: AppStateStatus) => void) | null = null;
 const mockAnalyticsClient = {
@@ -38,6 +47,12 @@ const mockAnalyticsClient = {
 
 jest.mock('@/lib/api/queries', () => ({
   activateAccount: () => mockActivateAccount(),
+  fetchUserAccount: () => mockFetchUserAccount(),
+}));
+
+jest.mock('expo-web-browser', () => ({
+  maybeCompleteAuthSession: jest.fn(),
+  openAuthSessionAsync: (...args: unknown[]) => mockOpenAuthSessionAsync(...args),
 }));
 
 jest.mock('@/providers/analytics-provider', () => ({
@@ -51,6 +66,7 @@ jest.mock('../lib/supabase/client', () => ({
       getUser: () => mockGetUser(),
       onAuthStateChange: (cb: unknown) => mockOnAuthStateChange(cb),
       signInWithOtp: (params: unknown) => mockSignInWithOtp(params),
+      signInWithOAuth: (params: unknown) => mockSignInWithOAuth(params),
       verifyOtp: (params: unknown) => mockVerifyOtp(params),
       setSession: (params: unknown) => mockSetSession(params),
       signOut: (params?: unknown) => mockSignOut(params),
@@ -84,6 +100,11 @@ describe('AuthProvider', () => {
     mockGetUser.mockResolvedValue({
       data: { user: null },
       error: null,
+    });
+    mockFetchUserAccount.mockResolvedValue({ org_id: 'org-1' });
+    mockOpenAuthSessionAsync.mockResolvedValue({
+      type: 'success',
+      url: 'iconicedu://auth-callback#access_token=access-token&refresh_token=refresh-token',
     });
   });
 
@@ -136,6 +157,57 @@ describe('AuthProvider', () => {
       type: 'email',
     });
     expect(mockActivateAccount).toHaveBeenCalled();
+  });
+
+  it('signInWithApple starts Supabase OAuth through the in-app auth session', async () => {
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    let response: { error: string | null } = { error: 'not-called' };
+    await act(async () => {
+      response = await result.current.signInWithApple();
+    });
+
+    expect(response.error).toBeNull();
+    expect(mockSignInWithOAuth).toHaveBeenCalledWith({
+      provider: 'apple',
+      options: {
+        redirectTo: 'iconicedu://auth-callback',
+        skipBrowserRedirect: true,
+      },
+    });
+    expect(mockOpenAuthSessionAsync).toHaveBeenCalledWith(
+      'https://auth.example.test/oauth',
+      'iconicedu://auth-callback',
+    );
+    expect(mockSetSession).toHaveBeenCalledWith({
+      access_token: 'access-token',
+      refresh_token: 'refresh-token',
+    });
+  });
+
+  it('signs out OAuth users without a linked account', async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: 'user-1', email: 'iconicedudev+test@gmail.com' } },
+      error: null,
+    });
+    mockFetchUserAccount.mockResolvedValueOnce(null);
+
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    let response: { error: string | null } = { error: null };
+    await act(async () => {
+      response = await result.current.signInWithGoogle();
+    });
+
+    expect(response.error).toContain('No ICONIC Academy account');
+    expect(mockSignOut).toHaveBeenCalled();
+    expect(mockActivateAccount).not.toHaveBeenCalled();
   });
 
   it('signOut calls supabase', async () => {
