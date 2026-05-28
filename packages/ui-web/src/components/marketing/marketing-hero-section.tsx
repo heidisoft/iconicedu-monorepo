@@ -33,7 +33,7 @@ export function MarketingHeroSection({
                 Find the right tutor
               </a>
               <a
-                href="/subjects"
+                href="/programs"
                 className="inline-flex min-h-12 items-center justify-center rounded-full border border-border bg-background px-8 py-3 text-sm font-semibold text-foreground transition hover:bg-muted dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:hover:bg-emerald-900/35"
               >
                 Explore programs

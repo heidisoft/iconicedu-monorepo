@@ -30,7 +30,7 @@ describe('marketing sections', () => {
     );
     expect(screen.getByRole('link', { name: 'Explore programs' })).toHaveAttribute(
       'href',
-      '/subjects',
+      '/programs',
     );
   });
 
@@ -76,7 +76,7 @@ describe('marketing sections', () => {
     );
     expect(screen.getByRole('link', { name: 'Programs' })).toHaveAttribute(
       'href',
-      '/subjects',
+      '/programs',
     );
     expect(
       screen.getByText('New York, NY, USA · Colombo, Sri Lanka'),

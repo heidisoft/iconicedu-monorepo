@@ -81,7 +81,7 @@ export default async function LocationPage({ params }: LocationPageProps) {
               Find the right tutor
             </a>
             <Link
-              href="/subjects"
+              href="/programs"
               className="inline-flex min-h-11 items-center justify-center rounded-full border border-border bg-background px-6 text-sm font-semibold transition hover:bg-muted"
             >
               Explore programs

@@ -4,7 +4,7 @@ import { ThemeToggle } from '@iconicedu/ui-web/components/theme-toggle';
 import { Menu } from 'lucide-react';
 
 const NAV_ITEMS = [
-  { label: 'Programs', href: '/subjects' },
+  { label: 'Programs', href: '/programs' },
   { label: 'How It Works', href: '/how-it-works' },
   { label: 'For Parents', href: '/for-parents' },
   { label: 'Pricing', href: '/pricing' },

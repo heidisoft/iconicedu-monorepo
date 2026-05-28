@@ -68,6 +68,439 @@ export type LocationLandingPage = PublicPageSeo & {
   }[];
 };
 
+type UsStateLocationConfig = {
+  name: string;
+  slug: string;
+  standardsLabel: string;
+  assessmentLabel: string;
+  departmentLabel: string;
+  cityKeyword?: string;
+  parentSearchFocus?: readonly string[];
+};
+
+const PUBLIC_PRIVATE_SCHOOL_SUPPORT =
+  'Public, charter, private, and homeschool support connected to the learner’s school goals where applicable';
+
+const US_STATE_RELATED_LOCATIONS = [
+  { label: 'USA tutoring', href: '/locations/usa' },
+  { label: 'U.S. curriculum support', href: '/programs/us-curriculum-support' },
+  { label: 'Online tutoring', href: '/programs/online-tutoring' },
+] as const;
+
+function createUsStateLocationPage(config: UsStateLocationConfig): LocationLandingPage {
+  const localKeyword = config.cityKeyword ? [`${config.cityKeyword} online tutor`] : [];
+  const parentSearchFocus = config.parentSearchFocus ?? [
+    `${config.assessmentLabel} practice`,
+    'Gifted, magnet, honors, and accelerated program readiness where available',
+    'Private school entrance, ISEE/SSAT, SAT/ACT, and AP support where applicable',
+  ];
+
+  return {
+    slug: config.slug,
+    path: `/locations/${config.slug}`,
+    title: `Online Tutoring in ${config.name}`,
+    description: `Online tutoring for ${config.name} students with ${config.departmentLabel} and ${config.standardsLabel} awareness, public and private school homework support, state assessment readiness, test prep, and enrichment.`,
+    priority: 0.58,
+    changeFrequency: 'monthly',
+    h1: `Online tutoring for students in ${config.name}`,
+    summary: `ICONIC Academy helps ${config.name} families find flexible online tutoring for public school, private school, charter school, homeschool, and enrichment goals from home.`,
+    keywords: [
+      `online tutoring ${config.name}`,
+      `${config.name} tutor`,
+      `${config.name} DOE tutoring`,
+      `${config.standardsLabel} tutoring`,
+      `${config.assessmentLabel} tutoring`,
+      ...parentSearchFocus.map((focus) => `${config.name} ${focus} tutoring`),
+      ...localKeyword,
+    ],
+    standards: [
+      config.departmentLabel,
+      config.standardsLabel,
+      PUBLIC_PRIVATE_SCHOOL_SUPPORT,
+    ],
+    exams: [
+      config.assessmentLabel,
+      ...parentSearchFocus,
+      'SAT and ACT support',
+      'AP support',
+      'ISEE and SSAT support for private school goals where applicable',
+    ],
+    support: [
+      'Math, English language arts, reading, writing, science, and study skills',
+      'Homework help for public, private, charter, and homeschool students',
+      'State assessment readiness, classroom test review, and enrichment',
+      ...parentSearchFocus,
+    ],
+    audience: `${config.name} families looking for curriculum-aware online tutoring that can connect to state education standards, local district expectations, private school assignments, and learner-specific goals where applicable.`,
+    relatedLocations: US_STATE_RELATED_LOCATIONS,
+  };
+}
+
+const ADDITIONAL_US_STATE_LOCATION_PAGES: LocationLandingPage[] = [
+  {
+    name: 'Alabama',
+    slug: 'alabama',
+    departmentLabel: 'Alabama State Department of Education guidance',
+    standardsLabel: 'Alabama Course of Study standards',
+    assessmentLabel: 'Alabama Comprehensive Assessment Program readiness',
+    cityKeyword: 'Birmingham',
+  },
+  {
+    name: 'Alaska',
+    slug: 'alaska',
+    departmentLabel: 'Alaska Department of Education and Early Development guidance',
+    standardsLabel: 'Alaska standards-aligned learning goals',
+    assessmentLabel: 'Alaska System of Academic Readiness practice',
+    cityKeyword: 'Anchorage',
+  },
+  {
+    name: 'Arizona',
+    slug: 'arizona',
+    departmentLabel: 'Arizona Department of Education guidance',
+    standardsLabel: 'Arizona Academic Standards',
+    assessmentLabel: 'Arizona statewide assessment readiness',
+    cityKeyword: 'Phoenix',
+  },
+  {
+    name: 'Arkansas',
+    slug: 'arkansas',
+    departmentLabel: 'Arkansas Department of Education guidance',
+    standardsLabel: 'Arkansas Academic Standards',
+    assessmentLabel: 'Arkansas state assessment readiness',
+    cityKeyword: 'Little Rock',
+  },
+  {
+    name: 'Colorado',
+    slug: 'colorado',
+    departmentLabel: 'Colorado Department of Education guidance',
+    standardsLabel: 'Colorado Academic Standards',
+    assessmentLabel: 'CMAS and PSAT/SAT readiness where applicable',
+    cityKeyword: 'Denver',
+  },
+  {
+    name: 'Connecticut',
+    slug: 'connecticut',
+    departmentLabel: 'Connecticut State Department of Education guidance',
+    standardsLabel: 'Connecticut Core Standards and state frameworks',
+    assessmentLabel: 'Connecticut state assessment readiness',
+    cityKeyword: 'Hartford',
+  },
+  {
+    name: 'Delaware',
+    slug: 'delaware',
+    departmentLabel: 'Delaware Department of Education guidance',
+    standardsLabel: 'Delaware state standards',
+    assessmentLabel: 'Delaware System of Student Assessments readiness',
+    cityKeyword: 'Wilmington',
+  },
+  {
+    name: 'Georgia',
+    slug: 'georgia',
+    departmentLabel: 'Georgia Department of Education guidance',
+    standardsLabel: 'Georgia Standards of Excellence',
+    assessmentLabel: 'Georgia Milestones readiness',
+    cityKeyword: 'Atlanta',
+  },
+  {
+    name: 'Hawaii',
+    slug: 'hawaii',
+    departmentLabel: 'Hawaii State Department of Education guidance',
+    standardsLabel: 'Hawaii Core Standards and state learning expectations',
+    assessmentLabel: 'Smarter Balanced assessment readiness',
+    cityKeyword: 'Honolulu',
+  },
+  {
+    name: 'Idaho',
+    slug: 'idaho',
+    departmentLabel: 'Idaho State Department of Education guidance',
+    standardsLabel: 'Idaho Content Standards',
+    assessmentLabel: 'Idaho Standards Achievement Test readiness',
+    cityKeyword: 'Boise',
+  },
+  {
+    name: 'Illinois',
+    slug: 'illinois',
+    departmentLabel: 'Illinois State Board of Education guidance',
+    standardsLabel: 'Illinois Learning Standards',
+    assessmentLabel:
+      'Illinois Assessment of Readiness and SAT readiness where applicable',
+    cityKeyword: 'Chicago',
+  },
+  {
+    name: 'Indiana',
+    slug: 'indiana',
+    departmentLabel: 'Indiana Department of Education guidance',
+    standardsLabel: 'Indiana Academic Standards',
+    assessmentLabel: 'ILEARN and SAT readiness where applicable',
+    cityKeyword: 'Indianapolis',
+  },
+  {
+    name: 'Iowa',
+    slug: 'iowa',
+    departmentLabel: 'Iowa Department of Education guidance',
+    standardsLabel: 'Iowa Core standards',
+    assessmentLabel: 'Iowa Statewide Assessment of Student Progress readiness',
+    cityKeyword: 'Des Moines',
+  },
+  {
+    name: 'Kansas',
+    slug: 'kansas',
+    departmentLabel: 'Kansas State Department of Education guidance',
+    standardsLabel: 'Kansas College and Career Ready Standards',
+    assessmentLabel: 'Kansas Assessment Program readiness',
+    cityKeyword: 'Wichita',
+  },
+  {
+    name: 'Kentucky',
+    slug: 'kentucky',
+    departmentLabel: 'Kentucky Department of Education guidance',
+    standardsLabel: 'Kentucky Academic Standards',
+    assessmentLabel: 'Kentucky Summative Assessment readiness',
+    cityKeyword: 'Louisville',
+  },
+  {
+    name: 'Louisiana',
+    slug: 'louisiana',
+    departmentLabel: 'Louisiana Department of Education guidance',
+    standardsLabel: 'Louisiana Student Standards',
+    assessmentLabel: 'LEAP readiness',
+    cityKeyword: 'New Orleans',
+  },
+  {
+    name: 'Maine',
+    slug: 'maine',
+    departmentLabel: 'Maine Department of Education guidance',
+    standardsLabel: 'Maine Learning Results',
+    assessmentLabel: 'Maine state assessment readiness',
+    cityKeyword: 'Portland Maine',
+  },
+  {
+    name: 'Maryland',
+    slug: 'maryland',
+    departmentLabel: 'Maryland State Department of Education guidance',
+    standardsLabel: 'Maryland College and Career Ready Standards',
+    assessmentLabel: 'MCAP readiness',
+    cityKeyword: 'Baltimore',
+  },
+  {
+    name: 'Massachusetts',
+    slug: 'massachusetts',
+    departmentLabel:
+      'Massachusetts Department of Elementary and Secondary Education guidance',
+    standardsLabel: 'Massachusetts Curriculum Frameworks',
+    assessmentLabel: 'MCAS readiness',
+    cityKeyword: 'Boston',
+  },
+  {
+    name: 'Michigan',
+    slug: 'michigan',
+    departmentLabel: 'Michigan Department of Education guidance',
+    standardsLabel: 'Michigan Academic Standards',
+    assessmentLabel: 'M-STEP, PSAT, and SAT readiness where applicable',
+    cityKeyword: 'Detroit',
+  },
+  {
+    name: 'Minnesota',
+    slug: 'minnesota',
+    departmentLabel: 'Minnesota Department of Education guidance',
+    standardsLabel: 'Minnesota Academic Standards',
+    assessmentLabel: 'Minnesota Comprehensive Assessments readiness',
+    cityKeyword: 'Minneapolis',
+  },
+  {
+    name: 'Mississippi',
+    slug: 'mississippi',
+    departmentLabel: 'Mississippi Department of Education guidance',
+    standardsLabel: 'Mississippi College- and Career-Readiness Standards',
+    assessmentLabel: 'Mississippi Academic Assessment Program readiness',
+    cityKeyword: 'Jackson',
+  },
+  {
+    name: 'Missouri',
+    slug: 'missouri',
+    departmentLabel: 'Missouri Department of Elementary and Secondary Education guidance',
+    standardsLabel: 'Missouri Learning Standards',
+    assessmentLabel: 'Missouri Assessment Program readiness',
+    cityKeyword: 'St. Louis',
+  },
+  {
+    name: 'Montana',
+    slug: 'montana',
+    departmentLabel: 'Montana Office of Public Instruction guidance',
+    standardsLabel: 'Montana Content Standards',
+    assessmentLabel: 'Montana state assessment readiness',
+    cityKeyword: 'Billings',
+  },
+  {
+    name: 'Nebraska',
+    slug: 'nebraska',
+    departmentLabel: 'Nebraska Department of Education guidance',
+    standardsLabel: 'Nebraska College and Career Ready Standards',
+    assessmentLabel: 'NSCAS readiness',
+    cityKeyword: 'Omaha',
+  },
+  {
+    name: 'Nevada',
+    slug: 'nevada',
+    departmentLabel: 'Nevada Department of Education guidance',
+    standardsLabel: 'Nevada Academic Content Standards',
+    assessmentLabel: 'Smarter Balanced and end-of-course readiness where applicable',
+    cityKeyword: 'Las Vegas',
+  },
+  {
+    name: 'New Hampshire',
+    slug: 'new-hampshire',
+    departmentLabel: 'New Hampshire Department of Education guidance',
+    standardsLabel: 'New Hampshire College and Career Ready Standards',
+    assessmentLabel: 'SAS and PSAT/SAT readiness where applicable',
+    cityKeyword: 'Manchester',
+  },
+  {
+    name: 'New Mexico',
+    slug: 'new-mexico',
+    departmentLabel: 'New Mexico Public Education Department guidance',
+    standardsLabel: 'New Mexico state standards',
+    assessmentLabel: 'New Mexico Measures of Student Success and Achievement readiness',
+    cityKeyword: 'Albuquerque',
+  },
+  {
+    name: 'North Carolina',
+    slug: 'north-carolina',
+    departmentLabel: 'North Carolina Department of Public Instruction guidance',
+    standardsLabel: 'North Carolina Standard Course of Study',
+    assessmentLabel: 'End-of-grade and end-of-course test readiness',
+    cityKeyword: 'Charlotte',
+  },
+  {
+    name: 'North Dakota',
+    slug: 'north-dakota',
+    departmentLabel: 'North Dakota Department of Public Instruction guidance',
+    standardsLabel: 'North Dakota Content Standards',
+    assessmentLabel: 'North Dakota state assessment readiness',
+    cityKeyword: 'Fargo',
+  },
+  {
+    name: 'Ohio',
+    slug: 'ohio',
+    departmentLabel: 'Ohio Department of Education and Workforce guidance',
+    standardsLabel: 'Ohio Learning Standards',
+    assessmentLabel: 'Ohio State Tests readiness',
+    cityKeyword: 'Columbus',
+  },
+  {
+    name: 'Oklahoma',
+    slug: 'oklahoma',
+    departmentLabel: 'Oklahoma State Department of Education guidance',
+    standardsLabel: 'Oklahoma Academic Standards',
+    assessmentLabel: 'Oklahoma School Testing Program readiness',
+    cityKeyword: 'Oklahoma City',
+  },
+  {
+    name: 'Oregon',
+    slug: 'oregon',
+    departmentLabel: 'Oregon Department of Education guidance',
+    standardsLabel: 'Oregon state standards',
+    assessmentLabel: 'Oregon Statewide Assessment System readiness',
+    cityKeyword: 'Portland Oregon',
+  },
+  {
+    name: 'Pennsylvania',
+    slug: 'pennsylvania',
+    departmentLabel: 'Pennsylvania Department of Education guidance',
+    standardsLabel: 'Pennsylvania Academic Standards',
+    assessmentLabel: 'PSSA and Keystone Exam readiness',
+    cityKeyword: 'Philadelphia',
+  },
+  {
+    name: 'Rhode Island',
+    slug: 'rhode-island',
+    departmentLabel: 'Rhode Island Department of Education guidance',
+    standardsLabel: 'Rhode Island state standards',
+    assessmentLabel: 'RICAS and PSAT/SAT readiness where applicable',
+    cityKeyword: 'Providence',
+  },
+  {
+    name: 'South Carolina',
+    slug: 'south-carolina',
+    departmentLabel: 'South Carolina Department of Education guidance',
+    standardsLabel: 'South Carolina College- and Career-Ready Standards',
+    assessmentLabel: 'SC READY and end-of-course readiness',
+    cityKeyword: 'Charleston',
+  },
+  {
+    name: 'South Dakota',
+    slug: 'south-dakota',
+    departmentLabel: 'South Dakota Department of Education guidance',
+    standardsLabel: 'South Dakota Content Standards',
+    assessmentLabel: 'South Dakota state assessment readiness',
+    cityKeyword: 'Sioux Falls',
+  },
+  {
+    name: 'Tennessee',
+    slug: 'tennessee',
+    departmentLabel: 'Tennessee Department of Education guidance',
+    standardsLabel: 'Tennessee Academic Standards',
+    assessmentLabel: 'TCAP and end-of-course readiness',
+    cityKeyword: 'Nashville',
+  },
+  {
+    name: 'Utah',
+    slug: 'utah',
+    departmentLabel: 'Utah State Board of Education guidance',
+    standardsLabel: 'Utah Core Standards',
+    assessmentLabel: 'Utah state assessment readiness',
+    cityKeyword: 'Salt Lake City',
+  },
+  {
+    name: 'Vermont',
+    slug: 'vermont',
+    departmentLabel: 'Vermont Agency of Education guidance',
+    standardsLabel: 'Vermont state standards',
+    assessmentLabel: 'Vermont state assessment readiness',
+    cityKeyword: 'Burlington',
+  },
+  {
+    name: 'Virginia',
+    slug: 'virginia',
+    departmentLabel: 'Virginia Department of Education guidance',
+    standardsLabel: 'Virginia Standards of Learning',
+    assessmentLabel: 'SOL test readiness',
+    cityKeyword: 'Northern Virginia',
+  },
+  {
+    name: 'Washington',
+    slug: 'washington',
+    departmentLabel: 'Washington Office of Superintendent of Public Instruction guidance',
+    standardsLabel: 'Washington State Learning Standards',
+    assessmentLabel: 'Smarter Balanced and WCAS readiness where applicable',
+    cityKeyword: 'Seattle',
+  },
+  {
+    name: 'West Virginia',
+    slug: 'west-virginia',
+    departmentLabel: 'West Virginia Department of Education guidance',
+    standardsLabel: 'West Virginia College- and Career-Readiness Standards',
+    assessmentLabel: 'West Virginia General Summative Assessment readiness',
+    cityKeyword: 'Charleston WV',
+  },
+  {
+    name: 'Wisconsin',
+    slug: 'wisconsin',
+    departmentLabel: 'Wisconsin Department of Public Instruction guidance',
+    standardsLabel: 'Wisconsin Academic Standards',
+    assessmentLabel: 'Forward Exam and ACT readiness where applicable',
+    cityKeyword: 'Milwaukee',
+  },
+  {
+    name: 'Wyoming',
+    slug: 'wyoming',
+    departmentLabel: 'Wyoming Department of Education guidance',
+    standardsLabel: 'Wyoming Content and Performance Standards',
+    assessmentLabel: 'WY-TOPP readiness',
+    cityKeyword: 'Cheyenne',
+  },
+].map(createUsStateLocationPage);
+
 export function getSiteUrl() {
   const configuredUrl =
     process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
@@ -142,7 +575,7 @@ export const PUBLIC_MARKETING_PAGES: PublicPageSeo[] = [
     changeFrequency: 'weekly',
   },
   {
-    path: '/subjects',
+    path: '/programs',
     title: 'K-12 Tutoring Programs and Enrichment',
     description:
       'Explore ICONIC Academy programs for math, ELA, reading, writing, science, homework help, test prep, coding, debate, chess, music, art, and future-ready skills.',
@@ -446,23 +879,342 @@ export const PROGRAM_LANDING_PAGES: ProgramLandingPage[] = [
   {
     slug: 'us-curriculum-support',
     path: '/programs/us-curriculum-support',
-    title: 'U.S. Curriculum and State Standards Support',
+    title: 'U.S. Curriculum, DOE, and State Standards Support',
     description:
-      'Curriculum-aware online tutoring for students across the USA, with support connected to homework, grade-level skills, school goals, and state standards where applicable.',
+      'Curriculum-aware online tutoring for U.S. students with support connected to state DOE standards, public and private school assignments, state exams, homework, and grade-level skills.',
     priority: 0.85,
     changeFrequency: 'monthly',
-    h1: 'U.S. curriculum support for students across every state',
+    h1: 'U.S. curriculum, DOE, and school-aligned tutoring support',
     summary:
-      'ICONIC Academy supports families across the United States with tutoring that can connect to classroom expectations, school assignments, and state standards where applicable.',
+      'ICONIC Academy supports families across the United States with tutoring that can connect to state standards, local DOE expectations, public school assignments, private school goals, charter programs, homeschool plans, and test preparation where applicable.',
     audience:
-      'Families in U.S. schools who want tutoring connected to school goals and grade-level expectations.',
-    support: [...US_CURRICULUM_STANDARDS, 'School-specific goals and assignment support'],
+      'Families in public, private, charter, and homeschool settings who want tutoring connected to school goals and grade-level expectations.',
+    support: [
+      ...US_CURRICULUM_STANDARDS,
+      'State DOE and district expectations where applicable',
+      'Public, private, charter, and homeschool assignment support',
+      'School-specific goals and assignment support',
+    ],
     outcomes: [
       'Better school alignment',
       'Clearer parent understanding',
       'More targeted tutoring',
     ],
-    relatedSubjects: ['State Standards', 'Homework Help', 'Test Prep', 'Core Academics'],
+    relatedSubjects: [
+      'State Standards',
+      'DOE Expectations',
+      'Public School Support',
+      'Private School Support',
+      'Homework Help',
+      'Test Prep',
+      'Core Academics',
+    ],
+  },
+  {
+    slug: 'australia-curriculum-naplan-atar-support',
+    path: '/programs/australia-curriculum-naplan-atar-support',
+    title: 'Australian Curriculum, NAPLAN, and ATAR Support',
+    description:
+      'Online tutoring for Australian students with Australian Curriculum support, NAPLAN practice, ATAR pathway awareness, HSC, VCE, QCE, WACE, SACE, homework help, and enrichment.',
+    keywords: [
+      'Australian Curriculum tutoring',
+      'NAPLAN tutoring',
+      'ATAR tutoring',
+      'HSC tutoring',
+      'VCE tutoring',
+      'QCE tutoring',
+      'WACE tutoring',
+      'SACE tutoring',
+    ],
+    priority: 0.78,
+    changeFrequency: 'monthly',
+    h1: 'Australian Curriculum, NAPLAN, and senior pathway tutoring',
+    summary:
+      'ICONIC Academy helps Australian families connect online tutoring to classroom goals, NAPLAN readiness, state syllabus expectations, senior secondary pathways, and confident study habits.',
+    audience:
+      'Australian families looking for Maths, English, science, homework, NAPLAN, HSC, VCE, QCE, WACE, SACE, or ATAR-aware support.',
+    support: [
+      'Australian Curriculum and state syllabus awareness where applicable',
+      'NAPLAN practice for reading, writing, language conventions, and numeracy',
+      'Senior pathway support for HSC, VCE, QCE, WACE, SACE, and ATAR goals',
+      'Parent-visible homework help, study planning, and enrichment',
+    ],
+    outcomes: [
+      'Stronger school foundations',
+      'More confident assessment preparation',
+      'Clearer parent understanding of next steps',
+    ],
+    relatedSubjects: ['Australian Curriculum', 'NAPLAN', 'ATAR', 'HSC', 'VCE', 'QCE'],
+  },
+  {
+    slug: 'uk-curriculum-gcse-a-level-support',
+    path: '/programs/uk-curriculum-gcse-a-level-support',
+    title: 'UK Curriculum, GCSE, and A Level Support',
+    description:
+      'Online tutoring for UK students with National Curriculum, Key Stage, SATs, 11 plus, GCSE, IGCSE, and A Level support across Maths, English, science, and writing.',
+    keywords: [
+      'UK curriculum tutoring',
+      'GCSE tutoring',
+      'IGCSE tutoring',
+      'A Level tutoring',
+      '11 plus tutoring',
+      'Key Stage tutoring',
+    ],
+    priority: 0.78,
+    changeFrequency: 'monthly',
+    h1: 'UK curriculum tutoring for Key Stages, GCSEs, and A Levels',
+    summary:
+      'ICONIC Academy supports UK families with online tutoring shaped around school goals, Key Stage progress, admissions preparation, GCSE and IGCSE study, A Level readiness, and parent communication.',
+    audience:
+      'UK families looking for Maths, English, science, SATs, 11+, GCSE, IGCSE, A Level, homework, or exam-board-aware support.',
+    support: [
+      'National Curriculum and Key Stage awareness where applicable',
+      'SATs, 11+, GCSE, IGCSE, and A Level practice',
+      'Maths, English, science, reading, writing, and study-skills tutoring',
+      'Native English-speaking tutor options where language fluency matters',
+    ],
+    outcomes: [
+      'Clearer exam preparation',
+      'More confident homework routines',
+      'Better alignment between tutoring and school expectations',
+    ],
+    relatedSubjects: [
+      'National Curriculum',
+      'Key Stages',
+      'SATs',
+      '11+',
+      'GCSE',
+      'A Levels',
+    ],
+  },
+  {
+    slug: 'new-zealand-ncea-curriculum-support',
+    path: '/programs/new-zealand-ncea-curriculum-support',
+    title: 'New Zealand Curriculum and NCEA Support',
+    description:
+      'Online tutoring for New Zealand students with New Zealand Curriculum support, NCEA Levels 1-3, NZ Scholarship, homework help, study skills, and enrichment.',
+    keywords: [
+      'New Zealand Curriculum tutoring',
+      'NCEA tutoring',
+      'NCEA Level 1 tutoring',
+      'NCEA Level 2 tutoring',
+      'NCEA Level 3 tutoring',
+      'NZ Scholarship tutoring',
+    ],
+    priority: 0.7,
+    changeFrequency: 'monthly',
+    h1: 'New Zealand Curriculum and NCEA tutoring support',
+    summary:
+      'ICONIC Academy helps New Zealand families connect online tutoring to school assignments, New Zealand Curriculum goals, NCEA preparation, senior subject confidence, and enrichment.',
+    audience:
+      'New Zealand families looking for Maths, English, science, NCEA Levels 1-3, NZ Scholarship, homework, or study planning support.',
+    support: [
+      'New Zealand Curriculum awareness where applicable',
+      'NCEA Levels 1-3 and NZ Scholarship preparation',
+      'Maths, English, science, writing, homework, and study skills',
+      'Flexible online sessions across New Zealand time zones',
+    ],
+    outcomes: [
+      'More organized study habits',
+      'Stronger subject confidence',
+      'Clearer parent visibility around progress',
+    ],
+    relatedSubjects: [
+      'New Zealand Curriculum',
+      'NCEA Level 1',
+      'NCEA Level 2',
+      'NCEA Level 3',
+      'NZ Scholarship',
+    ],
+  },
+  {
+    slug: 'italy-school-invalsi-maturita-support',
+    path: '/programs/italy-school-invalsi-maturita-support',
+    title: 'Italy School, INVALSI, and Maturita Support',
+    description:
+      'Online tutoring for students in Italy with primary and secondary school support, INVALSI readiness, Esame di Stato or maturita preparation, English, maths, science, and writing tutoring.',
+    keywords: [
+      'Italy online tutoring',
+      'INVALSI tutoring',
+      'maturita tutoring',
+      'Esame di Stato tutoring',
+      'English tutor Italy',
+      'maths tutor Italy',
+    ],
+    priority: 0.66,
+    changeFrequency: 'monthly',
+    h1: 'Online school support for students in Italy',
+    summary:
+      'ICONIC Academy supports families in Italy with tutoring for school confidence, English language development, maths, science, INVALSI practice, Esame di Stato or maturita readiness, and international curriculum goals where applicable.',
+    audience:
+      'Families in Italy looking for English, maths, science, homework, INVALSI, maturita, or international school support.',
+    support: [
+      'Primary and secondary school assignment support',
+      'INVALSI and Esame di Stato / maturita readiness',
+      'English language development, reading, writing, maths, and science',
+      'International curriculum support where applicable',
+    ],
+    outcomes: [
+      'Stronger academic English and subject confidence',
+      'Better routines for homework and revision',
+      'More focused exam preparation',
+    ],
+    relatedSubjects: [
+      'INVALSI',
+      'Esame di Stato',
+      'Maturita',
+      'English',
+      'Maths',
+      'Science',
+    ],
+  },
+  {
+    slug: 'uae-curriculum-emsat-igcse-support',
+    path: '/programs/uae-curriculum-emsat-igcse-support',
+    title: 'UAE Curriculum, EmSAT, IGCSE, and International School Support',
+    description:
+      'Online tutoring for UAE students with MoE, British, IB, American, and CBSE pathway support plus EmSAT, IGCSE, A Level, SAT, IELTS, TOEFL, and homework help.',
+    keywords: [
+      'UAE online tutoring',
+      'Dubai online tutor',
+      'EmSAT tutoring',
+      'IGCSE tutor UAE',
+      'A Level tutor UAE',
+      'CBSE tutor UAE',
+    ],
+    priority: 0.72,
+    changeFrequency: 'monthly',
+    h1: 'UAE curriculum and international school tutoring support',
+    summary:
+      'ICONIC Academy helps UAE families navigate national and international school pathways with online tutoring for homework, exams, English fluency, STEM, and study planning.',
+    audience:
+      'UAE families comparing support for MoE, British, IB, American, CBSE, EmSAT, IGCSE, A Level, SAT, IELTS, or TOEFL goals.',
+    support: [
+      'UAE MoE curriculum support where applicable',
+      'British, IB, American, and CBSE pathway support',
+      'EmSAT, IGCSE, A Level, SAT, IELTS, TOEFL, and IB assessment preparation',
+      'Maths, English, science, writing, homework help, and enrichment',
+    ],
+    outcomes: [
+      'Clearer pathway planning',
+      'Better exam-readiness routines',
+      'More confident school and English-language support',
+    ],
+    relatedSubjects: ['MoE Curriculum', 'EmSAT', 'IGCSE', 'A Level', 'IB', 'CBSE'],
+  },
+  {
+    slug: 'canada-provincial-curriculum-eqao-osslt-support',
+    path: '/programs/canada-provincial-curriculum-eqao-osslt-support',
+    title: 'Canada Provincial Curriculum, EQAO, and OSSLT Support',
+    description:
+      'Online tutoring for Canadian students with provincial curriculum support, EQAO, OSSLT, BC literacy and numeracy assessments, Alberta PATs, diploma exams, homework help, and enrichment.',
+    keywords: [
+      'Canada curriculum tutoring',
+      'EQAO tutoring',
+      'OSSLT tutoring',
+      'BC literacy assessment tutoring',
+      'Alberta PAT tutoring',
+      'Canadian online tutor',
+    ],
+    priority: 0.76,
+    changeFrequency: 'monthly',
+    h1: 'Canadian provincial curriculum and assessment tutoring support',
+    summary:
+      'ICONIC Academy supports Canadian families with online tutoring connected to provincial expectations, classroom assignments, assessment readiness, and flexible parent communication.',
+    audience:
+      'Canadian families looking for provincial curriculum, EQAO, OSSLT, BC literacy/numeracy, Alberta PATs, diploma exam, homework, or enrichment support.',
+    support: [
+      'Provincial curriculum expectations where applicable',
+      'EQAO, OSSLT, BC literacy and numeracy assessments, Alberta PATs, and diploma exam practice',
+      'Math, English, science, reading, writing, and study skills',
+      'English and French-language school support where available',
+    ],
+    outcomes: [
+      'Better provincial assessment readiness',
+      'Stronger foundations across core subjects',
+      'Clearer support for parents across school systems',
+    ],
+    relatedSubjects: [
+      'Provincial Curriculum',
+      'EQAO',
+      'OSSLT',
+      'BC Assessments',
+      'Alberta PATs',
+    ],
+  },
+  {
+    slug: 'japan-school-english-eiken-support',
+    path: '/programs/japan-school-english-eiken-support',
+    title: 'Japan School, English, and EIKEN Support',
+    description:
+      'Online tutoring for students in Japan with Japanese school support, English tutoring, EIKEN preparation, school entrance readiness, international curriculum support, and enrichment.',
+    keywords: [
+      'Japan online tutoring',
+      'EIKEN tutoring',
+      'English tutor Japan',
+      'Japan entrance exam tutoring',
+      'international school tutor Japan',
+    ],
+    priority: 0.66,
+    changeFrequency: 'monthly',
+    h1: 'Online English, school, and EIKEN support for students in Japan',
+    summary:
+      'ICONIC Academy helps families in Japan with online English development, school-subject support, EIKEN preparation, entrance readiness, and international curriculum goals where applicable.',
+    audience:
+      'Families in Japan looking for English, reading, writing, maths, science, EIKEN, entrance exam readiness, or international school support.',
+    support: [
+      'Japanese school assignment support where applicable',
+      'EIKEN and school entrance readiness',
+      'English language development, reading, writing, maths, and science',
+      'International curriculum support for globally mobile families',
+    ],
+    outcomes: [
+      'More confident English communication',
+      'Stronger school-subject foundations',
+      'Better preparation habits for exams and interviews',
+    ],
+    relatedSubjects: [
+      'EIKEN',
+      'English',
+      'Entrance Exams',
+      'Maths',
+      'Science',
+      'International Curriculum',
+    ],
+  },
+  {
+    slug: 'qatar-curriculum-igcse-a-level-support',
+    path: '/programs/qatar-curriculum-igcse-a-level-support',
+    title: 'Qatar Curriculum, IGCSE, A Level, and International School Support',
+    description:
+      'Online tutoring for Qatar students with national and international curriculum support including British, IB, American, CBSE, IGCSE, A Level, SAT, IELTS, TOEFL, and homework help.',
+    keywords: [
+      'Qatar online tutoring',
+      'Doha online tutor',
+      'IGCSE tutor Qatar',
+      'A Level tutor Qatar',
+      'CBSE tutor Qatar',
+      'IB tutor Qatar',
+    ],
+    priority: 0.68,
+    changeFrequency: 'monthly',
+    h1: 'Qatar curriculum and international school tutoring support',
+    summary:
+      'ICONIC Academy supports Qatar families with online tutoring for national curriculum goals, international school pathways, homework, exam preparation, English fluency, and enrichment.',
+    audience:
+      'Qatar families looking for support with national curriculum, British, IB, American, CBSE, IGCSE, A Level, SAT, IELTS, TOEFL, or school assignments.',
+    support: [
+      'Qatar national curriculum support where applicable',
+      'British, IB, American, and CBSE pathway support',
+      'IGCSE, A Level, SAT, IELTS, TOEFL, and IB assessment preparation',
+      'Maths, English, science, writing, homework help, and study planning',
+    ],
+    outcomes: [
+      'Stronger international school readiness',
+      'More focused exam preparation',
+      'Clearer parent visibility across subjects and pathways',
+    ],
+    relatedSubjects: ['Qatar Curriculum', 'IGCSE', 'A Level', 'IB', 'CBSE', 'SAT'],
   },
 ];
 
@@ -489,6 +1241,7 @@ export const LOCATION_LANDING_PAGES: LocationLandingPage[] = [
     support: [
       'USA-based and global tutor options',
       'State standards where applicable',
+      PUBLIC_PRIVATE_SCHOOL_SUPPORT,
       'Flexible scheduling for evening, weekend, and time-zone needs',
     ],
     audience:
@@ -499,6 +1252,10 @@ export const LOCATION_LANDING_PAGES: LocationLandingPage[] = [
       { label: 'California', href: '/locations/california' },
       { label: 'Texas', href: '/locations/texas' },
       { label: 'Florida', href: '/locations/florida' },
+      { label: 'Massachusetts', href: '/locations/massachusetts' },
+      { label: 'Georgia', href: '/locations/georgia' },
+      { label: 'Washington', href: '/locations/washington' },
+      { label: 'U.S. curriculum support', href: '/programs/us-curriculum-support' },
     ],
   },
   {
@@ -522,11 +1279,13 @@ export const LOCATION_LANDING_PAGES: LocationLandingPage[] = [
       'New York State Next Generation Learning Standards',
       'New York State learning standards where applicable',
       'School-specific goals and assignments',
+      PUBLIC_PRIVATE_SCHOOL_SUPPORT,
     ],
     exams: ['Regents support', 'New York state test preparation', 'SAT and ACT support'],
     support: [
       'Math, ELA, science, reading, and writing',
       'State test preparation',
+      'Public, private, charter, and homeschool assignment support where applicable',
       'Enrichment and advanced challenge',
     ],
     audience:
@@ -551,6 +1310,9 @@ export const LOCATION_LANDING_PAGES: LocationLandingPage[] = [
     keywords: [
       'SHSAT prep online',
       'NYC tutoring',
+      'Mark Twain I.S. 239 tutoring',
+      'Mark Twain talent test prep',
+      'NYC gifted and talented tutoring',
       'specialized high school admissions tutoring',
       'New York City math tutor',
       'NYC ELA tutor',
@@ -559,16 +1321,22 @@ export const LOCATION_LANDING_PAGES: LocationLandingPage[] = [
       'New York State Next Generation Learning Standards',
       'NYC school assignments and grade-level expectations',
       'Middle school math and ELA foundations',
+      PUBLIC_PRIVATE_SCHOOL_SUPPORT,
     ],
     exams: [
       'SHSAT prep',
+      'Mark Twain I.S. 239 talent test and audition readiness',
+      'NYC gifted and talented middle school readiness',
       'Specialized high school readiness',
       'Regents support where relevant',
       'New York state test preparation',
     ],
     support: [
       'Targeted SHSAT math and verbal practice',
+      'Mark Twain I.S. 239 talent areas, audition routines, and portfolio-style preparation where applicable',
+      'NYC gifted, honors, screened, and accelerated program readiness',
       'Middle school math, reading, writing, and study habits',
+      'Public, charter, private, and independent school assignment support',
       'High school readiness and advanced enrichment',
     ],
     audience:
@@ -595,11 +1363,16 @@ export const LOCATION_LANDING_PAGES: LocationLandingPage[] = [
       'New Jersey Student Learning Standards tutoring',
       'New Jersey test prep',
     ],
-    standards: ['New Jersey Student Learning Standards', 'School-specific goals'],
+    standards: [
+      'New Jersey Student Learning Standards',
+      'School-specific goals',
+      PUBLIC_PRIVATE_SCHOOL_SUPPORT,
+    ],
     exams: ['State test preparation', 'SAT and ACT support', 'ISEE and SSAT support'],
     support: [
       'Core academic tutoring',
       'Reading, writing, and math foundations',
+      'Public, private, charter, and homeschool assignment support where applicable',
       'Advanced and enrichment programs',
     ],
     audience:
@@ -631,11 +1404,13 @@ export const LOCATION_LANDING_PAGES: LocationLandingPage[] = [
       'California Common Core State Standards',
       'School assignments',
       'Grade-level readiness',
+      PUBLIC_PRIVATE_SCHOOL_SUPPORT,
     ],
     exams: ['State test preparation', 'SAT and ACT support', 'AP support'],
     support: [
       'Math, ELA, science, reading, and writing',
       'Flexible online sessions',
+      'Public, private, charter, and homeschool assignment support where applicable',
       'Coding, debate, chess, art, and music enrichment',
     ],
     audience:
@@ -658,7 +1433,12 @@ export const LOCATION_LANDING_PAGES: LocationLandingPage[] = [
     summary:
       'Families in Texas can use ICONIC Academy for online academic support, test prep, homework help, and enrichment programs.',
     keywords: ['online tutoring Texas', 'Texas TEKS tutoring', 'STAAR tutoring'],
-    standards: ['Texas TEKS', 'School-specific goals', 'Grade-level readiness'],
+    standards: [
+      'Texas TEKS',
+      'School-specific goals',
+      'Grade-level readiness',
+      PUBLIC_PRIVATE_SCHOOL_SUPPORT,
+    ],
     exams: [
       'State test preparation',
       'STAAR-aligned practice where applicable',
@@ -667,6 +1447,7 @@ export const LOCATION_LANDING_PAGES: LocationLandingPage[] = [
     support: [
       'Core academic tutoring',
       'Test prep and study skills',
+      'Public, private, charter, and homeschool assignment support where applicable',
       'Future-ready enrichment programs',
     ],
     audience:
@@ -693,11 +1474,16 @@ export const LOCATION_LANDING_PAGES: LocationLandingPage[] = [
       'Florida B.E.S.T. Standards tutoring',
       'Florida test prep',
     ],
-    standards: ['Florida B.E.S.T. Standards', 'Grade-level skills'],
+    standards: [
+      'Florida B.E.S.T. Standards',
+      'Grade-level skills',
+      PUBLIC_PRIVATE_SCHOOL_SUPPORT,
+    ],
     exams: ['State test preparation', 'SAT and ACT support', 'AP support'],
     support: [
       'Math, ELA, science, reading, and writing',
       'Homework help and test prep',
+      'Public, private, charter, and homeschool assignment support where applicable',
       'Coding, robotics, debate, and creative enrichment',
     ],
     audience:
@@ -708,6 +1494,7 @@ export const LOCATION_LANDING_PAGES: LocationLandingPage[] = [
       { label: 'Online tutoring', href: '/programs/online-tutoring' },
     ],
   },
+  ...ADDITIONAL_US_STATE_LOCATION_PAGES,
   {
     slug: 'australia',
     path: '/locations/australia',
@@ -1379,7 +2166,7 @@ export function websiteJsonLd() {
     inLanguage: 'en-US',
     potentialAction: {
       '@type': 'SearchAction',
-      target: absoluteUrl('/subjects?query={search_term_string}'),
+      target: absoluteUrl('/programs?query={search_term_string}'),
       'query-input': 'required name=search_term_string',
     },
   };

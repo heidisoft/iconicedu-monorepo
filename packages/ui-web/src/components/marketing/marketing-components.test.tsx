@@ -35,7 +35,7 @@ describe('marketing components', () => {
     expect(screen.queryByRole('link', { name: 'Tutoring' })).not.toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: 'Programs' })[0]).toHaveAttribute(
       'href',
-      '/subjects',
+      '/programs',
     );
     expect(screen.getAllByRole('link', { name: 'How It Works' })[0]).toHaveAttribute(
       'href',
@@ -103,7 +103,7 @@ describe('marketing components', () => {
     );
     expect(screen.getByRole('link', { name: 'Explore programs' })).toHaveAttribute(
       'href',
-      '/subjects',
+      '/programs',
     );
   });
 
