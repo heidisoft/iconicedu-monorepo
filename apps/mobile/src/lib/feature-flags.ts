@@ -28,6 +28,12 @@ export function isLocalOrPreviewMobileEnvironment(): boolean {
 }
 
 export function getLocalMobileFeatureFlagFallback(key: MobileFeatureFlagKey): boolean {
+  if (key === mobileFeatureFlagKeys.enableMobileOnboardingAddressSearch) {
+    return parseBooleanFeatureFlag(
+      process.env.EXPO_PUBLIC_ENABLE_MOBILE_ONBOARDING_ADDRESS_SEARCH,
+    );
+  }
+
   if (isLocalOrPreviewMobileEnvironment()) {
     return true;
   }

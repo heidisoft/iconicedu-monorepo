@@ -53,6 +53,7 @@ export {
 export {
   completeOnboarding,
   completeParentRole,
+  createChildProfile,
   fetchOnboardingStatus,
   saveEducatorAvailabilityStep,
   saveEducatorProfileStep,
@@ -61,7 +62,6 @@ export {
   savePhoneStep,
   saveStudentStep,
   saveTimezoneStep,
-  submitOnboardingClassRequest,
 } from './onboarding/queries';
 export {
   cancelRecurringSessionOccurrence,

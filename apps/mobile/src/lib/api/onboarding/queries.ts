@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase/client';
 import { apiGet, apiPost } from '@/lib/api/http-client';
+import type { ChildProfileVM } from '@iconicedu/shared-types';
 import type { DayAvailability, OnboardingStatus } from '@/lib/api/types';
 
 export function fetchOnboardingStatus(): Promise<OnboardingStatus> {
@@ -25,16 +26,20 @@ export async function completeParentRole(): Promise<void> {
   await apiPost('/onboarding/role', { role: 'parent' });
 }
 
-export async function submitOnboardingClassRequest(input: {
-  requestIntent: string;
-  subjects: string[];
-  learningGoals: string;
-  specialRequirements?: string | null;
-}) {
-  return apiPost<{ success: boolean; channelId: string }>(
-    '/onboarding/class-request',
-    input,
-  );
+export async function createChildProfile(input: {
+  orgId: string;
+  displayName: string;
+  firstName: string;
+  lastName: string;
+  gradeLevel: string;
+  birthYear: number;
+  timezone?: string | null;
+  city?: string | null;
+  region?: string | null;
+  countryCode?: string | null;
+  postalCode?: string | null;
+}): Promise<ChildProfileVM> {
+  return apiPost<ChildProfileVM>('/profiles/children', input);
 }
 
 export async function saveNameStep(

@@ -394,6 +394,15 @@ export class OnboardingService {
       hasRoleData =
         (subjectRowsResponse.data?.length ?? 0) > 0 &&
         (gradeRowsResponse.data?.length ?? 0) > 0;
+    } else if (kind === 'guardian') {
+      const { data: familyRows, error: familyError } = await serviceSupabase
+        .from('family_links')
+        .select('child_account_id')
+        .eq('org_id', account.org_id)
+        .eq('guardian_account_id', account.id)
+        .limit(1);
+      if (familyError) throw new InternalServerErrorException(familyError.message);
+      hasRoleData = (familyRows?.length ?? 0) > 0;
     }
 
     let hasAvailability = kind !== 'educator';

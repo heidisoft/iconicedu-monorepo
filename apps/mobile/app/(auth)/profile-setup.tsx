@@ -17,17 +17,19 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/providers/auth-provider';
 import { useTheme } from '@/providers/theme-provider';
 import { useAnalytics } from '@/providers/analytics-provider';
+import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
+import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
 import { AnalyticsEvent } from '@iconicedu/utils';
 import {
-  CLASS_REQUEST_INTENT_OPTIONS,
-  type ClassRequestIntent,
-  STANDARD_SUBJECT_OPTIONS,
+  normalizeCountryCode,
+  optionsForCountry,
+  type GradeLevel,
 } from '@iconicedu/shared-types';
 import type { AppColors } from '@/lib/theme';
 import {
   fetchOnboardingStatus,
   completeParentRole,
-  submitOnboardingClassRequest,
+  createChildProfile,
   saveNameStep,
   savePhoneStep,
   saveTimezoneStep,
@@ -222,25 +224,7 @@ type NominatimResult = {
   };
 };
 
-const GRADE_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: 'pre_k', label: 'Pre-K' },
-  { value: 'kindergarten', label: 'Kindergarten' },
-  { value: 'grade_1', label: 'Grade 1' },
-  { value: 'grade_2', label: 'Grade 2' },
-  { value: 'grade_3', label: 'Grade 3' },
-  { value: 'grade_4', label: 'Grade 4' },
-  { value: 'grade_5', label: 'Grade 5' },
-  { value: 'grade_6', label: 'Grade 6' },
-  { value: 'grade_7', label: 'Grade 7' },
-  { value: 'grade_8', label: 'Grade 8' },
-  { value: 'grade_9', label: 'Grade 9' },
-  { value: 'grade_10', label: 'Grade 10 (O/L Prep)' },
-  { value: 'grade_11', label: 'Grade 11 (O/L Exam)' },
-  { value: 'grade_12', label: 'Grade 12 (A/L Year 1)' },
-  { value: 'grade_13', label: 'Grade 13 (A/L Year 2)' },
-  { value: 'undergraduate', label: 'Undergraduate' },
-  { value: 'graduate', label: 'Graduate' },
-];
+type GradeOption = { value: GradeLevel; label: string };
 
 const EDUCATOR_SUBJECTS = [
   'Mathematics',
@@ -273,6 +257,7 @@ const DAYS_OF_WEEK = [
 
 const CURRENT_YEAR = new Date().getFullYear();
 const BIRTH_YEARS = Array.from({ length: 30 }, (_, i) => CURRENT_YEAR - 4 - i);
+const DEFAULT_GRADE_OPTIONS = optionsForCountry(normalizeCountryCode());
 
 // ─── Step types ────────────────────────────────────────────────────────────────
 
@@ -284,7 +269,7 @@ type WizardStepId =
   | 'student-profile'
   | 'educator-profile'
   | 'educator-availability'
-  | 'class-request';
+  | 'first-child';
 
 function buildSteps(
   profileKind: string | null,
@@ -297,7 +282,7 @@ function buildSteps(
     steps.push('educator-profile');
     steps.push('educator-availability');
   } else if (kind === 'guardian') {
-    steps.push('class-request');
+    steps.push('first-child');
   }
   return steps;
 }
@@ -343,10 +328,10 @@ const STEP_META: Record<
     title: 'Your availability',
     subtitle: "Let students know when you're available and how you like to teach.",
   },
-  'class-request': {
-    emoji: '🎯',
-    title: 'Request a class',
-    subtitle: 'Tell us what kind of tutoring support your family needs first.',
+  'first-child': {
+    emoji: '🎓',
+    title: 'Add your first child',
+    subtitle: 'Create your child profile so we can personalise their learning space.',
   },
 };
 
@@ -464,6 +449,13 @@ function makeStyles(C: AppColors) {
         marginBottom: 12,
       },
       searchInput: { flex: 1, fontSize: 15, color: C.text },
+      addressSearchBox: {
+        minHeight: 52,
+        borderRadius: 14,
+        paddingHorizontal: 16,
+        paddingVertical: 0,
+      },
+      addressSearchInput: { fontSize: 17, paddingVertical: 14 },
 
       listItem: {
         flexDirection: 'row' as const,
@@ -626,7 +618,7 @@ function NameStep({
   return (
     <>
       <Text style={s.label}>First Name</Text>
-      <View style={s.inputWrap}>
+      <View style={[s.inputWrap, { marginBottom: 12 }]}>
         <TextInput
           style={s.input}
           value={firstName}
@@ -985,6 +977,7 @@ function LocationStep({
   setCountryCode,
   s,
   colors,
+  enableAddressSearch,
 }: {
   city: string;
   setCity: (v: string) => void;
@@ -996,6 +989,7 @@ function LocationStep({
   setCountryCode: (v: string) => void;
   s: S;
   colors: AppColors;
+  enableAddressSearch: boolean;
 }) {
   const [showPicker, setShowPicker] = useState(false);
   const [countrySearch, setCountrySearch] = useState('');
@@ -1013,6 +1007,12 @@ function LocationStep({
   }, [countrySearch]);
 
   useEffect(() => {
+    if (!enableAddressSearch) {
+      setSuggestions([]);
+      setIsSearching(false);
+      return;
+    }
+
     if (!addressQuery.trim() || addressQuery.length < 3) {
       setSuggestions([]);
       return;
@@ -1036,7 +1036,7 @@ function LocationStep({
       }
     }, 400);
     return () => clearTimeout(timer);
-  }, [addressQuery, countryCode]);
+  }, [addressQuery, countryCode, enableAddressSearch]);
 
   const handleSelectSuggestion = useCallback(
     (result: NominatimResult) => {
@@ -1128,38 +1128,52 @@ function LocationStep({
         <Text style={s.listChevron}>›</Text>
       </TouchableOpacity>
 
-      <Text style={s.label}>
-        Search address{'  '}
-        <Text style={s.labelOptional}>(auto-fill fields below)</Text>
-      </Text>
-      <View style={[s.searchBox, { marginBottom: suggestions.length > 0 ? 4 : 16 }]}>
-        <Text>🔍</Text>
-        <TextInput
-          style={s.searchInput}
-          value={addressQuery}
-          onChangeText={setAddressQuery}
-          placeholder="Type a city, suburb or address…"
-          placeholderTextColor={s.placeholderColor}
-          autoCapitalize="words"
-          returnKeyType="search"
-        />
-        {isSearching && <ActivityIndicator size="small" color={colors.teal} />}
-        {addressQuery.length > 0 && !isSearching && (
-          <TouchableOpacity
-            onPress={() => {
-              setAddressQuery('');
-              setSuggestions([]);
-            }}
+      {enableAddressSearch && (
+        <>
+          <Text style={s.label}>
+            Search address{'  '}
+            <Text style={s.labelOptional}>(auto-fill fields below)</Text>
+          </Text>
+          <View
+            style={[
+              s.searchBox,
+              s.addressSearchBox,
+              { marginBottom: suggestions.length > 0 ? 4 : 16 },
+            ]}
           >
-            <Text
-              style={{ color: s.placeholderColor, fontSize: 16, paddingHorizontal: 4 }}
-            >
-              ✕
-            </Text>
-          </TouchableOpacity>
-        )}
-      </View>
-      {suggestions.length > 0 && (
+            <Text>🔍</Text>
+            <TextInput
+              style={[s.searchInput, s.addressSearchInput]}
+              value={addressQuery}
+              onChangeText={setAddressQuery}
+              placeholder="Type a city, suburb or address…"
+              placeholderTextColor={s.placeholderColor}
+              autoCapitalize="words"
+              returnKeyType="search"
+            />
+            {isSearching && <ActivityIndicator size="small" color={colors.teal} />}
+            {addressQuery.length > 0 && !isSearching && (
+              <TouchableOpacity
+                onPress={() => {
+                  setAddressQuery('');
+                  setSuggestions([]);
+                }}
+              >
+                <Text
+                  style={{
+                    color: s.placeholderColor,
+                    fontSize: 16,
+                    paddingHorizontal: 4,
+                  }}
+                >
+                  ✕
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </>
+      )}
+      {enableAddressSearch && suggestions.length > 0 && (
         <View
           style={{
             borderWidth: 1,
@@ -1234,99 +1248,97 @@ function LocationStep({
   );
 }
 
+function GradeLevelSelect({
+  value,
+  onChange,
+  options,
+  s,
+}: {
+  value: string | null;
+  onChange: (value: string) => void;
+  options: GradeOption[];
+  s: S;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const selected = options.find((option) => option.value === value);
+
+  return (
+    <>
+      <TouchableOpacity
+        style={[s.inputWrap, isOpen && { marginBottom: 6 }]}
+        onPress={() => setIsOpen((open) => !open)}
+        activeOpacity={0.85}
+      >
+        <Text
+          style={[
+            s.input,
+            {
+              paddingVertical: 0,
+              color: selected ? undefined : s.placeholderColor,
+            },
+          ]}
+        >
+          {selected?.label ?? 'Select grade'}
+        </Text>
+        <Text style={s.listChevron}>{isOpen ? '⌃' : '⌄'}</Text>
+      </TouchableOpacity>
+      {isOpen &&
+        options.map((item) => {
+          const isSelected = value === item.value;
+          return (
+            <TouchableOpacity
+              key={item.value}
+              style={[s.listItem, isSelected && s.listItemSelected]}
+              onPress={() => {
+                onChange(item.value);
+                setIsOpen(false);
+              }}
+            >
+              <Text style={[s.listItemTxt, isSelected && s.listItemSelectedTxt]}>
+                {item.label}
+              </Text>
+              {isSelected && <Text style={s.listCheck}>✓</Text>}
+            </TouchableOpacity>
+          );
+        })}
+    </>
+  );
+}
+
 function StudentProfileStep({
   birthYear,
   setBirthYear,
   grade,
   setGrade,
+  gradeOptions,
   s,
 }: {
   birthYear: string;
   setBirthYear: (v: string) => void;
   grade: string | null;
   setGrade: (v: string) => void;
+  gradeOptions: GradeOption[];
   s: S;
   colors: AppColors;
 }) {
-  const [tab, setTab] = useState<'grade' | 'year'>('grade');
   return (
     <>
-      <View style={s.tabRow}>
-        <TouchableOpacity
-          style={[s.tabBtn, tab === 'grade' && s.tabBtnActive]}
-          onPress={() => setTab('grade')}
-        >
-          <Text style={[s.tabTxt, tab === 'grade' && s.tabTxtActive]}>Grade Level</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[s.tabBtn, tab === 'year' && s.tabBtnActive]}
-          onPress={() => setTab('year')}
-        >
-          <Text style={[s.tabTxt, tab === 'year' && s.tabTxtActive]}>Birth Year</Text>
-        </TouchableOpacity>
+      <Text style={s.label}>Year of Birth</Text>
+      <View style={s.inputWrap}>
+        <TextInput
+          style={s.input}
+          value={birthYear}
+          onChangeText={(v) => setBirthYear(v.replace(/\D/g, '').slice(0, 4))}
+          placeholder={`e.g. ${BIRTH_YEARS[8]}`}
+          placeholderTextColor={s.placeholderColor}
+          keyboardType="number-pad"
+          maxLength={4}
+          returnKeyType="next"
+        />
       </View>
 
-      {tab === 'grade' ? (
-        GRADE_OPTIONS.map((item) => {
-          const sel = grade === item.value;
-          return (
-            <TouchableOpacity
-              key={item.value}
-              style={[s.listItem, sel && s.listItemSelected]}
-              onPress={() => setGrade(item.value)}
-            >
-              <Text style={[s.listItemTxt, sel && s.listItemSelectedTxt]}>
-                {item.label}
-              </Text>
-              {sel && <Text style={s.listCheck}>✓</Text>}
-            </TouchableOpacity>
-          );
-        })
-      ) : (
-        <>
-          <Text style={s.label}>Year of Birth</Text>
-          <View style={s.inputWrap}>
-            <TextInput
-              style={s.input}
-              value={birthYear}
-              onChangeText={(v) => setBirthYear(v.replace(/\D/g, '').slice(0, 4))}
-              placeholder={`e.g. ${BIRTH_YEARS[8]}`}
-              placeholderTextColor={s.placeholderColor}
-              keyboardType="number-pad"
-              maxLength={4}
-              autoFocus
-            />
-          </View>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
-            {BIRTH_YEARS.slice(0, 16).map((yr) => (
-              <TouchableOpacity
-                key={yr}
-                onPress={() => setBirthYear(String(yr))}
-                style={[
-                  s.listItem,
-                  {
-                    paddingHorizontal: 12,
-                    paddingVertical: 10,
-                    minWidth: 72,
-                    justifyContent: 'center',
-                  },
-                  birthYear === String(yr) && s.listItemSelected,
-                ]}
-              >
-                <Text
-                  style={[
-                    s.listItemTxt,
-                    { textAlign: 'center' },
-                    birthYear === String(yr) && s.listItemSelectedTxt,
-                  ]}
-                >
-                  {yr}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </>
-      )}
+      <Text style={s.label}>Grade Level</Text>
+      <GradeLevelSelect value={grade} onChange={setGrade} options={gradeOptions} s={s} />
     </>
   );
 }
@@ -1402,7 +1414,7 @@ function EducatorProfileStep({
       <Text style={s.sectionHint}>
         {"Select all grade levels you're comfortable teaching."}
       </Text>
-      {GRADE_OPTIONS.map((item) => {
+      {DEFAULT_GRADE_OPTIONS.map((item) => {
         const sel = gradeLevels.includes(item.value);
         return (
           <TouchableOpacity
@@ -1566,110 +1578,73 @@ function EducatorAvailabilityStep({
   );
 }
 
-function ClassRequestStep({
-  requestIntent,
-  setRequestIntent,
-  requestSubjects,
-  setRequestSubjects,
-  learningGoals,
-  setLearningGoals,
-  specialRequirements,
-  setSpecialRequirements,
+function FirstChildStep({
+  firstName,
+  setFirstName,
+  lastName,
+  setLastName,
+  birthYear,
+  setBirthYear,
+  grade,
+  setGrade,
+  gradeOptions,
   s,
 }: {
-  requestIntent: ClassRequestIntent;
-  setRequestIntent: (value: ClassRequestIntent) => void;
-  requestSubjects: string[];
-  setRequestSubjects: (value: string[]) => void;
-  learningGoals: string;
-  setLearningGoals: (value: string) => void;
-  specialRequirements: string;
-  setSpecialRequirements: (value: string) => void;
+  firstName: string;
+  setFirstName: (value: string) => void;
+  lastName: string;
+  setLastName: (value: string) => void;
+  birthYear: string;
+  setBirthYear: (value: string) => void;
+  grade: string | null;
+  setGrade: (value: string) => void;
+  gradeOptions: GradeOption[];
   s: S;
 }) {
-  const toggleSubject = (subject: string) => {
-    setRequestSubjects(
-      requestSubjects.includes(subject)
-        ? requestSubjects.filter((item) => item !== subject)
-        : [...requestSubjects, subject],
-    );
-  };
-
   return (
     <>
-      <Text style={s.sectionLabel}>Request type</Text>
-      <View style={s.chipsRow}>
-        {CLASS_REQUEST_INTENT_OPTIONS.map((option) => {
-          const selected = requestIntent === option.value;
-          return (
-            <TouchableOpacity
-              key={option.value}
-              style={[
-                s.chip,
-                {
-                  backgroundColor: selected ? '#14b8a620' : 'transparent',
-                  borderColor: selected ? '#14b8a6' : '#d1d5db',
-                },
-              ]}
-              onPress={() => setRequestIntent(option.value)}
-            >
-              <Text style={[s.chipTxt, { color: selected ? '#0f766e' : '#64748b' }]}>
-                {option.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      <Text style={s.sectionLabel}>Subjects</Text>
-      <View style={s.chipsRow}>
-        {STANDARD_SUBJECT_OPTIONS.map((subject) => {
-          const selected = requestSubjects.includes(subject);
-          return (
-            <TouchableOpacity
-              key={subject}
-              style={[
-                s.chip,
-                {
-                  backgroundColor: selected ? '#14b8a620' : 'transparent',
-                  borderColor: selected ? '#14b8a6' : '#d1d5db',
-                },
-              ]}
-              onPress={() => toggleSubject(subject)}
-            >
-              <Text style={[s.chipTxt, { color: selected ? '#0f766e' : '#64748b' }]}>
-                {subject}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      <Text style={s.label}>Learning goals</Text>
-      <View style={[s.inputWrap, { minHeight: 96, alignItems: 'flex-start' }]}>
+      <Text style={s.label}>Child First Name</Text>
+      <View style={s.inputWrap}>
         <TextInput
-          style={[s.input, { minHeight: 80, textAlignVertical: 'top' }]}
-          value={learningGoals}
-          onChangeText={setLearningGoals}
-          placeholder="What should we help your student with first?"
+          style={s.input}
+          value={firstName}
+          onChangeText={setFirstName}
+          placeholder="First name"
           placeholderTextColor={s.placeholderColor}
-          multiline
+          autoCapitalize="words"
+          returnKeyType="next"
         />
       </View>
 
-      <Text style={s.label}>
-        Special requirements <Text style={s.labelOptional}>(optional)</Text>
-      </Text>
-      <View style={[s.inputWrap, { minHeight: 86, alignItems: 'flex-start' }]}>
+      <Text style={s.label}>Child Last Name</Text>
+      <View style={s.inputWrap}>
         <TextInput
-          style={[s.input, { minHeight: 70, textAlignVertical: 'top' }]}
-          value={specialRequirements}
-          onChangeText={setSpecialRequirements}
-          placeholder="Preferred schedule, curriculum, or learning needs"
+          style={s.input}
+          value={lastName}
+          onChangeText={setLastName}
+          placeholder="Last name"
           placeholderTextColor={s.placeholderColor}
-          multiline
+          autoCapitalize="words"
+          returnKeyType="next"
         />
       </View>
+
+      <Text style={s.label}>Year of Birth</Text>
+      <View style={s.inputWrap}>
+        <TextInput
+          style={s.input}
+          value={birthYear}
+          onChangeText={(v) => setBirthYear(v.replace(/\D/g, '').slice(0, 4))}
+          placeholder={`e.g. ${BIRTH_YEARS[8]}`}
+          placeholderTextColor={s.placeholderColor}
+          keyboardType="number-pad"
+          maxLength={4}
+          returnKeyType="next"
+        />
+      </View>
+
+      <Text style={s.label}>Grade Level</Text>
+      <GradeLevelSelect value={grade} onChange={setGrade} options={gradeOptions} s={s} />
     </>
   );
 }
@@ -1683,6 +1658,9 @@ export default function ProfileSetupScreen() {
   const queryClient = useQueryClient();
   const { session, setOnboardingCompletionStatus } = useAuth();
   const analytics = useAnalytics();
+  const enableAddressSearch = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.enableMobileOnboardingAddressSearch,
+  );
 
   useEffect(() => {
     analytics.screen('Profile Setup', { screen_name: 'profile_setup' });
@@ -1708,6 +1686,10 @@ export default function ProfileSetupScreen() {
   const [region, setRegion] = useState('');
   const [postalCode, setPostalCode] = useState('');
   const [countryCode, setCountryCode] = useState('US');
+  const countryGradeOptions = useMemo(
+    () => optionsForCountry(normalizeCountryCode(countryCode)),
+    [countryCode],
+  );
 
   // Student-specific
   const [birthYear, setBirthYear] = useState('');
@@ -1722,13 +1704,11 @@ export default function ProfileSetupScreen() {
     Record<string, { start: string; end: string }>
   >({});
 
-  // Parent sign-up class request
-  const [requestIntent, setRequestIntent] = useState<ClassRequestIntent>(
-    CLASS_REQUEST_INTENT_OPTIONS[0].value,
-  );
-  const [requestSubjects, setRequestSubjects] = useState<string[]>(['Math']);
-  const [learningGoals, setLearningGoals] = useState('');
-  const [specialRequirements, setSpecialRequirements] = useState('');
+  // Guardian onboarding
+  const [childFirstName, setChildFirstName] = useState('');
+  const [childLastName, setChildLastName] = useState('');
+  const [childBirthYear, setChildBirthYear] = useState('');
+  const [childGrade, setChildGrade] = useState<string | null>(null);
 
   const [stepIdx, setStepIdx] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -1833,7 +1813,10 @@ export default function ProfileSetupScreen() {
       targetIdx = steps.indexOf('location');
     } else if (!f.hasRoleData) {
       const roleStep = steps.find(
-        (step) => step === 'student-profile' || step === 'educator-profile',
+        (step) =>
+          step === 'student-profile' ||
+          step === 'educator-profile' ||
+          step === 'first-child',
       );
       if (roleStep) targetIdx = steps.indexOf(roleStep);
     } else if (onboardingKind === 'educator' && !f.hasAvailability) {
@@ -1891,12 +1874,24 @@ export default function ProfileSetupScreen() {
             weeklyHours ? parseInt(weeklyHours, 10) : null,
             availability,
           );
-        } else if (currentStep === 'class-request') {
-          await submitOnboardingClassRequest({
-            requestIntent,
-            subjects: requestSubjects,
-            learningGoals,
-            specialRequirements,
+        } else if (currentStep === 'first-child') {
+          if (!onboarding.orgId) {
+            throw new Error('Organization not found. Please try logging in again.');
+          }
+          const trimmedFirstName = childFirstName.trim();
+          const trimmedLastName = childLastName.trim();
+          await createChildProfile({
+            orgId: onboarding.orgId,
+            firstName: trimmedFirstName,
+            lastName: trimmedLastName,
+            displayName: `${trimmedFirstName} ${trimmedLastName}`.trim(),
+            gradeLevel: childGrade ?? '',
+            birthYear: parseInt(childBirthYear, 10),
+            timezone,
+            city,
+            region,
+            countryCode,
+            postalCode,
           });
         }
       }
@@ -1941,8 +1936,13 @@ export default function ProfileSetupScreen() {
         return subjects.length > 0 && gradeLevels.length > 0;
       case 'educator-availability':
         return classTypes.length > 0 && Object.keys(daySlots).length > 0;
-      case 'class-request':
-        return requestSubjects.length > 0;
+      case 'first-child':
+        return (
+          !!childFirstName.trim() &&
+          !!childLastName.trim() &&
+          !!childGrade &&
+          childBirthYear.length === 4
+        );
       default:
         return true;
     }
@@ -1961,7 +1961,10 @@ export default function ProfileSetupScreen() {
     gradeLevels,
     classTypes,
     daySlots,
-    requestSubjects,
+    childFirstName,
+    childLastName,
+    childGrade,
+    childBirthYear,
     kind,
   ]);
 
@@ -2030,9 +2033,21 @@ export default function ProfileSetupScreen() {
           return;
         }
         break;
-      case 'class-request':
-        if (requestSubjects.length === 0) {
-          setError('Please select at least one subject.');
+      case 'first-child':
+        if (!childFirstName.trim()) {
+          setError("Please enter your child's first name.");
+          return;
+        }
+        if (!childLastName.trim()) {
+          setError("Please enter your child's last name.");
+          return;
+        }
+        if (!childBirthYear || childBirthYear.length !== 4) {
+          setError("Please enter your child's birth year.");
+          return;
+        }
+        if (!childGrade) {
+          setError("Please select your child's grade level.");
           return;
         }
         break;
@@ -2052,7 +2067,10 @@ export default function ProfileSetupScreen() {
     gradeLevels,
     classTypes,
     daySlots,
-    requestSubjects,
+    childFirstName,
+    childLastName,
+    childBirthYear,
+    childGrade,
     kind,
     advance,
     isLastStep,
@@ -2218,6 +2236,7 @@ export default function ProfileSetupScreen() {
               setCountryCode={setCountryCode}
               s={s}
               colors={colors}
+              enableAddressSearch={enableAddressSearch}
             />
           )}
           {currentStep === 'student-profile' && (
@@ -2226,6 +2245,7 @@ export default function ProfileSetupScreen() {
               setBirthYear={setBirthYear}
               grade={grade}
               setGrade={setGrade}
+              gradeOptions={countryGradeOptions}
               s={s}
               colors={colors}
             />
@@ -2252,16 +2272,17 @@ export default function ProfileSetupScreen() {
               colors={colors}
             />
           )}
-          {currentStep === 'class-request' && (
-            <ClassRequestStep
-              requestIntent={requestIntent}
-              setRequestIntent={setRequestIntent}
-              requestSubjects={requestSubjects}
-              setRequestSubjects={setRequestSubjects}
-              learningGoals={learningGoals}
-              setLearningGoals={setLearningGoals}
-              specialRequirements={specialRequirements}
-              setSpecialRequirements={setSpecialRequirements}
+          {currentStep === 'first-child' && (
+            <FirstChildStep
+              firstName={childFirstName}
+              setFirstName={setChildFirstName}
+              lastName={childLastName}
+              setLastName={setChildLastName}
+              birthYear={childBirthYear}
+              setBirthYear={setChildBirthYear}
+              grade={childGrade}
+              setGrade={setChildGrade}
+              gradeOptions={countryGradeOptions}
               s={s}
             />
           )}

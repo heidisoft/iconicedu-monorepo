@@ -45,6 +45,28 @@ describe('mobile feature flags', () => {
     ).toBe(true);
   });
 
+  it('defaults onboarding address search rollout to off', () => {
+    delete process.env.EXPO_PUBLIC_ENABLE_MOBILE_ONBOARDING_ADDRESS_SEARCH;
+    process.env.EXPO_PUBLIC_APP_ENV = 'local';
+
+    expect(
+      getLocalMobileFeatureFlagFallback(
+        mobileFeatureFlagKeys.enableMobileOnboardingAddressSearch,
+      ),
+    ).toBe(false);
+  });
+
+  it('enables onboarding address search rollout from an Expo public env flag', () => {
+    delete process.env.EXPO_PUBLIC_APP_ENV;
+    process.env.EXPO_PUBLIC_ENABLE_MOBILE_ONBOARDING_ADDRESS_SEARCH = 'true';
+
+    expect(
+      getLocalMobileFeatureFlagFallback(
+        mobileFeatureFlagKeys.enableMobileOnboardingAddressSearch,
+      ),
+    ).toBe(true);
+  });
+
   it('normalizes PostHog boolean-style values', () => {
     expect(parseBooleanFeatureFlag(true)).toBe(true);
     expect(parseBooleanFeatureFlag('on')).toBe(true);
