@@ -44,9 +44,14 @@ export default function AppLayout() {
           router.replace('/(auth)/profile-setup');
         }
       })
-      .catch(() => {
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : '';
+        if (message.includes('No account found')) {
+          // New user with no account row — send to onboarding to create one.
+          router.replace('/(auth)/profile-setup');
+          return;
+        }
         // Network error or timeout — let the user access the app.
-        // They can complete their profile later from account settings.
       });
     // Re-run only when the authenticated user changes (login/logout).
   }, [

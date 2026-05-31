@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase/client';
-import { apiGet } from '@/lib/api/http-client';
+import { apiGet, apiPost } from '@/lib/api/http-client';
 import type { DayAvailability, OnboardingStatus } from '@/lib/api/types';
 
 export function fetchOnboardingStatus(): Promise<OnboardingStatus> {
@@ -19,6 +19,22 @@ export function fetchOnboardingStatus(): Promise<OnboardingStatus> {
 
 async function doFetchOnboardingStatus(): Promise<OnboardingStatus> {
   return apiGet<OnboardingStatus>('/onboarding/status');
+}
+
+export async function completeParentRole(): Promise<void> {
+  await apiPost('/onboarding/role', { role: 'parent' });
+}
+
+export async function submitOnboardingClassRequest(input: {
+  requestIntent: string;
+  subjects: string[];
+  learningGoals: string;
+  specialRequirements?: string | null;
+}) {
+  return apiPost<{ success: boolean; channelId: string }>(
+    '/onboarding/class-request',
+    input,
+  );
 }
 
 export async function saveNameStep(

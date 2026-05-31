@@ -14,6 +14,7 @@ import { useTheme } from '@/providers/theme-provider';
 import { useActivityFeed, useMarkActivityFeedRead } from '@/hooks/use-activity-feed';
 import { useProfile } from '@/hooks/use-profile';
 import { ActivityFeedSkeleton } from '@/components/skeletons';
+import { QueryError } from '@/components/errors/query-error';
 import { createHeaderSurface } from '@/lib/header-surface';
 import {
   ActivityItem,
@@ -147,9 +148,14 @@ export default function InboxScreen() {
   const { colors, isDark } = useTheme();
   const s = React.useMemo(() => makeStyles(colors), [colors]);
   const activityS = React.useMemo(() => makeActivityItemStyles(colors), [colors]);
-  const { data: profile } = useProfile();
+  const { data: profile, isError: profileError } = useProfile();
 
-  const { data: feed, isPending: feedLoading, refetch: refetchFeed } = useActivityFeed();
+  const {
+    data: feed,
+    isPending: feedLoading,
+    isError: feedError,
+    refetch: refetchFeed,
+  } = useActivityFeed();
   const { mutate: markRead } = useMarkActivityFeedRead();
 
   const [activeTab, setActiveTab] = useState<InboxTabKeyVM>('all');
@@ -392,8 +398,10 @@ export default function InboxScreen() {
       </View>
 
       {/* Content */}
-      {feedLoading || refreshing ? (
+      {(!profileError && feedLoading) || refreshing ? (
         <ActivityFeedSkeleton count={3} />
+      ) : (profileError || feedError) && !feed ? (
+        <QueryError onRetry={onRefresh} />
       ) : filteredSections.length === 0 ? (
         <View style={s.emptyWrap}>
           <View style={[s.emptyIcon, { backgroundColor: colors.inputBg }]}>

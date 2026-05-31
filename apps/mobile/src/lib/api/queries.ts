@@ -52,6 +52,7 @@ export {
 } from './spaces/queries';
 export {
   completeOnboarding,
+  completeParentRole,
   fetchOnboardingStatus,
   saveEducatorAvailabilityStep,
   saveEducatorProfileStep,
@@ -60,6 +61,7 @@ export {
   savePhoneStep,
   saveStudentStep,
   saveTimezoneStep,
+  submitOnboardingClassRequest,
 } from './onboarding/queries';
 export {
   cancelRecurringSessionOccurrence,

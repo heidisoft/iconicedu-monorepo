@@ -37,7 +37,9 @@ type AuthState = {
   loading: boolean;
   sessionExpiryMessage: string | null;
   signInWithOtp: (email: string) => Promise<{ error: string | null }>;
+  signUpWithOtp: (email: string) => Promise<{ error: string | null }>;
   verifyOtp: (email: string, token: string) => Promise<{ error: string | null }>;
+  verifySignupOtp: (email: string, token: string) => Promise<{ error: string | null }>;
   signInWithGoogle: () => Promise<{ error: string | null }>;
   signInWithApple: () => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
@@ -287,143 +289,177 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error: null };
   }, []);
 
-  /** Verify OTP code and confirm org membership before allowing access. */
-  const verifyOtp = useCallback(async (email: string, token: string) => {
-    try {
-      setSessionExpiryMessage(null);
-      const { data, error } = await supabase.auth.verifyOtp({
-        email,
-        token,
-        type: 'email',
-      });
+  const signUpWithOtp = useCallback(async (email: string) => {
+    setSessionExpiryMessage(null);
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser: true },
+    });
 
-      if (error) return { error: error.message };
-
-      // Explicitly commit the session so the SecureStore adapter has the tokens
-      // persisted before the subsequent accounts query (avoids RLS race condition).
-      if (data.session) {
-        await supabase.auth.setSession({
-          access_token: data.session.access_token,
-          refresh_token: data.session.refresh_token,
-        });
-      }
-
-      if (data.user) {
-        const orgError = await checkOrgAssignment();
-        if (orgError) return { error: orgError };
-      }
-
-      // Mark account as active, mirroring web's /api/accounts/activate step.
-      await withTimeout(
-        activateAccount(),
-        'Account activation timed out. Please check your connection and try again.',
-      );
-
-      return { error: null };
-    } catch (error) {
-      reportObservedError({
-        error,
-        source: 'mobile.auth.verify_otp',
-        message: 'Failed to complete OTP sign-in',
-      });
-      return {
-        error:
-          error instanceof Error
-            ? error.message
-            : 'Could not complete sign-in. Please try again.',
-      };
-    }
+    return { error: error?.message ?? null };
   }, []);
+
+  /** Verify OTP code and confirm org membership before allowing access. */
+  const verifyOtpCode = useCallback(
+    async (email: string, token: string, options: { requireLinkedAccount: boolean }) => {
+      try {
+        setSessionExpiryMessage(null);
+        const { data, error } = await supabase.auth.verifyOtp({
+          email,
+          token,
+          type: 'email',
+        });
+
+        if (error) return { error: error.message };
+
+        // Explicitly commit the session so the SecureStore adapter has the tokens
+        // persisted before the subsequent accounts query (avoids RLS race condition).
+        if (data.session) {
+          await supabase.auth.setSession({
+            access_token: data.session.access_token,
+            refresh_token: data.session.refresh_token,
+          });
+        }
+
+        if (options.requireLinkedAccount && data.user) {
+          const orgError = await checkOrgAssignment();
+          if (orgError) return { error: orgError };
+        }
+
+        if (options.requireLinkedAccount) {
+          // Mark account as active, mirroring web's /api/accounts/activate step.
+          await withTimeout(
+            activateAccount(),
+            'Account activation timed out. Please check your connection and try again.',
+          );
+        }
+
+        return { error: null };
+      } catch (error) {
+        reportObservedError({
+          error,
+          source: 'mobile.auth.verify_otp',
+          message: 'Failed to complete OTP sign-in',
+        });
+        return {
+          error:
+            error instanceof Error
+              ? error.message
+              : 'Could not complete sign-in. Please try again.',
+        };
+      }
+    },
+    [],
+  );
+
+  const verifyOtp = useCallback(
+    (email: string, token: string) =>
+      verifyOtpCode(email, token, { requireLinkedAccount: true }),
+    [verifyOtpCode],
+  );
+
+  const verifySignupOtp = useCallback(
+    (email: string, token: string) =>
+      verifyOtpCode(email, token, { requireLinkedAccount: false }),
+    [verifyOtpCode],
+  );
 
   /**
    * Sign in with a Supabase OAuth provider (implicit flow).
    * Opens Safari View Controller (iOS) / Chrome Custom Tab (Android).
    * Supabase returns access_token + refresh_token in the URL hash.
    */
-  const signInWithOAuthProvider = useCallback(async (provider: OAuthProvider) => {
-    try {
-      setSessionExpiryMessage(null);
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: {
-          redirectTo: AUTH_REDIRECT_URI,
-          skipBrowserRedirect: true,
-        },
-      });
+  const signInWithOAuthProvider = useCallback(
+    async (provider: OAuthProvider, options: { requireLinkedAccount: boolean }) => {
+      try {
+        setSessionExpiryMessage(null);
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider,
+          options: {
+            redirectTo: AUTH_REDIRECT_URI,
+            skipBrowserRedirect: true,
+          },
+        });
 
-      if (error || !data.url) {
-        return { error: error?.message ?? `Could not start ${provider} sign-in.` };
-      }
+        if (error || !data.url) {
+          return { error: error?.message ?? `Could not start ${provider} sign-in.` };
+        }
 
-      const browserResult = await withTimeout(
-        WebBrowser.openAuthSessionAsync(data.url, AUTH_REDIRECT_URI),
-        'Sign-in timed out. Please check your connection and try again.',
-      );
+        const browserResult = await withTimeout(
+          WebBrowser.openAuthSessionAsync(data.url, AUTH_REDIRECT_URI),
+          'Sign-in timed out. Please check your connection and try again.',
+        );
 
-      if (browserResult.type !== 'success') {
+        if (browserResult.type !== 'success') {
+          return { error: null };
+        }
+
+        // Implicit flow: tokens arrive in the URL hash fragment
+        const url = browserResult.url;
+        const fragment = url.includes('#')
+          ? url.split('#')[1]
+          : (url.split('?')[1] ?? '');
+        const params = new URLSearchParams(fragment);
+        const authError = params.get('error_description') ?? params.get('error');
+        if (authError) {
+          return { error: authError };
+        }
+
+        const accessToken = params.get('access_token');
+        const refreshToken = params.get('refresh_token');
+
+        if (!accessToken) {
+          return { error: 'Sign-in failed. No token received.' };
+        }
+
+        const { error: sessionError } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken ?? '',
+        });
+
+        if (sessionError) return { error: sessionError.message };
+
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (options.requireLinkedAccount && user) {
+          const orgError = await checkOrgAssignment();
+          if (orgError) return { error: orgError };
+        }
+
+        if (options.requireLinkedAccount) {
+          // Mark account as active, mirroring web's /api/accounts/activate step.
+          await withTimeout(
+            activateAccount(),
+            'Account activation timed out. Please check your connection and try again.',
+          );
+        }
+
         return { error: null };
+      } catch (error) {
+        reportObservedError({
+          error,
+          source: `mobile.auth.oauth.${provider}`,
+          message: `Failed to complete ${provider} sign-in`,
+        });
+        return {
+          error:
+            error instanceof Error
+              ? error.message
+              : `Could not complete ${provider} sign-in. Please try again.`,
+        };
       }
-
-      // Implicit flow: tokens arrive in the URL hash fragment
-      const url = browserResult.url;
-      const fragment = url.includes('#') ? url.split('#')[1] : (url.split('?')[1] ?? '');
-      const params = new URLSearchParams(fragment);
-      const authError = params.get('error_description') ?? params.get('error');
-      if (authError) {
-        return { error: authError };
-      }
-
-      const accessToken = params.get('access_token');
-      const refreshToken = params.get('refresh_token');
-
-      if (!accessToken) {
-        return { error: 'Sign-in failed. No token received.' };
-      }
-
-      const { error: sessionError } = await supabase.auth.setSession({
-        access_token: accessToken,
-        refresh_token: refreshToken ?? '',
-      });
-
-      if (sessionError) return { error: sessionError.message };
-
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (user) {
-        const orgError = await checkOrgAssignment();
-        if (orgError) return { error: orgError };
-      }
-
-      // Mark account as active, mirroring web's /api/accounts/activate step.
-      await withTimeout(
-        activateAccount(),
-        'Account activation timed out. Please check your connection and try again.',
-      );
-
-      return { error: null };
-    } catch (error) {
-      reportObservedError({
-        error,
-        source: `mobile.auth.oauth.${provider}`,
-        message: `Failed to complete ${provider} sign-in`,
-      });
-      return {
-        error:
-          error instanceof Error
-            ? error.message
-            : `Could not complete ${provider} sign-in. Please try again.`,
-      };
-    }
-  }, []);
+    },
+    [],
+  );
 
   const signInWithGoogle = useCallback(
-    () => signInWithOAuthProvider('google'),
+    () => signInWithOAuthProvider('google', { requireLinkedAccount: false }),
     [signInWithOAuthProvider],
   );
 
   const signInWithApple = useCallback(
-    () => signInWithOAuthProvider('apple'),
+    () => signInWithOAuthProvider('apple', { requireLinkedAccount: false }),
     [signInWithOAuthProvider],
   );
 
@@ -449,7 +485,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       sessionExpiryMessage,
       signInWithOtp,
+      signUpWithOtp,
       verifyOtp,
+      verifySignupOtp,
       signInWithGoogle,
       signInWithApple,
       signOut,
@@ -461,7 +499,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       sessionExpiryMessage,
       signInWithOtp,
+      signUpWithOtp,
       verifyOtp,
+      verifySignupOtp,
       signInWithGoogle,
       signInWithApple,
       signOut,

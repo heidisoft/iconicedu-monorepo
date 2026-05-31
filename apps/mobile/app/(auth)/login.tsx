@@ -11,7 +11,6 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, {
@@ -238,6 +237,23 @@ function makeStyles(C: AppColors) {
         textAlign: 'center',
       },
       sub: { fontSize: 16, color: C.textMuted, lineHeight: 22, textAlign: 'center' },
+      tabRow: {
+        flexDirection: 'row',
+        backgroundColor: C.inputBg,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: C.border,
+        padding: 4,
+      },
+      tab: {
+        flex: 1,
+        alignItems: 'center',
+        borderRadius: 10,
+        paddingVertical: 10,
+      },
+      tabActive: { backgroundColor: C.card },
+      tabTxt: { fontSize: 15, fontWeight: '700', color: C.textMuted },
+      tabTxtActive: { color: C.text },
 
       field: { gap: 6 },
       label: { fontSize: 14, fontWeight: '500', color: C.textMuted },
@@ -327,7 +343,7 @@ export default function LoginScreen() {
   const [googleError, setGoogleError] = useState<string | null>(null);
   const [appleError, setAppleError] = useState<string | null>(null);
   const {
-    signInWithOtp,
+    signUpWithOtp,
     signInWithGoogle,
     signInWithApple,
     sessionExpiryMessage,
@@ -342,7 +358,7 @@ export default function LoginScreen() {
     analytics.screen('Login', { screen_name: 'login' });
   }, [analytics]);
 
-  const handleLogin = useCallback(async () => {
+  const handleEmailContinue = useCallback(async () => {
     if (!email.trim()) {
       setError('Please enter your email address');
       return;
@@ -352,7 +368,7 @@ export default function LoginScreen() {
       setError(null);
       clearSessionExpiryMessage();
       analytics.capture(AnalyticsEvent.LOGIN_OTP_REQUESTED, { method: 'email' });
-      const { error: signInError } = await signInWithOtp(email.trim());
+      const { error: signInError } = await signUpWithOtp(email.trim());
       if (signInError) {
         analytics.capture(AnalyticsEvent.LOGIN_ERROR, {
           method: 'email',
@@ -367,15 +383,12 @@ export default function LoginScreen() {
         loginError instanceof Error
           ? loginError.message
           : 'Could not send your sign-in code. Please try again.';
-      analytics.capture(AnalyticsEvent.LOGIN_ERROR, {
-        method: 'email',
-        error: message,
-      });
+      analytics.capture(AnalyticsEvent.LOGIN_ERROR, { method: 'email', error: message });
       setError(message);
     } finally {
       setLoading(false);
     }
-  }, [analytics, clearSessionExpiryMessage, email, router, signInWithOtp]);
+  }, [analytics, clearSessionExpiryMessage, email, router, signUpWithOtp]);
 
   const handleGoogle = useCallback(async () => {
     try {
@@ -391,15 +404,13 @@ export default function LoginScreen() {
         });
         setGoogleError(googleErr);
       }
+      // Navigation is handled by (auth)/_layout → (app)/_layout → profile-setup if needed
     } catch (googleErr) {
       const message =
         googleErr instanceof Error
           ? googleErr.message
           : 'Could not complete Google sign-in. Please try again.';
-      analytics.capture(AnalyticsEvent.LOGIN_ERROR, {
-        method: 'google',
-        error: message,
-      });
+      analytics.capture(AnalyticsEvent.LOGIN_ERROR, { method: 'google', error: message });
       setGoogleError(message);
     } finally {
       setGoogleLoading(false);
@@ -420,30 +431,18 @@ export default function LoginScreen() {
         });
         setAppleError(appleErr);
       }
+      // Navigation is handled by (auth)/_layout → (app)/_layout → profile-setup if needed
     } catch (appleErr) {
       const message =
         appleErr instanceof Error
           ? appleErr.message
           : 'Could not complete Apple sign-in. Please try again.';
-      analytics.capture(AnalyticsEvent.LOGIN_ERROR, {
-        method: 'apple',
-        error: message,
-      });
+      analytics.capture(AnalyticsEvent.LOGIN_ERROR, { method: 'apple', error: message });
       setAppleError(message);
     } finally {
       setAppleLoading(false);
     }
   }, [analytics, clearSessionExpiryMessage, signInWithApple]);
-
-  const openSignup = useCallback(async () => {
-    try {
-      await WebBrowser.openBrowserAsync('https://www.iconicedu.com/i/get-started', {
-        presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
-      });
-    } catch {
-      setError('Could not open account registration. Please try again.');
-    }
-  }, []);
 
   const socialLoading = googleLoading || appleLoading;
 
@@ -466,12 +465,11 @@ export default function LoginScreen() {
           </View>
 
           {/* Heading */}
-          <Text style={s.heading}>Welcome back</Text>
+          <Text style={s.heading}>Welcome to ICONIC Academy</Text>
 
           {/* Subtitle */}
           <Text style={s.sub}>
-            Enter your email address to receive a sign-in code.{'\n'}Only registered
-            accounts can sign in.
+            Enter your email to sign in or create a parent account.
           </Text>
 
           {/* Email input */}
@@ -493,7 +491,7 @@ export default function LoginScreen() {
                 placeholderTextColor={s.placeholderColor}
                 editable={!loading && !socialLoading}
                 returnKeyType="done"
-                onSubmitEditing={handleLogin}
+                onSubmitEditing={handleEmailContinue}
               />
               {email.length > 0 && (
                 <Pressable
@@ -515,12 +513,12 @@ export default function LoginScreen() {
           {/* CTA */}
           <TouchableOpacity
             style={[s.cta, loading ? s.ctaDim : undefined]}
-            onPress={handleLogin}
+            onPress={handleEmailContinue}
             disabled={loading || socialLoading}
             activeOpacity={0.85}
           >
             {loading && <ActivityIndicator size="small" color={colors.tealFg} />}
-            <Text style={s.ctaTxt}>{loading ? 'Sending…' : 'Send code'}</Text>
+            <Text style={s.ctaTxt}>{loading ? 'Sending…' : 'Continue'}</Text>
           </TouchableOpacity>
 
           {/* Divider */}
@@ -562,13 +560,9 @@ export default function LoginScreen() {
           </TouchableOpacity>
           {appleError && <Text style={s.errorTxt}>{appleError}</Text>}
 
-          {/* No account helper */}
           <Text style={s.noAcct}>
-            {"Don't have an account? Visit "}
-            <Text style={s.noAcctLink} onPress={openSignup}>
-              www.iconicedu.com
-            </Text>
-            {' to sign up.'}
+            Parent accounts can sign up directly. Students and educators need an
+            invitation.
           </Text>
         </ScrollView>
 

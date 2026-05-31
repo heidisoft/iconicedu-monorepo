@@ -36,6 +36,7 @@ import { useFamilyView } from '@/providers/family-view-provider';
 import { PulseBox } from '@/components/skeletons/pulse-box';
 import { SessionCard } from '@/components/sessions/session-card';
 import { AppSupportFooter } from '@/components/support/app-support-footer';
+import { QueryError } from '@/components/errors/query-error';
 import {
   buildHomeMetricSummary,
   buildHomeUpcomingSessionsMetricDisplay,
@@ -338,16 +339,19 @@ export default function HomeScreen() {
   const {
     data: profile,
     isPending: profileLoading,
+    isError: profileError,
     refetch: refetchProfile,
   } = useProfile();
   const {
     sessions,
     isPending: sessionsLoading,
+    isError: sessionsError,
     refetch: refetchSessions,
   } = useUpcomingSessions();
   const {
     data: account,
     isPending: accountLoading,
+    isError: accountError,
     refetch: refetchAccount,
   } = useAccount();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
@@ -590,6 +594,15 @@ export default function HomeScreen() {
       switchFamilyView,
     ],
   );
+
+  const coreDataError = (accountError || profileError) && !account && !profile;
+  if (coreDataError) {
+    return (
+      <SafeAreaView style={[s.safe, { justifyContent: 'center' }]} edges={['top']}>
+        <QueryError onRetry={onRefresh} />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>

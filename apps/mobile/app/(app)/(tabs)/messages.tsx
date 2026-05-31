@@ -46,6 +46,7 @@ import {
   type DmParticipant,
 } from '@/lib/api/queries';
 import { ChannelListSkeleton } from '@/components/skeletons';
+import { QueryError } from '@/components/errors/query-error';
 import { RoleAvatarBadge } from '@/components/profile/role-avatar-badge';
 import { RoleNameIndicator } from '@/components/profile/role-name-indicator';
 import { profileAvatarColors } from '@/lib/profile-avatar-colors';
@@ -921,7 +922,11 @@ export default function MessagesScreen() {
     setActiveTab(resolvedTab);
   }, [resolvedTab]);
 
-  const { data: account, isPending: accountLoading } = useAccount();
+  const {
+    data: account,
+    isPending: accountLoading,
+    isError: accountError,
+  } = useAccount();
   const { data: profile } = useProfile();
   const { guardianAccountId, guardianProfileId } = useFamilyView();
   const { colors } = useTheme();
@@ -953,11 +958,13 @@ export default function MessagesScreen() {
   const {
     data: dms,
     isPending: dmsLoading,
+    isError: dmsError,
     refetch: refetchDms,
   } = useDirectMessages(orgId, myProfileId, accountId);
   const {
     data: channels,
     isPending: channelsLoading,
+    isError: channelsError,
     refetch: refetchChannels,
   } = useLearningSpaceChannels(orgId, myProfileId, accountId, profileKind);
   const {
@@ -1100,7 +1107,9 @@ export default function MessagesScreen() {
     { key: 'channels', label: 'Classrooms', count: unreadChannels },
   ];
 
-  const isLoading = accountLoading || dmsLoading || channelsLoading || supervisedLoading;
+  const isLoading =
+    !accountError &&
+    (accountLoading || dmsLoading || channelsLoading || supervisedLoading);
   const [markingAllRead, setMarkingAllRead] = useState(false);
   const visibleUnreadChannelIds = useMemo(
     () =>
@@ -1346,6 +1355,8 @@ export default function MessagesScreen() {
 
       {isLoading || refreshing ? (
         <ChannelListSkeleton count={6} />
+      ) : (accountError || dmsError || channelsError) && !dms && !channels ? (
+        <QueryError onRetry={onRefresh} />
       ) : isEmpty ? (
         <View style={s.emptyWrap}>
           <View style={[s.emptyIcon, { backgroundColor: colors.inputBg }]}>
