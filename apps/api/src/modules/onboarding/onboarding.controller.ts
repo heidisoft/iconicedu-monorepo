@@ -53,7 +53,9 @@ export class OnboardingController {
     @Body()
     body: {
       requestIntent?: unknown;
+      studentProfileIds?: unknown;
       subjects?: unknown;
+      otherSubject?: unknown;
       learningGoals?: unknown;
       specialRequirements?: unknown;
     },

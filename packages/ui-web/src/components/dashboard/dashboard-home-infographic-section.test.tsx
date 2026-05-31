@@ -466,8 +466,6 @@ describe('DashboardHomeInfographicSection', () => {
 
     await user.click(screen.getAllByRole('button', { name: 'Explore More Classes' })[0]!);
 
-    expect(screen.getByText('How would you like to start?')).toBeInTheDocument();
-    await user.click(screen.getByRole('radio', { name: /Trial class/i }));
     expect(screen.getByText('Student name')).toBeInTheDocument();
     const comboboxes = screen.getAllByRole('combobox');
 
@@ -488,7 +486,7 @@ describe('DashboardHomeInfographicSection', () => {
     const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
     expect(JSON.parse(String(requestInit?.body))).toEqual(
       expect.objectContaining({
-        requestIntent: 'trial-class',
+        requestIntent: 'ongoing-tutoring',
         studentProfileIds: ['child-1'],
         subjects: ['Math'],
       }),

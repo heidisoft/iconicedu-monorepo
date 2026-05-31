@@ -62,6 +62,7 @@ export {
   savePhoneStep,
   saveStudentStep,
   saveTimezoneStep,
+  submitClassRequest,
 } from './onboarding/queries';
 export {
   cancelRecurringSessionOccurrence,

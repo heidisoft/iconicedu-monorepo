@@ -427,7 +427,13 @@ function makeStyles(C: AppColors) {
         marginBottom: 16,
         minHeight: 52,
       },
-      input: { flex: 1, fontSize: 17, color: C.text, paddingVertical: 14 },
+      input: {
+        flex: 1,
+        fontSize: 17,
+        color: C.text,
+        paddingVertical: 14,
+        letterSpacing: 0,
+      },
       inputHint: {
         fontSize: 13,
         color: C.textFaint,

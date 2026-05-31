@@ -42,6 +42,20 @@ export async function createChildProfile(input: {
   return apiPost<ChildProfileVM>('/profiles/children', input);
 }
 
+export async function submitClassRequest(input: {
+  requestIntent: string;
+  studentProfileIds: string[];
+  subjects: string[];
+  otherSubject?: string | null;
+  learningGoals: string;
+  specialRequirements?: string | null;
+}) {
+  return apiPost<{ success: boolean; channelId: string }>(
+    '/onboarding/class-request',
+    input,
+  );
+}
+
 export async function saveNameStep(
   profileId: string,
   firstName: string,

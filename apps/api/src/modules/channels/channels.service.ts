@@ -40,6 +40,7 @@ type ChannelListItem = {
   icon_key?: string | null;
   themeKey?: string | null;
   messageUiThemeKey?: 'classic' | 'feed' | null;
+  purpose?: string | null;
   participants?: DmParticipant[];
   is_supervised?: boolean;
   supervised_child_name?: string | null;
@@ -967,6 +968,7 @@ export class ChannelsService {
       .select(
         `
         id, org_id, topic, description, kind, updated_at, ui_defaults,
+        icon_key, ui_theme_key, purpose,
         channel_read_state!left(unread_count)
       `,
       )
@@ -1002,7 +1004,12 @@ export class ChannelsService {
         last_message_text: last?.text ?? null,
         last_message_at: last?.at ?? null,
         last_message_sender: last?.sender ?? null,
+        icon_key: channel.icon_key ?? null,
+        themeKey: channel.ui_theme_key ?? null,
         messageUiThemeKey: resolveMessageUiThemeKey(channel.ui_defaults) ?? 'feed',
+        purpose: channel.purpose ?? null,
+        is_support: channel.purpose === 'support',
+        is_learning_space: false,
       };
     });
   }

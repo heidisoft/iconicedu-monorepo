@@ -188,7 +188,7 @@ describe('AuthProvider', () => {
     });
   });
 
-  it('signs out OAuth users without a linked account', async () => {
+  it('lets OAuth users without a linked account continue into onboarding', async () => {
     mockGetUser.mockResolvedValue({
       data: { user: { id: 'user-1', email: 'iconicedudev+test@gmail.com' } },
       error: null,
@@ -205,8 +205,8 @@ describe('AuthProvider', () => {
       response = await result.current.signInWithGoogle();
     });
 
-    expect(response.error).toContain('No ICONIC Academy account');
-    expect(mockSignOut).toHaveBeenCalled();
+    expect(response.error).toBeNull();
+    expect(mockSignOut).not.toHaveBeenCalled();
     expect(mockActivateAccount).not.toHaveBeenCalled();
   });
 

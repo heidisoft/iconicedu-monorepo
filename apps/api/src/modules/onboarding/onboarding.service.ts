@@ -19,6 +19,7 @@ import type {
 import {
   CLASS_REQUEST_INTENT_LABELS,
   isClassRequestIntent,
+  OTHER_SUBJECT_OPTION,
   STANDARD_SUBJECT_OPTIONS,
 } from '@iconicedu/shared-types';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
@@ -48,7 +49,9 @@ type StudentAccessCodeRow = {
 
 type MobileClassRequestInput = {
   requestIntent: ClassRequestIntent;
+  studentProfileIds: string[];
   subjects: string[];
+  otherSubject: string | null;
   learningGoals: string;
   specialRequirements: string | null;
 };
@@ -85,7 +88,9 @@ function normalizeRoleStatus(value: AccountRow['role_status'] | undefined): Role
 
 function parseMobileClassRequest(body: {
   requestIntent?: unknown;
+  studentProfileIds?: unknown;
   subjects?: unknown;
+  otherSubject?: unknown;
   learningGoals?: unknown;
   specialRequirements?: unknown;
 }): MobileClassRequestInput {
@@ -99,13 +104,38 @@ function parseMobileClassRequest(body: {
         .filter(Boolean)
     : [];
   if (!subjects.length) throw new BadRequestException('Select at least one subject.');
-  const allowedSubjects = new Set<string>(STANDARD_SUBJECT_OPTIONS);
+  const allowedSubjects = new Set<string>([
+    ...STANDARD_SUBJECT_OPTIONS,
+    OTHER_SUBJECT_OPTION,
+  ]);
   if (subjects.some((subject) => !allowedSubjects.has(subject))) {
     throw new BadRequestException('Invalid subject selection.');
   }
+  const otherSubject =
+    typeof body.otherSubject === 'string' && body.otherSubject.trim()
+      ? body.otherSubject.trim()
+      : null;
+  if (subjects.includes(OTHER_SUBJECT_OPTION) && !otherSubject) {
+    throw new BadRequestException('Enter the custom subject when "Other" is selected.');
+  }
+  const studentProfileIds = Array.isArray(body.studentProfileIds)
+    ? Array.from(
+        new Set(
+          body.studentProfileIds
+            .filter((id): id is string => typeof id === 'string')
+            .map((id) => id.trim())
+            .filter(Boolean),
+        ),
+      )
+    : [];
+  if (!studentProfileIds.length) {
+    throw new BadRequestException('Select at least one student.');
+  }
   return {
     requestIntent: body.requestIntent,
+    studentProfileIds,
     subjects,
+    otherSubject,
     learningGoals:
       typeof body.learningGoals === 'string' ? body.learningGoals.trim() : '',
     specialRequirements:
@@ -633,14 +663,26 @@ export class OnboardingService {
     const { user, serviceSupabase } = await this.requireUser(accessToken);
     const account = await this.getAccountByAuthUserId(serviceSupabase, user.id);
     if (!account?.org_id) throw new BadRequestException('No account found.');
-    if (account.primary_role !== 'guardian') {
-      throw new ForbiddenException('Only parents can request classes.');
+    if (account.primary_role !== 'guardian' && account.primary_role !== 'child') {
+      throw new ForbiddenException('Only parents and students can request classes.');
     }
 
-    const guardianProfile = await this.getProfileByAccountId(serviceSupabase, account.id);
-    if (!guardianProfile || guardianProfile.kind !== 'guardian') {
-      throw new BadRequestException('Parent profile not found.');
+    const requesterProfile = await this.getProfileByAccountId(
+      serviceSupabase,
+      account.id,
+    );
+    if (
+      !requesterProfile ||
+      (requesterProfile.kind !== 'guardian' && requesterProfile.kind !== 'child')
+    ) {
+      throw new BadRequestException('Requester profile not found.');
     }
+    const selectedStudents = await this.resolveClassRequestStudents(serviceSupabase, {
+      orgId: account.org_id,
+      accountId: account.id,
+      requesterProfile,
+      studentProfileIds: input.studentProfileIds,
+    });
 
     const staffProfiles = await this.listClassRequestStaffProfiles(
       serviceSupabase,
@@ -649,33 +691,35 @@ export class OnboardingService {
     const now = new Date().toISOString();
     const channelId = randomUUID();
     const requesterName =
-      guardianProfile.display_name?.trim() ||
-      [guardianProfile.first_name, guardianProfile.last_name].filter(Boolean).join(' ') ||
+      requesterProfile.display_name?.trim() ||
+      [requesterProfile.first_name, requesterProfile.last_name]
+        .filter(Boolean)
+        .join(' ') ||
       user.email ||
-      'Parent';
+      'Requester';
 
     const { error: channelError } = await serviceSupabase.from('channels').insert({
       id: channelId,
       org_id: account.org_id,
       kind: 'channel',
       topic: `Class Requests · ${requesterName}`,
-      description: 'Class request from mobile onboarding',
+      description: 'Class request from mobile dashboard',
       visibility: 'private',
       purpose: CLASS_REQUEST_CHANNEL_PURPOSE,
       status: 'active',
       posting_policy_kind: 'members-only',
       allow_threads: true,
       allow_reactions: true,
-      created_by_profile_id: guardianProfile.id,
+      created_by_profile_id: requesterProfile.id,
       created_at: now,
-      created_by: guardianProfile.id,
+      created_by: requesterProfile.id,
       updated_at: now,
-      updated_by: guardianProfile.id,
+      updated_by: requesterProfile.id,
     });
     if (channelError) throw new InternalServerErrorException(channelError.message);
 
     const memberRows = Array.from(
-      new Set([guardianProfile.id, ...staffProfiles.map((profile) => profile.id)]),
+      new Set([requesterProfile.id, ...staffProfiles.map((profile) => profile.id)]),
     ).map((profileId) => ({
       id: randomUUID(),
       org_id: account.org_id,
@@ -683,9 +727,9 @@ export class OnboardingService {
       profile_id: profileId,
       joined_at: now,
       created_at: now,
-      created_by: guardianProfile.id,
+      created_by: requesterProfile.id,
       updated_at: now,
-      updated_by: guardianProfile.id,
+      updated_by: requesterProfile.id,
     }));
     const { error: memberError } = await serviceSupabase
       .from('channel_members')
@@ -697,12 +741,12 @@ export class OnboardingService {
       .insert({
         org_id: account.org_id,
         channel_id: channelId,
-        sender_profile_id: guardianProfile.id,
+        sender_profile_id: requesterProfile.id,
         type: 'text',
         created_at: now,
-        created_by: guardianProfile.id,
+        created_by: requesterProfile.id,
         updated_at: now,
-        updated_by: guardianProfile.id,
+        updated_by: requesterProfile.id,
       })
       .select('id')
       .single<{ id: string }>();
@@ -721,7 +765,11 @@ export class OnboardingService {
           '',
           `Requested by: ${requesterName}`,
           `Request type: ${CLASS_REQUEST_INTENT_LABELS[input.requestIntent]}`,
+          `Student(s): ${selectedStudents
+            .map((student) => student.display_name?.trim() || 'Student')
+            .join(', ')}`,
           `Subject(s): ${input.subjects.join(', ')}`,
+          ...(input.otherSubject ? [`Other subject: ${input.otherSubject}`] : []),
           ...(input.learningGoals ? ['', 'Learning goals:', input.learningGoals] : []),
           '',
           'Special requirements:',
@@ -729,9 +777,9 @@ export class OnboardingService {
         ].join('\n'),
       },
       created_at: now,
-      created_by: guardianProfile.id,
+      created_by: requesterProfile.id,
       updated_at: now,
-      updated_by: guardianProfile.id,
+      updated_by: requesterProfile.id,
     });
     if (payloadError) throw new InternalServerErrorException(payloadError.message);
 
@@ -920,6 +968,75 @@ export class OnboardingService {
     return Array.from(
       new Map((data ?? []).map((profile) => [profile.id, profile])).values(),
     );
+  }
+
+  private async resolveClassRequestStudents(
+    supabase: SupabaseClient,
+    input: {
+      orgId: string;
+      accountId: string;
+      requesterProfile: ProfileRow;
+      studentProfileIds: string[];
+    },
+  ): Promise<ProfileRow[]> {
+    const allowedStudentIds =
+      input.requesterProfile.kind === 'child'
+        ? new Set([input.requesterProfile.id])
+        : await this.listGuardianChildProfileIds(supabase, input.orgId, input.accountId);
+    const selectedStudentIds = input.studentProfileIds.filter((id) =>
+      allowedStudentIds.has(id),
+    );
+
+    if (!selectedStudentIds.length) {
+      throw new BadRequestException('Select at least one valid student.');
+    }
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('org_id', input.orgId)
+      .eq('kind', 'child')
+      .in('id', selectedStudentIds)
+      .is('deleted_at', null)
+      .returns<ProfileRow[]>();
+    if (error) throw new InternalServerErrorException(error.message);
+    if (!data?.length) {
+      throw new BadRequestException('Unable to resolve selected students.');
+    }
+
+    return data;
+  }
+
+  private async listGuardianChildProfileIds(
+    supabase: SupabaseClient,
+    orgId: string,
+    guardianAccountId: string,
+  ): Promise<Set<string>> {
+    const { data: links, error: linkError } = await supabase
+      .from('family_links')
+      .select('child_account_id')
+      .eq('org_id', orgId)
+      .eq('guardian_account_id', guardianAccountId)
+      .is('deleted_at', null)
+      .returns<Array<{ child_account_id: string }>>();
+    if (linkError) throw new InternalServerErrorException(linkError.message);
+
+    const childAccountIds = Array.from(
+      new Set((links ?? []).map((link) => link.child_account_id).filter(Boolean)),
+    );
+    if (!childAccountIds.length) return new Set();
+
+    const { data: profiles, error: profileError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('org_id', orgId)
+      .eq('kind', 'child')
+      .in('account_id', childAccountIds)
+      .is('deleted_at', null)
+      .returns<Array<{ id: string }>>();
+    if (profileError) throw new InternalServerErrorException(profileError.message);
+
+    return new Set((profiles ?? []).map((profile) => profile.id));
   }
 
   private async ensureProfile(
