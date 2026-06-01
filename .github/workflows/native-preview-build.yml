@@ -67,7 +67,7 @@ jobs:
           FALLBACK_API_URL: ${{ secrets.EXPO_PUBLIC_API_URL }}
           FALLBACK_WEB_URL: ${{ secrets.EXPO_PUBLIC_WEB_URL }}
           POSTHOG_KEY: ${{ secrets.POSTHOG_KEY }}
-          POSTHOG_HOST: ${{ vars.POSTHOG_HOST }}
+          POSTHOG_HOST: ${{ vars.POSTHOG_HOST || 'https://t.iconicedu.lk' }}
           BUILD_PROFILE: ${{ inputs.profile }}
         run: |
           set -euo pipefail

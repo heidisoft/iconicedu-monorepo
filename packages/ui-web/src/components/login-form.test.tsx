@@ -35,6 +35,18 @@ describe('LoginForm', () => {
     expect(onOAuthLogin).toHaveBeenCalledWith('apple');
   });
 
+  it('hides the social separator when no social provider is enabled', () => {
+    render(<LoginForm enableGoogleSignIn={false} enableAppleSignIn={false} />);
+
+    expect(
+      screen.queryByRole('button', { name: 'Continue with Google' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Continue with Apple' }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Or')).not.toBeInTheDocument();
+  });
+
   it('renders a prominent message state container', () => {
     const { rerender } = render(<LoginForm errorMessage="Invalid email address" />);
 

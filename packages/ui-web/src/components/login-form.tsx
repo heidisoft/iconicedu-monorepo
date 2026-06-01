@@ -21,6 +21,8 @@ type LoginFormProps = React.ComponentProps<'div'> & {
   onOAuthLogin?: (provider: OAuthProvider) => Promise<void> | void;
   statusMessage?: string | null;
   errorMessage?: string | null;
+  enableGoogleSignIn?: boolean;
+  enableAppleSignIn?: boolean;
 };
 
 function GoogleIcon() {
@@ -55,10 +57,13 @@ export function LoginForm({
   onOAuthLogin,
   statusMessage,
   errorMessage,
+  enableGoogleSignIn = true,
+  enableAppleSignIn = true,
   ...props
 }: LoginFormProps) {
   const [email, setEmail] = React.useState('');
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const showOAuthOptions = enableGoogleSignIn || enableAppleSignIn;
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -100,17 +105,33 @@ export function LoginForm({
               automatically if you&apos;re new.
             </FieldDescription>
           </div>
-          <Field>
-            <Button type="button" onClick={handleOAuthLogin('google')} variant="default">
-              <GoogleIcon />
-              Continue with Google
-            </Button>
-            <Button type="button" onClick={handleOAuthLogin('apple')} variant="default">
-              <AppleIcon />
-              Continue with Apple
-            </Button>
-          </Field>
-          <FieldSeparator>Or</FieldSeparator>
+          {showOAuthOptions ? (
+            <>
+              <Field>
+                {enableGoogleSignIn ? (
+                  <Button
+                    type="button"
+                    onClick={handleOAuthLogin('google')}
+                    variant="default"
+                  >
+                    <GoogleIcon />
+                    Continue with Google
+                  </Button>
+                ) : null}
+                {enableAppleSignIn ? (
+                  <Button
+                    type="button"
+                    onClick={handleOAuthLogin('apple')}
+                    variant="default"
+                  >
+                    <AppleIcon />
+                    Continue with Apple
+                  </Button>
+                ) : null}
+              </Field>
+              <FieldSeparator>Or</FieldSeparator>
+            </>
+          ) : null}
           <Field>
             <div className="space-y-1 text-center text-xs text-muted-foreground">
               <p className="">

@@ -29,6 +29,8 @@ import { useTheme } from '@/providers/theme-provider';
 import { useAnalytics } from '@/providers/analytics-provider';
 import { AnalyticsEvent } from '@iconicedu/utils';
 import type { AppColors } from '@/lib/theme';
+import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
+import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
 
 // ─── Decorative background (circles, ring, diamond, grid) ─────────────────────
 
@@ -353,6 +355,13 @@ export default function LoginScreen() {
   const { colors, isDark } = useTheme();
   const analytics = useAnalytics();
   const s = useMemo(() => makeStyles(colors), [colors]);
+  const enableGoogleSignIn = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.enableMobileGoogleSignIn,
+  );
+  const enableAppleSignIn = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.enableMobileAppleSignIn,
+  );
+  const showSocialSignIn = enableGoogleSignIn || enableAppleSignIn;
 
   React.useEffect(() => {
     analytics.screen('Login', { screen_name: 'login' });
@@ -444,7 +453,8 @@ export default function LoginScreen() {
     }
   }, [analytics, clearSessionExpiryMessage, signInWithApple]);
 
-  const socialLoading = googleLoading || appleLoading;
+  const socialLoading =
+    (enableGoogleSignIn && googleLoading) || (enableAppleSignIn && appleLoading);
 
   return (
     <SafeAreaView style={s.safe}>
@@ -521,44 +531,58 @@ export default function LoginScreen() {
             <Text style={s.ctaTxt}>{loading ? 'Sending…' : 'Continue'}</Text>
           </TouchableOpacity>
 
-          {/* Divider */}
-          <View style={s.divRow}>
-            <View style={s.divLine} />
-            <Text style={s.divTxt}>or</Text>
-            <View style={s.divLine} />
-          </View>
+          {showSocialSignIn ? (
+            <>
+              {/* Divider */}
+              <View style={s.divRow}>
+                <View style={s.divLine} />
+                <Text style={s.divTxt}>or</Text>
+                <View style={s.divLine} />
+              </View>
 
-          {/* Google */}
-          <TouchableOpacity
-            style={[s.social, googleLoading ? s.ctaDim : undefined]}
-            activeOpacity={0.8}
-            onPress={handleGoogle}
-            disabled={loading || socialLoading}
-          >
-            {googleLoading ? (
-              <ActivityIndicator size="small" color={colors.textMuted} />
-            ) : (
-              <GoogleIcon />
-            )}
-            <Text style={s.socialTxt}>Continue with Google</Text>
-          </TouchableOpacity>
-          {googleError && <Text style={s.errorTxt}>{googleError}</Text>}
+              {enableGoogleSignIn ? (
+                <>
+                  {/* Google */}
+                  <TouchableOpacity
+                    style={[s.social, googleLoading ? s.ctaDim : undefined]}
+                    activeOpacity={0.8}
+                    onPress={handleGoogle}
+                    disabled={loading || socialLoading}
+                  >
+                    {googleLoading ? (
+                      <ActivityIndicator size="small" color={colors.textMuted} />
+                    ) : (
+                      <GoogleIcon />
+                    )}
+                    <Text style={s.socialTxt}>Continue with Google</Text>
+                  </TouchableOpacity>
+                  {googleError && <Text style={s.errorTxt}>{googleError}</Text>}
+                </>
+              ) : null}
 
-          {/* Apple */}
-          <TouchableOpacity
-            style={[s.social, s.appleSocial, appleLoading ? s.ctaDim : undefined]}
-            activeOpacity={0.8}
-            onPress={handleApple}
-            disabled={loading || socialLoading}
-          >
-            {appleLoading ? (
-              <ActivityIndicator size="small" color={colors.bg} />
-            ) : (
-              <AppleIcon color={colors.bg} />
-            )}
-            <Text style={[s.socialTxt, s.appleSocialTxt]}>Continue with Apple</Text>
-          </TouchableOpacity>
-          {appleError && <Text style={s.errorTxt}>{appleError}</Text>}
+              {enableAppleSignIn ? (
+                <>
+                  {/* Apple */}
+                  <TouchableOpacity
+                    style={[s.social, s.appleSocial, appleLoading ? s.ctaDim : undefined]}
+                    activeOpacity={0.8}
+                    onPress={handleApple}
+                    disabled={loading || socialLoading}
+                  >
+                    {appleLoading ? (
+                      <ActivityIndicator size="small" color={colors.bg} />
+                    ) : (
+                      <AppleIcon color={colors.bg} />
+                    )}
+                    <Text style={[s.socialTxt, s.appleSocialTxt]}>
+                      Continue with Apple
+                    </Text>
+                  </TouchableOpacity>
+                  {appleError && <Text style={s.errorTxt}>{appleError}</Text>}
+                </>
+              ) : null}
+            </>
+          ) : null}
 
           <Text style={s.noAcct}>
             Parent accounts can sign up directly. Students and educators need an

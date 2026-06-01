@@ -7,6 +7,7 @@ import { resolveOrgDashboardPath } from '@iconicedu/web/lib/org/resolve-dashboar
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
+import { enableMobileAppleSignIn, enableMobileGoogleSignIn } from '@iconicedu/web/flags';
 
 export const metadata: Metadata = {
   title: 'Get Started | ICONIC Academy',
@@ -55,6 +56,11 @@ export default async function OrgGetStartedPage({
     );
   }
 
+  const [showGoogleSignIn, showAppleSignIn] = await Promise.all([
+    enableMobileGoogleSignIn(),
+    enableMobileAppleSignIn(),
+  ]);
+
   return (
     <div className="bg-background flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
       <div className="w-full max-w-sm">
@@ -62,6 +68,8 @@ export default async function OrgGetStartedPage({
           orgSlug={org.slug}
           orgName={org.name}
           initialEmail={initialEmail}
+          enableGoogleSignIn={showGoogleSignIn}
+          enableAppleSignIn={showAppleSignIn}
         />
       </div>
     </div>

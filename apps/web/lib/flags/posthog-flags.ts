@@ -7,7 +7,6 @@ import type {
   Provider,
   ResolutionDetails,
 } from '@openfeature/server-sdk';
-import { resolveAppUrl } from '@iconicedu/web/lib/config/app-url';
 
 type EvaluatePosthogBooleanFlagInput = {
   flagKey: string;
@@ -30,14 +29,6 @@ function getPosthogHost() {
 
 function getPosthogKey() {
   return (process.env.POSTHOG_KEY ?? process.env.NEXT_PUBLIC_POSTHOG_KEY ?? '').trim();
-}
-
-function isLocalWebEnvironment() {
-  if (process.env.NODE_ENV !== 'development') {
-    return false;
-  }
-  const hostname = new URL(resolveAppUrl()).hostname;
-  return hostname === 'localhost' || hostname === '127.0.0.1';
 }
 
 function getFeatureFlagValue(payload: unknown, flagKey: string) {
@@ -78,7 +69,7 @@ class PosthogOpenFeatureProvider implements Provider {
     const apiKey = getPosthogKey();
     const host = getPosthogHost();
 
-    if (!distinctId || !flagKey.trim() || !apiKey || !host || isLocalWebEnvironment()) {
+    if (!distinctId || !flagKey.trim() || !apiKey || !host) {
       return { value: defaultValue, reason: 'DEFAULT' };
     }
 

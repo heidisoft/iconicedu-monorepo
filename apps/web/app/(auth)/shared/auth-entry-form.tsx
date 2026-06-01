@@ -31,6 +31,8 @@ type AuthEntryFormProps = React.ComponentProps<'div'> & {
   submitLabel?: string;
   submitLoadingLabel?: string;
   oauthActionVerb?: OAuthActionVerb;
+  enableGoogleSignIn?: boolean;
+  enableAppleSignIn?: boolean;
   footerLinkLabel?: string;
   footerLinkHref?: string;
   footerLinkIntro?: string;
@@ -98,6 +100,8 @@ export function AuthEntryForm({
   submitLabel = 'Send secure link',
   submitLoadingLabel = 'Sending secure link...',
   oauthActionVerb = 'login',
+  enableGoogleSignIn = true,
+  enableAppleSignIn = true,
   footerLinkLabel,
   footerLinkHref,
   footerLinkIntro,
@@ -110,6 +114,7 @@ export function AuthEntryForm({
     React.useState<OAuthProvider | null>(null);
 
   const isSubmitting = isEmailSubmitting || oauthSubmittingProvider !== null;
+  const showOAuthOptions = enableGoogleSignIn || enableAppleSignIn;
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -212,43 +217,51 @@ export function AuthEntryForm({
               )}
             </Button>
           </Field>
-          <FieldSeparator className="my-0">OR</FieldSeparator>
-          <Field>
-            <Button
-              type="button"
-              onClick={handleOAuthLogin('google')}
-              variant="default"
-              disabled={isSubmitting}
-            >
-              {oauthSubmittingProvider === 'google' ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <GoogleIcon />
-              )}
-              {getOAuthButtonLabel(
-                'google',
-                oauthSubmittingProvider === 'google',
-                oauthActionVerb,
-              )}
-            </Button>
-            <Button
-              type="button"
-              onClick={handleOAuthLogin('apple')}
-              variant="default"
-              disabled={isSubmitting}
-            >
-              {oauthSubmittingProvider === 'apple' ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <AppleIcon />
-              )}
-              {getOAuthButtonLabel(
-                'apple',
-                oauthSubmittingProvider === 'apple',
-                oauthActionVerb,
-              )}
-            </Button>
-          </Field>
+          {showOAuthOptions ? (
+            <>
+              <FieldSeparator className="my-0">OR</FieldSeparator>
+              <Field>
+                {enableGoogleSignIn ? (
+                  <Button
+                    type="button"
+                    onClick={handleOAuthLogin('google')}
+                    variant="default"
+                    disabled={isSubmitting}
+                  >
+                    {oauthSubmittingProvider === 'google' ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <GoogleIcon />
+                    )}
+                    {getOAuthButtonLabel(
+                      'google',
+                      oauthSubmittingProvider === 'google',
+                      oauthActionVerb,
+                    )}
+                  </Button>
+                ) : null}
+                {enableAppleSignIn ? (
+                  <Button
+                    type="button"
+                    onClick={handleOAuthLogin('apple')}
+                    variant="default"
+                    disabled={isSubmitting}
+                  >
+                    {oauthSubmittingProvider === 'apple' ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <AppleIcon />
+                    )}
+                    {getOAuthButtonLabel(
+                      'apple',
+                      oauthSubmittingProvider === 'apple',
+                      oauthActionVerb,
+                    )}
+                  </Button>
+                ) : null}
+              </Field>
+            </>
+          ) : null}
           <div className="space-y-1 text-center text-xs text-muted-foreground">
             <p>{trustLine}</p>
           </div>

@@ -715,7 +715,7 @@ jobs:
             --arg evt   "${{ secrets.INTERNAL_EVENTS_TOKEN }}" \
             --arg expo  "${{ secrets.EXPO_ACCESS_TOKEN || secrets.EXPO_TOKEN }}" \
             --arg phk   "${{ secrets.POSTHOG_KEY }}" \
-            --arg phh   "${{ vars.POSTHOG_HOST }}" \
+            --arg phh   "${{ vars.POSTHOG_HOST || 'https://t.iconicedu.lk' }}" \
             '{DATABASE_URL:$db, DIRECT_URL:$dir, SUPABASE_URL:$surl,
               SUPABASE_SERVICE_ROLE_KEY:$srkey, SUPABASE_ANON_KEY:$anon, SUPABASE_JWT_SECRET:$jwt,
               INTERNAL_EVENTS_TOKEN:$evt,

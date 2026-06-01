@@ -14,7 +14,9 @@ import {
   enableClassScheduleStaffEdit,
   enableMarketingSitePages,
   enableMessageTypeComposer,
+  enableMobileAppleSignIn,
   enableMobileDirectMessageStart,
+  enableMobileGoogleSignIn,
   getFlagsProviderData,
   isVercelFlagsSdkConfigured,
   webFlags,
@@ -61,6 +63,16 @@ describe('web flags', () => {
     expect(webFlags.enableMobileDirectMessageStart).toBe(enableMobileDirectMessageStart);
   });
 
+  it('declares the mobile social sign-in flags with stable metadata', () => {
+    expect(enableMobileGoogleSignIn.key).toBe('enable-mobile-google-sign-in');
+    expect(enableMobileGoogleSignIn.defaultValue).toBe(false);
+    expect(webFlags.enableMobileGoogleSignIn).toBe(enableMobileGoogleSignIn);
+
+    expect(enableMobileAppleSignIn.key).toBe('enable-mobile-apple-sign-in');
+    expect(enableMobileAppleSignIn.defaultValue).toBe(false);
+    expect(webFlags.enableMobileAppleSignIn).toBe(enableMobileAppleSignIn);
+  });
+
   it('declares the class schedule cancel flag with stable metadata', () => {
     expect(enableClassScheduleStaffCancel.key).toBe('enable-class-schedule-staff-cancel');
     expect(enableClassScheduleStaffCancel.defaultValue).toBe(true);
@@ -90,12 +102,12 @@ describe('web flags', () => {
     expect(isVercelFlagsSdkConfigured()).toBe(true);
   });
 
-  it('does not require PostHog when running in preview', () => {
+  it('reports configured when PostHog is provided in preview', () => {
     process.env.VERCEL_ENV = 'preview';
     process.env.POSTHOG_KEY = 'phc_test';
     process.env.POSTHOG_HOST = 'https://posthog.example.com';
 
-    expect(isVercelFlagsSdkConfigured()).toBe(false);
+    expect(isVercelFlagsSdkConfigured()).toBe(true);
   });
 
   it('evaluates channel communications via PostHog using anonymous fallback', async () => {
@@ -116,8 +128,9 @@ describe('web flags', () => {
     });
   });
 
-  it('enables flags by default in preview without calling PostHog', async () => {
+  it('evaluates flags via PostHog in preview', async () => {
     process.env.VERCEL_ENV = 'preview';
+    evaluatePosthogBooleanFlag.mockResolvedValueOnce(false);
 
     await expect(
       (
@@ -127,8 +140,11 @@ describe('web flags', () => {
           }) => Promise<boolean>;
         }
       ).decide({ entities: { profileId: 'profile-1' } }),
-    ).resolves.toBe(true);
-    expect(evaluatePosthogBooleanFlag).not.toHaveBeenCalled();
+    ).resolves.toBe(false);
+    expect(evaluatePosthogBooleanFlag).toHaveBeenCalledWith({
+      flagKey: 'enable-channel-communications',
+      distinctId: 'profile-1',
+    });
   });
 
   it('builds provider data for flag discovery', async () => {

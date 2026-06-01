@@ -15,6 +15,8 @@ type OrgLoginClientProps = {
   orgSlug: string;
   orgName: string;
   loginReason?: 'session-expired' | null;
+  enableGoogleSignIn?: boolean;
+  enableAppleSignIn?: boolean;
 };
 
 export function resolveOrgLoginCallbackUrl(orgSlug: string): string {
@@ -41,6 +43,8 @@ export default function OrgLoginClient({
   orgSlug,
   orgName,
   loginReason = null,
+  enableGoogleSignIn = false,
+  enableAppleSignIn = false,
 }: OrgLoginClientProps) {
   const router = useRouter();
   const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
@@ -147,6 +151,8 @@ export default function OrgLoginClient({
       trustLine="Secure login. No password required. Organization access only."
       submitLabel="Send verification code"
       submitLoadingLabel="Sending verification code..."
+      enableGoogleSignIn={enableGoogleSignIn}
+      enableAppleSignIn={enableAppleSignIn}
       footerLinkIntro="New to ICONIC Academy?"
       footerLinkLabel="Get started here"
       footerLinkHref={`/${orgSlug}/get-started${currentEmail ? `?email=${encodeURIComponent(currentEmail)}` : ''}`}

@@ -14,6 +14,8 @@ type OrgGetStartedClientProps = {
   orgSlug: string;
   orgName: string;
   initialEmail?: string;
+  enableGoogleSignIn?: boolean;
+  enableAppleSignIn?: boolean;
 };
 
 export function resolveOrgGetStartedCallbackUrl(orgSlug: string): string {
@@ -31,6 +33,8 @@ export default function OrgGetStartedClient({
   orgSlug,
   orgName,
   initialEmail,
+  enableGoogleSignIn = false,
+  enableAppleSignIn = false,
 }: OrgGetStartedClientProps) {
   const router = useRouter();
   const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
@@ -89,6 +93,8 @@ export default function OrgGetStartedClient({
       introText=""
       trustLine="Create your account to get started with guided onboarding for your organization."
       oauthActionVerb="sign-up"
+      enableGoogleSignIn={enableGoogleSignIn}
+      enableAppleSignIn={enableAppleSignIn}
       submitLabel="Send verification code"
       submitLoadingLabel="Sending verification code..."
       footerLinkIntro="Already have an account?"

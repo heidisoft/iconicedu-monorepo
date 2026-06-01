@@ -5,19 +5,8 @@ const POSTHOG_HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST ?? 'https://t.iconiced
 
 let initialized = false;
 
-function isLocalWebRuntime() {
-  if (typeof window === 'undefined') return false;
-  const hostname = window.location.hostname;
-  return hostname === 'localhost' || hostname === '127.0.0.1';
-}
-
 export function initPostHog() {
-  if (
-    initialized ||
-    typeof window === 'undefined' ||
-    !POSTHOG_KEY ||
-    isLocalWebRuntime()
-  ) {
+  if (initialized || typeof window === 'undefined' || !POSTHOG_KEY) {
     return;
   }
   initialized = true;
