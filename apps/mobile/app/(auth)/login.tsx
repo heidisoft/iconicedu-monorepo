@@ -10,7 +10,6 @@ import {
   Pressable,
   ScrollView,
   ActivityIndicator,
-  Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -30,6 +29,8 @@ import { useTheme } from '@/providers/theme-provider';
 import { useAnalytics } from '@/providers/analytics-provider';
 import { AnalyticsEvent } from '@iconicedu/utils';
 import type { AppColors } from '@/lib/theme';
+import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
+import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
 
 // ─── Decorative background (circles, ring, diamond, grid) ─────────────────────
 
@@ -197,6 +198,21 @@ function GoogleIcon() {
   );
 }
 
+function AppleIcon({ color }: { color: string }) {
+  return (
+    <Svg width={20} height={20} viewBox="7 5 12.5 15">
+      <Path
+        d="M17.05 12.58c-.03-2.06 1.68-3.05 1.76-3.1-1-.46-2.04-.52-2.47-.53-1.05-.11-2.06.62-2.59.62-.54 0-1.37-.61-2.25-.59-1.16.02-2.23.67-2.83 1.71-1.21 2.1-.31 5.2.87 6.9.58.83 1.26 1.77 2.17 1.73.87-.03 1.2-.56 2.25-.56 1.05 0 1.35.56 2.27.54.94-.02 1.53-.85 2.1-1.69.66-.96.93-1.89.94-1.94-.02-.01-1.81-.69-1.83-2.74z"
+        fill={color}
+      />
+      <Path
+        d="M15.65 7.84c.48-.58.8-1.38.71-2.18-.69.03-1.53.46-2.03 1.04-.44.51-.83 1.33-.73 2.11.78.06 1.57-.39 2.05-.97z"
+        fill={color}
+      />
+    </Svg>
+  );
+}
+
 // ─── Styles ────────────────────────────────────────────────────────────────────
 
 function makeStyles(C: AppColors) {
@@ -223,6 +239,23 @@ function makeStyles(C: AppColors) {
         textAlign: 'center',
       },
       sub: { fontSize: 16, color: C.textMuted, lineHeight: 22, textAlign: 'center' },
+      tabRow: {
+        flexDirection: 'row',
+        backgroundColor: C.inputBg,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: C.border,
+        padding: 4,
+      },
+      tab: {
+        flex: 1,
+        alignItems: 'center',
+        borderRadius: 10,
+        paddingVertical: 10,
+      },
+      tabActive: { backgroundColor: C.card },
+      tabTxt: { fontSize: 15, fontWeight: '700', color: C.textMuted },
+      tabTxtActive: { color: C.text },
 
       field: { gap: 6 },
       label: { fontSize: 14, fontWeight: '500', color: C.textMuted },
@@ -285,6 +318,8 @@ function makeStyles(C: AppColors) {
 
       noAcct: { fontSize: 14, color: C.textMuted, textAlign: 'center', lineHeight: 19 },
       noAcctLink: { color: C.teal, fontWeight: '600' },
+      appleSocial: { backgroundColor: C.text, borderColor: C.text },
+      appleSocialTxt: { color: C.bg },
 
       terms: {
         paddingHorizontal: 24,
@@ -305,11 +340,14 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [googleError, setGoogleError] = useState<string | null>(null);
+  const [appleError, setAppleError] = useState<string | null>(null);
   const {
-    signInWithOtp,
+    signUpWithOtp,
     signInWithGoogle,
+    signInWithApple,
     sessionExpiryMessage,
     clearSessionExpiryMessage,
   } = useAuth();
@@ -317,49 +355,106 @@ export default function LoginScreen() {
   const { colors, isDark } = useTheme();
   const analytics = useAnalytics();
   const s = useMemo(() => makeStyles(colors), [colors]);
+  const enableGoogleSignIn = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.enableMobileGoogleSignIn,
+  );
+  const enableAppleSignIn = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.enableMobileAppleSignIn,
+  );
+  const showSocialSignIn = enableGoogleSignIn || enableAppleSignIn;
 
   React.useEffect(() => {
     analytics.screen('Login', { screen_name: 'login' });
   }, [analytics]);
 
-  const handleLogin = useCallback(async () => {
+  const handleEmailContinue = useCallback(async () => {
     if (!email.trim()) {
       setError('Please enter your email address');
       return;
     }
-    setLoading(true);
-    setError(null);
-    clearSessionExpiryMessage();
-    analytics.capture(AnalyticsEvent.LOGIN_OTP_REQUESTED, { method: 'email' });
-    const { error: signInError } = await signInWithOtp(email.trim());
-    if (signInError) {
-      analytics.capture(AnalyticsEvent.LOGIN_ERROR, {
-        method: 'email',
-        error: signInError,
-      });
-      setError(signInError);
+    try {
+      setLoading(true);
+      setError(null);
+      clearSessionExpiryMessage();
+      analytics.capture(AnalyticsEvent.LOGIN_OTP_REQUESTED, { method: 'email' });
+      const { error: signInError } = await signUpWithOtp(email.trim());
+      if (signInError) {
+        analytics.capture(AnalyticsEvent.LOGIN_ERROR, {
+          method: 'email',
+          error: signInError,
+        });
+        setError(signInError);
+        return;
+      }
+      router.push({ pathname: '/(auth)/otp', params: { email: email.trim() } });
+    } catch (loginError) {
+      const message =
+        loginError instanceof Error
+          ? loginError.message
+          : 'Could not send your sign-in code. Please try again.';
+      analytics.capture(AnalyticsEvent.LOGIN_ERROR, { method: 'email', error: message });
+      setError(message);
+    } finally {
       setLoading(false);
-      return;
     }
-    setLoading(false);
-    router.push({ pathname: '/(auth)/otp', params: { email: email.trim() } });
-  }, [analytics, clearSessionExpiryMessage, email, router, signInWithOtp]);
+  }, [analytics, clearSessionExpiryMessage, email, router, signUpWithOtp]);
 
   const handleGoogle = useCallback(async () => {
-    setGoogleLoading(true);
-    setGoogleError(null);
-    clearSessionExpiryMessage();
-    analytics.capture(AnalyticsEvent.LOGIN_GOOGLE_STARTED);
-    const { error: googleErr } = await signInWithGoogle();
-    if (googleErr) {
-      analytics.capture(AnalyticsEvent.LOGIN_ERROR, {
-        method: 'google',
-        error: googleErr,
-      });
-      setGoogleError(googleErr);
+    try {
+      setGoogleLoading(true);
+      setGoogleError(null);
+      clearSessionExpiryMessage();
+      analytics.capture(AnalyticsEvent.LOGIN_GOOGLE_STARTED);
+      const { error: googleErr } = await signInWithGoogle();
+      if (googleErr) {
+        analytics.capture(AnalyticsEvent.LOGIN_ERROR, {
+          method: 'google',
+          error: googleErr,
+        });
+        setGoogleError(googleErr);
+      }
+      // Navigation is handled by (auth)/_layout → (app)/_layout → profile-setup if needed
+    } catch (googleErr) {
+      const message =
+        googleErr instanceof Error
+          ? googleErr.message
+          : 'Could not complete Google sign-in. Please try again.';
+      analytics.capture(AnalyticsEvent.LOGIN_ERROR, { method: 'google', error: message });
+      setGoogleError(message);
+    } finally {
+      setGoogleLoading(false);
     }
-    setGoogleLoading(false);
   }, [analytics, clearSessionExpiryMessage, signInWithGoogle]);
+
+  const handleApple = useCallback(async () => {
+    try {
+      setAppleLoading(true);
+      setAppleError(null);
+      clearSessionExpiryMessage();
+      analytics.capture(AnalyticsEvent.LOGIN_APPLE_STARTED);
+      const { error: appleErr } = await signInWithApple();
+      if (appleErr) {
+        analytics.capture(AnalyticsEvent.LOGIN_ERROR, {
+          method: 'apple',
+          error: appleErr,
+        });
+        setAppleError(appleErr);
+      }
+      // Navigation is handled by (auth)/_layout → (app)/_layout → profile-setup if needed
+    } catch (appleErr) {
+      const message =
+        appleErr instanceof Error
+          ? appleErr.message
+          : 'Could not complete Apple sign-in. Please try again.';
+      analytics.capture(AnalyticsEvent.LOGIN_ERROR, { method: 'apple', error: message });
+      setAppleError(message);
+    } finally {
+      setAppleLoading(false);
+    }
+  }, [analytics, clearSessionExpiryMessage, signInWithApple]);
+
+  const socialLoading =
+    (enableGoogleSignIn && googleLoading) || (enableAppleSignIn && appleLoading);
 
   return (
     <SafeAreaView style={s.safe}>
@@ -380,12 +475,11 @@ export default function LoginScreen() {
           </View>
 
           {/* Heading */}
-          <Text style={s.heading}>Welcome back</Text>
+          <Text style={s.heading}>Welcome to ICONIC Academy</Text>
 
           {/* Subtitle */}
           <Text style={s.sub}>
-            Enter your email address to receive a sign-in code.{'\n'}Only registered
-            accounts can sign in.
+            Enter your email to sign in or create a parent account.
           </Text>
 
           {/* Email input */}
@@ -405,9 +499,9 @@ export default function LoginScreen() {
                 autoComplete="email"
                 placeholder="you@example.com"
                 placeholderTextColor={s.placeholderColor}
-                editable={!loading}
+                editable={!loading && !socialLoading}
                 returnKeyType="done"
-                onSubmitEditing={handleLogin}
+                onSubmitEditing={handleEmailContinue}
               />
               {email.length > 0 && (
                 <Pressable
@@ -429,47 +523,70 @@ export default function LoginScreen() {
           {/* CTA */}
           <TouchableOpacity
             style={[s.cta, loading ? s.ctaDim : undefined]}
-            onPress={handleLogin}
-            disabled={loading}
+            onPress={handleEmailContinue}
+            disabled={loading || socialLoading}
             activeOpacity={0.85}
           >
             {loading && <ActivityIndicator size="small" color={colors.tealFg} />}
-            <Text style={s.ctaTxt}>{loading ? 'Sending…' : 'Send code'}</Text>
+            <Text style={s.ctaTxt}>{loading ? 'Sending…' : 'Continue'}</Text>
           </TouchableOpacity>
 
-          {/* Divider */}
-          <View style={s.divRow}>
-            <View style={s.divLine} />
-            <Text style={s.divTxt}>or</Text>
-            <View style={s.divLine} />
-          </View>
+          {showSocialSignIn ? (
+            <>
+              {/* Divider */}
+              <View style={s.divRow}>
+                <View style={s.divLine} />
+                <Text style={s.divTxt}>or</Text>
+                <View style={s.divLine} />
+              </View>
 
-          {/* Google */}
-          <TouchableOpacity
-            style={[s.social, googleLoading ? s.ctaDim : undefined]}
-            activeOpacity={0.8}
-            onPress={handleGoogle}
-            disabled={googleLoading}
-          >
-            {googleLoading ? (
-              <ActivityIndicator size="small" color={colors.textMuted} />
-            ) : (
-              <GoogleIcon />
-            )}
-            <Text style={s.socialTxt}>Continue with Google</Text>
-          </TouchableOpacity>
-          {googleError && <Text style={s.errorTxt}>{googleError}</Text>}
+              {enableGoogleSignIn ? (
+                <>
+                  {/* Google */}
+                  <TouchableOpacity
+                    style={[s.social, googleLoading ? s.ctaDim : undefined]}
+                    activeOpacity={0.8}
+                    onPress={handleGoogle}
+                    disabled={loading || socialLoading}
+                  >
+                    {googleLoading ? (
+                      <ActivityIndicator size="small" color={colors.textMuted} />
+                    ) : (
+                      <GoogleIcon />
+                    )}
+                    <Text style={s.socialTxt}>Continue with Google</Text>
+                  </TouchableOpacity>
+                  {googleError && <Text style={s.errorTxt}>{googleError}</Text>}
+                </>
+              ) : null}
 
-          {/* No account helper */}
+              {enableAppleSignIn ? (
+                <>
+                  {/* Apple */}
+                  <TouchableOpacity
+                    style={[s.social, s.appleSocial, appleLoading ? s.ctaDim : undefined]}
+                    activeOpacity={0.8}
+                    onPress={handleApple}
+                    disabled={loading || socialLoading}
+                  >
+                    {appleLoading ? (
+                      <ActivityIndicator size="small" color={colors.bg} />
+                    ) : (
+                      <AppleIcon color={colors.bg} />
+                    )}
+                    <Text style={[s.socialTxt, s.appleSocialTxt]}>
+                      Continue with Apple
+                    </Text>
+                  </TouchableOpacity>
+                  {appleError && <Text style={s.errorTxt}>{appleError}</Text>}
+                </>
+              ) : null}
+            </>
+          ) : null}
+
           <Text style={s.noAcct}>
-            {"Don't have an account? Visit "}
-            <Text
-              style={s.noAcctLink}
-              onPress={() => Linking.openURL('https://www.iconicedu.com')}
-            >
-              www.iconicedu.com
-            </Text>
-            {' to sign up.'}
+            Parent accounts can sign up directly. Students and educators need an
+            invitation.
           </Text>
         </ScrollView>
 

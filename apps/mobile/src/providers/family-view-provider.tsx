@@ -47,6 +47,7 @@ type FamilyViewContextValue = {
   isViewingAsChild: boolean;
   viewingAsProfileId: string | null;
   isPending: boolean;
+  isError: boolean;
   switchFamilyView: (childProfileId: string | null) => Promise<void>;
   refresh: () => Promise<void>;
 };
@@ -103,6 +104,7 @@ export function FamilyViewProvider({ children }: { children: React.ReactNode }) 
     queryKey: ['account-base', user?.id],
     queryFn: fetchUserAccount,
     enabled: !!user,
+    retry: 1,
   });
 
   const baseAccount = (baseAccountQuery.data ?? null) as Record<string, unknown> | null;
@@ -377,17 +379,31 @@ export function FamilyViewProvider({ children }: { children: React.ReactNode }) 
       familySwitchOptions,
       isViewingAsChild,
       viewingAsProfileId,
-      isPending:
-        baseAccountQuery.isPending ||
-        baseProfilesQuery.isPending ||
-        !selectionHydrated ||
-        effectiveProfileQuery.isPending,
+      isPending: (() => {
+        // Short-circuit: if baseAccountQuery has already failed, nothing else will load.
+        // Disabled downstream queries keep isPending=true in RQ v5, so we must not
+        // include them when the root query has errored.
+        if (!baseAccountQuery.isPending && baseAccountQuery.isError) return false;
+        return (
+          baseAccountQuery.isPending ||
+          baseProfilesQuery.isPending ||
+          !selectionHydrated ||
+          effectiveProfileQuery.isPending
+        );
+      })(),
+      isError:
+        (!baseAccountQuery.isPending && baseAccountQuery.isError) ||
+        (!baseAccountQuery.isPending &&
+          !baseProfilesQuery.isPending &&
+          baseProfilesQuery.isError),
       switchFamilyView,
       refresh,
     }),
     [
       baseAccountId,
+      baseAccountQuery.isError,
       baseAccountQuery.isPending,
+      baseProfilesQuery.isError,
       baseProfilesQuery.isPending,
       effectiveAccount,
       effectiveProfile,

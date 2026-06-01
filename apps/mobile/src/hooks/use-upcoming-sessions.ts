@@ -54,6 +54,7 @@ function isScopedSchedule(input: {
 export function useUpcomingSessions(): {
   sessions: ClassSession[];
   isPending: boolean;
+  isError: boolean;
   refetch: () => Promise<unknown>;
 } {
   const { data: account } = useAccount();
@@ -99,6 +100,7 @@ export function useUpcomingSessions(): {
   return {
     sessions,
     isPending: query.isPending,
+    isError: query.isError,
     refetch: query.refetch,
   };
 }

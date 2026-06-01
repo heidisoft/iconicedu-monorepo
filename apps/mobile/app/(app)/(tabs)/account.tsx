@@ -34,6 +34,7 @@ import { useProfile } from '@/hooks/use-profile';
 import type { AppColors } from '@/lib/theme';
 import { createHeaderSurface } from '@/lib/header-surface';
 import { ProfileSkeleton } from '@/components/skeletons';
+import { QueryError } from '@/components/errors/query-error';
 import { profileAvatarColors } from '@/lib/profile-avatar-colors';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -198,11 +199,13 @@ export default function AccountScreen() {
   const {
     data: account,
     isPending: accountLoading,
+    isError: accountError,
     refetch: refetchAccount,
   } = useAccount();
   const {
     data: profile,
     isPending: profileLoading,
+    isError: profileError,
     refetch: refetchProfile,
   } = useProfile();
   const router = useRouter();
@@ -263,6 +266,17 @@ export default function AccountScreen() {
           <Text style={s.pageTitle}>Account</Text>
         </View>
         <ProfileSkeleton />
+      </SafeAreaView>
+    );
+  }
+
+  if ((accountError || profileError) && !account && !profile) {
+    return (
+      <SafeAreaView style={s.safe} edges={['top']}>
+        <View style={s.header}>
+          <Text style={s.pageTitle}>Account</Text>
+        </View>
+        <QueryError onRetry={onRefresh} />
       </SafeAreaView>
     );
   }

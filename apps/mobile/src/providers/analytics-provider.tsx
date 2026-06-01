@@ -19,15 +19,12 @@ const POSTHOG_HOST: string =
   (Constants.expoConfig?.extra?.['posthogHost'] as string | undefined) ??
   process.env.POSTHOG_HOST ??
   process.env.EXPO_PUBLIC_POSTHOG_HOST ??
-  'https://us.i.posthog.com';
+  'https://t.iconicedu.lk';
 
 // Only enable session replay when the native module is actually linked.
 // Without this guard, PostHogProvider crashes in Expo Go / non-prebuild builds,
 // taking ALL event capture down with it.
 const ENABLE_SESSION_REPLAY = !!NativeModules.PosthogReactNativeSessionReplay;
-const POSTHOG_DISABLED_LOCALLY =
-  // eslint-disable-next-line no-undef
-  typeof __DEV__ !== 'undefined' && __DEV__ && process.env.NODE_ENV !== 'test';
 
 // ─── Vendor-agnostic context ──────────────────────────────────────────────────
 
@@ -94,7 +91,7 @@ function AnalyticsBridge({ children }: { children: React.ReactNode }) {
  * in the PostHog Activity Feed immediately without waiting for the 30 s batch.
  */
 export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
-  if (!POSTHOG_KEY || POSTHOG_DISABLED_LOCALLY) {
+  if (!POSTHOG_KEY) {
     // No key configured — use noop in dev/CI to avoid crashing.
     return (
       <MobileFeatureFlagsProvider client={null}>

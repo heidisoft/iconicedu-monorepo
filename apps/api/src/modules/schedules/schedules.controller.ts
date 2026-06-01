@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from '@iconicedu/api/modules/auth/auth.guard';
 import { SchedulesService } from '@iconicedu/api/modules/schedules/schedules.service';
 import {
@@ -23,6 +32,9 @@ export class SchedulesController {
     @Query('orgId') orgId: string,
     @Query('channelId') channelId?: string,
   ) {
+    if (!orgId || typeof orgId !== 'string') {
+      throw new BadRequestException('orgId is required');
+    }
     return this.schedulesService.list(extractBearerToken(req.headers.authorization), {
       orgId,
       channelId,

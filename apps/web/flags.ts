@@ -1,24 +1,5 @@
 import { flag, getProviderData as getCodeProviderData } from 'flags/next';
 import { platformFeatureFlagKeys } from '@iconicedu/shared-types';
-import { resolveAppUrl } from '@iconicedu/web/lib/config/app-url';
-
-function isLocalOrPreviewEnvironment() {
-  const vercelEnv = (
-    process.env.VERCEL_ENV?.trim() ??
-    process.env.NEXT_PUBLIC_VERCEL_ENV?.trim() ??
-    ''
-  ).toLowerCase();
-  if (vercelEnv === 'preview') {
-    return true;
-  }
-
-  if (process.env.NODE_ENV !== 'development') {
-    return false;
-  }
-
-  const hostname = new URL(resolveAppUrl()).hostname;
-  return hostname === 'localhost' || hostname === '127.0.0.1';
-}
 
 function resolveDistinctId(profileId?: string | null) {
   const resolved = profileId?.trim();
@@ -32,10 +13,6 @@ async function evaluateWebBooleanFlag(input: {
   flagKey: string;
   profileId?: string | null;
 }) {
-  if (isLocalOrPreviewEnvironment()) {
-    return true;
-  }
-
   const { evaluatePosthogBooleanFlag } =
     await import('@iconicedu/web/lib/flags/posthog-flags');
   return evaluatePosthogBooleanFlag({
@@ -92,6 +69,38 @@ export const enableMobileDirectMessageStart = flag<
   async decide({ entities }) {
     return evaluateWebBooleanFlag({
       flagKey: platformFeatureFlagKeys.enableMobileDirectMessageStart,
+      profileId: entities?.profileId,
+    });
+  },
+});
+
+export const enableMobileGoogleSignIn = flag<boolean, { profileId?: string | null }>({
+  key: platformFeatureFlagKeys.enableMobileGoogleSignIn,
+  description: 'Shows the Continue with Google option on the mobile login screen.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: platformFeatureFlagKeys.enableMobileGoogleSignIn,
+      profileId: entities?.profileId,
+    });
+  },
+});
+
+export const enableMobileAppleSignIn = flag<boolean, { profileId?: string | null }>({
+  key: platformFeatureFlagKeys.enableMobileAppleSignIn,
+  description: 'Shows the Continue with Apple option on the mobile login screen.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: platformFeatureFlagKeys.enableMobileAppleSignIn,
       profileId: entities?.profileId,
     });
   },
@@ -191,16 +200,14 @@ export const webFlags = {
   enableClassScheduleStaffEdit,
   enableMarketingSitePages,
   enableMessageTypeComposer,
+  enableMobileAppleSignIn,
   enableMobileDirectMessageStart,
+  enableMobileGoogleSignIn,
 } as const;
 
 export type WebFlagKey = keyof typeof webFlags;
 
 export function isVercelFlagsSdkConfigured() {
-  if (isLocalOrPreviewEnvironment()) {
-    return false;
-  }
-
   const posthogKey =
     process.env.POSTHOG_KEY?.trim() ?? process.env.NEXT_PUBLIC_POSTHOG_KEY?.trim() ?? '';
   const posthogHost =

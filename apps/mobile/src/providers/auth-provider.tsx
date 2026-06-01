@@ -11,7 +11,7 @@ import { AppState, type AppStateStatus } from 'react-native';
 import { type Session, type User } from '@supabase/supabase-js';
 import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '@/lib/supabase/client';
-import { activateAccount } from '@/lib/api/queries';
+import { activateAccount, fetchUserAccount } from '@/lib/api/queries';
 import { getStoredPushToken, revokePushToken } from '@/lib/notifications/push-token';
 import { useAnalytics } from '@/providers/analytics-provider';
 import {
@@ -25,7 +25,8 @@ import {
 // Explicit path is required — bare `iconicedu://` does not match Supabase's `iconicedu://**` glob.
 // Ensure `iconicedu://auth-callback` (or `iconicedu://**`) is in
 // Supabase → Auth → URL Configuration → Redirect URLs.
-const GOOGLE_REDIRECT_URI = 'iconicedu://auth-callback';
+const AUTH_REDIRECT_URI = 'iconicedu://auth-callback';
+const AUTH_TIMEOUT_MS = 12_000;
 
 // Required for iOS Safari View Controller / Android Chrome Custom Tab to complete the session
 WebBrowser.maybeCompleteAuthSession();
@@ -36,29 +37,47 @@ type AuthState = {
   loading: boolean;
   sessionExpiryMessage: string | null;
   signInWithOtp: (email: string) => Promise<{ error: string | null }>;
+  signUpWithOtp: (email: string) => Promise<{ error: string | null }>;
   verifyOtp: (email: string, token: string) => Promise<{ error: string | null }>;
+  verifySignupOtp: (email: string, token: string) => Promise<{ error: string | null }>;
   signInWithGoogle: () => Promise<{ error: string | null }>;
+  signInWithApple: () => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   setOnboardingCompletionStatus: (isComplete: boolean | null) => void;
   clearSessionExpiryMessage: () => void;
 };
 
 const AuthContext = createContext<AuthState | null>(null);
+type OAuthProvider = 'apple' | 'google';
+
+function withTimeout<T>(promise: Promise<T>, message: string): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeout = setTimeout(() => reject(new Error(message)), AUTH_TIMEOUT_MS);
+  });
+
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    if (timeout) clearTimeout(timeout);
+  });
+}
+
+type UserAccount = {
+  org_id?: string | null;
+};
 
 /** Check that the signed-in user has an account row with an org assigned. */
-async function checkOrgAssignment(userId: string): Promise<string | null> {
-  const { data: account, error } = await supabase
-    .from('accounts')
-    .select('org_id')
-    .eq('auth_user_id', userId)
-    .maybeSingle();
+async function checkOrgAssignment(): Promise<string | null> {
+  const account = (await withTimeout(
+    fetchUserAccount(),
+    'Account lookup timed out. Please check your connection and try again.',
+  )) as UserAccount | null;
 
-  // If the query itself errors (e.g. RLS blocked before session propagated),
-  // do not sign the user out — let them through and surface data errors later.
-  if (error) return null;
+  if (!account) {
+    await supabase.auth.signOut();
+    return 'No ICONIC Academy account is linked to this sign-in. Please register first or contact your administrator.';
+  }
 
-  // Row found but org not assigned — genuine configuration problem.
-  if (account && !account.org_id) {
+  if (!account.org_id) {
     await supabase.auth.signOut();
     return 'Your account is not linked to an organisation. Please contact your administrator.';
   }
@@ -106,7 +125,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const {
           data: { session: s },
-        } = await supabase.auth.getSession();
+        } = await withTimeout(
+          supabase.auth.getSession(),
+          'Session check timed out. Please try again.',
+        );
 
         if (!s) {
           if (!cancelled) {
@@ -119,7 +141,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const {
           data: { user },
           error,
-        } = await supabase.auth.getUser();
+        } = await withTimeout(
+          supabase.auth.getUser(),
+          'User lookup timed out. Please try again.',
+        );
 
         if (error || !user) {
           if (!cancelled) {
@@ -264,96 +289,179 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error: null };
   }, []);
 
-  /** Verify OTP code and confirm org membership before allowing access. */
-  const verifyOtp = useCallback(async (email: string, token: string) => {
+  const signUpWithOtp = useCallback(async (email: string) => {
     setSessionExpiryMessage(null);
-    const { data, error } = await supabase.auth.verifyOtp({
+    const { error } = await supabase.auth.signInWithOtp({
       email,
-      token,
-      type: 'email',
+      options: { shouldCreateUser: true },
     });
 
-    if (error) return { error: error.message };
-
-    // Explicitly commit the session so the SecureStore adapter has the tokens
-    // persisted before the subsequent accounts query (avoids RLS race condition).
-    if (data.session) {
-      await supabase.auth.setSession({
-        access_token: data.session.access_token,
-        refresh_token: data.session.refresh_token,
-      });
-    }
-
-    if (data.user) {
-      const orgError = await checkOrgAssignment(data.user.id);
-      if (orgError) return { error: orgError };
-    }
-
-    // Mark account as active, mirroring web's /api/accounts/activate step.
-    await activateAccount();
-
-    return { error: null };
+    return { error: error?.message ?? null };
   }, []);
 
+  /** Verify OTP code and confirm org membership before allowing access. */
+  const verifyOtpCode = useCallback(
+    async (email: string, token: string, options: { requireLinkedAccount: boolean }) => {
+      try {
+        setSessionExpiryMessage(null);
+        const { data, error } = await supabase.auth.verifyOtp({
+          email,
+          token,
+          type: 'email',
+        });
+
+        if (error) return { error: error.message };
+
+        // Explicitly commit the session so the SecureStore adapter has the tokens
+        // persisted before the subsequent accounts query (avoids RLS race condition).
+        if (data.session) {
+          await supabase.auth.setSession({
+            access_token: data.session.access_token,
+            refresh_token: data.session.refresh_token,
+          });
+        }
+
+        if (options.requireLinkedAccount && data.user) {
+          const orgError = await checkOrgAssignment();
+          if (orgError) return { error: orgError };
+        }
+
+        if (options.requireLinkedAccount) {
+          // Mark account as active, mirroring web's /api/accounts/activate step.
+          await withTimeout(
+            activateAccount(),
+            'Account activation timed out. Please check your connection and try again.',
+          );
+        }
+
+        return { error: null };
+      } catch (error) {
+        reportObservedError({
+          error,
+          source: 'mobile.auth.verify_otp',
+          message: 'Failed to complete OTP sign-in',
+        });
+        return {
+          error:
+            error instanceof Error
+              ? error.message
+              : 'Could not complete sign-in. Please try again.',
+        };
+      }
+    },
+    [],
+  );
+
+  const verifyOtp = useCallback(
+    (email: string, token: string) =>
+      verifyOtpCode(email, token, { requireLinkedAccount: true }),
+    [verifyOtpCode],
+  );
+
+  const verifySignupOtp = useCallback(
+    (email: string, token: string) =>
+      verifyOtpCode(email, token, { requireLinkedAccount: false }),
+    [verifyOtpCode],
+  );
+
   /**
-   * Sign in with Google via Supabase OAuth (implicit flow).
+   * Sign in with a Supabase OAuth provider (implicit flow).
    * Opens Safari View Controller (iOS) / Chrome Custom Tab (Android).
    * Supabase returns access_token + refresh_token in the URL hash.
    */
-  const signInWithGoogle = useCallback(async () => {
-    setSessionExpiryMessage(null);
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: GOOGLE_REDIRECT_URI,
-        skipBrowserRedirect: true,
-      },
-    });
+  const signInWithOAuthProvider = useCallback(
+    async (provider: OAuthProvider, options: { requireLinkedAccount: boolean }) => {
+      try {
+        setSessionExpiryMessage(null);
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider,
+          options: {
+            redirectTo: AUTH_REDIRECT_URI,
+            skipBrowserRedirect: true,
+          },
+        });
 
-    if (error || !data.url) {
-      return { error: error?.message ?? 'Could not start Google sign-in.' };
-    }
+        if (error || !data.url) {
+          return { error: error?.message ?? `Could not start ${provider} sign-in.` };
+        }
 
-    const browserResult = await WebBrowser.openAuthSessionAsync(
-      data.url,
-      GOOGLE_REDIRECT_URI,
-    );
+        const browserResult = await withTimeout(
+          WebBrowser.openAuthSessionAsync(data.url, AUTH_REDIRECT_URI),
+          'Sign-in timed out. Please check your connection and try again.',
+        );
 
-    if (browserResult.type !== 'success') {
-      return { error: null };
-    }
+        if (browserResult.type !== 'success') {
+          return { error: null };
+        }
 
-    // Implicit flow: tokens arrive in the URL hash fragment
-    const url = browserResult.url;
-    const fragment = url.includes('#') ? url.split('#')[1] : (url.split('?')[1] ?? '');
-    const params = new URLSearchParams(fragment);
-    const accessToken = params.get('access_token');
-    const refreshToken = params.get('refresh_token');
+        // Implicit flow: tokens arrive in the URL hash fragment
+        const url = browserResult.url;
+        const fragment = url.includes('#')
+          ? url.split('#')[1]
+          : (url.split('?')[1] ?? '');
+        const params = new URLSearchParams(fragment);
+        const authError = params.get('error_description') ?? params.get('error');
+        if (authError) {
+          return { error: authError };
+        }
 
-    if (!accessToken) {
-      return { error: 'Sign-in failed. No token received.' };
-    }
+        const accessToken = params.get('access_token');
+        const refreshToken = params.get('refresh_token');
 
-    const { error: sessionError } = await supabase.auth.setSession({
-      access_token: accessToken,
-      refresh_token: refreshToken ?? '',
-    });
+        if (!accessToken) {
+          return { error: 'Sign-in failed. No token received.' };
+        }
 
-    if (sessionError) return { error: sessionError.message };
+        const { error: sessionError } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken ?? '',
+        });
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (user) {
-      const orgError = await checkOrgAssignment(user.id);
-      if (orgError) return { error: orgError };
-    }
+        if (sessionError) return { error: sessionError.message };
 
-    // Mark account as active, mirroring web's /api/accounts/activate step.
-    await activateAccount();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (options.requireLinkedAccount && user) {
+          const orgError = await checkOrgAssignment();
+          if (orgError) return { error: orgError };
+        }
 
-    return { error: null };
-  }, []);
+        if (options.requireLinkedAccount) {
+          // Mark account as active, mirroring web's /api/accounts/activate step.
+          await withTimeout(
+            activateAccount(),
+            'Account activation timed out. Please check your connection and try again.',
+          );
+        }
+
+        return { error: null };
+      } catch (error) {
+        reportObservedError({
+          error,
+          source: `mobile.auth.oauth.${provider}`,
+          message: `Failed to complete ${provider} sign-in`,
+        });
+        return {
+          error:
+            error instanceof Error
+              ? error.message
+              : `Could not complete ${provider} sign-in. Please try again.`,
+        };
+      }
+    },
+    [],
+  );
+
+  const signInWithGoogle = useCallback(
+    () => signInWithOAuthProvider('google', { requireLinkedAccount: false }),
+    [signInWithOAuthProvider],
+  );
+
+  const signInWithApple = useCallback(
+    () => signInWithOAuthProvider('apple', { requireLinkedAccount: false }),
+    [signInWithOAuthProvider],
+  );
 
   const signOut = useCallback(async () => {
     setSessionExpiryMessage(null);
@@ -377,8 +485,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       sessionExpiryMessage,
       signInWithOtp,
+      signUpWithOtp,
       verifyOtp,
+      verifySignupOtp,
       signInWithGoogle,
+      signInWithApple,
       signOut,
       setOnboardingCompletionStatus,
       clearSessionExpiryMessage,
@@ -388,8 +499,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       sessionExpiryMessage,
       signInWithOtp,
+      signUpWithOtp,
       verifyOtp,
+      verifySignupOtp,
       signInWithGoogle,
+      signInWithApple,
       signOut,
       setOnboardingCompletionStatus,
       clearSessionExpiryMessage,

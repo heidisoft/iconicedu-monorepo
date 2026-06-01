@@ -77,7 +77,7 @@ export default function OtpScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isVerifyingRef = React.useRef(false);
-  const { verifyOtp, signInWithOtp, setOnboardingCompletionStatus } = useAuth();
+  const { verifySignupOtp, signUpWithOtp, setOnboardingCompletionStatus } = useAuth();
   const router = useRouter();
   const { colors } = useTheme();
   const analytics = useAnalytics();
@@ -102,7 +102,9 @@ export default function OtpScreen() {
       setLoading(true);
       setError(null);
 
-      const { error: verifyError } = await verifyOtp(email ?? '', nextCode);
+      // Always verify without requiring a pre-existing account — new users are created
+      // via completeParentRole() in profile-setup if the account doesn't exist yet.
+      const { error: verifyError } = await verifySignupOtp(email ?? '', nextCode);
       if (verifyError) {
         analytics.capture(AnalyticsEvent.OTP_VERIFICATION_FAILED, { error: verifyError });
         setError(verifyError);
@@ -113,25 +115,24 @@ export default function OtpScreen() {
 
       analytics.capture(AnalyticsEvent.OTP_VERIFIED);
 
-      // Session is now stored in SecureStore. fetchOnboardingStatus uses getSession()
-      // (local read, no network hang) to determine where to send the user.
       try {
         const status = await fetchOnboardingStatus();
         setOnboardingCompletionStatus(status.isComplete);
-        if (!status.isComplete) {
-          router.replace('/(auth)/profile-setup');
-        } else {
+        if (status.isComplete) {
           router.replace('/(app)/(tabs)');
+        } else {
+          router.replace('/(auth)/profile-setup');
         }
       } catch {
-        // On error, fall through to app — (app)/_layout will re-check on mount.
-        router.replace('/(app)/(tabs)');
+        // No account row yet (new user) or network error — profile-setup will
+        // create the account and guide through onboarding.
+        router.replace('/(auth)/profile-setup');
       } finally {
         setLoading(false);
         isVerifyingRef.current = false;
       }
     },
-    [analytics, email, router, setOnboardingCompletionStatus, verifyOtp],
+    [analytics, email, router, setOnboardingCompletionStatus, verifySignupOtp],
   );
 
   const handleVerify = useCallback(async () => {
@@ -146,9 +147,9 @@ export default function OtpScreen() {
     if (!email) return;
     setError(null);
     analytics.capture(AnalyticsEvent.OTP_RESENT);
-    const { error: resendError } = await signInWithOtp(email);
+    const { error: resendError } = await signUpWithOtp(email);
     if (resendError) setError(resendError);
-  }, [email, signInWithOtp, analytics]);
+  }, [email, signUpWithOtp, analytics]);
 
   return (
     <SafeAreaView style={s.safe}>

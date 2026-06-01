@@ -10,16 +10,27 @@ import {
   ActivityIndicator,
   ScrollView,
 } from 'react-native';
+import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/providers/auth-provider';
 import { useTheme } from '@/providers/theme-provider';
 import { useAnalytics } from '@/providers/analytics-provider';
+import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
+import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
+import { queryKeys } from '@/lib/api/query-keys';
 import { AnalyticsEvent } from '@iconicedu/utils';
+import {
+  normalizeCountryCode,
+  optionsForCountry,
+  type GradeLevel,
+} from '@iconicedu/shared-types';
 import type { AppColors } from '@/lib/theme';
 import {
   fetchOnboardingStatus,
+  completeParentRole,
+  createChildProfile,
   saveNameStep,
   savePhoneStep,
   saveTimezoneStep,
@@ -89,25 +100,132 @@ const COUNTRIES: Array<{ code: string; label: string; flag: string }> = [
   { code: 'QA', label: 'Qatar', flag: '🇶🇦' },
 ];
 
-const GRADE_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: 'pre_k', label: 'Pre-K' },
-  { value: 'kindergarten', label: 'Kindergarten' },
-  { value: 'grade_1', label: 'Grade 1' },
-  { value: 'grade_2', label: 'Grade 2' },
-  { value: 'grade_3', label: 'Grade 3' },
-  { value: 'grade_4', label: 'Grade 4' },
-  { value: 'grade_5', label: 'Grade 5' },
-  { value: 'grade_6', label: 'Grade 6' },
-  { value: 'grade_7', label: 'Grade 7' },
-  { value: 'grade_8', label: 'Grade 8' },
-  { value: 'grade_9', label: 'Grade 9' },
-  { value: 'grade_10', label: 'Grade 10 (O/L Prep)' },
-  { value: 'grade_11', label: 'Grade 11 (O/L Exam)' },
-  { value: 'grade_12', label: 'Grade 12 (A/L Year 1)' },
-  { value: 'grade_13', label: 'Grade 13 (A/L Year 2)' },
-  { value: 'undergraduate', label: 'Undergraduate' },
-  { value: 'graduate', label: 'Graduate' },
-];
+type AddressConfig = {
+  cityLabel: string;
+  cityPlaceholder: string;
+  regionLabel: string;
+  regionPlaceholder: string;
+  postalLabel: string;
+  postalPlaceholder: string;
+};
+
+const ADDRESS_CONFIG: Record<string, AddressConfig> = {
+  US: {
+    cityLabel: 'City',
+    cityPlaceholder: 'e.g. New York',
+    regionLabel: 'State',
+    regionPlaceholder: 'e.g. New York',
+    postalLabel: 'ZIP Code',
+    postalPlaceholder: 'e.g. 10001',
+  },
+  CA: {
+    cityLabel: 'City',
+    cityPlaceholder: 'e.g. Toronto',
+    regionLabel: 'Province',
+    regionPlaceholder: 'e.g. Ontario',
+    postalLabel: 'Postal Code',
+    postalPlaceholder: 'e.g. M5H 2N2',
+  },
+  GB: {
+    cityLabel: 'City or Town',
+    cityPlaceholder: 'e.g. London',
+    regionLabel: 'County or Region',
+    regionPlaceholder: 'e.g. Greater London',
+    postalLabel: 'Postcode',
+    postalPlaceholder: 'e.g. SW1A 1AA',
+  },
+  AU: {
+    cityLabel: 'City or Suburb',
+    cityPlaceholder: 'e.g. Sydney',
+    regionLabel: 'State or Territory',
+    regionPlaceholder: 'e.g. New South Wales',
+    postalLabel: 'Postcode',
+    postalPlaceholder: 'e.g. 2000',
+  },
+  NZ: {
+    cityLabel: 'City or Town',
+    cityPlaceholder: 'e.g. Auckland',
+    regionLabel: 'Region',
+    regionPlaceholder: 'e.g. Auckland Region',
+    postalLabel: 'Postcode',
+    postalPlaceholder: 'e.g. 1010',
+  },
+  IN: {
+    cityLabel: 'City',
+    cityPlaceholder: 'e.g. Mumbai',
+    regionLabel: 'State',
+    regionPlaceholder: 'e.g. Maharashtra',
+    postalLabel: 'PIN Code',
+    postalPlaceholder: 'e.g. 400001',
+  },
+  LK: {
+    cityLabel: 'City',
+    cityPlaceholder: 'e.g. Colombo',
+    regionLabel: 'Province',
+    regionPlaceholder: 'e.g. Western Province',
+    postalLabel: 'Postal Code',
+    postalPlaceholder: 'e.g. 00100',
+  },
+  SG: {
+    cityLabel: 'District',
+    cityPlaceholder: 'e.g. Orchard',
+    regionLabel: 'Region',
+    regionPlaceholder: 'e.g. Central Region',
+    postalLabel: 'Postal Code',
+    postalPlaceholder: 'e.g. 238823',
+  },
+  AE: {
+    cityLabel: 'City',
+    cityPlaceholder: 'e.g. Dubai',
+    regionLabel: 'Emirate',
+    regionPlaceholder: 'e.g. Dubai',
+    postalLabel: 'Postal Code',
+    postalPlaceholder: '',
+  },
+  DE: {
+    cityLabel: 'City',
+    cityPlaceholder: 'e.g. Berlin',
+    regionLabel: 'State (Bundesland)',
+    regionPlaceholder: 'e.g. Berlin',
+    postalLabel: 'Postleitzahl',
+    postalPlaceholder: 'e.g. 10115',
+  },
+  FR: {
+    cityLabel: 'City',
+    cityPlaceholder: 'e.g. Paris',
+    regionLabel: 'Region',
+    regionPlaceholder: 'e.g. Île-de-France',
+    postalLabel: 'Code Postal',
+    postalPlaceholder: 'e.g. 75001',
+  },
+};
+
+const DEFAULT_ADDRESS_CONFIG: AddressConfig = {
+  cityLabel: 'City',
+  cityPlaceholder: 'e.g. City name',
+  regionLabel: 'State / Region / Province',
+  regionPlaceholder: 'e.g. Region name',
+  postalLabel: 'Postal Code',
+  postalPlaceholder: 'e.g. Postal code',
+};
+
+type NominatimResult = {
+  place_id: number;
+  display_name: string;
+  address: {
+    city?: string;
+    town?: string;
+    village?: string;
+    municipality?: string;
+    state?: string;
+    county?: string;
+    region?: string;
+    postcode?: string;
+    country_code?: string;
+  };
+};
+
+type GradeOption = { value: GradeLevel; label: string };
 
 const EDUCATOR_SUBJECTS = [
   'Mathematics',
@@ -140,6 +258,7 @@ const DAYS_OF_WEEK = [
 
 const CURRENT_YEAR = new Date().getFullYear();
 const BIRTH_YEARS = Array.from({ length: 30 }, (_, i) => CURRENT_YEAR - 4 - i);
+const DEFAULT_GRADE_OPTIONS = optionsForCountry(normalizeCountryCode());
 
 // ─── Step types ────────────────────────────────────────────────────────────────
 
@@ -150,7 +269,8 @@ type WizardStepId =
   | 'location'
   | 'student-profile'
   | 'educator-profile'
-  | 'educator-availability';
+  | 'educator-availability'
+  | 'first-child';
 
 function buildSteps(
   profileKind: string | null,
@@ -162,8 +282,9 @@ function buildSteps(
   else if (kind === 'educator') {
     steps.push('educator-profile');
     steps.push('educator-availability');
+  } else if (kind === 'guardian') {
+    steps.push('first-child');
   }
-  // guardian: universal steps cover requirements; family management handled separately
   return steps;
 }
 
@@ -180,7 +301,7 @@ const STEP_META: Record<
     emoji: '📱',
     title: 'Your phone number',
     subtitle:
-      'For important updates and reminders. Include your country code (e.g. +94, +44, +1).',
+      'For important updates and reminders. Include your country code (e.g. +1, +44, +94).',
   },
   timezone: {
     emoji: '🌍',
@@ -207,6 +328,11 @@ const STEP_META: Record<
     emoji: '🗓️',
     title: 'Your availability',
     subtitle: "Let students know when you're available and how you like to teach.",
+  },
+  'first-child': {
+    emoji: '🎓',
+    title: 'Add your first child',
+    subtitle: 'Create your child profile so we can personalise their learning space.',
   },
 };
 
@@ -281,17 +407,14 @@ function makeStyles(C: AppColors) {
       },
 
       label: {
-        fontSize: 13,
-        fontWeight: '600' as const,
+        fontSize: 14,
+        fontWeight: '500' as const,
         color: C.textMuted,
-        letterSpacing: 0.5,
         marginBottom: 6,
-        textTransform: 'uppercase' as const,
       },
       labelOptional: {
         fontWeight: '400' as const,
-        textTransform: 'none' as const,
-        fontSize: 12,
+        fontSize: 13,
       },
 
       inputWrap: {
@@ -305,7 +428,13 @@ function makeStyles(C: AppColors) {
         marginBottom: 16,
         minHeight: 52,
       },
-      input: { flex: 1, fontSize: 17, color: C.text, paddingVertical: 14 },
+      input: {
+        flex: 1,
+        fontSize: 17,
+        color: C.text,
+        paddingVertical: 14,
+        letterSpacing: 0,
+      },
       inputHint: {
         fontSize: 13,
         color: C.textFaint,
@@ -327,6 +456,13 @@ function makeStyles(C: AppColors) {
         marginBottom: 12,
       },
       searchInput: { flex: 1, fontSize: 15, color: C.text },
+      addressSearchBox: {
+        minHeight: 52,
+        borderRadius: 14,
+        paddingHorizontal: 16,
+        paddingVertical: 0,
+      },
+      addressSearchInput: { fontSize: 17, paddingVertical: 14 },
 
       listItem: {
         flexDirection: 'row' as const,
@@ -489,7 +625,7 @@ function NameStep({
   return (
     <>
       <Text style={s.label}>First Name</Text>
-      <View style={s.inputWrap}>
+      <View style={[s.inputWrap, { marginBottom: 12 }]}>
         <TextInput
           style={s.input}
           value={firstName}
@@ -517,6 +653,55 @@ function NameStep({
   );
 }
 
+function formatPhone(input: string): string {
+  // Strip everything except digits and a leading +
+  const stripped = input.replace(/[^\d+]/g, '');
+  const normalized = stripped.startsWith('+')
+    ? '+' + stripped.slice(1).replace(/\+/g, '')
+    : stripped.replace(/\+/g, '');
+
+  if (!normalized.startsWith('+')) return normalized;
+  const digits = normalized.slice(1); // digits after +
+
+  // +1 — US / Canada: +1 (XXX) XXX-XXXX
+  if (digits.startsWith('1')) {
+    const nat = digits.slice(1);
+    if (nat.length === 0) return '+1';
+    if (nat.length <= 3) return `+1 (${nat}`;
+    if (nat.length <= 6) return `+1 (${nat.slice(0, 3)}) ${nat.slice(3)}`;
+    return `+1 (${nat.slice(0, 3)}) ${nat.slice(3, 6)}-${nat.slice(6, 10)}`;
+  }
+
+  // +44 — UK: +44 XXXX XXXXXX
+  if (digits.startsWith('44')) {
+    const nat = digits.slice(2);
+    if (nat.length === 0) return '+44';
+    if (nat.length <= 4) return `+44 ${nat}`;
+    return `+44 ${nat.slice(0, 4)} ${nat.slice(4, 10)}`;
+  }
+
+  // +61 — Australia: +61 X XXXX XXXX
+  if (digits.startsWith('61')) {
+    const nat = digits.slice(2);
+    if (nat.length === 0) return '+61';
+    if (nat.length <= 1) return `+61 ${nat}`;
+    if (nat.length <= 5) return `+61 ${nat[0]} ${nat.slice(1)}`;
+    return `+61 ${nat[0]} ${nat.slice(1, 5)} ${nat.slice(5, 9)}`;
+  }
+
+  // +94 — Sri Lanka: +94 XX XXX XXXX
+  if (digits.startsWith('94')) {
+    const nat = digits.slice(2);
+    if (nat.length === 0) return '+94';
+    if (nat.length <= 2) return `+94 ${nat}`;
+    if (nat.length <= 5) return `+94 ${nat.slice(0, 2)} ${nat.slice(2)}`;
+    return `+94 ${nat.slice(0, 2)} ${nat.slice(2, 5)} ${nat.slice(5, 9)}`;
+  }
+
+  // Generic — keep raw with + prefix, no extra formatting
+  return normalized;
+}
+
 function PhoneStep({
   phone,
   setPhone,
@@ -529,6 +714,11 @@ function PhoneStep({
   colors: AppColors;
   isChild: boolean;
 }) {
+  const handleChange = useCallback(
+    (text: string) => setPhone(formatPhone(text)),
+    [setPhone],
+  );
+
   return (
     <>
       <Text style={s.label}>
@@ -538,36 +728,62 @@ function PhoneStep({
         <TextInput
           style={s.input}
           value={phone}
-          onChangeText={setPhone}
-          placeholder="+94 71 234 5678"
+          onChangeText={handleChange}
+          placeholder="+1 (555) 867-5309"
           placeholderTextColor={s.placeholderColor}
           keyboardType="phone-pad"
           autoFocus
-          returnKeyType="done"
         />
       </View>
-      <Text style={s.inputHint}>Include your country code, e.g. +94, +44, +1</Text>
+      <Text style={s.inputHint}>Include your country code, e.g. +1, +44, +94</Text>
     </>
   );
 }
 
+type DetectedLocation = {
+  city: string;
+  region: string;
+  postalCode: string;
+  countryCode: string;
+};
+
 function TimezoneStep({
   timezone,
   setTimezone,
+  onLocationDetected,
   s,
+  colors,
 }: {
   timezone: string;
   setTimezone: (v: string) => void;
+  onLocationDetected?: (loc: DetectedLocation) => void;
   s: S;
   colors: AppColors;
 }) {
+  const [detecting, setDetecting] = useState(false);
+  const [detectError, setDetectError] = useState<string | null>(null);
+  // Initialize label only when timezone was explicitly prefilled from DB
+  // (i.e. it differs from the device's current Intl timezone, meaning it was stored before)
+  const [detectedLabel, setDetectedLabel] = useState<string | null>(() => {
+    try {
+      const deviceTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (timezone && timezone !== 'UTC' && timezone !== deviceTz) {
+        return TIMEZONES.find((t) => t.id === timezone)?.label ?? timezone;
+      }
+    } catch {
+      /* ignore */
+    }
+    return null;
+  });
+  const [showManual, setShowManual] = useState(false);
   const [search, setSearch] = useState('');
 
   const allTimezones = useMemo(() => {
+    // Include detected device timezone if it's not already in the list
     try {
       const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
       if (detected && !TIMEZONES.some((t) => t.id === detected)) {
-        return [{ id: detected, label: `${detected} (your device)` }, ...TIMEZONES];
+        return [{ id: detected, label: detected }, ...TIMEZONES];
       }
     } catch {
       /* ignore */
@@ -583,8 +799,143 @@ function TimezoneStep({
     );
   }, [search, allTimezones]);
 
+  const handleDetect = useCallback(async () => {
+    setDetecting(true);
+    setDetectError(null);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setDetectError(
+          'Location permission denied. Please select your time zone manually.',
+        );
+        setShowManual(true);
+        return;
+      }
+      const pos = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Lowest,
+      });
+      const [geo] = await Location.reverseGeocodeAsync({
+        latitude: pos.coords.latitude,
+        longitude: pos.coords.longitude,
+      });
+      const tz = geo?.timezone;
+      if (tz) {
+        setTimezone(tz);
+        const match = TIMEZONES.find((t) => t.id === tz);
+        setDetectedLabel(match?.label ?? tz);
+        onLocationDetected?.({
+          city: geo.city ?? '',
+          region: geo.region ?? '',
+          postalCode: geo.postalCode ?? '',
+          countryCode: geo.isoCountryCode ?? '',
+        });
+      } else {
+        setDetectError('Could not determine your time zone. Please select it manually.');
+        setShowManual(true);
+      }
+    } catch {
+      setDetectError('Location unavailable. Please select your time zone manually.');
+      setShowManual(true);
+    } finally {
+      setDetecting(false);
+    }
+  }, [setTimezone]);
+
+  // Confirmed state — show after GPS detection, manual selection, or DB prefill
+  if (!showManual && !!detectedLabel) {
+    const label = detectedLabel;
+
+    return (
+      <>
+        {/* Detected timezone card */}
+        <View
+          style={[
+            s.listItem,
+            s.listItemSelected,
+            { flexDirection: 'column', alignItems: 'flex-start', gap: 4 },
+          ]}
+        >
+          <Text style={[s.listItemSelectedTxt, { fontWeight: '700', fontSize: 13 }]}>
+            ✓ Time zone selected
+          </Text>
+          <Text style={[s.listItemSelectedTxt, { fontSize: 17 }]}>{label}</Text>
+        </View>
+
+        {detectError ? (
+          <Text style={[s.inputHint, { color: colors.textMuted, marginTop: 4 }]}>
+            {detectError}
+          </Text>
+        ) : null}
+
+        <TouchableOpacity
+          style={[s.listItem, { marginTop: 4 }]}
+          onPress={() => {
+            setShowManual(true);
+            setDetectedLabel(null);
+          }}
+        >
+          <Text style={s.listItemTxt}>Choose a different time zone</Text>
+          <Text style={s.listChevron}>›</Text>
+        </TouchableOpacity>
+      </>
+    );
+  }
+
+  // Initial state — not yet detected, not manual
+  if (!showManual && !detectedLabel) {
+    return (
+      <>
+        <TouchableOpacity
+          style={[
+            s.listItem,
+            {
+              backgroundColor: colors.tealBg,
+              borderColor: colors.teal,
+              justifyContent: 'center',
+              minHeight: 56,
+            },
+          ]}
+          onPress={handleDetect}
+          disabled={detecting}
+          activeOpacity={0.8}
+        >
+          {detecting ? (
+            <ActivityIndicator color={colors.teal} size="small" />
+          ) : (
+            <Text style={[s.listItemSelectedTxt, { textAlign: 'center', fontSize: 16 }]}>
+              📍 Detect from my location
+            </Text>
+          )}
+        </TouchableOpacity>
+
+        {detectError ? (
+          <Text style={[s.inputHint, { marginTop: 8 }]}>{detectError}</Text>
+        ) : null}
+
+        <TouchableOpacity
+          style={[s.listItem, { marginTop: 4 }]}
+          onPress={() => setShowManual(true)}
+        >
+          <Text style={s.listItemTxt}>Choose manually</Text>
+          <Text style={s.listChevron}>›</Text>
+        </TouchableOpacity>
+      </>
+    );
+  }
+
+  // Manual selection
   return (
     <>
+      <TouchableOpacity
+        style={[s.listItem, { marginBottom: 12 }]}
+        onPress={() => {
+          setShowManual(false);
+          setSearch('');
+        }}
+      >
+        <Text style={s.listCheck}>‹</Text>
+        <Text style={[s.listItemTxt, { marginLeft: 8 }]}>Back</Text>
+      </TouchableOpacity>
       <View style={s.searchBox}>
         <Text>🔍</Text>
         <TextInput
@@ -594,6 +945,7 @@ function TimezoneStep({
           placeholder="Search time zones…"
           placeholderTextColor={s.placeholderColor}
           autoCapitalize="none"
+          autoFocus
         />
       </View>
       {filtered.map((item) => {
@@ -602,7 +954,13 @@ function TimezoneStep({
           <TouchableOpacity
             key={item.id}
             style={[s.listItem, sel && s.listItemSelected]}
-            onPress={() => setTimezone(item.id)}
+            onPress={() => {
+              setTimezone(item.id);
+              const match = TIMEZONES.find((t) => t.id === item.id);
+              setDetectedLabel(match?.label ?? item.id);
+              setShowManual(false);
+              setSearch('');
+            }}
           >
             <Text style={[s.listItemTxt, sel && s.listItemSelectedTxt]}>
               {item.label}
@@ -625,6 +983,8 @@ function LocationStep({
   countryCode,
   setCountryCode,
   s,
+  colors,
+  enableAddressSearch,
 }: {
   city: string;
   setCity: (v: string) => void;
@@ -636,17 +996,75 @@ function LocationStep({
   setCountryCode: (v: string) => void;
   s: S;
   colors: AppColors;
+  enableAddressSearch: boolean;
 }) {
   const [showPicker, setShowPicker] = useState(false);
-  const [search, setSearch] = useState('');
+  const [countrySearch, setCountrySearch] = useState('');
+  const [addressQuery, setAddressQuery] = useState('');
+  const [suggestions, setSuggestions] = useState<NominatimResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
 
+  const addrConfig = ADDRESS_CONFIG[countryCode] ?? DEFAULT_ADDRESS_CONFIG;
   const selectedCountry = COUNTRIES.find((c) => c.code === countryCode);
 
-  const filtered = useMemo(() => {
-    if (!search.trim()) return COUNTRIES;
-    const q = search.toLowerCase();
+  const filteredCountries = useMemo(() => {
+    if (!countrySearch.trim()) return COUNTRIES;
+    const q = countrySearch.toLowerCase();
     return COUNTRIES.filter((c) => c.label.toLowerCase().includes(q));
-  }, [search]);
+  }, [countrySearch]);
+
+  useEffect(() => {
+    if (!enableAddressSearch) {
+      setSuggestions([]);
+      setIsSearching(false);
+      return;
+    }
+
+    if (!addressQuery.trim() || addressQuery.length < 3) {
+      setSuggestions([]);
+      return;
+    }
+    setIsSearching(true);
+    const timer = setTimeout(async () => {
+      try {
+        const countryFilter = countryCode
+          ? `&countrycodes=${countryCode.toLowerCase()}`
+          : '';
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(addressQuery)}&format=json&addressdetails=1&limit=5${countryFilter}`,
+          { headers: { 'User-Agent': 'IconicEdu/1.0' } },
+        );
+        const data: NominatimResult[] = await res.json();
+        setSuggestions(data);
+      } catch {
+        setSuggestions([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [addressQuery, countryCode, enableAddressSearch]);
+
+  const handleSelectSuggestion = useCallback(
+    (result: NominatimResult) => {
+      const addr = result.address;
+      const resolvedCity =
+        addr.city ?? addr.town ?? addr.village ?? addr.municipality ?? '';
+      const resolvedRegion = addr.state ?? addr.county ?? addr.region ?? '';
+      const resolvedPostal = addr.postcode ?? '';
+      const resolvedCountry = addr.country_code?.toUpperCase() ?? '';
+
+      if (resolvedCity) setCity(resolvedCity);
+      if (resolvedRegion) setRegion(resolvedRegion);
+      if (resolvedPostal) setPostalCode(resolvedPostal);
+      if (resolvedCountry && COUNTRIES.some((c) => c.code === resolvedCountry)) {
+        setCountryCode(resolvedCountry);
+      }
+      setAddressQuery('');
+      setSuggestions([]);
+    },
+    [setCity, setCountryCode, setPostalCode, setRegion],
+  );
 
   if (showPicker) {
     return (
@@ -655,7 +1073,7 @@ function LocationStep({
           style={[s.listItem, { marginBottom: 12 }]}
           onPress={() => {
             setShowPicker(false);
-            setSearch('');
+            setCountrySearch('');
           }}
         >
           <Text style={s.listCheck}>‹</Text>
@@ -665,15 +1083,15 @@ function LocationStep({
           <Text>🔍</Text>
           <TextInput
             style={s.searchInput}
-            value={search}
-            onChangeText={setSearch}
+            value={countrySearch}
+            onChangeText={setCountrySearch}
             placeholder="Search countries…"
             placeholderTextColor={s.placeholderColor}
             autoFocus
             autoCapitalize="none"
           />
         </View>
-        {filtered.map((c) => {
+        {filteredCountries.map((c) => {
           const sel = countryCode === c.code;
           return (
             <TouchableOpacity
@@ -682,7 +1100,7 @@ function LocationStep({
               onPress={() => {
                 setCountryCode(c.code);
                 setShowPicker(false);
-                setSearch('');
+                setCountrySearch('');
               }}
             >
               <Text style={s.listFlag}>{c.flag}</Text>
@@ -717,26 +1135,101 @@ function LocationStep({
         <Text style={s.listChevron}>›</Text>
       </TouchableOpacity>
 
-      <Text style={s.label}>City</Text>
+      {enableAddressSearch && (
+        <>
+          <Text style={s.label}>
+            Search address{'  '}
+            <Text style={s.labelOptional}>(auto-fill fields below)</Text>
+          </Text>
+          <View
+            style={[
+              s.searchBox,
+              s.addressSearchBox,
+              { marginBottom: suggestions.length > 0 ? 4 : 16 },
+            ]}
+          >
+            <Text>🔍</Text>
+            <TextInput
+              style={[s.searchInput, s.addressSearchInput]}
+              value={addressQuery}
+              onChangeText={setAddressQuery}
+              placeholder="Type a city, suburb or address…"
+              placeholderTextColor={s.placeholderColor}
+              autoCapitalize="words"
+              returnKeyType="search"
+            />
+            {isSearching && <ActivityIndicator size="small" color={colors.teal} />}
+            {addressQuery.length > 0 && !isSearching && (
+              <TouchableOpacity
+                onPress={() => {
+                  setAddressQuery('');
+                  setSuggestions([]);
+                }}
+              >
+                <Text
+                  style={{
+                    color: s.placeholderColor,
+                    fontSize: 16,
+                    paddingHorizontal: 4,
+                  }}
+                >
+                  ✕
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </>
+      )}
+      {enableAddressSearch && suggestions.length > 0 && (
+        <View
+          style={{
+            borderWidth: 1,
+            borderColor: colors.border,
+            borderRadius: 10,
+            marginBottom: 16,
+            overflow: 'hidden',
+          }}
+        >
+          {suggestions.map((result, i) => (
+            <TouchableOpacity
+              key={result.place_id}
+              onPress={() => handleSelectSuggestion(result)}
+              style={{
+                paddingHorizontal: 14,
+                paddingVertical: 12,
+                borderTopWidth: i === 0 ? 0 : StyleSheet.hairlineWidth,
+                borderTopColor: colors.border,
+                backgroundColor: colors.card,
+              }}
+            >
+              <Text style={{ fontSize: 14, color: colors.text }} numberOfLines={2}>
+                {result.display_name}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
+      <Text style={s.label}>{addrConfig.cityLabel}</Text>
       <View style={s.inputWrap}>
         <TextInput
           style={s.input}
           value={city}
           onChangeText={setCity}
-          placeholder="e.g. Colombo"
+          placeholder={addrConfig.cityPlaceholder}
           placeholderTextColor={s.placeholderColor}
           autoCapitalize="words"
           returnKeyType="next"
         />
       </View>
 
-      <Text style={s.label}>State / Region / Province</Text>
+      <Text style={s.label}>{addrConfig.regionLabel}</Text>
       <View style={s.inputWrap}>
         <TextInput
           style={s.input}
           value={region}
           onChangeText={setRegion}
-          placeholder="e.g. Western Province"
+          placeholder={addrConfig.regionPlaceholder}
           placeholderTextColor={s.placeholderColor}
           autoCapitalize="words"
           returnKeyType="next"
@@ -744,7 +1237,8 @@ function LocationStep({
       </View>
 
       <Text style={s.label}>
-        Postal Code{'  '}
+        {addrConfig.postalLabel}
+        {'  '}
         <Text style={s.labelOptional}>(optional)</Text>
       </Text>
       <View style={s.inputWrap}>
@@ -752,11 +1246,68 @@ function LocationStep({
           style={s.input}
           value={postalCode}
           onChangeText={setPostalCode}
-          placeholder="e.g. 00100"
+          placeholder={addrConfig.postalPlaceholder}
           placeholderTextColor={s.placeholderColor}
           returnKeyType="done"
         />
       </View>
+    </>
+  );
+}
+
+function GradeLevelSelect({
+  value,
+  onChange,
+  options,
+  s,
+}: {
+  value: string | null;
+  onChange: (value: string) => void;
+  options: GradeOption[];
+  s: S;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const selected = options.find((option) => option.value === value);
+
+  return (
+    <>
+      <TouchableOpacity
+        style={[s.inputWrap, isOpen && { marginBottom: 6 }]}
+        onPress={() => setIsOpen((open) => !open)}
+        activeOpacity={0.85}
+      >
+        <Text
+          style={[
+            s.input,
+            {
+              paddingVertical: 0,
+              color: selected ? undefined : s.placeholderColor,
+            },
+          ]}
+        >
+          {selected?.label ?? 'Select grade'}
+        </Text>
+        <Text style={s.listChevron}>{isOpen ? '⌃' : '⌄'}</Text>
+      </TouchableOpacity>
+      {isOpen &&
+        options.map((item) => {
+          const isSelected = value === item.value;
+          return (
+            <TouchableOpacity
+              key={item.value}
+              style={[s.listItem, isSelected && s.listItemSelected]}
+              onPress={() => {
+                onChange(item.value);
+                setIsOpen(false);
+              }}
+            >
+              <Text style={[s.listItemTxt, isSelected && s.listItemSelectedTxt]}>
+                {item.label}
+              </Text>
+              {isSelected && <Text style={s.listCheck}>✓</Text>}
+            </TouchableOpacity>
+          );
+        })}
     </>
   );
 }
@@ -766,94 +1317,34 @@ function StudentProfileStep({
   setBirthYear,
   grade,
   setGrade,
+  gradeOptions,
   s,
 }: {
   birthYear: string;
   setBirthYear: (v: string) => void;
   grade: string | null;
   setGrade: (v: string) => void;
+  gradeOptions: GradeOption[];
   s: S;
   colors: AppColors;
 }) {
-  const [tab, setTab] = useState<'grade' | 'year'>('grade');
   return (
     <>
-      <View style={s.tabRow}>
-        <TouchableOpacity
-          style={[s.tabBtn, tab === 'grade' && s.tabBtnActive]}
-          onPress={() => setTab('grade')}
-        >
-          <Text style={[s.tabTxt, tab === 'grade' && s.tabTxtActive]}>Grade Level</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[s.tabBtn, tab === 'year' && s.tabBtnActive]}
-          onPress={() => setTab('year')}
-        >
-          <Text style={[s.tabTxt, tab === 'year' && s.tabTxtActive]}>Birth Year</Text>
-        </TouchableOpacity>
+      <Text style={s.label}>Year of Birth</Text>
+      <View style={s.inputWrap}>
+        <TextInput
+          style={s.input}
+          value={birthYear}
+          onChangeText={(v) => setBirthYear(v.replace(/\D/g, '').slice(0, 4))}
+          placeholder={`e.g. ${BIRTH_YEARS[8]}`}
+          placeholderTextColor={s.placeholderColor}
+          keyboardType="number-pad"
+          maxLength={4}
+        />
       </View>
 
-      {tab === 'grade' ? (
-        GRADE_OPTIONS.map((item) => {
-          const sel = grade === item.value;
-          return (
-            <TouchableOpacity
-              key={item.value}
-              style={[s.listItem, sel && s.listItemSelected]}
-              onPress={() => setGrade(item.value)}
-            >
-              <Text style={[s.listItemTxt, sel && s.listItemSelectedTxt]}>
-                {item.label}
-              </Text>
-              {sel && <Text style={s.listCheck}>✓</Text>}
-            </TouchableOpacity>
-          );
-        })
-      ) : (
-        <>
-          <Text style={s.label}>Year of Birth</Text>
-          <View style={s.inputWrap}>
-            <TextInput
-              style={s.input}
-              value={birthYear}
-              onChangeText={(v) => setBirthYear(v.replace(/\D/g, '').slice(0, 4))}
-              placeholder={`e.g. ${BIRTH_YEARS[8]}`}
-              placeholderTextColor={s.placeholderColor}
-              keyboardType="number-pad"
-              maxLength={4}
-              autoFocus
-            />
-          </View>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
-            {BIRTH_YEARS.slice(0, 16).map((yr) => (
-              <TouchableOpacity
-                key={yr}
-                onPress={() => setBirthYear(String(yr))}
-                style={[
-                  s.listItem,
-                  {
-                    paddingHorizontal: 12,
-                    paddingVertical: 10,
-                    minWidth: 72,
-                    justifyContent: 'center',
-                  },
-                  birthYear === String(yr) && s.listItemSelected,
-                ]}
-              >
-                <Text
-                  style={[
-                    s.listItemTxt,
-                    { textAlign: 'center' },
-                    birthYear === String(yr) && s.listItemSelectedTxt,
-                  ]}
-                >
-                  {yr}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </>
-      )}
+      <Text style={s.label}>Grade Level</Text>
+      <GradeLevelSelect value={grade} onChange={setGrade} options={gradeOptions} s={s} />
     </>
   );
 }
@@ -929,7 +1420,7 @@ function EducatorProfileStep({
       <Text style={s.sectionHint}>
         {"Select all grade levels you're comfortable teaching."}
       </Text>
-      {GRADE_OPTIONS.map((item) => {
+      {DEFAULT_GRADE_OPTIONS.map((item) => {
         const sel = gradeLevels.includes(item.value);
         return (
           <TouchableOpacity
@@ -1093,6 +1584,76 @@ function EducatorAvailabilityStep({
   );
 }
 
+function FirstChildStep({
+  firstName,
+  setFirstName,
+  lastName,
+  setLastName,
+  birthYear,
+  setBirthYear,
+  grade,
+  setGrade,
+  gradeOptions,
+  s,
+}: {
+  firstName: string;
+  setFirstName: (value: string) => void;
+  lastName: string;
+  setLastName: (value: string) => void;
+  birthYear: string;
+  setBirthYear: (value: string) => void;
+  grade: string | null;
+  setGrade: (value: string) => void;
+  gradeOptions: GradeOption[];
+  s: S;
+}) {
+  return (
+    <>
+      <Text style={s.label}>Child First Name</Text>
+      <View style={s.inputWrap}>
+        <TextInput
+          style={s.input}
+          value={firstName}
+          onChangeText={setFirstName}
+          placeholder="First name"
+          placeholderTextColor={s.placeholderColor}
+          autoCapitalize="words"
+          returnKeyType="next"
+        />
+      </View>
+
+      <Text style={s.label}>Child Last Name</Text>
+      <View style={s.inputWrap}>
+        <TextInput
+          style={s.input}
+          value={lastName}
+          onChangeText={setLastName}
+          placeholder="Last name"
+          placeholderTextColor={s.placeholderColor}
+          autoCapitalize="words"
+          returnKeyType="next"
+        />
+      </View>
+
+      <Text style={s.label}>Year of Birth</Text>
+      <View style={s.inputWrap}>
+        <TextInput
+          style={s.input}
+          value={birthYear}
+          onChangeText={(v) => setBirthYear(v.replace(/\D/g, '').slice(0, 4))}
+          placeholder={`e.g. ${BIRTH_YEARS[8]}`}
+          placeholderTextColor={s.placeholderColor}
+          keyboardType="number-pad"
+          maxLength={4}
+        />
+      </View>
+
+      <Text style={s.label}>Grade Level</Text>
+      <GradeLevelSelect value={grade} onChange={setGrade} options={gradeOptions} s={s} />
+    </>
+  );
+}
+
 // ─── Main wizard ───────────────────────────────────────────────────────────────
 
 export default function ProfileSetupScreen() {
@@ -1101,7 +1662,15 @@ export default function ProfileSetupScreen() {
   const s = useMemo(() => makeStyles(colors), [colors]);
   const queryClient = useQueryClient();
   const { session, setOnboardingCompletionStatus } = useAuth();
+  const sessionUserId = session?.user.id ?? null;
+  const onboardingStatusQueryKey = useMemo(
+    () => (sessionUserId ? queryKeys.onboardingStatus(sessionUserId) : null),
+    [sessionUserId],
+  );
   const analytics = useAnalytics();
+  const enableAddressSearch = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.enableMobileOnboardingAddressSearch,
+  );
 
   useEffect(() => {
     analytics.screen('Profile Setup', { screen_name: 'profile_setup' });
@@ -1126,7 +1695,11 @@ export default function ProfileSetupScreen() {
   const [city, setCity] = useState('');
   const [region, setRegion] = useState('');
   const [postalCode, setPostalCode] = useState('');
-  const [countryCode, setCountryCode] = useState('LK');
+  const [countryCode, setCountryCode] = useState('US');
+  const countryGradeOptions = useMemo(
+    () => optionsForCountry(normalizeCountryCode(countryCode)),
+    [countryCode],
+  );
 
   // Student-specific
   const [birthYear, setBirthYear] = useState('');
@@ -1141,35 +1714,87 @@ export default function ProfileSetupScreen() {
     Record<string, { start: string; end: string }>
   >({});
 
+  // Guardian onboarding
+  const [childFirstName, setChildFirstName] = useState('');
+  const [childLastName, setChildLastName] = useState('');
+  const [childBirthYear, setChildBirthYear] = useState('');
+  const [childGrade, setChildGrade] = useState<string | null>(null);
+
   const [stepIdx, setStepIdx] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
-  // Synchronously seed from the TanStack Query cache (populated by OTP screen).
+  // Synchronously seed from the user-scoped TanStack Query cache.
   // If cache is cold this is null and statusLoading starts true.
   const [onboarding, setOnboarding] = useState<OnboardingStatus | null>(
-    () => queryClient.getQueryData<OnboardingStatus>(['onboarding-status']) ?? null,
+    () =>
+      (onboardingStatusQueryKey
+        ? queryClient.getQueryData<OnboardingStatus>(onboardingStatusQueryKey)
+        : null) ?? null,
   );
   const [statusLoading, setStatusLoading] = useState(
-    () => !queryClient.getQueryData(['onboarding-status']),
+    () =>
+      !onboardingStatusQueryKey || !queryClient.getQueryData(onboardingStatusQueryKey),
   );
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const roleClaimedRef = useRef(false);
 
-  // Kick off a network fetch only when the cache is cold or stale.
+  // Load onboarding status. If the account doesn't exist yet (new user arriving
+  // via OAuth or OTP), create a parent account first then re-fetch.
   useEffect(() => {
-    queryClient
-      .fetchQuery({
-        queryKey: ['onboarding-status'],
-        queryFn: fetchOnboardingStatus,
-        staleTime: 5 * 60 * 1000,
-      })
-      .then((data) => {
+    async function loadOnboarding() {
+      setStatusError(null);
+      if (!onboardingStatusQueryKey) return;
+      try {
+        let data: OnboardingStatus;
+        try {
+          data = await queryClient.fetchQuery({
+            queryKey: onboardingStatusQueryKey,
+            queryFn: fetchOnboardingStatus,
+            staleTime: 5 * 60 * 1000,
+          });
+        } catch {
+          // Account doesn't exist yet — create parent account first.
+          if (!roleClaimedRef.current) {
+            roleClaimedRef.current = true;
+            await completeParentRole();
+            queryClient.removeQueries({ queryKey: onboardingStatusQueryKey });
+            queryClient.invalidateQueries({ queryKey: ['account-base', sessionUserId] });
+          }
+          data = await queryClient.fetchQuery({
+            queryKey: onboardingStatusQueryKey,
+            queryFn: fetchOnboardingStatus,
+            staleTime: 0,
+          });
+        }
         setOnboarding(data);
         setOnboardingCompletionStatus(data.isComplete);
+
+        if (data.isComplete) {
+          router.replace('/(app)/(tabs)');
+          return;
+        }
+
         setStatusLoading(false);
-      })
-      .catch(() => {
+      } catch (err) {
+        roleClaimedRef.current = false;
+        setStatusError(
+          err instanceof Error && err.message
+            ? err.message
+            : 'Could not connect to the server. Please check your connection and try again.',
+        );
         setStatusLoading(false);
-      });
-  }, [queryClient, setOnboardingCompletionStatus]);
+      }
+    }
+    void loadOnboarding();
+  }, [
+    onboardingStatusQueryKey,
+    queryClient,
+    retryCount,
+    router,
+    sessionUserId,
+    setOnboardingCompletionStatus,
+  ]);
 
   const kind = onboarding?.profileKind ?? onboarding?.primaryRole ?? null;
 
@@ -1211,7 +1836,10 @@ export default function ProfileSetupScreen() {
       targetIdx = steps.indexOf('location');
     } else if (!f.hasRoleData) {
       const roleStep = steps.find(
-        (step) => step === 'student-profile' || step === 'educator-profile',
+        (step) =>
+          step === 'student-profile' ||
+          step === 'educator-profile' ||
+          step === 'first-child',
       );
       if (roleStep) targetIdx = steps.indexOf(roleStep);
     } else if (onboardingKind === 'educator' && !f.hasAvailability) {
@@ -1231,7 +1859,8 @@ export default function ProfileSetupScreen() {
         if (currentStep === 'name') {
           await saveNameStep(onboarding.profileId, firstName, lastName);
         } else if (currentStep === 'phone') {
-          if (phone.trim()) await savePhoneStep(onboarding.accountId, phone);
+          const rawPhone = phone.replace(/[\s()-]/g, '');
+          if (rawPhone.trim()) await savePhoneStep(onboarding.accountId, rawPhone);
         } else if (currentStep === 'timezone') {
           await saveTimezoneStep(onboarding.profileId, timezone);
         } else if (currentStep === 'location') {
@@ -1268,6 +1897,25 @@ export default function ProfileSetupScreen() {
             weeklyHours ? parseInt(weeklyHours, 10) : null,
             availability,
           );
+        } else if (currentStep === 'first-child') {
+          if (!onboarding.orgId) {
+            throw new Error('Organization not found. Please try logging in again.');
+          }
+          const trimmedFirstName = childFirstName.trim();
+          const trimmedLastName = childLastName.trim();
+          await createChildProfile({
+            orgId: onboarding.orgId,
+            firstName: trimmedFirstName,
+            lastName: trimmedLastName,
+            displayName: `${trimmedFirstName} ${trimmedLastName}`.trim(),
+            gradeLevel: childGrade ?? '',
+            birthYear: parseInt(childBirthYear, 10),
+            timezone,
+            city,
+            region,
+            countryCode,
+            postalCode,
+          });
         }
       }
       if (isLast) {
@@ -1279,8 +1927,10 @@ export default function ProfileSetupScreen() {
     onSuccess: (_, { isLast }) => {
       setError(null);
       if (isLast) {
-        queryClient.invalidateQueries({ queryKey: ['onboarding-status'] });
-        queryClient.invalidateQueries({ queryKey: ['account'] });
+        if (onboardingStatusQueryKey) {
+          queryClient.invalidateQueries({ queryKey: onboardingStatusQueryKey });
+        }
+        queryClient.invalidateQueries({ queryKey: ['account-base', sessionUserId] });
         router.replace('/(app)/(tabs)');
       } else {
         setStepIdx((i) => i + 1);
@@ -1302,7 +1952,7 @@ export default function ProfileSetupScreen() {
       case 'phone':
         return kind === 'child' || !!phone.trim();
       case 'timezone':
-        return !!timezone && timezone !== 'UTC';
+        return !!timezone;
       case 'location':
         return !!city.trim() && !!region.trim() && !!countryCode;
       case 'student-profile':
@@ -1311,6 +1961,13 @@ export default function ProfileSetupScreen() {
         return subjects.length > 0 && gradeLevels.length > 0;
       case 'educator-availability':
         return classTypes.length > 0 && Object.keys(daySlots).length > 0;
+      case 'first-child':
+        return (
+          !!childFirstName.trim() &&
+          !!childLastName.trim() &&
+          !!childGrade &&
+          childBirthYear.length === 4
+        );
       default:
         return true;
     }
@@ -1329,6 +1986,10 @@ export default function ProfileSetupScreen() {
     gradeLevels,
     classTypes,
     daySlots,
+    childFirstName,
+    childLastName,
+    childGrade,
+    childBirthYear,
     kind,
   ]);
 
@@ -1352,7 +2013,7 @@ export default function ProfileSetupScreen() {
         }
         break;
       case 'timezone':
-        if (!timezone || timezone === 'UTC') {
+        if (!timezone) {
           setError('Please select your time zone.');
           return;
         }
@@ -1397,6 +2058,24 @@ export default function ProfileSetupScreen() {
           return;
         }
         break;
+      case 'first-child':
+        if (!childFirstName.trim()) {
+          setError("Please enter your child's first name.");
+          return;
+        }
+        if (!childLastName.trim()) {
+          setError("Please enter your child's last name.");
+          return;
+        }
+        if (!childBirthYear || childBirthYear.length !== 4) {
+          setError("Please enter your child's birth year.");
+          return;
+        }
+        if (!childGrade) {
+          setError("Please select your child's grade level.");
+          return;
+        }
+        break;
     }
     advance({ isSkip: false, isLast: isLastStep });
   }, [
@@ -1413,6 +2092,10 @@ export default function ProfileSetupScreen() {
     gradeLevels,
     classTypes,
     daySlots,
+    childFirstName,
+    childLastName,
+    childBirthYear,
+    childGrade,
     kind,
     advance,
     isLastStep,
@@ -1430,10 +2113,58 @@ export default function ProfileSetupScreen() {
     }
   }, [stepIdx]);
 
-  if (statusLoading) {
+  if (statusLoading || statusError) {
     return (
       <SafeAreaView style={[s.safe, s.center]}>
-        <ActivityIndicator color={colors.teal} size="large" />
+        {statusError ? (
+          <View style={{ paddingHorizontal: 32, alignItems: 'center', gap: 16 }}>
+            <Text style={{ fontSize: 40 }}>⚠️</Text>
+            <Text
+              style={{
+                fontSize: 17,
+                fontWeight: '600',
+                color: colors.text,
+                textAlign: 'center',
+              }}
+            >
+              Unable to connect
+            </Text>
+            <Text
+              style={{
+                fontSize: 15,
+                color: colors.textMuted,
+                textAlign: 'center',
+                lineHeight: 22,
+              }}
+            >
+              {statusError}
+            </Text>
+            <TouchableOpacity
+              style={{
+                marginTop: 8,
+                backgroundColor: colors.teal,
+                borderRadius: 14,
+                paddingVertical: 14,
+                paddingHorizontal: 32,
+              }}
+              onPress={() => {
+                if (onboardingStatusQueryKey) {
+                  queryClient.removeQueries({ queryKey: onboardingStatusQueryKey });
+                }
+                setStatusError(null);
+                setStatusLoading(true);
+                setRetryCount((n) => n + 1);
+              }}
+              activeOpacity={0.85}
+            >
+              <Text style={{ color: colors.tealFg, fontSize: 16, fontWeight: '700' }}>
+                Try again
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <ActivityIndicator color={colors.teal} size="large" />
+        )}
       </SafeAreaView>
     );
   }
@@ -1510,6 +2241,12 @@ export default function ProfileSetupScreen() {
             <TimezoneStep
               timezone={timezone}
               setTimezone={setTimezone}
+              onLocationDetected={(loc) => {
+                if (loc.city) setCity(loc.city);
+                if (loc.region) setRegion(loc.region);
+                if (loc.postalCode) setPostalCode(loc.postalCode);
+                if (loc.countryCode) setCountryCode(loc.countryCode);
+              }}
               s={s}
               colors={colors}
             />
@@ -1526,6 +2263,7 @@ export default function ProfileSetupScreen() {
               setCountryCode={setCountryCode}
               s={s}
               colors={colors}
+              enableAddressSearch={enableAddressSearch}
             />
           )}
           {currentStep === 'student-profile' && (
@@ -1534,6 +2272,7 @@ export default function ProfileSetupScreen() {
               setBirthYear={setBirthYear}
               grade={grade}
               setGrade={setGrade}
+              gradeOptions={countryGradeOptions}
               s={s}
               colors={colors}
             />
@@ -1558,6 +2297,20 @@ export default function ProfileSetupScreen() {
               setDaySlots={setDaySlots}
               s={s}
               colors={colors}
+            />
+          )}
+          {currentStep === 'first-child' && (
+            <FirstChildStep
+              firstName={childFirstName}
+              setFirstName={setChildFirstName}
+              lastName={childLastName}
+              setLastName={setChildLastName}
+              birthYear={childBirthYear}
+              setBirthYear={setChildBirthYear}
+              grade={childGrade}
+              setGrade={setChildGrade}
+              gradeOptions={countryGradeOptions}
+              s={s}
             />
           )}
 

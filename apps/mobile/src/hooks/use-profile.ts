@@ -15,6 +15,7 @@ export type MobileProfileRecord = {
 type MobileProfileQueryResult = {
   data: MobileProfileRecord | null;
   isPending: boolean;
+  isError: boolean;
   refetch: () => Promise<void>;
 };
 
@@ -24,6 +25,7 @@ export function useProfile(): MobileProfileQueryResult {
   return {
     data: familyView.profile,
     isPending: familyView.isPending,
+    isError: familyView.isError,
     refetch: familyView.refresh,
   };
 }

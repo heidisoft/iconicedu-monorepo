@@ -22,20 +22,25 @@ export function parseBooleanFeatureFlag(value: unknown): boolean {
   return true;
 }
 
-export function isLocalOrPreviewMobileEnvironment(): boolean {
-  const appEnv = (process.env.EXPO_PUBLIC_APP_ENV ?? '').trim().toLowerCase();
-  return appEnv === 'local' || appEnv === 'preview';
-}
-
 export function getLocalMobileFeatureFlagFallback(key: MobileFeatureFlagKey): boolean {
-  if (isLocalOrPreviewMobileEnvironment()) {
-    return true;
+  if (key === mobileFeatureFlagKeys.enableMobileOnboardingAddressSearch) {
+    return parseBooleanFeatureFlag(
+      process.env.EXPO_PUBLIC_ENABLE_MOBILE_ONBOARDING_ADDRESS_SEARCH,
+    );
   }
 
   if (key === mobileFeatureFlagKeys.enableMobileDirectMessageStart) {
     return parseBooleanFeatureFlag(
       process.env.EXPO_PUBLIC_ENABLE_MOBILE_DIRECT_MESSAGE_START,
     );
+  }
+
+  if (key === mobileFeatureFlagKeys.enableMobileGoogleSignIn) {
+    return parseBooleanFeatureFlag(process.env.EXPO_PUBLIC_ENABLE_MOBILE_GOOGLE_SIGN_IN);
+  }
+
+  if (key === mobileFeatureFlagKeys.enableMobileAppleSignIn) {
+    return parseBooleanFeatureFlag(process.env.EXPO_PUBLIC_ENABLE_MOBILE_APPLE_SIGN_IN);
   }
 
   return false;

@@ -226,6 +226,7 @@ export async function fetchLearningSpaceChannels(
   });
   const spaceItems = items.map((item) => ({
     ...item,
+    is_learning_space: item.is_learning_space ?? true,
     student_profiles: item.student_profiles ?? [],
     participant_profiles: item.participant_profiles ?? [],
   }));
@@ -254,6 +255,7 @@ export async function fetchLearningSpaceChannels(
       student_name: null,
       student_profiles: [],
       participant_profiles: [],
+      is_learning_space: false,
       is_support: true,
     },
   ];

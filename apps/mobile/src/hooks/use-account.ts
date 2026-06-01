@@ -11,6 +11,7 @@ export type MobileAccountRecord = {
 type MobileAccountQueryResult = {
   data: MobileAccountRecord | null;
   isPending: boolean;
+  isError: boolean;
   refetch: () => Promise<void>;
 };
 
@@ -20,6 +21,7 @@ export function useAccount(): MobileAccountQueryResult {
   return {
     data: familyView.account,
     isPending: familyView.isPending,
+    isError: familyView.isError,
     refetch: familyView.refresh,
   };
 }

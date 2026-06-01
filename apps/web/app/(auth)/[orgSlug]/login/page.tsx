@@ -8,6 +8,7 @@ import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
 import { resolveOrgLoginReason } from '@iconicedu/web/app/(auth)/[orgSlug]/login/login-reason';
+import { enableMobileAppleSignIn, enableMobileGoogleSignIn } from '@iconicedu/web/flags';
 
 export const metadata: Metadata = {
   title: 'Organization Login | ICONIC Academy',
@@ -53,6 +54,11 @@ export default async function OrgLoginPage({
     redirect(`/${org.slug}/get-started`);
   }
 
+  const [showGoogleSignIn, showAppleSignIn] = await Promise.all([
+    enableMobileGoogleSignIn(),
+    enableMobileAppleSignIn(),
+  ]);
+
   return (
     <div className="bg-background flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
       <div className="w-full max-w-sm">
@@ -60,6 +66,8 @@ export default async function OrgLoginPage({
           orgSlug={org.slug}
           orgName={org.name}
           loginReason={resolveOrgLoginReason(resolvedSearchParams?.reason)}
+          enableGoogleSignIn={showGoogleSignIn}
+          enableAppleSignIn={showAppleSignIn}
         />
       </div>
     </div>

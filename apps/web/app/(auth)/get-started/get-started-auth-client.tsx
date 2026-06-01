@@ -20,7 +20,15 @@ export function resolveGetStartedCallbackUrl(): string {
   return callbackUrl.toString();
 }
 
-export default function GetStartedAuthClient() {
+type GetStartedAuthClientProps = {
+  enableGoogleSignIn?: boolean;
+  enableAppleSignIn?: boolean;
+};
+
+export default function GetStartedAuthClient({
+  enableGoogleSignIn = false,
+  enableAppleSignIn = false,
+}: GetStartedAuthClientProps) {
   const router = useRouter();
   const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
   const [statusMessage, setStatusMessage] = React.useState<string | null>(null);
@@ -78,6 +86,8 @@ export default function GetStartedAuthClient() {
       submitLabel="Send verification code"
       submitLoadingLabel="Sending verification code..."
       oauthActionVerb="sign-up"
+      enableGoogleSignIn={enableGoogleSignIn}
+      enableAppleSignIn={enableAppleSignIn}
     />
   );
 }

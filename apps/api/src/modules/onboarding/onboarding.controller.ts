@@ -46,6 +46,26 @@ export class OnboardingController {
     );
   }
 
+  @Post('onboarding/class-request')
+  @UseGuards(AuthGuard)
+  classRequest(
+    @Req() req: AuthenticatedRequest,
+    @Body()
+    body: {
+      requestIntent?: unknown;
+      studentProfileIds?: unknown;
+      subjects?: unknown;
+      otherSubject?: unknown;
+      learningGoals?: unknown;
+      specialRequirements?: unknown;
+    },
+  ) {
+    return this.onboardingService.submitClassRequest(
+      extractBearerToken(req.headers.authorization),
+      body,
+    );
+  }
+
   @Post('orgs/bootstrap')
   @UseGuards(AuthGuard)
   bootstrapOrg(

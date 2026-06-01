@@ -38,6 +38,7 @@ export const AnalyticsEvent = {
   // ── Authentication ─────────────────────────────────────────────────────────
   LOGIN_OTP_REQUESTED: 'login otp requested',
   LOGIN_GOOGLE_STARTED: 'login google started',
+  LOGIN_APPLE_STARTED: 'login apple started',
   LOGIN_ERROR: 'login error',
   OTP_VERIFIED: 'otp verified',
   OTP_VERIFICATION_FAILED: 'otp verification failed',

@@ -31,11 +31,39 @@ type AuthEntryFormProps = React.ComponentProps<'div'> & {
   submitLabel?: string;
   submitLoadingLabel?: string;
   oauthActionVerb?: OAuthActionVerb;
+  enableGoogleSignIn?: boolean;
+  enableAppleSignIn?: boolean;
   footerLinkLabel?: string;
   footerLinkHref?: string;
   footerLinkIntro?: string;
   initialEmail?: string;
 };
+
+function GoogleIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+      <path
+        d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+function AppleIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="7 5 12.5 15">
+      <path
+        d="M17.05 12.58c-.03-2.06 1.68-3.05 1.76-3.1-1-.46-2.04-.52-2.47-.53-1.05-.11-2.06.62-2.59.62-.54 0-1.37-.61-2.25-.59-1.16.02-2.23.67-2.83 1.71-1.21 2.1-.31 5.2.87 6.9.58.83 1.26 1.77 2.17 1.73.87-.03 1.2-.56 2.25-.56 1.05 0 1.35.56 2.27.54.94-.02 1.53-.85 2.1-1.69.66-.96.93-1.89.94-1.94-.02-.01-1.81-.69-1.83-2.74z"
+        fill="currentColor"
+      />
+      <path
+        d="M15.65 7.84c.48-.58.8-1.38.71-2.18-.69.03-1.53.46-2.03 1.04-.44.51-.83 1.33-.73 2.11.78.06 1.57-.39 2.05-.97z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
 
 export function getOAuthButtonLabel(
   provider: OAuthProvider,
@@ -72,6 +100,8 @@ export function AuthEntryForm({
   submitLabel = 'Send secure link',
   submitLoadingLabel = 'Sending secure link...',
   oauthActionVerb = 'login',
+  enableGoogleSignIn = true,
+  enableAppleSignIn = true,
   footerLinkLabel,
   footerLinkHref,
   footerLinkIntro,
@@ -84,6 +114,7 @@ export function AuthEntryForm({
     React.useState<OAuthProvider | null>(null);
 
   const isSubmitting = isEmailSubmitting || oauthSubmittingProvider !== null;
+  const showOAuthOptions = enableGoogleSignIn || enableAppleSignIn;
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -186,31 +217,51 @@ export function AuthEntryForm({
               )}
             </Button>
           </Field>
-          <FieldSeparator className="my-0">OR</FieldSeparator>
-          <Field>
-            <Button
-              type="button"
-              onClick={handleOAuthLogin('google')}
-              variant="default"
-              disabled={isSubmitting}
-            >
-              {oauthSubmittingProvider === 'google' ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                  <path
-                    d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z"
-                    fill="currentColor"
-                  />
-                </svg>
-              )}
-              {getOAuthButtonLabel(
-                'google',
-                oauthSubmittingProvider === 'google',
-                oauthActionVerb,
-              )}
-            </Button>
-          </Field>
+          {showOAuthOptions ? (
+            <>
+              <FieldSeparator className="my-0">OR</FieldSeparator>
+              <Field>
+                {enableGoogleSignIn ? (
+                  <Button
+                    type="button"
+                    onClick={handleOAuthLogin('google')}
+                    variant="default"
+                    disabled={isSubmitting}
+                  >
+                    {oauthSubmittingProvider === 'google' ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <GoogleIcon />
+                    )}
+                    {getOAuthButtonLabel(
+                      'google',
+                      oauthSubmittingProvider === 'google',
+                      oauthActionVerb,
+                    )}
+                  </Button>
+                ) : null}
+                {enableAppleSignIn ? (
+                  <Button
+                    type="button"
+                    onClick={handleOAuthLogin('apple')}
+                    variant="default"
+                    disabled={isSubmitting}
+                  >
+                    {oauthSubmittingProvider === 'apple' ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <AppleIcon />
+                    )}
+                    {getOAuthButtonLabel(
+                      'apple',
+                      oauthSubmittingProvider === 'apple',
+                      oauthActionVerb,
+                    )}
+                  </Button>
+                ) : null}
+              </Field>
+            </>
+          ) : null}
           <div className="space-y-1 text-center text-xs text-muted-foreground">
             <p>{trustLine}</p>
           </div>

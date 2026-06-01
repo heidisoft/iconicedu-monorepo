@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useQuery } from '@tanstack/react-query';
 import {
   BookOpenCheck,
   MessageSquare,
@@ -41,11 +42,13 @@ import {
 import type { AppColors } from '@/lib/theme';
 import { createHeaderSurface } from '@/lib/header-surface';
 import {
+  fetchChannels,
   markChannelsReadByIds,
   type ChannelListItem,
   type DmParticipant,
 } from '@/lib/api/queries';
 import { ChannelListSkeleton } from '@/components/skeletons';
+import { QueryError } from '@/components/errors/query-error';
 import { RoleAvatarBadge } from '@/components/profile/role-avatar-badge';
 import { RoleNameIndicator } from '@/components/profile/role-name-indicator';
 import { profileAvatarColors } from '@/lib/profile-avatar-colors';
@@ -55,6 +58,8 @@ type ClassroomStudentTab = 'all' | string;
 
 type SectionHeaderItem = { _type: 'section-header'; title: string; id: string };
 type ListRow = ChannelListItem | SectionHeaderItem;
+
+const CLASS_REQUEST_CHANNEL_PURPOSE = 'chass-requests';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -760,7 +765,7 @@ function ChannelRow({
   const time = formatListTime(item.last_message_at ?? item.updated_at);
   const unread = (item.unread_count ?? 0) + (item.thread_unread_count ?? 0);
   const hasUnread = unread > 0;
-  const isClassroom = !isDm && !item.is_support;
+  const isClassroom = !isDm && Boolean(item.is_learning_space);
   const studentProfiles = !isDm ? (item.student_profiles ?? []) : [];
   const participantProfiles = !isDm ? (item.participant_profiles ?? []) : [];
   const classThemeKey = !isDm ? (item.themeKey ?? null) : null;
@@ -921,7 +926,11 @@ export default function MessagesScreen() {
     setActiveTab(resolvedTab);
   }, [resolvedTab]);
 
-  const { data: account, isPending: accountLoading } = useAccount();
+  const {
+    data: account,
+    isPending: accountLoading,
+    isError: accountError,
+  } = useAccount();
   const { data: profile } = useProfile();
   const { guardianAccountId, guardianProfileId } = useFamilyView();
   const { colors } = useTheme();
@@ -953,13 +962,25 @@ export default function MessagesScreen() {
   const {
     data: dms,
     isPending: dmsLoading,
+    isError: dmsError,
     refetch: refetchDms,
   } = useDirectMessages(orgId, myProfileId, accountId);
   const {
     data: channels,
     isPending: channelsLoading,
+    isError: channelsError,
     refetch: refetchChannels,
   } = useLearningSpaceChannels(orgId, myProfileId, accountId, profileKind);
+  const {
+    data: listedChannels,
+    isPending: listedChannelsLoading,
+    isError: listedChannelsError,
+    refetch: refetchListedChannels,
+  } = useQuery({
+    queryKey: ['messageListedChannels', orgId, accountId] as const,
+    queryFn: () => fetchChannels(orgId, accountId),
+    enabled: !!orgId && !!accountId,
+  });
   const {
     data: supervisedDms,
     isLoading: supervisedLoading,
@@ -969,14 +990,31 @@ export default function MessagesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([refetchDms(), refetchChannels(), refetchSupervised()]);
+    await Promise.all([
+      refetchDms(),
+      refetchChannels(),
+      refetchListedChannels(),
+      refetchSupervised(),
+    ]);
     setRefreshing(false);
-  }, [refetchDms, refetchChannels, refetchSupervised]);
+  }, [refetchDms, refetchChannels, refetchListedChannels, refetchSupervised]);
 
   const allDms = useMemo(() => dms ?? [], [dms]);
   const allChannels = useMemo(() => channels ?? [], [channels]);
+  const classRequestChannels = useMemo(() => {
+    const existingChannelIds = new Set(allChannels.map((channel) => channel.id));
+    return (listedChannels ?? []).filter(
+      (channel) =>
+        channel.purpose === CLASS_REQUEST_CHANNEL_PURPOSE &&
+        !existingChannelIds.has(channel.id),
+    );
+  }, [allChannels, listedChannels]);
+  const allMessageChannels = useMemo(
+    () => [...allChannels, ...classRequestChannels],
+    [allChannels, classRequestChannels],
+  );
   const classroomChannels = useMemo(
-    () => allChannels.filter((channel) => !channel.is_support),
+    () => allChannels.filter((channel) => channel.is_learning_space),
     [allChannels],
   );
   const classroomStudentTabs = useMemo(() => {
@@ -1025,12 +1063,12 @@ export default function MessagesScreen() {
 
   const allItems = useMemo(
     () =>
-      [...allDms, ...allSupervisedDms, ...allChannels].sort((a, b) => {
+      [...allDms, ...allSupervisedDms, ...allMessageChannels].sort((a, b) => {
         const ta = a.last_message_at ?? a.updated_at ?? '';
         const tb = b.last_message_at ?? b.updated_at ?? '';
         return tb.localeCompare(ta);
       }),
-    [allDms, allSupervisedDms, allChannels],
+    [allDms, allSupervisedDms, allMessageChannels],
   );
 
   // DMs tab: regular DMs followed by a "Supervised Inboxes" section when applicable
@@ -1100,7 +1138,13 @@ export default function MessagesScreen() {
     { key: 'channels', label: 'Classrooms', count: unreadChannels },
   ];
 
-  const isLoading = accountLoading || dmsLoading || channelsLoading || supervisedLoading;
+  const isLoading =
+    !accountError &&
+    (accountLoading ||
+      dmsLoading ||
+      channelsLoading ||
+      listedChannelsLoading ||
+      supervisedLoading);
   const [markingAllRead, setMarkingAllRead] = useState(false);
   const visibleUnreadChannelIds = useMemo(
     () =>
@@ -1133,7 +1177,12 @@ export default function MessagesScreen() {
                 profileId: myProfileId,
                 channelIds: visibleUnreadChannelIds,
               });
-              await Promise.all([refetchDms(), refetchChannels(), refetchSupervised()]);
+              await Promise.all([
+                refetchDms(),
+                refetchChannels(),
+                refetchListedChannels(),
+                refetchSupervised(),
+              ]);
             } finally {
               setMarkingAllRead(false);
             }
@@ -1150,6 +1199,7 @@ export default function MessagesScreen() {
     orgId,
     refetchChannels,
     refetchDms,
+    refetchListedChannels,
     refetchSupervised,
     visibleUnreadChannelIds,
   ]);
@@ -1208,7 +1258,7 @@ export default function MessagesScreen() {
       const participantProfiles = !isDm
         ? JSON.stringify(channel.participant_profiles ?? [])
         : '';
-      const isLearningSpace = !isDm && !channel.is_support ? '1' : '0';
+      const isLearningSpace = !isDm && channel.is_learning_space ? '1' : '0';
       const pathname = isDm
         ? '/(app)/dm/[channelId]'
         : isLearningSpace === '1'
@@ -1244,7 +1294,7 @@ export default function MessagesScreen() {
                 studentProfiles,
                 participantProfiles,
                 isLearningSpace,
-                purpose: channel.is_support ? 'support' : '',
+                purpose: channel.purpose ?? (channel.is_support ? 'support' : ''),
                 ...(channel.is_supervised
                   ? {
                       isSupervisedReadOnly: '1',
@@ -1346,6 +1396,11 @@ export default function MessagesScreen() {
 
       {isLoading || refreshing ? (
         <ChannelListSkeleton count={6} />
+      ) : (accountError || dmsError || channelsError || listedChannelsError) &&
+        !dms &&
+        !channels &&
+        !listedChannels ? (
+        <QueryError onRetry={onRefresh} />
       ) : isEmpty ? (
         <View style={s.emptyWrap}>
           <View style={[s.emptyIcon, { backgroundColor: colors.inputBg }]}>

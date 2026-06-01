@@ -30,7 +30,6 @@ import { Input } from '@iconicedu/ui-web/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@iconicedu/ui-web/ui/popover';
 import { Textarea } from '@iconicedu/ui-web/ui/textarea';
 import {
-  CLASS_REQUEST_INTENT_OPTIONS,
   type ClassRequestIntent,
   OTHER_SUBJECT_OPTION,
   STANDARD_SUBJECT_OPTIONS,
@@ -44,7 +43,6 @@ export interface ClassRequestableStudent {
 export type ClassRequestRole = 'parents' | 'students' | 'other';
 
 type ClassRequestFormState = {
-  requestIntent: ClassRequestIntent | '';
   studentProfileIds: string[];
   subjects: string[];
   otherSubject: string;
@@ -72,9 +70,9 @@ export interface ClassRequestActionProps {
 const OTHER_SUBJECT_VALUE = OTHER_SUBJECT_OPTION;
 
 const DEFAULT_SUBJECT_OPTIONS = [...STANDARD_SUBJECT_OPTIONS, OTHER_SUBJECT_VALUE];
+const DEFAULT_CLASS_REQUEST_INTENT: ClassRequestIntent = 'ongoing-tutoring';
 
 const createInitialFormState = (): ClassRequestFormState => ({
-  requestIntent: '',
   studentProfileIds: [],
   subjects: [],
   otherSubject: '',
@@ -110,25 +108,6 @@ function renderMultiSelectLabel(
   }
 
   return `${selectedLabels.length} selected`;
-}
-
-function getRequestIntentHelperCopy(
-  requestIntent: ClassRequestFormState['requestIntent'],
-) {
-  switch (requestIntent) {
-    case 'trial-class':
-      return 'Free trial classes are useful for checking tutor fit, teaching style, and schedule before committing to regular tutoring.';
-    case 'learning-match-call':
-      return 'Consultation calls help us match curriculum, schedule, learner needs, and the right tutoring plan before class starts.';
-    case 'urgent-homework-help':
-      return 'For urgent homework help, include the assignment deadline, topic, and preferred availability so staff can check same-week support where available.';
-    case 'same-week-support':
-      return 'Same-week support requests should include preferred days, time windows, and the topics that need attention first.';
-    case 'ongoing-tutoring':
-      return 'Ongoing tutoring requests can include school goals, current class level, preferred schedule, and any recent assessment details.';
-    default:
-      return 'Choose the starting point that feels easiest for your family.';
-  }
 }
 
 export function ClassRequestAction({
@@ -200,11 +179,6 @@ export function ClassRequestAction({
   const handleRequestSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!requestForm.requestIntent) {
-      setRequestError('Select how you want to start.');
-      return;
-    }
-
     if (!requestForm.studentProfileIds.length) {
       setRequestError('Select at least one student.');
       return;
@@ -234,7 +208,7 @@ export function ClassRequestAction({
         },
         body: JSON.stringify({
           orgSlug,
-          requestIntent: requestForm.requestIntent,
+          requestIntent: DEFAULT_CLASS_REQUEST_INTENT,
           studentProfileIds: requestForm.studentProfileIds,
           subjects: requestForm.subjects,
           otherSubject: requestForm.otherSubject.trim() || null,
@@ -291,45 +265,6 @@ export function ClassRequestAction({
           </DialogHeader>
 
           <form className="space-y-4" onSubmit={handleRequestSubmit}>
-            <fieldset className="space-y-2">
-              <legend className="font-medium">
-                How would you like to start? <span className="text-destructive">*</span>
-              </legend>
-              <p className="text-sm text-muted-foreground">
-                {getRequestIntentHelperCopy(requestForm.requestIntent)}
-              </p>
-              <div className="grid gap-3 md:grid-cols-2">
-                {CLASS_REQUEST_INTENT_OPTIONS.map((option) => (
-                  <label
-                    key={option.value}
-                    className="flex min-h-24 cursor-pointer gap-3 rounded-lg border border-border/70 bg-background px-4 py-3 text-sm transition hover:bg-muted/60 has-[:checked]:border-primary has-[:checked]:bg-primary/5"
-                  >
-                    <input
-                      type="radio"
-                      name="requestIntent"
-                      value={option.value}
-                      checked={requestForm.requestIntent === option.value}
-                      onChange={() =>
-                        setRequestForm((current) => ({
-                          ...current,
-                          requestIntent: option.value,
-                        }))
-                      }
-                      className="mt-1 size-4 accent-primary"
-                    />
-                    <span>
-                      <span className="block font-medium text-foreground">
-                        {option.label}
-                      </span>
-                      <span className="mt-1 block leading-6 text-muted-foreground">
-                        {option.description}
-                      </span>
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-
             <div className="space-y-2">
               <label className="font-medium">
                 Student name <span className="text-destructive">*</span>
