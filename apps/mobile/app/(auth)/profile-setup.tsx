@@ -19,6 +19,7 @@ import { useTheme } from '@/providers/theme-provider';
 import { useAnalytics } from '@/providers/analytics-provider';
 import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
 import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
+import { queryKeys } from '@/lib/api/query-keys';
 import { AnalyticsEvent } from '@iconicedu/utils';
 import {
   normalizeCountryCode,
@@ -1339,7 +1340,6 @@ function StudentProfileStep({
           placeholderTextColor={s.placeholderColor}
           keyboardType="number-pad"
           maxLength={4}
-          returnKeyType="next"
         />
       </View>
 
@@ -1645,7 +1645,6 @@ function FirstChildStep({
           placeholderTextColor={s.placeholderColor}
           keyboardType="number-pad"
           maxLength={4}
-          returnKeyType="next"
         />
       </View>
 
@@ -1663,6 +1662,11 @@ export default function ProfileSetupScreen() {
   const s = useMemo(() => makeStyles(colors), [colors]);
   const queryClient = useQueryClient();
   const { session, setOnboardingCompletionStatus } = useAuth();
+  const sessionUserId = session?.user.id ?? null;
+  const onboardingStatusQueryKey = useMemo(
+    () => (sessionUserId ? queryKeys.onboardingStatus(sessionUserId) : null),
+    [sessionUserId],
+  );
   const analytics = useAnalytics();
   const enableAddressSearch = useMobileFeatureFlag(
     mobileFeatureFlagKeys.enableMobileOnboardingAddressSearch,
@@ -1719,13 +1723,17 @@ export default function ProfileSetupScreen() {
   const [stepIdx, setStepIdx] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
-  // Synchronously seed from the TanStack Query cache (populated by OTP screen).
+  // Synchronously seed from the user-scoped TanStack Query cache.
   // If cache is cold this is null and statusLoading starts true.
   const [onboarding, setOnboarding] = useState<OnboardingStatus | null>(
-    () => queryClient.getQueryData<OnboardingStatus>(['onboarding-status']) ?? null,
+    () =>
+      (onboardingStatusQueryKey
+        ? queryClient.getQueryData<OnboardingStatus>(onboardingStatusQueryKey)
+        : null) ?? null,
   );
   const [statusLoading, setStatusLoading] = useState(
-    () => !queryClient.getQueryData(['onboarding-status']),
+    () =>
+      !onboardingStatusQueryKey || !queryClient.getQueryData(onboardingStatusQueryKey),
   );
   const [statusError, setStatusError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
@@ -1736,11 +1744,12 @@ export default function ProfileSetupScreen() {
   useEffect(() => {
     async function loadOnboarding() {
       setStatusError(null);
+      if (!onboardingStatusQueryKey) return;
       try {
         let data: OnboardingStatus;
         try {
           data = await queryClient.fetchQuery({
-            queryKey: ['onboarding-status'],
+            queryKey: onboardingStatusQueryKey,
             queryFn: fetchOnboardingStatus,
             staleTime: 5 * 60 * 1000,
           });
@@ -1749,10 +1758,11 @@ export default function ProfileSetupScreen() {
           if (!roleClaimedRef.current) {
             roleClaimedRef.current = true;
             await completeParentRole();
-            queryClient.removeQueries({ queryKey: ['onboarding-status'] });
+            queryClient.removeQueries({ queryKey: onboardingStatusQueryKey });
+            queryClient.invalidateQueries({ queryKey: ['account-base', sessionUserId] });
           }
           data = await queryClient.fetchQuery({
-            queryKey: ['onboarding-status'],
+            queryKey: onboardingStatusQueryKey,
             queryFn: fetchOnboardingStatus,
             staleTime: 0,
           });
@@ -1777,7 +1787,14 @@ export default function ProfileSetupScreen() {
       }
     }
     void loadOnboarding();
-  }, [queryClient, retryCount, router, setOnboardingCompletionStatus]);
+  }, [
+    onboardingStatusQueryKey,
+    queryClient,
+    retryCount,
+    router,
+    sessionUserId,
+    setOnboardingCompletionStatus,
+  ]);
 
   const kind = onboarding?.profileKind ?? onboarding?.primaryRole ?? null;
 
@@ -1910,8 +1927,10 @@ export default function ProfileSetupScreen() {
     onSuccess: (_, { isLast }) => {
       setError(null);
       if (isLast) {
-        queryClient.invalidateQueries({ queryKey: ['onboarding-status'] });
-        queryClient.invalidateQueries({ queryKey: ['account'] });
+        if (onboardingStatusQueryKey) {
+          queryClient.invalidateQueries({ queryKey: onboardingStatusQueryKey });
+        }
+        queryClient.invalidateQueries({ queryKey: ['account-base', sessionUserId] });
         router.replace('/(app)/(tabs)');
       } else {
         setStepIdx((i) => i + 1);
@@ -2129,7 +2148,9 @@ export default function ProfileSetupScreen() {
                 paddingHorizontal: 32,
               }}
               onPress={() => {
-                queryClient.removeQueries({ queryKey: ['onboarding-status'] });
+                if (onboardingStatusQueryKey) {
+                  queryClient.removeQueries({ queryKey: onboardingStatusQueryKey });
+                }
                 setStatusError(null);
                 setStatusLoading(true);
                 setRetryCount((n) => n + 1);
