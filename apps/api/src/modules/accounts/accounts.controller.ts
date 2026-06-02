@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Post,
+  Put,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from '@iconicedu/api/modules/auth/auth.guard';
 import { AccountsService } from '@iconicedu/api/modules/accounts/accounts.service';
 import {
@@ -35,6 +45,12 @@ export class AccountsController {
       extractBearerToken(req.headers.authorization),
       body,
     );
+  }
+
+  @Delete('me')
+  @UseGuards(AuthGuard)
+  deleteMe(@Req() req: AuthenticatedRequest) {
+    return this.accountsService.deleteMe(extractBearerToken(req.headers.authorization));
   }
 
   @Post('activate')
