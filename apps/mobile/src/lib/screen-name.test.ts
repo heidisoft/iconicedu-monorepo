@@ -20,6 +20,7 @@ describe('getScreenName', () => {
       ['/(app)/settings/profile', 'Profile Settings'],
       ['/(app)/settings/preferences', 'Preferences'],
       ['/(app)/settings/location', 'Location Settings'],
+      ['/(app)/settings/privacy-data', 'Privacy & Data'],
     ])('maps %s → %s', (path, expected) => {
       expect(getScreenName(path)).toBe(expected);
     });

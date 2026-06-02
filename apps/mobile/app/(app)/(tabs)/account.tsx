@@ -410,7 +410,7 @@ export default function AccountScreen() {
             label="Privacy & Data"
             labelColor={colors.text}
             chevronColor={colors.textFaint}
-            onPress={() => {}}
+            onPress={() => router.push('/(app)/settings/privacy-data' as never)}
           />
         </View>
 

@@ -167,4 +167,12 @@ describe('AccountScreen', () => {
     expect(screen.getAllByText('Parent One').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Child One').length).toBeGreaterThan(0);
   });
+
+  it('routes Privacy & Data to the privacy data screen', () => {
+    render(<AccountScreen />);
+
+    fireEvent.press(screen.getByText('Privacy & Data'));
+
+    expect(mockPush).toHaveBeenCalledWith('/(app)/settings/privacy-data');
+  });
 });

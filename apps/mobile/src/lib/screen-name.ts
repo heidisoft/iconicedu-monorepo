@@ -37,6 +37,7 @@ const ROUTE_NAMES: Record<string, string> = {
   '/(app)/settings/profile': 'Profile Settings',
   '/(app)/settings/preferences': 'Preferences',
   '/(app)/settings/location': 'Location Settings',
+  '/(app)/settings/privacy-data': 'Privacy & Data',
 };
 
 // ─── Dynamic-route prefixes → readable labels ─────────────────────────────────

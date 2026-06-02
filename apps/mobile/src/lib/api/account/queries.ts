@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from '@/lib/api/http-client';
+import { apiDelete, apiGet, apiPost } from '@/lib/api/http-client';
 
 export async function activateAccount(): Promise<void> {
   await apiPost('/accounts/activate', {});
@@ -6,6 +6,10 @@ export async function activateAccount(): Promise<void> {
 
 export async function fetchUserAccount() {
   return apiGet('/accounts/me');
+}
+
+export async function deleteCurrentAccount(): Promise<{ deletedAt: string }> {
+  return apiDelete('/accounts/me');
 }
 
 export async function fetchProfile(profileId: string) {

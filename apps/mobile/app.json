@@ -26,6 +26,14 @@
       "buildNumber": "1",
       "bundleIdentifier": "com.heidisoft.iconicedu",
       "userInterfaceStyle": "automatic",
+      "infoPlist": {
+        "NSCameraUsageDescription": "ICONIC Academy uses your camera only when you choose to take a photo, for example to add an image attachment to a class or direct message.",
+        "NSFaceIDUsageDescription": "ICONIC Academy uses Face ID only when you choose biometric access, for example to unlock your saved app session more securely.",
+        "NSLocationWhenInUseUsageDescription": "ICONIC Academy uses your location during onboarding to detect your time zone and city, region, and country; for example, this helps show class times in your local time zone.",
+        "NSMicrophoneUsageDescription": "ICONIC Academy uses your microphone only when you choose to record audio, for example to send a voice message in a class or direct message conversation.",
+        "NSPhotoLibraryAddUsageDescription": "ICONIC Academy saves images to your photo library only when you choose to save a message image, for example keeping a class attachment for later.",
+        "NSPhotoLibraryUsageDescription": "ICONIC Academy uses your photo library only when you choose an image, for example to attach a photo to a class or direct message."
+      },
       "config": {
         "usesNonExemptEncryption": false
       }
