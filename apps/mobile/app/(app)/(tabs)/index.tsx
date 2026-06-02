@@ -12,6 +12,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -707,7 +708,6 @@ export default function HomeScreen() {
   const {
     sessions,
     isPending: sessionsLoading,
-    isError: sessionsError,
     refetch: refetchSessions,
   } = useUpcomingSessions();
   const {
@@ -897,40 +897,53 @@ export default function HomeScreen() {
       FAMILY_SWITCH_BOTTOM_PADDING,
     windowHeight * 0.78,
   );
+  const refreshHomeData = useCallback(
+    () =>
+      Promise.all([
+        refetchAccount(),
+        refetchProfile(),
+        refetchSessions(),
+        refetchLearningSpaces(),
+        refetchSupportChannel(),
+        refetchOrgSchedules(),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.familyLinks(
+            orgId ?? '',
+            ((account as Record<string, unknown> | undefined)?.id as string) ?? '',
+          ),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.childProfiles(
+            orgId ?? '',
+            (childProfiles as Record<string, unknown>[]).map(
+              (child) => child.id as string,
+            ),
+          ),
+        }),
+      ]),
+    [
+      account,
+      childProfiles,
+      orgId,
+      queryClient,
+      refetchAccount,
+      refetchLearningSpaces,
+      refetchOrgSchedules,
+      refetchProfile,
+      refetchSessions,
+      refetchSupportChannel,
+    ],
+  );
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    Promise.all([
-      refetchAccount(),
-      refetchProfile(),
-      refetchSessions(),
-      refetchLearningSpaces(),
-      refetchSupportChannel(),
-      refetchOrgSchedules(),
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.familyLinks(
-          orgId ?? '',
-          ((account as Record<string, unknown> | undefined)?.id as string) ?? '',
-        ),
-      }),
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.childProfiles(
-          orgId ?? '',
-          (childProfiles as Record<string, unknown>[]).map((child) => child.id as string),
-        ),
-      }),
-    ]).finally(() => setRefreshing(false));
-  }, [
-    account,
-    childProfiles,
-    orgId,
-    queryClient,
-    refetchAccount,
-    refetchLearningSpaces,
-    refetchOrgSchedules,
-    refetchProfile,
-    refetchSessions,
-    refetchSupportChannel,
-  ]);
+    refreshHomeData().finally(() => setRefreshing(false));
+  }, [refreshHomeData]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void refreshHomeData();
+    }, [refreshHomeData]),
+  );
   const handleUpcomingSessionsPress = useCallback(() => {
     const targetY = todaySessions.length > 0 ? todaySectionY : thisWeekSectionY;
 
