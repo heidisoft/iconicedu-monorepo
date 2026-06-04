@@ -6,8 +6,6 @@ import {
   StyleSheet,
   Switch,
   TouchableOpacity,
-  Linking,
-  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Bell, BellOff } from 'lucide-react-native';
@@ -18,6 +16,8 @@ import { useNotificationPrefs } from '@/hooks/use-notification-prefs';
 import { usePushToggle } from '@/hooks/use-push-toggle';
 import { useUpdateNotificationPref } from '@/hooks/use-update-notification-pref';
 import { NOTIFICATION_REGISTRY } from '@/lib/notifications/notification-config';
+import { openNotificationSettings } from '@/lib/notifications/push-token';
+import { PushNudgeSheet } from '@/components/notifications/push-nudge-sheet';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 
@@ -71,12 +71,6 @@ function makeStyles(C: AppColors) {
     },
     emptyTitle: { fontSize: 16, fontWeight: '600', color: C.text },
     emptyDesc: { fontSize: 14, color: C.textMuted, textAlign: 'center' },
-    osBlockedHint: {
-      fontSize: 13,
-      color: C.textMuted,
-      paddingHorizontal: 12,
-      paddingBottom: 4,
-    },
   });
 }
 
@@ -92,10 +86,7 @@ export default function NotificationsScreen() {
     toggle: togglePush,
   } = usePushToggle();
   const s = useMemo(() => makeStyles(colors), [colors]);
-  const osBlockedHint =
-    Platform.OS === 'ios'
-      ? 'Push notifications are disabled in iPhone Settings. Tap here, then go to Notifications and turn on Allow Notifications.'
-      : 'Push notifications are disabled in Android Settings. Tap here, then open Notifications for ICONIC Academy and turn them back on.';
+  const [nudgeVisible, setNudgeVisible] = useState(false);
 
   // Local muted state for category-level preferences.
   const [mutedMap, setMutedMap] = useState<Record<string, boolean>>({});
@@ -152,7 +143,7 @@ export default function NotificationsScreen() {
               label="Allow push notifications"
               labelColor={colors.textFaint}
               hideChevron
-              onPress={() => void Linking.openSettings()}
+              onPress={() => setNudgeVisible(true)}
               trailing={
                 <Switch
                   value={false}
@@ -182,7 +173,6 @@ export default function NotificationsScreen() {
             />
           )}
         </View>
-        {isOsPermissionDenied && <Text style={s.osBlockedHint}>{osBlockedHint}</Text>}
 
         {/* Per-category preferences */}
         {(prefs as Record<string, unknown>[]).length === 0 ? (
@@ -236,6 +226,17 @@ export default function NotificationsScreen() {
           </>
         )}
       </ScrollView>
+
+      <PushNudgeSheet
+        visible={nudgeVisible}
+        variant="open-settings"
+        onEnable={() => {}}
+        onOpenSettings={async () => {
+          setNudgeVisible(false);
+          await openNotificationSettings();
+        }}
+        onDismiss={() => setNudgeVisible(false)}
+      />
     </SafeAreaView>
   );
 }

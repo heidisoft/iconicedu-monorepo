@@ -130,6 +130,7 @@ export type ConversationHeaderProps = {
   onVideo?: () => void;
   onMore?: () => void;
   liveJoinUrl?: string | null;
+  onJoinPress?: () => void;
   secondaryAvatarSeed?: string | null;
   secondaryAvatarThemeKey?: string | null;
   secondaryAvatarRole?: string | null;
@@ -614,6 +615,7 @@ export function ConversationHeader({
   onVideo,
   onMore,
   liveJoinUrl,
+  onJoinPress,
   secondaryAvatarSeed,
   secondaryAvatarThemeKey,
   secondaryAvatarRole,
@@ -697,6 +699,7 @@ export function ConversationHeader({
 
   const handleJoinPress = useCallback(() => {
     if (!liveJoinUrl) return;
+    onJoinPress?.();
     if (isExternalJoinHref(liveJoinUrl)) {
       setExternalJoinTarget({
         joinHref: liveJoinUrl,
@@ -705,7 +708,7 @@ export function ConversationHeader({
       return;
     }
     handleOpenJoinHref(liveJoinUrl);
-  }, [handleOpenJoinHref, liveJoinUrl]);
+  }, [handleOpenJoinHref, liveJoinUrl, onJoinPress]);
   const handleShareJoinHref = useCallback(async () => {
     if (!externalJoinTarget?.joinHref) return;
     try {

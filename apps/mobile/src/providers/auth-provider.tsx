@@ -10,9 +10,14 @@ import React, {
 import { AppState, type AppStateStatus } from 'react-native';
 import { type Session, type User } from '@supabase/supabase-js';
 import * as WebBrowser from 'expo-web-browser';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase/client';
 import { activateAccount, fetchUserAccount } from '@/lib/api/queries';
-import { getStoredPushToken, revokePushToken } from '@/lib/notifications/push-token';
+import {
+  getStoredPushToken,
+  revokePushToken,
+  clearUserNotificationState,
+} from '@/lib/notifications/push-token';
 import { useAnalytics } from '@/providers/analytics-provider';
 import {
   AnalyticsEvent,
@@ -90,6 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [sessionExpiryMessage, setSessionExpiryMessage] = useState<string | null>(null);
   const analytics = useAnalytics();
+  const queryClient = useQueryClient();
   const onboardingCompleteRef = useRef<boolean | null>(null);
   const backgroundedAtRef = useRef<number | null>(null);
   const previousAppState = useRef<AppStateStatus>(AppState.currentState);
@@ -475,8 +481,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // Token revocation is best-effort; never block sign-out
     }
+    await clearUserNotificationState();
+    queryClient.clear();
     await supabase.auth.signOut();
-  }, [analytics]);
+  }, [analytics, queryClient]);
 
   const value = useMemo<AuthState>(
     () => ({
