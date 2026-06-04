@@ -46,8 +46,6 @@ import { reportMobileObservedError } from '@/lib/analytics/report-error';
 import type { MessageVM, UserProfileVM } from '@iconicedu/shared-types';
 import { useMarkRead } from '@/hooks/use-mark-read';
 import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
-import { usePushNudge } from '@/hooks/use-push-nudge';
-import { PushNudgeSheet } from '@/components/notifications/push-nudge-sheet';
 import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
 
 type PendingUpload = {
@@ -301,15 +299,6 @@ export default function SpaceDetailScreen() {
 
   const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
 
-  const {
-    isVisible: isNudgeVisible,
-    nudgeVariant,
-    triggerNudge,
-    handleEnable,
-    handleOpenSettings,
-    handleDismiss,
-  } = usePushNudge();
-
   const handleSend = useCallback(
     async (text: string) => {
       if (!channelId || !profileId || !orgId) return;
@@ -342,11 +331,9 @@ export default function SpaceDetailScreen() {
             ? error.message
             : 'Something went wrong. Please try again.',
         );
-        return;
       }
-      void triggerNudge();
     },
-    [channelId, profileId, orgId, threadReplyTarget, refetch, triggerNudge],
+    [channelId, profileId, orgId, threadReplyTarget, refetch],
   );
 
   const handleSendAttachment = useCallback(
@@ -555,7 +542,6 @@ export default function SpaceDetailScreen() {
         onBack={() => router.back()}
         onMore={() => setInfoVisible(true)}
         liveJoinUrl={resolvedLiveJoinUrl}
-        onJoinPress={() => void triggerNudge()}
       />
 
       {/* Tab bar: Messages | Sessions */}
@@ -682,15 +668,6 @@ export default function SpaceDetailScreen() {
         onReact={handleReactionToggle}
         onThread={handleThreadOpen}
         onDelete={handleDelete}
-      />
-
-      {/* Push notification nudge */}
-      <PushNudgeSheet
-        visible={isNudgeVisible}
-        variant={nudgeVariant}
-        onEnable={handleEnable}
-        onOpenSettings={handleOpenSettings}
-        onDismiss={handleDismiss}
       />
     </SafeAreaView>
   );
