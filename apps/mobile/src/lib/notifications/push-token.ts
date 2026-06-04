@@ -1,6 +1,6 @@
 import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
-import { Platform } from 'react-native';
+import { Platform, Linking } from 'react-native';
 
 import { reportMobileObservedError } from '@/lib/analytics/report-error';
 import { apiPost } from '@/lib/api/http-client';
@@ -137,4 +137,33 @@ export async function storePushToken(
  */
 export async function revokePushToken(token: string): Promise<void> {
   await apiPost('/push-tokens/revoke', { token });
+}
+
+/**
+ * Clears all notification-related state from SecureStore.
+ * Call on sign-out so the next session starts clean.
+ */
+export async function clearUserNotificationState(): Promise<void> {
+  await Promise.allSettled([
+    SecureStore.deleteItemAsync(PUSH_TOKEN_STORE_KEY),
+    SecureStore.deleteItemAsync('push_nudge_last_shown_at'),
+  ]);
+}
+
+/**
+ * Opens the app's notification settings page.
+ * On Android 8+, deep-links directly to the app notification settings.
+ * On iOS, opens the app's settings page (the OS does not allow deeper navigation).
+ */
+export async function openNotificationSettings(): Promise<void> {
+  if (Platform.OS === 'android') {
+    const packageName = Constants.expoConfig?.android?.package;
+    if (packageName) {
+      await Linking.sendIntent('android.settings.APP_NOTIFICATION_SETTINGS', [
+        { key: 'android.provider.Settings.EXTRA_APP_PACKAGE', value: packageName },
+      ]);
+      return;
+    }
+  }
+  await Linking.openSettings();
 }

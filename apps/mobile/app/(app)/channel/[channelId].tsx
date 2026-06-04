@@ -49,6 +49,8 @@ import { reportMobileObservedError } from '@/lib/analytics/report-error';
 import { useMarkRead } from '@/hooks/use-mark-read';
 import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
 import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
+import { usePushNudge } from '@/hooks/use-push-nudge';
+import { PushNudgeSheet } from '@/components/notifications/push-nudge-sheet';
 
 type ChannelTab = 'messages' | 'sessions';
 
@@ -201,6 +203,15 @@ export default function ChannelConversationScreen() {
   // the pending item with the real message — no manual refetch needed.
   const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
 
+  const {
+    isVisible: isNudgeVisible,
+    nudgeVariant,
+    triggerNudge,
+    handleEnable,
+    handleOpenSettings,
+    handleDismiss,
+  } = usePushNudge();
+
   // ── Send message ──
   const handleSend = useCallback(
     async (text: string) => {
@@ -236,9 +247,11 @@ export default function ChannelConversationScreen() {
             ? error.message
             : 'Something went wrong. Please try again.',
         );
+        return;
       }
+      void triggerNudge();
     },
-    [channelId, profileId, orgId, threadReplyTarget, refetch],
+    [channelId, profileId, orgId, threadReplyTarget, refetch, triggerNudge],
   );
 
   // ── Send attachment (WhatsApp-style: show locally first, upload in background) ──
@@ -637,6 +650,15 @@ export default function ChannelConversationScreen() {
         onReact={handleReactionToggle}
         onThread={handleThreadOpen}
         onDelete={handleDelete}
+      />
+
+      {/* Push notification nudge */}
+      <PushNudgeSheet
+        visible={isNudgeVisible}
+        variant={nudgeVariant}
+        onEnable={handleEnable}
+        onOpenSettings={handleOpenSettings}
+        onDismiss={handleDismiss}
       />
     </SafeAreaView>
   );
