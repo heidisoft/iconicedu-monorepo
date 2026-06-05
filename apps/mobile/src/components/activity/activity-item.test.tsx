@@ -358,31 +358,17 @@ describe('ActivityItem', () => {
       expect(screen.getByText('Submit feedback')).toBeTruthy();
     });
 
-    const realSetTimeout = global.setTimeout;
-    const setTimeoutSpy = jest
-      .spyOn(global, 'setTimeout')
-      .mockImplementation(((
-        handler: TimerHandler,
-        timeout?: number,
-        ...args: unknown[]
-      ) =>
-        realSetTimeout(
-          handler,
-          timeout === 600 ? 0 : timeout,
-          ...args,
-        )) as typeof setTimeout);
-    try {
-      fireEvent.changeText(
-        screen.getByPlaceholderText('Tell us what could be better...'),
-        'Helpful, but a little fast.',
-      );
+    jest.useFakeTimers();
 
-      await act(async () => {
-        await new Promise((resolve) => realSetTimeout(resolve, 0));
-      });
-    } finally {
-      setTimeoutSpy.mockRestore();
-    }
+    fireEvent.changeText(
+      screen.getByPlaceholderText('Tell us what could be better...'),
+      'Helpful, but a little fast.',
+    );
+
+    await act(async () => {
+      jest.advanceTimersByTime(600);
+      await Promise.resolve();
+    });
 
     expect(mockSubmitActivityFeedFeedback).toHaveBeenCalledTimes(2);
     expect(screen.getByText('Submit feedback')).toBeTruthy();
