@@ -36,11 +36,13 @@ export default defineConfig({
     globals: true,
     css: false,
     pool: 'vmThreads',
-    // vmThreads is required for v8 coverage: the forks pool (vitest 4.x default) disconnects
+    // vmThreads is required for v8 coverage: the forks pool (vitest 3.x default) disconnects
     // the V8 inspector in each worker, causing ERR_INSPECTOR_NOT_CONNECTED on coverage collection.
-    // In CI, run serially with a memory cap to avoid OOM in constrained runners.
-    fileParallelism: isCI ? false : undefined,
-    vmMemoryLimit: isCI ? '512MB' : undefined,
+    poolOptions: {
+      vmThreads: isCI
+        ? { singleThread: true, minThreads: 1, maxThreads: 1, memoryLimit: '512MB' }
+        : undefined,
+    },
     server: {
       deps: {
         inline: [/.*/],
