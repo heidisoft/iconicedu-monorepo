@@ -1,6 +1,15 @@
 import React from 'react';
 import '@testing-library/jest-dom/vitest';
-import { vi } from 'vitest';
+import { cleanup } from '@testing-library/react';
+import { afterEach, vi } from 'vitest';
+
+afterEach(() => {
+  cleanup();
+  document.body.style.pointerEvents = '';
+  document.body.querySelectorAll('[data-radix-focus-guard]').forEach((node) => {
+    node.remove();
+  });
+});
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
