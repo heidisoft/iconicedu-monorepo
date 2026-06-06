@@ -21,6 +21,7 @@ vi.mock('./context/messages-state-provider', () => ({
     messageFilter: null,
     toggleMessageFilter: vi.fn(),
   }),
+  useOptionalMessagesState: () => null,
 }));
 
 const makeParticipant = (id: string, overrides?: Record<string, unknown>) =>
