@@ -40,8 +40,7 @@ export default defineConfig({
     // the V8 inspector in each worker, causing ERR_INSPECTOR_NOT_CONNECTED on coverage collection.
     // Keep CI workers memory-capped without forcing all files through one shared
     // serial run; several tests intentionally rely on per-file mock isolation.
-    // GitHub's default runners can starve vmThreads when Vitest fans out too far.
-    ...(isCI && { maxWorkers: 2, vmMemoryLimit: '512MB' }),
+    ...(isCI && { vmMemoryLimit: '512MB' }),
     // Server-component tests render async RSC trees and use waitFor; 5 s is too tight.
     testTimeout: 10000,
     server: {
