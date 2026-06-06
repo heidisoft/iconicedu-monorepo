@@ -709,15 +709,18 @@ jobs:
           api() {
             local body="$1"
             local resp
-            resp=$(curl -sf \
+            resp=$(curl --fail-with-body --silent --show-error --max-time 30 --retry 2 --retry-delay 2 \
               -H "Authorization: Bearer $RAILWAY_TOKEN" \
               -H "Content-Type: application/json" \
               "$GQL" \
-              -d "$body") || { echo "::error::Railway API HTTP request failed"; exit 1; }
+              -d "$body") || {
+                echo "::error::Railway API HTTP request failed" >&2
+                exit 1
+              }
             local errs
             errs=$(echo "$resp" | jq -r 'if .errors then .errors | map(.message) | join(", ") else empty end')
             if [[ -n "$errs" ]]; then
-              echo "::error::Railway GQL error: $errs"
+              echo "::error::Railway GQL error: $errs" >&2
               exit 1
             fi
             echo "$resp"
@@ -754,7 +757,8 @@ jobs:
           echo "Found service: $SERVICE_NAME ($SERVICE_ID)"
 
           # Step 3: Set env vars on the service in the PR environment.
-          # skipDeploys:true so we control the deploy trigger ourselves in the next step.
+          # Use single-variable upserts so one slow Railway write cannot sink the
+          # whole collection request without an actionable key name in the logs.
           # Ref: https://docs.railway.com/integrations/api/manage-variables
           VARS_JSON=$(jq -n \
             --arg db    "${{ steps.branch-creds.outputs.database_url }}" \
@@ -776,13 +780,18 @@ jobs:
               NODE_ENV:"production", NEXT_PUBLIC_APP_ENV:"preview",
               POSTHOG_KEY:$phk, POSTHOG_HOST:$phh}')
 
-          api "$(jq -n \
-            --arg pid "$RAILWAY_PROJECT_ID" \
-            --arg eid "$ENV_ID" \
-            --arg sid "$SERVICE_ID" \
-            --argjson vars "$VARS_JSON" \
-            '{query:"mutation variableCollectionUpsert($input: VariableCollectionUpsertInput!) { variableCollectionUpsert(input: $input) }",
-              variables:{input:{projectId:$pid, environmentId:$eid, serviceId:$sid, variables:$vars, skipDeploys:true}}}')" > /dev/null
+          jq -r 'keys[]' <<< "$VARS_JSON" | while read -r KEY; do
+            VALUE=$(jq -r --arg key "$KEY" '.[$key]' <<< "$VARS_JSON")
+            echo "Setting Railway variable: $KEY"
+            api "$(jq -n \
+              --arg pid "$RAILWAY_PROJECT_ID" \
+              --arg eid "$ENV_ID" \
+              --arg sid "$SERVICE_ID" \
+              --arg name "$KEY" \
+              --arg value "$VALUE" \
+              '{query:"mutation variableUpsert($input: VariableUpsertInput!) { variableUpsert(input: $input) }",
+                variables:{input:{projectId:$pid, environmentId:$eid, serviceId:$sid, name:$name, value:$value, skipDeploys:true}}}')" > /dev/null
+          done
           echo "Variables set."
 
           # Step 4: Trigger a deploy for the service in the PR environment.
