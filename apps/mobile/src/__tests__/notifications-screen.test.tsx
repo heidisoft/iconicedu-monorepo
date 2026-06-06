@@ -43,6 +43,16 @@ jest.mock('@/lib/notifications/notification-config', () => ({
   NOTIFICATION_REGISTRY: {},
 }));
 
+// ─── Mock: push-nudge-sheet (avoids BottomSheet native module dependency) ────
+jest.mock('@/components/notifications/push-nudge-sheet', () => ({
+  PushNudgeSheet: () => null,
+}));
+
+// ─── Mock: push-token (openNotificationSettings) ─────────────────────────────
+jest.mock('@/lib/notifications/push-token', () => ({
+  openNotificationSettings: jest.fn().mockResolvedValue(undefined),
+}));
+
 // ─── Mock: @iconicedu/ui-native (SettingsRow) ─────────────────────────────────
 jest.mock('@iconicedu/ui-native', () => {
   const React = require('react');
@@ -186,55 +196,11 @@ describe('NotificationsScreen — master push toggle (OS permission denied)', ()
     expect(sw.props.disabled).toBe(true);
   });
 
-  it('shows the system-settings hint text', () => {
-    pushToggleDenied();
-    render(<NotificationsScreen />);
-    expect(
-      screen.getByText(
-        /Push notifications are disabled in iPhone Settings|Push notifications are disabled in Android Settings/i,
-      ),
-    ).toBeTruthy();
-  });
-
-  it('shows iOS-specific guidance on iOS', () => {
-    setPlatformOS('ios');
-    pushToggleDenied();
-
-    render(<NotificationsScreen />);
-
-    expect(
-      screen.getByText(
-        /iPhone Settings\. Tap here, then go to Notifications and turn on Allow Notifications\./i,
-      ),
-    ).toBeTruthy();
-  });
-
-  it('shows Android-specific guidance on Android', () => {
-    setPlatformOS('android');
-    pushToggleDenied();
-
-    render(<NotificationsScreen />);
-
-    expect(
-      screen.getByText(
-        /Android Settings\. Tap here, then open Notifications for ICONIC Academy and turn them back on\./i,
-      ),
-    ).toBeTruthy();
-  });
-
-  it('does NOT show hint text when OS is not denied', () => {
-    pushToggleEnabled();
-    render(<NotificationsScreen />);
-    expect(
-      screen.queryByText(/Push notifications are disabled in system Settings/i),
-    ).toBeNull();
-  });
-
-  it('tapping the row calls Linking.openSettings', () => {
+  it('tapping the row does not directly call Linking.openSettings (nudge sheet opens first)', () => {
     pushToggleDenied();
     render(<NotificationsScreen />);
     fireEvent.press(screen.getByTestId('settings-row-Allow push notifications'));
-    expect(openSettingsSpy).toHaveBeenCalled();
+    expect(openSettingsSpy).not.toHaveBeenCalled();
   });
 
   it('tapping the row does NOT call togglePush', () => {

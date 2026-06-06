@@ -1,22 +1,14 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { vi } from 'vitest';
-
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-} from './carousel';
+import { beforeEach, vi } from 'vitest';
 
 const { scrollPrev, scrollNext } = vi.hoisted(() => ({
   scrollPrev: vi.fn(),
   scrollNext: vi.fn(),
 }));
 
-vi.mock('embla-carousel-react', () => {
+const mockEmblaCarousel = () => {
   const api = {
     canScrollPrev: () => true,
     canScrollNext: () => true,
@@ -30,15 +22,23 @@ vi.mock('embla-carousel-react', () => {
     __esModule: true,
     default: vi.fn(() => [vi.fn(), api]),
   };
-});
+};
+
+const loadSubject = async () => {
+  vi.doMock('embla-carousel-react', mockEmblaCarousel);
+  return import('./carousel');
+};
 
 describe('Carousel', () => {
   beforeEach(() => {
+    vi.resetModules();
     scrollPrev.mockClear();
     scrollNext.mockClear();
   });
 
   it('renders slides and handles controls', async () => {
+    const { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } =
+      await loadSubject();
     const user = userEvent.setup();
 
     render(

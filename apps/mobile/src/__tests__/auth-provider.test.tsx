@@ -1,6 +1,7 @@
 import React from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 import { renderHook, act, waitFor } from '@testing-library/react-native';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from '@/providers/auth-provider';
 import { AnalyticsEvent } from '@iconicedu/utils';
 
@@ -76,7 +77,14 @@ jest.mock('../lib/supabase/client', () => ({
 }));
 
 function wrapper({ children }: { children: React.ReactNode }) {
-  return <AuthProvider>{children}</AuthProvider>;
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>{children}</AuthProvider>
+    </QueryClientProvider>
+  );
 }
 
 describe('AuthProvider', () => {
