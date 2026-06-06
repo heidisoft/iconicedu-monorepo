@@ -54,7 +54,6 @@ vi.mock('./context/messages-state-provider', () => ({
     messageFilter: null,
     toggleMessageFilter: vi.fn(),
   }),
-  useOptionalMessagesState: () => null,
 }));
 
 vi.mock('./message-list', () => ({
