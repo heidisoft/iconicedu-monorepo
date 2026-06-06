@@ -38,9 +38,9 @@ export default defineConfig({
     pool: 'vmThreads',
     // vmThreads is required for v8 coverage: the forks pool (vitest 4.x default) disconnects
     // the V8 inspector in each worker, causing ERR_INSPECTOR_NOT_CONNECTED on coverage collection.
-    // Keep CI workers memory-capped without forcing all files through one shared
-    // serial run; several tests intentionally rely on per-file mock isolation.
-    ...(isCI && { vmMemoryLimit: '512MB' }),
+    // poolOptions was removed in vitest 4.x; use top-level fileParallelism + vmMemoryLimit instead.
+    // In CI, run serially with a memory cap to avoid OOM in constrained runners.
+    ...(isCI && { fileParallelism: false, vmMemoryLimit: '512MB' }),
     // Server-component tests render async RSC trees and use waitFor; 5 s is too tight.
     testTimeout: 10000,
     server: {
