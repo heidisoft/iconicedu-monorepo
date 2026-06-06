@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { Bell, CalendarCheck, CalendarX, MessageSquare, Star } from 'lucide-react-native';
 
 import type { ActivityFeedItemVM } from '@iconicedu/shared-types';
@@ -505,20 +505,19 @@ describe('ActivityItem', () => {
 
     renderActivity(item, { currentProfileId: 'profile-1' });
 
-    await act(async () => {
-      fireEvent.press(screen.getByText('Confirm Lesson'));
-      await flushMicrotasks();
-    });
+    fireEvent.press(screen.getByText('Confirm Lesson'));
 
-    expect(mockSubmitCompletionVote).toHaveBeenCalledWith(
-      expect.objectContaining({
-        orgId: 'org-1',
-        scheduleId: 'schedule-1',
-        occurrenceKey: '2026-03-19T22:00:00.000Z',
-        role: 'guardian',
-        status: 'confirmed',
-        recipientProfileId: 'profile-1',
-      }),
-    );
+    await waitFor(() => {
+      expect(mockSubmitCompletionVote).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orgId: 'org-1',
+          scheduleId: 'schedule-1',
+          occurrenceKey: '2026-03-19T22:00:00.000Z',
+          role: 'guardian',
+          status: 'confirmed',
+          recipientProfileId: 'profile-1',
+        }),
+      );
+    });
   });
 });
