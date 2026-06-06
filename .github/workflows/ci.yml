@@ -127,7 +127,7 @@ jobs:
 
       # PRs: only affected packages. Push to main: all packages.
       - name: Test
-        run: pnpm exec turbo run test ${{ github.event_name == 'pull_request' && '--affected' || '' }}
+        run: pnpm exec turbo run test ${{ github.event_name == 'pull_request' && '--affected' || '' }} --concurrency=1
         env:
           CI: true
           TURBO_SCM_BASE: ${{ github.event.pull_request.base.sha }}
@@ -453,30 +453,61 @@ jobs:
           set -euo pipefail
           # Use the GitHub branch name — stable across pushes to the same PR branch.
           SUPABASE_BRANCH="${BRANCH_NAME}"
+          SUPABASE_PROJECT_REF="${{ vars.SUPABASE_PROJECT_ID }}"
+          BRANCH_NEW=false
 
-          EXISTING_ID=$(supabase branches list \
-            --project-ref "${{ vars.SUPABASE_PROJECT_ID }}" \
-            --output json \
-            | jq -r --arg name "$SUPABASE_BRANCH" '.[] | select(.name==$name) | .id // ""')
+          get_branch_data() {
+            supabase branches list \
+              --project-ref "$SUPABASE_PROJECT_REF" \
+              --output json \
+              | jq -c --arg name "$SUPABASE_BRANCH" 'map(select(.name==$name)) | first // {}'
+          }
+
+          create_branch() {
+            echo "Creating branch: $SUPABASE_BRANCH"
+            supabase branches create "$SUPABASE_BRANCH" \
+              --project-ref "$SUPABASE_PROJECT_REF" \
+              --region ap-southeast-1
+            BRANCH_NEW=true
+          }
+
+          BRANCH_DATA=$(get_branch_data)
+          EXISTING_ID=$(echo "$BRANCH_DATA" | jq -r '.id // ""')
+          EXISTING_STATUS=$(echo "$BRANCH_DATA" | jq -r '.status // ""')
+
+          if [[ -n "$EXISTING_ID" && "$EXISTING_STATUS" == "MIGRATIONS_FAILED" ]]; then
+            echo "::warning::Existing Supabase branch is stuck in MIGRATIONS_FAILED; deleting and recreating it once."
+            supabase branches delete "$EXISTING_ID" \
+              --project-ref "$SUPABASE_PROJECT_REF" \
+              --yes
+
+            for i in $(seq 1 12); do
+              BRANCH_DATA=$(get_branch_data)
+              EXISTING_ID=$(echo "$BRANCH_DATA" | jq -r '.id // ""')
+              if [[ -z "$EXISTING_ID" ]]; then
+                break
+              fi
+              if [[ $i -eq 12 ]]; then
+                echo "::error::Timed out waiting for failed Supabase branch deletion"
+                exit 1
+              fi
+              sleep 5
+            done
+          fi
+
+          BRANCH_DATA=$(get_branch_data)
+          EXISTING_ID=$(echo "$BRANCH_DATA" | jq -r '.id // ""')
 
           if [[ -n "$EXISTING_ID" ]]; then
             echo "Branch $SUPABASE_BRANCH already exists — skipping create and seed"
-            echo "branch_new=false" >> "$GITHUB_OUTPUT"
           else
-            echo "Creating branch: $SUPABASE_BRANCH"
-            supabase branches create "$SUPABASE_BRANCH" \
-              --project-ref "${{ vars.SUPABASE_PROJECT_ID }}" \
-              --region ap-southeast-1
-            echo "branch_new=true" >> "$GITHUB_OUTPUT"
+            create_branch
           fi
+          echo "branch_new=$BRANCH_NEW" >> "$GITHUB_OUTPUT"
 
           echo "Waiting for branch migrations to complete..."
           for i in $(seq 1 30); do
-            BRANCH_DATA=$(supabase branches list \
-              --project-ref "${{ vars.SUPABASE_PROJECT_ID }}" \
-              --output json \
-              | jq --arg name "$SUPABASE_BRANCH" '.[] | select(.name==$name)')
-
+            BRANCH_DATA=$(get_branch_data)
             STATUS=$(echo "$BRANCH_DATA" | jq -r '.status // ""')
             BRANCH_ID=$(echo "$BRANCH_DATA" | jq -r '.id // ""')
 
@@ -491,8 +522,11 @@ jobs:
               fi
               break
             elif [[ "$STATUS" == "MIGRATIONS_FAILED" ]]; then
-              echo "::error::Supabase branch migrations failed"
-              exit 1
+              echo "::warning::Supabase hosted branch migrations failed; running explicit repo migration push next for actionable logs."
+              echo "branch_id=$BRANCH_ID" >> "$GITHUB_OUTPUT"
+              BRANCH_REF=$(echo "$BRANCH_DATA" | jq -r '.project_ref // .ref // ""')
+              echo "branch_ref=$BRANCH_REF" >> "$GITHUB_OUTPUT"
+              break
             fi
 
             if [[ $i -eq 30 ]]; then
@@ -628,7 +662,25 @@ jobs:
 
           echo "branch_api_url=https://${BRANCH_REF}.supabase.co" >> "$GITHUB_OUTPUT"
 
-      # 3. Configure Railway PR environment env vars and deploy.
+      # 3. Link the CLI to the preview branch so repo migrations can be applied there.
+      - name: Link Supabase preview branch
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          supabase link \
+            --project-ref "${{ steps.supabase-branch.outputs.branch_ref }}"
+
+      # 4. Ensure preview branches receive repo migrations added in the PR.
+      - name: Apply preview branch migrations
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          supabase db push \
+            --linked
+
+      # 5. Configure Railway PR environment env vars and deploy.
       # Uses the Railway GraphQL API to:
       #   1. Find the PR environment by name
       #   2. Find the service ID dynamically from the project (avoids stale RAILWAY_SERVICE_ID)
@@ -772,24 +824,6 @@ jobs:
               --arg url "${FINAL_URL}/healthz" \
               '{"state":"success","target_url":$url,"description":"Railway preview API","context":"railway/preview-api"}')" \
             || echo "::warning::Failed to post commit status (non-fatal)"
-
-      # 4. Link the CLI to the preview branch so repo migrations can be applied there.
-      - name: Link Supabase preview branch
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: |
-          set -euo pipefail
-          supabase link \
-            --project-ref "${{ steps.supabase-branch.outputs.branch_ref }}"
-
-      # 5. Ensure preview branches receive repo migrations added in the PR.
-      - name: Apply preview branch migrations
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: |
-          set -euo pipefail
-          supabase db push \
-            --linked
 
       # 6. Configure Vercel preview env vars before we capture its preview URL for
       # branch-local Supabase function secrets.

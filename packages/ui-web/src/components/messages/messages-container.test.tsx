@@ -36,6 +36,7 @@ vi.mock('../../hooks/use-messages', () => ({
 }));
 
 vi.mock('./context/messages-state-provider', () => ({
+  useOptionalMessagesState: () => null,
   useMessagesState: () => ({
     toggle: vi.fn(),
     setSavedCount: vi.fn(),

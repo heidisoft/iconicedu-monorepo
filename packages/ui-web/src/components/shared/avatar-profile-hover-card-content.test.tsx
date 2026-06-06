@@ -2,18 +2,26 @@
 
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { AvatarProfileHoverCardContent } from './avatar-profile-hover-card-content';
+const loadSubject = async () => {
+  vi.doMock('@iconicedu/ui-web/ui/hover-card', () => ({
+    HoverCardContent: ({ children }: { children?: React.ReactNode }) => (
+      <div>{children}</div>
+    ),
+  }));
 
-vi.mock('@iconicedu/ui-web/ui/hover-card', () => ({
-  HoverCardContent: ({ children }: { children?: React.ReactNode }) => (
-    <div>{children}</div>
-  ),
-}));
+  return import('./avatar-profile-hover-card-content');
+};
 
 describe('AvatarProfileHoverCardContent', () => {
-  it('renders the updated loading shell with the current hover-card structure', () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  it('renders the updated loading shell with the current hover-card structure', async () => {
+    const { AvatarProfileHoverCardContent } = await loadSubject();
+
     const { container } = render(
       <AvatarProfileHoverCardContent
         avatarNode={<div data-testid="preview-avatar" />}

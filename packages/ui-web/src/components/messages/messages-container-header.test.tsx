@@ -12,6 +12,7 @@ const mockMessagesState = vi.hoisted(() => ({
 }));
 
 vi.mock('./context/messages-state-provider', () => ({
+  useOptionalMessagesState: () => null,
   useMessagesState: () => ({
     savedCount: 0,
     homeworkCount: 0,

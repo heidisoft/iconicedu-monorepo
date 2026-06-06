@@ -2,33 +2,41 @@
 
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { AvatarWithStatus } from './avatar-with-status';
+const loadSubject = async () => {
+  vi.doMock('@iconicedu/ui-web/ui/hover-card', () => ({
+    HoverCard: ({
+      children,
+      onOpenChange,
+    }: {
+      children?: React.ReactNode;
+      onOpenChange?: (open: boolean) => void;
+    }) => {
+      React.useEffect(() => {
+        onOpenChange?.(true);
+      }, [onOpenChange]);
+      return <div>{children}</div>;
+    },
+    HoverCardTrigger: ({ children }: { children?: React.ReactNode }) => (
+      <div>{children}</div>
+    ),
+    HoverCardContent: ({ children }: { children?: React.ReactNode }) => (
+      <div>{children}</div>
+    ),
+  }));
 
-vi.mock('@iconicedu/ui-web/ui/hover-card', () => ({
-  HoverCard: ({
-    children,
-    onOpenChange,
-  }: {
-    children?: React.ReactNode;
-    onOpenChange?: (open: boolean) => void;
-  }) => {
-    React.useEffect(() => {
-      onOpenChange?.(true);
-    }, [onOpenChange]);
-    return <div>{children}</div>;
-  },
-  HoverCardTrigger: ({ children }: { children?: React.ReactNode }) => (
-    <div>{children}</div>
-  ),
-  HoverCardContent: ({ children }: { children?: React.ReactNode }) => (
-    <div>{children}</div>
-  ),
-}));
+  return import('./avatar-with-status');
+};
 
 describe('AvatarWithStatus', () => {
-  it('renders the shared avatar preview shell with direct message action', () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  it('renders the shared avatar preview shell with direct message action', async () => {
+    const { AvatarWithStatus } = await loadSubject();
+
     render(
       <AvatarWithStatus
         profileId="profile-2"
@@ -52,6 +60,8 @@ describe('AvatarWithStatus', () => {
   });
 
   it('keeps rendering fallback preview details when the enhancement request fails', async () => {
+    const { AvatarWithStatus } = await loadSubject();
+
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Not authenticated')));
 
     try {
