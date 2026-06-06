@@ -36,7 +36,12 @@ vi.mock('../../hooks/use-messages', () => ({
 }));
 
 vi.mock('./context/messages-state-provider', () => ({
-  useMessagesState: () => ({
+  useMessagesState: () => mockMessagesState(),
+  useOptionalMessagesState: () => mockMessagesState(),
+}));
+
+function mockMessagesState() {
+  return {
     toggle: vi.fn(),
     setSavedCount: vi.fn(),
     setHomeworkCount: vi.fn(),
@@ -53,8 +58,8 @@ vi.mock('./context/messages-state-provider', () => ({
     setScrollToMessage: vi.fn(),
     messageFilter: null,
     toggleMessageFilter: vi.fn(),
-  }),
-}));
+  };
+}
 
 vi.mock('./message-list', () => ({
   MessageList: ({

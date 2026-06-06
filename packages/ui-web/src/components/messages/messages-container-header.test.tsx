@@ -12,7 +12,12 @@ const mockMessagesState = vi.hoisted(() => ({
 }));
 
 vi.mock('./context/messages-state-provider', () => ({
-  useMessagesState: () => ({
+  useMessagesState: () => mockMessagesProviderState(),
+  useOptionalMessagesState: () => mockMessagesProviderState(),
+}));
+
+function mockMessagesProviderState() {
+  return {
     savedCount: 0,
     homeworkCount: 0,
     sessionSummaryCount: 0,
@@ -20,8 +25,8 @@ vi.mock('./context/messages-state-provider', () => ({
     toggle: vi.fn(),
     messageFilter: null,
     toggleMessageFilter: vi.fn(),
-  }),
-}));
+  };
+}
 
 const makeParticipant = (id: string, overrides?: Record<string, unknown>) =>
   ({
