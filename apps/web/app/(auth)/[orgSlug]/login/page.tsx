@@ -1,14 +1,21 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 
 import OrgLoginClient from '@iconicedu/web/app/(auth)/[orgSlug]/login/org-login-client';
+import { MobileAppPrompt } from '@iconicedu/web/app/(auth)/shared/mobile-app-prompt';
 import { getAccountByAuthUserIdInOrg } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { resolveOrgDashboardPath } from '@iconicedu/web/lib/org/resolve-dashboard-path';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
 import { resolveOrgLoginReason } from '@iconicedu/web/app/(auth)/[orgSlug]/login/login-reason';
-import { enableMobileAppleSignIn, enableMobileGoogleSignIn } from '@iconicedu/web/flags';
+import {
+  enableAuthMobileAppPrompt,
+  enableMobileAppleSignIn,
+  enableMobileGoogleSignIn,
+} from '@iconicedu/web/flags';
+import { isMobileOrTablet } from '@iconicedu/web/lib/mobile/detect-mobile';
 
 export const metadata: Metadata = {
   title: 'Organization Login | ICONIC Academy',
@@ -54,13 +61,17 @@ export default async function OrgLoginPage({
     redirect(`/${org.slug}/get-started`);
   }
 
-  const [showGoogleSignIn, showAppleSignIn] = await Promise.all([
+  const isMobile = isMobileOrTablet(await headers());
+
+  const [showGoogleSignIn, showAppleSignIn, showMobilePrompt] = await Promise.all([
     enableMobileGoogleSignIn(),
     enableMobileAppleSignIn(),
+    enableAuthMobileAppPrompt(),
   ]);
 
   return (
     <div className="bg-background flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
+      <MobileAppPrompt defaultVisible={isMobile && showMobilePrompt} />
       <div className="w-full max-w-sm">
         <OrgLoginClient
           orgSlug={org.slug}
