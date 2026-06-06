@@ -1,6 +1,6 @@
 import { MOBILE_APP_LINKS } from './marketing.constants';
 
-type StoreBadgeSize = 'default' | 'compact';
+type StoreBadgeSize = 'default' | 'medium' | 'compact';
 type StoreBadgeLayout = 'inline' | 'stacked';
 
 type StoreBadgeProps = {
@@ -56,8 +56,36 @@ function StoreIcon({
   );
 }
 
-export function MarketingStoreBadge({ link, size = 'default' }: StoreBadgeProps) {
-  const compact = size === 'compact';
+const sizeStyles = {
+  compact: {
+    badge: 'min-h-9 gap-1.5 px-2.5 py-1.5',
+    icon: 'size-4 shrink-0',
+    eyebrow: 'text-[0.48rem]',
+    label: 'text-xs font-semibold',
+  },
+  medium: {
+    badge: 'min-h-11 gap-2 px-3 py-2',
+    icon: 'size-5 shrink-0',
+    eyebrow: 'text-[0.56rem]',
+    label: 'text-sm font-semibold',
+  },
+  default: {
+    badge: 'min-h-14 gap-3 px-4 py-2.5',
+    icon: 'size-7 shrink-0',
+    eyebrow: 'text-[0.65rem]',
+    label: 'text-lg font-semibold',
+  },
+} satisfies Record<
+  StoreBadgeSize,
+  { badge: string; icon: string; eyebrow: string; label: string }
+>;
+
+export function MarketingStoreBadge({
+  link,
+  size = 'default',
+  className,
+}: StoreBadgeProps & { className?: string }) {
+  const s = sizeStyles[size];
 
   return (
     <a
@@ -67,20 +95,16 @@ export function MarketingStoreBadge({ link, size = 'default' }: StoreBadgeProps)
       aria-label={link.label}
       className={[
         'inline-flex items-center rounded-lg bg-black text-white shadow-sm ring-1 ring-white/15 transition hover:bg-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
-        compact ? 'min-h-9 gap-1.5 px-2.5 py-1.5' : 'min-h-14 gap-3 px-4 py-2.5',
+        s.badge,
+        className ?? '',
       ].join(' ')}
     >
-      <StoreIcon
-        shortLabel={link.shortLabel}
-        className={compact ? 'size-4 shrink-0' : 'size-7 shrink-0'}
-      />
+      <StoreIcon shortLabel={link.shortLabel} className={s.icon} />
       <span className="grid text-left leading-none">
-        <span className={compact ? 'text-[0.48rem]' : 'text-[0.65rem]'}>
+        <span className={s.eyebrow}>
           {link.shortLabel === 'App Store' ? 'Download on the' : 'Get it on'}
         </span>
-        <span className={compact ? 'text-xs font-semibold' : 'text-lg font-semibold'}>
-          {link.shortLabel}
-        </span>
+        <span className={s.label}>{link.shortLabel}</span>
       </span>
     </a>
   );
@@ -89,20 +113,30 @@ export function MarketingStoreBadge({ link, size = 'default' }: StoreBadgeProps)
 export function MarketingStoreBadges({
   size = 'default',
   layout = 'stacked',
+  className,
+  badgeClassName,
 }: {
   size?: StoreBadgeSize;
   layout?: StoreBadgeLayout;
+  className?: string;
+  badgeClassName?: string;
 }) {
   return (
     <div
-      className={
+      className={[
         layout === 'inline'
-          ? 'flex flex-row flex-wrap items-start gap-3'
-          : 'flex flex-col items-start gap-3'
-      }
+          ? 'flex flex-row flex-wrap items-stretch gap-3'
+          : 'flex flex-col items-stretch gap-3',
+        className ?? '',
+      ].join(' ')}
     >
       {MOBILE_APP_LINKS.map((link) => (
-        <MarketingStoreBadge key={link.href} link={link} size={size} />
+        <MarketingStoreBadge
+          key={link.href}
+          link={link}
+          size={size}
+          className={badgeClassName}
+        />
       ))}
     </div>
   );

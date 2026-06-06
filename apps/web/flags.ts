@@ -192,9 +192,27 @@ export const enableMarketingSitePages = flag<boolean, { profileId?: string | nul
   },
 });
 
+export const enableAuthMobileAppPrompt = flag<boolean, { profileId?: string | null }>({
+  key: 'auth-mobile-app-prompt',
+  description:
+    'Shows a mobile app download prompt on auth pages (login, get-started) when accessed from a mobile or tablet device.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: true,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: 'auth-mobile-app-prompt',
+      profileId: entities?.profileId,
+    });
+  },
+});
+
 export const webFlags = {
   enableAdminActivityFeedAudit,
   enableAdminReports,
+  enableAuthMobileAppPrompt,
   enableChannelCommunications,
   enableClassScheduleStaffCancel,
   enableClassScheduleStaffEdit,
