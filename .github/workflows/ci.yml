@@ -127,7 +127,7 @@ jobs:
 
       # PRs: only affected packages. Push to main: all packages.
       - name: Test
-        run: pnpm exec turbo run test ${{ github.event_name == 'pull_request' && '--affected' || '' }} --concurrency=1
+        run: pnpm exec turbo run test ${{ github.event_name == 'pull_request' && '--affected' || '' }}
         env:
           CI: true
           TURBO_SCM_BASE: ${{ github.event.pull_request.base.sha }}
