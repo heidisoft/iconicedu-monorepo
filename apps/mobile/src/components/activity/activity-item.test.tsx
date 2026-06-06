@@ -371,11 +371,7 @@ describe('ActivityItem', () => {
     });
 
     expect(mockSubmitActivityFeedFeedback).toHaveBeenCalledTimes(2);
-    jest.useRealTimers();
-
-    await waitFor(() => {
-      expect(screen.getByText('Submit feedback')).toBeTruthy();
-    });
+    expect(screen.getByText('Submit feedback')).toBeTruthy();
     expect(screen.queryByText('Rating saved. Comments save automatically.')).toBeNull();
 
     fireEvent.press(screen.getByText('Submit feedback'));
