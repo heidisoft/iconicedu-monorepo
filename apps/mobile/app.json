@@ -61,14 +61,6 @@
       "expo-image-picker",
       "expo-sharing",
       "expo-web-browser",
-      [
-        "expo-location",
-        {
-          "locationAlwaysAndWhenInUsePermission": false,
-          "locationAlwaysPermission": false,
-          "locationWhenInUsePermission": "ICONIC Academy uses your location during onboarding to detect your time zone and city, region, and country; for example, this helps show class times in your local time zone."
-        }
-      ],
       "expo-audio",
       [
         "expo-notifications",
