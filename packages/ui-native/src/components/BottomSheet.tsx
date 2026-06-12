@@ -3,6 +3,7 @@ import {
   Modal,
   View,
   Animated,
+  Easing,
   PanResponder,
   Dimensions,
   Pressable,
@@ -13,6 +14,13 @@ import {
 
 const SCREEN_HEIGHT = Dimensions.get('screen').height;
 const DEFAULT_PARTIAL_HEIGHT_RATIO = 0.58;
+const OPEN_CLOSE_DURATION_MS = 240;
+const SPRING_CONFIG = {
+  stiffness: 260,
+  damping: 32,
+  mass: 1,
+  useNativeDriver: true,
+};
 
 type BottomSheetRenderProps = {
   isExpanded: boolean;
@@ -27,6 +35,7 @@ export type BottomSheetProps = {
   partialHeight?: number;
   allowExpand?: boolean;
   enablePartialOverlay?: boolean;
+  partialOverlayTopInset?: number;
   topInset?: number;
   bottomInset?: number;
   backdropColor?: string;
@@ -74,6 +83,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   partialHeight,
   allowExpand = false,
   enablePartialOverlay = false,
+  partialOverlayTopInset = 0,
   topInset = 0,
   bottomInset = 0,
   backdropColor = 'rgba(0,0,0,0.45)',
@@ -89,10 +99,22 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   const isExpandedRef = useRef(false);
   const panStartRef = useRef(partialTranslateY);
 
+  const settleTo = useCallback(
+    (toValue: number, velocity = 0) => {
+      Animated.spring(translateY, {
+        ...SPRING_CONFIG,
+        toValue,
+        velocity,
+      }).start();
+    },
+    [translateY],
+  );
+
   const close = useCallback(() => {
     Animated.timing(translateY, {
       toValue: SCREEN_HEIGHT,
-      duration: 220,
+      duration: OPEN_CLOSE_DURATION_MS,
+      easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start(() => {
       isExpandedRef.current = false;
@@ -108,24 +130,8 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
 
     isExpandedRef.current = true;
     setIsExpanded(true);
-    Animated.spring(translateY, {
-      toValue: 0,
-      tension: 85,
-      friction: 12,
-      useNativeDriver: true,
-    }).start();
-  }, [allowExpand, translateY]);
-
-  const collapse = useCallback(() => {
-    isExpandedRef.current = false;
-    setIsExpanded(false);
-    Animated.spring(translateY, {
-      toValue: partialTranslateY,
-      tension: 80,
-      friction: 12,
-      useNativeDriver: true,
-    }).start();
-  }, [partialTranslateY, translateY]);
+    settleTo(0);
+  }, [allowExpand, settleTo]);
 
   useEffect(() => {
     if (!visible) {
@@ -135,26 +141,27 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
     isExpandedRef.current = false;
     setIsExpanded(false);
     translateY.setValue(SCREEN_HEIGHT);
-    Animated.spring(translateY, {
-      toValue: partialTranslateY,
-      tension: 80,
-      friction: 12,
-      useNativeDriver: true,
-    }).start();
-  }, [partialTranslateY, translateY, visible]);
+    settleTo(partialTranslateY);
+  }, [partialTranslateY, settleTo, translateY, visible]);
 
   const handlePanRelease = useCallback(
     (dy: number, vy: number) => {
       const expanded = isExpandedRef.current;
+      const currentY = Math.max(0, Math.min(SCREEN_HEIGHT, panStartRef.current + dy));
+      const projectedY = currentY + vy * 120;
 
-      if (allowExpand && (dy < -50 || vy < -0.5)) {
-        expand();
+      if (allowExpand && projectedY < partialTranslateY * 0.55) {
+        isExpandedRef.current = true;
+        setIsExpanded(true);
+        settleTo(0, vy);
         return;
       }
 
-      if (dy > 80 || vy > 0.6) {
+      if (dy > 80 || vy > 0.6 || projectedY > partialTranslateY + 120) {
         if (allowExpand && expanded) {
-          collapse();
+          isExpandedRef.current = false;
+          setIsExpanded(false);
+          settleTo(partialTranslateY, vy);
           return;
         }
 
@@ -162,14 +169,9 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
         return;
       }
 
-      Animated.spring(translateY, {
-        toValue: allowExpand && expanded ? 0 : partialTranslateY,
-        tension: 80,
-        friction: 12,
-        useNativeDriver: true,
-      }).start();
+      settleTo(allowExpand && expanded ? 0 : partialTranslateY, vy);
     },
-    [allowExpand, close, collapse, expand, partialTranslateY, translateY],
+    [allowExpand, close, partialTranslateY, settleTo],
   );
 
   const panResponder = useMemo(
@@ -205,11 +207,13 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
           });
         },
         onPanResponderMove: (_, { dy }) => {
-          if (dy > 0) {
-            translateY.setValue(Math.min(SCREEN_HEIGHT, panStartRef.current + dy));
-          }
+          const next = Math.max(0, Math.min(SCREEN_HEIGHT, panStartRef.current + dy));
+          translateY.setValue(next);
         },
         onPanResponderRelease: (_, { dy, vy }) => {
+          const currentY = Math.max(0, Math.min(SCREEN_HEIGHT, panStartRef.current + dy));
+          const projectedY = currentY + vy * 120;
+
           if (Math.abs(dy) < 8) {
             if (allowExpand) {
               expand();
@@ -219,25 +223,22 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
             return;
           }
 
-          if (dy > 60 || vy > 0.5) {
+          if (dy > 60 || vy > 0.5 || projectedY > partialTranslateY + 100) {
             close();
             return;
           }
 
-          if (allowExpand && (dy < -30 || vy < -0.5)) {
-            expand();
+          if (allowExpand && projectedY < partialTranslateY * 0.65) {
+            isExpandedRef.current = true;
+            setIsExpanded(true);
+            settleTo(0, vy);
             return;
           }
 
-          Animated.spring(translateY, {
-            toValue: partialTranslateY,
-            tension: 80,
-            friction: 12,
-            useNativeDriver: true,
-          }).start();
+          settleTo(partialTranslateY, vy);
         },
       }),
-    [allowExpand, close, expand, partialTranslateY, translateY],
+    [allowExpand, close, expand, partialTranslateY, settleTo, translateY],
   );
 
   const renderedChildren =
@@ -272,7 +273,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
         {renderedChildren}
         {enablePartialOverlay && !isExpanded ? (
           <View
-            style={StyleSheet.absoluteFill}
+            style={[StyleSheet.absoluteFill, { top: partialOverlayTopInset }]}
             {...partialOverlayPanResponder.panHandlers}
           />
         ) : null}

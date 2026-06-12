@@ -58,6 +58,7 @@ const CHANNEL_FILES_BUCKET = 'channel-files';
 // ─── Screen dimensions ─────────────────────────────────────────────────────────
 const PARTIAL_HEIGHT_RATIO = 0.58;
 const JOIN_AFTER_CLOSE_DELAY_MS = 260;
+const PARTIAL_OVERLAY_TOP_INSET = 190;
 
 // ─── Avatar helpers ────────────────────────────────────────────────────────────
 
@@ -1465,6 +1466,8 @@ export function ChannelInfoSheet({
         visible={visible}
         onClose={onClose}
         allowExpand
+        enablePartialOverlay
+        partialOverlayTopInset={PARTIAL_OVERLAY_TOP_INSET}
         topInset={insets.top}
         bottomInset={insets.bottom}
         partialHeight={Dimensions.get('screen').height * PARTIAL_HEIGHT_RATIO}
