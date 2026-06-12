@@ -53,6 +53,7 @@ const ACTIVITY_SCOPED_VERB_KEYS: ActivityVerbVM[] = [
   'class.session.canceled',
   'message.posted',
   'message.mentioned',
+  'message.unviewed_intended_participants',
   'message.thread_reply.posted',
   'file.uploaded',
   'image.uploaded',
@@ -107,6 +108,9 @@ function formatActivityVerbLabel(verb: ActivityVerbVM): string {
   }
   if (verb === 'session.feedback_request.sent') {
     return 'Session - Feedback Request';
+  }
+  if (verb === 'message.unviewed_intended_participants') {
+    return 'Messages - Unviewed Classroom Messages';
   }
 
   return verb

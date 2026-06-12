@@ -123,6 +123,35 @@ describe('API activity definitions context rendering', () => {
     });
   });
 
+  it('renders staff unviewed classroom message alerts', () => {
+    const definition = getActivityEventDefinition(
+      'message.unviewed_intended_participants',
+    );
+    expect(definition).toBeDefined();
+
+    const rendered = definition!.render(
+      makeEvent('message.unviewed_intended_participants', {
+        senderName: 'Ari Parent',
+        unviewedParticipantNames: ['Ms. Chen'],
+        unviewedParticipantIds: ['teacher-1'],
+        unviewedParticipantCount: 1,
+        thresholdHours: 24,
+      }),
+    );
+
+    expect(definition!.importance).toBe('important');
+    expect(rendered.leading).toMatchObject({
+      kind: 'icon',
+      iconKey: 'AlertCircle',
+      tone: 'warning',
+    });
+    expect(rendered.headline.primary).toBe('Algebra I message not viewed');
+    expect(rendered.summary).toBe(
+      "Ms. Chen has not viewed Ari Parent's message after 24 hours.",
+    );
+    expect(rendered.actionButton?.label).toBe('Open message');
+  });
+
   it('renders reactions with original message preview and quiet importance', () => {
     const definition = getActivityEventDefinition('reaction.added');
     expect(definition).toBeDefined();

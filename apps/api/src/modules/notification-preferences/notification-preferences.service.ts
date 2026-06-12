@@ -14,6 +14,7 @@ export class NotificationPreferencesService {
   private readonly signupDefaultPreferences = [
     { prefKey: 'message.posted', channels: ['push', 'email'] },
     { prefKey: 'message.mentioned', channels: ['push', 'email'] },
+    { prefKey: 'message.unviewed_intended_participants', channels: ['push', 'email'] },
     { prefKey: 'message.thread_reply.posted', channels: ['push', 'email'] },
     { prefKey: 'file.uploaded', channels: ['push', 'email'] },
     { prefKey: 'image.uploaded', channels: ['push', 'email'] },

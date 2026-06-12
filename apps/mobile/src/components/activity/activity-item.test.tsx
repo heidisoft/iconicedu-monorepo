@@ -1,6 +1,13 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import { Bell, CalendarCheck, CalendarX, MessageSquare, Star } from 'lucide-react-native';
+import {
+  AlertCircle,
+  Bell,
+  CalendarCheck,
+  CalendarX,
+  MessageSquare,
+  Star,
+} from 'lucide-react-native';
 
 import type { ActivityFeedItemVM } from '@iconicedu/shared-types';
 
@@ -105,6 +112,7 @@ describe('ActivityItem', () => {
   it.each([
     ['class.session.rescheduled', 'CalendarCheck', CalendarCheck],
     ['class.session.canceled', 'CalendarX', CalendarX],
+    ['message.unviewed_intended_participants', 'AlertCircle', AlertCircle],
     ['session.reminder.sent', 'Bell', Bell],
     ['session.feedback_request.sent', 'Star', Star],
   ] as const)('displays the correct icon for %s notifications', (verb, iconKey, Icon) => {
@@ -131,6 +139,7 @@ describe('ActivityItem', () => {
   it.each([
     ['class.session.rescheduled', 'CalendarCheck'],
     ['class.session.canceled', 'CalendarX'],
+    ['message.unviewed_intended_participants', 'AlertCircle'],
     ['session.reminder.sent', 'Bell'],
     ['session.feedback_request.sent', 'Star'],
   ] as const)('falls back to the correct icon key for %s', (verb, iconKey) => {

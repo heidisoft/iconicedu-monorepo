@@ -463,6 +463,45 @@ function renderMessageItem(
   } satisfies ActivityRenderResult;
 }
 
+function renderUnviewedClassroomMessageItem(event: ActivityEventRow) {
+  const payload = asRecord(event.payload);
+  const senderName = asString(payload.senderName, 'Someone');
+  const classTitle = getContextTitle(payload) ?? 'Classroom';
+  const names = asStringArray(payload.unviewedParticipantNames);
+  const participantLabel =
+    formatNamesList(names) ??
+    `${typeof payload.unviewedParticipantCount === 'number' ? payload.unviewedParticipantCount : 'Some'} participant(s)`;
+  const thresholdHours =
+    typeof payload.thresholdHours === 'number' ? payload.thresholdHours : 24;
+  const summary = `${participantLabel} has not viewed ${senderName}'s message after ${thresholdHours} hours.`;
+
+  return {
+    verb: 'message.unviewed_intended_participants',
+    leading: { kind: 'icon', iconKey: 'AlertCircle', tone: 'warning' },
+    headline: {
+      primary: `${classTitle} message not viewed`,
+      secondary: summary,
+      secondaryHref: buildInboxSourceHref(event, payload),
+    },
+    summary,
+    preview: { text: summary },
+    expandedContent: names.length
+      ? `Unviewed intended participants\n${names.join('\n')}`
+      : summary,
+    actionButton: sourceAction(event, payload, 'outline', 'Open message'),
+    metadata: {
+      ...buildCommonContextMetadata(payload),
+      channelId: asOptionalString(payload.channelId),
+      channelRouteKind: payload.channelRouteKind === 'space' ? 'space' : undefined,
+      messageId: asOptionalString(payload.messageId),
+      senderProfileId: asOptionalString(payload.senderProfileId),
+      unviewedParticipantIds: asStringArray(payload.unviewedParticipantIds),
+      unviewedParticipantNames: names,
+      thresholdHours,
+    },
+  } satisfies ActivityRenderResult;
+}
+
 function renderReactionItem(event: ActivityEventRow) {
   const payload = asRecord(event.payload);
   const senderName = asString(payload.senderName, 'Someone');
@@ -760,6 +799,17 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     },
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => renderMessageItem(event, 'message.mentioned', 'mention'),
+  },
+  'message.unviewed_intended_participants': {
+    eventType: 'message.unviewed_intended_participants',
+    tabKey: 'all',
+    importance: 'important',
+    notification: {
+      defaultChannels: ['push'],
+      timing: 'standard',
+    },
+    resolveRecipients: DEFAULT_RECIPIENTS,
+    render: renderUnviewedClassroomMessageItem,
   },
   'message.thread_reply.posted': {
     eventType: 'message.thread_reply.posted',

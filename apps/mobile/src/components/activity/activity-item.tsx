@@ -102,6 +102,8 @@ export function getIconKey(item: ActivityFeedItemVM): InboxIconKeyVM {
       return 'MessageSquareDot';
     case 'message.mentioned':
       return 'AtSign';
+    case 'message.unviewed_intended_participants':
+      return 'AlertCircle';
     case 'message.thread_reply.posted':
       return 'MessageSquareReply';
     case 'file.uploaded':
