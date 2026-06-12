@@ -651,6 +651,8 @@ export default function SpaceDetailScreen() {
         iconKey={resolvedIconKey}
         themeKey={resolvedThemeKey}
         messages={messages ?? []}
+        liveJoinUrl={resolvedLiveJoinUrl}
+        onJoinPress={() => void triggerNudge()}
         onClose={() => setInfoVisible(false)}
         onProfilePress={(user) => {
           setInfoVisible(false);

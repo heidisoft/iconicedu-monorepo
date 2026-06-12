@@ -930,7 +930,7 @@ export function ConversationHeader({
           <View style={s.titleBlock}>{titleContent}</View>
         )}
 
-        {!isReadOnly && (
+        {(liveJoinUrl || !isReadOnly) && (
           <View style={s.actions}>
             {liveJoinUrl ? (
               <TouchableOpacity
@@ -942,14 +942,16 @@ export function ConversationHeader({
                 <Video size={14} color={colors.teal} />
                 <Text style={s.joinPillTxt}>Join</Text>
               </TouchableOpacity>
-            ) : onVideo ? (
+            ) : !isReadOnly && onVideo ? (
               <TouchableOpacity style={s.actionBtn} onPress={onVideo} hitSlop={8}>
                 <Video size={20} color={colors.text} />
               </TouchableOpacity>
             ) : null}
-            <TouchableOpacity style={s.actionBtn} onPress={onMore} hitSlop={8}>
-              <MoreVertical size={22} color={colors.text} />
-            </TouchableOpacity>
+            {!isReadOnly && (
+              <TouchableOpacity style={s.actionBtn} onPress={onMore} hitSlop={8}>
+                <MoreVertical size={22} color={colors.text} />
+              </TouchableOpacity>
+            )}
           </View>
         )}
       </View>
