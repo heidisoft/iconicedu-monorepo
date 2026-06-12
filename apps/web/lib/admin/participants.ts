@@ -1,6 +1,7 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type { UserProfileVM, ProfileRow } from '@iconicedu/shared-types';
 
-import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
+import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 import { mapBaseProfile } from '@iconicedu/web/lib/profile/mappers/base-profile.mapper';
 import { getAccountsByOrgId } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import {
@@ -78,12 +79,12 @@ function mapProfileToUserProfile(
 
 export async function getActiveParticipantProfiles(
   orgId: string,
+  supabase: SupabaseClient = createSupabaseServiceClient(),
 ): Promise<UserProfileVM[]> {
   if (!orgId) {
     return [];
   }
 
-  const supabase = await createSupabaseServerClient();
   const { data: accounts } = await getAccountsByOrgId(supabase, orgId, {
     status: 'active',
   });
