@@ -9,7 +9,7 @@ import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service
 type ProjectionStatus = 'pending' | 'processing' | 'failed';
 
 function isAllowedAdminRole(roleKey: string | null | undefined) {
-  return roleKey === 'owner' || roleKey === 'admin';
+  return roleKey === 'owner' || roleKey === 'admin' || roleKey === 'staff';
 }
 
 async function countByProjectionStatus(input: {

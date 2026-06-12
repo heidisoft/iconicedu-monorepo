@@ -113,6 +113,19 @@ describe('GET /api/admin/activity/events/failed', () => {
     });
   });
 
+  it('allows staff to inspect projection failures', async () => {
+    getUserRoles.mockResolvedValueOnce({
+      data: [{ role_key: 'staff' }],
+      error: null,
+    });
+
+    const response = await GET(
+      new Request('http://localhost/api/admin/activity/events/failed?orgId=org-1'),
+    );
+
+    expect(response.status).toBe(200);
+  });
+
   it('returns 403 for non-admin users', async () => {
     getUserRoles.mockResolvedValueOnce({
       data: [{ role_key: 'guardian' }],

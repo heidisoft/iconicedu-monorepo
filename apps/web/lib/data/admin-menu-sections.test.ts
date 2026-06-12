@@ -99,4 +99,32 @@ describe('buildAdminMenuSections', () => {
 
     expect(titles.indexOf('Reports')).toBe(titles.indexOf('Settings') - 1);
   });
+
+  it('only links to implemented admin pages', () => {
+    const implementedAdminPaths = new Set([
+      '/admin/activity/feed',
+      '/admin/activity/logs',
+      '/admin/attendance/sessions',
+      '/admin/channels',
+      '/admin/channels/direct-messages',
+      '/admin/classrooms',
+      '/admin/reports',
+      '/admin/reports/activity',
+      '/admin/reports/channels',
+      '/admin/reports/classrooms',
+      '/admin/reports/users',
+      '/admin/settings/activity',
+      '/admin/settings/roles',
+      '/admin/settings/subjects',
+      '/admin/tools',
+      '/admin/users',
+      '/admin/users/families',
+    ]);
+    const links = buildAdminMenuSections('/iconic-academy').flatMap((section) =>
+      section.links.map((link) => link.url.replace('/iconic-academy', '')),
+    );
+
+    expect(links).toEqual(expect.arrayContaining([...implementedAdminPaths]));
+    expect(links).toHaveLength(implementedAdminPaths.size);
+  });
 });

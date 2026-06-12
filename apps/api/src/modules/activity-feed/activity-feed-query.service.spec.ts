@@ -25,6 +25,19 @@ function makeQuery<T>(rows: T[]) {
   return query;
 }
 
+function makeAdminAuditQuery<T>(rows: T[]) {
+  const query = {
+    select: jest.fn(() => query),
+    eq: jest.fn(() => query),
+    is: jest.fn(() => query),
+    order: jest.fn(() => query),
+    limit: jest.fn(() => query),
+    maybeSingle: jest.fn(async () => ({ data: rows[0] ?? null, error: null })),
+    returns: jest.fn(async () => ({ data: rows, error: null })),
+  };
+  return query;
+}
+
 describe('ActivityFeedQueryService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -213,6 +226,32 @@ describe('ActivityFeedQueryService', () => {
           votedAt: '2026-05-05T12:10:00.000Z',
         },
       },
+    });
+  });
+
+  it('allows staff to fetch the admin activity feed audit', async () => {
+    const accountQuery = makeAdminAuditQuery([{ id: 'account-staff' }]);
+    const rolesQuery = makeAdminAuditQuery([{ role_key: 'staff' }]);
+    const activityQuery = makeAdminAuditQuery([]);
+    const from = jest.fn((table: string) => {
+      if (table === 'accounts') return accountQuery;
+      if (table === 'user_roles') return rolesQuery;
+      if (table === 'activity_feed_items') return activityQuery;
+      throw new Error(`Unexpected table ${table}`);
+    });
+    createSupabaseServiceClientMock.mockReturnValue({ from } as never);
+
+    const service = new ActivityFeedQueryService();
+    const audit = await service.fetchAdminActivityFeedAudit('auth-user-1', 'org-1');
+
+    expect(rolesQuery.returns).toHaveBeenCalled();
+    expect(audit).toMatchObject({
+      totalCount: 0,
+      unreadCount: 0,
+      pipelineJobCount: 0,
+      reminderJobCount: 0,
+      verbSummaries: [],
+      items: [],
     });
   });
 });
