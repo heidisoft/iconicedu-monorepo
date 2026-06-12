@@ -863,12 +863,70 @@ describe('SchedulesService authorization', () => {
       { table: 'class_schedules', action: 'delete' },
     ]);
   });
+
+  it('soft-deletes learning-space schedules that have completion votes', async () => {
+    createSupabaseSessionClientMock.mockReturnValue({
+      auth: {
+        getUser: jest.fn(async () => ({
+          data: { user: { id: 'auth-user-1' } },
+          error: null,
+        })),
+      },
+    } as never);
+
+    const operations: Array<{ table: string; action: string; payload?: unknown }> = [];
+    const mainClient = makeReplaceSchedulesClient({
+      previousSchedules: [{ id: 'schedule-with-votes' }, { id: 'schedule-free' }],
+      cascadeSchedules: [],
+      completionVoteRows: [{ schedule_id: 'schedule-with-votes' }],
+      operations,
+    });
+    createSupabaseServiceClientMock
+      .mockReturnValueOnce(
+        makeSingleResult({
+          id: 'account-1',
+          active_profile_id: 'profile-staff',
+        }) as never,
+      )
+      .mockReturnValueOnce(makeSingleResult([{ role_key: 'staff' }]) as never)
+      .mockReturnValueOnce(mainClient as never);
+
+    const service = new SchedulesService();
+    await service.deleteSchedulesForLearningSpace('token-1', {
+      orgId: 'org-1',
+      learningSpaceId: 'space-1',
+    });
+
+    expect(operations).toEqual([
+      {
+        table: 'reminder_jobs',
+        action: 'update',
+        payload: expect.objectContaining({
+          status: 'canceled',
+          lease_owner: null,
+          lease_until: null,
+        }),
+      },
+      { table: 'class_schedule_participants', action: 'delete' },
+      { table: 'class_schedules', action: 'delete' },
+      {
+        table: 'class_schedules',
+        action: 'update',
+        payload: expect.objectContaining({
+          status: 'cancelled',
+          deleted_by: 'profile-staff',
+          updated_by: 'profile-staff',
+        }),
+      },
+    ]);
+  });
 });
 
 function makeReplaceSchedulesClient(input: {
   previousSchedules: unknown[];
   cascadeSchedules: unknown[];
   cascadeRecurrences?: unknown[];
+  completionVoteRows?: unknown[];
   operations?: Array<{ table: string; action: string; payload?: unknown }>;
 }) {
   let classSchedulesSelectCount = 0;
@@ -904,6 +962,9 @@ function makeReplaceSchedulesClient(input: {
           }
           if (table === 'class_schedule_recurrence') {
             return { data: input.cascadeRecurrences ?? [], error: null };
+          }
+          if (table === 'class_session_completion_votes') {
+            return { data: input.completionVoteRows ?? [], error: null };
           }
           return { data: [], error: null };
         }),
