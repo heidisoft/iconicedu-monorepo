@@ -279,6 +279,23 @@ describe('ConversationHeader', () => {
     expect(screen.queryByTestId('more-icon')).toBeNull();
   });
 
+  it('shows live session join for read-only users', () => {
+    render(
+      <ConversationHeader
+        {...baseProps}
+        kind="space"
+        isReadOnly={true}
+        liveJoinUrl="/live-sessions/session-1"
+        onMore={jest.fn()}
+      />,
+    );
+
+    fireEvent.press(screen.getByLabelText('Join live session'));
+
+    expect(Linking.openURL).toHaveBeenCalledWith('/live-sessions/session-1');
+    expect(screen.queryByTestId('more-icon')).toBeNull();
+  });
+
   it('hides online dot when isReadOnly is true', () => {
     render(<ConversationHeader {...baseProps} isReadOnly={true} />);
     // Online dot is a plain View with no testID — verify by ensuring no green dot

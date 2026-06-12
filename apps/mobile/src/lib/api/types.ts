@@ -29,6 +29,12 @@ export type ChannelListItem = {
   icon_key?: string | null;
   themeKey?: string | null;
   messageUiThemeKey?: 'classic' | 'feed' | null;
+  liveSession?: {
+    enabled: boolean;
+    provider: 'daily' | 'zoom' | 'jitsi' | 'custom';
+    mode: 'video' | 'audio' | null;
+    joinUrl: string | null;
+  } | null;
   purpose?: string | null;
   student_name?: string | null;
   student_profiles?: Array<{ name: string; themeKey?: string | null }>;

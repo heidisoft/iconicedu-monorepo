@@ -9,6 +9,9 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
+  Modal,
+  Pressable,
+  Share,
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { useRouter } from 'expo-router';
@@ -23,6 +26,9 @@ import {
   Download,
   File,
   MessageCircle,
+  Share2,
+  Video,
+  X,
 } from 'lucide-react-native';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
@@ -51,6 +57,7 @@ const CHANNEL_FILES_BUCKET = 'channel-files';
 
 // ─── Screen dimensions ─────────────────────────────────────────────────────────
 const PARTIAL_HEIGHT_RATIO = 0.58;
+const JOIN_AFTER_CLOSE_DELAY_MS = 260;
 
 // ─── Avatar helpers ────────────────────────────────────────────────────────────
 
@@ -62,6 +69,28 @@ function getInitials(name: string): string {
   const words = name.trim().split(/\s+/);
   if (words.length >= 2) return (words[0]![0]! + words[1]![0]!).toUpperCase();
   return name[0]?.toUpperCase() ?? '?';
+}
+
+function isExternalJoinHref(joinHref?: string | null): boolean {
+  return Boolean(joinHref && /^https?:\/\//i.test(joinHref));
+}
+
+function resolveExternalJoinProviderLabel(joinHref?: string | null) {
+  if (!joinHref || !isExternalJoinHref(joinHref)) {
+    return null;
+  }
+
+  try {
+    const hostname = new URL(joinHref).hostname.toLowerCase();
+    if (hostname.includes('zoom')) return 'Zoom';
+    if (hostname.includes('jitsi')) return 'Jitsi';
+    if (hostname.includes('meet.google')) return 'Google Meet';
+    if (hostname.includes('teams.microsoft')) return 'Microsoft Teams';
+  } catch {
+    return null;
+  }
+
+  return null;
 }
 
 function themeAvatarColor(
@@ -292,6 +321,8 @@ export type ChannelInfoSheetProps = {
     role?: string | null;
   }> | null;
   messages?: MessageVM[];
+  liveJoinUrl?: string | null;
+  onJoinPress?: () => void;
   onClose: () => void;
   onProfilePress?: (user: UserProfileVM) => void;
 };
@@ -744,6 +775,113 @@ function makeStyles(C: AppColors) {
       textAlign: 'center',
     },
     heroSub: { fontSize: 15, color: C.textMuted, textAlign: 'center' },
+    heroJoinButton: {
+      marginTop: 4,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 5,
+      borderRadius: 20,
+      backgroundColor: C.tealBg,
+      borderWidth: hairline,
+      borderColor: C.teal,
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+    },
+    heroJoinButtonText: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: C.teal,
+    },
+    modalBackdrop: {
+      flex: 1,
+      justifyContent: 'center',
+      paddingHorizontal: 20,
+      backgroundColor: 'rgba(15, 23, 42, 0.42)',
+    },
+    modalCard: {
+      gap: 16,
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor: C.border,
+      backgroundColor: C.card,
+      padding: 20,
+    },
+    modalHeading: { gap: 8 },
+    modalTitle: {
+      fontSize: 20,
+      fontWeight: '700',
+      color: C.text,
+    },
+    modalDescription: {
+      fontSize: 15,
+      lineHeight: 20,
+      color: C.textMuted,
+    },
+    modalLinkBox: {
+      gap: 6,
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: C.border,
+      backgroundColor: C.inputBg,
+      padding: 14,
+    },
+    modalLinkLabel: {
+      fontSize: 12,
+      fontWeight: '700',
+      letterSpacing: 0.5,
+      textTransform: 'uppercase',
+      color: C.textMuted,
+    },
+    modalLinkValue: {
+      fontSize: 14,
+      lineHeight: 19,
+      color: C.text,
+    },
+    modalFooter: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      flexWrap: 'wrap',
+      gap: 10,
+    },
+    modalButton: {
+      minWidth: 104,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexDirection: 'row',
+      gap: 8,
+      borderRadius: 18,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+    },
+    modalButtonSecondary: {
+      borderWidth: 1,
+      borderColor: C.border,
+      backgroundColor: C.inputBg,
+    },
+    modalButtonPrimary: {
+      backgroundColor: C.teal,
+    },
+    modalButtonSecondaryText: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: C.text,
+    },
+    modalButtonPrimaryText: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: C.tealFg,
+    },
+    modalCloseIconButton: {
+      width: 42,
+      height: 42,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 21,
+      borderWidth: 1,
+      borderColor: C.border,
+      backgroundColor: C.inputBg,
+    },
 
     // ── Info rows (DM only) ───────────────────────────────────────────────────
     section: {
@@ -1003,6 +1141,8 @@ export function ChannelInfoSheet({
   description,
   members,
   messages = [],
+  liveJoinUrl,
+  onJoinPress,
   onClose,
   onProfilePress,
 }: ChannelInfoSheetProps) {
@@ -1023,6 +1163,13 @@ export function ChannelInfoSheet({
   const [activeTab, setActiveTab] = useState<ChannelTab>('files');
   const [channelUiDefaults, setChannelUiDefaults] =
     useState<ParsedMobileChannelUiDefaults | null>(null);
+  const [externalJoinTarget, setExternalJoinTarget] = useState<{
+    joinHref: string;
+    providerLabel: string | null;
+  } | null>(null);
+  const joinTransitionTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
   const isDm = kind === 'dm';
   const seed = avatarSeed ?? title;
@@ -1035,6 +1182,59 @@ export function ChannelInfoSheet({
     () => (isDm ? [] : getVisibleChannelInfoTabs(channelUiDefaults)),
     [channelUiDefaults, isDm],
   );
+  useEffect(
+    () => () => {
+      if (joinTransitionTimeoutRef.current) {
+        clearTimeout(joinTransitionTimeoutRef.current);
+      }
+    },
+    [],
+  );
+
+  const handleJoinPress = useCallback(
+    (closeSheet?: () => void) => {
+      if (!liveJoinUrl) return;
+      onJoinPress?.();
+
+      if (joinTransitionTimeoutRef.current) {
+        clearTimeout(joinTransitionTimeoutRef.current);
+      }
+      const openJoinTarget = () => {
+        if (isExternalJoinHref(liveJoinUrl)) {
+          setExternalJoinTarget({
+            joinHref: liveJoinUrl,
+            providerLabel: resolveExternalJoinProviderLabel(liveJoinUrl),
+          });
+          return;
+        }
+        Linking.openURL(liveJoinUrl).catch(() => null);
+      };
+
+      closeSheet?.();
+      if (!closeSheet) {
+        onClose();
+      }
+      joinTransitionTimeoutRef.current = setTimeout(() => {
+        joinTransitionTimeoutRef.current = null;
+        openJoinTarget();
+      }, JOIN_AFTER_CLOSE_DELAY_MS);
+    },
+    [liveJoinUrl, onClose, onJoinPress],
+  );
+  const handleOpenJoinHref = useCallback((joinHref: string) => {
+    Linking.openURL(joinHref).catch(() => null);
+  }, []);
+  const handleShareJoinHref = useCallback(async () => {
+    if (!externalJoinTarget?.joinHref) return;
+    try {
+      await Share.share({
+        message: externalJoinTarget.joinHref,
+        url: externalJoinTarget.joinHref,
+      });
+    } catch {
+      // best effort share
+    }
+  }, [externalJoinTarget?.joinHref]);
 
   // ── Files: fetch directly from channel_files + channel_media tables ─────────
   // Messages are paginated (last ~40), so we can't extract files from them reliably.
@@ -1260,141 +1460,220 @@ export function ChannelInfoSheet({
   );
 
   return (
-    <BottomSheet
-      visible={visible}
-      onClose={onClose}
-      allowExpand
-      enablePartialOverlay
-      topInset={insets.top}
-      bottomInset={insets.bottom}
-      partialHeight={Dimensions.get('screen').height * PARTIAL_HEIGHT_RATIO}
-      sheetStyle={s.sheet}
-    >
-      {({ isExpanded }) =>
-        isDm ? (
-          /* ── DM: hero + static info rows ── */
-          <ScrollView showsVerticalScrollIndicator={false} scrollEnabled={isExpanded}>
-            {/* Hero */}
-            <View style={s.hero}>
-              <View style={{ width: 72, height: 72, position: 'relative' }}>
-                <View style={[s.avatarCircle, { backgroundColor: heroAvatarColors.bg }]}>
-                  <Text style={[s.avatarTxt, { color: heroAvatarColors.fg }]}>
-                    {getInitials(title)}
-                  </Text>
-                </View>
-              </View>
-              <RoleNameIndicator
-                name={title}
-                role={avatarRole}
-                textStyle={s.heroName}
-                iconSize={14}
-              />
-              {!!subtitle && <Text style={s.heroSub}>{subtitle}</Text>}
-            </View>
-
-            {/* Info rows */}
-            <View style={s.section}>
-              <View style={s.row}>
-                <Text style={s.rowIcon}>💬</Text>
-                <Text style={s.rowLabel}>Type</Text>
-                <Text style={s.rowValue}>{typeLabel}</Text>
-              </View>
-              {memberCount != null && (
-                <>
-                  <View style={s.rowSep} />
-                  <View style={s.row}>
-                    <Text style={s.rowIcon}>👥</Text>
-                    <Text style={s.rowLabel}>Members</Text>
-                    <Text style={s.rowValue}>{memberCount}</Text>
-                  </View>
-                </>
-              )}
-              {!!description && (
-                <>
-                  <View style={s.rowSep} />
-                  <View style={s.row}>
-                    <Text style={s.rowIcon}>📝</Text>
-                    <Text style={s.rowLabel}>Description</Text>
-                    <Text style={s.rowValue} numberOfLines={2}>
-                      {description}
+    <>
+      <BottomSheet
+        visible={visible}
+        onClose={onClose}
+        allowExpand
+        topInset={insets.top}
+        bottomInset={insets.bottom}
+        partialHeight={Dimensions.get('screen').height * PARTIAL_HEIGHT_RATIO}
+        sheetStyle={s.sheet}
+      >
+        {({ isExpanded, close }) =>
+          isDm ? (
+            /* ── DM: hero + static info rows ── */
+            <ScrollView showsVerticalScrollIndicator={false} scrollEnabled={isExpanded}>
+              {/* Hero */}
+              <View style={s.hero}>
+                <View style={{ width: 72, height: 72, position: 'relative' }}>
+                  <View
+                    style={[s.avatarCircle, { backgroundColor: heroAvatarColors.bg }]}
+                  >
+                    <Text style={[s.avatarTxt, { color: heroAvatarColors.fg }]}>
+                      {getInitials(title)}
                     </Text>
                   </View>
-                </>
-              )}
-            </View>
-          </ScrollView>
-        ) : (
-          /* ── Channel / Space: compact hero + fixed tabs + scrollable content ── */
-          <>
-            <View style={s.heroCompact}>
-              <ChannelTopicIconBadge
-                iconKey={iconKey}
-                size={56}
-                iconSize={28}
-                borderRadius={28}
-                backgroundColor={iconTheme.bg}
-                color={iconTheme.fg}
-                style={s.avatarCircleCompact}
-              />
-              <Text style={s.heroNameCompact}>{title}</Text>
-              {!!subtitle && <Text style={s.heroSub}>{subtitle}</Text>}
-            </View>
-
-            {/* Fixed tab bar */}
-            {visibleTabs.length > 1 ? (
-              <View style={s.tabBar}>
-                {visibleTabs.map((tab) => {
-                  const isActive = activeTab === tab.key;
-                  const tabColor = isActive ? colors.teal : colors.textMuted;
-                  return (
-                    <TouchableOpacity
-                      key={tab.key}
-                      style={[s.tabItem, isActive && s.tabItemActive]}
-                      onPress={() => setActiveTab(tab.key)}
-                      activeOpacity={0.7}
-                    >
-                      <TabIcon tabKey={tab.key} color={tabColor} />
-                      <Text style={[s.tabLabel, isActive && s.tabLabelActive]}>
-                        {tab.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
+                </View>
+                <RoleNameIndicator
+                  name={title}
+                  role={avatarRole}
+                  textStyle={s.heroName}
+                  iconSize={14}
+                />
+                {!!subtitle && <Text style={s.heroSub}>{subtitle}</Text>}
               </View>
-            ) : null}
 
-            {/* Tab content — flex: 1 so it fills remaining space */}
-            <View style={{ flex: 1 }}>
-              {visibleTabs.length > 0 ? (
-                <TabContent
-                  activeTab={activeTab}
-                  fileItems={fileItems}
-                  filesLoading={filesLoading}
-                  membersLoading={membersLoading}
-                  savedItems={savedItems}
-                  memberItems={memberItems}
-                  colors={colors}
-                  s={s}
-                  memberCount={memberCount}
-                  isFullScreen={isExpanded}
-                  currentProfileId={currentProfileId}
-                  onMemberMessage={handleMemberMessage}
-                  onProfilePress={onProfilePress}
+              {/* Info rows */}
+              <View style={s.section}>
+                <View style={s.row}>
+                  <Text style={s.rowIcon}>💬</Text>
+                  <Text style={s.rowLabel}>Type</Text>
+                  <Text style={s.rowValue}>{typeLabel}</Text>
+                </View>
+                {memberCount != null && (
+                  <>
+                    <View style={s.rowSep} />
+                    <View style={s.row}>
+                      <Text style={s.rowIcon}>👥</Text>
+                      <Text style={s.rowLabel}>Members</Text>
+                      <Text style={s.rowValue}>{memberCount}</Text>
+                    </View>
+                  </>
+                )}
+                {!!description && (
+                  <>
+                    <View style={s.rowSep} />
+                    <View style={s.row}>
+                      <Text style={s.rowIcon}>📝</Text>
+                      <Text style={s.rowLabel}>Description</Text>
+                      <Text style={s.rowValue} numberOfLines={2}>
+                        {description}
+                      </Text>
+                    </View>
+                  </>
+                )}
+              </View>
+            </ScrollView>
+          ) : (
+            /* ── Channel / Space: compact hero + fixed tabs + scrollable content ── */
+            <>
+              <View style={s.heroCompact}>
+                <ChannelTopicIconBadge
+                  iconKey={iconKey}
+                  size={56}
+                  iconSize={28}
+                  borderRadius={28}
+                  backgroundColor={iconTheme.bg}
+                  color={iconTheme.fg}
+                  style={s.avatarCircleCompact}
                 />
-              ) : (
-                <EmptyTabState
-                  icon={<FileText size={22} color={colors.textMuted} />}
-                  title="Nothing to show"
-                  description="This panel is hidden by the channel settings."
-                  colors={colors}
-                  s={s}
-                />
-              )}
+                <Text style={s.heroNameCompact}>{title}</Text>
+                {!!subtitle && <Text style={s.heroSub}>{subtitle}</Text>}
+                {!!liveJoinUrl && (
+                  <TouchableOpacity
+                    style={s.heroJoinButton}
+                    onPress={() => handleJoinPress(close)}
+                    activeOpacity={0.85}
+                    accessibilityRole="button"
+                    accessibilityLabel="Join live session"
+                  >
+                    <Video size={14} color={colors.teal} />
+                    <Text style={s.heroJoinButtonText}>Join</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* Fixed tab bar */}
+              {visibleTabs.length > 1 ? (
+                <View style={s.tabBar}>
+                  {visibleTabs.map((tab) => {
+                    const isActive = activeTab === tab.key;
+                    const tabColor = isActive ? colors.teal : colors.textMuted;
+                    return (
+                      <TouchableOpacity
+                        key={tab.key}
+                        style={[s.tabItem, isActive && s.tabItemActive]}
+                        onPress={() => setActiveTab(tab.key)}
+                        activeOpacity={0.7}
+                      >
+                        <TabIcon tabKey={tab.key} color={tabColor} />
+                        <Text style={[s.tabLabel, isActive && s.tabLabelActive]}>
+                          {tab.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ) : null}
+
+              {/* Tab content — flex: 1 so it fills remaining space */}
+              <View style={{ flex: 1 }}>
+                {visibleTabs.length > 0 ? (
+                  <TabContent
+                    activeTab={activeTab}
+                    fileItems={fileItems}
+                    filesLoading={filesLoading}
+                    membersLoading={membersLoading}
+                    savedItems={savedItems}
+                    memberItems={memberItems}
+                    colors={colors}
+                    s={s}
+                    memberCount={memberCount}
+                    isFullScreen={isExpanded}
+                    currentProfileId={currentProfileId}
+                    onMemberMessage={handleMemberMessage}
+                    onProfilePress={onProfilePress}
+                  />
+                ) : (
+                  <EmptyTabState
+                    icon={<FileText size={22} color={colors.textMuted} />}
+                    title="Nothing to show"
+                    description="This panel is hidden by the channel settings."
+                    colors={colors}
+                    s={s}
+                  />
+                )}
+              </View>
+            </>
+          )
+        }
+      </BottomSheet>
+
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={Boolean(externalJoinTarget)}
+        onRequestClose={() => setExternalJoinTarget(null)}
+      >
+        <Pressable style={s.modalBackdrop} onPress={() => setExternalJoinTarget(null)}>
+          <Pressable style={s.modalCard} onPress={(event) => event.stopPropagation()}>
+            <View style={s.modalHeading}>
+              <Text style={s.modalTitle}>Session ready to join</Text>
+              <Text style={s.modalDescription}>
+                This session opens in an external provider. Stay here until you are ready,
+                then use the link below to join.
+              </Text>
             </View>
-          </>
-        )
-      }
-    </BottomSheet>
+            <View style={s.modalLinkBox}>
+              <Text style={s.modalLinkLabel}>Join link</Text>
+              <Text style={s.modalLinkValue}>{externalJoinTarget?.joinHref}</Text>
+            </View>
+            <View style={s.modalFooter}>
+              <TouchableOpacity
+                style={[s.modalButton, s.modalButtonSecondary]}
+                onPress={() => void handleShareJoinHref()}
+                activeOpacity={0.85}
+                accessibilityLabel="Share join link"
+              >
+                <Share2 size={16} color={colors.text} />
+                <Text style={s.modalButtonSecondaryText}>Share</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.modalButton, s.modalButtonPrimary]}
+                onPress={() => {
+                  if (externalJoinTarget?.joinHref) {
+                    handleOpenJoinHref(externalJoinTarget.joinHref);
+                  }
+                  setExternalJoinTarget(null);
+                }}
+                activeOpacity={0.85}
+                accessibilityLabel={
+                  externalJoinTarget?.providerLabel
+                    ? `Open ${externalJoinTarget.providerLabel}`
+                    : 'Open session'
+                }
+              >
+                <Video size={16} color={colors.tealFg} />
+                <Text style={s.modalButtonPrimaryText}>
+                  {externalJoinTarget?.providerLabel
+                    ? `Join ${externalJoinTarget.providerLabel}`
+                    : 'Join session'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={s.modalCloseIconButton}
+                onPress={() => setExternalJoinTarget(null)}
+                activeOpacity={0.85}
+                accessibilityLabel="Close join dialog"
+              >
+                <X size={16} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </>
   );
 }
 

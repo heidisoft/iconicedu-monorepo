@@ -129,6 +129,17 @@ export default function ChannelConversationScreen() {
     isLoading: isLoadingSessions,
     error: sessionsError,
   } = useSpaceSessions(channelId ?? '', orgId);
+  const liveSession = useMemo(() => {
+    if (!schedules?.length) return null;
+    const now = Date.now();
+    return (
+      schedules.find((schedule) => {
+        const start = Date.parse(schedule.startAt);
+        const end = Date.parse(schedule.endAt);
+        return start <= now && end >= now && !!schedule.meetingLink;
+      }) ?? null
+    );
+  }, [schedules]);
   const { data: channelReadState } = useQuery({
     queryKey: queryKeys.channelReadState(channelId ?? '', accountId),
     queryFn: () => fetchChannelReadState(channelId ?? '', accountId),
@@ -174,6 +185,9 @@ export default function ChannelConversationScreen() {
   const s = useMemo(() => makeStyles(colors), [colors]);
   const messageTheme = resolveMobileMessageUiTheme(resolvedMessageUiThemeKey);
   const ThemedMessageList = messageTheme.MessageList;
+  const resolvedLiveJoinUrl =
+    channelMeta?.liveSession?.joinUrl ??
+    (channelMeta?.liveSession?.enabled ? (liveSession?.meetingLink ?? null) : null);
 
   // ── Info sheet state ──
   const [infoVisible, setInfoVisible] = useState(false);
@@ -519,6 +533,8 @@ export default function ChannelConversationScreen() {
         loading={isLoadingChannelMeta && !channelMeta}
         onBack={() => router.back()}
         onMore={() => setInfoVisible(true)}
+        liveJoinUrl={resolvedLiveJoinUrl}
+        onJoinPress={() => void triggerNudge()}
       />
 
       {/* Tab bar: Messages | Sessions — only shown for class channels */}
@@ -619,6 +635,8 @@ export default function ChannelConversationScreen() {
         iconKey={resolvedIconKey}
         themeKey={resolvedThemeKey}
         messages={messages ?? []}
+        liveJoinUrl={resolvedLiveJoinUrl}
+        onJoinPress={() => void triggerNudge()}
         onClose={() => setInfoVisible(false)}
         onProfilePress={(user) => {
           setInfoVisible(false);
