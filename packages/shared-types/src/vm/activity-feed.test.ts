@@ -9,6 +9,7 @@ describe('ActivityVerbVM', () => {
   it('accepts supported activity verbs', () => {
     expectTypeOf<'message.posted'>().toMatchTypeOf<ActivityVerbVM>();
     expectTypeOf<'message.mentioned'>().toMatchTypeOf<ActivityVerbVM>();
+    expectTypeOf<'message.unviewed_intended_participants'>().toMatchTypeOf<ActivityVerbVM>();
     expectTypeOf<'message.thread_reply.posted'>().toMatchTypeOf<ActivityVerbVM>();
     expectTypeOf<'file.uploaded'>().toMatchTypeOf<ActivityVerbVM>();
     expectTypeOf<'image.uploaded'>().toMatchTypeOf<ActivityVerbVM>();

@@ -9,6 +9,7 @@ import type {
 import {
   publishReactionAddedActivity,
   publishTextMessagePostSendActivities,
+  publishUnviewedClassroomMessageActivity,
   resolveActivityChannelContext,
   resolveVisibilityAudienceFromMessageRow,
 } from '@iconicedu/api/lib/messages/message-activity';
@@ -64,12 +65,36 @@ export class ActivityWorkerService {
           : job.source_kind;
     if (
       rawSourceKind !== 'message' &&
+      rawSourceKind !== 'message_unviewed_check' &&
       rawSourceKind !== 'reaction' &&
       rawSourceKind !== 'session_cancel' &&
       rawSourceKind !== 'session_reschedule'
     ) {
       throw new Error(`Unsupported activity source job kind: ${String(rawSourceKind)}`);
     }
+
+    if (rawSourceKind === 'message_unviewed_check') {
+      const messageId =
+        typeof payload.messageId === 'string'
+          ? payload.messageId
+          : typeof job.source_id === 'string'
+            ? job.source_id
+            : null;
+      if (!messageId) {
+        throw new Error('Missing messageId for message unviewed check job');
+      }
+
+      await publishUnviewedClassroomMessageActivity({
+        supabase,
+        orgId: job.org_id,
+        messageId,
+        now: new Date().toISOString(),
+        thresholdHours:
+          typeof payload.thresholdHours === 'number' ? payload.thresholdHours : 24,
+      });
+      return;
+    }
+
     const sourceKind: ActivitySourceJobKind = rawSourceKind;
     const sourceId =
       typeof payload.sourceId === 'string'

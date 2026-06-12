@@ -26,6 +26,30 @@ export type VisibilityAudienceResolution = {
   allowedProfileIds?: Set<string> | null;
 };
 
+type ClassroomMessageProfile = {
+  id: string;
+  account_id: string | null;
+  kind: string | null;
+  display_name?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+};
+
+type ClassroomMessageRow = {
+  id: string;
+  org_id: string;
+  channel_id: string;
+  sender_profile_id: string;
+  created_at: string;
+  type: string | null;
+  visibility_type: string | null;
+  visibility_user_id?: string | null;
+  visibility_user_ids?: string[] | null;
+  thread_id?: string | null;
+  thread_parent_id?: string | null;
+  sender?: ClassroomMessageProfile | null;
+};
+
 export function resolveVisibilityAudienceFromMessageRow(input: {
   visibilityType?: string | null;
   visibilityUserId?: string | null;
@@ -104,6 +128,166 @@ function buildDisplayName(input: {
     .trim();
 
   return fullName || 'Someone';
+}
+
+function addHours(value: string, hours: number) {
+  const time = new Date(value).getTime();
+  if (Number.isNaN(time)) {
+    return null;
+  }
+  return new Date(time + hours * 60 * 60 * 1000).toISOString();
+}
+
+function pickIntendedProfileKinds(senderKind?: string | null) {
+  if (senderKind === 'guardian' || senderKind === 'child') {
+    return new Set(['educator']);
+  }
+
+  if (senderKind === 'educator') {
+    return new Set(['guardian', 'child']);
+  }
+
+  return new Set<string>();
+}
+
+function profileMatchesVisibilityAudience(input: {
+  profileId: string;
+  visibilityAudience?: VisibilityAudienceResolution;
+}) {
+  const allowedProfileIds = input.visibilityAudience?.allowedProfileIds;
+  return allowedProfileIds ? allowedProfileIds.has(input.profileId) : true;
+}
+
+function hasViewedMessage(input: {
+  messageCreatedAt: string;
+  lastReadAt?: string | null;
+}) {
+  if (!input.lastReadAt) {
+    return false;
+  }
+
+  const messageTime = new Date(input.messageCreatedAt).getTime();
+  const readTime = new Date(input.lastReadAt).getTime();
+  if (Number.isNaN(messageTime) || Number.isNaN(readTime)) {
+    return false;
+  }
+
+  return readTime >= messageTime;
+}
+
+async function resolveStaffProfileIds(input: {
+  supabase: SupabaseQueryClient;
+  orgId: string;
+}) {
+  const response = await input.supabase
+    .from('profiles')
+    .select('id')
+    .eq('org_id', input.orgId)
+    .eq('kind', 'staff')
+    .is('deleted_at', null)
+    .returns<Array<{ id: string }>>();
+
+  if (response.error) {
+    throw new Error(response.error.message);
+  }
+
+  return Array.from(new Set((response.data ?? []).map((row) => row.id).filter(Boolean)));
+}
+
+async function resolveClassroomChannelMembers(input: {
+  supabase: SupabaseQueryClient;
+  orgId: string;
+  channelId: string;
+}) {
+  const membersResponse = await input.supabase
+    .from('channel_members')
+    .select(
+      'profile:profiles!profile_id(id, account_id, kind, display_name, first_name, last_name)',
+    )
+    .eq('org_id', input.orgId)
+    .eq('channel_id', input.channelId)
+    .is('deleted_at', null)
+    .returns<Array<{ profile: ClassroomMessageProfile | null }>>();
+
+  if (membersResponse.error) {
+    throw new Error(membersResponse.error.message);
+  }
+
+  return (membersResponse.data ?? [])
+    .map((row) => row.profile)
+    .filter((profile): profile is ClassroomMessageProfile => Boolean(profile?.id));
+}
+
+async function resolveUnreadIntendedClassroomParticipants(input: {
+  supabase: SupabaseQueryClient;
+  orgId: string;
+  channelId: string;
+  message: ClassroomMessageRow;
+  visibilityAudience?: VisibilityAudienceResolution;
+}) {
+  const senderKind = input.message.sender?.kind ?? null;
+  const intendedKinds = pickIntendedProfileKinds(senderKind);
+  if (!intendedKinds.size) {
+    return [];
+  }
+
+  const members = await resolveClassroomChannelMembers({
+    supabase: input.supabase,
+    orgId: input.orgId,
+    channelId: input.channelId,
+  });
+  const intendedProfiles = members.filter(
+    (profile) =>
+      profile.id !== input.message.sender_profile_id &&
+      intendedKinds.has(profile.kind ?? '') &&
+      profileMatchesVisibilityAudience({
+        profileId: profile.id,
+        visibilityAudience: input.visibilityAudience,
+      }),
+  );
+
+  if (!intendedProfiles.length) {
+    return [];
+  }
+
+  const accountIds = Array.from(
+    new Set(
+      intendedProfiles
+        .map((profile) => profile.account_id)
+        .filter((accountId): accountId is string => Boolean(accountId)),
+    ),
+  );
+  if (!accountIds.length) {
+    return intendedProfiles;
+  }
+
+  const readStatesResponse = await input.supabase
+    .from('channel_read_state')
+    .select('account_id,last_read_at')
+    .eq('org_id', input.orgId)
+    .eq('channel_id', input.channelId)
+    .in('account_id', accountIds)
+    .is('thread_id', null)
+    .is('deleted_at', null)
+    .returns<Array<{ account_id: string; last_read_at: string | null }>>();
+
+  if (readStatesResponse.error) {
+    throw new Error(readStatesResponse.error.message);
+  }
+
+  const lastReadAtByAccountId = new Map(
+    (readStatesResponse.data ?? []).map((row) => [row.account_id, row.last_read_at]),
+  );
+
+  return intendedProfiles.filter(
+    (profile) =>
+      !hasViewedMessage({
+        messageCreatedAt: input.message.created_at,
+        lastReadAt: profile.account_id
+          ? lastReadAtByAccountId.get(profile.account_id)
+          : null,
+      }),
+  );
 }
 
 async function resolveSenderDisplayName(input: {
@@ -744,6 +928,129 @@ export async function publishFileUploadActivity(input: {
     dedupeKey: `${eventType}:${input.messageId}`,
     createdBy: input.senderProfileId,
   });
+}
+
+export async function publishUnviewedClassroomMessageActivity(input: {
+  supabase: SupabaseServiceClient;
+  readSupabase?: SupabaseQueryClient;
+  publishActivity?: PublishActivityFn;
+  orgId: string;
+  messageId: string;
+  now: string;
+  thresholdHours?: number;
+}) {
+  const readSupabase = input.readSupabase ?? input.supabase;
+  const messageResponse = await readSupabase
+    .from('messages')
+    .select(
+      `
+        id, org_id, channel_id, sender_profile_id, created_at, type, visibility_type, visibility_user_id, visibility_user_ids, thread_id, thread_parent_id,
+        sender:profiles!sender_profile_id(id, account_id, kind, display_name, first_name, last_name)
+      `,
+    )
+    .eq('org_id', input.orgId)
+    .eq('id', input.messageId)
+    .is('deleted_at', null)
+    .maybeSingle<ClassroomMessageRow>();
+
+  if (messageResponse.error) {
+    throw new Error(messageResponse.error.message);
+  }
+
+  const message = messageResponse.data;
+  if (!message || message.thread_parent_id) {
+    return { suppressed: true, reason: 'message_not_eligible' };
+  }
+
+  const activityContext = await resolveActivityChannelContext({
+    supabase: readSupabase,
+    orgId: input.orgId,
+    channelId: message.channel_id,
+  });
+
+  if (activityContext.channelRouteKind !== 'space' || !activityContext.learningSpaceId) {
+    return { suppressed: true, reason: 'not_classroom_channel' };
+  }
+
+  const thresholdAt = addHours(
+    message.created_at,
+    typeof input.thresholdHours === 'number' ? input.thresholdHours : 24,
+  );
+  if (!thresholdAt || new Date(input.now).getTime() < new Date(thresholdAt).getTime()) {
+    return { suppressed: true, reason: 'threshold_not_reached' };
+  }
+
+  const visibilityAudience = resolveVisibilityAudienceFromMessageRow({
+    visibilityType: message.visibility_type,
+    visibilityUserId: message.visibility_user_id,
+    visibilityUserIds: message.visibility_user_ids,
+  });
+
+  if (visibilityAudience.suppressActivity) {
+    return { suppressed: true, reason: 'message_visibility_suppressed' };
+  }
+
+  const unviewedProfiles = await resolveUnreadIntendedClassroomParticipants({
+    supabase: readSupabase,
+    orgId: input.orgId,
+    channelId: message.channel_id,
+    message,
+    visibilityAudience,
+  });
+
+  if (!unviewedProfiles.length) {
+    return { suppressed: true, reason: 'all_intended_participants_viewed' };
+  }
+
+  const staffProfileIds = await resolveStaffProfileIds({
+    supabase: readSupabase,
+    orgId: input.orgId,
+  });
+
+  if (!staffProfileIds.length) {
+    return { suppressed: true, reason: 'no_staff_recipients' };
+  }
+
+  const senderName = buildDisplayName(message.sender ?? {});
+  const unviewedParticipantNames = unviewedProfiles.map(buildDisplayName);
+  const publishActivity = input.publishActivity ?? publishActivityEvent;
+
+  await publishActivity({
+    supabase: input.supabase,
+    orgId: input.orgId,
+    eventType: 'message.unviewed_intended_participants',
+    occurredAt: input.now,
+    sourceKind: 'system',
+    actorProfileId: message.sender_profile_id,
+    scope: { kind: 'learning_space', learningSpaceId: activityContext.learningSpaceId },
+    objectRef: { kind: 'message', id: input.messageId },
+    targetRef: activityContext.targetRef,
+    audienceRules: [{ kind: 'users_only', userIds: staffProfileIds }],
+    payload: {
+      channelId: message.channel_id,
+      messageId: input.messageId,
+      senderProfileId: message.sender_profile_id,
+      senderName,
+      unviewedParticipantIds: unviewedProfiles.map((profile) => profile.id),
+      unviewedParticipantNames,
+      unviewedParticipantCount: unviewedProfiles.length,
+      thresholdHours:
+        typeof input.thresholdHours === 'number' ? input.thresholdHours : 24,
+      learningSpaceId: activityContext.learningSpaceId,
+      learningSpaceTitle: activityContext.learningSpaceTitle ?? null,
+      channelTopic: activityContext.channelTopic ?? null,
+      channelRouteKind: activityContext.channelRouteKind,
+    },
+    dedupeKey: `message.unviewed-intended:${input.messageId}`,
+    refreshOnDedupe: true,
+    createdBy: message.sender_profile_id,
+  });
+
+  return {
+    suppressed: false,
+    unviewedParticipantCount: unviewedProfiles.length,
+    staffRecipientCount: staffProfileIds.length,
+  };
 }
 
 export async function publishTextMessagePostSendActivities(input: {

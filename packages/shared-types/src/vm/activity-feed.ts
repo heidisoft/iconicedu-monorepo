@@ -10,6 +10,7 @@ import type {
 export type ActivityVerbVM =
   | 'message.posted'
   | 'message.mentioned'
+  | 'message.unviewed_intended_participants'
   | 'message.thread_reply.posted'
   | 'file.uploaded'
   | 'image.uploaded'

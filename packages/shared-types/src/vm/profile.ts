@@ -117,6 +117,7 @@ export type NotificationKey =
   | 'digest.urgent_only'
   | 'message.posted'
   | 'message.mentioned'
+  | 'message.unviewed_intended_participants'
   | 'message.thread_reply.posted'
   | 'file.uploaded'
   | 'image.uploaded'
