@@ -3,12 +3,12 @@ import { getUserRoles } from '@iconicedu/web/lib/profile/queries/roles.query';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 
 function isAllowedAdminRole(roleKey: string | null | undefined) {
-  return roleKey === 'owner' || roleKey === 'admin';
+  return roleKey === 'owner' || roleKey === 'admin' || roleKey === 'staff';
 }
 
 export async function requireAdminOrgContext(
   orgId: string,
-  options?: { allowStaff?: boolean },
+  _options?: { allowStaff?: boolean },
 ) {
   const supabase = await createSupabaseServerClient();
   let actor;
@@ -35,9 +35,7 @@ export async function requireAdminOrgContext(
   }
 
   const hasAdminRole = (rolesResponse.data ?? []).some((role) =>
-    options?.allowStaff && role.role_key === 'staff'
-      ? true
-      : isAllowedAdminRole(role.role_key),
+    isAllowedAdminRole(role.role_key),
   );
   if (!hasAdminRole) {
     return { ok: false as const, status: 403, message: 'Forbidden' };

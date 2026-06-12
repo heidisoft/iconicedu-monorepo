@@ -340,7 +340,10 @@ export class ActivityFeedQueryService {
     if (rolesError) throw new InternalServerErrorException(rolesError.message);
 
     const isAdmin = (roles ?? []).some(
-      (role) => role.role_key === 'owner' || role.role_key === 'admin',
+      (role) =>
+        role.role_key === 'owner' ||
+        role.role_key === 'admin' ||
+        role.role_key === 'staff',
     );
     if (!isAdmin) throw new ForbiddenException('Forbidden');
 

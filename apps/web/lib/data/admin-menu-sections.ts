@@ -9,10 +9,6 @@ export function buildAdminMenuSections(
       ? []
       : [{ title: 'Activity feed', url: `${basePath}/admin/activity/feed` }]),
     { title: 'Activity logs', url: `${basePath}/admin/activity/logs` },
-    {
-      title: 'Inbox & notifications',
-      url: `${basePath}/admin/activity/inbox`,
-    },
   ];
 
   const sections: AdminMenuSectionVM[] = [
@@ -46,14 +42,6 @@ export function buildAdminMenuSections(
       links: activityLinks,
     },
     {
-      title: 'Moderation',
-      iconKey: 'moderation',
-      links: [
-        { title: 'Flagged messages', url: `${basePath}/admin/moderation/flags` },
-        { title: 'Participant reports', url: `${basePath}/admin/moderation/reports` },
-      ],
-    },
-    {
       title: 'Reports',
       iconKey: 'reports',
       links: [
@@ -70,7 +58,6 @@ export function buildAdminMenuSections(
       links: [
         { title: 'Subjects', url: `${basePath}/admin/settings/subjects` },
         { title: 'Activity controls', url: `${basePath}/admin/settings/activity` },
-        { title: 'Account settings', url: `${basePath}/admin/settings/accounts` },
         { title: 'Roles & policies', url: `${basePath}/admin/settings/roles` },
         { title: 'Tools', url: `${basePath}/admin/tools` },
       ],
