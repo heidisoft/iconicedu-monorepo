@@ -129,7 +129,7 @@ export class SchedulesService {
     accessToken: string,
     dto: ReplaceSchedulesDto,
   ): Promise<{ scheduleIds: string[] }> {
-    await this.requireOrgActor(accessToken, dto.orgId);
+    const actor = await this.requireOrgActor(accessToken, dto.orgId);
     const supabase = createSupabaseServiceClient();
     const now = new Date().toISOString();
     const previousSchedules = await this.loadExistingSchedulesForActivityComparison(
@@ -143,6 +143,7 @@ export class SchedulesService {
       supabase,
       dto.orgId,
       dto.learningSpaceId,
+      actor.profileId ?? dto.createdBy ?? null,
     );
 
     if (!dto.schedules.length) {
@@ -221,13 +222,14 @@ export class SchedulesService {
     accessToken: string,
     dto: DeleteSchedulesDto,
   ): Promise<{ success: true }> {
-    await this.requireOrgActor(accessToken, dto.orgId);
+    const actor = await this.requireOrgActor(accessToken, dto.orgId);
     const supabase = createSupabaseServiceClient();
 
     await this.cascadeDeleteSchedulesForLearningSpace(
       supabase,
       dto.orgId,
       dto.learningSpaceId,
+      actor.profileId ?? null,
     );
 
     return { success: true };
@@ -774,6 +776,7 @@ export class SchedulesService {
     supabase: SupabaseServiceClient,
     orgId: string,
     learningSpaceId: string,
+    actorProfileId: string | null,
   ) {
     const { data: existingSchedules, error: fetchError } = await supabase
       .from('class_schedules')
@@ -789,6 +792,7 @@ export class SchedulesService {
 
     const scheduleIds = (existingSchedules ?? []).map((r) => r.id);
     if (!scheduleIds.length) return;
+    const now = new Date().toISOString();
 
     // Cancel active reminder jobs before source_schedule_id is nulled by the FK.
     const { error: cancelJobsError } = await supabase
@@ -797,7 +801,7 @@ export class SchedulesService {
         status: 'canceled',
         lease_owner: null,
         lease_until: null,
-        updated_at: new Date().toISOString(),
+        updated_at: now,
       })
       .eq('org_id', orgId)
       .in('source_schedule_id', scheduleIds)
@@ -807,6 +811,27 @@ export class SchedulesService {
     if (cancelJobsError) {
       throw new InternalServerErrorException(cancelJobsError.message);
     }
+
+    const { data: completionVoteRows, error: completionVotesError } = await supabase
+      .from('class_session_completion_votes')
+      .select('schedule_id')
+      .eq('org_id', orgId)
+      .in('schedule_id', scheduleIds)
+      .returns<Array<{ schedule_id: string }>>();
+
+    if (completionVotesError) {
+      throw new InternalServerErrorException(completionVotesError.message);
+    }
+
+    const referencedScheduleIds = new Set(
+      (completionVoteRows ?? []).map((row) => row.schedule_id),
+    );
+    const softDeleteScheduleIds = scheduleIds.filter((id) =>
+      referencedScheduleIds.has(id),
+    );
+    const hardDeleteScheduleIds = scheduleIds.filter(
+      (id) => !referencedScheduleIds.has(id),
+    );
 
     const { data: recurrenceRows, error: recurrenceError } = await supabase
       .from('class_schedule_recurrence')
@@ -851,12 +876,29 @@ export class SchedulesService {
       .in('schedule_id', scheduleIds);
     if (e4) throw new InternalServerErrorException(e4.message);
 
-    const { error: e5 } = await supabase
-      .from('class_schedules')
-      .delete()
-      .eq('org_id', orgId)
-      .in('id', scheduleIds);
-    if (e5) throw new InternalServerErrorException(e5.message);
+    if (hardDeleteScheduleIds.length) {
+      const { error: e5 } = await supabase
+        .from('class_schedules')
+        .delete()
+        .eq('org_id', orgId)
+        .in('id', hardDeleteScheduleIds);
+      if (e5) throw new InternalServerErrorException(e5.message);
+    }
+
+    if (softDeleteScheduleIds.length) {
+      const { error: e6 } = await supabase
+        .from('class_schedules')
+        .update({
+          status: 'cancelled',
+          deleted_at: now,
+          deleted_by: actorProfileId,
+          updated_at: now,
+          updated_by: actorProfileId,
+        })
+        .eq('org_id', orgId)
+        .in('id', softDeleteScheduleIds);
+      if (e6) throw new InternalServerErrorException(e6.message);
+    }
   }
 
   private async loadExistingSchedulesForActivityComparison(
