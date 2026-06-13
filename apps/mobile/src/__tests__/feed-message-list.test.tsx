@@ -15,7 +15,10 @@ import type {
   ReactionVM,
   ThreadVM,
 } from '@iconicedu/shared-types';
-import { FeedMessageList } from '@/components/messages/themes/feed-message-list';
+import {
+  buildFeedMessageGroups,
+  FeedMessageList,
+} from '@/components/messages/themes/feed-message-list';
 import { resolveMobileMessageUiTheme } from '@/components/messages/themes/registry';
 import { lightColors as mockLightColors } from '@/lib/theme';
 
@@ -85,6 +88,7 @@ function makeTextMessage(
     thread?: ThreadVM;
     reactions?: ReactionVM[];
     presence?: MessageVM['core']['sender']['presence'];
+    createdAt?: string;
   },
 ): MessageVM {
   return {
@@ -97,7 +101,7 @@ function makeTextMessage(
         'educator',
         input?.presence,
       ),
-      createdAt: '2025-01-15T10:30:00Z',
+      createdAt: input?.createdAt ?? '2025-01-15T10:30:00Z',
       visibility: { type: 'all' },
     },
     social: { reactions: input?.reactions ?? [], thread: input?.thread },
@@ -203,6 +207,56 @@ describe('FeedMessageList', () => {
     expect(screen.getByTestId('feed-message-post')).toBeTruthy();
     expect(screen.getByText('Happy Friday!')).toBeTruthy();
     expect(screen.getByText('Tutor')).toBeTruthy();
+  });
+
+  it('groups same-sender feed messages within the visual time window into one post', () => {
+    const messages = [
+      makeTextMessage('msg-1', 'First update.', {
+        createdAt: '2025-01-15T10:30:00Z',
+      }),
+      makeTextMessage('msg-2', 'Second update.', {
+        createdAt: '2025-01-15T10:33:00Z',
+      }),
+      makeTextMessage('msg-3', 'Third update.', {
+        createdAt: '2025-01-15T10:35:00Z',
+      }),
+    ];
+
+    expect(buildFeedMessageGroups(messages)).toHaveLength(1);
+
+    render(<FeedMessageList messages={messages} currentProfileId="profile-current" />);
+
+    expect(screen.getAllByTestId('feed-message-post')).toHaveLength(1);
+    expect(screen.getByText('First update.')).toBeTruthy();
+    expect(screen.getByText('Second update.')).toBeTruthy();
+    expect(screen.getByText('Third update.')).toBeTruthy();
+    expect(screen.getAllByLabelText('Add emoji reaction')).toHaveLength(1);
+    expect(screen.getAllByLabelText('Reply to thread')).toHaveLength(1);
+  });
+
+  it('keeps feed messages in separate posts when sender or time window changes', () => {
+    const messages = [
+      makeTextMessage('msg-1', 'First update.', {
+        senderId: 'profile-1',
+        createdAt: '2025-01-15T10:30:00Z',
+      }),
+      makeTextMessage('msg-2', 'Different sender.', {
+        senderId: 'profile-2',
+        senderName: 'Taras H',
+        createdAt: '2025-01-15T10:31:00Z',
+      }),
+      makeTextMessage('msg-3', 'Later follow up.', {
+        senderId: 'profile-2',
+        senderName: 'Taras H',
+        createdAt: '2025-01-15T10:38:00Z',
+      }),
+    ];
+
+    expect(buildFeedMessageGroups(messages)).toHaveLength(3);
+
+    render(<FeedMessageList messages={messages} currentProfileId="profile-current" />);
+
+    expect(screen.getAllByTestId('feed-message-post')).toHaveLength(3);
   });
 
   it('matches the classic DM empty-state text scale', () => {

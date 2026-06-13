@@ -1,4 +1,5 @@
 import {
+  areMessagesInSameVisualGroup,
   buildListData,
   findLatestUnreadIncomingMessageId,
 } from '@/components/messages/message-list';
@@ -219,6 +220,24 @@ describe('isGroupStart logic', () => {
       makeMsg('b', 'owner', '2025-12-17T10:01:00Z'),
     ];
     expect(computeIsGroupStart(msgs, 0)).toBe(true);
+  });
+});
+
+describe('message visual grouping helpers', () => {
+  it('groups messages from the same sender within five minutes', () => {
+    const older = makeMsg('a', 'u1', '2025-12-17T10:00:00Z');
+    const newer = makeMsg('b', 'u1', '2025-12-17T10:05:00Z');
+
+    expect(areMessagesInSameVisualGroup(older, newer)).toBe(true);
+  });
+
+  it('does not group messages from different senders or after the time window', () => {
+    const older = makeMsg('a', 'u1', '2025-12-17T10:00:00Z');
+    const differentSender = makeMsg('b', 'u2', '2025-12-17T10:01:00Z');
+    const lateFollowUp = makeMsg('c', 'u1', '2025-12-17T10:06:00Z');
+
+    expect(areMessagesInSameVisualGroup(older, differentSender)).toBe(false);
+    expect(areMessagesInSameVisualGroup(older, lateFollowUp)).toBe(false);
   });
 });
 

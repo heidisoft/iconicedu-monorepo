@@ -46,7 +46,10 @@ import type { AudioStatus } from 'expo-audio';
 import * as WebBrowser from 'expo-web-browser';
 import { useTheme } from '@/providers/theme-provider';
 import type { MessageListProps } from '@/components/messages/message-list';
-import { findLatestUnreadIncomingMessageId } from '@/components/messages/message-list';
+import {
+  areMessagesInSameVisualGroup,
+  findLatestUnreadIncomingMessageId,
+} from '@/components/messages/message-list';
 import {
   findInlineUnreadStartIndex,
   MessageAvatar,
@@ -165,6 +168,10 @@ const FONT = {
 };
 
 type FeedMessageListProps = MessageListProps;
+type FeedMessageGroup = {
+  id: string;
+  messages: MessageVM[];
+};
 
 function getMessageText(message: MessageVM): string {
   return (message as { content?: { text?: string } }).content?.text ?? '';
@@ -172,6 +179,38 @@ function getMessageText(message: MessageVM): string {
 
 function getMentions(message: MessageVM): MessageMentionVM[] | undefined {
   return (message as { content?: { mentions?: MessageMentionVM[] } }).content?.mentions;
+}
+
+function getVisibilityGroupKey(message: MessageVM): string {
+  const visibility = message.core.visibility;
+  if (!visibility) return 'none';
+  if (visibility.type === 'specific-users') {
+    return `${visibility.type}:${[...visibility.userIds].sort().join(',')}`;
+  }
+  return visibility.type;
+}
+
+export function buildFeedMessageGroups(messages: MessageVM[]): FeedMessageGroup[] {
+  return messages.reduce<FeedMessageGroup[]>((groups, message) => {
+    const previousGroup = groups[groups.length - 1];
+    const previousMessage =
+      previousGroup?.messages[previousGroup.messages.length - 1] ?? null;
+
+    const canJoinPreviousGroup =
+      previousGroup &&
+      previousMessage &&
+      areMessagesInSameVisualGroup(previousMessage, message) &&
+      getVisibilityGroupKey(previousMessage) === getVisibilityGroupKey(message);
+
+    if (canJoinPreviousGroup) {
+      previousGroup.messages.push(message);
+      previousGroup.id = `${previousGroup.messages[0]!.ids.id}:${message.ids.id}`;
+      return groups;
+    }
+
+    groups.push({ id: message.ids.id, messages: [message] });
+    return groups;
+  }, []);
 }
 
 function applyOptimisticReaction(
@@ -962,6 +1001,7 @@ function FeedActions({
   disabled,
   compact = false,
   hideReplyButton = false,
+  showActionControls = true,
 }: {
   message: MessageVM;
   onReactionToggle?: (messageId: string, emoji: string) => void;
@@ -969,8 +1009,19 @@ function FeedActions({
   disabled?: boolean;
   compact?: boolean;
   hideReplyButton?: boolean;
+  showActionControls?: boolean;
 }) {
   const { colors } = useTheme();
+  const hasReactions = Boolean(message.social.reactions?.length);
+  const hasThread = Boolean(
+    !hideReplyButton &&
+    message.social.thread &&
+    message.social.thread.stats.messageCount > 0,
+  );
+
+  if (!showActionControls && !hasReactions && !hasThread) {
+    return null;
+  }
 
   return (
     <View style={compact ? styles.commentActionsRow : styles.actionsRow}>
@@ -986,8 +1037,214 @@ function FeedActions({
         disabledActions={disabled ?? false}
         hideThreadButton={hideReplyButton}
         replyButtonLabel={!compact ? 'Reply' : undefined}
+        showActionControls={showActionControls}
       />
     </View>
+  );
+}
+
+function FeedMessageBlock({
+  message,
+  isLastInGroup,
+  presenceByProfileId,
+  channelId,
+  currentProfileId,
+  currentAccountId,
+  onReactionToggle,
+  onThreadOpen,
+  onProfilePress,
+  onLongPress,
+  onSendAnnotation,
+  isReadOnly,
+}: {
+  message: MessageVM;
+  isLastInGroup: boolean;
+  presenceByProfileId: Map<string, PresenceDisplayStatus>;
+  channelId?: string;
+  currentProfileId: string;
+  currentAccountId?: string;
+  onReactionToggle?: (messageId: string, emoji: string) => void;
+  onThreadOpen?: (message: MessageVM) => void;
+  onProfilePress?: (user: MessageVM['core']['sender']) => void;
+  onLongPress?: (message: MessageVM) => void;
+  onSendAnnotation?: (attachment: AttachmentPayload) => void;
+  isReadOnly?: boolean;
+}) {
+  const { colors } = useTheme();
+  const [threadExpanded, setThreadExpanded] = useState(false);
+  const [threadReplies, setThreadReplies] = useState<MessageVM[]>([]);
+  const [threadLoading, setThreadLoading] = useState(false);
+  const [threadUnreadCount, setThreadUnreadCount] = useState(
+    message.social.thread?.readState?.unreadCount ?? 0,
+  );
+  const thread = message.social.thread ?? null;
+  const { markThreadRead } = useMarkRead({
+    orgId: message.ids.orgId,
+    profileId: currentProfileId,
+    accountId: currentAccountId ?? '',
+    channelId: channelId ?? thread?.readState?.channelId ?? '',
+  });
+  const inlineUnreadStartIndex = findInlineUnreadStartIndex({
+    replies: threadReplies,
+    lastReadMessageId: thread?.readState?.lastReadMessageId,
+    unreadCount: threadUnreadCount,
+    currentUserId: currentProfileId,
+  });
+
+  useEffect(() => {
+    setThreadUnreadCount(thread?.readState?.unreadCount ?? 0);
+  }, [thread?.ids.id, thread?.readState?.unreadCount]);
+
+  useEffect(() => {
+    if (!threadExpanded || !thread) return;
+    let cancelled = false;
+    setThreadLoading(true);
+    fetchThreadMessages(
+      message.ids.orgId,
+      thread.readState?.channelId ?? channelId ?? '',
+      thread.ids.id,
+      message.ids.id,
+      currentProfileId,
+      currentAccountId ?? '',
+    )
+      .then(async (replies) => {
+        if (cancelled) return;
+        setThreadReplies(replies);
+        const resolvedChannelId = thread.readState?.channelId ?? channelId ?? '';
+        const lastReplyId = replies[replies.length - 1]?.ids.id ?? null;
+        if (resolvedChannelId && currentProfileId && currentAccountId) {
+          const alreadyUpToDate =
+            threadUnreadCount === 0 &&
+            lastReplyId === thread.readState?.lastReadMessageId;
+          if (!alreadyUpToDate) {
+            await markThreadRead({
+              orgId: message.ids.orgId,
+              channelId: resolvedChannelId,
+              parentMessageId: message.ids.id,
+              threadId: thread.ids.id,
+              lastReadMessageId: lastReplyId,
+            });
+            if (!cancelled) setThreadUnreadCount(0);
+          }
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setThreadLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    channelId,
+    currentAccountId,
+    currentProfileId,
+    markThreadRead,
+    message.ids.id,
+    message.ids.orgId,
+    thread,
+    threadExpanded,
+    threadUnreadCount,
+  ]);
+
+  const handleThreadPress = () => {
+    if (!thread) {
+      onThreadOpen?.(message);
+      return;
+    }
+    setThreadExpanded((value) => !value);
+  };
+
+  const handleThreadReplyReactionToggle = useCallback(
+    (messageId: string, emoji: string) => {
+      setThreadReplies((replies) =>
+        replies.map((reply) =>
+          reply.ids.id === messageId
+            ? {
+                ...reply,
+                social: {
+                  ...reply.social,
+                  reactions: applyOptimisticReaction(
+                    reply.social?.reactions,
+                    emoji,
+                    currentAccountId,
+                  ),
+                },
+              }
+            : reply,
+        ),
+      );
+      onReactionToggle?.(messageId, emoji);
+    },
+    [currentAccountId, onReactionToggle],
+  );
+
+  return (
+    <Pressable onLongPress={() => onLongPress?.(message)} delayLongPress={350}>
+      <View style={styles.groupedMessageBlock}>
+        {isRichMessageType(message.core.type) ? (
+          <RichMessageContent message={message} colors={colors} />
+        ) : null}
+        {!isRichMessageType(message.core.type) ? (
+          <FeedImageGrid message={message} onSendAnnotation={onSendAnnotation} />
+        ) : null}
+        {!isRichMessageType(message.core.type) ? (
+          <FeedFileAttachments message={message} onSendAnnotation={onSendAnnotation} />
+        ) : null}
+        {!isRichMessageType(message.core.type) && message.core.type === 'link-preview' ? (
+          <FeedLinkPreview message={message} />
+        ) : null}
+        {!isRichMessageType(message.core.type) &&
+        message.core.type === 'audio-recording' ? (
+          <FeedAudioPlayer message={message as AudioRecordingMessageVM} />
+        ) : null}
+        {!isRichMessageType(message.core.type) ? (
+          <FeedContentCard
+            message={message}
+            isOwn={message.core.sender.ids.id === currentProfileId}
+          />
+        ) : null}
+        <FeedActions
+          message={message}
+          disabled={isReadOnly}
+          onReactionToggle={onReactionToggle}
+          onThreadPress={handleThreadPress}
+          showActionControls={isLastInGroup}
+        />
+        {threadExpanded ? (
+          <View style={styles.commentsWrap}>
+            {threadLoading ? (
+              <ActivityIndicator size="small" color={colors.teal} />
+            ) : (
+              <>
+                {threadReplies.map((reply) => (
+                  <React.Fragment key={reply.ids.id}>
+                    {inlineUnreadStartIndex >= 0 &&
+                    threadReplies[inlineUnreadStartIndex]?.ids.id === reply.ids.id ? (
+                      <View
+                        testID="feed-thread-unread-dot"
+                        style={[styles.threadUnreadDot, { backgroundColor: colors.teal }]}
+                      />
+                    ) : null}
+                    <FeedComment
+                      message={reply}
+                      currentProfileId={currentProfileId}
+                      presenceStatus={
+                        presenceByProfileId.get(reply.core.sender.ids.id) ?? null
+                      }
+                      onReactionToggle={handleThreadReplyReactionToggle}
+                      onThreadPress={() => onThreadOpen?.(message)}
+                      onProfilePress={onProfilePress}
+                      onLongPress={onLongPress}
+                      isReadOnly={isReadOnly}
+                    />
+                  </React.Fragment>
+                ))}
+              </>
+            )}
+          </View>
+        ) : null}
+      </View>
+    </Pressable>
   );
 }
 
@@ -1109,7 +1366,7 @@ function FeedComment({
 }
 
 function FeedPost({
-  message,
+  messages,
   presenceByProfileId,
   showUnreadDot,
   channelId,
@@ -1122,7 +1379,7 @@ function FeedPost({
   onSendAnnotation,
   isReadOnly,
 }: {
-  message: MessageVM;
+  messages: MessageVM[];
   presenceByProfileId: Map<string, PresenceDisplayStatus>;
   showUnreadDot?: boolean;
   channelId?: string;
@@ -1136,121 +1393,15 @@ function FeedPost({
   isReadOnly?: boolean;
 }) {
   const { colors } = useTheme();
-  const [threadExpanded, setThreadExpanded] = useState(false);
-  const [threadReplies, setThreadReplies] = useState<MessageVM[]>([]);
-  const [threadLoading, setThreadLoading] = useState(false);
-  const [threadUnreadCount, setThreadUnreadCount] = useState(
-    message.social.thread?.readState?.unreadCount ?? 0,
-  );
-  const thread = message.social.thread ?? null;
-  const { markThreadRead } = useMarkRead({
-    orgId: message.ids.orgId,
-    profileId: currentProfileId,
-    accountId: currentAccountId ?? '',
-    channelId: channelId ?? thread?.readState?.channelId ?? '',
-  });
-
+  const headerMessage = messages[messages.length - 1]!;
   const senderPresenceStatus =
-    presenceByProfileId.get(message.core.sender.ids.id) ?? null;
-  const inlineUnreadStartIndex = findInlineUnreadStartIndex({
-    replies: threadReplies,
-    lastReadMessageId: thread?.readState?.lastReadMessageId,
-    unreadCount: threadUnreadCount,
-    currentUserId: currentProfileId,
-  });
-
-  useEffect(() => {
-    setThreadUnreadCount(thread?.readState?.unreadCount ?? 0);
-  }, [thread?.ids.id, thread?.readState?.unreadCount]);
-
-  useEffect(() => {
-    if (!threadExpanded || !thread) return;
-    let cancelled = false;
-    setThreadLoading(true);
-    fetchThreadMessages(
-      message.ids.orgId,
-      thread.readState?.channelId ?? channelId ?? '',
-      thread.ids.id,
-      message.ids.id,
-      currentProfileId,
-      currentAccountId ?? '',
-    )
-      .then(async (replies) => {
-        if (cancelled) return;
-        setThreadReplies(replies);
-        const resolvedChannelId = thread.readState?.channelId ?? channelId ?? '';
-        const lastReplyId = replies[replies.length - 1]?.ids.id ?? null;
-        if (resolvedChannelId && currentProfileId && currentAccountId) {
-          const alreadyUpToDate =
-            threadUnreadCount === 0 &&
-            lastReplyId === thread.readState?.lastReadMessageId;
-          if (!alreadyUpToDate) {
-            await markThreadRead({
-              orgId: message.ids.orgId,
-              channelId: resolvedChannelId,
-              parentMessageId: message.ids.id,
-              threadId: thread.ids.id,
-              lastReadMessageId: lastReplyId,
-            });
-            if (!cancelled) setThreadUnreadCount(0);
-          }
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setThreadLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    channelId,
-    currentAccountId,
-    currentProfileId,
-    markThreadRead,
-    message.ids.id,
-    message.ids.orgId,
-    thread,
-    threadExpanded,
-    threadUnreadCount,
-  ]);
-
-  const handleThreadPress = () => {
-    if (!thread) {
-      onThreadOpen?.(message);
-      return;
-    }
-    setThreadExpanded((value) => !value);
-  };
-
-  const handleThreadReplyReactionToggle = useCallback(
-    (messageId: string, emoji: string) => {
-      setThreadReplies((replies) =>
-        replies.map((reply) =>
-          reply.ids.id === messageId
-            ? {
-                ...reply,
-                social: {
-                  ...reply.social,
-                  reactions: applyOptimisticReaction(
-                    reply.social?.reactions,
-                    emoji,
-                    currentAccountId,
-                  ),
-                },
-              }
-            : reply,
-        ),
-      );
-      onReactionToggle?.(messageId, emoji);
-    },
-    [currentAccountId, onReactionToggle],
-  );
+    presenceByProfileId.get(headerMessage.core.sender.ids.id) ?? null;
 
   return (
     <Pressable
       testID="feed-message-post"
       style={[styles.post, { borderColor: colors.border, backgroundColor: colors.card }]}
-      onLongPress={() => onLongPress?.(message)}
+      onLongPress={() => onLongPress?.(headerMessage)}
       delayLongPress={350}
     >
       {showUnreadDot ? (
@@ -1260,73 +1411,29 @@ function FeedPost({
         />
       ) : null}
       <FeedHeader
-        message={message}
+        message={headerMessage}
         presenceStatus={senderPresenceStatus}
         onProfilePress={onProfilePress}
         onMorePress={onLongPress}
       />
       <View style={styles.postBody}>
-        {isRichMessageType(message.core.type) ? (
-          <RichMessageContent message={message} colors={colors} />
-        ) : null}
-        {!isRichMessageType(message.core.type) ? (
-          <FeedImageGrid message={message} onSendAnnotation={onSendAnnotation} />
-        ) : null}
-        {!isRichMessageType(message.core.type) ? (
-          <FeedFileAttachments message={message} onSendAnnotation={onSendAnnotation} />
-        ) : null}
-        {!isRichMessageType(message.core.type) && message.core.type === 'link-preview' ? (
-          <FeedLinkPreview message={message} />
-        ) : null}
-        {!isRichMessageType(message.core.type) &&
-        message.core.type === 'audio-recording' ? (
-          <FeedAudioPlayer message={message as AudioRecordingMessageVM} />
-        ) : null}
-        {!isRichMessageType(message.core.type) ? (
-          <FeedContentCard
+        {messages.map((message, index) => (
+          <FeedMessageBlock
+            key={message.ids.id}
             message={message}
-            isOwn={message.core.sender.ids.id === currentProfileId}
+            isLastInGroup={index === messages.length - 1}
+            presenceByProfileId={presenceByProfileId}
+            channelId={channelId}
+            currentProfileId={currentProfileId}
+            currentAccountId={currentAccountId}
+            onReactionToggle={onReactionToggle}
+            onThreadOpen={onThreadOpen}
+            onProfilePress={onProfilePress}
+            onLongPress={onLongPress}
+            onSendAnnotation={onSendAnnotation}
+            isReadOnly={isReadOnly}
           />
-        ) : null}
-        <FeedActions
-          message={message}
-          disabled={isReadOnly}
-          onReactionToggle={onReactionToggle}
-          onThreadPress={handleThreadPress}
-        />
-        {threadExpanded ? (
-          <View style={styles.commentsWrap}>
-            {threadLoading ? (
-              <ActivityIndicator size="small" color={colors.teal} />
-            ) : (
-              <>
-                {threadReplies.map((reply) => (
-                  <React.Fragment key={reply.ids.id}>
-                    {inlineUnreadStartIndex >= 0 &&
-                    threadReplies[inlineUnreadStartIndex]?.ids.id === reply.ids.id ? (
-                      <View
-                        testID="feed-thread-unread-dot"
-                        style={[styles.threadUnreadDot, { backgroundColor: colors.teal }]}
-                      />
-                    ) : null}
-                    <FeedComment
-                      message={reply}
-                      currentProfileId={currentProfileId}
-                      presenceStatus={
-                        presenceByProfileId.get(reply.core.sender.ids.id) ?? null
-                      }
-                      onReactionToggle={handleThreadReplyReactionToggle}
-                      onThreadPress={() => onThreadOpen?.(message)}
-                      onProfilePress={onProfilePress}
-                      onLongPress={onLongPress}
-                      isReadOnly={isReadOnly}
-                    />
-                  </React.Fragment>
-                ))}
-              </>
-            )}
-          </View>
-        ) : null}
+        ))}
       </View>
     </Pressable>
   );
@@ -1359,7 +1466,7 @@ export const FeedMessageList: React.FC<FeedMessageListProps> = ({
   onSendAnnotation,
 }) => {
   const { colors } = useTheme();
-  const flatListRef = React.useRef<FlatList<MessageVM>>(null);
+  const flatListRef = React.useRef<FlatList<FeedMessageGroup>>(null);
   const didInitialScrollRef = React.useRef(false);
   const latestMessageIdRef = React.useRef<string | undefined>(undefined);
   const isLoadingOlderRef = React.useRef(false);
@@ -1413,6 +1520,19 @@ export const FeedMessageList: React.FC<FeedMessageListProps> = ({
         : -1,
     [sortedMessages, unreadStartMessageId],
   );
+  const groupedMessages = useMemo(
+    () => buildFeedMessageGroups(sortedMessages),
+    [sortedMessages],
+  );
+  const unreadMessageIds = useMemo(() => {
+    if (unreadStartIndex < 0) return new Set<string>();
+    return new Set(
+      sortedMessages
+        .slice(unreadStartIndex)
+        .filter((message) => message.core.sender.ids.id !== currentProfileId)
+        .map((message) => message.ids.id),
+    );
+  }, [currentProfileId, sortedMessages, unreadStartIndex]);
   const orgId = sortedMessages[0]?.ids.orgId ?? messages[0]?.ids.orgId ?? '';
   const participantProfileIds = useMemo(
     () => messages.map((message) => message.core.sender.ids.id),
@@ -1515,7 +1635,7 @@ export const FeedMessageList: React.FC<FeedMessageListProps> = ({
     </View>
   );
 
-  if (!loading && sortedMessages.length === 0 && !pendingUploads?.length) {
+  if (!loading && groupedMessages.length === 0 && !pendingUploads?.length) {
     return emptyNode;
   }
 
@@ -1546,8 +1666,8 @@ export const FeedMessageList: React.FC<FeedMessageListProps> = ({
     <FlatList
       ref={flatListRef}
       testID="feed-message-list"
-      data={sortedMessages}
-      keyExtractor={(item) => item.ids.id}
+      data={groupedMessages}
+      keyExtractor={(item) => item.id}
       style={{ flex: 1, backgroundColor: colors.pageBg }}
       contentContainerStyle={[styles.listContent, { backgroundColor: colors.pageBg }]}
       refreshControl={
@@ -1598,14 +1718,11 @@ export const FeedMessageList: React.FC<FeedMessageListProps> = ({
       }
       renderItem={({ item }) => (
         <FeedPost
-          message={item}
+          messages={item.messages}
           presenceByProfileId={presenceByProfileId}
-          showUnreadDot={
-            unreadStartIndex >= 0 &&
-            sortedMessages.findIndex((message) => message.ids.id === item.ids.id) >=
-              unreadStartIndex &&
-            item.core.sender.ids.id !== currentProfileId
-          }
+          showUnreadDot={item.messages.some((message) =>
+            unreadMessageIds.has(message.ids.id),
+          )}
           channelId={channelId}
           currentProfileId={currentProfileId}
           currentAccountId={currentAccountId}
@@ -1716,7 +1833,10 @@ const styles = StyleSheet.create({
   },
   postBody: {
     marginTop: 16,
-    gap: 12,
+    gap: 3,
+  },
+  groupedMessageBlock: {
+    gap: 8,
   },
   singleImageWrap: {
     overflow: 'hidden',
