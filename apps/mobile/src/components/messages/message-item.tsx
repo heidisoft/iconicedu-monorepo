@@ -502,12 +502,12 @@ export function SocialBar({
           </>
         )}
 
-        {/* Thread pill always visible when thread exists (even on emoji-only), unless inside a thread */}
-        {hideActions && hasThread && !hideThreadButton && (
+        {/* Thread pill always visible when thread exists, unless inside a thread. */}
+        {!showsActionButtons && showsThreadPill && (
           <ThreadPill
             thread={thread!}
             colors={colors}
-            onPress={onThreadPress ?? (() => {})}
+            onPress={disabledActions ? () => {} : (onThreadPress ?? (() => {}))}
             expanded={threadExpanded}
             unreadCount={threadUnreadCount}
           />

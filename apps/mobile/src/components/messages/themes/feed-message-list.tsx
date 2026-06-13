@@ -67,6 +67,7 @@ import {
 import { ChatPdfViewer } from '@/components/messages/chat-pdf-viewer';
 import { PendingMessageRow } from '@/components/messages/pending-message-row';
 import type { AttachmentPayload } from '@/components/messages/attachment-sheet';
+import { reportMobileObservedError } from '@/lib/analytics/report-error';
 import {
   useOnlineProfileIds,
   type PresenceDisplayStatus,
@@ -1074,6 +1075,7 @@ function FeedMessageBlock({
   const [threadExpanded, setThreadExpanded] = useState(false);
   const [threadReplies, setThreadReplies] = useState<MessageVM[]>([]);
   const [threadLoading, setThreadLoading] = useState(false);
+  const [threadLoadFailed, setThreadLoadFailed] = useState(false);
   const [threadUnreadCount, setThreadUnreadCount] = useState(
     message.social.thread?.readState?.unreadCount ?? 0,
   );
@@ -1099,6 +1101,7 @@ function FeedMessageBlock({
     if (!threadExpanded || !thread) return;
     let cancelled = false;
     setThreadLoading(true);
+    setThreadLoadFailed(false);
     fetchThreadMessages(
       message.ids.orgId,
       thread.readState?.channelId ?? channelId ?? '',
@@ -1128,6 +1131,20 @@ function FeedMessageBlock({
           }
         }
       })
+      .catch((error) => {
+        if (cancelled) return;
+        setThreadReplies([]);
+        setThreadLoadFailed(true);
+        reportMobileObservedError({
+          error,
+          source: 'mobile.messages.feed_message_list.thread_expand',
+          message: 'Failed to load feed thread replies',
+          context: {
+            threadId: thread.ids.id,
+            messageId: message.ids.id,
+          },
+        });
+      })
       .finally(() => {
         if (!cancelled) setThreadLoading(false);
       });
@@ -1143,7 +1160,6 @@ function FeedMessageBlock({
     message.ids.orgId,
     thread,
     threadExpanded,
-    threadUnreadCount,
   ]);
 
   const handleThreadPress = () => {
@@ -1208,7 +1224,7 @@ function FeedMessageBlock({
           disabled={isReadOnly}
           onReactionToggle={onReactionToggle}
           onThreadPress={handleThreadPress}
-          showActionControls
+          showActionControls={isLastInGroup}
         />
         {threadExpanded ? (
           <View style={styles.commentsWrap}>
@@ -1216,6 +1232,11 @@ function FeedMessageBlock({
               <ActivityIndicator size="small" color={colors.teal} />
             ) : (
               <>
+                {threadLoadFailed ? (
+                  <Text style={[styles.threadLoadError, { color: colors.textMuted }]}>
+                    Could not load replies.
+                  </Text>
+                ) : null}
                 {threadReplies.map((reply) => (
                   <React.Fragment key={reply.ids.id}>
                     {inlineUnreadStartIndex >= 0 &&
@@ -2021,6 +2042,11 @@ const styles = StyleSheet.create({
   commentsWrap: {
     gap: 12,
     paddingTop: 8,
+  },
+  threadLoadError: {
+    fontSize: FONT.small,
+    lineHeight: FONT.smallLine,
+    paddingVertical: 4,
   },
   threadUnreadDot: {
     alignSelf: 'center',
