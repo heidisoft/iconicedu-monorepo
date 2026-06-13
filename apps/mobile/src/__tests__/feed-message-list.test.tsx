@@ -230,8 +230,8 @@ describe('FeedMessageList', () => {
     expect(screen.getByText('First update.')).toBeTruthy();
     expect(screen.getByText('Second update.')).toBeTruthy();
     expect(screen.getByText('Third update.')).toBeTruthy();
-    expect(screen.getAllByLabelText('Add emoji reaction')).toHaveLength(3);
-    expect(screen.getAllByLabelText('Reply to thread')).toHaveLength(3);
+    expect(screen.getAllByLabelText('Add emoji reaction')).toHaveLength(1);
+    expect(screen.getAllByLabelText('Reply to thread')).toHaveLength(1);
   });
 
   it('keeps feed messages in separate posts when sender or time window changes', () => {

@@ -566,6 +566,15 @@ export const MessageList: React.FC<MessageListProps> = ({
         }
       }
 
+      let nextMsg: MessageVM | null = null;
+      for (let i = index - 1; i >= 0; i--) {
+        const candidate = listData[i];
+        if (!isDateSeparator(candidate) && !isUnreadSeparator(candidate)) {
+          nextMsg = candidate;
+          break;
+        }
+      }
+
       const isOwn = item.core.sender.ids.id === currentProfileId;
 
       // A new group starts if: different sender, no prev message, or >5 min gap

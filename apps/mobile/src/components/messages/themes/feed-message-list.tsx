@@ -1045,6 +1045,7 @@ function FeedActions({
 
 function FeedMessageBlock({
   message,
+  isLastInGroup,
   presenceByProfileId,
   channelId,
   currentProfileId,
@@ -1057,6 +1058,7 @@ function FeedMessageBlock({
   isReadOnly,
 }: {
   message: MessageVM;
+  isLastInGroup: boolean;
   presenceByProfileId: Map<string, PresenceDisplayStatus>;
   channelId?: string;
   currentProfileId: string;
@@ -1415,10 +1417,11 @@ function FeedPost({
         onMorePress={onLongPress}
       />
       <View style={styles.postBody}>
-        {messages.map((message) => (
+        {messages.map((message, index) => (
           <FeedMessageBlock
             key={message.ids.id}
             message={message}
+            isLastInGroup={index === messages.length - 1}
             presenceByProfileId={presenceByProfileId}
             channelId={channelId}
             currentProfileId={currentProfileId}
