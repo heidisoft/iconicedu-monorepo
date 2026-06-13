@@ -1,21 +1,28 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Loader2, MonitorUp } from 'lucide-react';
 
-import type { LiveSessionProviderVM } from '@iconicedu/shared-types';
+import type { LiveSessionProviderVM, WhiteboardPanelMode } from '@iconicedu/shared-types';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import {
   canEmbedLiveSession,
   getEmbeddedLiveSessionFrameAllow,
   getEmbeddedLiveSessionTitle,
 } from '@iconicedu/web/lib/live-sessions/embed';
-import { getLiveSessionHostHeading } from '@iconicedu/web/components/live-sessions/live-session-host.utils';
+import { getLiveSessionHostHeading } from '@iconicedu/ui-web/components/live-sessions/live-session-host.utils';
+import type { LinkedChildProfile } from '@iconicedu/ui-web/components/live-sessions/daily-live-session-embed';
+import { createSupabaseBrowserClient } from '@iconicedu/web/lib/supabase/client';
+import {
+  loadWhiteboardSnapshot,
+  saveWhiteboardSnapshot,
+} from '@iconicedu/web/lib/whiteboard/whiteboard-snapshot';
 
 const DailyLiveSessionEmbed = dynamic(
   () =>
-    import('@iconicedu/web/components/live-sessions/daily-live-session-embed').then(
+    import('@iconicedu/ui-web/components/live-sessions/daily-live-session-embed').then(
       (module) => module.DailyLiveSessionEmbed,
     ),
   {
@@ -31,42 +38,121 @@ const DailyLiveSessionEmbed = dynamic(
   },
 );
 
+const ClassroomWhiteboard = dynamic(
+  () =>
+    import('@iconicedu/web/components/live-sessions/whiteboard/classroom-whiteboard').then(
+      (module) => module.ClassroomWhiteboard,
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex min-h-[70vh] items-center justify-center rounded-2xl border border-border bg-card">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading whiteboard...
+        </div>
+      </div>
+    ),
+  },
+);
+
 export function LiveSessionHost({
   provider,
   joinUrl,
   token,
   externalJoinUrl,
   channelKind,
+  channelId,
   mode,
   channelTopic,
   channelPurpose,
   returnPath,
+  liveSessionId,
+  orgId,
+  profileId,
+  userName,
+  userAvatarUrl,
+  linkedChildren,
+  isPresenter,
+  whiteboardEnabled,
 }: {
   provider: LiveSessionProviderVM;
   joinUrl?: string | null;
   token?: string | null;
   externalJoinUrl?: string | null;
   channelKind?: string | null;
+  channelId?: string | null;
   mode?: 'video' | 'audio' | null;
   channelTopic?: string | null;
   channelPurpose?: string | null;
   returnPath: string;
+  liveSessionId?: string | null;
+  orgId?: string | null;
+  profileId?: string | null;
+  userName?: string | null;
+  userAvatarUrl?: string | null;
+  linkedChildren?: LinkedChildProfile[];
+  isPresenter?: boolean;
+  whiteboardEnabled?: boolean;
 }) {
+  const router = useRouter();
   const [isLoaded, setIsLoaded] = useState(false);
+  const [panelMode, setPanelMode] = useState<WhiteboardPanelMode>('split');
+  const [hasJoined, setHasJoined] = useState(false);
   const heading = getLiveSessionHostHeading({ provider, channelTopic });
+
+  const supabase = createSupabaseBrowserClient();
+
+  const showWhiteboard = whiteboardEnabled && provider === 'daily' && !!liveSessionId;
+  const showVideo = panelMode !== 'board';
+  const showBoard = showWhiteboard && panelMode !== 'video' && hasJoined;
 
   if (provider === 'daily' && joinUrl) {
     return (
-      <div className="flex flex-1 flex-col gap-4 px-4 py-4">
-        <DailyLiveSessionEmbed
-          joinUrl={joinUrl}
-          token={token ?? null}
-          externalJoinUrl={externalJoinUrl ?? null}
-          channelKind={channelKind ?? null}
-          mode={mode ?? null}
-          returnPath={returnPath}
-          meetingName={heading}
-        />
+      <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 py-4">
+        <div
+          className={
+            showVideo && showBoard
+              ? 'grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-2'
+              : 'flex min-h-0 flex-1 flex-col gap-4'
+          }
+        >
+          {showVideo ? (
+            <DailyLiveSessionEmbed
+              joinUrl={joinUrl}
+              token={token ?? null}
+              externalJoinUrl={externalJoinUrl ?? null}
+              channelKind={channelKind ?? null}
+              mode={mode ?? null}
+              returnPath={returnPath}
+              meetingName={heading}
+              userName={userName ?? null}
+              userAvatarUrl={userAvatarUrl ?? null}
+              linkedChildren={linkedChildren}
+              liveSessionId={liveSessionId ?? null}
+              channelId={channelId ?? null}
+              whiteboardEnabled={showWhiteboard}
+              panelMode={panelMode}
+              onPanelModeChange={showWhiteboard ? setPanelMode : undefined}
+              onJoined={() => setHasJoined(true)}
+              onLeave={(path) => router.push(path)}
+            />
+          ) : null}
+
+          {showBoard && liveSessionId && orgId && profileId ? (
+            <ClassroomWhiteboard
+              liveSessionId={liveSessionId}
+              isPresenter={isPresenter ?? false}
+              supabase={supabase}
+              onLoadSnapshot={() => loadWhiteboardSnapshot(liveSessionId)}
+              onSaveSnapshot={(elements) =>
+                saveWhiteboardSnapshot(liveSessionId, orgId, channelId ?? '', {
+                  elements,
+                })
+              }
+            />
+          ) : null}
+        </div>
       </div>
     );
   }

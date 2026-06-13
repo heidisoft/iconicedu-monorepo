@@ -5,7 +5,8 @@ import {
   getDashboardProfileContext,
 } from '@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth';
 import { LiveSessionHost } from '@iconicedu/web/components/live-sessions/live-session-host';
-import { getLiveSessionReturnPath } from '@iconicedu/web/components/live-sessions/live-session-host.utils';
+import { getLiveSessionReturnPath } from '@iconicedu/ui-web/components/live-sessions/live-session-host.utils';
+import type { LinkedChildProfile } from '@iconicedu/ui-web/components/live-sessions/daily-live-session-embed';
 import { resolveLiveSessionJoinAccess } from '@iconicedu/web/lib/live-sessions/service';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 
@@ -44,6 +45,10 @@ export default async function Page({
       liveSessionId: sessionId,
       profile: profileResponse.data,
     });
+    // Whiteboard is enabled for all Daily sessions. Wire this to PostHog flag
+    // (enable-classroom-whiteboard) once the flag is created in your PostHog project.
+    const whiteboardEnabled = session.provider === 'daily';
+
     const channelResponse = await serviceSupabase
       .from('channels')
       .select('topic, purpose, kind, live_session_config')
@@ -63,8 +68,60 @@ export default async function Page({
       channelPurpose: channelResponse.data?.purpose ?? null,
     });
 
+    const isPresenter =
+      profileResponse.data.kind === 'educator' || profileResponse.data.kind === 'staff';
+
+    // For guardian accounts, resolve linked children so the pre-join screen shows
+    // the child's identity and lets the parent switch between children if there are multiple.
+    let linkedChildren: LinkedChildProfile[] = [];
+    if (profileResponse.data.kind === 'guardian' && profileResponse.data.account_id) {
+      const familyLinksResponse = await serviceSupabase
+        .from('family_links')
+        .select('child_account_id')
+        .eq('org_id', session.org_id)
+        .eq('guardian_account_id', profileResponse.data.account_id)
+        .is('deleted_at', null)
+        .returns<Array<{ child_account_id: string | null }>>();
+
+      const childAccountIds = (familyLinksResponse.data ?? [])
+        .map((r) => r.child_account_id)
+        .filter((id): id is string => Boolean(id));
+
+      if (childAccountIds.length > 0) {
+        // Only include children who are actual members of this session's channel.
+        const childProfilesResponse = await serviceSupabase
+          .from('profiles')
+          .select(
+            'id, display_name, first_name, last_name, avatar_url, channel_members!inner(channel_id)',
+          )
+          .in('account_id', childAccountIds)
+          .eq('org_id', session.org_id)
+          .eq('kind', 'child')
+          .eq('channel_members.channel_id', session.channel_id)
+          .is('channel_members.deleted_at', null)
+          .is('deleted_at', null)
+          .returns<
+            Array<{
+              id: string;
+              display_name: string | null;
+              first_name: string | null;
+              last_name: string | null;
+              avatar_url: string | null;
+            }>
+          >();
+
+        linkedChildren = (childProfilesResponse.data ?? []).map((p) => ({
+          id: p.id,
+          displayName:
+            p.display_name ??
+            ([p.first_name, p.last_name].filter(Boolean).join(' ') || 'Child'),
+          avatarUrl: p.avatar_url ?? null,
+        }));
+      }
+    }
+
     return (
-      <div className="flex h-[calc(100vh-1rem)] flex-col">
+      <div className="flex h-[calc(100vh-1rem)] flex-col overflow-hidden">
         <DashboardHeader />
         <LiveSessionHost
           provider={session.provider as 'daily' | 'zoom' | 'jitsi' | 'custom'}
@@ -76,10 +133,19 @@ export default async function Page({
               : null
           }
           channelKind={channelResponse.data?.kind ?? null}
+          channelId={session.channel_id}
           mode={parseLiveSessionMode(channelResponse.data?.live_session_config)}
           channelTopic={channelResponse.data?.topic ?? null}
           channelPurpose={channelResponse.data?.purpose ?? null}
           returnPath={returnPath}
+          liveSessionId={session.id}
+          orgId={session.org_id}
+          profileId={profileResponse.data.id}
+          userName={profileResponse.data.display_name}
+          userAvatarUrl={profileResponse.data.avatar_url ?? null}
+          linkedChildren={linkedChildren.length > 0 ? linkedChildren : undefined}
+          isPresenter={isPresenter}
+          whiteboardEnabled={whiteboardEnabled}
         />
       </div>
     );

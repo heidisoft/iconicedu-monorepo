@@ -15,7 +15,7 @@ import {
   isDailyParticipantMicMuted,
   isDailyParticipantSpeaking,
   shouldShowFullMeetingControls,
-} from '@iconicedu/web/components/live-sessions/daily-live-session-embed.utils';
+} from '@iconicedu/ui-web/components/live-sessions/daily-live-session-embed.utils';
 
 describe('daily-live-session-embed.utils', () => {
   it('prepends the local participant ahead of remote participants', () => {
@@ -106,12 +106,9 @@ describe('daily-live-session-embed.utils', () => {
     ).toBe('blur-strong');
     expect(
       getDailyBackgroundPresetValue({
-        processor: {
-          type: 'background-image',
-          config: { url: '/live-session-backgrounds/classroom.svg' },
-        },
+        processor: { type: 'background-image', config: { url: '/unknown.svg' } },
       }),
-    ).toBe('classroom');
+    ).toBe('none');
   });
 
   it('builds stable background processors from preset values', () => {
@@ -120,9 +117,9 @@ describe('daily-live-session-embed.utils', () => {
       type: 'background-blur',
       config: { strength: 0.55 },
     });
-    expect(buildDailyBackgroundProcessor('study')).toEqual({
-      type: 'background-image',
-      config: { url: '/live-session-backgrounds/study.svg' },
+    expect(buildDailyBackgroundProcessor('blur-strong')).toEqual({
+      type: 'background-blur',
+      config: { strength: 0.9 },
     });
   });
 
@@ -143,8 +140,6 @@ describe('daily-live-session-embed.utils', () => {
       'none',
       'blur-soft',
       'blur-strong',
-      'classroom',
-      'study',
     ]);
   });
 

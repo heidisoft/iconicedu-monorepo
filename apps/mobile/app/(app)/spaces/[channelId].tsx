@@ -525,9 +525,13 @@ export default function SpaceDetailScreen() {
     spaceMeta?.messageUiThemeKey ?? messageUiThemeKey ?? 'feed',
   );
   const ThemedMessageList = messageTheme.MessageList;
+  // For Daily-managed sessions the join URL is created on-demand via the API;
+  // only fall back to the schedule's meetingLink for external providers (Zoom, custom, etc.)
   const resolvedLiveJoinUrl =
     spaceMeta?.liveSession?.joinUrl ??
-    (spaceMeta?.liveSession?.enabled ? (liveSession?.meetingLink ?? null) : null);
+    (spaceMeta?.liveSession?.enabled && spaceMeta?.liveSession?.provider !== 'daily'
+      ? (liveSession?.meetingLink ?? null)
+      : null);
   const emptyStateCopy = buildMobileChannelEmptyStateCopy({
     channelKind: 'learning-space',
     currentUserKind:

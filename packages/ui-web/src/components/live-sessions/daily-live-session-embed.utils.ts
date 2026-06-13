@@ -2,10 +2,8 @@ import type { DailyInputVideoProcessorSettings } from '@daily-co/daily-js';
 
 export const DAILY_BACKGROUND_PRESET_OPTIONS = [
   { value: 'none', label: 'No background' },
-  { value: 'blur-soft', label: 'Blur background' },
+  { value: 'blur-soft', label: 'Blur' },
   { value: 'blur-strong', label: 'Strong blur' },
-  { value: 'classroom', label: 'Classroom' },
-  { value: 'study', label: 'Study room' },
 ] as const;
 
 export type DailyBackgroundPresetValue =
@@ -86,16 +84,6 @@ export function getDailyBackgroundPresetValue(input: {
     return (processor.config?.strength ?? 0.6) >= 0.8 ? 'blur-strong' : 'blur-soft';
   }
 
-  if (processor.type === 'background-image') {
-    if (processor.config?.url?.includes('/live-session-backgrounds/classroom.svg')) {
-      return 'classroom';
-    }
-
-    if (processor.config?.url?.includes('/live-session-backgrounds/study.svg')) {
-      return 'study';
-    }
-  }
-
   return 'none';
 }
 
@@ -107,16 +95,6 @@ export function buildDailyBackgroundProcessor(
       return { type: 'background-blur', config: { strength: 0.55 } };
     case 'blur-strong':
       return { type: 'background-blur', config: { strength: 0.9 } };
-    case 'classroom':
-      return {
-        type: 'background-image',
-        config: { url: '/live-session-backgrounds/classroom.svg' },
-      };
-    case 'study':
-      return {
-        type: 'background-image',
-        config: { url: '/live-session-backgrounds/study.svg' },
-      };
     default:
       return { type: 'none' };
   }

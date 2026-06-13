@@ -26,6 +26,7 @@ export * from './vm/org';
 export * from './vm/onboarding';
 export * from './vm/availability';
 export * from './vm/live-session';
+export * from './vm/whiteboard';
 export * from './vm/org-subject-catalog';
 export * from './rows';
 export * from './shared/grades';

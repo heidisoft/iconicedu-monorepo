@@ -548,9 +548,6 @@ export function NavUser({
                 <BadgeCheck />
                 {accountTabDisabled ? 'Account (child login required)' : 'Account'}
               </DropdownMenuItem>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
               <DropdownMenuItem onSelect={() => openSettings('profile')}>
                 <User />
                 Profile

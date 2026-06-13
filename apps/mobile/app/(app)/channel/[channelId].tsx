@@ -185,9 +185,13 @@ export default function ChannelConversationScreen() {
   const s = useMemo(() => makeStyles(colors), [colors]);
   const messageTheme = resolveMobileMessageUiTheme(resolvedMessageUiThemeKey);
   const ThemedMessageList = messageTheme.MessageList;
+  // For Daily-managed sessions the join URL is created on-demand via the API;
+  // only fall back to the schedule's meetingLink for external providers (Zoom, custom, etc.)
   const resolvedLiveJoinUrl =
     channelMeta?.liveSession?.joinUrl ??
-    (channelMeta?.liveSession?.enabled ? (liveSession?.meetingLink ?? null) : null);
+    (channelMeta?.liveSession?.enabled && channelMeta?.liveSession?.provider !== 'daily'
+      ? (liveSession?.meetingLink ?? null)
+      : null);
 
   // ── Info sheet state ──
   const [infoVisible, setInfoVisible] = useState(false);

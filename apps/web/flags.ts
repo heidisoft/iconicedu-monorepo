@@ -192,6 +192,23 @@ export const enableMarketingSitePages = flag<boolean, { profileId?: string | nul
   },
 });
 
+export const enableClassroomWhiteboard = flag<boolean, { profileId?: string | null }>({
+  key: 'enable-classroom-whiteboard',
+  description:
+    'Shows the collaborative tldraw whiteboard panel during Daily live sessions, with real-time sync via Supabase Realtime.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: true,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: 'enable-classroom-whiteboard',
+      profileId: entities?.profileId,
+    });
+  },
+});
+
 export const enableAuthMobileAppPrompt = flag<boolean, { profileId?: string | null }>({
   key: 'auth-mobile-app-prompt',
   description:
@@ -214,6 +231,7 @@ export const webFlags = {
   enableAdminReports,
   enableAuthMobileAppPrompt,
   enableChannelCommunications,
+  enableClassroomWhiteboard,
   enableClassScheduleStaffCancel,
   enableClassScheduleStaffEdit,
   enableMarketingSitePages,

@@ -4,7 +4,7 @@ import {
   getLiveSessionHostHeading,
   getLiveSessionHostSubheading,
   getLiveSessionReturnPath,
-} from '@iconicedu/web/components/live-sessions/live-session-host.utils';
+} from '@iconicedu/ui-web/components/live-sessions/live-session-host.utils';
 
 describe('live-session-host.utils', () => {
   it('prefers channel topic for the heading', () => {

@@ -9,12 +9,16 @@ import {
   MicOff,
   MonitorUp,
   MoreVertical,
+  PenLine,
   Phone,
+  Radio,
   Settings,
   Users,
   Video,
   VideoOff,
 } from 'lucide-react';
+
+import type { WhiteboardPanelMode } from '@iconicedu/shared-types';
 
 import { Button } from '@iconicedu/ui-web/ui/button';
 import {
@@ -26,7 +30,7 @@ import {
 import {
   ViewSwitcher,
   type LiveSessionViewType,
-} from '@iconicedu/web/components/live-sessions/view-switcher';
+} from '@iconicedu/ui-web/components/live-sessions/view-switcher';
 
 interface ControlBarProps {
   microphoneOptions?: Array<{ id: string; label: string }>;
@@ -41,6 +45,10 @@ interface ControlBarProps {
   isEnding?: boolean;
   isParticipantsOpen?: boolean;
   isHandRaised?: boolean;
+  isRecording?: boolean;
+  isTogglingRecording?: boolean;
+  whiteboardEnabled?: boolean;
+  panelMode?: WhiteboardPanelMode;
   currentView?: LiveSessionViewType;
   onToggleMute: () => void;
   onToggleVideo: () => void;
@@ -48,10 +56,25 @@ interface ControlBarProps {
   onToggleParticipants: () => void;
   onToggleSettings: () => void;
   onToggleRaiseHand: () => void;
+  onToggleRecording?: () => void;
+  onPanelModeChange?: (mode: WhiteboardPanelMode) => void;
   onEndCall: () => void;
   onSelectMicrophone?: (id: string) => void;
   onSelectCamera?: (id: string) => void;
   onViewChange?: (view: LiveSessionViewType) => void;
+}
+
+const PANEL_MODE_CYCLE: WhiteboardPanelMode[] = ['split', 'video', 'board'];
+
+function nextPanelMode(current: WhiteboardPanelMode): WhiteboardPanelMode {
+  const idx = PANEL_MODE_CYCLE.indexOf(current);
+  return PANEL_MODE_CYCLE[(idx + 1) % PANEL_MODE_CYCLE.length];
+}
+
+function panelModeLabel(mode: WhiteboardPanelMode): string {
+  if (mode === 'video') return 'Show board';
+  if (mode === 'board') return 'Show both';
+  return 'Hide board';
 }
 
 export function ControlBar({
@@ -67,6 +90,10 @@ export function ControlBar({
   isEnding = false,
   isParticipantsOpen = false,
   isHandRaised = false,
+  isRecording = false,
+  isTogglingRecording = false,
+  whiteboardEnabled = false,
+  panelMode = 'split',
   currentView,
   onToggleMute,
   onToggleVideo,
@@ -74,6 +101,8 @@ export function ControlBar({
   onToggleParticipants,
   onToggleSettings,
   onToggleRaiseHand,
+  onToggleRecording,
+  onPanelModeChange,
   onEndCall,
   onSelectMicrophone,
   onSelectCamera,
@@ -214,6 +243,34 @@ export function ControlBar({
             <Hand className="h-5 w-5" />
           </Button>
 
+          {whiteboardEnabled && onPanelModeChange ? (
+            <Button
+              size="icon"
+              variant={panelMode !== 'video' ? 'secondary' : 'ghost'}
+              onClick={() => onPanelModeChange(nextPanelMode(panelMode))}
+              className="h-10 w-10 rounded-full"
+              title={panelModeLabel(panelMode)}
+            >
+              <PenLine className="h-5 w-5" />
+            </Button>
+          ) : null}
+
+          {onToggleRecording ? (
+            <Button
+              size="icon"
+              variant={isRecording ? 'destructive' : 'ghost'}
+              onClick={onToggleRecording}
+              disabled={isTogglingRecording}
+              className="relative h-10 w-10 rounded-full"
+              title={isRecording ? 'Stop recording' : 'Start recording'}
+            >
+              <Radio className="h-5 w-5" />
+              {isRecording ? (
+                <span className="absolute right-1.5 top-1.5 h-2 w-2 animate-pulse rounded-full bg-red-500" />
+              ) : null}
+            </Button>
+          ) : null}
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -230,7 +287,6 @@ export function ControlBar({
                 <Settings className="mr-2 h-4 w-4" />
                 Open settings
               </DropdownMenuItem>
-              <DropdownMenuItem>Record meeting</DropdownMenuItem>
               <DropdownMenuItem>Schedule something</DropdownMenuItem>
               <DropdownMenuItem>Blur background</DropdownMenuItem>
             </DropdownMenuContent>
