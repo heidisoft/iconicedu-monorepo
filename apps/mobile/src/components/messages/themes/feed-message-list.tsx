@@ -1045,7 +1045,6 @@ function FeedActions({
 
 function FeedMessageBlock({
   message,
-  isLastInGroup,
   presenceByProfileId,
   channelId,
   currentProfileId,
@@ -1058,7 +1057,6 @@ function FeedMessageBlock({
   isReadOnly,
 }: {
   message: MessageVM;
-  isLastInGroup: boolean;
   presenceByProfileId: Map<string, PresenceDisplayStatus>;
   channelId?: string;
   currentProfileId: string;
@@ -1208,7 +1206,7 @@ function FeedMessageBlock({
           disabled={isReadOnly}
           onReactionToggle={onReactionToggle}
           onThreadPress={handleThreadPress}
-          showActionControls={isLastInGroup}
+          showActionControls
         />
         {threadExpanded ? (
           <View style={styles.commentsWrap}>
@@ -1417,11 +1415,10 @@ function FeedPost({
         onMorePress={onLongPress}
       />
       <View style={styles.postBody}>
-        {messages.map((message, index) => (
+        {messages.map((message) => (
           <FeedMessageBlock
             key={message.ids.id}
             message={message}
-            isLastInGroup={index === messages.length - 1}
             presenceByProfileId={presenceByProfileId}
             channelId={channelId}
             currentProfileId={currentProfileId}
