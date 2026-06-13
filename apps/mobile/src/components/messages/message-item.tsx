@@ -1532,17 +1532,17 @@ function makeStyles(colors: AppColors) {
       flexDirection: 'row',
       alignItems: 'flex-start',
       paddingHorizontal: 8,
-      paddingVertical: 8,
+      paddingVertical: 2,
       gap: 12,
     },
     rowOwn: { flexDirection: 'row-reverse' },
-    rowGroupStart: { paddingTop: 12 },
+    rowGroupStart: { paddingTop: 10 },
 
     // ── Avatar slot (always 36px to reserve space) ───────────────────────────
     avatarSlot: { width: 36, flexShrink: 0, alignItems: 'center' },
 
     // ── Content column ────────────────────────────────────────────────────────
-    contentCol: { flex: 1, alignItems: 'flex-start', gap: 4 },
+    contentCol: { flex: 1, alignItems: 'flex-start', gap: 3 },
     contentColOwn: { alignItems: 'flex-end' },
 
     // ── Name + time row (inside bubble) ──────────────────────────────────────
