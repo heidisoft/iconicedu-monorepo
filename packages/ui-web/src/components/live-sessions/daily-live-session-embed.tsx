@@ -1,6 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from 'react';
+import type { ReactNode } from 'react';
 import {
   DailyAudio,
   DailyProvider,
@@ -14,28 +22,26 @@ import {
   useMeetingState,
   useParticipant,
   useParticipantIds,
-  useParticipantCounts,
 } from '@daily-co/daily-react';
 import type { DailyInputSettings } from '@daily-co/daily-js';
 import {
   AudioLines,
   Blend,
-  Camera,
   ChevronDown,
   CircleOff,
   CloudFog,
   Loader2,
+  MessageCircle,
   Mic,
   MicOff,
-  RefreshCw,
+  MonitorUp,
+  PhoneOff,
   ScanFace,
   Settings,
-  Settings2,
   Users,
   Video,
   VideoOff,
   Volume2,
-  WandSparkles,
 } from 'lucide-react';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@iconicedu/ui-web/ui/avatar';
@@ -69,7 +75,6 @@ import {
   isDailyParticipantMicMuted,
   isDailyParticipantSpeaking,
 } from '@iconicedu/ui-web/components/live-sessions/daily-live-session-embed.utils';
-import { type LiveSessionViewType } from '@iconicedu/ui-web/components/live-sessions/view-switcher';
 import { VideoParticipant } from '@iconicedu/ui-web/components/live-sessions/video-participant';
 
 // ─── Pre-join: Permissions card ──────────────────────────────────────────────
@@ -586,7 +591,7 @@ function DailyParticipantTile({
 }: {
   sessionId: string;
   isLocal?: boolean;
-  variant?: 'default' | 'floating';
+  variant?: 'default' | 'floating' | 'strip';
 }) {
   const participant = useParticipant(sessionId);
   const [audioLevel, setAudioLevel] = useState(0);
@@ -617,6 +622,7 @@ function DailyParticipantTile({
     audioState: participant?.tracks.audio.state,
   });
   const isFloating = variant === 'floating';
+  const isStrip = variant === 'strip';
 
   useAudioLevel(participant?.tracks.audio.persistentTrack, setAudioLevel);
 
@@ -627,7 +633,8 @@ function DailyParticipantTile({
       isActive={isSpeaking}
       isSpeaking={isSpeaking}
       initials={participantInitials}
-      aspectClassName="aspect-[16/9]"
+      autoHeight={isStrip}
+      aspectClassName="aspect-video"
     >
       {!isVideoOff ? (
         <DailyVideo
@@ -639,8 +646,10 @@ function DailyParticipantTile({
           type="video"
           className={[
             'h-full w-full bg-muted',
-            isFloating ? 'min-h-32' : 'min-h-44 md:min-h-[200px]',
-          ].join(' ')}
+            isFloating ? 'min-h-32' : isStrip ? undefined : 'min-h-44 md:min-h-[200px]',
+          ]
+            .filter(Boolean)
+            .join(' ')}
         />
       ) : undefined}
     </VideoParticipant>
@@ -674,44 +683,40 @@ function DailyScreenShareTile({ sessionId }: { sessionId: string }) {
   );
 }
 
-function DailyParticipantListItem({
-  sessionId,
-  isLocal,
-}: {
-  sessionId: string;
-  isLocal?: boolean;
-}) {
-  const participant = useParticipant(sessionId);
-  const participantLabel = getDailyParticipantLabel({
-    isLocal,
-    userName: participant?.user_name,
-  });
-  const participantInitials = getDailyParticipantInitials(participant?.user_name);
-  const isMicMuted = isDailyParticipantMicMuted({
-    audioState: participant?.tracks.audio.state,
-  });
-  const isCameraOff = participant?.tracks.video.state !== 'playable';
+// ─── In-call control button ───────────────────────────────────────────────────
 
+function InCallButton({
+  icon,
+  label,
+  onClick,
+  active = true,
+  destructive = false,
+  disabled = false,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  active?: boolean;
+  destructive?: boolean;
+  disabled?: boolean;
+}) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background/70 px-3 py-2">
-      <div className="flex min-w-0 items-center gap-3">
-        <Avatar className="h-9 w-9 border border-border">
-          <AvatarFallback>{participantInitials}</AvatarFallback>
-        </Avatar>
-        <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-foreground">
-            {participantLabel}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {isLocal ? 'You' : 'Participant'}
-          </p>
-        </div>
-      </div>
-      <div className="flex items-center gap-2 text-muted-foreground">
-        {isMicMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-        {isCameraOff ? <VideoOff className="h-4 w-4" /> : <Video className="h-4 w-4" />}
-      </div>
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={[
+        'flex flex-col items-center gap-1 rounded-xl px-3 py-2 transition-colors disabled:opacity-50',
+        destructive
+          ? 'bg-red-600 text-white hover:bg-red-700'
+          : active
+            ? 'bg-zinc-700 text-white hover:bg-zinc-600'
+            : 'bg-zinc-800 text-white/60 hover:bg-zinc-700 hover:text-white',
+      ].join(' ')}
+    >
+      <span className="flex h-5 w-5 items-center justify-center">{icon}</span>
+      <span className="text-[10px] font-medium">{label}</span>
+    </button>
   );
 }
 
@@ -732,9 +737,11 @@ function DailyLiveSessionSurface({
   linkedChildren,
   liveSessionId,
   channelId,
-  whiteboardEnabled,
-  panelMode,
-  onPanelModeChange,
+  contentSlot,
+  // whiteboardEnabled/panelMode/onPanelModeChange kept in signature for future use
+  whiteboardEnabled: _whiteboardEnabled,
+  panelMode: _panelMode,
+  onPanelModeChange: _onPanelModeChange,
   onJoined,
   onLeave,
 }: {
@@ -751,6 +758,7 @@ function DailyLiveSessionSurface({
   linkedChildren?: LinkedChildProfile[];
   liveSessionId?: string | null;
   channelId?: string | null;
+  contentSlot?: ReactNode;
   whiteboardEnabled?: boolean;
   panelMode?: import('@iconicedu/shared-types').WhiteboardPanelMode;
   onPanelModeChange?: (
@@ -761,7 +769,6 @@ function DailyLiveSessionSurface({
 }) {
   const localSessionId = useLocalSessionId();
   const remoteParticipantIds = useParticipantIds({ filter: 'remote' });
-  const participantCounts = useParticipantCounts();
   const meetingState = useMeetingState();
   const {
     cameras,
@@ -773,13 +780,8 @@ function DailyLiveSessionSurface({
     setCamera,
     setMicrophone,
     setSpeaker,
-    refreshDevices,
   } = useDevices();
-  const {
-    inputSettings,
-    updateInputSettings,
-    errorMsg: inputSettingsError,
-  } = useInputSettings();
+  const { inputSettings, updateInputSettings } = useInputSettings();
 
   const [selectedChildId, setSelectedChildId] = useState<string | null>(
     linkedChildren?.[0]?.id ?? null,
@@ -793,14 +795,6 @@ function DailyLiveSessionSurface({
   const [isLeaving, setIsLeaving] = useState(false);
   const [isMicEnabled, setIsMicEnabled] = useState(false);
   const [isCameraEnabled, setIsCameraEnabled] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isParticipantsOpen, setIsParticipantsOpen] = useState(false);
-  const [isRefreshingDevices, setIsRefreshingDevices] = useState(false);
-  const [isApplyingDevice, setIsApplyingDevice] = useState<string | null>(null);
-  const [isApplyingInputSettings, setIsApplyingInputSettings] = useState(false);
-  const [currentView, setCurrentView] = useState<LiveSessionViewType>('gallery');
-  const [isRecording, setIsRecording] = useState(false);
-  const [isTogglingRecording, setIsTogglingRecording] = useState(false);
   const [, forceParticipantTrackRefresh] = useReducer((value: number) => value + 1, 0);
 
   const shouldRouteOnLeaveRef = useRef(true);
@@ -837,17 +831,11 @@ function DailyLiveSessionSurface({
   );
   useDailyEvent(
     'local-screen-share-started',
-    useCallback(() => {
-      forceParticipantTrackRefresh();
-      setCurrentView('shared-content');
-    }, []),
+    useCallback(() => forceParticipantTrackRefresh(), []),
   );
   useDailyEvent(
     'local-screen-share-stopped',
-    useCallback(() => {
-      forceParticipantTrackRefresh();
-      setCurrentView((v) => (v === 'shared-content' ? 'gallery' : v));
-    }, []),
+    useCallback(() => forceParticipantTrackRefresh(), []),
   );
   useDailyEvent(
     'track-started',
@@ -965,7 +953,11 @@ function DailyLiveSessionSurface({
     setIsJoining(true);
     setError(null);
     try {
-      await callObject.join({ url: joinUrl, token: token ?? undefined });
+      await callObject.join({
+        url: joinUrl,
+        token: token ?? undefined,
+        userName: userName ?? undefined,
+      });
     } catch (joinError: unknown) {
       setIsJoining(false);
       setError(getDailyLiveSessionErrorMessage(joinError));
@@ -998,30 +990,15 @@ function DailyLiveSessionSurface({
     );
   })();
 
-  const stageParticipantIds = useMemo(
-    () => participantIds.filter((id) => id !== activeScreenShareSessionId),
-    [activeScreenShareSessionId, participantIds],
-  );
-
   const localParticipant = useParticipant(localSessionId ?? undefined);
-  const isHandRaised = Boolean(
-    localParticipant &&
-    typeof localParticipant.userData === 'object' &&
-    localParticipant.userData !== null &&
-    'raisedHand' in localParticipant.userData &&
-    localParticipant.userData.raisedHand,
-  );
 
   const applyInputSettings = useCallback(
     async (nextInputSettings: DailyInputSettings) => {
       if (!updateInputSettings) return;
-      setIsApplyingInputSettings(true);
       try {
         await updateInputSettings(nextInputSettings);
       } catch (inputError: unknown) {
         setError(getDailyLiveSessionErrorMessage(inputError));
-      } finally {
-        setIsApplyingInputSettings(false);
       }
     },
     [updateInputSettings],
@@ -1042,34 +1019,8 @@ function DailyLiveSessionSurface({
   const handleToggleScreenShare = () => {
     if (!isScreenSharing) {
       callObject.startScreenShare();
-      setCurrentView('shared-content');
     } else {
       callObject.stopScreenShare();
-      setCurrentView((v) => (v === 'shared-content' ? 'gallery' : v));
-    }
-  };
-
-  const handleToggleRaiseHand = async () => {
-    const currentUserData =
-      localParticipant &&
-      typeof localParticipant.userData === 'object' &&
-      localParticipant.userData !== null
-        ? localParticipant.userData
-        : {};
-    try {
-      await callObject.setUserData({ ...currentUserData, raisedHand: !isHandRaised });
-      forceParticipantTrackRefresh();
-    } catch (err: unknown) {
-      setError(getDailyLiveSessionErrorMessage(err));
-    }
-  };
-
-  const handleRefreshDevices = async () => {
-    setIsRefreshingDevices(true);
-    try {
-      await refreshDevices();
-    } finally {
-      setIsRefreshingDevices(false);
     }
   };
 
@@ -1078,15 +1029,12 @@ function DailyLiveSessionSurface({
     deviceId: string,
   ) => {
     if (!deviceId) return;
-    setIsApplyingDevice(`${kind}:${deviceId}`);
     try {
       if (kind === 'camera') await setCamera(deviceId);
       else if (kind === 'microphone') await setMicrophone(deviceId);
       else await setSpeaker(deviceId);
     } catch (deviceError: unknown) {
       setError(getDailyLiveSessionErrorMessage(deviceError));
-    } finally {
-      setIsApplyingDevice(null);
     }
   };
 
@@ -1098,26 +1046,6 @@ function DailyLiveSessionSurface({
         processor: { type: enabled ? 'noise-cancellation' : 'none' },
       },
     });
-  };
-
-  const handleToggleRecording = async () => {
-    if (isTogglingRecording || !liveSessionId || !channelId) return;
-    setIsTogglingRecording(true);
-    try {
-      const res = await fetch(
-        `/api/channels/${channelId}/live-sessions/${liveSessionId}/recording`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: isRecording ? 'stop' : 'start' }),
-        },
-      );
-      if (res.ok) setIsRecording((prev) => !prev);
-    } catch {
-      // Leave recording state unchanged on network error
-    } finally {
-      setIsTogglingRecording(false);
-    }
   };
 
   const handleSelectBackgroundPreset = async (preset: string) => {
@@ -1132,402 +1060,242 @@ function DailyLiveSessionSurface({
     });
   };
 
+  const hasMainContent = !!(activeScreenShareSessionId || contentSlot);
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-background text-foreground">
-      <div className="relative min-h-0 flex-1 overflow-hidden">
-        {/* REC indicator */}
-        {isRecording ? (
-          <div className="pointer-events-none absolute right-4 top-4 z-30 flex items-center gap-1.5 rounded-full bg-destructive/90 px-2.5 py-1 text-xs font-medium text-destructive-foreground">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-white" />
-            REC
-          </div>
-        ) : null}
+    <div className="relative flex min-h-0 flex-1 flex-col bg-background text-foreground">
+      <DailyAudio />
 
-        {/* Joining overlay */}
-        {isJoining && !error ? (
-          <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/85">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Joining live session…
+      {/* ── Pre-join ── */}
+      {!hasStartedJoin && meetingState !== 'joined-meeting' ? (
+        <div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-4 py-6">
+          <div className="w-full max-w-md space-y-4">
+            {/* error inline when pre-join */}
+            {error && !permissionsBlocked ? (
+              <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-center">
+                <p className="text-sm font-medium text-destructive">
+                  Live session unavailable
+                </p>
+                <p className="text-xs text-destructive/80">{error}</p>
+              </div>
+            ) : null}
+
+            {meetingName?.trim() ? (
+              <div className="space-y-0.5 text-center">
+                <h1 className="text-xl font-semibold tracking-tight text-foreground">
+                  {meetingName.trim()}
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                  Check your setup before joining
+                </p>
+              </div>
+            ) : null}
+
+            {permissionsBlocked ? (
+              <PreJoinPermissionsCard
+                meetingName={meetingName}
+                onRequestPermissions={() => void handleRequestPermissions()}
+              />
+            ) : (
+              <PreJoinDeviceSetupCard
+                participant={localParticipant ?? undefined}
+                userName={userName}
+                userAvatarUrl={userAvatarUrl}
+                linkedChildren={linkedChildren}
+                selectedChildId={selectedChildId}
+                onSelectChild={setSelectedChildId}
+                isCameraEnabled={isCameraEnabled}
+                isMicEnabled={isMicEnabled}
+                isPreparingPreview={isPreparingPreview}
+                isJoining={isJoining}
+                mode={mode}
+                cameras={cameras}
+                microphones={microphones}
+                speakers={speakers}
+                currentCam={currentCam}
+                currentMic={currentMic}
+                currentSpeaker={currentSpeaker}
+                backgroundPreset={backgroundPreset}
+                isNoiseCancellationEnabled={isNoiseCancellationEnabled}
+                onToggleCamera={handleToggleCamera}
+                onToggleMic={handleToggleMic}
+                onJoin={() => void handleJoinMeeting()}
+                onSelectCamera={(id) => void handleSelectDevice('camera', id)}
+                onSelectMic={(id) => void handleSelectDevice('microphone', id)}
+                onSelectSpeaker={(id) => void handleSelectDevice('speaker', id)}
+                onSelectBackgroundPreset={(preset) =>
+                  void handleSelectBackgroundPreset(preset)
+                }
+                onToggleNoiseCancellation={(enabled) =>
+                  void handleToggleNoiseCancellation(enabled)
+                }
+              />
+            )}
+          </div>
+        </div>
+      ) : (
+        /* ── In-call layout ── */
+        <>
+          {/* Absolute overlays */}
+          {isJoining && !error ? (
+            <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/85">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Joining live session…
+              </div>
             </div>
-          </div>
-        ) : null}
-
-        {/* Generic error overlay (not shown when permissions card is visible) */}
-        {error && !permissionsBlocked ? (
-          <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/90 px-6 text-center">
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-foreground">
-                Live session unavailable
-              </p>
-              <p className="text-sm text-muted-foreground">{error}</p>
-            </div>
-          </div>
-        ) : null}
-
-        <div className="mx-auto flex h-full max-w-[1440px] flex-col gap-3 p-3 md:gap-4 md:p-4">
-          <DailyAudio />
-
-          {/* ── Pre-join screen ── */}
-          {!hasStartedJoin && meetingState !== 'joined-meeting' ? (
-            <div className="flex flex-1 items-center justify-center overflow-y-auto px-4 py-6">
-              <div className="w-full max-w-md space-y-4">
-                {/* Class title */}
-                {meetingName?.trim() ? (
-                  <div className="space-y-0.5 text-center">
-                    <h1 className="text-xl font-semibold tracking-tight text-foreground">
-                      {meetingName.trim()}
-                    </h1>
-                    <p className="text-sm text-muted-foreground">
-                      Check your setup before joining
-                    </p>
-                  </div>
-                ) : null}
-
-                {permissionsBlocked ? (
-                  <PreJoinPermissionsCard
-                    meetingName={meetingName}
-                    onRequestPermissions={() => void handleRequestPermissions()}
-                  />
-                ) : (
-                  <PreJoinDeviceSetupCard
-                    participant={localParticipant ?? undefined}
-                    userName={userName}
-                    userAvatarUrl={userAvatarUrl}
-                    linkedChildren={linkedChildren}
-                    selectedChildId={selectedChildId}
-                    onSelectChild={setSelectedChildId}
-                    isCameraEnabled={isCameraEnabled}
-                    isMicEnabled={isMicEnabled}
-                    isPreparingPreview={isPreparingPreview}
-                    isJoining={isJoining}
-                    mode={mode}
-                    cameras={cameras}
-                    microphones={microphones}
-                    speakers={speakers}
-                    currentCam={currentCam}
-                    currentMic={currentMic}
-                    currentSpeaker={currentSpeaker}
-                    backgroundPreset={backgroundPreset}
-                    isNoiseCancellationEnabled={isNoiseCancellationEnabled}
-                    onToggleCamera={handleToggleCamera}
-                    onToggleMic={handleToggleMic}
-                    onJoin={() => void handleJoinMeeting()}
-                    onSelectCamera={(id) => void handleSelectDevice('camera', id)}
-                    onSelectMic={(id) => void handleSelectDevice('microphone', id)}
-                    onSelectSpeaker={(id) => void handleSelectDevice('speaker', id)}
-                    onSelectBackgroundPreset={(preset) =>
-                      void handleSelectBackgroundPreset(preset)
-                    }
-                    onToggleNoiseCancellation={(enabled) =>
-                      void handleToggleNoiseCancellation(enabled)
-                    }
-                  />
-                )}
+          ) : null}
+          {error && !permissionsBlocked ? (
+            <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/90 px-6 text-center">
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-foreground">
+                  Live session unavailable
+                </p>
+                <p className="text-sm text-muted-foreground">{error}</p>
               </div>
             </div>
           ) : null}
 
-          {/* ── Participants panel ── */}
-          {hasStartedJoin && isParticipantsOpen ? (
-            <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-medium text-foreground">Participants</p>
-                  <p className="text-xs text-muted-foreground">
-                    {participantCounts.present} in this live session
-                  </p>
+          {/* ── Main content + participant strip ── */}
+          {isDirectCall && directCallComposition.useOneToOneLayout ? (
+            /* 1-to-1 direct call: primary fills area, self floats bottom-right */
+            <div className="relative min-h-0 flex-1">
+              {directCallComposition.primaryParticipantId ? (
+                <DailyParticipantTile
+                  sessionId={directCallComposition.primaryParticipantId}
+                  isLocal={directCallComposition.primaryParticipantId === localSessionId}
+                />
+              ) : null}
+              {directCallComposition.floatingParticipantId ? (
+                <div className="absolute bottom-3 right-3 z-10 w-[22vw] min-w-36 max-w-52 md:bottom-4 md:right-4">
+                  <DailyParticipantTile
+                    sessionId={directCallComposition.floatingParticipantId}
+                    isLocal={
+                      directCallComposition.floatingParticipantId === localSessionId
+                    }
+                    variant="floating"
+                  />
                 </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsParticipantsOpen(false)}
+              ) : null}
+            </div>
+          ) : (
+            /* Group call: whiteboard/screen-share left, participant strip right (desktop) / bottom (mobile) */
+            <div className="flex min-h-0 flex-1 flex-col gap-2 p-2 md:flex-row md:gap-3 md:p-3">
+              {/* Main content area: screen share takes priority over contentSlot */}
+              {activeScreenShareSessionId ? (
+                <div className="min-h-0 flex-1 overflow-hidden rounded-2xl">
+                  <DailyScreenShareTile sessionId={activeScreenShareSessionId} />
+                </div>
+              ) : contentSlot ? (
+                <div className="min-h-0 flex-1 overflow-hidden rounded-2xl">
+                  {contentSlot}
+                </div>
+              ) : null}
+
+              {/* Participant tiles */}
+              {participantIds.length > 0 ? (
+                <div
+                  className={
+                    hasMainContent
+                      ? /* strip: horizontal scroll on mobile, vertical on desktop */
+                        'flex shrink-0 gap-2 overflow-x-auto md:w-52 md:flex-col md:overflow-x-hidden md:overflow-y-auto'
+                      : /* full grid when no main content */
+                        'grid min-h-0 flex-1 auto-rows-fr grid-cols-1 gap-2 overflow-y-auto md:grid-cols-2'
+                  }
                 >
-                  Close
-                </Button>
-              </div>
-              <div className="mt-4 grid gap-2">
-                {participantIds.map((sessionId) => (
-                  <DailyParticipantListItem
-                    key={`participant-list-${sessionId}`}
-                    sessionId={sessionId}
-                    isLocal={sessionId === localSessionId}
-                  />
-                ))}
-              </div>
-            </div>
-          ) : null}
-
-          {/* ── Settings panel (used for background / noise-cancellation / advanced devices) ── */}
-          {isSettingsOpen ? (
-            <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-medium text-foreground">Session settings</p>
-                  <p className="text-xs text-muted-foreground">
-                    Choose your devices and effects for this session.
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => void handleRefreshDevices()}
-                  disabled={isRefreshingDevices}
-                >
-                  {isRefreshingDevices ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <RefreshCw className="h-4 w-4" />
-                  )}
-                  Refresh devices
-                </Button>
-              </div>
-
-              <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                {mode !== 'audio' ? (
-                  <label className="space-y-2">
-                    <span className="inline-flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                      <Camera className="h-3.5 w-3.5" />
-                      Camera
-                    </span>
-                    <Select
-                      value={currentCam?.device.deviceId ?? ''}
-                      onValueChange={(value) => void handleSelectDevice('camera', value)}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select camera" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {cameras.map((camera, index) => (
-                          <SelectItem
-                            key={camera.device.deviceId}
-                            value={camera.device.deviceId}
-                          >
-                            {getDailyDeviceLabel({
-                              label: camera.device.label,
-                              kind: camera.device.kind,
-                              index,
-                            })}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </label>
-                ) : null}
-
-                <label className="space-y-2">
-                  <span className="inline-flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                    <Mic className="h-3.5 w-3.5" />
-                    Microphone
-                  </span>
-                  <Select
-                    value={currentMic?.device.deviceId ?? ''}
-                    onValueChange={(value) =>
-                      void handleSelectDevice('microphone', value)
-                    }
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select microphone" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {microphones.map((microphone, index) => (
-                        <SelectItem
-                          key={microphone.device.deviceId}
-                          value={microphone.device.deviceId}
-                        >
-                          {getDailyDeviceLabel({
-                            label: microphone.device.label,
-                            kind: microphone.device.kind,
-                            index,
-                          })}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </label>
-
-                <label className="space-y-2">
-                  <span className="inline-flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                    <Volume2 className="h-3.5 w-3.5" />
-                    Speaker
-                  </span>
-                  <Select
-                    value={currentSpeaker?.device.deviceId ?? ''}
-                    onValueChange={(value) => void handleSelectDevice('speaker', value)}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select speaker" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {speakers.map((speaker, index) => (
-                        <SelectItem
-                          key={speaker.device.deviceId}
-                          value={speaker.device.deviceId}
-                        >
-                          {getDailyDeviceLabel({
-                            label: speaker.device.label,
-                            kind: speaker.device.kind,
-                            index,
-                          })}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </label>
-
-                {mode !== 'audio' ? (
-                  <label className="space-y-2">
-                    <span className="inline-flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                      <WandSparkles className="h-3.5 w-3.5" />
-                      Background
-                    </span>
-                    <Select
-                      value={backgroundPreset}
-                      onValueChange={(value) => void handleSelectBackgroundPreset(value)}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Background effect" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {DAILY_BACKGROUND_PRESET_OPTIONS.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </label>
-                ) : null}
-              </div>
-
-              <div className="mt-4 flex flex-wrap items-center gap-4 rounded-2xl border border-border bg-muted/40 px-4 py-3">
-                <div className="flex items-center gap-3">
-                  <Switch
-                    checked={isNoiseCancellationEnabled}
-                    onCheckedChange={(checked) =>
-                      void handleToggleNoiseCancellation(checked)
-                    }
-                    disabled={isApplyingInputSettings}
-                  />
-                  <div className="space-y-0.5">
-                    <p className="text-sm font-medium text-foreground">
-                      Noise cancellation
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Reduce room noise on your microphone input.
-                    </p>
-                  </div>
-                </div>
-
-                {isApplyingDevice || isApplyingInputSettings ? (
-                  <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    Applying changes…
-                  </div>
-                ) : null}
-
-                {inputSettingsError ? (
-                  <div className="text-xs text-destructive">{inputSettingsError}</div>
-                ) : null}
-              </div>
-            </div>
-          ) : null}
-
-          {/* ── In-call: participant video grid ── */}
-          {hasStartedJoin && participantIds.length > 0 ? (
-            <div
-              className={[
-                'min-h-0 flex-1',
-                activeScreenShareSessionId && !isDirectCall
-                  ? 'flex flex-col gap-3'
-                  : isDirectCall && directCallComposition.useOneToOneLayout
-                    ? 'relative'
-                    : isDirectCall
-                      ? 'grid grid-cols-1 gap-3 md:grid-cols-2'
-                      : currentView === 'speaker'
-                        ? 'grid grid-cols-1 gap-3'
-                        : currentView === 'gallery'
-                          ? 'grid grid-cols-1 gap-3 md:grid-cols-2'
-                          : 'grid grid-cols-1 gap-3',
-              ].join(' ')}
-            >
-              {activeScreenShareSessionId && !isDirectCall ? (
-                <>
-                  <div className="min-h-0 flex-1">
-                    <DailyScreenShareTile sessionId={activeScreenShareSessionId} />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                    {stageParticipantIds.map((sessionId) => (
+                  {participantIds.map((sessionId) =>
+                    hasMainContent ? (
+                      <div key={sessionId} className="w-32 shrink-0 md:w-full">
+                        <DailyParticipantTile
+                          sessionId={sessionId}
+                          isLocal={sessionId === localSessionId}
+                          variant="strip"
+                        />
+                      </div>
+                    ) : (
                       <DailyParticipantTile
                         key={sessionId}
                         sessionId={sessionId}
                         isLocal={sessionId === localSessionId}
                       />
-                    ))}
-                  </div>
-                </>
-              ) : isDirectCall && directCallComposition.useOneToOneLayout ? (
-                <>
-                  {directCallComposition.primaryParticipantId ? (
-                    <DailyParticipantTile
-                      key={directCallComposition.primaryParticipantId}
-                      sessionId={directCallComposition.primaryParticipantId}
-                      isLocal={
-                        directCallComposition.primaryParticipantId === localSessionId
-                      }
-                    />
-                  ) : null}
-                  {directCallComposition.floatingParticipantId ? (
-                    <div className="absolute bottom-3 right-3 z-10 w-[22vw] min-w-36 max-w-52 md:bottom-4 md:right-4">
-                      <DailyParticipantTile
-                        key={directCallComposition.floatingParticipantId}
-                        sessionId={directCallComposition.floatingParticipantId}
-                        isLocal={
-                          directCallComposition.floatingParticipantId === localSessionId
-                        }
-                        variant="floating"
-                      />
+                    ),
+                  )}
+                </div>
+              ) : !hasMainContent ? (
+                <div className="flex min-h-0 flex-1 items-center justify-center rounded-2xl border border-dashed border-border bg-muted/30 text-center">
+                  <div className="space-y-3 text-muted-foreground">
+                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/15 text-primary">
+                      <Users className="h-5 w-5" />
                     </div>
-                  ) : null}
-                </>
-              ) : (
-                participantIds.map((sessionId) => (
-                  <DailyParticipantTile
-                    key={sessionId}
-                    sessionId={sessionId}
-                    isLocal={sessionId === localSessionId}
-                  />
-                ))
-              )}
-            </div>
-          ) : hasStartedJoin ? (
-            <div className="flex min-h-0 flex-1 items-center justify-center rounded-2xl border border-dashed border-border bg-muted/30 text-center">
-              <div className="space-y-3 text-muted-foreground">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/15 text-primary">
-                  <Users className="h-5 w-5" />
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-foreground">
+                        Waiting for participants
+                      </p>
+                      <p className="text-sm">
+                        Share the live session link to bring others in.
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-foreground">
-                    Waiting for participants
-                  </p>
-                  <p className="text-sm">
-                    Share the live session message or join link to bring others in.
-                  </p>
-                </div>
-              </div>
+              ) : null}
             </div>
-          ) : null}
+          )}
 
-          {hasStartedJoin && !localSessionId ? (
-            <div className="inline-flex items-center gap-2 rounded-xl border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-              <VideoOff className="h-4 w-4" />
-              Camera preview will appear after Daily finishes joining the room.
-            </div>
-          ) : null}
-        </div>
-      </div>
+          {/* ── Dark control bar (Cam / Mic / Share / Chat / Leave) ── */}
+          <div className="flex shrink-0 items-center justify-center gap-2 bg-zinc-900 px-4 py-3 md:gap-4">
+            <InCallButton
+              icon={
+                isCameraEnabled ? (
+                  <Video className="h-5 w-5" />
+                ) : (
+                  <VideoOff className="h-5 w-5" />
+                )
+              }
+              label="Cam"
+              active={isCameraEnabled}
+              onClick={handleToggleCamera}
+            />
+            <InCallButton
+              icon={
+                isMicEnabled ? (
+                  <Mic className="h-5 w-5" />
+                ) : (
+                  <MicOff className="h-5 w-5" />
+                )
+              }
+              label="Mic"
+              active={isMicEnabled}
+              onClick={handleToggleMic}
+            />
+            {!isDirectCall ? (
+              <InCallButton
+                icon={<MonitorUp className="h-5 w-5" />}
+                label="Share"
+                active={isScreenSharing}
+                onClick={handleToggleScreenShare}
+              />
+            ) : null}
+            <InCallButton
+              icon={<MessageCircle className="h-5 w-5" />}
+              label="Chat"
+              onClick={() => undefined}
+            />
+            <InCallButton
+              icon={
+                isLeaving ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <PhoneOff className="h-5 w-5" />
+                )
+              }
+              label="Leave"
+              destructive
+              disabled={isLeaving}
+              onClick={() => void handleLeave()}
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -1547,6 +1315,7 @@ export function DailyLiveSessionEmbed({
   linkedChildren,
   liveSessionId,
   channelId,
+  contentSlot,
   whiteboardEnabled,
   panelMode,
   onPanelModeChange,
@@ -1565,6 +1334,7 @@ export function DailyLiveSessionEmbed({
   linkedChildren?: LinkedChildProfile[];
   liveSessionId?: string | null;
   channelId?: string | null;
+  contentSlot?: ReactNode;
   whiteboardEnabled?: boolean;
   panelMode?: import('@iconicedu/shared-types').WhiteboardPanelMode;
   onPanelModeChange?: (
@@ -1616,6 +1386,7 @@ export function DailyLiveSessionEmbed({
         linkedChildren={linkedChildren}
         liveSessionId={liveSessionId}
         channelId={channelId}
+        contentSlot={contentSlot}
         whiteboardEnabled={whiteboardEnabled}
         panelMode={panelMode}
         onPanelModeChange={onPanelModeChange}

@@ -2,10 +2,9 @@
 
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
 import { Loader2, MonitorUp } from 'lucide-react';
 
-import type { LiveSessionProviderVM, WhiteboardPanelMode } from '@iconicedu/shared-types';
+import type { LiveSessionProviderVM } from '@iconicedu/shared-types';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import {
   canEmbedLiveSession,
@@ -28,7 +27,7 @@ const DailyLiveSessionEmbed = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex min-h-[70vh] items-center justify-center rounded-2xl border border-border bg-card">
+      <div className="flex h-full items-center justify-center">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
           Loading live session...
@@ -46,7 +45,7 @@ const ClassroomWhiteboard = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex min-h-[70vh] items-center justify-center rounded-2xl border border-border bg-card">
+      <div className="flex h-full items-center justify-center">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
           Loading whiteboard...
@@ -96,63 +95,44 @@ export function LiveSessionHost({
   whiteboardEnabled?: boolean;
 }) {
   const router = useRouter();
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [panelMode, setPanelMode] = useState<WhiteboardPanelMode>('split');
-  const [hasJoined, setHasJoined] = useState(false);
   const heading = getLiveSessionHostHeading({ provider, channelTopic });
-
   const supabase = createSupabaseBrowserClient();
 
   const showWhiteboard = whiteboardEnabled && provider === 'daily' && !!liveSessionId;
-  const showVideo = panelMode !== 'board';
-  const showBoard = showWhiteboard && panelMode !== 'video' && hasJoined;
+
+  const whiteboardSlot =
+    showWhiteboard && liveSessionId && orgId && profileId ? (
+      <ClassroomWhiteboard
+        liveSessionId={liveSessionId}
+        isPresenter={isPresenter ?? false}
+        supabase={supabase}
+        onLoadSnapshot={() => loadWhiteboardSnapshot(liveSessionId)}
+        onSaveSnapshot={(elements) =>
+          saveWhiteboardSnapshot(liveSessionId, orgId, channelId ?? '', { elements })
+        }
+      />
+    ) : undefined;
 
   if (provider === 'daily' && joinUrl) {
     return (
-      <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 py-4">
-        <div
-          className={
-            showVideo && showBoard
-              ? 'grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-2'
-              : 'flex min-h-0 flex-1 flex-col gap-4'
-          }
-        >
-          {showVideo ? (
-            <DailyLiveSessionEmbed
-              joinUrl={joinUrl}
-              token={token ?? null}
-              externalJoinUrl={externalJoinUrl ?? null}
-              channelKind={channelKind ?? null}
-              mode={mode ?? null}
-              returnPath={returnPath}
-              meetingName={heading}
-              userName={userName ?? null}
-              userAvatarUrl={userAvatarUrl ?? null}
-              linkedChildren={linkedChildren}
-              liveSessionId={liveSessionId ?? null}
-              channelId={channelId ?? null}
-              whiteboardEnabled={showWhiteboard}
-              panelMode={panelMode}
-              onPanelModeChange={showWhiteboard ? setPanelMode : undefined}
-              onJoined={() => setHasJoined(true)}
-              onLeave={(path) => router.push(path)}
-            />
-          ) : null}
-
-          {showBoard && liveSessionId && orgId && profileId ? (
-            <ClassroomWhiteboard
-              liveSessionId={liveSessionId}
-              isPresenter={isPresenter ?? false}
-              supabase={supabase}
-              onLoadSnapshot={() => loadWhiteboardSnapshot(liveSessionId)}
-              onSaveSnapshot={(elements) =>
-                saveWhiteboardSnapshot(liveSessionId, orgId, channelId ?? '', {
-                  elements,
-                })
-              }
-            />
-          ) : null}
-        </div>
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <DailyLiveSessionEmbed
+          joinUrl={joinUrl}
+          token={token ?? null}
+          externalJoinUrl={externalJoinUrl ?? null}
+          channelKind={channelKind ?? null}
+          mode={mode ?? null}
+          returnPath={returnPath}
+          meetingName={heading}
+          userName={userName ?? null}
+          userAvatarUrl={userAvatarUrl ?? null}
+          linkedChildren={linkedChildren}
+          liveSessionId={liveSessionId ?? null}
+          channelId={channelId ?? null}
+          contentSlot={whiteboardSlot}
+          whiteboardEnabled={showWhiteboard}
+          onLeave={(path) => router.push(path)}
+        />
       </div>
     );
   }
@@ -190,21 +170,12 @@ export function LiveSessionHost({
       </div>
 
       <div className="relative min-h-0 flex-1 overflow-hidden rounded-2xl border border-border bg-card">
-        {!isLoaded ? (
-          <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/80">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Loading live session...
-            </div>
-          </div>
-        ) : null}
         <iframe
           title={getEmbeddedLiveSessionTitle(provider)}
           src={joinUrl ?? undefined}
           className="h-full min-h-[70vh] w-full border-0"
           allow={getEmbeddedLiveSessionFrameAllow(provider)}
           allowFullScreen
-          onLoad={() => setIsLoaded(true)}
         />
       </div>
     </div>
