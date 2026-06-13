@@ -152,6 +152,25 @@ describe('API activity definitions context rendering', () => {
     expect(rendered.actionButton?.label).toBe('Open message');
   });
 
+  it('defaults unviewed classroom message alert copy to 4 hours', () => {
+    const definition = getActivityEventDefinition(
+      'message.unviewed_intended_participants',
+    );
+
+    const rendered = definition!.render(
+      makeEvent('message.unviewed_intended_participants', {
+        senderName: 'Ari Parent',
+        unviewedParticipantNames: ['Ms. Chen'],
+        unviewedParticipantIds: ['teacher-1'],
+        unviewedParticipantCount: 1,
+      }),
+    );
+
+    expect(rendered.summary).toBe(
+      "Ms. Chen has not viewed Ari Parent's message after 4 hours.",
+    );
+  });
+
   it('renders reactions with original message preview and quiet importance', () => {
     const definition = getActivityEventDefinition('reaction.added');
     expect(definition).toBeDefined();

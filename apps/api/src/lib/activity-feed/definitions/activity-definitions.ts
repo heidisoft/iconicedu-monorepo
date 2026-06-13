@@ -472,7 +472,7 @@ function renderUnviewedClassroomMessageItem(event: ActivityEventRow) {
     formatNamesList(names) ??
     `${typeof payload.unviewedParticipantCount === 'number' ? payload.unviewedParticipantCount : 'Some'} participant(s)`;
   const thresholdHours =
-    typeof payload.thresholdHours === 'number' ? payload.thresholdHours : 24;
+    typeof payload.thresholdHours === 'number' ? payload.thresholdHours : 4;
   const summary = `${participantLabel} has not viewed ${senderName}'s message after ${thresholdHours} hours.`;
 
   return {
