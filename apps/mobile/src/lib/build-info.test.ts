@@ -15,9 +15,7 @@ describe('build-info', () => {
       updateId: 'update-1',
     };
 
-    expect(formatBuildFingerprint(info)).toBe(
-      'preview · channel preview · runtime 2.0.0 · commit abcdef1 · update update-1 · build build-12',
-    );
+    expect(formatBuildFingerprint(info)).toBe('update update-1');
   });
 
   it('returns null when there is no diagnostic metadata', () => {

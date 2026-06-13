@@ -180,9 +180,7 @@ describe('AccountScreen', () => {
     expect(screen.getByText('Switch to child account')).toBeTruthy();
     expect(screen.getByText('Personal')).toBeTruthy();
     expect(screen.getByText('ICONIC Academy v0.1.0')).toBeTruthy();
-    expect(
-      screen.getByText('channel test · runtime 1.0.0 · update update-1'),
-    ).toBeTruthy();
+    expect(screen.getByText('update update-1')).toBeTruthy();
 
     fireEvent.press(screen.getByText('Switch to child account'));
 
