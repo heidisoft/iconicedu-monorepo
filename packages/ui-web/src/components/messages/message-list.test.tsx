@@ -16,21 +16,26 @@ vi.mock('@iconicedu/ui-web/components/messages/message-item', () => ({
     isThreadReply,
     feedGroupPosition,
     showActionControls,
+    inlineThreadContent,
   }: {
     message: MessageVM;
     onOpenThread?: (thread: ThreadVM, message: MessageVM) => void;
     isThreadReply?: boolean;
     feedGroupPosition?: string;
     showActionControls?: boolean;
+    inlineThreadContent?: React.ReactNode;
   }) =>
     !isThreadReply && message.social.thread ? (
-      <button
-        type="button"
-        data-testid={`open-thread-${message.ids.id}`}
-        onClick={() => onOpenThread?.(message.social.thread as ThreadVM, message)}
-      >
-        Open thread
-      </button>
+      <>
+        <button
+          type="button"
+          data-testid={`open-thread-${message.ids.id}`}
+          onClick={() => onOpenThread?.(message.social.thread as ThreadVM, message)}
+        >
+          Open thread
+        </button>
+        {inlineThreadContent}
+      </>
     ) : (
       <div
         data-testid={`message-item-${message.ids.id}`}
@@ -828,5 +833,52 @@ describe('MessageList', () => {
     });
 
     expect(screen.queryByText(/New messages/)).not.toBeInTheDocument();
+  });
+
+  it('keeps feed inline replies actionable when a thread is expanded', async () => {
+    const thread: ThreadVM = {
+      ids: { id: 'thread-feed', orgId: 'org-1' },
+      parent: { messageId: 'message-parent' },
+      stats: { messageCount: 1, lastReplyAt: '2026-02-16T10:01:00.000Z' },
+      participants: [],
+    };
+    const parent = createMessage({
+      id: 'message-parent',
+      senderId: 'profile-parent',
+      createdAt: '2026-02-16T10:00:00.000Z',
+      thread,
+    });
+    const reply = createMessage({
+      id: 'reply-1',
+      senderId: 'profile-2',
+      createdAt: '2026-02-16T10:01:00.000Z',
+      thread,
+      text: 'Feed thread reply',
+    });
+
+    render(
+      <MessageList
+        messages={[parent, reply]}
+        onOpenThread={
+          vi.fn() as unknown as (thread: ThreadVM, message: MessageVM) => void
+        }
+        onProfileClick={vi.fn()}
+        onToggleReaction={vi.fn()}
+        onToggleSaved={vi.fn()}
+        onToggleHidden={vi.fn()}
+        onDelete={vi.fn()}
+        currentUserId="profile-1"
+        messageUiThemeKey="feed"
+      />,
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('open-thread-message-parent'));
+    });
+
+    expect(screen.getByText('Feed thread reply')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save message' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'More actions' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add emoji' })).toBeInTheDocument();
   });
 });

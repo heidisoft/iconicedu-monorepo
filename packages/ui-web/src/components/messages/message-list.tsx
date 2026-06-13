@@ -637,6 +637,14 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
           {inlineReplies.map((reply, replyIndex) => {
             const senderName = getProfileDisplayName(reply.core.sender.profile);
             const isOwnReply = currentUserId === reply.core.sender.ids.id;
+            const shouldHideQuickActions = shouldHideMessageQuickActions(reply);
+            const replyActionState = getMessageActionState?.(reply.ids.id);
+            const isSavingReply = Boolean(replyActionState?.isSaving);
+            const isHidingReply = Boolean(replyActionState?.isHiding);
+            const isDeletingReply = Boolean(replyActionState?.isDeleting);
+            const isAddingReactionReply = Boolean(replyActionState?.isAddingReaction);
+            const pendingReplyReactionEmojis =
+              replyActionState?.pendingReactionEmojis ?? [];
             return (
               <div key={reply.ids.id}>
                 {inlineUnreadStartIndex === replyIndex && (
@@ -672,13 +680,146 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                           {getAvatarRoleLabel(reply.core.sender.kind)}
                         </span>
                       </div>
-                      <span className="whitespace-nowrap text-xs leading-none text-muted-foreground">
-                        {formatTime(reply.core.createdAt)}
-                      </span>
+                      <div className="flex shrink-0 items-center gap-1">
+                        <span className="whitespace-nowrap text-xs leading-none text-muted-foreground">
+                          {formatTime(reply.core.createdAt)}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          disabled={isReadOnly || isSavingReply}
+                          onClick={() => onToggleSaved?.(reply.ids.id)}
+                          aria-label={
+                            reply.state?.isSaved ? 'Unsave message' : 'Save message'
+                          }
+                        >
+                          {isSavingReply ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Bookmark
+                              className={cn(
+                                'h-3.5 w-3.5',
+                                reply.state?.isSaved && 'fill-primary text-primary',
+                              )}
+                            />
+                          )}
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              aria-label="More actions"
+                            >
+                              <MoreHorizontal className="h-3.5 w-3.5" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent
+                            align="end"
+                            sideOffset={8}
+                            className="w-44 z-[100]"
+                          >
+                            <DropdownMenuItem
+                              onSelect={(e) => e.preventDefault()}
+                              className="py-2"
+                            >
+                              <Forward className="mr-2 h-4 w-4" />
+                              <span>Forward</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onSelect={(e) => e.preventDefault()}
+                              className="py-2"
+                            >
+                              <Copy className="mr-2 h-4 w-4" />
+                              <span>Copy text</span>
+                            </DropdownMenuItem>
+                            {isOwnReply || currentUserCanDeleteAnyMessages ? (
+                              <>
+                                <DropdownMenuSeparator />
+                                {isOwnReply ? (
+                                  <DropdownMenuItem
+                                    onClick={() => onToggleHidden?.(reply.ids.id)}
+                                    disabled={isHidingReply}
+                                    className="py-2"
+                                  >
+                                    {isHidingReply ? (
+                                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <EyeOff className="mr-2 h-4 w-4" />
+                                    )}
+                                    <span>Hide message</span>
+                                  </DropdownMenuItem>
+                                ) : null}
+                                <DropdownMenuItem
+                                  onClick={() => onDelete?.(reply.ids.id)}
+                                  disabled={isDeletingReply}
+                                  className="py-2 text-destructive focus:text-destructive"
+                                >
+                                  {isDeletingReply ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                  )}
+                                  <span>Delete</span>
+                                </DropdownMenuItem>
+                              </>
+                            ) : null}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </div>
                     <p className="mt-2 break-words text-left text-sm leading-6 text-foreground/85">
                       {getInlineReplyPreview(reply)}
                     </p>
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      <div className={cn(isReadOnly && 'pointer-events-none opacity-60')}>
+                        <ReactionBar
+                          reactions={reply.social.reactions}
+                          pendingEmojis={pendingReplyReactionEmojis}
+                          size="compact"
+                          onToggleReaction={
+                            isReadOnly
+                              ? undefined
+                              : (emoji) => onToggleReaction?.(reply.ids.id, emoji, 'bar')
+                          }
+                        />
+                      </div>
+                      {!shouldHideQuickActions ? (
+                        isReadOnly ? (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            disabled
+                            className="h-6 w-6 rounded-full border border-border bg-background/60 text-muted-foreground"
+                            aria-label="Add emoji"
+                          >
+                            <SmilePlus className="h-3.5 w-3.5" />
+                          </Button>
+                        ) : (
+                          <EmojiPicker
+                            onEmojiSelect={(emoji) =>
+                              onToggleReaction?.(reply.ids.id, emoji, 'picker')
+                            }
+                          >
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              disabled={isAddingReactionReply}
+                              className="h-6 w-6 rounded-full border border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+                              aria-label="Add emoji"
+                            >
+                              {isAddingReactionReply ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <SmilePlus className="h-3.5 w-3.5" />
+                              )}
+                            </Button>
+                          </EmojiPicker>
+                        )
+                      ) : null}
+                    </div>
                   </div>
                 </div>
               </div>

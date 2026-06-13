@@ -176,6 +176,7 @@ export const MessageBase = memo(function MessageBase({
   const shouldShowQuickActionControls = showActionControls && !shouldHideQuickActions;
   const shouldShowActionsRow = hasReactions || hasThread;
   const shouldPinQuickActions = isQuickActionsActive || isEmojiPickerOpen;
+  const shouldShowCompactManagementActions = isGroupedFeedChild || isGroupedClassicChild;
   const shouldFrameFeedContent =
     isFeedTheme &&
     ![
@@ -371,6 +372,35 @@ export const MessageBase = memo(function MessageBase({
             {isFeedTheme ? <span>Reply</span> : null}
           </Button>
         )
+      ) : null}
+      {shouldShowCompactManagementActions ? (
+        <>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              'rounded-full border border-border bg-background text-muted-foreground shadow-sm hover:bg-muted hover:text-foreground',
+              isFeedTheme ? 'h-6 w-6' : 'h-7 w-7',
+            )}
+            onClick={onToggleSaved}
+            disabled={isInteractionDisabled || isSaving}
+            aria-label={message.state?.isSaved ? 'Unsave message' : 'Save message'}
+          >
+            {isSaving ? (
+              <Loader2
+                className={cn('animate-spin', isFeedTheme ? 'h-3.5 w-3.5' : 'h-4 w-4')}
+              />
+            ) : (
+              <Bookmark
+                className={cn(
+                  isFeedTheme ? 'h-3.5 w-3.5' : 'h-4 w-4',
+                  message.state?.isSaved && 'fill-primary text-primary',
+                )}
+              />
+            )}
+          </Button>
+          {actionsMenu}
+        </>
       ) : null}
     </>
   ) : null;
