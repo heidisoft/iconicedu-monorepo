@@ -72,16 +72,5 @@ export function getMobileBuildInfo(): MobileBuildInfo {
 }
 
 export function formatBuildFingerprint(info: MobileBuildInfo): string | null {
-  const releaseParts = [
-    info.appEnv,
-    info.channel ? `channel ${info.channel}` : null,
-    info.runtimeVersion ? `runtime ${info.runtimeVersion}` : null,
-  ].filter(Boolean);
-  const buildParts = [
-    info.gitCommit ? `commit ${info.gitCommit}` : null,
-    info.updateId ? `update ${info.updateId}` : null,
-    info.easBuildId ? `build ${info.easBuildId}` : null,
-  ].filter(Boolean);
-
-  return [...releaseParts, ...buildParts].join(' · ') || null;
+  return info.updateId ? `update ${info.updateId}` : null;
 }
