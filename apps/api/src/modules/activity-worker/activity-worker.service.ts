@@ -15,6 +15,7 @@ import {
 } from '@iconicedu/api/lib/messages/message-activity';
 import { publishActivityEvent } from '@iconicedu/api/lib/activity-feed/activity-publisher';
 import { type SupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
+import { resolveUnviewedMessageAlertThresholdHours } from '@iconicedu/api/lib/messages/unviewed-message-alert-config';
 
 type MessageRow = {
   id: string;
@@ -90,7 +91,9 @@ export class ActivityWorkerService {
         messageId,
         now: new Date().toISOString(),
         thresholdHours:
-          typeof payload.thresholdHours === 'number' ? payload.thresholdHours : 24,
+          typeof payload.thresholdHours === 'number'
+            ? payload.thresholdHours
+            : resolveUnviewedMessageAlertThresholdHours(),
       });
       return;
     }

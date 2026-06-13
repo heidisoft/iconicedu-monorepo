@@ -108,7 +108,7 @@ describe('publishUnviewedClassroomMessageActivity', () => {
       publishActivity: publishActivity as never,
       orgId: 'org-1',
       messageId: 'message-1',
-      now: '2026-06-02T10:01:00.000Z',
+      now: '2026-06-01T14:01:00.000Z',
     });
 
     expect(result).toMatchObject({
@@ -124,10 +124,33 @@ describe('publishUnviewedClassroomMessageActivity', () => {
           senderName: 'Ari Parent',
           unviewedParticipantIds: ['teacher-1'],
           unviewedParticipantNames: ['Ms. Chen'],
-          thresholdHours: 24,
+          thresholdHours: 4,
         }),
       }),
     );
+  });
+
+  it('suppresses the staff activity before the configured threshold', async () => {
+    const publishActivity = jest.fn(async () => null);
+    const supabase = makeSupabase({
+      messages: [message],
+      channels: [channel],
+    });
+
+    const result = await publishUnviewedClassroomMessageActivity({
+      supabase: supabase as never,
+      readSupabase: supabase as never,
+      publishActivity: publishActivity as never,
+      orgId: 'org-1',
+      messageId: 'message-1',
+      now: '2026-06-01T13:59:00.000Z',
+    });
+
+    expect(result).toEqual({
+      suppressed: true,
+      reason: 'threshold_not_reached',
+    });
+    expect(publishActivity).not.toHaveBeenCalled();
   });
 
   it('suppresses the staff activity when intended participants have read the message', async () => {

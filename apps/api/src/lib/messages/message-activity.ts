@@ -2,6 +2,7 @@ import type { AudienceRuleVM, MessageMentionVM } from '@iconicedu/shared-types';
 
 import { publishActivityEvent } from '@iconicedu/api/lib/activity-feed/activity-publisher';
 import type { SupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
+import { resolveUnviewedMessageAlertThresholdHours } from '@iconicedu/api/lib/messages/unviewed-message-alert-config';
 
 type SupabaseQueryClient = Pick<SupabaseServiceClient, 'from'>;
 type PublishActivityFn = typeof publishActivityEvent;
@@ -972,10 +973,11 @@ export async function publishUnviewedClassroomMessageActivity(input: {
     return { suppressed: true, reason: 'not_classroom_channel' };
   }
 
-  const thresholdAt = addHours(
-    message.created_at,
-    typeof input.thresholdHours === 'number' ? input.thresholdHours : 24,
-  );
+  const thresholdHours =
+    typeof input.thresholdHours === 'number'
+      ? input.thresholdHours
+      : resolveUnviewedMessageAlertThresholdHours();
+  const thresholdAt = addHours(message.created_at, thresholdHours);
   if (!thresholdAt || new Date(input.now).getTime() < new Date(thresholdAt).getTime()) {
     return { suppressed: true, reason: 'threshold_not_reached' };
   }
@@ -1034,8 +1036,7 @@ export async function publishUnviewedClassroomMessageActivity(input: {
       unviewedParticipantIds: unviewedProfiles.map((profile) => profile.id),
       unviewedParticipantNames,
       unviewedParticipantCount: unviewedProfiles.length,
-      thresholdHours:
-        typeof input.thresholdHours === 'number' ? input.thresholdHours : 24,
+      thresholdHours,
       learningSpaceId: activityContext.learningSpaceId,
       learningSpaceTitle: activityContext.learningSpaceTitle ?? null,
       channelTopic: activityContext.channelTopic ?? null,
