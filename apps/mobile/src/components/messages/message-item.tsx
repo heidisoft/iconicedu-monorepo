@@ -1783,6 +1783,12 @@ function makeStyles(colors: AppColors) {
       marginRight: 8,
     },
     inlineReplies: { flex: 1 },
+    threadLoadError: {
+      color: colors.textMuted,
+      fontSize: 12,
+      lineHeight: 18,
+      paddingVertical: 4,
+    },
   });
 }
 
@@ -1958,6 +1964,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   const [threadExpanded, setThreadExpanded] = useState(false);
   const [threadReplies, setThreadReplies] = useState<MessageVM[]>([]);
   const [threadLoading, setThreadLoading] = useState(false);
+  const [threadLoadFailed, setThreadLoadFailed] = useState(false);
   const [threadUnreadCount, setThreadUnreadCount] = useState(
     message.social?.thread?.readState?.unreadCount ?? 0,
   );
@@ -1967,6 +1974,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   const [audioDurationMs, setAudioDurationMs] = useState(0);
   const soundRef = useRef<AudioPlayer | null>(null);
   const audioSubRef = useRef<{ remove(): void } | null>(null);
+  const markThreadReadRef = useRef(markThreadRead);
   const [openingFile, setOpeningFile] = useState<string | null>(null);
   const [imageSignedUrls, setImageSignedUrls] = useState<Record<string, string>>({});
   const [audioSignedUrl, setAudioSignedUrl] = useState<string | null>(null);
@@ -2070,73 +2078,81 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     setThreadUnreadCount(thread?.readState?.unreadCount ?? 0);
   }, [thread?.ids.id, thread?.readState?.unreadCount]);
 
-  const loadThreadReplies = useCallback(async () => {
-    if (!thread) {
-      return;
-    }
-
-    setThreadLoading(true);
-    try {
-      const resolvedChannelId = thread.readState?.channelId ?? channelId ?? '';
-      const replies = await fetchThreadMessages(
-        message.ids.orgId,
-        resolvedChannelId,
-        thread.ids.id,
-        message.ids.id,
-        currentProfileId ?? '',
-        currentAccountId ?? '',
-      );
-      setThreadReplies(replies);
-      const lastReplyId = replies[replies.length - 1]?.ids.id ?? null;
-      if (resolvedChannelId && currentProfileId && currentAccountId) {
-        const alreadyUpToDate =
-          threadUnreadCount === 0 && lastReplyId === thread.readState?.lastReadMessageId;
-        if (!alreadyUpToDate) {
-          await markThreadRead({
-            orgId: message.ids.orgId,
-            channelId: resolvedChannelId,
-            parentMessageId: message.ids.id,
-            threadId: thread.ids.id,
-            lastReadMessageId: lastReplyId,
-          });
-        }
-      }
-    } catch (error) {
-      reportMobileObservedError({
-        error,
-        source: 'mobile.messages.message_item.thread_expand',
-        message: 'Failed to load thread replies',
-        context: {
-          threadId: thread?.ids.id,
-          messageId: message.ids.id,
-        },
-      });
-    } finally {
-      setThreadLoading(false);
-    }
-  }, [
-    thread,
-    channelId,
-    message.ids.id,
-    message.ids.orgId,
-    currentProfileId,
-    currentAccountId,
-    threadUnreadCount,
-    markThreadRead,
-  ]);
+  useEffect(() => {
+    markThreadReadRef.current = markThreadRead;
+  }, [markThreadRead]);
 
   useEffect(() => {
     if (!threadExpanded || !thread) {
       return;
     }
 
-    void loadThreadReplies();
+    let cancelled = false;
+    setThreadLoading(true);
+    setThreadLoadFailed(false);
+
+    const loadReplies = async () => {
+      const resolvedChannelId = thread.readState?.channelId ?? channelId ?? '';
+      try {
+        const replies = await fetchThreadMessages(
+          message.ids.orgId,
+          resolvedChannelId,
+          thread.ids.id,
+          message.ids.id,
+          currentProfileId ?? '',
+          currentAccountId ?? '',
+        );
+        if (cancelled) return;
+        setThreadReplies(replies);
+        const lastReplyId = replies[replies.length - 1]?.ids.id ?? null;
+        const lastReadMessageId = thread.readState?.lastReadMessageId ?? null;
+        if (resolvedChannelId && currentProfileId && currentAccountId) {
+          if (lastReplyId !== lastReadMessageId) {
+            await markThreadReadRef.current({
+              orgId: message.ids.orgId,
+              channelId: resolvedChannelId,
+              parentMessageId: message.ids.id,
+              threadId: thread.ids.id,
+              lastReadMessageId: lastReplyId,
+            });
+            if (!cancelled) setThreadUnreadCount(0);
+          }
+        }
+      } catch (error) {
+        if (cancelled) return;
+        setThreadReplies([]);
+        setThreadLoadFailed(true);
+        reportMobileObservedError({
+          error,
+          source: 'mobile.messages.message_item.thread_expand',
+          message: 'Failed to load thread replies',
+          context: {
+            threadId: thread.ids.id,
+            messageId: message.ids.id,
+          },
+        });
+      } finally {
+        if (!cancelled) setThreadLoading(false);
+      }
+    };
+
+    void loadReplies();
+    return () => {
+      cancelled = true;
+    };
   }, [
     threadExpanded,
     thread?.ids.id,
     thread?.stats.messageCount,
     thread?.stats.lastReplyAt,
-    loadThreadReplies,
+    thread?.readState?.channelId,
+    thread?.readState?.lastReadMessageId,
+    thread,
+    channelId,
+    message.ids.id,
+    message.ids.orgId,
+    currentProfileId,
+    currentAccountId,
   ]);
 
   const handleAudioPress = useCallback(
@@ -2819,6 +2835,9 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                   </View>
                 ) : (
                   <>
+                    {threadLoadFailed ? (
+                      <Text style={s.threadLoadError}>Could not load replies.</Text>
+                    ) : null}
                     {threadReplies.map((reply, replyIndex) => (
                       <React.Fragment key={reply.ids.id}>
                         {inlineUnreadStartIndex === replyIndex && (
@@ -2951,6 +2970,9 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                   </View>
                 ) : (
                   <>
+                    {threadLoadFailed ? (
+                      <Text style={s.threadLoadError}>Could not load replies.</Text>
+                    ) : null}
                     {threadReplies.map((reply, replyIndex) => (
                       <React.Fragment key={reply.ids.id}>
                         {inlineUnreadStartIndex === replyIndex && (

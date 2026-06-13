@@ -1115,11 +1115,9 @@ function FeedMessageBlock({
         setThreadReplies(replies);
         const resolvedChannelId = thread.readState?.channelId ?? channelId ?? '';
         const lastReplyId = replies[replies.length - 1]?.ids.id ?? null;
+        const lastReadMessageId = thread.readState?.lastReadMessageId ?? null;
         if (resolvedChannelId && currentProfileId && currentAccountId) {
-          const alreadyUpToDate =
-            threadUnreadCount === 0 &&
-            lastReplyId === thread.readState?.lastReadMessageId;
-          if (!alreadyUpToDate) {
+          if (lastReplyId !== lastReadMessageId) {
             await markThreadRead({
               orgId: message.ids.orgId,
               channelId: resolvedChannelId,
