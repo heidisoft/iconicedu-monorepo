@@ -1833,7 +1833,7 @@ const styles = StyleSheet.create({
   },
   postBody: {
     marginTop: 16,
-    gap: 8,
+    gap: 3,
   },
   groupedMessageBlock: {
     gap: 8,
