@@ -5,6 +5,28 @@ const mockPush = jest.fn();
 const mockSignOut = jest.fn();
 const mockSwitchFamilyView = jest.fn();
 
+jest.mock('expo-constants', () => ({
+  default: {
+    expoConfig: {
+      name: 'ICONIC Academy',
+      version: '0.1.0',
+      runtimeVersion: '1.0.0',
+      extra: {
+        appEnv: 'test',
+        gitCommit: 'abcdef1',
+      },
+    },
+    nativeAppVersion: '0.1.0',
+    nativeBuildVersion: '1',
+  },
+}));
+
+jest.mock('expo-updates', () => ({
+  runtimeVersion: '1.0.0',
+  channel: 'test',
+  updateId: 'update-123456',
+}));
+
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     push: mockPush,
@@ -157,6 +179,10 @@ describe('AccountScreen', () => {
     expect(screen.queryByText('Family View')).toBeNull();
     expect(screen.getByText('Switch to child account')).toBeTruthy();
     expect(screen.getByText('Personal')).toBeTruthy();
+    expect(screen.getByText('ICONIC Academy v0.1.0')).toBeTruthy();
+    expect(
+      screen.getByText('channel test · runtime 1.0.0 · update update-1'),
+    ).toBeTruthy();
 
     fireEvent.press(screen.getByText('Switch to child account'));
 
