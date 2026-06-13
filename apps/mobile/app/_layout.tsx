@@ -11,7 +11,9 @@ import { useAuth } from '@/providers/auth-provider';
 import { ScreenTracker } from '@/components/analytics/screen-tracker';
 import { AppLifecycleTracker } from '@/components/analytics/app-lifecycle-tracker';
 import { PresenceTracker } from '@/components/presence/presence-tracker';
+import { WhatsNewModal } from '@/components/updates/whats-new-modal';
 import { useAppUpdate } from '@/hooks/use-app-update';
+import { useWhatsNewReleaseNotes } from '@/hooks/use-whats-new-release-notes';
 
 function SpinnerScreen() {
   const { colors } = useTheme();
@@ -30,6 +32,7 @@ const styles = StyleSheet.create({
 function RootContent() {
   const { isDark } = useTheme();
   const { loading } = useAuth();
+  const whatsNew = useWhatsNewReleaseNotes();
   useAppUpdate();
 
   if (loading) {
@@ -51,6 +54,11 @@ function RootContent() {
       <AppLifecycleTracker />
       <PresenceTracker />
       <Slot />
+      <WhatsNewModal
+        visible={whatsNew.shouldShow}
+        releaseNotes={whatsNew.releaseNotes}
+        onDismiss={whatsNew.dismiss}
+      />
       <PortalHost />
     </>
   );
