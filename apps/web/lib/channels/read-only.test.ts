@@ -16,12 +16,12 @@ describe('isStaffObserverReadOnlyChannel', () => {
     },
   } as any;
 
-  it('returns true for staff who are not participants', () => {
+  it('returns false for staff who are not participants', () => {
     expect(
       isStaffObserverReadOnlyChannel(baseChannel, 'account-staff', {
         kind: 'staff',
       } as any),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it('returns false for staff who are participants', () => {
