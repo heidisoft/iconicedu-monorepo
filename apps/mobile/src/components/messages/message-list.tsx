@@ -46,6 +46,15 @@ type UnreadSeparatorItem = { _type: 'unread-separator'; count?: number };
 type MessageListItem = MessageVM | DateSeparatorItem | UnreadSeparatorItem;
 export const MESSAGE_GROUP_WINDOW_MINUTES = 5;
 
+function getVisibilityGroupKey(message: MessageVM): string {
+  const visibility = message.core.visibility;
+  if (!visibility) return 'none';
+  if (visibility.type === 'specific-users') {
+    return `${visibility.type}:${[...visibility.userIds].sort().join(',')}`;
+  }
+  return visibility.type;
+}
+
 export function areMessagesInSameVisualGroup(
   olderMessage: MessageVM,
   newerMessage: MessageVM,
@@ -58,7 +67,8 @@ export function areMessagesInSameVisualGroup(
   return (
     olderMessage.core.sender.ids.id === newerMessage.core.sender.ids.id &&
     timeDiffMinutes >= 0 &&
-    timeDiffMinutes <= MESSAGE_GROUP_WINDOW_MINUTES
+    timeDiffMinutes <= MESSAGE_GROUP_WINDOW_MINUTES &&
+    getVisibilityGroupKey(olderMessage) === getVisibilityGroupKey(newerMessage)
   );
 }
 
@@ -566,17 +576,27 @@ export const MessageList: React.FC<MessageListProps> = ({
         }
       }
 
+      let nextMsg: MessageVM | null = null;
+      for (let i = index - 1; i >= 0; i--) {
+        const candidate = listData[i];
+        if (!isDateSeparator(candidate) && !isUnreadSeparator(candidate)) {
+          nextMsg = candidate;
+          break;
+        }
+      }
+
       const isOwn = item.core.sender.ids.id === currentProfileId;
 
       // A new group starts if: different sender, no prev message, or >5 min gap
       const isGroupStart = !prevMsg || !areMessagesInSameVisualGroup(prevMsg, item);
+      const isGroupEnd = !nextMsg || !areMessagesInSameVisualGroup(item, nextMsg);
       return (
         <MessageItem
           message={item}
           channelId={channelId}
           isOwn={isOwn}
           isGroupStart={isGroupStart}
-          showActionControls
+          showActionControls={isGroupEnd}
           colors={colors}
           onLongPress={onMessageLongPress}
           onReactionToggle={handleReactionToggle}

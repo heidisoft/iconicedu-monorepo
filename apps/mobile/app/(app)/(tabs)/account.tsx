@@ -23,7 +23,6 @@ import {
   ArrowRightLeft,
   Check,
 } from 'lucide-react-native';
-import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import { BottomSheet, Card, SettingsRow } from '@iconicedu/ui-native';
 import { useAuth } from '@/providers/auth-provider';
@@ -36,6 +35,7 @@ import { createHeaderSurface } from '@/lib/header-surface';
 import { ProfileSkeleton } from '@/components/skeletons';
 import { QueryError } from '@/components/errors/query-error';
 import { profileAvatarColors } from '@/lib/profile-avatar-colors';
+import { formatBuildFingerprint, getMobileBuildInfo } from '@/lib/build-info';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -185,7 +185,15 @@ function makeStyles(C: AppColors) {
       fontSize: 13,
       color: C.textMuted,
     },
-    version: { textAlign: 'center', fontSize: 13, color: C.textFaint, marginTop: 4 },
+    buildFooter: { gap: 2, marginTop: 4 },
+    version: { textAlign: 'center', fontSize: 13, color: C.textFaint },
+    buildFingerprint: {
+      textAlign: 'center',
+      fontSize: 12,
+      color: C.textFaint,
+      paddingHorizontal: 12,
+      lineHeight: 17,
+    },
   });
 }
 
@@ -211,6 +219,8 @@ export default function AccountScreen() {
   const router = useRouter();
 
   const s = useMemo(() => makeStyles(colors), [colors]);
+  const buildInfo = useMemo(() => getMobileBuildInfo(), []);
+  const buildFingerprint = useMemo(() => formatBuildFingerprint(buildInfo), [buildInfo]);
 
   const [refreshing, setRefreshing] = useState(false);
   const [familySwitchOpen, setFamilySwitchOpen] = useState(false);
@@ -440,10 +450,15 @@ export default function AccountScreen() {
             labelColor={colors.red}
           />
         </View>
-        <Text style={s.version}>
-          {Constants.expoConfig?.name ?? 'ICONIC Academy'} v
-          {Constants.expoConfig?.version ?? '0.1.0'}
-        </Text>
+        <View style={s.buildFooter}>
+          <Text style={s.version}>
+            {buildInfo.appName} v{buildInfo.version}
+            {buildInfo.nativeBuildVersion ? ` (${buildInfo.nativeBuildVersion})` : ''}
+          </Text>
+          {buildFingerprint ? (
+            <Text style={s.buildFingerprint}>{buildFingerprint}</Text>
+          ) : null}
+        </View>
       </ScrollView>
       <BottomSheet
         visible={familySwitchOpen}

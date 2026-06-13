@@ -25,6 +25,7 @@ import { lightColors as mockLightColors } from '@/lib/theme';
 const mockFetchThreadMessages = jest.fn();
 const mockUseOnlineProfileIds = jest.fn(() => new Map());
 const mockMarkThreadRead = jest.fn();
+const mockReportMobileObservedError = jest.fn();
 
 jest.mock('@/providers/theme-provider', () => ({
   useTheme: () => ({ colors: mockLightColors }),
@@ -40,6 +41,11 @@ jest.mock('@/hooks/use-online-profile-ids', () => ({
 
 jest.mock('@/hooks/use-mark-read', () => ({
   useMarkRead: () => ({ markThreadRead: mockMarkThreadRead }),
+}));
+
+jest.mock('@/lib/analytics/report-error', () => ({
+  reportMobileObservedError: (...args: unknown[]) =>
+    mockReportMobileObservedError(...args),
 }));
 
 jest.mock('@/lib/supabase/client', () => ({
@@ -230,8 +236,8 @@ describe('FeedMessageList', () => {
     expect(screen.getByText('First update.')).toBeTruthy();
     expect(screen.getByText('Second update.')).toBeTruthy();
     expect(screen.getByText('Third update.')).toBeTruthy();
-    expect(screen.getAllByLabelText('Add emoji reaction')).toHaveLength(3);
-    expect(screen.getAllByLabelText('Reply to thread')).toHaveLength(3);
+    expect(screen.getAllByLabelText('Add emoji reaction')).toHaveLength(1);
+    expect(screen.getAllByLabelText('Reply to thread')).toHaveLength(1);
   });
 
   it('keeps feed messages in separate posts when sender or time window changes', () => {
@@ -442,6 +448,36 @@ describe('FeedMessageList', () => {
       expect(commentCard.getByLabelText('Reply to thread')).toBeTruthy();
       expect(commentCard.queryByText('Reply')).toBeNull();
     });
+  });
+
+  it('stops loading when feed thread replies fail to load', async () => {
+    const thread = {
+      ids: { id: 'thread-1', orgId: 'org-1' },
+      parent: { messageId: 'msg-threaded' },
+      stats: { messageCount: 1, lastReplyAt: '2025-01-15T10:35:00Z' },
+      participants: [],
+    } as unknown as ThreadVM;
+    mockFetchThreadMessages.mockRejectedValueOnce(new Error('network down'));
+
+    render(
+      <FeedMessageList
+        messages={[makeTextMessage('msg-threaded', 'Threaded message.', { thread })]}
+        channelId="channel-1"
+        currentProfileId="profile-current"
+        currentAccountId="account-1"
+      />,
+    );
+
+    fireEvent.press(screen.getByText('1 reply'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Could not load replies.')).toBeTruthy();
+    });
+    expect(mockReportMobileObservedError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: 'mobile.messages.feed_message_list.thread_expand',
+      }),
+    );
   });
 
   it('opens profiles only from the avatar or sender name', () => {
