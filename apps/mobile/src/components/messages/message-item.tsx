@@ -386,6 +386,7 @@ type SocialBarProps = {
   /** When true, the thread pill and reply button are hidden (used in thread replies). */
   hideThreadButton?: boolean;
   replyButtonLabel?: string;
+  showActionControls?: boolean;
 };
 
 export function SocialBar({
@@ -401,9 +402,16 @@ export function SocialBar({
   disabledActions,
   hideThreadButton,
   replyButtonLabel,
+  showActionControls = true,
 }: SocialBarProps) {
   const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
   const hasThread = !!thread && thread.stats.messageCount > 0;
+  const showsActionButtons = !hideActions && showActionControls;
+  const showsThreadPill = hasThread && !hideThreadButton;
+
+  if (!reactions.length && !showsActionButtons && !showsThreadPill) {
+    return null;
+  }
 
   const actionBtnStyle = {
     width: 30,
@@ -424,7 +432,7 @@ export function SocialBar({
           flexWrap: 'wrap',
           gap: 6,
           marginTop: 4,
-          minHeight: 30,
+          minHeight: showsActionButtons || showsThreadPill ? 30 : undefined,
           alignItems: 'center',
         }}
       >
@@ -459,7 +467,7 @@ export function SocialBar({
           </TouchableOpacity>
         ))}
 
-        {!hideActions && (
+        {showsActionButtons && (
           <>
             {/* Emoji reaction add button */}
             <TouchableOpacity
@@ -1917,6 +1925,7 @@ export type MessageItemProps = {
   currentAccountId?: string;
   isReadOnly?: boolean;
   isThreadMessage?: boolean;
+  showActionControls?: boolean;
   onSendAnnotation?: (attachment: AttachmentPayload) => void;
   messageUiThemeKey?: 'classic' | 'feed';
 };
@@ -1935,6 +1944,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   currentAccountId,
   isReadOnly,
   isThreadMessage = false,
+  showActionControls = true,
   onSendAnnotation,
   messageUiThemeKey = 'classic',
 }) => {
@@ -2797,6 +2807,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             hideActions={hideActions}
             disabledActions={isReadOnly ?? false}
             hideThreadButton={isThreadMessage}
+            showActionControls={showActionControls}
           />
           {!isThreadMessage && threadExpanded && (
             <View style={[s.inlineThread, isOwn && s.inlineThreadOwn]}>
@@ -2926,6 +2937,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             hideActions={hideActions}
             disabledActions={isReadOnly ?? false}
             hideThreadButton={isThreadMessage}
+            showActionControls={showActionControls}
           />
 
           {/* Inline thread replies (not shown when already inside a thread) */}
