@@ -162,7 +162,7 @@ describe('d/dm/[channelId] page', () => {
     });
   });
 
-  it('enables read-only mode for staff observing a dm they do not participate in', async () => {
+  it('keeps staff observers writable when observing a dm they do not participate in', async () => {
     buildChannelByIdMock.mockResolvedValueOnce({
       ids: { id: 'channel-1', orgId: 'org-1' },
       basics: { kind: 'dm' },
@@ -192,7 +192,7 @@ describe('d/dm/[channelId] page', () => {
     await waitFor(() => {
       expect(messagesShellMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          readOnly: true,
+          readOnly: false,
         }),
       );
     });

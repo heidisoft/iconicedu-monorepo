@@ -1,6 +1,10 @@
-import { MessagesService } from '@iconicedu/api/modules/messages/messages.service';
+import {
+  MessagesService,
+  resolveChannelWriteAccessForMessage,
+} from '@iconicedu/api/modules/messages/messages.service';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
+import { ForbiddenException } from '@nestjs/common';
 
 jest.mock('@iconicedu/api/lib/supabase/service', () => ({
   createSupabaseServiceClient: jest.fn(),
@@ -46,6 +50,18 @@ function makeChain<T>(result: { data: T; error: null }) {
     select: jest.fn(() => chain),
     eq: jest.fn(() => chain),
     is: jest.fn(() => chain),
+    maybeSingle: jest.fn(async () => result),
+  };
+  return chain;
+}
+
+function makeAccessChain<T>(result: { data: T; error: null }) {
+  const chain = {
+    select: jest.fn(() => chain),
+    eq: jest.fn(() => chain),
+    in: jest.fn(() => chain),
+    is: jest.fn(() => chain),
+    limit: jest.fn(() => chain),
     maybeSingle: jest.fn(async () => result),
   };
   return chain;
@@ -236,5 +252,130 @@ describe('MessagesService.resolveThreadContext', () => {
       ]),
       { onConflict: 'org_id,thread_id,profile_id' },
     );
+  });
+});
+
+describe('resolveChannelWriteAccessForMessage', () => {
+  function makeSupabase(input: {
+    membership?: { id: string } | null;
+    userRole?: { id: string } | null;
+    primaryRoleAccount?: { id: string } | null;
+  }) {
+    const membershipChain = makeAccessChain({
+      data: input.membership ?? null,
+      error: null,
+    });
+    const userRoleChain = makeAccessChain({
+      data: input.userRole ?? null,
+      error: null,
+    });
+    const accountChain = makeAccessChain({
+      data: input.primaryRoleAccount ?? null,
+      error: null,
+    });
+
+    return {
+      chains: { membershipChain, userRoleChain, accountChain },
+      supabase: {
+        from: jest.fn((table: string) => {
+          if (table === 'channel_members') return membershipChain;
+          if (table === 'user_roles') return userRoleChain;
+          if (table === 'accounts') return accountChain;
+          throw new Error(`Unexpected table ${table}`);
+        }),
+      },
+    };
+  }
+
+  const baseInput = {
+    orgId: 'org-1',
+    channelId: 'channel-1',
+    accountId: 'account-1',
+    profileId: 'profile-1',
+    profileKind: 'guardian',
+  };
+
+  it('allows a staff profile to post in a classroom without ensuring membership', async () => {
+    const { supabase, chains } = makeSupabase({ membership: null });
+
+    const result = await resolveChannelWriteAccessForMessage({
+      serviceSupabase: supabase as never,
+      activityContext: {
+        scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+        channelRouteKind: 'space',
+        channelPurpose: 'learning-space',
+        channelVisibility: 'private',
+      },
+      ...baseInput,
+      profileKind: 'staff',
+    });
+
+    expect(result).toEqual({ shouldEnsureMembership: false });
+    expect(chains.membershipChain.eq).toHaveBeenCalledWith('profile_id', 'profile-1');
+    expect(supabase.from).not.toHaveBeenCalledWith('user_roles');
+  });
+
+  it('allows an admin role to post in a classroom without ensuring membership', async () => {
+    const { supabase, chains } = makeSupabase({
+      membership: null,
+      userRole: { id: 'role-1' },
+    });
+
+    const result = await resolveChannelWriteAccessForMessage({
+      serviceSupabase: supabase as never,
+      activityContext: {
+        scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+        channelRouteKind: 'space',
+        channelPurpose: 'learning-space',
+        channelVisibility: 'private',
+      },
+      ...baseInput,
+    });
+
+    expect(result).toEqual({ shouldEnsureMembership: false });
+    expect(chains.userRoleChain.in).toHaveBeenCalledWith('role_key', [
+      'owner',
+      'admin',
+      'staff',
+    ]);
+  });
+
+  it('keeps support-channel posting behavior membership-seeding eligible', async () => {
+    const { supabase } = makeSupabase({ membership: null });
+
+    const result = await resolveChannelWriteAccessForMessage({
+      serviceSupabase: supabase as never,
+      activityContext: {
+        scope: { kind: 'channel', channelId: 'support-channel-1' },
+        channelRouteKind: 'channel',
+        channelPurpose: 'support',
+        channelVisibility: 'private',
+      },
+      ...baseInput,
+    });
+
+    expect(result).toEqual({ shouldEnsureMembership: true });
+    expect(supabase.from).not.toHaveBeenCalledWith('user_roles');
+  });
+
+  it('rejects a private classroom post from a non-member without an operational role', async () => {
+    const { supabase } = makeSupabase({
+      membership: null,
+      userRole: null,
+      primaryRoleAccount: null,
+    });
+
+    await expect(
+      resolveChannelWriteAccessForMessage({
+        serviceSupabase: supabase as never,
+        activityContext: {
+          scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+          channelRouteKind: 'space',
+          channelPurpose: 'learning-space',
+          channelVisibility: 'private',
+        },
+        ...baseInput,
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 });

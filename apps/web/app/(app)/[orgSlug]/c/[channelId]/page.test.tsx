@@ -71,7 +71,7 @@ describe('d/c/[channelId] page', () => {
     });
   });
 
-  it('enables read-only mode for staff who are not channel participants', async () => {
+  it('keeps staff observers writable even when they are not channel participants', async () => {
     const { getDashboardProfileContext } =
       await import('@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth');
     vi.mocked(getDashboardProfileContext).mockResolvedValueOnce({
@@ -95,7 +95,7 @@ describe('d/c/[channelId] page', () => {
     await waitFor(() => {
       expect(messagesShellMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          readOnly: true,
+          readOnly: false,
         }),
       );
     });
