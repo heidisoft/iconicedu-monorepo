@@ -119,6 +119,8 @@ export interface MessageBaseProps {
   canDeleteAnyMessages?: boolean;
   actionState?: MessageActionState;
   messageUiThemeKey?: MessageUiThemeKeyVM;
+  feedGroupPosition?: 'single' | 'first' | 'middle' | 'last';
+  showActionControls?: boolean;
 }
 
 export const MessageBase = memo(function MessageBase({
@@ -138,9 +140,13 @@ export const MessageBase = memo(function MessageBase({
   canDeleteAnyMessages = false,
   actionState,
   messageUiThemeKey = 'classic',
+  feedGroupPosition,
+  showActionControls = true,
 }: MessageBaseProps) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isThreadActionPending, setIsThreadActionPending] = useState(false);
+  const [isQuickActionsActive, setIsQuickActionsActive] = useState(false);
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
 
   const senderName = getProfileDisplayName(message.core.sender.profile);
   const isOwnMessage = currentUserId === message.core.sender.ids.id;
@@ -162,6 +168,14 @@ export const MessageBase = memo(function MessageBase({
   const isDeleting = Boolean(actionState?.isDeleting);
   const isAddingReaction = Boolean(actionState?.isAddingReaction);
   const isFeedTheme = messageUiThemeKey === 'feed';
+  const isGroupedFeedChild = isFeedTheme && Boolean(feedGroupPosition);
+  const isGroupedClassicChild =
+    !isFeedTheme && (feedGroupPosition === 'middle' || feedGroupPosition === 'last');
+  const hasReactions = message.social.reactions.length > 0;
+  const hasThread = !isThreadReply && Boolean(message.social.thread);
+  const shouldShowQuickActionControls = showActionControls && !shouldHideQuickActions;
+  const shouldShowActionsRow = hasReactions || hasThread;
+  const shouldPinQuickActions = isQuickActionsActive || isEmojiPickerOpen;
   const shouldFrameFeedContent =
     isFeedTheme &&
     ![
@@ -293,6 +307,73 @@ export const MessageBase = memo(function MessageBase({
       </DropdownMenuContent>
     </DropdownMenu>
   );
+  const quickActionControls = shouldShowQuickActionControls ? (
+    <>
+      {isInteractionDisabled ? (
+        <Button
+          variant="ghost"
+          size="icon"
+          disabled
+          className={cn(
+            'rounded-full border border-border bg-background text-muted-foreground shadow-sm',
+            isFeedTheme ? 'h-6 w-6' : 'h-7 w-7',
+          )}
+          aria-label="Add emoji"
+        >
+          <SmilePlus className={isFeedTheme ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
+        </Button>
+      ) : (
+        <EmojiPicker
+          onEmojiSelect={(emoji) => handleToggleReaction(emoji, 'picker')}
+          onOpenChange={setIsEmojiPickerOpen}
+        >
+          <Button
+            variant="ghost"
+            size="icon"
+            disabled={isAddingReaction}
+            className={cn(
+              'rounded-full border border-border bg-background text-muted-foreground shadow-sm hover:bg-muted hover:text-foreground',
+              isFeedTheme ? 'h-6 w-6' : 'h-7 w-7',
+            )}
+            aria-label="Add emoji"
+          >
+            {isAddingReaction ? (
+              <Loader2
+                className={cn('animate-spin', isFeedTheme ? 'h-3.5 w-3.5' : 'h-4 w-4')}
+              />
+            ) : (
+              <SmilePlus className={isFeedTheme ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
+            )}
+          </Button>
+        </EmojiPicker>
+      )}
+
+      {!isThreadReply ? (
+        message.social.thread ? null : (
+          <Button
+            variant="ghost"
+            size={isFeedTheme ? 'sm' : 'icon'}
+            onClick={handleThreadClick}
+            disabled={isInteractionDisabled || isThreadActionPending}
+            className={cn(
+              'rounded-full border border-border bg-background text-muted-foreground shadow-sm hover:bg-muted hover:text-foreground',
+              isFeedTheme ? 'h-6 gap-1 px-2 text-xs' : 'h-7 w-7',
+            )}
+            aria-label="Reply"
+          >
+            {isThreadActionPending ? (
+              <Loader2
+                className={cn('animate-spin', isFeedTheme ? 'h-3.5 w-3.5' : 'h-4 w-4')}
+              />
+            ) : (
+              <MessageCircleReply className={isFeedTheme ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
+            )}
+            {isFeedTheme ? <span>Reply</span> : null}
+          </Button>
+        )
+      ) : null}
+    </>
+  ) : null;
 
   if (message.state?.isHidden) {
     return (
@@ -379,9 +460,23 @@ export const MessageBase = memo(function MessageBase({
 
   return (
     <div
+      onMouseEnter={() => setIsQuickActionsActive(true)}
+      onMouseLeave={() => setIsQuickActionsActive(false)}
+      onFocusCapture={() => setIsQuickActionsActive(true)}
+      onBlurCapture={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) {
+          setIsQuickActionsActive(false);
+        }
+      }}
       className={cn(
         'group relative flex w-full items-start gap-3 transition-colors',
-        isFeedTheme ? 'px-4 py-2 justify-start' : 'px-2 py-2',
+        isGroupedFeedChild
+          ? 'px-0 py-0 justify-start'
+          : isGroupedClassicChild
+            ? 'px-2 py-0.5'
+            : isFeedTheme
+              ? 'px-4 py-2 justify-start'
+              : 'px-2 py-2',
         !isFeedTheme && (isOwnMessage ? 'justify-end' : 'justify-start'),
         className,
       )}
@@ -391,168 +486,190 @@ export const MessageBase = memo(function MessageBase({
       <div
         className={cn(
           'relative flex w-full items-start',
-          isFeedTheme
-            ? 'max-w-[min(56rem,100%)] gap-3 rounded-xl border border-border bg-muted/25 px-3 py-3'
-            : 'max-w-[min(78ch,85%)] gap-3',
+          isGroupedFeedChild
+            ? 'w-full gap-0'
+            : isFeedTheme
+              ? cn(
+                  'max-w-[min(56rem,100%)] gap-3 rounded-xl border border-border bg-muted/25 px-3 py-3',
+                  feedGroupPosition === 'first' && 'rounded-b-none',
+                )
+              : 'max-w-[min(78ch,85%)] gap-3',
           !isFeedTheme && (isOwnMessage ? 'flex-row-reverse' : 'flex-row'),
         )}
       >
-        <div className="flex-shrink-0">
-          <AvatarWithStatus
-            accountId={message.core.sender.ids.accountId}
-            profileId={message.core.sender.ids.id}
-            name={senderName}
-            avatar={message.core.sender.profile.avatar}
-            presence={message.core.sender.presence}
-            themeKey={message.core.sender.ui?.themeKey}
-            roleLabel={getAvatarRoleLabel(message.core.sender.kind)}
-            timezone={message.core.sender.prefs?.timezone ?? null}
-            locationLabel={getAvatarLocationLabel(message.core.sender.location)}
-            about={message.core.sender.profile.bio ?? null}
-            sizeClassName={
-              isFeedTheme ? 'h-10 w-10 rounded-full' : 'h-9 w-9 rounded-full'
-            }
-            statusClassName={isFeedTheme ? 'bottom-0 right-0 h-2 w-2' : undefined}
-            fallbackClassName={isFeedTheme ? 'text-sm' : undefined}
-            onProfileClick={handleProfileClick}
-          />
-        </div>
-
-        <div className={cn('min-w-0', isFeedTheme ? 'w-full' : 'w-fit max-w-[78ch]')}>
-          <div
-            className={cn(
-              'mb-2 flex items-center gap-2',
-              isFeedTheme
-                ? 'justify-start'
-                : isOwnMessage
-                  ? 'justify-end'
-                  : 'justify-start',
-            )}
-          >
-            {isFeedTheme ? (
-              <div className="flex w-full items-start gap-2.5">
-                <div className="min-w-0 flex-1">
-                  <button
-                    onClick={handleProfileClick}
-                    className="block max-w-full truncate text-left text-sm font-semibold leading-tight text-foreground hover:underline"
-                  >
-                    {senderLabel}
-                  </button>
-                  <div className="mt-1 flex min-w-0 items-center gap-1 text-xs leading-none text-muted-foreground">
-                    <FeedRoleIcon className="h-3 w-3 shrink-0" aria-hidden="true" />
-                    <span className="truncate">{feedRoleLabel}</span>
-                  </div>
-                </div>
-                <div className="flex shrink-0 flex-col items-end gap-1">
-                  <div className="flex items-center gap-1">
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span className="cursor-default whitespace-nowrap text-xs text-muted-foreground/90">
-                            {formatFeedDate(message.core.createdAt)}
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>{formatFullDate(message.core.createdAt)}</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                    {actionsMenu}
-                  </div>
-                  <VisibilityBadge message={message} />
-                </div>
-              </div>
-            ) : isOwnMessage ? (
-              <>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  onClick={onToggleSaved}
-                  disabled={isInteractionDisabled || isSaving}
-                  aria-label={message.state?.isSaved ? 'Unsave message' : 'Save message'}
-                >
-                  {isSaving ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Bookmark
-                      className={cn(
-                        'h-4 w-4',
-                        message.state?.isSaved && 'fill-primary text-primary',
-                      )}
-                    />
-                  )}
-                </Button>
-                {actionsMenu}
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="cursor-default text-xs text-muted-foreground/90">
-                        {formatTime(message.core.createdAt)}
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>{formatFullDate(message.core.createdAt)}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                <button
-                  onClick={handleProfileClick}
-                  className="text-sm font-semibold text-muted-foreground/80 hover:underline"
-                >
-                  {senderNameWithRole}
-                </button>
-              </>
+        {!isGroupedFeedChild && (
+          <div className="flex-shrink-0">
+            {isGroupedClassicChild ? (
+              <div className="h-9 w-9" aria-hidden="true" />
             ) : (
-              <>
-                <button
-                  onClick={handleProfileClick}
-                  className="text-sm font-semibold text-primary hover:underline"
-                >
-                  {senderNameWithRole}
-                </button>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="cursor-default text-xs text-muted-foreground/90">
-                        {formatTime(message.core.createdAt)}
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>{formatFullDate(message.core.createdAt)}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  onClick={onToggleSaved}
-                  disabled={isInteractionDisabled || isSaving}
-                  aria-label={message.state?.isSaved ? 'Unsave message' : 'Save message'}
-                >
-                  {isSaving ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Bookmark
-                      className={cn(
-                        'h-4 w-4',
-                        message.state?.isSaved && 'fill-primary text-primary',
-                      )}
-                    />
-                  )}
-                </Button>
-                {actionsMenu}
-              </>
-            )}
-            {!isFeedTheme && <VisibilityBadge message={message} />}
-            {message.state?.isEdited && (
-              <span className={cn('text-[10px]', 'text-muted-foreground')}>(edited)</span>
+              <AvatarWithStatus
+                accountId={message.core.sender.ids.accountId}
+                profileId={message.core.sender.ids.id}
+                name={senderName}
+                avatar={message.core.sender.profile.avatar}
+                presence={message.core.sender.presence}
+                themeKey={message.core.sender.ui?.themeKey}
+                roleLabel={getAvatarRoleLabel(message.core.sender.kind)}
+                timezone={message.core.sender.prefs?.timezone ?? null}
+                locationLabel={getAvatarLocationLabel(message.core.sender.location)}
+                about={message.core.sender.profile.bio ?? null}
+                sizeClassName={
+                  isFeedTheme ? 'h-10 w-10 rounded-full' : 'h-9 w-9 rounded-full'
+                }
+                statusClassName={isFeedTheme ? 'bottom-0 right-0 h-2 w-2' : undefined}
+                fallbackClassName={isFeedTheme ? 'text-sm' : undefined}
+                onProfileClick={handleProfileClick}
+              />
             )}
           </div>
+        )}
+
+        <div className={cn('min-w-0', isFeedTheme ? 'w-full' : 'w-fit max-w-[78ch]')}>
+          {!isGroupedFeedChild && !isGroupedClassicChild && (
+            <div
+              className={cn(
+                'mb-2 flex items-center gap-2',
+                isFeedTheme
+                  ? 'justify-start'
+                  : isOwnMessage
+                    ? 'justify-end'
+                    : 'justify-start',
+              )}
+            >
+              {isFeedTheme ? (
+                <div className="flex w-full items-start gap-2.5">
+                  <div className="min-w-0 flex-1">
+                    <button
+                      onClick={handleProfileClick}
+                      className="block max-w-full truncate text-left text-sm font-semibold leading-tight text-foreground hover:underline"
+                    >
+                      {senderLabel}
+                    </button>
+                    <div className="mt-1 flex min-w-0 items-center gap-1 text-xs leading-none text-muted-foreground">
+                      <FeedRoleIcon className="h-3 w-3 shrink-0" aria-hidden="true" />
+                      <span className="truncate">{feedRoleLabel}</span>
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <div className="flex items-center gap-1">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="cursor-default whitespace-nowrap text-xs text-muted-foreground/90">
+                              {formatFeedDate(message.core.createdAt)}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{formatFullDate(message.core.createdAt)}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      {actionsMenu}
+                    </div>
+                    <VisibilityBadge message={message} />
+                  </div>
+                </div>
+              ) : isOwnMessage ? (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={onToggleSaved}
+                    disabled={isInteractionDisabled || isSaving}
+                    aria-label={
+                      message.state?.isSaved ? 'Unsave message' : 'Save message'
+                    }
+                  >
+                    {isSaving ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Bookmark
+                        className={cn(
+                          'h-4 w-4',
+                          message.state?.isSaved && 'fill-primary text-primary',
+                        )}
+                      />
+                    )}
+                  </Button>
+                  {actionsMenu}
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="cursor-default text-xs text-muted-foreground/90">
+                          {formatTime(message.core.createdAt)}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{formatFullDate(message.core.createdAt)}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <button
+                    onClick={handleProfileClick}
+                    className="text-sm font-semibold text-muted-foreground/80 hover:underline"
+                  >
+                    {senderNameWithRole}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={handleProfileClick}
+                    className="text-sm font-semibold text-primary hover:underline"
+                  >
+                    {senderNameWithRole}
+                  </button>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="cursor-default text-xs text-muted-foreground/90">
+                          {formatTime(message.core.createdAt)}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{formatFullDate(message.core.createdAt)}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={onToggleSaved}
+                    disabled={isInteractionDisabled || isSaving}
+                    aria-label={
+                      message.state?.isSaved ? 'Unsave message' : 'Save message'
+                    }
+                  >
+                    {isSaving ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Bookmark
+                        className={cn(
+                          'h-4 w-4',
+                          message.state?.isSaved && 'fill-primary text-primary',
+                        )}
+                      />
+                    )}
+                  </Button>
+                  {actionsMenu}
+                </>
+              )}
+              {!isFeedTheme && <VisibilityBadge message={message} />}
+              {message.state?.isEdited && (
+                <span className={cn('text-[10px]', 'text-muted-foreground')}>
+                  (edited)
+                </span>
+              )}
+            </div>
+          )}
 
           <div
-            className={cn('relative max-w-full', isFeedTheme ? 'block' : 'inline-block')}
+            className={cn(
+              'group/message-bubble relative max-w-full overflow-visible',
+              isFeedTheme ? 'block' : 'inline-block',
+            )}
           >
             <div
               className={cn(
@@ -567,112 +684,56 @@ export const MessageBase = memo(function MessageBase({
             >
               {children}
             </div>
-          </div>
-
-          <div
-            className={cn(
-              'mt-2 flex flex-wrap items-center',
-              isFeedTheme
-                ? 'justify-start gap-1.5 text-xs'
-                : isOwnMessage
-                  ? 'justify-end gap-2'
-                  : 'justify-start gap-2',
-            )}
-          >
-            <div
-              className={cn(isInteractionDisabled && 'pointer-events-none opacity-60')}
-            >
-              <ReactionBar
-                reactions={message.social.reactions}
-                onToggleReaction={
-                  isInteractionDisabled ? undefined : handleToggleReaction
-                }
-                pendingEmojis={pendingReactionEmojis}
-                size={isFeedTheme ? 'compact' : 'default'}
-              />
-            </div>
-
-            {!shouldHideQuickActions ? (
-              <>
-                {isInteractionDisabled ? (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    disabled
-                    className={cn(
-                      'rounded-full border border-border bg-background/60 text-muted-foreground',
-                      isFeedTheme ? 'h-6 w-6' : 'h-7 w-7',
-                    )}
-                    aria-label="Add emoji"
-                  >
-                    <SmilePlus className={isFeedTheme ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
-                  </Button>
-                ) : (
-                  <EmojiPicker
-                    onEmojiSelect={(emoji) => handleToggleReaction(emoji, 'picker')}
-                  >
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      disabled={isAddingReaction}
-                      className={cn(
-                        'rounded-full border border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground',
-                        isFeedTheme ? 'h-6 w-6' : 'h-7 w-7',
-                      )}
-                      aria-label="Add emoji"
-                    >
-                      {isAddingReaction ? (
-                        <Loader2
-                          className={cn(
-                            'animate-spin',
-                            isFeedTheme ? 'h-3.5 w-3.5' : 'h-4 w-4',
-                          )}
-                        />
-                      ) : (
-                        <SmilePlus className={isFeedTheme ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
-                      )}
-                    </Button>
-                  </EmojiPicker>
+            {quickActionControls ? (
+              <div
+                className={cn(
+                  'pointer-events-none absolute z-20 flex items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100',
+                  isFeedTheme
+                    ? 'right-2 top-2'
+                    : isOwnMessage
+                      ? 'right-full top-1/2 mr-2 -translate-y-1/2'
+                      : 'left-full top-1/2 ml-2 -translate-y-1/2',
+                  shouldPinQuickActions && 'pointer-events-auto opacity-100',
                 )}
-
-                {!isThreadReply ? (
-                  message.social.thread ? (
-                    <ThreadIndicator
-                      thread={message.social.thread}
-                      onClick={handleThreadClick}
-                      unreadCount={message.social.thread.readState?.unreadCount}
-                    />
-                  ) : (
-                    <Button
-                      variant="ghost"
-                      size={isFeedTheme ? 'sm' : 'icon'}
-                      onClick={handleThreadClick}
-                      disabled={isInteractionDisabled || isThreadActionPending}
-                      className={cn(
-                        'rounded-full border border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground',
-                        isFeedTheme ? 'h-6 gap-1 px-2 text-xs' : 'h-7 w-7',
-                      )}
-                      aria-label="Reply"
-                    >
-                      {isThreadActionPending ? (
-                        <Loader2
-                          className={cn(
-                            'animate-spin',
-                            isFeedTheme ? 'h-3.5 w-3.5' : 'h-4 w-4',
-                          )}
-                        />
-                      ) : (
-                        <MessageCircleReply
-                          className={isFeedTheme ? 'h-3.5 w-3.5' : 'h-4 w-4'}
-                        />
-                      )}
-                      {isFeedTheme ? <span>Reply</span> : null}
-                    </Button>
-                  )
-                ) : null}
-              </>
+              >
+                {quickActionControls}
+              </div>
             ) : null}
           </div>
+
+          {shouldShowActionsRow ? (
+            <div
+              className={cn(
+                'mt-2 flex flex-wrap items-center',
+                isFeedTheme
+                  ? 'justify-start gap-1.5 text-xs'
+                  : isOwnMessage
+                    ? 'justify-end gap-2'
+                    : 'justify-start gap-2',
+              )}
+            >
+              <div
+                className={cn(isInteractionDisabled && 'pointer-events-none opacity-60')}
+              >
+                <ReactionBar
+                  reactions={message.social.reactions}
+                  onToggleReaction={
+                    isInteractionDisabled ? undefined : handleToggleReaction
+                  }
+                  pendingEmojis={pendingReactionEmojis}
+                  size={isFeedTheme ? 'compact' : 'default'}
+                />
+              </div>
+
+              {hasThread && message.social.thread ? (
+                <ThreadIndicator
+                  thread={message.social.thread}
+                  onClick={handleThreadClick}
+                  unreadCount={message.social.thread.readState?.unreadCount}
+                />
+              ) : null}
+            </div>
+          ) : null}
 
           {inlineThreadContent ? (
             <div className={cn('mt-3', isFeedTheme && 'border-t border-border/70 pt-3')}>

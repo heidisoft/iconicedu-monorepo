@@ -3,7 +3,10 @@ import React from 'react';
 import { render, act, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-import { MessageList } from '@iconicedu/ui-web/components/messages/message-list';
+import {
+  areMessagesInSameVisualGroup,
+  MessageList,
+} from '@iconicedu/ui-web/components/messages/message-list';
 import type { MessageVM, ThreadVM } from '@iconicedu/shared-types';
 
 vi.mock('@iconicedu/ui-web/components/messages/message-item', () => ({
@@ -11,10 +14,14 @@ vi.mock('@iconicedu/ui-web/components/messages/message-item', () => ({
     message,
     onOpenThread,
     isThreadReply,
+    feedGroupPosition,
+    showActionControls,
   }: {
     message: MessageVM;
     onOpenThread?: (thread: ThreadVM, message: MessageVM) => void;
     isThreadReply?: boolean;
+    feedGroupPosition?: string;
+    showActionControls?: boolean;
   }) =>
     !isThreadReply && message.social.thread ? (
       <button
@@ -25,7 +32,11 @@ vi.mock('@iconicedu/ui-web/components/messages/message-item', () => ({
         Open thread
       </button>
     ) : (
-      <div data-testid={`message-item-${message.ids.id}`} />
+      <div
+        data-testid={`message-item-${message.ids.id}`}
+        data-feed-group-position={feedGroupPosition ?? 'none'}
+        data-show-action-controls={String(showActionControls)}
+      />
     ),
 }));
 
@@ -262,6 +273,121 @@ describe('MessageList', () => {
     );
 
     expect(queryByText('New messages')).not.toBeInTheDocument();
+  });
+
+  it('identifies same-sender web feed visual groups within five minutes', () => {
+    const older = createMessage({
+      id: 'message-older',
+      createdAt: '2026-02-16T10:00:00.000Z',
+    });
+    const newer = createMessage({
+      id: 'message-newer',
+      createdAt: '2026-02-16T10:05:00.000Z',
+    });
+    const tooLate = createMessage({
+      id: 'message-late',
+      createdAt: '2026-02-16T10:06:00.000Z',
+    });
+    const differentSender = createMessage({
+      id: 'message-other',
+      senderId: 'profile-2',
+      createdAt: '2026-02-16T10:01:00.000Z',
+    });
+
+    expect(areMessagesInSameVisualGroup(older, newer)).toBe(true);
+    expect(areMessagesInSameVisualGroup(older, tooLate)).toBe(false);
+    expect(areMessagesInSameVisualGroup(older, differentSender)).toBe(false);
+  });
+
+  it('passes feed grouping positions and shows quick actions on every grouped message', () => {
+    render(
+      <MessageList
+        messages={[
+          createMessage({
+            id: 'message-1',
+            createdAt: '2026-02-16T10:00:00.000Z',
+          }),
+          createMessage({
+            id: 'message-2',
+            createdAt: '2026-02-16T10:03:00.000Z',
+          }),
+          createMessage({
+            id: 'message-3',
+            createdAt: '2026-02-16T10:05:00.000Z',
+          }),
+        ]}
+        onOpenThread={
+          vi.fn() as unknown as (thread: ThreadVM, message: MessageVM) => void
+        }
+        onProfileClick={vi.fn()}
+        messageUiThemeKey="feed"
+      />,
+    );
+
+    expect(screen.getAllByTestId('feed-message-post')).toHaveLength(1);
+    expect(screen.getByTestId('message-item-message-1')).toHaveAttribute(
+      'data-feed-group-position',
+      'first',
+    );
+    expect(screen.getByTestId('message-item-message-1')).toHaveAttribute(
+      'data-show-action-controls',
+      'true',
+    );
+    expect(screen.getByTestId('message-item-message-2')).toHaveAttribute(
+      'data-feed-group-position',
+      'middle',
+    );
+    expect(screen.getByTestId('message-item-message-2')).toHaveAttribute(
+      'data-show-action-controls',
+      'true',
+    );
+    expect(screen.getByTestId('message-item-message-3')).toHaveAttribute(
+      'data-feed-group-position',
+      'last',
+    );
+    expect(screen.getByTestId('message-item-message-3')).toHaveAttribute(
+      'data-show-action-controls',
+      'true',
+    );
+  });
+
+  it('keeps quick actions available on every grouped classic DM message', () => {
+    render(
+      <MessageList
+        messages={[
+          createMessage({
+            id: 'message-1',
+            createdAt: '2026-02-16T10:00:00.000Z',
+          }),
+          createMessage({
+            id: 'message-2',
+            createdAt: '2026-02-16T10:02:00.000Z',
+          }),
+        ]}
+        onOpenThread={
+          vi.fn() as unknown as (thread: ThreadVM, message: MessageVM) => void
+        }
+        onProfileClick={vi.fn()}
+        messageUiThemeKey="classic"
+      />,
+    );
+
+    expect(screen.getByTestId('message-item-message-1')).toHaveAttribute(
+      'data-feed-group-position',
+      'first',
+    );
+    expect(screen.getByTestId('message-item-message-1')).toHaveAttribute(
+      'data-show-action-controls',
+      'true',
+    );
+    expect(screen.getByTestId('message-item-message-2')).toHaveAttribute(
+      'data-feed-group-position',
+      'last',
+    );
+    expect(screen.getByTestId('message-item-message-2')).toHaveAttribute(
+      'data-show-action-controls',
+      'true',
+    );
   });
 
   it('keeps new messages divider visible across in-page rerenders', () => {
