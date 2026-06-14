@@ -47,6 +47,132 @@ export function getDailyLiveSessionErrorMessage(error: unknown) {
   return 'Failed to join live session';
 }
 
+export type SessionErrorPayload = { title: string; description: string };
+
+/**
+ * Returns a human-readable title + description for any Daily/browser media error.
+ * Handles the "blocked-by-browser: NotAllowedError: ..." pattern from Daily,
+ * DOMException names, and network / device errors.
+ */
+export function parseSessionError(error: unknown, context?: string): SessionErrorPayload {
+  const raw =
+    typeof error === 'string'
+      ? error
+      : error instanceof Error
+        ? `${error.name}: ${error.message}`
+        : String(error);
+  const lower = raw.toLowerCase();
+
+  // ── Screen share / display capture ─────────────────────────────────────────
+  if (
+    context === 'screenshare' ||
+    lower.includes('screenshare') ||
+    lower.includes('getdisplaymedia') ||
+    lower.includes('screen recording')
+  ) {
+    if (
+      lower.includes('notallowederror') ||
+      lower.includes('not allowed') ||
+      lower.includes('blocked-by-browser')
+    ) {
+      return {
+        title: 'Screen sharing blocked',
+        description:
+          'Your browser or system settings are preventing screen sharing. On macOS, go to System Settings → Privacy & Security → Screen & System Audio Recording and enable your browser. Then try again.',
+      };
+    }
+    if (lower.includes('aborterror') || lower.includes('permission dismissed')) {
+      return {
+        title: 'Screen sharing cancelled',
+        description:
+          "You dismissed the screen sharing prompt. Click Share again when you're ready.",
+      };
+    }
+    return {
+      title: 'Screen sharing failed',
+      description:
+        'Unable to start screen sharing. Try again or use a different browser.',
+    };
+  }
+
+  // ── Camera / microphone permission ─────────────────────────────────────────
+  if (
+    lower.includes('notallowederror') ||
+    lower.includes('permission denied') ||
+    lower.includes('blocked-by-browser')
+  ) {
+    return {
+      title: 'Camera or microphone blocked',
+      description:
+        "Access to your camera or microphone was denied. Click the camera icon in your browser's address bar and allow access, then refresh.",
+    };
+  }
+
+  // ── Device not found ───────────────────────────────────────────────────────
+  if (
+    lower.includes('notfounderror') ||
+    lower.includes('device not found') ||
+    lower.includes('no device')
+  ) {
+    return {
+      title: 'Device not found',
+      description:
+        'No camera or microphone detected. Make sure your device is connected, then try again.',
+    };
+  }
+
+  // ── Device in use by another app ───────────────────────────────────────────
+  if (
+    lower.includes('notreadableerror') ||
+    lower.includes('could not start video') ||
+    lower.includes('device in use') ||
+    lower.includes('trackstarterror')
+  ) {
+    return {
+      title: 'Device already in use',
+      description:
+        'Your camera or microphone is being used by another app. Close other video calls or apps and try again.',
+    };
+  }
+
+  // ── Network / connection ───────────────────────────────────────────────────
+  if (
+    lower.includes('network') ||
+    lower.includes('connection') ||
+    lower.includes('timeout') ||
+    lower.includes('ice')
+  ) {
+    return {
+      title: 'Connection problem',
+      description:
+        'Having trouble connecting to the session. Check your internet connection and try again.',
+    };
+  }
+
+  // ── Meeting full / token expired ───────────────────────────────────────────
+  if (lower.includes('meeting-full') || lower.includes('meeting full')) {
+    return {
+      title: 'Session is full',
+      description: 'This session has reached its participant limit.',
+    };
+  }
+  if (lower.includes('token') || lower.includes('expired') || lower.includes('invalid')) {
+    return {
+      title: 'Session link expired',
+      description: 'Your invite link is no longer valid. Ask the host for a fresh link.',
+    };
+  }
+
+  // ── Generic fallback ───────────────────────────────────────────────────────
+  return {
+    title: 'Something went wrong',
+    description:
+      raw.length > 0 && raw.length < 180
+        ? raw
+        : 'An unexpected error occurred. Please try again.',
+  };
+}
+
 export function isDirectLiveSessionLayout(input: {
   channelKind?: string | null;
   mode?: 'video' | 'audio' | null;

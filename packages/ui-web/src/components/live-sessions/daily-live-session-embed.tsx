@@ -25,22 +25,28 @@ import {
 } from '@daily-co/daily-react';
 import type { DailyInputSettings } from '@daily-co/daily-js';
 import {
+  AlertCircle,
   AudioLines,
   Blend,
   Check,
   ChevronDown,
+  LayoutGrid,
+  Monitor,
+  Share2,
   CircleOff,
   CloudFog,
   Link,
   Loader2,
   Mic,
   MicOff,
+  MonitorOff,
   MonitorUp,
   PhoneOff,
   ShieldUser,
   Users,
   Video,
   VideoOff,
+  X,
 } from 'lucide-react';
 import { Button, buttonVariants } from '@iconicedu/ui-web/ui/button';
 import { cn } from '@iconicedu/ui-web/lib/utils';
@@ -60,8 +66,11 @@ import {
   isDirectLiveSessionLayout,
   isDailyParticipantMicMuted,
   isDailyParticipantSpeaking,
+  parseSessionError,
 } from '@iconicedu/ui-web/components/live-sessions/daily-live-session-embed.utils';
+import { Alert, AlertDescription, AlertTitle } from '@iconicedu/ui-web/ui/alert';
 import { VideoParticipant } from '@iconicedu/ui-web/components/live-sessions/video-participant';
+import type { LiveSessionViewType } from '@iconicedu/ui-web/components/live-sessions/view-switcher';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -619,18 +628,19 @@ function DailyScreenShareTile({ sessionId }: { sessionId: string }) {
   });
 
   return (
-    <div className="relative h-full w-full overflow-hidden rounded-2xl border border-border bg-card shadow-[0_12px_40px_rgba(15,23,42,0.18)] dark:shadow-[0_12px_40px_rgba(0,0,0,0.35)]">
+    <div className="relative h-full w-full overflow-hidden rounded-2xl border border-border bg-zinc-900 dark:bg-zinc-950">
       <DailyVideo
         fit="contain"
         muted
         playableStyle={{ objectFit: 'contain' }}
         sessionId={sessionId}
         type="screenVideo"
-        className="h-full w-full bg-black"
+        className="h-full w-full bg-zinc-900 dark:bg-zinc-950"
       />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-linear-to-t from-background/95 to-transparent px-4 py-3">
-        <div className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
-          <Video className="h-4 w-4" />
+      {/* Pill label bottom-left */}
+      <div className="absolute bottom-3 left-3">
+        <div className="inline-flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-sm">
+          <MonitorUp className="h-3.5 w-3.5" />
           <span>{participantLabel} is sharing</span>
         </div>
       </div>
@@ -840,6 +850,24 @@ function DailyLiveSessionSurface({
   const [isMicEnabled, setIsMicEnabled] = useState(false);
   const [isCameraEnabled, setIsCameraEnabled] = useState(false);
   const [, forceParticipantTrackRefresh] = useReducer((value: number) => value + 1, 0);
+  const [viewMode, setViewMode] = useState<LiveSessionViewType>('shared-content');
+  const [activeSpeakerSessionId, setActiveSpeakerSessionId] = useState<string | null>(
+    null,
+  );
+  const preShareViewMode = useRef<LiveSessionViewType>('shared-content');
+  const [notifications, setNotifications] = useState<
+    Array<{ id: string; title: string; description: string }>
+  >([]);
+
+  const showError = useCallback((title: string, description: string) => {
+    const id = Math.random().toString(36).slice(2);
+    setNotifications((prev) => [...prev, { id, title, description }]);
+    setTimeout(() => setNotifications((prev) => prev.filter((n) => n.id !== id)), 7000);
+  }, []);
+
+  const dismissNotification = useCallback((id: string) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  }, []);
   const [preJoinPresence, setPreJoinPresence] = useState<{
     count: number;
     names: string[];
@@ -869,10 +897,23 @@ function DailyLiveSessionSurface({
     onLeave(returnPath);
   }, [returnPath, onLeave]);
 
-  const handleError = useCallback((event: { errorMsg?: string } | undefined) => {
-    setIsJoining(false);
-    setError(event?.errorMsg ?? 'Failed to join live session');
-  }, []);
+  const handleError = useCallback(
+    (event: { errorMsg?: string } | undefined) => {
+      const raw = event?.errorMsg ?? '';
+      const { title, description } = parseSessionError(raw);
+      setIsJoining((joining) => {
+        if (joining) {
+          // Still in the join flow — show the blocking overlay
+          setError(description);
+        } else {
+          // Already in the call — show a dismissible toast instead
+          showError(title, description);
+        }
+        return false;
+      });
+    },
+    [showError],
+  );
 
   useDailyEvent('left-meeting', handleLeftMeeting);
   useDailyEvent('error', handleError);
@@ -890,15 +931,31 @@ function DailyLiveSessionSurface({
   );
   useDailyEvent(
     'local-screen-share-started',
-    useCallback(() => forceParticipantTrackRefresh(), []),
+    useCallback(() => {
+      forceParticipantTrackRefresh();
+      setViewMode((current) => {
+        preShareViewMode.current = current;
+        return 'shared-content';
+      });
+    }, []),
   );
   useDailyEvent(
     'local-screen-share-stopped',
-    useCallback(() => forceParticipantTrackRefresh(), []),
+    useCallback(() => {
+      forceParticipantTrackRefresh();
+      setViewMode(preShareViewMode.current);
+    }, []),
   );
   useDailyEvent(
     'track-started',
     useCallback(() => forceParticipantTrackRefresh(), []),
+  );
+  useDailyEvent(
+    'active-speaker-change',
+    useCallback((ev: { activeSpeaker?: { peerId?: string } } | undefined) => {
+      const peerId = ev?.activeSpeaker?.peerId;
+      if (peerId) setActiveSpeakerSessionId(peerId);
+    }, []),
   );
   useDailyEvent(
     'joined-meeting',
@@ -1046,6 +1103,12 @@ function DailyLiveSessionSurface({
     [localSessionId, remoteParticipantIds],
   );
 
+  const localParticipant = useParticipant(localSessionId ?? undefined);
+
+  // Derive screen-share state from the reactive useParticipant hook, not from
+  // callObject.participants() which is a snapshot and won't trigger re-renders.
+  const isScreenSharing = localParticipant?.tracks.screenVideo.state === 'playable';
+
   const activeScreenShareSessionId = (() => {
     const participants = callObject.participants();
     for (const sessionId of participantIds) {
@@ -1056,25 +1119,17 @@ function DailyLiveSessionSurface({
     return null;
   })();
 
-  const isScreenSharing = (() => {
-    if (!localSessionId) return false;
-    return (
-      callObject.participants()[localSessionId]?.tracks.screenVideo.state === 'playable'
-    );
-  })();
-
-  const localParticipant = useParticipant(localSessionId ?? undefined);
-
   const applyInputSettings = useCallback(
     async (nextInputSettings: DailyInputSettings) => {
       if (!updateInputSettings) return;
       try {
         await updateInputSettings(nextInputSettings);
       } catch (inputError: unknown) {
-        setError(getDailyLiveSessionErrorMessage(inputError));
+        const { title, description } = parseSessionError(inputError);
+        showError(title, description);
       }
     },
-    [updateInputSettings],
+    [updateInputSettings, showError],
   );
 
   const handleToggleMic = () => {
@@ -1099,9 +1154,14 @@ function DailyLiveSessionSurface({
     });
   };
 
-  const handleToggleScreenShare = () => {
+  const handleToggleScreenShare = async () => {
     if (!isScreenSharing) {
-      callObject.startScreenShare();
+      try {
+        await callObject.startScreenShare();
+      } catch (err) {
+        const { title, description } = parseSessionError(err, 'screenshare');
+        showError(title, description);
+      }
     } else {
       callObject.stopScreenShare();
     }
@@ -1117,7 +1177,8 @@ function DailyLiveSessionSurface({
       else if (kind === 'microphone') await setMicrophone(deviceId);
       else await setSpeaker(deviceId);
     } catch (deviceError: unknown) {
-      setError(getDailyLiveSessionErrorMessage(deviceError));
+      const { title, description } = parseSessionError(deviceError);
+      showError(title, description);
     }
   };
 
@@ -1241,6 +1302,45 @@ function DailyLiveSessionSurface({
             </div>
           ) : null}
 
+          {/* ── Dismissible error notifications ── */}
+          {notifications.length > 0 ? (
+            <div className="absolute right-4 top-4 z-40 flex w-80 flex-col gap-2">
+              {notifications.map((n) => (
+                <Alert key={n.id} variant="destructive" className="shadow-lg">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>{n.title}</AlertTitle>
+                  <AlertDescription>{n.description}</AlertDescription>
+                  <button
+                    type="button"
+                    onClick={() => dismissNotification(n.id)}
+                    className="absolute right-3 top-3 rounded p-0.5 opacity-70 transition-opacity hover:opacity-100"
+                    aria-label="Dismiss"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </Alert>
+              ))}
+            </div>
+          ) : null}
+
+          {/* ── Screen-share presenting banner ── */}
+          {isScreenSharing ? (
+            <div className="absolute left-0 right-0 top-0 z-30 flex items-center justify-between gap-3 bg-green-600 px-4 py-2 shadow-md">
+              <div className="flex items-center gap-2 text-sm font-medium text-white">
+                <MonitorUp className="h-4 w-4 shrink-0" />
+                You are presenting your screen to everyone
+              </div>
+              <button
+                type="button"
+                onClick={handleToggleScreenShare}
+                className="flex items-center gap-1.5 rounded-md bg-white/20 px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-white/30"
+              >
+                <MonitorOff className="h-3.5 w-3.5" />
+                Stop sharing
+              </button>
+            </div>
+          ) : null}
+
           {/* ── Main content + participant strip ── */}
           {isDirectCall && directCallComposition.useOneToOneLayout ? (
             /* 1-to-1 direct call: primary fills area, self floats bottom-right */
@@ -1264,66 +1364,108 @@ function DailyLiveSessionSurface({
               ) : null}
             </div>
           ) : (
-            /* Group call: whiteboard/screen-share left, participant strip right (desktop) / bottom (mobile) */
-            <div className="flex min-h-0 flex-1 flex-col gap-2 p-2 md:flex-row md:gap-3 md:p-3">
-              {/* Main content area: screen share takes priority over contentSlot */}
-              {activeScreenShareSessionId ? (
-                <div className="min-h-0 flex-1 overflow-hidden rounded-2xl">
-                  <DailyScreenShareTile sessionId={activeScreenShareSessionId} />
-                </div>
-              ) : contentSlot ? (
-                <div className="min-h-0 flex-1 overflow-hidden rounded-2xl">
-                  {contentSlot}
-                </div>
-              ) : null}
+            /* Group call — layout driven by viewMode */
+            (() => {
+              // Screen share always overrides content area regardless of viewMode
+              const mainContent = activeScreenShareSessionId ? (
+                <DailyScreenShareTile sessionId={activeScreenShareSessionId} />
+              ) : viewMode === 'shared-content' && contentSlot ? (
+                contentSlot
+              ) : viewMode === 'speaker' ? (
+                (() => {
+                  // Prefer the active remote speaker; fall back to any remote; last resort is self
+                  const speakerId =
+                    (activeSpeakerSessionId &&
+                    activeSpeakerSessionId !== localSessionId &&
+                    participantIds.includes(activeSpeakerSessionId)
+                      ? activeSpeakerSessionId
+                      : null) ??
+                    participantIds.find((id) => id !== localSessionId) ??
+                    participantIds[0] ??
+                    null;
+                  return speakerId ? (
+                    <DailyParticipantTile
+                      sessionId={speakerId}
+                      isLocal={speakerId === localSessionId}
+                    />
+                  ) : null;
+                })()
+              ) : null;
 
-              {/* Participant tiles */}
-              {participantIds.length > 0 ? (
-                <div
-                  className={
-                    hasMainContent
-                      ? /* strip: horizontal scroll on mobile, vertical on desktop */
-                        'flex shrink-0 gap-2 overflow-x-auto md:w-52 md:flex-col md:overflow-x-hidden md:overflow-y-auto'
-                      : /* full grid when no main content */
-                        'grid min-h-0 flex-1 auto-rows-fr grid-cols-1 gap-2 overflow-y-auto md:grid-cols-2'
-                  }
-                >
-                  {participantIds.map((sessionId) =>
-                    hasMainContent ? (
-                      <div key={sessionId} className="w-32 shrink-0 md:w-full">
-                        <DailyParticipantTile
-                          sessionId={sessionId}
-                          isLocal={sessionId === localSessionId}
-                          variant="strip"
-                        />
+              const hasMain = !!mainContent;
+
+              // In speaker mode the strip shows everyone except the main speaker
+              const speakerModeMainId =
+                viewMode === 'speaker' && !activeScreenShareSessionId
+                  ? ((activeSpeakerSessionId &&
+                    activeSpeakerSessionId !== localSessionId &&
+                    participantIds.includes(activeSpeakerSessionId)
+                      ? activeSpeakerSessionId
+                      : null) ??
+                    participantIds.find((id) => id !== localSessionId) ??
+                    participantIds[0] ??
+                    null)
+                  : null;
+              const stripIds = speakerModeMainId
+                ? participantIds.filter((id) => id !== speakerModeMainId)
+                : participantIds;
+
+              return (
+                <div className="flex min-h-0 flex-1 flex-col gap-2 p-2 md:flex-row md:gap-3 md:p-3">
+                  {/* Main content area */}
+                  {hasMain ? (
+                    <div className="min-h-0 flex-1 overflow-hidden rounded-2xl">
+                      {mainContent}
+                    </div>
+                  ) : null}
+
+                  {/* Participant tiles */}
+                  {stripIds.length > 0 ? (
+                    <div
+                      className={
+                        hasMain
+                          ? 'flex shrink-0 gap-2 overflow-x-auto md:w-52 md:flex-col md:overflow-x-hidden md:overflow-y-auto'
+                          : 'grid min-h-0 flex-1 auto-rows-fr grid-cols-1 gap-2 overflow-y-auto md:grid-cols-2'
+                      }
+                    >
+                      {stripIds.map((id) =>
+                        hasMain ? (
+                          <div key={id} className="w-32 shrink-0 md:w-full">
+                            <DailyParticipantTile
+                              sessionId={id}
+                              isLocal={id === localSessionId}
+                              variant="strip"
+                            />
+                          </div>
+                        ) : (
+                          <DailyParticipantTile
+                            key={id}
+                            sessionId={id}
+                            isLocal={id === localSessionId}
+                          />
+                        ),
+                      )}
+                    </div>
+                  ) : !hasMain ? (
+                    <div className="flex min-h-0 flex-1 items-center justify-center rounded-2xl border border-dashed border-border bg-muted/30 text-center">
+                      <div className="space-y-3 text-muted-foreground">
+                        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/15 text-primary">
+                          <Users className="h-5 w-5" />
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium text-foreground">
+                            Waiting for participants
+                          </p>
+                          <p className="text-sm">
+                            Share the live session link to bring others in.
+                          </p>
+                        </div>
                       </div>
-                    ) : (
-                      <DailyParticipantTile
-                        key={sessionId}
-                        sessionId={sessionId}
-                        isLocal={sessionId === localSessionId}
-                      />
-                    ),
-                  )}
-                </div>
-              ) : !hasMainContent ? (
-                <div className="flex min-h-0 flex-1 items-center justify-center rounded-2xl border border-dashed border-border bg-muted/30 text-center">
-                  <div className="space-y-3 text-muted-foreground">
-                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/15 text-primary">
-                      <Users className="h-5 w-5" />
                     </div>
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium text-foreground">
-                        Waiting for participants
-                      </p>
-                      <p className="text-sm">
-                        Share the live session link to bring others in.
-                      </p>
-                    </div>
-                  </div>
+                  ) : null}
                 </div>
-              ) : null}
-            </div>
+              );
+            })()
           )}
 
           {/* ── Control bar (Cam / Mic / Share / Leave) ── */}
@@ -1443,11 +1585,71 @@ function DailyLiveSessionSurface({
               />
               {!isDirectCall ? (
                 <InCallButton
-                  icon={<MonitorUp className="h-5 w-5" />}
-                  label="Share"
-                  active={isScreenSharing}
+                  icon={
+                    isScreenSharing ? (
+                      <MonitorOff className="h-5 w-5" />
+                    ) : (
+                      <MonitorUp className="h-5 w-5" />
+                    )
+                  }
+                  label={isScreenSharing ? 'Stop sharing' : 'Share'}
+                  active={false}
+                  destructive={isScreenSharing}
                   onClick={handleToggleScreenShare}
                 />
+              ) : null}
+              {!isDirectCall ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className={cn(
+                        buttonVariants({ variant: 'outline' }),
+                        'h-auto flex-col gap-1 rounded-xl px-4 py-2',
+                      )}
+                    >
+                      <span className="flex h-5 w-5 items-center justify-center">
+                        {viewMode === 'gallery' ? (
+                          <LayoutGrid className="h-5 w-5" />
+                        ) : viewMode === 'speaker' ? (
+                          <Monitor className="h-5 w-5" />
+                        ) : (
+                          <Share2 className="h-5 w-5" />
+                        )}
+                      </span>
+                      <span className="text-[10px] font-medium">View</span>
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="center" side="top" className="w-48">
+                    <DropdownMenuItem
+                      onClick={() => setViewMode('gallery')}
+                      className={
+                        viewMode === 'gallery' ? 'bg-primary/10 text-primary' : ''
+                      }
+                    >
+                      <LayoutGrid className="mr-2 h-4 w-4" />
+                      Gallery
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setViewMode('speaker')}
+                      className={
+                        viewMode === 'speaker' ? 'bg-primary/10 text-primary' : ''
+                      }
+                    >
+                      <Monitor className="mr-2 h-4 w-4" />
+                      Speaker
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setViewMode('shared-content')}
+                      className={
+                        viewMode === 'shared-content' ? 'bg-primary/10 text-primary' : ''
+                      }
+                    >
+                      <Share2 className="mr-2 h-4 w-4" />
+                      Shared content
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               ) : null}
               <InCallButton
                 icon={
