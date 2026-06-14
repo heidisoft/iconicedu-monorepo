@@ -248,7 +248,8 @@ function PreJoinDeviceSetupCard({
       return () => {
         el.pause();
         el.srcObject = null;
-        stream.getTracks().forEach((t) => t.stop());
+        // Do not stop the tracks here — Daily owns the camera track lifecycle.
+        // Stopping them here permanently kills the video stream when unmounting.
       };
     }
     el.pause();
@@ -1001,6 +1002,8 @@ function DailyLiveSessionSurface({
         url: joinUrl,
         token: token ?? undefined,
         userName: effectiveName,
+        startVideoOff: !isCameraEnabled,
+        startAudioOff: !isMicEnabled,
       });
       // The meeting token has the parent's user_name baked in and takes precedence
       // over the userName passed to join(). Override it after joining when a child
