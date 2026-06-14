@@ -71,14 +71,14 @@ export function ClassroomWhiteboard({
 
   if (!snapshotReady) {
     return (
-      <div className="flex min-h-[60vh] w-full items-center justify-center rounded-2xl border border-border bg-card lg:h-full lg:min-h-0">
+      <div className="flex h-full min-h-48 w-full items-center justify-center rounded-2xl border border-border bg-card">
         <p className="text-sm text-muted-foreground">Loading whiteboard…</p>
       </div>
     );
   }
 
   return (
-    <div className="relative min-h-[60vh] w-full overflow-hidden rounded-2xl border border-border bg-card lg:h-full lg:min-h-0">
+    <div className="relative h-full min-h-48 w-full overflow-hidden rounded-2xl border border-border bg-card">
       <Excalidraw
         excalidrawAPI={handleExcalidrawAPI}
         initialData={{ elements: initialElements ?? [] }}

@@ -32,10 +32,10 @@ import {
   Blend,
   Check,
   ChevronDown,
-  Circle,
   Hand,
   LayoutGrid,
   Monitor,
+  MoreHorizontal,
   Share2,
   CircleOff,
   CloudFog,
@@ -557,11 +557,13 @@ function DailyParticipantTile({
   sessionId,
   isLocal,
   isHandRaised,
+  isRecording,
   variant = 'default',
 }: {
   sessionId: string;
   isLocal?: boolean;
   isHandRaised?: boolean;
+  isRecording?: boolean;
   variant?: 'default' | 'floating' | 'strip';
 }) {
   const participant = useParticipant(sessionId);
@@ -603,6 +605,7 @@ function DailyParticipantTile({
       isMuted={isMicMuted}
       isSpeaking={isSpeaking}
       isHandRaised={isHandRaised}
+      isRecording={isRecording}
       initials={participantInitials}
       autoHeight={isStrip}
       aspectClassName="aspect-video"
@@ -665,6 +668,7 @@ function InCallButton({
   destructive = false,
   disabled = false,
   ariaLabel,
+  className,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -673,6 +677,7 @@ function InCallButton({
   destructive?: boolean;
   disabled?: boolean;
   ariaLabel?: string;
+  className?: string;
 }) {
   const variant = destructive ? 'destructive' : active ? 'secondary' : 'outline';
   return (
@@ -684,6 +689,7 @@ function InCallButton({
       className={cn(
         buttonVariants({ variant }),
         'h-auto flex-col gap-1 rounded-xl px-4 py-2',
+        className,
       )}
     >
       <span className="flex h-5 w-5 items-center justify-center">{icon}</span>
@@ -743,10 +749,10 @@ function InCallButtonWithPicker({
             aria-label={`${label} settings`}
             className={cn(
               buttonVariants({ variant }),
-              'h-auto rounded-l-none rounded-r-xl border-l border-l-border/40 px-2',
+              'h-auto rounded-l-none rounded-r-xl border-l border-l-border/40 px-1',
             )}
           >
-            <ChevronDown className="h-4 w-4" />
+            <ChevronDown className="h-3 w-3" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="center" side="top" className="w-60">
@@ -1018,7 +1024,16 @@ function DailyLiveSessionSurface({
     useCallback(() => {
       forceParticipantTrackRefresh();
       setViewMode(preShareViewMode.current);
-    }, []),
+      // track-stopped for local screen video fires asynchronously; eagerly remove the
+      // local session from the sharing set so the black screen share tile disappears immediately
+      if (localSessionId) {
+        setSharingSessionIds((prev) => {
+          const next = new Set(prev);
+          next.delete(localSessionId);
+          return next;
+        });
+      }
+    }, [localSessionId]),
   );
   const [sharingSessionIds, setSharingSessionIds] = useState<Set<string>>(new Set());
 
@@ -1677,6 +1692,7 @@ function DailyLiveSessionSurface({
                       ? isHandRaised
                       : raisedHands.get(directCallComposition.primaryParticipantId)
                   }
+                  isRecording={isRecording}
                 />
               ) : null}
               {directCallComposition.floatingParticipantId ? (
@@ -1691,6 +1707,7 @@ function DailyLiveSessionSurface({
                         ? isHandRaised
                         : raisedHands.get(directCallComposition.floatingParticipantId)
                     }
+                    isRecording={isRecording}
                     variant="floating"
                   />
                 </div>
@@ -1725,6 +1742,7 @@ function DailyLiveSessionSurface({
                           ? isHandRaised
                           : raisedHands.get(speakerId)
                       }
+                      isRecording={isRecording}
                     />
                   ) : null;
                 })()
@@ -1775,6 +1793,7 @@ function DailyLiveSessionSurface({
                               isHandRaised={
                                 id === localSessionId ? isHandRaised : raisedHands.get(id)
                               }
+                              isRecording={isRecording}
                               variant="strip"
                             />
                           </div>
@@ -1786,6 +1805,7 @@ function DailyLiveSessionSurface({
                             isHandRaised={
                               id === localSessionId ? isHandRaised : raisedHands.get(id)
                             }
+                            isRecording={isRecording}
                           />
                         ),
                       )}
@@ -1813,274 +1833,20 @@ function DailyLiveSessionSurface({
           )}
 
           {/* ── Control bar (Cam / Mic / Share / Leave) ── */}
-          <div className="flex shrink-0 items-center border-t border-border bg-card px-4 py-3">
-            {/* Left — session title */}
-            <div className="flex min-w-0 flex-1 items-center">
+          <div className="flex shrink-0 flex-col border-t border-border bg-card">
+            {/* Mobile-only top row: title + copy link */}
+            <div className="flex items-center gap-2 px-4 pt-2 md:hidden">
               {meetingName?.trim() ? (
-                <p className="truncate text-sm font-medium text-foreground">
+                <p className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
                   {meetingName.trim()}
                 </p>
-              ) : null}
-            </div>
-
-            {/* Centre — controls */}
-            <div className="flex items-center gap-2 md:gap-4">
-              <InCallButtonWithPicker
-                icon={
-                  isCameraEnabled ? (
-                    <Video className="h-5 w-5" />
-                  ) : (
-                    <VideoOff className="h-5 w-5" />
-                  )
-                }
-                label="Cam"
-                ariaLabel={isCameraEnabled ? 'Turn off camera (V)' : 'Turn on camera (V)'}
-                active={isCameraEnabled}
-                onClick={handleToggleCamera}
-                topContent={
-                  <>
-                    <DropdownMenuLabel className="text-xs text-muted-foreground">
-                      Background
-                    </DropdownMenuLabel>
-                    {(
-                      [
-                        { value: 'none', label: 'No background', icon: CircleOff },
-                        { value: 'blur-soft', label: 'Blur', icon: Blend },
-                        { value: 'blur-strong', label: 'Strong blur', icon: CloudFog },
-                      ] as const
-                    ).map(({ value, label, icon: Icon }) => (
-                      <DropdownMenuItem
-                        key={value}
-                        onClick={() => void handleSelectBackgroundPreset(value)}
-                        className={backgroundPreset === value ? 'bg-accent' : ''}
-                      >
-                        <Icon className="h-4 w-4 shrink-0" />
-                        <span>{label}</span>
-                      </DropdownMenuItem>
-                    ))}
-                  </>
-                }
-                deviceGroups={[
-                  {
-                    label: 'Camera',
-                    devices: cameras.map((c, i) => ({
-                      deviceId: c.device.deviceId,
-                      label: getDailyDeviceLabel({
-                        label: c.device.label,
-                        kind: c.device.kind,
-                        index: i,
-                      }),
-                    })),
-                    currentDeviceId: currentCam?.device.deviceId,
-                    onSelectDevice: (id) => void handleSelectDevice('camera', id),
-                  },
-                ]}
-              />
-              <InCallButtonWithPicker
-                icon={
-                  isMicEnabled ? (
-                    <Mic className="h-5 w-5" />
-                  ) : (
-                    <MicOff className="h-5 w-5" />
-                  )
-                }
-                label="Mic"
-                ariaLabel={isMicEnabled ? 'Mute microphone (M)' : 'Unmute microphone (M)'}
-                active={isMicEnabled}
-                onClick={handleToggleMic}
-                deviceGroups={[
-                  {
-                    label: 'Microphone',
-                    devices: microphones.map((m, i) => ({
-                      deviceId: m.device.deviceId,
-                      label: getDailyDeviceLabel({
-                        label: m.device.label,
-                        kind: m.device.kind,
-                        index: i,
-                      }),
-                    })),
-                    currentDeviceId: currentMic?.device.deviceId,
-                    onSelectDevice: (id) => void handleSelectDevice('microphone', id),
-                  },
-                  {
-                    label: 'Speaker',
-                    devices: speakers.map((s, i) => ({
-                      deviceId: s.device.deviceId,
-                      label: getDailyDeviceLabel({
-                        label: s.device.label,
-                        kind: s.device.kind,
-                        index: i,
-                      }),
-                    })),
-                    currentDeviceId: currentSpeaker?.device.deviceId,
-                    onSelectDevice: (id) => void handleSelectDevice('speaker', id),
-                  },
-                ]}
-                bottomContent={
-                  <div className="flex items-center justify-between gap-3 px-2 py-1.5">
-                    <div className="flex items-center gap-2 text-sm">
-                      <AudioLines className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      <span className="font-medium">Noise cancellation</span>
-                    </div>
-                    <Switch
-                      checked={isNoiseCancellationEnabled}
-                      onCheckedChange={(v) => void handleToggleNoiseCancellation(v)}
-                    />
-                  </div>
-                }
-              />
-              {!isDirectCall ? (
-                <InCallButton
-                  icon={
-                    isScreenSharing ? (
-                      <MonitorOff className="h-5 w-5" />
-                    ) : (
-                      <MonitorUp className="h-5 w-5" />
-                    )
-                  }
-                  label={isScreenSharing ? 'Stop sharing' : 'Share'}
-                  ariaLabel={
-                    isScreenSharing
-                      ? 'Stop screen sharing (S)'
-                      : 'Start screen sharing (S)'
-                  }
-                  active={false}
-                  destructive={isScreenSharing}
-                  onClick={handleToggleScreenShare}
-                />
-              ) : null}
-              {!isDirectCall ? (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      type="button"
-                      aria-label="Change view layout"
-                      className={cn(
-                        buttonVariants({ variant: 'outline' }),
-                        'h-auto flex-col gap-1 rounded-xl px-4 py-2',
-                      )}
-                    >
-                      <span className="flex h-5 w-5 items-center justify-center">
-                        {viewMode === 'gallery' ? (
-                          <LayoutGrid className="h-5 w-5" />
-                        ) : viewMode === 'speaker' ? (
-                          <Monitor className="h-5 w-5" />
-                        ) : (
-                          <Share2 className="h-5 w-5" />
-                        )}
-                      </span>
-                      <span className="text-[10px] font-medium">View</span>
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="center" side="top" className="w-48">
-                    <DropdownMenuItem
-                      onClick={() => {
-                        setViewMode('gallery');
-                        onPanelModeChange?.('video');
-                      }}
-                      className={
-                        viewMode === 'gallery' ? 'bg-primary/10 text-primary' : ''
-                      }
-                    >
-                      <LayoutGrid className="mr-2 h-4 w-4" />
-                      Gallery
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => {
-                        setViewMode('speaker');
-                        onPanelModeChange?.('split');
-                      }}
-                      className={
-                        viewMode === 'speaker' ? 'bg-primary/10 text-primary' : ''
-                      }
-                    >
-                      <Monitor className="mr-2 h-4 w-4" />
-                      Speaker
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => {
-                        setViewMode('shared-content');
-                        onPanelModeChange?.('split');
-                      }}
-                      className={
-                        viewMode === 'shared-content' ? 'bg-primary/10 text-primary' : ''
-                      }
-                    >
-                      <Share2 className="mr-2 h-4 w-4" />
-                      Shared content
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              ) : null}
-              {!isDirectCall && liveSessionId && channelId ? (
-                <InCallButton
-                  icon={
-                    <span className="relative flex h-5 w-5 items-center justify-center">
-                      <Circle
-                        className="h-4 w-4"
-                        fill={isRecording ? 'currentColor' : 'none'}
-                      />
-                      {isRecording && (
-                        <span className="absolute -right-1 -top-1 h-2 w-2 animate-pulse rounded-full bg-red-500" />
-                      )}
-                    </span>
-                  }
-                  label={isRecording ? 'Stop rec' : 'Record'}
-                  ariaLabel={isRecording ? 'Stop recording' : 'Start recording'}
-                  active={isRecording}
-                  onClick={() => void handleToggleRecording()}
-                />
-              ) : null}
-              <InCallButton
-                icon={
-                  <Hand
-                    className="h-5 w-5"
-                    fill={isHandRaised ? 'currentColor' : 'none'}
-                  />
-                }
-                label="Hand"
-                ariaLabel={isHandRaised ? 'Lower hand' : 'Raise hand'}
-                active={isHandRaised}
-                onClick={handleToggleHandRaise}
-              />
-              <InCallButton
-                icon={
-                  <span className="relative flex h-5 w-5 items-center justify-center">
-                    <Users className="h-5 w-5" />
-                    {participantIds.length > 1 && (
-                      <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
-                        {participantIds.length}
-                      </span>
-                    )}
-                  </span>
-                }
-                label="People"
-                ariaLabel={showParticipants ? 'Hide participants' : 'Show participants'}
-                active={showParticipants}
-                onClick={() => setShowParticipants((prev) => !prev)}
-              />
-              <InCallButton
-                icon={
-                  isLeaving ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                  ) : (
-                    <PhoneOff className="h-5 w-5" />
-                  )
-                }
-                label="Leave"
-                ariaLabel="Leave session"
-                destructive
-                disabled={isLeaving}
-                onClick={() => void handleLeave()}
-              />
-            </div>
-
-            {/* Right — invite button */}
-            <div className="flex flex-1 items-center justify-end">
+              ) : (
+                <div className="flex-1" />
+              )}
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-1.5 text-xs"
+                className="shrink-0 gap-1.5 text-xs"
                 onClick={handleCopyJoinLink}
               >
                 {isCopied ? (
@@ -2088,8 +1854,378 @@ function DailyLiveSessionSurface({
                 ) : (
                   <Link className="h-3.5 w-3.5" />
                 )}
-                {isCopied ? 'Copied!' : 'Copy invite link'}
+                {isCopied ? 'Copied!' : 'Copy link'}
               </Button>
+            </div>
+
+            <div className="flex items-center px-4 py-3">
+              {/* Left — session title (desktop only) */}
+              <div className="hidden min-w-0 flex-1 items-center md:flex">
+                {meetingName?.trim() ? (
+                  <p className="truncate text-sm font-medium text-foreground">
+                    {meetingName.trim()}
+                  </p>
+                ) : null}
+              </div>
+
+              {/* Centre — controls */}
+              <div className="flex flex-1 items-center justify-center gap-2 md:flex-none md:gap-4">
+                <InCallButtonWithPicker
+                  icon={
+                    isCameraEnabled ? (
+                      <Video className="h-5 w-5" />
+                    ) : (
+                      <VideoOff className="h-5 w-5" />
+                    )
+                  }
+                  label="Cam"
+                  ariaLabel={
+                    isCameraEnabled ? 'Turn off camera (V)' : 'Turn on camera (V)'
+                  }
+                  active={isCameraEnabled}
+                  onClick={handleToggleCamera}
+                  topContent={
+                    <>
+                      <DropdownMenuLabel className="text-xs text-muted-foreground">
+                        Background
+                      </DropdownMenuLabel>
+                      {(
+                        [
+                          { value: 'none', label: 'No background', icon: CircleOff },
+                          { value: 'blur-soft', label: 'Blur', icon: Blend },
+                          { value: 'blur-strong', label: 'Strong blur', icon: CloudFog },
+                        ] as const
+                      ).map(({ value, label, icon: Icon }) => (
+                        <DropdownMenuItem
+                          key={value}
+                          onClick={() => void handleSelectBackgroundPreset(value)}
+                          className={backgroundPreset === value ? 'bg-accent' : ''}
+                        >
+                          <Icon className="h-4 w-4 shrink-0" />
+                          <span>{label}</span>
+                        </DropdownMenuItem>
+                      ))}
+                    </>
+                  }
+                  deviceGroups={[
+                    {
+                      label: 'Camera',
+                      devices: cameras.map((c, i) => ({
+                        deviceId: c.device.deviceId,
+                        label: getDailyDeviceLabel({
+                          label: c.device.label,
+                          kind: c.device.kind,
+                          index: i,
+                        }),
+                      })),
+                      currentDeviceId: currentCam?.device.deviceId,
+                      onSelectDevice: (id) => void handleSelectDevice('camera', id),
+                    },
+                  ]}
+                />
+                <InCallButtonWithPicker
+                  icon={
+                    isMicEnabled ? (
+                      <Mic className="h-5 w-5" />
+                    ) : (
+                      <MicOff className="h-5 w-5" />
+                    )
+                  }
+                  label="Mic"
+                  ariaLabel={
+                    isMicEnabled ? 'Mute microphone (M)' : 'Unmute microphone (M)'
+                  }
+                  active={isMicEnabled}
+                  onClick={handleToggleMic}
+                  deviceGroups={[
+                    {
+                      label: 'Microphone',
+                      devices: microphones.map((m, i) => ({
+                        deviceId: m.device.deviceId,
+                        label: getDailyDeviceLabel({
+                          label: m.device.label,
+                          kind: m.device.kind,
+                          index: i,
+                        }),
+                      })),
+                      currentDeviceId: currentMic?.device.deviceId,
+                      onSelectDevice: (id) => void handleSelectDevice('microphone', id),
+                    },
+                    {
+                      label: 'Speaker',
+                      devices: speakers.map((s, i) => ({
+                        deviceId: s.device.deviceId,
+                        label: getDailyDeviceLabel({
+                          label: s.device.label,
+                          kind: s.device.kind,
+                          index: i,
+                        }),
+                      })),
+                      currentDeviceId: currentSpeaker?.device.deviceId,
+                      onSelectDevice: (id) => void handleSelectDevice('speaker', id),
+                    },
+                  ]}
+                  bottomContent={
+                    <div className="flex items-center justify-between gap-3 px-2 py-1.5">
+                      <div className="flex items-center gap-2 text-sm">
+                        <AudioLines className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <span className="font-medium">Noise cancellation</span>
+                      </div>
+                      <Switch
+                        checked={isNoiseCancellationEnabled}
+                        onCheckedChange={(v) => void handleToggleNoiseCancellation(v)}
+                      />
+                    </div>
+                  }
+                />
+
+                {/* Desktop-only extra buttons */}
+                {!isDirectCall ? (
+                  <InCallButton
+                    icon={
+                      isScreenSharing ? (
+                        <MonitorOff className="h-5 w-5" />
+                      ) : (
+                        <MonitorUp className="h-5 w-5" />
+                      )
+                    }
+                    label={isScreenSharing ? 'Stop sharing' : 'Share'}
+                    ariaLabel={
+                      isScreenSharing
+                        ? 'Stop screen sharing (S)'
+                        : 'Start screen sharing (S)'
+                    }
+                    active={false}
+                    destructive={isScreenSharing}
+                    onClick={handleToggleScreenShare}
+                    className="hidden md:flex"
+                  />
+                ) : null}
+                {!isDirectCall ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        aria-label="Change view layout"
+                        className={cn(
+                          buttonVariants({ variant: 'outline' }),
+                          'hidden h-auto flex-col gap-1 rounded-xl px-4 py-2 md:flex',
+                        )}
+                      >
+                        <span className="flex h-5 w-5 items-center justify-center">
+                          {viewMode === 'gallery' ? (
+                            <LayoutGrid className="h-5 w-5" />
+                          ) : viewMode === 'speaker' ? (
+                            <Monitor className="h-5 w-5" />
+                          ) : (
+                            <Share2 className="h-5 w-5" />
+                          )}
+                        </span>
+                        <span className="text-[10px] font-medium">View</span>
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="center" side="top" className="w-48">
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setViewMode('gallery');
+                          onPanelModeChange?.('video');
+                        }}
+                        className={
+                          viewMode === 'gallery' ? 'bg-primary/10 text-primary' : ''
+                        }
+                      >
+                        <LayoutGrid className="mr-2 h-4 w-4" />
+                        Gallery
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setViewMode('speaker');
+                          onPanelModeChange?.('split');
+                        }}
+                        className={
+                          viewMode === 'speaker' ? 'bg-primary/10 text-primary' : ''
+                        }
+                      >
+                        <Monitor className="mr-2 h-4 w-4" />
+                        Speaker
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setViewMode('shared-content');
+                          onPanelModeChange?.('split');
+                        }}
+                        className={
+                          viewMode === 'shared-content'
+                            ? 'bg-primary/10 text-primary'
+                            : ''
+                        }
+                      >
+                        <Share2 className="mr-2 h-4 w-4" />
+                        Shared content
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : null}
+                <InCallButton
+                  icon={
+                    <Hand
+                      className="h-5 w-5"
+                      fill={isHandRaised ? 'currentColor' : 'none'}
+                    />
+                  }
+                  label="Hand"
+                  ariaLabel={isHandRaised ? 'Lower hand' : 'Raise hand'}
+                  active={isHandRaised}
+                  onClick={handleToggleHandRaise}
+                  className="hidden md:flex"
+                />
+                <InCallButton
+                  icon={
+                    <span className="relative flex h-5 w-5 items-center justify-center">
+                      <Users className="h-5 w-5" />
+                      {participantIds.length > 1 && (
+                        <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
+                          {participantIds.length}
+                        </span>
+                      )}
+                    </span>
+                  }
+                  label="People"
+                  ariaLabel={showParticipants ? 'Hide participants' : 'Show participants'}
+                  active={showParticipants}
+                  onClick={() => setShowParticipants((prev) => !prev)}
+                  className="hidden md:flex"
+                />
+
+                {/* Mobile-only More button */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="More options"
+                      className={cn(
+                        buttonVariants({ variant: 'outline' }),
+                        'flex h-auto flex-col gap-1 rounded-xl px-4 py-2 md:hidden',
+                      )}
+                    >
+                      <span className="flex h-5 w-5 items-center justify-center">
+                        <MoreHorizontal className="h-5 w-5" />
+                      </span>
+                      <span className="text-[10px] font-medium">More</span>
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="center" side="top" className="w-52">
+                    {!isDirectCall ? (
+                      <DropdownMenuItem onClick={() => void handleToggleScreenShare()}>
+                        {isScreenSharing ? (
+                          <MonitorOff className="h-4 w-4 text-destructive" />
+                        ) : (
+                          <MonitorUp className="h-4 w-4" />
+                        )}
+                        {isScreenSharing ? 'Stop sharing' : 'Share screen'}
+                      </DropdownMenuItem>
+                    ) : null}
+                    <DropdownMenuItem
+                      onClick={handleToggleHandRaise}
+                      className={isHandRaised ? 'text-primary' : ''}
+                    >
+                      <Hand
+                        className="h-4 w-4"
+                        fill={isHandRaised ? 'currentColor' : 'none'}
+                      />
+                      {isHandRaised ? 'Lower hand' : 'Raise hand'}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setShowParticipants((prev) => !prev)}
+                      className={showParticipants ? 'text-primary' : ''}
+                    >
+                      <Users className="h-4 w-4" />
+                      <span>
+                        People
+                        {participantIds.length > 1 ? ` (${participantIds.length})` : ''}
+                      </span>
+                    </DropdownMenuItem>
+                    {!isDirectCall ? (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel className="text-xs text-muted-foreground">
+                          View
+                        </DropdownMenuLabel>
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setViewMode('gallery');
+                            onPanelModeChange?.('video');
+                          }}
+                          className={
+                            viewMode === 'gallery' ? 'bg-primary/10 text-primary' : ''
+                          }
+                        >
+                          <LayoutGrid className="h-4 w-4" />
+                          Gallery
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setViewMode('speaker');
+                            onPanelModeChange?.('split');
+                          }}
+                          className={
+                            viewMode === 'speaker' ? 'bg-primary/10 text-primary' : ''
+                          }
+                        >
+                          <Monitor className="h-4 w-4" />
+                          Speaker
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setViewMode('shared-content');
+                            onPanelModeChange?.('split');
+                          }}
+                          className={
+                            viewMode === 'shared-content'
+                              ? 'bg-primary/10 text-primary'
+                              : ''
+                          }
+                        >
+                          <Share2 className="h-4 w-4" />
+                          Shared content
+                        </DropdownMenuItem>
+                      </>
+                    ) : null}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                <InCallButton
+                  icon={
+                    isLeaving ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <PhoneOff className="h-5 w-5" />
+                    )
+                  }
+                  label="Leave"
+                  ariaLabel="Leave session"
+                  destructive
+                  disabled={isLeaving}
+                  onClick={() => void handleLeave()}
+                />
+              </div>
+
+              {/* Right — invite button (desktop only) */}
+              <div className="hidden flex-1 items-center justify-end md:flex">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 text-xs"
+                  onClick={handleCopyJoinLink}
+                >
+                  {isCopied ? (
+                    <Check className="h-3.5 w-3.5 text-emerald-500" />
+                  ) : (
+                    <Link className="h-3.5 w-3.5" />
+                  )}
+                  {isCopied ? 'Copied!' : 'Copy invite link'}
+                </Button>
+              </div>
             </div>
           </div>
         </>

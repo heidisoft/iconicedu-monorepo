@@ -8,6 +8,7 @@ interface VideoParticipantProps {
   isMuted: boolean;
   isSpeaking?: boolean;
   isHandRaised?: boolean;
+  isRecording?: boolean;
   image?: string;
   initials?: string;
   children?: ReactNode;
@@ -21,6 +22,7 @@ export function VideoParticipant({
   isMuted,
   isSpeaking = false,
   isHandRaised = false,
+  isRecording = false,
   image,
   initials = name
     .split(' ')
@@ -63,6 +65,13 @@ export function VideoParticipant({
           </div>
         )}
       </div>
+
+      {isRecording && (
+        <div className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-red-600/90 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow">
+          <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
+          REC
+        </div>
+      )}
 
       <div className="absolute bottom-0 left-0 right-0 px-2 pb-2">
         <div className="inline-flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-1 text-xs font-semibold text-white">
