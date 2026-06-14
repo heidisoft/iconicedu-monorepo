@@ -132,6 +132,18 @@ export function LiveSessionHost({
           contentSlot={whiteboardSlot}
           whiteboardEnabled={showWhiteboard}
           onLeave={(path) => router.push(path)}
+          onFetchParticipantCount={
+            liveSessionId && channelId
+              ? async () => {
+                  const res = await fetch(
+                    `/api/channels/${channelId}/live-sessions/${liveSessionId}/presence`,
+                  );
+                  if (!res.ok) return { count: 0, names: [] };
+                  const data = (await res.json()) as { count?: number; names?: string[] };
+                  return { count: data.count ?? 0, names: data.names ?? [] };
+                }
+              : undefined
+          }
         />
       </div>
     );

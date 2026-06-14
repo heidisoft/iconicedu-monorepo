@@ -35,8 +35,6 @@ import {
   MicOff,
   MonitorUp,
   PhoneOff,
-  ScanFace,
-  Settings,
   Users,
   Video,
   VideoOff,
@@ -45,14 +43,7 @@ import { Button, buttonVariants } from '@iconicedu/ui-web/ui/button';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@iconicedu/ui-web/ui/avatar';
 import { Switch } from '@iconicedu/ui-web/ui/switch';
-import {
-  Popover,
-  PopoverContent,
-  PopoverDescription,
-  PopoverHeader,
-  PopoverTitle,
-  PopoverTrigger,
-} from '@iconicedu/ui-web/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@iconicedu/ui-web/ui/popover';
 import {
   DAILY_BACKGROUND_PRESET_OPTIONS,
   buildDailyDirectCallComposition,
@@ -72,6 +63,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@iconicedu/ui-web/ui/dropdown-menu';
 
@@ -130,6 +123,23 @@ export type LinkedChildProfile = {
   avatarUrl: string | null;
 };
 
+function buildPresenceLabel(count: number, names: string[]): string {
+  const first = names[0];
+  if (!first) {
+    return count === 1
+      ? '1 person is already in this session'
+      : `${count} people are already in this session`;
+  }
+  if (count === 1) return `${first} is already in this session`;
+  if (count === 2) {
+    const second = names[1];
+    return second
+      ? `${first} and ${second} are already in this session`
+      : `${first} + 1 other is already in this session`;
+  }
+  return `${first} + ${count - 1} others are already in this session`;
+}
+
 function PreJoinDeviceSetupCard({
   participant,
   userName,
@@ -158,6 +168,8 @@ function PreJoinDeviceSetupCard({
   onSelectSpeaker,
   onSelectBackgroundPreset,
   onToggleNoiseCancellation,
+  remoteParticipantCount = 0,
+  remoteParticipantNames = [],
 }: {
   participant:
     | ReturnType<NonNullable<ReturnType<typeof useCallObject>>['participants']>['local']
@@ -188,6 +200,8 @@ function PreJoinDeviceSetupCard({
   onSelectSpeaker: (id: string) => void;
   onSelectBackgroundPreset: (preset: string) => void;
   onToggleNoiseCancellation: (enabled: boolean) => void;
+  remoteParticipantCount?: number;
+  remoteParticipantNames?: string[];
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const videoTrack = participant?.tracks.video.persistentTrack;
@@ -359,136 +373,116 @@ function PreJoinDeviceSetupCard({
             {/* Dark gradient so buttons are readable over any video frame */}
             <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-28 bg-linear-to-t from-black/50 to-transparent" />
 
-            {/* 3-column: [empty] [camera|mic] [settings] */}
-            <div className="absolute inset-x-0 bottom-0 z-20 grid grid-cols-3 items-end px-4 pb-4">
-              {/* Left: empty */}
-              <div />
-
-              {/* Center: Camera + Mic with device pickers */}
-              <div className="flex items-end justify-center gap-3">
-                <InCallButtonWithPicker
-                  icon={
-                    isCameraEnabled ? (
-                      <Video className="h-5 w-5" />
-                    ) : (
-                      <VideoOff className="h-5 w-5" />
-                    )
-                  }
-                  label="Cam"
-                  active={isCameraEnabled}
-                  onClick={onToggleCamera}
-                  devices={cameras.map((c, i) => ({
-                    deviceId: c.device.deviceId,
-                    label: getDailyDeviceLabel({
-                      label: c.device.label,
-                      kind: c.device.kind,
-                      index: i,
-                    }),
-                  }))}
-                  currentDeviceId={currentCam?.device.deviceId}
-                  onSelectDevice={onSelectCamera}
-                />
-                <div
-                  className={[
-                    'transition-shadow duration-700 ease-in-out',
-                    isSpeaking
-                      ? 'rounded-xl shadow-[0_0_0_4px_rgba(34,197,94,0.85)]'
-                      : '',
-                  ].join(' ')}
-                >
-                  <InCallButtonWithPicker
-                    icon={
-                      isMicEnabled ? (
-                        <Mic className="h-5 w-5" />
-                      ) : (
-                        <MicOff className="h-5 w-5" />
-                      )
-                    }
-                    label="Mic"
-                    active={isMicEnabled}
-                    onClick={onToggleMic}
-                    devices={microphones.map((m, i) => ({
-                      deviceId: m.device.deviceId,
+            {/* centered row: Camera + Mic */}
+            <div className="absolute inset-x-0 bottom-0 z-20 flex items-end justify-center gap-3 px-4 pb-4">
+              <InCallButtonWithPicker
+                icon={
+                  isCameraEnabled ? (
+                    <Video className="h-5 w-5" />
+                  ) : (
+                    <VideoOff className="h-5 w-5" />
+                  )
+                }
+                label="Cam"
+                active={isCameraEnabled}
+                onClick={onToggleCamera}
+                topContent={
+                  <>
+                    <DropdownMenuLabel className="text-xs text-muted-foreground">
+                      Background
+                    </DropdownMenuLabel>
+                    {(
+                      [
+                        { value: 'none', label: 'No background', icon: CircleOff },
+                        { value: 'blur-soft', label: 'Blur', icon: Blend },
+                        { value: 'blur-strong', label: 'Strong blur', icon: CloudFog },
+                      ] as const
+                    ).map(({ value, label, icon: Icon }) => (
+                      <DropdownMenuItem
+                        key={value}
+                        onClick={() => onSelectBackgroundPreset(value)}
+                        className={backgroundPreset === value ? 'bg-accent' : ''}
+                      >
+                        <Icon className="h-4 w-4 shrink-0" />
+                        <span>{label}</span>
+                      </DropdownMenuItem>
+                    ))}
+                  </>
+                }
+                deviceGroups={[
+                  {
+                    label: 'Camera',
+                    devices: cameras.map((c, i) => ({
+                      deviceId: c.device.deviceId,
                       label: getDailyDeviceLabel({
-                        label: m.device.label,
-                        kind: m.device.kind,
+                        label: c.device.label,
+                        kind: c.device.kind,
                         index: i,
                       }),
-                    }))}
-                    currentDeviceId={currentMic?.device.deviceId}
-                    onSelectDevice={onSelectMic}
-                  />
-                </div>
-              </div>
-
-              {/* Right: Settings (background + noise cancellation) */}
-              <div className="flex justify-end">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant={backgroundPreset !== 'none' ? 'secondary' : 'outline'}
-                      aria-label="Settings"
-                    >
-                      <Settings className="h-5 w-5" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent side="top" align="end" className="w-64">
-                    <PopoverHeader>
-                      <PopoverTitle>Settings</PopoverTitle>
-                    </PopoverHeader>
-
-                    {/* Background */}
-                    <div className="space-y-1.5">
-                      <p className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                        <ScanFace className="h-3.5 w-3.5" />
-                        Background
-                      </p>
-                      <div className="flex flex-col gap-1">
-                        {(
-                          [
-                            { value: 'none', label: 'No background', icon: CircleOff },
-                            { value: 'blur-soft', label: 'Blur', icon: Blend },
-                            {
-                              value: 'blur-strong',
-                              label: 'Strong blur',
-                              icon: CloudFog,
-                            },
-                          ] as const
-                        ).map(({ value, label, icon: Icon }) => (
-                          <Button
-                            key={value}
-                            type="button"
-                            variant={backgroundPreset === value ? 'default' : 'ghost'}
-                            className="justify-start"
-                            onClick={() => onSelectBackgroundPreset(value)}
-                          >
-                            <Icon className="h-4 w-4 shrink-0" />
-                            {label}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Noise cancellation */}
-                    <div className="flex items-center justify-between gap-3 pt-3 border-t border-border">
-                      <div className="flex items-start gap-2.5">
-                        <AudioLines className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                        <div className="space-y-0.5">
-                          <p className="text-sm font-medium text-foreground">
-                            Noise cancellation
-                          </p>
-                          <PopoverDescription>Reduce background noise</PopoverDescription>
-                        </div>
+                    })),
+                    currentDeviceId: currentCam?.device.deviceId,
+                    onSelectDevice: onSelectCamera,
+                  },
+                ]}
+              />
+              <div
+                className={[
+                  'transition-shadow duration-700 ease-in-out',
+                  isSpeaking ? 'rounded-xl shadow-[0_0_0_4px_rgba(34,197,94,0.85)]' : '',
+                ].join(' ')}
+              >
+                <InCallButtonWithPicker
+                  icon={
+                    isMicEnabled ? (
+                      <Mic className="h-5 w-5" />
+                    ) : (
+                      <MicOff className="h-5 w-5" />
+                    )
+                  }
+                  label="Mic"
+                  active={isMicEnabled}
+                  onClick={onToggleMic}
+                  deviceGroups={[
+                    {
+                      label: 'Microphone',
+                      devices: microphones.map((m, i) => ({
+                        deviceId: m.device.deviceId,
+                        label: getDailyDeviceLabel({
+                          label: m.device.label,
+                          kind: m.device.kind,
+                          index: i,
+                        }),
+                      })),
+                      currentDeviceId: currentMic?.device.deviceId,
+                      onSelectDevice: onSelectMic,
+                    },
+                    {
+                      label: 'Speaker',
+                      devices: speakers.map((s, i) => ({
+                        deviceId: s.device.deviceId,
+                        label: getDailyDeviceLabel({
+                          label: s.device.label,
+                          kind: s.device.kind,
+                          index: i,
+                        }),
+                      })),
+                      currentDeviceId: currentSpeaker?.device.deviceId,
+                      onSelectDevice: onSelectSpeaker,
+                    },
+                  ]}
+                  bottomContent={
+                    <div className="flex items-center justify-between gap-3 px-2 py-1.5">
+                      <div className="flex items-center gap-2 text-sm">
+                        <AudioLines className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <span className="font-medium">Noise cancellation</span>
                       </div>
                       <Switch
                         checked={isNoiseCancellationEnabled}
                         onCheckedChange={onToggleNoiseCancellation}
                       />
                     </div>
-                  </PopoverContent>
-                </Popover>
+                  }
+                />
               </div>
             </div>
           </>
@@ -497,6 +491,14 @@ function PreJoinDeviceSetupCard({
 
       {/* ── Card bottom: join button + disclaimer ── */}
       <div className="space-y-3 p-5">
+        {remoteParticipantCount > 0 ? (
+          <div className="flex items-center justify-center gap-2 rounded-xl border border-border bg-muted/60 px-4 py-2.5 text-sm text-muted-foreground">
+            <Users className="h-4 w-4 shrink-0" />
+            <span>
+              {buildPresenceLabel(remoteParticipantCount, remoteParticipantNames)}
+            </span>
+          </div>
+        ) : null}
         <Button
           type="button"
           size="lg"
@@ -652,24 +654,31 @@ function InCallButton({
   );
 }
 
+type DeviceGroup = {
+  label: string;
+  devices: Array<{ deviceId: string; label: string }>;
+  currentDeviceId?: string | null;
+  onSelectDevice: (deviceId: string) => void;
+};
+
 function InCallButtonWithPicker({
   icon,
   label,
   onClick,
   active = true,
   disabled = false,
-  devices,
-  currentDeviceId,
-  onSelectDevice,
+  deviceGroups,
+  topContent,
+  bottomContent,
 }: {
   icon: React.ReactNode;
   label: string;
   onClick: () => void;
   active?: boolean;
   disabled?: boolean;
-  devices: Array<{ deviceId: string; label: string }>;
-  currentDeviceId?: string | null;
-  onSelectDevice: (deviceId: string) => void;
+  deviceGroups: DeviceGroup[];
+  topContent?: React.ReactNode;
+  bottomContent?: React.ReactNode;
 }) {
   const variant = active ? 'secondary' : 'outline';
   return (
@@ -699,16 +708,36 @@ function InCallButtonWithPicker({
             <ChevronDown className="h-4 w-4" />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="center" side="top" className="w-56">
-          {devices.map((d) => (
-            <DropdownMenuItem
-              key={d.deviceId}
-              onClick={() => onSelectDevice(d.deviceId)}
-              className={currentDeviceId === d.deviceId ? 'bg-accent' : ''}
-            >
-              <span className="truncate">{d.label || 'Default device'}</span>
-            </DropdownMenuItem>
+        <DropdownMenuContent align="center" side="top" className="w-60">
+          {topContent ? (
+            <>
+              {topContent}
+              <DropdownMenuSeparator />
+            </>
+          ) : null}
+          {deviceGroups.map((group, gi) => (
+            <React.Fragment key={group.label}>
+              {gi > 0 ? <DropdownMenuSeparator /> : null}
+              <DropdownMenuLabel className="text-xs text-muted-foreground">
+                {group.label}
+              </DropdownMenuLabel>
+              {group.devices.map((d) => (
+                <DropdownMenuItem
+                  key={d.deviceId}
+                  onClick={() => group.onSelectDevice(d.deviceId)}
+                  className={group.currentDeviceId === d.deviceId ? 'bg-accent' : ''}
+                >
+                  <span className="truncate">{d.label || 'Default device'}</span>
+                </DropdownMenuItem>
+              ))}
+            </React.Fragment>
           ))}
+          {bottomContent ? (
+            <>
+              <DropdownMenuSeparator />
+              {bottomContent}
+            </>
+          ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
@@ -739,6 +768,7 @@ function DailyLiveSessionSurface({
   onPanelModeChange: _onPanelModeChange,
   onJoined,
   onLeave,
+  onFetchParticipantCount,
 }: {
   callObject: NonNullable<ReturnType<typeof useCallObject>>;
   joinUrl: string;
@@ -761,6 +791,7 @@ function DailyLiveSessionSurface({
   ) => void;
   onJoined?: () => void;
   onLeave: (path: string) => void;
+  onFetchParticipantCount?: () => Promise<{ count: number; names: string[] }>;
 }) {
   const localSessionId = useLocalSessionId();
   const remoteParticipantIds = useParticipantIds({ filter: 'remote' });
@@ -791,6 +822,21 @@ function DailyLiveSessionSurface({
   const [isMicEnabled, setIsMicEnabled] = useState(false);
   const [isCameraEnabled, setIsCameraEnabled] = useState(false);
   const [, forceParticipantTrackRefresh] = useReducer((value: number) => value + 1, 0);
+  const [preJoinPresence, setPreJoinPresence] = useState<{
+    count: number;
+    names: string[];
+  }>({ count: 0, names: [] });
+
+  useEffect(() => {
+    if (!onFetchParticipantCount) return;
+    let cancelled = false;
+    void onFetchParticipantCount().then((result) => {
+      if (!cancelled) setPreJoinPresence(result);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [onFetchParticipantCount]);
 
   const shouldRouteOnLeaveRef = useRef(true);
   const isDirectCall = isDirectLiveSessionLayout({ channelKind, mode });
@@ -948,11 +994,20 @@ function DailyLiveSessionSurface({
     setIsJoining(true);
     setError(null);
     try {
+      const effectiveChild =
+        linkedChildren?.find((c) => c.id === selectedChildId) ?? linkedChildren?.[0];
+      const effectiveName = effectiveChild?.displayName ?? userName ?? undefined;
       await callObject.join({
         url: joinUrl,
         token: token ?? undefined,
-        userName: userName ?? undefined,
+        userName: effectiveName,
       });
+      // The meeting token has the parent's user_name baked in and takes precedence
+      // over the userName passed to join(). Override it after joining when a child
+      // identity is selected.
+      if (effectiveChild?.displayName) {
+        callObject.setUserName(effectiveChild.displayName);
+      }
     } catch (joinError: unknown) {
       setIsJoining(false);
       setError(getDailyLiveSessionErrorMessage(joinError));
@@ -1124,6 +1179,8 @@ function DailyLiveSessionSurface({
                 onToggleNoiseCancellation={(enabled) =>
                   void handleToggleNoiseCancellation(enabled)
                 }
+                remoteParticipantCount={preJoinPresence.count}
+                remoteParticipantNames={preJoinPresence.names}
               />
             )}
           </div>
@@ -1249,16 +1306,44 @@ function DailyLiveSessionSurface({
               label="Cam"
               active={isCameraEnabled}
               onClick={handleToggleCamera}
-              devices={cameras.map((c, i) => ({
-                deviceId: c.device.deviceId,
-                label: getDailyDeviceLabel({
-                  label: c.device.label,
-                  kind: c.device.kind,
-                  index: i,
-                }),
-              }))}
-              currentDeviceId={currentCam?.device.deviceId}
-              onSelectDevice={(id) => void handleSelectDevice('camera', id)}
+              topContent={
+                <>
+                  <DropdownMenuLabel className="text-xs text-muted-foreground">
+                    Background
+                  </DropdownMenuLabel>
+                  {(
+                    [
+                      { value: 'none', label: 'No background', icon: CircleOff },
+                      { value: 'blur-soft', label: 'Blur', icon: Blend },
+                      { value: 'blur-strong', label: 'Strong blur', icon: CloudFog },
+                    ] as const
+                  ).map(({ value, label, icon: Icon }) => (
+                    <DropdownMenuItem
+                      key={value}
+                      onClick={() => void handleSelectBackgroundPreset(value)}
+                      className={backgroundPreset === value ? 'bg-accent' : ''}
+                    >
+                      <Icon className="h-4 w-4 shrink-0" />
+                      <span>{label}</span>
+                    </DropdownMenuItem>
+                  ))}
+                </>
+              }
+              deviceGroups={[
+                {
+                  label: 'Camera',
+                  devices: cameras.map((c, i) => ({
+                    deviceId: c.device.deviceId,
+                    label: getDailyDeviceLabel({
+                      label: c.device.label,
+                      kind: c.device.kind,
+                      index: i,
+                    }),
+                  })),
+                  currentDeviceId: currentCam?.device.deviceId,
+                  onSelectDevice: (id) => void handleSelectDevice('camera', id),
+                },
+              ]}
             />
             <InCallButtonWithPicker
               icon={
@@ -1271,16 +1356,46 @@ function DailyLiveSessionSurface({
               label="Mic"
               active={isMicEnabled}
               onClick={handleToggleMic}
-              devices={microphones.map((m, i) => ({
-                deviceId: m.device.deviceId,
-                label: getDailyDeviceLabel({
-                  label: m.device.label,
-                  kind: m.device.kind,
-                  index: i,
-                }),
-              }))}
-              currentDeviceId={currentMic?.device.deviceId}
-              onSelectDevice={(id) => void handleSelectDevice('microphone', id)}
+              deviceGroups={[
+                {
+                  label: 'Microphone',
+                  devices: microphones.map((m, i) => ({
+                    deviceId: m.device.deviceId,
+                    label: getDailyDeviceLabel({
+                      label: m.device.label,
+                      kind: m.device.kind,
+                      index: i,
+                    }),
+                  })),
+                  currentDeviceId: currentMic?.device.deviceId,
+                  onSelectDevice: (id) => void handleSelectDevice('microphone', id),
+                },
+                {
+                  label: 'Speaker',
+                  devices: speakers.map((s, i) => ({
+                    deviceId: s.device.deviceId,
+                    label: getDailyDeviceLabel({
+                      label: s.device.label,
+                      kind: s.device.kind,
+                      index: i,
+                    }),
+                  })),
+                  currentDeviceId: currentSpeaker?.device.deviceId,
+                  onSelectDevice: (id) => void handleSelectDevice('speaker', id),
+                },
+              ]}
+              bottomContent={
+                <div className="flex items-center justify-between gap-3 px-2 py-1.5">
+                  <div className="flex items-center gap-2 text-sm">
+                    <AudioLines className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span className="font-medium">Noise cancellation</span>
+                  </div>
+                  <Switch
+                    checked={isNoiseCancellationEnabled}
+                    onCheckedChange={(v) => void handleToggleNoiseCancellation(v)}
+                  />
+                </div>
+              }
             />
             {!isDirectCall ? (
               <InCallButton
@@ -1331,6 +1446,7 @@ export function DailyLiveSessionEmbed({
   onPanelModeChange,
   onJoined,
   onLeave,
+  onFetchParticipantCount,
 }: {
   joinUrl: string;
   token?: string | null;
@@ -1352,6 +1468,7 @@ export function DailyLiveSessionEmbed({
   ) => void;
   onJoined?: () => void;
   onLeave: (path: string) => void;
+  onFetchParticipantCount?: () => Promise<{ count: number; names: string[] }>;
 }) {
   const callObject = useCallObject({
     options: {
@@ -1402,6 +1519,7 @@ export function DailyLiveSessionEmbed({
         onPanelModeChange={onPanelModeChange}
         onJoined={onJoined}
         onLeave={onLeave}
+        onFetchParticipantCount={onFetchParticipantCount}
       />
     </DailyProvider>
   );
