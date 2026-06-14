@@ -27,14 +27,17 @@ import type { DailyInputSettings } from '@daily-co/daily-js';
 import {
   AudioLines,
   Blend,
+  Check,
   ChevronDown,
   CircleOff,
   CloudFog,
+  Link,
   Loader2,
   Mic,
   MicOff,
   MonitorUp,
   PhoneOff,
+  ShieldUser,
   Users,
   Video,
   VideoOff,
@@ -178,7 +181,7 @@ function PreJoinDeviceSetupCard({
   userAvatarUrl?: string | null;
   linkedChildren?: LinkedChildProfile[];
   selectedChildId?: string | null;
-  onSelectChild?: (id: string) => void;
+  onSelectChild?: (id: string | null) => void;
   isCameraEnabled: boolean;
   isMicEnabled: boolean;
   isPreparingPreview: boolean;
@@ -208,12 +211,18 @@ function PreJoinDeviceSetupCard({
   const audioTrack = participant?.tracks.audio.persistentTrack;
 
   const hasChildren = linkedChildren && linkedChildren.length > 0;
-  const selectedChild = hasChildren
-    ? (linkedChildren.find((c) => c.id === selectedChildId) ?? linkedChildren[0]!)
-    : null;
-  // In the pre-join preview, show the child's identity when joining as a guardian
-  const displayName = selectedChild?.displayName ?? userName;
-  const displayAvatarUrl = selectedChild?.avatarUrl ?? userAvatarUrl;
+  // null selectedChildId means the parent/guardian is joining as themselves
+  const isJoiningAsParent = hasChildren && selectedChildId === null;
+  const selectedChild =
+    hasChildren && !isJoiningAsParent
+      ? (linkedChildren.find((c) => c.id === selectedChildId) ?? linkedChildren[0]!)
+      : null;
+  const displayName = isJoiningAsParent
+    ? userName
+    : (selectedChild?.displayName ?? userName);
+  const displayAvatarUrl = isJoiningAsParent
+    ? userAvatarUrl
+    : (selectedChild?.avatarUrl ?? userAvatarUrl);
 
   const participantInitials = getDailyParticipantInitials(displayName);
   const showVideo = !!videoTrack && isCameraEnabled;
@@ -300,53 +309,39 @@ function PreJoinDeviceSetupCard({
           </div>
         )}
 
-        {/* Child switcher — top-right of video area (guardian accounts only) */}
+        {/* Identity switcher — top-right of video area (guardian accounts only) */}
         {hasChildren && !isPreparingPreview ? (
           <div className="absolute right-3 top-3 z-30">
-            {linkedChildren!.length === 1 ? (
-              <div className="flex items-center gap-1.5 rounded-full bg-black/50 px-2.5 py-1 backdrop-blur-sm">
-                <Avatar className="h-5 w-5">
-                  {selectedChild?.avatarUrl ? (
-                    <AvatarImage src={selectedChild.avatarUrl} alt="" />
-                  ) : null}
-                  <AvatarFallback className="text-[10px]">
-                    {getDailyParticipantInitials(selectedChild?.displayName)}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="text-xs font-medium text-white">
-                  {selectedChild?.displayName}
-                </span>
-              </div>
-            ) : (
-              <Popover>
-                <PopoverTrigger asChild>
-                  <button
-                    type="button"
-                    className="flex items-center gap-1.5 rounded-full bg-black/50 px-2.5 py-1 backdrop-blur-sm transition-colors hover:bg-black/70"
-                  >
-                    <Avatar className="h-5 w-5">
-                      {selectedChild?.avatarUrl ? (
-                        <AvatarImage src={selectedChild.avatarUrl} alt="" />
-                      ) : null}
-                      <AvatarFallback className="text-[10px]">
-                        {getDailyParticipantInitials(selectedChild?.displayName)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="text-xs font-medium text-white">
-                      {selectedChild?.displayName}
-                    </span>
-                    <ChevronDown className="h-3 w-3 text-white/80" />
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent side="bottom" align="end" className="w-48 gap-0 p-1">
-                  {linkedChildren!.map((child) => (
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="flex items-center gap-1.5 rounded-full bg-black/50 px-2.5 py-1 backdrop-blur-sm transition-colors hover:bg-black/70"
+                >
+                  <Avatar className="h-5 w-5">
+                    {displayAvatarUrl ? (
+                      <AvatarImage src={displayAvatarUrl} alt="" />
+                    ) : null}
+                    <AvatarFallback className="text-[10px]">
+                      {getDailyParticipantInitials(displayName ?? undefined)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="text-xs font-medium text-white">{displayName}</span>
+                  <ChevronDown className="h-3 w-3 text-white/80" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent side="bottom" align="end" className="w-52 gap-0 p-1">
+                {/* Children first */}
+                {linkedChildren!.map((child) => {
+                  const isSelected = selectedChildId === child.id;
+                  return (
                     <button
                       key={child.id}
                       type="button"
                       onClick={() => onSelectChild?.(child.id)}
                       className={[
                         'flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors',
-                        (selectedChildId ?? linkedChildren![0]?.id) === child.id
+                        isSelected
                           ? 'bg-primary text-primary-foreground'
                           : 'text-foreground hover:bg-muted',
                       ].join(' ')}
@@ -361,10 +356,33 @@ function PreJoinDeviceSetupCard({
                       </Avatar>
                       <span className="truncate">{child.displayName}</span>
                     </button>
-                  ))}
-                </PopoverContent>
-              </Popover>
-            )}
+                  );
+                })}
+                {/* Divider + parent option */}
+                <div className="my-1 border-t border-border" />
+                <button
+                  type="button"
+                  onClick={() => onSelectChild?.(null)}
+                  className={[
+                    'flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors',
+                    isJoiningAsParent
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-foreground hover:bg-muted',
+                  ].join(' ')}
+                >
+                  <Avatar className="h-6 w-6 shrink-0">
+                    {userAvatarUrl ? <AvatarImage src={userAvatarUrl} alt="" /> : null}
+                    <AvatarFallback className="text-xs">
+                      {getDailyParticipantInitials(userName ?? undefined)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="truncate">{userName}</span>
+                  <span className="ml-auto shrink-0" title="Parent account">
+                    <ShieldUser className="h-3.5 w-3.5 opacity-60" />
+                  </span>
+                </button>
+              </PopoverContent>
+            </Popover>
           </div>
         ) : null}
 
@@ -568,7 +586,6 @@ function DailyParticipantTile({
     <VideoParticipant
       name={participantLabel}
       isMuted={isMicMuted}
-      isActive={isSpeaking}
       isSpeaking={isSpeaking}
       initials={participantInitials}
       autoHeight={isStrip}
@@ -751,8 +768,7 @@ function DailyLiveSessionSurface({
   callObject,
   joinUrl,
   token,
-  // externalJoinUrl kept in signature for API compatibility but no longer used in-surface
-  externalJoinUrl: _externalJoinUrl,
+  externalJoinUrl,
   channelKind,
   mode,
   returnPath,
@@ -820,6 +836,7 @@ function DailyLiveSessionSurface({
   const [hasStartedJoin, setHasStartedJoin] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
   const [isMicEnabled, setIsMicEnabled] = useState(false);
   const [isCameraEnabled, setIsCameraEnabled] = useState(false);
   const [, forceParticipantTrackRefresh] = useReducer((value: number) => value + 1, 0);
@@ -995,8 +1012,12 @@ function DailyLiveSessionSurface({
     setIsJoining(true);
     setError(null);
     try {
+      // null selectedChildId = guardian joining as themselves; otherwise use selected child (default: first child)
       const effectiveChild =
-        linkedChildren?.find((c) => c.id === selectedChildId) ?? linkedChildren?.[0];
+        selectedChildId === null
+          ? null
+          : (linkedChildren?.find((c) => c.id === selectedChildId) ??
+            linkedChildren?.[0]);
       const effectiveName = effectiveChild?.displayName ?? userName ?? undefined;
       await callObject.join({
         url: joinUrl,
@@ -1006,10 +1027,9 @@ function DailyLiveSessionSurface({
         startAudioOff: !isMicEnabled,
       });
       // The meeting token has the parent's user_name baked in and takes precedence
-      // over the userName passed to join(). Override it after joining when a child
-      // identity is selected.
-      if (effectiveChild?.displayName) {
-        callObject.setUserName(effectiveChild.displayName);
+      // over the userName passed to join(). Always override to ensure the chosen identity is used.
+      if (effectiveName) {
+        callObject.setUserName(effectiveName);
       }
     } catch (joinError: unknown) {
       setIsJoining(false);
@@ -1067,6 +1087,16 @@ function DailyLiveSessionSurface({
     const next = !isCameraEnabled;
     callObject.setLocalVideo(next);
     setIsCameraEnabled(next);
+  };
+
+  const handleCopyJoinLink = () => {
+    // Use the current page URL so invitees land on the full web app (whiteboard included),
+    // not the raw Daily room URL.
+    const url = window.location.href;
+    void navigator.clipboard.writeText(url).then(() => {
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    });
   };
 
   const handleToggleScreenShare = () => {
@@ -1297,130 +1327,159 @@ function DailyLiveSessionSurface({
           )}
 
           {/* ── Control bar (Cam / Mic / Share / Leave) ── */}
-          <div className="flex shrink-0 items-center justify-center gap-2 border-t border-border bg-card px-4 py-3 md:gap-4">
-            <InCallButtonWithPicker
-              icon={
-                isCameraEnabled ? (
-                  <Video className="h-5 w-5" />
-                ) : (
-                  <VideoOff className="h-5 w-5" />
-                )
-              }
-              label="Cam"
-              active={isCameraEnabled}
-              onClick={handleToggleCamera}
-              topContent={
-                <>
-                  <DropdownMenuLabel className="text-xs text-muted-foreground">
-                    Background
-                  </DropdownMenuLabel>
-                  {(
-                    [
-                      { value: 'none', label: 'No background', icon: CircleOff },
-                      { value: 'blur-soft', label: 'Blur', icon: Blend },
-                      { value: 'blur-strong', label: 'Strong blur', icon: CloudFog },
-                    ] as const
-                  ).map(({ value, label, icon: Icon }) => (
-                    <DropdownMenuItem
-                      key={value}
-                      onClick={() => void handleSelectBackgroundPreset(value)}
-                      className={backgroundPreset === value ? 'bg-accent' : ''}
-                    >
-                      <Icon className="h-4 w-4 shrink-0" />
-                      <span>{label}</span>
-                    </DropdownMenuItem>
-                  ))}
-                </>
-              }
-              deviceGroups={[
-                {
-                  label: 'Camera',
-                  devices: cameras.map((c, i) => ({
-                    deviceId: c.device.deviceId,
-                    label: getDailyDeviceLabel({
-                      label: c.device.label,
-                      kind: c.device.kind,
-                      index: i,
-                    }),
-                  })),
-                  currentDeviceId: currentCam?.device.deviceId,
-                  onSelectDevice: (id) => void handleSelectDevice('camera', id),
-                },
-              ]}
-            />
-            <InCallButtonWithPicker
-              icon={
-                isMicEnabled ? (
-                  <Mic className="h-5 w-5" />
-                ) : (
-                  <MicOff className="h-5 w-5" />
-                )
-              }
-              label="Mic"
-              active={isMicEnabled}
-              onClick={handleToggleMic}
-              deviceGroups={[
-                {
-                  label: 'Microphone',
-                  devices: microphones.map((m, i) => ({
-                    deviceId: m.device.deviceId,
-                    label: getDailyDeviceLabel({
-                      label: m.device.label,
-                      kind: m.device.kind,
-                      index: i,
-                    }),
-                  })),
-                  currentDeviceId: currentMic?.device.deviceId,
-                  onSelectDevice: (id) => void handleSelectDevice('microphone', id),
-                },
-                {
-                  label: 'Speaker',
-                  devices: speakers.map((s, i) => ({
-                    deviceId: s.device.deviceId,
-                    label: getDailyDeviceLabel({
-                      label: s.device.label,
-                      kind: s.device.kind,
-                      index: i,
-                    }),
-                  })),
-                  currentDeviceId: currentSpeaker?.device.deviceId,
-                  onSelectDevice: (id) => void handleSelectDevice('speaker', id),
-                },
-              ]}
-              bottomContent={
-                <div className="flex items-center justify-between gap-3 px-2 py-1.5">
-                  <div className="flex items-center gap-2 text-sm">
-                    <AudioLines className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    <span className="font-medium">Noise cancellation</span>
-                  </div>
-                  <Switch
-                    checked={isNoiseCancellationEnabled}
-                    onCheckedChange={(v) => void handleToggleNoiseCancellation(v)}
-                  />
-                </div>
-              }
-            />
-            {!isDirectCall ? (
-              <InCallButton
-                icon={<MonitorUp className="h-5 w-5" />}
-                label="Share"
-                active={isScreenSharing}
-                onClick={handleToggleScreenShare}
+          <div className="flex shrink-0 items-center border-t border-border bg-card px-4 py-3">
+            {/* Left — session title */}
+            <div className="flex min-w-0 flex-1 items-center">
+              {meetingName?.trim() ? (
+                <p className="truncate text-sm font-medium text-foreground">
+                  {meetingName.trim()}
+                </p>
+              ) : null}
+            </div>
+
+            {/* Centre — controls */}
+            <div className="flex items-center gap-2 md:gap-4">
+              <InCallButtonWithPicker
+                icon={
+                  isCameraEnabled ? (
+                    <Video className="h-5 w-5" />
+                  ) : (
+                    <VideoOff className="h-5 w-5" />
+                  )
+                }
+                label="Cam"
+                active={isCameraEnabled}
+                onClick={handleToggleCamera}
+                topContent={
+                  <>
+                    <DropdownMenuLabel className="text-xs text-muted-foreground">
+                      Background
+                    </DropdownMenuLabel>
+                    {(
+                      [
+                        { value: 'none', label: 'No background', icon: CircleOff },
+                        { value: 'blur-soft', label: 'Blur', icon: Blend },
+                        { value: 'blur-strong', label: 'Strong blur', icon: CloudFog },
+                      ] as const
+                    ).map(({ value, label, icon: Icon }) => (
+                      <DropdownMenuItem
+                        key={value}
+                        onClick={() => void handleSelectBackgroundPreset(value)}
+                        className={backgroundPreset === value ? 'bg-accent' : ''}
+                      >
+                        <Icon className="h-4 w-4 shrink-0" />
+                        <span>{label}</span>
+                      </DropdownMenuItem>
+                    ))}
+                  </>
+                }
+                deviceGroups={[
+                  {
+                    label: 'Camera',
+                    devices: cameras.map((c, i) => ({
+                      deviceId: c.device.deviceId,
+                      label: getDailyDeviceLabel({
+                        label: c.device.label,
+                        kind: c.device.kind,
+                        index: i,
+                      }),
+                    })),
+                    currentDeviceId: currentCam?.device.deviceId,
+                    onSelectDevice: (id) => void handleSelectDevice('camera', id),
+                  },
+                ]}
               />
-            ) : null}
-            <InCallButton
-              icon={
-                isLeaving ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
+              <InCallButtonWithPicker
+                icon={
+                  isMicEnabled ? (
+                    <Mic className="h-5 w-5" />
+                  ) : (
+                    <MicOff className="h-5 w-5" />
+                  )
+                }
+                label="Mic"
+                active={isMicEnabled}
+                onClick={handleToggleMic}
+                deviceGroups={[
+                  {
+                    label: 'Microphone',
+                    devices: microphones.map((m, i) => ({
+                      deviceId: m.device.deviceId,
+                      label: getDailyDeviceLabel({
+                        label: m.device.label,
+                        kind: m.device.kind,
+                        index: i,
+                      }),
+                    })),
+                    currentDeviceId: currentMic?.device.deviceId,
+                    onSelectDevice: (id) => void handleSelectDevice('microphone', id),
+                  },
+                  {
+                    label: 'Speaker',
+                    devices: speakers.map((s, i) => ({
+                      deviceId: s.device.deviceId,
+                      label: getDailyDeviceLabel({
+                        label: s.device.label,
+                        kind: s.device.kind,
+                        index: i,
+                      }),
+                    })),
+                    currentDeviceId: currentSpeaker?.device.deviceId,
+                    onSelectDevice: (id) => void handleSelectDevice('speaker', id),
+                  },
+                ]}
+                bottomContent={
+                  <div className="flex items-center justify-between gap-3 px-2 py-1.5">
+                    <div className="flex items-center gap-2 text-sm">
+                      <AudioLines className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span className="font-medium">Noise cancellation</span>
+                    </div>
+                    <Switch
+                      checked={isNoiseCancellationEnabled}
+                      onCheckedChange={(v) => void handleToggleNoiseCancellation(v)}
+                    />
+                  </div>
+                }
+              />
+              {!isDirectCall ? (
+                <InCallButton
+                  icon={<MonitorUp className="h-5 w-5" />}
+                  label="Share"
+                  active={isScreenSharing}
+                  onClick={handleToggleScreenShare}
+                />
+              ) : null}
+              <InCallButton
+                icon={
+                  isLeaving ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    <PhoneOff className="h-5 w-5" />
+                  )
+                }
+                label="Leave"
+                destructive
+                disabled={isLeaving}
+                onClick={() => void handleLeave()}
+              />
+            </div>
+
+            {/* Right — invite button */}
+            <div className="flex flex-1 items-center justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-xs"
+                onClick={handleCopyJoinLink}
+              >
+                {isCopied ? (
+                  <Check className="h-3.5 w-3.5 text-emerald-500" />
                 ) : (
-                  <PhoneOff className="h-5 w-5" />
-                )
-              }
-              label="Leave"
-              destructive
-              disabled={isLeaving}
-              onClick={() => void handleLeave()}
-            />
+                  <Link className="h-3.5 w-3.5" />
+                )}
+                {isCopied ? 'Copied!' : 'Copy invite link'}
+              </Button>
+            </div>
           </div>
         </>
       )}
