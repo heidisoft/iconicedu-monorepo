@@ -31,7 +31,6 @@ import {
   CircleOff,
   CloudFog,
   Loader2,
-  MessageCircle,
   Mic,
   MicOff,
   MonitorUp,
@@ -41,17 +40,10 @@ import {
   Users,
   Video,
   VideoOff,
-  Volume2,
 } from 'lucide-react';
-import { Button } from '@iconicedu/ui-web/ui/button';
+import { Button, buttonVariants } from '@iconicedu/ui-web/ui/button';
+import { cn } from '@iconicedu/ui-web/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@iconicedu/ui-web/ui/avatar';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@iconicedu/ui-web/ui/select';
 import { Switch } from '@iconicedu/ui-web/ui/switch';
 import {
   Popover,
@@ -76,6 +68,12 @@ import {
   isDailyParticipantSpeaking,
 } from '@iconicedu/ui-web/components/live-sessions/daily-live-session-embed.utils';
 import { VideoParticipant } from '@iconicedu/ui-web/components/live-sessions/video-participant';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@iconicedu/ui-web/ui/dropdown-menu';
 
 // ─── Pre-join: Permissions card ──────────────────────────────────────────────
 
@@ -359,113 +357,122 @@ function PreJoinDeviceSetupCard({
         {!isPreparingPreview ? (
           <>
             {/* Dark gradient so buttons are readable over any video frame */}
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-24 bg-linear-to-t from-black/50 to-transparent" />
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-28 bg-linear-to-t from-black/50 to-transparent" />
 
-            {/* 3-column: [background] [camera|mic] [settings] */}
-            <div className="absolute inset-x-0 bottom-0 z-20 grid grid-cols-3 items-center px-4 pb-4">
-              {/* Left: Background effects */}
-              <div className="flex justify-start">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <button
-                      type="button"
-                      aria-label="Background effects"
-                      className={[
-                        'rounded-xl border border-zinc-600 bg-muted p-2.5 transition-colors hover:bg-muted/80',
-                        backgroundPreset !== 'none'
-                          ? 'ring-2 ring-white/80 ring-offset-1 ring-offset-transparent'
-                          : '',
-                      ].join(' ')}
-                    >
-                      <ScanFace className="h-5 w-5 text-foreground" />
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent side="top" align="start">
-                    <PopoverHeader>
-                      <PopoverTitle>Background</PopoverTitle>
-                      <PopoverDescription>
-                        Choose a virtual background effect.
-                      </PopoverDescription>
-                    </PopoverHeader>
-                    <div className="flex flex-col gap-1">
-                      {(
-                        [
-                          { value: 'none', label: 'No background', icon: CircleOff },
-                          { value: 'blur-soft', label: 'Blur', icon: Blend },
-                          { value: 'blur-strong', label: 'Strong blur', icon: CloudFog },
-                        ] as const
-                      ).map(({ value, label, icon: Icon }) => (
-                        <button
-                          key={value}
-                          type="button"
-                          onClick={() => onSelectBackgroundPreset(value)}
-                          className={[
-                            'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-                            backgroundPreset === value
-                              ? 'bg-primary text-primary-foreground'
-                              : 'text-foreground hover:bg-muted',
-                          ].join(' ')}
-                        >
-                          <Icon className="h-4 w-4 shrink-0" />
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                  </PopoverContent>
-                </Popover>
-              </div>
+            {/* 3-column: [empty] [camera|mic] [settings] */}
+            <div className="absolute inset-x-0 bottom-0 z-20 grid grid-cols-3 items-end px-4 pb-4">
+              {/* Left: empty */}
+              <div />
 
-              {/* Center: Camera + Mic */}
-              <div className="flex items-center justify-center gap-3">
-                <button
-                  type="button"
-                  aria-label={isCameraEnabled ? 'Turn off camera' : 'Turn on camera'}
+              {/* Center: Camera + Mic with device pickers */}
+              <div className="flex items-end justify-center gap-3">
+                <InCallButtonWithPicker
+                  icon={
+                    isCameraEnabled ? (
+                      <Video className="h-5 w-5" />
+                    ) : (
+                      <VideoOff className="h-5 w-5" />
+                    )
+                  }
+                  label="Cam"
+                  active={isCameraEnabled}
                   onClick={onToggleCamera}
-                  className="rounded-xl border border-zinc-600 bg-muted p-2.5 transition-colors hover:bg-muted/80"
-                >
-                  {isCameraEnabled ? (
-                    <Video className="h-5 w-5 text-foreground" />
-                  ) : (
-                    <VideoOff className="h-5 w-5 text-foreground" />
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  aria-label={isMicEnabled ? 'Mute microphone' : 'Unmute microphone'}
-                  onClick={onToggleMic}
+                  devices={cameras.map((c, i) => ({
+                    deviceId: c.device.deviceId,
+                    label: getDailyDeviceLabel({
+                      label: c.device.label,
+                      kind: c.device.kind,
+                      index: i,
+                    }),
+                  }))}
+                  currentDeviceId={currentCam?.device.deviceId}
+                  onSelectDevice={onSelectCamera}
+                />
+                <div
                   className={[
-                    'rounded-xl border bg-muted p-2.5 transition-shadow duration-700 ease-in-out hover:bg-muted/80',
+                    'transition-shadow duration-700 ease-in-out',
                     isSpeaking
-                      ? 'border-green-500 shadow-[0_0_0_4px_rgba(34,197,94,0.85)]'
-                      : 'border-zinc-600 shadow-none',
+                      ? 'rounded-xl shadow-[0_0_0_4px_rgba(34,197,94,0.85)]'
+                      : '',
                   ].join(' ')}
                 >
-                  {isMicEnabled ? (
-                    <Mic className="h-5 w-5 text-foreground" />
-                  ) : (
-                    <MicOff className="h-5 w-5 text-foreground" />
-                  )}
-                </button>
+                  <InCallButtonWithPicker
+                    icon={
+                      isMicEnabled ? (
+                        <Mic className="h-5 w-5" />
+                      ) : (
+                        <MicOff className="h-5 w-5" />
+                      )
+                    }
+                    label="Mic"
+                    active={isMicEnabled}
+                    onClick={onToggleMic}
+                    devices={microphones.map((m, i) => ({
+                      deviceId: m.device.deviceId,
+                      label: getDailyDeviceLabel({
+                        label: m.device.label,
+                        kind: m.device.kind,
+                        index: i,
+                      }),
+                    }))}
+                    currentDeviceId={currentMic?.device.deviceId}
+                    onSelectDevice={onSelectMic}
+                  />
+                </div>
               </div>
 
-              {/* Right: Settings */}
+              {/* Right: Settings (background + noise cancellation) */}
               <div className="flex justify-end">
                 <Popover>
                   <PopoverTrigger asChild>
-                    <button
+                    <Button
                       type="button"
-                      aria-label="Audio settings"
-                      className="rounded-xl border border-zinc-600 bg-muted p-2.5 transition-colors hover:bg-muted/80"
+                      size="icon"
+                      variant={backgroundPreset !== 'none' ? 'secondary' : 'outline'}
+                      aria-label="Settings"
                     >
-                      <Settings className="h-5 w-5 text-foreground" />
-                    </button>
+                      <Settings className="h-5 w-5" />
+                    </Button>
                   </PopoverTrigger>
-                  <PopoverContent side="top" align="end">
+                  <PopoverContent side="top" align="end" className="w-64">
                     <PopoverHeader>
-                      <PopoverTitle>Audio settings</PopoverTitle>
+                      <PopoverTitle>Settings</PopoverTitle>
                     </PopoverHeader>
-                    <div className="flex items-center justify-between gap-3">
+
+                    {/* Background */}
+                    <div className="space-y-1.5">
+                      <p className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                        <ScanFace className="h-3.5 w-3.5" />
+                        Background
+                      </p>
+                      <div className="flex flex-col gap-1">
+                        {(
+                          [
+                            { value: 'none', label: 'No background', icon: CircleOff },
+                            { value: 'blur-soft', label: 'Blur', icon: Blend },
+                            {
+                              value: 'blur-strong',
+                              label: 'Strong blur',
+                              icon: CloudFog,
+                            },
+                          ] as const
+                        ).map(({ value, label, icon: Icon }) => (
+                          <Button
+                            key={value}
+                            type="button"
+                            variant={backgroundPreset === value ? 'default' : 'ghost'}
+                            className="justify-start"
+                            onClick={() => onSelectBackgroundPreset(value)}
+                          >
+                            <Icon className="h-4 w-4 shrink-0" />
+                            {label}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Noise cancellation */}
+                    <div className="flex items-center justify-between gap-3 pt-3 border-t border-border">
                       <div className="flex items-start gap-2.5">
                         <AudioLines className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                         <div className="space-y-0.5">
@@ -488,80 +495,8 @@ function PreJoinDeviceSetupCard({
         ) : null}
       </div>
 
-      {/* ── Card bottom: device selects + join button + disclaimer ── */}
+      {/* ── Card bottom: join button + disclaimer ── */}
       <div className="space-y-3 p-5">
-        {/* Device selects */}
-        <div className="space-y-2">
-          {mode !== 'audio' ? (
-            <Select
-              value={currentCam?.device.deviceId ?? ''}
-              onValueChange={onSelectCamera}
-            >
-              <SelectTrigger className="h-12 w-full pl-3.5">
-                <div className="flex min-w-0 items-center gap-2.5">
-                  <Video className="h-4 w-4 shrink-0 text-foreground" />
-                  <SelectValue placeholder="Select camera" />
-                </div>
-              </SelectTrigger>
-              <SelectContent>
-                {cameras.map((cam, i) => (
-                  <SelectItem key={cam.device.deviceId} value={cam.device.deviceId}>
-                    {getDailyDeviceLabel({
-                      label: cam.device.label,
-                      kind: cam.device.kind,
-                      index: i,
-                    })}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : null}
-
-          <Select value={currentMic?.device.deviceId ?? ''} onValueChange={onSelectMic}>
-            <SelectTrigger className="h-12 w-full pl-3.5">
-              <div className="flex min-w-0 items-center gap-2.5">
-                <Mic className="h-4 w-4 shrink-0 text-foreground" />
-                <SelectValue placeholder="Select microphone" />
-              </div>
-            </SelectTrigger>
-            <SelectContent>
-              {microphones.map((mic, i) => (
-                <SelectItem key={mic.device.deviceId} value={mic.device.deviceId}>
-                  {getDailyDeviceLabel({
-                    label: mic.device.label,
-                    kind: mic.device.kind,
-                    index: i,
-                  })}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={currentSpeaker?.device.deviceId ?? ''}
-            onValueChange={onSelectSpeaker}
-          >
-            <SelectTrigger className="h-12 w-full pl-3.5">
-              <div className="flex min-w-0 items-center gap-2.5">
-                <Volume2 className="h-4 w-4 shrink-0 text-foreground" />
-                <SelectValue placeholder="Select speaker" />
-              </div>
-            </SelectTrigger>
-            <SelectContent>
-              {speakers.map((spk, i) => (
-                <SelectItem key={spk.device.deviceId} value={spk.device.deviceId}>
-                  {getDailyDeviceLabel({
-                    label: spk.device.label,
-                    kind: spk.device.kind,
-                    index: i,
-                  })}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Join */}
         <Button
           type="button"
           size="lg"
@@ -700,23 +635,83 @@ function InCallButton({
   destructive?: boolean;
   disabled?: boolean;
 }) {
+  const variant = destructive ? 'destructive' : active ? 'secondary' : 'outline';
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={[
-        'flex flex-col items-center gap-1 rounded-xl px-3 py-2 transition-colors disabled:opacity-50',
-        destructive
-          ? 'bg-red-600 text-white hover:bg-red-700'
-          : active
-            ? 'bg-zinc-700 text-white hover:bg-zinc-600'
-            : 'bg-zinc-800 text-white/60 hover:bg-zinc-700 hover:text-white',
-      ].join(' ')}
+      className={cn(
+        buttonVariants({ variant }),
+        'h-auto flex-col gap-1 rounded-xl px-4 py-2',
+      )}
     >
       <span className="flex h-5 w-5 items-center justify-center">{icon}</span>
       <span className="text-[10px] font-medium">{label}</span>
     </button>
+  );
+}
+
+function InCallButtonWithPicker({
+  icon,
+  label,
+  onClick,
+  active = true,
+  disabled = false,
+  devices,
+  currentDeviceId,
+  onSelectDevice,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  active?: boolean;
+  disabled?: boolean;
+  devices: Array<{ deviceId: string; label: string }>;
+  currentDeviceId?: string | null;
+  onSelectDevice: (deviceId: string) => void;
+}) {
+  const variant = active ? 'secondary' : 'outline';
+  return (
+    <div className="flex items-stretch">
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        className={cn(
+          buttonVariants({ variant }),
+          'h-auto flex-col gap-1 rounded-r-none rounded-l-xl border-r-0 px-4 py-2',
+        )}
+      >
+        <span className="flex h-5 w-5 items-center justify-center">{icon}</span>
+        <span className="text-[10px] font-medium">{label}</span>
+      </button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            aria-label={`${label} settings`}
+            className={cn(
+              buttonVariants({ variant }),
+              'h-auto rounded-l-none rounded-r-xl border-l border-l-border/40 px-2',
+            )}
+          >
+            <ChevronDown className="h-4 w-4" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="center" side="top" className="w-56">
+          {devices.map((d) => (
+            <DropdownMenuItem
+              key={d.deviceId}
+              onClick={() => onSelectDevice(d.deviceId)}
+              className={currentDeviceId === d.deviceId ? 'bg-accent' : ''}
+            >
+              <span className="truncate">{d.label || 'Default device'}</span>
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   );
 }
 
@@ -1241,9 +1236,9 @@ function DailyLiveSessionSurface({
             </div>
           )}
 
-          {/* ── Dark control bar (Cam / Mic / Share / Chat / Leave) ── */}
-          <div className="flex shrink-0 items-center justify-center gap-2 bg-zinc-900 px-4 py-3 md:gap-4">
-            <InCallButton
+          {/* ── Control bar (Cam / Mic / Share / Leave) ── */}
+          <div className="flex shrink-0 items-center justify-center gap-2 border-t border-border bg-card px-4 py-3 md:gap-4">
+            <InCallButtonWithPicker
               icon={
                 isCameraEnabled ? (
                   <Video className="h-5 w-5" />
@@ -1254,8 +1249,18 @@ function DailyLiveSessionSurface({
               label="Cam"
               active={isCameraEnabled}
               onClick={handleToggleCamera}
+              devices={cameras.map((c, i) => ({
+                deviceId: c.device.deviceId,
+                label: getDailyDeviceLabel({
+                  label: c.device.label,
+                  kind: c.device.kind,
+                  index: i,
+                }),
+              }))}
+              currentDeviceId={currentCam?.device.deviceId}
+              onSelectDevice={(id) => void handleSelectDevice('camera', id)}
             />
-            <InCallButton
+            <InCallButtonWithPicker
               icon={
                 isMicEnabled ? (
                   <Mic className="h-5 w-5" />
@@ -1266,6 +1271,16 @@ function DailyLiveSessionSurface({
               label="Mic"
               active={isMicEnabled}
               onClick={handleToggleMic}
+              devices={microphones.map((m, i) => ({
+                deviceId: m.device.deviceId,
+                label: getDailyDeviceLabel({
+                  label: m.device.label,
+                  kind: m.device.kind,
+                  index: i,
+                }),
+              }))}
+              currentDeviceId={currentMic?.device.deviceId}
+              onSelectDevice={(id) => void handleSelectDevice('microphone', id)}
             />
             {!isDirectCall ? (
               <InCallButton
@@ -1275,11 +1290,6 @@ function DailyLiveSessionSurface({
                 onClick={handleToggleScreenShare}
               />
             ) : null}
-            <InCallButton
-              icon={<MessageCircle className="h-5 w-5" />}
-              label="Chat"
-              onClick={() => undefined}
-            />
             <InCallButton
               icon={
                 isLeaving ? (
