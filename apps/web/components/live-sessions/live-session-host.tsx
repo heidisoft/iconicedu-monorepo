@@ -129,6 +129,7 @@ export function LiveSessionHost({
           linkedChildren={linkedChildren}
           liveSessionId={liveSessionId ?? null}
           channelId={channelId ?? null}
+          profileId={profileId ?? null}
           contentSlot={whiteboardSlot}
           whiteboardEnabled={showWhiteboard}
           onLeave={(path) => router.push(path)}

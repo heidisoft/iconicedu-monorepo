@@ -1,5 +1,7 @@
 import type { DailyInputVideoProcessorSettings } from '@daily-co/daily-js';
 
+export type LiveSessionViewType = 'gallery' | 'speaker' | 'shared-content';
+
 export const DAILY_BACKGROUND_PRESET_OPTIONS = [
   { value: 'none', label: 'No background' },
   { value: 'blur-soft', label: 'Blur' },

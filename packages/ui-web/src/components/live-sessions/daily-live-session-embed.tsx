@@ -1,5 +1,7 @@
 'use client';
 
+const NOTIFICATION_DISMISS_MS = 7_000;
+
 import React, {
   useCallback,
   useEffect,
@@ -30,6 +32,8 @@ import {
   Blend,
   Check,
   ChevronDown,
+  Circle,
+  Hand,
   LayoutGrid,
   Monitor,
   Share2,
@@ -67,10 +71,10 @@ import {
   isDailyParticipantMicMuted,
   isDailyParticipantSpeaking,
   parseSessionError,
+  type LiveSessionViewType,
 } from '@iconicedu/ui-web/components/live-sessions/daily-live-session-embed.utils';
 import { Alert, AlertDescription, AlertTitle } from '@iconicedu/ui-web/ui/alert';
 import { VideoParticipant } from '@iconicedu/ui-web/components/live-sessions/video-participant';
-import type { LiveSessionViewType } from '@iconicedu/ui-web/components/live-sessions/view-switcher';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -552,10 +556,12 @@ function PreJoinDeviceSetupCard({
 function DailyParticipantTile({
   sessionId,
   isLocal,
+  isHandRaised,
   variant = 'default',
 }: {
   sessionId: string;
   isLocal?: boolean;
+  isHandRaised?: boolean;
   variant?: 'default' | 'floating' | 'strip';
 }) {
   const participant = useParticipant(sessionId);
@@ -596,6 +602,7 @@ function DailyParticipantTile({
       name={participantLabel}
       isMuted={isMicMuted}
       isSpeaking={isSpeaking}
+      isHandRaised={isHandRaised}
       initials={participantInitials}
       autoHeight={isStrip}
       aspectClassName="aspect-video"
@@ -657,6 +664,7 @@ function InCallButton({
   active = true,
   destructive = false,
   disabled = false,
+  ariaLabel,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -664,6 +672,7 @@ function InCallButton({
   active?: boolean;
   destructive?: boolean;
   disabled?: boolean;
+  ariaLabel?: string;
 }) {
   const variant = destructive ? 'destructive' : active ? 'secondary' : 'outline';
   return (
@@ -671,6 +680,7 @@ function InCallButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
+      aria-label={ariaLabel ?? label}
       className={cn(
         buttonVariants({ variant }),
         'h-auto flex-col gap-1 rounded-xl px-4 py-2',
@@ -695,6 +705,7 @@ function InCallButtonWithPicker({
   onClick,
   active = true,
   disabled = false,
+  ariaLabel,
   deviceGroups,
   topContent,
   bottomContent,
@@ -704,6 +715,7 @@ function InCallButtonWithPicker({
   onClick: () => void;
   active?: boolean;
   disabled?: boolean;
+  ariaLabel?: string;
   deviceGroups: DeviceGroup[];
   topContent?: React.ReactNode;
   bottomContent?: React.ReactNode;
@@ -715,6 +727,7 @@ function InCallButtonWithPicker({
         type="button"
         onClick={onClick}
         disabled={disabled}
+        aria-label={ariaLabel ?? label}
         className={cn(
           buttonVariants({ variant }),
           'h-auto flex-col gap-1 rounded-r-none rounded-l-xl border-r-0 px-4 py-2',
@@ -772,6 +785,39 @@ function InCallButtonWithPicker({
   );
 }
 
+// ─── Participants panel row ───────────────────────────────────────────────────
+
+function ParticipantPanelRow({
+  sessionId,
+  isLocal,
+  isHandRaised,
+}: {
+  sessionId: string;
+  isLocal?: boolean;
+  isHandRaised?: boolean;
+}) {
+  const participant = useParticipant(sessionId);
+  const label = getDailyParticipantLabel({ isLocal, userName: participant?.user_name });
+  const isMuted = isDailyParticipantMicMuted({
+    audioState: participant?.tracks.audio.state,
+  });
+
+  return (
+    <div className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 hover:bg-muted/50">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-semibold text-secondary-foreground">
+        {getDailyParticipantInitials(participant?.user_name)}
+      </div>
+      <span className="flex-1 truncate text-sm font-medium">{label}</span>
+      {isHandRaised && <span className="text-sm">✋</span>}
+      {isMuted ? (
+        <MicOff className="h-3.5 w-3.5 shrink-0 text-red-400" />
+      ) : (
+        <Mic className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+      )}
+    </div>
+  );
+}
+
 // ─── Main surface ─────────────────────────────────────────────────────────────
 
 function DailyLiveSessionSurface({
@@ -788,11 +834,11 @@ function DailyLiveSessionSurface({
   linkedChildren,
   liveSessionId,
   channelId,
+  profileId,
   contentSlot,
-  // whiteboardEnabled/panelMode/onPanelModeChange kept in signature for future use
   whiteboardEnabled: _whiteboardEnabled,
-  panelMode: _panelMode,
-  onPanelModeChange: _onPanelModeChange,
+  panelMode,
+  onPanelModeChange,
   onJoined,
   onLeave,
   onFetchParticipantCount,
@@ -809,6 +855,7 @@ function DailyLiveSessionSurface({
   userAvatarUrl?: string | null;
   linkedChildren?: LinkedChildProfile[];
   liveSessionId?: string | null;
+  profileId?: string | null;
   channelId?: string | null;
   contentSlot?: ReactNode;
   whiteboardEnabled?: boolean;
@@ -854,7 +901,18 @@ function DailyLiveSessionSurface({
   const [activeSpeakerSessionId, setActiveSpeakerSessionId] = useState<string | null>(
     null,
   );
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingId, setRecordingId] = useState<string | null>(null);
+  const [isHandRaised, setIsHandRaised] = useState(false);
+  const [raisedHands, setRaisedHands] = useState<Map<string, boolean>>(new Map());
+  const [showParticipants, setShowParticipants] = useState(false);
   const preShareViewMode = useRef<LiveSessionViewType>('shared-content');
+
+  useEffect(() => {
+    if (!panelMode) return;
+    setViewMode(panelMode === 'video' ? 'gallery' : 'shared-content');
+  }, [panelMode]);
+
   const [notifications, setNotifications] = useState<
     Array<{ id: string; title: string; description: string }>
   >([]);
@@ -862,7 +920,10 @@ function DailyLiveSessionSurface({
   const showError = useCallback((title: string, description: string) => {
     const id = Math.random().toString(36).slice(2);
     setNotifications((prev) => [...prev, { id, title, description }]);
-    setTimeout(() => setNotifications((prev) => prev.filter((n) => n.id !== id)), 7000);
+    setTimeout(
+      () => setNotifications((prev) => prev.filter((n) => n.id !== id)),
+      NOTIFICATION_DISMISS_MS,
+    );
   }, []);
 
   const dismissNotification = useCallback((id: string) => {
@@ -892,10 +953,23 @@ function DailyLiveSessionSurface({
   const isNoiseCancellationEnabled =
     inputSettings?.audio?.processor?.type === 'noise-cancellation';
 
+  const recordAttendance = useCallback(
+    (action: 'join' | 'leave') => {
+      if (!liveSessionId || !channelId || !profileId) return;
+      void fetch(`/api/channels/${channelId}/live-sessions/${liveSessionId}/attendance`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, profileId, timestamp: new Date().toISOString() }),
+      }).catch(() => undefined);
+    },
+    [liveSessionId, channelId, profileId],
+  );
+
   const handleLeftMeeting = useCallback(() => {
+    recordAttendance('leave');
     if (!shouldRouteOnLeaveRef.current) return;
     onLeave(returnPath);
-  }, [returnPath, onLeave]);
+  }, [returnPath, onLeave, recordAttendance]);
 
   const handleError = useCallback(
     (event: { errorMsg?: string } | undefined) => {
@@ -946,9 +1020,56 @@ function DailyLiveSessionSurface({
       setViewMode(preShareViewMode.current);
     }, []),
   );
+  const [sharingSessionIds, setSharingSessionIds] = useState<Set<string>>(new Set());
+
   useDailyEvent(
     'track-started',
-    useCallback(() => forceParticipantTrackRefresh(), []),
+    useCallback(
+      (
+        ev:
+          | {
+              participant?: { session_id?: string; screen?: boolean } | null;
+              track?: { kind?: string };
+            }
+          | undefined,
+      ) => {
+        forceParticipantTrackRefresh();
+        if (
+          ev?.participant?.screen &&
+          ev?.track?.kind === 'video' &&
+          ev.participant.session_id
+        ) {
+          setSharingSessionIds((prev) => new Set([...prev, ev.participant!.session_id!]));
+        }
+      },
+      [],
+    ),
+  );
+  useDailyEvent(
+    'track-stopped',
+    useCallback(
+      (
+        ev:
+          | {
+              participant?: { session_id?: string; screen?: boolean } | null;
+              track?: { kind?: string };
+            }
+          | undefined,
+      ) => {
+        if (
+          ev?.participant?.screen &&
+          ev?.track?.kind === 'video' &&
+          ev.participant.session_id
+        ) {
+          setSharingSessionIds((prev) => {
+            const next = new Set(prev);
+            next.delete(ev.participant!.session_id!);
+            return next;
+          });
+        }
+      },
+      [],
+    ),
   );
   useDailyEvent(
     'active-speaker-change',
@@ -965,10 +1086,64 @@ function DailyLiveSessionSurface({
       setHasStartedJoin(true);
       setError(null);
       forceParticipantTrackRefresh();
+      recordAttendance('join');
       onJoined?.();
-      // onJoined is a stable ref from the parent — safe to omit
+      // onJoined + recordAttendance are stable refs — safe to omit
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []),
+  );
+  useDailyEvent(
+    'network-quality-change',
+    useCallback(
+      (ev: { threshold?: string } | undefined) => {
+        if (ev?.threshold === 'very-low') {
+          showError(
+            'Poor connection',
+            'Your internet connection is weak. Video quality may be reduced.',
+          );
+        }
+      },
+      [showError],
+    ),
+  );
+  useDailyEvent(
+    'network-connection',
+    useCallback(
+      (ev: { event?: string } | undefined) => {
+        if (ev?.event === 'interrupted') {
+          showError('Connection lost', 'Reconnecting to the session…');
+        }
+      },
+      [showError],
+    ),
+  );
+  useDailyEvent(
+    'camera-error',
+    useCallback(
+      (ev: { errorMsg?: { errorMsg?: string } } | undefined) => {
+        const raw = ev?.errorMsg?.errorMsg ?? 'Camera error';
+        const { title, description } = parseSessionError(raw);
+        showError(title, description);
+      },
+      [showError],
+    ),
+  );
+  useDailyEvent(
+    'nonfatal-error',
+    useCallback(
+      (ev: { errorMsg?: string; type?: string } | undefined) => {
+        if (ev?.type === 'cam-in-use' || ev?.type === 'mic-in-use') {
+          showError(
+            'Device already in use',
+            'Your camera or microphone is being used by another app. Close other video apps and try again.',
+          );
+        } else if (ev?.errorMsg) {
+          const { title, description } = parseSessionError(ev.errorMsg);
+          showError(title, description);
+        }
+      },
+      [showError],
+    ),
   );
 
   // Start camera preview on mount
@@ -1109,15 +1284,8 @@ function DailyLiveSessionSurface({
   // callObject.participants() which is a snapshot and won't trigger re-renders.
   const isScreenSharing = localParticipant?.tracks.screenVideo.state === 'playable';
 
-  const activeScreenShareSessionId = (() => {
-    const participants = callObject.participants();
-    for (const sessionId of participantIds) {
-      if (participants[sessionId]?.tracks.screenVideo.state === 'playable') {
-        return sessionId;
-      }
-    }
-    return null;
-  })();
+  const activeScreenShareSessionId =
+    [...sharingSessionIds].find((id) => participantIds.includes(id)) ?? null;
 
   const applyInputSettings = useCallback(
     async (nextInputSettings: DailyInputSettings) => {
@@ -1203,6 +1371,120 @@ function DailyLiveSessionSurface({
       },
     });
   };
+
+  const handleToggleRecording = async () => {
+    if (!liveSessionId || !channelId) return;
+    try {
+      const res = await fetch(
+        `/api/channels/${channelId}/live-sessions/${liveSessionId}/recording`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: isRecording ? 'stop' : 'start',
+            ...(isRecording && recordingId ? { recordingId } : {}),
+          }),
+        },
+      );
+      const data = (await res.json()) as {
+        success?: boolean;
+        recordingId?: string;
+        error?: string;
+      };
+      if (!res.ok || !data.success) {
+        showError(
+          'Recording failed',
+          data.error ?? 'Could not toggle recording. Please try again.',
+        );
+        return;
+      }
+      if (data.recordingId) {
+        setRecordingId(data.recordingId);
+        setIsRecording(true);
+      } else {
+        setRecordingId(null);
+        setIsRecording(false);
+      }
+    } catch {
+      showError(
+        'Recording failed',
+        'Could not connect to the recording service. Please try again.',
+      );
+    }
+  };
+
+  useDailyEvent(
+    'recording-started',
+    useCallback((ev: { recordingId?: string } | undefined) => {
+      setIsRecording(true);
+      if (ev?.recordingId) setRecordingId(ev.recordingId);
+    }, []),
+  );
+  useDailyEvent(
+    'recording-stopped',
+    useCallback(() => {
+      setIsRecording(false);
+      setRecordingId(null);
+    }, []),
+  );
+
+  const handleToggleHandRaise = () => {
+    const next = !isHandRaised;
+    setIsHandRaised(next);
+    callObject.sendAppMessage({ event: 'hand-raise', raised: next }, '*');
+  };
+
+  useDailyEvent(
+    'app-message',
+    useCallback(
+      (
+        ev: { data?: { event?: string; raised?: boolean }; fromId?: string } | undefined,
+      ) => {
+        if (ev?.data?.event === 'hand-raise' && ev.fromId) {
+          const raised = Boolean(ev.data.raised);
+          setRaisedHands((prev) => {
+            const next = new Map(prev);
+            if (raised) {
+              next.set(ev.fromId!, true);
+            } else {
+              next.delete(ev.fromId!);
+            }
+            return next;
+          });
+          if (raised) {
+            const senderName =
+              callObject.participants()[ev.fromId]?.user_name ?? 'Someone';
+            showError('Hand raised', `✋ ${senderName} raised their hand`);
+          }
+        }
+      },
+      [callObject, showError],
+    ),
+  );
+
+  useEffect(() => {
+    if (meetingState !== 'joined-meeting') return;
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.matches('input, textarea, select, [contenteditable]')) return;
+      if (e.key.toLowerCase() === 'm' && !e.metaKey && !e.ctrlKey) {
+        handleToggleMic();
+      } else if (e.key.toLowerCase() === 'v' && !e.metaKey && !e.ctrlKey) {
+        handleToggleCamera();
+      } else if (
+        e.key.toLowerCase() === 's' &&
+        !e.metaKey &&
+        !e.ctrlKey &&
+        !isDirectCall
+      ) {
+        void handleToggleScreenShare();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+    // handlers are stable within a meeting state
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [meetingState, isDirectCall]);
 
   const hasMainContent = !!(activeScreenShareSessionId || contentSlot);
 
@@ -1302,9 +1584,50 @@ function DailyLiveSessionSurface({
             </div>
           ) : null}
 
+          {/* ── Participants panel ── */}
+          {showParticipants ? (
+            <>
+              <div
+                className="absolute inset-0 z-30"
+                onClick={() => setShowParticipants(false)}
+              />
+              <div className="absolute right-0 top-0 z-40 flex h-full w-72 flex-col border-l border-border bg-background/95 shadow-xl backdrop-blur-sm">
+                <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                  <span className="text-sm font-semibold">
+                    People ({participantIds.length})
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowParticipants(false)}
+                    className="rounded p-1 opacity-70 hover:opacity-100"
+                    aria-label="Close participants panel"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="flex flex-col gap-1 overflow-y-auto p-3">
+                  {participantIds.map((sessionId) => (
+                    <ParticipantPanelRow
+                      key={sessionId}
+                      sessionId={sessionId}
+                      isLocal={sessionId === localSessionId}
+                      isHandRaised={
+                        raisedHands.get(sessionId) ??
+                        (sessionId === localSessionId && isHandRaised)
+                      }
+                    />
+                  ))}
+                </div>
+              </div>
+            </>
+          ) : null}
+
           {/* ── Dismissible error notifications ── */}
           {notifications.length > 0 ? (
-            <div className="absolute right-4 top-4 z-40 flex w-80 flex-col gap-2">
+            <div
+              aria-live="polite"
+              className="absolute right-4 top-4 z-40 flex w-80 flex-col gap-2"
+            >
               {notifications.map((n) => (
                 <Alert key={n.id} variant="destructive" className="shadow-lg">
                   <AlertCircle className="h-4 w-4" />
@@ -1349,6 +1672,11 @@ function DailyLiveSessionSurface({
                 <DailyParticipantTile
                   sessionId={directCallComposition.primaryParticipantId}
                   isLocal={directCallComposition.primaryParticipantId === localSessionId}
+                  isHandRaised={
+                    directCallComposition.primaryParticipantId === localSessionId
+                      ? isHandRaised
+                      : raisedHands.get(directCallComposition.primaryParticipantId)
+                  }
                 />
               ) : null}
               {directCallComposition.floatingParticipantId ? (
@@ -1357,6 +1685,11 @@ function DailyLiveSessionSurface({
                     sessionId={directCallComposition.floatingParticipantId}
                     isLocal={
                       directCallComposition.floatingParticipantId === localSessionId
+                    }
+                    isHandRaised={
+                      directCallComposition.floatingParticipantId === localSessionId
+                        ? isHandRaised
+                        : raisedHands.get(directCallComposition.floatingParticipantId)
                     }
                     variant="floating"
                   />
@@ -1387,6 +1720,11 @@ function DailyLiveSessionSurface({
                     <DailyParticipantTile
                       sessionId={speakerId}
                       isLocal={speakerId === localSessionId}
+                      isHandRaised={
+                        speakerId === localSessionId
+                          ? isHandRaised
+                          : raisedHands.get(speakerId)
+                      }
                     />
                   ) : null;
                 })()
@@ -1434,6 +1772,9 @@ function DailyLiveSessionSurface({
                             <DailyParticipantTile
                               sessionId={id}
                               isLocal={id === localSessionId}
+                              isHandRaised={
+                                id === localSessionId ? isHandRaised : raisedHands.get(id)
+                              }
                               variant="strip"
                             />
                           </div>
@@ -1442,6 +1783,9 @@ function DailyLiveSessionSurface({
                             key={id}
                             sessionId={id}
                             isLocal={id === localSessionId}
+                            isHandRaised={
+                              id === localSessionId ? isHandRaised : raisedHands.get(id)
+                            }
                           />
                         ),
                       )}
@@ -1490,6 +1834,7 @@ function DailyLiveSessionSurface({
                   )
                 }
                 label="Cam"
+                ariaLabel={isCameraEnabled ? 'Turn off camera (V)' : 'Turn on camera (V)'}
                 active={isCameraEnabled}
                 onClick={handleToggleCamera}
                 topContent={
@@ -1540,6 +1885,7 @@ function DailyLiveSessionSurface({
                   )
                 }
                 label="Mic"
+                ariaLabel={isMicEnabled ? 'Mute microphone (M)' : 'Unmute microphone (M)'}
                 active={isMicEnabled}
                 onClick={handleToggleMic}
                 deviceGroups={[
@@ -1593,6 +1939,11 @@ function DailyLiveSessionSurface({
                     )
                   }
                   label={isScreenSharing ? 'Stop sharing' : 'Share'}
+                  ariaLabel={
+                    isScreenSharing
+                      ? 'Stop screen sharing (S)'
+                      : 'Start screen sharing (S)'
+                  }
                   active={false}
                   destructive={isScreenSharing}
                   onClick={handleToggleScreenShare}
@@ -1603,6 +1954,7 @@ function DailyLiveSessionSurface({
                   <DropdownMenuTrigger asChild>
                     <button
                       type="button"
+                      aria-label="Change view layout"
                       className={cn(
                         buttonVariants({ variant: 'outline' }),
                         'h-auto flex-col gap-1 rounded-xl px-4 py-2',
@@ -1622,7 +1974,10 @@ function DailyLiveSessionSurface({
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="center" side="top" className="w-48">
                     <DropdownMenuItem
-                      onClick={() => setViewMode('gallery')}
+                      onClick={() => {
+                        setViewMode('gallery');
+                        onPanelModeChange?.('video');
+                      }}
                       className={
                         viewMode === 'gallery' ? 'bg-primary/10 text-primary' : ''
                       }
@@ -1631,7 +1986,10 @@ function DailyLiveSessionSurface({
                       Gallery
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      onClick={() => setViewMode('speaker')}
+                      onClick={() => {
+                        setViewMode('speaker');
+                        onPanelModeChange?.('split');
+                      }}
                       className={
                         viewMode === 'speaker' ? 'bg-primary/10 text-primary' : ''
                       }
@@ -1640,7 +1998,10 @@ function DailyLiveSessionSurface({
                       Speaker
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      onClick={() => setViewMode('shared-content')}
+                      onClick={() => {
+                        setViewMode('shared-content');
+                        onPanelModeChange?.('split');
+                      }}
                       className={
                         viewMode === 'shared-content' ? 'bg-primary/10 text-primary' : ''
                       }
@@ -1651,6 +2012,53 @@ function DailyLiveSessionSurface({
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : null}
+              {!isDirectCall && liveSessionId && channelId ? (
+                <InCallButton
+                  icon={
+                    <span className="relative flex h-5 w-5 items-center justify-center">
+                      <Circle
+                        className="h-4 w-4"
+                        fill={isRecording ? 'currentColor' : 'none'}
+                      />
+                      {isRecording && (
+                        <span className="absolute -right-1 -top-1 h-2 w-2 animate-pulse rounded-full bg-red-500" />
+                      )}
+                    </span>
+                  }
+                  label={isRecording ? 'Stop rec' : 'Record'}
+                  ariaLabel={isRecording ? 'Stop recording' : 'Start recording'}
+                  active={isRecording}
+                  onClick={() => void handleToggleRecording()}
+                />
+              ) : null}
+              <InCallButton
+                icon={
+                  <Hand
+                    className="h-5 w-5"
+                    fill={isHandRaised ? 'currentColor' : 'none'}
+                  />
+                }
+                label="Hand"
+                ariaLabel={isHandRaised ? 'Lower hand' : 'Raise hand'}
+                active={isHandRaised}
+                onClick={handleToggleHandRaise}
+              />
+              <InCallButton
+                icon={
+                  <span className="relative flex h-5 w-5 items-center justify-center">
+                    <Users className="h-5 w-5" />
+                    {participantIds.length > 1 && (
+                      <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
+                        {participantIds.length}
+                      </span>
+                    )}
+                  </span>
+                }
+                label="People"
+                ariaLabel={showParticipants ? 'Hide participants' : 'Show participants'}
+                active={showParticipants}
+                onClick={() => setShowParticipants((prev) => !prev)}
+              />
               <InCallButton
                 icon={
                   isLeaving ? (
@@ -1660,6 +2068,7 @@ function DailyLiveSessionSurface({
                   )
                 }
                 label="Leave"
+                ariaLabel="Leave session"
                 destructive
                 disabled={isLeaving}
                 onClick={() => void handleLeave()}
@@ -1704,6 +2113,7 @@ export function DailyLiveSessionEmbed({
   linkedChildren,
   liveSessionId,
   channelId,
+  profileId,
   contentSlot,
   whiteboardEnabled,
   panelMode,
@@ -1724,6 +2134,7 @@ export function DailyLiveSessionEmbed({
   linkedChildren?: LinkedChildProfile[];
   liveSessionId?: string | null;
   channelId?: string | null;
+  profileId?: string | null;
   contentSlot?: ReactNode;
   whiteboardEnabled?: boolean;
   panelMode?: import('@iconicedu/shared-types').WhiteboardPanelMode;
@@ -1777,6 +2188,7 @@ export function DailyLiveSessionEmbed({
         linkedChildren={linkedChildren}
         liveSessionId={liveSessionId}
         channelId={channelId}
+        profileId={profileId}
         contentSlot={contentSlot}
         whiteboardEnabled={whiteboardEnabled}
         panelMode={panelMode}

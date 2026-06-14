@@ -102,9 +102,7 @@ export {
   MessageCircle,
 } from 'lucide-react';
 export { Briefcase, GraduationCap, Shield, User, Users } from 'lucide-react';
-export * from '@iconicedu/ui-web/components/live-sessions/view-switcher';
 export * from '@iconicedu/ui-web/components/live-sessions/video-participant';
-export * from '@iconicedu/ui-web/components/live-sessions/control-bar';
 export * from '@iconicedu/ui-web/components/live-sessions/live-session-host.utils';
 export * from '@iconicedu/ui-web/components/live-sessions/daily-live-session-embed.utils';
 export * from '@iconicedu/ui-web/components/live-sessions/daily-live-session-embed';

@@ -7,6 +7,7 @@ interface VideoParticipantProps {
   name: string;
   isMuted: boolean;
   isSpeaking?: boolean;
+  isHandRaised?: boolean;
   image?: string;
   initials?: string;
   children?: ReactNode;
@@ -19,6 +20,7 @@ export function VideoParticipant({
   name,
   isMuted,
   isSpeaking = false,
+  isHandRaised = false,
   image,
   initials = name
     .split(' ')
@@ -70,6 +72,7 @@ export function VideoParticipant({
             <Mic className="h-3 w-3 shrink-0 text-white/60" />
           )}
           <span className="truncate">{name}</span>
+          {isHandRaised && <span className="shrink-0 text-[10px]">✋</span>}
         </div>
       </div>
     </div>
