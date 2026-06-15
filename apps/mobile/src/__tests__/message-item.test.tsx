@@ -10,6 +10,7 @@ const mockFetchThreadMessages = jest.fn();
 const mockMarkThreadReadState = jest.fn();
 const mockInvalidateQueries = jest.fn();
 const mockSetQueryData = jest.fn();
+const mockReportMobileObservedError = jest.fn();
 
 jest.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({
@@ -35,6 +36,11 @@ jest.mock('@/lib/api/queries', () => ({
 
 jest.mock('@/lib/messages/apply-optimistic-channel-read-state', () => ({
   applyOptimisticThreadReadState: jest.fn(),
+}));
+
+jest.mock('@/lib/analytics/report-error', () => ({
+  reportMobileObservedError: (...args: unknown[]) =>
+    mockReportMobileObservedError(...args),
 }));
 
 jest.mock('@/components/messages/chat-pdf-viewer', () => {
@@ -237,6 +243,44 @@ describe('MessageItem', () => {
     expect(screen.queryByText('John Doe')).toBeNull();
   });
 
+  it('hides add-reaction and reply controls on earlier messages in a visual group', () => {
+    render(
+      <MessageItem
+        message={baseMessage}
+        isOwn={false}
+        isGroupStart={false}
+        showActionControls={false}
+        colors={colors}
+      />,
+    );
+
+    expect(screen.queryByLabelText('Add emoji reaction')).toBeNull();
+    expect(screen.queryByLabelText('Reply to thread')).toBeNull();
+  });
+
+  it('keeps existing reaction pills visible when grouped action controls are hidden', () => {
+    const reactedMessage = {
+      ...baseMessage,
+      social: {
+        reactions: [{ emoji: '👍', count: 2, reactedByMe: false }],
+      },
+    } as unknown as MessageVM;
+
+    render(
+      <MessageItem
+        message={reactedMessage}
+        isOwn={false}
+        isGroupStart={false}
+        showActionControls={false}
+        colors={colors}
+      />,
+    );
+
+    expect(screen.getByText('👍')).toBeTruthy();
+    expect(screen.getByText('2')).toBeTruthy();
+    expect(screen.queryByLabelText('Add emoji reaction')).toBeNull();
+  });
+
   it('renders own message without bubble style', () => {
     render(<MessageItem message={baseMessage} isOwn isGroupStart colors={colors} />);
     expect(screen.getByText('Hello world')).toBeTruthy();
@@ -304,6 +348,33 @@ describe('MessageItem', () => {
         lastReadMessageId: 'reply-1',
       });
     });
+  });
+
+  it('stops loading when DM thread replies fail to load', async () => {
+    mockFetchThreadMessages.mockRejectedValueOnce(new Error('network down'));
+
+    render(
+      <MessageItem
+        message={threadedUnreadMessage}
+        channelId="channel-1"
+        isOwn={false}
+        isGroupStart
+        colors={colors}
+        currentProfileId="user-1"
+        currentAccountId="acc-1"
+      />,
+    );
+
+    fireEvent.press(screen.getByText('3 replies'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Could not load replies.')).toBeTruthy();
+    });
+    expect(mockReportMobileObservedError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: 'mobile.messages.message_item.thread_expand',
+      }),
+    );
   });
 
   it('renders the visibility badge for sender-only messages', () => {

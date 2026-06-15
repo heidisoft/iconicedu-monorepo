@@ -44,6 +44,33 @@ function formatDateHeader(iso: string): string {
 type DateSeparatorItem = { _type: 'date-separator'; dateKey: string; label: string };
 type UnreadSeparatorItem = { _type: 'unread-separator'; count?: number };
 type MessageListItem = MessageVM | DateSeparatorItem | UnreadSeparatorItem;
+export const MESSAGE_GROUP_WINDOW_MINUTES = 5;
+
+function getVisibilityGroupKey(message: MessageVM): string {
+  const visibility = message.core.visibility;
+  if (!visibility) return 'none';
+  if (visibility.type === 'specific-users') {
+    return `${visibility.type}:${[...visibility.userIds].sort().join(',')}`;
+  }
+  return visibility.type;
+}
+
+export function areMessagesInSameVisualGroup(
+  olderMessage: MessageVM,
+  newerMessage: MessageVM,
+): boolean {
+  const timeDiffMinutes =
+    (new Date(newerMessage.core.createdAt).getTime() -
+      new Date(olderMessage.core.createdAt).getTime()) /
+    60_000;
+
+  return (
+    olderMessage.core.sender.ids.id === newerMessage.core.sender.ids.id &&
+    timeDiffMinutes >= 0 &&
+    timeDiffMinutes <= MESSAGE_GROUP_WINDOW_MINUTES &&
+    getVisibilityGroupKey(olderMessage) === getVisibilityGroupKey(newerMessage)
+  );
+}
 
 function findUnreadStartMessageId(input: {
   messages: MessageVM[];
@@ -549,25 +576,27 @@ export const MessageList: React.FC<MessageListProps> = ({
         }
       }
 
+      let nextMsg: MessageVM | null = null;
+      for (let i = index - 1; i >= 0; i--) {
+        const candidate = listData[i];
+        if (!isDateSeparator(candidate) && !isUnreadSeparator(candidate)) {
+          nextMsg = candidate;
+          break;
+        }
+      }
+
       const isOwn = item.core.sender.ids.id === currentProfileId;
 
       // A new group starts if: different sender, no prev message, or >5 min gap
-      const timeDiffMinutes = prevMsg
-        ? (new Date(item.core.createdAt).getTime() -
-            new Date(prevMsg.core.createdAt).getTime()) /
-          60_000
-        : Infinity;
-      const isGroupStart =
-        !prevMsg ||
-        prevMsg.core.sender.ids.id !== item.core.sender.ids.id ||
-        timeDiffMinutes > 5;
-
+      const isGroupStart = !prevMsg || !areMessagesInSameVisualGroup(prevMsg, item);
+      const isGroupEnd = !nextMsg || !areMessagesInSameVisualGroup(item, nextMsg);
       return (
         <MessageItem
           message={item}
           channelId={channelId}
           isOwn={isOwn}
           isGroupStart={isGroupStart}
+          showActionControls={isGroupEnd}
           colors={colors}
           onLongPress={onMessageLongPress}
           onReactionToggle={handleReactionToggle}

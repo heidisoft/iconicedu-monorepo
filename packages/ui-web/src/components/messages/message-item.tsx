@@ -66,6 +66,8 @@ interface MessageItemProps {
   actionState?: MessageActionState;
   messageUiThemeKey?: MessageUiThemeKeyVM;
   inlineThreadContent?: ReactNode;
+  feedGroupPosition?: 'single' | 'first' | 'middle' | 'last';
+  showActionControls?: boolean;
 }
 
 export const MessageItem = memo(function MessageItem({
@@ -84,6 +86,8 @@ export const MessageItem = memo(function MessageItem({
   actionState,
   messageUiThemeKey = 'classic',
   inlineThreadContent,
+  feedGroupPosition,
+  showActionControls,
 }: MessageItemProps) {
   if (!isMessageVisibleToUser(message, currentUserId)) {
     return null;
@@ -124,6 +128,8 @@ export const MessageItem = memo(function MessageItem({
     actionState,
     messageUiThemeKey,
     inlineThreadContent,
+    feedGroupPosition,
+    showActionControls,
   };
 
   if (isTextMessage(message)) {

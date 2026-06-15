@@ -592,6 +592,105 @@ async function ensureChannelMembershipForMessageWrite(input: {
   }
 }
 
+async function hasOperationalMessageWriteRole(input: {
+  supabase: ReturnType<typeof createSupabaseServiceClient>;
+  orgId: string;
+  accountId: string;
+  profileKind?: string | null;
+}): Promise<boolean> {
+  if (input.profileKind === 'staff') {
+    return true;
+  }
+
+  const [roleResponse, accountResponse] = await Promise.all([
+    input.supabase
+      .from('user_roles')
+      .select('id')
+      .eq('org_id', input.orgId)
+      .eq('account_id', input.accountId)
+      .in('role_key', ['owner', 'admin', 'staff'])
+      .is('deleted_at', null)
+      .limit(1)
+      .maybeSingle<{ id: string }>(),
+    input.supabase
+      .from('accounts')
+      .select('id')
+      .eq('id', input.accountId)
+      .eq('org_id', input.orgId)
+      .in('primary_role', ['owner', 'admin', 'staff'])
+      .is('deleted_at', null)
+      .limit(1)
+      .maybeSingle<{ id: string }>(),
+  ]);
+
+  if (roleResponse.error) {
+    throw new Error(roleResponse.error.message);
+  }
+  if (accountResponse.error) {
+    throw new Error(accountResponse.error.message);
+  }
+
+  return Boolean(roleResponse.data?.id || accountResponse.data?.id);
+}
+
+export async function resolveChannelWriteAccessForMessage(input: {
+  serviceSupabase: ReturnType<typeof createSupabaseServiceClient>;
+  activityContext: ActivityChannelContext;
+  orgId: string;
+  channelId: string;
+  accountId: string;
+  profileId: string;
+  profileKind?: string | null;
+}): Promise<{ shouldEnsureMembership: boolean }> {
+  const membershipResponse = await input.serviceSupabase
+    .from('channel_members')
+    .select('id')
+    .eq('org_id', input.orgId)
+    .eq('channel_id', input.channelId)
+    .eq('profile_id', input.profileId)
+    .is('deleted_at', null)
+    .limit(1)
+    .maybeSingle<{ id: string }>();
+
+  if (membershipResponse.error) {
+    throw new Error(membershipResponse.error.message);
+  }
+
+  const isChannelMember = Boolean(membershipResponse.data?.id);
+  const isSupportChannel = input.activityContext.channelPurpose === 'support';
+  const isPublicChannel = input.activityContext.channelVisibility === 'public';
+
+  if (isChannelMember) {
+    return {
+      shouldEnsureMembership: isSupportChannel || isPublicChannel,
+    };
+  }
+
+  if (isSupportChannel) {
+    return { shouldEnsureMembership: true };
+  }
+
+  const hasOperationalRole = await hasOperationalMessageWriteRole({
+    supabase: input.serviceSupabase,
+    orgId: input.orgId,
+    accountId: input.accountId,
+    profileKind: input.profileKind,
+  });
+  const isClassroomChannel =
+    input.activityContext.channelRouteKind === 'space' ||
+    input.activityContext.channelPurpose === 'learning-space';
+
+  if (hasOperationalRole && isClassroomChannel) {
+    return { shouldEnsureMembership: false };
+  }
+
+  if (isPublicChannel) {
+    return { shouldEnsureMembership: true };
+  }
+
+  throw new ForbiddenException('You do not have permission to post in this channel');
+}
+
 async function upsertSupportThreadAssignments(input: {
   supabase: ReturnType<typeof createSupabaseServiceClient>;
   orgId: string;
@@ -1303,10 +1402,18 @@ export class MessagesService {
         questionOwnerProfileId: supportQuestionOwnerProfileId,
         privilegedProfileIds: supportPrivilegedProfileIds,
       });
+      const writeAccess = await resolveChannelWriteAccessForMessage({
+        serviceSupabase,
+        activityContext,
+        orgId: input.orgId,
+        channelId: input.channelId,
+        accountId: actor.accountId,
+        profileId: actor.profile.id,
+        profileKind: actor.profile.kind,
+      });
       await ensureChannelMembershipForMessageWrite({
         serviceSupabase,
-        shouldEnsureMembership:
-          isSupportChannel || activityContext.channelVisibility === 'public',
+        shouldEnsureMembership: writeAccess.shouldEnsureMembership,
         orgId: input.orgId,
         channelId: input.channelId,
         profileId: actor.profile.id,
@@ -1509,10 +1616,18 @@ export class MessagesService {
         questionOwnerProfileId: supportQuestionOwnerProfileId,
         privilegedProfileIds: supportPrivilegedProfileIds,
       });
+      const writeAccess = await resolveChannelWriteAccessForMessage({
+        serviceSupabase,
+        activityContext,
+        orgId: input.orgId,
+        channelId: input.channelId,
+        accountId: actor.accountId,
+        profileId: actor.profile.id,
+        profileKind: actor.profile.kind,
+      });
       await ensureChannelMembershipForMessageWrite({
         serviceSupabase,
-        shouldEnsureMembership:
-          isSupportChannel || activityContext.channelVisibility === 'public',
+        shouldEnsureMembership: writeAccess.shouldEnsureMembership,
         orgId: input.orgId,
         channelId: input.channelId,
         profileId: actor.profile.id,
@@ -1748,10 +1863,18 @@ export class MessagesService {
         questionOwnerProfileId: supportQuestionOwnerProfileId,
         privilegedProfileIds: supportPrivilegedProfileIds,
       });
+      const writeAccess = await resolveChannelWriteAccessForMessage({
+        serviceSupabase,
+        activityContext,
+        orgId: input.orgId,
+        channelId: input.channelId,
+        accountId: actor.accountId,
+        profileId: actor.profile.id,
+        profileKind: actor.profile.kind,
+      });
       await ensureChannelMembershipForMessageWrite({
         serviceSupabase,
-        shouldEnsureMembership:
-          isSupportChannel || activityContext.channelVisibility === 'public',
+        shouldEnsureMembership: writeAccess.shouldEnsureMembership,
         orgId: input.orgId,
         channelId: input.channelId,
         profileId: actor.profile.id,

@@ -27,7 +27,6 @@ import {
   deleteMessage,
   fetchChannelMetaByChannelId,
   fetchChannelReadState,
-  fetchIsChannelMember,
   ensureDirectMessageChannelForProfiles,
   queryKeys,
 } from '@/lib/api/queries';
@@ -41,7 +40,6 @@ import { ConversationHeader } from '@/components/messages/conversation-header';
 import { MessageActionsSheet } from '@/components/messages/message-actions-sheet';
 import { ChannelInfoSheet } from '@/components/messages/channel-info-sheet';
 import { ProfileSheet } from '@/components/messages/profile-sheet';
-import { ReadOnlyNotice } from '@/components/messages/read-only-notice';
 import { SpaceSessionsTab } from '@/components/messages/space-sessions-tab';
 import { resolveChannelTopicIconKey } from '@/lib/learning-space-icons';
 import { buildMobileChannelEmptyStateCopy } from '@/lib/message-empty-state';
@@ -55,9 +53,8 @@ import { PushNudgeSheet } from '@/components/notifications/push-nudge-sheet';
 type ChannelTab = 'messages' | 'sessions';
 
 export default function ChannelConversationScreen() {
-  const { channelId, isStaffObserverReadOnly } = useLocalSearchParams<{
+  const { channelId } = useLocalSearchParams<{
     channelId: string;
-    isStaffObserverReadOnly?: string;
   }>();
   const router = useRouter();
   const isFocused = useIsFocused();
@@ -106,10 +103,6 @@ export default function ChannelConversationScreen() {
     : (channelMeta?.icon_key ?? null);
   const resolvedThemeKey = channelMeta?.themeKey ?? null;
   const resolvedMessageUiThemeKey = channelMeta?.messageUiThemeKey ?? 'feed';
-  const shouldCheckStaffReadOnly =
-    profileKind === 'staff' && !isSupportChannel && !!channelId && !!profileId && !!orgId;
-  const initialStaffReadOnly = isStaffObserverReadOnly === '1';
-
   const {
     data: messages,
     isLoading,
@@ -164,21 +157,11 @@ export default function ChannelConversationScreen() {
         : Promise.resolve(),
     ]);
   }, [accountId, channelId, queryClient, refetch]);
-  const { data: isChannelMember = true } = useQuery({
-    queryKey: queryKeys.channelMembership(orgId, channelId ?? '', profileId),
-    queryFn: () => fetchIsChannelMember(orgId, channelId ?? '', profileId),
-    enabled: shouldCheckStaffReadOnly,
-    initialData: initialStaffReadOnly ? false : undefined,
-    staleTime: 30_000,
-  });
   useEffect(() => {
     if (!isFocused || !channelId || !orgId) return;
     void refreshConversation();
   }, [channelId, isFocused, orgId, refreshConversation]);
-  const isStaffReadOnly =
-    profileKind === 'staff' &&
-    !isSupportChannel &&
-    (initialStaffReadOnly || !isChannelMember);
+  const isStaffReadOnly = false;
 
   // ── Tab state ──
   const [activeTab, setActiveTab] = useState<ChannelTab>('messages');
@@ -612,20 +595,16 @@ export default function ChannelConversationScreen() {
             emptyIcon={emptyStateCopy.icon}
           />
           <TypingIndicator typingUsers={typingUsers} />
-          {isStaffReadOnly ? (
-            <ReadOnlyNotice />
-          ) : (
-            <MessageInput
-              onSend={handleSend}
-              onSendAttachment={handleSendAttachment}
-              placeholder={`Message ${isSpaceChannel ? resolvedTitle : `#${resolvedTitle}`}…`}
-              onTypingChange={broadcastTyping}
-              onTypingStop={broadcastTypingStop}
-              replyTo={threadReplyTarget}
-              onCancelReply={() => setThreadReplyTarget(null)}
-              uploading={pendingUploads.some((p) => !p.failed)}
-            />
-          )}
+          <MessageInput
+            onSend={handleSend}
+            onSendAttachment={handleSendAttachment}
+            placeholder={`Message ${isSpaceChannel ? resolvedTitle : `#${resolvedTitle}`}…`}
+            onTypingChange={broadcastTyping}
+            onTypingStop={broadcastTypingStop}
+            replyTo={threadReplyTarget}
+            onCancelReply={() => setThreadReplyTarget(null)}
+            uploading={pendingUploads.some((p) => !p.failed)}
+          />
         </KeyboardAvoidingView>
       )}
 

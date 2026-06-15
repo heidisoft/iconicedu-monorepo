@@ -386,6 +386,7 @@ type SocialBarProps = {
   /** When true, the thread pill and reply button are hidden (used in thread replies). */
   hideThreadButton?: boolean;
   replyButtonLabel?: string;
+  showActionControls?: boolean;
 };
 
 export function SocialBar({
@@ -401,9 +402,16 @@ export function SocialBar({
   disabledActions,
   hideThreadButton,
   replyButtonLabel,
+  showActionControls = true,
 }: SocialBarProps) {
   const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
   const hasThread = !!thread && thread.stats.messageCount > 0;
+  const showsActionButtons = !hideActions && showActionControls;
+  const showsThreadPill = hasThread && !hideThreadButton;
+
+  if (!reactions.length && !showsActionButtons && !showsThreadPill) {
+    return null;
+  }
 
   const actionBtnStyle = {
     width: 30,
@@ -424,7 +432,7 @@ export function SocialBar({
           flexWrap: 'wrap',
           gap: 6,
           marginTop: 4,
-          minHeight: 30,
+          minHeight: showsActionButtons || showsThreadPill ? 30 : undefined,
           alignItems: 'center',
         }}
       >
@@ -459,7 +467,7 @@ export function SocialBar({
           </TouchableOpacity>
         ))}
 
-        {!hideActions && (
+        {showsActionButtons && (
           <>
             {/* Emoji reaction add button */}
             <TouchableOpacity
@@ -494,12 +502,12 @@ export function SocialBar({
           </>
         )}
 
-        {/* Thread pill always visible when thread exists (even on emoji-only), unless inside a thread */}
-        {hideActions && hasThread && !hideThreadButton && (
+        {/* Thread pill always visible when thread exists, unless inside a thread. */}
+        {!showsActionButtons && showsThreadPill && (
           <ThreadPill
             thread={thread!}
             colors={colors}
-            onPress={onThreadPress ?? (() => {})}
+            onPress={disabledActions ? () => {} : (onThreadPress ?? (() => {}))}
             expanded={threadExpanded}
             unreadCount={threadUnreadCount}
           />
@@ -1524,17 +1532,17 @@ function makeStyles(colors: AppColors) {
       flexDirection: 'row',
       alignItems: 'flex-start',
       paddingHorizontal: 8,
-      paddingVertical: 8,
+      paddingVertical: 2,
       gap: 12,
     },
     rowOwn: { flexDirection: 'row-reverse' },
-    rowGroupStart: { paddingTop: 12 },
+    rowGroupStart: { paddingTop: 10 },
 
     // ── Avatar slot (always 36px to reserve space) ───────────────────────────
     avatarSlot: { width: 36, flexShrink: 0, alignItems: 'center' },
 
     // ── Content column ────────────────────────────────────────────────────────
-    contentCol: { flex: 1, alignItems: 'flex-start', gap: 4 },
+    contentCol: { flex: 1, alignItems: 'flex-start', gap: 3 },
     contentColOwn: { alignItems: 'flex-end' },
 
     // ── Name + time row (inside bubble) ──────────────────────────────────────
@@ -1775,6 +1783,12 @@ function makeStyles(colors: AppColors) {
       marginRight: 8,
     },
     inlineReplies: { flex: 1 },
+    threadLoadError: {
+      color: colors.textMuted,
+      fontSize: 12,
+      lineHeight: 18,
+      paddingVertical: 4,
+    },
   });
 }
 
@@ -1917,6 +1931,7 @@ export type MessageItemProps = {
   currentAccountId?: string;
   isReadOnly?: boolean;
   isThreadMessage?: boolean;
+  showActionControls?: boolean;
   onSendAnnotation?: (attachment: AttachmentPayload) => void;
   messageUiThemeKey?: 'classic' | 'feed';
 };
@@ -1935,6 +1950,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   currentAccountId,
   isReadOnly,
   isThreadMessage = false,
+  showActionControls = true,
   onSendAnnotation,
   messageUiThemeKey = 'classic',
 }) => {
@@ -1948,6 +1964,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   const [threadExpanded, setThreadExpanded] = useState(false);
   const [threadReplies, setThreadReplies] = useState<MessageVM[]>([]);
   const [threadLoading, setThreadLoading] = useState(false);
+  const [threadLoadFailed, setThreadLoadFailed] = useState(false);
   const [threadUnreadCount, setThreadUnreadCount] = useState(
     message.social?.thread?.readState?.unreadCount ?? 0,
   );
@@ -1957,6 +1974,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   const [audioDurationMs, setAudioDurationMs] = useState(0);
   const soundRef = useRef<AudioPlayer | null>(null);
   const audioSubRef = useRef<{ remove(): void } | null>(null);
+  const markThreadReadRef = useRef(markThreadRead);
   const [openingFile, setOpeningFile] = useState<string | null>(null);
   const [imageSignedUrls, setImageSignedUrls] = useState<Record<string, string>>({});
   const [audioSignedUrl, setAudioSignedUrl] = useState<string | null>(null);
@@ -2060,73 +2078,81 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     setThreadUnreadCount(thread?.readState?.unreadCount ?? 0);
   }, [thread?.ids.id, thread?.readState?.unreadCount]);
 
-  const loadThreadReplies = useCallback(async () => {
-    if (!thread) {
-      return;
-    }
-
-    setThreadLoading(true);
-    try {
-      const resolvedChannelId = thread.readState?.channelId ?? channelId ?? '';
-      const replies = await fetchThreadMessages(
-        message.ids.orgId,
-        resolvedChannelId,
-        thread.ids.id,
-        message.ids.id,
-        currentProfileId ?? '',
-        currentAccountId ?? '',
-      );
-      setThreadReplies(replies);
-      const lastReplyId = replies[replies.length - 1]?.ids.id ?? null;
-      if (resolvedChannelId && currentProfileId && currentAccountId) {
-        const alreadyUpToDate =
-          threadUnreadCount === 0 && lastReplyId === thread.readState?.lastReadMessageId;
-        if (!alreadyUpToDate) {
-          await markThreadRead({
-            orgId: message.ids.orgId,
-            channelId: resolvedChannelId,
-            parentMessageId: message.ids.id,
-            threadId: thread.ids.id,
-            lastReadMessageId: lastReplyId,
-          });
-        }
-      }
-    } catch (error) {
-      reportMobileObservedError({
-        error,
-        source: 'mobile.messages.message_item.thread_expand',
-        message: 'Failed to load thread replies',
-        context: {
-          threadId: thread?.ids.id,
-          messageId: message.ids.id,
-        },
-      });
-    } finally {
-      setThreadLoading(false);
-    }
-  }, [
-    thread,
-    channelId,
-    message.ids.id,
-    message.ids.orgId,
-    currentProfileId,
-    currentAccountId,
-    threadUnreadCount,
-    markThreadRead,
-  ]);
+  useEffect(() => {
+    markThreadReadRef.current = markThreadRead;
+  }, [markThreadRead]);
 
   useEffect(() => {
     if (!threadExpanded || !thread) {
       return;
     }
 
-    void loadThreadReplies();
+    let cancelled = false;
+    setThreadLoading(true);
+    setThreadLoadFailed(false);
+
+    const loadReplies = async () => {
+      const resolvedChannelId = thread.readState?.channelId ?? channelId ?? '';
+      try {
+        const replies = await fetchThreadMessages(
+          message.ids.orgId,
+          resolvedChannelId,
+          thread.ids.id,
+          message.ids.id,
+          currentProfileId ?? '',
+          currentAccountId ?? '',
+        );
+        if (cancelled) return;
+        setThreadReplies(replies);
+        const lastReplyId = replies[replies.length - 1]?.ids.id ?? null;
+        const lastReadMessageId = thread.readState?.lastReadMessageId ?? null;
+        if (resolvedChannelId && currentProfileId && currentAccountId) {
+          if (lastReplyId !== lastReadMessageId) {
+            await markThreadReadRef.current({
+              orgId: message.ids.orgId,
+              channelId: resolvedChannelId,
+              parentMessageId: message.ids.id,
+              threadId: thread.ids.id,
+              lastReadMessageId: lastReplyId,
+            });
+            if (!cancelled) setThreadUnreadCount(0);
+          }
+        }
+      } catch (error) {
+        if (cancelled) return;
+        setThreadReplies([]);
+        setThreadLoadFailed(true);
+        reportMobileObservedError({
+          error,
+          source: 'mobile.messages.message_item.thread_expand',
+          message: 'Failed to load thread replies',
+          context: {
+            threadId: thread.ids.id,
+            messageId: message.ids.id,
+          },
+        });
+      } finally {
+        if (!cancelled) setThreadLoading(false);
+      }
+    };
+
+    void loadReplies();
+    return () => {
+      cancelled = true;
+    };
   }, [
     threadExpanded,
     thread?.ids.id,
     thread?.stats.messageCount,
     thread?.stats.lastReplyAt,
-    loadThreadReplies,
+    thread?.readState?.channelId,
+    thread?.readState?.lastReadMessageId,
+    thread,
+    channelId,
+    message.ids.id,
+    message.ids.orgId,
+    currentProfileId,
+    currentAccountId,
   ]);
 
   const handleAudioPress = useCallback(
@@ -2797,6 +2823,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             hideActions={hideActions}
             disabledActions={isReadOnly ?? false}
             hideThreadButton={isThreadMessage}
+            showActionControls={showActionControls}
           />
           {!isThreadMessage && threadExpanded && (
             <View style={[s.inlineThread, isOwn && s.inlineThreadOwn]}>
@@ -2808,6 +2835,9 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                   </View>
                 ) : (
                   <>
+                    {threadLoadFailed ? (
+                      <Text style={s.threadLoadError}>Could not load replies.</Text>
+                    ) : null}
                     {threadReplies.map((reply, replyIndex) => (
                       <React.Fragment key={reply.ids.id}>
                         {inlineUnreadStartIndex === replyIndex && (
@@ -2926,6 +2956,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             hideActions={hideActions}
             disabledActions={isReadOnly ?? false}
             hideThreadButton={isThreadMessage}
+            showActionControls={showActionControls}
           />
 
           {/* Inline thread replies (not shown when already inside a thread) */}
@@ -2939,6 +2970,9 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                   </View>
                 ) : (
                   <>
+                    {threadLoadFailed ? (
+                      <Text style={s.threadLoadError}>Could not load replies.</Text>
+                    ) : null}
                     {threadReplies.map((reply, replyIndex) => (
                       <React.Fragment key={reply.ids.id}>
                         {inlineUnreadStartIndex === replyIndex && (

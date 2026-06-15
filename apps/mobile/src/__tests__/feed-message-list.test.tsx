@@ -15,13 +15,17 @@ import type {
   ReactionVM,
   ThreadVM,
 } from '@iconicedu/shared-types';
-import { FeedMessageList } from '@/components/messages/themes/feed-message-list';
+import {
+  buildFeedMessageGroups,
+  FeedMessageList,
+} from '@/components/messages/themes/feed-message-list';
 import { resolveMobileMessageUiTheme } from '@/components/messages/themes/registry';
 import { lightColors as mockLightColors } from '@/lib/theme';
 
 const mockFetchThreadMessages = jest.fn();
 const mockUseOnlineProfileIds = jest.fn(() => new Map());
 const mockMarkThreadRead = jest.fn();
+const mockReportMobileObservedError = jest.fn();
 
 jest.mock('@/providers/theme-provider', () => ({
   useTheme: () => ({ colors: mockLightColors }),
@@ -37,6 +41,11 @@ jest.mock('@/hooks/use-online-profile-ids', () => ({
 
 jest.mock('@/hooks/use-mark-read', () => ({
   useMarkRead: () => ({ markThreadRead: mockMarkThreadRead }),
+}));
+
+jest.mock('@/lib/analytics/report-error', () => ({
+  reportMobileObservedError: (...args: unknown[]) =>
+    mockReportMobileObservedError(...args),
 }));
 
 jest.mock('@/lib/supabase/client', () => ({
@@ -85,6 +94,7 @@ function makeTextMessage(
     thread?: ThreadVM;
     reactions?: ReactionVM[];
     presence?: MessageVM['core']['sender']['presence'];
+    createdAt?: string;
   },
 ): MessageVM {
   return {
@@ -97,7 +107,7 @@ function makeTextMessage(
         'educator',
         input?.presence,
       ),
-      createdAt: '2025-01-15T10:30:00Z',
+      createdAt: input?.createdAt ?? '2025-01-15T10:30:00Z',
       visibility: { type: 'all' },
     },
     social: { reactions: input?.reactions ?? [], thread: input?.thread },
@@ -203,6 +213,56 @@ describe('FeedMessageList', () => {
     expect(screen.getByTestId('feed-message-post')).toBeTruthy();
     expect(screen.getByText('Happy Friday!')).toBeTruthy();
     expect(screen.getByText('Tutor')).toBeTruthy();
+  });
+
+  it('groups same-sender feed messages within the visual time window into one post', () => {
+    const messages = [
+      makeTextMessage('msg-1', 'First update.', {
+        createdAt: '2025-01-15T10:30:00Z',
+      }),
+      makeTextMessage('msg-2', 'Second update.', {
+        createdAt: '2025-01-15T10:33:00Z',
+      }),
+      makeTextMessage('msg-3', 'Third update.', {
+        createdAt: '2025-01-15T10:35:00Z',
+      }),
+    ];
+
+    expect(buildFeedMessageGroups(messages)).toHaveLength(1);
+
+    render(<FeedMessageList messages={messages} currentProfileId="profile-current" />);
+
+    expect(screen.getAllByTestId('feed-message-post')).toHaveLength(1);
+    expect(screen.getByText('First update.')).toBeTruthy();
+    expect(screen.getByText('Second update.')).toBeTruthy();
+    expect(screen.getByText('Third update.')).toBeTruthy();
+    expect(screen.getAllByLabelText('Add emoji reaction')).toHaveLength(1);
+    expect(screen.getAllByLabelText('Reply to thread')).toHaveLength(1);
+  });
+
+  it('keeps feed messages in separate posts when sender or time window changes', () => {
+    const messages = [
+      makeTextMessage('msg-1', 'First update.', {
+        senderId: 'profile-1',
+        createdAt: '2025-01-15T10:30:00Z',
+      }),
+      makeTextMessage('msg-2', 'Different sender.', {
+        senderId: 'profile-2',
+        senderName: 'Taras H',
+        createdAt: '2025-01-15T10:31:00Z',
+      }),
+      makeTextMessage('msg-3', 'Later follow up.', {
+        senderId: 'profile-2',
+        senderName: 'Taras H',
+        createdAt: '2025-01-15T10:38:00Z',
+      }),
+    ];
+
+    expect(buildFeedMessageGroups(messages)).toHaveLength(3);
+
+    render(<FeedMessageList messages={messages} currentProfileId="profile-current" />);
+
+    expect(screen.getAllByTestId('feed-message-post')).toHaveLength(3);
   });
 
   it('matches the classic DM empty-state text scale', () => {
@@ -388,6 +448,36 @@ describe('FeedMessageList', () => {
       expect(commentCard.getByLabelText('Reply to thread')).toBeTruthy();
       expect(commentCard.queryByText('Reply')).toBeNull();
     });
+  });
+
+  it('stops loading when feed thread replies fail to load', async () => {
+    const thread = {
+      ids: { id: 'thread-1', orgId: 'org-1' },
+      parent: { messageId: 'msg-threaded' },
+      stats: { messageCount: 1, lastReplyAt: '2025-01-15T10:35:00Z' },
+      participants: [],
+    } as unknown as ThreadVM;
+    mockFetchThreadMessages.mockRejectedValueOnce(new Error('network down'));
+
+    render(
+      <FeedMessageList
+        messages={[makeTextMessage('msg-threaded', 'Threaded message.', { thread })]}
+        channelId="channel-1"
+        currentProfileId="profile-current"
+        currentAccountId="account-1"
+      />,
+    );
+
+    fireEvent.press(screen.getByText('1 reply'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Could not load replies.')).toBeTruthy();
+    });
+    expect(mockReportMobileObservedError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: 'mobile.messages.feed_message_list.thread_expand',
+      }),
+    );
   });
 
   it('opens profiles only from the avatar or sender name', () => {

@@ -9,6 +9,7 @@ import { Clock } from 'lucide-react';
 
 interface EmojiPickerProps {
   onEmojiSelect: (emoji: string) => void;
+  onOpenChange?: (open: boolean) => void;
   children: React.ReactNode;
 }
 
@@ -132,6 +133,7 @@ const EmojiButton = memo(function EmojiButton({
 
 export const EmojiPicker = memo(function EmojiPicker({
   onEmojiSelect,
+  onOpenChange,
   children,
 }: EmojiPickerProps) {
   const [open, setOpen] = useState(false);
@@ -176,12 +178,21 @@ export const EmojiPicker = memo(function EmojiPicker({
       updateRecentEmojis(emoji);
       onEmojiSelect(emoji);
       setOpen(false);
+      onOpenChange?.(false);
     },
-    [updateRecentEmojis, onEmojiSelect],
+    [onOpenChange, updateRecentEmojis, onEmojiSelect],
+  );
+
+  const handleOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      setOpen(nextOpen);
+      onOpenChange?.(nextOpen);
+    },
+    [onOpenChange],
   );
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>{children}</PopoverTrigger>
       <PopoverContent
         className="w-[320px] p-0"

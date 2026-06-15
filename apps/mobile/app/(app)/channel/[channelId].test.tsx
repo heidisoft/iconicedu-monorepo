@@ -205,7 +205,7 @@ describe('ChannelConversationScreen', () => {
     );
   });
 
-  it('renders read-only notice for staff observers who are not channel members', async () => {
+  it('renders the composer for staff observers who are not channel members', async () => {
     mockUseLocalSearchParams.mockReturnValue({
       channelId: 'channel-1',
       topic: 'Biology',
@@ -216,11 +216,11 @@ describe('ChannelConversationScreen', () => {
     renderScreen();
 
     await waitFor(() => {
-      expect(screen.getByText('Read-only supervised conversation')).toBeTruthy();
+      expect(screen.getByText('MessageInput')).toBeTruthy();
     });
-    expect(screen.queryByText('MessageInput')).toBeNull();
+    expect(screen.queryByText('Read-only supervised conversation')).toBeNull();
     expect(mockConversationHeader).toHaveBeenCalledWith(
-      expect.objectContaining({ isReadOnly: true }),
+      expect.objectContaining({ isReadOnly: false }),
     );
   });
 

@@ -24,7 +24,6 @@ import {
   uploadChannelFile,
   buildMessageStoragePath,
   ensureDirectMessageChannelForProfiles,
-  fetchIsChannelMember,
   fetchSpaceChannelMetaByChannelId,
   fetchChannelReadState,
   deleteMessage,
@@ -38,7 +37,6 @@ import { ConversationHeader } from '@/components/messages/conversation-header';
 import { MessageActionsSheet } from '@/components/messages/message-actions-sheet';
 import { ChannelInfoSheet } from '@/components/messages/channel-info-sheet';
 import { ProfileSheet } from '@/components/messages/profile-sheet';
-import { ReadOnlyNotice } from '@/components/messages/read-only-notice';
 import { SpaceSessionsTab } from '@/components/messages/space-sessions-tab';
 import type { AttachmentPayload } from '@/components/messages/attachment-sheet';
 import { buildMobileChannelEmptyStateCopy } from '@/lib/message-empty-state';
@@ -63,25 +61,16 @@ type PendingUpload = {
 type SpaceTab = 'messages' | 'sessions';
 
 export default function SpaceDetailScreen() {
-  const {
-    channelId,
-    topic,
-    iconKey,
-    themeKey,
-    subtitle,
-    tab,
-    isStaffObserverReadOnly,
-    messageUiThemeKey,
-  } = useLocalSearchParams<{
-    channelId: string;
-    topic?: string;
-    iconKey?: string;
-    themeKey?: string;
-    subtitle?: string;
-    tab?: string;
-    isStaffObserverReadOnly?: string;
-    messageUiThemeKey?: string;
-  }>();
+  const { channelId, topic, iconKey, themeKey, subtitle, tab, messageUiThemeKey } =
+    useLocalSearchParams<{
+      channelId: string;
+      topic?: string;
+      iconKey?: string;
+      themeKey?: string;
+      subtitle?: string;
+      tab?: string;
+      messageUiThemeKey?: string;
+    }>();
   const router = useRouter();
   const isFocused = useIsFocused();
   const queryClient = useQueryClient();
@@ -120,10 +109,6 @@ export default function SpaceDetailScreen() {
         (profile as Record<string, unknown> | undefined)?.first_name as string | undefined
       )?.trim()) ??
     'Me';
-  const shouldCheckStaffReadOnly =
-    profileKind === 'staff' && !!channelId && !!profileId && !!orgId;
-  const initialStaffReadOnly = isStaffObserverReadOnly === '1';
-
   const {
     data: messages,
     isLoading,
@@ -167,19 +152,11 @@ export default function SpaceDetailScreen() {
         : Promise.resolve(),
     ]);
   }, [accountId, channelId, queryClient, refetch]);
-  const { data: isChannelMember = true } = useQuery({
-    queryKey: queryKeys.channelMembership(orgId, channelId ?? '', profileId),
-    queryFn: () => fetchIsChannelMember(orgId, channelId ?? '', profileId),
-    enabled: shouldCheckStaffReadOnly,
-    initialData: initialStaffReadOnly ? false : undefined,
-    staleTime: 30_000,
-  });
   useEffect(() => {
     if (!isFocused || !channelId || !orgId) return;
     void refreshConversation();
   }, [channelId, isFocused, orgId, refreshConversation]);
-  const isStaffReadOnly =
-    profileKind === 'staff' && (initialStaffReadOnly || !isChannelMember);
+  const isStaffReadOnly = false;
 
   const {
     schedules,
@@ -620,20 +597,16 @@ export default function SpaceDetailScreen() {
             emptyIcon={emptyStateCopy.icon}
           />
           <TypingIndicator typingUsers={typingUsers} />
-          {isStaffReadOnly ? (
-            <ReadOnlyNotice />
-          ) : (
-            <MessageInput
-              onSend={handleSend}
-              onSendAttachment={handleSendAttachment}
-              placeholder={`Message ${resolvedTitle}…`}
-              onTypingChange={broadcastTyping}
-              onTypingStop={broadcastTypingStop}
-              replyTo={threadReplyTarget}
-              onCancelReply={() => setThreadReplyTarget(null)}
-              uploading={pendingUploads.some((upload) => !upload.failed)}
-            />
-          )}
+          <MessageInput
+            onSend={handleSend}
+            onSendAttachment={handleSendAttachment}
+            placeholder={`Message ${resolvedTitle}…`}
+            onTypingChange={broadcastTyping}
+            onTypingStop={broadcastTypingStop}
+            replyTo={threadReplyTarget}
+            onCancelReply={() => setThreadReplyTarget(null)}
+            uploading={pendingUploads.some((upload) => !upload.failed)}
+          />
         </KeyboardAvoidingView>
       ) : (
         <View style={[s.flex, { backgroundColor: colors.pageBg }]}>
