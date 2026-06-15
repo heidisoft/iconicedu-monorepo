@@ -9,6 +9,7 @@ import { getLiveSessionReturnPath } from '@iconicedu/ui-web/components/live-sess
 import type { LinkedChildProfile } from '@iconicedu/ui-web/components/live-sessions/daily-live-session-embed';
 import { resolveLiveSessionJoinAccess } from '@iconicedu/web/lib/live-sessions/service';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
+import { enableClassroomWhiteboard } from '@iconicedu/web/flags';
 
 function parseLiveSessionMode(value: unknown): 'video' | 'audio' | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -45,9 +46,11 @@ export default async function Page({
       liveSessionId: sessionId,
       profile: profileResponse.data,
     });
-    // Whiteboard is enabled for all Daily sessions. Wire this to PostHog flag
-    // (enable-classroom-whiteboard) once the flag is created in your PostHog project.
-    const whiteboardEnabled = session.provider === 'daily';
+    const whiteboardEnabled =
+      session.provider === 'daily' &&
+      (await enableClassroomWhiteboard.run({
+        identify: { profileId: profileResponse.data.id },
+      }));
 
     const channelResponse = await serviceSupabase
       .from('channels')
