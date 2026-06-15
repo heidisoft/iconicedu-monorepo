@@ -45,11 +45,11 @@ BEGIN
     DROP TRIGGER IF EXISTS "prefixes_delete_hierarchy" ON "storage"."prefixes";
   END IF;
 
-  -- Create protect-delete triggers only if the backing function exists
+  -- Create protect-delete triggers only if the compatibility function exists.
   IF EXISTS (
     SELECT 1 FROM pg_proc p
     JOIN pg_namespace n ON n.oid = p.pronamespace
-    WHERE n.nspname = 'storage' AND p.proname = 'protect_delete'
+    WHERE n.nspname = 'public' AND p.proname = 'storage_protect_delete'
   ) THEN
     IF NOT EXISTS (
       SELECT 1 FROM pg_trigger t
@@ -60,7 +60,7 @@ BEGIN
     ) THEN
       CREATE TRIGGER protect_buckets_delete
         BEFORE DELETE ON storage.buckets
-        FOR EACH STATEMENT EXECUTE FUNCTION storage.protect_delete();
+        FOR EACH STATEMENT EXECUTE FUNCTION public.storage_protect_delete();
     END IF;
 
     IF NOT EXISTS (
@@ -72,7 +72,7 @@ BEGIN
     ) THEN
       CREATE TRIGGER protect_objects_delete
         BEFORE DELETE ON storage.objects
-        FOR EACH STATEMENT EXECUTE FUNCTION storage.protect_delete();
+        FOR EACH STATEMENT EXECUTE FUNCTION public.storage_protect_delete();
     END IF;
   END IF;
 END $$;
