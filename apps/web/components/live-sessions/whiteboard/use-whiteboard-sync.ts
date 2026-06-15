@@ -3,10 +3,19 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
 import type { ExcalidrawElement } from '@excalidraw/excalidraw/element/types';
+import type { Zoom } from '@excalidraw/excalidraw/types';
 
 const BROADCAST_EVENT = 'wb:op';
+const VIEWPORT_EVENT = 'wb:vp';
 const SAVE_INTERVAL_MS = 30_000;
 const BROADCAST_DEBOUNCE_MS = 80;
+const VIEWPORT_THROTTLE_MS = 150;
+
+export interface ViewportState {
+  scrollX: number;
+  scrollY: number;
+  zoom: Zoom;
+}
 
 export interface UseWhiteboardSyncOptions {
   liveSessionId: string;
@@ -15,6 +24,7 @@ export interface UseWhiteboardSyncOptions {
   onRemoteElements: (elements: readonly ExcalidrawElement[]) => void;
   getElements: () => readonly ExcalidrawElement[];
   onSaveSnapshot?: (elements: readonly ExcalidrawElement[]) => Promise<void>;
+  onRemoteViewport?: (viewport: ViewportState) => void;
 }
 
 export function useWhiteboardSync({
@@ -24,12 +34,16 @@ export function useWhiteboardSync({
   onRemoteElements,
   getElements,
   onSaveSnapshot,
+  onRemoteViewport,
 }: UseWhiteboardSyncOptions) {
   const channelRef = useRef<RealtimeChannel | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const vpThrottleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isApplyingRemoteRef = useRef(false);
   const onRemoteRef = useRef(onRemoteElements);
+  const onRemoteViewportRef = useRef(onRemoteViewport);
   onRemoteRef.current = onRemoteElements;
+  onRemoteViewportRef.current = onRemoteViewport;
 
   useEffect(() => {
     const channel = supabase.channel(`whiteboard:${liveSessionId}`, {
@@ -43,6 +57,11 @@ export function useWhiteboardSync({
       setTimeout(() => {
         isApplyingRemoteRef.current = false;
       }, 0);
+    });
+
+    channel.on('broadcast', { event: VIEWPORT_EVENT }, ({ payload }) => {
+      if (!payload || typeof payload.scrollX !== 'number') return;
+      onRemoteViewportRef.current?.(payload as ViewportState);
     });
 
     channel.subscribe();
@@ -87,5 +106,17 @@ export function useWhiteboardSync({
     }, BROADCAST_DEBOUNCE_MS);
   }, []);
 
-  return { broadcastElements };
+  const broadcastViewport = useCallback((viewport: ViewportState) => {
+    if (vpThrottleRef.current) return;
+    vpThrottleRef.current = setTimeout(() => {
+      vpThrottleRef.current = null;
+      channelRef.current?.send({
+        type: 'broadcast',
+        event: VIEWPORT_EVENT,
+        payload: viewport,
+      });
+    }, VIEWPORT_THROTTLE_MS);
+  }, []);
+
+  return { broadcastElements, broadcastViewport };
 }
