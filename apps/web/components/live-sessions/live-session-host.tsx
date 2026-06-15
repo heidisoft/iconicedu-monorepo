@@ -18,6 +18,7 @@ import {
   loadWhiteboardSnapshot,
   saveWhiteboardSnapshot,
 } from '@iconicedu/web/lib/whiteboard/whiteboard-snapshot';
+import type { WhiteboardRole } from '@iconicedu/web/components/live-sessions/whiteboard/classroom-whiteboard';
 
 const DailyLiveSessionEmbed = dynamic(
   () =>
@@ -73,6 +74,7 @@ export function LiveSessionHost({
   userAvatarUrl,
   linkedChildren,
   isPresenter,
+  whiteboardRole,
   whiteboardEnabled,
 }: {
   provider: LiveSessionProviderVM;
@@ -92,6 +94,7 @@ export function LiveSessionHost({
   userAvatarUrl?: string | null;
   linkedChildren?: LinkedChildProfile[];
   isPresenter?: boolean;
+  whiteboardRole?: WhiteboardRole;
   whiteboardEnabled?: boolean;
 }) {
   const router = useRouter();
@@ -100,12 +103,17 @@ export function LiveSessionHost({
 
   const showWhiteboard = whiteboardEnabled && provider === 'daily' && !!liveSessionId;
 
+  const resolvedWhiteboardRole: WhiteboardRole =
+    whiteboardRole ?? (isPresenter ? 'teacher' : 'student');
+
   const whiteboardSlot =
     showWhiteboard && liveSessionId && orgId && profileId ? (
       <ClassroomWhiteboard
         liveSessionId={liveSessionId}
-        isPresenter={isPresenter ?? false}
+        role={resolvedWhiteboardRole}
         supabase={supabase}
+        participantId={profileId}
+        participantName={userName ?? undefined}
         onLoadSnapshot={() => loadWhiteboardSnapshot(liveSessionId)}
         onSaveSnapshot={(elements) =>
           saveWhiteboardSnapshot(liveSessionId, orgId, channelId ?? '', { elements })

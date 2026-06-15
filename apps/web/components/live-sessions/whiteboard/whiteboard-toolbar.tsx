@@ -41,7 +41,7 @@ function OptionDivider() {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function WhiteboardToolbar({ items, api, callbacks }: WhiteboardToolbarProps) {
-  const [activeToolId, setActiveToolId] = useState<string>('hand');
+  const [activeToolId, setActiveToolId] = useState<string>('laser');
   const [toolOptions, setToolOptions] = useState<Record<string, ActiveToolOptions>>({});
   const [toggleStates, setToggleStates] = useState<Record<string, boolean>>(() => {
     const init: Record<string, boolean> = {};
@@ -60,13 +60,13 @@ export function WhiteboardToolbar({ items, api, callbacks }: WhiteboardToolbarPr
   // after firing the excalidrawAPI callback — we must run after that settles.
   useEffect(() => {
     if (!api) return;
-    const handItem = items.find(
+    const laserItem = items.find(
       (i): i is Extract<ToolbarItemConfig, { kind: 'tool' }> =>
-        i.kind === 'tool' && i.id === 'hand',
+        i.kind === 'tool' && i.id === 'laser',
     );
-    if (!handItem) return;
+    if (!laserItem) return;
     const raf = requestAnimationFrame(() => {
-      api.setActiveTool(handItem.tool);
+      api.setActiveTool(laserItem.tool);
     });
     return () => cancelAnimationFrame(raf);
   }, [api, items]);

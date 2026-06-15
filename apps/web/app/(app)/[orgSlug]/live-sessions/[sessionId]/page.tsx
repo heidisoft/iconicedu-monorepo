@@ -71,6 +71,13 @@ export default async function Page({
     const isPresenter =
       profileResponse.data.kind === 'educator' || profileResponse.data.kind === 'staff';
 
+    const whiteboardRole =
+      profileResponse.data.kind === 'educator' || profileResponse.data.kind === 'staff'
+        ? ('teacher' as const)
+        : profileResponse.data.kind === 'guardian'
+          ? ('observer' as const)
+          : ('student' as const);
+
     // For guardian accounts, resolve linked children so the pre-join screen shows
     // the child's identity and lets the parent switch between children if there are multiple.
     let linkedChildren: LinkedChildProfile[] = [];
@@ -145,6 +152,7 @@ export default async function Page({
           userAvatarUrl={profileResponse.data.avatar_url ?? null}
           linkedChildren={linkedChildren.length > 0 ? linkedChildren : undefined}
           isPresenter={isPresenter}
+          whiteboardRole={whiteboardRole}
           whiteboardEnabled={whiteboardEnabled}
         />
       </div>

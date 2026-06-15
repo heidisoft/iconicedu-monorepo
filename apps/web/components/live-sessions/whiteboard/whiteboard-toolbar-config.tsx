@@ -424,17 +424,19 @@ const SELECT_TOOL: ToolbarItemConfig = {
   tool: { type: 'selection' },
 };
 
+const LASER_TOOL: ToolbarItemConfig = {
+  kind: 'tool',
+  id: 'laser',
+  label: 'Laser',
+  icon: <WandSparkles className="h-4 w-4" />,
+  tool: { type: 'laser' },
+};
+
 export const TEACHER_TOOLBAR: ToolbarItemConfig[] = [
   HAND_TOOL,
   SELECT_TOOL,
   { kind: 'separator', id: 'sep-0' },
-  {
-    kind: 'tool',
-    id: 'laser',
-    label: 'Laser',
-    icon: <WandSparkles className="h-4 w-4" />,
-    tool: { type: 'laser' },
-  },
+  LASER_TOOL,
   {
     kind: 'tool',
     id: 'pen',
@@ -528,6 +530,7 @@ export const STUDENT_TOOLBAR: ToolbarItemConfig[] = [
   HAND_TOOL,
   SELECT_TOOL,
   { kind: 'separator', id: 'sep-0' },
+  LASER_TOOL,
   {
     kind: 'tool',
     id: 'pen',
@@ -567,6 +570,14 @@ export const STUDENT_TOOLBAR: ToolbarItemConfig[] = [
     icon: <Eraser className="h-4 w-4" />,
     tool: { type: 'eraser' },
   },
+];
+
+// Observer (guardian/parent): navigate and point only — no drawing tools
+export const OBSERVER_TOOLBAR: ToolbarItemConfig[] = [
+  HAND_TOOL,
+  SELECT_TOOL,
+  { kind: 'separator', id: 'sep-0' },
+  LASER_TOOL,
 ];
 
 // Re-export option presets so callers can build custom toolbars

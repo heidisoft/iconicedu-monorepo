@@ -2,55 +2,140 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Excalidraw } from '@excalidraw/excalidraw';
-import type { AppState, ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';
+import type {
+  AppState,
+  Collaborator,
+  ExcalidrawImperativeAPI,
+  SocketId,
+} from '@excalidraw/excalidraw/types';
 import type { ExcalidrawElement } from '@excalidraw/excalidraw/element/types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import '@excalidraw/excalidraw/index.css';
 
 import { useWhiteboardSync } from '@iconicedu/web/components/live-sessions/whiteboard/use-whiteboard-sync';
-import type { ViewportState } from '@iconicedu/web/components/live-sessions/whiteboard/use-whiteboard-sync';
+import type {
+  PointerUpdate,
+  ViewportState,
+} from '@iconicedu/web/components/live-sessions/whiteboard/use-whiteboard-sync';
 import { WhiteboardToolbar } from '@iconicedu/web/components/live-sessions/whiteboard/whiteboard-toolbar';
 import type { WhiteboardToolbarCallbacks } from '@iconicedu/web/components/live-sessions/whiteboard/whiteboard-toolbar';
 import {
+  OBSERVER_TOOLBAR,
   STUDENT_TOOLBAR,
   TEACHER_TOOLBAR,
 } from '@iconicedu/web/components/live-sessions/whiteboard/whiteboard-toolbar-config';
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export type WhiteboardRole = 'teacher' | 'student' | 'observer';
+
+// ─── Element merge ────────────────────────────────────────────────────────────
+// Bidirectional concurrent drawing: keep the highest-versioned copy of each
+// element rather than replacing wholesale, so both sides' work survives.
+function mergeElements(
+  local: readonly ExcalidrawElement[],
+  remote: readonly ExcalidrawElement[],
+): ExcalidrawElement[] {
+  const map = new Map<string, ExcalidrawElement>(local.map((el) => [el.id, el]));
+  for (const el of remote) {
+    const existing = map.get(el.id);
+    if (
+      !existing ||
+      el.version > existing.version ||
+      (el.version === existing.version && el.versionNonce > existing.versionNonce)
+    ) {
+      map.set(el.id, el);
+    }
+  }
+  return [...map.values()];
+}
+
+// ─── Toolbar config by role ───────────────────────────────────────────────────
+
+const TOOLBAR_BY_ROLE = {
+  teacher: TEACHER_TOOLBAR,
+  student: STUDENT_TOOLBAR,
+  observer: OBSERVER_TOOLBAR,
+} as const;
+
+// ─── Props ────────────────────────────────────────────────────────────────────
+
 export interface ClassroomWhiteboardProps {
   liveSessionId: string;
-  isPresenter: boolean;
+  role: WhiteboardRole;
   supabase: SupabaseClient;
+  /** Stable ID for this participant — deduplicates cursors on the canvas */
+  participantId?: string;
+  /** Display name shown on remote participants' cursors */
+  participantName?: string;
   onLoadSnapshot?: () => Promise<Record<string, unknown> | null>;
   onSaveSnapshot?: (elements: readonly ExcalidrawElement[]) => Promise<void>;
   toolbarCallbacks?: WhiteboardToolbarCallbacks;
 }
 
+// ─── Component ────────────────────────────────────────────────────────────────
+
 export function ClassroomWhiteboard({
   liveSessionId,
-  isPresenter,
+  role,
   supabase,
+  participantId,
+  participantName,
   onLoadSnapshot,
   onSaveSnapshot,
   toolbarCallbacks,
 }: ClassroomWhiteboardProps) {
-  // Hoisted so the useState initializer below can reference it
-  const toolbarItems = isPresenter ? TEACHER_TOOLBAR : STUDENT_TOOLBAR;
+  const isTeacher = role === 'teacher';
+  const toolbarItems = TOOLBAR_BY_ROLE[role];
 
   const excalidrawAPIRef = useRef<ExcalidrawImperativeAPI | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
   const [initialElements, setInitialElements] = useState<
     readonly ExcalidrawElement[] | undefined
   >();
   const [snapshotReady, setSnapshotReady] = useState(false);
-  // Derive initial Follow Me state from the toolbar config so the UI toggle
-  // and the actual broadcast state agree from the first render.
+  const [theme, setTheme] = useState<'light' | 'dark'>(() =>
+    typeof window !== 'undefined' &&
+    window.matchMedia('(prefers-color-scheme: dark)').matches
+      ? 'dark'
+      : 'light',
+  );
+
+  // Derive Follow Me initial state from the toolbar config so the UI toggle
+  // and the actual broadcast state are in sync from the first render.
   const [followMeActive, setFollowMeActive] = useState(() => {
     const item = toolbarItems.find((i) => i.kind === 'action' && i.id === 'follow-me');
     return item?.kind === 'action' ? (item.defaultActive ?? false) : false;
   });
-  // Ref so onChange closure always sees latest value without stale captures
   const followMeRef = useRef(followMeActive);
   followMeRef.current = followMeActive;
+
+  const participantIdRef = useRef(participantId ?? crypto.randomUUID());
+  const participantNameRef = useRef(participantName ?? 'Anonymous');
+  useEffect(() => {
+    if (participantId) participantIdRef.current = participantId;
+  }, [participantId]);
+  useEffect(() => {
+    if (participantName) participantNameRef.current = participantName;
+  }, [participantName]);
+
+  // Collaborator cursors + auto-expiry timers (2 s of inactivity → hide)
+  const collaboratorsRef = useRef<Map<SocketId, Collaborator>>(new Map());
+  const collaboratorTimersRef = useRef<Map<SocketId, ReturnType<typeof setTimeout>>>(
+    new Map(),
+  );
+
+  // ── System theme sync ───────────────────────────────────────────────────────
+
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const onChange = (e: MediaQueryListEvent) => setTheme(e.matches ? 'dark' : 'light');
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  // ── Snapshot load ───────────────────────────────────────────────────────────
 
   useEffect(() => {
     if (!onLoadSnapshot) {
@@ -64,22 +149,64 @@ export function ClassroomWhiteboard({
         }
       })
       .catch(() => {
-        // Start with a blank board if snapshot load fails
+        /* start blank if load fails */
       })
       .finally(() => setSnapshotReady(true));
   }, [onLoadSnapshot]);
+
+  // ── Excalidraw API ──────────────────────────────────────────────────────────
 
   const handleExcalidrawAPI = useCallback((excalidrawApi: ExcalidrawImperativeAPI) => {
     excalidrawAPIRef.current = excalidrawApi;
     setApi(excalidrawApi);
   }, []);
 
-  const applyRemoteElements = useCallback((elements: readonly ExcalidrawElement[]) => {
-    excalidrawAPIRef.current?.updateScene({ elements });
-  }, []);
+  // ── Remote event handlers ───────────────────────────────────────────────────
+
+  const applyRemoteElements = useCallback(
+    (remoteElements: readonly ExcalidrawElement[]) => {
+      const currentApi = excalidrawAPIRef.current;
+      if (!currentApi) return;
+      const merged = mergeElements(currentApi.getSceneElements(), remoteElements);
+      currentApi.updateScene({ elements: merged });
+    },
+    [],
+  );
 
   const applyRemoteViewport = useCallback((viewport: ViewportState) => {
     excalidrawAPIRef.current?.updateScene({ appState: viewport });
+  }, []);
+
+  const applyRemotePointer = useCallback((update: PointerUpdate) => {
+    const currentApi = excalidrawAPIRef.current;
+    if (!currentApi) return;
+    const collab = collaboratorsRef.current;
+    const timers = collaboratorTimersRef.current;
+    const id = update.senderId as SocketId;
+
+    collab.set(id, {
+      pointer: { x: update.x, y: update.y, tool: update.tool },
+      button: update.button,
+      username: update.username,
+      color:
+        update.tool === 'laser'
+          ? { background: '#e03131', stroke: '#e03131' }
+          : undefined,
+    });
+
+    // Auto-remove after 2 s of no movement
+    const prev = timers.get(id);
+    if (prev) clearTimeout(prev);
+    timers.set(
+      id,
+      setTimeout(() => {
+        collab.delete(id);
+        timers.delete(id);
+        excalidrawAPIRef.current?.updateScene({ collaborators: new Map(collab) });
+      }, 2000),
+    );
+
+    currentApi.updateScene({ collaborators: new Map(collab) });
   }, []);
 
   const getElements = useCallback(
@@ -87,21 +214,28 @@ export function ClassroomWhiteboard({
     [],
   );
 
-  const { broadcastElements, broadcastViewport } = useWhiteboardSync({
+  // ── Sync hook ───────────────────────────────────────────────────────────────
+
+  const { broadcastElements, broadcastViewport, broadcastPointer } = useWhiteboardSync({
     liveSessionId,
-    isPresenter,
+    isPresenter: isTeacher,
     supabase,
     onRemoteElements: applyRemoteElements,
     getElements,
-    onSaveSnapshot,
-    // Students receive viewport syncs; teacher only broadcasts
-    onRemoteViewport: !isPresenter ? applyRemoteViewport : undefined,
+    // Only the teacher persists the snapshot so there's one canonical save
+    onSaveSnapshot: isTeacher ? onSaveSnapshot : undefined,
+    // Non-teachers follow the teacher's viewport when Follow Me is on
+    onRemoteViewport: !isTeacher ? applyRemoteViewport : undefined,
+    onRemotePointer: applyRemotePointer,
   });
+
+  // ── Scene change handler ────────────────────────────────────────────────────
 
   const handleChange = useCallback(
     (elements: readonly ExcalidrawElement[], appState: AppState) => {
       broadcastElements(elements);
-      if (isPresenter && followMeRef.current) {
+      // Teacher broadcasts viewport when Follow Me is active
+      if (isTeacher && followMeRef.current) {
         broadcastViewport({
           scrollX: appState.scrollX,
           scrollY: appState.scrollY,
@@ -109,11 +243,43 @@ export function ClassroomWhiteboard({
         });
       }
     },
-    [broadcastElements, broadcastViewport, isPresenter],
+    [broadcastElements, broadcastViewport, isTeacher],
   );
 
-  // Intercept onFollowMeToggle so ClassroomWhiteboard owns the active state,
-  // then forward to any external callback the parent passed in.
+  // ── Cursor broadcast via DOM ────────────────────────────────────────────────
+  // We use a direct DOM pointermove listener instead of Excalidraw's onPointerUpdate
+  // because onPointerUpdate only reports tool:'laser' while the mouse button is held —
+  // hovering with laser selected silently reports 'pointer'.
+  // snapshotReady ensures the canvas div is mounted before we attach the listener.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const onMove = (e: PointerEvent) => {
+      const currentApi = excalidrawAPIRef.current;
+      if (!currentApi) return;
+      const appState = currentApi.getAppState();
+      // Convert screen → scene coordinates
+      const x =
+        (e.clientX - appState.offsetLeft) / appState.zoom.value - appState.scrollX;
+      const y = (e.clientY - appState.offsetTop) / appState.zoom.value - appState.scrollY;
+      broadcastPointer({
+        senderId: participantIdRef.current,
+        username: participantNameRef.current,
+        x,
+        y,
+        tool: appState.activeTool.type === 'laser' ? 'laser' : 'pointer',
+        button: e.buttons > 0 ? 'down' : 'up',
+      });
+    };
+
+    el.addEventListener('pointermove', onMove);
+    return () => el.removeEventListener('pointermove', onMove);
+    // snapshotReady re-runs this once the canvas div is in the DOM
+  }, [broadcastPointer, snapshotReady]);
+
+  // ── Follow Me toggle intercept ──────────────────────────────────────────────
+
   const mergedCallbacks: WhiteboardToolbarCallbacks = {
     ...toolbarCallbacks,
     onFollowMeToggle: (active) => {
@@ -121,6 +287,8 @@ export function ClassroomWhiteboard({
       toolbarCallbacks?.onFollowMeToggle?.(active);
     },
   };
+
+  // ── Render ──────────────────────────────────────────────────────────────────
 
   if (!snapshotReady) {
     return (
@@ -131,45 +299,39 @@ export function ClassroomWhiteboard({
   }
 
   return (
-    <div className="excalidraw-tutoring relative h-full min-h-48 w-full overflow-hidden rounded-2xl border border-border bg-card">
+    <div
+      ref={containerRef}
+      className="excalidraw-tutoring relative h-full min-h-48 w-full overflow-hidden rounded-2xl border border-border bg-card"
+    >
       <style>{`
-        /* ── Hide built-in toolbar & menus ── */
         .excalidraw-tutoring .App-toolbar-container { display: none !important; }
         .excalidraw-tutoring .main-menu-trigger     { display: none !important; }
         .excalidraw-tutoring .App-menu_top          { display: none !important; }
-
-        /* ── Move zoom/undo controls to bottom-right (keep them accessible) ── */
-        .excalidraw-tutoring .layer-ui__wrapper__footer-left {
-          margin-bottom: 4.5rem;
-        }
-        .excalidraw-tutoring .layer-ui__wrapper__footer-right {
-          margin-bottom: 4.5rem;
-        }
-
-        /* ── Hide hint viewer (keyboard shortcut hints) ── */
-        .excalidraw-tutoring .HintViewer { display: none !important; }
+        .excalidraw-tutoring .HintViewer            { display: none !important; }
       `}</style>
 
       <Excalidraw
         excalidrawAPI={handleExcalidrawAPI}
         initialData={{ elements: initialElements ?? [] }}
+        theme={theme}
+        isCollaborating={true}
         onChange={handleChange}
         UIOptions={{
           canvasActions: {
             saveToActiveFile: false,
-            loadScene: !isPresenter ? false : undefined,
-            export: { saveFileToDisk: isPresenter },
+            loadScene: isTeacher ? undefined : false,
+            export: { saveFileToDisk: isTeacher },
             toggleTheme: false,
             changeViewBackgroundColor: false,
-            clearCanvas: isPresenter,
+            clearCanvas: isTeacher,
           },
           tools: { image: false },
         }}
         langCode="en"
       />
 
-      {/* Custom toolbar pinned to the bottom centre */}
-      <div className="absolute inset-x-0 bottom-3 z-10 px-4">
+      {/* Custom toolbar pinned to the top centre */}
+      <div className="absolute inset-x-0 top-3 z-10 px-4">
         <WhiteboardToolbar items={toolbarItems} api={api} callbacks={mergedCallbacks} />
       </div>
     </div>
