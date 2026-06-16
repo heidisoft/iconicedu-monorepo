@@ -10,8 +10,6 @@ import {
   Hand,
   Highlighter,
   Image,
-  Lock,
-  Minus,
   MousePointer,
   MousePointer2,
   MoveRight,
@@ -91,7 +89,7 @@ export type ExcalidrawTool =
   | { type: 'arrow' }
   | { type: 'eraser' };
 
-export type ToolbarAction = 'upload-pdf' | 'upload-image' | 'follow-me' | 'lock-student';
+export type ToolbarAction = 'upload-pdf' | 'upload-image' | 'follow-me';
 
 export type ToolbarItemConfig =
   | {
@@ -515,70 +513,10 @@ export const TEACHER_TOOLBAR: ToolbarItemConfig[] = [
     isToggle: true,
     defaultActive: true,
   },
-  {
-    kind: 'action',
-    id: 'lock-student',
-    label: 'Lock',
-    icon: <Lock className="h-4 w-4" />,
-    action: 'lock-student',
-    isToggle: true,
-    defaultActive: false,
-  },
 ];
 
-export const STUDENT_TOOLBAR: ToolbarItemConfig[] = [
-  HAND_TOOL,
-  SELECT_TOOL,
-  { kind: 'separator', id: 'sep-0' },
-  LASER_TOOL,
-  {
-    kind: 'tool',
-    id: 'pen',
-    label: 'Pen',
-    icon: <Pencil className="h-4 w-4" />,
-    tool: { type: 'freedraw' },
-    applyStyle: applyPenStyle,
-    options: { colors: DRAW_COLORS, strokeWidths: DRAW_WIDTHS },
-  },
-  {
-    kind: 'tool',
-    id: 'highlighter',
-    label: 'Highlight',
-    icon: <Highlighter className="h-4 w-4" />,
-    tool: { type: 'freedraw' },
-    applyStyle: applyHighlighterStyle,
-    options: { colors: HIGHLIGHTER_COLORS, strokeWidths: HIGHLIGHTER_WIDTHS },
-  },
-  {
-    kind: 'tool',
-    id: 'text',
-    label: 'Text',
-    icon: <Type className="h-4 w-4" />,
-    tool: { type: 'text' },
-    applyStyle: applyTextStyle,
-    options: {
-      colors: DRAW_COLORS,
-      fontSizes: TEXT_FONT_SIZES,
-      fontFamilies: TEXT_FONT_FAMILIES,
-      textAligns: TEXT_ALIGNS,
-    },
-  },
-  {
-    kind: 'tool',
-    id: 'eraser',
-    label: 'Eraser',
-    icon: <Eraser className="h-4 w-4" />,
-    tool: { type: 'eraser' },
-  },
-];
-
-// Observer (guardian/parent): navigate and point only — no drawing tools
-export const OBSERVER_TOOLBAR: ToolbarItemConfig[] = [
-  HAND_TOOL,
-  SELECT_TOOL,
-  { kind: 'separator', id: 'sep-0' },
-  LASER_TOOL,
-];
+export const STUDENT_TOOLBAR: ToolbarItemConfig[] = TEACHER_TOOLBAR;
+export const OBSERVER_TOOLBAR: ToolbarItemConfig[] = TEACHER_TOOLBAR;
 
 // Re-export option presets so callers can build custom toolbars
 export {

@@ -19,15 +19,7 @@ import type {
 } from '@iconicedu/web/components/live-sessions/whiteboard/use-whiteboard-sync';
 import { WhiteboardToolbar } from '@iconicedu/web/components/live-sessions/whiteboard/whiteboard-toolbar';
 import type { WhiteboardToolbarCallbacks } from '@iconicedu/web/components/live-sessions/whiteboard/whiteboard-toolbar';
-import {
-  OBSERVER_TOOLBAR,
-  STUDENT_TOOLBAR,
-  TEACHER_TOOLBAR,
-} from '@iconicedu/web/components/live-sessions/whiteboard/whiteboard-toolbar-config';
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-export type WhiteboardRole = 'teacher' | 'student' | 'observer';
+import { TEACHER_TOOLBAR } from '@iconicedu/web/components/live-sessions/whiteboard/whiteboard-toolbar-config';
 
 // ─── Element merge ────────────────────────────────────────────────────────────
 // Bidirectional concurrent drawing: keep the highest-versioned copy of each
@@ -50,19 +42,10 @@ function mergeElements(
   return [...map.values()];
 }
 
-// ─── Toolbar config by role ───────────────────────────────────────────────────
-
-const TOOLBAR_BY_ROLE = {
-  teacher: TEACHER_TOOLBAR,
-  student: STUDENT_TOOLBAR,
-  observer: OBSERVER_TOOLBAR,
-} as const;
-
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 export interface ClassroomWhiteboardProps {
   liveSessionId: string;
-  role: WhiteboardRole;
   supabase: SupabaseClient;
   /** Stable ID for this participant — deduplicates cursors on the canvas */
   participantId?: string;
@@ -77,7 +60,6 @@ export interface ClassroomWhiteboardProps {
 
 export function ClassroomWhiteboard({
   liveSessionId,
-  role,
   supabase,
   participantId,
   participantName,
@@ -85,8 +67,7 @@ export function ClassroomWhiteboard({
   onSaveSnapshot,
   toolbarCallbacks,
 }: ClassroomWhiteboardProps) {
-  const isTeacher = role === 'teacher';
-  const toolbarItems = TOOLBAR_BY_ROLE[role];
+  const toolbarItems = TEACHER_TOOLBAR;
 
   const excalidrawAPIRef = useRef<ExcalidrawImperativeAPI | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -218,14 +199,11 @@ export function ClassroomWhiteboard({
 
   const { broadcastElements, broadcastViewport, broadcastPointer } = useWhiteboardSync({
     liveSessionId,
-    isPresenter: isTeacher,
     supabase,
     onRemoteElements: applyRemoteElements,
     getElements,
-    // Only the teacher persists the snapshot so there's one canonical save
-    onSaveSnapshot: isTeacher ? onSaveSnapshot : undefined,
-    // Non-teachers follow the teacher's viewport when Follow Me is on
-    onRemoteViewport: !isTeacher ? applyRemoteViewport : undefined,
+    onSaveSnapshot,
+    onRemoteViewport: applyRemoteViewport,
     onRemotePointer: applyRemotePointer,
   });
 
@@ -234,8 +212,7 @@ export function ClassroomWhiteboard({
   const handleChange = useCallback(
     (elements: readonly ExcalidrawElement[], appState: AppState) => {
       broadcastElements(elements);
-      // Teacher broadcasts viewport when Follow Me is active
-      if (isTeacher && followMeRef.current) {
+      if (followMeRef.current) {
         broadcastViewport({
           scrollX: appState.scrollX,
           scrollY: appState.scrollY,
@@ -243,7 +220,7 @@ export function ClassroomWhiteboard({
         });
       }
     },
-    [broadcastElements, broadcastViewport, isTeacher],
+    [broadcastElements, broadcastViewport],
   );
 
   // ── Cursor broadcast via DOM ────────────────────────────────────────────────
@@ -319,11 +296,11 @@ export function ClassroomWhiteboard({
         UIOptions={{
           canvasActions: {
             saveToActiveFile: false,
-            loadScene: isTeacher ? undefined : false,
-            export: { saveFileToDisk: isTeacher },
+            loadScene: undefined,
+            export: { saveFileToDisk: true },
             toggleTheme: false,
             changeViewBackgroundColor: false,
-            clearCanvas: isTeacher,
+            clearCanvas: true,
           },
           tools: { image: false },
         }}

@@ -19,7 +19,6 @@ export interface WhiteboardToolbarCallbacks {
   onUploadPdf?: () => void;
   onUploadImage?: () => void;
   onFollowMeToggle?: (active: boolean) => void;
-  onLockStudentToggle?: (active: boolean) => void;
 }
 
 interface WhiteboardToolbarProps {
@@ -113,13 +112,6 @@ export function WhiteboardToolbar({ items, api, callbacks }: WhiteboardToolbarPr
           setToggleStates((prev) => {
             const next = !prev[itemId];
             callbacks?.onFollowMeToggle?.(next);
-            return { ...prev, [itemId]: next };
-          });
-          break;
-        case 'lock-student':
-          setToggleStates((prev) => {
-            const next = !prev[itemId];
-            callbacks?.onLockStudentToggle?.(next);
             return { ...prev, [itemId]: next };
           });
           break;

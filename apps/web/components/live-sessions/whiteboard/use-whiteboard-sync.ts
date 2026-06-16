@@ -16,6 +16,7 @@ const ELEMENTS_DEBOUNCE_MS = 80;
 const VIEWPORT_THROTTLE_MS = 150;
 const POINTER_THROTTLE_MS = 40;
 const SAVE_INTERVAL_MS = 30_000;
+const MAX_SUBSCRIBE_RETRIES = 3;
 
 // ─── Exported types ───────────────────────────────────────────────────────────
 
@@ -36,14 +37,13 @@ export interface PointerUpdate {
 
 export interface UseWhiteboardSyncOptions {
   liveSessionId: string;
-  isPresenter: boolean;
   supabase: SupabaseClient;
   /** Called when remote elements arrive — should merge, not replace */
   onRemoteElements: (elements: readonly ExcalidrawElement[]) => void;
   /** Returns the current local scene (used for catch-up pushes) */
   getElements: () => readonly ExcalidrawElement[];
   onSaveSnapshot?: (elements: readonly ExcalidrawElement[]) => Promise<void>;
-  /** Called when a viewport sync arrives (non-presenter only) */
+  /** Called when a viewport sync arrives */
   onRemoteViewport?: (viewport: ViewportState) => void;
   /** Called when a cursor position arrives */
   onRemotePointer?: (update: PointerUpdate) => void;
@@ -53,7 +53,6 @@ export interface UseWhiteboardSyncOptions {
 
 export function useWhiteboardSync({
   liveSessionId,
-  isPresenter,
   supabase,
   onRemoteElements,
   getElements,
@@ -66,6 +65,9 @@ export function useWhiteboardSync({
   const vpThrottleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ptrThrottleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isApplyingRef = useRef(false);
+  const pendingElementsRef = useRef<readonly ExcalidrawElement[] | null>(null);
+  const pendingViewportRef = useRef<ViewportState | null>(null);
+  const pendingPointerRef = useRef<PointerUpdate | null>(null);
 
   // Keep latest callback/getter refs so channel handlers are never stale
   const onRemoteRef = useRef(onRemoteElements);
@@ -79,59 +81,126 @@ export function useWhiteboardSync({
 
   // ── Channel subscription ────────────────────────────────────────────────────
   useEffect(() => {
-    const channel = supabase.channel(`whiteboard:${liveSessionId}`, {
-      config: { broadcast: { self: false } },
-    });
+    let active = true;
+    let retryCount = 0;
+    let currentChannel: RealtimeChannel | null = null;
 
-    // Element updates — merge, never replace
-    channel.on('broadcast', { event: ELEMENTS_EVENT }, ({ payload }) => {
-      if (!payload?.elements) return;
-      isApplyingRef.current = true;
-      onRemoteRef.current(payload.elements as ExcalidrawElement[]);
-      setTimeout(() => {
-        isApplyingRef.current = false;
-      }, 0);
-    });
+    const flushPendingBroadcasts = () => {
+      const channel = channelRef.current;
+      if (!channel) return;
 
-    // Viewport sync (Follow-Me)
-    channel.on('broadcast', { event: VIEWPORT_EVENT }, ({ payload }) => {
-      if (!payload || typeof payload.scrollX !== 'number') return;
-      onRemoteViewportRef.current?.(payload as ViewportState);
-    });
+      const pendingElements = pendingElementsRef.current;
+      if (pendingElements) {
+        pendingElementsRef.current = null;
+        channel.send({
+          type: 'broadcast',
+          event: ELEMENTS_EVENT,
+          payload: { elements: pendingElements },
+        });
+      }
 
-    // Cursor positions
-    channel.on('broadcast', { event: POINTER_EVENT }, ({ payload }) => {
-      if (!payload?.senderId) return;
-      onRemotePointerRef.current?.(payload as PointerUpdate);
-    });
+      const pendingViewport = pendingViewportRef.current;
+      if (pendingViewport) {
+        pendingViewportRef.current = null;
+        channel.send({
+          type: 'broadcast',
+          event: VIEWPORT_EVENT,
+          payload: pendingViewport,
+        });
+      }
 
-    // Catch-up: any participant signals join → all others push their current scene.
-    channel.on('broadcast', { event: JOIN_EVENT }, () => {
-      const elements = getElementsRef.current();
-      if (elements.length === 0) return;
-      channel.send({
-        type: 'broadcast',
-        event: ELEMENTS_EVENT,
-        payload: { elements },
+      const pendingPointer = pendingPointerRef.current;
+      if (pendingPointer) {
+        pendingPointerRef.current = null;
+        channel.send({
+          type: 'broadcast',
+          event: POINTER_EVENT,
+          payload: pendingPointer,
+        });
+      }
+    };
+
+    const subscribe = () => {
+      const channel = supabase.channel(`whiteboard:${liveSessionId}`, {
+        config: { broadcast: { self: false } },
       });
-    });
+      currentChannel = channel;
 
-    channel.subscribe((status) => {
-      if (status !== 'SUBSCRIBED') return;
-      channelRef.current = channel;
-      // Announce presence so existing participants push their scene to us
-      channel.send({ type: 'broadcast', event: JOIN_EVENT, payload: {} });
-    });
+      // Element updates — merge, never replace
+      channel.on('broadcast', { event: ELEMENTS_EVENT }, ({ payload }) => {
+        if (!payload?.elements) return;
+        isApplyingRef.current = true;
+        onRemoteRef.current(payload.elements as ExcalidrawElement[]);
+        setTimeout(() => {
+          isApplyingRef.current = false;
+        }, 0);
+      });
+
+      // Viewport sync (Follow-Me)
+      channel.on('broadcast', { event: VIEWPORT_EVENT }, ({ payload }) => {
+        if (!payload || typeof payload.scrollX !== 'number') return;
+        onRemoteViewportRef.current?.(payload as ViewportState);
+      });
+
+      // Cursor positions
+      channel.on('broadcast', { event: POINTER_EVENT }, ({ payload }) => {
+        if (!payload?.senderId) return;
+        onRemotePointerRef.current?.(payload as PointerUpdate);
+      });
+
+      // Catch-up: any participant signals join → all others push their current scene.
+      channel.on('broadcast', { event: JOIN_EVENT }, () => {
+        const elements = getElementsRef.current();
+        if (elements.length === 0) return;
+        channel.send({
+          type: 'broadcast',
+          event: ELEMENTS_EVENT,
+          payload: { elements },
+        });
+      });
+
+      channel.subscribe((status) => {
+        if (!active) return;
+
+        if (status === 'SUBSCRIBED') {
+          retryCount = 0;
+          channelRef.current = channel;
+          flushPendingBroadcasts();
+          // Announce presence so existing participants push their scene to us
+          channel.send({ type: 'broadcast', event: JOIN_EVENT, payload: {} });
+          return;
+        }
+
+        if (
+          (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') &&
+          retryCount < MAX_SUBSCRIBE_RETRIES
+        ) {
+          retryCount += 1;
+          channelRef.current = null;
+          const failedChannel = channel;
+          setTimeout(() => {
+            if (!active) return;
+            void supabase.removeChannel(failedChannel);
+            subscribe();
+          }, 1000 * retryCount);
+        }
+      });
+    };
+
+    subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      active = false;
+      if (currentChannel) {
+        void supabase.removeChannel(currentChannel);
+      }
       channelRef.current = null;
     };
   }, [liveSessionId, supabase]);
 
-  // ── Periodic snapshot save (presenter only) ─────────────────────────────────
+  // ── Periodic snapshot save ─────────────────────────────────────────────────
   useEffect(() => {
-    if (!isPresenter || !onSaveSnapshot) return;
+    if (!onSaveSnapshot) return;
 
     const save = async () => {
       const elements = getElementsRef.current();
@@ -148,8 +217,7 @@ export function useWhiteboardSync({
       clearInterval(id);
       void save();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPresenter, liveSessionId, onSaveSnapshot]);
+  }, [liveSessionId, onSaveSnapshot]);
 
   // ── Broadcast helpers ───────────────────────────────────────────────────────
 
@@ -158,7 +226,12 @@ export function useWhiteboardSync({
     if (isApplyingRef.current) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      channelRef.current?.send({
+      const channel = channelRef.current;
+      if (!channel) {
+        pendingElementsRef.current = elements;
+        return;
+      }
+      channel.send({
         type: 'broadcast',
         event: ELEMENTS_EVENT,
         payload: { elements },
@@ -171,7 +244,12 @@ export function useWhiteboardSync({
     if (vpThrottleRef.current) return;
     vpThrottleRef.current = setTimeout(() => {
       vpThrottleRef.current = null;
-      channelRef.current?.send({
+      const channel = channelRef.current;
+      if (!channel) {
+        pendingViewportRef.current = viewport;
+        return;
+      }
+      channel.send({
         type: 'broadcast',
         event: VIEWPORT_EVENT,
         payload: viewport,
@@ -182,7 +260,12 @@ export function useWhiteboardSync({
   /** Leading-edge throttled pointer broadcast */
   const broadcastPointer = useCallback((update: PointerUpdate) => {
     if (ptrThrottleRef.current) return;
-    channelRef.current?.send({
+    const channel = channelRef.current;
+    if (!channel) {
+      pendingPointerRef.current = update;
+      return;
+    }
+    channel.send({
       type: 'broadcast',
       event: POINTER_EVENT,
       payload: update,

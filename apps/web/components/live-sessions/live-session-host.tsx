@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { Loader2, MonitorUp } from 'lucide-react';
+import { useMemo } from 'react';
 
 import type { LiveSessionProviderVM } from '@iconicedu/shared-types';
 import { Button } from '@iconicedu/ui-web/ui/button';
@@ -18,7 +19,6 @@ import {
   loadWhiteboardSnapshot,
   saveWhiteboardSnapshot,
 } from '@iconicedu/web/lib/whiteboard/whiteboard-snapshot';
-import type { WhiteboardRole } from '@iconicedu/web/components/live-sessions/whiteboard/classroom-whiteboard';
 
 const DailyLiveSessionEmbed = dynamic(
   () =>
@@ -73,8 +73,6 @@ export function LiveSessionHost({
   userName,
   userAvatarUrl,
   linkedChildren,
-  isPresenter,
-  whiteboardRole,
   whiteboardEnabled,
 }: {
   provider: LiveSessionProviderVM;
@@ -93,24 +91,18 @@ export function LiveSessionHost({
   userName?: string | null;
   userAvatarUrl?: string | null;
   linkedChildren?: LinkedChildProfile[];
-  isPresenter?: boolean;
-  whiteboardRole?: WhiteboardRole;
   whiteboardEnabled?: boolean;
 }) {
   const router = useRouter();
   const heading = getLiveSessionHostHeading({ provider, channelTopic });
-  const supabase = createSupabaseBrowserClient();
+  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
   const showWhiteboard = whiteboardEnabled && provider === 'daily' && !!liveSessionId;
-
-  const resolvedWhiteboardRole: WhiteboardRole =
-    whiteboardRole ?? (isPresenter ? 'teacher' : 'student');
 
   const whiteboardSlot =
     showWhiteboard && liveSessionId && orgId && profileId ? (
       <ClassroomWhiteboard
         liveSessionId={liveSessionId}
-        role={resolvedWhiteboardRole}
         supabase={supabase}
         participantId={profileId}
         participantName={userName ?? undefined}

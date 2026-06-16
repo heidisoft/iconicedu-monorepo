@@ -9,7 +9,6 @@ import { getLiveSessionReturnPath } from '@iconicedu/ui-web/components/live-sess
 import type { LinkedChildProfile } from '@iconicedu/ui-web/components/live-sessions/daily-live-session-embed';
 import { resolveLiveSessionJoinAccess } from '@iconicedu/web/lib/live-sessions/service';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
-import { enableClassroomWhiteboard } from '@iconicedu/web/flags';
 
 function parseLiveSessionMode(value: unknown): 'video' | 'audio' | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -46,11 +45,7 @@ export default async function Page({
       liveSessionId: sessionId,
       profile: profileResponse.data,
     });
-    const whiteboardEnabled =
-      session.provider === 'daily' &&
-      (await enableClassroomWhiteboard.run({
-        identify: { profileId: profileResponse.data.id },
-      }));
+    const whiteboardEnabled = session.provider === 'daily';
 
     const channelResponse = await serviceSupabase
       .from('channels')
@@ -70,16 +65,6 @@ export default async function Page({
       channelKind: channelResponse.data?.kind ?? null,
       channelPurpose: channelResponse.data?.purpose ?? null,
     });
-
-    const isPresenter =
-      profileResponse.data.kind === 'educator' || profileResponse.data.kind === 'staff';
-
-    const whiteboardRole =
-      profileResponse.data.kind === 'educator' || profileResponse.data.kind === 'staff'
-        ? ('teacher' as const)
-        : profileResponse.data.kind === 'guardian'
-          ? ('observer' as const)
-          : ('student' as const);
 
     // For guardian accounts, resolve linked children so the pre-join screen shows
     // the child's identity and lets the parent switch between children if there are multiple.
@@ -154,8 +139,6 @@ export default async function Page({
           userName={profileResponse.data.display_name}
           userAvatarUrl={profileResponse.data.avatar_url ?? null}
           linkedChildren={linkedChildren.length > 0 ? linkedChildren : undefined}
-          isPresenter={isPresenter}
-          whiteboardRole={whiteboardRole}
           whiteboardEnabled={whiteboardEnabled}
         />
       </div>
