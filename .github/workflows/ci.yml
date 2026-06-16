@@ -784,10 +784,11 @@ jobs:
             --arg phk   "${{ secrets.POSTHOG_KEY }}" \
             --arg phh   "${{ vars.POSTHOG_HOST || 'https://t.iconicedu.lk' }}" \
             '{DATABASE_URL:$db, DIRECT_URL:$dir, SUPABASE_URL:$surl,
-              SUPABASE_SERVICE_ROLE_KEY:$srkey, SUPABASE_ANON_KEY:$anon, SUPABASE_JWT_SECRET:$jwt,
+              SUPABASE_SERVICE_ROLE_KEY:$srkey, SUPABASE_PUBLISHABLE_KEY:$anon,
+              SUPABASE_ANON_KEY:$anon, SUPABASE_JWT_SECRET:$jwt,
               INTERNAL_EVENTS_TOKEN:$evt,
               INTERNAL_REMINDERS_TOKEN:$rem,
-              EXPO_ACCESS_TOKEN:$expo,
+              EXPO_ACCESS_TOKEN:$expo, API_ENV:"preview",
               NODE_ENV:"production", NEXT_PUBLIC_APP_ENV:"preview",
               POSTHOG_KEY:$phk, POSTHOG_HOST:$phh}')
 
@@ -907,6 +908,16 @@ jobs:
           set_vercel_env "NEXT_PUBLIC_API_URL" "${{ steps.railway.outputs.railway_api_url }}"
           set_vercel_env "EXPO_PUBLIC_API_URL" "${{ steps.railway.outputs.railway_api_url }}"
           set_vercel_env "NEXT_PUBLIC_APP_ENV" "preview"
+          set_vercel_env "SUPABASE_URL" "${{ steps.branch-creds.outputs.branch_api_url }}"
+          set_vercel_env "NEXT_PUBLIC_SUPABASE_URL" "${{ steps.branch-creds.outputs.branch_api_url }}"
+          set_vercel_env "EXPO_PUBLIC_SUPABASE_URL" "${{ steps.branch-creds.outputs.branch_api_url }}"
+          set_vercel_env "SUPABASE_PUBLISHABLE_KEY" "${{ steps.branch-creds.outputs.anon_key }}"
+          set_vercel_env "SUPABASE_ANON_KEY" "${{ steps.branch-creds.outputs.anon_key }}"
+          set_vercel_env "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" "${{ steps.branch-creds.outputs.anon_key }}"
+          set_vercel_env "NEXT_PUBLIC_SUPABASE_ANON_KEY" "${{ steps.branch-creds.outputs.anon_key }}"
+          set_vercel_env "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY" "${{ steps.branch-creds.outputs.anon_key }}"
+          set_vercel_env "EXPO_PUBLIC_SUPABASE_ANON_KEY" "${{ steps.branch-creds.outputs.anon_key }}"
+          set_vercel_env "SUPABASE_SERVICE_ROLE_KEY" "${{ steps.branch-creds.outputs.service_role_key }}"
           set_vercel_env "INTERNAL_EVENTS_TOKEN" "${{ secrets.INTERNAL_EVENTS_TOKEN }}"
           set_vercel_env "INTERNAL_REMINDERS_TOKEN" "${{ secrets.INTERNAL_REMINDERS_TOKEN }}"
 
