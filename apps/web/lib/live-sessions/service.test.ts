@@ -25,6 +25,7 @@ vi.mock('@iconicedu/web/lib/live-sessions/providers', () => ({
 
 import { getProfilesByIds } from '@iconicedu/web/lib/profile/queries/profiles.query';
 import { resolveChannelLiveSessionScope } from '@iconicedu/web/lib/live-sessions/scope';
+import { getLiveSessionProvider } from '@iconicedu/web/lib/live-sessions/providers';
 import {
   createOrJoinLiveSession,
   resolveLiveSessionJoinAccess,
@@ -483,6 +484,11 @@ describe('createOrJoinLiveSession', () => {
 
   it('reuses an active live session and still emits the joined activity immediately', async () => {
     const serviceSupabase = createServiceSupabaseStub({
+      liveSessionConfig: {
+        enabled: true,
+        provider: 'daily',
+        mode: 'video',
+      },
       activeLiveSessionRow: {
         id: 'live-session-existing',
         org_id: 'org-1',
@@ -522,6 +528,58 @@ describe('createOrJoinLiveSession', () => {
     });
   });
 
+  it('starts a new Daily session instead of reusing an active external session after config changes', async () => {
+    const serviceSupabase = createServiceSupabaseStub({
+      liveSessionConfig: {
+        enabled: true,
+        provider: 'daily',
+        mode: 'video',
+      },
+      activeLiveSessionRow: {
+        id: 'live-session-existing',
+        org_id: 'org-1',
+        channel_id: 'channel-1',
+        provider: 'custom',
+        session_scope_key: 'channel:channel-1',
+        occurrence_key: '2026-03-02T10:00:00.000Z',
+        status: 'live',
+        started_by_profile_id: 'profile-2',
+        join_path: 'https://zoom.us/j/123',
+        started_at: '2026-03-02T10:00:00.000Z',
+        app_metadata: {
+          learningSpaceId: 'space-1',
+          occurrenceLabel: 'Mar 2, 10:00 AM',
+          scheduleTitle: 'Math',
+          mode: 'video',
+        },
+      },
+    });
+    const scheduler = createImmediateScheduler();
+
+    const result = await createOrJoinLiveSession({
+      serviceSupabase: serviceSupabase as never,
+      actor: DEFAULT_ACTOR,
+      channelId: 'channel-1',
+      orgSlug: 'iconic-academy',
+      schedulePostJoinSideEffects: scheduler.schedule,
+    });
+
+    expect(result).toEqual({
+      sessionId: 'live-session-1',
+      joinPath: '/iconic-academy/live-sessions/live-session-1',
+      status: 'live',
+      created: true,
+      provider: 'daily',
+    });
+    expect(getLiveSessionProvider).toHaveBeenCalledWith('daily');
+    expect(serviceSupabase.state.liveSessionRow).toMatchObject({
+      id: 'live-session-1',
+      provider: 'daily',
+      join_path: '/iconic-academy/live-sessions/live-session-1',
+      status: 'live',
+    });
+  });
+
   it('does not publish removed session start activity when reusing an outside-schedule huddle session', async () => {
     vi.mocked(resolveChannelLiveSessionScope).mockResolvedValueOnce({
       scopeKey: 'channel:channel-1',
@@ -532,6 +590,11 @@ describe('createOrJoinLiveSession', () => {
     });
 
     const serviceSupabase = createServiceSupabaseStub({
+      liveSessionConfig: {
+        enabled: true,
+        provider: 'daily',
+        mode: 'audio',
+      },
       channel: {
         purpose: 'general',
         primary_entity_id: null,

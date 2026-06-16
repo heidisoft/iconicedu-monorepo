@@ -364,6 +364,49 @@ async function getActiveLiveSession(
     .maybeSingle<ChannelLiveSessionRowRecord>();
 }
 
+function isActiveLiveSessionCompatibleWithConfig(input: {
+  session: ChannelLiveSessionRowRecord;
+  config: ChannelLiveSessionConfigRecord;
+  orgSlug: string;
+}) {
+  if (input.session.provider !== input.config.provider) {
+    return false;
+  }
+
+  if (input.config.provider === 'custom') {
+    return input.session.join_path === input.config.joinUrl;
+  }
+
+  return input.session.join_path.startsWith(`/${input.orgSlug}/live-sessions/`);
+}
+
+async function endActiveLiveSessionForConfigChange(input: {
+  supabase: SupabaseServiceClient;
+  session: ChannelLiveSessionRowRecord;
+  profileId: string;
+  now: string;
+}) {
+  const response = await input.supabase
+    .from('channel_live_sessions')
+    .update({
+      status: 'ended',
+      ended_at: input.now,
+      updated_at: input.now,
+      updated_by: input.profileId,
+      app_metadata: {
+        ...(input.session.app_metadata ?? {}),
+        endedReason: 'live_session_config_changed',
+        previousProvider: input.session.provider,
+      },
+    })
+    .eq('id', input.session.id)
+    .eq('org_id', input.session.org_id);
+
+  if (response.error) {
+    throw new Error(response.error.message);
+  }
+}
+
 async function upsertJoinRequestedParticipant(input: {
   supabase: SupabaseServiceClient;
   session: ChannelLiveSessionRowRecord;
@@ -656,7 +699,14 @@ export async function createOrJoinLiveSession(input: {
 
   const now = new Date().toISOString();
   const existingSession = activeSessionResponse.data ?? null;
-  if (existingSession) {
+  if (
+    existingSession &&
+    isActiveLiveSessionCompatibleWithConfig({
+      session: existingSession,
+      config: liveSessionConfig,
+      orgSlug: input.orgSlug,
+    })
+  ) {
     await snapshotExpectedParticipantsForLiveSession({
       supabase: input.serviceSupabase,
       session: existingSession,
@@ -695,6 +745,14 @@ export async function createOrJoinLiveSession(input: {
       created: false,
       provider: existingSession.provider as LiveSessionProviderVM,
     };
+  }
+  if (existingSession) {
+    await endActiveLiveSessionForConfigChange({
+      supabase: input.serviceSupabase,
+      session: existingSession,
+      profileId: profile.id,
+      now,
+    });
   }
 
   const joinPath =
