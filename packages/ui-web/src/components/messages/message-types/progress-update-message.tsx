@@ -6,6 +6,7 @@ import {
   MessageBase,
   type MessageBaseProps,
 } from '@iconicedu/ui-web/components/messages/message-base';
+import { MessageTextContent } from '@iconicedu/ui-web/components/messages/message-text-content';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 
 interface ProgressUpdateMessageProps extends Omit<
@@ -30,9 +31,7 @@ export const ProgressUpdateMessage = memo(function ProgressUpdateMessage(
   return (
     <MessageBase message={message} {...baseProps} className="bg-green-500/5">
       {message.content?.text && (
-        <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap break-words mb-2">
-          {message.content.text}
-        </p>
+        <MessageTextContent text={message.content.text} className="mb-2" />
       )}
       <div className="rounded-xl border border-green-500/20 bg-card overflow-hidden max-w-md">
         <div className="p-4">

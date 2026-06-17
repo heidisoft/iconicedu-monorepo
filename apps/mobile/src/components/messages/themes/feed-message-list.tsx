@@ -68,6 +68,7 @@ import { ChatPdfViewer } from '@/components/messages/chat-pdf-viewer';
 import { PendingMessageRow } from '@/components/messages/pending-message-row';
 import type { AttachmentPayload } from '@/components/messages/attachment-sheet';
 import { reportMobileObservedError } from '@/lib/analytics/report-error';
+import { openMessageLink, splitMessageTextByLinks } from '@/lib/messages/link-opening';
 import {
   useOnlineProfileIds,
   type PresenceDisplayStatus,
@@ -330,6 +331,22 @@ function FeedText({
   color: string;
   mentionColor: string;
 }) {
+  const renderTextParts = (value: string, keyPrefix: string) =>
+    splitMessageTextByLinks(value).map((part, index) =>
+      part.kind === 'link' ? (
+        <Text
+          key={`${keyPrefix}-${index}`}
+          accessibilityRole="link"
+          style={{ color: mentionColor, textDecorationLine: 'underline' }}
+          onPress={() => openMessageLink(part.url)}
+        >
+          {part.value}
+        </Text>
+      ) : (
+        <Text key={`${keyPrefix}-${index}`}>{part.value}</Text>
+      ),
+    );
+
   return (
     <Text style={[styles.feedText, { color, fontSize: size, lineHeight }]}>
       {buildSegments(text, mentions).map((segment, index) =>
@@ -338,7 +355,7 @@ function FeedText({
             {segment.value}
           </Text>
         ) : (
-          <Text key={index}>{segment.value}</Text>
+          renderTextParts(segment.value, String(index))
         ),
       )}
     </Text>
@@ -772,7 +789,7 @@ function FeedLinkPreview({ message }: { message: MessageVM }) {
         styles.linkCard,
         { borderColor: colors.border, backgroundColor: colors.card },
       ]}
-      onPress={() => Linking.openURL(linkMessage.link.url).catch(() => null)}
+      onPress={() => openMessageLink(linkMessage.link.url)}
       accessibilityLabel={`Open link: ${linkMessage.link.title}`}
     >
       {!!linkMessage.link.imageUrl && (

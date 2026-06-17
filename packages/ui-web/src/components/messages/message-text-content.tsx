@@ -2,6 +2,10 @@ import { memo } from 'react';
 import type { MessageMentionVM } from '@iconicedu/shared-types';
 
 import { cn } from '@iconicedu/ui-web/lib/utils';
+import {
+  confirmExternalMessageLink,
+  splitMessageTextByLinks,
+} from './message-link.utils';
 import { buildMessageTextSegments } from './message-mentions.utils';
 import { isEmojiOnlyText } from './message-action-visibility.utils';
 
@@ -18,6 +22,30 @@ export const MessageTextContent = memo(function MessageTextContent({
 }: MessageTextContentProps) {
   const segments = buildMessageTextSegments(text, mentions);
   const isEmojiOnly = isEmojiOnlyText(text);
+
+  const renderLinkedText = (value: string, keyPrefix: string) =>
+    splitMessageTextByLinks(value).map((part, index) => {
+      if (part.kind === 'link') {
+        return (
+          <a
+            key={`${keyPrefix}-link-${index}`}
+            href={part.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-primary underline underline-offset-2"
+            onClick={(event) => {
+              if (!confirmExternalMessageLink(part.url)) {
+                event.preventDefault();
+              }
+            }}
+          >
+            {part.value}
+          </a>
+        );
+      }
+
+      return <span key={`${keyPrefix}-text-${index}`}>{part.value}</span>;
+    });
 
   const renderFormattedText = (value: string) => {
     const parts: Array<{ type: 'text' | 'bold' | 'italic'; text: string }> = [];
@@ -50,12 +78,22 @@ export const MessageTextContent = memo(function MessageTextContent({
 
     return parts.map((part, index) => {
       if (part.type === 'bold') {
-        return <strong key={`bold-${index}`}>{part.text}</strong>;
+        return (
+          <strong key={`bold-${index}`}>
+            {renderLinkedText(part.text, `bold-${index}`)}
+          </strong>
+        );
       }
       if (part.type === 'italic') {
-        return <em key={`italic-${index}`}>{part.text}</em>;
+        return (
+          <em key={`italic-${index}`}>
+            {renderLinkedText(part.text, `italic-${index}`)}
+          </em>
+        );
       }
-      return <span key={`text-${index}`}>{part.text}</span>;
+      return (
+        <span key={`text-${index}`}>{renderLinkedText(part.text, `text-${index}`)}</span>
+      );
     });
   };
 

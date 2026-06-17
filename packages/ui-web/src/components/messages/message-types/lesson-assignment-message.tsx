@@ -9,6 +9,7 @@ import {
   MessageBase,
   type MessageBaseProps,
 } from '@iconicedu/ui-web/components/messages/message-base';
+import { MessageTextContent } from '@iconicedu/ui-web/components/messages/message-text-content';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 
 interface LessonAssignmentMessageProps extends Omit<
@@ -67,9 +68,7 @@ export const LessonAssignmentMessage = memo(function LessonAssignmentMessage(
   return (
     <MessageBase message={message} {...baseProps} className="bg-primary/5">
       {message.content?.text && (
-        <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap break-words mb-2">
-          {message.content.text}
-        </p>
+        <MessageTextContent text={message.content.text} className="mb-2" />
       )}
       <div className="rounded-xl border border-primary/20 bg-card overflow-hidden max-w-md">
         <div className="p-4">

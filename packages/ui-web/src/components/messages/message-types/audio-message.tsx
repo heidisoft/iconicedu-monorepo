@@ -10,6 +10,7 @@ import {
 } from '@iconicedu/ui-web/components/messages/message-base';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 import { buildFileAccessHref } from '@iconicedu/ui-web/components/messages/file-download.utils';
+import { MessageTextContent } from '@iconicedu/ui-web/components/messages/message-text-content';
 
 interface AudioMessageProps extends Omit<MessageBaseProps, 'message' | 'children'> {
   message: AudioRecordingMessageVM;
@@ -226,9 +227,7 @@ export const AudioMessage = memo(function AudioMessage(props: AudioMessageProps)
   return (
     <MessageBase message={message} {...baseProps}>
       {!isFeedTheme && message.content?.text && (
-        <p className="mb-3 whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground">
-          {message.content.text}
-        </p>
+        <MessageTextContent text={message.content.text} className="mb-3" />
       )}
       <div className="max-w-md rounded-2xl border border-border bg-card px-3 py-3">
         <audio
@@ -295,9 +294,10 @@ export const AudioMessage = memo(function AudioMessage(props: AudioMessageProps)
         </div>
       </div>
       {isFeedTheme && message.content?.text && (
-        <p className="mt-3 rounded-[10px] border border-border/70 bg-background px-4 py-3 text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words">
-          {message.content.text}
-        </p>
+        <MessageTextContent
+          text={message.content.text}
+          className="mt-3 rounded-[10px] border border-border/70 bg-background px-4 py-3"
+        />
       )}
     </MessageBase>
   );

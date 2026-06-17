@@ -7,6 +7,7 @@ import {
   MessageBase,
   type MessageBaseProps,
 } from '@iconicedu/ui-web/components/messages/message-base';
+import { MessageTextContent } from '@iconicedu/ui-web/components/messages/message-text-content';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 
 interface DesignFileMessageProps extends Omit<MessageBaseProps, 'message' | 'children'> {
@@ -39,9 +40,7 @@ export const DesignFileMessage = memo(function DesignFileMessage(
   return (
     <MessageBase message={message} {...baseProps}>
       {message.content?.text && (
-        <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap break-words mb-2">
-          {message.content.text}
-        </p>
+        <MessageTextContent text={message.content.text} className="mb-2" />
       )}
       <div className="rounded-xl border border-border overflow-hidden max-w-md">
         {message.attachment.thumbnail && (

@@ -37,6 +37,7 @@ import type {
 import type { AppColors } from '@/lib/theme';
 import type { PresenceDisplayStatus } from '@/hooks/use-online-profile-ids';
 import { reportMobileObservedError } from '@/lib/analytics/report-error';
+import { openMessageLink, splitMessageTextByLinks } from '@/lib/messages/link-opening';
 import { fetchThreadMessages } from '@/lib/api/queries';
 import { useMarkRead } from '@/hooks/use-mark-read';
 import { EmojiPicker } from './emoji-picker';
@@ -341,13 +342,39 @@ function FormattedText({
         if (seg.kind === 'bold')
           return (
             <Text key={i} style={{ fontWeight: '700' }}>
-              {seg.value}
+              {splitMessageTextByLinks(seg.value).map((part, partIndex) =>
+                part.kind === 'link' ? (
+                  <Text
+                    key={partIndex}
+                    accessibilityRole="link"
+                    style={{ color: colors.teal, textDecorationLine: 'underline' }}
+                    onPress={() => openMessageLink(part.url)}
+                  >
+                    {part.value}
+                  </Text>
+                ) : (
+                  <Text key={partIndex}>{part.value}</Text>
+                ),
+              )}
             </Text>
           );
         if (seg.kind === 'italic')
           return (
             <Text key={i} style={{ fontStyle: 'italic' }}>
-              {seg.value}
+              {splitMessageTextByLinks(seg.value).map((part, partIndex) =>
+                part.kind === 'link' ? (
+                  <Text
+                    key={partIndex}
+                    accessibilityRole="link"
+                    style={{ color: colors.teal, textDecorationLine: 'underline' }}
+                    onPress={() => openMessageLink(part.url)}
+                  >
+                    {part.value}
+                  </Text>
+                ) : (
+                  <Text key={partIndex}>{part.value}</Text>
+                ),
+              )}
             </Text>
           );
         if (seg.kind === 'mention')
@@ -363,7 +390,20 @@ function FormattedText({
               {` ${seg.value} `}
             </Text>
           );
-        return <Text key={i}>{seg.value}</Text>;
+        return splitMessageTextByLinks(seg.value).map((part, partIndex) =>
+          part.kind === 'link' ? (
+            <Text
+              key={`${i}-${partIndex}`}
+              accessibilityRole="link"
+              style={{ color: colors.teal, textDecorationLine: 'underline' }}
+              onPress={() => openMessageLink(part.url)}
+            >
+              {part.value}
+            </Text>
+          ) : (
+            <Text key={`${i}-${partIndex}`}>{part.value}</Text>
+          ),
+        );
       })}
     </Text>
   );
@@ -2609,7 +2649,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
               width: '85%' as const,
             },
           ]}
-          onPress={() => Linking.openURL(lp.link.url).catch(() => null)}
+          onPress={() => openMessageLink(lp.link.url)}
           accessibilityLabel={`Open link: ${lp.link.title}`}
         >
           {!!lp.link.imageUrl && (
