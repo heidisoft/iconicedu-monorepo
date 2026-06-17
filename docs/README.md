@@ -66,6 +66,7 @@ Internal engineers, operators, and AI assistants.
 - [Overview](architecture/overview.md)
 - [Shared Packages](architecture/packages.md)
 - [Database](architecture/database.md)
+- [Assessments](architecture/assessments.md)
 - [Diagrams](architecture/diagrams.md)
 - [Swimlanes](architecture/swimlanes.md)
 - [Activity Feed Contract](architecture/activity-feed.md)

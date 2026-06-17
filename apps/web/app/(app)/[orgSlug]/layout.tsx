@@ -124,31 +124,6 @@ export default async function Layout({
   });
   const includeReports = true;
 
-  // Inject assessments nav item when flag is on
-  if (assessmentsEnabled) {
-    const role = account.primary_role;
-    const isStaff = role === 'staff' || role === 'owner';
-    const assessmentsUrl = isStaff
-      ? `/${orgSlug}/admin/assessments`
-      : `/${orgSlug}/assessments`;
-    const alreadyHasAssessments = sidebarData.navigation.navMain.some((item) =>
-      item.url.includes('/assessments'),
-    );
-    if (!alreadyHasAssessments) {
-      (
-        sidebarData.navigation.navMain as Array<{
-          title: string;
-          url: string;
-          icon: string;
-        }>
-      ).push({
-        title: 'Assessments',
-        url: assessmentsUrl,
-        icon: 'assessments',
-      });
-    }
-  }
-
   return (
     <SidebarProvider>
       <SidebarShell

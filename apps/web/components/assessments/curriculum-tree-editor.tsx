@@ -17,6 +17,11 @@ import {
   Button,
   Card,
   CardContent,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
   Input,
   Label,
   Textarea,
@@ -52,7 +57,6 @@ function getApi() {
 export function CurriculumTreeEditor({ subject, domains: initialDomains, orgId }: Props) {
   const [domains, setDomains] = useState(initialDomains);
 
-  // Domain add state
   const [addingDomain, setAddingDomain] = useState(false);
   const [newDomainName, setNewDomainName] = useState('');
   const [newDomainGrade, setNewDomainGrade] = useState(1);
@@ -182,7 +186,7 @@ export function CurriculumTreeEditor({ subject, domains: initialDomains, orgId }
                   </span>
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="px-4 pb-3">
+              <AccordionContent className="px-4 pb-4">
                 <DomainSkills
                   domain={domain}
                   allSkills={domains.flatMap((d) => d.skills ?? [])}
@@ -215,10 +219,11 @@ interface DomainSkillsProps {
 
 function DomainSkills({ domain, allSkills, orgId, onSkillsChange }: DomainSkillsProps) {
   const skills = domain.skills ?? [];
-  const [addingSkill, setAddingSkill] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
   const [newSkill, setNewSkill] = useState({
     name: '',
     standard: '',
+    description: '',
     difficultyBaseline: 3,
     estimatedTimeSeconds: 90,
   });
@@ -240,10 +245,11 @@ function DomainSkills({ domain, allSkills, orgId, onSkillsChange }: DomainSkills
       setNewSkill({
         name: '',
         standard: '',
+        description: '',
         difficultyBaseline: 3,
         estimatedTimeSeconds: 90,
       });
-      setAddingSkill(false);
+      setAddOpen(false);
     } finally {
       setSavingSkill(false);
     }
@@ -256,9 +262,9 @@ function DomainSkills({ domain, allSkills, orgId, onSkillsChange }: DomainSkills
   }
 
   return (
-    <div className="flex flex-col gap-1">
-      {skills.length === 0 && !addingSkill && (
-        <p className="text-xs text-muted-foreground py-2">
+    <div className="flex flex-col gap-0.5">
+      {skills.length === 0 && (
+        <p className="text-xs text-muted-foreground py-2 px-1">
           No skills in this domain yet.
         </p>
       )}
@@ -276,96 +282,114 @@ function DomainSkills({ domain, allSkills, orgId, onSkillsChange }: DomainSkills
         />
       ))}
 
-      {addingSkill && (
-        <div className="flex flex-col gap-2 p-3 rounded-md border border-dashed bg-muted/20 mt-1">
-          <div className="flex gap-2 flex-wrap">
-            <div className="flex-1 min-w-48">
-              <Label className="text-xs">Skill name</Label>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="mt-2 self-start text-xs h-7 text-muted-foreground hover:text-foreground"
+        onClick={() => setAddOpen(true)}
+      >
+        <Plus className="mr-1 h-3 w-3" /> Add skill
+      </Button>
+
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Add skill to {domain.name}</DialogTitle>
+          </DialogHeader>
+
+          <div className="flex flex-col gap-4 py-2">
+            <div>
+              <Label htmlFor="add-skill-name">Skill name</Label>
               <Input
-                className="mt-1 h-8 text-sm"
+                id="add-skill-name"
+                className="mt-1.5"
                 placeholder="e.g. Compare fractions with unlike denominators"
                 value={newSkill.name}
                 onChange={(e) => setNewSkill((p) => ({ ...p, name: e.target.value }))}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddSkill()}
                 autoFocus
               />
             </div>
-            <div className="w-44">
-              <Label className="text-xs">Standard (optional)</Label>
+
+            <div>
+              <Label htmlFor="add-skill-standard">Standard (optional)</Label>
               <Input
-                className="mt-1 h-8 text-sm"
-                placeholder="CCSS.Math.4.NF.A.2"
+                id="add-skill-standard"
+                className="mt-1.5"
+                placeholder="e.g. CCSS.Math.4.NF.A.2"
                 value={newSkill.standard}
                 onChange={(e) => setNewSkill((p) => ({ ...p, standard: e.target.value }))}
               />
             </div>
-          </div>
-          <div className="flex gap-2 flex-wrap items-end">
-            <div className="w-36">
-              <Label className="text-xs">Baseline difficulty</Label>
-              <Select
-                value={String(newSkill.difficultyBaseline)}
-                onValueChange={(v) =>
-                  setNewSkill((p) => ({ ...p, difficultyBaseline: Number(v) }))
-                }
-              >
-                <SelectTrigger className="mt-1 h-8 text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {DIFFICULTIES.map((d) => (
-                    <SelectItem key={d} value={String(d)}>
-                      Level {d}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="w-36">
-              <Label className="text-xs">Est. time (sec)</Label>
-              <Input
-                className="mt-1 h-8 text-sm"
-                type="number"
-                value={newSkill.estimatedTimeSeconds}
+
+            <div>
+              <Label htmlFor="add-skill-desc">Description (optional)</Label>
+              <Textarea
+                id="add-skill-desc"
+                className="mt-1.5 resize-none"
+                rows={2}
+                placeholder="What students will learn or practise"
+                value={newSkill.description}
                 onChange={(e) =>
-                  setNewSkill((p) => ({
-                    ...p,
-                    estimatedTimeSeconds: Number(e.target.value),
-                  }))
+                  setNewSkill((p) => ({ ...p, description: e.target.value }))
                 }
               />
             </div>
-            <div className="flex gap-2 ml-auto">
-              <Button
-                size="sm"
-                className="h-8"
-                onClick={handleAddSkill}
-                disabled={savingSkill || !newSkill.name.trim()}
-              >
-                {savingSkill ? 'Adding…' : 'Add skill'}
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-8"
-                onClick={() => setAddingSkill(false)}
-              >
-                Cancel
-              </Button>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Baseline difficulty</Label>
+                <Select
+                  value={String(newSkill.difficultyBaseline)}
+                  onValueChange={(v) =>
+                    setNewSkill((p) => ({ ...p, difficultyBaseline: Number(v) }))
+                  }
+                >
+                  <SelectTrigger className="mt-1.5">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DIFFICULTIES.map((d) => (
+                      <SelectItem key={d} value={String(d)}>
+                        Level {d}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="add-skill-time">Est. time (seconds)</Label>
+                <Input
+                  id="add-skill-time"
+                  className="mt-1.5"
+                  type="number"
+                  min={10}
+                  value={newSkill.estimatedTimeSeconds}
+                  onChange={(e) =>
+                    setNewSkill((p) => ({
+                      ...p,
+                      estimatedTimeSeconds: Number(e.target.value),
+                    }))
+                  }
+                />
+              </div>
             </div>
           </div>
-        </div>
-      )}
 
-      {!addingSkill && (
-        <Button
-          size="sm"
-          variant="ghost"
-          className="mt-1 self-start text-xs h-7"
-          onClick={() => setAddingSkill(true)}
-        >
-          <Plus className="mr-1 h-3 w-3" /> Add skill
-        </Button>
-      )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddSkill}
+              disabled={savingSkill || !newSkill.name.trim()}
+            >
+              {savingSkill ? 'Adding…' : 'Add skill'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -383,14 +407,28 @@ interface SkillRowProps {
 }
 
 function SkillRow({ skill, allSkills, orgId, onDelete, onUpdate }: SkillRowProps) {
-  const [editing, setEditing] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [form, setForm] = useState({
     name: skill.name,
     standard: skill.standard ?? '',
     description: skill.description ?? '',
+    difficultyBaseline: skill.difficultyBaseline,
+    estimatedTimeSeconds: skill.estimatedTimeSeconds,
   });
   const [saving, setSaving] = useState(false);
   const [prereqOpen, setPrereqOpen] = useState(false);
+
+  // Keep form in sync when skill prop updates
+  function openEdit() {
+    setForm({
+      name: skill.name,
+      standard: skill.standard ?? '',
+      description: skill.description ?? '',
+      difficultyBaseline: skill.difficultyBaseline,
+      estimatedTimeSeconds: skill.estimatedTimeSeconds,
+    });
+    setEditOpen(true);
+  }
 
   async function handleSave() {
     setSaving(true);
@@ -400,9 +438,11 @@ function SkillRow({ skill, allSkills, orgId, onDelete, onUpdate }: SkillRowProps
         name: form.name.trim(),
         standard: form.standard || undefined,
         description: form.description || undefined,
+        difficultyBaseline: form.difficultyBaseline,
+        estimatedTimeSeconds: form.estimatedTimeSeconds,
       });
       onUpdate(updated);
-      setEditing(false);
+      setEditOpen(false);
     } finally {
       setSaving(false);
     }
@@ -420,138 +460,189 @@ function SkillRow({ skill, allSkills, orgId, onDelete, onUpdate }: SkillRowProps
 
   const otherSkills = allSkills.filter((s) => s.id !== skill.id);
 
-  if (editing) {
-    return (
-      <div className="flex flex-col gap-2 p-3 rounded-md border bg-muted/10 my-1">
-        <Input
-          className="h-8 text-sm"
-          value={form.name}
-          onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-          autoFocus
-        />
-        <Input
-          className="h-8 text-sm"
-          placeholder="Standard (e.g. CCSS.Math.4.NF.A.2)"
-          value={form.standard}
-          onChange={(e) => setForm((p) => ({ ...p, standard: e.target.value }))}
-        />
-        <Textarea
-          className="text-sm min-h-0 h-16 resize-none"
-          placeholder="Description (optional)"
-          value={form.description}
-          onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
-        />
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            className="h-7"
-            onClick={handleSave}
-            disabled={saving || !form.name.trim()}
-          >
-            {saving ? 'Saving…' : 'Save'}
+  return (
+    <>
+      <div className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-muted/30 group transition-colors min-w-0">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-medium truncate">{skill.name}</span>
+            {skill.standard && (
+              <span className="text-xs text-muted-foreground font-mono shrink-0">
+                {skill.standard}
+              </span>
+            )}
+          </div>
+          {skill.prerequisites.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1">
+              {skill.prerequisites.map((p) => (
+                <Badge key={p.id} variant="outline" className="text-xs gap-1 py-0">
+                  <Link2 className="h-2.5 w-2.5" /> {p.name}
+                </Badge>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+          {skill.itemCount !== undefined && (
+            <span className="text-xs text-muted-foreground mr-1">
+              {skill.itemCount} q
+            </span>
+          )}
+
+          <Popover open={prereqOpen} onOpenChange={setPrereqOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7"
+                title="Set prerequisites"
+              >
+                <Link2 className="h-3.5 w-3.5" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-72 p-0" align="end">
+              <Command>
+                <CommandInput placeholder="Search skills…" />
+                <CommandEmpty>No skills found.</CommandEmpty>
+                <CommandGroup heading="Prerequisites">
+                  {otherSkills.map((s) => {
+                    const selected = skill.prerequisites.some((p) => p.id === s.id);
+                    return (
+                      <CommandItem key={s.id} onSelect={() => handleTogglePrereq(s)}>
+                        <Check
+                          className={`mr-2 h-4 w-4 ${selected ? 'opacity-100' : 'opacity-0'}`}
+                        />
+                        <span className="flex-1">{s.name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {s.domainName}
+                        </span>
+                      </CommandItem>
+                    );
+                  })}
+                </CommandGroup>
+              </Command>
+            </PopoverContent>
+          </Popover>
+
+          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={openEdit}>
+            <Pencil className="h-3.5 w-3.5" />
           </Button>
           <Button
-            size="sm"
+            size="icon"
             variant="ghost"
-            className="h-7"
-            onClick={() => setEditing(false)}
+            className="h-7 w-7 text-destructive hover:text-destructive"
+            onClick={onDelete}
           >
-            Cancel
+            <Trash2 className="h-3.5 w-3.5" />
           </Button>
         </div>
-      </div>
-    );
-  }
 
-  return (
-    <div className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-muted/30 group transition-colors">
-      <div className="flex-1 min-w-0">
-        <span className="text-sm font-medium">{skill.name}</span>
-        {skill.standard && (
-          <span className="ml-2 text-xs text-muted-foreground font-mono">
-            {skill.standard}
-          </span>
-        )}
-        {skill.prerequisites.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-1">
-            {skill.prerequisites.map((p) => (
-              <Badge key={p.id} variant="outline" className="text-xs gap-1 py-0">
-                <Link2 className="h-2.5 w-2.5" /> {p.name}
-              </Badge>
-            ))}
+        <div
+          className="flex gap-0.5 ml-1 shrink-0"
+          title={`Baseline difficulty: ${skill.difficultyBaseline}`}
+        >
+          {[1, 2, 3, 4, 5].map((d) => (
+            <div
+              key={d}
+              className={`h-1.5 w-1.5 rounded-full ${d <= skill.difficultyBaseline ? 'bg-primary' : 'bg-muted'}`}
+            />
+          ))}
+        </div>
+      </div>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit skill</DialogTitle>
+          </DialogHeader>
+
+          <div className="flex flex-col gap-4 py-2">
+            <div>
+              <Label htmlFor="edit-skill-name">Skill name</Label>
+              <Input
+                id="edit-skill-name"
+                className="mt-1.5"
+                value={form.name}
+                onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+                autoFocus
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="edit-skill-standard">Standard (optional)</Label>
+              <Input
+                id="edit-skill-standard"
+                className="mt-1.5"
+                placeholder="e.g. CCSS.Math.4.NF.A.2"
+                value={form.standard}
+                onChange={(e) => setForm((p) => ({ ...p, standard: e.target.value }))}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="edit-skill-desc">Description (optional)</Label>
+              <Textarea
+                id="edit-skill-desc"
+                className="mt-1.5 resize-none"
+                rows={3}
+                placeholder="What students will learn or practise"
+                value={form.description}
+                onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Baseline difficulty</Label>
+                <Select
+                  value={String(form.difficultyBaseline)}
+                  onValueChange={(v) =>
+                    setForm((p) => ({ ...p, difficultyBaseline: Number(v) }))
+                  }
+                >
+                  <SelectTrigger className="mt-1.5">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DIFFICULTIES.map((d) => (
+                      <SelectItem key={d} value={String(d)}>
+                        Level {d}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="edit-skill-time">Est. time (seconds)</Label>
+                <Input
+                  id="edit-skill-time"
+                  className="mt-1.5"
+                  type="number"
+                  min={10}
+                  value={form.estimatedTimeSeconds}
+                  onChange={(e) =>
+                    setForm((p) => ({
+                      ...p,
+                      estimatedTimeSeconds: Number(e.target.value),
+                    }))
+                  }
+                />
+              </div>
+            </div>
           </div>
-        )}
-      </div>
 
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        {skill.itemCount !== undefined && (
-          <span className="text-xs text-muted-foreground mr-1">{skill.itemCount} q</span>
-        )}
-
-        <Popover open={prereqOpen} onOpenChange={setPrereqOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-7 w-7"
-              title="Set prerequisites"
-            >
-              <Link2 className="h-3.5 w-3.5" />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)}>
+              Cancel
             </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-72 p-0" align="end">
-            <Command>
-              <CommandInput placeholder="Search skills…" />
-              <CommandEmpty>No skills found.</CommandEmpty>
-              <CommandGroup heading="Prerequisites">
-                {otherSkills.map((s) => {
-                  const selected = skill.prerequisites.some((p) => p.id === s.id);
-                  return (
-                    <CommandItem key={s.id} onSelect={() => handleTogglePrereq(s)}>
-                      <Check
-                        className={`mr-2 h-4 w-4 ${selected ? 'opacity-100' : 'opacity-0'}`}
-                      />
-                      <span className="flex-1">{s.name}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {s.domainName}
-                      </span>
-                    </CommandItem>
-                  );
-                })}
-              </CommandGroup>
-            </Command>
-          </PopoverContent>
-        </Popover>
-
-        <Button
-          size="icon"
-          variant="ghost"
-          className="h-7 w-7"
-          onClick={() => setEditing(true)}
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </Button>
-        <Button
-          size="icon"
-          variant="ghost"
-          className="h-7 w-7 text-destructive hover:text-destructive"
-          onClick={onDelete}
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </Button>
-      </div>
-
-      <div
-        className="flex gap-0.5 ml-1 flex-shrink-0"
-        title={`Baseline difficulty: ${skill.difficultyBaseline}`}
-      >
-        {[1, 2, 3, 4, 5].map((d) => (
-          <div
-            key={d}
-            className={`h-1.5 w-1.5 rounded-full ${d <= skill.difficultyBaseline ? 'bg-primary' : 'bg-muted'}`}
-          />
-        ))}
-      </div>
-    </div>
+            <Button onClick={handleSave} disabled={saving || !form.name.trim()}>
+              {saving ? 'Saving…' : 'Save changes'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

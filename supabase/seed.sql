@@ -1099,8 +1099,8 @@ ON CONFLICT DO NOTHING;
 
 -- Subjects
 INSERT INTO public.assessment_subjects (id, org_id, name, icon, color, created_by) VALUES
-  ('a1000000-0000-0000-0000-000000000001', '6d121c93-6deb-4130-8fb0-fb449999d21b', 'Mathematics',           'calculator',  '#3B82F6', NULL),
-  ('a1000000-0000-0000-0000-000000000002', '6d121c93-6deb-4130-8fb0-fb449999d21b', 'English Language Arts', 'book-open',   '#10B981', NULL)
+  ('a1000000-0000-0000-0000-000000000001', '6d121c93-6deb-4130-8fb0-fb449999d21b', 'Mathematics',           '🔢',  '#3B82F6', NULL),
+  ('a1000000-0000-0000-0000-000000000002', '6d121c93-6deb-4130-8fb0-fb449999d21b', 'English Language Arts', '📖',  '#10B981', NULL)
 ON CONFLICT DO NOTHING;
 
 -- Domains
