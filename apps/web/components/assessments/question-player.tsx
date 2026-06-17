@@ -547,7 +547,7 @@ function OrderingWidget({
   onChange: (r: unknown) => void;
 }) {
   const [order, setOrder] = useState<string[]>(() => {
-    if (response && response.length > 0) return response;
+    if (Array.isArray(response) && response.length > 0) return response;
     const ids = content.items.map((it) => it.id);
     return content.shuffle ? [...ids].sort(() => Math.random() - 0.5) : ids;
   });
@@ -751,7 +751,10 @@ function MatchingWidget({
   onChange: (r: unknown) => void;
 }) {
   const [selected, setSelected] = useState<string | null>(null);
-  const matches = response ?? {};
+  const matches =
+    response !== null && typeof response === 'object' && !Array.isArray(response)
+      ? (response as Record<string, string>)
+      : {};
 
   const rightItems = content.pairs.map((p) => p.right);
   const shuffledRight = useRef(
@@ -890,7 +893,10 @@ function GapMatchWidget({
   response: Record<string, string>;
   onChange: (r: unknown) => void;
 }) {
-  const answers = response ?? {};
+  const answers =
+    response !== null && typeof response === 'object' && !Array.isArray(response)
+      ? (response as Record<string, string>)
+      : {};
   const parts = content.stem.split('_____');
 
   return (

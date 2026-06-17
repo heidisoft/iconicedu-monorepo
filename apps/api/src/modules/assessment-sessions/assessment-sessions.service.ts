@@ -12,16 +12,13 @@ import type {
   AssessmentItemVM,
   AdaptiveState,
   AdaptiveConfig,
-  MultipleChoiceContent,
-  ShortAnswerContent,
-  OrderingContent,
-  MatchingContent,
-  GapMatchContent,
 } from '@iconicedu/shared-types';
 import { DEFAULT_ADAPTIVE_CONFIG } from '@iconicedu/shared-types';
 import { AssessmentItemsService } from '@iconicedu/api/modules/assessment-items/assessment-items.service';
 import { AssessmentTestsService } from '@iconicedu/api/modules/assessment-tests/assessment-tests.service';
+import { AssessmentResultsService } from '@iconicedu/api/modules/assessment-results/assessment-results.service';
 import { runAdaptiveEngine, buildInitialAdaptiveState } from './adaptive-engine';
+import { scoreItem } from './score-item';
 
 type TestJoinRow = {
   mode: string;
@@ -40,6 +37,7 @@ export class AssessmentSessionsService {
   constructor(
     private readonly itemsService: AssessmentItemsService,
     private readonly testsService: AssessmentTestsService,
+    private readonly resultsService: AssessmentResultsService,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -180,15 +178,14 @@ export class AssessmentSessionsService {
     let currentItem: AssessmentItemVM | null = null;
 
     if (data.current_item_id) {
-      const delivery = await supabase
+      const { data: delivery } = await supabase
         .from('assessment_deliveries')
-        .select('test_id, assessment_tests(org_id)')
+        .select('org_id')
         .eq('id', data.delivery_id)
         .single();
-      const orgId = (delivery.data?.assessment_tests as unknown as TestJoinRow)?.org_id;
-      if (orgId) {
+      if (delivery?.org_id) {
         currentItem = await this.itemsService
-          .getItem(data.current_item_id, orgId)
+          .getItem(data.current_item_id, delivery.org_id as string)
           .catch(() => null);
       }
     }
@@ -234,7 +231,7 @@ export class AssessmentSessionsService {
     const { data: session } = await supabase
       .from('assessment_sessions')
       .select(
-        '*, assessment_deliveries!inner(test_id, assessment_tests(mode, org_id, adaptive_config))',
+        '*, assessment_deliveries!inner(org_id, test_id, assessment_tests(mode, adaptive_config))',
       )
       .eq('id', sessionId)
       .single();
@@ -244,11 +241,13 @@ export class AssessmentSessionsService {
       throw new ForbiddenException('Session already submitted');
 
     const deliveryRow = session.assessment_deliveries as {
+      org_id?: string;
+      test_id?: string;
       assessment_tests?: TestJoinRow;
     } | null;
     const test = deliveryRow?.assessment_tests;
     const isAdaptive = test?.mode === 'adaptive';
-    const orgId = test?.org_id;
+    const orgId = deliveryRow?.org_id as string | undefined;
 
     // Load the item to score
     const item = await this.itemsService.getItem(body.itemId, orgId ?? '');
@@ -351,11 +350,20 @@ export class AssessmentSessionsService {
     const supabase = createSupabaseServiceClient();
     const { data: session } = await supabase
       .from('assessment_sessions')
-      .select('*')
+      .select('id, status')
       .eq('id', sessionId)
       .single();
 
     if (!session) throw new NotFoundException('Session not found');
+    if (session.status === 'completed') {
+      // Already submitted — just return the existing result
+      const { data: existing } = await supabase
+        .from('assessment_results')
+        .select('id')
+        .eq('session_id', sessionId)
+        .maybeSingle();
+      return { sessionId, resultId: existing?.id ?? sessionId };
+    }
 
     await supabase
       .from('assessment_sessions')
@@ -365,7 +373,9 @@ export class AssessmentSessionsService {
       })
       .eq('id', sessionId);
 
-    return { sessionId, resultId: sessionId }; // scoring done by results service
+    // Score the session and generate all reports
+    const result = await this.resultsService.computeResult(sessionId);
+    return { sessionId, resultId: result.id };
   }
 
   async getMySessions(profileId: string): Promise<AssessmentSessionListVM[]> {
@@ -437,91 +447,5 @@ export class AssessmentSessionsService {
       map[r.skill_id].push(r.prerequisite_skill_id);
     }
     return map;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Scoring functions
-// ---------------------------------------------------------------------------
-
-function scoreItem(
-  item: AssessmentItemVM,
-  responseData: unknown,
-): { isCorrect: boolean | null; autoScore: number | null; maxScore: number } {
-  const rd = (responseData ?? {}) as Record<string, unknown>;
-
-  switch (item.type) {
-    case 'multiple_choice':
-    case 'true_false': {
-      const c = item.content as MultipleChoiceContent;
-      const selectedId = rd['selectedId'] as string | undefined;
-      const correct = c.options?.find((o) => o.correct);
-      const isCorrect = correct?.id === selectedId;
-      return { isCorrect, autoScore: isCorrect ? 1 : 0, maxScore: 1 };
-    }
-    case 'multiple_response': {
-      const c = item.content as MultipleChoiceContent;
-      const selected: string[] = (rd['selectedIds'] as string[] | undefined) ?? [];
-      const correctIds: string[] =
-        c.options?.filter((o) => o.correct).map((o) => o.id) ?? [];
-      const incorrectIds: string[] =
-        c.options?.filter((o) => !o.correct).map((o) => o.id) ?? [];
-      const correctSelected = selected.filter((id) => correctIds.includes(id)).length;
-      const incorrectSelected = selected.filter((id) => incorrectIds.includes(id)).length;
-      const score = Math.max(
-        0,
-        (correctSelected - incorrectSelected) / (correctIds.length || 1),
-      );
-      return { isCorrect: score === 1, autoScore: score, maxScore: 1 };
-    }
-    case 'short_answer': {
-      const c = item.content as ShortAnswerContent;
-      const answer: string = String(rd['answer'] ?? '');
-      const correct = c.correctAnswers?.some((ca: string) =>
-        c.caseSensitive ? ca === answer : ca.toLowerCase() === answer.toLowerCase(),
-      );
-      return { isCorrect: !!correct, autoScore: correct ? 1 : 0, maxScore: 1 };
-    }
-    case 'essay':
-      return { isCorrect: null, autoScore: null, maxScore: 1 };
-    case 'ordering': {
-      const c = item.content as OrderingContent;
-      const placed: { id: string; position: number }[] =
-        (rd['items'] as { id: string; position: number }[] | undefined) ?? [];
-      const items = c.items ?? [];
-      const correct = placed.filter((p) => {
-        const original = items.find((i) => i.id === p.id);
-        return original?.correctPosition === p.position;
-      }).length;
-      const score = correct / (items.length || 1);
-      return { isCorrect: score === 1, autoScore: score, maxScore: 1 };
-    }
-    case 'matching': {
-      const c = item.content as MatchingContent;
-      const matched: { leftId: string; rightId: string }[] =
-        (rd['pairs'] as { leftId: string; rightId: string }[] | undefined) ?? [];
-      const pairs = c.pairs ?? [];
-      const correctPairs = pairs.filter((p) =>
-        matched.some((m) => m.leftId === p.left.id && m.rightId === p.right.id),
-      ).length;
-      const score = correctPairs / (pairs.length || 1);
-      return { isCorrect: score === 1, autoScore: score, maxScore: 1 };
-    }
-    case 'gap_match': {
-      const c = item.content as GapMatchContent;
-      const answers: Record<string, string> =
-        (rd['answers'] as Record<string, string> | undefined) ?? {};
-      const gaps = c.gaps ?? [];
-      const correctGaps = gaps.filter((g) => {
-        const given = answers[g.id] ?? '';
-        return g.correctAnswers.some((ca) =>
-          g.caseSensitive ? ca === given : ca.toLowerCase() === given.toLowerCase(),
-        );
-      }).length;
-      const score = correctGaps / (gaps.length || 1);
-      return { isCorrect: score === 1, autoScore: score, maxScore: 1 };
-    }
-    default:
-      return { isCorrect: null, autoScore: null, maxScore: 1 };
   }
 }

@@ -1169,7 +1169,7 @@ INSERT INTO public.assessment_items (id, org_id, skill_id, title, type, content,
    'a3000000-0000-0000-0000-000000000001',
    'True or false: 3/6 equals 1/2',
    'true_false',
-   '{"stem": "The fractions 3/6 and 1/2 are equivalent.", "options": [{"id": "true", "text": "True", "correct": true}, {"id": "false", "text": "False", "correct": false}]}',
+   '{"stem": "The fractions 3/6 and 1/2 are equivalent.", "correct": true}',
    '3 ÷ 3 = 1 and 6 ÷ 3 = 2, so 3/6 = 1/2.',
    1, 45),
 
