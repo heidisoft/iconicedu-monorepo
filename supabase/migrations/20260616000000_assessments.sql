@@ -353,7 +353,7 @@ create policy "curriculum_write" on public.assessment_subjects
       select 1 from public.accounts a
       where a.org_id = assessment_subjects.org_id
         and a.auth_user_id = auth.uid()
-        and a.role in ('staff','admin','owner')
+        and a.primary_role in ('staff','admin','owner')
         and a.deleted_at is null
     )
   );
@@ -374,7 +374,7 @@ create policy "domains_write" on public.assessment_domains
       select 1 from public.accounts a
       where a.org_id = assessment_domains.org_id
         and a.auth_user_id = auth.uid()
-        and a.role in ('staff','admin','owner')
+        and a.primary_role in ('staff','admin','owner')
         and a.deleted_at is null
     )
   );
@@ -397,7 +397,7 @@ create policy "skills_write" on public.assessment_skills
       join public.assessment_domains d on d.id = assessment_skills.domain_id
       where a.org_id = d.org_id
         and a.auth_user_id = auth.uid()
-        and a.role in ('staff','admin','owner')
+        and a.primary_role in ('staff','admin','owner')
         and a.deleted_at is null
     )
   );
@@ -411,7 +411,11 @@ create policy "skill_prerequisites_write" on public.assessment_skill_prerequisit
 create policy "skill_mastery_own" on public.assessment_skill_mastery
   for select using (
     profile_id in (
-      select p.id from public.profiles p where p.auth_user_id = auth.uid()
+      select p.id from public.profiles p
+      join public.accounts a on a.id = p.account_id
+      where a.auth_user_id = auth.uid()
+        and p.deleted_at is null
+        and a.deleted_at is null
     )
   );
 
@@ -421,7 +425,7 @@ create policy "skill_mastery_staff" on public.assessment_skill_mastery
       select 1 from public.accounts a
       where a.org_id = assessment_skill_mastery.org_id
         and a.auth_user_id = auth.uid()
-        and a.role in ('staff','admin','owner')
+        and a.primary_role in ('staff','admin','owner')
         and a.deleted_at is null
     )
   );
@@ -443,7 +447,7 @@ create policy "items_write" on public.assessment_items
       select 1 from public.accounts a
       where a.org_id = assessment_items.org_id
         and a.auth_user_id = auth.uid()
-        and a.role in ('staff','admin','owner')
+        and a.primary_role in ('staff','admin','owner')
         and a.deleted_at is null
     )
   );
@@ -464,7 +468,7 @@ create policy "tests_write" on public.assessment_tests
       select 1 from public.accounts a
       where a.org_id = assessment_tests.org_id
         and a.auth_user_id = auth.uid()
-        and a.role in ('staff','admin','owner')
+        and a.primary_role in ('staff','admin','owner')
         and a.deleted_at is null
     )
   );
@@ -515,7 +519,12 @@ create policy "delivery_participants_write" on public.assessment_delivery_partic
 -- Sessions: own session or staff
 create policy "sessions_own" on public.assessment_sessions
   for all using (
-    profile_id in (select p.id from public.profiles p where p.auth_user_id = auth.uid())
+    profile_id in (
+      select p.id from public.profiles p
+      join public.accounts a on a.id = p.account_id
+      where a.auth_user_id = auth.uid()
+        and p.deleted_at is null and a.deleted_at is null
+    )
     or auth.role() = 'service_role'
   );
 
@@ -527,20 +536,32 @@ create policy "responses_own" on public.assessment_responses
     session_id in (
       select s.id from public.assessment_sessions s
       join public.profiles p on p.id = s.profile_id
-      where p.auth_user_id = auth.uid()
+      join public.accounts a on a.id = p.account_id
+      where a.auth_user_id = auth.uid()
+        and p.deleted_at is null and a.deleted_at is null
     )
     or auth.role() = 'service_role'
   );
 
 create policy "skill_scores_own" on public.assessment_skill_scores
   for select using (
-    profile_id in (select p.id from public.profiles p where p.auth_user_id = auth.uid())
+    profile_id in (
+      select p.id from public.profiles p
+      join public.accounts a on a.id = p.account_id
+      where a.auth_user_id = auth.uid()
+        and p.deleted_at is null and a.deleted_at is null
+    )
     or auth.role() = 'service_role'
   );
 
 create policy "results_own" on public.assessment_results
   for select using (
-    profile_id in (select p.id from public.profiles p where p.auth_user_id = auth.uid())
+    profile_id in (
+      select p.id from public.profiles p
+      join public.accounts a on a.id = p.account_id
+      where a.auth_user_id = auth.uid()
+        and p.deleted_at is null and a.deleted_at is null
+    )
     or auth.role() = 'service_role'
   );
 

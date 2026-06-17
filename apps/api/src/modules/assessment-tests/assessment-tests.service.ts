@@ -471,19 +471,31 @@ export class AssessmentTestsService {
     testId: string,
   ): Promise<{ itemId: string; points: number; sectionId: string }[]> {
     const supabase = createSupabaseServiceClient();
-    const { data } = await supabase
-      .from('assessment_test_section_items')
+    // Query from sections (direct test_id filter) → items to avoid unreliable
+    // parent-join filtering when querying from the child table.
+    const { data: sections } = await supabase
+      .from('assessment_test_sections')
       .select(
-        'item_id, points, section_id, assessment_test_sections!inner(test_id, order_position, shuffle_items)',
+        'id, order_position, assessment_test_section_items(item_id, points, order_position)',
       )
-      .eq('assessment_test_sections.test_id', testId)
-      .order('assessment_test_sections.order_position')
+      .eq('test_id', testId)
       .order('order_position');
-    return (data ?? []).map((r) => ({
-      itemId: r.item_id,
-      points: r.points,
-      sectionId: r.section_id,
-    }));
+
+    const result: { itemId: string; points: number; sectionId: string }[] = [];
+    for (const section of sections ?? []) {
+      const sectionItems = (
+        Array.isArray(section.assessment_test_section_items)
+          ? section.assessment_test_section_items
+          : []
+      ).sort(
+        (a: { order_position: number }, b: { order_position: number }) =>
+          a.order_position - b.order_position,
+      );
+      for (const si of sectionItems) {
+        result.push({ itemId: si.item_id, points: si.points, sectionId: section.id });
+      }
+    }
+    return result;
   }
 
   private mapItemFromRow(row: ItemJoinRow): AssessmentItemVM {

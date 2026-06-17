@@ -1087,4 +1087,169 @@ ON CONFLICT DO NOTHING;
 
 -- \unrestrict Uo7M89l27kVgmwhKv2a4amKWS4wGo7u5M86OkdCf8K2oCJyYbtopcQxhQ8iXv7o
 
+-- ---------------------------------------------------------------------------
+-- ASSESSMENT SEED DATA
+-- ---------------------------------------------------------------------------
+-- Org: ICONIC Academy  (6d121c93-6deb-4130-8fb0-fb449999d21b)
+-- Two subjects: Mathematics, English Language Arts
+-- Each subject has two Grade 4 domains with 2-3 skills each
+-- Six assessment items of various types
+-- One standard-mode test + delivery
+-- ---------------------------------------------------------------------------
+
+-- Subjects
+INSERT INTO public.assessment_subjects (id, org_id, name, icon, color, created_by) VALUES
+  ('a1000000-0000-0000-0000-000000000001', '6d121c93-6deb-4130-8fb0-fb449999d21b', 'Mathematics',           'calculator',  '#3B82F6', NULL),
+  ('a1000000-0000-0000-0000-000000000002', '6d121c93-6deb-4130-8fb0-fb449999d21b', 'English Language Arts', 'book-open',   '#10B981', NULL)
+ON CONFLICT DO NOTHING;
+
+-- Domains
+INSERT INTO public.assessment_domains (id, org_id, subject_id, name, grade, description, order_position) VALUES
+  ('a2000000-0000-0000-0000-000000000001', '6d121c93-6deb-4130-8fb0-fb449999d21b', 'a1000000-0000-0000-0000-000000000001', 'Fractions',                     4, 'Understanding, comparing, and ordering fractions',         0),
+  ('a2000000-0000-0000-0000-000000000002', '6d121c93-6deb-4130-8fb0-fb449999d21b', 'a1000000-0000-0000-0000-000000000001', 'Operations & Algebraic Thinking', 4, 'Multi-digit multiplication and division strategies',       1),
+  ('a2000000-0000-0000-0000-000000000003', '6d121c93-6deb-4130-8fb0-fb449999d21b', 'a1000000-0000-0000-0000-000000000002', 'Reading Informational Text',     4, 'Main idea, key details, and text structure',               0),
+  ('a2000000-0000-0000-0000-000000000004', '6d121c93-6deb-4130-8fb0-fb449999d21b', 'a1000000-0000-0000-0000-000000000002', 'Language Conventions',           4, 'Punctuation, grammar, and sentence structure',             1)
+ON CONFLICT DO NOTHING;
+
+-- Skills
+INSERT INTO public.assessment_skills (id, org_id, domain_id, name, description, standard, difficulty_baseline, estimated_time_seconds, order_position) VALUES
+  -- Fractions
+  ('a3000000-0000-0000-0000-000000000001', '6d121c93-6deb-4130-8fb0-fb449999d21b', 'a2000000-0000-0000-0000-000000000001',
+   'Equivalent Fractions',
+   'Generate and recognise equivalent fractions using visual models and multiplication',
+   'CCSS.Math.Content.4.NF.A.1', 2, 90, 0),
+  ('a3000000-0000-0000-0000-000000000002', '6d121c93-6deb-4130-8fb0-fb449999d21b', 'a2000000-0000-0000-0000-000000000001',
+   'Compare Fractions with Unlike Denominators',
+   'Compare two fractions with different numerators and denominators using benchmarks and common denominators',
+   'CCSS.Math.Content.4.NF.A.2', 3, 120, 1),
+  -- Operations
+  ('a3000000-0000-0000-0000-000000000003', '6d121c93-6deb-4130-8fb0-fb449999d21b', 'a2000000-0000-0000-0000-000000000002',
+   'Multiply Two-Digit Numbers',
+   'Use strategies based on place value and the properties of operations to multiply two-digit numbers',
+   'CCSS.Math.Content.4.NBT.B.5', 3, 120, 0),
+  -- Reading
+  ('a3000000-0000-0000-0000-000000000004', '6d121c93-6deb-4130-8fb0-fb449999d21b', 'a2000000-0000-0000-0000-000000000003',
+   'Main Idea and Key Details',
+   'Determine the main idea of a text and explain how key details support it',
+   'CCSS.ELA-Literacy.RI.4.2', 2, 90, 0),
+  ('a3000000-0000-0000-0000-000000000005', '6d121c93-6deb-4130-8fb0-fb449999d21b', 'a2000000-0000-0000-0000-000000000003',
+   'Text Structure',
+   'Describe the overall structure of a text (e.g. chronology, comparison, cause/effect, problem/solution)',
+   'CCSS.ELA-Literacy.RI.4.5', 3, 100, 1),
+  -- Language
+  ('a3000000-0000-0000-0000-000000000006', '6d121c93-6deb-4130-8fb0-fb449999d21b', 'a2000000-0000-0000-0000-000000000004',
+   'Correct Use of Commas',
+   'Use commas and quotation marks to mark direct speech, coordinate adjectives, and introductory phrases',
+   'CCSS.ELA-Literacy.L.4.2b', 2, 80, 0)
+ON CONFLICT DO NOTHING;
+
+-- Prerequisite: "Compare Fractions" requires "Equivalent Fractions" first
+INSERT INTO public.assessment_skill_prerequisites (id, skill_id, prerequisite_skill_id) VALUES
+  ('a4000000-0000-0000-0000-000000000001',
+   'a3000000-0000-0000-0000-000000000002',
+   'a3000000-0000-0000-0000-000000000001')
+ON CONFLICT DO NOTHING;
+
+-- Items
+INSERT INTO public.assessment_items (id, org_id, skill_id, title, type, content, explanation, difficulty, estimated_time_seconds) VALUES
+
+  -- Item 1: MCQ — Equivalent Fractions (easy)
+  ('a5000000-0000-0000-0000-000000000001',
+   '6d121c93-6deb-4130-8fb0-fb449999d21b',
+   'a3000000-0000-0000-0000-000000000001',
+   'Identify the equivalent fraction',
+   'multiple_choice',
+   '{"stem": "Which fraction is equivalent to 2/4?", "options": [{"id": "a", "text": "1/2", "correct": true}, {"id": "b", "text": "1/3", "correct": false}, {"id": "c", "text": "3/4", "correct": false}, {"id": "d", "text": "2/3", "correct": false}]}',
+   'Dividing numerator and denominator of 2/4 by 2 gives 1/2.',
+   2, 60),
+
+  -- Item 2: True/False — Equivalent Fractions (beginner)
+  ('a5000000-0000-0000-0000-000000000002',
+   '6d121c93-6deb-4130-8fb0-fb449999d21b',
+   'a3000000-0000-0000-0000-000000000001',
+   'True or false: 3/6 equals 1/2',
+   'true_false',
+   '{"stem": "The fractions 3/6 and 1/2 are equivalent.", "options": [{"id": "true", "text": "True", "correct": true}, {"id": "false", "text": "False", "correct": false}]}',
+   '3 ÷ 3 = 1 and 6 ÷ 3 = 2, so 3/6 = 1/2.',
+   1, 45),
+
+  -- Item 3: MCQ — Compare Fractions (medium)
+  ('a5000000-0000-0000-0000-000000000003',
+   '6d121c93-6deb-4130-8fb0-fb449999d21b',
+   'a3000000-0000-0000-0000-000000000002',
+   'Compare fractions with unlike denominators',
+   'multiple_choice',
+   '{"stem": "Which symbol correctly compares 3/4 and 2/3?", "options": [{"id": "a", "text": "3/4 > 2/3", "correct": true}, {"id": "b", "text": "3/4 < 2/3", "correct": false}, {"id": "c", "text": "3/4 = 2/3", "correct": false}, {"id": "d", "text": "Cannot be determined", "correct": false}]}',
+   'Convert to a common denominator of 12: 3/4 = 9/12 and 2/3 = 8/12. Since 9 > 8, we have 3/4 > 2/3.',
+   3, 90),
+
+  -- Item 4: Ordering — Fractions smallest to largest (medium)
+  ('a5000000-0000-0000-0000-000000000004',
+   '6d121c93-6deb-4130-8fb0-fb449999d21b',
+   'a3000000-0000-0000-0000-000000000001',
+   'Order fractions from smallest to largest',
+   'ordering',
+   '{"stem": "Arrange the following fractions from smallest to largest.", "items": [{"id": "a", "text": "1/4", "correctPosition": 1}, {"id": "b", "text": "3/4", "correctPosition": 4}, {"id": "c", "text": "1/3", "correctPosition": 2}, {"id": "d", "text": "1/2", "correctPosition": 3}]}',
+   'Converting to decimals: 1/4 = 0.25, 1/3 ≈ 0.33, 1/2 = 0.5, 3/4 = 0.75.',
+   3, 100),
+
+  -- Item 5: MCQ — Main Idea (easy)
+  ('a5000000-0000-0000-0000-000000000005',
+   '6d121c93-6deb-4130-8fb0-fb449999d21b',
+   'a3000000-0000-0000-0000-000000000004',
+   'Identify the main idea of a passage about bees',
+   'multiple_choice',
+   '{"stem": "Read the paragraph: ''Bees are important pollinators. They travel from flower to flower collecting nectar. As they move, pollen sticks to their bodies and is carried to other flowers. Without bees, many plants could not reproduce.'' What is the main idea?", "options": [{"id": "a", "text": "Bees collect nectar from flowers.", "correct": false}, {"id": "b", "text": "Bees are important pollinators that help plants reproduce.", "correct": true}, {"id": "c", "text": "Pollen sticks to bees as they fly.", "correct": false}, {"id": "d", "text": "Many plants cannot survive without sunlight.", "correct": false}]}',
+   'The main idea is the most important point supported by all the details — here, that bees help plants reproduce through pollination.',
+   2, 90),
+
+  -- Item 6: Short Answer — Main Idea (easy)
+  ('a5000000-0000-0000-0000-000000000006',
+   '6d121c93-6deb-4130-8fb0-fb449999d21b',
+   'a3000000-0000-0000-0000-000000000004',
+   'Define: main idea',
+   'short_answer',
+   '{"stem": "In your own words, what does it mean to find the ''main idea'' of a passage?", "correctAnswers": ["the most important point", "what the passage is mostly about", "the central topic", "the key message"]}',
+   'The main idea is what the passage is mostly about — the central point the author wants to communicate.',
+   2, 75)
+
+ON CONFLICT DO NOTHING;
+
+-- Test
+INSERT INTO public.assessment_tests (id, org_id, title, description, instructions, mode, time_limit_minutes, passing_score_percent, show_results_immediately, show_correct_answers, created_by) VALUES
+  ('a6000000-0000-0000-0000-000000000001',
+   '6d121c93-6deb-4130-8fb0-fb449999d21b',
+   'Grade 4 Math & Reading Check-In',
+   'A mixed assessment covering fraction skills and reading comprehension for Grade 4 students.',
+   'Read each question carefully. You may use scratch paper for the maths questions. There is no penalty for guessing.',
+   'standard', 30, 70, true, true, NULL)
+ON CONFLICT DO NOTHING;
+
+-- Test section
+INSERT INTO public.assessment_test_sections (id, test_id, title, order_position) VALUES
+  ('a7000000-0000-0000-0000-000000000001', 'a6000000-0000-0000-0000-000000000001', 'Part 1: Mathematics', 0),
+  ('a7000000-0000-0000-0000-000000000002', 'a6000000-0000-0000-0000-000000000001', 'Part 2: English Language Arts', 1)
+ON CONFLICT DO NOTHING;
+
+-- Section items
+INSERT INTO public.assessment_test_section_items (id, section_id, item_id, order_position, points) VALUES
+  ('a8000000-0000-0000-0000-000000000001', 'a7000000-0000-0000-0000-000000000001', 'a5000000-0000-0000-0000-000000000002', 0, 1),
+  ('a8000000-0000-0000-0000-000000000002', 'a7000000-0000-0000-0000-000000000001', 'a5000000-0000-0000-0000-000000000001', 1, 1),
+  ('a8000000-0000-0000-0000-000000000003', 'a7000000-0000-0000-0000-000000000001', 'a5000000-0000-0000-0000-000000000004', 2, 2),
+  ('a8000000-0000-0000-0000-000000000004', 'a7000000-0000-0000-0000-000000000001', 'a5000000-0000-0000-0000-000000000003', 3, 2),
+  ('a8000000-0000-0000-0000-000000000005', 'a7000000-0000-0000-0000-000000000002', 'a5000000-0000-0000-0000-000000000005', 0, 1),
+  ('a8000000-0000-0000-0000-000000000006', 'a7000000-0000-0000-0000-000000000002', 'a5000000-0000-0000-0000-000000000006', 1, 2)
+ON CONFLICT DO NOTHING;
+
+-- Delivery (open to authenticated users, no expiry)
+INSERT INTO public.assessment_deliveries (id, org_id, test_id, title, access_type, max_attempts, allow_resume, created_by) VALUES
+  ('a9000000-0000-0000-0000-000000000001',
+   '6d121c93-6deb-4130-8fb0-fb449999d21b',
+   'a6000000-0000-0000-0000-000000000001',
+   'Grade 4 Check-In — Spring 2026',
+   'authenticated', 2, true, NULL)
+ON CONFLICT DO NOTHING;
+
+-- ---------------------------------------------------------------------------
+
 RESET ALL;

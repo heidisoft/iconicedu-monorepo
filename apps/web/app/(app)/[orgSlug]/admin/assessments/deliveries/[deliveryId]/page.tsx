@@ -29,20 +29,28 @@ export default async function DeliveryResultsPage({
   if (!org) notFound();
 
   const api = createAssessmentApiClient(supabase);
-  const [delivery, results] = await Promise.all([
+  const [delivery, rawResults] = await Promise.all([
     api.getDelivery(deliveryId, org.id).catch(() => null),
-    api.getDeliveryResults(deliveryId).catch(() => ({ sessions: [] })) as Promise<{
-      sessions: {
-        id: string;
-        anonName?: string;
-        profileName?: string;
-        percentage?: number;
-        completedAt?: string;
-        status: string;
-      }[];
-    }>,
+    api.getDeliveryResults(deliveryId).catch(() => []) as Promise<
+      {
+        session_id: string;
+        profile_id: string | null;
+        percentage: number | null;
+        completed_at: string | null;
+        assessment_sessions: { status: string; anon_name: string | null } | null;
+      }[]
+    >,
   ]);
   if (!delivery) notFound();
+
+  const sessions = (rawResults ?? []).map((r) => ({
+    id: r.session_id,
+    anonName: r.assessment_sessions?.anon_name ?? undefined,
+    profileName: undefined as string | undefined,
+    percentage: r.percentage ?? undefined,
+    completedAt: r.completed_at ?? undefined,
+    status: r.assessment_sessions?.status ?? 'unknown',
+  }));
 
   return (
     <div className="flex flex-1 flex-col">
@@ -101,40 +109,18 @@ export default async function DeliveryResultsPage({
               <CardTitle className="text-sm">Sessions</CardTitle>
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <Users className="h-3 w-3" />
-                {(results as { sessions: unknown[] }).sessions.length}
+                {sessions.length}
               </div>
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            {(
-              results as {
-                sessions: {
-                  id: string;
-                  anonName?: string;
-                  profileName?: string;
-                  percentage?: number;
-                  completedAt?: string;
-                  status: string;
-                }[];
-              }
-            ).sessions.length === 0 ? (
+            {sessions.length === 0 ? (
               <p className="text-sm text-muted-foreground px-4 py-6 text-center">
                 No sessions yet.
               </p>
             ) : (
               <div className="flex flex-col">
-                {(
-                  results as {
-                    sessions: {
-                      id: string;
-                      anonName?: string;
-                      profileName?: string;
-                      percentage?: number;
-                      completedAt?: string;
-                      status: string;
-                    }[];
-                  }
-                ).sessions.map((session) => (
+                {sessions.map((session) => (
                   <Link
                     key={session.id}
                     href={`/${orgSlug}/admin/assessments/deliveries/${deliveryId}/results/${session.id}`}

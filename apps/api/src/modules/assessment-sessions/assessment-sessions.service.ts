@@ -113,7 +113,10 @@ export class AssessmentSessionsService {
       const staticItems = await this.testsService.getStaticItemIds(delivery.test_id);
       itemOrder = staticItems.map((s) => s.itemId);
       if (itemOrder.length > 0) {
-        const itemRow = await this.itemsService.getItem(itemOrder[0], test?.org_id ?? '');
+        const itemRow = await this.itemsService.getItem(
+          itemOrder[0],
+          delivery.org_id as string,
+        );
         firstItem = itemRow;
       }
     }
