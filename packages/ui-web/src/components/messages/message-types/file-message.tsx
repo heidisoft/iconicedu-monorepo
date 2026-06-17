@@ -7,6 +7,7 @@ import {
   type MessageBaseProps,
 } from '@iconicedu/ui-web/components/messages/message-base';
 import { buildFileDownloadHref } from '@iconicedu/ui-web/components/messages/file-download.utils';
+import { MessageTextContent } from '@iconicedu/ui-web/components/messages/message-text-content';
 
 interface FileMessageProps extends Omit<MessageBaseProps, 'message' | 'children'> {
   message: FileMessageType;
@@ -36,9 +37,7 @@ export const FileMessage = memo(function FileMessage(props: FileMessageProps) {
   return (
     <MessageBase message={message} {...baseProps}>
       {!isFeedTheme && message.content?.text && (
-        <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap break-words mb-2">
-          {message.content.text}
-        </p>
+        <MessageTextContent text={message.content.text} className="mb-2" />
       )}
       <div className="max-w-sm overflow-hidden rounded-xl border border-border bg-card">
         {attachments.map((attachment, index) => (
@@ -83,9 +82,10 @@ export const FileMessage = memo(function FileMessage(props: FileMessageProps) {
         ))}
       </div>
       {isFeedTheme && message.content?.text && (
-        <p className="mt-3 rounded-[10px] border border-border/70 bg-background px-4 py-3 text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words">
-          {message.content.text}
-        </p>
+        <MessageTextContent
+          text={message.content.text}
+          className="mt-3 rounded-[10px] border border-border/70 bg-background px-4 py-3"
+        />
       )}
     </MessageBase>
   );

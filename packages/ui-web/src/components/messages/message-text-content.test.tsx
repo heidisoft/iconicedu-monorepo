@@ -30,8 +30,19 @@ describe('MessageTextContent', () => {
     render(<MessageTextContent text="This is **bold** and *italic* text" />);
 
     await waitFor(() => {
-      expect(screen.getByText('bold').tagName).toBe('STRONG');
-      expect(screen.getByText('italic').tagName).toBe('EM');
+      expect(screen.getByText('bold').closest('strong')).toBeInTheDocument();
+      expect(screen.getByText('italic').closest('em')).toBeInTheDocument();
     });
+  });
+
+  it('renders URLs as clickable links', async () => {
+    render(<MessageTextContent text="Open https://example.com/docs." />);
+
+    const link = await screen.findByRole('link', {
+      name: 'https://example.com/docs',
+    });
+    expect(link).toHaveAttribute('href', 'https://example.com/docs');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(screen.getByText('.')).toBeInTheDocument();
   });
 });

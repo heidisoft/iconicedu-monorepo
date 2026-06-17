@@ -365,7 +365,14 @@ export function ProfileSheet({
   const hasPresence = user.presence?.state?.emoji || user.presence?.state?.text;
 
   return (
-    <BottomSheet visible={visible} onClose={onClose} allowExpand>
+    <BottomSheet
+      visible={visible}
+      onClose={onClose}
+      allowExpand
+      backdropColor={colors.modalOverlay}
+      sheetStyle={{ backgroundColor: colors.bg }}
+      dragHandleStyle={{ backgroundColor: colors.border }}
+    >
       <ScrollView
         contentContainerStyle={[
           s.scrollContent,

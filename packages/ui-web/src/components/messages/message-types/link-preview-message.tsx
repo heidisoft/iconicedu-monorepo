@@ -8,6 +8,7 @@ import {
 } from '@iconicedu/ui-web/components/messages/message-base';
 import { MessageTextContent } from '@iconicedu/ui-web/components/messages/message-text-content';
 import { LinkPreviewCard } from '@iconicedu/ui-web/components/messages/link-preview-card';
+import { confirmExternalMessageLink } from '@iconicedu/ui-web/components/messages/message-link.utils';
 
 interface LinkPreviewMessageProps extends Omit<MessageBaseProps, 'message' | 'children'> {
   message: LinkPreviewMessageType;
@@ -34,6 +35,11 @@ export const LinkPreviewMessage = memo(function LinkPreviewMessage(
         target="_blank"
         rel="noopener noreferrer"
         className="block hover:bg-accent"
+        onClick={(event) => {
+          if (!confirmExternalMessageLink(message.link.url)) {
+            event.preventDefault();
+          }
+        }}
       >
         <LinkPreviewCard
           url={message.link.url}
