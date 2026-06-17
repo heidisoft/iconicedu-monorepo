@@ -8,8 +8,10 @@ import {
   Button,
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogTrigger,
   Input,
   Label,
@@ -45,6 +47,8 @@ export function CreateSubjectForm({ orgId }: { orgId: string }) {
       await api.createSubject(orgId, { name: name.trim(), icon, color });
       setOpen(false);
       setName('');
+      setIcon('📚');
+      setColor(SUBJECT_COLORS[0]);
       router.refresh();
     } finally {
       setSaving(false);
@@ -55,25 +59,33 @@ export function CreateSubjectForm({ orgId }: { orgId: string }) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button size="sm">
-          <Plus className="mr-2 h-4 w-4" /> Add Subject
+          <Plus className="mr-1.5 h-3.5 w-3.5" /> Add Subject
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>New Subject</DialogTitle>
+          <DialogDescription>
+            Subjects organise your curriculum into domains and skills. Choose a name,
+            icon, and colour to make it recognisable.
+          </DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col gap-4 py-2">
+        <div className="flex flex-col gap-5 py-2">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="subject-name">Subject name</Label>
+            <Label htmlFor="subject-name">
+              Subject name <span className="text-destructive">*</span>
+            </Label>
             <Input
               id="subject-name"
               placeholder="e.g. Mathematics"
               value={name}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+              autoFocus
             />
           </div>
-          <div className="flex flex-col gap-1.5">
+
+          <div className="flex flex-col gap-2">
             <Label>Icon</Label>
             <div className="flex flex-wrap gap-2">
               {SUBJECT_ICONS.map((emoji) => (
@@ -81,31 +93,54 @@ export function CreateSubjectForm({ orgId }: { orgId: string }) {
                   key={emoji}
                   type="button"
                   onClick={() => setIcon(emoji)}
-                  className={`text-xl p-1.5 rounded border-2 transition-colors ${icon === emoji ? 'border-primary' : 'border-transparent hover:border-muted'}`}
+                  className={`text-xl p-2 rounded-lg border-2 transition-all hover:scale-105 ${
+                    icon === emoji
+                      ? 'border-primary bg-primary/5'
+                      : 'border-transparent hover:border-border'
+                  }`}
                 >
                   {emoji}
                 </button>
               ))}
             </div>
           </div>
-          <div className="flex flex-col gap-1.5">
-            <Label>Color</Label>
+
+          <div className="flex flex-col gap-2">
+            <Label>Colour</Label>
             <div className="flex flex-wrap gap-2">
               {SUBJECT_COLORS.map((c) => (
                 <button
                   key={c}
                   type="button"
                   onClick={() => setColor(c)}
-                  className={`h-7 w-7 rounded-full border-2 transition-all ${color === c ? 'border-foreground scale-110' : 'border-transparent'}`}
+                  className={`h-8 w-8 rounded-full border-2 transition-all hover:scale-110 ${
+                    color === c
+                      ? 'border-foreground scale-110 ring-2 ring-offset-2 ring-foreground/20'
+                      : 'border-transparent'
+                  }`}
                   style={{ backgroundColor: c }}
+                  title={c}
                 />
               ))}
             </div>
+            {/* Preview */}
+            <div
+              className="mt-1 inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium self-start"
+              style={{ borderLeftWidth: 4, borderLeftColor: color }}
+            >
+              <span>{icon}</span>
+              <span>{name || 'Subject name'}</span>
+            </div>
           </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>
+            Cancel
+          </Button>
           <Button onClick={handleCreate} disabled={saving || !name.trim()}>
             {saving ? 'Creating…' : 'Create subject'}
           </Button>
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

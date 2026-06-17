@@ -9,10 +9,10 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
+  CardDescription,
   Input,
-  Label,
 } from '@iconicedu/ui-web';
-import { Copy, Link2, RefreshCw } from 'lucide-react';
+import { Copy, Check, Link2, RefreshCw } from 'lucide-react';
 
 interface Props {
   deliveryId: string;
@@ -23,11 +23,10 @@ interface Props {
 
 export function DeliverySharePanel({
   deliveryId,
-  accessToken: initialToken,
+  accessToken: _initialToken,
   publicUrl: initialUrl,
   orgId,
 }: Props) {
-  const [token, setToken] = useState(initialToken);
   const [publicUrl, setPublicUrl] = useState(initialUrl);
   const [generating, setGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -37,7 +36,6 @@ export function DeliverySharePanel({
     try {
       const api = createAssessmentApiClient(createSupabaseBrowserClient());
       const result = await api.generateToken(deliveryId, orgId);
-      setToken(result.accessToken);
       setPublicUrl(result.publicUrl);
     } finally {
       setGenerating(false);
@@ -53,46 +51,69 @@ export function DeliverySharePanel({
 
   return (
     <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm flex items-center gap-2">
-          <Link2 className="h-4 w-4" /> Public Link
-        </CardTitle>
+      <CardHeader className="pb-3">
+        <div className="flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
+            <Link2 className="h-4 w-4 text-muted-foreground" />
+          </div>
+          <div>
+            <CardTitle className="text-sm">Public link</CardTitle>
+            <CardDescription className="text-xs">
+              Share this URL with anyone — no account required.
+            </CardDescription>
+          </div>
+        </div>
       </CardHeader>
-      <CardContent className="flex flex-col gap-3">
+      <CardContent>
         {publicUrl ? (
           <div className="flex gap-2">
             <Input
               value={publicUrl}
               readOnly
-              className="flex-1 text-sm font-mono bg-muted"
+              className="flex-1 text-sm font-mono bg-muted/50 text-muted-foreground"
             />
-            <Button variant="outline" size="sm" onClick={handleCopy}>
-              {copied ? 'Copied!' : <Copy className="h-4 w-4" />}
+            <Button variant="outline" size="sm" onClick={handleCopy} className="shrink-0">
+              {copied ? (
+                <>
+                  <Check className="mr-1.5 h-3.5 w-3.5 text-emerald-500" /> Copied
+                </>
+              ) : (
+                <>
+                  <Copy className="mr-1.5 h-3.5 w-3.5" /> Copy
+                </>
+              )}
             </Button>
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
               onClick={handleGenerate}
               disabled={generating}
-              title="Regenerate token"
+              title="Regenerate link (invalidates the old one)"
+              className="shrink-0 text-muted-foreground"
             >
-              <RefreshCw className={`h-4 w-4 ${generating ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-3.5 w-3.5 ${generating ? 'animate-spin' : ''}`} />
             </Button>
           </div>
         ) : (
-          <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between gap-4">
             <p className="text-sm text-muted-foreground">
-              Generate a shareable link for anonymous access.
+              No link generated yet. Generate one to allow anonymous access.
             </p>
-            <Button size="sm" onClick={handleGenerate} disabled={generating}>
-              {generating ? 'Generating…' : 'Generate link'}
+            <Button
+              size="sm"
+              onClick={handleGenerate}
+              disabled={generating}
+              className="shrink-0"
+            >
+              {generating ? (
+                <>
+                  <RefreshCw className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Generating…
+                </>
+              ) : (
+                'Generate link'
+              )}
             </Button>
           </div>
-        )}
-        {token && (
-          <p className="text-xs text-muted-foreground">
-            Token: <code className="font-mono">{token}</code>
-          </p>
         )}
       </CardContent>
     </Card>

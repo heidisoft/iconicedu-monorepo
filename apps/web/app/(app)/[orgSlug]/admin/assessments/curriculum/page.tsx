@@ -10,10 +10,11 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
+  CardDescription,
   Badge,
   Button,
 } from '@iconicedu/ui-web';
-import { BookOpen, ChevronRight, Plus } from 'lucide-react';
+import { BookOpen, ChevronRight, Layers, Brain, ClipboardList } from 'lucide-react';
 import { CreateSubjectForm } from '@iconicedu/web/components/assessments/create-subject-form';
 
 export const metadata: Metadata = {
@@ -43,19 +44,27 @@ export default async function CurriculumPage({
       <div className="flex flex-1 flex-col gap-6 p-6">
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            {subjects.length} subject{subjects.length !== 1 ? 's' : ''}
+            {subjects.length > 0
+              ? `${subjects.length} subject${subjects.length !== 1 ? 's' : ''}`
+              : 'No subjects yet'}
           </p>
           <CreateSubjectForm orgId={org.id} />
         </div>
 
         {subjects.length === 0 ? (
           <Card className="border-dashed">
-            <CardContent className="flex flex-col items-center gap-3 py-12">
-              <BookOpen className="h-10 w-10 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground text-center">
-                No subjects yet. Create your first subject to start defining the
-                curriculum.
-              </p>
+            <CardContent className="flex flex-col items-center gap-4 py-16 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">
+                <BookOpen className="h-7 w-7 text-muted-foreground" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <p className="text-sm font-medium">No subjects yet</p>
+                <p className="text-sm text-muted-foreground max-w-xs">
+                  Subjects organise your curriculum into domains and skills. Create your
+                  first subject to get started.
+                </p>
+              </div>
+              <CreateSubjectForm orgId={org.id} />
             </CardContent>
           </Card>
         ) : (
@@ -65,29 +74,44 @@ export default async function CurriculumPage({
                 key={subject.id}
                 href={`/${orgSlug}/admin/assessments/curriculum/${subject.id}`}
               >
-                <Card className="hover:border-primary transition-colors cursor-pointer h-full">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-2xl">{subject.icon ?? '📚'}</span>
-                      <CardTitle className="text-base">{subject.name}</CardTitle>
+                <Card className="hover:border-primary/50 hover:shadow-sm transition-all cursor-pointer h-full overflow-hidden group">
+                  {/* Color accent stripe */}
+                  {subject.color && (
+                    <div
+                      className="h-1 w-full"
+                      style={{ backgroundColor: subject.color }}
+                    />
+                  )}
+                  <CardHeader className="pb-2 pt-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-2xl leading-none">
+                          {subject.icon ?? '📚'}
+                        </span>
+                        <CardTitle className="text-base leading-snug">
+                          {subject.name}
+                        </CardTitle>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
                   </CardHeader>
-                  <CardContent>
-                    <div className="flex gap-3 text-xs text-muted-foreground">
-                      <span>{subject.domainCount ?? 0} domains</span>
-                      <span>•</span>
-                      <span>{subject.skillCount ?? 0} skills</span>
-                      <span>•</span>
-                      <span>{subject.itemCount ?? 0} questions</span>
-                    </div>
-                    <div className="mt-3 flex items-center justify-between">
-                      {subject.color && (
-                        <div
-                          className="h-3 w-3 rounded-full"
-                          style={{ backgroundColor: subject.color }}
-                        />
-                      )}
-                      <ChevronRight className="h-4 w-4 text-muted-foreground ml-auto" />
+                  <CardContent className="pb-4">
+                    <div className="flex flex-wrap gap-1.5">
+                      <Badge variant="secondary" className="text-xs gap-1">
+                        <Layers className="h-2.5 w-2.5" />
+                        {subject.domainCount ?? 0} domain
+                        {subject.domainCount !== 1 ? 's' : ''}
+                      </Badge>
+                      <Badge variant="secondary" className="text-xs gap-1">
+                        <Brain className="h-2.5 w-2.5" />
+                        {subject.skillCount ?? 0} skill
+                        {subject.skillCount !== 1 ? 's' : ''}
+                      </Badge>
+                      <Badge variant="outline" className="text-xs gap-1">
+                        <ClipboardList className="h-2.5 w-2.5" />
+                        {subject.itemCount ?? 0} question
+                        {subject.itemCount !== 1 ? 's' : ''}
+                      </Badge>
                     </div>
                   </CardContent>
                 </Card>
