@@ -373,47 +373,62 @@ function LearningPlanCard({ plan }: { plan: StudentLearningPlan }) {
       {plan.learningGoals.length > 0 && (
         <div>
           <h3 className="text-sm font-semibold mb-3">Your Learning Goals</h3>
-          <Accordion type="multiple">
+          <Accordion type="multiple" className="flex flex-col gap-2">
             {plan.learningGoals.map((goal, i) => (
-              <AccordionItem key={i} value={String(i)} className="border rounded-lg mb-2">
-                <AccordionTrigger className="px-4 py-3 hover:no-underline">
-                  <div className="flex items-center gap-2 text-left">
-                    <span className="font-medium text-sm">{goal.skill}</span>
-                    <Badge variant="outline" className="text-xs">
-                      Gr. {goal.grade}
+              <AccordionItem
+                key={i}
+                value={String(i)}
+                className="border rounded-xl overflow-hidden shadow-sm bg-card"
+              >
+                <AccordionTrigger className="px-4 py-3.5 hover:no-underline hover:bg-muted/30 transition-colors [&>svg]:text-muted-foreground [&>svg]:flex-shrink-0">
+                  <div className="flex items-center gap-2.5 text-left min-w-0 flex-1 mr-2">
+                    <span className="font-semibold text-sm leading-snug">
+                      {goal.skill}
+                    </span>
+                    <Badge
+                      variant="secondary"
+                      className="text-xs flex-shrink-0 font-medium"
+                    >
+                      Gr.&nbsp;{goal.grade}
                     </Badge>
-                    <span className="text-xs text-muted-foreground">{goal.domain}</span>
+                    <span className="text-xs text-muted-foreground truncate">
+                      {goal.domain}
+                    </span>
                   </div>
                 </AccordionTrigger>
-                <AccordionContent className="px-4 pb-4">
-                  <p className="text-sm text-muted-foreground mb-2">
-                    {goal.whyItMatters}
-                  </p>
-                  <p className="text-xs text-primary mb-3">{goal.currentLevel}</p>
-                  <div className="flex flex-col gap-1.5">
-                    {goal.steps.map((step, j) => (
-                      <div key={j} className="flex items-start gap-2">
-                        <span className="text-xs font-medium text-muted-foreground mt-0.5 w-4 flex-shrink-0">
-                          {j + 1}.
-                        </span>
-                        <p className="text-sm">{step}</p>
-                      </div>
-                    ))}
-                  </div>
-                  {goal.prerequisiteSkills.length > 0 && (
-                    <div className="mt-3">
-                      <p className="text-xs text-muted-foreground mb-1">
-                        Strengthen first:
-                      </p>
-                      <div className="flex flex-wrap gap-1">
-                        {goal.prerequisiteSkills.map((p, j) => (
-                          <Badge key={j} variant="outline" className="text-xs">
-                            {p}
-                          </Badge>
-                        ))}
-                      </div>
+                <AccordionContent className="px-4 pb-5 pt-1">
+                  <div className="flex flex-col gap-3">
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      {goal.whyItMatters}
+                    </p>
+                    <p className="text-xs font-medium text-primary bg-primary/8 rounded-md px-2.5 py-1.5 w-fit">
+                      {goal.currentLevel}
+                    </p>
+                    <div className="flex flex-col gap-2">
+                      {goal.steps.map((step, j) => (
+                        <div key={j} className="flex items-start gap-3">
+                          <span className="flex-shrink-0 h-5 w-5 rounded-full bg-muted text-muted-foreground text-xs font-semibold flex items-center justify-center mt-0.5">
+                            {j + 1}
+                          </span>
+                          <p className="text-sm leading-snug">{step}</p>
+                        </div>
+                      ))}
                     </div>
-                  )}
+                    {goal.prerequisiteSkills.length > 0 && (
+                      <div className="mt-1 pt-3 border-t">
+                        <p className="text-xs font-medium text-muted-foreground mb-1.5">
+                          Strengthen first:
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {goal.prerequisiteSkills.map((p, j) => (
+                            <Badge key={j} variant="outline" className="text-xs">
+                              {p}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </AccordionContent>
               </AccordionItem>
             ))}
