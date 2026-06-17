@@ -13,6 +13,7 @@ export * from '@iconicedu/ui-web/ui/dropdown-menu';
 export * from '@iconicedu/ui-web/ui/dot-pattern';
 export * from '@iconicedu/ui-web/ui/command';
 export * from '@iconicedu/ui-web/ui/accordion';
+export * from '@iconicedu/ui-web/ui/tabs';
 export * from '@iconicedu/ui-web/ui/field';
 export * from '@iconicedu/ui-web/ui/input';
 export * from '@iconicedu/ui-web/ui/textarea';

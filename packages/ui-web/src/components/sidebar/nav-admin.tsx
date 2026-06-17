@@ -16,6 +16,7 @@ import {
   Activity,
   BarChart3,
   CalendarCheck,
+  ClipboardList,
   Layers,
   Shield,
   ShieldCheck,
@@ -43,6 +44,7 @@ const ADMIN_MENU_ICON_MAP: Record<
   activity: Activity,
   moderation: ShieldCheck,
   system: Sliders,
+  assessments: ClipboardList,
 };
 
 type NavAdminProps = {

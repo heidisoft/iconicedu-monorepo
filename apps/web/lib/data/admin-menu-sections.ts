@@ -2,7 +2,11 @@ import type { AdminMenuSectionVM } from '@iconicedu/shared-types';
 
 export function buildAdminMenuSections(
   basePath: string,
-  options: { includeActivityFeedAudit?: boolean; includeReports?: boolean } = {},
+  options: {
+    includeActivityFeedAudit?: boolean;
+    includeReports?: boolean;
+    includeAssessments?: boolean;
+  } = {},
 ): AdminMenuSectionVM[] {
   const activityLinks = [
     ...(options.includeActivityFeedAudit === false
@@ -63,6 +67,20 @@ export function buildAdminMenuSections(
       ],
     },
   ];
+
+  if (options.includeAssessments) {
+    sections.splice(1, 0, {
+      title: 'Assessments',
+      iconKey: 'assessments',
+      links: [
+        { title: 'Overview', url: `${basePath}/admin/assessments` },
+        { title: 'Curriculum', url: `${basePath}/admin/assessments/curriculum` },
+        { title: 'Item Bank', url: `${basePath}/admin/assessments/items` },
+        { title: 'Tests', url: `${basePath}/admin/assessments/tests` },
+        { title: 'Deliveries', url: `${basePath}/admin/assessments/deliveries` },
+      ],
+    });
+  }
 
   return options.includeReports === false
     ? sections.filter((section) => section.title !== 'Reports')

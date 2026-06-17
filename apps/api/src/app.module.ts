@@ -21,6 +21,12 @@ import { PresenceModule } from '@iconicedu/api/modules/presence/presence.module'
 import { SpacesModule } from '@iconicedu/api/modules/spaces/spaces.module';
 import { SchedulesModule } from '@iconicedu/api/modules/schedules/schedules.module';
 import { OnboardingModule } from '@iconicedu/api/modules/onboarding/onboarding.module';
+import { AssessmentCurriculumModule } from '@iconicedu/api/modules/assessment-curriculum/assessment-curriculum.module';
+import { AssessmentItemsModule } from '@iconicedu/api/modules/assessment-items/assessment-items.module';
+import { AssessmentTestsModule } from '@iconicedu/api/modules/assessment-tests/assessment-tests.module';
+import { AssessmentDeliveriesModule } from '@iconicedu/api/modules/assessment-deliveries/assessment-deliveries.module';
+import { AssessmentSessionsModule } from '@iconicedu/api/modules/assessment-sessions/assessment-sessions.module';
+import { AssessmentResultsModule } from '@iconicedu/api/modules/assessment-results/assessment-results.module';
 import { GlobalExceptionFilter } from '@iconicedu/api/observability/global-exception.filter';
 import { RequestLoggingInterceptor } from '@iconicedu/api/observability/request-logging.interceptor';
 
@@ -47,6 +53,12 @@ import { RequestLoggingInterceptor } from '@iconicedu/api/observability/request-
     SpacesModule,
     SchedulesModule,
     OnboardingModule,
+    AssessmentCurriculumModule,
+    AssessmentItemsModule,
+    AssessmentTestsModule,
+    AssessmentDeliveriesModule,
+    AssessmentSessionsModule,
+    AssessmentResultsModule,
   ],
   providers: [
     {

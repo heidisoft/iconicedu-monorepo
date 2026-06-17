@@ -9,6 +9,7 @@ import {
   Check,
   ChefHat,
   ChevronDown,
+  ClipboardList,
   Earth,
   Home,
   Languages,
@@ -97,6 +98,7 @@ const ICONS = {
   'square-pi': SquarePi,
   'life-buoy': LifeBuoy,
   send: Send,
+  assessments: ClipboardList,
 } as const;
 
 function resolveDashboardBasePath(activePath?: string | null): string {

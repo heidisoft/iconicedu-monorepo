@@ -8,7 +8,8 @@ export type AdminMenuIconKey =
   | 'reports'
   | 'activity'
   | 'moderation'
-  | 'system';
+  | 'system'
+  | 'assessments';
 
 export interface AdminMenuLinkVM {
   title: string;

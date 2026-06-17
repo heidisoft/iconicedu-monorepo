@@ -23,7 +23,11 @@ import {
   listActiveOrgSubjectCatalog,
   mapOrgSubjectRowsToOptions,
 } from '@iconicedu/web/lib/subjects/queries/org-subject-catalog.query';
-import { enableAdminActivityFeedAudit, enableAdminReports } from '@iconicedu/web/flags';
+import {
+  enableAdminActivityFeedAudit,
+  enableAdminReports,
+  enableAssessments,
+} from '@iconicedu/web/flags';
 
 export const metadata: Metadata = {
   title: {
@@ -115,7 +119,35 @@ export default async function Layout({
   const includeActivityFeedAudit = await enableAdminActivityFeedAudit.run({
     identify: { profileId: familyViewResolution.effectiveProfile.id },
   });
+  const assessmentsEnabled = await enableAssessments.run({
+    identify: { profileId: familyViewResolution.effectiveProfile.id },
+  });
   const includeReports = true;
+
+  // Inject assessments nav item when flag is on
+  if (assessmentsEnabled) {
+    const role = account.primary_role;
+    const isStaff = role === 'staff' || role === 'owner';
+    const assessmentsUrl = isStaff
+      ? `/${orgSlug}/admin/assessments`
+      : `/${orgSlug}/assessments`;
+    const alreadyHasAssessments = sidebarData.navigation.navMain.some((item) =>
+      item.url.includes('/assessments'),
+    );
+    if (!alreadyHasAssessments) {
+      (
+        sidebarData.navigation.navMain as Array<{
+          title: string;
+          url: string;
+          icon: string;
+        }>
+      ).push({
+        title: 'Assessments',
+        url: assessmentsUrl,
+        icon: 'assessments',
+      });
+    }
+  }
 
   return (
     <SidebarProvider>
@@ -127,6 +159,7 @@ export default async function Layout({
         adminSections={buildAdminMenuSections(`/${orgSlug}`, {
           includeActivityFeedAudit,
           includeReports,
+          includeAssessments: assessmentsEnabled,
         })}
         subjectOptions={subjectOptions}
       >

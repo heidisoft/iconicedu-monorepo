@@ -209,9 +209,27 @@ export const enableAuthMobileAppPrompt = flag<boolean, { profileId?: string | nu
   },
 });
 
+export const enableAssessments = flag<boolean, { profileId?: string | null }>({
+  key: 'assessments-enabled',
+  description:
+    'Enables the assessment platform (item bank, tests, deliveries, adaptive engine, reports).',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: 'assessments-enabled',
+      profileId: entities?.profileId,
+    });
+  },
+});
+
 export const webFlags = {
   enableAdminActivityFeedAudit,
   enableAdminReports,
+  enableAssessments,
   enableAuthMobileAppPrompt,
   enableChannelCommunications,
   enableClassScheduleStaffCancel,
