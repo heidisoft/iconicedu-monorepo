@@ -206,7 +206,7 @@ function SkillPoolManager({ test, orgId }: { test: AssessmentTestVM; orgId: stri
 
       {/* Add skill dialog */}
       <Dialog open={dialogOpen} onOpenChange={handleOpenChange}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Add Skill to Pool</DialogTitle>
             <DialogDescription>
@@ -580,11 +580,11 @@ function SectionItemsManager({
             </DialogDescription>
           </DialogHeader>
 
-          {/* Search input */}
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              className="pl-11"
+          {/* Search input — flex layout avoids icon/padding misalignment */}
+          <div className="flex items-center gap-2.5 h-10 rounded-lg border bg-background px-3.5 focus-within:ring-2 focus-within:ring-ring">
+            <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <input
+              className="flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none"
               placeholder="Search by title or skill…"
               value={search}
               onChange={(e) => handleSearch(e.target.value)}
@@ -593,19 +593,23 @@ function SectionItemsManager({
           </div>
 
           {/* Results list */}
-          <div className="max-h-72 overflow-y-auto -mx-6 px-6">
+          <div className="min-h-[160px] max-h-80 overflow-y-auto -mx-6 px-6">
             {search.length < 2 && (
-              <p className="py-4 text-sm text-muted-foreground text-center">
-                Type at least 2 characters to search
-              </p>
+              <div className="flex items-center justify-center h-[160px]">
+                <p className="text-sm text-muted-foreground">
+                  Type at least 2 characters to search
+                </p>
+              </div>
             )}
             {search.length >= 2 && searching && (
-              <p className="py-4 text-sm text-muted-foreground text-center">Searching…</p>
+              <div className="flex items-center justify-center h-[160px]">
+                <p className="text-sm text-muted-foreground">Searching…</p>
+              </div>
             )}
             {search.length >= 2 && !searching && results.length === 0 && (
-              <p className="py-4 text-sm text-muted-foreground text-center">
-                No questions found.
-              </p>
+              <div className="flex items-center justify-center h-[160px]">
+                <p className="text-sm text-muted-foreground">No questions found.</p>
+              </div>
             )}
             {!searching && results.length > 0 && (
               <div className="rounded-lg border divide-y overflow-hidden">

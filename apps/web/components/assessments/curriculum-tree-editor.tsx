@@ -795,10 +795,10 @@ function SkillRow({ skill, allSkills, orgId, onDelete, onUpdate }: SkillRowProps
           </DialogHeader>
 
           {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-            <Input
-              className="pl-9"
+          <div className="flex items-center gap-2.5 h-10 rounded-lg border bg-background px-3.5 focus-within:ring-2 focus-within:ring-ring">
+            <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <input
+              className="flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none"
               placeholder="Search by name, domain, or standard…"
               value={prereqSearch}
               onChange={(e) => setPrereqSearch(e.target.value)}
