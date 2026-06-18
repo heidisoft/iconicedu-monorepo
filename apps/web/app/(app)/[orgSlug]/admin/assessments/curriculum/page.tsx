@@ -4,17 +4,8 @@ import { notFound } from 'next/navigation';
 import { getDashboardAccountContext } from '@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth';
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
 import { createAssessmentApiClient } from '@iconicedu/web/lib/assessments/api';
-import {
-  DashboardHeader,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  Badge,
-  Button,
-} from '@iconicedu/ui-web';
-import { BookOpen, ChevronRight, Layers, Brain, ClipboardList } from 'lucide-react';
+import { DashboardHeader, Button } from '@iconicedu/ui-web';
+import { BookOpen, Layers, Brain, ClipboardList } from 'lucide-react';
 import { CreateSubjectForm } from '@iconicedu/web/components/assessments/create-subject-form';
 
 export const metadata: Metadata = {
@@ -37,86 +28,103 @@ export default async function CurriculumPage({
 
   return (
     <div className="flex flex-1 flex-col">
-      <DashboardHeader
-        title="Curriculum"
-        description="Define subjects, domains, and skills. Every question must be tagged to a skill."
-      />
-      <div className="flex flex-1 flex-col gap-6 p-6">
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            {subjects.length > 0
-              ? `${subjects.length} subject${subjects.length !== 1 ? 's' : ''}`
-              : 'No subjects yet'}
-          </p>
+      <DashboardHeader title="Curriculum" />
+      <div className="flex flex-1 flex-col p-6 lg:p-8 gap-8">
+        {/* Page title row */}
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Curriculum</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Define subjects, domains, and skills. Every question must be tagged to a
+              skill.
+            </p>
+          </div>
           <CreateSubjectForm orgId={org.id} />
         </div>
 
+        {/* Subject list */}
         {subjects.length === 0 ? (
-          <Card className="border-dashed">
-            <CardContent className="flex flex-col items-center gap-4 py-16 text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">
-                <BookOpen className="h-7 w-7 text-muted-foreground" />
-              </div>
-              <div className="flex flex-col gap-1">
-                <p className="text-sm font-medium">No subjects yet</p>
-                <p className="text-sm text-muted-foreground max-w-xs">
-                  Subjects organise your curriculum into domains and skills. Create your
-                  first subject to get started.
-                </p>
-              </div>
-              <CreateSubjectForm orgId={org.id} />
-            </CardContent>
-          </Card>
+          <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed py-20 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">
+              <BookOpen className="h-7 w-7 text-muted-foreground" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <p className="text-sm font-medium">No subjects yet</p>
+              <p className="text-sm text-muted-foreground max-w-xs">
+                Subjects organise your curriculum into domains and skills. Create your
+                first subject to get started.
+              </p>
+            </div>
+            <CreateSubjectForm orgId={org.id} />
+          </div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {subjects.map((subject) => (
-              <Link
-                key={subject.id}
-                href={`/${orgSlug}/admin/assessments/curriculum/${subject.id}`}
-              >
-                <Card className="hover:border-primary/50 hover:shadow-sm transition-all cursor-pointer h-full overflow-hidden group">
-                  {/* Color accent stripe */}
+          <div className="rounded-xl border overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b bg-muted/30">
+              <h2 className="text-sm font-semibold">Subjects ({subjects.length})</h2>
+            </div>
+
+            <div className="divide-y">
+              {subjects.map((subject) => (
+                <div key={subject.id} className="flex items-center gap-4 px-6 py-5">
+                  {/* Color + icon */}
+                  <div
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xl"
+                    style={{
+                      backgroundColor: subject.color ? `${subject.color}20` : undefined,
+                    }}
+                  >
+                    {subject.icon ?? '📚'}
+                  </div>
+
+                  {/* Name + stats */}
+                  <div className="flex-1 min-w-0">
+                    <Link
+                      href={`/${orgSlug}/admin/assessments/curriculum/${subject.id}`}
+                      className="text-sm font-semibold hover:underline underline-offset-2"
+                    >
+                      {subject.name}
+                    </Link>
+                    <div className="flex flex-wrap items-center gap-3 mt-1.5">
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Layers className="h-3 w-3" />
+                        {subject.domainCount ?? 0} domain
+                        {subject.domainCount !== 1 ? 's' : ''}
+                      </span>
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Brain className="h-3 w-3" />
+                        {subject.skillCount ?? 0} skill
+                        {subject.skillCount !== 1 ? 's' : ''}
+                      </span>
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <ClipboardList className="h-3 w-3" />
+                        {subject.itemCount ?? 0} question
+                        {subject.itemCount !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Color swatch */}
                   {subject.color && (
                     <div
-                      className="h-1 w-full"
+                      className="hidden sm:block h-3 w-3 rounded-full shrink-0"
                       style={{ backgroundColor: subject.color }}
                     />
                   )}
-                  <CardHeader className="pb-2 pt-4">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2.5">
-                        <span className="text-2xl leading-none">
-                          {subject.icon ?? '📚'}
-                        </span>
-                        <CardTitle className="text-base leading-snug">
-                          {subject.name}
-                        </CardTitle>
-                      </div>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pb-4">
-                    <div className="flex flex-wrap gap-1.5">
-                      <Badge variant="secondary" className="text-xs gap-1">
-                        <Layers className="h-2.5 w-2.5" />
-                        {subject.domainCount ?? 0} domain
-                        {subject.domainCount !== 1 ? 's' : ''}
-                      </Badge>
-                      <Badge variant="secondary" className="text-xs gap-1">
-                        <Brain className="h-2.5 w-2.5" />
-                        {subject.skillCount ?? 0} skill
-                        {subject.skillCount !== 1 ? 's' : ''}
-                      </Badge>
-                      <Badge variant="outline" className="text-xs gap-1">
-                        <ClipboardList className="h-2.5 w-2.5" />
-                        {subject.itemCount ?? 0} question
-                        {subject.itemCount !== 1 ? 's' : ''}
-                      </Badge>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <CreateSubjectForm orgId={org.id} subject={subject} />
+                    <Button asChild variant="outline" size="sm">
+                      <Link
+                        href={`/${orgSlug}/admin/assessments/curriculum/${subject.id}`}
+                      >
+                        Domains & Skills
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

@@ -9,16 +9,14 @@ import type {
   AssessmentSkillPoolVM,
 } from '@iconicedu/shared-types';
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
   Badge,
   Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   Input,
   Label,
   Select,
@@ -31,7 +29,16 @@ import {
   TabsList,
   TabsTrigger,
 } from '@iconicedu/ui-web';
-import { Plus, Trash2 } from 'lucide-react';
+import {
+  BookOpen,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Plus,
+  Search,
+  Trash2,
+} from 'lucide-react';
+import { useConfirm } from './confirm-dialog';
 import { SkillPicker } from './skill-picker';
 import { TestForm } from './test-form';
 
@@ -58,16 +65,16 @@ export function TestBuilder({ test, orgId, orgSlug }: Props) {
       </TabsList>
 
       {test.mode === 'adaptive' ? (
-        <TabsContent value="skills" className="pt-4">
+        <TabsContent value="skills" className="pt-6">
           <SkillPoolManager test={test} orgId={orgId} />
         </TabsContent>
       ) : (
-        <TabsContent value="sections" className="pt-4">
+        <TabsContent value="sections" className="pt-6">
           <SectionManager test={test} orgId={orgId} />
         </TabsContent>
       )}
 
-      <TabsContent value="settings" className="pt-4">
+      <TabsContent value="settings" className="pt-6">
         <TestForm orgId={orgId} orgSlug={orgSlug} test={test} />
       </TabsContent>
     </Tabs>
@@ -79,6 +86,7 @@ export function TestBuilder({ test, orgId, orgSlug }: Props) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 function SkillPoolManager({ test, orgId }: { test: AssessmentTestVM; orgId: string }) {
+  const { confirm: confirmPool, ConfirmDialog: PoolConfirmDialog } = useConfirm();
   const [pools, setPools] = useState<AssessmentSkillPoolVM[]>(test.skillPools ?? []);
   const [addingPool, setAddingPool] = useState(false);
   const [newPool, setNewPool] = useState({
@@ -104,64 +112,93 @@ function SkillPoolManager({ test, orgId }: { test: AssessmentTestVM; orgId: stri
     }
   }
 
-  async function handleRemovePool(poolId: string) {
+  async function handleRemovePool(poolId: string, skillName: string) {
+    const ok = await confirmPool({
+      title: `Remove "${skillName}"?`,
+      description:
+        'This skill will be removed from the adaptive pool. This cannot be undone.',
+      confirmLabel: 'Remove',
+      destructive: true,
+    });
+    if (!ok) return;
     await getApi().removeSkillPool(poolId);
     setPools((p) => p.filter((pool) => pool.id !== poolId));
   }
 
   return (
-    <div className="flex flex-col gap-4 max-w-2xl">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          The adaptive engine will assess each skill in order, using the rules configured
-          on the test.
-        </p>
-        <Button size="sm" variant="outline" onClick={() => setAddingPool(true)}>
-          <Plus className="mr-2 h-4 w-4" /> Add Skill
-        </Button>
-      </div>
+    <>
+      <PoolConfirmDialog />
+      <div className="flex flex-col gap-4 max-w-2xl">
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            The adaptive engine assesses each skill in order using the rules configured on
+            the test.
+          </p>
+          <Button size="sm" variant="outline" onClick={() => setAddingPool(true)}>
+            <Plus className="mr-1.5 h-3.5 w-3.5" /> Add Skill
+          </Button>
+        </div>
 
-      {pools.length === 0 && !addingPool && (
-        <Card className="border-dashed">
-          <CardContent className="py-10 flex flex-col items-center gap-2">
-            <p className="text-sm text-muted-foreground">No skills in the pool yet.</p>
-          </CardContent>
-        </Card>
-      )}
+        {pools.length === 0 && !addingPool && (
+          <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed py-16 text-center">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted">
+              <BookOpen className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="text-sm font-medium">No skills in the pool yet</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Add skills to define what this adaptive test will assess.
+              </p>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => setAddingPool(true)}>
+              <Plus className="mr-1.5 h-3.5 w-3.5" /> Add Skill
+            </Button>
+          </div>
+        )}
 
-      <div className="flex flex-col gap-2">
-        {pools.map((pool, i) => (
-          <Card key={pool.id}>
-            <CardContent className="flex items-center gap-3 py-3 px-4">
-              <span className="text-sm text-muted-foreground w-5 flex-shrink-0">
-                {i + 1}.
+        {pools.length > 0 && (
+          <div className="rounded-xl border">
+            <div className="px-6 py-3 border-b bg-muted/30 rounded-t-xl">
+              <span className="text-sm font-medium text-muted-foreground">
+                Skill Pool ({pools.length})
               </span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium">{pool.skillName}</p>
-                <p className="text-xs text-muted-foreground">
-                  {pool.subjectName} · {pool.domainName} · Grade {pool.grade}
-                </p>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span>Target: {pool.targetItems}</span>
-                <span>Start: L{pool.startDifficulty}</span>
-              </div>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8 text-destructive"
-                onClick={() => handleRemovePool(pool.id)}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+            </div>
+            <div className="divide-y">
+              {pools.map((pool, i) => (
+                <div key={pool.id} className="group flex items-center gap-3 px-6 py-4">
+                  <span className="text-sm text-muted-foreground w-5 shrink-0">
+                    {i + 1}.
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">{pool.skillName}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {pool.subjectName} · {pool.domainName} · Grade {pool.grade}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground shrink-0">
+                    <span className="bg-muted rounded px-2 py-0.5">
+                      Target: {pool.targetItems}
+                    </span>
+                    <span className="bg-muted rounded px-2 py-0.5">
+                      Start: L{pool.startDifficulty}
+                    </span>
+                  </div>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => handleRemovePool(pool.id, pool.skillName)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
-      {addingPool && (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col gap-3 py-4">
+        {addingPool && (
+          <div className="rounded-xl border border-dashed p-4 flex flex-col gap-3">
             <div>
               <Label className="text-xs mb-1 block">Skill</Label>
               <SkillPicker
@@ -215,10 +252,10 @@ function SkillPoolManager({ test, orgId }: { test: AssessmentTestVM; orgId: stri
                 Cancel
               </Button>
             </div>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+          </div>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -253,86 +290,122 @@ function SectionManager({ test, orgId }: { test: AssessmentTestVM; orgId: string
     <div className="flex flex-col gap-4 max-w-3xl">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Add sections and questions. Sections are shown in order.
+          Add sections and questions. Sections are shown in order during the test.
         </p>
         <Button size="sm" variant="outline" onClick={() => setAddingSection(true)}>
-          <Plus className="mr-2 h-4 w-4" /> Add Section
+          <Plus className="mr-1.5 h-3.5 w-3.5" /> Add Section
         </Button>
       </div>
 
       {sections.length === 0 && !addingSection && (
-        <Card className="border-dashed">
-          <CardContent className="py-10 flex flex-col items-center gap-2">
-            <p className="text-sm text-muted-foreground">
-              No sections yet. Add a section to start adding questions.
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed py-16 text-center">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted">
+            <BookOpen className="h-5 w-5 text-muted-foreground" />
+          </div>
+          <div>
+            <p className="text-sm font-medium">No sections yet</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Add a section to start adding questions.
             </p>
-          </CardContent>
-        </Card>
+          </div>
+          <Button size="sm" variant="outline" onClick={() => setAddingSection(true)}>
+            <Plus className="mr-1.5 h-3.5 w-3.5" /> Add Section
+          </Button>
+        </div>
       )}
 
       {addingSection && (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col gap-3 py-4">
-            <div>
-              <Label className="text-xs">Section title (optional)</Label>
-              <Input
-                className="mt-1"
-                placeholder="e.g. Fractions"
-                value={newSectionTitle}
-                onChange={(e) => setNewSectionTitle(e.target.value)}
-                autoFocus
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button size="sm" onClick={handleAddSection} disabled={savingSection}>
-                {savingSection ? 'Adding…' : 'Add section'}
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setAddingSection(false)}>
-                Cancel
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="rounded-xl border border-dashed p-4 flex flex-col gap-3">
+          <div>
+            <Label className="text-xs">Section title (optional)</Label>
+            <Input
+              className="mt-1"
+              placeholder="e.g. Fractions"
+              value={newSectionTitle}
+              onChange={(e) => setNewSectionTitle(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={handleAddSection} disabled={savingSection}>
+              {savingSection ? 'Adding…' : 'Add section'}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setAddingSection(false)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
       )}
 
       {sections.length > 0 && (
-        <Accordion type="multiple" defaultValue={sections.map((s) => s.id)}>
+        <div className="flex flex-col gap-3">
           {sections.map((section, i) => (
-            <AccordionItem
+            <CollapsibleSection
               key={section.id}
-              value={section.id}
-              className="border rounded-lg mb-2"
-            >
-              <AccordionTrigger className="px-4 py-3 hover:no-underline">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">
-                    {section.title ?? `Section ${i + 1}`}
-                  </span>
-                  <Badge variant="outline" className="text-xs">
-                    {section.items.length} question{section.items.length !== 1 ? 's' : ''}
-                  </Badge>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="px-4 pb-3">
-                <SectionItemsManager
-                  section={section}
-                  orgId={orgId}
-                  onItemsChange={(items) =>
-                    setSections((prev) =>
-                      prev.map((s) => (s.id === section.id ? { ...s, items } : s)),
-                    )
-                  }
-                />
-              </AccordionContent>
-            </AccordionItem>
+              section={section}
+              index={i}
+              orgId={orgId}
+              onItemsChange={(items) =>
+                setSections((prev) =>
+                  prev.map((s) => (s.id === section.id ? { ...s, items } : s)),
+                )
+              }
+            />
           ))}
-        </Accordion>
+        </div>
       )}
     </div>
   );
 }
 
-// Section items (search + add items to a section)
+function CollapsibleSection({
+  section,
+  index,
+  orgId,
+  onItemsChange,
+}: {
+  section: AssessmentTestSectionVM;
+  index: number;
+  orgId: string;
+  onItemsChange: (items: AssessmentTestSectionVM['items']) => void;
+}) {
+  const [collapsed, setCollapsed] = useState(false);
+  const ChevronIcon = collapsed ? ChevronRight : ChevronDown;
+
+  return (
+    // No overflow-hidden here — allows the search dropdown inside to escape the container
+    <div className="rounded-xl border">
+      <div
+        className="flex items-center gap-3 px-6 py-4 bg-muted/30 border-b rounded-t-xl cursor-pointer select-none hover:bg-muted/50 transition-colors"
+        onClick={() => setCollapsed((c) => !c)}
+      >
+        <ChevronIcon className="h-4 w-4 text-muted-foreground shrink-0" />
+        <span className="font-medium text-sm flex-1">
+          {section.title ?? `Section ${index + 1}`}
+        </span>
+        <Badge variant="outline" className="text-xs">
+          {section.items.length} question{section.items.length !== 1 ? 's' : ''}
+        </Badge>
+      </div>
+      {!collapsed && (
+        <div className="p-6">
+          <SectionItemsManager
+            section={section}
+            orgId={orgId}
+            onItemsChange={onItemsChange}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// SectionItemsManager — questions list + dialog to add multiple
+// ──────────────────────────────────────────────────────────────────────────────
+
+type SearchResult = { id: string; title: string; skillName: string; difficulty: number };
+
 function SectionItemsManager({
   section,
   orgId,
@@ -343,12 +416,13 @@ function SectionItemsManager({
   onItemsChange: (items: AssessmentTestSectionVM['items']) => void;
 }) {
   const items = section.items;
+  const { confirm: confirmItem, ConfirmDialog: ItemConfirmDialog } = useConfirm();
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [search, setSearch] = useState('');
-  const [results, setResults] = useState<
-    { id: string; title: string; skillName: string; difficulty: number }[]
-  >([]);
+  const [results, setResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
-  const [addingId, setAddingId] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [saving, setSaving] = useState(false);
 
   async function handleSearch(q: string) {
     setSearch(q);
@@ -372,73 +446,209 @@ function SectionItemsManager({
     setSearching(false);
   }
 
-  async function handleAddItem(itemId: string) {
-    setAddingId(itemId);
-    const result = await getApi().addItemToSection(section.id, { itemId, points: 1 });
-    onItemsChange([...items, result as AssessmentTestSectionVM['items'][number]]);
-    setResults([]);
-    setSearch('');
-    setAddingId(null);
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   }
 
-  async function handleRemoveItem(itemId: string) {
+  async function handleAddSelected() {
+    if (selected.size === 0) return;
+    setSaving(true);
+    try {
+      const api = getApi();
+      const newItems: AssessmentTestSectionVM['items'] = [...items];
+      for (const itemId of selected) {
+        const result = await api.addItemToSection(section.id, { itemId, points: 1 });
+        newItems.push(result as AssessmentTestSectionVM['items'][number]);
+      }
+      onItemsChange(newItems);
+      setDialogOpen(false);
+      setSearch('');
+      setResults([]);
+      setSelected(new Set());
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function handleOpenChange(open: boolean) {
+    setDialogOpen(open);
+    if (!open) {
+      setSearch('');
+      setResults([]);
+      setSelected(new Set());
+    }
+  }
+
+  async function handleRemoveItem(itemId: string, itemTitle: string) {
+    const ok = await confirmItem({
+      title: `Remove "${itemTitle}"?`,
+      description: 'This question will be removed from the section.',
+      confirmLabel: 'Remove',
+      destructive: true,
+    });
+    if (!ok) return;
     await getApi().removeItemFromSection(section.id, itemId);
     onItemsChange(items.filter((it) => it.itemId !== itemId));
   }
 
-  return (
-    <div className="flex flex-col gap-2">
-      {items.map((sectionItem, i) => (
-        <div
-          key={sectionItem.id}
-          className="flex items-center gap-2 px-2 py-1 rounded hover:bg-muted/20"
-        >
-          <span className="text-xs text-muted-foreground w-5">{i + 1}.</span>
-          <span className="flex-1 text-sm">
-            {sectionItem.item?.title ?? sectionItem.itemId}
-          </span>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-7 w-7 text-destructive"
-            onClick={() => handleRemoveItem(sectionItem.itemId)}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-      ))}
+  const alreadyInSection = new Set(items.map((it) => it.itemId));
 
-      <div className="mt-2 relative">
-        <Input
-          className="h-8 text-sm"
-          placeholder="Search questions to add…"
-          value={search}
-          onChange={(e) => handleSearch(e.target.value)}
-        />
-        {results.length > 0 && (
-          <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-y-auto">
-            {results.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted text-left"
-                onClick={() => handleAddItem(item.id)}
-                disabled={
-                  addingId === item.id || items.some((it) => it.itemId === item.id)
-                }
+  return (
+    <>
+      <ItemConfirmDialog />
+
+      <div className="flex flex-col gap-3">
+        {/* Existing questions */}
+        {items.length > 0 && (
+          <div className="rounded-lg border divide-y">
+            {items.map((sectionItem, i) => (
+              <div
+                key={sectionItem.id}
+                className="group flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors"
               >
-                <span className="flex-1 truncate">{item.title}</span>
-                <span className="text-xs text-muted-foreground">{item.skillName}</span>
-                {items.some((it) => it.itemId === item.id) && (
-                  <Badge variant="secondary" className="text-xs">
-                    Added
-                  </Badge>
-                )}
-              </button>
+                <span className="text-xs text-muted-foreground w-5 shrink-0">
+                  {i + 1}.
+                </span>
+                <span className="flex-1 text-sm truncate">
+                  {sectionItem.item?.title ?? sectionItem.itemId}
+                </span>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                  onClick={() =>
+                    handleRemoveItem(
+                      sectionItem.itemId,
+                      sectionItem.item?.title ?? 'this question',
+                    )
+                  }
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
             ))}
           </div>
         )}
+
+        {/* Add questions button */}
+        <Button
+          size="sm"
+          variant="outline"
+          className="w-fit"
+          onClick={() => setDialogOpen(true)}
+        >
+          <Plus className="mr-1.5 h-3.5 w-3.5" /> Add Questions
+        </Button>
       </div>
-    </div>
+
+      {/* Pick questions dialog */}
+      <Dialog open={dialogOpen} onOpenChange={handleOpenChange}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Add Questions</DialogTitle>
+            <DialogDescription>
+              Search and select questions to add to this section.
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Search input */}
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              className="pl-11"
+              placeholder="Search by title or skill…"
+              value={search}
+              onChange={(e) => handleSearch(e.target.value)}
+              autoFocus
+            />
+          </div>
+
+          {/* Results list */}
+          <div className="max-h-72 overflow-y-auto -mx-6 px-6">
+            {search.length < 2 && (
+              <p className="py-4 text-sm text-muted-foreground text-center">
+                Type at least 2 characters to search
+              </p>
+            )}
+            {search.length >= 2 && searching && (
+              <p className="py-4 text-sm text-muted-foreground text-center">Searching…</p>
+            )}
+            {search.length >= 2 && !searching && results.length === 0 && (
+              <p className="py-4 text-sm text-muted-foreground text-center">
+                No questions found.
+              </p>
+            )}
+            {!searching && results.length > 0 && (
+              <div className="rounded-lg border divide-y overflow-hidden">
+                {results.map((item) => {
+                  const inSection = alreadyInSection.has(item.id);
+                  const isSelected = selected.has(item.id);
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      disabled={inSection}
+                      onClick={() => toggleSelect(item.id)}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-left hover:bg-muted/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <div
+                        className={`h-4 w-4 shrink-0 rounded border-2 flex items-center justify-center transition-colors ${
+                          inSection
+                            ? 'bg-muted border-muted-foreground/30'
+                            : isSelected
+                              ? 'bg-primary border-primary'
+                              : 'border-input'
+                        }`}
+                      >
+                        {(isSelected || inSection) && (
+                          <Check className="h-2.5 w-2.5 text-primary-foreground" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{item.title}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {item.skillName}
+                        </p>
+                      </div>
+                      {inSection && (
+                        <Badge variant="secondary" className="text-xs shrink-0">
+                          Added
+                        </Badge>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="flex items-center justify-between gap-2">
+            <p className="text-xs text-muted-foreground">
+              {selected.size > 0
+                ? `${selected.size} question${selected.size !== 1 ? 's' : ''} selected`
+                : 'No questions selected'}
+            </p>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => handleOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleAddSelected}
+                disabled={selected.size === 0 || saving}
+              >
+                {saving
+                  ? 'Adding…'
+                  : `Add ${selected.size > 0 ? selected.size : ''} question${selected.size !== 1 ? 's' : ''}`}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

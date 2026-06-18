@@ -76,9 +76,14 @@ export class AssessmentCurriculumService {
     body: { name?: string; icon?: string; color?: string },
   ): Promise<AssessmentSubjectVM> {
     const supabase = createSupabaseServiceClient();
+    const { name, icon, color } = body;
+    const update: Record<string, unknown> = {};
+    if (name !== undefined) update.name = name;
+    if (icon !== undefined) update.icon = icon;
+    if (color !== undefined) update.color = color;
     const { data, error } = await supabase
       .from('assessment_subjects')
-      .update({ ...body })
+      .update(update)
       .eq('id', id)
       .eq('org_id', orgId)
       .select()
@@ -343,17 +348,33 @@ export class AssessmentCurriculumService {
       update.estimated_time_seconds = body.estimatedTimeSeconds;
     if (body.orderPosition !== undefined) update.order_position = body.orderPosition;
 
-    const { data, error } = await supabase
-      .from('assessment_skills')
-      .update(update)
-      .eq('id', id)
-      .eq('org_id', orgId)
-      .select(
-        `*, assessment_domains!inner(name, grade, subject_id, assessment_subjects(name))`,
-      )
-      .single();
+    let data: Record<string, unknown> | null = null;
+    if (Object.keys(update).length > 0) {
+      const { data: updated, error } = await supabase
+        .from('assessment_skills')
+        .update(update)
+        .eq('id', id)
+        .eq('org_id', orgId)
+        .select(
+          `*, assessment_domains!inner(name, grade, subject_id, assessment_subjects(name))`,
+        )
+        .single();
+      if (error || !updated) throw new BadRequestException(error?.message ?? 'Not found');
+      data = updated as Record<string, unknown>;
+    } else {
+      const { data: fetched, error } = await supabase
+        .from('assessment_skills')
+        .select(
+          `*, assessment_domains!inner(name, grade, subject_id, assessment_subjects(name))`,
+        )
+        .eq('id', id)
+        .eq('org_id', orgId)
+        .single();
+      if (error || !fetched) throw new BadRequestException(error?.message ?? 'Not found');
+      data = fetched as Record<string, unknown>;
+    }
 
-    if (error || !data) throw new BadRequestException(error?.message ?? 'Not found');
+    if (!data) throw new BadRequestException('Not found');
 
     if (body.prerequisiteIds !== undefined) {
       await this.setPrerequisites(id, body.prerequisiteIds);

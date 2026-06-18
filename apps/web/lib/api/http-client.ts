@@ -46,7 +46,13 @@ async function parseResponse<T>(response: Response): Promise<T> {
     throw new Error(errorBody?.message ?? `API error ${response.status}`);
   }
 
-  if (response.status === 204) {
+  const contentLength = response.headers.get('content-length');
+  const contentType = response.headers.get('content-type') ?? '';
+  if (
+    response.status === 204 ||
+    contentLength === '0' ||
+    !contentType.includes('application/json')
+  ) {
     return undefined as T;
   }
 

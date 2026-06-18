@@ -4,8 +4,9 @@ import { notFound } from 'next/navigation';
 import { getDashboardAccountContext } from '@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth';
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
 import { createAssessmentApiClient } from '@iconicedu/web/lib/assessments/api';
-import { DashboardHeader, Card, CardContent, Badge, Button } from '@iconicedu/ui-web';
+import { DashboardHeader, Button } from '@iconicedu/ui-web';
 import { Plus, ClipboardList, ChevronRight } from 'lucide-react';
+import { ItemBankFilters } from '@iconicedu/web/components/assessments/item-bank-filters';
 
 export const metadata: Metadata = { title: 'Admin · Item Bank' };
 
@@ -56,8 +57,10 @@ export default async function ItemBankPage({
   params: Promise<{ orgSlug: string }>;
   searchParams: Promise<{
     skillId?: string;
-    type?: string;
-    difficulty?: string;
+    subjectIds?: string;
+    grades?: string;
+    types?: string;
+    difficulties?: string;
     search?: string;
     page?: string;
   }>;
@@ -69,27 +72,52 @@ export default async function ItemBankPage({
   if (!org) notFound();
 
   const api = createAssessmentApiClient(supabase);
-  const { items, total } = await api
-    .listItems(org.id, {
-      skillId: filters.skillId,
-      type: filters.type,
-      difficulty: filters.difficulty ? Number(filters.difficulty) : undefined,
-      search: filters.search,
-      page: filters.page ? Number(filters.page) : 1,
-    })
-    .catch(() => ({ items: [], total: 0 }));
+  function parseParam(v?: string): string[] {
+    return v ? v.split(',').filter(Boolean) : [];
+  }
+
+  const subjectIds = parseParam(filters.subjectIds);
+  const grades = parseParam(filters.grades).map(Number);
+  const types = parseParam(filters.types);
+  const difficulties = parseParam(filters.difficulties).map(Number);
+
+  const [{ items, total }, subjects] = await Promise.all([
+    api
+      .listItems(org.id, {
+        skillId: filters.skillId,
+        subjectIds: subjectIds.length ? subjectIds : undefined,
+        grades: grades.length ? grades : undefined,
+        types: types.length ? types : undefined,
+        difficulties: difficulties.length ? difficulties : undefined,
+        search: filters.search,
+        page: filters.page ? Number(filters.page) : 1,
+      })
+      .catch(() => ({ items: [], total: 0 })),
+    api.listSubjects(org.id).catch(() => []),
+  ]);
+
+  const hasActiveFilters = !!(
+    filters.skillId ||
+    subjectIds.length ||
+    grades.length ||
+    types.length ||
+    difficulties.length ||
+    filters.search
+  );
 
   return (
     <div className="flex flex-1 flex-col">
-      <DashboardHeader
-        title="Item Bank"
-        description="Questions tagged to skills, ready to be assembled into tests."
-      />
-      <div className="flex flex-1 flex-col gap-4 p-6">
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            {total} question{total !== 1 ? 's' : ''}
-          </p>
+      <DashboardHeader title="Item Bank" />
+      <div className="flex flex-1 flex-col p-6 lg:p-8 gap-6">
+        {/* Page title row */}
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Item Bank</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Questions tagged to skills and difficulty levels, ready to be assembled into
+              tests.
+            </p>
+          </div>
           <Button asChild size="sm">
             <Link href={`/${orgSlug}/admin/assessments/items/new`}>
               <Plus className="mr-1.5 h-3.5 w-3.5" /> New Question
@@ -97,74 +125,98 @@ export default async function ItemBankPage({
           </Button>
         </div>
 
+        {/* Filters */}
+        <ItemBankFilters subjects={subjects} />
+
+        {/* List */}
         {items.length === 0 ? (
-          <Card className="border-dashed">
-            <CardContent className="flex flex-col items-center gap-4 py-16 text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">
-                <ClipboardList className="h-7 w-7 text-muted-foreground" />
-              </div>
-              <div className="flex flex-col gap-1">
-                <p className="text-sm font-medium">No questions yet</p>
-                <p className="text-sm text-muted-foreground max-w-xs">
-                  Every question is tagged to a skill and difficulty level. Build your
-                  item bank before creating a test.
-                </p>
-              </div>
+          <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed py-20 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">
+              <ClipboardList className="h-7 w-7 text-muted-foreground" />
+            </div>
+            <div className="flex flex-col gap-1">
+              {hasActiveFilters ? (
+                <>
+                  <p className="text-sm font-medium">No questions match your filters</p>
+                  <p className="text-sm text-muted-foreground max-w-xs">
+                    Try adjusting or clearing the filters above.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-medium">No questions yet</p>
+                  <p className="text-sm text-muted-foreground max-w-xs">
+                    Every question is tagged to a skill and difficulty level. Build your
+                    item bank before creating a test.
+                  </p>
+                </>
+              )}
+            </div>
+            {!hasActiveFilters && (
               <Button asChild size="sm">
                 <Link href={`/${orgSlug}/admin/assessments/items/new`}>
                   <Plus className="mr-1.5 h-3.5 w-3.5" /> New Question
                 </Link>
               </Button>
-            </CardContent>
-          </Card>
+            )}
+          </div>
         ) : (
-          <div className="flex flex-col gap-1.5">
-            {items.map((item) => (
-              <Link key={item.id} href={`/${orgSlug}/admin/assessments/items/${item.id}`}>
-                <Card className="hover:border-primary/50 hover:shadow-sm transition-all cursor-pointer group">
-                  <CardContent className="flex items-center gap-3 py-3 px-4">
-                    {/* Type badge */}
-                    <span
-                      className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium shrink-0 ${ITEM_TYPE_COLORS[item.type] ?? 'bg-muted text-muted-foreground border-border'}`}
+          <div className="rounded-xl border overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b bg-muted/30">
+              <h2 className="text-sm font-semibold">Questions ({total})</h2>
+            </div>
+            <div className="divide-y">
+              {items.map((item) => (
+                <Link
+                  key={item.id}
+                  href={`/${orgSlug}/admin/assessments/items/${item.id}`}
+                  className="group flex items-center gap-4 px-6 py-4 hover:bg-muted/30 transition-colors"
+                >
+                  {/* Type pill */}
+                  <span
+                    className={`inline-flex shrink-0 items-center rounded-md border px-2.5 py-1 text-xs font-medium ${ITEM_TYPE_COLORS[item.type] ?? 'bg-muted text-muted-foreground border-border'}`}
+                  >
+                    {ITEM_TYPE_LABELS[item.type] ?? item.type}
+                  </span>
+
+                  {/* Question title + breadcrumb */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{item.title}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                      {[
+                        item.skillName,
+                        item.domainName,
+                        item.grade ? `Grade ${item.grade}` : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </p>
+                  </div>
+
+                  {/* Difficulty */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div
+                      className="flex gap-0.5"
+                      title={`Difficulty: ${DIFFICULTY_LABELS[item.difficulty]}`}
                     >
-                      {ITEM_TYPE_LABELS[item.type] ?? item.type}
+                      {[1, 2, 3, 4, 5].map((d) => (
+                        <div
+                          key={d}
+                          className={`h-2 w-2 rounded-full ${d <= item.difficulty ? 'bg-primary' : 'bg-muted'}`}
+                        />
+                      ))}
+                    </div>
+                    <span
+                      className={`text-xs font-medium hidden sm:block ${DIFFICULTY_COLORS[item.difficulty] ?? ''}`}
+                    >
+                      {DIFFICULTY_LABELS[item.difficulty] ?? ''}
                     </span>
+                  </div>
 
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate">{item.title}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                        {item.skillName}
-                        {item.domainName ? ` · ${item.domainName}` : ''}
-                        {item.grade ? ` · Grade ${item.grade}` : ''}
-                      </p>
-                    </div>
-
-                    {/* Difficulty */}
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <div
-                        className="flex gap-0.5"
-                        title={`Difficulty: ${DIFFICULTY_LABELS[item.difficulty]}`}
-                      >
-                        {[1, 2, 3, 4, 5].map((d) => (
-                          <div
-                            key={d}
-                            className={`h-2 w-2 rounded-full transition-colors ${d <= item.difficulty ? 'bg-primary' : 'bg-muted'}`}
-                          />
-                        ))}
-                      </div>
-                      <span
-                        className={`text-xs font-medium ${DIFFICULTY_COLORS[item.difficulty] ?? ''}`}
-                      >
-                        {DIFFICULTY_LABELS[item.difficulty] ?? ''}
-                      </span>
-                    </div>
-
-                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
+                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </Link>
+              ))}
+            </div>
           </div>
         )}
       </div>

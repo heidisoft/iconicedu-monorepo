@@ -40,8 +40,10 @@ export class AssessmentItemsService {
     orgId: string,
     filters: {
       skillId?: string;
-      type?: string;
-      difficulty?: number;
+      subjectIds?: string[];
+      grades?: number[];
+      types?: string[];
+      difficulties?: number[];
       search?: string;
       page?: number;
       pageSize?: number;
@@ -73,8 +75,18 @@ export class AssessmentItemsService {
       .range(offset, offset + pageSize - 1);
 
     if (filters.skillId) q = q.eq('skill_id', filters.skillId);
-    if (filters.type) q = q.eq('type', filters.type);
-    if (filters.difficulty) q = q.eq('difficulty', filters.difficulty);
+    if (filters.subjectIds?.length)
+      q = q.in(
+        'assessment_skills.assessment_domains.subject_id' as 'skill_id',
+        filters.subjectIds,
+      );
+    if (filters.grades?.length)
+      q = q.in(
+        'assessment_skills.assessment_domains.grade' as 'skill_id',
+        filters.grades,
+      );
+    if (filters.types?.length) q = q.in('type', filters.types);
+    if (filters.difficulties?.length) q = q.in('difficulty', filters.difficulties);
     if (filters.search) q = q.ilike('title', `%${filters.search}%`);
 
     const { data, error, count } = await q;

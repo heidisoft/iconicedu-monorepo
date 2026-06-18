@@ -23,16 +23,22 @@ export class AssessmentItemsController {
   listItems(
     @Query('orgId') orgId: string,
     @Query('skillId') skillId?: string,
-    @Query('type') type?: string,
-    @Query('difficulty') difficulty?: string,
+    @Query('subjectIds') subjectIds?: string,
+    @Query('grades') grades?: string,
+    @Query('types') types?: string,
+    @Query('difficulties') difficulties?: string,
     @Query('search') search?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
     return this.service.listItems(orgId, {
       skillId,
-      type,
-      difficulty: difficulty ? Number(difficulty) : undefined,
+      subjectIds: subjectIds ? subjectIds.split(',').filter(Boolean) : undefined,
+      grades: grades ? grades.split(',').map(Number).filter(Boolean) : undefined,
+      types: types ? types.split(',').filter(Boolean) : undefined,
+      difficulties: difficulties
+        ? difficulties.split(',').map(Number).filter(Boolean)
+        : undefined,
       search,
       page: page ? Number(page) : 1,
       pageSize: pageSize ? Number(pageSize) : 50,

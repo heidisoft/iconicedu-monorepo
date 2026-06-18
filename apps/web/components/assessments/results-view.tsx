@@ -64,38 +64,38 @@ export function ResultsView({ result, showAllReports = false }: Props) {
   return (
     <div className="flex flex-col gap-6 max-w-3xl">
       {/* Score hero */}
-      <Card>
-        <CardContent className="py-6">
-          <div className="flex items-center gap-6">
-            <div className="text-center">
-              <p className="text-4xl font-bold">{Math.round(result.percentage ?? 0)}%</p>
-              <p className="text-sm text-muted-foreground mt-1">Overall score</p>
-            </div>
-            <div className="flex-1 flex flex-col gap-1">
-              <div className="flex items-center gap-2">
-                {passed !== null && passed !== undefined && (
-                  <Badge variant={passed ? 'default' : 'destructive'}>
-                    {passed ? 'Passed' : 'Not passed'}
-                  </Badge>
-                )}
-                <span className="text-sm text-muted-foreground">
-                  {result.totalScore} / {result.maxScore} points
-                </span>
-              </div>
-              {skillScores.length > 0 && (
-                <p className="text-sm text-muted-foreground">
-                  {skillScores.length} skill{skillScores.length !== 1 ? 's' : ''} assessed
-                </p>
-              )}
-              {result.needsManualGrading && (
-                <Badge variant="outline" className="w-fit text-xs">
-                  Essay answers pending manual grading
+      <div className="rounded-xl border overflow-hidden">
+        <div className="flex items-center gap-6 px-6 py-5">
+          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+            <span className="text-2xl font-bold text-primary">
+              {Math.round(result.percentage ?? 0)}%
+            </span>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center gap-2 flex-wrap">
+              {passed !== null && passed !== undefined && (
+                <Badge variant={passed ? 'default' : 'destructive'}>
+                  {passed ? 'Passed' : 'Not passed'}
                 </Badge>
               )}
+              <span className="text-sm text-muted-foreground">
+                {result.totalScore} / {result.maxScore} points
+              </span>
+              {skillScores.length > 0 && (
+                <span className="text-sm text-muted-foreground">
+                  · {skillScores.length} skill{skillScores.length !== 1 ? 's' : ''}{' '}
+                  assessed
+                </span>
+              )}
             </div>
+            {result.needsManualGrading && (
+              <Badge variant="outline" className="w-fit text-xs">
+                Essay answers pending manual grading
+              </Badge>
+            )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       <Tabs defaultValue="scorecard">
         <TabsList>
@@ -154,12 +154,17 @@ function SkillScorecard({ skillScores }: { skillScores: AssessmentSkillScoreVM[]
   const sorted = [...skillScores].sort((a, b) => a.percentage - b.percentage);
 
   return (
-    <div className="flex flex-col gap-2">
-      {sorted.map((skill) => {
-        const pct = Math.round(skill.percentage);
-        return (
-          <Card key={skill.id}>
-            <CardContent className="py-3 px-4">
+    <div className="rounded-xl border overflow-hidden">
+      <div className="px-6 py-3 border-b bg-muted/30">
+        <span className="text-sm font-medium text-muted-foreground">
+          Skills ({skillScores.length})
+        </span>
+      </div>
+      <div className="divide-y">
+        {sorted.map((skill) => {
+          const pct = Math.round(skill.percentage);
+          return (
+            <div key={skill.id} className="px-6 py-4">
               <div className="flex items-center gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -173,11 +178,10 @@ function SkillScorecard({ skillScores }: { skillScores: AssessmentSkillScoreVM[]
                       Gr. {skill.grade}
                     </span>
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground mt-0.5">
                     {skill.subject} · {skill.domain}
                   </p>
-                  {/* Progress bar */}
-                  <div className="mt-2 h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                  <div className="mt-2 h-1.5 w-full max-w-xs rounded-full bg-muted overflow-hidden">
                     <div
                       className={`h-full rounded-full transition-all ${pct >= 80 ? 'bg-green-500' : pct >= 70 ? 'bg-yellow-500' : 'bg-red-500'}`}
                       style={{ width: `${pct}%` }}
@@ -185,7 +189,7 @@ function SkillScorecard({ skillScores }: { skillScores: AssessmentSkillScoreVM[]
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className="text-sm font-medium">{pct}%</span>
+                  <span className="text-sm font-semibold">{pct}%</span>
                   <Badge
                     variant="outline"
                     className={`text-xs ${MASTERY_COLOR[skill.masteryLevel] ?? ''}`}
@@ -197,10 +201,10 @@ function SkillScorecard({ skillScores }: { skillScores: AssessmentSkillScoreVM[]
                   </span>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        );
-      })}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -267,50 +271,48 @@ function ParentReportCard({ report }: { report: ParentReport }) {
 function TutorReportCard({ report }: { report: TutorReport }) {
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-3 gap-3">
-        <Card>
-          <CardContent className="py-3 px-4 text-center">
+      <div className="rounded-xl border overflow-hidden">
+        <div className="grid grid-cols-3 divide-x">
+          <div className="px-6 py-4 text-center">
             <p className="text-2xl font-bold">{Math.round(report.percentage)}%</p>
-            <p className="text-xs text-muted-foreground">Overall</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="py-3 px-4 text-center">
+            <p className="text-xs text-muted-foreground mt-0.5">Overall</p>
+          </div>
+          <div className="px-6 py-4 text-center">
             <p className="text-2xl font-bold">{report.timeSpentMinutes}m</p>
-            <p className="text-xs text-muted-foreground">Time spent</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="py-3 px-4 text-center">
+            <p className="text-xs text-muted-foreground mt-0.5">Time spent</p>
+          </div>
+          <div className="px-6 py-4 flex flex-col items-center justify-center gap-1">
             <Badge variant={report.testMode === 'adaptive' ? 'default' : 'secondary'}>
               {report.testMode}
             </Badge>
-            <p className="text-xs text-muted-foreground mt-1">Mode</p>
-          </CardContent>
-        </Card>
+            <p className="text-xs text-muted-foreground">Mode</p>
+          </div>
+        </div>
       </div>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Skill Breakdown</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
+      <div className="rounded-xl border overflow-hidden">
+        <div className="px-6 py-3 border-b bg-muted/30">
+          <span className="text-sm font-medium text-muted-foreground">
+            Skill Breakdown
+          </span>
+        </div>
+        <div className="divide-y">
           {report.skillBreakdown.map((skill) => (
-            <div key={skill.skillId} className="px-4 py-3 border-b last:border-b-0">
+            <div key={skill.skillId} className="px-6 py-4">
               <div className="flex items-center gap-2 justify-between flex-wrap">
-                <div>
+                <div className="flex-1 min-w-0">
                   <span className="text-sm font-medium">{skill.skillName}</span>
                   {skill.standard && (
                     <span className="ml-2 text-xs text-muted-foreground font-mono">
                       {skill.standard}
                     </span>
                   )}
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground mt-0.5">
                     {skill.domain} · Grade {skill.grade}
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className="text-sm font-semibold">
                     {Math.round(skill.percentage)}%
                   </span>
                   <Badge
@@ -325,28 +327,33 @@ function TutorReportCard({ report }: { report: TutorReport }) {
                 </div>
               </div>
               {skill.recommendedAction && (
-                <p className="text-xs text-blue-600 mt-1">💡 {skill.recommendedAction}</p>
+                <p className="text-xs text-blue-600 mt-1.5">
+                  💡 {skill.recommendedAction}
+                </p>
               )}
             </div>
           ))}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {report.nextLessonSuggestions.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Next Lesson Suggestions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ol className="list-decimal list-inside flex flex-col gap-1">
-              {report.nextLessonSuggestions.map((s, i) => (
-                <li key={i} className="text-sm text-muted-foreground">
-                  {s}
-                </li>
-              ))}
-            </ol>
-          </CardContent>
-        </Card>
+        <div className="rounded-xl border overflow-hidden">
+          <div className="px-6 py-3 border-b bg-muted/30">
+            <span className="text-sm font-medium text-muted-foreground">
+              Next Lesson Suggestions
+            </span>
+          </div>
+          <ol className="divide-y">
+            {report.nextLessonSuggestions.map((s, i) => (
+              <li key={i} className="flex items-start gap-3 px-6 py-3.5">
+                <span className="flex-shrink-0 h-5 w-5 rounded-full bg-muted text-muted-foreground text-xs font-semibold flex items-center justify-center mt-0.5">
+                  {i + 1}
+                </span>
+                <span className="text-sm">{s}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
       )}
     </div>
   );

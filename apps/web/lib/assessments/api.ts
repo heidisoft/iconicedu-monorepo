@@ -97,15 +97,23 @@ export function createAssessmentApiClient(supabase: SupabaseClient) {
       orgId: string,
       filters?: {
         skillId?: string;
-        type?: string;
-        difficulty?: number;
+        subjectIds?: string[];
+        grades?: number[];
+        types?: string[];
+        difficulties?: number[];
         search?: string;
         page?: number;
       },
     ) =>
       api.get<{ items: AssessmentItemListVM[]; total: number }>('/assessment-items', {
         orgId,
-        ...filters,
+        skillId: filters?.skillId,
+        subjectIds: filters?.subjectIds?.join(','),
+        grades: filters?.grades?.join(','),
+        types: filters?.types?.join(','),
+        difficulties: filters?.difficulties?.join(','),
+        search: filters?.search,
+        page: filters?.page,
       }),
 
     getItem: (id: string, orgId: string) =>

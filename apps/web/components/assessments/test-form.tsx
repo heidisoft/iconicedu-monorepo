@@ -14,6 +14,7 @@ import {
   Button,
   Card,
   CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
   Input,
@@ -23,9 +24,11 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Separator,
   Switch,
   Textarea,
 } from '@iconicedu/ui-web';
+import { AlertCircle } from 'lucide-react';
 
 interface Props {
   orgId: string;
@@ -95,11 +98,20 @@ export function TestForm({ orgId, orgSlug, test }: Props) {
 
   return (
     <div className="flex flex-col gap-6 max-w-2xl">
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && (
+        <div className="flex items-start gap-3 rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+          <span>{error}</span>
+        </div>
+      )}
 
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm">Test details</CardTitle>
+        <CardHeader className="pb-4">
+          <CardTitle>Test details</CardTitle>
+          <CardDescription>
+            Name your test and set the mode — standard tests use a fixed question order,
+            adaptive tests select questions based on student performance.
+          </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
@@ -173,58 +185,84 @@ export function TestForm({ orgId, orgSlug, test }: Props) {
               />
             </div>
           </div>
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <Label className="text-sm">Show results immediately</Label>
-              <Switch
-                checked={showResultsImmediately}
-                onCheckedChange={setShowResultsImmediately}
-              />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-4">
+          <CardTitle>Results settings</CardTitle>
+          <CardDescription>
+            Control what students see after completing the test.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-0 divide-y">
+          <div className="flex items-center justify-between py-4 first:pt-0">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-sm font-medium">Show results immediately</span>
+              <span className="text-xs text-muted-foreground">
+                Students see their score as soon as they submit
+              </span>
             </div>
-            <div className="flex items-center justify-between">
-              <Label className="text-sm">Show correct answers after completion</Label>
-              <Switch
-                checked={showCorrectAnswers}
-                onCheckedChange={setShowCorrectAnswers}
-              />
+            <Switch
+              checked={showResultsImmediately}
+              onCheckedChange={setShowResultsImmediately}
+            />
+          </div>
+          <div className="flex items-center justify-between py-4 last:pb-0">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-sm font-medium">Show correct answers</span>
+              <span className="text-xs text-muted-foreground">
+                Reveal correct answers after the test is completed
+              </span>
             </div>
+            <Switch
+              checked={showCorrectAnswers}
+              onCheckedChange={setShowCorrectAnswers}
+            />
           </div>
         </CardContent>
       </Card>
 
       {mode === 'adaptive' && (
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm">Adaptive rules</CardTitle>
+          <CardHeader className="pb-4">
+            <CardTitle>Adaptive rules</CardTitle>
+            <CardDescription>
+              Configure how the engine adjusts difficulty, injects prerequisites, and
+              decides when a skill is resolved.
+            </CardDescription>
           </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-4">
-            {(
-              [
-                ['prereqTriggerMissCount', 'Miss threshold (trigger prerequisites)'],
-                ['prereqItemsToInject', 'Prerequisite items to inject'],
-                ['advanceTriggerCorrectCount', 'Correct streak to advance difficulty'],
-                ['advanceDifficultyStep', 'Difficulty step when advancing'],
-                ['stopOnConsecutiveCorrect', 'Stop after N consecutive correct'],
-                ['stopOnConsecutiveWrong', 'Stop after N consecutive wrong'],
-                ['minItemsPerSkill', 'Minimum items per skill'],
-                ['maxItemsPerSkill', 'Maximum items per skill'],
-              ] as [keyof AdaptiveConfig, string][]
-            ).map(([key, label]) => (
-              <div key={key} className="flex flex-col gap-1">
-                <Label className="text-xs">{label}</Label>
-                <Input
-                  type="number"
-                  className="h-8 text-sm"
-                  value={adaptiveConfig[key]}
-                  onChange={(e) =>
-                    setAdaptiveConfig((prev) => ({
-                      ...prev,
-                      [key]: Number(e.target.value),
-                    }))
-                  }
-                />
-              </div>
-            ))}
+          <CardContent>
+            <Separator className="mb-4" />
+            <div className="grid grid-cols-2 gap-4">
+              {(
+                [
+                  ['prereqTriggerMissCount', 'Miss threshold (trigger prerequisites)'],
+                  ['prereqItemsToInject', 'Prerequisite items to inject'],
+                  ['advanceTriggerCorrectCount', 'Correct streak to advance difficulty'],
+                  ['advanceDifficultyStep', 'Difficulty step when advancing'],
+                  ['stopOnConsecutiveCorrect', 'Stop after N consecutive correct'],
+                  ['stopOnConsecutiveWrong', 'Stop after N consecutive wrong'],
+                  ['minItemsPerSkill', 'Minimum items per skill'],
+                  ['maxItemsPerSkill', 'Maximum items per skill'],
+                ] as [keyof AdaptiveConfig, string][]
+              ).map(([key, label]) => (
+                <div key={key} className="flex flex-col gap-1">
+                  <Label className="text-xs">{label}</Label>
+                  <Input
+                    type="number"
+                    className="h-8 text-sm"
+                    value={adaptiveConfig[key]}
+                    onChange={(e) =>
+                      setAdaptiveConfig((prev) => ({
+                        ...prev,
+                        [key]: Number(e.target.value),
+                      }))
+                    }
+                  />
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
       )}

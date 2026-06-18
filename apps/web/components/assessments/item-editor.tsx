@@ -7,7 +7,6 @@ import { createAssessmentApiClient } from '@iconicedu/web/lib/assessments/api';
 import type {
   AssessmentItemVM,
   AssessmentItemType,
-  AssessmentSkillVM,
   ItemOption,
   MultipleChoiceContent,
   TrueFalseContent,
@@ -20,6 +19,7 @@ import {
   Button,
   Card,
   CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
   Input,
@@ -29,12 +29,9 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Separator,
   Textarea,
   Badge,
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
 } from '@iconicedu/ui-web';
 import { Plus, Trash2, GripVertical } from 'lucide-react';
 import { SkillPicker } from './skill-picker';
@@ -45,15 +42,51 @@ interface Props {
   item?: AssessmentItemVM;
 }
 
-const ITEM_TYPES: { value: AssessmentItemType; label: string }[] = [
-  { value: 'multiple_choice', label: 'Multiple Choice' },
-  { value: 'multiple_response', label: 'Multiple Response' },
-  { value: 'true_false', label: 'True / False' },
-  { value: 'short_answer', label: 'Short Answer' },
-  { value: 'essay', label: 'Essay' },
-  { value: 'ordering', label: 'Ordering' },
-  { value: 'matching', label: 'Matching' },
-  { value: 'gap_match', label: 'Fill in the Blank' },
+const ITEM_TYPES: { value: AssessmentItemType; label: string; description: string }[] = [
+  {
+    value: 'multiple_choice',
+    label: 'Multiple Choice',
+    description: 'One correct answer',
+  },
+  {
+    value: 'multiple_response',
+    label: 'Multiple Response',
+    description: 'One or more correct answers',
+  },
+  {
+    value: 'true_false',
+    label: 'True / False',
+    description: 'Binary correct/incorrect statement',
+  },
+  {
+    value: 'short_answer',
+    label: 'Short Answer',
+    description: 'Student types a short response',
+  },
+  { value: 'essay', label: 'Essay', description: 'Extended response, manually graded' },
+  {
+    value: 'ordering',
+    label: 'Ordering',
+    description: 'Arrange items in correct sequence',
+  },
+  {
+    value: 'matching',
+    label: 'Matching',
+    description: 'Connect left and right column pairs',
+  },
+  {
+    value: 'gap_match',
+    label: 'Fill in the Blank',
+    description: 'Complete missing words',
+  },
+];
+
+const DIFFICULTY_OPTIONS = [
+  { value: 1, label: 'Beginner' },
+  { value: 2, label: 'Easy' },
+  { value: 3, label: 'Medium' },
+  { value: 4, label: 'Hard' },
+  { value: 5, label: 'Expert' },
 ];
 
 function generateId() {
@@ -129,7 +162,7 @@ export function ItemEditor({ orgId, orgSlug, item }: Props) {
 
   async function handleSave() {
     if (!title.trim() || !skillId) {
-      setError('Title and skill are required.');
+      setError('Question title and skill are required.');
       return;
     }
     setSaving(true);
@@ -170,49 +203,72 @@ export function ItemEditor({ orgId, orgSlug, item }: Props) {
 
   return (
     <div className="flex flex-col gap-6 max-w-3xl">
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && (
+        <div className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {error}
+        </div>
+      )}
 
-      <Tabs defaultValue="question">
-        <TabsList>
-          <TabsTrigger value="question">Question</TabsTrigger>
-          <TabsTrigger value="metadata">Metadata</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="question" className="flex flex-col gap-4 pt-4">
+      {/* Question section */}
+      <Card>
+        <CardHeader className="pb-4">
+          <CardTitle className="text-base">Question</CardTitle>
+          <CardDescription>
+            Set the question title, type, and content. The title is your internal
+            reference — it won&apos;t be shown to students.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-5">
           <div className="flex flex-col gap-1.5">
-            <Label>Question title / reference</Label>
+            <Label htmlFor="item-title">
+              Question title / reference <span className="text-destructive">*</span>
+            </Label>
             <Input
+              id="item-title"
               placeholder="e.g. Compare fractions with unlike denominators – Q1"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
           </div>
 
-          <div className="flex gap-3">
-            <div className="flex-1">
-              <Label className="mb-1.5 block">Question type</Label>
-              <Select
-                value={type}
-                onValueChange={(v) => handleTypeChange(v as AssessmentItemType)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {ITEM_TYPES.map((t) => (
-                    <SelectItem key={t.value} value={t.value}>
-                      {t.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="item-type">Question type</Label>
+            <Select
+              value={type}
+              onValueChange={(v) => handleTypeChange(v as AssessmentItemType)}
+            >
+              <SelectTrigger id="item-type">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ITEM_TYPES.map((t) => (
+                  <SelectItem key={t.value} value={t.value}>
+                    <span>{t.label}</span>
+                    <span className="ml-2 text-xs text-muted-foreground hidden sm:inline">
+                      — {t.description}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
-          <ContentEditor type={type} content={content} onChange={setContent} />
-        </TabsContent>
+          <Separator />
 
-        <TabsContent value="metadata" className="flex flex-col gap-4 pt-4">
+          <ContentEditor type={type} content={content} onChange={setContent} />
+        </CardContent>
+      </Card>
+
+      {/* Metadata section */}
+      <Card>
+        <CardHeader className="pb-4">
+          <CardTitle className="text-base">Metadata</CardTitle>
+          <CardDescription>
+            Tag this question to a skill and set its difficulty so the adaptive engine can
+            select it appropriately.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-5">
           <div className="flex flex-col gap-1.5">
             <Label>
               Skill <span className="text-destructive">*</span>
@@ -222,31 +278,37 @@ export function ItemEditor({ orgId, orgSlug, item }: Props) {
               value={skillId}
               onChange={(id) => setSkillId(id)}
             />
+            <p className="text-xs text-muted-foreground">
+              The skill this question assesses. Used for skill-level scoring and the
+              adaptive engine.
+            </p>
           </div>
 
-          <div className="flex gap-4">
-            <div className="flex-1">
-              <Label className="mb-1.5 block">Difficulty (1–5)</Label>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="item-difficulty">Difficulty</Label>
               <Select
                 value={String(difficulty)}
                 onValueChange={(v) => setDifficulty(Number(v))}
               >
-                <SelectTrigger>
+                <SelectTrigger id="item-difficulty">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {[1, 2, 3, 4, 5].map((d) => (
-                    <SelectItem key={d} value={String(d)}>
-                      {d} — {['', 'Beginner', 'Easy', 'Medium', 'Hard', 'Expert'][d]}
+                  {DIFFICULTY_OPTIONS.map((d) => (
+                    <SelectItem key={d.value} value={String(d.value)}>
+                      {d.label} (Level {d.value})
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex-1">
-              <Label className="mb-1.5 block">Estimated time (seconds)</Label>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="item-time">Estimated time (seconds)</Label>
               <Input
+                id="item-time"
                 type="number"
+                min={10}
                 value={estimatedTime}
                 onChange={(e) => setEstimatedTime(Number(e.target.value))}
               />
@@ -254,19 +316,21 @@ export function ItemEditor({ orgId, orgSlug, item }: Props) {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label>Explanation (shown after answering)</Label>
+            <Label htmlFor="item-explanation">Explanation (optional)</Label>
             <Textarea
-              placeholder="Explain the correct answer…"
+              id="item-explanation"
+              placeholder="Explain the correct answer — shown to students after they submit."
               value={explanation}
               onChange={(e) => setExplanation(e.target.value)}
               className="min-h-24 resize-none"
             />
           </div>
-        </TabsContent>
-      </Tabs>
+        </CardContent>
+      </Card>
 
+      {/* Actions */}
       <div className="flex gap-3">
-        <Button onClick={handleSave} disabled={saving}>
+        <Button onClick={handleSave} disabled={saving || !title.trim()}>
           {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Create question'}
         </Button>
         <Button variant="outline" onClick={() => router.back()} disabled={saving}>
@@ -278,7 +342,7 @@ export function ItemEditor({ orgId, orgSlug, item }: Props) {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// ContentEditor — renders the appropriate form for each item type
+// ContentEditor
 // ──────────────────────────────────────────────────────────────────────────────
 
 interface ContentEditorProps {
@@ -322,7 +386,32 @@ function ContentEditor({ type, content, onChange }: ContentEditorProps) {
   }
 }
 
-// MCQ / Multiple response
+// ── Shared stem field ──────────────────────────────────────────────────────────
+
+function StemField({
+  value,
+  onChange,
+  placeholder = 'Enter the question…',
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label>Question stem</Label>
+      <Textarea
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="min-h-20 resize-none"
+      />
+    </div>
+  );
+}
+
+// ── MCQ / Multiple response ────────────────────────────────────────────────────
+
 function MCQEditor({
   multiple,
   content,
@@ -362,60 +451,64 @@ function MCQEditor({
   }
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm">Question stem</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        <Textarea
-          placeholder="Enter the question…"
-          value={content.stem}
-          onChange={(e) => onChange({ ...content, stem: e.target.value })}
-          className="min-h-20 resize-none"
-        />
-        <div className="flex flex-col gap-2">
-          <Label className="text-xs text-muted-foreground">
-            {multiple ? 'Select all correct options' : 'Click the correct answer'}
-          </Label>
-          {content.options.map((opt, i) => (
-            <div key={opt.id} className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => toggleCorrect(opt.id)}
-                className={`flex-shrink-0 h-5 w-5 rounded-${multiple ? 'sm' : 'full'} border-2 transition-colors ${opt.correct ? 'bg-primary border-primary' : 'border-muted-foreground'}`}
-                title="Mark as correct"
-              />
-              <Input
-                value={opt.text}
-                onChange={(e) => updateOption(opt.id, 'text', e.target.value)}
-                placeholder={`Option ${String.fromCharCode(65 + i)}`}
-                className="h-8 text-sm flex-1"
-              />
+    <div className="flex flex-col gap-4">
+      <StemField
+        value={content.stem}
+        onChange={(v) => onChange({ ...content, stem: v })}
+      />
+
+      <div className="flex flex-col gap-2">
+        <Label className="text-sm">
+          Answer options
+          <span className="ml-2 text-xs font-normal text-muted-foreground">
+            {multiple ? 'Check all correct answers' : 'Click to mark the correct answer'}
+          </span>
+        </Label>
+        {content.options.map((opt, i) => (
+          <div key={opt.id} className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => toggleCorrect(opt.id)}
+              className={`flex-shrink-0 h-5 w-5 rounded-${multiple ? 'sm' : 'full'} border-2 transition-colors ${
+                opt.correct
+                  ? 'bg-primary border-primary'
+                  : 'border-muted-foreground hover:border-primary'
+              }`}
+              title="Mark as correct"
+            />
+            <Input
+              value={opt.text}
+              onChange={(e) => updateOption(opt.id, 'text', e.target.value)}
+              placeholder={`Option ${String.fromCharCode(65 + i)}`}
+              className="h-9 text-sm flex-1"
+            />
+            {content.options.length > 2 && (
               <Button
                 size="icon"
                 variant="ghost"
-                className="h-8 w-8 flex-shrink-0"
+                className="h-8 w-8 flex-shrink-0 text-muted-foreground hover:text-destructive"
                 onClick={() => removeOption(opt.id)}
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </Button>
-            </div>
-          ))}
-          <Button
-            size="sm"
-            variant="ghost"
-            className="self-start text-xs h-7"
-            onClick={addOption}
-          >
-            <Plus className="mr-1 h-3 w-3" /> Add option
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+            )}
+          </div>
+        ))}
+        <Button
+          size="sm"
+          variant="ghost"
+          className="self-start text-xs h-7 text-muted-foreground"
+          onClick={addOption}
+        >
+          <Plus className="mr-1 h-3 w-3" /> Add option
+        </Button>
+      </div>
+    </div>
   );
 }
 
-// True / False
+// ── True / False ───────────────────────────────────────────────────────────────
+
 function TrueFalseEditor({
   content,
   onChange,
@@ -424,33 +517,37 @@ function TrueFalseEditor({
   onChange: (c: unknown) => void;
 }) {
   return (
-    <Card>
-      <CardContent className="flex flex-col gap-3 pt-4">
-        <Textarea
-          placeholder="Enter the statement…"
-          value={content.stem}
-          onChange={(e) => onChange({ ...content, stem: e.target.value })}
-          className="min-h-20 resize-none"
-        />
+    <div className="flex flex-col gap-4">
+      <StemField
+        value={content.stem}
+        onChange={(v) => onChange({ ...content, stem: v })}
+        placeholder="Enter the statement to evaluate…"
+      />
+      <div className="flex flex-col gap-1.5">
+        <Label className="text-sm">Correct answer</Label>
         <div className="flex gap-3">
           {[true, false].map((val) => (
             <button
               key={String(val)}
               type="button"
               onClick={() => onChange({ ...content, correct: val })}
-              className={`flex-1 py-2 rounded-md border-2 text-sm font-medium transition-colors ${content.correct === val ? 'border-primary bg-primary/10' : 'border-muted hover:border-muted-foreground'}`}
+              className={`flex-1 py-2.5 rounded-lg border-2 text-sm font-medium transition-all ${
+                content.correct === val
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-border hover:border-muted-foreground'
+              }`}
             >
-              {val ? 'True' : 'False'} {content.correct === val && '✓'}
+              {val ? 'True' : 'False'}
             </button>
           ))}
         </div>
-        <p className="text-xs text-muted-foreground">Click to mark the correct answer.</p>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
-// Short answer
+// ── Short answer ───────────────────────────────────────────────────────────────
+
 function ShortAnswerEditor({
   content,
   onChange,
@@ -459,15 +556,18 @@ function ShortAnswerEditor({
   onChange: (c: unknown) => void;
 }) {
   return (
-    <Card>
-      <CardContent className="flex flex-col gap-3 pt-4">
-        <Textarea
-          placeholder="Enter the question…"
-          value={content.stem}
-          onChange={(e) => onChange({ ...content, stem: e.target.value })}
-          className="min-h-20 resize-none"
-        />
-        <Label className="text-xs">Accepted answers (add multiple for variations)</Label>
+    <div className="flex flex-col gap-4">
+      <StemField
+        value={content.stem}
+        onChange={(v) => onChange({ ...content, stem: v })}
+      />
+      <div className="flex flex-col gap-2">
+        <Label className="text-sm">
+          Accepted answers
+          <span className="ml-2 text-xs font-normal text-muted-foreground">
+            Add multiple variations for flexible marking
+          </span>
+        </Label>
         {content.correctAnswers.map((answer, i) => (
           <div key={i} className="flex gap-2">
             <Input
@@ -477,14 +577,14 @@ function ShortAnswerEditor({
                 correctAnswers[i] = e.target.value;
                 onChange({ ...content, correctAnswers });
               }}
-              placeholder="Accepted answer…"
-              className="h-8 text-sm"
+              placeholder={`Variation ${i + 1}…`}
+              className="h-9 text-sm"
             />
             {i > 0 && (
               <Button
                 size="icon"
                 variant="ghost"
-                className="h-8 w-8"
+                className="h-8 w-8 text-muted-foreground hover:text-destructive"
                 onClick={() => {
                   onChange({
                     ...content,
@@ -500,19 +600,20 @@ function ShortAnswerEditor({
         <Button
           size="sm"
           variant="ghost"
-          className="self-start text-xs h-7"
+          className="self-start text-xs h-7 text-muted-foreground"
           onClick={() => {
             onChange({ ...content, correctAnswers: [...content.correctAnswers, ''] });
           }}
         >
           <Plus className="mr-1 h-3 w-3" /> Add variation
         </Button>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
-// Essay
+// ── Essay ──────────────────────────────────────────────────────────────────────
+
 function EssayEditor({
   content,
   onChange,
@@ -521,47 +622,52 @@ function EssayEditor({
   onChange: (c: unknown) => void;
 }) {
   return (
-    <Card>
-      <CardContent className="flex flex-col gap-3 pt-4">
+    <div className="flex flex-col gap-4">
+      <StemField
+        value={content.stem}
+        onChange={(v) => onChange({ ...content, stem: v })}
+        placeholder="Enter the essay prompt…"
+      />
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="essay-rubric" className="text-sm">
+          Grading rubric
+          <span className="ml-2 text-xs font-normal text-muted-foreground">optional</span>
+        </Label>
         <Textarea
-          placeholder="Enter the essay prompt…"
-          value={content.stem}
-          onChange={(e) => onChange({ ...content, stem: e.target.value })}
-          className="min-h-24 resize-none"
+          id="essay-rubric"
+          placeholder="Describe how to grade this essay…"
+          value={content.rubric ?? ''}
+          onChange={(e) => onChange({ ...content, rubric: e.target.value })}
+          className="min-h-16 resize-none text-sm"
         />
-        <div>
-          <Label className="text-xs mb-1 block">Rubric (optional, shown to grader)</Label>
-          <Textarea
-            placeholder="Grading rubric…"
-            value={content.rubric ?? ''}
-            onChange={(e) => onChange({ ...content, rubric: e.target.value })}
-            className="min-h-16 resize-none text-sm"
-          />
-        </div>
-        <div className="flex items-center gap-3">
-          <Label className="text-xs">Word limit</Label>
-          <Input
-            type="number"
-            className="h-8 w-28 text-sm"
-            placeholder="None"
-            value={content.wordLimit ?? ''}
-            onChange={(e) =>
-              onChange({
-                ...content,
-                wordLimit: e.target.value ? Number(e.target.value) : null,
-              })
-            }
-          />
-        </div>
-        <Badge variant="outline" className="w-fit text-xs">
+      </div>
+      <div className="flex items-center gap-3">
+        <Label htmlFor="essay-word-limit" className="text-sm shrink-0">
+          Word limit
+        </Label>
+        <Input
+          id="essay-word-limit"
+          type="number"
+          className="h-9 w-28 text-sm"
+          placeholder="No limit"
+          value={content.wordLimit ?? ''}
+          onChange={(e) =>
+            onChange({
+              ...content,
+              wordLimit: e.target.value ? Number(e.target.value) : null,
+            })
+          }
+        />
+        <Badge variant="outline" className="text-xs">
           Manual grading required
         </Badge>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
-// Ordering
+// ── Ordering ───────────────────────────────────────────────────────────────────
+
 function OrderingEditor({
   content,
   onChange,
@@ -570,19 +676,23 @@ function OrderingEditor({
   onChange: (c: unknown) => void;
 }) {
   return (
-    <Card>
-      <CardContent className="flex flex-col gap-3 pt-4">
-        <Textarea
-          placeholder="Enter the ordering prompt…"
-          value={content.stem}
-          onChange={(e) => onChange({ ...content, stem: e.target.value })}
-          className="min-h-20 resize-none"
-        />
-        <Label className="text-xs">Items in correct order (top = first)</Label>
+    <div className="flex flex-col gap-4">
+      <StemField
+        value={content.stem}
+        onChange={(v) => onChange({ ...content, stem: v })}
+        placeholder="Enter the ordering prompt…"
+      />
+      <div className="flex flex-col gap-2">
+        <Label className="text-sm">
+          Items in correct order
+          <span className="ml-2 text-xs font-normal text-muted-foreground">
+            top = position 1
+          </span>
+        </Label>
         {content.items.map((item, i) => (
           <div key={item.id} className="flex items-center gap-2">
             <GripVertical className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-            <span className="text-xs text-muted-foreground w-4 flex-shrink-0">
+            <span className="text-xs text-muted-foreground w-5 flex-shrink-0 tabular-nums">
               {i + 1}.
             </span>
             <Input
@@ -594,13 +704,13 @@ function OrderingEditor({
                 onChange({ ...content, items });
               }}
               placeholder={`Item ${i + 1}…`}
-              className="h-8 text-sm flex-1"
+              className="h-9 text-sm flex-1"
             />
             {content.items.length > 2 && (
               <Button
                 size="icon"
                 variant="ghost"
-                className="h-8 w-8"
+                className="h-8 w-8 text-muted-foreground hover:text-destructive"
                 onClick={() => {
                   const items = content.items
                     .filter((_, j) => j !== i)
@@ -616,7 +726,7 @@ function OrderingEditor({
         <Button
           size="sm"
           variant="ghost"
-          className="self-start text-xs h-7"
+          className="self-start text-xs h-7 text-muted-foreground"
           onClick={() => {
             const newItem = {
               id: generateId(),
@@ -628,12 +738,13 @@ function OrderingEditor({
         >
           <Plus className="mr-1 h-3 w-3" /> Add item
         </Button>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
-// Matching
+// ── Matching ───────────────────────────────────────────────────────────────────
+
 function MatchingEditor({
   content,
   onChange,
@@ -642,15 +753,14 @@ function MatchingEditor({
   onChange: (c: unknown) => void;
 }) {
   return (
-    <Card>
-      <CardContent className="flex flex-col gap-3 pt-4">
-        <Textarea
-          placeholder="Matching prompt…"
-          value={content.stem}
-          onChange={(e) => onChange({ ...content, stem: e.target.value })}
-          className="min-h-16 resize-none"
-        />
-        <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground mb-1">
+    <div className="flex flex-col gap-4">
+      <StemField
+        value={content.stem}
+        onChange={(v) => onChange({ ...content, stem: v })}
+        placeholder="Matching prompt…"
+      />
+      <div className="flex flex-col gap-2">
+        <div className="grid grid-cols-2 gap-2 text-xs font-medium text-muted-foreground px-0.5">
           <span>Left column</span>
           <span>Right column (match)</span>
         </div>
@@ -665,7 +775,7 @@ function MatchingEditor({
                 onChange({ ...content, pairs });
               }}
               placeholder={`Left ${i + 1}`}
-              className="h-8 text-sm"
+              className="h-9 text-sm"
             />
             <div className="flex gap-1">
               <Input
@@ -677,13 +787,13 @@ function MatchingEditor({
                   onChange({ ...content, pairs });
                 }}
                 placeholder={`Right ${i + 1}`}
-                className="h-8 text-sm flex-1"
+                className="h-9 text-sm flex-1"
               />
               {content.pairs.length > 1 && (
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="h-8 w-8 flex-shrink-0"
+                  className="h-8 w-8 flex-shrink-0 text-muted-foreground hover:text-destructive"
                   onClick={() => {
                     onChange({
                       ...content,
@@ -700,7 +810,7 @@ function MatchingEditor({
         <Button
           size="sm"
           variant="ghost"
-          className="self-start text-xs h-7"
+          className="self-start text-xs h-7 text-muted-foreground"
           onClick={() => {
             const pair = {
               left: { id: generateId(), text: '' },
@@ -711,12 +821,13 @@ function MatchingEditor({
         >
           <Plus className="mr-1 h-3 w-3" /> Add pair
         </Button>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
-// Gap match (fill-in-the-blank)
+// ── Gap match (fill-in-the-blank) ─────────────────────────────────────────────
+
 function GapMatchEditor({
   content,
   onChange,
@@ -725,23 +836,29 @@ function GapMatchEditor({
   onChange: (c: unknown) => void;
 }) {
   return (
-    <Card>
-      <CardContent className="flex flex-col gap-3 pt-4">
-        <div>
-          <Label className="text-xs mb-1 block">
-            Question with blanks — use _____ for each blank
-          </Label>
-          <Textarea
-            placeholder="The capital of France is _____."
-            value={content.stem}
-            onChange={(e) => onChange({ ...content, stem: e.target.value })}
-            className="min-h-20 resize-none"
-          />
-        </div>
-        <Label className="text-xs">Correct answers for each blank (in order)</Label>
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1.5">
+        <Label>
+          Question with blanks
+          <span className="ml-2 text-xs font-normal text-muted-foreground">
+            use _____ for each blank
+          </span>
+        </Label>
+        <Textarea
+          placeholder="The capital of France is _____."
+          value={content.stem}
+          onChange={(e) => onChange({ ...content, stem: e.target.value })}
+          className="min-h-20 resize-none"
+        />
+      </div>
+      <div className="flex flex-col gap-2">
+        <Label className="text-sm">
+          Correct answers
+          <span className="ml-2 text-xs font-normal text-muted-foreground">in order</span>
+        </Label>
         {content.gaps.map((gap, i) => (
           <div key={gap.id} className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground flex-shrink-0">
+            <span className="text-xs text-muted-foreground flex-shrink-0 w-14 tabular-nums">
               Blank {i + 1}:
             </span>
             <Input
@@ -753,13 +870,13 @@ function GapMatchEditor({
                 onChange({ ...content, gaps });
               }}
               placeholder="Correct answer…"
-              className="h-8 text-sm flex-1"
+              className="h-9 text-sm flex-1"
             />
             {content.gaps.length > 1 && (
               <Button
                 size="icon"
                 variant="ghost"
-                className="h-8 w-8"
+                className="h-8 w-8 text-muted-foreground hover:text-destructive"
                 onClick={() => {
                   onChange({ ...content, gaps: content.gaps.filter((_, j) => j !== i) });
                 }}
@@ -772,7 +889,7 @@ function GapMatchEditor({
         <Button
           size="sm"
           variant="ghost"
-          className="self-start text-xs h-7"
+          className="self-start text-xs h-7 text-muted-foreground"
           onClick={() => {
             onChange({
               ...content,
@@ -782,7 +899,7 @@ function GapMatchEditor({
         >
           <Plus className="mr-1 h-3 w-3" /> Add blank
         </Button>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

@@ -29,14 +29,14 @@ export function SkillPicker({ orgId, value, onChange }: Props) {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!open || skills.length > 0) return;
+    if (skills.length > 0) return;
     setLoading(true);
     const api = createAssessmentApiClient(createSupabaseBrowserClient());
     api.listSkills(orgId).then((data) => {
       setSkills(data);
       setLoading(false);
     });
-  }, [open, orgId, skills.length]);
+  }, [orgId, skills.length]);
 
   const selected = skills.find((s) => s.id === value);
 
