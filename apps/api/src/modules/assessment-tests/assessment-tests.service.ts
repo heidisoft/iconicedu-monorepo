@@ -39,27 +39,42 @@ type ItemJoinRow = {
 
 @Injectable()
 export class AssessmentTestsService {
-  async listTests(orgId: string): Promise<AssessmentTestListVM[]> {
+  async listTests(
+    orgId: string,
+    filters?: { search?: string; mode?: string; page?: number; limit?: number },
+  ): Promise<{ tests: AssessmentTestListVM[]; total: number }> {
     const supabase = createSupabaseServiceClient();
-    const { data, error } = await supabase
+    const page = Math.max(1, filters?.page ?? 1);
+    const limit = filters?.limit ?? 20;
+    const from = (page - 1) * limit;
+
+    let q = supabase
       .from('assessment_tests')
-      .select('*')
+      .select('*', { count: 'exact' })
       .eq('org_id', orgId)
       .is('deleted_at', null)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(from, from + limit - 1);
 
+    if (filters?.search) q = q.ilike('title', `%${filters.search}%`);
+    if (filters?.mode) q = q.eq('mode', filters.mode);
+
+    const { data, error, count } = await q;
     if (error) throw new BadRequestException(error.message);
 
-    return (data ?? []).map((row) => ({
-      id: row.id,
-      orgId: row.org_id,
-      title: row.title,
-      mode: row.mode,
-      totalItems: 0,
-      estimatedMinutes: 0,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-    }));
+    return {
+      total: count ?? 0,
+      tests: (data ?? []).map((row) => ({
+        id: row.id,
+        orgId: row.org_id,
+        title: row.title,
+        mode: row.mode,
+        totalItems: 0,
+        estimatedMinutes: 0,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      })),
+    };
   }
 
   async getTest(id: string, orgId: string): Promise<AssessmentTestVM> {

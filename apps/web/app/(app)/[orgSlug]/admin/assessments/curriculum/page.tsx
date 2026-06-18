@@ -7,6 +7,7 @@ import { createAssessmentApiClient } from '@iconicedu/web/lib/assessments/api';
 import { DashboardHeader, Button } from '@iconicedu/ui-web';
 import { BookOpen, Layers, Brain, ClipboardList } from 'lucide-react';
 import { CreateSubjectForm } from '@iconicedu/web/components/assessments/create-subject-form';
+import { ListFilters } from '@iconicedu/web/components/assessments/list-filters';
 
 export const metadata: Metadata = {
   title: 'Admin · Curriculum',
@@ -15,21 +16,26 @@ export const metadata: Metadata = {
 
 export default async function CurriculumPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ orgSlug: string }>;
+  searchParams: Promise<{ search?: string }>;
 }) {
   const { orgSlug } = await params;
+  const filters = await searchParams;
   const { supabase } = await getDashboardAccountContext(orgSlug);
   const org = await buildOrgBySlug(supabase, orgSlug);
   if (!org) notFound();
 
   const api = createAssessmentApiClient(supabase);
-  const subjects = await api.listSubjects(org.id).catch(() => []);
+  const subjects = await api.listSubjects(org.id, filters.search).catch(() => []);
+
+  const hasActiveFilters = !!filters.search;
 
   return (
     <div className="flex flex-1 flex-col">
       <DashboardHeader title="Curriculum" />
-      <div className="flex flex-1 flex-col p-6 lg:p-8 gap-8">
+      <div className="flex flex-1 flex-col p-6 lg:p-8 gap-6">
         {/* Page title row */}
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -42,6 +48,9 @@ export default async function CurriculumPage({
           <CreateSubjectForm orgId={org.id} />
         </div>
 
+        {/* Filters — only search, no extra categorical filters needed for subjects */}
+        <ListFilters searchPlaceholder="Search subjects…" />
+
         {/* Subject list */}
         {subjects.length === 0 ? (
           <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed py-20 text-center">
@@ -49,13 +58,24 @@ export default async function CurriculumPage({
               <BookOpen className="h-7 w-7 text-muted-foreground" />
             </div>
             <div className="flex flex-col gap-1">
-              <p className="text-sm font-medium">No subjects yet</p>
-              <p className="text-sm text-muted-foreground max-w-xs">
-                Subjects organise your curriculum into domains and skills. Create your
-                first subject to get started.
-              </p>
+              {hasActiveFilters ? (
+                <>
+                  <p className="text-sm font-medium">No subjects match your search</p>
+                  <p className="text-sm text-muted-foreground max-w-xs">
+                    Try a different search term or clear the filter above.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-medium">No subjects yet</p>
+                  <p className="text-sm text-muted-foreground max-w-xs">
+                    Subjects organise your curriculum into domains and skills. Create your
+                    first subject to get started.
+                  </p>
+                </>
+              )}
             </div>
-            <CreateSubjectForm orgId={org.id} />
+            {!hasActiveFilters && <CreateSubjectForm orgId={org.id} />}
           </div>
         ) : (
           <div className="rounded-xl border overflow-hidden">
@@ -66,7 +86,6 @@ export default async function CurriculumPage({
             <div className="divide-y">
               {subjects.map((subject) => (
                 <div key={subject.id} className="flex items-center gap-4 px-6 py-5">
-                  {/* Color + icon */}
                   <div
                     className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xl"
                     style={{
@@ -76,7 +95,6 @@ export default async function CurriculumPage({
                     {subject.icon ?? '📚'}
                   </div>
 
-                  {/* Name + stats */}
                   <div className="flex-1 min-w-0">
                     <Link
                       href={`/${orgSlug}/admin/assessments/curriculum/${subject.id}`}
@@ -103,7 +121,6 @@ export default async function CurriculumPage({
                     </div>
                   </div>
 
-                  {/* Color swatch */}
                   {subject.color && (
                     <div
                       className="hidden sm:block h-3 w-3 rounded-full shrink-0"
@@ -111,7 +128,6 @@ export default async function CurriculumPage({
                     />
                   )}
 
-                  {/* Actions */}
                   <div className="flex items-center gap-2 shrink-0">
                     <CreateSubjectForm orgId={org.id} subject={subject} />
                     <Button asChild variant="outline" size="sm">

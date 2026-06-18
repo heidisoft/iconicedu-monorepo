@@ -21,8 +21,8 @@ export class AssessmentCurriculumController {
   // Subjects
   @Get('subjects')
   @UseGuards(AuthGuard)
-  listSubjects(@Query('orgId') orgId: string) {
-    return this.service.listSubjects(orgId);
+  listSubjects(@Query('orgId') orgId: string, @Query('search') search?: string) {
+    return this.service.listSubjects(orgId, search || undefined);
   }
 
   @Post('subjects')

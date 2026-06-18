@@ -20,8 +20,19 @@ export class AssessmentDeliveriesController {
 
   @Get()
   @UseGuards(AuthGuard)
-  listDeliveries(@Query('orgId') orgId: string) {
-    return this.service.listDeliveries(orgId);
+  listDeliveries(
+    @Query('orgId') orgId: string,
+    @Query('search') search?: string,
+    @Query('accessType') accessType?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.service.listDeliveries(orgId, {
+      search: search || undefined,
+      accessType: accessType || undefined,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
   }
 
   @Get('by-token/:token')

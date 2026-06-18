@@ -32,11 +32,11 @@ export default async function AssessmentsOverviewPage({
   const [subjects, items, tests, deliveries] = await Promise.all([
     api.listSubjects(org.id).catch(() => []),
     api.listItems(org.id).catch(() => ({ items: [], total: 0 })),
-    api.listTests(org.id).catch(() => []),
-    api.listDeliveries(org.id).catch(() => []),
+    api.listTests(org.id).catch(() => ({ tests: [], total: 0 })),
+    api.listDeliveries(org.id).catch(() => ({ deliveries: [], total: 0 })),
   ]);
 
-  const hasAnything = subjects.length > 0 || items.total > 0 || tests.length > 0;
+  const hasAnything = subjects.length > 0 || items.total > 0 || tests.total > 0;
 
   const kpis = [
     {
@@ -53,13 +53,13 @@ export default async function AssessmentsOverviewPage({
     },
     {
       label: 'Tests',
-      value: tests.length,
+      value: tests.total,
       description: 'assembled',
       href: `/${orgSlug}/admin/assessments/tests`,
     },
     {
       label: 'Deliveries',
-      value: deliveries.length,
+      value: deliveries.total,
       description: 'sent or active',
       href: `/${orgSlug}/admin/assessments/deliveries`,
     },
@@ -79,13 +79,13 @@ export default async function AssessmentsOverviewPage({
       href: `/${orgSlug}/admin/assessments/items/new`,
     },
     {
-      done: tests.length > 0,
+      done: tests.total > 0,
       label: 'Create a test',
       description: 'Assemble questions into a static or adaptive test',
       href: `/${orgSlug}/admin/assessments/tests/new`,
     },
     {
-      done: deliveries.length > 0,
+      done: deliveries.total > 0,
       label: 'Send a delivery',
       description: 'Assign the test to a class or share a public link',
       href: `/${orgSlug}/admin/assessments/deliveries/new`,
@@ -180,7 +180,7 @@ export default async function AssessmentsOverviewPage({
         )}
 
         {/* Recent deliveries */}
-        {deliveries.length > 0 && (
+        {deliveries.total > 0 && (
           <div className="rounded-xl border overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b bg-muted/30">
               <h2 className="text-sm font-semibold">Recent deliveries</h2>
@@ -191,7 +191,7 @@ export default async function AssessmentsOverviewPage({
               </Button>
             </div>
             <div className="divide-y">
-              {deliveries.slice(0, 5).map((d) => {
+              {deliveries.deliveries.slice(0, 5).map((d) => {
                 const completionPct =
                   d.sessionCount > 0
                     ? Math.round((d.completedCount / d.sessionCount) * 100)

@@ -20,8 +20,11 @@ export function createAssessmentApiClient(supabase: SupabaseClient) {
 
   return {
     // Curriculum
-    listSubjects: (orgId: string) =>
-      api.get<AssessmentSubjectVM[]>('/assessment-curriculum/subjects', { orgId }),
+    listSubjects: (orgId: string, search?: string) =>
+      api.get<AssessmentSubjectVM[]>('/assessment-curriculum/subjects', {
+        orgId,
+        search: search || undefined,
+      }),
 
     createSubject: (
       orgId: string,
@@ -140,8 +143,17 @@ export function createAssessmentApiClient(supabase: SupabaseClient) {
       api.get<Record<number, number>>(`/assessment-items/skill/${skillId}/coverage`),
 
     // Tests
-    listTests: (orgId: string) =>
-      api.get<AssessmentTestListVM[]>('/assessment-tests', { orgId }),
+    listTests: (
+      orgId: string,
+      filters?: { search?: string; mode?: string; page?: number; limit?: number },
+    ) =>
+      api.get<{ tests: AssessmentTestListVM[]; total: number }>('/assessment-tests', {
+        orgId,
+        search: filters?.search,
+        mode: filters?.mode,
+        page: filters?.page,
+        limit: filters?.limit,
+      }),
 
     getTest: (id: string, orgId: string) =>
       api.get<AssessmentTestVM>(`/assessment-tests/${id}`, { orgId }),
@@ -171,8 +183,20 @@ export function createAssessmentApiClient(supabase: SupabaseClient) {
       api.delete(`/assessment-tests/skill-pools/${poolId}`),
 
     // Deliveries
-    listDeliveries: (orgId: string) =>
-      api.get<AssessmentDeliveryListVM[]>('/assessment-deliveries', { orgId }),
+    listDeliveries: (
+      orgId: string,
+      filters?: { search?: string; accessType?: string; page?: number; limit?: number },
+    ) =>
+      api.get<{ deliveries: AssessmentDeliveryListVM[]; total: number }>(
+        '/assessment-deliveries',
+        {
+          orgId,
+          search: filters?.search,
+          accessType: filters?.accessType,
+          page: filters?.page,
+          limit: filters?.limit,
+        },
+      ),
 
     getDelivery: (id: string, orgId: string) =>
       api.get<AssessmentDeliveryVM>(`/assessment-deliveries/${id}`, { orgId }),

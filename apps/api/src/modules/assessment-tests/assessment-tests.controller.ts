@@ -20,8 +20,19 @@ export class AssessmentTestsController {
 
   @Get()
   @UseGuards(AuthGuard)
-  listTests(@Query('orgId') orgId: string) {
-    return this.service.listTests(orgId);
+  listTests(
+    @Query('orgId') orgId: string,
+    @Query('search') search?: string,
+    @Query('mode') mode?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.service.listTests(orgId, {
+      search: search || undefined,
+      mode: mode || undefined,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
   }
 
   @Get(':id')

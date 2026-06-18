@@ -20,7 +20,9 @@ export default async function StudentAssessmentsPage({
   if (!org) notFound();
 
   const api = createAssessmentApiClient(supabase);
-  const deliveries = await api.listDeliveries(org.id).catch(() => []);
+  const { deliveries } = await api
+    .listDeliveries(org.id, { limit: 200 })
+    .catch(() => ({ deliveries: [], total: 0 }));
 
   const pending = deliveries.filter((d) => d.accessType !== 'public');
 

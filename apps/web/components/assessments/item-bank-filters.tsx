@@ -99,7 +99,7 @@ function MultiSelect({
     );
   }
 
-  // ── Inline variant (used inside "More filters" dialog) ─────────────────────
+  // ── Inline variant — inside "More filters" dialog ──────────────────────────
   if (inline) {
     return (
       <div className="flex flex-col gap-2">
@@ -108,13 +108,14 @@ function MultiSelect({
             {label}
           </Label>
           {isActive && (
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-auto py-0 px-1 text-xs text-muted-foreground"
               onClick={() => onChange([])}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
               Clear
-            </button>
+            </Button>
           )}
         </div>
         <div className="flex flex-wrap gap-2">
@@ -141,73 +142,66 @@ function MultiSelect({
     );
   }
 
-  // ── Popover variant (used in the filter bar) ───────────────────────────────
+  // ── Popover variant — in the filter bar ────────────────────────────────────
   return (
-    <div className="flex items-center gap-2 shrink-0">
+    <div className="flex items-center gap-1.5 shrink-0">
       <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         {label}
       </span>
-      <div className="flex items-center">
-        <Popover>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              className={`flex h-9 items-center gap-1.5 whitespace-nowrap border px-3 text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                isActive
-                  ? 'rounded-l-lg border-r-0 border-primary/40 bg-primary/5 text-foreground'
-                  : 'rounded-lg border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground'
-              }`}
-            >
-              <span className="font-medium">
-                {isActive ? `${selected.length} selected` : allLabel}
-              </span>
-              <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
-            </button>
-          </PopoverTrigger>
-          <PopoverContent className="w-52 p-0" align="start">
-            <Command>
-              {options.length > 6 && <CommandInput placeholder="Search…" />}
-              <CommandEmpty>No results.</CommandEmpty>
-              <CommandGroup>
-                {options.map((opt) => {
-                  const checked = selected.includes(opt.value);
-                  return (
-                    <CommandItem
-                      key={opt.value}
-                      value={opt.value}
-                      onSelect={() => toggle(opt.value)}
-                      className="data-selected:bg-transparent gap-2.5"
-                    >
-                      <span
-                        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
-                          checked
-                            ? 'border-primary bg-primary text-primary-foreground'
-                            : 'border-border bg-background'
-                        }`}
-                      >
-                        {checked && <Check className="h-2.5 w-2.5" />}
-                      </span>
-                      {opt.label}
-                    </CommandItem>
-                  );
-                })}
-              </CommandGroup>
-            </Command>
-          </PopoverContent>
-        </Popover>
-
-        {/* Clear button — only shown when active; sits flush against the trigger */}
-        {isActive && (
-          <button
-            type="button"
-            onClick={() => onChange([])}
-            className="flex h-9 w-7 items-center justify-center rounded-r-lg border border-l-0 border-primary/40 bg-primary/5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus:outline-none"
-            aria-label={`Clear ${label} filter`}
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            className={isActive ? 'border-primary/40 bg-primary/5 font-semibold' : ''}
           >
-            <X className="h-3 w-3" />
-          </button>
-        )}
-      </div>
+            {isActive ? selected.length : allLabel}
+            <ChevronDown className="h-3 w-3 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-52 p-0" align="start">
+          <Command>
+            {options.length > 6 && <CommandInput placeholder="Search…" />}
+            <CommandEmpty>No results.</CommandEmpty>
+            <CommandGroup>
+              {options.map((opt) => {
+                const checked = selected.includes(opt.value);
+                return (
+                  <CommandItem
+                    key={opt.value}
+                    value={opt.value}
+                    onSelect={() => toggle(opt.value)}
+                    className="data-selected:bg-transparent gap-2.5"
+                  >
+                    <span
+                      className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
+                        checked
+                          ? 'border-primary bg-primary text-primary-foreground'
+                          : 'border-border bg-background'
+                      }`}
+                    >
+                      {checked && <Check className="h-2.5 w-2.5" />}
+                    </span>
+                    {opt.label}
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          </Command>
+        </PopoverContent>
+      </Popover>
+
+      {isActive && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+          onClick={() => onChange([])}
+          aria-label={`Clear ${label}`}
+        >
+          <X className="h-3.5 w-3.5" />
+        </Button>
+      )}
     </div>
   );
 }
@@ -284,9 +278,9 @@ export function ItemBankFilters({ subjects }: Props) {
   return (
     <>
       <div className="rounded-xl border bg-card px-4 py-3">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           {/* Search — always visible */}
-          <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             <span className="hidden sm:block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Search
             </span>
@@ -338,12 +332,12 @@ export function ItemBankFilters({ subjects }: Props) {
             />
           )}
 
-          {/* More filters — invisible when nothing is hidden, always rendered to reserve space */}
+          {/* More filters — always rendered; invisible when nothing is hidden */}
           <div className="ml-auto shrink-0">
             <Button
               variant="outline"
               size="sm"
-              className={`h-9 gap-2 transition-opacity ${anyHidden ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+              className={`gap-2 transition-opacity ${anyHidden ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
               onClick={() => setMobileOpen(true)}
             >
               <SlidersHorizontal className="h-3.5 w-3.5" />

@@ -7,6 +7,7 @@ import { createAssessmentApiClient } from '@iconicedu/web/lib/assessments/api';
 import { DashboardHeader, Button } from '@iconicedu/ui-web';
 import { Plus, ClipboardList, ChevronRight } from 'lucide-react';
 import { ItemBankFilters } from '@iconicedu/web/components/assessments/item-bank-filters';
+import { ListPagination } from '@iconicedu/web/components/assessments/list-pagination';
 
 export const metadata: Metadata = { title: 'Admin · Item Bank' };
 
@@ -161,62 +162,65 @@ export default async function ItemBankPage({
             )}
           </div>
         ) : (
-          <div className="rounded-xl border overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b bg-muted/30">
-              <h2 className="text-sm font-semibold">Questions ({total})</h2>
-            </div>
-            <div className="divide-y">
-              {items.map((item) => (
-                <Link
-                  key={item.id}
-                  href={`/${orgSlug}/admin/assessments/items/${item.id}`}
-                  className="group flex items-center gap-4 px-6 py-4 hover:bg-muted/30 transition-colors"
-                >
-                  {/* Type pill */}
-                  <span
-                    className={`inline-flex shrink-0 items-center rounded-md border px-2.5 py-1 text-xs font-medium ${ITEM_TYPE_COLORS[item.type] ?? 'bg-muted text-muted-foreground border-border'}`}
+          <div className="flex flex-col gap-4">
+            <div className="rounded-xl border overflow-hidden">
+              <div className="flex items-center justify-between px-6 py-4 border-b bg-muted/30">
+                <h2 className="text-sm font-semibold">Questions ({total})</h2>
+              </div>
+              <div className="divide-y">
+                {items.map((item) => (
+                  <Link
+                    key={item.id}
+                    href={`/${orgSlug}/admin/assessments/items/${item.id}`}
+                    className="group flex items-center gap-4 px-6 py-4 hover:bg-muted/30 transition-colors"
                   >
-                    {ITEM_TYPE_LABELS[item.type] ?? item.type}
-                  </span>
-
-                  {/* Question title + breadcrumb */}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{item.title}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                      {[
-                        item.skillName,
-                        item.domainName,
-                        item.grade ? `Grade ${item.grade}` : '',
-                      ]
-                        .filter(Boolean)
-                        .join(' · ')}
-                    </p>
-                  </div>
-
-                  {/* Difficulty */}
-                  <div className="flex items-center gap-2 shrink-0">
-                    <div
-                      className="flex gap-0.5"
-                      title={`Difficulty: ${DIFFICULTY_LABELS[item.difficulty]}`}
-                    >
-                      {[1, 2, 3, 4, 5].map((d) => (
-                        <div
-                          key={d}
-                          className={`h-2 w-2 rounded-full ${d <= item.difficulty ? 'bg-primary' : 'bg-muted'}`}
-                        />
-                      ))}
-                    </div>
+                    {/* Type pill */}
                     <span
-                      className={`text-xs font-medium hidden sm:block ${DIFFICULTY_COLORS[item.difficulty] ?? ''}`}
+                      className={`inline-flex shrink-0 items-center rounded-md border px-2.5 py-1 text-xs font-medium ${ITEM_TYPE_COLORS[item.type] ?? 'bg-muted text-muted-foreground border-border'}`}
                     >
-                      {DIFFICULTY_LABELS[item.difficulty] ?? ''}
+                      {ITEM_TYPE_LABELS[item.type] ?? item.type}
                     </span>
-                  </div>
 
-                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-                </Link>
-              ))}
+                    {/* Question title + breadcrumb */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{item.title}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                        {[
+                          item.skillName,
+                          item.domainName,
+                          item.grade ? `Grade ${item.grade}` : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </p>
+                    </div>
+
+                    {/* Difficulty */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div
+                        className="flex gap-0.5"
+                        title={`Difficulty: ${DIFFICULTY_LABELS[item.difficulty]}`}
+                      >
+                        {[1, 2, 3, 4, 5].map((d) => (
+                          <div
+                            key={d}
+                            className={`h-2 w-2 rounded-full ${d <= item.difficulty ? 'bg-primary' : 'bg-muted'}`}
+                          />
+                        ))}
+                      </div>
+                      <span
+                        className={`text-xs font-medium hidden sm:block ${DIFFICULTY_COLORS[item.difficulty] ?? ''}`}
+                      >
+                        {DIFFICULTY_LABELS[item.difficulty] ?? ''}
+                      </span>
+                    </div>
+
+                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </Link>
+                ))}
+              </div>
             </div>
+            <ListPagination total={total} pageSize={20} />
           </div>
         )}
       </div>

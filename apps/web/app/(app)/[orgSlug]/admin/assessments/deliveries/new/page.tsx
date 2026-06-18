@@ -21,7 +21,9 @@ export default async function NewDeliveryPage({
   if (!org) notFound();
 
   const api = createAssessmentApiClient(supabase);
-  const tests = await api.listTests(org.id).catch(() => []);
+  const { tests } = await api
+    .listTests(org.id, { limit: 200 })
+    .catch(() => ({ tests: [], total: 0 }));
 
   return (
     <div className="flex flex-1 flex-col">

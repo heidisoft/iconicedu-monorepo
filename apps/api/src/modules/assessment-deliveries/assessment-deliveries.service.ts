@@ -9,31 +9,46 @@ import type {
 
 @Injectable()
 export class AssessmentDeliveriesService {
-  async listDeliveries(orgId: string): Promise<AssessmentDeliveryListVM[]> {
+  async listDeliveries(
+    orgId: string,
+    filters?: { search?: string; accessType?: string; page?: number; limit?: number },
+  ): Promise<{ deliveries: AssessmentDeliveryListVM[]; total: number }> {
     const supabase = createSupabaseServiceClient();
-    const { data, error } = await supabase
+    const page = Math.max(1, filters?.page ?? 1);
+    const limit = filters?.limit ?? 20;
+    const from = (page - 1) * limit;
+
+    let q = supabase
       .from('assessment_deliveries')
-      .select('*, assessment_tests(title)')
+      .select('*, assessment_tests(title)', { count: 'exact' })
       .eq('org_id', orgId)
       .is('deleted_at', null)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(from, from + limit - 1);
 
+    if (filters?.search) q = q.ilike('title', `%${filters.search}%`);
+    if (filters?.accessType) q = q.eq('access_type', filters.accessType);
+
+    const { data, error, count } = await q;
     if (error) throw new BadRequestException(error.message);
 
-    return (data ?? []).map((row) => ({
-      id: row.id,
-      orgId: row.org_id,
-      testId: row.test_id,
-      testTitle: (row.assessment_tests as { title?: string } | null)?.title ?? '',
-      title: row.title,
-      accessType: row.access_type,
-      accessToken: row.access_token,
-      startsAt: row.starts_at,
-      endsAt: row.ends_at,
-      sessionCount: 0,
-      completedCount: 0,
-      createdAt: row.created_at,
-    }));
+    return {
+      total: count ?? 0,
+      deliveries: (data ?? []).map((row) => ({
+        id: row.id,
+        orgId: row.org_id,
+        testId: row.test_id,
+        testTitle: (row.assessment_tests as { title?: string } | null)?.title ?? '',
+        title: row.title,
+        accessType: row.access_type,
+        accessToken: row.access_token,
+        startsAt: row.starts_at,
+        endsAt: row.ends_at,
+        sessionCount: 0,
+        completedCount: 0,
+        createdAt: row.created_at,
+      })),
+    };
   }
 
   async getDelivery(id: string, orgId: string): Promise<AssessmentDeliveryVM> {

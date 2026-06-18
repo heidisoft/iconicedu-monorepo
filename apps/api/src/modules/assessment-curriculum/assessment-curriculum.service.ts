@@ -12,13 +12,15 @@ export class AssessmentCurriculumService {
   // Subjects
   // ---------------------------------------------------------------------------
 
-  async listSubjects(orgId: string): Promise<AssessmentSubjectVM[]> {
+  async listSubjects(orgId: string, search?: string): Promise<AssessmentSubjectVM[]> {
     const supabase = createSupabaseServiceClient();
-    const { data, error } = await supabase
+    let q = supabase
       .from('assessment_subjects')
       .select('*')
       .eq('org_id', orgId)
       .order('name');
+    if (search) q = q.ilike('name', `%${search}%`);
+    const { data, error } = await q;
 
     if (error) throw new BadRequestException(error.message);
 
