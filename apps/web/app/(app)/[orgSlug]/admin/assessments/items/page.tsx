@@ -126,8 +126,8 @@ export default async function ItemBankPage({
           </Button>
         </div>
 
-        {/* Filters */}
-        <ItemBankFilters subjects={subjects} />
+        {/* Filters — only shown once there's data or an active filter */}
+        {(total > 0 || hasActiveFilters) && <ItemBankFilters subjects={subjects} />}
 
         {/* List */}
         {items.length === 0 ? (

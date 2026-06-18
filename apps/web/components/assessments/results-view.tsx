@@ -13,10 +13,6 @@ import {
   AccordionItem,
   AccordionTrigger,
   Badge,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
   Tabs,
   TabsContent,
   TabsList,
@@ -160,7 +156,7 @@ function SkillScorecard({ skillScores }: { skillScores: AssessmentSkillScoreVM[]
           Skills ({skillScores.length})
         </span>
       </div>
-      <div className="divide-y">
+      <div className="divide-y divide-border">
         {sorted.map((skill) => {
           const pct = Math.round(skill.percentage);
           return (
@@ -212,57 +208,49 @@ function SkillScorecard({ skillScores }: { skillScores: AssessmentSkillScoreVM[]
 function ParentReportCard({ report }: { report: ParentReport }) {
   return (
     <div className="flex flex-col gap-4">
-      <Card>
-        <CardContent className="py-5">
-          <p className="text-lg font-medium leading-relaxed">{report.overallMessage}</p>
-          {report.passed !== null && (
-            <Badge variant={report.passed ? 'default' : 'secondary'} className="mt-2">
-              {report.passed ? '✓ Passed' : 'Keep practising'}
-            </Badge>
-          )}
-        </CardContent>
-      </Card>
+      <div className="rounded-xl border bg-card px-5 py-5">
+        <p className="text-lg font-medium leading-relaxed">{report.overallMessage}</p>
+        {report.passed !== null && (
+          <Badge variant={report.passed ? 'default' : 'secondary'} className="mt-2">
+            {report.passed ? '✓ Passed' : 'Keep practising'}
+          </Badge>
+        )}
+      </div>
 
       {report.highlights.map((h, i) => (
-        <Card
+        <div
           key={i}
-          className={h.type === 'strength' ? 'border-green-200' : 'border-orange-200'}
+          className={`rounded-xl border bg-card px-4 py-4 ${h.type === 'strength' ? 'border-green-200' : 'border-orange-200'}`}
         >
-          <CardContent className="py-4 px-4">
-            <div className="flex items-start gap-3">
-              <span className="text-xl">{h.type === 'strength' ? '⭐' : '📈'}</span>
-              <div>
-                <p className="text-sm font-medium">{h.skill}</p>
-                <p className="text-sm text-muted-foreground mt-1">{h.message}</p>
-              </div>
+          <div className="flex items-start gap-3">
+            <span className="text-xl">{h.type === 'strength' ? '⭐' : '📈'}</span>
+            <div>
+              <p className="text-sm font-medium">{h.skill}</p>
+              <p className="text-sm text-muted-foreground mt-1">{h.message}</p>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       ))}
 
       {report.suggestedHomeActivities.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Things to try at home</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="list-disc list-inside flex flex-col gap-1">
-              {report.suggestedHomeActivities.map((a, i) => (
-                <li key={i} className="text-sm text-muted-foreground">
-                  {a}
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
+        <div className="rounded-xl border bg-card overflow-hidden">
+          <div className="px-5 py-4 border-b bg-muted/30">
+            <p className="text-sm font-semibold">Things to try at home</p>
+          </div>
+          <ul className="divide-y divide-border">
+            {report.suggestedHomeActivities.map((a, i) => (
+              <li key={i} className="px-5 py-3 text-sm text-muted-foreground">
+                {a}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {report.encouragement && (
-        <Card className="bg-muted/30">
-          <CardContent className="py-4">
-            <p className="text-sm italic text-muted-foreground">{report.encouragement}</p>
-          </CardContent>
-        </Card>
+        <div className="rounded-xl border bg-muted/30 px-5 py-4">
+          <p className="text-sm italic text-muted-foreground">{report.encouragement}</p>
+        </div>
       )}
     </div>
   );
@@ -296,7 +284,7 @@ function TutorReportCard({ report }: { report: TutorReport }) {
             Skill Breakdown
           </span>
         </div>
-        <div className="divide-y">
+        <div className="divide-y divide-border">
           {report.skillBreakdown.map((skill) => (
             <div key={skill.skillId} className="px-6 py-4">
               <div className="flex items-center gap-2 justify-between flex-wrap">
@@ -343,7 +331,7 @@ function TutorReportCard({ report }: { report: TutorReport }) {
               Next Lesson Suggestions
             </span>
           </div>
-          <ol className="divide-y">
+          <ol className="divide-y divide-border">
             {report.nextLessonSuggestions.map((s, i) => (
               <li key={i} className="flex items-start gap-3 px-6 py-3.5">
                 <span className="flex-shrink-0 h-5 w-5 rounded-full bg-muted text-muted-foreground text-xs font-semibold flex items-center justify-center mt-0.5">
@@ -363,18 +351,18 @@ function LearningPlanCard({ plan }: { plan: StudentLearningPlan }) {
   return (
     <div className="flex flex-col gap-4">
       {plan.masteredSkills.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Skills You&apos;ve Mastered 🎉</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-2">
+        <div className="rounded-xl border bg-card overflow-hidden">
+          <div className="px-5 py-4 border-b bg-muted/30">
+            <p className="text-sm font-semibold">Skills You&apos;ve Mastered 🎉</p>
+          </div>
+          <div className="flex flex-wrap gap-2 px-5 py-4">
             {plan.masteredSkills.map((s, i) => (
               <Badge key={i} variant="secondary" className="text-sm gap-1">
                 {s.badge} {s.skill}
               </Badge>
             ))}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
       {plan.learningGoals.length > 0 && (
@@ -385,7 +373,7 @@ function LearningPlanCard({ plan }: { plan: StudentLearningPlan }) {
               <AccordionItem
                 key={i}
                 value={String(i)}
-                className="border rounded-xl overflow-hidden shadow-sm bg-card"
+                className="border rounded-xl overflow-hidden bg-card"
               >
                 <AccordionTrigger className="px-4 py-3.5 hover:no-underline hover:bg-muted/30 transition-colors [&>svg]:text-muted-foreground [&>svg]:flex-shrink-0">
                   <div className="flex items-center gap-2.5 text-left min-w-0 flex-1 mr-2">
@@ -444,17 +432,17 @@ function LearningPlanCard({ plan }: { plan: StudentLearningPlan }) {
       )}
 
       {plan.weeklyPracticePlan.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Weekly Practice Plan</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3">
+        <div className="rounded-xl border bg-card overflow-hidden">
+          <div className="px-5 py-4 border-b bg-muted/30">
+            <p className="text-sm font-semibold">Weekly Practice Plan</p>
+          </div>
+          <div className="divide-y divide-border">
             {plan.weeklyPracticePlan.map((week) => (
-              <div key={week.week} className="border rounded-md px-3 py-2">
+              <div key={week.week} className="px-5 py-4">
                 <p className="text-sm font-medium">
                   Week {week.week} — {week.focus}
                 </p>
-                <ul className="mt-1 flex flex-col gap-0.5">
+                <ul className="mt-1.5 flex flex-col gap-0.5">
                   {week.activities.map((act, i) => (
                     <li key={i} className="text-xs text-muted-foreground">
                       • {act}
@@ -463,8 +451,8 @@ function LearningPlanCard({ plan }: { plan: StudentLearningPlan }) {
                 </ul>
               </div>
             ))}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
     </div>
   );

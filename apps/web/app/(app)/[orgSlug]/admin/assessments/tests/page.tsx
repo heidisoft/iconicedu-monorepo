@@ -57,20 +57,22 @@ export default async function TestsPage({
           </Button>
         </div>
 
-        {/* Filters */}
-        <ListFilters
-          searchPlaceholder="Search tests…"
-          filters={[
-            {
-              key: 'mode',
-              label: 'Mode',
-              options: [
-                { value: 'standard', label: 'Static' },
-                { value: 'adaptive', label: 'Adaptive' },
-              ],
-            },
-          ]}
-        />
+        {/* Filters — only shown once there's data or an active filter */}
+        {(total > 0 || hasActiveFilters) && (
+          <ListFilters
+            searchPlaceholder="Search tests…"
+            filters={[
+              {
+                key: 'mode',
+                label: 'Mode',
+                options: [
+                  { value: 'standard', label: 'Static' },
+                  { value: 'adaptive', label: 'Adaptive' },
+                ],
+              },
+            ]}
+          />
+        )}
 
         {/* List */}
         {tests.length === 0 ? (

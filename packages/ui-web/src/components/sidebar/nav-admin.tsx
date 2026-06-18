@@ -61,7 +61,9 @@ export function NavAdmin({
 }: NavAdminProps) {
   const getIsActive = React.useCallback(
     (url: string) =>
-      activePath ? activePath === url || activePath.startsWith(url) : false,
+      activePath
+        ? activePath === url || activePath.startsWith(url.endsWith('/') ? url : `${url}/`)
+        : false,
     [activePath],
   );
   const [openSections, setOpenSections] = React.useState<Record<string, boolean>>(() =>

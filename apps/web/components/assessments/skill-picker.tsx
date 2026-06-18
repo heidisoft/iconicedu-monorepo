@@ -21,9 +21,10 @@ interface Props {
   orgId: string;
   value?: string;
   onChange: (skillId: string, skill: AssessmentSkillVM) => void;
+  disabledIds?: Set<string>;
 }
 
-export function SkillPicker({ orgId, value, onChange }: Props) {
+export function SkillPicker({ orgId, value, onChange, disabledIds }: Props) {
   const [open, setOpen] = useState(false);
   const [skills, setSkills] = useState<AssessmentSkillVM[]>([]);
   const [loading, setLoading] = useState(false);
@@ -73,26 +74,35 @@ export function SkillPicker({ orgId, value, onChange }: Props) {
           <CommandEmpty>{loading ? 'Loading…' : 'No skills found.'}</CommandEmpty>
           {Object.entries(grouped).map(([group, groupSkills]) => (
             <CommandGroup key={group} heading={group}>
-              {groupSkills.map((skill) => (
-                <CommandItem
-                  key={skill.id}
-                  value={`${skill.name} ${skill.domainName} ${skill.subjectName}`}
-                  onSelect={() => {
-                    onChange(skill.id, skill);
-                    setOpen(false);
-                  }}
-                >
-                  <Check
-                    className={`mr-2 h-4 w-4 ${skill.id === value ? 'opacity-100' : 'opacity-0'}`}
-                  />
-                  <span className="flex-1">{skill.name}</span>
-                  {skill.standard && (
-                    <span className="text-xs text-muted-foreground font-mono">
-                      {skill.standard}
-                    </span>
-                  )}
-                </CommandItem>
-              ))}
+              {groupSkills.map((skill) => {
+                const disabled = disabledIds?.has(skill.id) ?? false;
+                return (
+                  <CommandItem
+                    key={skill.id}
+                    value={`${skill.name} ${skill.domainName} ${skill.subjectName}`}
+                    disabled={disabled}
+                    onSelect={() => {
+                      if (disabled) return;
+                      onChange(skill.id, skill);
+                      setOpen(false);
+                    }}
+                    className={disabled ? 'opacity-40 cursor-not-allowed' : ''}
+                  >
+                    <Check
+                      className={`mr-2 h-4 w-4 ${skill.id === value ? 'opacity-100' : 'opacity-0'}`}
+                    />
+                    <span className="flex-1">{skill.name}</span>
+                    {disabled && (
+                      <span className="text-xs text-muted-foreground">Added</span>
+                    )}
+                    {!disabled && skill.standard && (
+                      <span className="text-xs text-muted-foreground font-mono">
+                        {skill.standard}
+                      </span>
+                    )}
+                  </CommandItem>
+                );
+              })}
             </CommandGroup>
           ))}
         </Command>

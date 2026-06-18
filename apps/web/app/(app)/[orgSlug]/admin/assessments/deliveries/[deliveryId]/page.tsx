@@ -4,19 +4,18 @@ import { notFound } from 'next/navigation';
 import { getDashboardAccountContext } from '@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth';
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
 import { createAssessmentApiClient } from '@iconicedu/web/lib/assessments/api';
-import { DashboardHeader, Card, CardContent, Badge, Button } from '@iconicedu/ui-web';
-import {
-  Users,
-  ArrowLeft,
-  ChevronRight,
-  CheckCircle2,
-  Clock,
-  BarChart2,
-  Send,
-} from 'lucide-react';
+import { DashboardHeader, Badge, Button } from '@iconicedu/ui-web';
+import { ArrowLeft, ChevronRight, CheckCircle2, Clock, Send } from 'lucide-react';
 import { DeliverySharePanel } from '@iconicedu/web/components/assessments/delivery-share-panel';
 
 export const metadata: Metadata = { title: 'Admin · Delivery Results' };
+
+const ACCESS_TYPE_LABELS: Record<string, string> = {
+  public: 'Public',
+  authenticated: 'Authenticated',
+  class: 'Class',
+  specific_users: 'Specific users',
+};
 
 const STATUS_CONFIG: Record<
   string,
@@ -30,7 +29,7 @@ const STATUS_CONFIG: Record<
 function ScoreBar({ pct }: { pct: number }) {
   const color = pct >= 80 ? 'bg-emerald-500' : pct >= 60 ? 'bg-amber-500' : 'bg-red-500';
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 shrink-0">
       <span className="text-sm font-semibold tabular-nums w-9 text-right">
         {Math.round(pct)}%
       </span>
@@ -83,13 +82,12 @@ export default async function DeliveryResultsPage({
     sessions.length > 0
       ? Math.round((completedSessions.length / sessions.length) * 100)
       : 0;
+  const scoredSessions = completedSessions.filter((s) => s.percentage !== undefined);
   const avgScore =
-    completedSessions.length > 0
+    scoredSessions.length > 0
       ? Math.round(
-          completedSessions
-            .filter((s) => s.percentage !== undefined)
-            .reduce((sum, s) => sum + (s.percentage ?? 0), 0) /
-            completedSessions.filter((s) => s.percentage !== undefined).length,
+          scoredSessions.reduce((sum, s) => sum + (s.percentage ?? 0), 0) /
+            scoredSessions.length,
         )
       : null;
 
@@ -118,51 +116,48 @@ export default async function DeliveryResultsPage({
               variant={delivery.accessType === 'public' ? 'default' : 'secondary'}
               className="mt-1 shrink-0"
             >
-              {delivery.accessType}
+              {ACCESS_TYPE_LABELS[delivery.accessType] ?? delivery.accessType}
             </Badge>
           </div>
         </div>
 
-        {/* Stats row */}
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
-          <Card>
-            <CardContent className="pt-5 pb-5 px-5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted mb-3">
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </div>
-              <p className="text-2xl font-bold">{delivery.sessionCount ?? 0}</p>
-              <p className="text-sm font-medium mt-0.5">Sessions</p>
-              <p className="text-xs text-muted-foreground mt-0.5">total started</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-5 pb-5 px-5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950 mb-3">
-                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-              </div>
-              <p className="text-2xl font-bold">{delivery.completedCount ?? 0}</p>
-              <p className="text-sm font-medium mt-0.5">Completed</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {sessions.length > 0
-                  ? `${completionRate}% completion rate`
-                  : 'no sessions yet'}
+        {/* KPI stats — same style as overview page */}
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+          <div className="rounded-xl border bg-card px-5 pt-4 pb-5">
+            <p className="text-sm text-muted-foreground">Sessions</p>
+            <div className="flex items-end justify-between mt-2 gap-2">
+              <p className="text-4xl font-bold tracking-tight leading-none">
+                {delivery.sessionCount ?? 0}
               </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-5 pb-5 px-5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-50 dark:bg-violet-950 mb-3">
-                <BarChart2 className="h-4 w-4 text-violet-600" />
-              </div>
-              <p className="text-2xl font-bold">
+              <span className="mb-0.5 shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">
+                total started
+              </span>
+            </div>
+          </div>
+
+          <div className="rounded-xl border bg-card px-5 pt-4 pb-5">
+            <p className="text-sm text-muted-foreground">Completed</p>
+            <div className="flex items-end justify-between mt-2 gap-2">
+              <p className="text-4xl font-bold tracking-tight leading-none">
+                {delivery.completedCount ?? 0}
+              </p>
+              <span className="mb-0.5 shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">
+                {sessions.length > 0 ? `${completionRate}% rate` : 'no sessions'}
+              </span>
+            </div>
+          </div>
+
+          <div className="col-span-2 md:col-span-1 rounded-xl border bg-card px-5 pt-4 pb-5">
+            <p className="text-sm text-muted-foreground">Avg score</p>
+            <div className="flex items-end justify-between mt-2 gap-2">
+              <p className="text-4xl font-bold tracking-tight leading-none">
                 {avgScore !== null ? `${avgScore}%` : '—'}
               </p>
-              <p className="text-sm font-medium mt-0.5">Avg score</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                across completed sessions
-              </p>
-            </CardContent>
-          </Card>
+              <span className="mb-0.5 shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">
+                completed only
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* Share panel */}
@@ -175,7 +170,7 @@ export default async function DeliveryResultsPage({
           />
         )}
 
-        {/* Sessions list */}
+        {/* Sessions table */}
         <div className="rounded-xl border overflow-hidden">
           <div className="flex items-center justify-between px-6 py-4 border-b bg-muted/30">
             <div>
@@ -196,7 +191,7 @@ export default async function DeliveryResultsPage({
               </p>
             </div>
           ) : (
-            <div className="divide-y">
+            <div className="divide-y divide-border">
               {sessions.map((session) => {
                 const statusConfig = STATUS_CONFIG[session.status] ?? {
                   label: session.status,
@@ -208,16 +203,14 @@ export default async function DeliveryResultsPage({
                     href={`/${orgSlug}/admin/assessments/deliveries/${deliveryId}/results/${session.id}`}
                     className="group flex items-center gap-4 px-6 py-4 hover:bg-muted/30 transition-colors"
                   >
-                    {/* Status icon */}
                     <div className="shrink-0">
                       {session.status === 'completed' ? (
-                        <CheckCircle2 className="h-4.5 w-4.5 text-emerald-500" />
+                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                       ) : (
-                        <Clock className="h-4.5 w-4.5 text-muted-foreground/50" />
+                        <Clock className="h-4 w-4 text-muted-foreground/50" />
                       )}
                     </div>
 
-                    {/* Name + date */}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium">
                         {session.profileName ?? session.anonName ?? 'Anonymous'}
@@ -233,14 +226,12 @@ export default async function DeliveryResultsPage({
                       )}
                     </div>
 
-                    {/* Score bar */}
                     {session.percentage !== undefined && session.percentage !== null ? (
                       <ScoreBar pct={session.percentage} />
                     ) : (
-                      <div className="w-28" />
+                      <div className="w-28 shrink-0" />
                     )}
 
-                    {/* Status badge */}
                     <Badge variant={statusConfig.variant} className="shrink-0">
                       {statusConfig.label}
                     </Badge>

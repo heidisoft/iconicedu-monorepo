@@ -48,8 +48,10 @@ export default async function CurriculumPage({
           <CreateSubjectForm orgId={org.id} />
         </div>
 
-        {/* Filters — only search, no extra categorical filters needed for subjects */}
-        <ListFilters searchPlaceholder="Search subjects…" />
+        {/* Filters — only shown once there's data or an active filter */}
+        {(subjects.length > 0 || hasActiveFilters) && (
+          <ListFilters searchPlaceholder="Search subjects…" />
+        )}
 
         {/* Subject list */}
         {subjects.length === 0 ? (

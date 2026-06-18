@@ -88,13 +88,18 @@ export function TestBuilder({ test, orgId, orgSlug }: Props) {
 function SkillPoolManager({ test, orgId }: { test: AssessmentTestVM; orgId: string }) {
   const { confirm: confirmPool, ConfirmDialog: PoolConfirmDialog } = useConfirm();
   const [pools, setPools] = useState<AssessmentSkillPoolVM[]>(test.skillPools ?? []);
-  const [addingPool, setAddingPool] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [newPool, setNewPool] = useState({
     skillId: '',
     targetItems: 5,
     startDifficulty: 3,
   });
   const [saving, setSaving] = useState(false);
+
+  function handleOpenChange(open: boolean) {
+    setDialogOpen(open);
+    if (!open) setNewPool({ skillId: '', targetItems: 5, startDifficulty: 3 });
+  }
 
   async function handleAddPool() {
     if (!newPool.skillId) return;
@@ -105,8 +110,7 @@ function SkillPoolManager({ test, orgId }: { test: AssessmentTestVM; orgId: stri
         newPool,
       )) as AssessmentSkillPoolVM;
       setPools((p) => [...p, result]);
-      setNewPool({ skillId: '', targetItems: 5, startDifficulty: 3 });
-      setAddingPool(false);
+      handleOpenChange(false);
     } finally {
       setSaving(false);
     }
@@ -125,6 +129,8 @@ function SkillPoolManager({ test, orgId }: { test: AssessmentTestVM; orgId: stri
     setPools((p) => p.filter((pool) => pool.id !== poolId));
   }
 
+  const alreadyInPool = new Set(pools.map((p) => p.skillId));
+
   return (
     <>
       <PoolConfirmDialog />
@@ -134,12 +140,12 @@ function SkillPoolManager({ test, orgId }: { test: AssessmentTestVM; orgId: stri
             The adaptive engine assesses each skill in order using the rules configured on
             the test.
           </p>
-          <Button size="sm" variant="outline" onClick={() => setAddingPool(true)}>
+          <Button size="sm" variant="outline" onClick={() => setDialogOpen(true)}>
             <Plus className="mr-1.5 h-3.5 w-3.5" /> Add Skill
           </Button>
         </div>
 
-        {pools.length === 0 && !addingPool && (
+        {pools.length === 0 && (
           <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed py-16 text-center">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted">
               <BookOpen className="h-5 w-5 text-muted-foreground" />
@@ -150,20 +156,20 @@ function SkillPoolManager({ test, orgId }: { test: AssessmentTestVM; orgId: stri
                 Add skills to define what this adaptive test will assess.
               </p>
             </div>
-            <Button size="sm" variant="outline" onClick={() => setAddingPool(true)}>
+            <Button size="sm" variant="outline" onClick={() => setDialogOpen(true)}>
               <Plus className="mr-1.5 h-3.5 w-3.5" /> Add Skill
             </Button>
           </div>
         )}
 
         {pools.length > 0 && (
-          <div className="rounded-xl border">
-            <div className="px-6 py-3 border-b bg-muted/30 rounded-t-xl">
+          <div className="rounded-xl border overflow-hidden">
+            <div className="px-6 py-3 border-b bg-muted/30">
               <span className="text-sm font-medium text-muted-foreground">
                 Skill Pool ({pools.length})
               </span>
             </div>
-            <div className="divide-y">
+            <div className="divide-y divide-border">
               {pools.map((pool, i) => (
                 <div key={pool.id} className="group flex items-center gap-3 px-6 py-4">
                   <span className="text-sm text-muted-foreground w-5 shrink-0">
@@ -196,38 +202,56 @@ function SkillPoolManager({ test, orgId }: { test: AssessmentTestVM; orgId: stri
             </div>
           </div>
         )}
+      </div>
 
-        {addingPool && (
-          <div className="rounded-xl border border-dashed p-4 flex flex-col gap-3">
-            <div>
-              <Label className="text-xs mb-1 block">Skill</Label>
+      {/* Add skill dialog */}
+      <Dialog open={dialogOpen} onOpenChange={handleOpenChange}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Skill to Pool</DialogTitle>
+            <DialogDescription>
+              Choose a skill and configure how many questions to serve for it.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col gap-4 py-1">
+            <div className="flex flex-col gap-1.5">
+              <Label>Skill</Label>
               <SkillPicker
                 orgId={orgId}
                 value={newPool.skillId}
                 onChange={(id) => setNewPool((p) => ({ ...p, skillId: id }))}
+                disabledIds={alreadyInPool}
               />
+              {newPool.skillId && alreadyInPool.has(newPool.skillId) && (
+                <p className="text-xs text-destructive">
+                  This skill is already in the pool.
+                </p>
+              )}
             </div>
-            <div className="flex gap-3">
-              <div className="flex-1">
-                <Label className="text-xs">Target items</Label>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1.5">
+                <Label>Target items</Label>
                 <Input
                   type="number"
-                  className="mt-1 h-8 text-sm"
+                  min={1}
+                  max={20}
                   value={newPool.targetItems}
                   onChange={(e) =>
                     setNewPool((p) => ({ ...p, targetItems: Number(e.target.value) }))
                   }
                 />
               </div>
-              <div className="flex-1">
-                <Label className="text-xs">Start difficulty</Label>
+              <div className="flex flex-col gap-1.5">
+                <Label>Start difficulty</Label>
                 <Select
                   value={String(newPool.startDifficulty)}
                   onValueChange={(v) =>
                     setNewPool((p) => ({ ...p, startDifficulty: Number(v) }))
                   }
                 >
-                  <SelectTrigger className="mt-1 h-8 text-sm">
+                  <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -240,21 +264,21 @@ function SkillPoolManager({ test, orgId }: { test: AssessmentTestVM; orgId: stri
                 </Select>
               </div>
             </div>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                onClick={handleAddPool}
-                disabled={saving || !newPool.skillId}
-              >
-                {saving ? 'Adding…' : 'Add to pool'}
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setAddingPool(false)}>
-                Cancel
-              </Button>
-            </div>
           </div>
-        )}
-      </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => handleOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddPool}
+              disabled={saving || !newPool.skillId || alreadyInPool.has(newPool.skillId)}
+            >
+              {saving ? 'Adding…' : 'Add to pool'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

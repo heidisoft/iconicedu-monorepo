@@ -67,22 +67,24 @@ export default async function DeliveriesPage({
           </Button>
         </div>
 
-        {/* Filters */}
-        <ListFilters
-          searchPlaceholder="Search deliveries…"
-          filters={[
-            {
-              key: 'accessType',
-              label: 'Access',
-              options: [
-                { value: 'public', label: 'Public' },
-                { value: 'authenticated', label: 'Authenticated' },
-                { value: 'class', label: 'Class' },
-                { value: 'specific_users', label: 'Specific users' },
-              ],
-            },
-          ]}
-        />
+        {/* Filters — only shown once there's data or an active filter */}
+        {(total > 0 || hasActiveFilters) && (
+          <ListFilters
+            searchPlaceholder="Search deliveries…"
+            filters={[
+              {
+                key: 'accessType',
+                label: 'Access',
+                options: [
+                  { value: 'public', label: 'Public' },
+                  { value: 'authenticated', label: 'Authenticated' },
+                  { value: 'class', label: 'Class' },
+                  { value: 'specific_users', label: 'Specific users' },
+                ],
+              },
+            ]}
+          />
+        )}
 
         {/* List */}
         {deliveries.length === 0 ? (
