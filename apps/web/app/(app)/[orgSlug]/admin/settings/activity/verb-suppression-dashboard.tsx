@@ -10,14 +10,10 @@ import type {
 import {
   Badge,
   Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
   Input,
   Label,
   Loader2,
+  Search,
   Select,
   SelectContent,
   SelectItem,
@@ -193,38 +189,43 @@ export function ActivityVerbSuppressionDashboard({
 
   if (isLoading) {
     return (
-      <Card>
-        <CardContent className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
+      <div className="rounded-xl border overflow-hidden">
+        <div className="flex items-center gap-2 px-6 py-4 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" />
           Loading activity controls...
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-4">
-      <Card>
-        <CardHeader className="gap-2">
-          <CardTitle>Global Verb Controls</CardTitle>
-          <CardDescription>
+      <div className="rounded-xl border overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b bg-muted/30">
+          <h2 className="text-sm font-semibold">Global Verb Controls</h2>
+          <p className="text-xs text-muted-foreground">
             Disable activity verbs at org level. Unknown custom verbs are shown as
             read-only.
-          </CardDescription>
-          <Input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search event type"
-            className="max-w-sm"
-          />
-        </CardHeader>
-        <CardContent className="space-y-3">
+          </p>
+        </div>
+        <div className="px-6 py-4 border-b">
+          <div className="flex items-center gap-2 h-9 w-full max-w-sm rounded-lg border bg-background px-3 focus-within:ring-2 focus-within:ring-ring">
+            <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            <input
+              className="flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none"
+              placeholder="Search event type"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+        </div>
+        <div className="divide-y divide-border">
           {filteredVerbCatalog.map((verb) => {
             const enabled = isEffectiveEnabled(verb.eventType, snapshot.orgRules);
             return (
               <div
                 key={verb.eventType}
-                className="flex items-center justify-between rounded-md border border-border px-3 py-2"
+                className="flex items-center justify-between px-6 py-4 hover:bg-muted/30 transition-colors"
               >
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{verb.eventType}</p>
@@ -256,19 +257,21 @@ export function ActivityVerbSuppressionDashboard({
             );
           })}
           {!filteredVerbCatalog.length ? (
-            <p className="text-sm text-muted-foreground">No verbs match the filter.</p>
+            <div className="px-6 py-4">
+              <p className="text-sm text-muted-foreground">No verbs match the filter.</p>
+            </div>
           ) : null}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Actor Overrides</CardTitle>
-          <CardDescription>
+      <div className="rounded-xl border overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b bg-muted/30">
+          <h2 className="text-sm font-semibold">Actor Overrides</h2>
+          <p className="text-xs text-muted-foreground">
             Override global behavior for a specific actor and verb.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+          </p>
+        </div>
+        <div className="px-6 py-4 flex flex-col gap-4">
           <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto]">
             <Select value={newActorProfileId} onValueChange={setNewActorProfileId}>
               <SelectTrigger>
@@ -380,8 +383,8 @@ export function ActivityVerbSuppressionDashboard({
               )}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

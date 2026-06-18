@@ -2,19 +2,7 @@
 
 import * as React from 'react';
 import type { RoleKey } from '@iconicedu/shared-types';
-import {
-  Badge,
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  Input,
-  Loader2,
-  Trash2,
-  toast,
-} from '@iconicedu/ui-web';
+import { Badge, Button, Input, Loader2, Search, Trash2, toast } from '@iconicedu/ui-web';
 
 type RolesManagementDashboardProps = {
   orgId: string;
@@ -181,29 +169,34 @@ export function RolesManagementDashboard({ orgId }: RolesManagementDashboardProp
 
   if (isLoading) {
     return (
-      <Card>
-        <CardContent className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
+      <div className="rounded-xl border overflow-hidden">
+        <div className="flex items-center gap-2 px-6 py-4 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" />
           Loading role assignments...
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-4">
-      <Card>
-        <CardHeader className="gap-2">
-          <CardTitle>User selector</CardTitle>
-          <CardDescription>
-            Search and pick a user to manage their `user_roles` records.
-          </CardDescription>
-          <Input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search users by name, email, or profile kind"
-            className="max-w-md"
-          />
+      <div className="rounded-xl border overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b bg-muted/30">
+          <h2 className="text-sm font-semibold">User selector</h2>
+          <p className="text-xs text-muted-foreground">
+            Search and pick a user to manage their user_roles records.
+          </p>
+        </div>
+        <div className="px-6 py-4 flex flex-col gap-3">
+          <div className="flex items-center gap-2 h-9 w-full md:max-w-md rounded-lg border bg-background px-3 focus-within:ring-2 focus-within:ring-ring">
+            <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            <input
+              className="flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none"
+              placeholder="Search users by name, email, or profile kind"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
           <div>
             <label htmlFor="roles-user-select" className="mb-2 block text-sm font-medium">
               User
@@ -222,15 +215,17 @@ export function RolesManagementDashboard({ orgId }: RolesManagementDashboardProp
               ))}
             </select>
           </div>
-        </CardHeader>
-      </Card>
+        </div>
+      </div>
 
-      <Card>
-        <CardHeader className="gap-2">
-          <CardTitle>Assign role</CardTitle>
-          <CardDescription>
+      <div className="rounded-xl border overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b bg-muted/30">
+          <h2 className="text-sm font-semibold">Assign role</h2>
+          <p className="text-xs text-muted-foreground">
             Add or restore a role record for the selected user.
-          </CardDescription>
+          </p>
+        </div>
+        <div className="px-6 py-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-end">
             <div className="w-full md:max-w-xs">
               <label
@@ -259,17 +254,17 @@ export function RolesManagementDashboard({ orgId }: RolesManagementDashboardProp
               {isSaving ? 'Saving...' : 'Assign role'}
             </Button>
           </div>
-        </CardHeader>
-      </Card>
+        </div>
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Current roles</CardTitle>
-          <CardDescription>
+      <div className="rounded-xl border overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b bg-muted/30">
+          <h2 className="text-sm font-semibold">Current roles</h2>
+          <p className="text-xs text-muted-foreground">
             Owner and admin roles are protected from removal on this page.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+          </p>
+        </div>
+        <div className="px-6 py-4">
           {!selectedUser ? (
             <p className="text-sm text-muted-foreground">Select a user to view roles.</p>
           ) : selectedUser.roles.length === 0 ? (
@@ -297,8 +292,8 @@ export function RolesManagementDashboard({ orgId }: RolesManagementDashboardProp
               ))}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

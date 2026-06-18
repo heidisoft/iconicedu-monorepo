@@ -41,7 +41,15 @@ export default async function AdminLearningSpacesPage({
   return (
     <div className="flex flex-1 flex-col">
       <DashboardHeader title="Classrooms" />
-      <div className="flex flex-1 flex-col gap-4 p-4">
+      <div className="flex flex-1 flex-col p-6 lg:p-8 gap-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Classrooms</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Manage learning spaces, subjects, participants, and schedules.
+            </p>
+          </div>
+        </div>
         <LearningSpacesDashboard
           rows={rows}
           currentUserTimezone={currentUserProfile?.prefs.timezone ?? null}

@@ -11,18 +11,13 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-  Input,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@iconicedu/ui-web';
 import { Loader2, RotateCw } from '@iconicedu/ui-web';
-import { Check, ChevronsUpDown } from 'lucide-react';
+import { Check, ChevronsUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { AdminFilterBar } from '@iconicedu/web/components/admin/admin-filter-bar';
 
 import type { AdminLearningSpaceRow } from '@iconicedu/web/lib/admin/learning-spaces';
 import { LearningSpacesTable } from '@iconicedu/web/app/(app)/[orgSlug]/admin/classrooms/learning-spaces-table';
@@ -182,57 +177,53 @@ export function LearningSpacesDashboard({
   };
 
   return (
-    <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-4">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <LearningSpaceFormDialog
-          participantOptions={participantOptions}
-          defaultScheduleTimezone={currentUserTimezone}
-          subjectOptions={subjectOptions}
-        />
-        <LearningSpaceFormDialog
-          mode="edit"
-          open={editOpen}
-          onOpenChange={(open) => {
-            setEditOpen(open);
-            if (!open) {
-              setEditData(null);
-            }
-          }}
-          participantOptions={participantOptions}
-          defaultScheduleTimezone={currentUserTimezone}
-          subjectOptions={subjectOptions}
-          initialData={editData}
-          onSuccess={() => {
-            handleRefresh();
+    <div className="flex flex-col gap-4">
+      <LearningSpaceFormDialog
+        participantOptions={participantOptions}
+        defaultScheduleTimezone={currentUserTimezone}
+        subjectOptions={subjectOptions}
+      />
+      <LearningSpaceFormDialog
+        mode="edit"
+        open={editOpen}
+        onOpenChange={(open) => {
+          setEditOpen(open);
+          if (!open) {
             setEditData(null);
-          }}
-        />
-        <div className="flex flex-wrap items-center gap-3">
-          <Input
-            placeholder="Search title or subject"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            className="w-64"
-          />
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span>Status:</span>
-            <Select
-              value={statusFilter}
-              onValueChange={(value) => setStatusFilter(value as 'all' | string)}
-            >
-              <SelectTrigger size="sm" className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="archived">Archived</SelectItem>
-                <SelectItem value="paused">Paused</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span>Participant:</span>
+          }
+        }}
+        participantOptions={participantOptions}
+        defaultScheduleTimezone={currentUserTimezone}
+        subjectOptions={subjectOptions}
+        initialData={editData}
+        onSuccess={() => {
+          handleRefresh();
+          setEditData(null);
+        }}
+      />
+
+      {/* Filter bar */}
+      <AdminFilterBar
+        search={search}
+        onSearchChange={setSearch}
+        filterGroups={[
+          {
+            label: 'Status',
+            value: statusFilter,
+            options: [
+              { value: 'all', label: 'All' },
+              { value: 'active', label: 'Active' },
+              { value: 'archived', label: 'Archived' },
+              { value: 'paused', label: 'Paused' },
+            ],
+            onChange: setStatusFilter,
+          },
+        ]}
+        extraFilters={
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Participant
+            </span>
             <Popover open={participantFilterOpen} onOpenChange={setParticipantFilterOpen}>
               <PopoverTrigger asChild>
                 <Button
@@ -240,7 +231,7 @@ export function LearningSpacesDashboard({
                   role="combobox"
                   aria-expanded={participantFilterOpen}
                   aria-label="Filter by participant"
-                  className="w-56 justify-between"
+                  className="h-8 w-40 justify-between"
                 >
                   <span className="truncate">{selectedParticipantFilterLabel}</span>
                   <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
@@ -296,69 +287,52 @@ export function LearningSpacesDashboard({
               </PopoverContent>
             </Popover>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="px-2"
-            onClick={handleRefresh}
-            disabled={refreshing}
-            aria-label="Refresh classrooms"
-          >
-            {refreshing ? (
-              <Loader2 className="size-4 animate-spin text-muted-foreground" />
-            ) : (
-              <RotateCw className="size-4 transition-transform" />
-            )}
-          </Button>
+        }
+      />
+
+      {/* Table container */}
+      <div className="rounded-xl border overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b bg-muted/30">
+          <h2 className="text-sm font-semibold">Classrooms ({totalRows})</h2>
         </div>
-      </div>
-      <div className="relative">
-        {isPending && (
-          <div className="absolute inset-0 rounded-2xl border border-border bg-card/70 flex items-center justify-center">
-            <Loader2 className="size-5 animate-spin text-muted-foreground" />
+        <div className="relative">
+          {isPending && (
+            <div className="absolute inset-0 bg-card/70 flex items-center justify-center z-10">
+              <Loader2 className="size-5 animate-spin text-muted-foreground" />
+            </div>
+          )}
+          <LearningSpacesTable rows={visibleRows} onEdit={handleEdit} />
+        </div>
+        <div className="flex items-center justify-between px-6 py-3 border-t">
+          <p className="text-xs text-muted-foreground">
+            {totalRows === 0 ? '0' : (pageIndex - 1) * pageSize + 1}–
+            {Math.min(pageIndex * pageSize, totalRows)} of {totalRows}
+          </p>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 w-8 p-0"
+              disabled={pageIndex <= 1}
+              onClick={() => setPageIndex((prev) => Math.max(1, prev - 1))}
+              aria-label="Previous page"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="px-2 text-xs text-muted-foreground">
+              Page {pageIndex} of {pageCount}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 w-8 p-0"
+              disabled={pageIndex >= pageCount}
+              onClick={() => setPageIndex((prev) => Math.min(pageCount, prev + 1))}
+              aria-label="Next page"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
           </div>
-        )}
-        <LearningSpacesTable rows={visibleRows} onEdit={handleEdit} />
-      </div>
-      <div className="flex flex-wrap items-center gap-3 border-t border-border pt-3 text-xs text-muted-foreground">
-        <div className="flex items-center gap-2">
-          <span>Page size</span>
-          <Select
-            value={String(pageSize)}
-            onValueChange={(value) => setPageSize(Number(value))}
-          >
-            <SelectTrigger size="sm" className="w-20">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {PAGE_SIZES.map((option) => (
-                <SelectItem key={option} value={String(option)}>
-                  {option}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex-1 flex items-center justify-end gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={pageIndex <= 1}
-            onClick={() => setPageIndex((prev) => Math.max(1, prev - 1))}
-          >
-            Previous
-          </Button>
-          <span>
-            Page {pageIndex} of {pageCount}
-          </span>
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={pageIndex >= pageCount}
-            onClick={() => setPageIndex((prev) => Math.min(pageCount, prev + 1))}
-          >
-            Next
-          </Button>
         </div>
       </div>
     </div>

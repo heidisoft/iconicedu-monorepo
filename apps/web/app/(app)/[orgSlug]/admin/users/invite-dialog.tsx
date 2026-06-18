@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Copy } from '@iconicedu/ui-web';
+import { Copy, UserPlus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from '@iconicedu/ui-web';
 
@@ -93,17 +93,12 @@ export function InviteUserDialog({ className }: { className?: string }) {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          className={className ?? 'flex items-center gap-2'}
-          type="button"
-        >
-          <Copy className="size-4" />
-          Invite users
+        <Button size="sm" className={className} type="button">
+          <UserPlus className="mr-1.5 h-3.5 w-3.5" />
+          Invite Users
         </Button>
       </DialogTrigger>
-      <DialogContent className="space-y-4 sm:max-w-[42rem]">
+      <DialogContent className="space-y-4 sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Invite guardians, educators, or staff</DialogTitle>
           <DialogDescription>

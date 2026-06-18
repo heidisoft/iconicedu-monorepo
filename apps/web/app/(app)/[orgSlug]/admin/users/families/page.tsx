@@ -31,7 +31,15 @@ export default async function AdminFamiliesPage({
   return (
     <div className="flex flex-1 flex-col">
       <DashboardHeader title="Manage families" />
-      <div className="flex flex-1 flex-col gap-4 p-4">
+      <div className="flex flex-1 flex-col p-6 lg:p-8 gap-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Families</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              View and manage family groups, guardians, and their children.
+            </p>
+          </div>
+        </div>
         <FamiliesDashboard rows={rows} />
       </div>
     </div>

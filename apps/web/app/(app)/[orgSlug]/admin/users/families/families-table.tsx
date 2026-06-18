@@ -21,7 +21,7 @@ type FamiliesTableProps = {
 
 export function FamiliesTable({ rows }: FamiliesTableProps) {
   return (
-    <div className="w-full rounded-2xl border border-border bg-card">
+    <div className="w-full">
       <div className="relative overflow-x-auto">
         <Table className="min-w-full">
           <TableHeader>

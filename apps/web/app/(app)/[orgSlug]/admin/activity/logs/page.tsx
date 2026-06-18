@@ -31,7 +31,15 @@ export default async function AdminActivityLogsPage({
   return (
     <div className="flex flex-1 flex-col">
       <DashboardHeader title="Activity logs" />
-      <div className="flex flex-1 flex-col gap-4 p-4">
+      <div className="flex flex-1 flex-col p-6 lg:p-8 gap-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Activity Logs</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Inspect raw activity events and their processing status.
+            </p>
+          </div>
+        </div>
         <ActivityEventsDashboard orgId={org.id} rows={rows} />
       </div>
     </div>

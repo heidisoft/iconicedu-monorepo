@@ -218,7 +218,7 @@ export function LearningSpacesTable({ rows, onEdit }: LearningSpacesTableProps) 
   };
 
   return (
-    <div className="w-full overflow-x-auto rounded-2xl border border-border bg-card">
+    <div className="w-full overflow-x-auto">
       <Table className="min-w-[860px] table-fixed lg:min-w-full">
         <TableHeader>
           <TableRow>

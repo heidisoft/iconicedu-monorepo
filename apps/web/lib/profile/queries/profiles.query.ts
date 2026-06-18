@@ -291,6 +291,33 @@ export async function getProfileSummariesByAccountIds(
     .returns<ProfileRow[]>();
 }
 
+export async function getProfileNamesByAccountIds(
+  supabase: SupabaseClient,
+  orgId: string,
+  accountIds: string[],
+) {
+  if (!accountIds.length) {
+    return {
+      data: [] as Pick<
+        ProfileRow,
+        'account_id' | 'kind' | 'display_name' | 'first_name' | 'last_name'
+      >[],
+    };
+  }
+  return supabase
+    .from('profiles')
+    .select('account_id,kind,display_name,first_name,last_name')
+    .in('account_id', accountIds)
+    .eq('org_id', orgId)
+    .is('deleted_at', null)
+    .returns<
+      Pick<
+        ProfileRow,
+        'account_id' | 'kind' | 'display_name' | 'first_name' | 'last_name'
+      >[]
+    >();
+}
+
 export async function getProfilesByKind(
   supabase: SupabaseClient,
   orgId: string,

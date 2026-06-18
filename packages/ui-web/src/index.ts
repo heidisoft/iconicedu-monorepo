@@ -90,6 +90,7 @@ export * from '@iconicedu/ui-web/ui/chart';
 export {
   Archive,
   ArchiveRestore,
+  ChevronLeft,
   ChevronRight,
   Copy,
   Loader2,
@@ -97,6 +98,7 @@ export {
   Pencil,
   Plus,
   RotateCw,
+  Search,
   SearchIcon,
   Trash2,
   UserCheck,

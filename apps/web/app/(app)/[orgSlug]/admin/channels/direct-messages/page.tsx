@@ -1,7 +1,9 @@
+import Link from 'next/link';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-import { DashboardHeader } from '@iconicedu/ui-web';
+import { ArrowLeft } from 'lucide-react';
+import { Button, DashboardHeader } from '@iconicedu/ui-web';
 
 import { getAdminDirectMessageRows } from '@iconicedu/web/lib/admin/channels';
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
@@ -31,7 +33,25 @@ export default async function AdminDirectMessagesPage({
   return (
     <div className="flex flex-1 flex-col">
       <DashboardHeader title="Direct Messages" />
-      <div className="flex flex-1 flex-col gap-4 p-4">
+      <div className="flex flex-1 flex-col p-6 lg:p-8 gap-6">
+        <Button
+          asChild
+          variant="ghost"
+          size="sm"
+          className="-ml-2 w-fit text-muted-foreground"
+        >
+          <Link href={`/${orgSlug}/admin/channels`}>
+            <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Channels
+          </Link>
+        </Button>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Direct Messages</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              View direct message channels between organisation members.
+            </p>
+          </div>
+        </div>
         <ChannelsDashboard rows={rows} />
       </div>
     </div>

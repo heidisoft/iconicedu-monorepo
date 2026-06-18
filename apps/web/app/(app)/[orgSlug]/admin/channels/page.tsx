@@ -31,7 +31,15 @@ export default async function AdminChannelsPage({
   return (
     <div className="flex flex-1 flex-col">
       <DashboardHeader title="Channels" />
-      <div className="flex flex-1 flex-col gap-4 p-4">
+      <div className="flex flex-1 flex-col p-6 lg:p-8 gap-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Channels</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Review and manage all channels across the organisation.
+            </p>
+          </div>
+        </div>
         <ChannelsDashboard rows={rows} />
       </div>
     </div>

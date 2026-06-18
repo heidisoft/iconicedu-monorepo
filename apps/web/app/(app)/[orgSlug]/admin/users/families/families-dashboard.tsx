@@ -3,16 +3,9 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 
-import {
-  Button,
-  Input,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@iconicedu/ui-web';
-import { Loader2, RotateCw } from '@iconicedu/ui-web';
+import { Button } from '@iconicedu/ui-web';
+import { Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { AdminFilterBar } from '@iconicedu/web/components/admin/admin-filter-bar';
 
 import type { AdminFamilyRow } from '@iconicedu/web/lib/admin/families';
 import { FamiliesTable } from '@iconicedu/web/app/(app)/[orgSlug]/admin/users/families/families-table';
@@ -80,94 +73,68 @@ export function FamiliesDashboard({ rows }: FamiliesDashboardProps) {
   };
 
   return (
-    <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-1 items-center justify-end gap-3">
-          <Input
-            placeholder="Search family, guardian, or child"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            className="w-64"
-          />
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span>Invite status:</span>
-            <Select
-              value={filter}
-              onValueChange={(value) => setFilter(value as typeof filter)}
-            >
-              <SelectTrigger size="sm" className="min-w-[180px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All families</SelectItem>
-                <SelectItem value="with-invites">With pending invites</SelectItem>
-                <SelectItem value="without-invites">Without pending invites</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+    <div className="flex flex-col gap-4">
+      {/* Filter bar */}
+      <AdminFilterBar
+        search={search}
+        onSearchChange={setSearch}
+        filterGroups={[
+          {
+            label: 'Invites',
+            value: filter,
+            options: [
+              { value: 'all', label: 'All' },
+              { value: 'with-invites', label: 'Pending' },
+              { value: 'without-invites', label: 'None' },
+            ],
+            onChange: (v) => setFilter(v as 'all' | 'with-invites' | 'without-invites'),
+          },
+        ]}
+      />
+
+      {/* Table container */}
+      <div className="rounded-xl border overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b bg-muted/30">
+          <h2 className="text-sm font-semibold">Families ({totalRows})</h2>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="px-2"
-          onClick={handleRefresh}
-          disabled={refreshing}
-          aria-label="Refresh families"
-        >
-          {refreshing ? (
-            <Loader2 className="size-4 animate-spin text-muted-foreground" />
-          ) : (
-            <RotateCw className="size-4 transition-transform" />
+        <div className="relative">
+          {isPending && (
+            <div className="absolute inset-0 bg-card/70 flex items-center justify-center z-10">
+              <Loader2 className="size-5 animate-spin text-muted-foreground" />
+            </div>
           )}
-        </Button>
-      </div>
-      <div className="relative">
-        {isPending && (
-          <div className="absolute inset-0 rounded-2xl border border-border bg-card/70 flex items-center justify-center">
-            <Loader2 className="size-5 animate-spin text-muted-foreground" />
-          </div>
-        )}
-        <FamiliesTable rows={visibleRows} />
-      </div>
-      <div className="flex flex-wrap items-center gap-3 border-t border-border pt-3 text-xs text-muted-foreground">
-        <div className="flex items-center gap-2">
-          <span>Page size</span>
-          <Select
-            value={String(pageSize)}
-            onValueChange={(value) => setPageSize(Number(value))}
-          >
-            <SelectTrigger size="sm" className="w-20">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {PAGE_SIZES.map((option) => (
-                <SelectItem key={option} value={String(option)}>
-                  {option}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <FamiliesTable rows={visibleRows} />
         </div>
-        <div className="flex-1 flex items-center justify-end gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={pageIndex <= 1}
-            onClick={() => setPageIndex((prev) => Math.max(1, prev - 1))}
-          >
-            Previous
-          </Button>
-          <span>
-            Page {pageIndex} of {pageCount}
-          </span>
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={pageIndex >= pageCount}
-            onClick={() => setPageIndex((prev) => Math.min(pageCount, prev + 1))}
-          >
-            Next
-          </Button>
+        <div className="flex items-center justify-between px-6 py-3 border-t">
+          <p className="text-xs text-muted-foreground">
+            {totalRows === 0 ? '0' : (pageIndex - 1) * pageSize + 1}–
+            {Math.min(pageIndex * pageSize, totalRows)} of {totalRows}
+          </p>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 w-8 p-0"
+              disabled={pageIndex <= 1}
+              onClick={() => setPageIndex((prev) => Math.max(1, prev - 1))}
+              aria-label="Previous page"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="px-2 text-xs text-muted-foreground">
+              Page {pageIndex} of {pageCount}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 w-8 p-0"
+              disabled={pageIndex >= pageCount}
+              onClick={() => setPageIndex((prev) => Math.min(pageCount, prev + 1))}
+              aria-label="Next page"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
     </div>

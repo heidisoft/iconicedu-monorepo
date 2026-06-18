@@ -2,7 +2,8 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-import { DashboardHeader } from '@iconicedu/ui-web';
+import { ArrowLeft } from 'lucide-react';
+import { Button, DashboardHeader } from '@iconicedu/ui-web';
 
 import { LiveSessionAttendanceDetail } from '@iconicedu/web/app/(app)/[orgSlug]/admin/attendance/sessions/[sessionId]/live-session-attendance-detail';
 import { getAdminLiveSessionAttendanceDetail } from '@iconicedu/web/lib/admin/live-session-attendance';
@@ -35,14 +36,26 @@ export default async function AdminLiveSessionAttendanceDetailPage({
   return (
     <div className="flex flex-1 flex-col">
       <DashboardHeader title="Session attendance detail" />
-      <div className="flex flex-1 flex-col gap-4 p-4">
-        <div>
-          <Link
-            href={`/${orgSlug}/admin/attendance/sessions`}
-            className="text-sm font-medium text-primary underline-offset-4 hover:underline"
-          >
-            Back to session attendance
+      <div className="flex flex-1 flex-col p-6 lg:p-8 gap-6">
+        <Button
+          asChild
+          variant="ghost"
+          size="sm"
+          className="-ml-2 w-fit text-muted-foreground"
+        >
+          <Link href={`/${orgSlug}/admin/attendance/sessions`}>
+            <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Attendance
           </Link>
+        </Button>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {detail.session.channelTopic}
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Live attendance for this session.
+            </p>
+          </div>
         </div>
         <LiveSessionAttendanceDetail detail={detail} />
       </div>

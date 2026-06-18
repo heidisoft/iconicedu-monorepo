@@ -157,7 +157,7 @@ export function ChannelsTable({ rows, onEdit }: ChannelsTableProps) {
   };
 
   return (
-    <div className="w-full border-y border-border bg-card">
+    <div className="w-full">
       <Table className="min-w-full">
         <TableHeader>
           <TableRow>

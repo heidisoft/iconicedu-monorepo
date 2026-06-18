@@ -37,7 +37,15 @@ export default async function AdminActivityFeedPage({
   return (
     <div className="flex flex-1 flex-col">
       <DashboardHeader title="Activity feed" />
-      <div className="flex flex-1 flex-col gap-4 p-4">
+      <div className="flex flex-1 flex-col p-6 lg:p-8 gap-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Activity Feed</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Audit generated activity items, delivery status, and pipeline jobs.
+            </p>
+          </div>
+        </div>
         <ActivityFeedAuditDashboard audit={audit} />
       </div>
     </div>

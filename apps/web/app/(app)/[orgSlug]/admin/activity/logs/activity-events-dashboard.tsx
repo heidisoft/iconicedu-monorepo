@@ -6,9 +6,11 @@ import { useRouter } from 'next/navigation';
 import {
   Badge,
   Button,
-  Input,
+  ChevronLeft,
+  ChevronRight,
   Loader2,
   RotateCw,
+  Search,
   Select,
   SelectContent,
   SelectItem,
@@ -111,6 +113,9 @@ export function ActivityEventsDashboard({ orgId, rows }: ActivityEventsDashboard
     safePageIndex * pageSize,
   );
 
+  const from = totalRows === 0 ? 0 : (safePageIndex - 1) * pageSize + 1;
+  const to = Math.min(safePageIndex * pageSize, totalRows);
+
   const handleRefresh = () => {
     startTransition(() => {
       router.refresh();
@@ -119,14 +124,17 @@ export function ActivityEventsDashboard({ orgId, rows }: ActivityEventsDashboard
 
   return (
     <div className="flex flex-1 flex-col gap-4">
-      <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
-          <Input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search event, actor, or scope"
-            className="w-full sm:max-w-sm"
-          />
+      <div className="rounded-xl border bg-card px-4 py-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 h-9 w-72 rounded-lg border bg-background px-3 focus-within:ring-2 focus-within:ring-ring shrink-0">
+            <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            <input
+              className="flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none"
+              placeholder="Search event, actor, or scope"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
           <Select
             value={statusFilter}
             onValueChange={(value) => setStatusFilter(value as ProjectionStatus)}
@@ -157,28 +165,26 @@ export function ActivityEventsDashboard({ orgId, rows }: ActivityEventsDashboard
               ))}
             </SelectContent>
           </Select>
+          <Button
+            variant="outline"
+            onClick={handleRefresh}
+            disabled={isPending}
+            className="ml-auto gap-2"
+          >
+            {isPending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <RotateCw className="size-4" />
+            )}
+            Refresh
+          </Button>
         </div>
-        <Button
-          variant="outline"
-          onClick={handleRefresh}
-          disabled={isPending}
-          className="gap-2"
-        >
-          {isPending ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <RotateCw className="size-4" />
-          )}
-          Refresh
-        </Button>
       </div>
 
-      <div className="rounded-lg border border-border bg-card">
-        <div className="flex items-center justify-between border-b border-border px-4 py-3 text-sm text-muted-foreground">
-          <span>
-            Showing {visibleRows.length} of {totalRows} activity events
-          </span>
-          <span>
+      <div className="rounded-xl border overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b bg-muted/30">
+          <h2 className="text-sm font-semibold">Activity events</h2>
+          <span className="text-xs text-muted-foreground">
             {rows.filter((row) => row.projection_status === 'failed').length} failed
           </span>
         </div>
@@ -258,27 +264,35 @@ export function ActivityEventsDashboard({ orgId, rows }: ActivityEventsDashboard
             )}
           </TableBody>
         </Table>
-      </div>
-
-      <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-muted-foreground">
-          Page {safePageIndex} of {pageCount}
-        </p>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setPageIndex((current) => Math.max(1, current - 1))}
-            disabled={safePageIndex <= 1}
-          >
-            Previous
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => setPageIndex((current) => Math.min(pageCount, current + 1))}
-            disabled={safePageIndex >= pageCount}
-          >
-            Next
-          </Button>
+        <div className="flex items-center justify-between px-6 py-3 border-t">
+          <p className="text-xs text-muted-foreground">
+            {from}–{to} of {totalRows}
+          </p>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 w-8 p-0"
+              disabled={safePageIndex <= 1}
+              onClick={() => setPageIndex((current) => Math.max(1, current - 1))}
+              aria-label="Previous page"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="px-2 text-xs text-muted-foreground">
+              Page {safePageIndex} of {pageCount}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 w-8 p-0"
+              disabled={safePageIndex >= pageCount}
+              onClick={() => setPageIndex((current) => Math.min(pageCount, current + 1))}
+              aria-label="Next page"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
     </div>
