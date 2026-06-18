@@ -86,7 +86,7 @@ export function SkillPicker({ orgId, value, onChange, disabledIds }: Props) {
                       onChange(skill.id, skill);
                       setOpen(false);
                     }}
-                    className={disabled ? 'opacity-40 cursor-not-allowed' : ''}
+                    className={`data-selected:bg-transparent ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
                   >
                     <Check
                       className={`mr-2 h-4 w-4 ${skill.id === value ? 'opacity-100' : 'opacity-0'}`}

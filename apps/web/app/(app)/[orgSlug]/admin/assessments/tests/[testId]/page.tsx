@@ -5,7 +5,7 @@ import { getDashboardAccountContext } from '@iconicedu/web/app/(app)/[orgSlug]/_
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
 import { createAssessmentApiClient } from '@iconicedu/web/lib/assessments/api';
 import { DashboardHeader, Badge, Button } from '@iconicedu/ui-web';
-import { ArrowLeft, Zap, LayoutList } from 'lucide-react';
+import { ArrowLeft, Zap, LayoutList, Pencil } from 'lucide-react';
 import { TestBuilder } from '@iconicedu/web/components/assessments/test-builder';
 
 export const metadata: Metadata = { title: 'Admin · Test Builder' };
@@ -43,7 +43,12 @@ export default async function TestBuilderPage({
           </Button>
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-semibold tracking-tight">{test.title}</h1>
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h1 className="text-2xl font-semibold tracking-tight">{test.title}</h1>
+                <Badge variant="secondary" className="gap-1 shrink-0">
+                  <Pencil className="h-3 w-3" /> Editing
+                </Badge>
+              </div>
               <p className="text-sm text-muted-foreground mt-1">
                 {test.mode === 'adaptive'
                   ? 'Configure skill pools and adaptive rules'

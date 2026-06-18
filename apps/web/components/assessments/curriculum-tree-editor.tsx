@@ -120,7 +120,12 @@ export function CurriculumTreeEditor({ subject, domains: initialDomains, orgId }
           </div>
         )}
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{subject.name}</h1>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <h1 className="text-2xl font-semibold tracking-tight">{subject.name}</h1>
+            <Badge variant="secondary" className="gap-1 shrink-0">
+              <Pencil className="h-3 w-3" /> Editing
+            </Badge>
+          </div>
           <p className="text-sm text-muted-foreground mt-0.5">
             {selectedGrade !== null ? `Grade ${selectedGrade} · ` : ''}
             {visibleDomains.length} domain{visibleDomains.length !== 1 ? 's' : ''} ·{' '}

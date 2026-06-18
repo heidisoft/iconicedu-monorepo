@@ -4,8 +4,8 @@ import { notFound } from 'next/navigation';
 import { getDashboardAccountContext } from '@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth';
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
 import { createAssessmentApiClient } from '@iconicedu/web/lib/assessments/api';
-import { DashboardHeader, Button } from '@iconicedu/ui-web';
-import { ArrowLeft } from 'lucide-react';
+import { DashboardHeader, Badge, Button } from '@iconicedu/ui-web';
+import { ArrowLeft, Pencil } from 'lucide-react';
 import { ItemEditor } from '@iconicedu/web/components/assessments/item-editor';
 
 export const metadata: Metadata = { title: 'Admin · Edit Question' };
@@ -40,7 +40,12 @@ export default async function EditItemPage({
             </Link>
           </Button>
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">{item.title}</h1>
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h1 className="text-2xl font-semibold tracking-tight">{item.title}</h1>
+              <Badge variant="secondary" className="gap-1 shrink-0">
+                <Pencil className="h-3 w-3" /> Editing
+              </Badge>
+            </div>
             <p className="text-sm text-muted-foreground mt-1">
               {item.skillName}
               {item.domainName ? ` · ${item.domainName}` : ''}
