@@ -1,7 +1,6 @@
 'use client';
 
 import * as React from 'react';
-import { useRouter } from 'next/navigation';
 
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { AdminFilterBar } from '@iconicedu/web/components/admin/admin-filter-bar';
@@ -28,7 +27,6 @@ import {
   Textarea,
   Plus,
   ParticipantSelector,
-  RotateCw,
   Select,
   SelectContent,
   SelectGroup,
@@ -57,15 +55,14 @@ import { CHANNEL_TOPIC_ICON_GROUPS } from '@iconicedu/shared-types';
 import { CHANNEL_TOPIC_ICON_MAP } from '@iconicedu/ui-web/lib/icons';
 import { ChannelsTable } from '@iconicedu/web/app/(app)/[orgSlug]/admin/channels/channels-table';
 import { LiveSessionSettingsSection } from '@iconicedu/web/components/admin/live-session-settings-section';
-import type { ChannelDetail } from '@iconicedu/web/lib/admin/channel-detail';
 import { withInfoPanelDisabled } from '@iconicedu/web/lib/channels/ui-defaults';
 import { DEFAULT_ADMIN_LIVE_SESSION_CONFIG } from '@iconicedu/web/lib/admin/live-session-config';
 
-const PAGE_SIZES = [10, 25, 50];
+const PAGE_SIZE = 10;
 const NO_CHANNEL_ICON_VALUE = '__none__';
 
 type ChannelsDashboardProps = {
-  rows: AdminChannelRow[];
+  orgSlug: string;
 };
 
 type CreateChannelFormState = {
@@ -92,16 +89,20 @@ function createDefaultChannelUiDefaults(): ChannelUiDefaultsVM {
   });
 }
 
-export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
-  const router = useRouter();
+export function ChannelsDashboard({ orgSlug }: ChannelsDashboardProps) {
+  // Lazy-load state
+  const [rows, setRows] = React.useState<AdminChannelRow[]>([]);
+  const [total, setTotal] = React.useState(0);
+  const [pageCount, setPageCount] = React.useState(1);
+  const [loading, setLoading] = React.useState(true);
+  const [fetchError, setFetchError] = React.useState<string | null>(null);
+
   const [search, setSearch] = React.useState('');
-  const [typeFilter, setTypeFilter] = React.useState<'all' | string>('all');
+  const [debouncedSearch, setDebouncedSearch] = React.useState('');
+  const [typeFilter, setTypeFilter] = React.useState('all');
   const [pageIndex, setPageIndex] = React.useState(1);
-  const [pageSize, setPageSize] = React.useState(PAGE_SIZES[0]);
-  const [isPending, startTransition] = React.useTransition();
+
   const [dialogOpen, setDialogOpen] = React.useState(false);
-  const [dialogMode, setDialogMode] = React.useState<'create' | 'edit'>('create');
-  const [editingId, setEditingId] = React.useState<string | null>(null);
   const [isCreating, setIsCreating] = React.useState(false);
   const [createError, setCreateError] = React.useState<string | null>(null);
   const [participantOptions, setParticipantOptions] = React.useState<UserProfileVM[]>([]);
@@ -123,6 +124,52 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
     capabilities: [],
   });
 
+  // Debounce search
+  React.useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  React.useEffect(() => {
+    setPageIndex(1);
+  }, [debouncedSearch, typeFilter]);
+
+  const fetchPage = React.useCallback(
+    async (page: number) => {
+      setLoading(true);
+      setFetchError(null);
+      try {
+        const params = new URLSearchParams({
+          orgSlug,
+          page: String(page),
+          ...(debouncedSearch ? { search: debouncedSearch } : {}),
+          ...(typeFilter !== 'all' ? { kind: typeFilter } : {}),
+        });
+        const res = await fetch(`/api/admin/channels/list?${params.toString()}`);
+        const json = (await res.json()) as {
+          success?: boolean;
+          message?: string;
+          rows?: AdminChannelRow[];
+          total?: number;
+          pageCount?: number;
+        };
+        if (!res.ok || !json.success) throw new Error(json.message ?? 'Failed to load');
+        setRows(json.rows ?? []);
+        setTotal(json.total ?? 0);
+        setPageCount(json.pageCount ?? 1);
+      } catch (err) {
+        setFetchError(err instanceof Error ? err.message : 'Failed to load channels');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [orgSlug, debouncedSearch, typeFilter],
+  );
+
+  React.useEffect(() => {
+    void fetchPage(pageIndex);
+  }, [fetchPage, pageIndex]);
+
   const loadParticipants = React.useCallback(async () => {
     try {
       const response = await fetch('/api/admin/channels/participants', {
@@ -141,49 +188,8 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
   }, []);
 
   React.useEffect(() => {
-    setPageIndex(1);
-  }, [search, typeFilter, pageSize]);
-
-  React.useEffect(() => {
     void loadParticipants();
   }, [loadParticipants]);
-
-  const normalizedSearch = search.trim().toLowerCase();
-
-  const filteredRows = React.useMemo(() => {
-    return rows.filter((row) => {
-      if (typeFilter !== 'all' && row.kind !== typeFilter) {
-        return false;
-      }
-      if (!normalizedSearch) {
-        return true;
-      }
-      if (row.topic?.toLowerCase().includes(normalizedSearch)) {
-        return true;
-      }
-      if (row.purpose?.toLowerCase().includes(normalizedSearch)) {
-        return true;
-      }
-      if (row.kind?.toLowerCase().includes(normalizedSearch)) {
-        return true;
-      }
-      return false;
-    });
-  }, [rows, normalizedSearch, typeFilter]);
-
-  const sortedRows = React.useMemo(() => {
-    const collator = new Intl.Collator('en', { sensitivity: 'base', numeric: true });
-    return [...filteredRows].sort((a, b) => collator.compare(a.topic, b.topic));
-  }, [filteredRows]);
-
-  const totalRows = sortedRows.length;
-  const pageCount = Math.max(1, Math.ceil(totalRows / pageSize));
-  const visibleRows = sortedRows.slice((pageIndex - 1) * pageSize, pageIndex * pageSize);
-
-  const handleRefresh = () => {
-    startTransition(() => router.refresh());
-    void loadParticipants();
-  };
 
   const updateFormState = (patch: Partial<CreateChannelFormState>) => {
     setFormState((prev) => ({ ...prev, ...patch }));
@@ -208,55 +214,6 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
     });
     setCreateError(null);
     setIsSubmitted(false);
-    setEditingId(null);
-  };
-
-  const applyDetailToForm = (detail: ChannelDetail) => {
-    setFormState({
-      topic: detail.basics.topic ?? '',
-      iconKey: detail.basics.iconKey ?? NO_CHANNEL_ICON_VALUE,
-      description: detail.basics.description ?? '',
-      kind: detail.basics.kind,
-      purpose: detail.basics.purpose,
-      visibility: detail.basics.visibility,
-      uiDefaults: {
-        ...createDefaultChannelUiDefaults(),
-        ...(detail.ui ?? {}),
-        themeKey: detail.ui?.themeKey ?? 'teal',
-      },
-      status: detail.lifecycle.status,
-      liveSession: detail.liveSession ?? { ...DEFAULT_ADMIN_LIVE_SESSION_CONFIG },
-      postingPolicyKind: detail.postingPolicy.kind,
-      allowThreads: detail.postingPolicy.allowThreads ?? true,
-      allowReactions: detail.postingPolicy.allowReactions ?? true,
-      participants: detail.participants ?? [],
-      capabilities: detail.capabilities ?? [],
-    });
-  };
-
-  const handleEdit = async (row: AdminChannelRow) => {
-    try {
-      const response = await fetch('/api/admin/channels/detail', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ channelId: row.id }),
-      });
-      const payload = (await response.json()) as {
-        success?: boolean;
-        message?: string;
-        data?: ChannelDetail;
-      };
-      if (!response.ok || !payload.success || !payload.data) {
-        setCreateError(payload.message ?? 'Unable to load channel.');
-        return;
-      }
-      applyDetailToForm(payload.data);
-      setEditingId(row.id);
-      setDialogMode('edit');
-      setDialogOpen(true);
-    } catch (error) {
-      setCreateError(error instanceof Error ? error.message : 'Unable to load channel.');
-    }
   };
 
   const handleSubmit = async () => {
@@ -294,21 +251,10 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
         })),
         capabilities: formState.capabilities,
       };
-      const endpoint =
-        dialogMode === 'edit'
-          ? '/api/admin/channels/update'
-          : '/api/admin/channels/create';
-      const body =
-        dialogMode === 'edit'
-          ? JSON.stringify({
-              channelId: editingId,
-              payload: createPayload,
-            })
-          : JSON.stringify(createPayload);
-      const response = await fetch(endpoint, {
+      const response = await fetch('/api/admin/channels/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body,
+        body: JSON.stringify(createPayload),
       });
       const responsePayload = (await response.json()) as {
         success?: boolean;
@@ -320,7 +266,7 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
       }
       setDialogOpen(false);
       resetCreateForm();
-      handleRefresh();
+      void fetchPage(pageIndex);
     } catch (error) {
       setCreateError(
         error instanceof Error ? error.message : 'Unable to create channel.',
@@ -332,339 +278,334 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      <Dialog
-        open={dialogOpen}
-        onOpenChange={(open) => {
-          setDialogOpen(open);
-          if (!open) {
-            resetCreateForm();
-            setDialogMode('create');
-          }
-        }}
-      >
-        <DialogTrigger asChild>
-          <Button
-            variant="secondary"
-            size="sm"
-            className="flex items-center gap-2"
-            onClick={() => {
-              setDialogMode('create');
-              resetCreateForm();
-              setDialogOpen(true);
-            }}
-          >
-            <Plus className="size-4" />
-            Create channel
-          </Button>
-        </DialogTrigger>
-        <DialogContent className="sm:max-w-[48rem]">
-          <DialogHeader>
-            <DialogTitle>
-              {dialogMode === 'edit' ? 'Edit channel' : 'Create channel'}
-            </DialogTitle>
-            <DialogDescription>
-              {dialogMode === 'edit'
-                ? 'Update the channel details and memberships.'
-                : 'Create a new channel that will appear in the admin list.'}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="no-scrollbar -mx-4 max-h-[65vh] overflow-y-auto px-4">
-            <div className="grid gap-4 py-2">
-              <FieldSet data-invalid={isSubmitted && !formState.topic.trim()}>
-                <FieldLegend>Basics</FieldLegend>
-                <FieldGroup>
-                  <Field>
-                    <FieldLabel htmlFor="channel-topic">
-                      Name <span className="text-destructive">*</span>
-                    </FieldLabel>
-                    <Input
-                      id="channel-topic"
-                      value={formState.topic}
-                      onChange={(event) => updateFormState({ topic: event.target.value })}
-                      placeholder="e.g., General updates"
-                      required
-                      aria-required="true"
-                    />
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="channel-kind">Kind</FieldLabel>
-                    <Select
-                      value={formState.kind}
-                      onValueChange={(value) => updateFormState({ kind: value })}
-                      disabled={dialogMode === 'edit'}
-                    >
-                      <SelectTrigger id="channel-kind">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="channel">Channel</SelectItem>
-                        <SelectItem value="group_dm">Group DM</SelectItem>
-                        <SelectItem value="dm">DM</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="channel-purpose">Purpose</FieldLabel>
-                    <Select
-                      value={formState.purpose}
-                      onValueChange={(value) => updateFormState({ purpose: value })}
-                      disabled={dialogMode === 'edit'}
-                    >
-                      <SelectTrigger id="channel-purpose">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="general">General</SelectItem>
-                        <SelectItem value="learning-space">Class</SelectItem>
-                        <SelectItem value="chass-requests">Class requests</SelectItem>
-                        <SelectItem value="support">Support</SelectItem>
-                        <SelectItem value="announcements">Announcements</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="channel-visibility">Visibility</FieldLabel>
-                    <Select
-                      value={formState.visibility}
-                      onValueChange={(value) => updateFormState({ visibility: value })}
-                    >
-                      <SelectTrigger id="channel-visibility">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="private">Private</SelectItem>
-                        <SelectItem value="public">Public</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="channel-icon">Icon</FieldLabel>
-                    <Select
-                      value={formState.iconKey}
-                      onValueChange={(value) =>
-                        updateFormState({
-                          iconKey: value as
-                            | ChannelTopicIconKey
-                            | typeof NO_CHANNEL_ICON_VALUE,
-                        })
-                      }
-                    >
-                      <SelectTrigger id="channel-icon">
-                        <SelectValue placeholder="No icon" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={NO_CHANNEL_ICON_VALUE}>No icon</SelectItem>
-                        {CHANNEL_TOPIC_ICON_GROUPS.map((group) => (
-                          <SelectGroup key={group.label}>
-                            <SelectLabel>{group.label}</SelectLabel>
-                            {group.options.map((option) => {
-                              const Icon = CHANNEL_TOPIC_ICON_MAP[option.value];
-                              return (
-                                <SelectItem key={option.value} value={option.value}>
-                                  <div className="flex items-center gap-2">
-                                    <Icon className="size-4" aria-hidden />
-                                    <span>{option.label}</span>
-                                  </div>
-                                </SelectItem>
-                              );
-                            })}
-                          </SelectGroup>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FieldDescription>
-                      Optional. Useful for support, public, private, parent, or other
-                      group channels.
-                    </FieldDescription>
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="channel-description">Description</FieldLabel>
-                    <Textarea
-                      id="channel-description"
-                      value={formState.description}
-                      onChange={(event) =>
-                        updateFormState({ description: event.target.value })
-                      }
-                      placeholder="Optional description"
-                      rows={3}
-                    />
-                  </Field>
-                </FieldGroup>
-              </FieldSet>
-              <FieldSeparator />
-              <FieldSet>
-                <FieldLegend>Posting policy</FieldLegend>
-                <FieldDescription>
-                  Control who can post and whether threads or reactions are enabled.
-                </FieldDescription>
-                <FieldGroup>
-                  <Field>
-                    <FieldLabel htmlFor="channel-posting-policy">Policy</FieldLabel>
-                    <Select
-                      value={formState.postingPolicyKind}
-                      onValueChange={(value) =>
-                        updateFormState({
-                          postingPolicyKind: value as ChannelPostingPolicyVM['kind'],
-                        })
-                      }
-                    >
-                      <SelectTrigger id="channel-posting-policy">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="everyone">Everyone</SelectItem>
-                        <SelectItem value="members-only">Members only</SelectItem>
-                        <SelectItem value="staff-only">Staff only</SelectItem>
-                        <SelectItem value="read-only">Read only</SelectItem>
-                        <SelectItem value="owners_only">Owners only</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                  <div className="flex flex-wrap gap-4 pt-2">
-                    <Label className="flex items-center gap-2 text-sm">
-                      <Checkbox
-                        checked={formState.allowThreads}
-                        onCheckedChange={(checked) =>
-                          updateFormState({ allowThreads: checked === true })
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Channels</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Review and manage all channels across the organisation.
+          </p>
+        </div>
+        <Dialog
+          open={dialogOpen}
+          onOpenChange={(open) => {
+            setDialogOpen(open);
+            if (!open) resetCreateForm();
+          }}
+        >
+          <DialogTrigger asChild>
+            <Button
+              size="sm"
+              className="flex items-center gap-2"
+              onClick={() => {
+                resetCreateForm();
+                setDialogOpen(true);
+              }}
+            >
+              <Plus className="size-4" />
+              Add new
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-xl">
+            <DialogHeader>
+              <DialogTitle>Create channel</DialogTitle>
+              <DialogDescription>
+                Create a new channel that will appear in the admin list.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="no-scrollbar -mx-4 max-h-[65vh] overflow-y-auto px-4">
+              <div className="grid gap-4 py-2">
+                <FieldSet data-invalid={isSubmitted && !formState.topic.trim()}>
+                  <FieldLegend>Basics</FieldLegend>
+                  <FieldGroup>
+                    <Field>
+                      <FieldLabel htmlFor="channel-topic">
+                        Name <span className="text-destructive">*</span>
+                      </FieldLabel>
+                      <Input
+                        id="channel-topic"
+                        value={formState.topic}
+                        onChange={(event) =>
+                          updateFormState({ topic: event.target.value })
                         }
+                        placeholder="e.g., General updates"
+                        required
+                        aria-required="true"
                       />
-                      Allow threads
-                    </Label>
-                    <Label className="flex items-center gap-2 text-sm">
-                      <Checkbox
-                        checked={formState.allowReactions}
-                        onCheckedChange={(checked) =>
-                          updateFormState({ allowReactions: checked === true })
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="channel-kind">Kind</FieldLabel>
+                      <Select
+                        value={formState.kind}
+                        onValueChange={(value) => updateFormState({ kind: value })}
+                        disabled={false}
+                      >
+                        <SelectTrigger id="channel-kind">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="channel">Channel</SelectItem>
+                          <SelectItem value="group_dm">Group DM</SelectItem>
+                          <SelectItem value="dm">DM</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="channel-purpose">Purpose</FieldLabel>
+                      <Select
+                        value={formState.purpose}
+                        onValueChange={(value) => updateFormState({ purpose: value })}
+                        disabled={false}
+                      >
+                        <SelectTrigger id="channel-purpose">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="general">General</SelectItem>
+                          <SelectItem value="learning-space">Class</SelectItem>
+                          <SelectItem value="chass-requests">Class requests</SelectItem>
+                          <SelectItem value="support">Support</SelectItem>
+                          <SelectItem value="announcements">Announcements</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="channel-visibility">Visibility</FieldLabel>
+                      <Select
+                        value={formState.visibility}
+                        onValueChange={(value) => updateFormState({ visibility: value })}
+                      >
+                        <SelectTrigger id="channel-visibility">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="private">Private</SelectItem>
+                          <SelectItem value="public">Public</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="channel-icon">Icon</FieldLabel>
+                      <Select
+                        value={formState.iconKey}
+                        onValueChange={(value) =>
+                          updateFormState({
+                            iconKey: value as
+                              | ChannelTopicIconKey
+                              | typeof NO_CHANNEL_ICON_VALUE,
+                          })
                         }
+                      >
+                        <SelectTrigger id="channel-icon">
+                          <SelectValue placeholder="No icon" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={NO_CHANNEL_ICON_VALUE}>No icon</SelectItem>
+                          {CHANNEL_TOPIC_ICON_GROUPS.map((group) => (
+                            <SelectGroup key={group.label}>
+                              <SelectLabel>{group.label}</SelectLabel>
+                              {group.options.map((option) => {
+                                const Icon = CHANNEL_TOPIC_ICON_MAP[option.value];
+                                return (
+                                  <SelectItem key={option.value} value={option.value}>
+                                    <div className="flex items-center gap-2">
+                                      <Icon className="size-4" aria-hidden />
+                                      <span>{option.label}</span>
+                                    </div>
+                                  </SelectItem>
+                                );
+                              })}
+                            </SelectGroup>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FieldDescription>
+                        Optional. Useful for support, public, private, parent, or other
+                        group channels.
+                      </FieldDescription>
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="channel-description">Description</FieldLabel>
+                      <Textarea
+                        id="channel-description"
+                        value={formState.description}
+                        onChange={(event) =>
+                          updateFormState({ description: event.target.value })
+                        }
+                        placeholder="Optional description"
+                        rows={3}
                       />
-                      Allow reactions
-                    </Label>
-                  </div>
-                </FieldGroup>
-              </FieldSet>
-              <FieldSeparator />
-              <LiveSessionSettingsSection
-                description="Configure how members can start and join live sessions from the channel header."
-                providerSelectId="channel-live-session-provider"
-                modeSelectId="channel-live-session-mode"
-                joinUrlInputId="channel-live-session-join-url"
-                value={formState.liveSession}
-                onChange={(nextLiveSession) =>
-                  updateFormState({
-                    liveSession: nextLiveSession,
-                  })
-                }
-              />
-              <FieldSet>
-                <FieldLegend>Participants</FieldLegend>
-                <FieldDescription>
-                  Select the participants who should be members of this channel.
-                </FieldDescription>
-                <FieldGroup>
-                  <ParticipantSelector
-                    users={participantOptions}
-                    selectedUsers={formState.participants}
-                    onUserAdd={(user) =>
-                      updateFormState({
-                        participants: formState.participants.some(
-                          (item) => item.ids.id === user.ids.id,
-                        )
-                          ? formState.participants
-                          : [...formState.participants, user],
-                      })
-                    }
-                    onUserRemove={(user) =>
-                      updateFormState({
-                        participants: formState.participants.filter(
-                          (item) => item.ids.id !== user.ids.id,
-                        ),
-                      })
-                    }
-                    placeholder="Add participant"
-                  />
-                </FieldGroup>
-              </FieldSet>
-              <FieldSeparator />
-              <FieldSet>
-                <FieldLegend>Capabilities</FieldLegend>
-                <FieldDescription>
-                  Enable optional features for this channel.
-                </FieldDescription>
-                <FieldGroup>
-                  <div className="flex flex-col gap-2">
-                    {(
-                      [
-                        'has_schedule',
-                        'has_homework',
-                        'has_summaries',
-                      ] as ChannelCapabilityVM[]
-                    ).map((capability) => (
-                      <Label key={capability} className="flex items-center gap-2 text-sm">
+                    </Field>
+                  </FieldGroup>
+                </FieldSet>
+                <FieldSeparator />
+                <FieldSet>
+                  <FieldLegend>Posting policy</FieldLegend>
+                  <FieldDescription>
+                    Control who can post and whether threads or reactions are enabled.
+                  </FieldDescription>
+                  <FieldGroup>
+                    <Field>
+                      <FieldLabel htmlFor="channel-posting-policy">Policy</FieldLabel>
+                      <Select
+                        value={formState.postingPolicyKind}
+                        onValueChange={(value) =>
+                          updateFormState({
+                            postingPolicyKind: value as ChannelPostingPolicyVM['kind'],
+                          })
+                        }
+                      >
+                        <SelectTrigger id="channel-posting-policy">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="everyone">Everyone</SelectItem>
+                          <SelectItem value="members-only">Members only</SelectItem>
+                          <SelectItem value="staff-only">Staff only</SelectItem>
+                          <SelectItem value="read-only">Read only</SelectItem>
+                          <SelectItem value="owners_only">Owners only</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    <div className="flex flex-wrap gap-4 pt-2">
+                      <Label className="flex items-center gap-2 text-sm">
                         <Checkbox
-                          checked={formState.capabilities.includes(capability)}
+                          checked={formState.allowThreads}
                           onCheckedChange={(checked) =>
-                            updateFormState({
-                              capabilities:
-                                checked === true
-                                  ? formState.capabilities.includes(capability)
-                                    ? formState.capabilities
-                                    : [...formState.capabilities, capability]
-                                  : formState.capabilities.filter(
-                                      (item) => item !== capability,
-                                    ),
-                            })
+                            updateFormState({ allowThreads: checked === true })
                           }
                         />
-                        {capability.replace('has_', '').replace('_', ' ')}
+                        Allow threads
                       </Label>
-                    ))}
-                  </div>
-                </FieldGroup>
-              </FieldSet>
-              <FieldSeparator />
-              <ChannelUiDefaultsSettingsSection
-                themeSelectId="channel-theme-key"
-                uiDefaults={formState.uiDefaults}
-                onUiDefaultsChange={(updates) =>
-                  updateFormState({
-                    uiDefaults: {
-                      ...formState.uiDefaults,
-                      ...updates,
-                      infoPanel: {
-                        ...(formState.uiDefaults.infoPanel ?? {}),
-                        ...(updates.infoPanel ?? {}),
+                      <Label className="flex items-center gap-2 text-sm">
+                        <Checkbox
+                          checked={formState.allowReactions}
+                          onCheckedChange={(checked) =>
+                            updateFormState({ allowReactions: checked === true })
+                          }
+                        />
+                        Allow reactions
+                      </Label>
+                    </div>
+                  </FieldGroup>
+                </FieldSet>
+                <FieldSeparator />
+                <LiveSessionSettingsSection
+                  description="Configure how members can start and join live sessions from the channel header."
+                  providerSelectId="channel-live-session-provider"
+                  modeSelectId="channel-live-session-mode"
+                  joinUrlInputId="channel-live-session-join-url"
+                  value={formState.liveSession}
+                  onChange={(nextLiveSession) =>
+                    updateFormState({ liveSession: nextLiveSession })
+                  }
+                />
+                <FieldSet>
+                  <FieldLegend>Participants</FieldLegend>
+                  <FieldDescription>
+                    Select the participants who should be members of this channel.
+                  </FieldDescription>
+                  <FieldGroup>
+                    <ParticipantSelector
+                      users={participantOptions}
+                      selectedUsers={formState.participants}
+                      onUserAdd={(user) =>
+                        updateFormState({
+                          participants: formState.participants.some(
+                            (item) => item.ids.id === user.ids.id,
+                          )
+                            ? formState.participants
+                            : [...formState.participants, user],
+                        })
+                      }
+                      onUserRemove={(user) =>
+                        updateFormState({
+                          participants: formState.participants.filter(
+                            (item) => item.ids.id !== user.ids.id,
+                          ),
+                        })
+                      }
+                      placeholder="Add participant"
+                    />
+                  </FieldGroup>
+                </FieldSet>
+                <FieldSeparator />
+                <FieldSet>
+                  <FieldLegend>Capabilities</FieldLegend>
+                  <FieldDescription>
+                    Enable optional features for this channel.
+                  </FieldDescription>
+                  <FieldGroup>
+                    <div className="flex flex-col gap-2">
+                      {(
+                        [
+                          'has_schedule',
+                          'has_homework',
+                          'has_summaries',
+                        ] as ChannelCapabilityVM[]
+                      ).map((capability) => (
+                        <Label
+                          key={capability}
+                          className="flex items-center gap-2 text-sm"
+                        >
+                          <Checkbox
+                            checked={formState.capabilities.includes(capability)}
+                            onCheckedChange={(checked) =>
+                              updateFormState({
+                                capabilities:
+                                  checked === true
+                                    ? formState.capabilities.includes(capability)
+                                      ? formState.capabilities
+                                      : [...formState.capabilities, capability]
+                                    : formState.capabilities.filter(
+                                        (item) => item !== capability,
+                                      ),
+                              })
+                            }
+                          />
+                          {capability.replace('has_', '').replace('_', ' ')}
+                        </Label>
+                      ))}
+                    </div>
+                  </FieldGroup>
+                </FieldSet>
+                <FieldSeparator />
+                <ChannelUiDefaultsSettingsSection
+                  themeSelectId="channel-theme-key"
+                  uiDefaults={formState.uiDefaults}
+                  onUiDefaultsChange={(updates) =>
+                    updateFormState({
+                      uiDefaults: {
+                        ...formState.uiDefaults,
+                        ...updates,
+                        infoPanel: {
+                          ...(formState.uiDefaults.infoPanel ?? {}),
+                          ...(updates.infoPanel ?? {}),
+                        },
                       },
-                    },
-                  })
-                }
-              />
-              {createError ? (
-                <p className="text-sm text-destructive">{createError}</p>
-              ) : null}
+                    })
+                  }
+                />
+                {createError ? (
+                  <p className="text-sm text-destructive">{createError}</p>
+                ) : null}
+              </div>
             </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="ghost"
-              onClick={() => setDialogOpen(false)}
-              disabled={isCreating}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleSubmit} disabled={isCreating}>
-              {isCreating
-                ? dialogMode === 'edit'
-                  ? 'Saving…'
-                  : 'Creating…'
-                : dialogMode === 'edit'
-                  ? 'Save changes'
-                  : 'Create channel'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <DialogFooter>
+              <Button
+                variant="ghost"
+                onClick={() => setDialogOpen(false)}
+                disabled={isCreating}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleSubmit} disabled={isCreating}>
+                {isCreating ? 'Creating…' : 'Create channel'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
 
-      {/* Filter bar */}
       <AdminFilterBar
         search={search}
         onSearchChange={setSearch}
@@ -683,50 +624,63 @@ export function ChannelsDashboard({ rows }: ChannelsDashboardProps) {
         ]}
       />
 
-      {/* Table container */}
       <div className="rounded-xl border overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b bg-muted/30">
-          <h2 className="text-sm font-semibold">Channels ({totalRows})</h2>
-        </div>
         <div className="relative">
-          {isPending ? (
-            <div className="absolute inset-0 bg-card/70 flex items-center justify-center z-10">
+          {loading && (
+            <div className="absolute inset-0 rounded-xl bg-card/90 flex items-center justify-center z-10">
               <Loader2 className="size-5 animate-spin text-muted-foreground" />
             </div>
-          ) : null}
-          <ChannelsTable rows={visibleRows} onEdit={handleEdit} />
-        </div>
-        <div className="flex items-center justify-between px-6 py-3 border-t">
-          <p className="text-xs text-muted-foreground">
-            {totalRows === 0 ? '0' : (pageIndex - 1) * pageSize + 1}–
-            {Math.min(pageIndex * pageSize, totalRows)} of {totalRows}
-          </p>
-          <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 w-8 p-0"
-              disabled={pageIndex <= 1}
-              onClick={() => setPageIndex((prev) => Math.max(1, prev - 1))}
-              aria-label="Previous page"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="px-2 text-xs text-muted-foreground">
-              Page {pageIndex} of {pageCount}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 w-8 p-0"
-              disabled={pageIndex >= pageCount}
-              onClick={() => setPageIndex((prev) => Math.min(pageCount, prev + 1))}
-              aria-label="Next page"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+          )}
+          <div className="flex items-center justify-between px-6 py-4 border-b bg-muted/30">
+            <h2 className="text-sm font-semibold">Channels ({total})</h2>
           </div>
+          {fetchError ? (
+            <p className="px-6 py-10 text-center text-sm text-destructive">
+              {fetchError}
+            </p>
+          ) : !loading && rows.length === 0 ? (
+            <p className="px-6 py-10 text-center text-sm text-muted-foreground">
+              No channels found.
+            </p>
+          ) : (
+            <ChannelsTable rows={rows} orgSlug={orgSlug} />
+          )}
         </div>
+        {total > 0 && (
+          <div className="flex items-center justify-between px-6 py-3 border-t">
+            <p className="text-xs text-muted-foreground">
+              {(pageIndex - 1) * PAGE_SIZE + 1}–{Math.min(pageIndex * PAGE_SIZE, total)}{' '}
+              of {total}
+            </p>
+            {pageCount > 1 && (
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  disabled={pageIndex <= 1}
+                  onClick={() => setPageIndex((p) => Math.max(1, p - 1))}
+                  aria-label="Previous page"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="px-2 text-xs text-muted-foreground">
+                  Page {pageIndex} of {pageCount}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  disabled={pageIndex >= pageCount}
+                  onClick={() => setPageIndex((p) => Math.min(pageCount, p + 1))}
+                  aria-label="Next page"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

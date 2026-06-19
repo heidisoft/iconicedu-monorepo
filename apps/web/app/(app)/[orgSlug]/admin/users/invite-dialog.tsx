@@ -98,7 +98,7 @@ export function InviteUserDialog({ className }: { className?: string }) {
           Invite Users
         </Button>
       </DialogTrigger>
-      <DialogContent className="space-y-4 sm:max-w-2xl">
+      <DialogContent className="space-y-4 sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Invite guardians, educators, or staff</DialogTitle>
           <DialogDescription>

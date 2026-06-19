@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { SlidersHorizontal, Search, X } from 'lucide-react';
+import { SlidersHorizontal, Search, X, ChevronDown, Check } from 'lucide-react';
 import {
   Button,
   Dialog,
@@ -9,6 +9,13 @@ import {
   DialogHeader,
   DialogTitle,
   Label,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
 } from '@iconicedu/ui-web';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -52,66 +59,105 @@ function useWindowWidth() {
   return width;
 }
 
-// ─── PillGroup (inline) ───────────────────────────────────────────────────────
+// ─── FilterDropdown (inline) ──────────────────────────────────────────────────
 
-function PillGroup({ group }: { group: FilterGroup }) {
+function FilterDropdown({ group }: { group: FilterGroup }) {
   const isActive = group.value !== group.options[0]?.value;
+  const selectedLabel =
+    group.options.find((o) => o.value === group.value)?.label ?? group.options[0]?.label;
+
   return (
     <div className="flex items-center gap-1.5 shrink-0">
       <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         {group.label}
       </span>
-      <div className="flex items-center gap-1">
-        {group.options.map((opt) => (
-          <button
-            key={opt.value}
-            type="button"
-            className={`h-8 rounded-md px-3 text-sm font-medium border transition-colors ${
-              group.value === opt.value
-                ? 'bg-primary text-primary-foreground border-primary'
-                : 'bg-background border-border hover:bg-accent'
-            }`}
-            onClick={() => group.onChange(opt.value)}
-          >
-            {opt.label}
-          </button>
-        ))}
-        {isActive && (
+      <Popover>
+        <PopoverTrigger asChild>
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
-            className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-            onClick={() => group.onChange(group.options[0]?.value ?? 'all')}
-            aria-label={`Clear ${group.label}`}
+            className={`gap-1.5 ${isActive ? 'border-primary/40 bg-primary/5 font-semibold' : ''}`}
           >
-            <X className="h-3.5 w-3.5" />
+            {selectedLabel}
+            <ChevronDown className="h-3 w-3 opacity-50" />
           </Button>
-        )}
-      </div>
+        </PopoverTrigger>
+        <PopoverContent className="w-44 p-0" align="start">
+          <Command>
+            <CommandEmpty>No results.</CommandEmpty>
+            <CommandGroup>
+              {group.options.map((opt) => (
+                <CommandItem
+                  key={opt.value}
+                  value={opt.value}
+                  onSelect={() => group.onChange(opt.value)}
+                  className="gap-2.5"
+                >
+                  <span
+                    className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
+                      group.value === opt.value
+                        ? 'border-primary bg-primary text-primary-foreground'
+                        : 'border-border bg-background'
+                    }`}
+                  >
+                    {group.value === opt.value && <Check className="h-2.5 w-2.5" />}
+                  </span>
+                  {opt.label}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </Command>
+        </PopoverContent>
+      </Popover>
+      {isActive && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+          onClick={() => group.onChange(group.options[0]?.value ?? 'all')}
+          aria-label={`Clear ${group.label}`}
+        >
+          <X className="h-3.5 w-3.5" />
+        </Button>
+      )}
     </div>
   );
 }
 
-// ─── PillGroupDialog (inside More filters dialog) ─────────────────────────────
+// ─── FilterDialogGroup (inside More filters dialog) ───────────────────────────
 
-function PillGroupDialog({ group }: { group: FilterGroup }) {
+function FilterDialogGroup({ group }: { group: FilterGroup }) {
+  const isActive = group.value !== group.options[0]?.value;
   return (
     <div className="flex flex-col gap-2">
-      <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        {group.label}
-      </Label>
-      <div className="flex flex-wrap gap-1">
+      <div className="flex items-center justify-between">
+        <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {group.label}
+        </Label>
+        {isActive && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-auto py-0 px-1 text-xs text-muted-foreground"
+            onClick={() => group.onChange(group.options[0]?.value ?? 'all')}
+          >
+            Clear
+          </Button>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-2">
         {group.options.map((opt) => (
           <button
             key={opt.value}
             type="button"
-            className={`h-8 rounded-md px-3 text-sm font-medium border transition-colors ${
-              group.value === opt.value
-                ? 'bg-primary text-primary-foreground border-primary'
-                : 'bg-background border-border hover:bg-accent'
-            }`}
             onClick={() => group.onChange(opt.value)}
+            className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+              group.value === opt.value
+                ? 'border-primary/40 bg-primary/5 text-foreground font-medium'
+                : 'bg-background text-muted-foreground hover:bg-accent'
+            }`}
           >
+            {group.value === opt.value && <Check className="h-3 w-3 shrink-0" />}
             {opt.label}
           </button>
         ))}
@@ -171,7 +217,7 @@ export function AdminFilterBar({
 
           {/* Visible filter groups */}
           {visibleGroups.map((group) => (
-            <PillGroup key={group.label} group={group} />
+            <FilterDropdown key={group.label} group={group} />
           ))}
 
           {/* Extra filters — always visible */}
@@ -206,7 +252,7 @@ export function AdminFilterBar({
             </DialogHeader>
             <div className="flex flex-col gap-5 py-2">
               {hiddenGroups.map((group) => (
-                <PillGroupDialog key={group.label} group={group} />
+                <FilterDialogGroup key={group.label} group={group} />
               ))}
             </div>
             {activeHiddenCount > 0 && (

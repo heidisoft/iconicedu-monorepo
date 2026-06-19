@@ -471,7 +471,7 @@ export function UsersTable({ orgSlug }: UsersTableProps) {
     return (
       <div
         key={row.id}
-        className={`px-6 py-4 hover:bg-muted/30 transition-colors ${deletingId === row.id ? 'opacity-50' : ''}`}
+        className={`px-6 py-4 border-b border-border/60 last:border-b-0 hover:bg-muted/30 transition-colors ${deletingId === row.id ? 'opacity-50' : ''}`}
       >
         <div className="flex items-start gap-4">
           {/* Avatar */}
@@ -623,7 +623,10 @@ export function UsersTable({ orgSlug }: UsersTableProps) {
 
   const renderChildPanelRow = (parent: UserRow, children: UserRow[]) => {
     return (
-      <div key={`${parent.id}:children`} className="bg-muted/20 border-b last:border-b-0">
+      <div
+        key={`${parent.id}:children`}
+        className="bg-muted/20 border-b border-border/60 last:border-b-0"
+      >
         <div className="mx-6 my-4 rounded-xl border border-border/60 bg-background p-3">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
@@ -934,7 +937,7 @@ export function UsersTable({ orgSlug }: UsersTableProps) {
         </AlertDialogContent>
       </AlertDialog>
       <Dialog open={linkDialogOpen} onOpenChange={(open) => setLinkDialogOpen(open)}>
-        <DialogContent className="space-y-4 sm:max-w-2xl">
+        <DialogContent className="space-y-4 sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Generated login link</DialogTitle>
             <DialogDescription>
@@ -999,7 +1002,7 @@ export function UsersTable({ orgSlug }: UsersTableProps) {
           }
         }}
       >
-        <DialogContent className="space-y-4 sm:max-w-2xl">
+        <DialogContent className="space-y-4 sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Edit profile</DialogTitle>
             <DialogDescription>

@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Clock3 } from 'lucide-react';
+import { Clock3, Settings } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,7 +14,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   Button,
-  Badge,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -22,37 +21,108 @@ import {
   Archive,
   ArchiveRestore,
   MoreHorizontal,
-  Pencil,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
   Trash2,
   toast,
 } from '@iconicedu/ui-web';
+import { Avatar, AvatarFallback, AvatarImage } from '@iconicedu/ui-web/ui/avatar';
 import { ThemedIconBadge } from '@iconicedu/ui-web/components/shared/themed-icon';
 import { getLearningSpaceIcon } from '@iconicedu/ui-web/lib/icons';
-import { cn } from '@iconicedu/ui-web/lib/utils';
 
 import type { AdminLearningSpaceRow } from '@iconicedu/web/lib/admin/learning-spaces';
 
+const SCHEDULE_COLLAPSED_LIMIT = 2;
+
 type LearningSpacesTableProps = {
   rows: AdminLearningSpaceRow[];
-  onEdit: (row: AdminLearningSpaceRow) => void;
+  orgSlug: string;
 };
 
-export function LearningSpacesTable({ rows, onEdit }: LearningSpacesTableProps) {
+function MemberChip({
+  participant,
+}: {
+  participant: AdminLearningSpaceRow['participantDetails'][number];
+}) {
+  const themeClass = participant.themeKey ? `theme-${participant.themeKey}` : '';
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2 py-0.5 text-xs text-foreground">
+      <Avatar className={`size-5 shrink-0 ${themeClass}`}>
+        {participant.avatarUrl ? (
+          <AvatarImage src={participant.avatarUrl} alt={participant.displayName} />
+        ) : null}
+        <AvatarFallback className={themeClass ? 'theme-bg theme-fg' : ''}>
+          {(participant.displayName?.[0] ?? '?').toUpperCase()}
+        </AvatarFallback>
+      </Avatar>
+      <span className="max-w-[120px] truncate">{participant.displayName}</span>
+    </span>
+  );
+}
+
+function ScheduleChip({ summary }: { summary: string }) {
+  const parts = summary
+    .split(' · ')
+    .map((p) => p.trim())
+    .filter(Boolean);
+  const label = parts.slice(0, -1).join(' · ') || summary;
+  const time = parts.length > 1 ? parts[parts.length - 1] : null;
+
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-0.5 text-xs text-foreground">
+      <Clock3 className="size-3 shrink-0 text-muted-foreground" />
+      <span>{label}</span>
+      {time && <span className="text-muted-foreground">· {time}</span>}
+    </span>
+  );
+}
+
+function ScheduleList({ row }: { row: AdminLearningSpaceRow }) {
+  const [expanded, setExpanded] = React.useState(false);
+
+  if (!row.scheduleItems?.length) {
+    return <span className="text-xs text-muted-foreground">No schedule</span>;
+  }
+
+  const visible = expanded
+    ? row.scheduleItems
+    : row.scheduleItems.slice(0, SCHEDULE_COLLAPSED_LIMIT);
+  const overflow = row.scheduleItems.length - SCHEDULE_COLLAPSED_LIMIT;
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {visible.map((item, i) => (
+        <ScheduleChip key={i} summary={item.summary} />
+      ))}
+      {!expanded && overflow > 0 && (
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          className="text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline transition-colors"
+        >
+          +{overflow} more
+        </button>
+      )}
+      {expanded && overflow > 0 && (
+        <button
+          type="button"
+          onClick={() => setExpanded(false)}
+          className="text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline transition-colors"
+        >
+          Show less
+        </button>
+      )}
+    </div>
+  );
+}
+
+export function LearningSpacesTable({ rows, orgSlug }: LearningSpacesTableProps) {
   const router = useRouter();
   const pathname = usePathname();
   const dashboardBasePath = React.useMemo(() => {
     const firstSegment = pathname?.split('/').filter(Boolean)[0];
-    if (!firstSegment) {
-      return '/';
-    }
+    if (!firstSegment) return '/';
     return `/${firstSegment}`;
   }, [pathname]);
+
   const [confirmDeleteRow, setConfirmDeleteRow] =
     React.useState<AdminLearningSpaceRow | null>(null);
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
@@ -130,221 +200,121 @@ export function LearningSpacesTable({ rows, onEdit }: LearningSpacesTableProps) 
     }
   };
 
-  const handleEdit = (row: AdminLearningSpaceRow) => {
-    onEdit(row);
-  };
-
-  const renderScheduleItems = (row: AdminLearningSpaceRow) => {
-    if (!row.scheduleItems?.length) {
-      return <span className="text-sm text-muted-foreground">—</span>;
-    }
-
+  if (!rows.length) {
     return (
-      <div className="space-y-3">
-        {row.scheduleItems.map((item, index) => {
-          const [frequencyLabel, ...detailParts] = item.summary
-            .split(' · ')
-            .map((part) => part.trim())
-            .filter(Boolean);
-          const timeRange =
-            detailParts.length > 0 ? (detailParts[detailParts.length - 1] ?? '') : '';
-          const detailLabel = detailParts.slice(0, -1).join(' · ') || 'Scheduled';
-
-          return (
-            <div
-              key={`${row.id}-schedule-${index}`}
-              className={
-                index === 0 ? 'space-y-2' : 'space-y-2 border-t border-border/60 pt-3'
-              }
-            >
-              <div className="flex flex-wrap items-center gap-2.5">
-                <Badge variant="secondary" className="text-xs">
-                  {frequencyLabel}
-                </Badge>
-                <span className="text-sm text-foreground">{detailLabel}</span>
-              </div>
-              {timeRange ? (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Clock3 className="size-4 shrink-0" />
-                  <span>{timeRange}</span>
-                </div>
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
-
-  const renderStatusBadge = (status: string) => {
-    const normalized = status.toLowerCase();
-    const className =
-      normalized === 'active'
-        ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100'
-        : normalized === 'pending' || normalized === 'paused'
-          ? 'bg-amber-100 text-amber-700 hover:bg-amber-100'
-          : normalized === 'archived'
-            ? 'bg-muted text-muted-foreground hover:bg-muted'
-            : normalized === 'completed'
-              ? 'bg-blue-100 text-blue-700 hover:bg-blue-100'
-              : 'bg-secondary text-secondary-foreground hover:bg-secondary';
-
-    return <Badge className={`text-xs capitalize ${className}`}>{status}</Badge>;
-  };
-
-  const renderParticipantNames = (row: AdminLearningSpaceRow) => {
-    if (!row.participantDetails.length) {
-      return null;
-    }
-
-    return (
-      <p className="line-clamp-2 text-xs text-muted-foreground">
-        {row.participantDetails.map((participant, index) => {
-          const hasTheme = Boolean(participant.themeKey);
-          return (
-            <React.Fragment key={participant.id}>
-              {index > 0 ? <span className="text-muted-foreground">, </span> : null}
-              <span
-                className={cn(hasTheme ? `theme-${participant.themeKey}` : '')}
-                style={hasTheme ? { color: 'var(--theme-bg)' } : undefined}
-              >
-                {participant.displayName}
-              </span>
-            </React.Fragment>
-          );
-        })}
+      <p className="px-6 py-10 text-center text-sm text-muted-foreground">
+        No classrooms found.
       </p>
     );
-  };
+  }
 
   return (
-    <div className="w-full overflow-x-auto">
-      <Table className="min-w-[860px] table-fixed lg:min-w-full">
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[50%] px-3 sm:px-4 lg:px-6">Title</TableHead>
-            <TableHead className="w-[26%] px-3 sm:px-4 lg:px-6">Schedule</TableHead>
-            <TableHead className="w-[10%] px-3 sm:px-4 lg:px-6">Updated</TableHead>
-            <TableHead className="w-[8%] px-3 sm:px-4 lg:px-6">Status</TableHead>
-            <TableHead className="w-[6%] px-3 text-right sm:px-4 lg:px-6">
-              Actions
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((row) => (
-            <TableRow key={row.id} className="border-b border-border/60 last:border-b-0">
-              <TableCell className="px-3 py-4 align-middle sm:px-4 sm:py-5 lg:px-6 lg:py-6">
-                {(() => {
-                  const TitleIcon = getLearningSpaceIcon(row.icon_key);
-                  return (
-                    <div className="flex items-start gap-3 sm:gap-4">
-                      <ThemedIconBadge
-                        icon={TitleIcon}
-                        themeKey={row.themeKey ?? null}
-                        size="md"
-                        className="shrink-0"
-                      />
-                      <div className="min-w-0 flex-1">
-                        {row.primaryChannelId ? (
-                          <Link
-                            href={`${dashboardBasePath}/s/${row.primaryChannelId}`}
-                            className="line-clamp-2 text-sm font-semibold leading-tight hover:underline"
-                          >
-                            {row.title}
-                          </Link>
-                        ) : (
-                          <p className="line-clamp-2 text-sm font-semibold leading-tight">
-                            {row.title}
-                          </p>
-                        )}
-                        {(row.subject ||
-                          row.description ||
-                          row.participantDetails.length > 0) && (
-                          <div className="mt-1 space-y-1">
-                            {row.subject || row.description ? (
-                              <p className="line-clamp-2 text-xs text-muted-foreground">
-                                {row.subject ?? row.description}
-                              </p>
-                            ) : null}
-                            {renderParticipantNames(row)}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })()}
-              </TableCell>
-              <TableCell className="px-3 py-4 align-middle sm:px-4 sm:py-5 lg:px-6 lg:py-6">
-                <div className="min-w-0">{renderScheduleItems(row)}</div>
-              </TableCell>
-              <TableCell className="px-3 py-4 align-middle sm:px-4 sm:py-5 lg:px-6 lg:py-6">
-                <div className="space-y-1">
-                  <p className="text-sm text-foreground">
-                    {new Date(row.updated_at ?? row.created_at).toLocaleDateString()}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Updated by {row.updatedByDisplayName ?? 'Unknown'}
-                  </p>
+    <div className="w-full">
+      {rows.map((row) => {
+        const TitleIcon = getLearningSpaceIcon(row.icon_key);
+        return (
+          <div
+            key={row.id}
+            className="flex items-center justify-between gap-4 px-6 py-4 border-b border-border/60 last:border-b-0 hover:bg-muted/30 transition-colors"
+          >
+            {/* Left: icon + title + participants + schedules */}
+            <div className="flex min-w-0 flex-1 items-center gap-4">
+              <div className="shrink-0">
+                <ThemedIconBadge
+                  icon={TitleIcon}
+                  themeKey={row.themeKey ?? null}
+                  size="lg"
+                />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {row.primaryChannelId ? (
+                    <Link
+                      href={`${dashboardBasePath}/s/${row.primaryChannelId}`}
+                      className="text-base font-semibold leading-tight hover:underline"
+                    >
+                      {row.title}
+                    </Link>
+                  ) : (
+                    <span className="text-base font-semibold leading-tight">
+                      {row.title}
+                    </span>
+                  )}
+                  {row.subject && (
+                    <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground font-normal">
+                      {row.subject}
+                    </span>
+                  )}
                 </div>
-              </TableCell>
-              <TableCell className="px-3 py-4 align-middle sm:px-4 sm:py-5 lg:px-6 lg:py-6">
-                {renderStatusBadge(row.status)}
-              </TableCell>
-              <TableCell className="px-3 py-4 text-right align-middle sm:px-4 sm:py-5 lg:px-6 lg:py-6">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 rounded-full p-0"
-                    >
-                      <MoreHorizontal className="size-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => handleEdit(row)}>
-                      <Pencil className="mr-2 size-3" />
-                      Edit
-                    </DropdownMenuItem>
-                    {row.status === 'archived' ? (
-                      <DropdownMenuItem
-                        onClick={() => handleUnarchive(row)}
-                        disabled={unarchivingId === row.id}
-                      >
-                        <ArchiveRestore className="mr-2 size-3" />
-                        {unarchivingId === row.id ? 'Restoring…' : 'Unarchive'}
-                      </DropdownMenuItem>
-                    ) : (
-                      <DropdownMenuItem
-                        onClick={() => handleArchive(row)}
-                        disabled={archivingId === row.id}
-                      >
-                        <Archive className="mr-2 size-3" />
-                        {archivingId === row.id ? 'Archiving…' : 'Archive'}
-                      </DropdownMenuItem>
-                    )}
+
+                {row.participantDetails.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                    {row.participantDetails.map((p) => (
+                      <MemberChip key={p.id} participant={p} />
+                    ))}
+                  </div>
+                )}
+
+                <div className="mt-1.5">
+                  <ScheduleList row={row} />
+                </div>
+              </div>
+            </div>
+
+            {/* Right: Settings button + overflow menu */}
+            <div className="flex shrink-0 items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => router.push(`/${orgSlug}/admin/classrooms/${row.id}`)}
+              >
+                <Settings className="size-3.5" />
+                Settings
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 rounded-full p-0">
+                    <MoreHorizontal className="size-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {row.status === 'archived' ? (
                     <DropdownMenuItem
-                      onClick={() => setConfirmDeleteRow(row)}
-                      disabled={deletingId === row.id}
-                      className="text-destructive"
+                      onClick={() => handleUnarchive(row)}
+                      disabled={unarchivingId === row.id}
                     >
-                      <Trash2 className="mr-2 size-3" />
-                      {deletingId === row.id ? 'Deleting…' : 'Delete'}
+                      <ArchiveRestore className="mr-2 size-3" />
+                      {unarchivingId === row.id ? 'Restoring…' : 'Unarchive'}
                     </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+                  ) : (
+                    <DropdownMenuItem
+                      onClick={() => handleArchive(row)}
+                      disabled={archivingId === row.id}
+                    >
+                      <Archive className="mr-2 size-3" />
+                      {archivingId === row.id ? 'Archiving…' : 'Archive'}
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem
+                    onClick={() => setConfirmDeleteRow(row)}
+                    disabled={deletingId === row.id}
+                    className="text-destructive"
+                  >
+                    <Trash2 className="mr-2 size-3" />
+                    {deletingId === row.id ? 'Deleting…' : 'Delete'}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+        );
+      })}
+
       <AlertDialog
         open={Boolean(confirmDeleteRow)}
         onOpenChange={(open) => {
-          if (!open) {
-            setConfirmDeleteRow(null);
-          }
+          if (!open) setConfirmDeleteRow(null);
         }}
       >
         <AlertDialogContent>
@@ -358,9 +328,7 @@ export function LearningSpacesTable({ rows, onEdit }: LearningSpacesTableProps) 
             <AlertDialogCancel disabled={Boolean(deletingId)}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
-                if (confirmDeleteRow) {
-                  void handleDelete(confirmDeleteRow);
-                }
+                if (confirmDeleteRow) void handleDelete(confirmDeleteRow);
               }}
               disabled={Boolean(deletingId)}
             >

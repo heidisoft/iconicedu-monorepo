@@ -35,10 +35,7 @@ export function buildAdminMenuSections(
     {
       title: 'Channels',
       iconKey: 'channels',
-      links: [
-        { title: 'All', url: `${basePath}/admin/channels` },
-        { title: 'Direct messages', url: `${basePath}/admin/channels/direct-messages` },
-      ],
+      links: [{ title: 'All', url: `${basePath}/admin/channels` }],
     },
     {
       title: 'Activity',

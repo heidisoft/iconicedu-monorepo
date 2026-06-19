@@ -106,7 +106,6 @@ describe('buildAdminMenuSections', () => {
       '/admin/activity/logs',
       '/admin/attendance/sessions',
       '/admin/channels',
-      '/admin/channels/direct-messages',
       '/admin/classrooms',
       '/admin/reports',
       '/admin/reports/activity',

@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 import {
   Button,
@@ -11,45 +11,86 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
+  Loader2,
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@iconicedu/ui-web';
-import { Loader2, RotateCw } from '@iconicedu/ui-web';
-import { Check, ChevronsUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Check, ChevronsUpDown, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { AdminFilterBar } from '@iconicedu/web/components/admin/admin-filter-bar';
 
 import type { AdminLearningSpaceRow } from '@iconicedu/web/lib/admin/learning-spaces';
 import { LearningSpacesTable } from '@iconicedu/web/app/(app)/[orgSlug]/admin/classrooms/learning-spaces-table';
-import { LearningSpaceFormDialog } from '@iconicedu/web/app/(app)/[orgSlug]/admin/classrooms/learning-space-form-dialog';
 import type { UserProfileVM } from '@iconicedu/shared-types';
-import type { LearningSpaceDetail } from '@iconicedu/web/lib/admin/learning-space-detail';
 
-const PAGE_SIZES = [10, 25, 50];
+const PAGE_SIZE = 10;
 
 type LearningSpacesDashboardProps = {
-  rows: AdminLearningSpaceRow[];
-  currentUserTimezone?: string | null;
-  subjectOptions?: string[];
+  orgSlug: string;
 };
 
-export function LearningSpacesDashboard({
-  rows,
-  currentUserTimezone,
-  subjectOptions,
-}: LearningSpacesDashboardProps) {
-  const router = useRouter();
+export function LearningSpacesDashboard({ orgSlug }: LearningSpacesDashboardProps) {
+  // Lazy-load state
+  const [rows, setRows] = React.useState<AdminLearningSpaceRow[]>([]);
+  const [total, setTotal] = React.useState(0);
+  const [pageCount, setPageCount] = React.useState(1);
+  const [loading, setLoading] = React.useState(true);
+  const [fetchError, setFetchError] = React.useState<string | null>(null);
+
   const [search, setSearch] = React.useState('');
-  const [statusFilter, setStatusFilter] = React.useState<'all' | string>('all');
-  const [participantFilter, setParticipantFilter] = React.useState<'all' | string>('all');
+  const [debouncedSearch, setDebouncedSearch] = React.useState('');
+  const [statusFilter, setStatusFilter] = React.useState('all');
+  const [participantFilter, setParticipantFilter] = React.useState('all');
   const [participantFilterOpen, setParticipantFilterOpen] = React.useState(false);
   const [pageIndex, setPageIndex] = React.useState(1);
-  const [pageSize, setPageSize] = React.useState(PAGE_SIZES[0]);
-  const [isPending, startTransition] = React.useTransition();
   const [participantOptions, setParticipantOptions] = React.useState<UserProfileVM[]>([]);
-  const [editOpen, setEditOpen] = React.useState(false);
-  const [editData, setEditData] = React.useState<LearningSpaceDetail | null>(null);
-  const refreshing = isPending;
+
+  // Debounce search
+  React.useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  React.useEffect(() => {
+    setPageIndex(1);
+  }, [debouncedSearch, statusFilter, participantFilter]);
+
+  const fetchPage = React.useCallback(
+    async (page: number) => {
+      setLoading(true);
+      setFetchError(null);
+      try {
+        const params = new URLSearchParams({
+          orgSlug,
+          page: String(page),
+          ...(debouncedSearch ? { search: debouncedSearch } : {}),
+          ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
+          ...(participantFilter !== 'all' ? { participantId: participantFilter } : {}),
+        });
+        const res = await fetch(`/api/admin/spaces/list?${params.toString()}`);
+        const json = (await res.json()) as {
+          success?: boolean;
+          message?: string;
+          rows?: AdminLearningSpaceRow[];
+          total?: number;
+          pageCount?: number;
+        };
+        if (!res.ok || !json.success) throw new Error(json.message ?? 'Failed to load');
+        setRows(json.rows ?? []);
+        setTotal(json.total ?? 0);
+        setPageCount(json.pageCount ?? 1);
+      } catch (err) {
+        setFetchError(err instanceof Error ? err.message : 'Failed to load classrooms');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [orgSlug, debouncedSearch, statusFilter, participantFilter],
+  );
+
+  React.useEffect(() => {
+    void fetchPage(pageIndex);
+  }, [fetchPage, pageIndex]);
 
   const loadParticipants = React.useCallback(async () => {
     try {
@@ -69,43 +110,8 @@ export function LearningSpacesDashboard({
   }, []);
 
   React.useEffect(() => {
-    setPageIndex(1);
-  }, [search, statusFilter, participantFilter, pageSize]);
-
-  React.useEffect(() => {
     void loadParticipants();
   }, [loadParticipants]);
-
-  const normalizedSearch = search.trim().toLowerCase();
-
-  const filteredRows = React.useMemo(() => {
-    return rows.filter((row) => {
-      if (statusFilter !== 'all' && row.status !== statusFilter) {
-        return false;
-      }
-      if (
-        participantFilter !== 'all' &&
-        !row.participantDetails.some(
-          (participant) => participant.id === participantFilter,
-        )
-      ) {
-        return false;
-      }
-      if (!normalizedSearch) {
-        return true;
-      }
-      if (row.title.toLowerCase().includes(normalizedSearch)) {
-        return true;
-      }
-      if (row.subject?.toLowerCase().includes(normalizedSearch)) {
-        return true;
-      }
-      if (row.description?.toLowerCase().includes(normalizedSearch)) {
-        return true;
-      }
-      return false;
-    });
-  }, [rows, normalizedSearch, statusFilter, participantFilter]);
 
   const participantFilterOptions = React.useMemo(
     () =>
@@ -115,94 +121,32 @@ export function LearningSpacesDashboard({
             sensitivity: 'base',
           }),
         )
-        .map((participant) => ({
-          id: participant.ids.id,
-          name: participant.profile.displayName ?? 'Unknown',
-        })),
+        .map((p) => ({ id: p.ids.id, name: p.profile.displayName ?? 'Unknown' })),
     [participantOptions],
   );
-  const selectedParticipantFilterLabel = React.useMemo(() => {
-    if (participantFilter === 'all') {
-      return 'All';
-    }
-    return (
-      participantFilterOptions.find((participant) => participant.id === participantFilter)
-        ?.name ?? 'All'
-    );
-  }, [participantFilter, participantFilterOptions]);
 
-  const sortedRows = React.useMemo(() => {
-    return [...filteredRows].sort((a, b) => {
-      const updatedAtA = new Date(a.updated_at ?? a.created_at).getTime();
-      const updatedAtB = new Date(b.updated_at ?? b.created_at).getTime();
-
-      if (updatedAtA !== updatedAtB) {
-        return updatedAtB - updatedAtA;
-      }
-
-      return a.title.localeCompare(b.title, 'en', { sensitivity: 'base', numeric: true });
-    });
-  }, [filteredRows]);
-
-  const totalRows = sortedRows.length;
-  const pageCount = Math.max(1, Math.ceil(totalRows / pageSize));
-  const visibleRows = sortedRows.slice((pageIndex - 1) * pageSize, pageIndex * pageSize);
-
-  const handleRefresh = () => {
-    startTransition(() => router.refresh());
-    void loadParticipants();
-  };
-
-  const handleEdit = async (row: LearningSpacesDashboardProps['rows'][number]) => {
-    try {
-      const response = await fetch('/api/admin/spaces/detail', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ learningSpaceId: row.id }),
-      });
-      const payload = (await response.json()) as {
-        success?: boolean;
-        message?: string;
-        data?: LearningSpaceDetail;
-      };
-      if (!response.ok || !payload.success || !payload.data) {
-        setEditData(null);
-        return;
-      }
-      setEditData(payload.data);
-      setEditOpen(true);
-    } finally {
-      // no-op
-    }
-  };
+  const selectedParticipantFilterLabel =
+    participantFilter === 'all'
+      ? 'All'
+      : (participantFilterOptions.find((p) => p.id === participantFilter)?.name ?? 'All');
 
   return (
     <div className="flex flex-col gap-4">
-      <LearningSpaceFormDialog
-        participantOptions={participantOptions}
-        defaultScheduleTimezone={currentUserTimezone}
-        subjectOptions={subjectOptions}
-      />
-      <LearningSpaceFormDialog
-        mode="edit"
-        open={editOpen}
-        onOpenChange={(open) => {
-          setEditOpen(open);
-          if (!open) {
-            setEditData(null);
-          }
-        }}
-        participantOptions={participantOptions}
-        defaultScheduleTimezone={currentUserTimezone}
-        subjectOptions={subjectOptions}
-        initialData={editData}
-        onSuccess={() => {
-          handleRefresh();
-          setEditData(null);
-        }}
-      />
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Classrooms</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Manage learning spaces, subjects, participants, and schedules.
+          </p>
+        </div>
+        <Button asChild size="sm" className="flex items-center gap-2">
+          <Link href={`/${orgSlug}/admin/classrooms/new`}>
+            <Plus className="size-4" />
+            Add new
+          </Link>
+        </Button>
+      </div>
 
-      {/* Filter bar */}
       <AdminFilterBar
         search={search}
         onSearchChange={setSearch}
@@ -290,50 +234,63 @@ export function LearningSpacesDashboard({
         }
       />
 
-      {/* Table container */}
       <div className="rounded-xl border overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b bg-muted/30">
-          <h2 className="text-sm font-semibold">Classrooms ({totalRows})</h2>
-        </div>
         <div className="relative">
-          {isPending && (
-            <div className="absolute inset-0 bg-card/70 flex items-center justify-center z-10">
+          {loading && (
+            <div className="absolute inset-0 rounded-xl bg-card/90 flex items-center justify-center z-10">
               <Loader2 className="size-5 animate-spin text-muted-foreground" />
             </div>
           )}
-          <LearningSpacesTable rows={visibleRows} onEdit={handleEdit} />
-        </div>
-        <div className="flex items-center justify-between px-6 py-3 border-t">
-          <p className="text-xs text-muted-foreground">
-            {totalRows === 0 ? '0' : (pageIndex - 1) * pageSize + 1}–
-            {Math.min(pageIndex * pageSize, totalRows)} of {totalRows}
-          </p>
-          <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 w-8 p-0"
-              disabled={pageIndex <= 1}
-              onClick={() => setPageIndex((prev) => Math.max(1, prev - 1))}
-              aria-label="Previous page"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="px-2 text-xs text-muted-foreground">
-              Page {pageIndex} of {pageCount}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 w-8 p-0"
-              disabled={pageIndex >= pageCount}
-              onClick={() => setPageIndex((prev) => Math.min(pageCount, prev + 1))}
-              aria-label="Next page"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+          <div className="flex items-center justify-between px-6 py-4 border-b bg-muted/30">
+            <h2 className="text-sm font-semibold">Classrooms ({total})</h2>
           </div>
+          {fetchError ? (
+            <p className="px-6 py-10 text-center text-sm text-destructive">
+              {fetchError}
+            </p>
+          ) : !loading && rows.length === 0 ? (
+            <p className="px-6 py-10 text-center text-sm text-muted-foreground">
+              No classrooms found.
+            </p>
+          ) : (
+            <LearningSpacesTable rows={rows} orgSlug={orgSlug} />
+          )}
         </div>
+        {total > 0 && (
+          <div className="flex items-center justify-between px-6 py-3 border-t">
+            <p className="text-xs text-muted-foreground">
+              {(pageIndex - 1) * PAGE_SIZE + 1}–{Math.min(pageIndex * PAGE_SIZE, total)}{' '}
+              of {total}
+            </p>
+            {pageCount > 1 && (
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  disabled={pageIndex <= 1}
+                  onClick={() => setPageIndex((p) => Math.max(1, p - 1))}
+                  aria-label="Previous page"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="px-2 text-xs text-muted-foreground">
+                  Page {pageIndex} of {pageCount}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  disabled={pageIndex >= pageCount}
+                  onClick={() => setPageIndex((p) => Math.min(pageCount, p + 1))}
+                  aria-label="Next page"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

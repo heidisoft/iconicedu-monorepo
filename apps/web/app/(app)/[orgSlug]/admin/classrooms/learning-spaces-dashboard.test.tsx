@@ -15,15 +15,12 @@ vi.mock('next/navigation', () => ({
 if (!Element.prototype.hasPointerCapture) {
   Element.prototype.hasPointerCapture = () => false;
 }
-
 if (!Element.prototype.setPointerCapture) {
   Element.prototype.setPointerCapture = () => undefined;
 }
-
 if (!Element.prototype.releasePointerCapture) {
   Element.prototype.releasePointerCapture = () => undefined;
 }
-
 if (!Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = () => undefined;
 }
@@ -89,55 +86,83 @@ const participantOptions: UserProfileVM[] = [
   } as UserProfileVM,
 ];
 
+const allRows = [
+  makeRow({
+    id: 'space-1',
+    title: 'Algebra Foundations',
+    participantDetails: [{ id: 'profile-1', displayName: 'Maya Johnson', kind: 'child' }],
+  }),
+  makeRow({
+    id: 'space-2',
+    title: 'Creative Writing',
+    subject: 'English',
+    participantDetails: [{ id: 'profile-2', displayName: 'Leo Carter', kind: 'child' }],
+  }),
+];
+
+function makeListResponse(rows: AdminLearningSpaceRow[]) {
+  return {
+    ok: true,
+    json: async () => ({ success: true, rows, total: rows.length, pageCount: 1 }),
+  } as Response;
+}
+
 describe('LearningSpacesDashboard', () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it('filters rows with the searchable participant combobox', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
-      ok: true,
-      json: async () => ({ data: participantOptions }),
-    } as Response);
+  it('renders rows from the list API', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
+      if (String(url).includes('/api/admin/spaces/list'))
+        return Promise.resolve(makeListResponse(allRows));
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ data: participantOptions }),
+      } as Response);
+    });
+
+    render(<LearningSpacesDashboard orgSlug="iconic-academy" />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Algebra Foundations')).toBeInTheDocument();
+      expect(screen.getByText('Creative Writing')).toBeInTheDocument();
+    });
+  });
+
+  it('filters rows via the participant combobox by re-fetching with participantId', async () => {
+    const leoRow = allRows.filter((r) => r.id === 'space-2');
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
+      const urlStr = String(url);
+      if (urlStr.includes('/api/admin/spaces/list')) {
+        const parsed = new URL(urlStr, 'http://localhost');
+        const participantId = parsed.searchParams.get('participantId');
+        return Promise.resolve(
+          makeListResponse(participantId === 'profile-2' ? leoRow : allRows),
+        );
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ data: participantOptions }),
+      } as Response);
+    });
 
     const user = userEvent.setup();
-    const rows = [
-      makeRow({
-        id: 'space-1',
-        title: 'Algebra Foundations',
-        participantNames: ['Maya Johnson'],
-        participantDetails: [
-          { id: 'profile-1', displayName: 'Maya Johnson', kind: 'child' },
-        ],
-      }),
-      makeRow({
-        id: 'space-2',
-        title: 'Creative Writing',
-        subject: 'English',
-        participantNames: ['Leo Carter'],
-        participantDetails: [
-          { id: 'profile-2', displayName: 'Leo Carter', kind: 'child' },
-        ],
-      }),
-    ];
+    render(<LearningSpacesDashboard orgSlug="iconic-academy" />);
 
-    render(<LearningSpacesDashboard rows={rows} />);
-
-    await waitFor(() =>
-      expect(globalThis.fetch).toHaveBeenCalledWith(
-        '/api/admin/spaces/participants',
-        expect.objectContaining({ method: 'GET' }),
-      ),
-    );
-
-    expect(screen.getByText('Algebra Foundations')).toBeInTheDocument();
-    expect(screen.getByText('Creative Writing')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('Algebra Foundations')).toBeInTheDocument();
+    });
 
     await user.click(screen.getByRole('combobox', { name: 'Filter by participant' }));
     await user.type(screen.getByPlaceholderText('Search participants...'), 'leo');
     await user.click(await screen.findByRole('option', { name: 'Leo Carter' }));
 
-    expect(screen.queryByText('Algebra Foundations')).not.toBeInTheDocument();
-    expect(screen.getByText('Creative Writing')).toBeInTheDocument();
+    await waitFor(() => {
+      const listUrl = fetchMock.mock.calls
+        .map((c) => String(c[0]))
+        .find((u) => u.includes('participantId=profile-2'));
+      expect(listUrl).toBeDefined();
+    });
   });
 });

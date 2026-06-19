@@ -12,50 +12,34 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AvatarGroup,
-  Badge,
   Button,
   Archive,
   ArchiveRestore,
-  Pencil,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  MessageCircle,
   MoreHorizontal,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
   Trash2,
   toast,
 } from '@iconicedu/ui-web';
+import { Settings } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@iconicedu/ui-web/ui/avatar';
 import { getLearningSpaceIcon } from '@iconicedu/ui-web/lib/icons';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@iconicedu/ui-web/ui/tooltip';
-import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
-import { getAvatarRoleLabel } from '@iconicedu/ui-web/components/shared/avatar-with-status';
-import type { ThemeKey } from '@iconicedu/shared-types';
 
-import type { AdminChannelRow } from '@iconicedu/web/lib/admin/channels';
+import type {
+  AdminChannelRow,
+  ChannelParticipantDetail,
+} from '@iconicedu/web/lib/admin/channels';
 
 type ChannelsTableProps = {
   rows: AdminChannelRow[];
-  onEdit: (row: AdminChannelRow) => void;
-};
-
-const STATUS_BADGE_VARIANTS: Record<string, 'secondary' | 'outline' | 'ghost'> = {
-  active: 'secondary',
-  archived: 'outline',
+  orgSlug: string;
 };
 
 function resolveDashboardBasePath(pathname: string | null): string {
   const firstSegment = pathname?.split('/').filter(Boolean)[0];
-  if (!firstSegment) {
-    return '/';
-  }
+  if (!firstSegment) return '/';
   return `/${firstSegment}`;
 }
 
@@ -67,13 +51,73 @@ function getChannelHref(row: AdminChannelRow, dashboardBasePath: string) {
     : `${dashboardBasePath}/c/${row.id}`;
 }
 
-function formatType(row: AdminChannelRow) {
-  const primary = row.purpose || row.kind || 'channel';
-  const secondary = row.kind && row.kind !== primary ? row.kind : null;
-  return { primary, secondary };
+function ChannelAvatar({ row }: { row: AdminChannelRow }) {
+  const isLearningSpace =
+    row.purpose === 'learning-space' || row.primary_entity_kind === 'learning_space';
+  const themeKey = row.ui_theme_key ?? null;
+  const themeClass = themeKey ? `theme-${themeKey}` : '';
+
+  if ((row.kind === 'dm' || row.kind === 'group_dm') && row.participantDetails?.length) {
+    const first = row.participantDetails[0];
+    const participantThemeClass = first.themeKey ? `theme-${first.themeKey}` : '';
+    return (
+      <Avatar className={`size-14 shrink-0 ${participantThemeClass}`}>
+        {first.avatarUrl ? (
+          <AvatarImage src={first.avatarUrl} alt={first.displayName} />
+        ) : null}
+        <AvatarFallback
+          className={participantThemeClass ? 'theme-bg theme-fg text-lg' : 'text-lg'}
+        >
+          {(first.displayName?.[0] ?? '?').toUpperCase()}
+        </AvatarFallback>
+      </Avatar>
+    );
+  }
+
+  const Icon = isLearningSpace ? getLearningSpaceIcon(row.icon_key) : null;
+  const initial = (row.topic?.[0] ?? '?').toUpperCase();
+
+  return (
+    <div
+      className={`flex size-14 shrink-0 items-center justify-center rounded-full border ${themeClass || 'border-border bg-muted text-muted-foreground'}`}
+      style={
+        themeKey
+          ? {
+              backgroundColor:
+                'color-mix(in oklab, var(--theme-bg) 15%, var(--muted) 85%)',
+              color: 'var(--theme-bg)',
+              borderColor: 'color-mix(in oklab, var(--theme-bg) 25%, transparent 75%)',
+            }
+          : undefined
+      }
+    >
+      {Icon ? (
+        <Icon className="size-6" aria-hidden />
+      ) : (
+        <span className="text-lg font-semibold">{initial}</span>
+      )}
+    </div>
+  );
 }
 
-export function ChannelsTable({ rows, onEdit }: ChannelsTableProps) {
+function MemberChip({ participant }: { participant: ChannelParticipantDetail }) {
+  const themeClass = participant.themeKey ? `theme-${participant.themeKey}` : '';
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2 py-0.5 text-xs text-foreground">
+      <Avatar className={`size-5 shrink-0 ${themeClass}`}>
+        {participant.avatarUrl ? (
+          <AvatarImage src={participant.avatarUrl} alt={participant.displayName} />
+        ) : null}
+        <AvatarFallback className={themeClass ? 'theme-bg theme-fg' : ''}>
+          {(participant.displayName?.[0] ?? '?').toUpperCase()}
+        </AvatarFallback>
+      </Avatar>
+      <span className="max-w-[120px] truncate">{participant.displayName}</span>
+    </span>
+  );
+}
+
+export function ChannelsTable({ rows, orgSlug }: ChannelsTableProps) {
   const router = useRouter();
   const pathname = usePathname();
   const dashboardBasePath = React.useMemo(
@@ -156,166 +200,101 @@ export function ChannelsTable({ rows, onEdit }: ChannelsTableProps) {
     }
   };
 
+  if (!rows.length) {
+    return (
+      <p className="px-6 py-10 text-center text-sm text-muted-foreground">
+        No channels found.
+      </p>
+    );
+  }
+
   return (
     <div className="w-full">
-      <Table className="min-w-full">
-        <TableHeader>
-          <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead>Participants</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Created</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((row) => {
-            const isLearningSpace =
-              row.purpose === 'learning-space' ||
-              row.primary_entity_kind === 'learning_space';
-            const TitleIcon = isLearningSpace
-              ? getLearningSpaceIcon(row.icon_key)
-              : MessageCircle;
-            const type = formatType(row);
-            return (
-              <TableRow
-                key={row.id}
-                className="border-b border-border/60 last:border-b-0"
-              >
-                <TableCell>
-                  <div className="flex items-center gap-3">
-                    <div className="flex size-8 items-center justify-center rounded-full border border-border bg-muted">
-                      <TitleIcon className="size-4 text-muted-foreground" />
-                    </div>
-                    <div className="min-w-0">
-                      <Link
-                        href={getChannelHref(row, dashboardBasePath)}
-                        className="text-sm font-semibold hover:underline"
-                      >
-                        {row.topic}
-                      </Link>
-                      {row.description ? (
-                        <p className="text-xs text-muted-foreground">{row.description}</p>
-                      ) : null}
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <p className="text-sm capitalize">{type.primary}</p>
-                  {type.secondary ? (
-                    <p className="text-xs text-muted-foreground capitalize">
-                      {type.secondary}
-                    </p>
-                  ) : null}
-                </TableCell>
-                <TableCell>
-                  {row.kind === 'dm' || row.kind === 'group_dm' ? (
-                    row.participantDetails?.length ? (
-                      <AvatarGroup className="justify-start">
-                        {row.participantDetails.map((participant) => (
-                          <Tooltip key={participant.id}>
-                            <TooltipTrigger asChild>
-                              <span className="inline-flex">
-                                <AvatarWithStatus
-                                  profileId={participant.id}
-                                  name={participant.displayName}
-                                  avatar={{
-                                    source: participant.avatarUrl ? 'upload' : 'seed',
-                                    url: participant.avatarUrl ?? null,
-                                  }}
-                                  themeKey={
-                                    (participant.themeKey as ThemeKey | null) ?? null
-                                  }
-                                  roleLabel={getAvatarRoleLabel(participant.kind)}
-                                  sizeClassName="size-8"
-                                />
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p className="text-xs font-medium">
-                                {participant.displayName}
-                              </p>
-                              <p className="text-xs text-muted-foreground capitalize">
-                                {participant.kind}
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        ))}
-                      </AvatarGroup>
-                    ) : (
-                      <span className="text-sm text-muted-foreground">—</span>
-                    )
-                  ) : (
-                    <span className="text-sm text-muted-foreground">
-                      {row.participantCount}
-                    </span>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <Badge
-                    variant={STATUS_BADGE_VARIANTS[row.status] ?? 'ghost'}
-                    className="text-xs px-3"
+      {rows.map((row) => {
+        return (
+          <div
+            key={row.id}
+            className="flex items-center justify-between gap-4 px-6 py-4 border-b border-border/60 last:border-b-0 hover:bg-muted/30 transition-colors"
+          >
+            {/* Left: avatar + name + chips */}
+            <div className="flex min-w-0 flex-1 items-center gap-4">
+              <ChannelAvatar row={row} />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Link
+                    href={getChannelHref(row, dashboardBasePath)}
+                    className="text-base font-semibold hover:underline"
                   >
-                    {row.status}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <span className="text-sm">
-                    {new Date(row.created_at).toLocaleDateString()}
+                    {row.topic}
+                  </Link>
+                  <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground font-normal capitalize">
+                    {row.purpose ?? row.kind}
                   </span>
-                </TableCell>
-                <TableCell className="text-right">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className="px-2">
-                        <MoreHorizontal className="size-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => onEdit(row)}>
-                        <Pencil className="mr-2 size-3" />
-                        Edit
-                      </DropdownMenuItem>
-                      {row.status === 'archived' ? (
-                        <DropdownMenuItem
-                          onClick={() => handleUnarchive(row)}
-                          disabled={unarchivingId === row.id}
-                        >
-                          <ArchiveRestore className="mr-2 size-3" />
-                          {unarchivingId === row.id ? 'Restoring…' : 'Unarchive'}
-                        </DropdownMenuItem>
-                      ) : (
-                        <DropdownMenuItem
-                          onClick={() => handleArchive(row)}
-                          disabled={archivingId === row.id}
-                        >
-                          <Archive className="mr-2 size-3" />
-                          {archivingId === row.id ? 'Archiving…' : 'Archive'}
-                        </DropdownMenuItem>
-                      )}
-                      <DropdownMenuItem
-                        onClick={() => setConfirmDeleteRow(row)}
-                        disabled={deletingId === row.id}
-                        className="text-destructive"
-                      >
-                        <Trash2 className="mr-2 size-3" />
-                        {deletingId === row.id ? 'Deleting…' : 'Delete'}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
+                </div>
+                {row.participantDetails?.length ? (
+                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                    {row.participantDetails.map((p) => (
+                      <MemberChip key={p.id} participant={p} />
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+            {/* Right: Settings button + overflow menu */}
+            <div className="flex shrink-0 items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => router.push(`/${orgSlug}/admin/channels/${row.id}`)}
+              >
+                <Settings className="size-3.5" />
+                Settings
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 rounded-full p-0">
+                    <MoreHorizontal className="size-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {row.status === 'archived' ? (
+                    <DropdownMenuItem
+                      onClick={() => handleUnarchive(row)}
+                      disabled={unarchivingId === row.id}
+                    >
+                      <ArchiveRestore className="mr-2 size-3" />
+                      {unarchivingId === row.id ? 'Restoring…' : 'Unarchive'}
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem
+                      onClick={() => handleArchive(row)}
+                      disabled={archivingId === row.id}
+                    >
+                      <Archive className="mr-2 size-3" />
+                      {archivingId === row.id ? 'Archiving…' : 'Archive'}
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem
+                    onClick={() => setConfirmDeleteRow(row)}
+                    disabled={deletingId === row.id}
+                    className="text-destructive"
+                  >
+                    <Trash2 className="mr-2 size-3" />
+                    {deletingId === row.id ? 'Deleting…' : 'Delete'}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+        );
+      })}
+
       <AlertDialog
         open={Boolean(confirmDeleteRow)}
         onOpenChange={(open) => {
-          if (!open) {
-            setConfirmDeleteRow(null);
-          }
+          if (!open) setConfirmDeleteRow(null);
         }}
       >
         <AlertDialogContent>
@@ -329,9 +308,7 @@ export function ChannelsTable({ rows, onEdit }: ChannelsTableProps) {
             <AlertDialogCancel disabled={Boolean(deletingId)}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
-                if (confirmDeleteRow) {
-                  void handleDelete(confirmDeleteRow);
-                }
+                if (confirmDeleteRow) void handleDelete(confirmDeleteRow);
               }}
               disabled={Boolean(deletingId)}
             >
