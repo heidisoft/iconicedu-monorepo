@@ -35,6 +35,11 @@ type InviteUserResult = {
   email: string;
   inviteUrl: string;
   actionLink?: string | null;
+  // false when the user already had a Supabase auth account — invite email was not
+  // re-sent (inviteUserByEmail returns 422 for existing users), but DB setup completed
+  // and a login link was generated instead.
+  emailSent: boolean;
+  alreadyRegistered?: boolean;
 };
 
 function resolveInviteRoleState(
@@ -287,17 +292,26 @@ export async function inviteAdminUserAction(
   if (mode === 'invite') {
     const { error: inviteEmailError } = await adminClient.auth.admin.inviteUserByEmail(
       normalizedEmail,
-      {
-        redirectTo,
-      },
+      { redirectTo },
     );
-    if (inviteEmailError) {
+
+    // 422 = "User already registered" in Supabase auth.
+    // This happens when the user was previously invited (the invite link was emailed
+    // but never clicked) or already has a confirmed account via another path.
+    // The DB records (account, profile, role) were all set up correctly above, so
+    // this is not a fatal error — we just can't re-send an invite email.
+    // For any other error (network, config, permissions), we still throw.
+    const alreadyRegisteredInAuth = inviteEmailError?.status === 422;
+    if (inviteEmailError && !alreadyRegisteredInAuth) {
       throw inviteEmailError;
     }
 
+    // For an already-registered auth user, generate a magic link so the admin can
+    // share a working login link manually. For new users, generate an invite link.
+    const effectiveLinkType = alreadyRegisteredInAuth ? 'magiclink' : linkType;
     const { data: inviteData, error: inviteError } =
       await adminClient.auth.admin.generateLink({
-        type: linkType,
+        type: effectiveLinkType,
         email: normalizedEmail,
         options: { redirectTo },
       });
@@ -320,6 +334,8 @@ export async function inviteAdminUserAction(
       email: normalizedEmail,
       inviteUrl: actionLink,
       actionLink,
+      emailSent: !alreadyRegisteredInAuth,
+      alreadyRegistered: alreadyRegisteredInAuth,
     };
   }
 
@@ -351,6 +367,7 @@ export async function inviteAdminUserAction(
     email: normalizedEmail,
     inviteUrl: actionLink,
     actionLink,
+    emailSent: true,
   };
 }
 

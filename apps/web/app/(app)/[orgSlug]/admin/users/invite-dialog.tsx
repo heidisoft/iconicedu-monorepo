@@ -59,13 +59,17 @@ export function InviteUserDialog({ className }: { className?: string }) {
       if (inviteLink) {
         setGeneratedInviteUrl(inviteLink);
       }
-      toast.success('Invite email sent');
+      if (result.alreadyRegistered) {
+        toast.success(
+          'User set up — already has an account, so no invite email was sent. Share the login link below.',
+        );
+      } else {
+        toast.success('Invite email sent');
+      }
       router.refresh();
     } catch (error) {
       setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : 'Unable to send magic link at this time.',
+        error instanceof Error ? error.message : 'Unable to send invite at this time.',
       );
     } finally {
       setIsSubmitting(false);
@@ -145,10 +149,7 @@ export function InviteUserDialog({ className }: { className?: string }) {
           {generatedInviteUrl && (
             <div className="rounded-lg border border-border bg-muted px-3 py-2 text-sm">
               <div className="flex items-center justify-between gap-2">
-                <span
-                  className="text-xs text-muted-foreground break-words"
-                  style={{ wordBreak: 'break-word' }}
-                >
+                <span className="text-xs text-muted-foreground wrap-break-word">
                   {generatedInviteUrl}
                 </span>
                 <Button

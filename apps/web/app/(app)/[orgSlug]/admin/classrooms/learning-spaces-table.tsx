@@ -215,15 +215,15 @@ export function LearningSpacesTable({ rows, orgSlug }: LearningSpacesTableProps)
         return (
           <div
             key={row.id}
-            className="flex items-center justify-between gap-4 px-6 py-4 border-b border-border/60 last:border-b-0 hover:bg-muted/30 transition-colors"
+            className="flex items-start justify-between gap-4 px-6 py-4 border-b border-border/60 last:border-b-0 hover:bg-muted/30 transition-colors"
           >
-            {/* Left: icon + title + participants + schedules */}
-            <div className="flex min-w-0 flex-1 items-center gap-4">
+            {/* Left: icon + title + schedules + participants */}
+            <div className="flex min-w-0 flex-1 items-start gap-3">
               <div className="shrink-0">
                 <ThemedIconBadge
                   icon={TitleIcon}
                   themeKey={row.themeKey ?? null}
-                  size="lg"
+                  size="md"
                 />
               </div>
               <div className="min-w-0 flex-1">
@@ -247,6 +247,10 @@ export function LearningSpacesTable({ rows, orgSlug }: LearningSpacesTableProps)
                   )}
                 </div>
 
+                <div className="mt-1.5">
+                  <ScheduleList row={row} />
+                </div>
+
                 {row.participantDetails.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mt-1.5">
                     {row.participantDetails.map((p) => (
@@ -254,15 +258,11 @@ export function LearningSpacesTable({ rows, orgSlug }: LearningSpacesTableProps)
                     ))}
                   </div>
                 )}
-
-                <div className="mt-1.5">
-                  <ScheduleList row={row} />
-                </div>
               </div>
             </div>
 
             {/* Right: Settings button + overflow menu */}
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex shrink-0 items-start gap-2 pt-0.5">
               <Button
                 variant="outline"
                 size="sm"
