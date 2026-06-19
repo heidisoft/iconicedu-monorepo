@@ -51,11 +51,11 @@ import {
   User,
   Users,
 } from '@iconicedu/ui-web';
+import { Clock3, MapPin } from 'lucide-react';
 
 import { AdminFilterBar } from '@iconicedu/web/components/admin/admin-filter-bar';
 import { InviteUserDialog } from '@iconicedu/web/app/(app)/[orgSlug]/admin/users/invite-dialog';
 import { buildAdminUserDmPath } from '@iconicedu/web/app/(app)/[orgSlug]/admin/users/users-table.utils';
-import type { GroupedAdminUserRow } from '@iconicedu/web/app/(app)/[orgSlug]/admin/users/users-table.utils';
 import type { AdminUserRow } from '@iconicedu/web/lib/admin/users';
 import type {
   AvatarSource,
@@ -201,7 +201,6 @@ export function UsersTable({ orgSlug }: UsersTableProps) {
     roleStatus: 'unassigned',
   });
   const [editSaving, setEditSaving] = React.useState(false);
-  const [expandedParentIds, setExpandedParentIds] = React.useState<string[]>([]);
   const [previewOpen, setPreviewOpen] = React.useState(false);
   const [previewLoading, setPreviewLoading] = React.useState(false);
   const [previewError, setPreviewError] = React.useState<string | null>(null);
@@ -210,7 +209,7 @@ export function UsersTable({ orgSlug }: UsersTableProps) {
   const [previewUser, setPreviewUser] = React.useState<UserRow | null>(null);
 
   // Lazy-load state
-  const [groups, setGroups] = React.useState<GroupedAdminUserRow[]>([]);
+  const [rows, setRows] = React.useState<AdminUserRow[]>([]);
   const [total, setTotal] = React.useState(0);
   const [pageCount, setPageCount] = React.useState(1);
   const [loading, setLoading] = React.useState(true);
@@ -219,6 +218,7 @@ export function UsersTable({ orgSlug }: UsersTableProps) {
   const [search, setSearch] = React.useState('');
   const [debouncedSearch, setDebouncedSearch] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState<'all' | string>('all');
+  const [roleFilter, setRoleFilter] = React.useState('all');
   const [sortBy, setSortBy] = React.useState<'recently_active' | 'created'>(
     'recently_active',
   );
@@ -233,7 +233,7 @@ export function UsersTable({ orgSlug }: UsersTableProps) {
   // Reset to page 1 when filters change
   React.useEffect(() => {
     setPageIndex(1);
-  }, [debouncedSearch, statusFilter, sortBy]);
+  }, [debouncedSearch, statusFilter, roleFilter, sortBy]);
 
   // Fetch page from API
   const fetchPage = React.useCallback(
@@ -246,12 +246,13 @@ export function UsersTable({ orgSlug }: UsersTableProps) {
           page: String(page),
           ...(debouncedSearch ? { search: debouncedSearch } : {}),
           ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
+          ...(roleFilter !== 'all' ? { role: roleFilter } : {}),
           ...(sortBy !== 'recently_active' ? { sortBy } : {}),
         });
         const res = await fetch(`/api/admin/users/list?${params.toString()}`);
         const json = await res.json();
         if (!res.ok || !json.success) throw new Error(json.message ?? 'Failed to load');
-        setGroups(json.groups);
+        setRows(json.rows);
         setTotal(json.total);
         setPageCount(json.pageCount);
       } catch (err) {
@@ -260,7 +261,7 @@ export function UsersTable({ orgSlug }: UsersTableProps) {
         setLoading(false);
       }
     },
-    [orgSlug, debouncedSearch, statusFilter, sortBy],
+    [orgSlug, debouncedSearch, statusFilter, roleFilter, sortBy],
   );
 
   React.useEffect(() => {
@@ -452,25 +453,11 @@ export function UsersTable({ orgSlug }: UsersTableProps) {
     }
   };
 
-  const toggleExpandedParent = (parentId: string) => {
-    setExpandedParentIds((current) =>
-      current.includes(parentId)
-        ? current.filter((id) => id !== parentId)
-        : [...current, parentId],
-    );
-  };
-
-  const renderUserRow = (
-    row: UserRow,
-    options?: { childrenCount?: number; expanded?: boolean },
-  ) => {
+  const renderUserRow = (row: UserRow) => {
     const displayName = getUserDisplayName(row);
     const relativeLastSeen = formatRelativeLastSeen(row.lastSeenAt);
     const Icon =
       PROFILE_ICON_MAP[row.profileKind ?? 'default'] ?? PROFILE_ICON_MAP.default;
-    const childrenCount = options?.childrenCount ?? 0;
-    const expanded = options?.expanded ?? false;
-    const isExpandable = childrenCount > 0;
 
     return (
       <div
@@ -518,22 +505,20 @@ export function UsersTable({ orgSlug }: UsersTableProps) {
               >
                 {displayName}
               </button>
-              {isExpandable && (
-                <button
-                  type="button"
-                  onClick={() => toggleExpandedParent(row.id)}
-                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                  aria-label={
-                    expanded ? 'Collapse child accounts' : 'Expand child accounts'
-                  }
-                  aria-expanded={expanded}
-                >
-                  <ChevronRight
-                    className={`h-3 w-3 transition-transform ${expanded ? 'rotate-90' : ''}`}
-                  />
-                  {childrenCount} child{childrenCount === 1 ? '' : 'ren'}
-                </button>
+              {row.profileKind && (
+                <span className="inline-flex items-center gap-1 rounded-full border bg-background px-2 py-0.5 text-xs text-muted-foreground">
+                  <Icon className="h-3 w-3" aria-hidden />
+                  {row.profileKind.charAt(0).toUpperCase() + row.profileKind.slice(1)}
+                </span>
               )}
+              {row.profileKind === 'guardian' &&
+                (row.linkedChildAccountIds?.length ?? 0) > 0 && (
+                  <span className="inline-flex items-center gap-1 rounded-full border bg-background px-2 py-0.5 text-xs text-muted-foreground">
+                    <Users className="h-3 w-3" aria-hidden />
+                    {row.linkedChildAccountIds!.length}{' '}
+                    {row.linkedChildAccountIds!.length === 1 ? 'child' : 'children'}
+                  </span>
+                )}
             </div>
             {(row.email || row.phone) && (
               <p className="text-xs text-muted-foreground mt-0.5">
@@ -541,24 +526,22 @@ export function UsersTable({ orgSlug }: UsersTableProps) {
               </p>
             )}
             {/* Chips */}
-            <div className="flex flex-wrap items-center gap-1.5 mt-2">
-              {row.profileKind && (
-                <span className="inline-flex items-center gap-1 rounded-full border bg-background px-2.5 py-0.5 text-xs text-muted-foreground">
-                  <Icon className="h-3 w-3" aria-hidden />
-                  {row.profileKind.charAt(0).toUpperCase() + row.profileKind.slice(1)}
-                </span>
-              )}
-              {row.countryName && (
-                <span className="inline-flex items-center rounded-full border bg-background px-2.5 py-0.5 text-xs text-muted-foreground">
-                  {row.countryName}
-                </span>
-              )}
-              {relativeLastSeen && (
-                <span className="inline-flex items-center rounded-full border bg-background px-2.5 py-0.5 text-xs text-muted-foreground">
-                  {relativeLastSeen}
-                </span>
-              )}
-            </div>
+            {(row.countryName || relativeLastSeen) && (
+              <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                {row.countryName && (
+                  <span className="inline-flex items-center gap-1 rounded-full border bg-background px-2 py-0.5 text-xs text-muted-foreground">
+                    <MapPin className="h-3 w-3 shrink-0" aria-hidden />
+                    {row.countryName}
+                  </span>
+                )}
+                {relativeLastSeen && (
+                  <span className="inline-flex items-center gap-1 rounded-full border bg-background px-2 py-0.5 text-xs text-muted-foreground">
+                    <Clock3 className="h-3 w-3 shrink-0" aria-hidden />
+                    {relativeLastSeen}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Right: status badge + actions */}
@@ -625,164 +608,6 @@ export function UsersTable({ orgSlug }: UsersTableProps) {
     );
   };
 
-  const renderChildPanelRow = (parent: UserRow, children: UserRow[]) => {
-    return (
-      <div
-        key={`${parent.id}:children`}
-        className="bg-muted/20 border-b border-border/60 last:border-b-0"
-      >
-        <div className="mx-6 my-4 rounded-xl border border-border/60 bg-background p-3">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-medium">Linked child accounts</p>
-              <p className="text-xs text-muted-foreground">
-                Accounts connected to {getUserDisplayName(parent)}.
-              </p>
-            </div>
-            <Badge variant="secondary">{children.length}</Badge>
-          </div>
-          <div className="space-y-2">
-            {children.map((child) => {
-              const displayName = getUserDisplayName(child);
-              const Icon =
-                PROFILE_ICON_MAP[child.profileKind ?? 'default'] ??
-                PROFILE_ICON_MAP.default;
-              return (
-                <div
-                  key={`${parent.id}:${child.id}`}
-                  className="flex flex-col gap-3 rounded-lg border border-border/60 bg-card px-3 py-3 md:flex-row md:items-center md:justify-between"
-                >
-                  <div className="flex min-w-0 items-center gap-3">
-                    <AvatarWithStatus
-                      accountId={child.id}
-                      profileId={child.profileId ?? null}
-                      name={displayName}
-                      avatar={{
-                        source: resolveAvatarSource(child.avatarSource),
-                        url: child.avatarUrl ?? null,
-                        seed:
-                          resolveAvatarSource(child.avatarSource) === 'seed'
-                            ? (child.email ?? undefined)
-                            : undefined,
-                      }}
-                      themeKey={resolveThemeKey(child.themeKey)}
-                      email={child.email ?? null}
-                      roleLabel={getAvatarRoleLabel(child.profileKind ?? null)}
-                      timezone={child.timezone ?? null}
-                      locationLabel={getAvatarLocationLabel({
-                        city: null,
-                        region: null,
-                        countryName: child.countryName ?? null,
-                      })}
-                      onMessageClick={
-                        child.profileId
-                          ? () => handleStartDirectMessage(child)
-                          : undefined
-                      }
-                      sizeClassName="size-8"
-                    />
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          className="text-left text-sm font-semibold capitalize underline-offset-4 hover:underline"
-                          onClick={() => void handleOpenProfilePreview(child)}
-                        >
-                          {displayName}
-                        </button>
-                        <Badge
-                          variant="outline"
-                          className="text-[10px] uppercase tracking-wide"
-                        >
-                          Child
-                        </Badge>
-                      </div>
-                      {child.email ? (
-                        <p className="text-xs text-muted-foreground">{child.email}</p>
-                      ) : null}
-                      {child.phone ? (
-                        <p className="text-xs text-muted-foreground">{child.phone}</p>
-                      ) : null}
-                      {!child.email && !child.phone ? (
-                        <p className="text-xs text-muted-foreground">—</p>
-                      ) : null}
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-3 md:justify-end">
-                    <div className="inline-flex items-center gap-2 text-sm capitalize">
-                      <Icon className="size-4 text-muted-foreground" aria-hidden />
-                      {child.profileKind ?? 'account'}
-                    </div>
-                    <Badge
-                      variant={STATUS_BADGE_VARIANTS[child.status] ?? 'ghost'}
-                      className="text-xs capitalize"
-                    >
-                      {child.status}
-                    </Badge>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="px-2"
-                          aria-label={`Actions for ${displayName}`}
-                          disabled={deletingId === child.id}
-                        >
-                          <MoreHorizontal className="size-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() => openEditDialog(child)}
-                          disabled={Boolean(rowActionLoading) || deletingId === child.id}
-                        >
-                          <User className="size-3 mr-2" /> Edit profile
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleStartDirectMessage(child)}
-                          disabled={
-                            Boolean(rowActionLoading) ||
-                            deletingId === child.id ||
-                            !child.profileId
-                          }
-                        >
-                          <MessageCircle className="size-3 mr-2" /> Send message
-                        </DropdownMenuItem>
-                        {child.status === 'invited' && (
-                          <DropdownMenuItem
-                            onClick={() => handleRowInviteAction(child, 'invite')}
-                            disabled={
-                              Boolean(rowActionLoading) || deletingId === child.id
-                            }
-                          >
-                            <Copy className="size-3 mr-2" /> Resend invite
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuItem
-                          onClick={() => handleRowInviteAction(child, 'link')}
-                          disabled={Boolean(rowActionLoading) || deletingId === child.id}
-                        >
-                          <Copy className="size-3 mr-2" /> Generate a login link
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => openDeleteDialog(child)}
-                          disabled={deletingId === child.id}
-                        >
-                          <Trash2 className="size-3 mr-2" />
-                          {deletingId === child.id ? 'Deleting…' : 'Delete'}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div className="flex flex-col gap-4">
       {/* Title row */}
@@ -813,6 +638,18 @@ export function UsersTable({ orgSlug }: UsersTableProps) {
             onChange: setStatusFilter,
           },
           {
+            label: 'Role',
+            value: roleFilter,
+            options: [
+              { value: 'all', label: 'All' },
+              { value: 'guardian', label: 'Parent' },
+              { value: 'educator', label: 'Tutor' },
+              { value: 'child', label: 'Student' },
+              { value: 'staff', label: 'Staff' },
+            ],
+            onChange: setRoleFilter,
+          },
+          {
             label: 'Sort',
             value: sortBy,
             options: [
@@ -840,23 +677,12 @@ export function UsersTable({ orgSlug }: UsersTableProps) {
               <div className="px-6 py-10 text-center text-sm text-destructive">
                 {fetchError}
               </div>
-            ) : !loading && groups.length === 0 ? (
+            ) : !loading && rows.length === 0 ? (
               <div className="px-6 py-10 text-center text-sm text-muted-foreground">
                 No users found.
               </div>
             ) : (
-              groups.flatMap((group) => {
-                const expanded = expandedParentIds.includes(group.row.id);
-                return [
-                  renderUserRow(group.row, {
-                    childrenCount: group.children.length,
-                    expanded,
-                  }),
-                  ...(expanded && group.children.length
-                    ? [renderChildPanelRow(group.row, group.children)]
-                    : []),
-                ];
-              })
+              rows.map((row) => renderUserRow(row))
             )}
           </div>
         </div>

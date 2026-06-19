@@ -182,6 +182,7 @@ export async function getAdminUserRowsPaginated(
     pageSize: number;
     search?: string;
     status?: string;
+    role?: string;
     sortBy?: 'recently_active' | 'created';
   },
 ): Promise<AdminUserRowsPage> {
@@ -224,6 +225,7 @@ export async function getAdminUserRowsPaginated(
     allAccountIds,
   );
   type NameRow = {
+    id: string | null;
     account_id: string | null;
     kind: string | null;
     display_name: string | null;
@@ -253,6 +255,7 @@ export async function getAdminUserRowsPaginated(
     pageSize,
     search = '',
     status = 'all',
+    role = 'all',
     sortBy = 'recently_active',
   } = options;
   const normalizedSearch = search.trim().toLowerCase();
@@ -265,6 +268,10 @@ export async function getAdminUserRowsPaginated(
           ? 'invited'
           : 'active';
     if (status !== 'all' && normalizedStatus !== status) return false;
+    if (role !== 'all') {
+      const kind = nameByAccountId.get(account.id)?.kind?.toLowerCase() ?? '';
+      if (kind !== role.toLowerCase()) return false;
+    }
     if (!normalizedSearch) return true;
     const name = resolveName(account.id, account.email).toLowerCase();
     const kind = nameByAccountId.get(account.id)?.kind?.toLowerCase() ?? '';
@@ -280,40 +287,42 @@ export async function getAdminUserRowsPaginated(
   if (sortBy === 'created') {
     filtered.sort((a, b) => b.created_at.localeCompare(a.created_at));
   } else {
-    filtered.sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+    // "recently_active": sort by presence last_seen_at desc (null → end).
+    // Load presence for all filtered accounts before paginating so the sort is correct.
+    const filteredProfileIds = filtered
+      .map((a) => nameByAccountId.get(a.id)?.id)
+      .filter((id): id is string => Boolean(id));
+    const { data: allPresenceRows } = filteredProfileIds.length
+      ? await getPresenceByProfileIds(supabase, orgId, filteredProfileIds)
+      : { data: [] };
+    const lastSeenByProfileIdEarly = new Map<string, string>(
+      (allPresenceRows ?? [])
+        .filter((r) => r.last_seen_at)
+        .map((r) => [r.profile_id, r.last_seen_at!]),
+    );
+    const getLastSeen = (accountId: string): string | null => {
+      const profileId = nameByAccountId.get(accountId)?.id ?? null;
+      return profileId ? (lastSeenByProfileIdEarly.get(profileId) ?? null) : null;
+    };
+    filtered.sort((a, b) => {
+      const la = getLastSeen(a.id);
+      const lb = getLastSeen(b.id);
+      if (la && lb) return lb.localeCompare(la);
+      if (la) return -1;
+      if (lb) return 1;
+      return b.updated_at.localeCompare(a.updated_at);
+    });
   }
 
-  // Group into families (children hidden under their guardian)
-  const childAccountIds = new Set(
-    filtered.flatMap((a) =>
-      Array.from(linkedGuardianAccountIdsByChildId.get(a.id)?.size ? [a.id] : []),
-    ),
-  );
-  // Only "head" rows (not appearing as a child under a guardian in the filtered set)
-  const headAccounts = filtered.filter((a) => {
-    if (!linkedGuardianAccountIdsByChildId.has(a.id)) return true;
-    // check if any guardian is also in the filtered set
-    const guardianIds = linkedGuardianAccountIdsByChildId.get(a.id) ?? new Set();
-    return ![...guardianIds].some((gId) => filtered.find((f) => f.id === gId));
-  });
-
-  const total = headAccounts.length;
+  const total = filtered.length;
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
   const safePage = Math.min(page, pageCount);
-  const pageHead = headAccounts.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const pageAccounts = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
 
-  // Collect all account IDs for this page (heads + their children)
-  const pageAccountIds = new Set<string>(pageHead.map((a) => a.id));
-  pageHead.forEach((a) => {
-    (linkedChildAccountIdsByGuardianId.get(a.id) ?? new Set()).forEach((cId) => {
-      if (childAccountIds.has(cId)) pageAccountIds.add(cId);
-    });
-  });
-
-  if (pageAccountIds.size === 0) return { rows: [], total, pageCount };
+  if (pageAccounts.length === 0) return { rows: [], total, pageCount };
 
   // Phase 2 — heavy: full profiles + presence for only this page's accounts
-  const pageAccountIdArr = Array.from(pageAccountIds);
+  const pageAccountIdArr = pageAccounts.map((a) => a.id);
   const { data: profiles } = await getProfileSummariesByAccountIds(
     supabase,
     orgId,
@@ -340,12 +349,7 @@ export async function getAdminUserRowsPaginated(
     lastSeenByProfileId.set(r.profile_id, r.last_seen_at ?? null);
   });
 
-  // Build the page accounts map (includes children of page heads)
-  const pageAccountMap = new Map(
-    allAccounts.filter((a) => pageAccountIds.has(a.id)).map((a) => [a.id, a]),
-  );
-
-  const mapAccount = (account: AccountRow): AdminUserRow =>
+  const rows: AdminUserRow[] = pageAccounts.map((account) =>
     mapAccountToRow(
       account,
       profileByAccountId.get(account.id) ?? null,
@@ -363,22 +367,8 @@ export async function getAdminUserRowsPaginated(
           linkedGuardianAccountIdsByChildId.get(account.id) ?? [],
         ),
       },
-    );
-
-  // Return flat list in correct order: head then its children, repeat
-  const rows: AdminUserRow[] = [];
-  pageHead.forEach((headAccount) => {
-    const account = pageAccountMap.get(headAccount.id);
-    if (!account) return;
-    rows.push(mapAccount(account));
-    // append children in original order
-    (linkedChildAccountIdsByGuardianId.get(headAccount.id) ?? new Set()).forEach(
-      (cId) => {
-        const child = pageAccountMap.get(cId);
-        if (child) rows.push(mapAccount(child));
-      },
-    );
-  });
+    ),
+  );
 
   return { rows, total, pageCount };
 }

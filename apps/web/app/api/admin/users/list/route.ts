@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 
 import { getAdminUserRowsPaginated } from '@iconicedu/web/lib/admin/users';
-import { groupUsersByFamily } from '@iconicedu/web/app/(app)/[orgSlug]/admin/users/users-table.utils';
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 
@@ -13,6 +12,7 @@ export async function GET(request: Request) {
   const page = Math.max(1, Number(url.searchParams.get('page') ?? 1));
   const search = url.searchParams.get('search')?.trim() ?? '';
   const status = url.searchParams.get('status') ?? 'all';
+  const role = url.searchParams.get('role') ?? 'all';
   const sortByRaw = url.searchParams.get('sortBy') ?? 'recently_active';
   const sortBy = sortByRaw === 'created' ? 'created' : 'recently_active';
 
@@ -39,12 +39,11 @@ export async function GET(request: Request) {
       pageSize: PAGE_SIZE,
       search,
       status,
+      role,
       sortBy,
     });
 
-    const groups = groupUsersByFamily(rows);
-
-    return NextResponse.json({ success: true, groups, total, pageCount });
+    return NextResponse.json({ success: true, rows, total, pageCount });
   } catch (error) {
     return NextResponse.json(
       {
