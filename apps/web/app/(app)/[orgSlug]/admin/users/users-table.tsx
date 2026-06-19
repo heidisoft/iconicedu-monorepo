@@ -219,6 +219,9 @@ export function UsersTable({ orgSlug }: UsersTableProps) {
   const [search, setSearch] = React.useState('');
   const [debouncedSearch, setDebouncedSearch] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState<'all' | string>('all');
+  const [sortBy, setSortBy] = React.useState<'recently_active' | 'created'>(
+    'recently_active',
+  );
   const [pageIndex, setPageIndex] = React.useState(1);
 
   // Debounce search input
@@ -230,7 +233,7 @@ export function UsersTable({ orgSlug }: UsersTableProps) {
   // Reset to page 1 when filters change
   React.useEffect(() => {
     setPageIndex(1);
-  }, [debouncedSearch, statusFilter]);
+  }, [debouncedSearch, statusFilter, sortBy]);
 
   // Fetch page from API
   const fetchPage = React.useCallback(
@@ -243,6 +246,7 @@ export function UsersTable({ orgSlug }: UsersTableProps) {
           page: String(page),
           ...(debouncedSearch ? { search: debouncedSearch } : {}),
           ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
+          ...(sortBy !== 'recently_active' ? { sortBy } : {}),
         });
         const res = await fetch(`/api/admin/users/list?${params.toString()}`);
         const json = await res.json();
@@ -256,7 +260,7 @@ export function UsersTable({ orgSlug }: UsersTableProps) {
         setLoading(false);
       }
     },
-    [orgSlug, debouncedSearch, statusFilter],
+    [orgSlug, debouncedSearch, statusFilter, sortBy],
   );
 
   React.useEffect(() => {
@@ -807,6 +811,15 @@ export function UsersTable({ orgSlug }: UsersTableProps) {
               { value: 'archived', label: 'Archived' },
             ],
             onChange: setStatusFilter,
+          },
+          {
+            label: 'Sort',
+            value: sortBy,
+            options: [
+              { value: 'recently_active', label: 'Recently active' },
+              { value: 'created', label: 'Newest first' },
+            ],
+            onChange: (v) => setSortBy(v as 'recently_active' | 'created'),
           },
         ]}
       />

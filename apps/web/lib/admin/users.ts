@@ -182,6 +182,7 @@ export async function getAdminUserRowsPaginated(
     pageSize: number;
     search?: string;
     status?: string;
+    sortBy?: 'recently_active' | 'created';
   },
 ): Promise<AdminUserRowsPage> {
   if (!orgId) return { rows: [], total: 0, pageCount: 1 };
@@ -247,7 +248,13 @@ export async function getAdminUserRowsPaginated(
   };
 
   // Apply status filter + search filter at account level
-  const { page, pageSize, search = '', status = 'all' } = options;
+  const {
+    page,
+    pageSize,
+    search = '',
+    status = 'all',
+    sortBy = 'recently_active',
+  } = options;
   const normalizedSearch = search.trim().toLowerCase();
 
   const filtered = allAccounts.filter((account) => {
@@ -269,8 +276,12 @@ export async function getAdminUserRowsPaginated(
     );
   });
 
-  // Sort by updated_at desc (same default as getAdminUserRows)
-  filtered.sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+  // Sort
+  if (sortBy === 'created') {
+    filtered.sort((a, b) => b.created_at.localeCompare(a.created_at));
+  } else {
+    filtered.sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+  }
 
   // Group into families (children hidden under their guardian)
   const childAccountIds = new Set(

@@ -13,6 +13,8 @@ export async function GET(request: Request) {
   const page = Math.max(1, Number(url.searchParams.get('page') ?? 1));
   const search = url.searchParams.get('search')?.trim() ?? '';
   const status = url.searchParams.get('status') ?? 'all';
+  const sortByRaw = url.searchParams.get('sortBy') ?? 'recently_active';
+  const sortBy = sortByRaw === 'created' ? 'created' : 'recently_active';
 
   if (!orgSlug) {
     return NextResponse.json(
@@ -37,6 +39,7 @@ export async function GET(request: Request) {
       pageSize: PAGE_SIZE,
       search,
       status,
+      sortBy,
     });
 
     const groups = groupUsersByFamily(rows);
