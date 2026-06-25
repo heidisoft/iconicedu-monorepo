@@ -56,12 +56,12 @@ function ChannelAvatar({ row }: { row: AdminChannelRow }) {
     const first = row.participantDetails[0];
     const participantThemeClass = first.themeKey ? `theme-${first.themeKey}` : '';
     return (
-      <Avatar className={`size-14 shrink-0 ${participantThemeClass}`}>
+      <Avatar className={`size-9 shrink-0 ${participantThemeClass}`}>
         {first.avatarUrl ? (
           <AvatarImage src={first.avatarUrl} alt={first.displayName} />
         ) : null}
         <AvatarFallback
-          className={participantThemeClass ? 'theme-bg theme-fg text-lg' : 'text-lg'}
+          className={participantThemeClass ? 'theme-bg theme-fg text-sm' : 'text-sm'}
         >
           {(first.displayName?.[0] ?? '?').toUpperCase()}
         </AvatarFallback>
@@ -74,7 +74,7 @@ function ChannelAvatar({ row }: { row: AdminChannelRow }) {
 
   return (
     <div
-      className={`flex size-14 shrink-0 items-center justify-center rounded-full border ${themeClass || 'border-border bg-muted text-muted-foreground'}`}
+      className={`flex size-9 shrink-0 items-center justify-center rounded-full border ${themeClass || 'border-border bg-muted text-muted-foreground'}`}
       style={
         themeKey
           ? {
@@ -87,9 +87,9 @@ function ChannelAvatar({ row }: { row: AdminChannelRow }) {
       }
     >
       {Icon ? (
-        <Icon className="size-6" aria-hidden />
+        <Icon className="h-4.5 w-4.5" aria-hidden />
       ) : (
-        <span className="text-lg font-semibold">{initial}</span>
+        <span className="text-sm font-semibold">{initial}</span>
       )}
     </div>
   );
