@@ -15,15 +15,10 @@ import {
   Button,
   Archive,
   ArchiveRestore,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  MoreHorizontal,
+  Pencil,
   Trash2,
   toast,
 } from '@iconicedu/ui-web';
-import { Settings } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@iconicedu/ui-web/ui/avatar';
 import { getLearningSpaceIcon } from '@iconicedu/ui-web/lib/icons';
 
@@ -241,51 +236,54 @@ export function ChannelsTable({ rows, orgSlug }: ChannelsTableProps) {
               </div>
             </div>
 
-            {/* Right: Settings button + overflow menu */}
-            <div className="flex shrink-0 items-center gap-2">
+            {/* Right: actions */}
+            <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-1.5"
+                className="h-8 w-8 p-0"
+                aria-label={`Edit ${row.topic}`}
+                title="Edit channel"
                 onClick={() => router.push(`/${orgSlug}/admin/channels/${row.id}`)}
               >
-                <Settings className="size-3.5" />
-                Settings
+                <Pencil className="size-4" />
               </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 rounded-full p-0">
-                    <MoreHorizontal className="size-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {row.status === 'archived' ? (
-                    <DropdownMenuItem
-                      onClick={() => handleUnarchive(row)}
-                      disabled={unarchivingId === row.id}
-                    >
-                      <ArchiveRestore className="mr-2 size-3" />
-                      {unarchivingId === row.id ? 'Restoring…' : 'Unarchive'}
-                    </DropdownMenuItem>
-                  ) : (
-                    <DropdownMenuItem
-                      onClick={() => handleArchive(row)}
-                      disabled={archivingId === row.id}
-                    >
-                      <Archive className="mr-2 size-3" />
-                      {archivingId === row.id ? 'Archiving…' : 'Archive'}
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuItem
-                    onClick={() => setConfirmDeleteRow(row)}
-                    disabled={deletingId === row.id}
-                    className="text-destructive"
-                  >
-                    <Trash2 className="mr-2 size-3" />
-                    {deletingId === row.id ? 'Deleting…' : 'Delete'}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              {row.status === 'archived' ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  aria-label={`Unarchive ${row.topic}`}
+                  title="Unarchive"
+                  onClick={() => handleUnarchive(row)}
+                  disabled={unarchivingId === row.id}
+                >
+                  <ArchiveRestore className="size-4" />
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  aria-label={`Archive ${row.topic}`}
+                  title="Archive"
+                  onClick={() => handleArchive(row)}
+                  disabled={archivingId === row.id}
+                >
+                  <Archive className="size-4" />
+                </Button>
+              )}
+              <Button
+                variant="destructive"
+                size="sm"
+                className="h-8 w-8 p-0"
+                aria-label={`Delete ${row.topic}`}
+                title="Delete"
+                onClick={() => setConfirmDeleteRow(row)}
+                disabled={deletingId === row.id}
+              >
+                <Trash2 className="size-4" />
+              </Button>
             </div>
           </div>
         );

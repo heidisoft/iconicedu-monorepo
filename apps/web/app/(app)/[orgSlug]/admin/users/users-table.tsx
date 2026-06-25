@@ -19,17 +19,12 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
   Input,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-  AdminUserProfilePreviewDialog,
 } from '@iconicedu/ui-web';
 import { toast } from '@iconicedu/ui-web';
 import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
@@ -45,50 +40,24 @@ import {
   GraduationCap,
   Loader2,
   MessageCircle,
-  MoreHorizontal,
+  Pencil,
   Shield,
   Trash2,
   User,
   Users,
 } from '@iconicedu/ui-web';
-import { Clock3, MapPin } from 'lucide-react';
+import { Clock3, Link2, MailPlus, MapPin } from 'lucide-react';
 
 import { AdminFilterBar } from '@iconicedu/web/components/admin/admin-filter-bar';
 import { InviteUserDialog } from '@iconicedu/web/app/(app)/[orgSlug]/admin/users/invite-dialog';
 import { buildAdminUserDmPath } from '@iconicedu/web/app/(app)/[orgSlug]/admin/users/users-table.utils';
 import type { AdminUserRow } from '@iconicedu/web/lib/admin/users';
-import type {
-  AvatarSource,
-  ThemeKey,
-  UserAccountVM,
-  UserProfileVM,
-} from '@iconicedu/shared-types';
+import type { AvatarSource, ThemeKey } from '@iconicedu/shared-types';
 
 export type UserRow = AdminUserRow;
 
 type UsersTableProps = {
   orgSlug: string;
-};
-
-type AdminUserProfilePreviewPayload = {
-  account: UserAccountVM | null;
-  profile: UserProfileVM | null;
-  metadata: {
-    accountId: string | null;
-    accountOrgId: string | null;
-    profileId: string | null;
-    profileOrgId: string | null;
-    profileAccountId: string | null;
-    authUserId: string | null;
-    managerStaffId: string | null;
-    childProfileIds: string[];
-    childAccountIds: string[];
-    notificationScopeIds: string[];
-    familyInviteIds: string[];
-    familyInviteFamilyIds: string[];
-    familyInviteAcceptedByAccountIds: string[];
-    familyInviteCreatedByAccountIds: string[];
-  };
 };
 
 type BadgeVariant =
@@ -201,12 +170,6 @@ export function UsersTable({ orgSlug }: UsersTableProps) {
     roleStatus: 'unassigned',
   });
   const [editSaving, setEditSaving] = React.useState(false);
-  const [previewOpen, setPreviewOpen] = React.useState(false);
-  const [previewLoading, setPreviewLoading] = React.useState(false);
-  const [previewError, setPreviewError] = React.useState<string | null>(null);
-  const [previewPayload, setPreviewPayload] =
-    React.useState<AdminUserProfilePreviewPayload | null>(null);
-  const [previewUser, setPreviewUser] = React.useState<UserRow | null>(null);
 
   // Lazy-load state
   const [rows, setRows] = React.useState<AdminUserRow[]>([]);
@@ -296,38 +259,6 @@ export function UsersTable({ orgSlug }: UsersTableProps) {
       return;
     }
     router.push(buildAdminUserDmPath(orgSlug, row.profileId));
-  };
-
-  const handleOpenProfilePreview = async (row: UserRow) => {
-    setPreviewOpen(true);
-    setPreviewUser(row);
-    setPreviewLoading(true);
-    setPreviewError(null);
-    setPreviewPayload(null);
-
-    try {
-      const params = new URLSearchParams({ accountId: row.id });
-      const response = await fetch(
-        `/api/admin/users/profile-preview?${params.toString()}`,
-      );
-      const result = (await response.json()) as {
-        success?: boolean;
-        message?: string;
-        payload?: AdminUserProfilePreviewPayload;
-      };
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.message ?? 'Unable to load profile preview');
-      }
-
-      setPreviewPayload(result.payload ?? null);
-    } catch (error) {
-      setPreviewError(
-        error instanceof Error ? error.message : 'Unable to load profile preview',
-      );
-    } finally {
-      setPreviewLoading(false);
-    }
   };
 
   const handleEditSave = async () => {
@@ -498,25 +429,32 @@ export function UsersTable({ orgSlug }: UsersTableProps) {
           {/* Info */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <button
-                type="button"
-                className="text-sm font-semibold underline-offset-4 hover:underline"
-                onClick={() => void handleOpenProfilePreview(row)}
-              >
-                {displayName}
-              </button>
+              <span className="text-sm font-semibold">{displayName}</span>
               {row.profileKind && (
                 <span className="inline-flex items-center gap-1 rounded-full border bg-background px-2 py-0.5 text-xs text-muted-foreground">
                   <Icon className="h-3 w-3" aria-hidden />
                   {row.profileKind.charAt(0).toUpperCase() + row.profileKind.slice(1)}
                 </span>
               )}
+              <Badge
+                variant={STATUS_BADGE_VARIANTS[row.status] ?? 'ghost'}
+                className="text-xs capitalize"
+              >
+                {row.status}
+              </Badge>
               {row.profileKind === 'guardian' &&
                 (row.linkedChildAccountIds?.length ?? 0) > 0 && (
                   <span className="inline-flex items-center gap-1 rounded-full border bg-background px-2 py-0.5 text-xs text-muted-foreground">
                     <Users className="h-3 w-3" aria-hidden />
                     {row.linkedChildAccountIds!.length}{' '}
                     {row.linkedChildAccountIds!.length === 1 ? 'child' : 'children'}
+                  </span>
+                )}
+              {row.profileKind === 'child' &&
+                (row.linkedGuardianNames?.length ?? 0) > 0 && (
+                  <span className="inline-flex items-center gap-1 rounded-full border bg-background px-2 py-0.5 text-xs text-muted-foreground">
+                    <Users className="h-3 w-3 shrink-0" aria-hidden />
+                    {row.linkedGuardianNames!.join(', ')}
                   </span>
                 )}
             </div>
@@ -544,64 +482,69 @@ export function UsersTable({ orgSlug }: UsersTableProps) {
             )}
           </div>
 
-          {/* Right: status badge + actions */}
-          <div className="flex items-center gap-2 shrink-0">
-            <Badge
-              variant={STATUS_BADGE_VARIANTS[row.status] ?? 'ghost'}
-              className="text-xs capitalize"
-            >
-              {row.status}
-            </Badge>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
+          {/* Right: actions */}
+          <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center">
+            <div className="flex flex-wrap justify-end gap-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 w-8 p-0"
+                aria-label={`Edit ${displayName}`}
+                title="Edit profile"
+                onClick={() => router.push(`/${orgSlug}/admin/users/${row.id}`)}
+                disabled={Boolean(rowActionLoading) || deletingId === row.id}
+              >
+                <Pencil className="size-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 w-8 p-0"
+                aria-label={`Send message to ${displayName}`}
+                title="Send message"
+                onClick={() => handleStartDirectMessage(row)}
+                disabled={
+                  Boolean(rowActionLoading) || deletingId === row.id || !row.profileId
+                }
+              >
+                <MessageCircle className="size-4" />
+              </Button>
+              {row.status === 'invited' && (
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
                   className="h-8 w-8 p-0"
-                  aria-label={`Actions for ${displayName}`}
-                  disabled={deletingId === row.id}
+                  aria-label={`Resend invite to ${displayName}`}
+                  title="Resend invite"
+                  onClick={() => handleRowInviteAction(row, 'invite')}
+                  disabled={Boolean(rowActionLoading) || deletingId === row.id}
                 >
-                  <MoreHorizontal className="h-4 w-4" />
+                  <MailPlus className="size-4" />
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  onClick={() => openEditDialog(row)}
-                  disabled={Boolean(rowActionLoading) || deletingId === row.id}
-                >
-                  <User className="size-3 mr-2" /> Edit profile
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => handleStartDirectMessage(row)}
-                  disabled={
-                    Boolean(rowActionLoading) || deletingId === row.id || !row.profileId
-                  }
-                >
-                  <MessageCircle className="size-3 mr-2" /> Send message
-                </DropdownMenuItem>
-                {row.status === 'invited' && (
-                  <DropdownMenuItem
-                    onClick={() => handleRowInviteAction(row, 'invite')}
-                    disabled={Boolean(rowActionLoading) || deletingId === row.id}
-                  >
-                    <Copy className="size-3 mr-2" /> Resend invite
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuItem
-                  onClick={() => handleRowInviteAction(row, 'link')}
-                  disabled={Boolean(rowActionLoading) || deletingId === row.id}
-                >
-                  <Copy className="size-3 mr-2" /> Generate a login link
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => openDeleteDialog(row)}
-                  disabled={deletingId === row.id}
-                >
-                  <Trash2 className="size-3 mr-2" />
-                  {deletingId === row.id ? 'Deleting…' : 'Delete'}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 w-8 p-0"
+                aria-label={`Generate login link for ${displayName}`}
+                title="Generate login link"
+                onClick={() => handleRowInviteAction(row, 'link')}
+                disabled={Boolean(rowActionLoading) || deletingId === row.id}
+              >
+                <Link2 className="size-4" />
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                className="h-8 w-8 p-0"
+                aria-label={`Delete ${displayName}`}
+                title="Delete"
+                onClick={() => openDeleteDialog(row)}
+                disabled={deletingId === row.id}
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -813,26 +756,6 @@ export function UsersTable({ orgSlug }: UsersTableProps) {
           </div>
         </DialogContent>
       </Dialog>
-      <AdminUserProfilePreviewDialog
-        open={previewOpen}
-        onOpenChange={(open) => {
-          setPreviewOpen(open);
-          if (!open) {
-            setPreviewUser(null);
-            setPreviewPayload(null);
-            setPreviewError(null);
-            setPreviewLoading(false);
-          }
-        }}
-        account={previewPayload?.account ?? null}
-        profile={previewPayload?.profile ?? null}
-        metadata={previewPayload?.metadata ?? null}
-        isLoading={previewLoading}
-        error={previewError}
-        onDmClick={
-          previewUser?.profileId ? () => handleStartDirectMessage(previewUser) : undefined
-        }
-      />
       <Dialog
         open={Boolean(editUser)}
         onOpenChange={(open) => {

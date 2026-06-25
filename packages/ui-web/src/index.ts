@@ -42,7 +42,6 @@ export * from '@iconicedu/ui-web/ui/card';
 export * from '@iconicedu/ui-web/components/dashboard-header';
 export * from '@iconicedu/ui-web/components/participant-selector';
 export * from '@iconicedu/ui-web/components/admin/channel-ui-defaults-settings-section';
-export * from '@iconicedu/ui-web/components/admin/admin-user-profile-preview-dialog';
 export * from '@iconicedu/ui-web/components/admin/admin-report-chart-card';
 export * from '@iconicedu/ui-web/components/admin/admin-report-empty-state';
 export * from '@iconicedu/ui-web/components/admin/admin-report-kpi-card';

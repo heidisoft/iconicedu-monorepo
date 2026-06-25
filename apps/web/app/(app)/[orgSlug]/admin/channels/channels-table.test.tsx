@@ -43,7 +43,14 @@ describe('ChannelsTable', () => {
     render(<ChannelsTable rows={[baseRow]} orgSlug="iconic-academy" />);
     expect(screen.getByText('General')).toBeInTheDocument();
     expect(screen.getByText('general')).toBeInTheDocument();
-    expect(screen.getByText('3')).toBeInTheDocument();
+  });
+
+  it('shows direct row action buttons', () => {
+    render(<ChannelsTable rows={[baseRow]} orgSlug="iconic-academy" />);
+
+    expect(screen.getByRole('button', { name: 'Edit General' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Archive General' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete General' })).toBeInTheDocument();
   });
 
   it('links class channels to class pages', () => {

@@ -1,8 +1,12 @@
 import type { UserAccountVM, UserProfileVM } from '@iconicedu/shared-types';
 
-import { buildAccountById } from '@iconicedu/web/lib/accounts/builders/account.builder';
+import {
+  mapAccountRowToVM,
+  mapUserRoles,
+} from '@iconicedu/web/lib/accounts/mappers/account.mapper';
 import { getAccountById } from '@iconicedu/web/lib/accounts/queries/accounts.query';
 import { requireAdminOrgContext } from '@iconicedu/web/lib/admin/require-admin-org-context';
+import { getUserRoles } from '@iconicedu/web/lib/profile/queries/roles.query';
 import { buildUserProfileByAccountId } from '@iconicedu/web/lib/profile/builders/user-profile.builder';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 
@@ -27,6 +31,10 @@ export type AdminUserProfilePreview = {
   account: UserAccountVM | null;
   profile: UserProfileVM | null;
   metadata: AdminUserProfilePreviewMetadata;
+};
+
+type GetAdminUserProfilePreviewOptions = {
+  orgId?: string;
 };
 
 function dedupeIds(values: Array<string | null | undefined>): string[] {
@@ -81,6 +89,7 @@ function buildAdminUserProfilePreviewMetadata(
 
 export async function getAdminUserProfilePreview(
   accountId: string,
+  options: GetAdminUserProfilePreviewOptions = {},
 ): Promise<AdminUserProfilePreview | null> {
   const normalizedAccountId = accountId.trim();
 
@@ -96,6 +105,10 @@ export async function getAdminUserProfilePreview(
     return null;
   }
 
+  if (options.orgId && accountRow.org_id !== options.orgId) {
+    return null;
+  }
+
   const authContext = await requireAdminOrgContext(accountRow.org_id, {
     allowStaff: true,
   });
@@ -103,18 +116,20 @@ export async function getAdminUserProfilePreview(
     throw new Error(authContext.message);
   }
 
-  const [account, profile] = await Promise.all([
-    buildAccountById(
-      supabase,
-      normalizedAccountId,
-      accountRow.org_id,
-      accountRow.email ?? null,
-    ),
+  const [rolesResponse, profile] = await Promise.all([
+    getUserRoles(supabase, normalizedAccountId, accountRow.org_id),
     buildUserProfileByAccountId(supabase, normalizedAccountId, {
       accountEmail: accountRow.email ?? null,
       includeFamilyInvites: true,
+      includeNotificationPreferences: false,
     }),
   ]);
+  const account = mapAccountRowToVM(accountRow, {
+    accountId: normalizedAccountId,
+    orgId: accountRow.org_id,
+    authEmail: accountRow.email ?? null,
+    userRoles: mapUserRoles(rolesResponse.data ?? []),
+  });
 
   return {
     account,

@@ -33,6 +33,7 @@ export type AdminUserRow = {
   roleStatus?: AccountRow['role_status'] | null;
   linkedChildAccountIds?: string[];
   linkedGuardianAccountIds?: string[];
+  linkedGuardianNames?: string[];
 };
 
 function mapAccountToRow(
@@ -42,6 +43,7 @@ function mapAccountToRow(
   relationships?: {
     linkedChildAccountIds?: string[];
     linkedGuardianAccountIds?: string[];
+    linkedGuardianNames?: string[];
   },
 ): AdminUserRow {
   const normalizedStatus = account.status?.toLowerCase() ?? '';
@@ -81,6 +83,7 @@ function mapAccountToRow(
     roleStatus: account.role_status ?? null,
     linkedChildAccountIds: relationships?.linkedChildAccountIds ?? [],
     linkedGuardianAccountIds: relationships?.linkedGuardianAccountIds ?? [],
+    linkedGuardianNames: relationships?.linkedGuardianNames ?? [],
   };
 }
 
@@ -349,8 +352,22 @@ export async function getAdminUserRowsPaginated(
     lastSeenByProfileId.set(r.profile_id, r.last_seen_at ?? null);
   });
 
-  const rows: AdminUserRow[] = pageAccounts.map((account) =>
-    mapAccountToRow(
+  const rows: AdminUserRow[] = pageAccounts.map((account) => {
+    const guardianAccountIds = Array.from(
+      linkedGuardianAccountIdsByChildId.get(account.id) ?? [],
+    );
+    const guardianNames = guardianAccountIds
+      .map((gid) => {
+        const n = nameByAccountId.get(gid);
+        if (!n) return null;
+        const first = n.first_name?.trim() ?? '';
+        const last = n.last_name?.trim() ?? '';
+        const full = [first, last].filter(Boolean).join(' ').trim();
+        return n.display_name?.trim() || full || null;
+      })
+      .filter((name): name is string => Boolean(name));
+
+    return mapAccountToRow(
       account,
       profileByAccountId.get(account.id) ?? null,
       (() => {
@@ -363,12 +380,11 @@ export async function getAdminUserRowsPaginated(
         linkedChildAccountIds: Array.from(
           linkedChildAccountIdsByGuardianId.get(account.id) ?? [],
         ),
-        linkedGuardianAccountIds: Array.from(
-          linkedGuardianAccountIdsByChildId.get(account.id) ?? [],
-        ),
+        linkedGuardianAccountIds: guardianAccountIds,
+        linkedGuardianNames: guardianNames,
       },
-    ),
-  );
+    );
+  });
 
   return { rows, total, pageCount };
 }

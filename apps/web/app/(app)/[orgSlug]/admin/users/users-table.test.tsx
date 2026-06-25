@@ -1,6 +1,6 @@
 /* @vitest-environment jsdom */
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { afterEach, vi } from 'vitest';
 
 import { UsersTable } from '@iconicedu/web/app/(app)/[orgSlug]/admin/users/users-table';
@@ -50,126 +50,56 @@ function buildRow(
   };
 }
 
-function expectBefore(labelA: string, labelB: string) {
-  const first = screen.getByRole('button', { name: labelA }).closest('tr');
-  const second = screen.getByRole('button', { name: labelB }).closest('tr');
-
-  expect(first).not.toBeNull();
-  expect(second).not.toBeNull();
-  expect(first?.compareDocumentPosition(second as Node)).toBe(
-    Node.DOCUMENT_POSITION_FOLLOWING,
-  );
-}
-
 describe('UsersTable', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it('defaults to most recently seen first and toggles last seen sorting', () => {
-    render(
-      <UsersTable
-        rows={[
-          buildRow({
-            id: 'older-user',
-            displayName: 'Older User',
-            updatedAt: '2026-01-10T00:00:00.000Z',
-            lastSeenAt: '2026-01-01T00:00:00.000Z',
+  it('renders user names as text without opening a profile preview', async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.startsWith('/api/admin/users/list?')) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            rows: [
+              buildRow({
+                id: 'newer-seen-user',
+                displayName: 'Newer Seen User',
+                updatedAt: '2026-01-05T00:00:00.000Z',
+                lastSeenAt: '2026-01-15T00:00:00.000Z',
+              }),
+              buildRow({
+                id: 'older-user',
+                displayName: 'Older User',
+                updatedAt: '2026-01-10T00:00:00.000Z',
+                lastSeenAt: '2026-01-01T00:00:00.000Z',
+              }),
+            ],
+            total: 2,
+            pageCount: 1,
           }),
-          buildRow({
-            id: 'newer-seen-user',
-            displayName: 'Newer Seen User',
-            updatedAt: '2026-01-05T00:00:00.000Z',
-            lastSeenAt: '2026-01-15T00:00:00.000Z',
-          }),
-        ]}
-      />,
-    );
+        };
+      }
 
-    expect(screen.getByRole('button', { name: /Updated/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Last seen/i })).toBeInTheDocument();
-
-    expectBefore('Newer Seen User', 'Older User');
-
-    fireEvent.click(screen.getByRole('button', { name: /Last seen/i }));
-
-    expectBefore('Older User', 'Newer Seen User');
-  });
-
-  it('opens the preview dialog from the user name and shows metadata ids', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        success: true,
-        payload: {
-          account: {
-            ids: { id: 'user-1', orgId: 'org-1' },
-            contacts: { email: 'iconicedudev+user-1@gmail.com' },
-            lifecycle: {
-              status: 'active',
-              createdAt: '2026-01-01T00:00:00.000Z',
-              updatedAt: '2026-01-02T00:00:00.000Z',
-            },
-          },
-          profile: {
-            kind: 'staff',
-            ids: { id: 'profile-1', orgId: 'org-1', accountId: 'user-1' },
-            profile: { displayName: 'Preview User', avatar: { source: 'seed' } },
-            prefs: {},
-            meta: {
-              createdAt: '2026-01-01T00:00:00.000Z',
-              updatedAt: '2026-01-02T00:00:00.000Z',
-            },
-            department: 'Operations',
-          },
-          metadata: {
-            accountId: 'user-1',
-            accountOrgId: 'org-1',
-            profileId: 'profile-1',
-            profileOrgId: 'org-1',
-            profileAccountId: 'user-1',
-            authUserId: null,
-            managerStaffId: 'manager-1',
-            childProfileIds: [],
-            childAccountIds: [],
-            notificationScopeIds: ['scope-1'],
-            familyInviteIds: [],
-            familyInviteFamilyIds: [],
-            familyInviteAcceptedByAccountIds: [],
-            familyInviteCreatedByAccountIds: [],
-          },
-        },
-      }),
+      throw new Error(`Unexpected fetch: ${url}`);
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    render(
-      <UsersTable
-        rows={[
-          buildRow({
-            id: 'user-1',
-            displayName: 'Preview User',
-            updatedAt: '2026-01-10T00:00:00.000Z',
-          }),
-        ]}
-      />,
-    );
+    render(<UsersTable orgSlug="i" />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Preview User' }));
+    expect(await screen.findAllByText('Newer Seen User')).toHaveLength(2);
+    expect(screen.getAllByText('Older User')).toHaveLength(2);
+    expect(
+      screen.queryByRole('button', { name: 'Newer Seen User' }),
+    ).not.toBeInTheDocument();
 
-    await screen.findByRole('dialog');
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith(
-        '/api/admin/users/profile-preview?accountId=user-1',
-      );
+      expect(fetchMock).toHaveBeenCalledTimes(1);
     });
-
-    const metadataTab = screen.getByRole('tab', { name: /metadata/i });
-    fireEvent.mouseDown(metadataTab);
-    fireEvent.click(metadataTab);
-
-    expect(await screen.findByText('Manager staff UUID')).toBeInTheDocument();
-    expect(screen.getByText('manager-1')).toBeInTheDocument();
-    expect(screen.getByText('scope-1')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith('/api/admin/users/list?orgSlug=i&page=1');
+    expect(
+      fetchMock.mock.calls.some(([url]) => String(url).includes('profile-preview')),
+    ).toBe(false);
   });
 });

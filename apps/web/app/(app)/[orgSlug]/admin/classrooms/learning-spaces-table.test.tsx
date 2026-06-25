@@ -82,14 +82,17 @@ describe('LearningSpacesTable', () => {
     expect(screen.getByText('Show less')).toBeInTheDocument();
   });
 
-  it('shows Settings button linking to the edit page', () => {
-    const pushMock = vi.fn();
-    vi.mocked(vi.importMock('next/navigation')).useRouter = () => ({
-      refresh: vi.fn(),
-      push: pushMock,
-    });
-
+  it('shows direct row action buttons', () => {
     render(<LearningSpacesTable rows={[baseRow]} orgSlug="iconic-academy" />);
-    expect(screen.getByRole('button', { name: /settings/i })).toBeInTheDocument();
+
+    expect(
+      screen.getByRole('button', { name: 'Edit Algebra Foundations' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Archive Algebra Foundations' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Delete Algebra Foundations' }),
+    ).toBeInTheDocument();
   });
 });
