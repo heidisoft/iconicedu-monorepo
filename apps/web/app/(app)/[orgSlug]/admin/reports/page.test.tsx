@@ -57,7 +57,8 @@ describe('admin reports page', () => {
     const contentContainer = children?.[1] as
       | { props?: { children?: unknown } }
       | undefined;
-    const overviewElement = contentContainer?.props?.children as
+    const contentChildren = contentContainer?.props?.children as unknown[];
+    const overviewElement = contentChildren?.[1] as
       | { props?: { dashboard?: { generatedAt?: string } } }
       | undefined;
 
