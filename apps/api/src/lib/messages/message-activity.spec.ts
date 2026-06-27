@@ -108,7 +108,7 @@ describe('publishUnviewedClassroomMessageActivity', () => {
       publishActivity: publishActivity as never,
       orgId: 'org-1',
       messageId: 'message-1',
-      now: '2026-06-01T14:01:00.000Z',
+      now: '2026-06-01T11:01:00.000Z',
     });
 
     expect(result).toMatchObject({
@@ -124,7 +124,7 @@ describe('publishUnviewedClassroomMessageActivity', () => {
           senderName: 'Ari Parent',
           unviewedParticipantIds: ['teacher-1'],
           unviewedParticipantNames: ['Ms. Chen'],
-          thresholdHours: 4,
+          thresholdHours: 1,
         }),
       }),
     );
@@ -143,7 +143,7 @@ describe('publishUnviewedClassroomMessageActivity', () => {
       publishActivity: publishActivity as never,
       orgId: 'org-1',
       messageId: 'message-1',
-      now: '2026-06-01T13:59:00.000Z',
+      now: '2026-06-01T10:59:00.000Z',
     });
 
     expect(result).toEqual({
@@ -151,6 +151,58 @@ describe('publishUnviewedClassroomMessageActivity', () => {
       reason: 'threshold_not_reached',
     });
     expect(publishActivity).not.toHaveBeenCalled();
+  });
+
+  it('publishes to admin and staff-role account profiles when no staff-kind profile exists', async () => {
+    const publishActivity = jest.fn(async () => null);
+    const supabase = makeSupabase({
+      messages: [message],
+      channels: [channel],
+      channel_members: [
+        {
+          profile: {
+            id: 'teacher-1',
+            account_id: 'account-teacher-1',
+            kind: 'educator',
+            display_name: 'Ms. Chen',
+          },
+        },
+      ],
+      channel_read_state: [
+        {
+          account_id: 'account-teacher-1',
+          last_read_at: '2026-06-01T09:00:00.000Z',
+        },
+      ],
+      profiles: [{ id: 'admin-profile-1' }, { id: 'staff-role-profile-1' }],
+      user_roles: [{ account_id: 'account-staff-role-1' }],
+      accounts: [{ id: 'account-admin-1' }],
+    });
+
+    const result = await publishUnviewedClassroomMessageActivity({
+      supabase: supabase as never,
+      readSupabase: supabase as never,
+      publishActivity: publishActivity as never,
+      orgId: 'org-1',
+      messageId: 'message-1',
+      now: '2026-06-01T11:01:00.000Z',
+    });
+
+    expect(result).toMatchObject({
+      suppressed: false,
+      unviewedParticipantCount: 1,
+      staffRecipientCount: 2,
+    });
+    expect(publishActivity).toHaveBeenCalledWith(
+      expect.objectContaining({
+        audienceRules: [
+          {
+            kind: 'users_only',
+            userIds: ['admin-profile-1', 'staff-role-profile-1'],
+          },
+        ],
+      }),
+    );
   });
 
   it('suppresses the staff activity when intended participants have read the message', async () => {
