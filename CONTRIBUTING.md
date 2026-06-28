@@ -19,6 +19,7 @@ Internal engineers and trusted contributors opening branches, pull requests, and
 - [Development Workflow](docs/getting-started/development-workflow.md)
 - [Architecture Overview](docs/architecture/overview.md)
 - [Best Practices](docs/standards/best-practices.md)
+- [Git and Pull Request Standards](docs/standards/git-pr-standards.md)
 
 ## Before You Start
 
@@ -29,11 +30,11 @@ Internal engineers and trusted contributors opening branches, pull requests, and
 
 ## Branch Naming
 
-Use a prefix that describes the change type, followed by a short kebab-case description.
+Use a prefix that describes the change type, followed by a short kebab-case description. The full branch naming standard lives in [Git and Pull Request Standards](docs/standards/git-pr-standards.md).
 
 | Prefix      | Use for                                     |
 | ----------- | ------------------------------------------- |
-| `feature/`  | New functionality                           |
+| `feat/`     | New functionality                           |
 | `fix/`      | Bug fixes                                   |
 | `chore/`    | Tooling, config, dependency updates         |
 | `docs/`     | Documentation-only changes                  |
@@ -43,7 +44,7 @@ Use a prefix that describes the change type, followed by a short kebab-case desc
 Examples:
 
 ```text
-feature/avatar-upload
+feat/avatar-upload
 fix/thread-duplicate-parent-message
 chore/upgrade-expo-sdk-54
 docs/restructure-engineering-docs
@@ -57,6 +58,8 @@ Follow Conventional Commits:
 ```text
 <type>(<scope>): <short description>
 ```
+
+Use the same style for PR titles so squash commits stay readable.
 
 Common types:
 

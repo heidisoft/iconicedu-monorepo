@@ -1,3 +1,11 @@
+<!--
+PR title should use Conventional Commit style, for example:
+fix(api): notify staff about unviewed classroom messages
+
+Branch, commit, and PR conventions:
+docs/standards/git-pr-standards.md
+-->
+
 ## Summary
 
 <!-- What does this PR do? 1–3 bullet points. Focus on the "why", not just the "what". -->

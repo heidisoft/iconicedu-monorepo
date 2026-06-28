@@ -17,6 +17,7 @@ Internal engineers working day to day in the monorepo.
 - [Documentation Hub](../README.md)
 - [Local Setup](setup.md)
 - [Contributing](../../CONTRIBUTING.md)
+- [Git and Pull Request Standards](../standards/git-pr-standards.md)
 - [Deployment](../operations/deployment.md)
 
 ## Local Workflow
@@ -133,10 +134,13 @@ The repository uses trunk-based development. `main` should stay deployable.
 Workflow:
 
 1. Branch from `main`.
-2. Keep changes focused and short-lived.
-3. Open a PR early.
-4. Ensure required checks pass.
-5. Squash merge when approved.
+2. Name the branch with the standard `<type>/<short-kebab-case-summary>` format, such as `feat/channel-files` or `fix/unviewed-message-alerts`.
+3. Keep changes focused and short-lived.
+4. Open a PR early.
+5. Ensure required checks pass.
+6. Squash merge when approved.
+
+For branch prefixes, commit messages, PR titles, and PR body expectations, use [Git and Pull Request Standards](../standards/git-pr-standards.md).
 
 ## Required PR Checks
 

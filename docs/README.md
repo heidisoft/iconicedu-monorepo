@@ -32,6 +32,7 @@ Internal engineers, operators, and AI assistants.
 - [Architecture Overview](architecture/overview.md)
 - [Shared Packages](architecture/packages.md)
 - [Best Practices](standards/best-practices.md)
+- [Git and Pull Request Standards](standards/git-pr-standards.md)
 - [Architecture Decisions](decisions/README.md)
 
 ### Mobile Engineer
@@ -75,6 +76,7 @@ Internal engineers, operators, and AI assistants.
 ### Standards
 
 - [Best Practices](standards/best-practices.md)
+- [Git and Pull Request Standards](standards/git-pr-standards.md)
 
 ### Operations
 
