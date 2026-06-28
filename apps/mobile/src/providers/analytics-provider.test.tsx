@@ -19,7 +19,11 @@ jest.mock('expo-constants', () => ({
 }));
 
 import { usePostHog } from 'posthog-react-native';
-import { AnalyticsProvider, useAnalytics } from './analytics-provider';
+import {
+  AnalyticsProvider,
+  hasPostHogNativeReplayModule,
+  useAnalytics,
+} from './analytics-provider';
 import { createNoopAnalytics } from '@iconicedu/utils';
 
 // ─── Shared PostHog stub (populated before each test) ────────────────────────
@@ -101,6 +105,28 @@ describe('AnalyticsProvider / useAnalytics', () => {
     renderWrapped();
     screen.getByTestId('result').props.onPress();
     expect(mockPh.flush).toHaveBeenCalled();
+  });
+});
+
+describe('hasPostHogNativeReplayModule', () => {
+  it('detects the current PostHog native plugin module', () => {
+    expect(
+      hasPostHogNativeReplayModule({
+        PosthogReactNativePlugin: {},
+      }),
+    ).toBe(true);
+  });
+
+  it('keeps the legacy replay module fallback for existing native builds', () => {
+    expect(
+      hasPostHogNativeReplayModule({
+        PosthogReactNativeSessionReplay: {},
+      }),
+    ).toBe(true);
+  });
+
+  it('returns false when no native replay module is linked', () => {
+    expect(hasPostHogNativeReplayModule({})).toBe(false);
   });
 });
 
