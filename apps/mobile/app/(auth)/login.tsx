@@ -23,6 +23,7 @@ import Svg, {
   Rect,
   G,
 } from 'react-native-svg';
+import { ShieldCheck, BellRing, Sparkles } from 'lucide-react-native';
 import { SiteLogoFull } from '@iconicedu/ui-native';
 import { useAuth } from '@/providers/auth-provider';
 import { useTheme } from '@/providers/theme-provider';
@@ -31,6 +32,8 @@ import { AnalyticsEvent } from '@iconicedu/utils';
 import type { AppColors } from '@/lib/theme';
 import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
 import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // ─── Decorative background (circles, ring, diamond, grid) ─────────────────────
 
@@ -142,33 +145,54 @@ function BackgroundDecoration({ isDark }: { isDark: boolean }) {
           />
         ))}
       </View>
+    </View>
+  );
+}
 
-      {/* Rotated diamond — bottom right */}
-      <View
-        style={{
-          position: 'absolute',
-          bottom: 100,
-          right: 28,
-          width: 68,
-          height: 68,
-          transform: [{ rotate: '45deg' }],
-          borderWidth: 14,
-          borderColor: sq,
-        }}
-      />
+// ─── Trust row ────────────────────────────────────────────────────────────────
 
-      {/* Small accent circle — bottom left */}
-      <View
-        style={{
-          position: 'absolute',
-          bottom: 80,
-          left: 24,
-          width: 40,
-          height: 40,
-          borderRadius: 20,
-          backgroundColor: teal3,
-        }}
-      />
+// Copy chosen to address the 3 core parent anxieties:
+// 1. "Who are these tutors?" (safety) → background-checked
+// 2. "Will I know what's happening?" (control) → real-time updates
+// 3. "Will it work for my child?" (outcome) → personalised
+const TRUST_PILLARS = [
+  { Icon: ShieldCheck, label: 'Qualified, vetted educators' },
+  { Icon: BellRing, label: 'Real-time parent updates' },
+  { Icon: Sparkles, label: 'Tailored to your child' },
+] as const;
+
+function TrustRow({ colors }: { colors: AppColors }) {
+  return (
+    <View style={{ gap: 8, alignItems: 'center' }}>
+      {TRUST_PILLARS.map((p) => (
+        <View
+          key={p.label}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 10,
+            width: '100%',
+          }}
+        >
+          <View
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 18,
+              backgroundColor: colors.teal + '18',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <p.Icon size={18} color={colors.teal} />
+          </View>
+          <Text
+            style={{ fontSize: 14, color: colors.textMuted, fontWeight: '500', flex: 1 }}
+          >
+            {p.label}
+          </Text>
+        </View>
+      ))}
     </View>
   );
 }
@@ -229,16 +253,16 @@ function makeStyles(C: AppColors) {
         justifyContent: 'center',
       },
 
-      logo: { alignSelf: 'center', marginBottom: 16 },
+      logo: { alignSelf: 'center', marginBottom: 4 },
       heading: {
-        fontSize: 30,
+        fontSize: 28,
         fontWeight: '700',
         color: C.text,
-        lineHeight: 38,
-        letterSpacing: 0,
+        lineHeight: 36,
+        letterSpacing: -0.3,
         textAlign: 'center',
       },
-      sub: { fontSize: 16, color: C.textMuted, lineHeight: 22, textAlign: 'center' },
+      sub: { fontSize: 15, color: C.textMuted, lineHeight: 22, textAlign: 'center' },
       tabRow: {
         flexDirection: 'row',
         backgroundColor: C.inputBg,
@@ -325,7 +349,7 @@ function makeStyles(C: AppColors) {
         paddingHorizontal: 24,
         paddingBottom: 24,
         fontSize: 13,
-        color: C.textFaint,
+        color: C.textMuted,
         textAlign: 'center',
         lineHeight: 19,
       },
@@ -338,6 +362,7 @@ function makeStyles(C: AppColors) {
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
+  const [emailDirty, setEmailDirty] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [appleLoading, setAppleLoading] = useState(false);
@@ -455,6 +480,8 @@ export default function LoginScreen() {
 
   const socialLoading =
     (enableGoogleSignIn && googleLoading) || (enableAppleSignIn && appleLoading);
+  const isValidEmail = EMAIL_RE.test(email.trim());
+  const showEmailError = emailDirty && email.trim().length > 0 && !isValidEmail;
 
   return (
     <SafeAreaView style={s.safe}>
@@ -475,17 +502,14 @@ export default function LoginScreen() {
           </View>
 
           {/* Heading */}
-          <Text style={s.heading}>Welcome to ICONIC Academy</Text>
+          <Text style={s.heading}>The tutoring app{'\n'}that keeps you close.</Text>
 
           {/* Subtitle */}
-          <Text style={s.sub}>
-            Enter your email to sign in or create a parent account.
-          </Text>
+          <Text style={s.sub}>We&apos;ll send a one-time code. No password needed.</Text>
 
           {/* Email input */}
           <View style={s.field}>
-            <Text style={s.label}>Email address</Text>
-            <View style={[s.inputRow, error ? s.inputErr : undefined]}>
+            <View style={[s.inputRow, error || showEmailError ? s.inputErr : undefined]}>
               <TextInput
                 style={s.input}
                 value={email}
@@ -494,10 +518,13 @@ export default function LoginScreen() {
                   if (sessionExpiryMessage) clearSessionExpiryMessage();
                   if (error) setError(null);
                 }}
+                onBlur={() => {
+                  if (email.trim()) setEmailDirty(true);
+                }}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoComplete="email"
-                placeholder="you@example.com"
+                placeholder="your@email.com"
                 placeholderTextColor={s.placeholderColor}
                 editable={!loading && !socialLoading}
                 returnKeyType="done"
@@ -505,7 +532,10 @@ export default function LoginScreen() {
               />
               {email.length > 0 && (
                 <Pressable
-                  onPress={() => setEmail('')}
+                  onPress={() => {
+                    setEmail('');
+                    setEmailDirty(false);
+                  }}
                   hitSlop={12}
                   style={s.clearBtn}
                   accessibilityLabel="Clear email"
@@ -514,22 +544,39 @@ export default function LoginScreen() {
                 </Pressable>
               )}
             </View>
-            {error && <Text style={s.errorTxt}>{error}</Text>}
-            {!error && sessionExpiryMessage ? (
+            {showEmailError && (
+              <Text style={s.errorTxt}>Please enter a valid email address</Text>
+            )}
+            {!showEmailError && error && <Text style={s.errorTxt}>{error}</Text>}
+            {!showEmailError && !error && sessionExpiryMessage ? (
               <Text style={s.errorTxt}>{sessionExpiryMessage}</Text>
             ) : null}
           </View>
 
           {/* CTA */}
           <TouchableOpacity
-            style={[s.cta, loading ? s.ctaDim : undefined]}
+            style={[s.cta, !isValidEmail || loading ? s.ctaDim : undefined]}
             onPress={handleEmailContinue}
-            disabled={loading || socialLoading}
+            disabled={!isValidEmail || loading || socialLoading}
             activeOpacity={0.85}
           >
             {loading && <ActivityIndicator size="small" color={colors.tealFg} />}
             <Text style={s.ctaTxt}>{loading ? 'Sending…' : 'Continue'}</Text>
           </TouchableOpacity>
+
+          {/* Trust signals */}
+          <View
+            style={{
+              backgroundColor: colors.inputBg,
+              borderRadius: 14,
+              borderWidth: 1,
+              borderColor: colors.border,
+              padding: 16,
+              gap: 12,
+            }}
+          >
+            <TrustRow colors={colors} />
+          </View>
 
           {showSocialSignIn ? (
             <>
@@ -583,11 +630,6 @@ export default function LoginScreen() {
               ) : null}
             </>
           ) : null}
-
-          <Text style={s.noAcct}>
-            Parent accounts can sign up directly. Students and educators need an
-            invitation.
-          </Text>
         </ScrollView>
 
         {/* Footer */}

@@ -14,6 +14,7 @@ import {
   Easing,
 } from 'react-native';
 import * as Location from 'expo-location';
+import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -44,36 +45,480 @@ import {
   completeOnboarding,
   type OnboardingStatus,
 } from '@/lib/api/queries';
+import {
+  getExpoPushToken,
+  hasPushConsentPromptState,
+  markPushConsentAccepted,
+  snoozePushConsentPrompt,
+  storePushToken,
+  supportsNativePushNotifications,
+} from '@/lib/notifications/push-token';
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
-const TIMEZONES: Array<{ id: string; label: string }> = [
-  { id: 'Pacific/Auckland', label: 'New Zealand (Auckland)' },
-  { id: 'Australia/Sydney', label: 'Australia (Sydney)' },
-  { id: 'Australia/Melbourne', label: 'Australia (Melbourne)' },
-  { id: 'Australia/Perth', label: 'Australia (Perth)' },
-  { id: 'Asia/Tokyo', label: 'Japan (Tokyo)' },
-  { id: 'Asia/Singapore', label: 'Singapore' },
-  { id: 'Asia/Colombo', label: 'Sri Lanka (Colombo)' },
-  { id: 'Asia/Kolkata', label: 'India (Kolkata)' },
-  { id: 'Asia/Dhaka', label: 'Bangladesh (Dhaka)' },
-  { id: 'Asia/Karachi', label: 'Pakistan (Karachi)' },
-  { id: 'Asia/Dubai', label: 'UAE (Dubai)' },
-  { id: 'Asia/Riyadh', label: 'Saudi Arabia (Riyadh)' },
-  { id: 'Europe/Istanbul', label: 'Turkey (Istanbul)' },
-  { id: 'Europe/Moscow', label: 'Russia (Moscow)' },
-  { id: 'Africa/Nairobi', label: 'Kenya (Nairobi)' },
-  { id: 'Africa/Lagos', label: 'Nigeria (Lagos)' },
-  { id: 'Europe/Paris', label: 'France / Central Europe' },
-  { id: 'Europe/London', label: 'UK (London)' },
-  { id: 'America/Sao_Paulo', label: 'Brazil (São Paulo)' },
-  { id: 'America/New_York', label: 'US Eastern (New York)' },
-  { id: 'America/Chicago', label: 'US Central (Chicago)' },
-  { id: 'America/Denver', label: 'US Mountain (Denver)' },
-  { id: 'America/Los_Angeles', label: 'US Pacific (Los Angeles)' },
-  { id: 'America/Toronto', label: 'Canada (Toronto)' },
-  { id: 'America/Vancouver', label: 'Canada (Vancouver)' },
+// Comprehensive canonical IANA timezone IDs — used as fallback when
+// Intl.supportedValuesOf('timeZone') is unavailable (older Hermes builds).
+// Labels are always generated dynamically via Intl.DateTimeFormat.
+const TIMEZONE_IDS_FALLBACK: readonly string[] = [
+  'Africa/Abidjan',
+  'Africa/Accra',
+  'Africa/Addis_Ababa',
+  'Africa/Algiers',
+  'Africa/Asmara',
+  'Africa/Bamako',
+  'Africa/Bangui',
+  'Africa/Banjul',
+  'Africa/Bissau',
+  'Africa/Blantyre',
+  'Africa/Brazzaville',
+  'Africa/Bujumbura',
+  'Africa/Cairo',
+  'Africa/Casablanca',
+  'Africa/Ceuta',
+  'Africa/Conakry',
+  'Africa/Dakar',
+  'Africa/Dar_es_Salaam',
+  'Africa/Djibouti',
+  'Africa/Douala',
+  'Africa/El_Aaiun',
+  'Africa/Freetown',
+  'Africa/Gaborone',
+  'Africa/Harare',
+  'Africa/Johannesburg',
+  'Africa/Juba',
+  'Africa/Kampala',
+  'Africa/Khartoum',
+  'Africa/Kigali',
+  'Africa/Kinshasa',
+  'Africa/Lagos',
+  'Africa/Libreville',
+  'Africa/Lome',
+  'Africa/Luanda',
+  'Africa/Lubumbashi',
+  'Africa/Lusaka',
+  'Africa/Malabo',
+  'Africa/Maputo',
+  'Africa/Maseru',
+  'Africa/Mbabane',
+  'Africa/Mogadishu',
+  'Africa/Monrovia',
+  'Africa/Nairobi',
+  'Africa/Ndjamena',
+  'Africa/Niamey',
+  'Africa/Nouakchott',
+  'Africa/Ouagadougou',
+  'Africa/Porto-Novo',
+  'Africa/Sao_Tome',
+  'Africa/Tripoli',
+  'Africa/Tunis',
+  'Africa/Windhoek',
+  'America/Adak',
+  'America/Anchorage',
+  'America/Anguilla',
+  'America/Antigua',
+  'America/Araguaina',
+  'America/Argentina/Buenos_Aires',
+  'America/Argentina/Catamarca',
+  'America/Argentina/Cordoba',
+  'America/Argentina/Jujuy',
+  'America/Argentina/La_Rioja',
+  'America/Argentina/Mendoza',
+  'America/Argentina/Rio_Gallegos',
+  'America/Argentina/Salta',
+  'America/Argentina/San_Juan',
+  'America/Argentina/San_Luis',
+  'America/Argentina/Tucuman',
+  'America/Argentina/Ushuaia',
+  'America/Aruba',
+  'America/Asuncion',
+  'America/Atikokan',
+  'America/Bahia',
+  'America/Bahia_Banderas',
+  'America/Barbados',
+  'America/Belem',
+  'America/Belize',
+  'America/Blanc-Sablon',
+  'America/Boa_Vista',
+  'America/Bogota',
+  'America/Boise',
+  'America/Cambridge_Bay',
+  'America/Campo_Grande',
+  'America/Cancun',
+  'America/Caracas',
+  'America/Cayenne',
+  'America/Cayman',
+  'America/Chicago',
+  'America/Chihuahua',
+  'America/Ciudad_Juarez',
+  'America/Costa_Rica',
+  'America/Creston',
+  'America/Cuiaba',
+  'America/Curacao',
+  'America/Danmarkshavn',
+  'America/Dawson',
+  'America/Dawson_Creek',
+  'America/Denver',
+  'America/Detroit',
+  'America/Dominica',
+  'America/Edmonton',
+  'America/Eirunepe',
+  'America/El_Salvador',
+  'America/Fortaleza',
+  'America/Glace_Bay',
+  'America/Goose_Bay',
+  'America/Grand_Turk',
+  'America/Grenada',
+  'America/Guadeloupe',
+  'America/Guatemala',
+  'America/Guayaquil',
+  'America/Guyana',
+  'America/Halifax',
+  'America/Havana',
+  'America/Hermosillo',
+  'America/Indiana/Indianapolis',
+  'America/Indiana/Knox',
+  'America/Indiana/Marengo',
+  'America/Indiana/Petersburg',
+  'America/Indiana/Tell_City',
+  'America/Indiana/Vevay',
+  'America/Indiana/Vincennes',
+  'America/Indiana/Winamac',
+  'America/Inuvik',
+  'America/Iqaluit',
+  'America/Jamaica',
+  'America/Juneau',
+  'America/Kentucky/Louisville',
+  'America/Kentucky/Monticello',
+  'America/Kralendijk',
+  'America/La_Paz',
+  'America/Lima',
+  'America/Los_Angeles',
+  'America/Lower_Princes',
+  'America/Maceio',
+  'America/Managua',
+  'America/Manaus',
+  'America/Marigot',
+  'America/Martinique',
+  'America/Matamoros',
+  'America/Mazatlan',
+  'America/Menominee',
+  'America/Merida',
+  'America/Metlakatla',
+  'America/Mexico_City',
+  'America/Miquelon',
+  'America/Moncton',
+  'America/Monterrey',
+  'America/Montevideo',
+  'America/Montserrat',
+  'America/Nassau',
+  'America/New_York',
+  'America/Nome',
+  'America/Noronha',
+  'America/North_Dakota/Beulah',
+  'America/North_Dakota/Center',
+  'America/North_Dakota/New_Salem',
+  'America/Nuuk',
+  'America/Ojinaga',
+  'America/Panama',
+  'America/Paramaribo',
+  'America/Phoenix',
+  'America/Port-au-Prince',
+  'America/Port_of_Spain',
+  'America/Porto_Velho',
+  'America/Puerto_Rico',
+  'America/Punta_Arenas',
+  'America/Rankin_Inlet',
+  'America/Recife',
+  'America/Regina',
+  'America/Resolute',
+  'America/Rio_Branco',
+  'America/Santarem',
+  'America/Santiago',
+  'America/Santo_Domingo',
+  'America/Sao_Paulo',
+  'America/Scoresbysund',
+  'America/Sitka',
+  'America/St_Barthelemy',
+  'America/St_Johns',
+  'America/St_Kitts',
+  'America/St_Lucia',
+  'America/St_Thomas',
+  'America/St_Vincent',
+  'America/Swift_Current',
+  'America/Tegucigalpa',
+  'America/Thule',
+  'America/Tijuana',
+  'America/Toronto',
+  'America/Tortola',
+  'America/Vancouver',
+  'America/Whitehorse',
+  'America/Winnipeg',
+  'America/Yakutat',
+  'Antarctica/Casey',
+  'Antarctica/Davis',
+  'Antarctica/DumontDUrville',
+  'Antarctica/Macquarie',
+  'Antarctica/Mawson',
+  'Antarctica/McMurdo',
+  'Antarctica/Palmer',
+  'Antarctica/Rothera',
+  'Antarctica/Syowa',
+  'Antarctica/Troll',
+  'Antarctica/Vostok',
+  'Arctic/Longyearbyen',
+  'Asia/Aden',
+  'Asia/Almaty',
+  'Asia/Amman',
+  'Asia/Anadyr',
+  'Asia/Aqtau',
+  'Asia/Aqtobe',
+  'Asia/Ashgabat',
+  'Asia/Atyrau',
+  'Asia/Baghdad',
+  'Asia/Bahrain',
+  'Asia/Baku',
+  'Asia/Bangkok',
+  'Asia/Barnaul',
+  'Asia/Beirut',
+  'Asia/Bishkek',
+  'Asia/Brunei',
+  'Asia/Chita',
+  'Asia/Colombo',
+  'Asia/Damascus',
+  'Asia/Dhaka',
+  'Asia/Dili',
+  'Asia/Dubai',
+  'Asia/Dushanbe',
+  'Asia/Famagusta',
+  'Asia/Gaza',
+  'Asia/Hebron',
+  'Asia/Ho_Chi_Minh',
+  'Asia/Hong_Kong',
+  'Asia/Hovd',
+  'Asia/Irkutsk',
+  'Asia/Jakarta',
+  'Asia/Jayapura',
+  'Asia/Jerusalem',
+  'Asia/Kabul',
+  'Asia/Kamchatka',
+  'Asia/Karachi',
+  'Asia/Kathmandu',
+  'Asia/Khandyga',
+  'Asia/Kolkata',
+  'Asia/Krasnoyarsk',
+  'Asia/Kuala_Lumpur',
+  'Asia/Kuching',
+  'Asia/Kuwait',
+  'Asia/Macau',
+  'Asia/Magadan',
+  'Asia/Makassar',
+  'Asia/Manila',
+  'Asia/Muscat',
+  'Asia/Nicosia',
+  'Asia/Novokuznetsk',
+  'Asia/Novosibirsk',
+  'Asia/Omsk',
+  'Asia/Oral',
+  'Asia/Phnom_Penh',
+  'Asia/Pontianak',
+  'Asia/Pyongyang',
+  'Asia/Qatar',
+  'Asia/Qostanay',
+  'Asia/Qyzylorda',
+  'Asia/Riyadh',
+  'Asia/Sakhalin',
+  'Asia/Samarkand',
+  'Asia/Seoul',
+  'Asia/Shanghai',
+  'Asia/Singapore',
+  'Asia/Srednekolymsk',
+  'Asia/Taipei',
+  'Asia/Tashkent',
+  'Asia/Tbilisi',
+  'Asia/Tehran',
+  'Asia/Thimphu',
+  'Asia/Tokyo',
+  'Asia/Tomsk',
+  'Asia/Ulaanbaatar',
+  'Asia/Urumqi',
+  'Asia/Ust-Nera',
+  'Asia/Vientiane',
+  'Asia/Vladivostok',
+  'Asia/Yakutsk',
+  'Asia/Yangon',
+  'Asia/Yekaterinburg',
+  'Asia/Yerevan',
+  'Atlantic/Azores',
+  'Atlantic/Bermuda',
+  'Atlantic/Canary',
+  'Atlantic/Cape_Verde',
+  'Atlantic/Faroe',
+  'Atlantic/Madeira',
+  'Atlantic/Reykjavik',
+  'Atlantic/South_Georgia',
+  'Atlantic/St_Helena',
+  'Atlantic/Stanley',
+  'Australia/Adelaide',
+  'Australia/Brisbane',
+  'Australia/Broken_Hill',
+  'Australia/Darwin',
+  'Australia/Eucla',
+  'Australia/Hobart',
+  'Australia/Lindeman',
+  'Australia/Lord_Howe',
+  'Australia/Melbourne',
+  'Australia/Perth',
+  'Australia/Sydney',
+  'Europe/Amsterdam',
+  'Europe/Andorra',
+  'Europe/Astrakhan',
+  'Europe/Athens',
+  'Europe/Belgrade',
+  'Europe/Berlin',
+  'Europe/Bratislava',
+  'Europe/Brussels',
+  'Europe/Bucharest',
+  'Europe/Budapest',
+  'Europe/Busingen',
+  'Europe/Chisinau',
+  'Europe/Copenhagen',
+  'Europe/Dublin',
+  'Europe/Gibraltar',
+  'Europe/Guernsey',
+  'Europe/Helsinki',
+  'Europe/Isle_of_Man',
+  'Europe/Istanbul',
+  'Europe/Jersey',
+  'Europe/Kaliningrad',
+  'Europe/Kirov',
+  'Europe/Kyiv',
+  'Europe/Lisbon',
+  'Europe/Ljubljana',
+  'Europe/London',
+  'Europe/Luxembourg',
+  'Europe/Madrid',
+  'Europe/Malta',
+  'Europe/Mariehamn',
+  'Europe/Minsk',
+  'Europe/Monaco',
+  'Europe/Moscow',
+  'Europe/Nicosia',
+  'Europe/Oslo',
+  'Europe/Paris',
+  'Europe/Podgorica',
+  'Europe/Prague',
+  'Europe/Riga',
+  'Europe/Rome',
+  'Europe/Samara',
+  'Europe/San_Marino',
+  'Europe/Sarajevo',
+  'Europe/Saratov',
+  'Europe/Simferopol',
+  'Europe/Skopje',
+  'Europe/Sofia',
+  'Europe/Stockholm',
+  'Europe/Tallinn',
+  'Europe/Tirane',
+  'Europe/Ulyanovsk',
+  'Europe/Vaduz',
+  'Europe/Vatican',
+  'Europe/Vienna',
+  'Europe/Vilnius',
+  'Europe/Volgograd',
+  'Europe/Warsaw',
+  'Europe/Zagreb',
+  'Europe/Zurich',
+  'Indian/Antananarivo',
+  'Indian/Chagos',
+  'Indian/Christmas',
+  'Indian/Cocos',
+  'Indian/Comoro',
+  'Indian/Kerguelen',
+  'Indian/Mahe',
+  'Indian/Maldives',
+  'Indian/Mauritius',
+  'Indian/Mayotte',
+  'Indian/Reunion',
+  'Pacific/Apia',
+  'Pacific/Auckland',
+  'Pacific/Bougainville',
+  'Pacific/Chatham',
+  'Pacific/Chuuk',
+  'Pacific/Easter',
+  'Pacific/Efate',
+  'Pacific/Fakaofo',
+  'Pacific/Fiji',
+  'Pacific/Funafuti',
+  'Pacific/Galapagos',
+  'Pacific/Gambier',
+  'Pacific/Guadalcanal',
+  'Pacific/Guam',
+  'Pacific/Honolulu',
+  'Pacific/Kanton',
+  'Pacific/Kiritimati',
+  'Pacific/Kosrae',
+  'Pacific/Kwajalein',
+  'Pacific/Majuro',
+  'Pacific/Marquesas',
+  'Pacific/Midway',
+  'Pacific/Nauru',
+  'Pacific/Niue',
+  'Pacific/Norfolk',
+  'Pacific/Noumea',
+  'Pacific/Pago_Pago',
+  'Pacific/Palau',
+  'Pacific/Pitcairn',
+  'Pacific/Pohnpei',
+  'Pacific/Port_Moresby',
+  'Pacific/Rarotonga',
+  'Pacific/Saipan',
+  'Pacific/Tahiti',
+  'Pacific/Tarawa',
+  'Pacific/Tongatapu',
+  'Pacific/Wake',
+  'Pacific/Wallis',
+  'UTC',
 ];
+
+function parseOffsetMins(gmt: string): number {
+  const m = gmt.replace('GMT', '').match(/^([+-]?)(\d+):?(\d*)$/);
+  if (!m) return 0;
+  const sign = m[1] === '-' ? -1 : 1;
+  return sign * (parseInt(m[2] || '0', 10) * 60 + parseInt(m[3] || '0', 10));
+}
+
+function buildTimezoneList(): Array<{ id: string; label: string }> {
+  let ids: string[];
+  try {
+    ids = (
+      Intl as unknown as { supportedValuesOf(k: string): string[] }
+    ).supportedValuesOf('timeZone');
+  } catch {
+    ids = TIMEZONE_IDS_FALLBACK as string[];
+  }
+
+  const now = new Date();
+  type Entry = { id: string; label: string; offsetMins: number };
+  const list: Entry[] = [];
+
+  for (const id of ids) {
+    try {
+      const parts = new Intl.DateTimeFormat('en', {
+        timeZone: id,
+        timeZoneName: 'shortOffset',
+      }).formatToParts(now);
+      const gmt = parts.find((p) => p.type === 'timeZoneName')?.value ?? 'GMT';
+      list.push({ id, label: id, offsetMins: parseOffsetMins(gmt) });
+    } catch {
+      // skip IDs that fail formatting
+    }
+  }
+
+  list.sort((a, b) => a.offsetMins - b.offsetMins || a.id.localeCompare(b.id));
+  return list.map(({ id, label }) => ({ id, label }));
+}
+
+const TIMEZONES = buildTimezoneList();
 
 // Derived from PHONE_COUNTRIES after its definition — placeholder used by LocationStep
 let COUNTRIES: Array<{ code: string; label: string; flag: string }> = [];
@@ -248,11 +693,13 @@ type WizardStepId =
   | 'student-profile'
   | 'educator-profile'
   | 'educator-availability'
-  | 'first-child';
+  | 'first-child'
+  | 'notifications';
 
 function buildSteps(
   profileKind: string | null,
   primaryRole: string | null,
+  consentShown: boolean,
 ): WizardStepId[] {
   const steps: WizardStepId[] = ['name', 'phone', 'timezone', 'location'];
   const kind = profileKind ?? primaryRole;
@@ -263,6 +710,7 @@ function buildSteps(
   } else if (kind === 'guardian') {
     steps.push('first-child');
   }
+  if (!consentShown) steps.push('notifications');
   return steps;
 }
 
@@ -311,6 +759,11 @@ const STEP_META: Record<
     emoji: '🎓',
     title: 'Add your first child',
     subtitle: 'Create your child profile so we can personalise their learning space.',
+  },
+  notifications: {
+    emoji: '🔔',
+    title: 'Stay in the loop',
+    subtitle: '',
   },
 };
 
@@ -935,17 +1388,21 @@ function initPhoneState(phone: string): { code: string; national: string } {
 function PhoneStep({
   phone,
   setPhone,
+  countryCode: externalCode,
+  onCountryCodeChange,
   s,
   colors,
   isChild,
 }: {
   phone: string;
   setPhone: (v: string) => void;
+  countryCode: string;
+  onCountryCodeChange: (code: string) => void;
   s: S;
   colors: AppColors;
   isChild: boolean;
 }) {
-  const [selectedCode, setSelectedCode] = useState(() => initPhoneState(phone).code);
+  const [selectedCode, setSelectedCode] = useState(externalCode);
   const [nationalNumber, setNationalNumber] = useState(
     () => initPhoneState(phone).national,
   );
@@ -1008,11 +1465,12 @@ function PhoneStep({
   const handleCountrySelect = useCallback(
     (country: PhoneCountry) => {
       setSelectedCode(country.code);
+      onCountryCodeChange(country.code);
       setShowPicker(false);
       setSearch('');
       syncPhone(country.dialCode, nationalNumber, country.code);
     },
-    [nationalNumber, syncPhone],
+    [nationalNumber, onCountryCodeChange, syncPhone],
   );
 
   if (showPicker) {
@@ -1121,6 +1579,72 @@ function PhoneStep({
   );
 }
 
+// ─── Notifications Step ────────────────────────────────────────────────────────
+
+const NOTIF_BULLETS: Record<string, { icon: string; text: string }[]> = {
+  guardian: [
+    { icon: '📅', text: "Reminders before your child's sessions" },
+    { icon: '💬', text: "Messages from your child's tutor" },
+    { icon: '🔁', text: 'Schedule changes and cancellations' },
+  ],
+  educator: [
+    { icon: '📅', text: 'Session reminders before you teach' },
+    { icon: '💬', text: 'Messages from parents and students' },
+    { icon: '🔁', text: 'Schedule changes and booking updates' },
+  ],
+  child: [
+    { icon: '📅', text: 'Reminders before your sessions start' },
+    { icon: '💬', text: 'Messages from your teacher' },
+    { icon: '🔁', text: 'Schedule changes and class updates' },
+  ],
+  default: [
+    { icon: '📅', text: 'Reminders before class sessions' },
+    { icon: '💬', text: 'Tutor and class messages' },
+    { icon: '🔁', text: 'Schedule changes and cancellations' },
+  ],
+};
+
+function NotificationsStep({
+  kind,
+  s,
+  colors,
+}: {
+  kind: string | null;
+  s: S;
+  colors: AppColors;
+}) {
+  const bullets = NOTIF_BULLETS[kind ?? 'default'] ?? NOTIF_BULLETS.default;
+
+  return (
+    <View style={{ gap: 12 }}>
+      {bullets.map((b) => (
+        <View
+          key={b.text}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: colors.inputBg,
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: colors.border,
+            paddingHorizontal: 16,
+            paddingVertical: 14,
+            gap: 14,
+          }}
+        >
+          <Text style={{ fontSize: 22 }}>{b.icon}</Text>
+          <Text style={{ flex: 1, fontSize: 15, color: colors.text, lineHeight: 22 }}>
+            {b.text}
+          </Text>
+        </View>
+      ))}
+      <Text style={[s.inputHint, { marginTop: 4, textAlign: 'center' }]}>
+        No marketing notifications. You can change this any time in Settings.
+      </Text>
+    </View>
+  );
+}
+
 type DetectedLocation = {
   city: string;
   region: string;
@@ -1160,7 +1684,8 @@ function TimezoneStep({
   const [search, setSearch] = useState('');
 
   const allTimezones = useMemo(() => {
-    // Include detected device timezone if it's not already in the list
+    // TIMEZONES is built from Intl.supportedValuesOf so the device tz is already included.
+    // Only prepend as a fallback if it's somehow absent (unusual/private tz identifiers).
     try {
       const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
       if (detected && !TIMEZONES.some((t) => t.id === detected)) {
@@ -1180,7 +1705,7 @@ function TimezoneStep({
     );
   }, [search, allTimezones]);
 
-  const handleDetect = useCallback(async () => {
+  const runDetect = useCallback(async () => {
     setDetecting(true);
     setDetectError(null);
     try {
@@ -1199,7 +1724,15 @@ function TimezoneStep({
         latitude: pos.coords.latitude,
         longitude: pos.coords.longitude,
       });
-      const tz = geo?.timezone;
+      const tz =
+        geo?.timezone ??
+        (() => {
+          try {
+            return Intl.DateTimeFormat().resolvedOptions().timeZone;
+          } catch {
+            return null;
+          }
+        })();
       if (tz) {
         setTimezone(tz);
         const match = TIMEZONES.find((t) => t.id === tz);
@@ -1220,7 +1753,23 @@ function TimezoneStep({
     } finally {
       setDetecting(false);
     }
-  }, [setTimezone]);
+  }, [setTimezone, onLocationDetected]);
+
+  // Auto-detect on mount if permission already granted — skip the button tap
+  useEffect(() => {
+    if (detectedLabel) return;
+    void (async () => {
+      try {
+        const { status } = await Location.getForegroundPermissionsAsync();
+        if (status === 'granted') {
+          void runDetect();
+        }
+      } catch {
+        /* ignore — fall through to manual button */
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally run once on mount
 
   // Confirmed state — show after GPS detection, manual selection, or DB prefill
   if (!showManual && !!detectedLabel) {
@@ -1239,11 +1788,10 @@ function TimezoneStep({
         }}
         activeOpacity={0.7}
       >
-        <View style={{ flex: 1, gap: 3 }}>
-          <Text style={[s.listItemSelectedTxt, { fontWeight: '700', fontSize: 13 }]}>
-            ✓ Time zone selected
+        <View style={{ flex: 1, gap: 4 }}>
+          <Text style={[s.listItemSelectedTxt, { fontSize: 16, fontWeight: '600' }]}>
+            ✓ {label}
           </Text>
-          <Text style={[s.listItemSelectedTxt, { fontSize: 17 }]}>{label}</Text>
         </View>
         <Text style={{ fontSize: 13, color: colors.teal, fontWeight: '500' }}>Edit</Text>
       </TouchableOpacity>
@@ -1264,7 +1812,7 @@ function TimezoneStep({
               minHeight: 56,
             },
           ]}
-          onPress={handleDetect}
+          onPress={runDetect}
           disabled={detecting}
           activeOpacity={0.8}
         >
@@ -1272,7 +1820,7 @@ function TimezoneStep({
             <ActivityIndicator color={colors.teal} size="small" />
           ) : (
             <Text style={[s.listItemSelectedTxt, { textAlign: 'center', fontSize: 16 }]}>
-              📍 Detect from my location
+              📍 Use my current location
             </Text>
           )}
         </TouchableOpacity>
@@ -2073,6 +2621,7 @@ export default function ProfileSetupScreen() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
+  const [phoneCountryCode, setPhoneCountryCode] = useState(() => guessCountryCode());
   const [timezone, setTimezone] = useState(() => {
     try {
       return Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC';
@@ -2114,6 +2663,13 @@ export default function ProfileSetupScreen() {
 
   const [stepIdx, setStepIdx] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [consentShown, setConsentShown] = useState(false);
+
+  useEffect(() => {
+    hasPushConsentPromptState().then((hasState) => {
+      if (hasState) setConsentShown(true);
+    });
+  }, []);
 
   const progressAnim = useRef(new Animated.Value(0)).current;
   const stepFadeAnim = useRef(new Animated.Value(1)).current;
@@ -2194,8 +2750,13 @@ export default function ProfileSetupScreen() {
   const kind = onboarding?.profileKind ?? onboarding?.primaryRole ?? null;
 
   const steps = useMemo(
-    () => buildSteps(onboarding?.profileKind ?? null, onboarding?.primaryRole ?? null),
-    [onboarding?.profileKind, onboarding?.primaryRole],
+    () =>
+      buildSteps(
+        onboarding?.profileKind ?? null,
+        onboarding?.primaryRole ?? null,
+        consentShown,
+      ),
+    [onboarding?.profileKind, onboarding?.primaryRole, consentShown],
   );
   const currentStep = steps[stepIdx] as WizardStepId | undefined;
   const isLastStep = stepIdx === steps.length - 1;
@@ -2331,6 +2892,25 @@ export default function ProfileSetupScreen() {
             countryCode,
             postalCode,
           });
+        } else if (currentStep === 'notifications') {
+          setConsentShown(true);
+          if (isSkip) {
+            await snoozePushConsentPrompt();
+          } else {
+            await markPushConsentAccepted();
+          }
+          if (!isSkip && supportsNativePushNotifications()) {
+            try {
+              const { status } = await Notifications.requestPermissionsAsync();
+              if (status === 'granted' && onboarding.orgId && onboarding.profileId) {
+                const token = await getExpoPushToken({ requestPermissions: false });
+                if (token)
+                  await storePushToken(onboarding.orgId, onboarding.profileId, token);
+              }
+            } catch {
+              // Permission request errors must never block the wizard
+            }
+          }
         }
       }
       if (isLast) {
@@ -2357,7 +2937,15 @@ export default function ProfileSetupScreen() {
   });
 
   // Phone is skippable only for children
-  const canSkip = currentStep === 'phone' && kind === 'child';
+  const canSkip =
+    (currentStep === 'phone' && kind === 'child') || currentStep === 'notifications';
+  const btnLabel =
+    currentStep === 'notifications'
+      ? 'Turn on notifications'
+      : isLastStep
+        ? 'Finish'
+        : 'Continue';
+  const skipLabel = currentStep === 'notifications' ? 'Maybe later' : 'Skip for now';
 
   const canNext = useMemo(() => {
     if (saving) return false;
@@ -2383,6 +2971,8 @@ export default function ProfileSetupScreen() {
           !!childGrade &&
           childBirthYear.length === 4
         );
+      case 'notifications':
+        return true;
       default:
         return true;
     }
@@ -2490,6 +3080,8 @@ export default function ProfileSetupScreen() {
           setError("Please select your child's grade level.");
           return;
         }
+        break;
+      case 'notifications':
         break;
     }
     advance({ isSkip: false, isLast: isLastStep });
@@ -2658,6 +3250,8 @@ export default function ProfileSetupScreen() {
               <PhoneStep
                 phone={phone}
                 setPhone={setPhone}
+                countryCode={phoneCountryCode}
+                onCountryCodeChange={setPhoneCountryCode}
                 s={s}
                 colors={colors}
                 isChild={kind === 'child'}
@@ -2739,6 +3333,9 @@ export default function ProfileSetupScreen() {
                 s={s}
               />
             )}
+            {currentStep === 'notifications' && (
+              <NotificationsStep kind={kind} s={s} colors={colors} />
+            )}
           </Animated.View>
 
           {!!error && <Text style={s.errorTxt}>{error}</Text>}
@@ -2754,12 +3351,12 @@ export default function ProfileSetupScreen() {
             {saving ? (
               <ActivityIndicator color={colors.tealFg} />
             ) : (
-              <Text style={s.btnTxt}>{isLastStep ? 'Finish' : 'Continue'}</Text>
+              <Text style={s.btnTxt}>{btnLabel}</Text>
             )}
           </TouchableOpacity>
           {canSkip && (
             <TouchableOpacity style={s.skipBtn} onPress={handleSkip} disabled={saving}>
-              <Text style={s.skipTxt}>Skip for now</Text>
+              <Text style={s.skipTxt}>{skipLabel}</Text>
             </TouchableOpacity>
           )}
         </View>

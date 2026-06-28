@@ -19,8 +19,13 @@ jest.mock('@/providers/theme-provider', () => ({
 // ─── Mock: usePushToggle (the key dependency being tested) ────────────────────
 const mockToggle = jest.fn();
 const mockUsePushToggle = jest.fn();
+const mockRequestPushConsent = jest.fn();
 jest.mock('@/hooks/use-push-toggle', () => ({
   usePushToggle: () => mockUsePushToggle(),
+}));
+
+jest.mock('@/providers/push-consent-provider', () => ({
+  usePushConsent: () => ({ requestPushConsent: mockRequestPushConsent }),
 }));
 
 // ─── Mock: useNotificationPrefs ───────────────────────────────────────────────
@@ -85,6 +90,7 @@ function pushToggleEnabled() {
   mockUsePushToggle.mockReturnValue({
     isPushEnabled: true,
     isOsPermissionDenied: false,
+    isOsPermissionUndetermined: false,
     isToggling: false,
     toggle: mockToggle,
   });
@@ -94,6 +100,17 @@ function pushToggleDisabled() {
   mockUsePushToggle.mockReturnValue({
     isPushEnabled: false,
     isOsPermissionDenied: false,
+    isOsPermissionUndetermined: false,
+    isToggling: false,
+    toggle: mockToggle,
+  });
+}
+
+function pushToggleUndetermined() {
+  mockUsePushToggle.mockReturnValue({
+    isPushEnabled: false,
+    isOsPermissionDenied: false,
+    isOsPermissionUndetermined: true,
     isToggling: false,
     toggle: mockToggle,
   });
@@ -103,6 +120,7 @@ function pushToggleDenied() {
   mockUsePushToggle.mockReturnValue({
     isPushEnabled: false,
     isOsPermissionDenied: true,
+    isOsPermissionUndetermined: false,
     isToggling: false,
     toggle: mockToggle,
   });
@@ -131,10 +149,10 @@ function setPlatformOS(value: 'ios' | 'android') {
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe('NotificationsScreen — master push toggle (normal state, OS granted)', () => {
-  it('renders the "Allow push notifications" label', () => {
+  it('renders the "Class reminders" label', () => {
     pushToggleEnabled();
     render(<NotificationsScreen />);
-    expect(screen.getByText('Allow push notifications')).toBeTruthy();
+    expect(screen.getByText('Class reminders')).toBeTruthy();
   });
 
   it('Switch value is true when isPushEnabled is true', () => {
@@ -172,6 +190,7 @@ describe('NotificationsScreen — master push toggle (isToggling)', () => {
     mockUsePushToggle.mockReturnValue({
       isPushEnabled: true,
       isOsPermissionDenied: false,
+      isOsPermissionUndetermined: false,
       isToggling: true,
       toggle: mockToggle,
     });
@@ -181,11 +200,32 @@ describe('NotificationsScreen — master push toggle (isToggling)', () => {
   });
 });
 
+describe('NotificationsScreen — first-time push opt-in', () => {
+  it('renders the class reminders value card', () => {
+    pushToggleUndetermined();
+    render(<NotificationsScreen />);
+    expect(screen.getByText('Turn on class reminders')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'Get reminders before sessions, tutor messages, and schedule changes. No marketing notifications.',
+      ),
+    ).toBeTruthy();
+  });
+
+  it('uses the soft consent prompt before requesting OS permission', () => {
+    pushToggleUndetermined();
+    render(<NotificationsScreen />);
+    fireEvent.press(screen.getByLabelText('Turn on class reminders'));
+    expect(mockRequestPushConsent).toHaveBeenCalledTimes(1);
+    expect(mockToggle).not.toHaveBeenCalled();
+  });
+});
+
 describe('NotificationsScreen — master push toggle (OS permission denied)', () => {
-  it('renders "Allow push notifications" label', () => {
+  it('renders "Class reminders" label', () => {
     pushToggleDenied();
     render(<NotificationsScreen />);
-    expect(screen.getByText('Allow push notifications')).toBeTruthy();
+    expect(screen.getByText('Class reminders')).toBeTruthy();
   });
 
   it('Switch is rendered with value=false and disabled', () => {
@@ -199,14 +239,14 @@ describe('NotificationsScreen — master push toggle (OS permission denied)', ()
   it('tapping the row does not directly call Linking.openSettings (nudge sheet opens first)', () => {
     pushToggleDenied();
     render(<NotificationsScreen />);
-    fireEvent.press(screen.getByTestId('settings-row-Allow push notifications'));
+    fireEvent.press(screen.getByTestId('settings-row-Class reminders'));
     expect(openSettingsSpy).not.toHaveBeenCalled();
   });
 
   it('tapping the row does NOT call togglePush', () => {
     pushToggleDenied();
     render(<NotificationsScreen />);
-    fireEvent.press(screen.getByTestId('settings-row-Allow push notifications'));
+    fireEvent.press(screen.getByTestId('settings-row-Class reminders'));
     expect(mockToggle).not.toHaveBeenCalled();
   });
 });

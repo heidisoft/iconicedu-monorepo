@@ -1,8 +1,12 @@
-import { renderHook, waitFor } from '@testing-library/react-native';
+import { act, renderHook, waitFor } from '@testing-library/react-native';
 
 import { usePushRegistration } from './use-push-registration';
 
 const mockGetExpoPushToken = jest.fn();
+const mockMarkPushConsentAccepted = jest.fn();
+const mockMigrateLegacyPushConsentState = jest.fn();
+const mockShouldShowPushConsentPrompt = jest.fn();
+const mockSnoozePushConsentPrompt = jest.fn();
 const mockStorePushToken = jest.fn();
 const mockSupportsNativePushNotifications = jest.fn();
 const mockGetPermissionsAsync = jest.fn();
@@ -12,6 +16,12 @@ const mockSecureStoreSetItem = jest.fn();
 
 jest.mock('@/lib/notifications/push-token', () => ({
   getExpoPushToken: (...args: unknown[]) => mockGetExpoPushToken(...args),
+  markPushConsentAccepted: (...args: unknown[]) => mockMarkPushConsentAccepted(...args),
+  migrateLegacyPushConsentState: (...args: unknown[]) =>
+    mockMigrateLegacyPushConsentState(...args),
+  shouldShowPushConsentPrompt: (...args: unknown[]) =>
+    mockShouldShowPushConsentPrompt(...args),
+  snoozePushConsentPrompt: (...args: unknown[]) => mockSnoozePushConsentPrompt(...args),
   storePushToken: (...args: unknown[]) => mockStorePushToken(...args),
   supportsNativePushNotifications: (...args: unknown[]) =>
     mockSupportsNativePushNotifications(...args),
@@ -63,6 +73,10 @@ describe('usePushRegistration', () => {
     mockSupportsNativePushNotifications.mockReturnValue(true);
     mockGetPermissionsAsync.mockResolvedValue({ status: 'granted' });
     mockSetNotificationChannelAsync.mockResolvedValue(undefined);
+    mockMarkPushConsentAccepted.mockResolvedValue(undefined);
+    mockMigrateLegacyPushConsentState.mockResolvedValue(undefined);
+    mockShouldShowPushConsentPrompt.mockResolvedValue(false);
+    mockSnoozePushConsentPrompt.mockResolvedValue(undefined);
     mockStorePushToken.mockResolvedValue(undefined);
     mockSecureStoreGetItem.mockResolvedValue('1');
     mockSecureStoreSetItem.mockResolvedValue(undefined);
@@ -76,6 +90,7 @@ describe('usePushRegistration', () => {
     await waitFor(() => {
       expect(mockGetExpoPushToken).toHaveBeenCalled();
     });
+    expect(mockMigrateLegacyPushConsentState).toHaveBeenCalledWith('granted');
     await waitFor(() => {
       expect(mockStorePushToken).toHaveBeenCalledWith(
         'org-1',
@@ -117,17 +132,58 @@ describe('usePushRegistration', () => {
     });
   });
 
-  it('shows the consent sheet when notifications are still undetermined', async () => {
+  it('does not show the consent sheet automatically when notifications are still undetermined', async () => {
     mockGetPermissionsAsync.mockResolvedValue({ status: 'undetermined' });
-    mockSecureStoreGetItem.mockResolvedValue(null);
+    mockShouldShowPushConsentPrompt.mockResolvedValue(true);
 
     const { result } = renderHook(() => usePushRegistration());
 
     await waitFor(() => {
-      expect(result.current.showConsent).toBe(true);
+      expect(mockGetPermissionsAsync).toHaveBeenCalled();
     });
+    expect(result.current.showConsent).toBe(false);
     expect(mockGetExpoPushToken).not.toHaveBeenCalled();
     expect(mockStorePushToken).not.toHaveBeenCalled();
+  });
+
+  it('shows the consent sheet when contextual consent is requested', async () => {
+    mockGetPermissionsAsync.mockResolvedValue({ status: 'undetermined' });
+    mockShouldShowPushConsentPrompt.mockResolvedValue(true);
+
+    const { result } = renderHook(() => usePushRegistration());
+
+    let showedConsent = false;
+    await act(async () => {
+      showedConsent = await result.current.requestConsent();
+    });
+
+    expect(showedConsent).toBe(true);
+    expect(result.current.showConsent).toBe(true);
+    expect(mockGetExpoPushToken).not.toHaveBeenCalled();
+    expect(mockStorePushToken).not.toHaveBeenCalled();
+  });
+
+  it('snoozes contextual consent when dismissed', async () => {
+    const { result } = renderHook(() => usePushRegistration());
+
+    await act(async () => {
+      await result.current.onConsentDismissed();
+    });
+
+    expect(mockSnoozePushConsentPrompt).toHaveBeenCalledTimes(1);
+    expect(mockMarkPushConsentAccepted).not.toHaveBeenCalled();
+  });
+
+  it('marks contextual consent accepted when enabled', async () => {
+    mockGetExpoPushToken.mockResolvedValue(null);
+    const { result } = renderHook(() => usePushRegistration());
+
+    await act(async () => {
+      await result.current.onConsentGranted();
+    });
+
+    expect(mockMarkPushConsentAccepted).toHaveBeenCalledTimes(1);
+    expect(mockSnoozePushConsentPrompt).not.toHaveBeenCalled();
   });
 
   it('does not show the consent sheet when notifications are already granted', async () => {
@@ -155,7 +211,7 @@ describe('usePushRegistration', () => {
     expect(mockStorePushToken).not.toHaveBeenCalled();
   });
 
-  it('continues registration in bare builds when Constants.isDevice is undefined', async () => {
+  it('continues registration when native push support is available', async () => {
     mockConstants.isDevice = undefined;
     mockConstants.executionEnvironment = 'bare';
     mockGetExpoPushToken.mockResolvedValue('ExponentPushToken[test]');

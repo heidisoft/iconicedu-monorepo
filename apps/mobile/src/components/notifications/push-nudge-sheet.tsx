@@ -92,9 +92,9 @@ export function PushNudgeSheet({
   const iconColor = isRequestVariant ? colors.teal : AMBER_ICON;
 
   const iosBody =
-    'To receive class and message updates, go to Settings → Notifications → ICONIC Academy and turn on Allow Notifications.';
+    'To get class reminders, tutor messages, and schedule changes, go to Settings → Notifications → ICONIC Academy and turn on Allow Notifications.';
   const androidBody =
-    'To receive class and message updates, open Settings, find ICONIC Academy under Apps, and enable Notifications.';
+    'To get class reminders, tutor messages, and schedule changes, open Settings, find ICONIC Academy under Apps, and enable Notifications.';
 
   return (
     <BottomSheet
@@ -116,13 +116,13 @@ export function PushNudgeSheet({
 
         <Text style={s.title}>
           {isRequestVariant
-            ? 'Turn on notifications'
+            ? 'Stay on top of classes'
             : 'Enable notifications in Settings'}
         </Text>
 
         <Text style={s.body}>
           {isRequestVariant
-            ? "You'll miss important updates about class sessions, messages, and homework. Enable notifications to stay in the loop."
+            ? 'Get reminders before sessions, tutor messages, and schedule changes. No marketing notifications.'
             : Platform.OS === 'ios'
               ? iosBody
               : androidBody}
@@ -134,7 +134,7 @@ export function PushNudgeSheet({
           activeOpacity={0.8}
         >
           <Text style={s.btnPrimaryLabel}>
-            {isRequestVariant ? 'Enable Notifications' : 'Open Settings'}
+            {isRequestVariant ? 'Turn on class reminders' : 'Open Settings'}
           </Text>
         </TouchableOpacity>
 

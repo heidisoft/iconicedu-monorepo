@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   Alert,
   View,
@@ -46,6 +46,7 @@ import { useMarkRead } from '@/hooks/use-mark-read';
 import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
 import { usePushNudge } from '@/hooks/use-push-nudge';
 import { PushNudgeSheet } from '@/components/notifications/push-nudge-sheet';
+import { usePushConsent } from '@/providers/push-consent-provider';
 import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
 
 type PendingUpload = {
@@ -286,6 +287,21 @@ export default function SpaceDetailScreen() {
     handleOpenSettings,
     handleDismiss,
   } = usePushNudge();
+  const { requestPushConsent } = usePushConsent();
+  const scheduleConsentRequestedRef = useRef(false);
+
+  const handlePushNotificationMoment = useCallback(async () => {
+    const showedConsent = await requestPushConsent();
+    if (!showedConsent) {
+      await triggerNudge();
+    }
+  }, [requestPushConsent, triggerNudge]);
+
+  useEffect(() => {
+    if (activeTab !== 'sessions' || scheduleConsentRequestedRef.current) return;
+    scheduleConsentRequestedRef.current = true;
+    void handlePushNotificationMoment();
+  }, [activeTab, handlePushNotificationMoment]);
 
   const handleSend = useCallback(
     async (text: string) => {
@@ -321,9 +337,16 @@ export default function SpaceDetailScreen() {
         );
         return;
       }
-      void triggerNudge();
+      void handlePushNotificationMoment();
     },
-    [channelId, profileId, orgId, threadReplyTarget, refetch, triggerNudge],
+    [
+      channelId,
+      profileId,
+      orgId,
+      threadReplyTarget,
+      refetch,
+      handlePushNotificationMoment,
+    ],
   );
 
   const handleSendAttachment = useCallback(
@@ -402,6 +425,7 @@ export default function SpaceDetailScreen() {
         }
 
         setPendingUploads((prev) => prev.filter((upload) => upload.id !== pendingId));
+        void handlePushNotificationMoment();
       } catch {
         setPendingUploads((prev) =>
           prev.map((upload) =>
@@ -410,7 +434,7 @@ export default function SpaceDetailScreen() {
         );
       }
     },
-    [channelId, profileId, orgId, senderName],
+    [channelId, profileId, orgId, senderName, handlePushNotificationMoment],
   );
 
   // ── Retry a failed upload ──
@@ -532,7 +556,7 @@ export default function SpaceDetailScreen() {
         onBack={() => router.back()}
         onMore={() => setInfoVisible(true)}
         liveJoinUrl={resolvedLiveJoinUrl}
-        onJoinPress={() => void triggerNudge()}
+        onJoinPress={() => void handlePushNotificationMoment()}
       />
 
       {/* Tab bar: Messages | Sessions */}
@@ -625,7 +649,7 @@ export default function SpaceDetailScreen() {
         themeKey={resolvedThemeKey}
         messages={messages ?? []}
         liveJoinUrl={resolvedLiveJoinUrl}
-        onJoinPress={() => void triggerNudge()}
+        onJoinPress={() => void handlePushNotificationMoment()}
         onClose={() => setInfoVisible(false)}
         onProfilePress={(user) => {
           setInfoVisible(false);

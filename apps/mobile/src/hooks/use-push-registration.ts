@@ -1,11 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
-import * as SecureStore from 'expo-secure-store';
-import Constants from 'expo-constants';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 
 import { reportMobileObservedError } from '@/lib/analytics/report-error';
 import {
   getExpoPushToken,
+  markPushConsentAccepted,
+  migrateLegacyPushConsentState,
+  shouldShowPushConsentPrompt,
+  snoozePushConsentPrompt,
   storePushToken,
   supportsNativePushNotifications,
 } from '@/lib/notifications/push-token';
@@ -13,8 +15,6 @@ import {
 import { useAccount } from './use-account';
 import { useProfile } from './use-profile';
 
-const CONSENT_SHOWN_KEY = 'push_consent_shown';
-const CONSENT_DELAY_MS = 4000;
 function getNotificationsModule() {
   // Function-scoped require avoids loading the native module in Expo Go.
   // eslint-disable-next-line @typescript-eslint/no-require-imports, no-undef
@@ -35,15 +35,16 @@ async function ensureAndroidChannel() {
 /**
  * Manages push notification registration for the authenticated user.
  *
- * Shows a custom consent sheet on first run before touching OS permissions.
+ * Exposes a custom consent sheet that product surfaces can trigger before
+ * touching OS permissions.
  * This is required because:
  * - iOS: the OS prompt can only be shown once — we explain why first
  * - Android < 13: permissions are auto-granted, so the OS never shows a prompt
  *   at all; our sheet is the only way to inform the user
  * - Android 13+: runtime permission required, same as iOS
  *
- * After the user consents (or if permission was already granted from a
- * previous install), token registration happens silently.
+ * If permission was already granted from a previous install, token registration
+ * happens silently.
  * Errors are caught silently — push registration must never block the user.
  */
 export function usePushRegistration() {
@@ -59,13 +60,6 @@ export function usePushRegistration() {
 
   const [showConsent, setShowConsent] = useState(false);
   const registered = useRef(false);
-  const consentTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (consentTimer.current) clearTimeout(consentTimer.current);
-    };
-  }, []);
 
   useEffect(() => {
     if (!orgId || !profileId || registered.current) return;
@@ -79,22 +73,17 @@ export function usePushRegistration() {
         await ensureAndroidChannel();
         const Notifications = getNotificationsModule();
         const { status } = await Notifications.getPermissionsAsync();
+        await migrateLegacyPushConsentState(status);
 
         // If already explicitly denied, nothing to do — user must go to Settings
         if (status === 'denied') {
           return;
         }
 
-        const consentShown = await SecureStore.getItemAsync(CONSENT_SHOWN_KEY);
-
-        if ((!consentShown && status !== 'granted') || status === 'undetermined') {
-          consentTimer.current = setTimeout(() => setShowConsent(true), CONSENT_DELAY_MS);
-          return;
-        }
-
         if (status !== 'granted') {
           return;
         }
+
         registered.current = true;
         const token = await getExpoPushToken();
         if (token) {
@@ -111,9 +100,54 @@ export function usePushRegistration() {
     })();
   }, [orgId, profileId]);
 
-  const onConsentGranted = async () => {
+  const requestConsent = useCallback(async () => {
+    if (!orgId || !profileId) return false;
+    try {
+      if (!supportsNativePushNotifications()) {
+        return false;
+      }
+
+      await ensureAndroidChannel();
+      const Notifications = getNotificationsModule();
+      const { status } = await Notifications.getPermissionsAsync();
+      await migrateLegacyPushConsentState(status);
+
+      if (status === 'granted') {
+        if (!registered.current) {
+          registered.current = true;
+          const token = await getExpoPushToken({ requestPermissions: false });
+          if (token) {
+            await storePushToken(orgId, profileId, token);
+          }
+        }
+        return false;
+      }
+
+      if (status === 'denied') {
+        return false;
+      }
+
+      const shouldShowConsent = await shouldShowPushConsentPrompt();
+      if (!shouldShowConsent) {
+        return false;
+      }
+
+      setShowConsent(true);
+      return true;
+    } catch (error) {
+      reportMobileObservedError({
+        error,
+        source: 'mobile.notifications.use_push_registration.request_consent',
+        message: 'Push consent request failed',
+        context: { orgId, profileId },
+      });
+      return false;
+    }
+  }, [orgId, profileId]);
+
+  const onConsentGranted = useCallback(async () => {
     setShowConsent(false);
-    await SecureStore.setItemAsync(CONSENT_SHOWN_KEY, '1');
+    await markPushConsentAccepted();
     if (!orgId || !profileId) return;
     try {
       const token = await getExpoPushToken();
@@ -129,12 +163,12 @@ export function usePushRegistration() {
         context: { orgId, profileId },
       });
     }
-  };
+  }, [orgId, profileId]);
 
-  const onConsentDismissed = async () => {
+  const onConsentDismissed = useCallback(async () => {
     setShowConsent(false);
-    await SecureStore.setItemAsync(CONSENT_SHOWN_KEY, '1');
-  };
+    await snoozePushConsentPrompt();
+  }, []);
 
-  return { showConsent, onConsentGranted, onConsentDismissed };
+  return { showConsent, requestConsent, onConsentGranted, onConsentDismissed };
 }

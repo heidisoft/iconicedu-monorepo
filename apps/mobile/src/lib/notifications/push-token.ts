@@ -6,6 +6,13 @@ import { reportMobileObservedError } from '@/lib/analytics/report-error';
 import { apiPost } from '@/lib/api/http-client';
 
 export const PUSH_TOKEN_STORE_KEY = 'expo_push_token';
+export const PUSH_CONSENT_ACCEPTED_KEY = 'push_consent_accepted';
+export const PUSH_CONSENT_LEGACY_SHOWN_KEY = 'push_consent_shown';
+export const PUSH_CONSENT_NEXT_PROMPT_AT_KEY = 'push_consent_next_prompt_at';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const PUSH_CONSENT_SNOOZE_MIN_DAYS = 7;
+const PUSH_CONSENT_SNOOZE_MAX_DAYS = 14;
 
 /**
  * Returns the Expo push token stored on this device, or null if none.
@@ -13,6 +20,90 @@ export const PUSH_TOKEN_STORE_KEY = 'expo_push_token';
  */
 export async function getStoredPushToken(): Promise<string | null> {
   return SecureStore.getItemAsync(PUSH_TOKEN_STORE_KEY);
+}
+
+export function getPushConsentSnoozeUntil(
+  nowMs = Date.now(),
+  randomValue = Math.random(),
+): string {
+  const boundedRandom = Math.max(0, Math.min(0.999999, randomValue));
+  const rangeDays = PUSH_CONSENT_SNOOZE_MAX_DAYS - PUSH_CONSENT_SNOOZE_MIN_DAYS + 1;
+  const days = PUSH_CONSENT_SNOOZE_MIN_DAYS + Math.floor(boundedRandom * rangeDays);
+  return String(nowMs + days * DAY_MS);
+}
+
+export async function shouldShowPushConsentPrompt(): Promise<boolean> {
+  const accepted = await SecureStore.getItemAsync(PUSH_CONSENT_ACCEPTED_KEY);
+  if (accepted) {
+    return false;
+  }
+
+  const nextPromptAt = await SecureStore.getItemAsync(PUSH_CONSENT_NEXT_PROMPT_AT_KEY);
+  if (!nextPromptAt) {
+    return true;
+  }
+
+  const nextPromptAtMs = Number.parseInt(nextPromptAt, 10);
+  if (!Number.isFinite(nextPromptAtMs)) {
+    return true;
+  }
+
+  return Date.now() >= nextPromptAtMs;
+}
+
+export async function hasPushConsentPromptState(): Promise<boolean> {
+  const accepted = await SecureStore.getItemAsync(PUSH_CONSENT_ACCEPTED_KEY);
+  if (accepted) {
+    return true;
+  }
+
+  const nextPromptAt = await SecureStore.getItemAsync(PUSH_CONSENT_NEXT_PROMPT_AT_KEY);
+  if (nextPromptAt) {
+    return true;
+  }
+
+  const legacyShown = await SecureStore.getItemAsync(PUSH_CONSENT_LEGACY_SHOWN_KEY);
+  return Boolean(legacyShown);
+}
+
+export async function markPushConsentAccepted(): Promise<void> {
+  await Promise.all([
+    SecureStore.setItemAsync(PUSH_CONSENT_ACCEPTED_KEY, '1'),
+    SecureStore.deleteItemAsync(PUSH_CONSENT_LEGACY_SHOWN_KEY),
+    SecureStore.deleteItemAsync(PUSH_CONSENT_NEXT_PROMPT_AT_KEY),
+  ]);
+}
+
+export async function snoozePushConsentPrompt(): Promise<void> {
+  await Promise.all([
+    SecureStore.deleteItemAsync(PUSH_CONSENT_ACCEPTED_KEY),
+    SecureStore.deleteItemAsync(PUSH_CONSENT_LEGACY_SHOWN_KEY),
+    SecureStore.setItemAsync(
+      PUSH_CONSENT_NEXT_PROMPT_AT_KEY,
+      getPushConsentSnoozeUntil(),
+    ),
+  ]);
+}
+
+export async function migrateLegacyPushConsentState(
+  osPermissionStatus: 'granted' | 'denied' | 'undetermined' | string,
+): Promise<void> {
+  const legacyShown = await SecureStore.getItemAsync(PUSH_CONSENT_LEGACY_SHOWN_KEY);
+  if (!legacyShown) {
+    return;
+  }
+
+  if (osPermissionStatus === 'granted') {
+    await markPushConsentAccepted();
+    return;
+  }
+
+  if (osPermissionStatus === 'undetermined') {
+    await snoozePushConsentPrompt();
+    return;
+  }
+
+  await SecureStore.deleteItemAsync(PUSH_CONSENT_LEGACY_SHOWN_KEY);
 }
 
 function getNotificationsModule() {
@@ -146,6 +237,9 @@ export async function revokePushToken(token: string): Promise<void> {
 export async function clearUserNotificationState(): Promise<void> {
   await Promise.allSettled([
     SecureStore.deleteItemAsync(PUSH_TOKEN_STORE_KEY),
+    SecureStore.deleteItemAsync(PUSH_CONSENT_ACCEPTED_KEY),
+    SecureStore.deleteItemAsync(PUSH_CONSENT_LEGACY_SHOWN_KEY),
+    SecureStore.deleteItemAsync(PUSH_CONSENT_NEXT_PROMPT_AT_KEY),
     SecureStore.deleteItemAsync('push_nudge_last_shown_at'),
   ]);
 }

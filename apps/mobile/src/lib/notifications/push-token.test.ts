@@ -1,18 +1,28 @@
 import {
+  PUSH_CONSENT_ACCEPTED_KEY,
+  PUSH_CONSENT_LEGACY_SHOWN_KEY,
+  PUSH_CONSENT_NEXT_PROMPT_AT_KEY,
   PUSH_TOKEN_STORE_KEY,
   getExpoPushToken,
+  getPushConsentSnoozeUntil,
   getStoredPushToken,
+  markPushConsentAccepted,
+  migrateLegacyPushConsentState,
   revokePushToken,
+  shouldShowPushConsentPrompt,
+  snoozePushConsentPrompt,
   storePushToken,
   supportsNativePushNotifications,
 } from './push-token';
 
 const mockSecureStoreSetItemAsync = jest.fn();
 const mockSecureStoreGetItemAsync = jest.fn();
+const mockSecureStoreDeleteItemAsync = jest.fn();
 
 jest.mock('expo-secure-store', () => ({
   setItemAsync: (...args: unknown[]) => mockSecureStoreSetItemAsync(...args),
   getItemAsync: (...args: unknown[]) => mockSecureStoreGetItemAsync(...args),
+  deleteItemAsync: (...args: unknown[]) => mockSecureStoreDeleteItemAsync(...args),
 }));
 
 const mockGetPermissionsAsync = jest.fn();
@@ -189,6 +199,114 @@ describe('getStoredPushToken', () => {
     mockSecureStoreGetItemAsync.mockResolvedValue(null);
     const token = await getStoredPushToken();
     expect(token).toBeNull();
+  });
+});
+
+describe('push consent prompt cooldown', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('builds a next prompt timestamp between 7 and 14 days', () => {
+    const now = 1_700_000_000_000;
+    const dayMs = 24 * 60 * 60 * 1000;
+
+    expect(getPushConsentSnoozeUntil(now, 0)).toBe(String(now + 7 * dayMs));
+    expect(getPushConsentSnoozeUntil(now, 0.999999)).toBe(String(now + 14 * dayMs));
+  });
+
+  it('does not show the prompt when accepted', async () => {
+    mockSecureStoreGetItemAsync.mockResolvedValueOnce('1');
+
+    await expect(shouldShowPushConsentPrompt()).resolves.toBe(false);
+    expect(mockSecureStoreGetItemAsync).toHaveBeenCalledWith(PUSH_CONSENT_ACCEPTED_KEY);
+  });
+
+  it('does not show the prompt before the snooze expires', async () => {
+    jest.spyOn(Date, 'now').mockReturnValue(1_000);
+    mockSecureStoreGetItemAsync.mockResolvedValueOnce(null).mockResolvedValueOnce('2000');
+
+    await expect(shouldShowPushConsentPrompt()).resolves.toBe(false);
+  });
+
+  it('shows the prompt after the snooze expires', async () => {
+    jest.spyOn(Date, 'now').mockReturnValue(3_000);
+    mockSecureStoreGetItemAsync.mockResolvedValueOnce(null).mockResolvedValueOnce('2000');
+
+    await expect(shouldShowPushConsentPrompt()).resolves.toBe(true);
+  });
+
+  it('marks accepted by storing the accepted key and clearing snooze', async () => {
+    await markPushConsentAccepted();
+
+    expect(mockSecureStoreSetItemAsync).toHaveBeenCalledWith(
+      PUSH_CONSENT_ACCEPTED_KEY,
+      '1',
+    );
+    expect(mockSecureStoreDeleteItemAsync).toHaveBeenCalledWith(
+      PUSH_CONSENT_LEGACY_SHOWN_KEY,
+    );
+    expect(mockSecureStoreDeleteItemAsync).toHaveBeenCalledWith(
+      PUSH_CONSENT_NEXT_PROMPT_AT_KEY,
+    );
+  });
+
+  it('snoozes by clearing accepted and storing next prompt timestamp', async () => {
+    await snoozePushConsentPrompt();
+
+    expect(mockSecureStoreDeleteItemAsync).toHaveBeenCalledWith(
+      PUSH_CONSENT_ACCEPTED_KEY,
+    );
+    expect(mockSecureStoreDeleteItemAsync).toHaveBeenCalledWith(
+      PUSH_CONSENT_LEGACY_SHOWN_KEY,
+    );
+    expect(mockSecureStoreSetItemAsync).toHaveBeenCalledWith(
+      PUSH_CONSENT_NEXT_PROMPT_AT_KEY,
+      expect.any(String),
+    );
+  });
+
+  it('migrates legacy accepted state when OS permission is granted', async () => {
+    mockSecureStoreGetItemAsync.mockResolvedValueOnce('1');
+
+    await migrateLegacyPushConsentState('granted');
+
+    expect(mockSecureStoreSetItemAsync).toHaveBeenCalledWith(
+      PUSH_CONSENT_ACCEPTED_KEY,
+      '1',
+    );
+    expect(mockSecureStoreDeleteItemAsync).toHaveBeenCalledWith(
+      PUSH_CONSENT_LEGACY_SHOWN_KEY,
+    );
+  });
+
+  it('migrates legacy Not Now state to a snooze when OS permission is undetermined', async () => {
+    mockSecureStoreGetItemAsync.mockResolvedValueOnce('1');
+
+    await migrateLegacyPushConsentState('undetermined');
+
+    expect(mockSecureStoreDeleteItemAsync).toHaveBeenCalledWith(
+      PUSH_CONSENT_LEGACY_SHOWN_KEY,
+    );
+    expect(mockSecureStoreSetItemAsync).toHaveBeenCalledWith(
+      PUSH_CONSENT_NEXT_PROMPT_AT_KEY,
+      expect.any(String),
+    );
+  });
+
+  it('clears legacy state when OS permission is denied', async () => {
+    mockSecureStoreGetItemAsync.mockResolvedValueOnce('1');
+
+    await migrateLegacyPushConsentState('denied');
+
+    expect(mockSecureStoreDeleteItemAsync).toHaveBeenCalledWith(
+      PUSH_CONSENT_LEGACY_SHOWN_KEY,
+    );
+    expect(mockSecureStoreSetItemAsync).not.toHaveBeenCalled();
   });
 });
 
