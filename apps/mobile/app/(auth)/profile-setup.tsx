@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { isValidPhoneNumber, type CountryCode } from 'libphonenumber-js';
 import {
   View,
   Text,
@@ -9,6 +10,8 @@ import {
   StyleSheet,
   ActivityIndicator,
   ScrollView,
+  Animated,
+  Easing,
 } from 'react-native';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
@@ -72,33 +75,8 @@ const TIMEZONES: Array<{ id: string; label: string }> = [
   { id: 'America/Vancouver', label: 'Canada (Vancouver)' },
 ];
 
-const COUNTRIES: Array<{ code: string; label: string; flag: string }> = [
-  { code: 'LK', label: 'Sri Lanka', flag: '🇱🇰' },
-  { code: 'IN', label: 'India', flag: '🇮🇳' },
-  { code: 'AU', label: 'Australia', flag: '🇦🇺' },
-  { code: 'GB', label: 'United Kingdom', flag: '🇬🇧' },
-  { code: 'US', label: 'United States', flag: '🇺🇸' },
-  { code: 'CA', label: 'Canada', flag: '🇨🇦' },
-  { code: 'NZ', label: 'New Zealand', flag: '🇳🇿' },
-  { code: 'SG', label: 'Singapore', flag: '🇸🇬' },
-  { code: 'AE', label: 'UAE', flag: '🇦🇪' },
-  { code: 'SA', label: 'Saudi Arabia', flag: '🇸🇦' },
-  { code: 'PK', label: 'Pakistan', flag: '🇵🇰' },
-  { code: 'BD', label: 'Bangladesh', flag: '🇧🇩' },
-  { code: 'MY', label: 'Malaysia', flag: '🇲🇾' },
-  { code: 'KE', label: 'Kenya', flag: '🇰🇪' },
-  { code: 'NG', label: 'Nigeria', flag: '🇳🇬' },
-  { code: 'ZA', label: 'South Africa', flag: '🇿🇦' },
-  { code: 'FR', label: 'France', flag: '🇫🇷' },
-  { code: 'DE', label: 'Germany', flag: '🇩🇪' },
-  { code: 'TR', label: 'Turkey', flag: '🇹🇷' },
-  { code: 'BR', label: 'Brazil', flag: '🇧🇷' },
-  { code: 'JP', label: 'Japan', flag: '🇯🇵' },
-  { code: 'CN', label: 'China', flag: '🇨🇳' },
-  { code: 'PH', label: 'Philippines', flag: '🇵🇭' },
-  { code: 'OM', label: 'Oman', flag: '🇴🇲' },
-  { code: 'QA', label: 'Qatar', flag: '🇶🇦' },
-];
+// Derived from PHONE_COUNTRIES after its definition — placeholder used by LocationStep
+let COUNTRIES: Array<{ code: string; label: string; flag: string }> = [];
 
 type AddressConfig = {
   cityLabel: string;
@@ -295,13 +273,13 @@ const STEP_META: Record<
   name: {
     emoji: '👤',
     title: 'Your name',
-    subtitle: 'Let your teachers and classmates know who you are.',
+    subtitle: 'This helps personalise your account and lets others know who you are.',
   },
   phone: {
     emoji: '📱',
     title: 'Your phone number',
     subtitle:
-      'For important updates and reminders. Include your country code (e.g. +1, +44, +94).',
+      'For important updates and reminders. Select your country, then enter your number.',
   },
   timezone: {
     emoji: '🌍',
@@ -355,7 +333,6 @@ function makeStyles(C: AppColors) {
         paddingBottom: 4,
         flexDirection: 'row' as const,
         alignItems: 'center' as const,
-        gap: 10,
       },
       backBtn: {
         width: 40,
@@ -364,21 +341,29 @@ function makeStyles(C: AppColors) {
         justifyContent: 'center' as const,
         borderRadius: 20,
         backgroundColor: C.inputBg,
+        borderWidth: 1,
+        borderColor: C.border,
       },
-      backArrow: { fontSize: 20, color: C.teal },
-      stepLabel: { fontSize: 14, color: C.textFaint, fontWeight: '500' as const },
+      backArrow: { fontSize: 22, color: C.teal, lineHeight: 26 },
+      stepLabel: {
+        flex: 1,
+        fontSize: 14,
+        color: C.textFaint,
+        fontWeight: '500' as const,
+        textAlign: 'center' as const,
+      },
 
       progressTrack: {
         height: 4,
         borderRadius: 2,
         backgroundColor: C.border,
         marginHorizontal: 20,
-        marginBottom: 8,
+        marginBottom: 12,
         overflow: 'hidden' as const,
       },
       progressFill: { height: 4, borderRadius: 2, backgroundColor: C.teal },
 
-      scrollContent: { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 40 },
+      scrollContent: { paddingHorizontal: 24, paddingTop: 28, paddingBottom: 40 },
 
       badge: {
         alignSelf: 'center' as const,
@@ -388,7 +373,7 @@ function makeStyles(C: AppColors) {
         backgroundColor: C.teal + '18',
         alignItems: 'center' as const,
         justifyContent: 'center' as const,
-        marginBottom: 20,
+        marginBottom: 18,
       },
       badgeEmoji: { fontSize: 30 },
       heading: {
@@ -396,14 +381,14 @@ function makeStyles(C: AppColors) {
         fontWeight: '700' as const,
         color: C.text,
         textAlign: 'center' as const,
-        marginBottom: 6,
+        marginBottom: 8,
       },
       sub: {
         fontSize: 15,
         color: C.textMuted,
         textAlign: 'center' as const,
         marginBottom: 28,
-        lineHeight: 20,
+        lineHeight: 22,
       },
 
       label: {
@@ -421,16 +406,22 @@ function makeStyles(C: AppColors) {
         flexDirection: 'row' as const,
         alignItems: 'center' as const,
         backgroundColor: C.inputBg,
-        borderRadius: 14,
+        borderRadius: 12,
         borderWidth: 1,
         borderColor: C.border,
         paddingHorizontal: 16,
         marginBottom: 16,
         minHeight: 52,
       },
+      inputWrapFocused: {
+        borderColor: C.teal,
+      },
+      inputWrapError: {
+        borderColor: '#ef4444',
+      },
       input: {
         flex: 1,
-        fontSize: 17,
+        fontSize: 16,
         color: C.text,
         paddingVertical: 14,
         letterSpacing: 0,
@@ -440,8 +431,16 @@ function makeStyles(C: AppColors) {
         color: C.textFaint,
         marginTop: -10,
         marginBottom: 16,
-        marginLeft: 4,
+        marginLeft: 2,
       },
+
+      infoCard: {
+        backgroundColor: C.teal + '12',
+        borderRadius: 10,
+        padding: 14,
+        marginBottom: 20,
+      },
+      infoCardTxt: { fontSize: 14, color: C.textMuted, lineHeight: 21 },
 
       searchBox: {
         flexDirection: 'row' as const,
@@ -458,11 +457,11 @@ function makeStyles(C: AppColors) {
       searchInput: { flex: 1, fontSize: 15, color: C.text },
       addressSearchBox: {
         minHeight: 52,
-        borderRadius: 14,
+        borderRadius: 12,
         paddingHorizontal: 16,
         paddingVertical: 0,
       },
-      addressSearchInput: { fontSize: 17, paddingVertical: 14 },
+      addressSearchInput: { fontSize: 16, paddingVertical: 14 },
 
       listItem: {
         flexDirection: 'row' as const,
@@ -487,14 +486,14 @@ function makeStyles(C: AppColors) {
         flex: 1,
         paddingVertical: 10,
         alignItems: 'center' as const,
-        borderRadius: 12,
+        borderRadius: 10,
         backgroundColor: C.inputBg,
         borderWidth: 1,
         borderColor: C.border,
       },
       tabBtnActive: { backgroundColor: C.tealBg, borderColor: C.teal },
-      tabTxt: { fontSize: 15, fontWeight: '600' as const, color: C.textMuted },
-      tabTxtActive: { color: C.teal },
+      tabTxt: { fontSize: 15, fontWeight: '500' as const, color: C.textMuted },
+      tabTxtActive: { color: C.teal, fontWeight: '600' as const },
 
       chipsRow: {
         flexDirection: 'row' as const,
@@ -506,17 +505,17 @@ function makeStyles(C: AppColors) {
         flexDirection: 'row' as const,
         alignItems: 'center' as const,
         paddingHorizontal: 14,
-        paddingVertical: 9,
+        paddingVertical: 8,
         borderRadius: 20,
         borderWidth: 1,
       },
-      chipTxt: { fontSize: 15, fontWeight: '500' as const },
+      chipTxt: { fontSize: 14, fontWeight: '500' as const },
 
       sectionLabel: {
         fontSize: 14,
-        fontWeight: '700' as const,
+        fontWeight: '600' as const,
         color: C.text,
-        marginBottom: 10,
+        marginBottom: 8,
         marginTop: 4,
       },
       sectionHint: { fontSize: 13, color: C.textFaint, marginBottom: 12 },
@@ -566,7 +565,7 @@ function makeStyles(C: AppColors) {
         flexDirection: 'row' as const,
         alignItems: 'center' as const,
         backgroundColor: C.inputBg,
-        borderRadius: 14,
+        borderRadius: 12,
         borderWidth: 1,
         borderColor: C.border,
         paddingHorizontal: 16,
@@ -574,7 +573,7 @@ function makeStyles(C: AppColors) {
         minHeight: 52,
         gap: 10,
       },
-      numberInput: { flex: 1, fontSize: 17, color: C.text, paddingVertical: 14 },
+      numberInput: { flex: 1, fontSize: 16, color: C.text, paddingVertical: 14 },
       numberUnit: { fontSize: 15, color: C.textMuted },
 
       errorTxt: {
@@ -587,18 +586,25 @@ function makeStyles(C: AppColors) {
       footer: {
         paddingHorizontal: 20,
         paddingBottom: Platform.OS === 'ios' ? 32 : 20,
-        paddingTop: 12,
+        paddingTop: 14,
         gap: 8,
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: C.border,
+        backgroundColor: C.pageBg,
       },
       btn: {
         backgroundColor: C.teal,
-        borderRadius: 14,
+        borderRadius: 12,
         paddingVertical: 16,
         alignItems: 'center' as const,
       },
       btnDim: { opacity: 0.4 },
-      btnTxt: { color: C.tealFg, fontSize: 17, fontWeight: '700' as const },
-      skipBtn: { alignItems: 'center' as const, paddingVertical: 6 },
+      btnTxt: {
+        color: C.tealFg,
+        fontSize: 16,
+        fontWeight: '700' as const,
+      },
+      skipBtn: { alignItems: 'center' as const, paddingVertical: 8 },
       skipTxt: { fontSize: 15, color: C.textFaint },
     }),
   };
@@ -613,19 +619,29 @@ function NameStep({
   setFirstName,
   lastName,
   setLastName,
+  isGuardian,
   s,
 }: {
   firstName: string;
   setFirstName: (v: string) => void;
   lastName: string;
   setLastName: (v: string) => void;
+  isGuardian: boolean;
   s: S;
   colors: AppColors;
 }) {
+  const [focusedField, setFocusedField] = useState<'first' | 'last' | null>(null);
+
   return (
     <>
       <Text style={s.label}>First Name</Text>
-      <View style={[s.inputWrap, { marginBottom: 12 }]}>
+      <View
+        style={[
+          s.inputWrap,
+          focusedField === 'first' && s.inputWrapFocused,
+          { marginBottom: 12 },
+        ]}
+      >
         <TextInput
           style={s.input}
           value={firstName}
@@ -635,10 +651,12 @@ function NameStep({
           autoCapitalize="words"
           autoFocus
           returnKeyType="next"
+          onFocus={() => setFocusedField('first')}
+          onBlur={() => setFocusedField(null)}
         />
       </View>
       <Text style={s.label}>Last Name</Text>
-      <View style={s.inputWrap}>
+      <View style={[s.inputWrap, focusedField === 'last' && s.inputWrapFocused]}>
         <TextInput
           style={s.input}
           value={lastName}
@@ -647,65 +665,278 @@ function NameStep({
           placeholderTextColor={s.placeholderColor}
           autoCapitalize="words"
           returnKeyType="done"
+          onFocus={() => setFocusedField('last')}
+          onBlur={() => setFocusedField(null)}
         />
       </View>
     </>
   );
 }
 
-function formatPhone(input: string): string {
-  // Strip everything except digits and a leading +
-  const stripped = input.replace(/[^\d+]/g, '');
-  const normalized = stripped.startsWith('+')
-    ? '+' + stripped.slice(1).replace(/\+/g, '')
-    : stripped.replace(/\+/g, '');
+// ─── Phone helpers ─────────────────────────────────────────────────────────────
 
-  if (!normalized.startsWith('+')) return normalized;
-  const digits = normalized.slice(1); // digits after +
+type PhoneCountry = { code: string; label: string; flag: string; dialCode: string };
 
-  // +1 — US / Canada: +1 (XXX) XXX-XXXX
-  if (digits.startsWith('1')) {
-    const nat = digits.slice(1);
-    if (nat.length === 0) return '+1';
-    if (nat.length <= 3) return `+1 (${nat}`;
-    if (nat.length <= 6) return `+1 (${nat.slice(0, 3)}) ${nat.slice(3)}`;
-    return `+1 (${nat.slice(0, 3)}) ${nat.slice(3, 6)}-${nat.slice(6, 10)}`;
+const PHONE_COUNTRIES: PhoneCountry[] = [
+  { code: 'AF', label: 'Afghanistan', flag: '🇦🇫', dialCode: '93' },
+  { code: 'AL', label: 'Albania', flag: '🇦🇱', dialCode: '355' },
+  { code: 'DZ', label: 'Algeria', flag: '🇩🇿', dialCode: '213' },
+  { code: 'AD', label: 'Andorra', flag: '🇦🇩', dialCode: '376' },
+  { code: 'AO', label: 'Angola', flag: '🇦🇴', dialCode: '244' },
+  { code: 'AG', label: 'Antigua and Barbuda', flag: '🇦🇬', dialCode: '1' },
+  { code: 'AR', label: 'Argentina', flag: '🇦🇷', dialCode: '54' },
+  { code: 'AM', label: 'Armenia', flag: '🇦🇲', dialCode: '374' },
+  { code: 'AU', label: 'Australia', flag: '🇦🇺', dialCode: '61' },
+  { code: 'AT', label: 'Austria', flag: '🇦🇹', dialCode: '43' },
+  { code: 'AZ', label: 'Azerbaijan', flag: '🇦🇿', dialCode: '994' },
+  { code: 'BS', label: 'Bahamas', flag: '🇧🇸', dialCode: '1' },
+  { code: 'BH', label: 'Bahrain', flag: '🇧🇭', dialCode: '973' },
+  { code: 'BD', label: 'Bangladesh', flag: '🇧🇩', dialCode: '880' },
+  { code: 'BB', label: 'Barbados', flag: '🇧🇧', dialCode: '1' },
+  { code: 'BY', label: 'Belarus', flag: '🇧🇾', dialCode: '375' },
+  { code: 'BE', label: 'Belgium', flag: '🇧🇪', dialCode: '32' },
+  { code: 'BZ', label: 'Belize', flag: '🇧🇿', dialCode: '501' },
+  { code: 'BJ', label: 'Benin', flag: '🇧🇯', dialCode: '229' },
+  { code: 'BT', label: 'Bhutan', flag: '🇧🇹', dialCode: '975' },
+  { code: 'BO', label: 'Bolivia', flag: '🇧🇴', dialCode: '591' },
+  { code: 'BA', label: 'Bosnia and Herzegovina', flag: '🇧🇦', dialCode: '387' },
+  { code: 'BW', label: 'Botswana', flag: '🇧🇼', dialCode: '267' },
+  { code: 'BR', label: 'Brazil', flag: '🇧🇷', dialCode: '55' },
+  { code: 'BN', label: 'Brunei', flag: '🇧🇳', dialCode: '673' },
+  { code: 'BG', label: 'Bulgaria', flag: '🇧🇬', dialCode: '359' },
+  { code: 'BF', label: 'Burkina Faso', flag: '🇧🇫', dialCode: '226' },
+  { code: 'BI', label: 'Burundi', flag: '🇧🇮', dialCode: '257' },
+  { code: 'CV', label: 'Cabo Verde', flag: '🇨🇻', dialCode: '238' },
+  { code: 'KH', label: 'Cambodia', flag: '🇰🇭', dialCode: '855' },
+  { code: 'CM', label: 'Cameroon', flag: '🇨🇲', dialCode: '237' },
+  { code: 'CA', label: 'Canada', flag: '🇨🇦', dialCode: '1' },
+  { code: 'CF', label: 'Central African Republic', flag: '🇨🇫', dialCode: '236' },
+  { code: 'TD', label: 'Chad', flag: '🇹🇩', dialCode: '235' },
+  { code: 'CL', label: 'Chile', flag: '🇨🇱', dialCode: '56' },
+  { code: 'CN', label: 'China', flag: '🇨🇳', dialCode: '86' },
+  { code: 'CO', label: 'Colombia', flag: '🇨🇴', dialCode: '57' },
+  { code: 'KM', label: 'Comoros', flag: '🇰🇲', dialCode: '269' },
+  { code: 'CD', label: 'Congo (DRC)', flag: '🇨🇩', dialCode: '243' },
+  { code: 'CG', label: 'Congo (Republic)', flag: '🇨🇬', dialCode: '242' },
+  { code: 'CR', label: 'Costa Rica', flag: '🇨🇷', dialCode: '506' },
+  { code: 'HR', label: 'Croatia', flag: '🇭🇷', dialCode: '385' },
+  { code: 'CU', label: 'Cuba', flag: '🇨🇺', dialCode: '53' },
+  { code: 'CY', label: 'Cyprus', flag: '🇨🇾', dialCode: '357' },
+  { code: 'CZ', label: 'Czech Republic', flag: '🇨🇿', dialCode: '420' },
+  { code: 'DK', label: 'Denmark', flag: '🇩🇰', dialCode: '45' },
+  { code: 'DJ', label: 'Djibouti', flag: '🇩🇯', dialCode: '253' },
+  { code: 'DM', label: 'Dominica', flag: '🇩🇲', dialCode: '1' },
+  { code: 'DO', label: 'Dominican Republic', flag: '🇩🇴', dialCode: '1' },
+  { code: 'EC', label: 'Ecuador', flag: '🇪🇨', dialCode: '593' },
+  { code: 'EG', label: 'Egypt', flag: '🇪🇬', dialCode: '20' },
+  { code: 'SV', label: 'El Salvador', flag: '🇸🇻', dialCode: '503' },
+  { code: 'GQ', label: 'Equatorial Guinea', flag: '🇬🇶', dialCode: '240' },
+  { code: 'ER', label: 'Eritrea', flag: '🇪🇷', dialCode: '291' },
+  { code: 'EE', label: 'Estonia', flag: '🇪🇪', dialCode: '372' },
+  { code: 'SZ', label: 'Eswatini', flag: '🇸🇿', dialCode: '268' },
+  { code: 'ET', label: 'Ethiopia', flag: '🇪🇹', dialCode: '251' },
+  { code: 'FJ', label: 'Fiji', flag: '🇫🇯', dialCode: '679' },
+  { code: 'FI', label: 'Finland', flag: '🇫🇮', dialCode: '358' },
+  { code: 'FR', label: 'France', flag: '🇫🇷', dialCode: '33' },
+  { code: 'GA', label: 'Gabon', flag: '🇬🇦', dialCode: '241' },
+  { code: 'GM', label: 'Gambia', flag: '🇬🇲', dialCode: '220' },
+  { code: 'GE', label: 'Georgia', flag: '🇬🇪', dialCode: '995' },
+  { code: 'DE', label: 'Germany', flag: '🇩🇪', dialCode: '49' },
+  { code: 'GH', label: 'Ghana', flag: '🇬🇭', dialCode: '233' },
+  { code: 'GR', label: 'Greece', flag: '🇬🇷', dialCode: '30' },
+  { code: 'GD', label: 'Grenada', flag: '🇬🇩', dialCode: '1' },
+  { code: 'GT', label: 'Guatemala', flag: '🇬🇹', dialCode: '502' },
+  { code: 'GN', label: 'Guinea', flag: '🇬🇳', dialCode: '224' },
+  { code: 'GW', label: 'Guinea-Bissau', flag: '🇬🇼', dialCode: '245' },
+  { code: 'GY', label: 'Guyana', flag: '🇬🇾', dialCode: '592' },
+  { code: 'HT', label: 'Haiti', flag: '🇭🇹', dialCode: '509' },
+  { code: 'HN', label: 'Honduras', flag: '🇭🇳', dialCode: '504' },
+  { code: 'HU', label: 'Hungary', flag: '🇭🇺', dialCode: '36' },
+  { code: 'IS', label: 'Iceland', flag: '🇮🇸', dialCode: '354' },
+  { code: 'IN', label: 'India', flag: '🇮🇳', dialCode: '91' },
+  { code: 'ID', label: 'Indonesia', flag: '🇮🇩', dialCode: '62' },
+  { code: 'IR', label: 'Iran', flag: '🇮🇷', dialCode: '98' },
+  { code: 'IQ', label: 'Iraq', flag: '🇮🇶', dialCode: '964' },
+  { code: 'IE', label: 'Ireland', flag: '🇮🇪', dialCode: '353' },
+  { code: 'IL', label: 'Israel', flag: '🇮🇱', dialCode: '972' },
+  { code: 'IT', label: 'Italy', flag: '🇮🇹', dialCode: '39' },
+  { code: 'JM', label: 'Jamaica', flag: '🇯🇲', dialCode: '1' },
+  { code: 'JP', label: 'Japan', flag: '🇯🇵', dialCode: '81' },
+  { code: 'JO', label: 'Jordan', flag: '🇯🇴', dialCode: '962' },
+  { code: 'KZ', label: 'Kazakhstan', flag: '🇰🇿', dialCode: '7' },
+  { code: 'KE', label: 'Kenya', flag: '🇰🇪', dialCode: '254' },
+  { code: 'KI', label: 'Kiribati', flag: '🇰🇮', dialCode: '686' },
+  { code: 'KW', label: 'Kuwait', flag: '🇰🇼', dialCode: '965' },
+  { code: 'KG', label: 'Kyrgyzstan', flag: '🇰🇬', dialCode: '996' },
+  { code: 'LA', label: 'Laos', flag: '🇱🇦', dialCode: '856' },
+  { code: 'LV', label: 'Latvia', flag: '🇱🇻', dialCode: '371' },
+  { code: 'LB', label: 'Lebanon', flag: '🇱🇧', dialCode: '961' },
+  { code: 'LS', label: 'Lesotho', flag: '🇱🇸', dialCode: '266' },
+  { code: 'LR', label: 'Liberia', flag: '🇱🇷', dialCode: '231' },
+  { code: 'LY', label: 'Libya', flag: '🇱🇾', dialCode: '218' },
+  { code: 'LI', label: 'Liechtenstein', flag: '🇱🇮', dialCode: '423' },
+  { code: 'LT', label: 'Lithuania', flag: '🇱🇹', dialCode: '370' },
+  { code: 'LU', label: 'Luxembourg', flag: '🇱🇺', dialCode: '352' },
+  { code: 'MG', label: 'Madagascar', flag: '🇲🇬', dialCode: '261' },
+  { code: 'MW', label: 'Malawi', flag: '🇲🇼', dialCode: '265' },
+  { code: 'MY', label: 'Malaysia', flag: '🇲🇾', dialCode: '60' },
+  { code: 'MV', label: 'Maldives', flag: '🇲🇻', dialCode: '960' },
+  { code: 'ML', label: 'Mali', flag: '🇲🇱', dialCode: '223' },
+  { code: 'MT', label: 'Malta', flag: '🇲🇹', dialCode: '356' },
+  { code: 'MH', label: 'Marshall Islands', flag: '🇲🇭', dialCode: '692' },
+  { code: 'MR', label: 'Mauritania', flag: '🇲🇷', dialCode: '222' },
+  { code: 'MU', label: 'Mauritius', flag: '🇲🇺', dialCode: '230' },
+  { code: 'MX', label: 'Mexico', flag: '🇲🇽', dialCode: '52' },
+  { code: 'FM', label: 'Micronesia', flag: '🇫🇲', dialCode: '691' },
+  { code: 'MD', label: 'Moldova', flag: '🇲🇩', dialCode: '373' },
+  { code: 'MC', label: 'Monaco', flag: '🇲🇨', dialCode: '377' },
+  { code: 'MN', label: 'Mongolia', flag: '🇲🇳', dialCode: '976' },
+  { code: 'ME', label: 'Montenegro', flag: '🇲🇪', dialCode: '382' },
+  { code: 'MA', label: 'Morocco', flag: '🇲🇦', dialCode: '212' },
+  { code: 'MZ', label: 'Mozambique', flag: '🇲🇿', dialCode: '258' },
+  { code: 'MM', label: 'Myanmar', flag: '🇲🇲', dialCode: '95' },
+  { code: 'NA', label: 'Namibia', flag: '🇳🇦', dialCode: '264' },
+  { code: 'NR', label: 'Nauru', flag: '🇳🇷', dialCode: '674' },
+  { code: 'NP', label: 'Nepal', flag: '🇳🇵', dialCode: '977' },
+  { code: 'NL', label: 'Netherlands', flag: '🇳🇱', dialCode: '31' },
+  { code: 'NZ', label: 'New Zealand', flag: '🇳🇿', dialCode: '64' },
+  { code: 'NI', label: 'Nicaragua', flag: '🇳🇮', dialCode: '505' },
+  { code: 'NE', label: 'Niger', flag: '🇳🇪', dialCode: '227' },
+  { code: 'NG', label: 'Nigeria', flag: '🇳🇬', dialCode: '234' },
+  { code: 'KP', label: 'North Korea', flag: '🇰🇵', dialCode: '850' },
+  { code: 'MK', label: 'North Macedonia', flag: '🇲🇰', dialCode: '389' },
+  { code: 'NO', label: 'Norway', flag: '🇳🇴', dialCode: '47' },
+  { code: 'OM', label: 'Oman', flag: '🇴🇲', dialCode: '968' },
+  { code: 'PK', label: 'Pakistan', flag: '🇵🇰', dialCode: '92' },
+  { code: 'PW', label: 'Palau', flag: '🇵🇼', dialCode: '680' },
+  { code: 'PS', label: 'Palestine', flag: '🇵🇸', dialCode: '970' },
+  { code: 'PA', label: 'Panama', flag: '🇵🇦', dialCode: '507' },
+  { code: 'PG', label: 'Papua New Guinea', flag: '🇵🇬', dialCode: '675' },
+  { code: 'PY', label: 'Paraguay', flag: '🇵🇾', dialCode: '595' },
+  { code: 'PE', label: 'Peru', flag: '🇵🇪', dialCode: '51' },
+  { code: 'PH', label: 'Philippines', flag: '🇵🇭', dialCode: '63' },
+  { code: 'PL', label: 'Poland', flag: '🇵🇱', dialCode: '48' },
+  { code: 'PT', label: 'Portugal', flag: '🇵🇹', dialCode: '351' },
+  { code: 'QA', label: 'Qatar', flag: '🇶🇦', dialCode: '974' },
+  { code: 'RO', label: 'Romania', flag: '🇷🇴', dialCode: '40' },
+  { code: 'RU', label: 'Russia', flag: '🇷🇺', dialCode: '7' },
+  { code: 'RW', label: 'Rwanda', flag: '🇷🇼', dialCode: '250' },
+  { code: 'KN', label: 'Saint Kitts and Nevis', flag: '🇰🇳', dialCode: '1' },
+  { code: 'LC', label: 'Saint Lucia', flag: '🇱🇨', dialCode: '1' },
+  { code: 'VC', label: 'Saint Vincent and the Grenadines', flag: '🇻🇨', dialCode: '1' },
+  { code: 'WS', label: 'Samoa', flag: '🇼🇸', dialCode: '685' },
+  { code: 'SM', label: 'San Marino', flag: '🇸🇲', dialCode: '378' },
+  { code: 'ST', label: 'Sao Tome and Principe', flag: '🇸🇹', dialCode: '239' },
+  { code: 'SA', label: 'Saudi Arabia', flag: '🇸🇦', dialCode: '966' },
+  { code: 'SN', label: 'Senegal', flag: '🇸🇳', dialCode: '221' },
+  { code: 'RS', label: 'Serbia', flag: '🇷🇸', dialCode: '381' },
+  { code: 'SC', label: 'Seychelles', flag: '🇸🇨', dialCode: '248' },
+  { code: 'SL', label: 'Sierra Leone', flag: '🇸🇱', dialCode: '232' },
+  { code: 'SG', label: 'Singapore', flag: '🇸🇬', dialCode: '65' },
+  { code: 'SK', label: 'Slovakia', flag: '🇸🇰', dialCode: '421' },
+  { code: 'SI', label: 'Slovenia', flag: '🇸🇮', dialCode: '386' },
+  { code: 'SB', label: 'Solomon Islands', flag: '🇸🇧', dialCode: '677' },
+  { code: 'SO', label: 'Somalia', flag: '🇸🇴', dialCode: '252' },
+  { code: 'ZA', label: 'South Africa', flag: '🇿🇦', dialCode: '27' },
+  { code: 'KR', label: 'South Korea', flag: '🇰🇷', dialCode: '82' },
+  { code: 'SS', label: 'South Sudan', flag: '🇸🇸', dialCode: '211' },
+  { code: 'ES', label: 'Spain', flag: '🇪🇸', dialCode: '34' },
+  { code: 'LK', label: 'Sri Lanka', flag: '🇱🇰', dialCode: '94' },
+  { code: 'SD', label: 'Sudan', flag: '🇸🇩', dialCode: '249' },
+  { code: 'SR', label: 'Suriname', flag: '🇸🇷', dialCode: '597' },
+  { code: 'SE', label: 'Sweden', flag: '🇸🇪', dialCode: '46' },
+  { code: 'CH', label: 'Switzerland', flag: '🇨🇭', dialCode: '41' },
+  { code: 'SY', label: 'Syria', flag: '🇸🇾', dialCode: '963' },
+  { code: 'TW', label: 'Taiwan', flag: '🇹🇼', dialCode: '886' },
+  { code: 'TJ', label: 'Tajikistan', flag: '🇹🇯', dialCode: '992' },
+  { code: 'TZ', label: 'Tanzania', flag: '🇹🇿', dialCode: '255' },
+  { code: 'TH', label: 'Thailand', flag: '🇹🇭', dialCode: '66' },
+  { code: 'TL', label: 'Timor-Leste', flag: '🇹🇱', dialCode: '670' },
+  { code: 'TG', label: 'Togo', flag: '🇹🇬', dialCode: '228' },
+  { code: 'TO', label: 'Tonga', flag: '🇹🇴', dialCode: '676' },
+  { code: 'TT', label: 'Trinidad and Tobago', flag: '🇹🇹', dialCode: '1' },
+  { code: 'TN', label: 'Tunisia', flag: '🇹🇳', dialCode: '216' },
+  { code: 'TR', label: 'Turkey', flag: '🇹🇷', dialCode: '90' },
+  { code: 'TM', label: 'Turkmenistan', flag: '🇹🇲', dialCode: '993' },
+  { code: 'TV', label: 'Tuvalu', flag: '🇹🇻', dialCode: '688' },
+  { code: 'UG', label: 'Uganda', flag: '🇺🇬', dialCode: '256' },
+  { code: 'UA', label: 'Ukraine', flag: '🇺🇦', dialCode: '380' },
+  { code: 'AE', label: 'United Arab Emirates', flag: '🇦🇪', dialCode: '971' },
+  { code: 'GB', label: 'United Kingdom', flag: '🇬🇧', dialCode: '44' },
+  { code: 'US', label: 'United States', flag: '🇺🇸', dialCode: '1' },
+  { code: 'UY', label: 'Uruguay', flag: '🇺🇾', dialCode: '598' },
+  { code: 'UZ', label: 'Uzbekistan', flag: '🇺🇿', dialCode: '998' },
+  { code: 'VU', label: 'Vanuatu', flag: '🇻🇺', dialCode: '678' },
+  { code: 'VE', label: 'Venezuela', flag: '🇻🇪', dialCode: '58' },
+  { code: 'VN', label: 'Vietnam', flag: '🇻🇳', dialCode: '84' },
+  { code: 'YE', label: 'Yemen', flag: '🇾🇪', dialCode: '967' },
+  { code: 'ZM', label: 'Zambia', flag: '🇿🇲', dialCode: '260' },
+  { code: 'ZW', label: 'Zimbabwe', flag: '🇿🇼', dialCode: '263' },
+];
+
+// Reuse PHONE_COUNTRIES as the country list for LocationStep (strip dialCode)
+COUNTRIES = PHONE_COUNTRIES.map(({ code, label, flag }) => ({ code, label, flag }));
+
+function guessCountryCode(): string {
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (tz === 'Asia/Colombo') return 'LK';
+    if (tz.startsWith('Asia/Kolkata') || tz === 'Asia/Calcutta') return 'IN';
+    if (tz.startsWith('Australia/')) return 'AU';
+    if (tz === 'Europe/London') return 'GB';
+    if (tz.startsWith('Pacific/Auckland') || tz === 'Pacific/Chatham') return 'NZ';
+    if (tz === 'Asia/Singapore') return 'SG';
+    if (tz === 'Asia/Dubai') return 'AE';
+    if (tz === 'Asia/Riyadh') return 'SA';
+    if (tz === 'Asia/Karachi') return 'PK';
+    if (tz === 'Asia/Dhaka') return 'BD';
+    if (tz === 'Asia/Kuala_Lumpur' || tz === 'Asia/Kuching') return 'MY';
+    if (tz === 'Africa/Nairobi') return 'KE';
+    if (tz === 'Africa/Lagos') return 'NG';
+    if (tz === 'Africa/Johannesburg') return 'ZA';
+    if (tz === 'Europe/Berlin') return 'DE';
+    if (tz === 'Europe/Istanbul') return 'TR';
+    if (tz === 'America/Sao_Paulo') return 'BR';
+    if (tz === 'Asia/Tokyo') return 'JP';
+    if (tz.startsWith('Asia/Shanghai')) return 'CN';
+    if (tz === 'Asia/Manila') return 'PH';
+    if (tz === 'Asia/Muscat') return 'OM';
+    if (tz === 'Asia/Qatar') return 'QA';
+    if (
+      tz === 'America/Toronto' ||
+      tz === 'America/Vancouver' ||
+      tz === 'America/Winnipeg' ||
+      tz === 'America/Halifax'
+    )
+      return 'CA';
+    if (tz.startsWith('America/')) return 'US';
+  } catch {
+    // ignore
   }
+  return 'US';
+}
 
-  // +44 — UK: +44 XXXX XXXXXX
-  if (digits.startsWith('44')) {
-    const nat = digits.slice(2);
-    if (nat.length === 0) return '+44';
-    if (nat.length <= 4) return `+44 ${nat}`;
-    return `+44 ${nat.slice(0, 4)} ${nat.slice(4, 10)}`;
+function initPhoneState(phone: string): { code: string; national: string } {
+  if (!phone?.startsWith('+')) {
+    return { code: guessCountryCode(), national: phone?.replace(/\D/g, '') ?? '' };
   }
-
-  // +61 — Australia: +61 X XXXX XXXX
-  if (digits.startsWith('61')) {
-    const nat = digits.slice(2);
-    if (nat.length === 0) return '+61';
-    if (nat.length <= 1) return `+61 ${nat}`;
-    if (nat.length <= 5) return `+61 ${nat[0]} ${nat.slice(1)}`;
-    return `+61 ${nat[0]} ${nat.slice(1, 5)} ${nat.slice(5, 9)}`;
+  const digits = phone.slice(1).replace(/\D/g, '');
+  const sorted = [...PHONE_COUNTRIES].sort(
+    (a, b) => b.dialCode.length - a.dialCode.length,
+  );
+  for (const c of sorted) {
+    if (digits.startsWith(c.dialCode)) {
+      return { code: c.code, national: digits.slice(c.dialCode.length) };
+    }
   }
-
-  // +94 — Sri Lanka: +94 XX XXX XXXX
-  if (digits.startsWith('94')) {
-    const nat = digits.slice(2);
-    if (nat.length === 0) return '+94';
-    if (nat.length <= 2) return `+94 ${nat}`;
-    if (nat.length <= 5) return `+94 ${nat.slice(0, 2)} ${nat.slice(2)}`;
-    return `+94 ${nat.slice(0, 2)} ${nat.slice(2, 5)} ${nat.slice(5, 9)}`;
-  }
-
-  // Generic — keep raw with + prefix, no extra formatting
-  return normalized;
+  return { code: guessCountryCode(), national: digits };
 }
 
 function PhoneStep({
   phone,
   setPhone,
   s,
+  colors,
   isChild,
 }: {
   phone: string;
@@ -714,28 +945,178 @@ function PhoneStep({
   colors: AppColors;
   isChild: boolean;
 }) {
-  const handleChange = useCallback(
-    (text: string) => setPhone(formatPhone(text)),
+  const [selectedCode, setSelectedCode] = useState(() => initPhoneState(phone).code);
+  const [nationalNumber, setNationalNumber] = useState(
+    () => initPhoneState(phone).national,
+  );
+  const [showPicker, setShowPicker] = useState(false);
+  const [search, setSearch] = useState('');
+  const [focused, setFocused] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
+
+  const selectedCountry =
+    PHONE_COUNTRIES.find((c) => c.code === selectedCode) ??
+    PHONE_COUNTRIES.find((c) => c.code === 'US')!;
+
+  const isValid = useMemo<boolean | null>(() => {
+    if (!nationalNumber.trim()) return null;
+    try {
+      return isValidPhoneNumber(nationalNumber, selectedCode as CountryCode);
+    } catch {
+      return false;
+    }
+  }, [nationalNumber, selectedCode]);
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return PHONE_COUNTRIES;
+    const q = search.toLowerCase();
+    return PHONE_COUNTRIES.filter(
+      (c) => c.label.toLowerCase().includes(q) || c.dialCode.includes(q),
+    );
+  }, [search]);
+
+  const syncPhone = useCallback(
+    (dialCode: string, national: string, code: string) => {
+      const digits = national.replace(/\D/g, '');
+      if (!digits) {
+        setPhone('');
+        return;
+      }
+      try {
+        if (isValidPhoneNumber(national, code as CountryCode)) {
+          setPhone(`+${dialCode}${digits}`);
+        } else {
+          setPhone('');
+        }
+      } catch {
+        setPhone('');
+      }
+    },
     [setPhone],
   );
+
+  const handleNumberChange = useCallback(
+    (text: string) => {
+      const cleaned = text.replace(/[^\d\s\-()]/g, '');
+      setNationalNumber(cleaned);
+      setIsDirty(true);
+      syncPhone(selectedCountry.dialCode, cleaned, selectedCode);
+    },
+    [selectedCountry.dialCode, selectedCode, syncPhone],
+  );
+
+  const handleCountrySelect = useCallback(
+    (country: PhoneCountry) => {
+      setSelectedCode(country.code);
+      setShowPicker(false);
+      setSearch('');
+      syncPhone(country.dialCode, nationalNumber, country.code);
+    },
+    [nationalNumber, syncPhone],
+  );
+
+  if (showPicker) {
+    return (
+      <>
+        <TouchableOpacity
+          style={[s.listItem, { marginBottom: 12 }]}
+          onPress={() => {
+            setShowPicker(false);
+            setSearch('');
+          }}
+        >
+          <Text style={s.listCheck}>‹</Text>
+          <Text style={[s.listItemTxt, { marginLeft: 8 }]}>Back</Text>
+        </TouchableOpacity>
+        <View style={s.searchBox}>
+          <Text>🔍</Text>
+          <TextInput
+            style={s.searchInput}
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search countries…"
+            placeholderTextColor={s.placeholderColor}
+            autoFocus
+            autoCapitalize="none"
+          />
+        </View>
+        {filtered.map((c) => {
+          const sel = c.code === selectedCode;
+          return (
+            <TouchableOpacity
+              key={c.code}
+              style={[s.listItem, sel && s.listItemSelected]}
+              onPress={() => handleCountrySelect(c)}
+            >
+              <Text style={s.listFlag}>{c.flag}</Text>
+              <Text style={[s.listItemTxt, sel && s.listItemSelectedTxt]}>{c.label}</Text>
+              <Text style={{ fontSize: 14, color: sel ? colors.teal : colors.textFaint }}>
+                +{c.dialCode}
+              </Text>
+              {sel && <Text style={[s.listCheck, { marginLeft: 6 }]}>✓</Text>}
+            </TouchableOpacity>
+          );
+        })}
+      </>
+    );
+  }
 
   return (
     <>
       <Text style={s.label}>
         Phone Number{isChild ? <Text style={s.labelOptional}> (optional)</Text> : null}
       </Text>
-      <View style={s.inputWrap}>
+      <View
+        style={[
+          s.inputWrap,
+          isDirty && isValid === false ? s.inputWrapError : focused && s.inputWrapFocused,
+          isValid === true && s.inputWrapFocused,
+          { paddingHorizontal: 0 },
+        ]}
+      >
+        <TouchableOpacity
+          style={{
+            flexDirection: 'row' as const,
+            alignItems: 'center' as const,
+            paddingHorizontal: 14,
+            gap: 6,
+          }}
+          onPress={() => setShowPicker(true)}
+          activeOpacity={0.7}
+        >
+          <Text style={{ fontSize: 22 }}>{selectedCountry.flag}</Text>
+          <Text style={{ fontSize: 15, color: colors.text, fontWeight: '500' as const }}>
+            +{selectedCountry.dialCode}
+          </Text>
+          <Text style={{ fontSize: 11, color: colors.textFaint }}>▾</Text>
+        </TouchableOpacity>
+        <View style={{ width: 1, backgroundColor: colors.border, marginVertical: 12 }} />
         <TextInput
-          style={s.input}
-          value={phone}
-          onChangeText={handleChange}
-          placeholder="+1 (555) 867-5309"
+          style={[s.input, { paddingHorizontal: 14 }]}
+          value={nationalNumber}
+          onChangeText={handleNumberChange}
+          placeholder="Phone number"
           placeholderTextColor={s.placeholderColor}
           keyboardType="phone-pad"
           autoFocus
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
         />
+        {isValid === true && (
+          <Text style={{ fontSize: 18, color: colors.teal, paddingHorizontal: 12 }}>
+            ✓
+          </Text>
+        )}
       </View>
-      <Text style={s.inputHint}>Include your country code, e.g. +1, +44, +94</Text>
+      {isDirty && isValid === false ? (
+        <Text
+          style={{ fontSize: 13, color: '#ef4444', marginTop: -10, marginBottom: 12 }}
+        >
+          Enter a valid {selectedCountry.label} number
+        </Text>
+      ) : (
+        <Text style={s.inputHint}>Tap the flag to change your country</Text>
+      )}
     </>
   );
 }
@@ -846,38 +1227,26 @@ function TimezoneStep({
     const label = detectedLabel;
 
     return (
-      <>
-        {/* Detected timezone card */}
-        <View
-          style={[
-            s.listItem,
-            s.listItemSelected,
-            { flexDirection: 'column', alignItems: 'flex-start', gap: 4 },
-          ]}
-        >
+      <TouchableOpacity
+        style={[
+          s.listItem,
+          s.listItemSelected,
+          { flexDirection: 'row', alignItems: 'center' },
+        ]}
+        onPress={() => {
+          setShowManual(true);
+          setDetectedLabel(null);
+        }}
+        activeOpacity={0.7}
+      >
+        <View style={{ flex: 1, gap: 3 }}>
           <Text style={[s.listItemSelectedTxt, { fontWeight: '700', fontSize: 13 }]}>
             ✓ Time zone selected
           </Text>
           <Text style={[s.listItemSelectedTxt, { fontSize: 17 }]}>{label}</Text>
         </View>
-
-        {detectError ? (
-          <Text style={[s.inputHint, { color: colors.textMuted, marginTop: 4 }]}>
-            {detectError}
-          </Text>
-        ) : null}
-
-        <TouchableOpacity
-          style={[s.listItem, { marginTop: 4 }]}
-          onPress={() => {
-            setShowManual(true);
-            setDetectedLabel(null);
-          }}
-        >
-          <Text style={s.listItemTxt}>Choose a different time zone</Text>
-          <Text style={s.listChevron}>›</Text>
-        </TouchableOpacity>
-      </>
+        <Text style={{ fontSize: 13, color: colors.teal, fontWeight: '500' }}>Edit</Text>
+      </TouchableOpacity>
     );
   }
 
@@ -911,14 +1280,6 @@ function TimezoneStep({
         {detectError ? (
           <Text style={[s.inputHint, { marginTop: 8 }]}>{detectError}</Text>
         ) : null}
-
-        <TouchableOpacity
-          style={[s.listItem, { marginTop: 4 }]}
-          onPress={() => setShowManual(true)}
-        >
-          <Text style={s.listItemTxt}>Choose manually</Text>
-          <Text style={s.listChevron}>›</Text>
-        </TouchableOpacity>
       </>
     );
   }
@@ -926,16 +1287,21 @@ function TimezoneStep({
   // Manual selection
   return (
     <>
-      <TouchableOpacity
-        style={[s.listItem, { marginBottom: 12 }]}
-        onPress={() => {
-          setShowManual(false);
-          setSearch('');
-        }}
-      >
-        <Text style={s.listCheck}>‹</Text>
-        <Text style={[s.listItemTxt, { marginLeft: 8 }]}>Back</Text>
-      </TouchableOpacity>
+      {!detectError && (
+        <TouchableOpacity
+          style={[s.listItem, { marginBottom: 12 }]}
+          onPress={() => {
+            setShowManual(false);
+            setSearch('');
+          }}
+        >
+          <Text style={s.listCheck}>‹</Text>
+          <Text style={[s.listItemTxt, { marginLeft: 8 }]}>Back</Text>
+        </TouchableOpacity>
+      )}
+      {detectError ? (
+        <Text style={[s.inputHint, { marginBottom: 12 }]}>{detectError}</Text>
+      ) : null}
       <View style={s.searchBox}>
         <Text>🔍</Text>
         <TextInput
@@ -1000,6 +1366,9 @@ function LocationStep({
 }) {
   const [showPicker, setShowPicker] = useState(false);
   const [countrySearch, setCountrySearch] = useState('');
+  const [focusedField, setFocusedField] = useState<'city' | 'region' | 'postal' | null>(
+    null,
+  );
   const [addressQuery, setAddressQuery] = useState('');
   const [suggestions, setSuggestions] = useState<NominatimResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -1211,7 +1580,7 @@ function LocationStep({
       )}
 
       <Text style={s.label}>{addrConfig.cityLabel}</Text>
-      <View style={s.inputWrap}>
+      <View style={[s.inputWrap, focusedField === 'city' && s.inputWrapFocused]}>
         <TextInput
           style={s.input}
           value={city}
@@ -1220,11 +1589,13 @@ function LocationStep({
           placeholderTextColor={s.placeholderColor}
           autoCapitalize="words"
           returnKeyType="next"
+          onFocus={() => setFocusedField('city')}
+          onBlur={() => setFocusedField(null)}
         />
       </View>
 
       <Text style={s.label}>{addrConfig.regionLabel}</Text>
-      <View style={s.inputWrap}>
+      <View style={[s.inputWrap, focusedField === 'region' && s.inputWrapFocused]}>
         <TextInput
           style={s.input}
           value={region}
@@ -1233,6 +1604,8 @@ function LocationStep({
           placeholderTextColor={s.placeholderColor}
           autoCapitalize="words"
           returnKeyType="next"
+          onFocus={() => setFocusedField('region')}
+          onBlur={() => setFocusedField(null)}
         />
       </View>
 
@@ -1241,7 +1614,7 @@ function LocationStep({
         {'  '}
         <Text style={s.labelOptional}>(optional)</Text>
       </Text>
-      <View style={s.inputWrap}>
+      <View style={[s.inputWrap, focusedField === 'postal' && s.inputWrapFocused]}>
         <TextInput
           style={s.input}
           value={postalCode}
@@ -1249,6 +1622,8 @@ function LocationStep({
           placeholder={addrConfig.postalPlaceholder}
           placeholderTextColor={s.placeholderColor}
           returnKeyType="done"
+          onFocus={() => setFocusedField('postal')}
+          onBlur={() => setFocusedField(null)}
         />
       </View>
     </>
@@ -1328,10 +1703,11 @@ function StudentProfileStep({
   s: S;
   colors: AppColors;
 }) {
+  const [focused, setFocused] = useState(false);
   return (
     <>
       <Text style={s.label}>Year of Birth</Text>
-      <View style={s.inputWrap}>
+      <View style={[s.inputWrap, focused && s.inputWrapFocused]}>
         <TextInput
           style={s.input}
           value={birthYear}
@@ -1340,6 +1716,8 @@ function StudentProfileStep({
           placeholderTextColor={s.placeholderColor}
           keyboardType="number-pad"
           maxLength={4}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
         />
       </View>
 
@@ -1607,10 +1985,14 @@ function FirstChildStep({
   gradeOptions: GradeOption[];
   s: S;
 }) {
+  const [focusedField, setFocusedField] = useState<
+    'firstName' | 'lastName' | 'birthYear' | null
+  >(null);
+
   return (
     <>
       <Text style={s.label}>Child First Name</Text>
-      <View style={s.inputWrap}>
+      <View style={[s.inputWrap, focusedField === 'firstName' && s.inputWrapFocused]}>
         <TextInput
           style={s.input}
           value={firstName}
@@ -1619,11 +2001,13 @@ function FirstChildStep({
           placeholderTextColor={s.placeholderColor}
           autoCapitalize="words"
           returnKeyType="next"
+          onFocus={() => setFocusedField('firstName')}
+          onBlur={() => setFocusedField(null)}
         />
       </View>
 
       <Text style={s.label}>Child Last Name</Text>
-      <View style={s.inputWrap}>
+      <View style={[s.inputWrap, focusedField === 'lastName' && s.inputWrapFocused]}>
         <TextInput
           style={s.input}
           value={lastName}
@@ -1632,11 +2016,13 @@ function FirstChildStep({
           placeholderTextColor={s.placeholderColor}
           autoCapitalize="words"
           returnKeyType="next"
+          onFocus={() => setFocusedField('lastName')}
+          onBlur={() => setFocusedField(null)}
         />
       </View>
 
       <Text style={s.label}>Year of Birth</Text>
-      <View style={s.inputWrap}>
+      <View style={[s.inputWrap, focusedField === 'birthYear' && s.inputWrapFocused]}>
         <TextInput
           style={s.input}
           value={birthYear}
@@ -1645,6 +2031,8 @@ function FirstChildStep({
           placeholderTextColor={s.placeholderColor}
           keyboardType="number-pad"
           maxLength={4}
+          onFocus={() => setFocusedField('birthYear')}
+          onBlur={() => setFocusedField(null)}
         />
       </View>
 
@@ -1700,6 +2088,10 @@ export default function ProfileSetupScreen() {
     () => optionsForCountry(normalizeCountryCode(countryCode)),
     [countryCode],
   );
+  const studentGradeOptions = useMemo(
+    () => optionsForCountry(normalizeCountryCode(countryCode), false),
+    [countryCode],
+  );
 
   // Student-specific
   const [birthYear, setBirthYear] = useState('');
@@ -1722,6 +2114,9 @@ export default function ProfileSetupScreen() {
 
   const [stepIdx, setStepIdx] = useState(0);
   const [error, setError] = useState<string | null>(null);
+
+  const progressAnim = useRef(new Animated.Value(0)).current;
+  const stepFadeAnim = useRef(new Animated.Value(1)).current;
 
   // Synchronously seed from the user-scoped TanStack Query cache.
   // If cache is cold this is null and statusLoading starts true.
@@ -1804,6 +2199,26 @@ export default function ProfileSetupScreen() {
   );
   const currentStep = steps[stepIdx] as WizardStepId | undefined;
   const isLastStep = stepIdx === steps.length - 1;
+
+  useEffect(() => {
+    const target = steps.length > 0 ? (stepIdx + 1) / steps.length : 0;
+    Animated.timing(progressAnim, {
+      toValue: target,
+      duration: 350,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [stepIdx, steps.length, progressAnim]);
+
+  useEffect(() => {
+    stepFadeAnim.setValue(0);
+    Animated.timing(stepFadeAnim, {
+      toValue: 1,
+      duration: 240,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: true,
+    }).start();
+  }, [stepIdx, stepFadeAnim]);
 
   // Pre-populate from DB and jump to the first incomplete step (runs once after data loads)
   const initializedRef = useRef(false);
@@ -2170,7 +2585,6 @@ export default function ProfileSetupScreen() {
   }
 
   const meta = currentStep ? STEP_META[currentStep] : null;
-  const progress = steps.length > 0 ? (stepIdx + 1) / steps.length : 0;
 
   return (
     <SafeAreaView style={s.safe}>
@@ -2184,16 +2598,22 @@ export default function ProfileSetupScreen() {
           <View style={{ width: 40 }} />
         )}
         <Text style={s.stepLabel}>
-          Step {stepIdx + 1} of {steps.length}
+          {stepIdx + 1} of {steps.length}
         </Text>
+        <View style={{ width: 40 }} />
       </View>
 
-      {/* Progress bar */}
+      {/* Animated progress bar */}
       <View style={s.progressTrack}>
-        <View
+        <Animated.View
           style={[
             s.progressFill,
-            { width: `${Math.round(progress * 100)}%` as `${number}%` },
+            {
+              width: progressAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: ['0%', '100%'],
+              }),
+            },
           ]}
         />
       </View>
@@ -2208,111 +2628,118 @@ export default function ProfileSetupScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {meta && (
-            <>
-              <View style={s.badge}>
-                <Text style={s.badgeEmoji}>{meta.emoji}</Text>
-              </View>
-              <Text style={s.heading}>{meta.title}</Text>
-              <Text style={s.sub}>{meta.subtitle}</Text>
-            </>
-          )}
+          <Animated.View style={{ opacity: stepFadeAnim }}>
+            {meta && (
+              <>
+                <View style={s.badge}>
+                  <Text style={s.badgeEmoji}>{meta.emoji}</Text>
+                </View>
+                <Text style={s.heading}>{meta.title}</Text>
+                <Text style={s.sub}>
+                  {currentStep === 'name' && kind === 'guardian'
+                    ? 'Your name as the parent or guardian on this account.'
+                    : meta.subtitle}
+                </Text>
+              </>
+            )}
 
-          {currentStep === 'name' && (
-            <NameStep
-              firstName={firstName}
-              setFirstName={setFirstName}
-              lastName={lastName}
-              setLastName={setLastName}
-              s={s}
-              colors={colors}
-            />
-          )}
-          {currentStep === 'phone' && (
-            <PhoneStep
-              phone={phone}
-              setPhone={setPhone}
-              s={s}
-              colors={colors}
-              isChild={kind === 'child'}
-            />
-          )}
-          {currentStep === 'timezone' && (
-            <TimezoneStep
-              timezone={timezone}
-              setTimezone={setTimezone}
-              onLocationDetected={(loc) => {
-                if (loc.city) setCity(loc.city);
-                if (loc.region) setRegion(loc.region);
-                if (loc.postalCode) setPostalCode(loc.postalCode);
-                if (loc.countryCode) setCountryCode(loc.countryCode);
-              }}
-              s={s}
-              colors={colors}
-            />
-          )}
-          {currentStep === 'location' && (
-            <LocationStep
-              city={city}
-              setCity={setCity}
-              region={region}
-              setRegion={setRegion}
-              postalCode={postalCode}
-              setPostalCode={setPostalCode}
-              countryCode={countryCode}
-              setCountryCode={setCountryCode}
-              s={s}
-              colors={colors}
-              enableAddressSearch={enableAddressSearch}
-            />
-          )}
-          {currentStep === 'student-profile' && (
-            <StudentProfileStep
-              birthYear={birthYear}
-              setBirthYear={setBirthYear}
-              grade={grade}
-              setGrade={setGrade}
-              gradeOptions={countryGradeOptions}
-              s={s}
-              colors={colors}
-            />
-          )}
-          {currentStep === 'educator-profile' && (
-            <EducatorProfileStep
-              subjects={subjects}
-              setSubjects={setSubjects}
-              gradeLevels={gradeLevels}
-              setGradeLevels={setGradeLevels}
-              s={s}
-              colors={colors}
-            />
-          )}
-          {currentStep === 'educator-availability' && (
-            <EducatorAvailabilityStep
-              classTypes={classTypes}
-              setClassTypes={setClassTypes}
-              weeklyHours={weeklyHours}
-              setWeeklyHours={setWeeklyHours}
-              daySlots={daySlots}
-              setDaySlots={setDaySlots}
-              s={s}
-              colors={colors}
-            />
-          )}
-          {currentStep === 'first-child' && (
-            <FirstChildStep
-              firstName={childFirstName}
-              setFirstName={setChildFirstName}
-              lastName={childLastName}
-              setLastName={setChildLastName}
-              birthYear={childBirthYear}
-              setBirthYear={setChildBirthYear}
-              grade={childGrade}
-              setGrade={setChildGrade}
-              gradeOptions={countryGradeOptions}
-              s={s}
-            />
-          )}
+            {currentStep === 'name' && (
+              <NameStep
+                firstName={firstName}
+                setFirstName={setFirstName}
+                lastName={lastName}
+                setLastName={setLastName}
+                isGuardian={kind === 'guardian'}
+                s={s}
+                colors={colors}
+              />
+            )}
+            {currentStep === 'phone' && (
+              <PhoneStep
+                phone={phone}
+                setPhone={setPhone}
+                s={s}
+                colors={colors}
+                isChild={kind === 'child'}
+              />
+            )}
+            {currentStep === 'timezone' && (
+              <TimezoneStep
+                timezone={timezone}
+                setTimezone={setTimezone}
+                onLocationDetected={(loc) => {
+                  if (loc.city) setCity(loc.city);
+                  if (loc.region) setRegion(loc.region);
+                  if (loc.postalCode) setPostalCode(loc.postalCode);
+                  if (loc.countryCode) setCountryCode(loc.countryCode);
+                }}
+                s={s}
+                colors={colors}
+              />
+            )}
+            {currentStep === 'location' && (
+              <LocationStep
+                city={city}
+                setCity={setCity}
+                region={region}
+                setRegion={setRegion}
+                postalCode={postalCode}
+                setPostalCode={setPostalCode}
+                countryCode={countryCode}
+                setCountryCode={setCountryCode}
+                s={s}
+                colors={colors}
+                enableAddressSearch={enableAddressSearch}
+              />
+            )}
+            {currentStep === 'student-profile' && (
+              <StudentProfileStep
+                birthYear={birthYear}
+                setBirthYear={setBirthYear}
+                grade={grade}
+                setGrade={setGrade}
+                gradeOptions={studentGradeOptions}
+                s={s}
+                colors={colors}
+              />
+            )}
+            {currentStep === 'educator-profile' && (
+              <EducatorProfileStep
+                subjects={subjects}
+                setSubjects={setSubjects}
+                gradeLevels={gradeLevels}
+                setGradeLevels={setGradeLevels}
+                s={s}
+                colors={colors}
+              />
+            )}
+            {currentStep === 'educator-availability' && (
+              <EducatorAvailabilityStep
+                classTypes={classTypes}
+                setClassTypes={setClassTypes}
+                weeklyHours={weeklyHours}
+                setWeeklyHours={setWeeklyHours}
+                daySlots={daySlots}
+                setDaySlots={setDaySlots}
+                s={s}
+                colors={colors}
+              />
+            )}
+            {currentStep === 'first-child' && (
+              <FirstChildStep
+                firstName={childFirstName}
+                setFirstName={setChildFirstName}
+                lastName={childLastName}
+                setLastName={setChildLastName}
+                birthYear={childBirthYear}
+                setBirthYear={setChildBirthYear}
+                grade={childGrade}
+                setGrade={setChildGrade}
+                gradeOptions={studentGradeOptions}
+                s={s}
+              />
+            )}
+          </Animated.View>
 
           {!!error && <Text style={s.errorTxt}>{error}</Text>}
         </ScrollView>
@@ -2322,11 +2749,12 @@ export default function ProfileSetupScreen() {
             style={[s.btn, !canNext && s.btnDim]}
             onPress={handleNext}
             disabled={!canNext || saving}
+            activeOpacity={0.85}
           >
             {saving ? (
               <ActivityIndicator color={colors.tealFg} />
             ) : (
-              <Text style={s.btnTxt}>{isLastStep ? 'Finish →' : 'Continue →'}</Text>
+              <Text style={s.btnTxt}>{isLastStep ? 'Finish' : 'Continue'}</Text>
             )}
           </TouchableOpacity>
           {canSkip && (

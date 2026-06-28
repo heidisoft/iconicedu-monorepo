@@ -14,6 +14,7 @@ import { useAccount } from './use-account';
 import { useProfile } from './use-profile';
 
 const CONSENT_SHOWN_KEY = 'push_consent_shown';
+const CONSENT_DELAY_MS = 4000;
 function getNotificationsModule() {
   // Function-scoped require avoids loading the native module in Expo Go.
   // eslint-disable-next-line @typescript-eslint/no-require-imports, no-undef
@@ -58,6 +59,13 @@ export function usePushRegistration() {
 
   const [showConsent, setShowConsent] = useState(false);
   const registered = useRef(false);
+  const consentTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (consentTimer.current) clearTimeout(consentTimer.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (!orgId || !profileId || registered.current) return;
@@ -79,21 +87,11 @@ export function usePushRegistration() {
 
         const consentShown = await SecureStore.getItemAsync(CONSENT_SHOWN_KEY);
 
-        if (!consentShown && status !== 'granted') {
-          // First run on a supported device with notifications not yet granted:
-          // show the explainer sheet before requesting the OS permission prompt.
-          setShowConsent(true);
+        if ((!consentShown && status !== 'granted') || status === 'undetermined') {
+          consentTimer.current = setTimeout(() => setShowConsent(true), CONSENT_DELAY_MS);
           return;
         }
 
-        // Consent sheet was already shown, but OS permission may never have been requested
-        // (e.g. user tapped "Not Now", or CONSENT_SHOWN_KEY persisted from a prior install
-        // since SecureStore survives Android reinstalls via EncryptedSharedPreferences).
-        // Re-show the sheet so they get another chance. Only permanently bail on explicit denial.
-        if (status === 'undetermined') {
-          setShowConsent(true);
-          return;
-        }
         if (status !== 'granted') {
           return;
         }
