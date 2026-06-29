@@ -45,11 +45,8 @@ import { useProfile } from '@/hooks/use-profile';
 import {
   ensureDirectMessageChannelForProfiles,
   fetchChannelMembers,
-  findDirectMessageChannelForProfiles,
   queryKeys,
 } from '@/lib/api/queries';
-import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
-import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
 import { profileAvatarColors, profileAvatarBg } from '@/lib/profile-avatar-colors';
 import { BottomSheet } from '@iconicedu/ui-native';
 
@@ -1157,9 +1154,6 @@ export function ChannelInfoSheet({
   const orgId = account?.org_id ?? '';
   const currentProfileId =
     ((profile as Record<string, unknown> | undefined)?.id as string | undefined) ?? '';
-  const enableMobileDirectMessageStart = useMobileFeatureFlag(
-    mobileFeatureFlagKeys.enableMobileDirectMessageStart,
-  );
 
   const [activeTab, setActiveTab] = useState<ChannelTab>('files');
   const [channelUiDefaults, setChannelUiDefaults] =
@@ -1410,26 +1404,19 @@ export function ChannelInfoSheet({
       }
 
       try {
-        const dm = enableMobileDirectMessageStart
-          ? await ensureDirectMessageChannelForProfiles(orgId, currentProfileId, memberId)
-          : await findDirectMessageChannelForProfiles(orgId, currentProfileId, memberId);
+        const dm = await ensureDirectMessageChannelForProfiles(
+          orgId,
+          currentProfileId,
+          memberId,
+        );
         if (!dm) {
-          Alert.alert(
-            enableMobileDirectMessageStart
-              ? 'Unable to open direct message'
-              : 'No direct message',
-            enableMobileDirectMessageStart
-              ? `Cannot message ${memberName}.`
-              : `No direct message exists with ${memberName} yet.`,
-          );
+          Alert.alert('Unable to open direct message', `Cannot message ${memberName}.`);
           return;
         }
 
-        if (enableMobileDirectMessageStart) {
-          void queryClient.invalidateQueries({
-            queryKey: queryKeys.directMessages(orgId, currentProfileId),
-          });
-        }
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.directMessages(orgId, currentProfileId),
+        });
         onClose();
         router.push({
           pathname: '/(app)/dm/[channelId]',
@@ -1450,14 +1437,7 @@ export function ChannelInfoSheet({
         Alert.alert('Unable to open direct message', 'Please try again.');
       }
     },
-    [
-      currentProfileId,
-      enableMobileDirectMessageStart,
-      onClose,
-      orgId,
-      queryClient,
-      router,
-    ],
+    [currentProfileId, onClose, orgId, queryClient, router],
   );
 
   return (
