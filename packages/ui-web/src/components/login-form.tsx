@@ -105,7 +105,7 @@ export function LoginForm({
               <span className="sr-only">ICONIC Academy LLC.</span>
             </a>
             <p className="text-xs font-medium text-muted-foreground">
-              Welcome to ICONIC Academy.
+              Welcome to ICONIC Academy
             </p>
             <h1 className="text-2xl font-bold">
               One place for lessons, schedules, and progress.
