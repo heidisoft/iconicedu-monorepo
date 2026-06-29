@@ -928,6 +928,7 @@ jobs:
 
       # 7. Set branch-specific Edge Function secrets so preview functions talk to preview services.
       - name: Configure Supabase preview function secrets
+        if: steps.railway.outputs.railway_api_url != '' && steps.railway.outputs.railway_api_url != 'pending'
         env:
           BRANCH_API_URL: ${{ steps.branch-creds.outputs.branch_api_url }}
           BRANCH_PROJECT_REF: ${{ steps.supabase-branch.outputs.branch_ref }}
@@ -938,11 +939,6 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ steps.branch-creds.outputs.service_role_key }}
         run: |
           set -euo pipefail
-
-          if [[ -z "${RAILWAY_API_URL:-}" || "${RAILWAY_API_URL}" == "pending" ]]; then
-            echo "::error::Railway preview API URL is unavailable, cannot configure Supabase function secrets."
-            exit 1
-          fi
           if [[ -z "${INTERNAL_EVENTS_TOKEN:-}" ]]; then
             echo "::error::Missing INTERNAL_EVENTS_TOKEN GitHub secret. events-dispatch cannot authenticate to apps/api."
             exit 1
@@ -970,6 +966,7 @@ jobs:
 
       # 8. Deploy preview branch Edge Functions after secrets are in place.
       - name: Deploy Supabase preview Edge Functions
+        if: steps.railway.outputs.railway_api_url != '' && steps.railway.outputs.railway_api_url != 'pending'
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
@@ -992,6 +989,7 @@ jobs:
 
       # 9. Create or refresh branch-local cron jobs with the preview branch URL.
       - name: Configure Supabase preview cron jobs
+        if: steps.railway.outputs.railway_api_url != '' && steps.railway.outputs.railway_api_url != 'pending'
         env:
           ADMIN_DATABASE_URL: ${{ steps.branch-creds.outputs.admin_database_url }}
           BRANCH_API_URL: ${{ steps.branch-creds.outputs.branch_api_url }}
@@ -1043,6 +1041,7 @@ jobs:
             const apiUrl    = '${{ steps.railway.outputs.railway_api_url }}';
             const branchRef = '${{ steps.supabase-branch.outputs.branch_ref }}';
             const studioUrl = `https://supabase.com/dashboard/project/${branchRef}`;
+            const apiReady = apiUrl && apiUrl !== 'pending';
 
             // ── Helpers ────────────────────────────────────────────────────────
             const fmt = (bytes) => {
@@ -1095,7 +1094,7 @@ jobs:
               '| Service | URL |',
               '|---------|-----|',
               `| Web (Vercel) | ${webUrl} |`,
-              `| API (Railway) | ${apiUrl}/healthz |`,
+              `| API (Railway) | ${apiReady ? `${apiUrl}/healthz` : 'Pending — Railway has not assigned a PR preview domain yet'} |`,
               `| Supabase Studio | ${studioUrl} |`,
               '',
               `**Mobile build** — [Actions → EAS Preview Build](${easPreviewWorkflowUrl}) → PR number: \`${prNumber}\``,
