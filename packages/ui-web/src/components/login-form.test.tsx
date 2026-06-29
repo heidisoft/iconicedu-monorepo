@@ -13,7 +13,6 @@ describe('LoginForm', () => {
         name: 'One place for lessons, schedules, and progress.',
       }),
     ).toBeInTheDocument();
-    expect(screen.getByText('Welcome to ICONIC Academy')).toBeInTheDocument();
     expect(
       screen.getByText(
         /No password needed. We'll email you a secure one-time code to sign in\./i,

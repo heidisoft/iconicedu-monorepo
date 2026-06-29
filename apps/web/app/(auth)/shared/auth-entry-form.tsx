@@ -153,9 +153,6 @@ export function AuthEntryForm({
                 <SiteLogoFull className="h-16 w-auto sm:h-18" />
                 <span className="sr-only">ICONIC Academy LLC.</span>
               </a>
-              <p className="text-xs font-medium text-muted-foreground">
-                Welcome to ICONIC Academy.
-              </p>
               <h1 className="text-xl font-bold">{title}</h1>
               <FieldDescription className="text-center">
                 {subtitle}

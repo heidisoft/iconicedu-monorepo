@@ -51,7 +51,6 @@ describe('AuthEntryForm', () => {
       />,
     );
 
-    expect(screen.getByText('Welcome to ICONIC Academy.')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('you@email.com')).toBeInTheDocument();
     expect(screen.getByText('Qualified, vetted tutors')).toBeInTheDocument();
     expect(

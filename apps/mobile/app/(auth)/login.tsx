@@ -253,12 +253,6 @@ function makeStyles(C: AppColors) {
       },
 
       logo: { alignSelf: 'center', marginBottom: 4 },
-      brandLine: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: C.textMuted,
-        textAlign: 'center',
-      },
       heading: {
         fontSize: 28,
         fontWeight: '700',
@@ -505,9 +499,6 @@ export default function LoginScreen() {
           <View style={s.logo}>
             <SiteLogoFull height={68} color={colors.text} />
           </View>
-
-          {/* Brand line */}
-          <Text style={s.brandLine}>Welcome to ICONIC Academy.</Text>
 
           {/* Heading */}
           <Text style={s.heading}>One place for lessons, schedules, and progress.</Text>
