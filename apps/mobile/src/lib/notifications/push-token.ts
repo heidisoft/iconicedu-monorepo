@@ -51,6 +51,11 @@ export async function shouldShowPushConsentPrompt(): Promise<boolean> {
   return Date.now() >= nextPromptAtMs;
 }
 
+export async function hasPushConsentAccepted(): Promise<boolean> {
+  const accepted = await SecureStore.getItemAsync(PUSH_CONSENT_ACCEPTED_KEY);
+  return Boolean(accepted);
+}
+
 export async function hasPushConsentPromptState(): Promise<boolean> {
   const accepted = await SecureStore.getItemAsync(PUSH_CONSENT_ACCEPTED_KEY);
   if (accepted) {
@@ -130,6 +135,19 @@ export function supportsNativePushNotifications() {
   }
 
   return true;
+}
+
+export function isAndroidPushPermissionAutoGranted() {
+  if (Platform.OS !== 'android') {
+    return false;
+  }
+
+  const version =
+    typeof Platform.Version === 'number'
+      ? Platform.Version
+      : Number.parseInt(String(Platform.Version), 10);
+
+  return Number.isFinite(version) && version < 33;
 }
 
 /**

@@ -6,6 +6,8 @@ import {
   getExpoPushToken,
   getPushConsentSnoozeUntil,
   getStoredPushToken,
+  hasPushConsentAccepted,
+  isAndroidPushPermissionAutoGranted,
   markPushConsentAccepted,
   migrateLegacyPushConsentState,
   revokePushToken,
@@ -46,8 +48,13 @@ jest.mock('expo-constants', () => ({
 }));
 
 jest.mock('react-native', () => ({
-  Platform: { OS: 'ios' },
+  Platform: { OS: 'ios', Version: 17 },
 }));
+
+const mockPlatform = jest.requireMock('react-native').Platform as {
+  OS: 'ios' | 'android' | 'web';
+  Version: number | string;
+};
 
 const mockConstants = jest.requireMock('expo-constants').default as {
   appOwnership: string | null;
@@ -123,6 +130,8 @@ describe('getExpoPushToken', () => {
 describe('supportsNativePushNotifications', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockPlatform.OS = 'ios';
+    mockPlatform.Version = 17;
     mockConstants.appOwnership = null;
     mockConstants.isDevice = true;
   });
@@ -143,6 +152,34 @@ describe('supportsNativePushNotifications', () => {
     mockConstants.isDevice = undefined;
 
     expect(supportsNativePushNotifications()).toBe(true);
+  });
+});
+
+describe('isAndroidPushPermissionAutoGranted', () => {
+  afterEach(() => {
+    mockPlatform.OS = 'ios';
+    mockPlatform.Version = 17;
+  });
+
+  it('returns true for Android versions before API 33', () => {
+    mockPlatform.OS = 'android';
+    mockPlatform.Version = 32;
+
+    expect(isAndroidPushPermissionAutoGranted()).toBe(true);
+  });
+
+  it('returns false for Android API 33 and newer', () => {
+    mockPlatform.OS = 'android';
+    mockPlatform.Version = 33;
+
+    expect(isAndroidPushPermissionAutoGranted()).toBe(false);
+  });
+
+  it('returns false outside Android', () => {
+    mockPlatform.OS = 'ios';
+    mockPlatform.Version = 17;
+
+    expect(isAndroidPushPermissionAutoGranted()).toBe(false);
   });
 });
 
@@ -238,6 +275,15 @@ describe('push consent prompt cooldown', () => {
     mockSecureStoreGetItemAsync.mockResolvedValueOnce(null).mockResolvedValueOnce('2000');
 
     await expect(shouldShowPushConsentPrompt()).resolves.toBe(true);
+  });
+
+  it('reports whether push consent has been explicitly accepted', async () => {
+    mockSecureStoreGetItemAsync.mockResolvedValueOnce('1');
+
+    await expect(hasPushConsentAccepted()).resolves.toBe(true);
+
+    mockSecureStoreGetItemAsync.mockResolvedValueOnce(null);
+    await expect(hasPushConsentAccepted()).resolves.toBe(false);
   });
 
   it('marks accepted by storing the accepted key and clearing snooze', async () => {

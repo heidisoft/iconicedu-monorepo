@@ -4,6 +4,8 @@ import { Platform } from 'react-native';
 import { reportMobileObservedError } from '@/lib/analytics/report-error';
 import {
   getExpoPushToken,
+  hasPushConsentAccepted,
+  isAndroidPushPermissionAutoGranted,
   markPushConsentAccepted,
   migrateLegacyPushConsentState,
   shouldShowPushConsentPrompt,
@@ -75,6 +77,14 @@ export function usePushRegistration() {
         const { status } = await Notifications.getPermissionsAsync();
         await migrateLegacyPushConsentState(status);
 
+        if (
+          status === 'granted' &&
+          isAndroidPushPermissionAutoGranted() &&
+          !(await hasPushConsentAccepted())
+        ) {
+          return;
+        }
+
         // If already explicitly denied, nothing to do — user must go to Settings
         if (status === 'denied') {
           return;
@@ -111,6 +121,27 @@ export function usePushRegistration() {
       const Notifications = getNotificationsModule();
       const { status } = await Notifications.getPermissionsAsync();
       await migrateLegacyPushConsentState(status);
+
+      if (status === 'granted' && isAndroidPushPermissionAutoGranted()) {
+        if (await hasPushConsentAccepted()) {
+          if (!registered.current) {
+            registered.current = true;
+            const token = await getExpoPushToken({ requestPermissions: false });
+            if (token) {
+              await storePushToken(orgId, profileId, token);
+            }
+          }
+          return false;
+        }
+
+        const shouldShowConsent = await shouldShowPushConsentPrompt();
+        if (!shouldShowConsent) {
+          return false;
+        }
+
+        setShowConsent(true);
+        return true;
+      }
 
       if (status === 'granted') {
         if (!registered.current) {
