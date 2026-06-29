@@ -64,6 +64,11 @@ export function LoginForm({
   const [email, setEmail] = React.useState('');
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const showOAuthOptions = enableGoogleSignIn || enableAppleSignIn;
+  const featureBullets = [
+    'Qualified, vetted tutors',
+    'Schedules, sessions & homework in one place',
+    'Real-time messages, updates & payments',
+  ];
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -99,10 +104,14 @@ export function LoginForm({
               <SiteLogo className="size-18 border-0" />
               <span className="sr-only">ICONIC Academy LLC.</span>
             </a>
-            <h1 className="text-2xl font-bold">Welcome to ICONIC Academy</h1>
+            <p className="text-xs font-medium text-muted-foreground">
+              Welcome to ICONIC Academy.
+            </p>
+            <h1 className="text-2xl font-bold">
+              One place for lessons, schedules, and progress.
+            </h1>
             <FieldDescription className="text-center text-xs">
-              Sign in or get started in seconds. We&apos;ll create your secure account
-              automatically if you&apos;re new.
+              No password needed. We&apos;ll email you a secure one-time code to sign in.
             </FieldDescription>
           </div>
           {showOAuthOptions ? (
@@ -133,17 +142,11 @@ export function LoginForm({
             </>
           ) : null}
           <Field>
-            <div className="space-y-1 text-center text-xs text-muted-foreground">
-              <p className="">
-                We’ll send a one-time secure link to your email. For the best experience,
-                open it from the same device where you started.
-              </p>
-            </div>
             <FieldLabel htmlFor="email">Email</FieldLabel>
             <Input
               id="email"
               type="email"
-              placeholder="m@example.com"
+              placeholder="you@email.com"
               required
               value={email}
               onChange={(event) => setEmail(event.target.value)}
@@ -173,20 +176,22 @@ export function LoginForm({
               {isSubmitting ? (
                 <>
                   <Loader2 className="size-4 animate-spin" />
-                  Sending secure link...
+                  Sending code...
                 </>
               ) : (
-                'Send secure link'
+                'Continue'
               )}
             </Button>
           </Field>
-          <div className="space-y-1 text-center text-xs text-muted-foreground">
-            <p>Secure login. No password required. Flexible access.</p>
-          </div>
+          <ul className="space-y-1 text-center text-xs text-muted-foreground">
+            {featureBullets.map((bullet) => (
+              <li key={bullet}>{bullet}</li>
+            ))}
+          </ul>
         </FieldGroup>
       </form>
       <FieldDescription className="px-6 text-center text-xs">
-        By clicking continue, you agree to our <a href="#">Terms of Service</a> and{' '}
+        By continuing, you agree to our <a href="#">Terms of Service</a> and{' '}
         <a href="#">Privacy Policy</a>.
       </FieldDescription>
     </div>

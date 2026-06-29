@@ -89,6 +89,25 @@ describe('OrgLoginClient', () => {
     );
   });
 
+  it('passes the updated login page copy to the auth entry form', () => {
+    render(<OrgLoginClient orgSlug="iconic-academy" orgName="ICONIC Academy" />);
+
+    expect(authEntryFormPropsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'One place for lessons, schedules, and progress.',
+        subtitle:
+          "No password needed. We'll email you a secure one-time code to sign in.",
+        submitLabel: 'Continue',
+        submitLoadingLabel: 'Sending code...',
+        featureBullets: [
+          'Qualified, vetted tutors',
+          'Schedules, sessions & homework in one place',
+          'Real-time messages, updates & payments',
+        ],
+      }),
+    );
+  });
+
   it('renders the session expiry guidance when provided', () => {
     render(
       <OrgLoginClient

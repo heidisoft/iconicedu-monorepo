@@ -38,4 +38,28 @@ describe('AuthEntryForm', () => {
     ).not.toBeInTheDocument();
     expect(screen.getByText('OR')).toBeInTheDocument();
   });
+
+  it('renders the requested email placeholder, feature bullets, and footer copy', () => {
+    render(
+      <AuthEntryForm
+        {...BASE_PROPS}
+        featureBullets={[
+          'Qualified, vetted tutors',
+          'Schedules, sessions & homework in one place',
+          'Real-time messages, updates & payments',
+        ]}
+      />,
+    );
+
+    expect(screen.getByText('Welcome to ICONIC Academy.')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('you@email.com')).toBeInTheDocument();
+    expect(screen.getByText('Qualified, vetted tutors')).toBeInTheDocument();
+    expect(
+      screen.getByText('Schedules, sessions & homework in one place'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Real-time messages, updates & payments'),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/By continuing, you agree to our/i)).toBeInTheDocument();
+  });
 });

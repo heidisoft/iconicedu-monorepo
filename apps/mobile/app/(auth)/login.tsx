@@ -47,7 +47,6 @@ function BackgroundDecoration({ isDark }: { isDark: boolean }) {
   const teal3 = 'rgba(45,212,168,0.28)';
   const gray1 = isDark ? 'rgba(100,116,139,0.30)' : 'rgba(100,116,139,0.22)';
   const ring = isDark ? 'rgba(45,212,168,0.55)' : 'rgba(45,212,168,0.75)';
-  const sq = isDark ? 'rgba(100,116,139,0.20)' : 'rgba(71,85,105,0.16)';
   const grid = isDark ? 'rgba(100,116,139,0.22)' : 'rgba(71,85,105,0.10)';
 
   const gW = GRID_CELL * GRID_COLS;
@@ -156,9 +155,9 @@ function BackgroundDecoration({ isDark }: { isDark: boolean }) {
 // 2. "Will I know what's happening?" (control) → real-time updates
 // 3. "Will it work for my child?" (outcome) → personalised
 const TRUST_PILLARS = [
-  { Icon: ShieldCheck, label: 'Qualified, vetted educators' },
-  { Icon: BellRing, label: 'Real-time parent updates' },
-  { Icon: Sparkles, label: 'Tailored to your child' },
+  { Icon: ShieldCheck, label: 'Qualified, vetted tutors' },
+  { Icon: BellRing, label: 'Schedules, sessions & homework in one place' },
+  { Icon: Sparkles, label: 'Real-time messages, updates & payments' },
 ] as const;
 
 function TrustRow({ colors }: { colors: AppColors }) {
@@ -254,6 +253,12 @@ function makeStyles(C: AppColors) {
       },
 
       logo: { alignSelf: 'center', marginBottom: 4 },
+      brandLine: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: C.textMuted,
+        textAlign: 'center',
+      },
       heading: {
         fontSize: 28,
         fontWeight: '700',
@@ -501,11 +506,16 @@ export default function LoginScreen() {
             <SiteLogoFull height={68} color={colors.text} />
           </View>
 
+          {/* Brand line */}
+          <Text style={s.brandLine}>Welcome to ICONIC Academy.</Text>
+
           {/* Heading */}
-          <Text style={s.heading}>The tutoring app{'\n'}that keeps you close.</Text>
+          <Text style={s.heading}>One place for lessons, schedules, and progress.</Text>
 
           {/* Subtitle */}
-          <Text style={s.sub}>We&apos;ll send a one-time code. No password needed.</Text>
+          <Text style={s.sub}>
+            No password needed. We&apos;ll email you a secure one-time code to sign in.
+          </Text>
 
           {/* Email input */}
           <View style={s.field}>
@@ -524,7 +534,7 @@ export default function LoginScreen() {
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoComplete="email"
-                placeholder="your@email.com"
+                placeholder="you@email.com"
                 placeholderTextColor={s.placeholderColor}
                 editable={!loading && !socialLoading}
                 returnKeyType="done"
@@ -634,7 +644,7 @@ export default function LoginScreen() {
 
         {/* Footer */}
         <Text style={s.terms}>
-          {'By continuing you agree to our '}
+          {'By continuing, you agree to our '}
           <Text style={s.termsLink}>Terms of Service</Text>
           {' and '}
           <Text style={s.termsLink}>Privacy Policy</Text>
