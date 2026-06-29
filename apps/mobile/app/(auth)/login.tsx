@@ -40,6 +40,9 @@ function makeStyles(
       image: { flex: 1, justifyContent: 'flex-end', overflow: 'hidden' },
       imageStyle: {
         position: 'absolute',
+        top: 0,
+        left: 0,
+        width: '100%',
         resizeMode: 'cover',
         height: layout.imageHeight,
         transform: [{ translateY: layout.imageTranslateY }],
