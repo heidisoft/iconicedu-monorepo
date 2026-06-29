@@ -3,6 +3,8 @@ import {
   addMonths,
   addYears,
   differenceInCalendarDays,
+  differenceInCalendarMonths,
+  differenceInCalendarYears,
   format,
   startOfDay,
   startOfWeek,
@@ -38,6 +40,16 @@ interface UpcomingRecurrenceDateOptions {
   includeDates?: ISODate[];
 }
 
+interface IsRecurrenceDateOptions {
+  date?: Date;
+  startDate?: Date;
+  frequency: RecurrenceFrequencyVM;
+  interval?: number;
+  byWeekday?: WeekdayVM[];
+  count?: number;
+  until?: string;
+}
+
 function toIsoDate(date: Date) {
   return format(date, 'yyyy-MM-dd');
 }
@@ -54,6 +66,22 @@ function getWeeklyWeekOffset(date: Date, startDate: Date) {
   const weekStart = startOfWeek(date, { weekStartsOn: 1 });
   const initialWeekStart = startOfWeek(startDate, { weekStartsOn: 1 });
   return Math.floor(differenceInCalendarDays(weekStart, initialWeekStart) / 7);
+}
+
+function isWithinEndBoundaries({
+  targetDate,
+  untilDate,
+  occurrenceIndex,
+  count,
+}: {
+  targetDate: Date;
+  untilDate?: ISODate;
+  occurrenceIndex: number;
+  count?: number;
+}) {
+  if (untilDate && toIsoDate(targetDate) > untilDate) return false;
+  if (count && occurrenceIndex > count) return false;
+  return true;
 }
 
 function buildDailyMonthlyOrYearlyOccurrences({
@@ -206,12 +234,103 @@ export function getUpcomingRecurrenceDates({
   return Array.from(new Set([...computedDates, ...includeDates])).sort(sortIsoDatesAsc);
 }
 
+export function isRecurrenceDate({
+  date,
+  startDate,
+  frequency,
+  interval = 1,
+  byWeekday,
+  count,
+  until,
+}: IsRecurrenceDateOptions) {
+  if (!date || !startDate) return false;
+
+  const normalizedDate = startOfDay(date);
+  const normalizedStartDate = startOfDay(startDate);
+  if (normalizedDate < normalizedStartDate) return false;
+
+  const normalizedUntilDate = until ? toIsoDateBoundary(until) : undefined;
+
+  if (frequency === 'weekly') {
+    const selectedWeekdays =
+      byWeekday && byWeekday.length > 0
+        ? new Set(byWeekday.map((weekday) => WEEKDAY_INDEX[weekday]))
+        : new Set([normalizedStartDate.getDay()]);
+    const weekOffset = getWeeklyWeekOffset(normalizedDate, normalizedStartDate);
+    if (weekOffset < 0 || weekOffset % interval !== 0) return false;
+    if (!selectedWeekdays.has(normalizedDate.getDay())) return false;
+
+    let occurrenceIndex = 0;
+    let currentDate = normalizedStartDate;
+    let safetyCounter = 0;
+    while (currentDate <= normalizedDate && safetyCounter < 36500) {
+      safetyCounter += 1;
+      const currentWeekOffset = getWeeklyWeekOffset(currentDate, normalizedStartDate);
+      if (
+        currentWeekOffset >= 0 &&
+        currentWeekOffset % interval === 0 &&
+        selectedWeekdays.has(currentDate.getDay())
+      ) {
+        occurrenceIndex += 1;
+      }
+      currentDate = addDays(currentDate, 1);
+    }
+
+    return isWithinEndBoundaries({
+      targetDate: normalizedDate,
+      untilDate: normalizedUntilDate,
+      occurrenceIndex,
+      count,
+    });
+  }
+
+  if (frequency === 'daily') {
+    const dayOffset = differenceInCalendarDays(normalizedDate, normalizedStartDate);
+    if (dayOffset % interval !== 0) return false;
+    return isWithinEndBoundaries({
+      targetDate: normalizedDate,
+      untilDate: normalizedUntilDate,
+      occurrenceIndex: Math.floor(dayOffset / interval) + 1,
+      count,
+    });
+  }
+
+  if (frequency === 'monthly') {
+    const monthOffset = differenceInCalendarMonths(normalizedDate, normalizedStartDate);
+    if (monthOffset < 0 || monthOffset % interval !== 0) return false;
+    if (normalizedDate.getDate() !== normalizedStartDate.getDate()) return false;
+    return isWithinEndBoundaries({
+      targetDate: normalizedDate,
+      untilDate: normalizedUntilDate,
+      occurrenceIndex: Math.floor(monthOffset / interval) + 1,
+      count,
+    });
+  }
+
+  const yearOffset = differenceInCalendarYears(normalizedDate, normalizedStartDate);
+  if (yearOffset < 0 || yearOffset % interval !== 0) return false;
+  if (
+    normalizedDate.getMonth() !== normalizedStartDate.getMonth() ||
+    normalizedDate.getDate() !== normalizedStartDate.getDate()
+  ) {
+    return false;
+  }
+
+  return isWithinEndBoundaries({
+    targetDate: normalizedDate,
+    untilDate: normalizedUntilDate,
+    occurrenceIndex: Math.floor(yearOffset / interval) + 1,
+    count,
+  });
+}
+
 interface UpsertPendingExceptionOptions {
   exceptions: RecurrenceException[];
   editingExceptionId?: string | null;
   pendingDate?: Date;
   pendingReason?: string;
   allowedDates?: Iterable<ISODate>;
+  isDateAllowed?: (date: ISODate) => boolean;
 }
 
 export function upsertPendingException({
@@ -220,12 +339,17 @@ export function upsertPendingException({
   pendingDate,
   pendingReason,
   allowedDates = [],
+  isDateAllowed,
 }: UpsertPendingExceptionOptions) {
   if (!pendingDate) return exceptions;
 
   const nextDate = toIsoDate(pendingDate);
   const allowedDateSet = new Set(allowedDates);
-  if (allowedDateSet.size > 0 && !allowedDateSet.has(nextDate)) {
+  if (
+    isDateAllowed
+      ? !isDateAllowed(nextDate)
+      : allowedDateSet.size > 0 && !allowedDateSet.has(nextDate)
+  ) {
     return exceptions;
   }
 
@@ -266,6 +390,7 @@ interface UpsertPendingOverrideOptions {
   pendingNewTime?: string;
   pendingReason?: string;
   allowedOriginalDates?: Iterable<ISODate>;
+  isOriginalDateAllowed?: (date: ISODate) => boolean;
 }
 
 export function upsertPendingOverride({
@@ -276,13 +401,18 @@ export function upsertPendingOverride({
   pendingNewTime,
   pendingReason,
   allowedOriginalDates = [],
+  isOriginalDateAllowed,
 }: UpsertPendingOverrideOptions) {
   if (!pendingOriginalDate || !pendingNewDate) return overrides;
 
   const nextOriginalDate = toIsoDate(pendingOriginalDate);
   const nextNewDate = toIsoDate(pendingNewDate);
   const allowedOriginalDateSet = new Set(allowedOriginalDates);
-  if (allowedOriginalDateSet.size > 0 && !allowedOriginalDateSet.has(nextOriginalDate)) {
+  if (
+    isOriginalDateAllowed
+      ? !isOriginalDateAllowed(nextOriginalDate)
+      : allowedOriginalDateSet.size > 0 && !allowedOriginalDateSet.has(nextOriginalDate)
+  ) {
     return overrides;
   }
 

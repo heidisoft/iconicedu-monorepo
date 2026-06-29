@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   getUpcomingRecurrenceDates,
+  isRecurrenceDate,
   upsertPendingException,
   upsertPendingOverride,
 } from './recurrence-form.utils';
@@ -55,6 +56,28 @@ describe('recurrence-form utils', () => {
         maxResults: 12,
       }),
     ).toEqual(['2026-01-10', '2026-02-10', '2026-03-10', '2026-04-10']);
+  });
+
+  it('allows past dates that are valid recurrence occurrences', () => {
+    expect(
+      isRecurrenceDate({
+        date: new Date('2026-03-09T09:00:00.000Z'),
+        startDate: new Date('2026-03-02T09:00:00.000Z'),
+        frequency: 'weekly',
+        byWeekday: ['MO', 'WE'],
+      }),
+    ).toBe(true);
+  });
+
+  it('rejects dates before the recurrence start', () => {
+    expect(
+      isRecurrenceDate({
+        date: new Date('2026-02-23T09:00:00.000Z'),
+        startDate: new Date('2026-03-02T09:00:00.000Z'),
+        frequency: 'weekly',
+        byWeekday: ['MO'],
+      }),
+    ).toBe(false);
   });
 
   it('adds a pending exception on submit when it was selected but not explicitly added', () => {

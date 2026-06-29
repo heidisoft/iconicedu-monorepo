@@ -42,6 +42,7 @@ import { Separator } from '@iconicedu/ui-web/ui/separator';
 
 import {
   getUpcomingRecurrenceDates,
+  isRecurrenceDate,
   upsertPendingException,
   upsertPendingOverride,
 } from './recurrence-form.utils';
@@ -248,7 +249,7 @@ export function RecurrenceForm({
 
   const addException = () => {
     if (!newExceptionDate) return;
-    if (!availableExceptionDateSet.has(format(newExceptionDate, 'yyyy-MM-dd'))) return;
+    if (!isExceptionDateAllowed(format(newExceptionDate, 'yyyy-MM-dd'))) return;
 
     if (editingExceptionId) {
       setExceptions((prev) =>
@@ -293,6 +294,9 @@ export function RecurrenceForm({
 
   const addOverride = () => {
     if (!newOverrideOriginalDate || !newOverrideNewDate) return;
+    if (!isOverrideOriginalDateAllowed(format(newOverrideOriginalDate, 'yyyy-MM-dd'))) {
+      return;
+    }
 
     if (editingOverrideId) {
       setOverrides((prev) =>
@@ -368,7 +372,7 @@ export function RecurrenceForm({
             editingExceptionId,
             pendingDate: newExceptionDate,
             pendingReason: newExceptionReason,
-            allowedDates: availableExceptionDateSet,
+            isDateAllowed: isExceptionDateAllowed,
           });
     const submittedOverrides =
       repeatOption === 'none'
@@ -380,7 +384,7 @@ export function RecurrenceForm({
             pendingNewDate: newOverrideNewDate,
             pendingNewTime: newOverrideTime,
             pendingReason: newOverrideReason,
-            allowedOriginalDates: availableOverrideOriginalDateSet,
+            isOriginalDateAllowed: isOverrideOriginalDateAllowed,
           });
 
     const data: RecurrenceFormData = {
@@ -450,13 +454,14 @@ export function RecurrenceForm({
     [editingExceptionId, exceptions],
   );
   const availableExceptionDates = React.useMemo(() => {
-    const upcomingDates = getUpcomingRecurrenceDates({
+    const recurrenceDates = getUpcomingRecurrenceDates({
       startDate,
       frequency,
       interval,
       byWeekday,
       count: endType === 'count' ? count : undefined,
       until: endType === 'until' && untilDate ? untilDate.toISOString() : undefined,
+      fromDate: startDate,
       includeDates: editingException ? [editingException.date] : [],
     });
     const excludedDates = new Set(
@@ -465,7 +470,7 @@ export function RecurrenceForm({
         .map((exception) => exception.date),
     );
 
-    return upcomingDates.filter((date) => !excludedDates.has(date));
+    return recurrenceDates.filter((date) => !excludedDates.has(date));
   }, [
     byWeekday,
     count,
@@ -478,29 +483,52 @@ export function RecurrenceForm({
     startDate,
     untilDate,
   ]);
-  const availableExceptionDateSet = React.useMemo(
-    () => new Set(availableExceptionDates),
-    [availableExceptionDates],
+  const isExceptionDateAllowed = React.useCallback(
+    (date: string) => {
+      if (editingException?.date === date) return true;
+      if (exceptions.some((exception) => exception.date === date)) return false;
+      return isRecurrenceDate({
+        date: parseISO(date),
+        startDate,
+        frequency,
+        interval,
+        byWeekday,
+        count: endType === 'count' ? count : undefined,
+        until: endType === 'until' && untilDate ? untilDate.toISOString() : undefined,
+      });
+    },
+    [
+      byWeekday,
+      count,
+      editingException,
+      endType,
+      exceptions,
+      frequency,
+      interval,
+      startDate,
+      untilDate,
+    ],
   );
-  const hasSelectableExceptionDates = availableExceptionDates.length > 0;
+  const hasSelectableExceptionDates = Boolean(startDate);
   const selectedExceptionDateKey = newExceptionDate
     ? format(newExceptionDate, 'yyyy-MM-dd')
     : '';
   const isSelectedExceptionDateAllowed = selectedExceptionDateKey
-    ? availableExceptionDateSet.has(selectedExceptionDateKey)
+    ? isExceptionDateAllowed(selectedExceptionDateKey)
     : false;
   const editingOverride = React.useMemo(
     () => overrides.find((override) => override.id === editingOverrideId),
     [editingOverrideId, overrides],
   );
   const availableOverrideOriginalDates = React.useMemo(() => {
-    const upcomingDates = getUpcomingRecurrenceDates({
+    const recurrenceDates = getUpcomingRecurrenceDates({
       startDate,
       frequency,
       interval,
       byWeekday,
       count: endType === 'count' ? count : undefined,
       until: endType === 'until' && untilDate ? untilDate.toISOString() : undefined,
+      fromDate: startDate,
       includeDates: editingOverride ? [editingOverride.originalDate] : [],
     });
     const excludedExceptionDates = new Set(exceptions.map((exception) => exception.date));
@@ -510,7 +538,7 @@ export function RecurrenceForm({
         .map((override) => override.originalDate),
     );
 
-    return upcomingDates.filter(
+    return recurrenceDates.filter(
       (date) => !excludedExceptionDates.has(date) && !excludedOverrideDates.has(date),
     );
   }, [
@@ -526,16 +554,40 @@ export function RecurrenceForm({
     startDate,
     untilDate,
   ]);
-  const availableOverrideOriginalDateSet = React.useMemo(
-    () => new Set(availableOverrideOriginalDates),
-    [availableOverrideOriginalDates],
+  const isOverrideOriginalDateAllowed = React.useCallback(
+    (date: string) => {
+      if (editingOverride?.originalDate === date) return true;
+      if (exceptions.some((exception) => exception.date === date)) return false;
+      if (overrides.some((override) => override.originalDate === date)) return false;
+      return isRecurrenceDate({
+        date: parseISO(date),
+        startDate,
+        frequency,
+        interval,
+        byWeekday,
+        count: endType === 'count' ? count : undefined,
+        until: endType === 'until' && untilDate ? untilDate.toISOString() : undefined,
+      });
+    },
+    [
+      byWeekday,
+      count,
+      editingOverride,
+      endType,
+      exceptions,
+      frequency,
+      interval,
+      overrides,
+      startDate,
+      untilDate,
+    ],
   );
-  const hasSelectableOverrideOriginalDates = availableOverrideOriginalDates.length > 0;
+  const hasSelectableOverrideOriginalDates = Boolean(startDate);
   const selectedOverrideOriginalDateKey = newOverrideOriginalDate
     ? format(newOverrideOriginalDate, 'yyyy-MM-dd')
     : '';
   const isSelectedOverrideOriginalDateAllowed = selectedOverrideOriginalDateKey
-    ? availableOverrideOriginalDateSet.has(selectedOverrideOriginalDateKey)
+    ? isOverrideOriginalDateAllowed(selectedOverrideOriginalDateKey)
     : false;
 
   return (
@@ -933,7 +985,7 @@ export function RecurrenceForm({
                               ? format(newExceptionDate, 'PPP')
                               : hasSelectableExceptionDates
                                 ? 'Select date'
-                                : 'No future recurrence dates'}
+                                : 'No recurrence dates'}
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0" align="start">
@@ -942,7 +994,7 @@ export function RecurrenceForm({
                             selected={newExceptionDate}
                             onSelect={setNewExceptionDate}
                             disabled={(date) =>
-                              !availableExceptionDateSet.has(format(date, 'yyyy-MM-dd'))
+                              !isExceptionDateAllowed(format(date, 'yyyy-MM-dd'))
                             }
                           />
                         </PopoverContent>
@@ -956,7 +1008,7 @@ export function RecurrenceForm({
                     </div>
                     {hasSelectableExceptionDates && (
                       <p className="text-xs text-muted-foreground">
-                        Available future dates:{' '}
+                        Available dates:{' '}
                         {availableExceptionDates
                           .slice(0, 6)
                           .map((date) => format(parseISO(date), 'MMM d'))
@@ -1088,7 +1140,7 @@ export function RecurrenceForm({
                                 ? format(newOverrideOriginalDate, 'PP')
                                 : hasSelectableOverrideOriginalDates
                                   ? 'Select'
-                                  : 'No future recurrence dates'}
+                                  : 'No recurrence dates'}
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-auto p-0" align="start">
@@ -1097,9 +1149,7 @@ export function RecurrenceForm({
                               selected={newOverrideOriginalDate}
                               onSelect={setNewOverrideOriginalDate}
                               disabled={(date) =>
-                                !availableOverrideOriginalDateSet.has(
-                                  format(date, 'yyyy-MM-dd'),
-                                )
+                                !isOverrideOriginalDateAllowed(format(date, 'yyyy-MM-dd'))
                               }
                             />
                           </PopoverContent>
