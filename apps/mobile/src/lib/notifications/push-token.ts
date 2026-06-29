@@ -249,13 +249,16 @@ export async function revokePushToken(token: string): Promise<void> {
 }
 
 /**
- * Clears all notification-related state from SecureStore.
- * Call on sign-out so the next session starts clean.
+ * Clears session-scoped notification state from SecureStore on sign-out.
+ *
+ * push_consent_accepted is intentionally preserved — consent is a device-level
+ * decision, not a session. Wiping it on logout would force Android < 13 users
+ * (where the OS auto-grants permission and never shows its own dialog) to lose
+ * their push token registration silently on every re-login.
  */
 export async function clearUserNotificationState(): Promise<void> {
   await Promise.allSettled([
     SecureStore.deleteItemAsync(PUSH_TOKEN_STORE_KEY),
-    SecureStore.deleteItemAsync(PUSH_CONSENT_ACCEPTED_KEY),
     SecureStore.deleteItemAsync(PUSH_CONSENT_LEGACY_SHOWN_KEY),
     SecureStore.deleteItemAsync(PUSH_CONSENT_NEXT_PROMPT_AT_KEY),
     SecureStore.deleteItemAsync('push_nudge_last_shown_at'),

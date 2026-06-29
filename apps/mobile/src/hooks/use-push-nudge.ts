@@ -4,6 +4,8 @@ import * as SecureStore from 'expo-secure-store';
 import { reportMobileObservedError } from '@/lib/analytics/report-error';
 import {
   getExpoPushToken,
+  isAndroidPushPermissionAutoGranted,
+  markPushConsentAccepted,
   storePushToken,
   supportsNativePushNotifications,
   openNotificationSettings,
@@ -62,11 +64,15 @@ export function usePushNudge(): UsePushNudgeResult {
     const Notifications = getNotificationsModule();
     const { status } = await Notifications.getPermissionsAsync();
 
-    // Only nudge when the OS has permanently denied permission.
-    // 'undetermined' is handled by PushPermissionSheet (which can still prompt the OS).
-    if (status !== 'denied') return;
+    // Nothing to do if the user already has push enabled.
+    if (status === 'granted') return;
 
-    const variant: NudgeVariant = 'open-settings';
+    // Android < 13 OS auto-grants permission — undetermined never occurs there.
+    // For those users the PushPermissionSheet (consent) handles first-time opt-in.
+    if (status !== 'denied' && isAndroidPushPermissionAutoGranted()) return;
+
+    const variant: NudgeVariant =
+      status === 'denied' ? 'open-settings' : 'request-permission';
 
     try {
       const lastShownStr = await SecureStore.getItemAsync(NUDGE_LAST_SHOWN_KEY);
@@ -97,6 +103,7 @@ export function usePushNudge(): UsePushNudgeResult {
       const token = await getExpoPushToken();
       if (token) {
         await storePushToken(orgId, profileId, token);
+        await markPushConsentAccepted();
       }
     } catch (error) {
       reportMobileObservedError({
