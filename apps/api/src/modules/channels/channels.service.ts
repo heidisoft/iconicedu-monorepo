@@ -109,6 +109,12 @@ type DirectMessageChannelResult = {
   avatarThemeKey: string | null;
 };
 
+type ProfileActorRow = {
+  id: string;
+  org_id: string;
+  account_id: string | null;
+};
+
 const PREVIEW_LABELS: Record<string, string> = {
   image: 'Image',
   file: 'File',
@@ -217,6 +223,45 @@ async function hasRosterReadRole(input: {
   }
 
   return Boolean(roleResponse.data?.id || accountResponse.data?.id);
+}
+
+async function canAccessProfileAsActor(input: {
+  sessionSupabase: ReturnType<typeof createSupabaseSessionClient>;
+  serviceSupabase: ReturnType<typeof createSupabaseServiceClient>;
+  orgId: string;
+  profile: ProfileActorRow;
+}): Promise<boolean> {
+  if (!input.profile.account_id) return false;
+
+  const { data: authUser, error: authError } = await input.sessionSupabase.auth.getUser();
+  if (authError) throw new InternalServerErrorException(authError.message);
+
+  const authUserId = authUser?.user?.id;
+  if (!authUserId) return false;
+
+  const { data: account, error: accountError } = await input.serviceSupabase
+    .from('accounts')
+    .select('id')
+    .eq('auth_user_id', authUserId)
+    .eq('org_id', input.orgId)
+    .is('deleted_at', null)
+    .maybeSingle<{ id: string }>();
+  if (accountError) throw new InternalServerErrorException(accountError.message);
+  if (!account) return false;
+
+  if (account.id === input.profile.account_id) return true;
+
+  const { data: familyLink, error: familyLinkError } = await input.serviceSupabase
+    .from('family_links')
+    .select('id')
+    .eq('org_id', input.orgId)
+    .eq('guardian_account_id', account.id)
+    .eq('child_account_id', input.profile.account_id)
+    .is('deleted_at', null)
+    .maybeSingle<{ id: string }>();
+  if (familyLinkError) throw new InternalServerErrorException(familyLinkError.message);
+
+  return Boolean(familyLink);
 }
 
 function buildDirectMessageChannelResult(
@@ -717,13 +762,13 @@ export class ChannelsService {
       { data: currentProfile, error: currentProfileError },
       { data: targetProfile, error: targetProfileError },
     ] = await Promise.all([
-      supabase
+      writeSupabase
         .from('profiles')
-        .select('id, org_id')
+        .select('id, org_id, account_id')
         .eq('id', input.profileId)
         .eq('org_id', input.orgId)
         .is('deleted_at', null)
-        .maybeSingle<{ id: string; org_id: string }>(),
+        .maybeSingle<ProfileActorRow>(),
       writeSupabase
         .from('profiles')
         .select(
@@ -756,6 +801,14 @@ export class ChannelsService {
       throw new InternalServerErrorException(targetProfileError.message);
     }
     if (!currentProfile || !targetProfile) return null;
+
+    const canActAsCurrentProfile = await canAccessProfileAsActor({
+      sessionSupabase: supabase,
+      serviceSupabase: writeSupabase,
+      orgId: input.orgId,
+      profile: currentProfile,
+    });
+    if (!canActAsCurrentProfile) return null;
 
     const dmKey = `dm:${[input.profileId, input.otherProfileId].sort().join('-')}`;
     const now = new Date().toISOString();
