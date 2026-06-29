@@ -43,7 +43,7 @@
         "foregroundImage": "./assets/icon.png"
       },
       "package": "com.heidisoft.iconicedu",
-      "versionCode": 2,
+      "versionCode": 100,
       "userInterfaceStyle": "automatic",
       "resizeableActivity": true,
       "permissions": [
