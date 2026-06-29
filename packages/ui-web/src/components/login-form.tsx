@@ -176,7 +176,7 @@ export function LoginForm({
                   Sending code...
                 </>
               ) : (
-                'Continue'
+                'Send code'
               )}
             </Button>
           </Field>

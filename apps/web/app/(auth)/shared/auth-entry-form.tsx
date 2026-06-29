@@ -98,7 +98,7 @@ export function AuthEntryForm({
   onOAuthLogin,
   statusMessage,
   errorMessage,
-  submitLabel = 'Send secure link',
+  submitLabel = 'Send code',
   submitLoadingLabel = 'Sending secure link...',
   oauthActionVerb = 'login',
   enableGoogleSignIn = true,

@@ -562,7 +562,7 @@ export default function LoginScreen() {
             activeOpacity={0.85}
           >
             {loading && <ActivityIndicator size="small" color={colors.tealFg} />}
-            <Text style={s.ctaTxt}>{loading ? 'Sending…' : 'Continue'}</Text>
+            <Text style={s.ctaTxt}>{loading ? 'Sending…' : 'Send code'}</Text>
           </TouchableOpacity>
 
           {/* Trust signals */}

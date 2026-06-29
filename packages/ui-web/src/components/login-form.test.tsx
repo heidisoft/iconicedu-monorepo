@@ -25,7 +25,7 @@ describe('LoginForm', () => {
       screen.getByRole('button', { name: 'Continue with Apple' }),
     ).toBeInTheDocument();
     expect(screen.getByPlaceholderText('you@email.com')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Continue' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Send code' })).toBeInTheDocument();
     expect(screen.getByText('Qualified, vetted tutors')).toBeInTheDocument();
     expect(
       screen.getByText('Schedules, sessions & homework in one place'),
@@ -82,7 +82,7 @@ describe('LoginForm', () => {
     render(<LoginForm onEmailLogin={onEmailLogin} />);
 
     await user.type(screen.getByLabelText('Email'), 'iconicedudev+parent@gmail.com');
-    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: 'Send code' }));
 
     expect(screen.getByRole('button', { name: /Sending code/i })).toBeDisabled();
     expect(document.querySelector('.animate-spin')).toBeInTheDocument();

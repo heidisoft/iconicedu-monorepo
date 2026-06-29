@@ -148,7 +148,7 @@ export default function OrgLoginClient({
       }
       introText=""
       trustLine="Secure login. No password required. Organization access only."
-      submitLabel="Continue"
+      submitLabel="Send code"
       submitLoadingLabel="Sending code..."
       enableGoogleSignIn={enableGoogleSignIn}
       enableAppleSignIn={enableAppleSignIn}

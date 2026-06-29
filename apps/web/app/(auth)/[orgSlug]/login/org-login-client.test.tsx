@@ -97,7 +97,7 @@ describe('OrgLoginClient', () => {
         title: 'One place for lessons, schedules, and progress.',
         subtitle:
           "No password needed. We'll email you a secure one-time code to sign in.",
-        submitLabel: 'Continue',
+        submitLabel: 'Send code',
         submitLoadingLabel: 'Sending code...',
         featureBullets: [
           'Qualified, vetted tutors',
