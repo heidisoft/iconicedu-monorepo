@@ -10,7 +10,7 @@ const mockMaybeSingle = jest.fn();
 // Build a fluent chain that returns `mockMaybeSingle` at the leaf.
 function makeChain() {
   const chain: Record<string, jest.Mock> = {};
-  const methods = ['from', 'select', 'eq', 'is', 'order', 'limit'];
+  const methods = ['from', 'select', 'eq', 'in', 'is', 'order', 'limit'];
   for (const m of methods) {
     chain[m] = jest.fn().mockReturnValue(chain);
   }
@@ -59,17 +59,101 @@ function makeService() {
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
-describe('ChannelsService.markRead', () => {
+describe('ChannelsService.getChannelMembers', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    // Reset every chain method to return the chain itself by default.
-    const sessionMethods = ['from', 'select', 'eq', 'is', 'order', 'limit'];
+    const sessionMethods = ['from', 'select', 'eq', 'in', 'is', 'order', 'limit'];
     for (const m of sessionMethods) {
       (mockSessionClient as Record<string, jest.Mock>)[m].mockReturnValue(
         mockSessionClient,
       );
     }
-    const serviceMethods = ['from', 'select', 'eq', 'is', 'order', 'limit'];
+    const serviceMethods = ['from', 'select', 'eq', 'in', 'is', 'order', 'limit'];
+    for (const m of serviceMethods) {
+      (mockServiceClient as Record<string, jest.Mock>)[m].mockReturnValue(
+        mockServiceClient,
+      );
+    }
+    mockServiceClient.rpc.mockReturnValue(mockServiceClient);
+  });
+
+  it('returns classroom participants for staff observers who are not members', async () => {
+    mockMaybeSingle
+      .mockResolvedValueOnce({ data: { learning_space_id: 'space-1' }, error: null })
+      .mockResolvedValueOnce({ data: null, error: null })
+      .mockResolvedValueOnce({ data: null, error: null })
+      .mockResolvedValueOnce({
+        data: { account_id: 'staff-account-1', kind: 'staff' },
+        error: null,
+      });
+
+    mockServiceClient.order.mockResolvedValueOnce({ data: [], error: null });
+    mockServiceClient.is
+      .mockReturnValueOnce(mockServiceClient)
+      .mockReturnValueOnce(mockServiceClient)
+      .mockReturnValueOnce(mockServiceClient)
+      .mockResolvedValueOnce({
+        data: [
+          {
+            profile_id: 'educator-profile-1',
+            profile: {
+              account_id: 'educator-account-1',
+              display_name: 'Tutor Jane',
+              first_name: null,
+              last_name: null,
+              avatar_seed: 'jane-seed',
+              kind: 'educator',
+              bio: null,
+              timezone: 'America/New_York',
+              ui_theme_key: 'teal',
+            },
+          },
+          {
+            profile_id: 'student-profile-1',
+            profile: {
+              account_id: 'student-account-1',
+              display_name: 'Avery Student',
+              first_name: null,
+              last_name: null,
+              avatar_seed: 'avery-seed',
+              kind: 'child',
+              bio: null,
+              timezone: null,
+              ui_theme_key: 'coral',
+            },
+          },
+        ],
+        error: null,
+      });
+
+    const svc = makeService();
+    const result = await svc.getChannelMembers('staff-token', {
+      orgId: BASE_INPUT.orgId,
+      channelId: BASE_INPUT.channelId,
+      profileId: 'staff-profile-1',
+    });
+
+    expect(result.map((member) => member.name)).toEqual(['Avery Student', 'Tutor Jane']);
+    expect(result[0]).toMatchObject({
+      id: 'student-profile-1',
+      role: 'child',
+      themeKey: 'coral',
+    });
+    expect(mockServiceClient.from).toHaveBeenCalledWith('learning_space_participants');
+  });
+});
+
+describe('ChannelsService.markRead', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // Reset every chain method to return the chain itself by default.
+    const sessionMethods = ['from', 'select', 'eq', 'in', 'is', 'order', 'limit'];
+    for (const m of sessionMethods) {
+      (mockSessionClient as Record<string, jest.Mock>)[m].mockReturnValue(
+        mockSessionClient,
+      );
+    }
+    const serviceMethods = ['from', 'select', 'eq', 'in', 'is', 'order', 'limit'];
     for (const m of serviceMethods) {
       (mockServiceClient as Record<string, jest.Mock>)[m].mockReturnValue(
         mockServiceClient,
@@ -223,13 +307,13 @@ describe('ChannelsService.markRead', () => {
 describe('ChannelsService.markReadState', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    const sessionMethods = ['from', 'select', 'eq', 'is', 'order', 'limit'];
+    const sessionMethods = ['from', 'select', 'eq', 'in', 'is', 'order', 'limit'];
     for (const m of sessionMethods) {
       (mockSessionClient as Record<string, jest.Mock>)[m].mockReturnValue(
         mockSessionClient,
       );
     }
-    const serviceMethods = ['from', 'select', 'eq', 'is', 'order', 'limit'];
+    const serviceMethods = ['from', 'select', 'eq', 'in', 'is', 'order', 'limit'];
     for (const m of serviceMethods) {
       (mockServiceClient as Record<string, jest.Mock>)[m].mockReturnValue(
         mockServiceClient,

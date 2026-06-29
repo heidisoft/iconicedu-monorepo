@@ -167,6 +167,58 @@ function addChannelMemberProfileRows(
   }
 }
 
+async function hasRosterReadRole(input: {
+  supabase: ReturnType<typeof createSupabaseServiceClient>;
+  orgId: string;
+  profileId: string;
+}): Promise<boolean> {
+  const profileResponse = await input.supabase
+    .from('profiles')
+    .select('account_id, kind')
+    .eq('org_id', input.orgId)
+    .eq('id', input.profileId)
+    .is('deleted_at', null)
+    .maybeSingle<{ account_id: string | null; kind: string | null }>();
+
+  if (profileResponse.error) {
+    throw new InternalServerErrorException(profileResponse.error.message);
+  }
+
+  const accountId = profileResponse.data?.account_id ?? null;
+  if (!accountId) return false;
+  if (profileResponse.data?.kind === 'staff') return true;
+
+  const [roleResponse, accountResponse] = await Promise.all([
+    input.supabase
+      .from('user_roles')
+      .select('id')
+      .eq('org_id', input.orgId)
+      .eq('account_id', accountId)
+      .in('role_key', ['owner', 'admin', 'staff'])
+      .is('deleted_at', null)
+      .limit(1)
+      .maybeSingle<{ id: string }>(),
+    input.supabase
+      .from('accounts')
+      .select('id')
+      .eq('id', accountId)
+      .eq('org_id', input.orgId)
+      .in('primary_role', ['owner', 'admin', 'staff'])
+      .is('deleted_at', null)
+      .limit(1)
+      .maybeSingle<{ id: string }>(),
+  ]);
+
+  if (roleResponse.error) {
+    throw new InternalServerErrorException(roleResponse.error.message);
+  }
+  if (accountResponse.error) {
+    throw new InternalServerErrorException(accountResponse.error.message);
+  }
+
+  return Boolean(roleResponse.data?.id || accountResponse.data?.id);
+}
+
 function buildDirectMessageChannelResult(
   channelId: string,
   targetProfile: {
@@ -1066,6 +1118,14 @@ export class ChannelsService {
       if (participantError)
         throw new InternalServerErrorException(participantError.message);
       isAuthorized = Boolean(participant);
+    }
+
+    if (!isAuthorized) {
+      isAuthorized = await hasRosterReadRole({
+        supabase: serviceSupabase,
+        orgId: input.orgId,
+        profileId: input.profileId,
+      });
     }
 
     if (!isAuthorized) return [];
