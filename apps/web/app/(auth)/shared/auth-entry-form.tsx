@@ -33,6 +33,7 @@ type AuthEntryFormProps = React.ComponentProps<'div'> & {
   oauthActionVerb?: OAuthActionVerb;
   enableGoogleSignIn?: boolean;
   enableAppleSignIn?: boolean;
+  featureBullets?: string[];
   footerLinkLabel?: string;
   footerLinkHref?: string;
   footerLinkIntro?: string;
@@ -97,11 +98,12 @@ export function AuthEntryForm({
   onOAuthLogin,
   statusMessage,
   errorMessage,
-  submitLabel = 'Send secure link',
+  submitLabel = 'Send code',
   submitLoadingLabel = 'Sending secure link...',
   oauthActionVerb = 'login',
   enableGoogleSignIn = true,
   enableAppleSignIn = true,
+  featureBullets,
   footerLinkLabel,
   footerLinkHref,
   footerLinkIntro,
@@ -170,14 +172,16 @@ export function AuthEntryForm({
             </div>
           </Field>
           <Field>
-            <div className="text-center text-sm text-muted-foreground">
-              <p>{introText}</p>
-            </div>
+            {introText ? (
+              <div className="text-center text-sm text-muted-foreground">
+                <p>{introText}</p>
+              </div>
+            ) : null}
             <FieldLabel htmlFor="email">Email</FieldLabel>
             <Input
               id="email"
               type="email"
-              placeholder="m@example.com"
+              placeholder="you@email.com"
               required
               value={email}
               onChange={(event) => {
@@ -262,13 +266,21 @@ export function AuthEntryForm({
               </Field>
             </>
           ) : null}
-          <div className="space-y-1 text-center text-xs text-muted-foreground">
-            <p>{trustLine}</p>
-          </div>
+          {featureBullets?.length ? (
+            <ul className="space-y-1 text-center text-xs text-muted-foreground">
+              {featureBullets.map((bullet) => (
+                <li key={bullet}>{bullet}</li>
+              ))}
+            </ul>
+          ) : (
+            <div className="space-y-1 text-center text-xs text-muted-foreground">
+              <p>{trustLine}</p>
+            </div>
+          )}
         </FieldGroup>
       </form>
       <FieldDescription className="px-6 text-center">
-        By clicking continue, you agree to our <a href="#">Terms of Service</a> and{' '}
+        By continuing, you agree to our <a href="#">Terms of Service</a> and{' '}
         <a href="#">Privacy Policy</a>.
       </FieldDescription>
     </div>

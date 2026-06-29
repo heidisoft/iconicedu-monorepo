@@ -1,16 +1,18 @@
 import { InternalServerErrorException } from '@nestjs/common';
 import { ChannelsService } from './channels.service';
 import { ThreadsService } from '@iconicedu/api/modules/threads/threads.service';
+import { evaluateApiBooleanFlag } from '@iconicedu/api/lib/flags/posthog-openfeature';
 
 // ─── Supabase client mocks ────────────────────────────────────────────────────
 
 const mockRpc = jest.fn();
 const mockMaybeSingle = jest.fn();
+const mockEvaluateApiBooleanFlag = evaluateApiBooleanFlag as jest.Mock;
 
 // Build a fluent chain that returns `mockMaybeSingle` at the leaf.
 function makeChain() {
   const chain: Record<string, jest.Mock> = {};
-  const methods = ['from', 'select', 'eq', 'is', 'order', 'limit'];
+  const methods = ['from', 'select', 'eq', 'in', 'is', 'order', 'limit', 'insert'];
   for (const m of methods) {
     chain[m] = jest.fn().mockReturnValue(chain);
   }
@@ -37,6 +39,12 @@ jest.mock('@iconicedu/api/lib/supabase/session', () => ({
 jest.mock('@iconicedu/api/lib/supabase/service', () => ({
   createSupabaseServiceClient: jest.fn(() => mockServiceClient),
 }));
+jest.mock('@iconicedu/api/lib/flags/posthog-openfeature', () => ({
+  apiFeatureFlagKeys: {
+    enableMobileDirectMessageStart: 'enable-mobile-direct-message-start',
+  },
+  evaluateApiBooleanFlag: jest.fn(),
+}));
 
 // PrismaService is injected but not used by markRead.
 jest.mock('@iconicedu/api/prisma/prisma.service', () => ({
@@ -59,17 +67,346 @@ function makeService() {
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
-describe('ChannelsService.markRead', () => {
+describe('ChannelsService.getChannelMembers', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    // Reset every chain method to return the chain itself by default.
-    const sessionMethods = ['from', 'select', 'eq', 'is', 'order', 'limit'];
+    const sessionMethods = [
+      'from',
+      'select',
+      'eq',
+      'in',
+      'is',
+      'order',
+      'limit',
+      'insert',
+    ];
     for (const m of sessionMethods) {
       (mockSessionClient as Record<string, jest.Mock>)[m].mockReturnValue(
         mockSessionClient,
       );
     }
-    const serviceMethods = ['from', 'select', 'eq', 'is', 'order', 'limit'];
+    const serviceMethods = [
+      'from',
+      'select',
+      'eq',
+      'in',
+      'is',
+      'order',
+      'limit',
+      'insert',
+    ];
+    for (const m of serviceMethods) {
+      (mockServiceClient as Record<string, jest.Mock>)[m].mockReturnValue(
+        mockServiceClient,
+      );
+    }
+    mockServiceClient.rpc.mockReturnValue(mockServiceClient);
+  });
+
+  it('returns classroom participants for staff observers who are not members', async () => {
+    mockMaybeSingle
+      .mockResolvedValueOnce({ data: { learning_space_id: 'space-1' }, error: null })
+      .mockResolvedValueOnce({ data: null, error: null })
+      .mockResolvedValueOnce({ data: null, error: null })
+      .mockResolvedValueOnce({
+        data: { account_id: 'staff-account-1', kind: 'staff' },
+        error: null,
+      });
+
+    mockServiceClient.order.mockResolvedValueOnce({ data: [], error: null });
+    mockServiceClient.is
+      .mockReturnValueOnce(mockServiceClient)
+      .mockReturnValueOnce(mockServiceClient)
+      .mockReturnValueOnce(mockServiceClient)
+      .mockResolvedValueOnce({
+        data: [
+          {
+            profile_id: 'educator-profile-1',
+            profile: {
+              account_id: 'educator-account-1',
+              display_name: 'Tutor Jane',
+              first_name: null,
+              last_name: null,
+              avatar_seed: 'jane-seed',
+              kind: 'educator',
+              bio: null,
+              timezone: 'America/New_York',
+              ui_theme_key: 'teal',
+            },
+          },
+          {
+            profile_id: 'student-profile-1',
+            profile: {
+              account_id: 'student-account-1',
+              display_name: 'Avery Student',
+              first_name: null,
+              last_name: null,
+              avatar_seed: 'avery-seed',
+              kind: 'child',
+              bio: null,
+              timezone: null,
+              ui_theme_key: 'coral',
+            },
+          },
+        ],
+        error: null,
+      });
+
+    const svc = makeService();
+    const result = await svc.getChannelMembers('staff-token', {
+      orgId: BASE_INPUT.orgId,
+      channelId: BASE_INPUT.channelId,
+      profileId: 'staff-profile-1',
+    });
+
+    expect(result.map((member) => member.name)).toEqual(['Avery Student', 'Tutor Jane']);
+    expect(result[0]).toMatchObject({
+      id: 'student-profile-1',
+      role: 'child',
+      themeKey: 'coral',
+    });
+    expect(mockServiceClient.from).toHaveBeenCalledWith('learning_space_participants');
+  });
+});
+
+describe('ChannelsService.ensureDirectMessageChannel', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    const sessionMethods = [
+      'from',
+      'select',
+      'eq',
+      'in',
+      'is',
+      'order',
+      'limit',
+      'insert',
+    ];
+    for (const m of sessionMethods) {
+      (mockSessionClient as Record<string, jest.Mock>)[m].mockReturnValue(
+        mockSessionClient,
+      );
+    }
+    const serviceMethods = [
+      'from',
+      'select',
+      'eq',
+      'in',
+      'is',
+      'order',
+      'limit',
+      'insert',
+    ];
+    for (const m of serviceMethods) {
+      (mockServiceClient as Record<string, jest.Mock>)[m].mockReturnValue(
+        mockServiceClient,
+      );
+    }
+    mockEvaluateApiBooleanFlag.mockResolvedValue(true);
+  });
+
+  it('loads the target profile through the service client when creating a DM', async () => {
+    const svc = makeService();
+    mockAuthGetUser.mockResolvedValueOnce({
+      data: { user: { id: 'staff-auth-user-1' } },
+      error: null,
+    });
+
+    mockMaybeSingle
+      .mockResolvedValueOnce({
+        data: {
+          id: 'staff-profile-1',
+          org_id: 'org-1',
+          account_id: 'staff-account-1',
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: {
+          id: 'student-profile-1',
+          org_id: 'org-1',
+          display_name: 'Avery Student',
+          first_name: null,
+          last_name: null,
+          avatar_url: null,
+          avatar_seed: 'avery-seed',
+          timezone: 'America/New_York',
+          city: null,
+          country_code: null,
+          country_name: null,
+          kind: 'child',
+          ui_theme_key: 'coral',
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: { id: 'staff-account-1' },
+        error: null,
+      });
+    mockServiceClient.insert
+      .mockResolvedValueOnce({ error: null })
+      .mockResolvedValueOnce({ error: null });
+
+    const result = await svc.ensureDirectMessageChannel('staff-token', {
+      orgId: 'org-1',
+      profileId: 'staff-profile-1',
+      otherProfileId: 'student-profile-1',
+    });
+
+    expect(result).toMatchObject({
+      topic: 'Avery Student',
+      avatarSeed: 'avery-seed',
+      avatarRole: 'child',
+      avatarThemeKey: 'coral',
+    });
+    expect(mockServiceClient.from).toHaveBeenCalledWith('profiles');
+    expect(mockServiceClient.insert).toHaveBeenCalledTimes(2);
+  });
+
+  it('allows a linked guardian to create a DM from the active child profile', async () => {
+    const svc = makeService();
+    mockAuthGetUser.mockResolvedValueOnce({
+      data: { user: { id: 'guardian-auth-user-1' } },
+      error: null,
+    });
+
+    mockMaybeSingle
+      .mockResolvedValueOnce({
+        data: {
+          id: 'student-profile-1',
+          org_id: 'org-1',
+          account_id: 'student-account-1',
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: {
+          id: 'educator-profile-1',
+          org_id: 'org-1',
+          display_name: 'Ms Barbara',
+          first_name: null,
+          last_name: null,
+          avatar_url: null,
+          avatar_seed: 'barbara-seed',
+          timezone: 'America/New_York',
+          city: null,
+          country_code: null,
+          country_name: null,
+          kind: 'educator',
+          ui_theme_key: 'teal',
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: { id: 'guardian-account-1' },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: { id: 'family-link-1' },
+        error: null,
+      });
+    mockServiceClient.insert
+      .mockResolvedValueOnce({ error: null })
+      .mockResolvedValueOnce({ error: null });
+
+    const result = await svc.ensureDirectMessageChannel('guardian-token', {
+      orgId: 'org-1',
+      profileId: 'student-profile-1',
+      otherProfileId: 'educator-profile-1',
+    });
+
+    expect(result).toMatchObject({
+      topic: 'Ms Barbara',
+      avatarSeed: 'barbara-seed',
+      avatarRole: 'educator',
+    });
+    expect(mockServiceClient.from).toHaveBeenCalledWith('family_links');
+    expect(mockServiceClient.insert).toHaveBeenCalledTimes(2);
+  });
+
+  it('finds an existing DM through the authorized service-client path', async () => {
+    const svc = makeService();
+    mockAuthGetUser.mockResolvedValueOnce({
+      data: { user: { id: 'guardian-auth-user-1' } },
+      error: null,
+    });
+
+    mockMaybeSingle
+      .mockResolvedValueOnce({
+        data: {
+          id: 'student-profile-1',
+          org_id: 'org-1',
+          account_id: 'student-account-1',
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: {
+          id: 'educator-profile-1',
+          org_id: 'org-1',
+          display_name: 'Ms Barbara',
+          first_name: null,
+          last_name: null,
+          avatar_url: null,
+          avatar_seed: 'barbara-seed',
+          timezone: 'America/New_York',
+          city: null,
+          country_code: null,
+          country_name: null,
+          kind: 'educator',
+          ui_theme_key: 'teal',
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: { id: 'guardian-account-1' },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: { id: 'family-link-1' },
+        error: null,
+      });
+    let isCallCount = 0;
+    mockServiceClient.is.mockImplementation(() => {
+      isCallCount += 1;
+      if (isCallCount === 5 || isCallCount === 6) {
+        return Promise.resolve({
+          data: [{ channel_id: 'dm-channel-1' }],
+          error: null,
+        });
+      }
+      return mockServiceClient;
+    });
+    mockServiceClient.limit.mockResolvedValueOnce({
+      data: [{ id: 'dm-channel-1', updated_at: '2026-06-29T00:00:00.000Z' }],
+      error: null,
+    });
+
+    const result = await svc.ensureDirectMessageChannel('guardian-token', {
+      orgId: 'org-1',
+      profileId: 'student-profile-1',
+      otherProfileId: 'educator-profile-1',
+    });
+
+    expect(result).toMatchObject({
+      channelId: 'dm-channel-1',
+      topic: 'Ms Barbara',
+    });
+    expect(mockServiceClient.insert).not.toHaveBeenCalled();
+  });
+});
+
+describe('ChannelsService.markRead', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // Reset every chain method to return the chain itself by default.
+    const sessionMethods = ['from', 'select', 'eq', 'in', 'is', 'order', 'limit'];
+    for (const m of sessionMethods) {
+      (mockSessionClient as Record<string, jest.Mock>)[m].mockReturnValue(
+        mockSessionClient,
+      );
+    }
+    const serviceMethods = ['from', 'select', 'eq', 'in', 'is', 'order', 'limit'];
     for (const m of serviceMethods) {
       (mockServiceClient as Record<string, jest.Mock>)[m].mockReturnValue(
         mockServiceClient,
@@ -223,13 +560,13 @@ describe('ChannelsService.markRead', () => {
 describe('ChannelsService.markReadState', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    const sessionMethods = ['from', 'select', 'eq', 'is', 'order', 'limit'];
+    const sessionMethods = ['from', 'select', 'eq', 'in', 'is', 'order', 'limit'];
     for (const m of sessionMethods) {
       (mockSessionClient as Record<string, jest.Mock>)[m].mockReturnValue(
         mockSessionClient,
       );
     }
-    const serviceMethods = ['from', 'select', 'eq', 'is', 'order', 'limit'];
+    const serviceMethods = ['from', 'select', 'eq', 'in', 'is', 'order', 'limit'];
     for (const m of serviceMethods) {
       (mockServiceClient as Record<string, jest.Mock>)[m].mockReturnValue(
         mockServiceClient,

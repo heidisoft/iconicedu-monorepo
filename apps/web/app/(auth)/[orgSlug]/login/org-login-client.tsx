@@ -41,7 +41,6 @@ export function shouldPromptOrgSignUp(
 
 export default function OrgLoginClient({
   orgSlug,
-  orgName,
   loginReason = null,
   enableGoogleSignIn = false,
   enableAppleSignIn = false,
@@ -141,18 +140,23 @@ export default function OrgLoginClient({
       onOAuthLogin={handleOAuthLogin}
       statusMessage={statusMessage}
       errorMessage={errorMessage}
-      title={`Sign in to ${orgName}`}
+      title="One place for lessons, schedules, and progress."
       subtitle={
         loginReason === 'session-expired'
           ? 'Your session expired because onboarding was not completed. Sign in again to continue setup.'
-          : 'Use your existing organization account to access your dashboard.'
+          : "No password needed. We'll email you a secure one-time code to sign in."
       }
       introText=""
       trustLine="Secure login. No password required. Organization access only."
-      submitLabel="Send verification code"
-      submitLoadingLabel="Sending verification code..."
+      submitLabel="Send code"
+      submitLoadingLabel="Sending code..."
       enableGoogleSignIn={enableGoogleSignIn}
       enableAppleSignIn={enableAppleSignIn}
+      featureBullets={[
+        'Qualified, vetted tutors',
+        'Schedules, sessions & homework in one place',
+        'Real-time messages, updates & payments',
+      ]}
       footerLinkIntro="New to ICONIC Academy?"
       footerLinkLabel="Get started here"
       footerLinkHref={`/${orgSlug}/get-started${currentEmail ? `?email=${encodeURIComponent(currentEmail)}` : ''}`}

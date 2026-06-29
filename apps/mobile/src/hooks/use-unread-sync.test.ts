@@ -1,12 +1,10 @@
-import { act, renderHook } from '@testing-library/react-native';
+import { act, renderHook, waitFor } from '@testing-library/react-native';
 import { resolveChannelIdFromPayload, useUnreadSync } from './use-unread-sync';
 
 const mockInvalidateQueries = jest.fn();
 const mockGetQueryData = jest.fn().mockReturnValue(undefined);
 const mockSetBadgeCountAsync = jest.fn();
-const mockSelect = jest.fn();
-const mockEq = jest.fn();
-const mockIs = jest.fn();
+const mockFetchUnreadBadgeCount = jest.fn();
 const mockSubscribe = jest.fn();
 const mockOn = jest.fn();
 const mockChannel = jest.fn();
@@ -27,6 +25,7 @@ jest.mock('@tanstack/react-query', () => ({
 }));
 
 jest.mock('@/lib/api/queries', () => ({
+  fetchUnreadBadgeCount: (...args: unknown[]) => mockFetchUnreadBadgeCount(...args),
   queryKeys: {
     messages: (channelId: string, profileId = '') => ['messages', channelId, profileId],
     directMessages: (orgId: string, profileId: string) => [
@@ -44,9 +43,6 @@ jest.mock('@/lib/api/queries', () => ({
 
 jest.mock('@/lib/supabase/client', () => ({
   supabase: {
-    from: () => ({
-      select: (...args: unknown[]) => mockSelect(...args),
-    }),
     channel: (...args: unknown[]) => mockChannel(...args),
     removeChannel: (...args: unknown[]) => mockRemoveChannel(...args),
   },
@@ -60,11 +56,8 @@ describe('use-unread-sync', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetQueryData.mockReturnValue(undefined);
+    mockFetchUnreadBadgeCount.mockResolvedValue(0);
     realtimeCallbacks.clear();
-
-    mockIs.mockResolvedValue({ data: [], error: null });
-    mockEq.mockReturnValue({ eq: mockEq, is: mockIs });
-    mockSelect.mockReturnValue({ eq: mockEq });
 
     mockOn.mockImplementation(
       (_type: string, filter: { event: string }, callback: RealtimeCallback) => {
@@ -168,8 +161,8 @@ describe('use-unread-sync', () => {
       }),
     );
 
-    expect(mockSelect).toHaveBeenCalledTimes(1);
-    mockSelect.mockClear();
+    expect(mockFetchUnreadBadgeCount).toHaveBeenCalledTimes(1);
+    mockFetchUnreadBadgeCount.mockClear();
 
     await act(async () => {
       realtimeCallbacks.get('INSERT')?.({
@@ -183,18 +176,35 @@ describe('use-unread-sync', () => {
       });
     });
 
-    expect(mockSelect).not.toHaveBeenCalled();
+    expect(mockFetchUnreadBadgeCount).not.toHaveBeenCalled();
 
     await act(async () => {
       jest.advanceTimersByTime(399);
     });
 
-    expect(mockSelect).not.toHaveBeenCalled();
+    expect(mockFetchUnreadBadgeCount).not.toHaveBeenCalled();
 
     await act(async () => {
       jest.advanceTimersByTime(1);
     });
 
-    expect(mockSelect).toHaveBeenCalledTimes(1);
+    expect(mockFetchUnreadBadgeCount).toHaveBeenCalledTimes(1);
+  });
+
+  it('syncs the native badge count through the API-owned unread count', async () => {
+    mockFetchUnreadBadgeCount.mockResolvedValue(7);
+
+    renderHook(() =>
+      useUnreadSync({
+        orgId: 'org-1',
+        profileId: 'profile-1',
+        accountId: 'account-1',
+      }),
+    );
+
+    await waitFor(() => {
+      expect(mockSetBadgeCountAsync).toHaveBeenCalledWith(7);
+    });
+    expect(mockFetchUnreadBadgeCount).toHaveBeenCalledWith('org-1');
   });
 });

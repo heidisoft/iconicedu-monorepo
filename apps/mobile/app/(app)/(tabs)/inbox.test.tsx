@@ -40,6 +40,21 @@ jest.mock('@/hooks/use-activity-feed', () => ({
   }),
 }));
 
+jest.mock('@/hooks/use-push-nudge', () => ({
+  usePushNudge: () => ({
+    isVisible: false,
+    nudgeVariant: 'request-permission',
+    triggerNudge: jest.fn(),
+    handleEnable: jest.fn(),
+    handleOpenSettings: jest.fn(),
+    handleDismiss: jest.fn(),
+  }),
+}));
+
+jest.mock('@/components/notifications/push-nudge-sheet', () => ({
+  PushNudgeSheet: () => null,
+}));
+
 jest.mock('@/components/skeletons', () => ({
   ActivityFeedSkeleton: () => null,
 }));

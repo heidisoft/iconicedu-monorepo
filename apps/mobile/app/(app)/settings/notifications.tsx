@@ -19,6 +19,7 @@ import { NOTIFICATION_REGISTRY } from '@/lib/notifications/notification-config';
 import { openNotificationSettings } from '@/lib/notifications/push-token';
 import { PushNudgeSheet } from '@/components/notifications/push-nudge-sheet';
 import { useTheme } from '@/providers/theme-provider';
+import { usePushConsent } from '@/providers/push-consent-provider';
 import type { AppColors } from '@/lib/theme';
 
 function makeStyles(C: AppColors) {
@@ -61,6 +62,26 @@ function makeStyles(C: AppColors) {
     },
     divider: { height: 1, backgroundColor: C.border, marginLeft: 60 },
     emptyCard: { padding: 24, alignItems: 'center', gap: 8 },
+    consentCard: {
+      padding: 16,
+      gap: 8,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: C.border,
+      backgroundColor: C.card,
+      marginBottom: 8,
+    },
+    consentHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    consentIconWrap: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: C.tealBg,
+    },
+    consentTitle: { flex: 1, fontSize: 16, fontWeight: '700', color: C.text },
+    consentBody: { fontSize: 14, color: C.textMuted, lineHeight: 20 },
     emptyIconWrap: {
       width: 56,
       height: 56,
@@ -82,9 +103,11 @@ export default function NotificationsScreen() {
   const {
     isPushEnabled,
     isOsPermissionDenied,
+    isOsPermissionUndetermined,
     isToggling,
     toggle: togglePush,
   } = usePushToggle();
+  const { requestPushConsent } = usePushConsent();
   const s = useMemo(() => makeStyles(colors), [colors]);
   const [nudgeVisible, setNudgeVisible] = useState(false);
 
@@ -109,6 +132,23 @@ export default function NotificationsScreen() {
     },
     [mutedMap, updatePref],
   );
+  const handleMasterPushPress = useCallback(() => {
+    if (isOsPermissionDenied) {
+      setNudgeVisible(true);
+      return;
+    }
+    if (isOsPermissionUndetermined && !isPushEnabled) {
+      void requestPushConsent();
+      return;
+    }
+    void togglePush();
+  }, [
+    isOsPermissionDenied,
+    isOsPermissionUndetermined,
+    isPushEnabled,
+    requestPushConsent,
+    togglePush,
+  ]);
 
   if (isLoading) {
     return (
@@ -136,14 +176,34 @@ export default function NotificationsScreen() {
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
         {/* Push master toggle */}
         <Text style={s.sectionLabel}>Push Notifications</Text>
+        {!isPushEnabled && (
+          <TouchableOpacity
+            style={s.consentCard}
+            onPress={handleMasterPushPress}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel="Turn on class reminders"
+          >
+            <View style={s.consentHeader}>
+              <View style={s.consentIconWrap}>
+                <Bell size={20} color={colors.teal} />
+              </View>
+              <Text style={s.consentTitle}>Turn on class reminders</Text>
+            </View>
+            <Text style={s.consentBody}>
+              Get reminders before sessions, tutor messages, and schedule changes. No
+              marketing notifications.
+            </Text>
+          </TouchableOpacity>
+        )}
         <View style={s.card}>
           {isOsPermissionDenied ? (
             <SettingsRow
               icon={<BellOff size={20} color={colors.textFaint} />}
-              label="Allow push notifications"
+              label="Class reminders"
               labelColor={colors.textFaint}
               hideChevron
-              onPress={() => setNudgeVisible(true)}
+              onPress={handleMasterPushPress}
               trailing={
                 <Switch
                   value={false}
@@ -156,15 +216,14 @@ export default function NotificationsScreen() {
           ) : (
             <SettingsRow
               icon={<Bell size={20} color={colors.textMuted} />}
-              label="Allow push notifications"
+              label="Class reminders"
               labelColor={colors.text}
               hideChevron
+              onPress={handleMasterPushPress}
               trailing={
                 <Switch
                   value={isPushEnabled}
-                  onValueChange={() => {
-                    void togglePush();
-                  }}
+                  onValueChange={handleMasterPushPress}
                   disabled={isToggling}
                   trackColor={{ false: colors.switchTrackOff, true: colors.teal }}
                   thumbColor="#ffffff"

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   Alert,
   View,
@@ -49,6 +49,7 @@ import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
 import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
 import { usePushNudge } from '@/hooks/use-push-nudge';
 import { PushNudgeSheet } from '@/components/notifications/push-nudge-sheet';
+import { usePushConsent } from '@/providers/push-consent-provider';
 
 type ChannelTab = 'messages' | 'sessions';
 
@@ -208,6 +209,21 @@ export default function ChannelConversationScreen() {
     handleOpenSettings,
     handleDismiss,
   } = usePushNudge();
+  const { requestPushConsent } = usePushConsent();
+  const scheduleConsentRequestedRef = useRef(false);
+
+  const handlePushNotificationMoment = useCallback(async () => {
+    const showedConsent = await requestPushConsent();
+    if (!showedConsent) {
+      await triggerNudge();
+    }
+  }, [requestPushConsent, triggerNudge]);
+
+  useEffect(() => {
+    if (activeTab !== 'sessions' || scheduleConsentRequestedRef.current) return;
+    scheduleConsentRequestedRef.current = true;
+    void handlePushNotificationMoment();
+  }, [activeTab, handlePushNotificationMoment]);
 
   // ── Send message ──
   const handleSend = useCallback(
@@ -246,9 +262,16 @@ export default function ChannelConversationScreen() {
         );
         return;
       }
-      void triggerNudge();
+      void handlePushNotificationMoment();
     },
-    [channelId, profileId, orgId, threadReplyTarget, refetch, triggerNudge],
+    [
+      channelId,
+      profileId,
+      orgId,
+      threadReplyTarget,
+      refetch,
+      handlePushNotificationMoment,
+    ],
   );
 
   // ── Send attachment (WhatsApp-style: show locally first, upload in background) ──
@@ -319,6 +342,7 @@ export default function ChannelConversationScreen() {
 
         // 2. Remove pending entry — the realtime subscription will add the real message
         setPendingUploads((prev) => prev.filter((p) => p.id !== pendingId));
+        void handlePushNotificationMoment();
       } catch (error) {
         reportMobileObservedError({
           error,
@@ -339,7 +363,7 @@ export default function ChannelConversationScreen() {
         );
       }
     },
-    [channelId, profileId, orgId, senderName],
+    [channelId, profileId, orgId, senderName, handlePushNotificationMoment],
   );
 
   // ── Delete message ──
@@ -517,7 +541,7 @@ export default function ChannelConversationScreen() {
         onBack={() => router.back()}
         onMore={() => setInfoVisible(true)}
         liveJoinUrl={resolvedLiveJoinUrl}
-        onJoinPress={() => void triggerNudge()}
+        onJoinPress={() => void handlePushNotificationMoment()}
       />
 
       {/* Tab bar: Messages | Sessions — only shown for class channels */}
@@ -615,7 +639,7 @@ export default function ChannelConversationScreen() {
         themeKey={resolvedThemeKey}
         messages={messages ?? []}
         liveJoinUrl={resolvedLiveJoinUrl}
-        onJoinPress={() => void triggerNudge()}
+        onJoinPress={() => void handlePushNotificationMoment()}
         onClose={() => setInfoVisible(false)}
         onProfilePress={(user) => {
           setInfoVisible(false);

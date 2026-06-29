@@ -109,6 +109,12 @@ type DirectMessageChannelResult = {
   avatarThemeKey: string | null;
 };
 
+type ProfileActorRow = {
+  id: string;
+  org_id: string;
+  account_id: string | null;
+};
+
 const PREVIEW_LABELS: Record<string, string> = {
   image: 'Image',
   file: 'File',
@@ -165,6 +171,97 @@ function addChannelMemberProfileRows(
       themeKey: profile.ui_theme_key ? String(profile.ui_theme_key) : null,
     });
   }
+}
+
+async function hasRosterReadRole(input: {
+  supabase: ReturnType<typeof createSupabaseServiceClient>;
+  orgId: string;
+  profileId: string;
+}): Promise<boolean> {
+  const profileResponse = await input.supabase
+    .from('profiles')
+    .select('account_id, kind')
+    .eq('org_id', input.orgId)
+    .eq('id', input.profileId)
+    .is('deleted_at', null)
+    .maybeSingle<{ account_id: string | null; kind: string | null }>();
+
+  if (profileResponse.error) {
+    throw new InternalServerErrorException(profileResponse.error.message);
+  }
+
+  const accountId = profileResponse.data?.account_id ?? null;
+  if (!accountId) return false;
+  if (profileResponse.data?.kind === 'staff') return true;
+
+  const [roleResponse, accountResponse] = await Promise.all([
+    input.supabase
+      .from('user_roles')
+      .select('id')
+      .eq('org_id', input.orgId)
+      .eq('account_id', accountId)
+      .in('role_key', ['owner', 'admin', 'staff'])
+      .is('deleted_at', null)
+      .limit(1)
+      .maybeSingle<{ id: string }>(),
+    input.supabase
+      .from('accounts')
+      .select('id')
+      .eq('id', accountId)
+      .eq('org_id', input.orgId)
+      .in('primary_role', ['owner', 'admin', 'staff'])
+      .is('deleted_at', null)
+      .limit(1)
+      .maybeSingle<{ id: string }>(),
+  ]);
+
+  if (roleResponse.error) {
+    throw new InternalServerErrorException(roleResponse.error.message);
+  }
+  if (accountResponse.error) {
+    throw new InternalServerErrorException(accountResponse.error.message);
+  }
+
+  return Boolean(roleResponse.data?.id || accountResponse.data?.id);
+}
+
+async function canAccessProfileAsActor(input: {
+  sessionSupabase: ReturnType<typeof createSupabaseSessionClient>;
+  serviceSupabase: ReturnType<typeof createSupabaseServiceClient>;
+  orgId: string;
+  profile: ProfileActorRow;
+}): Promise<boolean> {
+  if (!input.profile.account_id) return false;
+
+  const { data: authUser, error: authError } = await input.sessionSupabase.auth.getUser();
+  if (authError) throw new InternalServerErrorException(authError.message);
+
+  const authUserId = authUser?.user?.id;
+  if (!authUserId) return false;
+
+  const { data: account, error: accountError } = await input.serviceSupabase
+    .from('accounts')
+    .select('id')
+    .eq('auth_user_id', authUserId)
+    .eq('org_id', input.orgId)
+    .is('deleted_at', null)
+    .maybeSingle<{ id: string }>();
+  if (accountError) throw new InternalServerErrorException(accountError.message);
+  if (!account) return false;
+
+  if (account.id === input.profile.account_id) return true;
+
+  const { data: familyLink, error: familyLinkError } = await input.serviceSupabase
+    .from('family_links')
+    .select('id')
+    .eq('org_id', input.orgId)
+    .eq('guardian_account_id', account.id)
+    .eq('child_account_id', input.profile.account_id)
+    .is('deleted_at', null)
+    .maybeSingle<{ id: string }>();
+  if (familyLinkError) throw new InternalServerErrorException(familyLinkError.message);
+
+  return Boolean(familyLink);
 }
 
 function buildDirectMessageChannelResult(
@@ -646,9 +743,6 @@ export class ChannelsService {
       return null;
     }
 
-    const existing = await this.findDirectMessageChannel(accessToken, input);
-    if (existing) return existing;
-
     const canCreateDirectMessage = await evaluateApiBooleanFlag({
       flagKey: apiFeatureFlagKeys.enableMobileDirectMessageStart,
       distinctId: input.profileId,
@@ -660,18 +754,19 @@ export class ChannelsService {
     if (!canCreateDirectMessage) return null;
 
     const supabase = createSupabaseSessionClient(accessToken);
+    const writeSupabase = createSupabaseServiceClient();
     const [
       { data: currentProfile, error: currentProfileError },
       { data: targetProfile, error: targetProfileError },
     ] = await Promise.all([
-      supabase
+      writeSupabase
         .from('profiles')
-        .select('id, org_id')
+        .select('id, org_id, account_id')
         .eq('id', input.profileId)
         .eq('org_id', input.orgId)
         .is('deleted_at', null)
-        .maybeSingle<{ id: string; org_id: string }>(),
-      supabase
+        .maybeSingle<ProfileActorRow>(),
+      writeSupabase
         .from('profiles')
         .select(
           'id, org_id, display_name, first_name, last_name, avatar_url, avatar_seed, timezone, city, country_code, country_name, kind, ui_theme_key',
@@ -704,10 +799,67 @@ export class ChannelsService {
     }
     if (!currentProfile || !targetProfile) return null;
 
+    const canActAsCurrentProfile = await canAccessProfileAsActor({
+      sessionSupabase: supabase,
+      serviceSupabase: writeSupabase,
+      orgId: input.orgId,
+      profile: currentProfile,
+    });
+    if (!canActAsCurrentProfile) return null;
+
+    const [
+      { data: currentMemberships, error: currentMembershipsError },
+      { data: targetMemberships, error: targetMembershipsError },
+    ] = await Promise.all([
+      writeSupabase
+        .from('channel_members')
+        .select('channel_id')
+        .eq('org_id', input.orgId)
+        .eq('profile_id', input.profileId)
+        .is('deleted_at', null),
+      writeSupabase
+        .from('channel_members')
+        .select('channel_id')
+        .eq('org_id', input.orgId)
+        .eq('profile_id', input.otherProfileId)
+        .is('deleted_at', null),
+    ]);
+    if (currentMembershipsError) {
+      throw new InternalServerErrorException(currentMembershipsError.message);
+    }
+    if (targetMembershipsError) {
+      throw new InternalServerErrorException(targetMembershipsError.message);
+    }
+
+    const currentChannelIds = new Set(
+      (currentMemberships ?? []).map((row) => row.channel_id as string),
+    );
+    const sharedChannelIds = (targetMemberships ?? [])
+      .map((row) => row.channel_id as string)
+      .filter((channelId) => currentChannelIds.has(channelId));
+    if (sharedChannelIds.length) {
+      const { data: existingChannels, error: existingChannelsError } = await writeSupabase
+        .from('channels')
+        .select('id, updated_at')
+        .eq('org_id', input.orgId)
+        .eq('kind', 'dm')
+        .eq('status', 'active')
+        .in('id', sharedChannelIds)
+        .is('deleted_at', null)
+        .order('updated_at', { ascending: false })
+        .limit(1);
+      if (existingChannelsError) {
+        throw new InternalServerErrorException(existingChannelsError.message);
+      }
+      const existingChannel = existingChannels?.[0];
+      if (existingChannel) {
+        return buildDirectMessageChannelResult(existingChannel.id, targetProfile);
+      }
+    }
+
     const dmKey = `dm:${[input.profileId, input.otherProfileId].sort().join('-')}`;
     const now = new Date().toISOString();
     const channelId = randomUUID();
-    const writeSupabase = createSupabaseServiceClient();
     const { error: channelError } = await writeSupabase.from('channels').insert({
       id: channelId,
       org_id: input.orgId,
@@ -1066,6 +1218,14 @@ export class ChannelsService {
       if (participantError)
         throw new InternalServerErrorException(participantError.message);
       isAuthorized = Boolean(participant);
+    }
+
+    if (!isAuthorized) {
+      isAuthorized = await hasRosterReadRole({
+        supabase: serviceSupabase,
+        orgId: input.orgId,
+        profileId: input.profileId,
+      });
     }
 
     if (!isAuthorized) return [];

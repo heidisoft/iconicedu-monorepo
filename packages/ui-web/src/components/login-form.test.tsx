@@ -9,11 +9,13 @@ describe('LoginForm', () => {
     render(<LoginForm />);
 
     expect(
-      screen.getByRole('heading', { name: 'Welcome to ICONIC Academy' }),
+      screen.getByRole('heading', {
+        name: 'One place for lessons, schedules, and progress.',
+      }),
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        /Sign in or get started in seconds. We'll create your secure account automatically if you're new\./i,
+        /No password needed. We'll email you a secure one-time code to sign in\./i,
       ),
     ).toBeInTheDocument();
     expect(
@@ -22,7 +24,16 @@ describe('LoginForm', () => {
     expect(
       screen.getByRole('button', { name: 'Continue with Apple' }),
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Send secure link' })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('you@email.com')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Send code' })).toBeInTheDocument();
+    expect(screen.getByText('Qualified, vetted tutors')).toBeInTheDocument();
+    expect(
+      screen.getByText('Schedules, sessions & homework in one place'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Real-time messages, updates & payments'),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/By continuing, you agree to our/i)).toBeInTheDocument();
   });
 
   it('calls the OAuth login handler with the selected provider', async () => {
@@ -71,9 +82,9 @@ describe('LoginForm', () => {
     render(<LoginForm onEmailLogin={onEmailLogin} />);
 
     await user.type(screen.getByLabelText('Email'), 'iconicedudev+parent@gmail.com');
-    await user.click(screen.getByRole('button', { name: 'Send secure link' }));
+    await user.click(screen.getByRole('button', { name: 'Send code' }));
 
-    expect(screen.getByRole('button', { name: /Sending secure link/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Sending code/i })).toBeDisabled();
     expect(document.querySelector('.animate-spin')).toBeInTheDocument();
 
     await act(async () => {

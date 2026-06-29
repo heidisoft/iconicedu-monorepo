@@ -108,6 +108,10 @@ type RawAdminAccountRow = {
   id: string;
 };
 
+type RawUnreadBadgeAccountRow = {
+  id: string;
+};
+
 type RawRoleRow = {
   role_key: string | null;
 };
@@ -981,6 +985,37 @@ export class ActivityFeedQueryService {
       nextCursor: null,
       unreadCount,
     };
+  }
+
+  async fetchUnreadBadgeCount(authUserId: string, orgId: string) {
+    const supabase = createSupabaseServiceClient();
+    const { data: account, error: accountError } = await supabase
+      .from('accounts')
+      .select('id')
+      .eq('auth_user_id', authUserId)
+      .eq('org_id', orgId)
+      .is('deleted_at', null)
+      .maybeSingle<RawUnreadBadgeAccountRow>();
+
+    if (accountError) throw new InternalServerErrorException(accountError.message);
+    if (!account) throw new ForbiddenException('Not a member of this organization');
+
+    const { data: unreadRows, error: unreadError } = await supabase
+      .from('channel_read_state')
+      .select('unread_count')
+      .eq('org_id', orgId)
+      .eq('account_id', account.id)
+      .is('deleted_at', null)
+      .returns<Array<{ unread_count?: number | null }>>();
+
+    if (unreadError) throw new InternalServerErrorException(unreadError.message);
+
+    const unreadCount = (unreadRows ?? []).reduce(
+      (total, row) => total + Math.max(0, row.unread_count ?? 0),
+      0,
+    );
+
+    return { unreadCount };
   }
 
   async markRead(accessToken: string, orgId: string, profileId: string, ids: string[]) {

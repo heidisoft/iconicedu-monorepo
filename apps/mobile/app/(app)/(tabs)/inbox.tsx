@@ -26,6 +26,8 @@ import {
   DEFAULT_NOTIFICATION_ROUTE,
   NOTIFICATION_REGISTRY,
 } from '@/lib/notifications/notification-config';
+import { usePushNudge } from '@/hooks/use-push-nudge';
+import { PushNudgeSheet } from '@/components/notifications/push-nudge-sheet';
 
 // ---------------------------------------------------------------------------
 // Styles
@@ -224,6 +226,24 @@ export default function InboxScreen() {
     if (unreadIdsForActiveTab.length === 0) return;
     markRead(unreadIdsForActiveTab);
   }, [markRead, unreadIdsForActiveTab]);
+
+  const {
+    isVisible: isNudgeVisible,
+    nudgeVariant,
+    triggerNudge,
+    handleEnable: handleNudgeEnable,
+    handleOpenSettings: handleNudgeOpenSettings,
+    handleDismiss: handleNudgeDismiss,
+  } = usePushNudge();
+
+  // Tier 1: user opened the inbox and has unread items — they clearly want to know
+  // when things happen, so this is a purposeful moment to ask about push.
+  const inboxNudgedRef = useRef(false);
+  useEffect(() => {
+    if (inboxNudgedRef.current || feedLoading || !unreadIdsForActiveTab.length) return;
+    inboxNudgedRef.current = true;
+    void triggerNudge();
+  }, [feedLoading, unreadIdsForActiveTab, triggerNudge]);
 
   useEffect(() => {
     if (!targetActivityId) return;
@@ -448,6 +468,15 @@ export default function InboxScreen() {
           ItemSeparatorComponent={() => <View style={s.separator} />}
         />
       )}
+
+      {/* Push notification nudge */}
+      <PushNudgeSheet
+        visible={isNudgeVisible}
+        variant={nudgeVariant}
+        onEnable={handleNudgeEnable}
+        onOpenSettings={handleNudgeOpenSettings}
+        onDismiss={handleNudgeDismiss}
+      />
     </SafeAreaView>
   );
 }

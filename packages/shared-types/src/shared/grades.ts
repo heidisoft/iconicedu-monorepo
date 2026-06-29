@@ -55,6 +55,8 @@ export type GradeMeta = Readonly<{
   labels: Partial<Record<CountryCode, string>>;
   milestones?: readonly GradeMilestone[];
   sortOrder: number;
+  /** When set, this grade is only shown for the listed countries */
+  onlyFor?: ReadonlyArray<CountryCode>;
 }>;
 
 export const GRADE_LEVEL_ORDER: readonly GradeLevel[] = [
@@ -323,9 +325,11 @@ export const GRADE_META: Readonly<Record<GradeLevel, GradeMeta>> = {
     ageRange: { min: 18, max: 19 },
     labels: {
       lk: 'Grade 13 (A/L year 2)',
+      gb: 'Year 13',
       global: 'Grade 13',
     },
     milestones: [GradeMilestone.SriLanka_AL_Year2, GradeMilestone.ExamYear],
+    onlyFor: ['lk', 'gb'],
     sortOrder: 150,
   },
   [GradeLevel.Undergraduate]: {
@@ -434,8 +438,13 @@ export function optionsForCountry(
   country: CountryCode,
   includePostSecondary = true,
 ): Array<{ value: GradeLevel; label: string }> {
-  return allGrades(includePostSecondary).map((level) => ({
-    value: level,
-    label: gradeLabel(level, country),
-  }));
+  return allGrades(includePostSecondary)
+    .filter((level) => {
+      const { onlyFor } = GRADE_META[level];
+      return !onlyFor || onlyFor.includes(country);
+    })
+    .map((level) => ({
+      value: level,
+      label: gradeLabel(level, country),
+    }));
 }

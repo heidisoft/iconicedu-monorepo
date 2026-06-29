@@ -26,6 +26,8 @@ export type UsePushToggleResult = {
   isPushEnabled: boolean;
   /** true when the OS has permanently denied push notification permission */
   isOsPermissionDenied: boolean;
+  /** true when the OS permission can still be requested */
+  isOsPermissionUndetermined: boolean;
   /** true while the async toggle operation is in flight (debounces rapid taps) */
   isToggling: boolean;
   toggle: () => Promise<void>;
@@ -117,6 +119,7 @@ export function usePushToggle(): UsePushToggleResult {
   }, [refreshPermission, refreshPushMuted]);
 
   const isOsPermissionDenied = osPermission === 'denied';
+  const isOsPermissionUndetermined = osPermission === 'undetermined';
   const isPushEnabled = osPermission === 'granted' && !isPushMuted;
 
   const toggle = useCallback(async () => {
@@ -175,5 +178,11 @@ export function usePushToggle(): UsePushToggleResult {
     setMasterPushMuted,
   ]);
 
-  return { isPushEnabled, isOsPermissionDenied, isToggling, toggle };
+  return {
+    isPushEnabled,
+    isOsPermissionDenied,
+    isOsPermissionUndetermined,
+    isToggling,
+    toggle,
+  };
 }

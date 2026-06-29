@@ -6,20 +6,7 @@ import { useTheme } from '@/providers/theme-provider';
 import { fetchOnboardingStatus } from '@/lib/api/queries';
 import { queryKeys } from '@/lib/api/query-keys';
 import { useNotificationHandler } from '@/hooks/use-notification-handler';
-import { usePushRegistration } from '@/hooks/use-push-registration';
-import { PushPermissionSheet } from '@/components/notifications/push-permission-sheet';
-
-function PushRegistrationGate() {
-  const { showConsent, onConsentGranted, onConsentDismissed } = usePushRegistration();
-
-  return (
-    <PushPermissionSheet
-      visible={showConsent}
-      onEnable={onConsentGranted}
-      onDismiss={onConsentDismissed}
-    />
-  );
-}
+import { PushConsentProvider } from '@/providers/push-consent-provider';
 
 export default function AppLayout() {
   const { session, loading, setOnboardingCompletionStatus } = useAuth();
@@ -95,14 +82,13 @@ export default function AppLayout() {
   if (loading || !session || onboardingCheckedUserId !== session.user.id) return null;
 
   return (
-    <>
+    <PushConsentProvider>
       <Stack
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: colors.pageBg },
         }}
       />
-      <PushRegistrationGate />
-    </>
+    </PushConsentProvider>
   );
 }

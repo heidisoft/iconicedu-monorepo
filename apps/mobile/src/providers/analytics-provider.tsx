@@ -21,10 +21,20 @@ const POSTHOG_HOST: string =
   process.env.EXPO_PUBLIC_POSTHOG_HOST ??
   'https://t.iconicedu.lk';
 
+export function hasPostHogNativeReplayModule(
+  nativeModules: Record<string, unknown>,
+): boolean {
+  return Boolean(
+    nativeModules.PosthogReactNativePlugin ??
+    nativeModules.PosthogReactNativeSessionReplay,
+  );
+}
+
 // Only enable session replay when the native module is actually linked.
 // Without this guard, PostHogProvider crashes in Expo Go / non-prebuild builds,
-// taking ALL event capture down with it.
-const ENABLE_SESSION_REPLAY = !!NativeModules.PosthogReactNativeSessionReplay;
+// taking ALL event capture down with it. PostHog renamed the replay package to
+// @posthog/react-native-plugin in SDK 4.47+, which registers this native module.
+const ENABLE_SESSION_REPLAY = hasPostHogNativeReplayModule(NativeModules);
 
 // ─── Vendor-agnostic context ──────────────────────────────────────────────────
 

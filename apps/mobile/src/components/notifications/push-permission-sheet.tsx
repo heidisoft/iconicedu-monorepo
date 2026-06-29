@@ -83,13 +83,13 @@ export function PushPermissionSheet({ visible, onEnable, onDismiss }: Props) {
         <View style={s.iconWrap}>
           <Bell size={32} color={colors.teal} />
         </View>
-        <Text style={s.title}>Stay in the loop</Text>
+        <Text style={s.title}>Stay on top of classes</Text>
         <Text style={s.body}>
-          Get notified about class sessions, messages, homework updates, and more — right
-          when they happen.
+          Get reminders before sessions, tutor messages, and schedule changes. No
+          marketing notifications.
         </Text>
         <TouchableOpacity style={s.btnPrimary} onPress={onEnable} activeOpacity={0.8}>
-          <Text style={s.btnPrimaryLabel}>Enable Notifications</Text>
+          <Text style={s.btnPrimaryLabel}>Turn on class reminders</Text>
         </TouchableOpacity>
         <TouchableOpacity style={s.btnSecondary} onPress={onDismiss} activeOpacity={0.7}>
           <Text style={s.btnSecondaryLabel}>Not Now</Text>

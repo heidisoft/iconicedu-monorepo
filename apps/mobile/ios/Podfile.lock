@@ -314,10 +314,10 @@ PODS:
   - libwebp/sharpyuv (1.5.0)
   - libwebp/webp (1.5.0):
     - libwebp/sharpyuv
-  - PostHog (3.42.1)
-  - posthog-react-native-session-replay (1.5.1):
+  - PostHog (3.61.1)
+  - posthog-react-native-plugin (2.1.1):
     - hermes-engine
-    - PostHog (~> 3.42.0)
+    - PostHog (~> 3.61.1)
     - RCTRequired
     - RCTTypeSafety
     - React-Core
@@ -2563,7 +2563,7 @@ DEPENDENCIES:
   - EXUpdatesInterface (from `../../../node_modules/expo-updates-interface/ios`)
   - FBLazyVector (from `../../../node_modules/react-native/Libraries/FBLazyVector`)
   - hermes-engine (from `../../../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`)
-  - posthog-react-native-session-replay (from `../../../node_modules/posthog-react-native-session-replay`)
+  - "posthog-react-native-plugin (from `../../../node_modules/@posthog/react-native-plugin`)"
   - RCTDeprecation (from `../../../node_modules/react-native/ReactApple/Libraries/RCTFoundation/RCTDeprecation`)
   - RCTRequired (from `../../../node_modules/react-native/Libraries/Required`)
   - RCTSwiftUI (from `../../../node_modules/react-native/ReactApple/RCTSwiftUI`)
@@ -2738,8 +2738,8 @@ EXTERNAL SOURCES:
   hermes-engine:
     :podspec: "../../../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec"
     :tag: hermes-v0.14.1
-  posthog-react-native-session-replay:
-    :path: "../../../node_modules/posthog-react-native-session-replay"
+  posthog-react-native-plugin:
+    :path: "../../../node_modules/@posthog/react-native-plugin"
   RCTDeprecation:
     :path: "../../../node_modules/react-native/ReactApple/Libraries/RCTFoundation/RCTDeprecation"
   RCTRequired:
@@ -2944,8 +2944,8 @@ SPEC CHECKSUMS:
   libavif: 5f8e715bea24debec477006f21ef9e95432e254d
   libdav1d: 23581a4d8ec811ff171ed5e2e05cd27bad64c39f
   libwebp: 02b23773aedb6ff1fd38cec7a77b81414c6842a8
-  PostHog: 148d2d62bac68c6da50a2325030b3fb2d6bca95b
-  posthog-react-native-session-replay: 858e7caa8626381a7a5baf8aca7308734448e4fe
+  PostHog: 6d64ad682f47610444d35c5f94e1029229283da4
+  posthog-react-native-plugin: b4042edad09c2bbecaaa5d70cadbf201f0c94667
   RCTDeprecation: a522c536d2c7be8f518dd834883cf6dce1d4f545
   RCTRequired: 44337def23abb244c025e9e7ab58f9cd3d63ec7d
   RCTSwiftUI: b2f0c2f2761631b8cd605767536cbb1cbf8d020f

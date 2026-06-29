@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { reportMobileObservedError } from '@/lib/analytics/report-error';
 import {
   Alert,
@@ -49,6 +49,9 @@ import type { ChannelListItem, DmParticipant } from '@/lib/api/types';
 import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
 import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
 import { buildLocalTimeContext, formatLocalTimeText } from '@/lib/local-time-context';
+import { usePushNudge } from '@/hooks/use-push-nudge';
+import { usePushConsent } from '@/providers/push-consent-provider';
+import { PushNudgeSheet } from '@/components/notifications/push-nudge-sheet';
 
 function participantName(participant: DmParticipant | null | undefined): string | null {
   if (!participant) return null;
@@ -304,6 +307,33 @@ export default function DmConversationScreen() {
     setThreadReplyTarget(msg);
   }, []);
 
+  // ── Push notification nudge ──
+  const {
+    isVisible: isNudgeVisible,
+    nudgeVariant,
+    triggerNudge,
+    handleEnable: handleNudgeEnable,
+    handleOpenSettings: handleNudgeOpenSettings,
+    handleDismiss: handleNudgeDismiss,
+  } = usePushNudge();
+  const { requestPushConsent } = usePushConsent();
+
+  const handlePushNotificationMoment = useCallback(async () => {
+    const showedConsent = await requestPushConsent();
+    if (!showedConsent) {
+      await triggerNudge();
+    }
+  }, [requestPushConsent, triggerNudge]);
+
+  // Tier 1: fire once when the first messages arrive — user is reading an incoming message,
+  // which is the strongest signal that lock-screen delivery has value.
+  const messagesNudgedRef = useRef(false);
+  useEffect(() => {
+    if (messagesNudgedRef.current || isLoading || !messages?.length) return;
+    messagesNudgedRef.current = true;
+    void triggerNudge();
+  }, [isLoading, messages, triggerNudge]);
+
   // ── Send message ──
   // When a thread reply target is active, route the message into that thread.
   const handleSend = useCallback(
@@ -339,9 +369,19 @@ export default function DmConversationScreen() {
             ? error.message
             : 'Something went wrong. Please try again.',
         );
+        return;
       }
+      // Tier 2: user just sent a message — they expect a reply, high intent for push.
+      void handlePushNotificationMoment();
     },
-    [channelId, profileId, orgId, threadReplyTarget, refetch],
+    [
+      channelId,
+      profileId,
+      orgId,
+      threadReplyTarget,
+      refetch,
+      handlePushNotificationMoment,
+    ],
   );
 
   const handleSendAttachment = useCallback(
@@ -685,6 +725,15 @@ export default function DmConversationScreen() {
         onReact={handleReactionToggle}
         onThread={handleThreadOpen}
         onDelete={handleDelete}
+      />
+
+      {/* Push notification nudge */}
+      <PushNudgeSheet
+        visible={isNudgeVisible}
+        variant={nudgeVariant}
+        onEnable={handleNudgeEnable}
+        onOpenSettings={handleNudgeOpenSettings}
+        onDismiss={handleNudgeDismiss}
       />
     </SafeAreaView>
   );
