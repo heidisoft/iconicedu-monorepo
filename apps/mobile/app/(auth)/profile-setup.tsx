@@ -2896,19 +2896,22 @@ export default function ProfileSetupScreen() {
           setConsentShown(true);
           if (isSkip) {
             await snoozePushConsentPrompt();
-          } else {
+          } else if (!supportsNativePushNotifications()) {
             await markPushConsentAccepted();
-          }
-          if (!isSkip && supportsNativePushNotifications()) {
+          } else {
             try {
               const { status } = await Notifications.requestPermissionsAsync();
               if (status === 'granted' && onboarding.orgId && onboarding.profileId) {
+                await markPushConsentAccepted();
                 const token = await getExpoPushToken({ requestPermissions: false });
                 if (token)
                   await storePushToken(onboarding.orgId, onboarding.profileId, token);
+              } else {
+                await snoozePushConsentPrompt();
               }
             } catch {
               // Permission request errors must never block the wizard
+              await snoozePushConsentPrompt();
             }
           }
         }

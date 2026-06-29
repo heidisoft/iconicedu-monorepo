@@ -73,4 +73,8 @@ export type {
   CancelRecurringSessionOccurrenceInput,
   CancelRecurringSessionOccurrenceResult,
 } from './schedules/queries';
-export { fetchActivityFeed, markActivityFeedRead } from './activity-feed/queries';
+export {
+  fetchActivityFeed,
+  fetchUnreadBadgeCount,
+  markActivityFeedRead,
+} from './activity-feed/queries';

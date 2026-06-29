@@ -254,4 +254,28 @@ describe('ActivityFeedQueryService', () => {
       items: [],
     });
   });
+
+  it('fetches unread badge count for the authenticated account in an org', async () => {
+    const accountQuery = makeAdminAuditQuery([{ id: 'account-1' }]);
+    const readStateQuery = makeAdminAuditQuery([
+      { unread_count: 3 },
+      { unread_count: 2 },
+      { unread_count: -1 },
+      { unread_count: null },
+    ]);
+    const from = jest.fn((table: string) => {
+      if (table === 'accounts') return accountQuery;
+      if (table === 'channel_read_state') return readStateQuery;
+      throw new Error(`Unexpected table ${table}`);
+    });
+    createSupabaseServiceClientMock.mockReturnValue({ from } as never);
+
+    const service = new ActivityFeedQueryService();
+    const result = await service.fetchUnreadBadgeCount('auth-user-1', 'org-1');
+
+    expect(accountQuery.eq).toHaveBeenCalledWith('auth_user_id', 'auth-user-1');
+    expect(accountQuery.eq).toHaveBeenCalledWith('org_id', 'org-1');
+    expect(readStateQuery.eq).toHaveBeenCalledWith('account_id', 'account-1');
+    expect(result).toEqual({ unreadCount: 5 });
+  });
 });

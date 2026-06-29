@@ -10,19 +10,21 @@ import {
   supportsNativePushNotifications,
   openNotificationSettings,
 } from '@/lib/notifications/push-token';
+import { apiGet, apiPut } from '@/lib/api/http-client';
 import { useAccount } from './use-account';
 import { useProfile } from './use-profile';
 
 const NUDGE_LAST_SHOWN_KEY = 'push_nudge_last_shown_at';
 const NUDGE_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+const MASTER_PUSH_PREF_KEY = '__push__';
 
 function getNotificationsModule() {
   // Function-scoped require avoids loading the native module in Expo Go / tests.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports, no-undef
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   return require('expo-notifications') as typeof import('expo-notifications');
 }
 
-export type NudgeVariant = 'request-permission' | 'open-settings';
+export type NudgeVariant = 'request-permission' | 'open-settings' | 'enable-in-app';
 
 export type UsePushNudgeResult = {
   isVisible: boolean;
@@ -63,16 +65,41 @@ export function usePushNudge(): UsePushNudgeResult {
 
     const Notifications = getNotificationsModule();
     const { status } = await Notifications.getPermissionsAsync();
+    let isMasterPushMuted = false;
+    try {
+      const rows = await apiGet<Array<{ muted?: boolean | null }>>(
+        '/notification-preferences',
+        {
+          orgId,
+          profileId,
+          prefKey: MASTER_PUSH_PREF_KEY,
+        },
+      );
+      isMasterPushMuted = Boolean(rows[0]?.muted);
+    } catch {
+      // Nudge eligibility is best-effort. If the preference lookup fails,
+      // fall back to OS permission state only.
+    }
 
-    // Nothing to do if the user already has push enabled.
-    if (status === 'granted') return;
+    // Nothing to do if the user already has push enabled in both OS and app prefs.
+    if (status === 'granted' && !isMasterPushMuted) return;
 
     // Android < 13 OS auto-grants permission — undetermined never occurs there.
     // For those users the PushPermissionSheet (consent) handles first-time opt-in.
-    if (status !== 'denied' && isAndroidPushPermissionAutoGranted()) return;
+    if (
+      status !== 'denied' &&
+      !isMasterPushMuted &&
+      isAndroidPushPermissionAutoGranted()
+    ) {
+      return;
+    }
 
     const variant: NudgeVariant =
-      status === 'denied' ? 'open-settings' : 'request-permission';
+      status === 'denied'
+        ? 'open-settings'
+        : status === 'granted' && isMasterPushMuted
+          ? 'enable-in-app'
+          : 'request-permission';
 
     try {
       const lastShownStr = await SecureStore.getItemAsync(NUDGE_LAST_SHOWN_KEY);
@@ -100,11 +127,21 @@ export function usePushNudge(): UsePushNudgeResult {
     if (!orgId || !profileId) return;
 
     try {
-      const token = await getExpoPushToken();
-      if (token) {
-        await storePushToken(orgId, profileId, token);
-        await markPushConsentAccepted();
+      const token = await getExpoPushToken({
+        requestPermissions: nudgeVariant !== 'enable-in-app',
+      });
+      if (!token) {
+        return;
       }
+      await storePushToken(orgId, profileId, token);
+      await apiPut('/notification-preferences', {
+        orgId,
+        profileId,
+        prefKey: MASTER_PUSH_PREF_KEY,
+        channels: ['push'],
+        muted: false,
+      });
+      await markPushConsentAccepted();
     } catch (error) {
       reportMobileObservedError({
         error,
@@ -113,7 +150,7 @@ export function usePushNudge(): UsePushNudgeResult {
         context: { orgId, profileId },
       });
     }
-  }, [orgId, profileId]);
+  }, [nudgeVariant, orgId, profileId]);
 
   const handleOpenSettings = useCallback(async () => {
     setIsVisible(false);
