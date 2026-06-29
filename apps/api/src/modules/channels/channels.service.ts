@@ -712,6 +712,7 @@ export class ChannelsService {
     if (!canCreateDirectMessage) return null;
 
     const supabase = createSupabaseSessionClient(accessToken);
+    const writeSupabase = createSupabaseServiceClient();
     const [
       { data: currentProfile, error: currentProfileError },
       { data: targetProfile, error: targetProfileError },
@@ -723,7 +724,7 @@ export class ChannelsService {
         .eq('org_id', input.orgId)
         .is('deleted_at', null)
         .maybeSingle<{ id: string; org_id: string }>(),
-      supabase
+      writeSupabase
         .from('profiles')
         .select(
           'id, org_id, display_name, first_name, last_name, avatar_url, avatar_seed, timezone, city, country_code, country_name, kind, ui_theme_key',
@@ -759,7 +760,6 @@ export class ChannelsService {
     const dmKey = `dm:${[input.profileId, input.otherProfileId].sort().join('-')}`;
     const now = new Date().toISOString();
     const channelId = randomUUID();
-    const writeSupabase = createSupabaseServiceClient();
     const { error: channelError } = await writeSupabase.from('channels').insert({
       id: channelId,
       org_id: input.orgId,
