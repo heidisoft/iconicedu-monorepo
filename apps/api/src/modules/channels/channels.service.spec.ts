@@ -207,7 +207,6 @@ describe('ChannelsService.ensureDirectMessageChannel', () => {
 
   it('loads the target profile through the service client when creating a DM', async () => {
     const svc = makeService();
-    jest.spyOn(svc, 'findDirectMessageChannel').mockResolvedValueOnce(null);
     mockAuthGetUser.mockResolvedValueOnce({
       data: { user: { id: 'staff-auth-user-1' } },
       error: null,
@@ -266,7 +265,6 @@ describe('ChannelsService.ensureDirectMessageChannel', () => {
 
   it('allows a linked guardian to create a DM from the active child profile', async () => {
     const svc = makeService();
-    jest.spyOn(svc, 'findDirectMessageChannel').mockResolvedValueOnce(null);
     mockAuthGetUser.mockResolvedValueOnce({
       data: { user: { id: 'guardian-auth-user-1' } },
       error: null,
@@ -324,6 +322,77 @@ describe('ChannelsService.ensureDirectMessageChannel', () => {
     });
     expect(mockServiceClient.from).toHaveBeenCalledWith('family_links');
     expect(mockServiceClient.insert).toHaveBeenCalledTimes(2);
+  });
+
+  it('finds an existing DM through the authorized service-client path', async () => {
+    const svc = makeService();
+    mockAuthGetUser.mockResolvedValueOnce({
+      data: { user: { id: 'guardian-auth-user-1' } },
+      error: null,
+    });
+
+    mockMaybeSingle
+      .mockResolvedValueOnce({
+        data: {
+          id: 'student-profile-1',
+          org_id: 'org-1',
+          account_id: 'student-account-1',
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: {
+          id: 'educator-profile-1',
+          org_id: 'org-1',
+          display_name: 'Ms Barbara',
+          first_name: null,
+          last_name: null,
+          avatar_url: null,
+          avatar_seed: 'barbara-seed',
+          timezone: 'America/New_York',
+          city: null,
+          country_code: null,
+          country_name: null,
+          kind: 'educator',
+          ui_theme_key: 'teal',
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: { id: 'guardian-account-1' },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: { id: 'family-link-1' },
+        error: null,
+      });
+    let isCallCount = 0;
+    mockServiceClient.is.mockImplementation(() => {
+      isCallCount += 1;
+      if (isCallCount === 5 || isCallCount === 6) {
+        return Promise.resolve({
+          data: [{ channel_id: 'dm-channel-1' }],
+          error: null,
+        });
+      }
+      return mockServiceClient;
+    });
+    mockServiceClient.limit.mockResolvedValueOnce({
+      data: [{ id: 'dm-channel-1', updated_at: '2026-06-29T00:00:00.000Z' }],
+      error: null,
+    });
+
+    const result = await svc.ensureDirectMessageChannel('guardian-token', {
+      orgId: 'org-1',
+      profileId: 'student-profile-1',
+      otherProfileId: 'educator-profile-1',
+    });
+
+    expect(result).toMatchObject({
+      channelId: 'dm-channel-1',
+      topic: 'Ms Barbara',
+    });
+    expect(mockServiceClient.insert).not.toHaveBeenCalled();
   });
 });
 

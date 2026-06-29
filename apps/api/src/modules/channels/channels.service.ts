@@ -743,9 +743,6 @@ export class ChannelsService {
       return null;
     }
 
-    const existing = await this.findDirectMessageChannel(accessToken, input);
-    if (existing) return existing;
-
     const canCreateDirectMessage = await evaluateApiBooleanFlag({
       flagKey: apiFeatureFlagKeys.enableMobileDirectMessageStart,
       distinctId: input.profileId,
@@ -809,6 +806,56 @@ export class ChannelsService {
       profile: currentProfile,
     });
     if (!canActAsCurrentProfile) return null;
+
+    const [
+      { data: currentMemberships, error: currentMembershipsError },
+      { data: targetMemberships, error: targetMembershipsError },
+    ] = await Promise.all([
+      writeSupabase
+        .from('channel_members')
+        .select('channel_id')
+        .eq('org_id', input.orgId)
+        .eq('profile_id', input.profileId)
+        .is('deleted_at', null),
+      writeSupabase
+        .from('channel_members')
+        .select('channel_id')
+        .eq('org_id', input.orgId)
+        .eq('profile_id', input.otherProfileId)
+        .is('deleted_at', null),
+    ]);
+    if (currentMembershipsError) {
+      throw new InternalServerErrorException(currentMembershipsError.message);
+    }
+    if (targetMembershipsError) {
+      throw new InternalServerErrorException(targetMembershipsError.message);
+    }
+
+    const currentChannelIds = new Set(
+      (currentMemberships ?? []).map((row) => row.channel_id as string),
+    );
+    const sharedChannelIds = (targetMemberships ?? [])
+      .map((row) => row.channel_id as string)
+      .filter((channelId) => currentChannelIds.has(channelId));
+    if (sharedChannelIds.length) {
+      const { data: existingChannels, error: existingChannelsError } = await writeSupabase
+        .from('channels')
+        .select('id, updated_at')
+        .eq('org_id', input.orgId)
+        .eq('kind', 'dm')
+        .eq('status', 'active')
+        .in('id', sharedChannelIds)
+        .is('deleted_at', null)
+        .order('updated_at', { ascending: false })
+        .limit(1);
+      if (existingChannelsError) {
+        throw new InternalServerErrorException(existingChannelsError.message);
+      }
+      const existingChannel = existingChannels?.[0];
+      if (existingChannel) {
+        return buildDirectMessageChannelResult(existingChannel.id, targetProfile);
+      }
+    }
 
     const dmKey = `dm:${[input.profileId, input.otherProfileId].sort().join('-')}`;
     const now = new Date().toISOString();
