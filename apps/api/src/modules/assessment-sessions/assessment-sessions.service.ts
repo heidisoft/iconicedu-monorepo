@@ -17,6 +17,7 @@ import { DEFAULT_ADAPTIVE_CONFIG } from '@iconicedu/shared-types';
 import { AssessmentItemsService } from '@iconicedu/api/modules/assessment-items/assessment-items.service';
 import { AssessmentTestsService } from '@iconicedu/api/modules/assessment-tests/assessment-tests.service';
 import { AssessmentResultsService } from '@iconicedu/api/modules/assessment-results/assessment-results.service';
+import { resolveAssessmentActorProfile } from '@iconicedu/api/modules/assessments/assessment-access';
 import { runAdaptiveEngine, buildInitialAdaptiveState } from './adaptive-engine';
 import { scoreItem } from './score-item';
 
@@ -31,6 +32,19 @@ type ResultJoinRow =
   | { percentage?: number | null; passed?: boolean | null }
   | { percentage?: number | null; passed?: boolean | null }[]
   | null;
+type DeliveryJoinRow = {
+  id: string;
+  org_id: string;
+  test_id: string;
+  access_type: string;
+  access_token?: string | null;
+  channel_id?: string | null;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  max_attempts?: number | null;
+  allow_resume?: boolean | null;
+  assessment_tests?: TestJoinRow;
+};
 
 @Injectable()
 export class AssessmentSessionsService {
@@ -49,6 +63,8 @@ export class AssessmentSessionsService {
     profileId?: string;
     anonName?: string;
     anonEmail?: string;
+    accessToken?: string;
+    actorAccountId?: string;
   }): Promise<AssessmentSessionVM> {
     const supabase = createSupabaseServiceClient();
 
@@ -62,13 +78,17 @@ export class AssessmentSessionsService {
 
     if (!delivery) throw new NotFoundException('Delivery not found');
 
+    const deliveryRow = delivery as DeliveryJoinRow;
+    const profileId = await this.resolveStartProfileId(deliveryRow, body);
+    await this.assertDeliveryWindow(deliveryRow);
+
     // Check if already in progress for authenticated users
-    if (body.profileId) {
+    if (profileId) {
       const { data: existing } = await supabase
         .from('assessment_sessions')
         .select('id, status')
         .eq('delivery_id', body.deliveryId)
-        .eq('profile_id', body.profileId)
+        .eq('profile_id', profileId)
         .eq('status', 'in_progress')
         .maybeSingle();
       if (existing) {
@@ -76,7 +96,14 @@ export class AssessmentSessionsService {
       }
     }
 
-    const test = delivery.assessment_tests as TestJoinRow;
+    await this.assertAttemptsAvailable(
+      body.deliveryId,
+      profileId,
+      body.anonEmail,
+      deliveryRow.max_attempts ?? 1,
+    );
+
+    const test = deliveryRow.assessment_tests as TestJoinRow;
     const isAdaptive = test?.mode === 'adaptive';
 
     // For adaptive tests, build initial AdaptiveState from skill pools
@@ -111,10 +138,7 @@ export class AssessmentSessionsService {
       const staticItems = await this.testsService.getStaticItemIds(delivery.test_id);
       itemOrder = staticItems.map((s) => s.itemId);
       if (itemOrder.length > 0) {
-        const itemRow = await this.itemsService.getItem(
-          itemOrder[0],
-          delivery.org_id as string,
-        );
+        const itemRow = await this.itemsService.getItem(itemOrder[0], deliveryRow.org_id);
         firstItem = itemRow;
       }
     }
@@ -123,7 +147,7 @@ export class AssessmentSessionsService {
       .from('assessment_sessions')
       .insert({
         delivery_id: body.deliveryId,
-        profile_id: body.profileId ?? null,
+        profile_id: profileId,
         anon_name: body.anonName ?? null,
         anon_email: body.anonEmail ?? null,
         status: 'in_progress',
@@ -155,6 +179,121 @@ export class AssessmentSessionsService {
       totalItems: isAdaptive ? null! : itemOrder.length,
       answeredItems: 0,
     };
+  }
+
+  private async resolveStartProfileId(
+    delivery: DeliveryJoinRow,
+    body: {
+      accessToken?: string;
+      actorAccountId?: string;
+      anonName?: string;
+      anonEmail?: string;
+    },
+  ): Promise<string | null> {
+    if (delivery.access_type === 'public') {
+      if (!delivery.access_token || body.accessToken !== delivery.access_token) {
+        throw new ForbiddenException('Invalid assessment access token');
+      }
+      return null;
+    }
+
+    if (!body.actorAccountId) {
+      throw new ForbiddenException('Authentication is required for this assessment');
+    }
+
+    const actor = await resolveAssessmentActorProfile(
+      body.actorAccountId,
+      delivery.org_id,
+    );
+
+    if (!actor.profileId) {
+      throw new ForbiddenException('Profile access is required for this assessment');
+    }
+
+    if (delivery.access_type === 'specific_users') {
+      await this.assertDeliveryParticipant(delivery.id, actor.profileId);
+    }
+
+    if (delivery.channel_id) {
+      await this.assertChannelParticipant(
+        delivery.org_id,
+        delivery.channel_id,
+        actor.profileId,
+      );
+    }
+
+    return actor.profileId;
+  }
+
+  private async assertDeliveryWindow(delivery: DeliveryJoinRow): Promise<void> {
+    const now = Date.now();
+    if (delivery.starts_at && Date.parse(delivery.starts_at) > now) {
+      throw new ForbiddenException('Assessment has not started yet');
+    }
+    if (delivery.ends_at && Date.parse(delivery.ends_at) < now) {
+      throw new ForbiddenException('Assessment is closed');
+    }
+  }
+
+  private async assertAttemptsAvailable(
+    deliveryId: string,
+    profileId: string | null,
+    anonEmail: string | undefined,
+    maxAttempts: number,
+  ): Promise<void> {
+    const supabase = createSupabaseServiceClient();
+    let query = supabase
+      .from('assessment_sessions')
+      .select('id', { count: 'exact', head: true })
+      .eq('delivery_id', deliveryId);
+
+    if (profileId) {
+      query = query.eq('profile_id', profileId);
+    } else if (anonEmail) {
+      query = query.eq('anon_email', anonEmail);
+    } else {
+      return;
+    }
+
+    const { count, error } = await query;
+    if (error) throw new BadRequestException(error.message);
+    if ((count ?? 0) >= maxAttempts) {
+      throw new ForbiddenException('Maximum attempts reached');
+    }
+  }
+
+  private async assertDeliveryParticipant(
+    deliveryId: string,
+    profileId: string,
+  ): Promise<void> {
+    const supabase = createSupabaseServiceClient();
+    const { data, error } = await supabase
+      .from('assessment_delivery_participants')
+      .select('profile_id')
+      .eq('delivery_id', deliveryId)
+      .eq('profile_id', profileId)
+      .maybeSingle<{ profile_id: string }>();
+
+    if (error) throw new BadRequestException(error.message);
+    if (!data) throw new ForbiddenException('You are not assigned to this assessment');
+  }
+
+  private async assertChannelParticipant(
+    orgId: string,
+    channelId: string,
+    profileId: string,
+  ): Promise<void> {
+    const supabase = createSupabaseServiceClient();
+    const { data, error } = await supabase
+      .from('channel_members')
+      .select('profile_id')
+      .eq('org_id', orgId)
+      .eq('channel_id', channelId)
+      .eq('profile_id', profileId)
+      .maybeSingle<{ profile_id: string }>();
+
+    if (error) throw new BadRequestException(error.message);
+    if (!data) throw new ForbiddenException('You are not assigned to this assessment');
   }
 
   // ---------------------------------------------------------------------------
@@ -378,12 +517,22 @@ export class AssessmentSessionsService {
     return { sessionId, resultId: result.id };
   }
 
-  async getMySessions(profileId: string): Promise<AssessmentSessionListVM[]> {
+  async getMySessions(accountId: string): Promise<AssessmentSessionListVM[]> {
     const supabase = createSupabaseServiceClient();
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('account_id', accountId);
+
+    if (profilesError) throw new BadRequestException(profilesError.message);
+
+    const profileIds = (profiles ?? []).map((profile) => profile.id as string);
+    if (profileIds.length === 0) return [];
+
     const { data } = await supabase
       .from('assessment_sessions')
       .select('*, assessment_results(percentage, passed)')
-      .eq('profile_id', profileId)
+      .in('profile_id', profileIds)
       .order('created_at', { ascending: false });
 
     return (data ?? []).map((row) => ({

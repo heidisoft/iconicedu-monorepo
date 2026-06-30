@@ -11,6 +11,7 @@ import type {
   AssessmentDeliveryVM,
   AssessmentDeliveryListVM,
   AssessmentSessionVM,
+  AssessmentSessionListVM,
   AssessmentNextItemVM,
   AssessmentResultVM,
 } from '@iconicedu/shared-types';
@@ -214,10 +215,11 @@ export function createAssessmentApiClient(supabase: SupabaseClient) {
         {},
       ),
 
-    getDeliveryResults: (id: string) => api.get(`/assessment-deliveries/${id}/results`),
+    getDeliveryResults: (id: string, orgId: string) =>
+      api.get(`/assessment-deliveries/${id}/results`, { orgId }),
 
-    getDeliverySkillBreakdown: (id: string) =>
-      api.get(`/assessment-deliveries/${id}/skill-breakdown`),
+    getDeliverySkillBreakdown: (id: string, orgId: string) =>
+      api.get(`/assessment-deliveries/${id}/skill-breakdown`, { orgId }),
 
     // Sessions (no auth required for some endpoints)
     startSession: (body: {
@@ -225,10 +227,13 @@ export function createAssessmentApiClient(supabase: SupabaseClient) {
       profileId?: string;
       anonName?: string;
       anonEmail?: string;
+      accessToken?: string;
     }) => api.post<AssessmentSessionVM>('/assessment-sessions', body),
 
     getSession: (sessionId: string) =>
       api.get<AssessmentSessionVM>(`/assessment-sessions/${sessionId}`),
+
+    getMySessions: () => api.get<AssessmentSessionListVM[]>('/assessment-sessions/my'),
 
     saveResponse: (
       sessionId: string,
@@ -287,6 +292,7 @@ export async function getPublicDeliveryByToken(
 
 export async function startPublicSession(body: {
   deliveryId: string;
+  accessToken: string;
   anonName?: string;
   anonEmail?: string;
 }): Promise<AssessmentSessionVM | null> {

@@ -65,6 +65,7 @@ export class AssessmentResultsService {
     if (!session) throw new NotFoundException('Session not found');
 
     const deliveryRow = session.assessment_deliveries as {
+      org_id?: string;
       assessment_tests?: TestJoinRow;
     } | null;
     const test = deliveryRow?.assessment_tests;
@@ -184,7 +185,7 @@ export class AssessmentResultsService {
           {
             profile_id: session.profile_id,
             skill_id: skillId,
-            org_id: session.delivery_id,
+            org_id: deliveryRow?.org_id,
             level: masteryLevel,
             best_percentage: pct,
             attempts: 1,

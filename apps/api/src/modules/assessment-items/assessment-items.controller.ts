@@ -13,6 +13,7 @@ import {
 import { AssessmentItemsService } from './assessment-items.service';
 import { AuthGuard } from '@iconicedu/api/modules/auth/auth.guard';
 import type { AuthenticatedRequest } from '@iconicedu/api/lib/http/authenticated-request';
+import { requireAssessmentOrgManager } from '@iconicedu/api/modules/assessments/assessment-access';
 
 @Controller('assessment-items')
 export class AssessmentItemsController {
@@ -20,7 +21,8 @@ export class AssessmentItemsController {
 
   @Get()
   @UseGuards(AuthGuard)
-  listItems(
+  async listItems(
+    @Req() req: AuthenticatedRequest,
     @Query('orgId') orgId: string,
     @Query('skillId') skillId?: string,
     @Query('subjectIds') subjectIds?: string,
@@ -31,6 +33,7 @@ export class AssessmentItemsController {
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
+    await requireAssessmentOrgManager(req.user.id, orgId);
     return this.service.listItems(orgId, {
       skillId,
       subjectIds: subjectIds ? subjectIds.split(',').filter(Boolean) : undefined,
@@ -53,13 +56,18 @@ export class AssessmentItemsController {
 
   @Get(':id')
   @UseGuards(AuthGuard)
-  getItem(@Param('id') id: string, @Query('orgId') orgId: string) {
+  async getItem(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Query('orgId') orgId: string,
+  ) {
+    await requireAssessmentOrgManager(req.user.id, orgId);
     return this.service.getItem(id, orgId);
   }
 
   @Post()
   @UseGuards(AuthGuard)
-  createItem(
+  async createItem(
     @Req() req: AuthenticatedRequest,
     @Body()
     body: {
@@ -73,12 +81,14 @@ export class AssessmentItemsController {
       estimatedTimeSeconds?: number;
     },
   ) {
+    await requireAssessmentOrgManager(req.user.id, body.orgId);
     return this.service.createItem(body.orgId, req.user.id, body);
   }
 
   @Put(':id')
   @UseGuards(AuthGuard)
-  updateItem(
+  async updateItem(
+    @Req() req: AuthenticatedRequest,
     @Param('id') id: string,
     @Body()
     body: {
@@ -91,12 +101,18 @@ export class AssessmentItemsController {
       estimatedTimeSeconds?: number;
     },
   ) {
+    await requireAssessmentOrgManager(req.user.id, body.orgId);
     return this.service.updateItem(id, body.orgId, body);
   }
 
   @Delete(':id')
   @UseGuards(AuthGuard)
-  deleteItem(@Param('id') id: string, @Query('orgId') orgId: string) {
+  async deleteItem(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Query('orgId') orgId: string,
+  ) {
+    await requireAssessmentOrgManager(req.user.id, orgId);
     return this.service.deleteItem(id, orgId);
   }
 }

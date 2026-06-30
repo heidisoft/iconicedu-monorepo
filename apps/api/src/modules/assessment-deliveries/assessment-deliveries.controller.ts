@@ -13,6 +13,7 @@ import {
 import { AssessmentDeliveriesService } from './assessment-deliveries.service';
 import { AuthGuard } from '@iconicedu/api/modules/auth/auth.guard';
 import type { AuthenticatedRequest } from '@iconicedu/api/lib/http/authenticated-request';
+import { requireAssessmentOrgManager } from '@iconicedu/api/modules/assessments/assessment-access';
 
 @Controller('assessment-deliveries')
 export class AssessmentDeliveriesController {
@@ -20,13 +21,15 @@ export class AssessmentDeliveriesController {
 
   @Get()
   @UseGuards(AuthGuard)
-  listDeliveries(
+  async listDeliveries(
+    @Req() req: AuthenticatedRequest,
     @Query('orgId') orgId: string,
     @Query('search') search?: string,
     @Query('accessType') accessType?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
+    await requireAssessmentOrgManager(req.user.id, orgId);
     return this.service.listDeliveries(orgId, {
       search: search || undefined,
       accessType: accessType || undefined,
@@ -42,13 +45,18 @@ export class AssessmentDeliveriesController {
 
   @Get(':id')
   @UseGuards(AuthGuard)
-  getDelivery(@Param('id') id: string, @Query('orgId') orgId: string) {
+  async getDelivery(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Query('orgId') orgId: string,
+  ) {
+    await requireAssessmentOrgManager(req.user.id, orgId);
     return this.service.getDelivery(id, orgId);
   }
 
   @Post()
   @UseGuards(AuthGuard)
-  createDelivery(
+  async createDelivery(
     @Req() req: AuthenticatedRequest,
     @Body()
     body: {
@@ -64,27 +72,40 @@ export class AssessmentDeliveriesController {
       allowResume?: boolean;
     },
   ) {
+    await requireAssessmentOrgManager(req.user.id, body.orgId);
     return this.service.createDelivery(body.orgId, req.user.id, body);
   }
 
   @Put(':id')
   @UseGuards(AuthGuard)
-  updateDelivery(
+  async updateDelivery(
+    @Req() req: AuthenticatedRequest,
     @Param('id') id: string,
     @Body() body: { orgId: string } & Record<string, unknown>,
   ) {
+    await requireAssessmentOrgManager(req.user.id, body.orgId);
     return this.service.updateDelivery(id, body.orgId, body);
   }
 
   @Delete(':id')
   @UseGuards(AuthGuard)
-  deleteDelivery(@Param('id') id: string, @Query('orgId') orgId: string) {
+  async deleteDelivery(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Query('orgId') orgId: string,
+  ) {
+    await requireAssessmentOrgManager(req.user.id, orgId);
     return this.service.deleteDelivery(id, orgId);
   }
 
   @Post(':id/generate-token')
   @UseGuards(AuthGuard)
-  generateToken(@Param('id') id: string, @Query('orgId') orgId: string) {
+  async generateToken(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Query('orgId') orgId: string,
+  ) {
+    await requireAssessmentOrgManager(req.user.id, orgId);
     return this.service.generateToken(id, orgId);
   }
 
@@ -99,13 +120,23 @@ export class AssessmentDeliveriesController {
 
   @Get(':id/results')
   @UseGuards(AuthGuard)
-  getResults(@Param('id') id: string) {
-    return this.service.getDeliveryResults(id);
+  async getResults(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Query('orgId') orgId: string,
+  ) {
+    await requireAssessmentOrgManager(req.user.id, orgId);
+    return this.service.getDeliveryResults(id, orgId);
   }
 
   @Get(':id/skill-breakdown')
   @UseGuards(AuthGuard)
-  getSkillBreakdown(@Param('id') id: string) {
-    return this.service.getDeliverySkillBreakdown(id);
+  async getSkillBreakdown(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Query('orgId') orgId: string,
+  ) {
+    await requireAssessmentOrgManager(req.user.id, orgId);
+    return this.service.getDeliverySkillBreakdown(id, orgId);
   }
 }

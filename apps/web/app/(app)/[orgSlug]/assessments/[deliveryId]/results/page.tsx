@@ -19,15 +19,10 @@ export default async function StudentResultsPage({
   if (!org) notFound();
 
   const api = createAssessmentApiClient(supabase);
-  // Get most recent session for this delivery
-  const sessionsData = (await api
-    .getDeliveryResults(deliveryId)
-    .catch(() => ({ sessions: [] }))) as {
-    sessions: { id: string; status: string; completedAt?: string }[];
-  };
-  const latestSession = sessionsData.sessions
-    .filter((s) => s.status === 'completed')
-    .sort((a, b) => (b.completedAt ?? '').localeCompare(a.completedAt ?? ''))[0];
+  const sessions = await api.getMySessions().catch(() => []);
+  const latestSession = sessions
+    .filter((s) => s.deliveryId === deliveryId && s.status === 'completed')
+    .sort((a, b) => (b.submittedAt ?? '').localeCompare(a.submittedAt ?? ''))[0];
 
   if (!latestSession) {
     return (

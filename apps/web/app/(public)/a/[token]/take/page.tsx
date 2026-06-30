@@ -2,11 +2,7 @@
 
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import type {
-  AssessmentSessionVM,
-  AssessmentNextItemVM,
-  AssessmentItemVM,
-} from '@iconicedu/shared-types';
+import type { AssessmentSessionVM, AssessmentNextItemVM } from '@iconicedu/shared-types';
 import {
   savePublicResponse,
   submitPublicSession,

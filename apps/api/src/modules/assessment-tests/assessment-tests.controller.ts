@@ -13,6 +13,7 @@ import {
 import { AssessmentTestsService } from './assessment-tests.service';
 import { AuthGuard } from '@iconicedu/api/modules/auth/auth.guard';
 import type { AuthenticatedRequest } from '@iconicedu/api/lib/http/authenticated-request';
+import { requireAssessmentOrgManager } from '@iconicedu/api/modules/assessments/assessment-access';
 
 @Controller('assessment-tests')
 export class AssessmentTestsController {
@@ -20,13 +21,15 @@ export class AssessmentTestsController {
 
   @Get()
   @UseGuards(AuthGuard)
-  listTests(
+  async listTests(
+    @Req() req: AuthenticatedRequest,
     @Query('orgId') orgId: string,
     @Query('search') search?: string,
     @Query('mode') mode?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
+    await requireAssessmentOrgManager(req.user.id, orgId);
     return this.service.listTests(orgId, {
       search: search || undefined,
       mode: mode || undefined,
@@ -37,13 +40,18 @@ export class AssessmentTestsController {
 
   @Get(':id')
   @UseGuards(AuthGuard)
-  getTest(@Param('id') id: string, @Query('orgId') orgId: string) {
+  async getTest(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Query('orgId') orgId: string,
+  ) {
+    await requireAssessmentOrgManager(req.user.id, orgId);
     return this.service.getTest(id, orgId);
   }
 
   @Post()
   @UseGuards(AuthGuard)
-  createTest(
+  async createTest(
     @Req() req: AuthenticatedRequest,
     @Body()
     body: {
@@ -60,21 +68,29 @@ export class AssessmentTestsController {
       adaptiveConfig?: Record<string, unknown>;
     },
   ) {
+    await requireAssessmentOrgManager(req.user.id, body.orgId);
     return this.service.createTest(body.orgId, req.user.id, body);
   }
 
   @Put(':id')
   @UseGuards(AuthGuard)
-  updateTest(
+  async updateTest(
+    @Req() req: AuthenticatedRequest,
     @Param('id') id: string,
     @Body() body: { orgId: string } & Record<string, unknown>,
   ) {
+    await requireAssessmentOrgManager(req.user.id, body.orgId);
     return this.service.updateTest(id, body.orgId, body);
   }
 
   @Delete(':id')
   @UseGuards(AuthGuard)
-  deleteTest(@Param('id') id: string, @Query('orgId') orgId: string) {
+  async deleteTest(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Query('orgId') orgId: string,
+  ) {
+    await requireAssessmentOrgManager(req.user.id, orgId);
     return this.service.deleteTest(id, orgId);
   }
 

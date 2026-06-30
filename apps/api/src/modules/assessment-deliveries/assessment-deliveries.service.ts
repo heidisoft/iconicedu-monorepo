@@ -206,27 +206,30 @@ export class AssessmentDeliveriesService {
     if (error) throw new BadRequestException(error.message);
   }
 
-  async getDeliveryResults(deliveryId: string) {
+  async getDeliveryResults(deliveryId: string, orgId: string) {
     const supabase = createSupabaseServiceClient();
     const { data } = await supabase
       .from('assessment_results')
       .select(
         `
         id, session_id, profile_id, total_score, max_score, percentage, passed, needs_manual_grading, completed_at,
+        assessment_deliveries!inner(org_id),
         assessment_sessions!inner(status, anon_name, anon_email, submitted_at, time_spent_seconds)
       `,
       )
       .eq('delivery_id', deliveryId)
+      .eq('assessment_deliveries.org_id', orgId)
       .order('completed_at', { ascending: false });
     return data ?? [];
   }
 
-  async getDeliverySkillBreakdown(deliveryId: string) {
+  async getDeliverySkillBreakdown(deliveryId: string, orgId: string) {
     const supabase = createSupabaseServiceClient();
     const { data } = await supabase
       .from('assessment_skill_scores')
-      .select('*')
-      .eq('delivery_id', deliveryId);
+      .select('*, assessment_deliveries!inner(org_id)')
+      .eq('delivery_id', deliveryId)
+      .eq('assessment_deliveries.org_id', orgId);
 
     const map = new Map<
       string,

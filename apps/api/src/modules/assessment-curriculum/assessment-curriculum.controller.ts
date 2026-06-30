@@ -13,6 +13,7 @@ import {
 import { AssessmentCurriculumService } from './assessment-curriculum.service';
 import { AuthGuard } from '@iconicedu/api/modules/auth/auth.guard';
 import type { AuthenticatedRequest } from '@iconicedu/api/lib/http/authenticated-request';
+import { requireAssessmentOrgManager } from '@iconicedu/api/modules/assessments/assessment-access';
 
 @Controller('assessment-curriculum')
 export class AssessmentCurriculumController {
@@ -21,50 +22,74 @@ export class AssessmentCurriculumController {
   // Subjects
   @Get('subjects')
   @UseGuards(AuthGuard)
-  listSubjects(@Query('orgId') orgId: string, @Query('search') search?: string) {
+  async listSubjects(
+    @Req() req: AuthenticatedRequest,
+    @Query('orgId') orgId: string,
+    @Query('search') search?: string,
+  ) {
+    await requireAssessmentOrgManager(req.user.id, orgId);
     return this.service.listSubjects(orgId, search || undefined);
   }
 
   @Post('subjects')
   @UseGuards(AuthGuard)
-  createSubject(
+  async createSubject(
     @Req() req: AuthenticatedRequest,
     @Body() body: { orgId: string; name: string; icon?: string; color?: string },
   ) {
+    await requireAssessmentOrgManager(req.user.id, body.orgId);
     return this.service.createSubject(body.orgId, req.user.id, body);
   }
 
   @Put('subjects/:id')
   @UseGuards(AuthGuard)
-  updateSubject(
+  async updateSubject(
+    @Req() req: AuthenticatedRequest,
     @Param('id') id: string,
     @Body() body: { orgId: string; name?: string; icon?: string; color?: string },
   ) {
+    await requireAssessmentOrgManager(req.user.id, body.orgId);
     return this.service.updateSubject(id, body.orgId, body);
   }
 
   @Delete('subjects/:id')
   @UseGuards(AuthGuard)
-  deleteSubject(@Param('id') id: string, @Query('orgId') orgId: string) {
+  async deleteSubject(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Query('orgId') orgId: string,
+  ) {
+    await requireAssessmentOrgManager(req.user.id, orgId);
     return this.service.deleteSubject(id, orgId);
   }
 
   @Get('subjects/:id/tree')
   @UseGuards(AuthGuard)
-  getSubjectTree(@Param('id') id: string, @Query('orgId') orgId: string) {
+  async getSubjectTree(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Query('orgId') orgId: string,
+  ) {
+    await requireAssessmentOrgManager(req.user.id, orgId);
     return this.service.getSubjectTree(id, orgId);
   }
 
   // Domains
   @Get('domains')
   @UseGuards(AuthGuard)
-  listDomains(@Query('orgId') orgId: string, @Query('subjectId') subjectId?: string) {
+  async listDomains(
+    @Req() req: AuthenticatedRequest,
+    @Query('orgId') orgId: string,
+    @Query('subjectId') subjectId?: string,
+  ) {
+    await requireAssessmentOrgManager(req.user.id, orgId);
     return this.service.listDomains(orgId, subjectId);
   }
 
   @Post('domains')
   @UseGuards(AuthGuard)
-  createDomain(
+  async createDomain(
+    @Req() req: AuthenticatedRequest,
     @Body()
     body: {
       orgId: string;
@@ -74,12 +99,14 @@ export class AssessmentCurriculumController {
       description?: string;
     },
   ) {
+    await requireAssessmentOrgManager(req.user.id, body.orgId);
     return this.service.createDomain(body.orgId, body);
   }
 
   @Put('domains/:id')
   @UseGuards(AuthGuard)
-  updateDomain(
+  async updateDomain(
+    @Req() req: AuthenticatedRequest,
     @Param('id') id: string,
     @Body()
     body: {
@@ -90,25 +117,33 @@ export class AssessmentCurriculumController {
       orderPosition?: number;
     },
   ) {
+    await requireAssessmentOrgManager(req.user.id, body.orgId);
     return this.service.updateDomain(id, body.orgId, body);
   }
 
   @Delete('domains/:id')
   @UseGuards(AuthGuard)
-  deleteDomain(@Param('id') id: string, @Query('orgId') orgId: string) {
+  async deleteDomain(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Query('orgId') orgId: string,
+  ) {
+    await requireAssessmentOrgManager(req.user.id, orgId);
     return this.service.deleteDomain(id, orgId);
   }
 
   // Skills
   @Get('skills')
   @UseGuards(AuthGuard)
-  listSkills(
+  async listSkills(
+    @Req() req: AuthenticatedRequest,
     @Query('orgId') orgId: string,
     @Query('domainId') domainId?: string,
     @Query('subjectId') subjectId?: string,
     @Query('grade') grade?: string,
     @Query('standard') standard?: string,
   ) {
+    await requireAssessmentOrgManager(req.user.id, orgId);
     return this.service.listSkills(orgId, {
       domainId,
       subjectId,
@@ -119,13 +154,19 @@ export class AssessmentCurriculumController {
 
   @Get('skills/:id')
   @UseGuards(AuthGuard)
-  getSkill(@Param('id') id: string, @Query('orgId') orgId: string) {
+  async getSkill(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Query('orgId') orgId: string,
+  ) {
+    await requireAssessmentOrgManager(req.user.id, orgId);
     return this.service.getSkill(id, orgId);
   }
 
   @Post('skills')
   @UseGuards(AuthGuard)
-  createSkill(
+  async createSkill(
+    @Req() req: AuthenticatedRequest,
     @Body()
     body: {
       orgId: string;
@@ -137,12 +178,14 @@ export class AssessmentCurriculumController {
       estimatedTimeSeconds?: number;
     },
   ) {
+    await requireAssessmentOrgManager(req.user.id, body.orgId);
     return this.service.createSkill(body.orgId, body);
   }
 
   @Put('skills/:id')
   @UseGuards(AuthGuard)
-  updateSkill(
+  async updateSkill(
+    @Req() req: AuthenticatedRequest,
     @Param('id') id: string,
     @Body()
     body: {
@@ -156,12 +199,18 @@ export class AssessmentCurriculumController {
       prerequisiteIds?: string[];
     },
   ) {
+    await requireAssessmentOrgManager(req.user.id, body.orgId);
     return this.service.updateSkill(id, body.orgId, body);
   }
 
   @Delete('skills/:id')
   @UseGuards(AuthGuard)
-  deleteSkill(@Param('id') id: string, @Query('orgId') orgId: string) {
+  async deleteSkill(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Query('orgId') orgId: string,
+  ) {
+    await requireAssessmentOrgManager(req.user.id, orgId);
     return this.service.deleteSkill(id, orgId);
   }
 

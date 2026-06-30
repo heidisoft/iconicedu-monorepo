@@ -4,16 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { AssessmentDeliveryVM } from '@iconicedu/shared-types';
 import { startPublicSession } from '@iconicedu/web/lib/assessments/api';
-import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  Input,
-  Label,
-  Badge,
-} from '@iconicedu/ui-web';
+import { Button, Card, CardContent, Input, Label, Badge } from '@iconicedu/ui-web';
 import { Clock, ChevronRight } from 'lucide-react';
 
 interface Props {
@@ -38,6 +29,7 @@ export function PublicAssessmentLanding({ delivery, token }: Props) {
     try {
       const session = await startPublicSession({
         deliveryId: delivery.id,
+        accessToken: token,
         anonName: name || undefined,
         anonEmail: email || undefined,
       });

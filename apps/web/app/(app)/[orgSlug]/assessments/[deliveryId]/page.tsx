@@ -31,13 +31,12 @@ export default async function DeliveryLandingPage({
   const delivery = await api.getDelivery(deliveryId, org.id).catch(() => null);
   if (!delivery) notFound();
 
-  const sessions = (await api
-    .getDeliveryResults(deliveryId)
-    .catch(() => ({ sessions: [] }))) as {
-    sessions: { id: string; status: string; percentage?: number }[];
-  };
-  const completedSession = sessions.sessions.find((s) => s.status === 'completed');
-  const activeSession = sessions.sessions.find((s) => s.status === 'in_progress');
+  const sessions = await api.getMySessions().catch(() => []);
+  const deliverySessions = sessions.filter(
+    (session) => session.deliveryId === deliveryId,
+  );
+  const completedSession = deliverySessions.find((s) => s.status === 'completed');
+  const activeSession = deliverySessions.find((s) => s.status === 'in_progress');
 
   return (
     <div className="flex flex-1 flex-col">
@@ -66,7 +65,7 @@ export default async function DeliveryLandingPage({
               <div className="flex flex-col gap-3">
                 <div className="flex items-center gap-2">
                   <Badge variant="secondary">Completed</Badge>
-                  {completedSession.percentage !== undefined && (
+                  {completedSession.percentage != null && (
                     <span className="text-sm">
                       {Math.round(completedSession.percentage)}%
                     </span>

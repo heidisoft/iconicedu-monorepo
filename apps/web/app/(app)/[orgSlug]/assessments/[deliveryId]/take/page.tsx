@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@iconicedu/web/lib/supabase/client';
 import { createAssessmentApiClient } from '@iconicedu/web/lib/assessments/api';
 import type { AssessmentSessionVM, AssessmentNextItemVM } from '@iconicedu/shared-types';
@@ -9,7 +9,6 @@ import { QuestionPlayer } from '@iconicedu/web/components/assessments/question-p
 
 export default function TakeAssessmentPage() {
   const { orgSlug, deliveryId } = useParams<{ orgSlug: string; deliveryId: string }>();
-  const router = useRouter();
   const [session, setSession] = useState<AssessmentSessionVM | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');

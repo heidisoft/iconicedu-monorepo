@@ -56,7 +56,7 @@ export default async function DeliveryResultsPage({
   const api = createAssessmentApiClient(supabase);
   const [delivery, rawResults] = await Promise.all([
     api.getDelivery(deliveryId, org.id).catch(() => null),
-    api.getDeliveryResults(deliveryId).catch(() => []) as Promise<
+    api.getDeliveryResults(deliveryId, org.id).catch(() => []) as Promise<
       {
         session_id: string;
         profile_id: string | null;
