@@ -18,6 +18,13 @@ jest.mock('@iconicedu/api/lib/activity-feed/activity-publisher', () => ({
 
 describe('RemindersService', () => {
   const analytics = { capture: jest.fn() };
+  const reminderReconcileService = {
+    reconcileNextReminderJobForSchedule: jest.fn(async () => ({ action: 'noop' })),
+    reconcileAllSchedulesForLearningSpace: jest.fn(async () => ({ action: 'noop' })),
+  };
+  const completionCheckDispatcher = {
+    dispatchCompletionCheck: jest.fn(async () => ['activity-event-1']),
+  };
   const createSupabaseServiceClientMock = jest.mocked(createSupabaseServiceClient);
   const createSupabaseSessionClientMock = jest.mocked(createSupabaseSessionClient);
   const publishActivityEventMock = jest.mocked(publishActivityEvent);
@@ -200,11 +207,19 @@ describe('RemindersService', () => {
     return { supabase, reminderJobsTable };
   }
 
+  function makeService() {
+    return new RemindersService(
+      analytics as never,
+      reminderReconcileService as never,
+      completionCheckDispatcher as never,
+    );
+  }
+
   it('compiles two class reminders and one completion check for a learning space', async () => {
     const { supabase, reminderJobsTable } = makeCompileSupabase();
     createSupabaseServiceClientMock.mockReturnValue(supabase as never);
 
-    const service = new RemindersService(analytics as never);
+    const service = makeService();
     const result = await service.compileLearningSpaceReminderJobs('token-1', {
       orgId: 'org-1',
       learningSpaceId: 'space-1',
@@ -248,7 +263,7 @@ describe('RemindersService', () => {
     const { supabase } = makeCompileSupabase({ account: null });
     createSupabaseServiceClientMock.mockReturnValue(supabase as never);
 
-    const service = new RemindersService(analytics as never);
+    const service = makeService();
 
     await expect(
       service.compileLearningSpaceReminderJobs('token-1', {
@@ -268,7 +283,7 @@ describe('RemindersService', () => {
     });
     createSupabaseServiceClientMock.mockReturnValue(supabase as never);
 
-    const service = new RemindersService(analytics as never);
+    const service = makeService();
     await service.compileLearningSpaceReminderJobs('token-1', {
       orgId: 'org-1',
       learningSpaceId: 'space-1',
@@ -311,7 +326,7 @@ describe('RemindersService', () => {
     });
     createSupabaseServiceClientMock.mockReturnValue(supabase as never);
 
-    const service = new RemindersService(analytics as never);
+    const service = makeService();
     const result = await service.compileLearningSpaceReminderJobs('token-1', {
       orgId: 'org-1',
       learningSpaceId: 'space-1',
@@ -335,7 +350,7 @@ describe('RemindersService', () => {
     });
     createSupabaseServiceClientMock.mockReturnValue(supabase as never);
 
-    const service = new RemindersService(analytics as never);
+    const service = makeService();
     await service.compileLearningSpaceReminderJobs('token-1', {
       orgId: 'org-1',
       learningSpaceId: 'space-1',
@@ -370,7 +385,7 @@ describe('RemindersService', () => {
     });
     createSupabaseServiceClientMock.mockReturnValue(supabase as never);
 
-    const service = new RemindersService(analytics as never);
+    const service = makeService();
     const result = await service.compileLearningSpaceReminderJobs('token-1', {
       orgId: 'org-1',
       learningSpaceId: 'space-1',
@@ -393,7 +408,7 @@ describe('RemindersService', () => {
     });
     createSupabaseServiceClientMock.mockReturnValue(supabase as never);
 
-    const service = new RemindersService(analytics as never);
+    const service = makeService();
     await service.compileLearningSpaceReminderJobs('token-1', {
       orgId: 'org-1',
       learningSpaceId: 'space-1',
@@ -415,7 +430,7 @@ describe('RemindersService', () => {
     });
     createSupabaseServiceClientMock.mockReturnValue(supabase as never);
 
-    const service = new RemindersService(analytics as never);
+    const service = makeService();
     const result = await service.resetAndReconcileOrgReminderJobs('org-1');
 
     expect(result).toEqual({
@@ -461,7 +476,7 @@ describe('RemindersService', () => {
     };
     createSupabaseServiceClientMock.mockReturnValue(supabase as never);
 
-    const service = new RemindersService(analytics as never);
+    const service = makeService();
     await expect(
       service.cancelLearningSpaceReminderJobs('token-1', {
         orgId: 'org-1',
@@ -519,7 +534,24 @@ describe('RemindersService', () => {
     };
 
     const supabase = {
-      rpc: jest.fn(async () => ({ data: [claimedJob], error: null })),
+      rpc: jest.fn(async (fn: string) => {
+        if (fn === 'claim_due_reminder_jobs') {
+          return { data: [claimedJob], error: null };
+        }
+        if (fn === 'run_stale_activity_cleanup') {
+          return {
+            data: [
+              {
+                notifications_marked_read: 2,
+                completion_votes_marked_completed: 3,
+                sessions_marked_completed: 1,
+              },
+            ],
+            error: null,
+          };
+        }
+        throw new Error(`Unexpected rpc ${fn}`);
+      }),
       from: jest.fn((table: string) => {
         switch (table) {
           case 'profiles':
@@ -548,7 +580,7 @@ describe('RemindersService', () => {
 
     createSupabaseServiceClientMock.mockReturnValue(supabase as never);
 
-    const service = new RemindersService(analytics as never);
+    const service = makeService();
     const result = await service.dispatchDueReminderJobs({
       leaseOwner: 'supabase-edge-cron',
       limit: 10,
@@ -557,6 +589,12 @@ describe('RemindersService', () => {
 
     expect(result.claimed).toBe(1);
     expect(result.succeeded).toBe(1);
+    expect(result.staleCleanup).toEqual({
+      notificationsMarkedRead: 2,
+      completionVotesMarkedCompleted: 3,
+      sessionsMarkedCompleted: 1,
+      failed: false,
+    });
     expect(publishActivityEventMock).toHaveBeenCalledWith(
       expect.objectContaining({
         eventType: 'session.reminder.sent',
@@ -573,6 +611,7 @@ describe('RemindersService', () => {
       p_lease_owner: 'supabase-edge-cron',
       p_lease_seconds: 90,
     });
+    expect(supabase.rpc).toHaveBeenCalledWith('run_stale_activity_cleanup');
     expect(supabase.from).not.toHaveBeenCalledWith('class_schedules');
   });
 });
