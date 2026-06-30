@@ -1,4 +1,4 @@
-export const DEFAULT_UNVIEWED_MESSAGE_ALERT_THRESHOLD_HOURS = 4;
+export const DEFAULT_UNVIEWED_MESSAGE_ALERT_THRESHOLD_HOURS = 1;
 const MAX_UNVIEWED_MESSAGE_ALERT_THRESHOLD_HOURS = 24 * 7;
 
 export function resolveUnviewedMessageAlertThresholdHours(

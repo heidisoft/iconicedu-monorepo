@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase/client';
-import { queryKeys } from '@/lib/api/queries';
+import { fetchUnreadBadgeCount, queryKeys } from '@/lib/api/queries';
 import type { ChannelListItem } from '@/lib/api/types';
 
 const BADGE_SYNC_DEBOUNCE_MS = 400;
@@ -24,44 +24,28 @@ export function resolveChannelIdFromPayload(payload: ReadStateRealtimePayload) {
 
 function getNotificationsModule() {
   // Function-scoped require avoids loading the native module in Expo Go.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports, no-undef
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   return require('expo-notifications') as typeof import('expo-notifications');
 }
 
-async function syncUnreadBadgeCount(orgId: string, accountId: string) {
+async function syncUnreadBadgeCount(orgId: string) {
   try {
     const Notifications = getNotificationsModule();
-    const { data, error } = await supabase
-      .from('channel_read_state')
-      .select('unread_count')
-      .eq('org_id', orgId)
-      .eq('account_id', accountId)
-      .is('deleted_at', null);
-
-    if (error || !Array.isArray(data)) {
-      return;
-    }
-
-    const unreadCount = data.reduce(
-      (total, row) =>
-        total + (typeof row?.unread_count === 'number' ? row.unread_count : 0),
-      0,
-    );
-
+    const unreadCount = await fetchUnreadBadgeCount(orgId);
     await Notifications.setBadgeCountAsync(unreadCount);
   } catch {
     // Ignore badge sync failures.
   }
 }
 
-function scheduleUnreadBadgeCountSync(orgId: string, accountId: string) {
+function scheduleUnreadBadgeCountSync(orgId: string) {
   if (badgeSyncTimerId) {
     clearTimeout(badgeSyncTimerId);
   }
 
   badgeSyncTimerId = setTimeout(() => {
     badgeSyncTimerId = null;
-    void syncUnreadBadgeCount(orgId, accountId);
+    void syncUnreadBadgeCount(orgId);
   }, BADGE_SYNC_DEBOUNCE_MS);
 }
 
@@ -157,10 +141,10 @@ export function useUnreadSync(params: {
       }
 
       invalidateChannelLists(o, p, pk, channelId);
-      scheduleUnreadBadgeCountSync(o, accountId);
+      scheduleUnreadBadgeCountSync(o);
     };
 
-    void syncUnreadBadgeCount(orgId, accountId);
+    void syncUnreadBadgeCount(orgId);
 
     const ch = supabase
       .channel(`unread-sync:${accountId}`)
@@ -192,5 +176,5 @@ export function useUnreadSync(params: {
     return () => {
       supabase.removeChannel(ch);
     };
-  }, [accountId, orgId, profileId, queryClient]);
+  }, [accountId, guardianAccountId, orgId, profileId, queryClient]);
 }

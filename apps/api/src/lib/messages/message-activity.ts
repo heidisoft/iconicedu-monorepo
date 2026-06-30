@@ -180,7 +180,7 @@ async function resolveStaffProfileIds(input: {
   supabase: SupabaseQueryClient;
   orgId: string;
 }) {
-  const response = await input.supabase
+  const staffProfilesResponse = await input.supabase
     .from('profiles')
     .select('id')
     .eq('org_id', input.orgId)
@@ -188,11 +188,62 @@ async function resolveStaffProfileIds(input: {
     .is('deleted_at', null)
     .returns<Array<{ id: string }>>();
 
-  if (response.error) {
-    throw new Error(response.error.message);
+  if (staffProfilesResponse.error) {
+    throw new Error(staffProfilesResponse.error.message);
   }
 
-  return Array.from(new Set((response.data ?? []).map((row) => row.id).filter(Boolean)));
+  const roleKeys = ['owner', 'admin', 'staff'];
+  const roleAccountsResponse = await input.supabase
+    .from('user_roles')
+    .select('account_id')
+    .eq('org_id', input.orgId)
+    .in('role_key', roleKeys)
+    .is('deleted_at', null)
+    .returns<Array<{ account_id: string }>>();
+
+  if (roleAccountsResponse.error) {
+    throw new Error(roleAccountsResponse.error.message);
+  }
+
+  const primaryRoleAccountsResponse = await input.supabase
+    .from('accounts')
+    .select('id')
+    .eq('org_id', input.orgId)
+    .in('primary_role', roleKeys)
+    .is('deleted_at', null)
+    .returns<Array<{ id: string }>>();
+
+  if (primaryRoleAccountsResponse.error) {
+    throw new Error(primaryRoleAccountsResponse.error.message);
+  }
+
+  const staffAccountIds = Array.from(
+    new Set([
+      ...(roleAccountsResponse.data ?? []).map((row) => row.account_id),
+      ...(primaryRoleAccountsResponse.data ?? []).map((row) => row.id),
+    ]),
+  ).filter(Boolean);
+
+  const profilesByRoleResponse = staffAccountIds.length
+    ? await input.supabase
+        .from('profiles')
+        .select('id')
+        .eq('org_id', input.orgId)
+        .in('account_id', staffAccountIds)
+        .is('deleted_at', null)
+        .returns<Array<{ id: string }>>()
+    : { data: [] as Array<{ id: string }>, error: null };
+
+  if (profilesByRoleResponse.error) {
+    throw new Error(profilesByRoleResponse.error.message);
+  }
+
+  return Array.from(
+    new Set([
+      ...(staffProfilesResponse.data ?? []).map((row) => row.id),
+      ...(profilesByRoleResponse.data ?? []).map((row) => row.id),
+    ]),
+  ).filter(Boolean);
 }
 
 async function resolveClassroomChannelMembers(input: {

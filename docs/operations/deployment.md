@@ -321,6 +321,8 @@ Required production checks:
 - `cron.job` includes `edge-function-events-dispatch`, `edge-function-reminders-dispatch`, and `edge-function-channel-read-state-repair`.
 - `cron.job` does not include deprecated `edge-function-notifications-dispatch`, `edge-function-reminders-reconcile-dispatch`, `edge-function-activity-worker-dispatch`, or `edge-function-activity-projector-dispatch`.
 - `EXPO_ACCESS_TOKEN` is set in `apps/api` if push delivery should use Expo authenticated sends.
+- iOS release builds are signed with the production APNs entitlement, and a real-device notification delivery test succeeds after TestFlight/App Store signing.
+- Android 13+ real-device testing confirms the runtime `POST_NOTIFICATIONS` prompt appears after the in-app soft consent, while Android 12 and older register only after in-app consent.
 
 `supabase functions deploy` accepts an optional function name. Omitting the name
 deploys all local functions. CI does not use `--prune`; it explicitly deletes

@@ -1,7 +1,9 @@
--- This migration syncs storage trigger changes that were applied on the hosted
--- Supabase project. Both storage.prefixes and storage.protect_delete() were
--- introduced in a newer Supabase Storage version that older / preview
--- environments may not have yet. Every statement is guarded accordingly.
+-- Guards for storage trigger changes introduced in 20260613223028_remote_schema.sql.
+--
+-- The original migration uses bare CREATE TRIGGER statements that fail when run
+-- against Supabase environments where storage.prefixes or storage.protect_delete()
+-- do not yet exist (older / preview versions). This migration re-applies the same
+-- operations idempotently so every environment reaches the correct state.
 
 DO $$
 BEGIN
@@ -36,7 +38,7 @@ BEGIN
     DROP TRIGGER "objects_update_create_prefix" ON "storage"."objects";
   END IF;
 
-  -- Drop hierarchy triggers from storage.prefixes (table may not exist yet)
+  -- Drop hierarchy triggers from storage.prefixes (table may not exist in all envs)
   IF EXISTS (
     SELECT 1 FROM pg_tables
     WHERE schemaname = 'storage' AND tablename = 'prefixes'
@@ -45,7 +47,7 @@ BEGIN
     DROP TRIGGER IF EXISTS "prefixes_delete_hierarchy" ON "storage"."prefixes";
   END IF;
 
-  -- Create protect-delete triggers only if the backing function exists
+  -- Create protect-delete triggers only if storage.protect_delete() exists
   IF EXISTS (
     SELECT 1 FROM pg_proc p
     JOIN pg_namespace n ON n.oid = p.pronamespace

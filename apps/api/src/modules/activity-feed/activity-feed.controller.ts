@@ -47,6 +47,13 @@ export class ActivityFeedController {
     );
   }
 
+  @Get('unread-badge-count')
+  @UseGuards(AuthGuard)
+  getUnreadBadgeCount(@Req() req: AuthenticatedRequest, @Query('orgId') orgId: string) {
+    extractBearerToken(req.headers.authorization);
+    return this.activityFeedQueryService.fetchUnreadBadgeCount(req.user.id, orgId);
+  }
+
   @Get('admin/audit')
   @UseGuards(AuthGuard)
   getAdminAudit(

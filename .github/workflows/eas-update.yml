@@ -1,13 +1,7 @@
 name: 'EAS Update'
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'apps/mobile/**'
-      - 'packages/shared-types/**'
-      - 'packages/utils/**'
-      - 'packages/ui-native/**'
+  workflow_dispatch:
 
 jobs:
   eas-update:

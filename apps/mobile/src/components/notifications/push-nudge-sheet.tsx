@@ -83,6 +83,7 @@ export function PushNudgeSheet({
   const s = useMemo(() => makeStyles(colors, insets.bottom), [colors, insets.bottom]);
 
   const isRequestVariant = variant === 'request-permission';
+  const isEnableInAppVariant = variant === 'enable-in-app';
 
   const iconBg = isRequestVariant
     ? colors.tealBg
@@ -92,9 +93,9 @@ export function PushNudgeSheet({
   const iconColor = isRequestVariant ? colors.teal : AMBER_ICON;
 
   const iosBody =
-    'To receive class and message updates, go to Settings → Notifications → ICONIC Academy and turn on Allow Notifications.';
+    'To get class reminders, tutor messages, and schedule changes, go to Settings → Notifications → ICONIC Academy and turn on Allow Notifications.';
   const androidBody =
-    'To receive class and message updates, open Settings, find ICONIC Academy under Apps, and enable Notifications.';
+    'To get class reminders, tutor messages, and schedule changes, open Settings, find ICONIC Academy under Apps, and enable Notifications.';
 
   return (
     <BottomSheet
@@ -116,25 +117,31 @@ export function PushNudgeSheet({
 
         <Text style={s.title}>
           {isRequestVariant
-            ? 'Turn on notifications'
-            : 'Enable notifications in Settings'}
+            ? 'Stay on top of classes'
+            : isEnableInAppVariant
+              ? 'Turn class reminders back on'
+              : 'Enable notifications in Settings'}
         </Text>
 
         <Text style={s.body}>
           {isRequestVariant
-            ? "You'll miss important updates about class sessions, messages, and homework. Enable notifications to stay in the loop."
-            : Platform.OS === 'ios'
-              ? iosBody
-              : androidBody}
+            ? 'Get reminders before sessions, tutor messages, and schedule changes. No marketing notifications.'
+            : isEnableInAppVariant
+              ? 'Class reminders are allowed by your device but turned off in ICONIC Academy. Turn them back on for sessions, messages, and schedule changes.'
+              : Platform.OS === 'ios'
+                ? iosBody
+                : androidBody}
         </Text>
 
         <TouchableOpacity
           style={s.btnPrimary}
-          onPress={isRequestVariant ? onEnable : onOpenSettings}
+          onPress={isRequestVariant || isEnableInAppVariant ? onEnable : onOpenSettings}
           activeOpacity={0.8}
         >
           <Text style={s.btnPrimaryLabel}>
-            {isRequestVariant ? 'Enable Notifications' : 'Open Settings'}
+            {isRequestVariant || isEnableInAppVariant
+              ? 'Turn on class reminders'
+              : 'Open Settings'}
           </Text>
         </TouchableOpacity>
 

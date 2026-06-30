@@ -202,6 +202,12 @@ type ExpandedClassSchedule = ClassScheduleVM & {
   };
 };
 
+type StaleActivityCleanupResult = {
+  notifications_marked_read?: number | null;
+  completion_votes_marked_completed?: number | null;
+  sessions_marked_completed?: number | null;
+};
+
 const CLASS_SCHEDULE_SELECT = `
   id, org_id, title, description, location, meeting_link,
   start_at, end_at, timezone, status, visibility, theme_key,
@@ -694,6 +700,7 @@ export class RemindersService {
       }
     }
 
+    const staleCleanup = await this.runStaleActivityCleanup(supabase);
     const durationMs = Date.now() - startedAt;
 
     this.analytics.capture('api reminders dispatch completed', {
@@ -703,6 +710,10 @@ export class RemindersService {
       skipped,
       failed,
       deadLettered,
+      staleNotificationsMarkedRead: staleCleanup.notificationsMarkedRead,
+      staleCompletionVotesMarkedCompleted: staleCleanup.completionVotesMarkedCompleted,
+      staleSessionsMarkedCompleted: staleCleanup.sessionsMarkedCompleted,
+      staleCleanupFailed: staleCleanup.failed,
       durationMs,
       leaseOwner: input.leaseOwner,
     });
@@ -714,8 +725,39 @@ export class RemindersService {
       failed,
       skipped,
       deadLettered,
+      staleCleanup,
       durationMs,
     };
+  }
+
+  private async runStaleActivityCleanup(supabase: SupabaseServiceClient) {
+    try {
+      const response = await supabase.rpc('run_stale_activity_cleanup');
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
+      const rows = (response.data ?? []) as StaleActivityCleanupResult[];
+      const row = rows[0] ?? {};
+      return {
+        notificationsMarkedRead: row.notifications_marked_read ?? 0,
+        completionVotesMarkedCompleted: row.completion_votes_marked_completed ?? 0,
+        sessionsMarkedCompleted: row.sessions_marked_completed ?? 0,
+        failed: false,
+      };
+    } catch (error) {
+      this.logger.warn(
+        `stale activity cleanup failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return {
+        notificationsMarkedRead: 0,
+        completionVotesMarkedCompleted: 0,
+        sessionsMarkedCompleted: 0,
+        failed: true,
+      };
+    }
   }
 
   private async requireOrgActor(accessToken: string, orgId: string) {

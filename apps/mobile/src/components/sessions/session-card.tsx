@@ -22,6 +22,7 @@ import {
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/providers/theme-provider';
+import { usePushConsent } from '@/providers/push-consent-provider';
 import { fetchSpaceChannelMetaByChannelId } from '@/lib/api/queries';
 import {
   MESSAGE_TITLE_FONT_SIZE,
@@ -219,6 +220,7 @@ export function SessionCard({
   } | null;
 }) {
   const { colors } = useTheme();
+  const { requestPushConsent } = usePushConsent();
   const router = useRouter();
   const [externalJoinTarget, setExternalJoinTarget] = useState<{
     joinHref: string;
@@ -283,6 +285,7 @@ export function SessionCard({
               });
               return;
             }
+            void requestPushConsent();
             handleOpenJoinHref(session.meetingLink);
             return;
           }
@@ -304,6 +307,7 @@ export function SessionCard({
                   return;
                 }
 
+                void requestPushConsent();
                 handleOpenJoinHref(joinHref);
                 return;
               }
@@ -313,6 +317,7 @@ export function SessionCard({
               setIsResolvingJoin(false);
             }
 
+            void requestPushConsent();
             router.push({
               pathname: '/(app)/spaces/[channelId]',
               params: { channelId: session.channelId, tab: 'sessions' },
@@ -645,6 +650,7 @@ export function SessionCard({
                 style={[s.modalButton, s.modalButtonPrimary]}
                 onPress={() => {
                   if (externalJoinTarget?.joinHref) {
+                    void requestPushConsent();
                     handleOpenJoinHref(externalJoinTarget.joinHref);
                   }
                   setExternalJoinTarget(null);
