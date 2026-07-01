@@ -2,13 +2,17 @@ import type { AdminMenuSectionVM } from '@iconicedu/shared-types';
 
 export function buildAdminMenuSections(
   basePath: string,
-  options: { includeActivityFeedAudit?: boolean } = {},
+  options: {
+    includeReports?: boolean;
+    includeAssessments?: boolean;
+  } = {},
 ): AdminMenuSectionVM[] {
   const activityLinks = [
-    ...(options.includeActivityFeedAudit === false
-      ? []
-      : [{ title: 'Activity feed', url: `${basePath}/admin/activity/feed` }]),
-    { title: 'Activity logs', url: `${basePath}/admin/activity/logs` },
+    { title: 'Activity feed', url: `${basePath}/admin/activity/feed` },
+    {
+      title: 'Push notifications',
+      url: `${basePath}/admin/activity/notifications`,
+    },
   ];
 
   const sections: AdminMenuSectionVM[] = [
@@ -31,10 +35,7 @@ export function buildAdminMenuSections(
     {
       title: 'Channels',
       iconKey: 'channels',
-      links: [
-        { title: 'All', url: `${basePath}/admin/channels` },
-        { title: 'Direct messages', url: `${basePath}/admin/channels/direct-messages` },
-      ],
+      links: [{ title: 'All', url: `${basePath}/admin/channels` }],
     },
     {
       title: 'Activity',
@@ -53,5 +54,21 @@ export function buildAdminMenuSections(
     },
   ];
 
-  return sections;
+  if (options.includeAssessments) {
+    sections.splice(1, 0, {
+      title: 'Assessments',
+      iconKey: 'assessments',
+      links: [
+        { title: 'Overview', url: `${basePath}/admin/assessments` },
+        { title: 'Curriculum', url: `${basePath}/admin/assessments/curriculum` },
+        { title: 'Item Bank', url: `${basePath}/admin/assessments/items` },
+        { title: 'Tests', url: `${basePath}/admin/assessments/tests` },
+        { title: 'Deliveries', url: `${basePath}/admin/assessments/deliveries` },
+      ],
+    });
+  }
+
+  return options.includeReports === false
+    ? sections.filter((section) => section.title !== 'Reports')
+    : sections;
 }

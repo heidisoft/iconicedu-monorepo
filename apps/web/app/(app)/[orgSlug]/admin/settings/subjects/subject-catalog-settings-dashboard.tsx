@@ -2,18 +2,7 @@
 
 import * as React from 'react';
 import type { OrgSubjectCatalogSnapshotVM } from '@iconicedu/shared-types';
-import {
-  Badge,
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  Input,
-  Loader2,
-  toast,
-} from '@iconicedu/ui-web';
+import { Badge, Button, Input, Loader2, Search, toast } from '@iconicedu/ui-web';
 import { normalizeSubjectKey } from '@iconicedu/web/lib/subjects/utils';
 
 type SubjectCatalogSettingsDashboardProps = {
@@ -188,31 +177,36 @@ export function SubjectCatalogSettingsDashboard({
 
   if (isLoading) {
     return (
-      <Card>
-        <CardContent className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
+      <div className="rounded-xl border overflow-hidden">
+        <div className="flex items-center gap-2 px-6 py-4 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" />
           Loading subject catalog...
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-4">
-      <Card>
-        <CardHeader className="gap-2">
-          <CardTitle>Subject catalog</CardTitle>
-          <CardDescription>
+      <div className="rounded-xl border overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b bg-muted/30">
+          <h2 className="text-sm font-semibold">Subject catalog</h2>
+          <p className="text-xs text-muted-foreground">
             Active subjects appear in classroom, educator, and class-request subject
             pickers.
-          </CardDescription>
+          </p>
+        </div>
+        <div className="px-6 py-4 border-b">
           <div className="flex flex-col gap-3 md:flex-row">
-            <Input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search subjects"
-              className="md:max-w-sm"
-            />
+            <div className="flex items-center gap-2 h-9 w-full md:max-w-sm rounded-lg border bg-background px-3 focus-within:ring-2 focus-within:ring-ring shrink-0">
+              <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <input
+                className="flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none"
+                placeholder="Search subjects"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
             <div className="flex gap-2 md:ml-auto md:max-w-md md:flex-1">
               <Input
                 value={newSubject}
@@ -229,12 +223,12 @@ export function SubjectCatalogSettingsDashboard({
               </Button>
             </div>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-3">
+        </div>
+        <div className="divide-y divide-border">
           {filteredItems.map((item) => (
             <div
               key={item.id}
-              className="flex flex-col gap-3 rounded-md border border-border px-4 py-3 md:flex-row md:items-center md:justify-between"
+              className="flex flex-col gap-3 px-6 py-4 hover:bg-muted/30 transition-colors md:flex-row md:items-center md:justify-between"
             >
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
@@ -341,10 +335,14 @@ export function SubjectCatalogSettingsDashboard({
             </div>
           ))}
           {!filteredItems.length ? (
-            <p className="text-sm text-muted-foreground">No subjects match the filter.</p>
+            <div className="px-6 py-4">
+              <p className="text-sm text-muted-foreground">
+                No subjects match the filter.
+              </p>
+            </div>
           ) : null}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

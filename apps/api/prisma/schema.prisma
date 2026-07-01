@@ -43,3 +43,149 @@ model Class {
 
   @@map("classes")
 }
+
+// Assessment platform models
+
+model AssessmentSubject {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId     String   @map("org_id") @db.Uuid
+  name      String
+  icon      String?
+  color     String?
+  createdBy String?  @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @map("updated_at")
+
+  @@map("assessment_subjects")
+}
+
+model AssessmentDomain {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId         String   @map("org_id") @db.Uuid
+  subjectId     String   @map("subject_id") @db.Uuid
+  name          String
+  grade         Int
+  description   String?
+  orderPosition Int      @default(0) @map("order_position")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @default(now()) @map("updated_at")
+
+  @@map("assessment_domains")
+}
+
+model AssessmentSkill {
+  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId                String   @map("org_id") @db.Uuid
+  domainId             String   @map("domain_id") @db.Uuid
+  name                 String
+  description          String?
+  standard             String?
+  difficultyBaseline   Int      @default(3) @map("difficulty_baseline")
+  estimatedTimeSeconds Int      @default(90) @map("estimated_time_seconds")
+  orderPosition        Int      @default(0) @map("order_position")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @default(now()) @map("updated_at")
+
+  @@map("assessment_skills")
+}
+
+model AssessmentItem {
+  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId                String   @map("org_id") @db.Uuid
+  skillId              String   @map("skill_id") @db.Uuid
+  title                String
+  type                 String
+  content              Json     @default("{}")
+  explanation          String?
+  difficulty           Int      @default(3)
+  estimatedTimeSeconds Int?     @map("estimated_time_seconds")
+  createdBy            String?  @map("created_by") @db.Uuid
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @default(now()) @map("updated_at")
+  deletedAt            DateTime? @map("deleted_at")
+
+  @@map("assessment_items")
+}
+
+model AssessmentTest {
+  id                       String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId                    String    @map("org_id") @db.Uuid
+  title                    String
+  description              String?
+  instructions             String?
+  mode                     String    @default("standard")
+  timeLimitMinutes         Int?      @map("time_limit_minutes")
+  passingScorePercent      Int?      @map("passing_score_percent")
+  shuffleSections          Boolean   @default(false) @map("shuffle_sections")
+  showResultsImmediately   Boolean   @default(true) @map("show_results_immediately")
+  showCorrectAnswers       Boolean   @default(false) @map("show_correct_answers")
+  adaptiveConfig           Json?     @map("adaptive_config")
+  createdBy                String?   @map("created_by") @db.Uuid
+  createdAt                DateTime  @default(now()) @map("created_at")
+  updatedAt                DateTime  @default(now()) @map("updated_at")
+  deletedAt                DateTime? @map("deleted_at")
+
+  @@map("assessment_tests")
+}
+
+model AssessmentDelivery {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId              String    @map("org_id") @db.Uuid
+  testId             String    @map("test_id") @db.Uuid
+  title              String
+  accessType         String    @default("authenticated") @map("access_type")
+  accessToken        String?   @unique @map("access_token")
+  channelId          String?   @map("channel_id") @db.Uuid
+  startsAt           DateTime? @map("starts_at")
+  endsAt             DateTime? @map("ends_at")
+  maxAttempts        Int       @default(1) @map("max_attempts")
+  collectNameEmail   Boolean   @default(false) @map("collect_name_email")
+  allowResume        Boolean   @default(true) @map("allow_resume")
+  createdBy          String?   @map("created_by") @db.Uuid
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @default(now()) @map("updated_at")
+  deletedAt          DateTime? @map("deleted_at")
+
+  @@map("assessment_deliveries")
+}
+
+model AssessmentSession {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  deliveryId       String    @map("delivery_id") @db.Uuid
+  profileId        String?   @map("profile_id") @db.Uuid
+  anonName         String?   @map("anon_name")
+  anonEmail        String?   @map("anon_email")
+  status           String    @default("not_started")
+  attemptNumber    Int       @default(1) @map("attempt_number")
+  currentItemId    String?   @map("current_item_id") @db.Uuid
+  itemOrder        Json      @default("[]") @map("item_order")
+  adaptiveState    Json?     @map("adaptive_state")
+  startedAt        DateTime? @map("started_at")
+  submittedAt      DateTime? @map("submitted_at")
+  timeSpentSeconds Int?      @map("time_spent_seconds")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @default(now()) @map("updated_at")
+
+  @@map("assessment_sessions")
+}
+
+model AssessmentResult {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId           String    @unique @map("session_id") @db.Uuid
+  deliveryId          String    @map("delivery_id") @db.Uuid
+  profileId           String?   @map("profile_id") @db.Uuid
+  totalScore          Float     @default(0) @map("total_score")
+  maxScore            Float     @default(0) @map("max_score")
+  percentage          Float     @default(0)
+  passed              Boolean?
+  needsManualGrading  Boolean   @default(false) @map("needs_manual_grading")
+  feedbackReport      Json?     @map("feedback_report")
+  parentReport        Json?     @map("parent_report")
+  tutorReport         Json?     @map("tutor_report")
+  learningPlan        Json?     @map("learning_plan")
+  completedAt         DateTime? @map("completed_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @default(now()) @map("updated_at")
+
+  @@map("assessment_results")
+}

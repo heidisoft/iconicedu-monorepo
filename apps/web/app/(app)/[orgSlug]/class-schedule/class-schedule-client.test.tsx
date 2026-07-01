@@ -101,6 +101,25 @@ describe('ClassScheduleClient', () => {
     );
   });
 
+  it('passes the full schedule editor link when session editing is allowed', () => {
+    render(
+      <ClassScheduleClient
+        events={[createSchedule()]}
+        orgSlug="iconic-academy"
+        canCancelSessions
+        canEditSessions
+        timezone="America/New_York"
+      />,
+    );
+
+    expect(classScheduleContainerMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        editFullScheduleHref: '/iconic-academy/admin/classrooms',
+      }),
+      undefined,
+    );
+  });
+
   it('respects an explicit day view query param', () => {
     searchParamsGetMock.mockImplementation((key: string) => {
       if (key === 'view') return 'day';

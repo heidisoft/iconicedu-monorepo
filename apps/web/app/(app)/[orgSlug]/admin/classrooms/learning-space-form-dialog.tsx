@@ -320,7 +320,7 @@ export function LearningSpaceFormDialog({
     <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
       {mode === 'create' && !isControlled && (
         <DialogTrigger asChild>
-          <Button variant="secondary" size="sm" className="flex items-center gap-2">
+          <Button size="sm" className="flex items-center gap-2">
             <Plus className="size-4" />
             Add new
           </Button>

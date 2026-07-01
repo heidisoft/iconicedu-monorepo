@@ -3,17 +3,9 @@ import { notFound } from 'next/navigation';
 
 import { DashboardHeader } from '@iconicedu/ui-web';
 
-import {
-  getDashboardAccountContext,
-  getDashboardProfileContext,
-} from '@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth';
-import { getAdminLearningSpaceRows } from '@iconicedu/web/lib/admin/learning-spaces';
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
+import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { LearningSpacesDashboard } from '@iconicedu/web/app/(app)/[orgSlug]/admin/classrooms/learning-spaces-dashboard';
-import {
-  listActiveOrgSubjectCatalog,
-  mapOrgSubjectRowsToOptions,
-} from '@iconicedu/web/lib/subjects/queries/org-subject-catalog.query';
 
 export const metadata: Metadata = {
   title: 'Admin · Classrooms',
@@ -26,27 +18,18 @@ export default async function AdminLearningSpacesPage({
   params: Promise<{ orgSlug: string }>;
 }) {
   const { orgSlug } = await params;
-  const { supabase, account } = await getDashboardAccountContext(orgSlug);
+  const supabase = await createSupabaseServerClient();
   const org = await buildOrgBySlug(supabase, orgSlug);
 
   if (!org) {
     notFound();
   }
 
-  const { currentUserProfile } = await getDashboardProfileContext(supabase, account.id);
-  const rows = await getAdminLearningSpaceRows(org.id);
-  const subjectCatalogResponse = await listActiveOrgSubjectCatalog(supabase, org.id);
-  const subjectOptions = mapOrgSubjectRowsToOptions(subjectCatalogResponse.data);
-
   return (
     <div className="flex flex-1 flex-col">
       <DashboardHeader title="Classrooms" />
-      <div className="flex flex-1 flex-col gap-4 p-4">
-        <LearningSpacesDashboard
-          rows={rows}
-          currentUserTimezone={currentUserProfile?.prefs.timezone ?? null}
-          subjectOptions={subjectOptions}
-        />
+      <div className="flex flex-1 flex-col p-6 lg:p-8 gap-6">
+        <LearningSpacesDashboard orgSlug={orgSlug} />
       </div>
     </div>
   );

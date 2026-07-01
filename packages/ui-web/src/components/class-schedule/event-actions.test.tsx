@@ -57,6 +57,20 @@ describe('EventActions', () => {
     expect(link).toHaveAttribute('href', '/iconic-academy/s/channel-1#sessions');
   });
 
+  it('renders a staff-only link to edit the full classroom schedule', () => {
+    render(
+      <EventActions
+        event={buildEvent()}
+        onClose={vi.fn()}
+        canEditSession
+        onEditSession={vi.fn(async () => undefined)}
+      />,
+    );
+
+    const link = screen.getByRole('link', { name: 'Edit full schedule' });
+    expect(link).toHaveAttribute('href', '/iconic-academy/admin/classrooms/space-1');
+  });
+
   it('disables view full schedule when event has no classroom channel', () => {
     render(
       <EventActions
@@ -118,7 +132,7 @@ describe('EventActions', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit schedule' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit this session' }));
     const dialog = screen.getByRole('dialog', { name: 'Edit this session' });
     fireEvent.change(within(dialog).getByLabelText('Date'), {
       target: { value: '2026-03-22' },

@@ -31,7 +31,15 @@ export default async function AdminLiveSessionAttendancePage({
   return (
     <div className="flex flex-1 flex-col">
       <DashboardHeader title="Session attendance" />
-      <div className="flex flex-1 flex-col gap-4 p-4">
+      <div className="flex flex-1 flex-col p-6 lg:p-8 gap-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Attendance</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Track live session attendance across all learning spaces.
+            </p>
+          </div>
+        </div>
         <LiveSessionAttendanceTable orgSlug={orgSlug} rows={rows} />
       </div>
     </div>

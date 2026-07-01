@@ -14,15 +14,12 @@ vi.mock('next/navigation', () => ({
 if (!Element.prototype.hasPointerCapture) {
   Element.prototype.hasPointerCapture = () => false;
 }
-
 if (!Element.prototype.setPointerCapture) {
   Element.prototype.setPointerCapture = () => undefined;
 }
-
 if (!Element.prototype.releasePointerCapture) {
   Element.prototype.releasePointerCapture = () => undefined;
 }
-
 if (!Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = () => undefined;
 }
@@ -56,71 +53,80 @@ const makeRow = (overrides: Partial<AdminChannelRow>): AdminChannelRow => ({
   ...overrides,
 });
 
-describe('ChannelsDashboard', () => {
-  const mockFetch = () =>
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
-      ok: true,
-      json: async () => ({ data: [] }),
-    } as Response);
+function makeListResponse(rows: AdminChannelRow[]) {
+  return {
+    ok: true,
+    json: async () => ({
+      success: true,
+      rows,
+      total: rows.length,
+      pageCount: 1,
+    }),
+  } as Response;
+}
 
+function makeParticipantsResponse() {
+  return { ok: true, json: async () => ({ data: [] }) } as Response;
+}
+
+describe('ChannelsDashboard', () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it('filters rows by search input', async () => {
-    mockFetch();
-    const user = userEvent.setup();
+  it('shows rows returned from the list API', async () => {
     const rows = [
       makeRow({ topic: 'General' }),
       makeRow({ id: 'channel-2', topic: 'Algebra' }),
     ];
+    vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
+      if (String(url).includes('/api/admin/channels/list'))
+        return Promise.resolve(makeListResponse(rows));
+      return Promise.resolve(makeParticipantsResponse());
+    });
 
-    render(<ChannelsDashboard rows={rows} />);
+    render(<ChannelsDashboard orgSlug="iconic-academy" />);
 
-    expect(screen.getByText('General')).toBeInTheDocument();
-    expect(screen.getByText('Algebra')).toBeInTheDocument();
-
-    await user.type(screen.getByPlaceholderText('Search name or type'), 'alg');
-
-    expect(screen.queryByText('General')).not.toBeInTheDocument();
-    expect(screen.getByText('Algebra')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('General')).toBeInTheDocument();
+      expect(screen.getByText('Algebra')).toBeInTheDocument();
+    });
   });
 
-  it('shows all rows when search is cleared', async () => {
-    mockFetch();
-    const user = userEvent.setup();
-    const rows = [
-      makeRow({ topic: 'General' }),
-      makeRow({ id: 'channel-2', topic: 'Algebra' }),
-    ];
+  it('shows empty state when no rows returned', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
+      if (String(url).includes('/api/admin/channels/list'))
+        return Promise.resolve(makeListResponse([]));
+      return Promise.resolve(makeParticipantsResponse());
+    });
 
-    render(<ChannelsDashboard rows={rows} />);
-    await user.type(screen.getByPlaceholderText('Search name or type'), 'alg');
-    expect(screen.queryByText('General')).not.toBeInTheDocument();
+    render(<ChannelsDashboard orgSlug="iconic-academy" />);
 
-    await user.clear(screen.getByPlaceholderText('Search name or type'));
-    expect(screen.getByText('General')).toBeInTheDocument();
-    expect(screen.getByText('Algebra')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('No channels found.')).toBeInTheDocument();
+    });
   });
 
   it('submits the selected channel icon in the payload', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
-      ok: true,
-      json: async () => ({ data: [] }),
-    } as Response);
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ data: [] }),
-    } as Response);
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ success: true }),
-    } as Response);
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
+      if (String(url).includes('/api/admin/channels/create')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ success: true }),
+        } as Response);
+      }
+      if (String(url).includes('/api/admin/channels/list')) {
+        return Promise.resolve(makeListResponse([makeRow({ topic: 'General' })]));
+      }
+      return Promise.resolve(makeParticipantsResponse());
+    });
+
     const user = userEvent.setup();
+    render(<ChannelsDashboard orgSlug="iconic-academy" />);
 
-    render(<ChannelsDashboard rows={[makeRow({ topic: 'General' })]} />);
+    await waitFor(() => expect(screen.getByText('General')).toBeInTheDocument());
 
-    await user.click(screen.getByRole('button', { name: 'Create channel' }));
+    await user.click(screen.getByRole('button', { name: /add new/i }));
 
     const dialog = await screen.findByRole('dialog');
     await user.type(within(dialog).getByLabelText('Name *'), 'Parent Lounge');
@@ -133,23 +139,12 @@ describe('ChannelsDashboard', () => {
     });
     await user.click(within(dialog).getByRole('button', { name: 'Create channel' }));
 
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
-      '/api/admin/channels/create',
-      expect.objectContaining({
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: expect.any(String),
-      }),
+    const createCall = fetchMock.mock.calls.find((call) =>
+      String(call[0]).includes('/api/admin/channels/create'),
     );
-
-    const createCallBody = fetchMock.mock.calls[1]?.[1];
-    expect(createCallBody).toBeDefined();
-    expect(JSON.parse(String(createCallBody?.body))).toMatchObject({
-      basics: {
-        topic: 'Parent Lounge',
-        iconKey: 'life-buoy',
-      },
+    expect(createCall).toBeDefined();
+    expect(JSON.parse(String(createCall?.[1]?.body))).toMatchObject({
+      basics: { topic: 'Parent Lounge', iconKey: 'life-buoy' },
     });
   }, 15000);
 });

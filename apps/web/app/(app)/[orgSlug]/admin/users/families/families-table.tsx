@@ -1,179 +1,102 @@
-import {
-  Badge,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@iconicedu/ui-web';
-import {
-  AvatarWithStatus,
-  getAvatarRoleLabel,
-} from '@iconicedu/ui-web/components/shared/avatar-with-status';
-import type { AvatarSource, ThemeKey } from '@iconicedu/shared-types';
+'use client';
 
-import type { AdminFamilyRow } from '@iconicedu/web/lib/admin/families';
+import { Badge } from '@iconicedu/ui-web';
+import { Avatar, AvatarFallback, AvatarImage } from '@iconicedu/ui-web/ui/avatar';
+import { Users } from 'lucide-react';
+import type {
+  AdminFamilyRow,
+  AdminFamilyParticipant,
+} from '@iconicedu/web/lib/admin/families';
 
 type FamiliesTableProps = {
   rows: AdminFamilyRow[];
 };
 
-export function FamiliesTable({ rows }: FamiliesTableProps) {
+function getInitials(name: string) {
+  return (name.trim()[0] ?? '?').toUpperCase();
+}
+
+function MemberChip({ participant }: { participant: AdminFamilyParticipant }) {
+  const name = participant.name ?? participant.label;
+  const themeClass = participant.themeKey ? `theme-${participant.themeKey}` : '';
+
   return (
-    <div className="w-full rounded-2xl border border-border bg-card">
-      <div className="relative overflow-x-auto">
-        <Table className="min-w-full">
-          <TableHeader>
-            <TableRow>
-              <TableHead className="text-xs font-semibold text-muted-foreground tracking-tight uppercase">
-                Family
-              </TableHead>
-              <TableHead className="text-xs font-semibold text-muted-foreground tracking-tight uppercase">
-                Guardians
-              </TableHead>
-              <TableHead className="text-xs font-semibold text-muted-foreground tracking-tight uppercase">
-                Children
-              </TableHead>
-              <TableHead className="text-xs font-semibold text-muted-foreground tracking-tight uppercase">
-                Pending invites
-              </TableHead>
-              <TableHead className="text-xs font-semibold text-muted-foreground tracking-tight uppercase text-right">
-                Links
-              </TableHead>
-              <TableHead className="text-xs font-semibold text-muted-foreground tracking-tight uppercase">
-                Created
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((row) => (
-              <TableRow
-                key={row.familyId}
-                className="border-b border-border/70 last:border-0 hover:bg-card-light transition-colors"
-              >
-                <TableCell className="py-4">
-                  <p className="text-sm font-semibold">{row.displayName}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Updated {new Date(row.updatedAt).toLocaleDateString()}
-                  </p>
-                </TableCell>
-                <TableCell className="py-4">
-                  {row.guardians.length ? (
-                    <div className="flex flex-col gap-2 text-xs">
-                      {row.guardians.map((guardian) => (
-                        <div key={guardian.id} className="min-w-0">
-                          <div className="flex items-center gap-2 text-sm">
-                            <AvatarWithStatus
-                              accountId={guardian.id}
-                              name={guardian.name ?? guardian.label}
-                              avatar={{
-                                source: resolveAvatarSource(guardian.avatarSource),
-                                url: guardian.avatarUrl ?? null,
-                                seed:
-                                  resolveAvatarSource(guardian.avatarSource) === 'seed'
-                                    ? guardian.id
-                                    : undefined,
-                              }}
-                              themeKey={resolveThemeKey(guardian.themeKey)}
-                              roleLabel={getAvatarRoleLabel('guardian')}
-                              sizeClassName="size-7"
-                            />
-                            <span className="truncate">
-                              {guardian.name ?? guardian.label}
-                            </span>
-                          </div>
-                          <p className="pl-9 text-xs text-muted-foreground">
-                            {guardian.email ?? '—'}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">No guardians</span>
-                  )}
-                </TableCell>
-                <TableCell className="py-4">
-                  {row.children.length ? (
-                    <div className="flex flex-col gap-1 text-xs">
-                      {row.children.map((child) => (
-                        <div key={child.id} className="flex items-center gap-2 text-sm">
-                          <AvatarWithStatus
-                            accountId={child.id}
-                            name={child.label}
-                            avatar={{
-                              source: resolveAvatarSource(child.avatarSource),
-                              url: child.avatarUrl ?? null,
-                              seed:
-                                resolveAvatarSource(child.avatarSource) === 'seed'
-                                  ? child.id
-                                  : undefined,
-                            }}
-                            themeKey={resolveThemeKey(child.themeKey)}
-                            roleLabel={getAvatarRoleLabel('child')}
-                            sizeClassName="size-7"
-                          />
-                          <span>{child.label}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">No children</span>
-                  )}
-                </TableCell>
-                <TableCell className="py-4">
-                  {row.pendingInvites.length ? (
-                    <div className="flex flex-col gap-2">
-                      {row.pendingInvites.map((invite) => (
-                        <div
-                          key={invite.id}
-                          className="flex items-center justify-between gap-2 text-xs"
-                        >
-                          <span className="truncate">
-                            {invite.invitedEmail ?? invite.invitedPhone ?? 'Invite'}
-                          </span>
-                          <Badge
-                            variant={
-                              invite.status === 'pending' ? 'secondary' : 'outline'
-                            }
-                            className="text-[11px] px-2"
-                          >
-                            {invite.status}
-                          </Badge>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">None</span>
-                  )}
-                </TableCell>
-                <TableCell className="py-4 text-right">
-                  <Badge variant="outline">{row.familyLinkCount}</Badge>
-                </TableCell>
-                <TableCell className="py-4">
-                  <span className="text-sm">
-                    {new Date(row.createdAt).toLocaleDateString()}
-                  </span>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-    </div>
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2 py-0.5 text-xs text-foreground">
+      <Avatar className={`size-5 shrink-0 ${themeClass}`}>
+        {participant.avatarUrl ? (
+          <AvatarImage src={participant.avatarUrl} alt={name} />
+        ) : null}
+        <AvatarFallback className={themeClass ? 'theme-bg theme-fg' : ''}>
+          {getInitials(name)}
+        </AvatarFallback>
+      </Avatar>
+      <span className="max-w-[120px] truncate">{name}</span>
+    </span>
   );
 }
 
-function resolveAvatarSource(value?: string | null): AvatarSource {
-  if (value === 'upload' || value === 'external') {
-    return value;
+export function FamiliesTable({ rows }: FamiliesTableProps) {
+  if (!rows.length) {
+    return (
+      <p className="px-6 py-10 text-center text-sm text-muted-foreground">
+        No families found.
+      </p>
+    );
   }
-  return 'seed';
-}
 
-function resolveThemeKey(value?: string | null): ThemeKey | null {
-  if (!value) {
-    return null;
-  }
-  return value as ThemeKey;
+  return (
+    <div className="w-full">
+      {rows.map((row) => (
+        <div
+          key={row.familyId}
+          className="flex items-start justify-between gap-4 px-6 py-4 border-b border-border/60 last:border-b-0 hover:bg-muted/30 transition-colors"
+        >
+          {/* Left: family icon + name + member chips */}
+          <div className="min-w-0 flex-1 flex items-start gap-2.5">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground">
+              <Users className="size-4" aria-hidden />
+            </div>
+            <div className="min-w-0 flex-1 flex flex-col gap-1.5">
+              <p className="text-sm font-semibold leading-tight">{row.displayName}</p>
+              {(row.guardians.length > 0 || row.children.length > 0) && (
+                <div className="flex flex-wrap gap-1.5 -ml-2">
+                  {row.guardians.map((guardian) => (
+                    <MemberChip key={guardian.id} participant={guardian} />
+                  ))}
+                  {row.children.map((child) => (
+                    <MemberChip key={child.id} participant={child} />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right: member count + pending invites */}
+          <div className="flex shrink-0 flex-col items-end gap-2 pt-1">
+            <Badge variant="secondary" className="text-xs gap-1">
+              <Users className="size-3" />
+              {row.familyLinkCount} {row.familyLinkCount === 1 ? 'member' : 'members'}
+            </Badge>
+            {row.pendingInvites.length > 0 && (
+              <div className="flex flex-col items-end gap-1">
+                {row.pendingInvites.map((invite) => (
+                  <div key={invite.id} className="flex items-center gap-1.5">
+                    <span className="text-xs text-muted-foreground max-w-[140px] truncate">
+                      {invite.invitedEmail ?? invite.invitedPhone ?? 'Invited'}
+                    </span>
+                    <Badge
+                      variant={invite.status === 'pending' ? 'outline' : 'secondary'}
+                      className="text-[11px] px-2 capitalize"
+                    >
+                      {invite.status}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }

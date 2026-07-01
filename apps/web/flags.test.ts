@@ -7,10 +7,7 @@ vi.mock('@iconicedu/web/lib/flags/posthog-flags', () => ({
 }));
 
 import {
-  enableAdminActivityFeedAudit,
   enableChannelCommunications,
-  enableClassScheduleStaffCancel,
-  enableClassScheduleStaffEdit,
   enableMarketingSitePages,
   enableMessageTypeComposer,
   enableMobileAppleSignIn,
@@ -38,12 +35,6 @@ describe('web flags', () => {
     expect(webFlags.enableChannelCommunications).toBe(enableChannelCommunications);
   });
 
-  it('declares the admin activity feed audit flag with stable metadata', () => {
-    expect(enableAdminActivityFeedAudit.key).toBe('enable-admin-activity-feed-audit');
-    expect(enableAdminActivityFeedAudit.defaultValue).toBe(false);
-    expect(webFlags.enableAdminActivityFeedAudit).toBe(enableAdminActivityFeedAudit);
-  });
-
   it('declares the message type composer flag with stable metadata', () => {
     expect(enableMessageTypeComposer.key).toBe('enable-message-type-composer');
     expect(enableMessageTypeComposer.defaultValue).toBe(false);
@@ -64,18 +55,6 @@ describe('web flags', () => {
     expect(enableMobileAppleSignIn.key).toBe('enable-mobile-apple-sign-in');
     expect(enableMobileAppleSignIn.defaultValue).toBe(false);
     expect(webFlags.enableMobileAppleSignIn).toBe(enableMobileAppleSignIn);
-  });
-
-  it('declares the class schedule cancel flag with stable metadata', () => {
-    expect(enableClassScheduleStaffCancel.key).toBe('enable-class-schedule-staff-cancel');
-    expect(enableClassScheduleStaffCancel.defaultValue).toBe(true);
-    expect(webFlags.enableClassScheduleStaffCancel).toBe(enableClassScheduleStaffCancel);
-  });
-
-  it('declares the class schedule edit flag with stable metadata', () => {
-    expect(enableClassScheduleStaffEdit.key).toBe('enable-class-schedule-staff-edit');
-    expect(enableClassScheduleStaffEdit.defaultValue).toBe(false);
-    expect(webFlags.enableClassScheduleStaffEdit).toBe(enableClassScheduleStaffEdit);
   });
 
   it('declares the marketing site pages flag with stable metadata', () => {
@@ -144,10 +123,7 @@ describe('web flags', () => {
     const providerData = await getFlagsProviderData();
 
     expect(providerData).toBeTruthy();
-    expect(JSON.stringify(providerData)).toContain('enable-admin-activity-feed-audit');
     expect(JSON.stringify(providerData)).toContain('enable-channel-communications');
-    expect(JSON.stringify(providerData)).toContain('enable-class-schedule-staff-cancel');
-    expect(JSON.stringify(providerData)).toContain('enable-class-schedule-staff-edit');
     expect(JSON.stringify(providerData)).toContain('enable-marketing-site-pages');
     expect(JSON.stringify(providerData)).toContain('enable-message-type-composer');
     expect(JSON.stringify(providerData)).toContain('enable-mobile-direct-message-start');

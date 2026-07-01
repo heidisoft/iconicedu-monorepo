@@ -34,7 +34,8 @@ describe('admin settings roles page', () => {
     const contentContainer = children?.[1] as
       | { props?: { children?: unknown } }
       | undefined;
-    const dashboardElement = contentContainer?.props?.children as
+    const contentChildren = contentContainer?.props?.children as unknown[];
+    const dashboardElement = contentChildren?.[1] as
       | { props?: { orgId?: string } }
       | undefined;
     expect(dashboardElement?.props?.orgId).toBe('org-1');

@@ -1,31 +1,9 @@
 /* @vitest-environment jsdom */
 
-import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const loadSubject = async () => {
-  vi.doMock('@iconicedu/ui-web/ui/hover-card', () => ({
-    HoverCard: ({
-      children,
-      onOpenChange,
-    }: {
-      children?: React.ReactNode;
-      onOpenChange?: (open: boolean) => void;
-    }) => {
-      React.useEffect(() => {
-        onOpenChange?.(true);
-      }, [onOpenChange]);
-      return <div>{children}</div>;
-    },
-    HoverCardTrigger: ({ children }: { children?: React.ReactNode }) => (
-      <div>{children}</div>
-    ),
-    HoverCardContent: ({ children }: { children?: React.ReactNode }) => (
-      <div>{children}</div>
-    ),
-  }));
-
   return import('./avatar-with-status');
 };
 
@@ -34,7 +12,7 @@ describe('AvatarWithStatus', () => {
     vi.resetModules();
   });
 
-  it('renders the shared avatar preview shell with direct message action', async () => {
+  it('renders the avatar without a hover preview shell', async () => {
     const { AvatarWithStatus } = await loadSubject();
 
     render(
@@ -47,22 +25,19 @@ describe('AvatarWithStatus', () => {
           displayStatus: 'online',
           state: {},
         }}
-        messageHref="/dm/profile-2"
       />,
     );
 
-    expect(screen.getByRole('link', { name: /send direct message/i })).toHaveAttribute(
-      'href',
-      '/dm/profile-2',
-    );
-    expect(screen.getByTestId('avatar-preview-header')).toBeInTheDocument();
-    expect(screen.getByTestId('avatar-preview-avatar-anchor')).toBeInTheDocument();
+    expect(screen.getByText('PS')).toBeInTheDocument();
+    expect(screen.queryByTestId('avatar-preview-header')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('avatar-preview-avatar-anchor')).not.toBeInTheDocument();
   });
 
-  it('keeps rendering fallback preview details when the enhancement request fails', async () => {
+  it('does not fetch or render preview details when preview props are provided', async () => {
     const { AvatarWithStatus } = await loadSubject();
 
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Not authenticated')));
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
 
     try {
       render(
@@ -76,18 +51,15 @@ describe('AvatarWithStatus', () => {
           about="Math educator"
           email="priya@example.com"
           messageHref="/dm/profile-2"
+          enableProfilePreview
         />,
       );
 
-      await waitFor(() => {
-        expect(screen.getByText('New York, NY, United States')).toBeInTheDocument();
-      });
-
-      expect(screen.getByText('Educator')).toBeInTheDocument();
-      expect(screen.getByText('Math educator')).toBeInTheDocument();
-      expect(screen.getByText('priya@example.com')).toBeInTheDocument();
-      expect(screen.queryByText('Unable to load profile')).not.toBeInTheDocument();
-      expect(screen.queryByText('Not authenticated')).not.toBeInTheDocument();
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(screen.queryByText('New York, NY, United States')).not.toBeInTheDocument();
+      expect(screen.queryByText('Educator')).not.toBeInTheDocument();
+      expect(screen.queryByText('Math educator')).not.toBeInTheDocument();
+      expect(screen.queryByText('priya@example.com')).not.toBeInTheDocument();
     } finally {
       vi.unstubAllGlobals();
     }

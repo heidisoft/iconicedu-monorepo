@@ -2,19 +2,7 @@
 
 import * as React from 'react';
 
-import {
-  Badge,
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  Input,
-  Label,
-  Loader2,
-  toast,
-} from '@iconicedu/ui-web';
+import { Badge, Button, Input, Label, Loader2, toast } from '@iconicedu/ui-web';
 
 type FunctionKind =
   | 'events-dispatch'
@@ -147,16 +135,14 @@ function FunctionCard({ orgId, config }: FunctionCardProps) {
   const isRunning = result.status === 'running';
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between gap-2">
-          <CardTitle className="text-base">{config.title}</CardTitle>
-          <Badge variant={badge.variant}>{badge.label}</Badge>
-        </div>
-        <CardDescription>{config.description}</CardDescription>
-      </CardHeader>
+    <div className="rounded-xl border overflow-hidden">
+      <div className="flex items-center justify-between px-6 py-4 border-b bg-muted/30">
+        <h2 className="text-sm font-semibold">{config.title}</h2>
+        <Badge variant={badge.variant}>{badge.label}</Badge>
+      </div>
+      <div className="px-6 py-4 flex flex-col gap-4">
+        <p className="text-sm text-muted-foreground">{config.description}</p>
 
-      <CardContent className="flex flex-col gap-4">
         {config.hasDispatchParams && (
           <div className="flex flex-wrap gap-3">
             <div className="flex flex-col gap-1">
@@ -237,8 +223,8 @@ function FunctionCard({ orgId, config }: FunctionCardProps) {
               : JSON.stringify(result.data, null, 2)}
           </pre>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 

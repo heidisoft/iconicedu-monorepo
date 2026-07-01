@@ -21,7 +21,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@iconicedu/ui-web/ui/dialog';
-import { CalendarDays, Pencil, X } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@iconicedu/ui-web/ui/tooltip';
+import { CalendarCog, CalendarDays, CalendarX, Pencil, X } from 'lucide-react';
 import type { DisplayClassScheduleVM } from '@iconicedu/ui-web/lib/class-schedule-utils';
 import type {
   CancelSessionActionInput,
@@ -95,12 +96,25 @@ export function EventActions({
           return `${orgBasePath}/s/${event.source.channelId}#sessions`;
         })()
       : null;
+  const fullScheduleEditLink =
+    event.source.kind === 'class_session' && event.source.learningSpaceId
+      ? (() => {
+          if (typeof window === 'undefined') {
+            return `/admin/classrooms/${event.source.learningSpaceId}`;
+          }
+          const firstSegment = window.location.pathname.split('/').filter(Boolean)[0];
+          const orgBasePath = firstSegment ? `/${firstSegment}` : '';
+          return `${orgBasePath}/admin/classrooms/${event.source.learningSpaceId}`;
+        })()
+      : null;
   const showSessionActionButtons =
     event.status !== 'cancelled' && event.source.kind === 'class_session';
   const showCancelSessionButton =
     showSessionActionButtons && canCancelSession && Boolean(onCancelSession);
   const showEditSessionButton =
     showSessionActionButtons && canEditSession && Boolean(onEditSession);
+  const showEditFullScheduleButton =
+    showSessionActionButtons && canEditSession && Boolean(fullScheduleEditLink);
   const isEditTimeRangeValid =
     Boolean(editStartTime) && Boolean(editEndTime) && editStartTime < editEndTime;
 
@@ -178,37 +192,94 @@ export function EventActions({
       <div className="flex justify-between items-center gap-3">
         <div className="flex gap-2 flex-wrap">
           {scheduleTabLink ? (
-            <Button size="sm" variant="outline" asChild>
-              <a href={scheduleTabLink}>
-                <CalendarDays className="h-4 w-4 mr-2" />
-                View full schedule
-              </a>
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon-sm"
+                  variant="outline"
+                  asChild
+                  aria-label="View full schedule"
+                >
+                  <a href={scheduleTabLink}>
+                    <CalendarDays className="h-4 w-4" />
+                  </a>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>View full schedule</TooltipContent>
+            </Tooltip>
           ) : (
-            <Button size="sm" variant="outline" disabled>
-              <CalendarDays className="h-4 w-4 mr-2" />
-              View full schedule
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>
+                  <Button
+                    size="icon-sm"
+                    variant="outline"
+                    aria-label="View full schedule"
+                    disabled
+                  >
+                    <CalendarDays className="h-4 w-4" />
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>View full schedule</TooltipContent>
+            </Tooltip>
           )}
+          {showEditFullScheduleButton && fullScheduleEditLink ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon-sm"
+                  variant="outline"
+                  asChild
+                  aria-label="Edit full schedule"
+                >
+                  <a href={fullScheduleEditLink}>
+                    <CalendarCog className="h-4 w-4" />
+                  </a>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Edit full schedule</TooltipContent>
+            </Tooltip>
+          ) : null}
           {showEditSessionButton ? (
-            <Button size="sm" variant="outline" onClick={openEditDialog}>
-              <Pencil className="h-4 w-4 mr-2" />
-              Edit schedule
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon-sm"
+                  variant="outline"
+                  aria-label="Edit this session"
+                  onClick={openEditDialog}
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Edit this session</TooltipContent>
+            </Tooltip>
           ) : null}
           {showCancelSessionButton ? (
-            <Button
-              size="sm"
-              variant="destructive"
-              onClick={() => setCancelDialogOpen(true)}
-            >
-              Cancel session
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon-sm"
+                  variant="destructive"
+                  aria-label="Cancel session"
+                  onClick={() => setCancelDialogOpen(true)}
+                >
+                  <CalendarX className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Cancel session</TooltipContent>
+            </Tooltip>
           ) : null}
         </div>
-        <Button size="sm" variant="ghost" onClick={onClose}>
-          <X className="h-4 w-4" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button size="icon-sm" variant="ghost" aria-label="Close" onClick={onClose}>
+              <X className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Close</TooltipContent>
+        </Tooltip>
       </div>
       <Dialog
         open={cancelDialogOpen}

@@ -30,6 +30,7 @@ import { mapFamilyLinkInviteRowToVM } from '@iconicedu/web/lib/family/queries/in
 type BuildUserProfileOptions = {
   accountEmail?: string | null;
   includeFamilyInvites?: boolean;
+  includeNotificationPreferences?: boolean;
 };
 
 export async function buildUserProfileById(
@@ -88,10 +89,15 @@ export async function buildUserProfileFromRow(
   profileRow: ProfileRow,
   options: BuildUserProfileOptions = {},
 ): Promise<UserProfileVM> {
+  const includeNotificationPreferences = options.includeNotificationPreferences ?? true;
   const [notificationDefaults, notificationScopedDefaults, presence, avatarUrl] =
     await Promise.all([
-      loadNotificationDefaults(supabase, profileRow.org_id, profileRow.id),
-      loadNotificationScopedDefaults(supabase, profileRow.org_id, profileRow.id),
+      includeNotificationPreferences
+        ? loadNotificationDefaults(supabase, profileRow.org_id, profileRow.id)
+        : Promise.resolve(null),
+      includeNotificationPreferences
+        ? loadNotificationScopedDefaults(supabase, profileRow.org_id, profileRow.id)
+        : Promise.resolve(null),
       loadPresence(supabase, profileRow.org_id, profileRow.id),
       resolveAvatarUrl(supabase, profileRow.avatar_source, profileRow.avatar_url ?? null),
     ]);

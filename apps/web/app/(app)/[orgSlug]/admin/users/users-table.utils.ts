@@ -1,5 +1,13 @@
 import type { AdminUserRow } from '@iconicedu/web/lib/admin/users';
 
+export function getUserDisplayName(row: AdminUserRow): string {
+  const firstName = row.firstName?.trim() ?? '';
+  const lastName = row.lastName?.trim() ?? '';
+  const fullName = [firstName, lastName].filter(Boolean).join(' ').trim();
+  if (fullName) return fullName;
+  return row.displayName?.trim() || row.email || 'Unnamed';
+}
+
 export function buildAdminUserDmPath(orgSlug: string, profileId: string): string {
   return `/${orgSlug}/dm?id=${encodeURIComponent(profileId)}`;
 }

@@ -9,7 +9,9 @@ import type {
 import {
   Badge,
   Button,
-  Input,
+  ChevronLeft,
+  ChevronRight,
+  Search,
   Select,
   SelectContent,
   SelectItem,
@@ -119,34 +121,57 @@ export function ActivityFeedAuditDashboard({ audit }: ActivityFeedAuditDashboard
     safePageIndex * pageSize,
   );
 
+  const from = filteredItems.length === 0 ? 0 : (safePageIndex - 1) * pageSize + 1;
+  const to = Math.min(safePageIndex * pageSize, filteredItems.length);
+
   return (
     <div className="flex flex-1 flex-col gap-4">
       <div className="grid gap-3 md:grid-cols-5">
-        <div className="rounded-lg border border-border bg-card p-4">
+        <div className="rounded-xl border bg-card px-5 pt-4 pb-5">
           <p className="text-sm text-muted-foreground">Generated items</p>
-          <p className="mt-2 text-2xl font-semibold">{audit.totalCount}</p>
+          <div className="flex items-end justify-between mt-2 gap-2">
+            <p className="text-4xl font-bold tracking-tight leading-none">
+              {audit.totalCount}
+            </p>
+          </div>
         </div>
-        <div className="rounded-lg border border-border bg-card p-4">
+        <div className="rounded-xl border bg-card px-5 pt-4 pb-5">
           <p className="text-sm text-muted-foreground">Unread items</p>
-          <p className="mt-2 text-2xl font-semibold">{audit.unreadCount}</p>
+          <div className="flex items-end justify-between mt-2 gap-2">
+            <p className="text-4xl font-bold tracking-tight leading-none">
+              {audit.unreadCount}
+            </p>
+          </div>
         </div>
-        <div className="rounded-lg border border-border bg-card p-4">
+        <div className="rounded-xl border bg-card px-5 pt-4 pb-5">
           <p className="text-sm text-muted-foreground">Tracked verbs</p>
-          <p className="mt-2 text-2xl font-semibold">{audit.verbSummaries.length}</p>
+          <div className="flex items-end justify-between mt-2 gap-2">
+            <p className="text-4xl font-bold tracking-tight leading-none">
+              {audit.verbSummaries.length}
+            </p>
+          </div>
         </div>
-        <div className="rounded-lg border border-border bg-card p-4">
+        <div className="rounded-xl border bg-card px-5 pt-4 pb-5">
           <p className="text-sm text-muted-foreground">Pipeline jobs</p>
-          <p className="mt-2 text-2xl font-semibold">{audit.pipelineJobCount}</p>
+          <div className="flex items-end justify-between mt-2 gap-2">
+            <p className="text-4xl font-bold tracking-tight leading-none">
+              {audit.pipelineJobCount}
+            </p>
+          </div>
         </div>
-        <div className="rounded-lg border border-border bg-card p-4">
+        <div className="rounded-xl border bg-card px-5 pt-4 pb-5">
           <p className="text-sm text-muted-foreground">Reminder jobs</p>
-          <p className="mt-2 text-2xl font-semibold">{audit.reminderJobCount}</p>
+          <div className="flex items-end justify-between mt-2 gap-2">
+            <p className="text-4xl font-bold tracking-tight leading-none">
+              {audit.reminderJobCount}
+            </p>
+          </div>
         </div>
       </div>
 
-      <div className="rounded-lg border border-border bg-card">
-        <div className="border-b border-border px-4 py-3">
-          <p className="text-sm font-medium">Created per verb</p>
+      <div className="rounded-xl border overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b bg-muted/30">
+          <h2 className="text-sm font-semibold">Created per verb</h2>
         </div>
         <Table>
           <TableHeader>
@@ -184,14 +209,17 @@ export function ActivityFeedAuditDashboard({ audit }: ActivityFeedAuditDashboard
         </Table>
       </div>
 
-      <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
-          <Input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search verb, user, channel, job, or delivery"
-            className="w-full sm:max-w-sm"
-          />
+      <div className="rounded-xl border bg-card px-4 py-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 h-9 w-80 rounded-lg border bg-background px-3 focus-within:ring-2 focus-within:ring-ring shrink-0">
+            <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            <input
+              className="flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none"
+              placeholder="Search verb, user, channel, job, or delivery"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
           <Select value={verb} onValueChange={setVerb}>
             <SelectTrigger className="w-full sm:w-72">
               <SelectValue placeholder="Verb" />
@@ -220,21 +248,13 @@ export function ActivityFeedAuditDashboard({ audit }: ActivityFeedAuditDashboard
               ))}
             </SelectContent>
           </Select>
+          <p className="ml-auto text-sm text-muted-foreground">
+            Generated {formatDateTime(audit.generatedAt)}
+          </p>
         </div>
-        <p className="text-sm text-muted-foreground">
-          Generated {formatDateTime(audit.generatedAt)}
-        </p>
       </div>
 
-      <div className="rounded-lg border border-border bg-card">
-        <div className="flex items-center justify-between border-b border-border px-4 py-3 text-sm text-muted-foreground">
-          <span>
-            Showing {visibleItems.length} of {filteredItems.length} activity items
-          </span>
-          <span>
-            Page {safePageIndex} of {pageCount}
-          </span>
-        </div>
+      <div className="rounded-xl border overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
@@ -317,23 +337,36 @@ export function ActivityFeedAuditDashboard({ audit }: ActivityFeedAuditDashboard
             ) : null}
           </TableBody>
         </Table>
-      </div>
-
-      <div className="flex justify-end gap-2">
-        <Button
-          variant="outline"
-          onClick={() => setPageIndex((current) => Math.max(1, current - 1))}
-          disabled={safePageIndex <= 1}
-        >
-          Previous
-        </Button>
-        <Button
-          variant="outline"
-          onClick={() => setPageIndex((current) => Math.min(pageCount, current + 1))}
-          disabled={safePageIndex >= pageCount}
-        >
-          Next
-        </Button>
+        <div className="flex items-center justify-between px-6 py-3 border-t">
+          <p className="text-xs text-muted-foreground">
+            {from}–{to} of {filteredItems.length}
+          </p>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 w-8 p-0"
+              disabled={safePageIndex <= 1}
+              onClick={() => setPageIndex((current) => Math.max(1, current - 1))}
+              aria-label="Previous page"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="px-2 text-xs text-muted-foreground">
+              Page {safePageIndex} of {pageCount}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 w-8 p-0"
+              disabled={safePageIndex >= pageCount}
+              onClick={() => setPageIndex((current) => Math.min(pageCount, current + 1))}
+              aria-label="Next page"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );

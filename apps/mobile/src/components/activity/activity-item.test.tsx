@@ -364,8 +364,15 @@ describe('ActivityItem', () => {
     fireEvent.press(screen.getByLabelText('Rate 4 stars'));
 
     await waitFor(() => {
-      expect(screen.getByText('Submit feedback')).toBeTruthy();
+      expect(mockSubmitActivityFeedFeedback).toHaveBeenCalledTimes(1);
     });
+    await waitFor(
+      () => {
+        expect(screen.queryByText('Saving...')).toBeNull();
+        expect(screen.getByText('Submit feedback')).toBeTruthy();
+      },
+      { timeout: 5000 },
+    );
 
     const realSetTimeout = global.setTimeout;
     const setTimeoutSpy = jest

@@ -28,7 +28,17 @@ export default async function AdminRolesSettingsPage({
   return (
     <div className="flex flex-1 flex-col">
       <DashboardHeader title="Roles & policies" />
-      <div className="flex flex-1 flex-col gap-4 p-4">
+      <div className="flex flex-1 flex-col p-6 lg:p-8 gap-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              Roles &amp; Policies
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Assign roles and configure access policies for organisation members.
+            </p>
+          </div>
+        </div>
         <RolesManagementDashboard orgId={org.id} />
       </div>
     </div>

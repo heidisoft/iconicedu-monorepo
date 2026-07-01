@@ -7,7 +7,7 @@ import type { AdminChannelRow } from '@iconicedu/web/lib/admin/channels';
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/iconic-academy/admin/channels',
-  useRouter: () => ({ refresh: vi.fn() }),
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
 
 const baseRow: AdminChannelRow = {
@@ -40,10 +40,17 @@ const baseRow: AdminChannelRow = {
 
 describe('ChannelsTable', () => {
   it('renders channel rows', () => {
-    render(<ChannelsTable rows={[baseRow]} onEdit={() => undefined} />);
+    render(<ChannelsTable rows={[baseRow]} orgSlug="iconic-academy" />);
     expect(screen.getByText('General')).toBeInTheDocument();
     expect(screen.getByText('general')).toBeInTheDocument();
-    expect(screen.getByText('3')).toBeInTheDocument();
+  });
+
+  it('shows direct row action buttons', () => {
+    render(<ChannelsTable rows={[baseRow]} orgSlug="iconic-academy" />);
+
+    expect(screen.getByRole('button', { name: 'Edit General' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Archive General' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete General' })).toBeInTheDocument();
   });
 
   it('links class channels to class pages', () => {
@@ -55,7 +62,7 @@ describe('ChannelsTable', () => {
       primary_entity_kind: 'learning_space',
     };
 
-    render(<ChannelsTable rows={[baseRow, learningSpaceRow]} onEdit={() => undefined} />);
+    render(<ChannelsTable rows={[baseRow, learningSpaceRow]} orgSlug="iconic-academy" />);
 
     const generalLink = screen.getByRole('link', { name: 'General' });
     expect(generalLink).toHaveAttribute('href', '/iconic-academy/c/channel-1');

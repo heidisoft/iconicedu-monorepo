@@ -13,6 +13,7 @@ export * from '@iconicedu/ui-web/ui/dropdown-menu';
 export * from '@iconicedu/ui-web/ui/dot-pattern';
 export * from '@iconicedu/ui-web/ui/command';
 export * from '@iconicedu/ui-web/ui/accordion';
+export * from '@iconicedu/ui-web/ui/tabs';
 export * from '@iconicedu/ui-web/ui/field';
 export * from '@iconicedu/ui-web/ui/input';
 export * from '@iconicedu/ui-web/ui/textarea';
@@ -41,7 +42,7 @@ export * from '@iconicedu/ui-web/ui/card';
 export * from '@iconicedu/ui-web/components/dashboard-header';
 export * from '@iconicedu/ui-web/components/participant-selector';
 export * from '@iconicedu/ui-web/components/admin/channel-ui-defaults-settings-section';
-export * from '@iconicedu/ui-web/components/admin/admin-user-profile-preview-dialog';
+export * from '@iconicedu/ui-web/components/admin/push-notification-delivery-status-dashboard';
 export * from '@iconicedu/ui-web/components/recurrence-form';
 export * from '@iconicedu/ui-web/components/recurrence-scheduler';
 export { GalleryVerticalEnd } from 'lucide-react';
@@ -84,6 +85,7 @@ export * from '@iconicedu/ui-web/lib/recurrence-types';
 export {
   Archive,
   ArchiveRestore,
+  ChevronLeft,
   ChevronRight,
   Copy,
   Loader2,
@@ -91,6 +93,7 @@ export {
   Pencil,
   Plus,
   RotateCw,
+  Search,
   SearchIcon,
   Trash2,
   UserCheck,

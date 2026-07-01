@@ -50,16 +50,22 @@ describe('buildAdminMenuSections', () => {
     );
   });
 
-  it('does not include activity feed audit when the flag is off', () => {
-    const sections = buildAdminMenuSections('/iconic-academy', {
-      includeActivityFeedAudit: false,
-    });
+  it('includes activity feed and push notification delivery under activity', () => {
+    const sections = buildAdminMenuSections('/iconic-academy');
     const activitySection = sections.find((section) => section.title === 'Activity');
 
-    expect(activitySection?.links.map((link) => link.title)).not.toContain(
-      'Activity feed',
+    expect(activitySection?.links).toEqual(
+      expect.arrayContaining([
+        {
+          title: 'Activity feed',
+          url: '/iconic-academy/admin/activity/feed',
+        },
+        {
+          title: 'Push notifications',
+          url: '/iconic-academy/admin/activity/notifications',
+        },
+      ]),
     );
-    expect(activitySection?.links.map((link) => link.title)).toContain('Activity logs');
   });
 
   it('does not include reports', () => {
@@ -71,10 +77,9 @@ describe('buildAdminMenuSections', () => {
   it('only links to implemented admin pages', () => {
     const implementedAdminPaths = new Set([
       '/admin/activity/feed',
-      '/admin/activity/logs',
+      '/admin/activity/notifications',
       '/admin/attendance/sessions',
       '/admin/channels',
-      '/admin/channels/direct-messages',
       '/admin/classrooms',
       '/admin/settings/activity',
       '/admin/settings/roles',

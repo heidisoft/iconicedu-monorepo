@@ -15,6 +15,7 @@ import {
 import {
   Activity,
   CalendarCheck,
+  ClipboardList,
   Layers,
   Shield,
   ShieldCheck,
@@ -41,6 +42,7 @@ const ADMIN_MENU_ICON_MAP: Record<
   activity: Activity,
   moderation: ShieldCheck,
   system: Sliders,
+  assessments: ClipboardList,
 };
 
 type NavAdminProps = {
@@ -57,7 +59,9 @@ export function NavAdmin({
 }: NavAdminProps) {
   const getIsActive = React.useCallback(
     (url: string) =>
-      activePath ? activePath === url || activePath.startsWith(url) : false,
+      activePath
+        ? activePath === url || activePath.startsWith(url.endsWith('/') ? url : `${url}/`)
+        : false,
     [activePath],
   );
   const [openSections, setOpenSections] = React.useState<Record<string, boolean>>(() =>

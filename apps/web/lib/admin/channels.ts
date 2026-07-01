@@ -10,7 +10,7 @@ import {
 } from '@iconicedu/web/lib/channels/queries/channels.query';
 import { buildUserProfileById } from '@iconicedu/web/lib/profile/builders/user-profile.builder';
 
-type ChannelParticipantDetail = {
+export type ChannelParticipantDetail = {
   id: string;
   displayName: string;
   kind: UserProfileVM['kind'];
@@ -41,10 +41,6 @@ function toDisplayName(input: {
     return first;
   }
   return 'User';
-}
-
-export function filterDirectMessageChannels(rows: AdminChannelRow[]) {
-  return rows.filter((row) => row.kind === 'dm' || row.kind === 'group_dm');
 }
 
 export async function getAdminChannelRows(orgId: string): Promise<AdminChannelRow[]> {
@@ -108,11 +104,4 @@ export async function getAdminChannelRows(orgId: string): Promise<AdminChannelRo
       participantDetails,
     };
   });
-}
-
-export async function getAdminDirectMessageRows(
-  orgId: string,
-): Promise<AdminChannelRow[]> {
-  const rows = await getAdminChannelRows(orgId);
-  return filterDirectMessageChannels(rows);
 }

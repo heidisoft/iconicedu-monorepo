@@ -3,7 +3,6 @@ import { notFound } from 'next/navigation';
 
 import { DashboardHeader } from '@iconicedu/ui-web';
 
-import { getAdminFamilyRows } from '@iconicedu/web/lib/admin/families';
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { FamiliesDashboard } from '@iconicedu/web/app/(app)/[orgSlug]/admin/users/families/families-dashboard';
@@ -26,13 +25,11 @@ export default async function AdminFamiliesPage({
     notFound();
   }
 
-  const rows = await getAdminFamilyRows(org.id);
-
   return (
     <div className="flex flex-1 flex-col">
       <DashboardHeader title="Manage families" />
-      <div className="flex flex-1 flex-col gap-4 p-4">
-        <FamiliesDashboard rows={rows} />
+      <div className="flex flex-1 flex-col p-6 lg:p-8 gap-6">
+        <FamiliesDashboard orgSlug={orgSlug} />
       </div>
     </div>
   );

@@ -9,11 +9,7 @@ import { resolveOrgDashboardPath } from '@iconicedu/web/lib/org/resolve-dashboar
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
-import {
-  enableAuthMobileAppPrompt,
-  enableMobileAppleSignIn,
-  enableMobileGoogleSignIn,
-} from '@iconicedu/web/flags';
+import { enableMobileAppleSignIn, enableMobileGoogleSignIn } from '@iconicedu/web/flags';
 import { isMobileOrTablet } from '@iconicedu/web/lib/mobile/detect-mobile';
 
 export const metadata: Metadata = {
@@ -65,15 +61,14 @@ export default async function OrgGetStartedPage({
 
   const isMobile = isMobileOrTablet(await headers());
 
-  const [showGoogleSignIn, showAppleSignIn, showMobilePrompt] = await Promise.all([
+  const [showGoogleSignIn, showAppleSignIn] = await Promise.all([
     enableMobileGoogleSignIn(),
     enableMobileAppleSignIn(),
-    enableAuthMobileAppPrompt(),
   ]);
 
   return (
     <div className="bg-background flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
-      <MobileAppPrompt defaultVisible={isMobile && showMobilePrompt} />
+      <MobileAppPrompt defaultVisible={isMobile} />
       <div className="w-full max-w-sm">
         <OrgGetStartedClient
           orgSlug={org.slug}

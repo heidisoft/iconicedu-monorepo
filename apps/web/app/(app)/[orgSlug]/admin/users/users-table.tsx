@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,23 +19,12 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
   Input,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-  AdminUserProfilePreviewDialog,
 } from '@iconicedu/ui-web';
 import { toast } from '@iconicedu/ui-web';
 import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
@@ -45,59 +34,30 @@ import {
 } from '@iconicedu/ui-web/components/shared/avatar-with-status';
 import {
   Briefcase,
-  Copy,
+  ChevronLeft,
   ChevronRight,
+  Copy,
   GraduationCap,
-  Shield,
-  User,
-  Users,
-  Trash2,
-  MoreHorizontal,
-  RotateCw,
   Loader2,
   MessageCircle,
+  Pencil,
+  Shield,
+  Trash2,
+  User,
+  Users,
 } from '@iconicedu/ui-web';
+import { Clock3, Link2, MailPlus, MapPin } from 'lucide-react';
 
+import { AdminFilterBar } from '@iconicedu/web/components/admin/admin-filter-bar';
 import { InviteUserDialog } from '@iconicedu/web/app/(app)/[orgSlug]/admin/users/invite-dialog';
-import {
-  buildAdminUserDmPath,
-  groupUsersByFamily,
-} from '@iconicedu/web/app/(app)/[orgSlug]/admin/users/users-table.utils';
+import { buildAdminUserDmPath } from '@iconicedu/web/app/(app)/[orgSlug]/admin/users/users-table.utils';
 import type { AdminUserRow } from '@iconicedu/web/lib/admin/users';
-import type {
-  AvatarSource,
-  ThemeKey,
-  UserAccountVM,
-  UserProfileVM,
-} from '@iconicedu/shared-types';
+import type { AvatarSource, ThemeKey } from '@iconicedu/shared-types';
 
 export type UserRow = AdminUserRow;
 
-type SortKey = 'name' | 'status' | 'updated' | 'lastSeen';
-
 type UsersTableProps = {
-  rows: AdminUserRow[];
-};
-
-type AdminUserProfilePreviewPayload = {
-  account: UserAccountVM | null;
-  profile: UserProfileVM | null;
-  metadata: {
-    accountId: string | null;
-    accountOrgId: string | null;
-    profileId: string | null;
-    profileOrgId: string | null;
-    profileAccountId: string | null;
-    authUserId: string | null;
-    managerStaffId: string | null;
-    childProfileIds: string[];
-    childAccountIds: string[];
-    notificationScopeIds: string[];
-    familyInviteIds: string[];
-    familyInviteFamilyIds: string[];
-    familyInviteAcceptedByAccountIds: string[];
-    familyInviteCreatedByAccountIds: string[];
-  };
+  orgSlug: string;
 };
 
 type BadgeVariant =
@@ -123,7 +83,7 @@ const PROFILE_ICON_MAP: Record<string, React.ComponentType<{ className?: string 
   default: User,
 };
 
-const PAGE_SIZES = [10, 25, 50];
+const PAGE_SIZE = 10;
 const ROLE_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'guardian', label: 'Parent' },
   { value: 'educator', label: 'Tutor' },
@@ -139,25 +99,6 @@ const ROLE_STATUS_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'active', label: 'Approved' },
   { value: 'blocked', label: 'Blocked' },
 ];
-
-function compareNullableDate(
-  left?: string | null,
-  right?: string | null,
-  direction: 'asc' | 'desc' = 'asc',
-): number {
-  if (!left && !right) {
-    return 0;
-  }
-  if (!left) {
-    return 1;
-  }
-  if (!right) {
-    return -1;
-  }
-
-  const compare = left.localeCompare(right);
-  return direction === 'asc' ? compare : -compare;
-}
 
 function formatRelativeLastSeen(value?: string | null): string | null {
   if (!value) {
@@ -192,22 +133,28 @@ function formatRelativeLastSeen(value?: string | null): string | null {
   return `${years} ${years === 1 ? 'year' : 'years'} ago`;
 }
 
+function getPageNumbers(current: number, total: number): (number | -1)[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: (number | -1)[] = [1];
+  if (current > 3) pages.push(-1);
+  for (let p = Math.max(2, current - 1); p <= Math.min(total - 1, current + 1); p++) {
+    pages.push(p);
+  }
+  if (current < total - 2) pages.push(-1);
+  pages.push(total);
+  return pages;
+}
+
 function getUserDisplayName(row: AdminUserRow): string {
   const firstName = row.firstName?.trim() ?? '';
   const lastName = row.lastName?.trim() ?? '';
   const fullName = [firstName, lastName].filter(Boolean).join(' ').trim();
-
-  if (fullName) {
-    return fullName;
-  }
-
+  if (fullName) return fullName;
   return row.displayName?.trim() || row.email || 'Unnamed';
 }
 
-export function UsersTable({ rows }: UsersTableProps) {
+export function UsersTable({ orgSlug }: UsersTableProps) {
   const router = useRouter();
-  const params = useParams<{ orgSlug?: string | string[] }>();
-  const [isPending, startTransition] = React.useTransition();
   const [confirmDeleteUser, setConfirmDeleteUser] = React.useState<UserRow | null>(null);
   const [rowActionLoading, setRowActionLoading] = React.useState<string | null>(null);
   const [loginLink, setLoginLink] = React.useState<string | null>(null);
@@ -223,100 +170,70 @@ export function UsersTable({ rows }: UsersTableProps) {
     roleStatus: 'unassigned',
   });
   const [editSaving, setEditSaving] = React.useState(false);
-  const [expandedParentIds, setExpandedParentIds] = React.useState<string[]>([]);
-  const [previewOpen, setPreviewOpen] = React.useState(false);
-  const [previewLoading, setPreviewLoading] = React.useState(false);
-  const [previewError, setPreviewError] = React.useState<string | null>(null);
-  const [previewPayload, setPreviewPayload] =
-    React.useState<AdminUserProfilePreviewPayload | null>(null);
-  const [previewUser, setPreviewUser] = React.useState<UserRow | null>(null);
-  const refreshing = isPending;
 
-  const handleRefresh = () => {
-    startTransition(() => {
-      router.refresh();
-    });
-  };
+  // Lazy-load state
+  const [rows, setRows] = React.useState<AdminUserRow[]>([]);
+  const [total, setTotal] = React.useState(0);
+  const [pageCount, setPageCount] = React.useState(1);
+  const [loading, setLoading] = React.useState(true);
+  const [fetchError, setFetchError] = React.useState<string | null>(null);
 
   const [search, setSearch] = React.useState('');
+  const [debouncedSearch, setDebouncedSearch] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState<'all' | string>('all');
-  const [sortKey, setSortKey] = React.useState<SortKey>('lastSeen');
-  const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc'>('desc');
+  const [roleFilter, setRoleFilter] = React.useState('all');
+  const [sortBy, setSortBy] = React.useState<'recently_active' | 'created'>(
+    'recently_active',
+  );
   const [pageIndex, setPageIndex] = React.useState(1);
-  const [pageSize, setPageSize] = React.useState(PAGE_SIZES[0]);
 
+  // Debounce search input
+  React.useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // Reset to page 1 when filters change
   React.useEffect(() => {
     setPageIndex(1);
-  }, [search, statusFilter, pageSize]);
+  }, [debouncedSearch, statusFilter, roleFilter, sortBy]);
 
-  const normalizedSearch = React.useMemo(() => search.trim().toLowerCase(), [search]);
-
-  const filteredRows = React.useMemo(() => {
-    return rows.filter((row) => {
-      if (statusFilter !== 'all' && row.status !== statusFilter) {
-        return false;
+  // Fetch page from API
+  const fetchPage = React.useCallback(
+    async (page: number) => {
+      setLoading(true);
+      setFetchError(null);
+      try {
+        const params = new URLSearchParams({
+          orgSlug,
+          page: String(page),
+          ...(debouncedSearch ? { search: debouncedSearch } : {}),
+          ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
+          ...(roleFilter !== 'all' ? { role: roleFilter } : {}),
+          ...(sortBy !== 'recently_active' ? { sortBy } : {}),
+        });
+        const res = await fetch(`/api/admin/users/list?${params.toString()}`);
+        const json = await res.json();
+        if (!res.ok || !json.success) throw new Error(json.message ?? 'Failed to load');
+        setRows(json.rows);
+        setTotal(json.total);
+        setPageCount(json.pageCount);
+      } catch (err) {
+        setFetchError(err instanceof Error ? err.message : 'Failed to load users');
+      } finally {
+        setLoading(false);
       }
-      if (!normalizedSearch) {
-        return true;
-      }
-      const title = getUserDisplayName(row).toLowerCase();
-      if (title.includes(normalizedSearch)) {
-        return true;
-      }
-      if (row.email?.toLowerCase().includes(normalizedSearch)) {
-        return true;
-      }
-      if (row.phone?.toLowerCase().includes(normalizedSearch)) {
-        return true;
-      }
-      if (row.profileKind?.toLowerCase().includes(normalizedSearch)) {
-        return true;
-      }
-      return false;
-    });
-  }, [rows, normalizedSearch, statusFilter]);
-
-  const sortedRows = React.useMemo(() => {
-    const collator = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
-    return [...filteredRows].sort((a, b) => {
-      let compare = 0;
-      if (sortKey === 'name') {
-        compare = collator.compare(getUserDisplayName(a), getUserDisplayName(b));
-      } else if (sortKey === 'status') {
-        compare = collator.compare(a.status, b.status);
-      } else if (sortKey === 'lastSeen') {
-        compare = compareNullableDate(a.lastSeenAt, b.lastSeenAt, sortDirection);
-      } else {
-        compare = compareNullableDate(a.updatedAt, b.updatedAt, sortDirection);
-      }
-      if (sortKey === 'lastSeen' || sortKey === 'updated') {
-        return compare;
-      }
-      return sortDirection === 'asc' ? compare : -compare;
-    });
-  }, [filteredRows, sortDirection, sortKey]);
-
-  const groupedRows = React.useMemo(() => groupUsersByFamily(sortedRows), [sortedRows]);
-
-  const totalRows = groupedRows.length;
-  const pageCount = Math.max(1, Math.ceil(totalRows / pageSize));
-  const visibleGroups = groupedRows.slice(
-    (pageIndex - 1) * pageSize,
-    pageIndex * pageSize,
+    },
+    [orgSlug, debouncedSearch, statusFilter, roleFilter, sortBy],
   );
 
-  const handleSort = (key: SortKey) => {
-    if (sortKey === key) {
-      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
-      return;
-    }
-    setSortKey(key);
-    setSortDirection(key === 'name' || key === 'status' ? 'asc' : 'desc');
-  };
+  React.useEffect(() => {
+    void fetchPage(pageIndex);
+  }, [fetchPage, pageIndex]);
+
+  const handleRefresh = () => void fetchPage(pageIndex);
 
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
-  const rawOrgSlug = params?.orgSlug;
-  const orgSlug = Array.isArray(rawOrgSlug) ? rawOrgSlug[0] : rawOrgSlug;
 
   const openDeleteDialog = (row: UserRow) => {
     setConfirmDeleteUser(row);
@@ -335,10 +252,6 @@ export function UsersTable({ rows }: UsersTableProps) {
   };
 
   const handleStartDirectMessage = (row: UserRow) => {
-    if (!orgSlug) {
-      toast.error('Unable to open DM from this page.');
-      return;
-    }
     if (!row.profileId) {
       toast.error(
         'This user does not have a profile yet. Invite or activate them first.',
@@ -346,38 +259,6 @@ export function UsersTable({ rows }: UsersTableProps) {
       return;
     }
     router.push(buildAdminUserDmPath(orgSlug, row.profileId));
-  };
-
-  const handleOpenProfilePreview = async (row: UserRow) => {
-    setPreviewOpen(true);
-    setPreviewUser(row);
-    setPreviewLoading(true);
-    setPreviewError(null);
-    setPreviewPayload(null);
-
-    try {
-      const params = new URLSearchParams({ accountId: row.id });
-      const response = await fetch(
-        `/api/admin/users/profile-preview?${params.toString()}`,
-      );
-      const result = (await response.json()) as {
-        success?: boolean;
-        message?: string;
-        payload?: AdminUserProfilePreviewPayload;
-      };
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.message ?? 'Unable to load profile preview');
-      }
-
-      setPreviewPayload(result.payload ?? null);
-    } catch (error) {
-      setPreviewError(
-        error instanceof Error ? error.message : 'Unable to load profile preview',
-      );
-    } finally {
-      setPreviewLoading(false);
-    }
   };
 
   const handleEditSave = async () => {
@@ -415,7 +296,7 @@ export function UsersTable({ rows }: UsersTableProps) {
 
       toast.success('Profile updated');
       setEditUser(null);
-      await router.refresh();
+      void fetchPage(pageIndex);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Unable to update user.');
     } finally {
@@ -441,23 +322,12 @@ export function UsersTable({ rows }: UsersTableProps) {
         throw new Error(result?.message ?? 'Failed to delete user');
       }
       setConfirmDeleteUser(null);
-      await router.refresh();
+      void fetchPage(pageIndex);
     } catch (error) {
       window.alert(error instanceof Error ? error.message : 'Unable to delete user.');
     } finally {
       setDeletingId(null);
     }
-  };
-
-  const renderSortIndicator = (key: SortKey) => {
-    if (sortKey !== key) {
-      return null;
-    }
-    return (
-      <span aria-hidden="true" className="ml-1 text-xs opacity-70">
-        {sortDirection === 'asc' ? '↑' : '↓'}
-      </span>
-    );
   };
 
   const handleRowInviteAction = async (row: UserRow, mode: 'invite' | 'link') => {
@@ -505,7 +375,7 @@ export function UsersTable({ rows }: UsersTableProps) {
         toast.success('Magic link resent');
       }
 
-      await router.refresh();
+      void fetchPage(pageIndex);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Invite action failed');
     } finally {
@@ -514,47 +384,20 @@ export function UsersTable({ rows }: UsersTableProps) {
     }
   };
 
-  const toggleExpandedParent = (parentId: string) => {
-    setExpandedParentIds((current) =>
-      current.includes(parentId)
-        ? current.filter((id) => id !== parentId)
-        : [...current, parentId],
-    );
-  };
-
-  const renderUserRow = (
-    row: UserRow,
-    options?: { childrenCount?: number; expanded?: boolean },
-  ) => {
+  const renderUserRow = (row: UserRow) => {
     const displayName = getUserDisplayName(row);
     const relativeLastSeen = formatRelativeLastSeen(row.lastSeenAt);
     const Icon =
       PROFILE_ICON_MAP[row.profileKind ?? 'default'] ?? PROFILE_ICON_MAP.default;
-    const childrenCount = options?.childrenCount ?? 0;
-    const expanded = options?.expanded ?? false;
-    const isExpandable = childrenCount > 0;
 
     return (
-      <TableRow key={row.id} data-deleting={deletingId === row.id ? 'true' : 'false'}>
-        <TableCell>
-          <div className="flex items-center gap-3">
-            {isExpandable ? (
-              <button
-                type="button"
-                onClick={() => toggleExpandedParent(row.id)}
-                className="flex size-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted"
-                aria-label={
-                  expanded ? 'Collapse child accounts' : 'Expand child accounts'
-                }
-                aria-expanded={expanded}
-              >
-                <ChevronRight
-                  className={`size-4 transition-transform ${expanded ? 'rotate-90' : ''}`}
-                />
-              </button>
-            ) : (
-              <div className="size-7 shrink-0" aria-hidden="true" />
-            )}
+      <div
+        key={row.id}
+        className={`px-6 py-4 border-b border-border/60 last:border-b-0 hover:bg-muted/30 transition-colors ${deletingId === row.id ? 'opacity-50' : ''}`}
+      >
+        <div className="flex items-start gap-4">
+          {/* Avatar */}
+          <div className="shrink-0 mt-0.5">
             <AvatarWithStatus
               accountId={row.id}
               profileId={row.profileId ?? null}
@@ -579,398 +422,266 @@ export function UsersTable({ rows }: UsersTableProps) {
               onMessageClick={
                 row.profileId ? () => handleStartDirectMessage(row) : undefined
               }
-              sizeClassName="size-8"
+              sizeClassName="size-9"
             />
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  className="text-left text-sm font-semibold capitalize underline-offset-4 hover:underline"
-                  onClick={() => void handleOpenProfilePreview(row)}
-                >
-                  {displayName}
-                </button>
-                {isExpandable ? (
-                  <Badge
-                    variant="outline"
-                    className="text-[10px] uppercase tracking-wide"
-                  >
-                    {childrenCount} child{childrenCount === 1 ? '' : 'ren'}
-                  </Badge>
-                ) : null}
-              </div>
-              {row.email ? (
-                <p className="text-xs text-muted-foreground">{row.email}</p>
-              ) : null}
-              {row.phone ? (
-                <p className="text-xs text-muted-foreground">{row.phone}</p>
-              ) : null}
-              {!row.email && !row.phone ? (
-                <p className="text-xs text-muted-foreground">—</p>
-              ) : null}
+          </div>
+
+          {/* Info */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm font-semibold">{displayName}</span>
+              {row.profileKind && (
+                <span className="inline-flex items-center gap-1 rounded-full border bg-background px-2 py-0.5 text-xs text-muted-foreground">
+                  <Icon className="h-3 w-3" aria-hidden />
+                  {row.profileKind.charAt(0).toUpperCase() + row.profileKind.slice(1)}
+                </span>
+              )}
+              <Badge
+                variant={STATUS_BADGE_VARIANTS[row.status] ?? 'ghost'}
+                className="text-xs capitalize"
+              >
+                {row.status}
+              </Badge>
+              {row.profileKind === 'guardian' &&
+                (row.linkedChildAccountIds?.length ?? 0) > 0 && (
+                  <span className="inline-flex items-center gap-1 rounded-full border bg-background px-2 py-0.5 text-xs text-muted-foreground">
+                    <Users className="h-3 w-3" aria-hidden />
+                    {row.linkedChildAccountIds!.length}{' '}
+                    {row.linkedChildAccountIds!.length === 1 ? 'child' : 'children'}
+                  </span>
+                )}
+              {row.profileKind === 'child' &&
+                (row.linkedGuardianNames?.length ?? 0) > 0 && (
+                  <span className="inline-flex items-center gap-1 rounded-full border bg-background px-2 py-0.5 text-xs text-muted-foreground">
+                    <Users className="h-3 w-3 shrink-0" aria-hidden />
+                    {row.linkedGuardianNames!.join(', ')}
+                  </span>
+                )}
             </div>
+            {(row.email || row.phone) && (
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {row.email ?? row.phone}
+              </p>
+            )}
+            {/* Chips */}
+            {(row.countryName || relativeLastSeen) && (
+              <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                {row.countryName && (
+                  <span className="inline-flex items-center gap-1 rounded-full border bg-background px-2 py-0.5 text-xs text-muted-foreground">
+                    <MapPin className="h-3 w-3 shrink-0" aria-hidden />
+                    {row.countryName}
+                  </span>
+                )}
+                {relativeLastSeen && (
+                  <span className="inline-flex items-center gap-1 rounded-full border bg-background px-2 py-0.5 text-xs text-muted-foreground">
+                    <Clock3 className="h-3 w-3 shrink-0" aria-hidden />
+                    {relativeLastSeen}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
-        </TableCell>
-        <TableCell>
-          <div className="inline-flex items-center gap-2 text-sm capitalize">
-            <Icon className="size-4 text-muted-foreground" aria-hidden />
-            {row.profileKind ?? 'account'}
-          </div>
-        </TableCell>
-        <TableCell>
-          <p className="text-sm">{row.countryName ?? '—'}</p>
-          <p className="text-xs text-muted-foreground">{row.timezone ?? '—'}</p>
-        </TableCell>
-        <TableCell>
-          <Badge
-            variant={STATUS_BADGE_VARIANTS[row.status] ?? 'ghost'}
-            className="text-xs capitalize"
-          >
-            {row.status}
-          </Badge>
-        </TableCell>
-        <TableCell>
-          {row.updatedAt ? (
-            <p className="text-sm">{new Date(row.updatedAt).toLocaleDateString()}</p>
-          ) : (
-            <span className="text-sm text-muted-foreground">—</span>
-          )}
-        </TableCell>
-        <TableCell>
-          {relativeLastSeen ? (
-            <p className="text-sm">{relativeLastSeen}</p>
-          ) : (
-            <span className="text-sm text-muted-foreground">n/a</span>
-          )}
-        </TableCell>
-        <TableCell>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+
+          {/* Right: actions */}
+          <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center">
+            <div className="flex flex-wrap justify-end gap-1.5">
               <Button
                 variant="outline"
                 size="sm"
-                className="px-2"
-                aria-label={`Actions for ${displayName}`}
-                disabled={deletingId === row.id}
-              >
-                <MoreHorizontal className="size-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onClick={() => openEditDialog(row)}
+                className="h-8 w-8 p-0"
+                aria-label={`Edit ${displayName}`}
+                title="Edit profile"
+                onClick={() => router.push(`/${orgSlug}/admin/users/${row.id}`)}
                 disabled={Boolean(rowActionLoading) || deletingId === row.id}
               >
-                <User className="size-3 mr-2" /> Edit profile
-              </DropdownMenuItem>
-              <DropdownMenuItem
+                <Pencil className="size-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 w-8 p-0"
+                aria-label={`Send message to ${displayName}`}
+                title="Send message"
                 onClick={() => handleStartDirectMessage(row)}
                 disabled={
                   Boolean(rowActionLoading) || deletingId === row.id || !row.profileId
                 }
               >
-                <MessageCircle className="size-3 mr-2" /> Send message
-              </DropdownMenuItem>
+                <MessageCircle className="size-4" />
+              </Button>
               {row.status === 'invited' && (
-                <DropdownMenuItem
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  aria-label={`Resend invite to ${displayName}`}
+                  title="Resend invite"
                   onClick={() => handleRowInviteAction(row, 'invite')}
                   disabled={Boolean(rowActionLoading) || deletingId === row.id}
                 >
-                  <Copy className="size-3 mr-2" /> Resend invite
-                </DropdownMenuItem>
+                  <MailPlus className="size-4" />
+                </Button>
               )}
-              <DropdownMenuItem
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 w-8 p-0"
+                aria-label={`Generate login link for ${displayName}`}
+                title="Generate login link"
                 onClick={() => handleRowInviteAction(row, 'link')}
                 disabled={Boolean(rowActionLoading) || deletingId === row.id}
               >
-                <Copy className="size-3 mr-2" /> Generate a login link
-              </DropdownMenuItem>
-              <DropdownMenuItem
+                <Link2 className="size-4" />
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                className="h-8 w-8 p-0"
+                aria-label={`Delete ${displayName}`}
+                title="Delete"
                 onClick={() => openDeleteDialog(row)}
                 disabled={deletingId === row.id}
               >
-                <Trash2 className="size-3 mr-2" />
-                {deletingId === row.id ? 'Deleting…' : 'Delete'}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </TableCell>
-      </TableRow>
-    );
-  };
-
-  const renderChildPanelRow = (parent: UserRow, children: UserRow[]) => {
-    return (
-      <TableRow key={`${parent.id}:children`} className="bg-muted/20">
-        <TableCell colSpan={7} className="py-0">
-          <div className="ml-10 mr-3 my-3 rounded-xl border border-border/60 bg-background p-3">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-medium">Linked child accounts</p>
-                <p className="text-xs text-muted-foreground">
-                  Accounts connected to {getUserDisplayName(parent)}.
-                </p>
-              </div>
-              <Badge variant="secondary">{children.length}</Badge>
-            </div>
-            <div className="space-y-2">
-              {children.map((child) => {
-                const displayName = getUserDisplayName(child);
-                const Icon =
-                  PROFILE_ICON_MAP[child.profileKind ?? 'default'] ??
-                  PROFILE_ICON_MAP.default;
-                return (
-                  <div
-                    key={`${parent.id}:${child.id}`}
-                    className="flex flex-col gap-3 rounded-lg border border-border/60 bg-card px-3 py-3 md:flex-row md:items-center md:justify-between"
-                  >
-                    <div className="flex min-w-0 items-center gap-3">
-                      <AvatarWithStatus
-                        accountId={child.id}
-                        profileId={child.profileId ?? null}
-                        name={displayName}
-                        avatar={{
-                          source: resolveAvatarSource(child.avatarSource),
-                          url: child.avatarUrl ?? null,
-                          seed:
-                            resolveAvatarSource(child.avatarSource) === 'seed'
-                              ? (child.email ?? undefined)
-                              : undefined,
-                        }}
-                        themeKey={resolveThemeKey(child.themeKey)}
-                        email={child.email ?? null}
-                        roleLabel={getAvatarRoleLabel(child.profileKind ?? null)}
-                        timezone={child.timezone ?? null}
-                        locationLabel={getAvatarLocationLabel({
-                          city: null,
-                          region: null,
-                          countryName: child.countryName ?? null,
-                        })}
-                        onMessageClick={
-                          child.profileId
-                            ? () => handleStartDirectMessage(child)
-                            : undefined
-                        }
-                        sizeClassName="size-8"
-                      />
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            className="text-left text-sm font-semibold capitalize underline-offset-4 hover:underline"
-                            onClick={() => void handleOpenProfilePreview(child)}
-                          >
-                            {displayName}
-                          </button>
-                          <Badge
-                            variant="outline"
-                            className="text-[10px] uppercase tracking-wide"
-                          >
-                            Child
-                          </Badge>
-                        </div>
-                        {child.email ? (
-                          <p className="text-xs text-muted-foreground">{child.email}</p>
-                        ) : null}
-                        {child.phone ? (
-                          <p className="text-xs text-muted-foreground">{child.phone}</p>
-                        ) : null}
-                        {!child.email && !child.phone ? (
-                          <p className="text-xs text-muted-foreground">—</p>
-                        ) : null}
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-3 md:justify-end">
-                      <div className="inline-flex items-center gap-2 text-sm capitalize">
-                        <Icon className="size-4 text-muted-foreground" aria-hidden />
-                        {child.profileKind ?? 'account'}
-                      </div>
-                      <Badge
-                        variant={STATUS_BADGE_VARIANTS[child.status] ?? 'ghost'}
-                        className="text-xs capitalize"
-                      >
-                        {child.status}
-                      </Badge>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="px-2"
-                            aria-label={`Actions for ${displayName}`}
-                            disabled={deletingId === child.id}
-                          >
-                            <MoreHorizontal className="size-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => openEditDialog(child)}
-                            disabled={
-                              Boolean(rowActionLoading) || deletingId === child.id
-                            }
-                          >
-                            <User className="size-3 mr-2" /> Edit profile
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleStartDirectMessage(child)}
-                            disabled={
-                              Boolean(rowActionLoading) ||
-                              deletingId === child.id ||
-                              !child.profileId
-                            }
-                          >
-                            <MessageCircle className="size-3 mr-2" /> Send message
-                          </DropdownMenuItem>
-                          {child.status === 'invited' && (
-                            <DropdownMenuItem
-                              onClick={() => handleRowInviteAction(child, 'invite')}
-                              disabled={
-                                Boolean(rowActionLoading) || deletingId === child.id
-                              }
-                            >
-                              <Copy className="size-3 mr-2" /> Resend invite
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem
-                            onClick={() => handleRowInviteAction(child, 'link')}
-                            disabled={
-                              Boolean(rowActionLoading) || deletingId === child.id
-                            }
-                          >
-                            <Copy className="size-3 mr-2" /> Generate a login link
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => openDeleteDialog(child)}
-                            disabled={deletingId === child.id}
-                          >
-                            <Trash2 className="size-3 mr-2" />
-                            {deletingId === child.id ? 'Deleting…' : 'Delete'}
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
-                );
-              })}
+                <Trash2 className="size-4" />
+              </Button>
             </div>
           </div>
-        </TableCell>
-      </TableRow>
+        </div>
+      </div>
     );
   };
 
   return (
-    <div className="w-full space-y-4 rounded-2xl border border-border bg-card p-4">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div className="flex items-center gap-2">
-          <InviteUserDialog />
+    <div className="flex flex-col gap-4">
+      {/* Title row */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Users</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Manage all enrolled users, families, educators, and staff.
+          </p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <Input
-            placeholder="Search name, email or role"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            className="w-64"
-          />
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Status:</span>
-            <Select
-              value={statusFilter}
-              onValueChange={(value) => setStatusFilter(value)}
-            >
-              <SelectTrigger size="sm" className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="invited">Invited</SelectItem>
-                <SelectItem value="archived">Archived</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="px-2"
-              onClick={handleRefresh}
-              disabled={refreshing}
-              aria-label="Refresh users"
-            >
-              {refreshing ? (
-                <Loader2 className="size-4 animate-spin text-muted-foreground" />
-              ) : (
-                <RotateCw className="size-4 transition-transform" />
-              )}
-            </Button>
+        <InviteUserDialog />
+      </div>
+
+      {/* Filter bar */}
+      <AdminFilterBar
+        search={search}
+        onSearchChange={setSearch}
+        filterGroups={[
+          {
+            label: 'Status',
+            value: statusFilter,
+            options: [
+              { value: 'all', label: 'All' },
+              { value: 'active', label: 'Active' },
+              { value: 'invited', label: 'Invited' },
+              { value: 'archived', label: 'Archived' },
+            ],
+            onChange: setStatusFilter,
+          },
+          {
+            label: 'Role',
+            value: roleFilter,
+            options: [
+              { value: 'all', label: 'All' },
+              { value: 'guardian', label: 'Parent' },
+              { value: 'educator', label: 'Tutor' },
+              { value: 'child', label: 'Student' },
+              { value: 'staff', label: 'Staff' },
+            ],
+            onChange: setRoleFilter,
+          },
+          {
+            label: 'Sort',
+            value: sortBy,
+            options: [
+              { value: 'recently_active', label: 'Recently active' },
+              { value: 'created', label: 'Newest first' },
+            ],
+            onChange: (v) => setSortBy(v as 'recently_active' | 'created'),
+          },
+        ]}
+      />
+
+      <div className="rounded-xl border overflow-hidden">
+        <div className="relative">
+          {loading && (
+            <div className="absolute inset-0 rounded-xl bg-card/90 flex items-center justify-center z-10">
+              <Loader2 className="size-5 animate-spin text-muted-foreground" />
+            </div>
+          )}
+          {/* Container header */}
+          <div className="flex items-center justify-between px-6 py-4 border-b bg-muted/30">
+            <h2 className="text-sm font-semibold">Members</h2>
+          </div>
+          <div className="divide-y divide-border">
+            {fetchError ? (
+              <div className="px-6 py-10 text-center text-sm text-destructive">
+                {fetchError}
+              </div>
+            ) : !loading && rows.length === 0 ? (
+              <div className="px-6 py-10 text-center text-sm text-muted-foreground">
+                No users found.
+              </div>
+            ) : (
+              rows.map((row) => renderUserRow(row))
+            )}
           </div>
         </div>
-      </div>
-      <div className="relative">
-        {isPending && (
-          <div className="absolute inset-0 rounded-2xl border border-border bg-card/90 flex items-center justify-center">
-            <Loader2 className="size-5 animate-spin text-muted-foreground" />
+        {/* Pagination */}
+        {total > 0 && (
+          <div className="flex items-center justify-between px-6 py-3 border-t">
+            <p className="text-xs text-muted-foreground">
+              {(pageIndex - 1) * PAGE_SIZE + 1}–{Math.min(pageIndex * PAGE_SIZE, total)}{' '}
+              of {total}
+            </p>
+            {pageCount > 1 && (
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  disabled={pageIndex <= 1}
+                  onClick={() => setPageIndex((p) => Math.max(1, p - 1))}
+                  aria-label="Previous page"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                {getPageNumbers(pageIndex, pageCount).map((p, i) =>
+                  p === -1 ? (
+                    <span
+                      key={`ellipsis-${i}`}
+                      className="px-1 text-xs text-muted-foreground"
+                    >
+                      …
+                    </span>
+                  ) : (
+                    <Button
+                      key={p}
+                      variant={p === pageIndex ? 'default' : 'outline'}
+                      size="sm"
+                      className="h-8 w-8 p-0 text-xs"
+                      onClick={() => setPageIndex(p)}
+                    >
+                      {p}
+                    </Button>
+                  ),
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  disabled={pageIndex >= pageCount}
+                  onClick={() => setPageIndex((p) => Math.min(pageCount, p + 1))}
+                  aria-label="Next page"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
           </div>
         )}
-        <Table className="min-w-full">
-          <TableHeader>
-            <TableRow>
-              <TableHead>
-                <button
-                  type="button"
-                  className="flex items-center"
-                  onClick={() => handleSort('name')}
-                >
-                  Name {renderSortIndicator('name')}
-                </button>
-              </TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Country / timezone</TableHead>
-              <TableHead>
-                <button
-                  type="button"
-                  className="flex items-center"
-                  onClick={() => handleSort('status')}
-                >
-                  Status {renderSortIndicator('status')}
-                </button>
-              </TableHead>
-              <TableHead>
-                <button
-                  type="button"
-                  className="flex items-center"
-                  onClick={() => handleSort('updated')}
-                >
-                  Updated {renderSortIndicator('updated')}
-                </button>
-              </TableHead>
-              <TableHead>
-                <button
-                  type="button"
-                  className="flex items-center"
-                  onClick={() => handleSort('lastSeen')}
-                >
-                  Last seen {renderSortIndicator('lastSeen')}
-                </button>
-              </TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {visibleGroups.flatMap((group) => {
-              const expanded = expandedParentIds.includes(group.row.id);
-              return [
-                renderUserRow(group.row, {
-                  childrenCount: group.children.length,
-                  expanded,
-                }),
-                ...(expanded && group.children.length
-                  ? [renderChildPanelRow(group.row, group.children)]
-                  : []),
-              ];
-            })}
-          </TableBody>
-        </Table>
       </div>
       <AlertDialog
         open={Boolean(confirmDeleteUser)}
@@ -1007,49 +718,8 @@ export function UsersTable({ rows }: UsersTableProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3 text-xs text-muted-foreground">
-        <div className="flex items-center gap-2">
-          <span>Page size</span>
-          <Select
-            value={String(pageSize)}
-            onValueChange={(value) => setPageSize(Number(value))}
-          >
-            <SelectTrigger size="sm" className="w-20">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {PAGE_SIZES.map((option) => (
-                <SelectItem key={option} value={String(option)}>
-                  {option}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={pageIndex <= 1}
-            onClick={() => setPageIndex((prev) => Math.max(1, prev - 1))}
-          >
-            Previous
-          </Button>
-          <span>
-            Page {pageIndex} of {pageCount}
-          </span>
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={pageIndex >= pageCount}
-            onClick={() => setPageIndex((prev) => Math.min(pageCount, prev + 1))}
-          >
-            Next
-          </Button>
-        </div>
-      </div>
       <Dialog open={linkDialogOpen} onOpenChange={(open) => setLinkDialogOpen(open)}>
-        <DialogContent className="space-y-4 sm:max-w-[42rem]">
+        <DialogContent className="space-y-4 sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Generated login link</DialogTitle>
             <DialogDescription>
@@ -1063,10 +733,7 @@ export function UsersTable({ rows }: UsersTableProps) {
               </div>
             )}
             <div className="flex items-center justify-between gap-3">
-              <span
-                className="text-xs text-muted-foreground break-words"
-                style={{ wordBreak: 'break-word' }}
-              >
+              <span className="text-xs text-muted-foreground wrap-break-word">
                 {loginLink}
               </span>
               <Button
@@ -1089,26 +756,6 @@ export function UsersTable({ rows }: UsersTableProps) {
           </div>
         </DialogContent>
       </Dialog>
-      <AdminUserProfilePreviewDialog
-        open={previewOpen}
-        onOpenChange={(open) => {
-          setPreviewOpen(open);
-          if (!open) {
-            setPreviewUser(null);
-            setPreviewPayload(null);
-            setPreviewError(null);
-            setPreviewLoading(false);
-          }
-        }}
-        account={previewPayload?.account ?? null}
-        profile={previewPayload?.profile ?? null}
-        metadata={previewPayload?.metadata ?? null}
-        isLoading={previewLoading}
-        error={previewError}
-        onDmClick={
-          previewUser?.profileId ? () => handleStartDirectMessage(previewUser) : undefined
-        }
-      />
       <Dialog
         open={Boolean(editUser)}
         onOpenChange={(open) => {
@@ -1117,7 +764,7 @@ export function UsersTable({ rows }: UsersTableProps) {
           }
         }}
       >
-        <DialogContent className="space-y-4 sm:max-w-[42rem]">
+        <DialogContent className="space-y-4 sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Edit profile</DialogTitle>
             <DialogDescription>

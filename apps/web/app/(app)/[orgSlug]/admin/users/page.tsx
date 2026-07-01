@@ -3,7 +3,6 @@ import { notFound } from 'next/navigation';
 
 import { DashboardHeader } from '@iconicedu/ui-web';
 
-import { getAdminUserRows } from '@iconicedu/web/lib/admin/users';
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { UsersTable } from '@iconicedu/web/app/(app)/[orgSlug]/admin/users/users-table';
@@ -26,18 +25,11 @@ export default async function AdminUsersPage({
     notFound();
   }
 
-  let rows: Awaited<ReturnType<typeof getAdminUserRows>> = [];
-  try {
-    rows = await getAdminUserRows(org.id);
-  } catch {
-    notFound();
-  }
-
   return (
     <div className="flex flex-1 flex-col">
       <DashboardHeader title="Users" />
-      <div className="flex flex-1 flex-col gap-4 p-4">
-        <UsersTable rows={rows} />
+      <div className="flex flex-1 flex-col p-6 lg:p-8 gap-6">
+        <UsersTable orgSlug={orgSlug} />
       </div>
     </div>
   );

@@ -15,7 +15,8 @@ export type SidebarIconKey =
   | 'earth'
   | 'square-pi'
   | 'life-buoy'
-  | 'send';
+  | 'send'
+  | 'assessments';
 
 export type SidebarIconComponent = React.ComponentType<{ className?: string }>;
 
