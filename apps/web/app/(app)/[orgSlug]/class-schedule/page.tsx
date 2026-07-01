@@ -6,7 +6,6 @@ import {
   getDashboardAccountContext,
   getDashboardProfileContext,
 } from '@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth';
-import { enableClassScheduleStaffEdit } from '@iconicedu/web/flags';
 
 export const metadata: Metadata = {
   title: 'Class Schedule',
@@ -70,11 +69,6 @@ export default async function ClassSchedulePage({
   const events = filterSchedulesForViewerProfile(allEvents, currentUserProfile);
   const canManageSessions =
     account.primary_role === 'staff' || account.primary_role === 'owner';
-  const canEditSessions =
-    canManageSessions &&
-    (await enableClassScheduleStaffEdit.run({
-      identify: { profileId: currentUserProfile?.ids.id ?? null },
-    }));
 
   return (
     <ClassScheduleClient
@@ -82,7 +76,7 @@ export default async function ClassSchedulePage({
       timezone={currentUserProfile?.prefs.timezone ?? null}
       orgSlug={orgSlug}
       canCancelSessions={canManageSessions}
-      canEditSessions={canEditSessions}
+      canEditSessions={canManageSessions}
     />
   );
 }

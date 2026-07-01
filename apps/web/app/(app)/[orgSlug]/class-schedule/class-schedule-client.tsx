@@ -136,6 +136,7 @@ export function ClassScheduleClient({
           events={scheduleEvents}
           canCancelSessions={canCancelSessions}
           canEditSessions={canEditSessions}
+          editFullScheduleHref={canEditSessions ? `/${orgSlug}/admin/classrooms` : null}
           onCancelSession={handleCancelSession}
           onEditSession={handleEditSession}
         />

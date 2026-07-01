@@ -11,7 +11,6 @@ const buildClassSchedulesByOrgMock = vi.fn();
 const getDashboardAccountContextMock = vi.fn();
 const getDashboardProfileContextMock = vi.fn();
 const classScheduleClientMock = vi.fn(() => null);
-const enableClassScheduleStaffEditRunMock = vi.fn(async () => false);
 
 vi.mock('@iconicedu/web/lib/schedules/builders/class-schedule.builder', () => ({
   buildClassSchedulesByOrg: (...args: unknown[]) => buildClassSchedulesByOrgMock(...args),
@@ -30,12 +29,6 @@ vi.mock(
     ClassScheduleClient: (props: unknown) => classScheduleClientMock(props),
   }),
 );
-
-vi.mock('@iconicedu/web/flags', () => ({
-  enableClassScheduleStaffEdit: {
-    run: (...args: unknown[]) => enableClassScheduleStaffEditRunMock(...args),
-  },
-}));
 
 function createSchedule(input: {
   id: string;
@@ -70,8 +63,6 @@ describe('class schedule page viewer scoping', () => {
     getDashboardAccountContextMock.mockReset();
     getDashboardProfileContextMock.mockReset();
     classScheduleClientMock.mockReset();
-    enableClassScheduleStaffEditRunMock.mockReset();
-    enableClassScheduleStaffEditRunMock.mockResolvedValue(false);
 
     getDashboardAccountContextMock.mockResolvedValue({
       supabase: {},
@@ -178,7 +169,7 @@ describe('class schedule page viewer scoping', () => {
     );
   });
 
-  it('enables session cancellation for owners by role only', async () => {
+  it('enables session management for owners by role only', async () => {
     getDashboardAccountContextMock.mockResolvedValue({
       supabase: {},
       account: { id: 'account-1', org_id: 'org-1', primary_role: 'owner' },
@@ -209,18 +200,17 @@ describe('class schedule page viewer scoping', () => {
     expect(classScheduleClientMock).toHaveBeenCalledWith(
       expect.objectContaining({
         canCancelSessions: true,
-        canEditSessions: false,
+        canEditSessions: true,
         orgSlug: 'iconic-academy',
       }),
     );
   });
 
-  it('enables session editing for owners only when the edit flag is on', async () => {
+  it('enables session management for staff by role only', async () => {
     getDashboardAccountContextMock.mockResolvedValue({
       supabase: {},
-      account: { id: 'account-1', org_id: 'org-1', primary_role: 'owner' },
+      account: { id: 'account-1', org_id: 'org-1', primary_role: 'staff' },
     });
-    enableClassScheduleStaffEditRunMock.mockResolvedValue(true);
     buildClassSchedulesByOrgMock.mockResolvedValue([
       createSchedule({
         id: 'schedule-staff-visible',
@@ -244,9 +234,6 @@ describe('class schedule page viewer scoping', () => {
       expect(classScheduleClientMock).toHaveBeenCalled();
     });
 
-    expect(enableClassScheduleStaffEditRunMock).toHaveBeenCalledWith({
-      identify: { profileId: 'staff-1' },
-    });
     expect(classScheduleClientMock).toHaveBeenCalledWith(
       expect.objectContaining({
         canCancelSessions: true,

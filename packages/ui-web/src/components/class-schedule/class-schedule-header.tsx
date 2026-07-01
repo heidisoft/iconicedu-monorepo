@@ -2,7 +2,15 @@
 
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { ButtonGroup } from '@iconicedu/ui-web/ui/button-group';
-import { ChevronLeft, ChevronRight, Columns4, Columns } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@iconicedu/ui-web/ui/tooltip';
+import {
+  CalendarCog,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  Columns4,
+  Columns,
+} from 'lucide-react';
 import type { ClassScheduleViewVM } from '@iconicedu/shared-types';
 
 interface ClassScheduleHeaderProps {
@@ -10,6 +18,7 @@ interface ClassScheduleHeaderProps {
   view: ClassScheduleViewVM;
   onViewChange: (view: ClassScheduleViewVM) => void;
   onNavigate: (direction: 'prev' | 'next' | 'today') => void;
+  editFullScheduleHref?: string | null;
 }
 
 export function ClassScheduleHeader({
@@ -17,6 +26,7 @@ export function ClassScheduleHeader({
   view,
   onViewChange,
   onNavigate,
+  editFullScheduleHref,
 }: ClassScheduleHeaderProps) {
   const monthYear = currentDate.toLocaleDateString('en-US', {
     month: 'long',
@@ -61,30 +71,86 @@ export function ClassScheduleHeader({
 
       <div className="flex items-center gap-2">
         <ButtonGroup>
-          <Button variant="outline" size="icon" onClick={() => onNavigate('prev')}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label="Previous period"
+                onClick={() => onNavigate('prev')}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Previous period</TooltipContent>
+          </Tooltip>
 
-          <Button variant="outline" onClick={() => onNavigate('today')}>
-            Today
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label="Today"
+                onClick={() => onNavigate('today')}
+              >
+                <CalendarDays className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Today</TooltipContent>
+          </Tooltip>
 
-          <Button variant="outline" size="icon" onClick={() => onNavigate('next')}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label="Next period"
+                onClick={() => onNavigate('next')}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Next period</TooltipContent>
+          </Tooltip>
         </ButtonGroup>
 
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => onViewChange(view === 'week' ? 'day' : 'week')}
-        >
-          {view === 'week' ? (
-            <Columns className="h-4 w-4" />
-          ) : (
-            <Columns4 className="h-4 w-4" />
-          )}
-        </Button>
+        {editFullScheduleHref ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                asChild
+                variant="outline"
+                size="icon"
+                aria-label="Edit full schedule"
+              >
+                <a href={editFullScheduleHref}>
+                  <CalendarCog className="h-4 w-4" />
+                </a>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Edit full schedule</TooltipContent>
+          </Tooltip>
+        ) : null}
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label={view === 'week' ? 'Switch to day view' : 'Switch to week view'}
+              onClick={() => onViewChange(view === 'week' ? 'day' : 'week')}
+            >
+              {view === 'week' ? (
+                <Columns className="h-4 w-4" />
+              ) : (
+                <Columns4 className="h-4 w-4" />
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            {view === 'week' ? 'Switch to day view' : 'Switch to week view'}
+          </TooltipContent>
+        </Tooltip>
       </div>
     </div>
   );

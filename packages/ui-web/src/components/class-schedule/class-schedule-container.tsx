@@ -27,6 +27,7 @@ interface ClassScheduleContainerProps {
   childrenCount?: number;
   canCancelSessions?: boolean;
   canEditSessions?: boolean;
+  editFullScheduleHref?: string | null;
   onCancelSession?: (
     event: DisplayClassScheduleVM,
     input: CancelSessionActionInput,
@@ -46,6 +47,7 @@ export function ClassScheduleContainer({
   childrenCount,
   canCancelSessions = false,
   canEditSessions = false,
+  editFullScheduleHref,
   onCancelSession,
   onEditSession,
 }: ClassScheduleContainerProps) {
@@ -98,6 +100,7 @@ export function ClassScheduleContainer({
         view={view}
         onViewChange={onViewChange}
         onNavigate={handleNavigate}
+        editFullScheduleHref={editFullScheduleHref}
       />
 
       {view === 'week' ? (
