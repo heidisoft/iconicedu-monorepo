@@ -42,10 +42,6 @@ export * from '@iconicedu/ui-web/components/dashboard-header';
 export * from '@iconicedu/ui-web/components/participant-selector';
 export * from '@iconicedu/ui-web/components/admin/channel-ui-defaults-settings-section';
 export * from '@iconicedu/ui-web/components/admin/admin-user-profile-preview-dialog';
-export * from '@iconicedu/ui-web/components/admin/admin-report-chart-card';
-export * from '@iconicedu/ui-web/components/admin/admin-report-empty-state';
-export * from '@iconicedu/ui-web/components/admin/admin-report-kpi-card';
-export * from '@iconicedu/ui-web/components/admin/admin-reports-overview';
 export * from '@iconicedu/ui-web/components/recurrence-form';
 export * from '@iconicedu/ui-web/components/recurrence-scheduler';
 export { GalleryVerticalEnd } from 'lucide-react';
@@ -85,7 +81,6 @@ export { Toaster } from '@iconicedu/ui-web/ui/sonner';
 export { toast } from 'sonner';
 export * from '@iconicedu/ui-web/lib/icons';
 export * from '@iconicedu/ui-web/lib/recurrence-types';
-export * from '@iconicedu/ui-web/ui/chart';
 export {
   Archive,
   ArchiveRestore,

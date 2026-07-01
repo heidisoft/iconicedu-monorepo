@@ -14,7 +14,6 @@ const {
   mapOrgSubjectRowsToOptionsMock,
   buildAdminMenuSectionsMock,
   enableAdminActivityFeedAuditRunMock,
-  enableAdminReportsRunMock,
   shouldRedirectToAuthResumeMock,
   resolveOrgDashboardPathMock,
   redirectMock,
@@ -33,7 +32,6 @@ const {
   mapOrgSubjectRowsToOptionsMock: vi.fn(),
   buildAdminMenuSectionsMock: vi.fn(),
   enableAdminActivityFeedAuditRunMock: vi.fn(),
-  enableAdminReportsRunMock: vi.fn(),
   shouldRedirectToAuthResumeMock: vi.fn(),
   resolveOrgDashboardPathMock: vi.fn(),
   redirectMock: vi.fn(),
@@ -97,9 +95,6 @@ vi.mock('@iconicedu/web/flags', () => ({
   enableAdminActivityFeedAudit: {
     run: (...args: unknown[]) => enableAdminActivityFeedAuditRunMock(...args),
   },
-  enableAdminReports: {
-    run: (...args: unknown[]) => enableAdminReportsRunMock(...args),
-  },
 }));
 
 vi.mock('@iconicedu/web/app/(app)/[orgSlug]/layout-auth-gate', () => ({
@@ -138,7 +133,6 @@ describe('org layout persona flags', () => {
     mapOrgSubjectRowsToOptionsMock.mockReset();
     buildAdminMenuSectionsMock.mockReset();
     enableAdminActivityFeedAuditRunMock.mockReset();
-    enableAdminReportsRunMock.mockReset();
     shouldRedirectToAuthResumeMock.mockReset();
     resolveOrgDashboardPathMock.mockReset();
     redirectMock.mockReset();
@@ -181,7 +175,6 @@ describe('org layout persona flags', () => {
     mapOrgSubjectRowsToOptionsMock.mockReturnValue([]);
     buildAdminMenuSectionsMock.mockReturnValue([]);
     enableAdminActivityFeedAuditRunMock.mockResolvedValue(false);
-    enableAdminReportsRunMock.mockResolvedValue(false);
     resolveOrgDashboardPathMock.mockResolvedValue('/iconic-academy');
   });
 
@@ -197,7 +190,6 @@ describe('org layout persona flags', () => {
     expect(sidebarShellElement?.props?.isPersonaAddEnabled).toBe(true);
     expect(buildAdminMenuSectionsMock).toHaveBeenCalledWith('/iconic-academy', {
       includeActivityFeedAudit: false,
-      includeReports: true,
     });
   });
 
