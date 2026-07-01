@@ -106,22 +106,6 @@ export const enableMobileAppleSignIn = flag<boolean, { profileId?: string | null
   },
 });
 
-export const enableAdminReports = flag<boolean, { profileId?: string | null }>({
-  key: 'enable-admin-reports',
-  description: 'Enables the admin reporting dashboard and navigation entry.',
-  options: [
-    { label: 'Off', value: false },
-    { label: 'On', value: true },
-  ],
-  defaultValue: true,
-  async decide({ entities }) {
-    return evaluateWebBooleanFlag({
-      flagKey: 'enable-admin-reports',
-      profileId: entities?.profileId,
-    });
-  },
-});
-
 export const enableAdminActivityFeedAudit = flag<boolean, { profileId?: string | null }>({
   key: 'enable-admin-activity-feed-audit',
   description: 'Enables the admin audit view for generated activity feed items.',
@@ -228,7 +212,6 @@ export const enableAssessments = flag<boolean, { profileId?: string | null }>({
 
 export const webFlags = {
   enableAdminActivityFeedAudit,
-  enableAdminReports,
   enableAssessments,
   enableAuthMobileAppPrompt,
   enableChannelCommunications,

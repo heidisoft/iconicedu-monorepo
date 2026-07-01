@@ -14,7 +14,6 @@ const {
   mapOrgSubjectRowsToOptionsMock,
   buildAdminMenuSectionsMock,
   enableAdminActivityFeedAuditRunMock,
-  enableAdminReportsRunMock,
   enableAssessmentsRunMock,
   shouldRedirectToAuthResumeMock,
   resolveOrgDashboardPathMock,
@@ -34,7 +33,6 @@ const {
   mapOrgSubjectRowsToOptionsMock: vi.fn(),
   buildAdminMenuSectionsMock: vi.fn(),
   enableAdminActivityFeedAuditRunMock: vi.fn(),
-  enableAdminReportsRunMock: vi.fn(),
   enableAssessmentsRunMock: vi.fn(),
   shouldRedirectToAuthResumeMock: vi.fn(),
   resolveOrgDashboardPathMock: vi.fn(),
@@ -99,9 +97,6 @@ vi.mock('@iconicedu/web/flags', () => ({
   enableAdminActivityFeedAudit: {
     run: (...args: unknown[]) => enableAdminActivityFeedAuditRunMock(...args),
   },
-  enableAdminReports: {
-    run: (...args: unknown[]) => enableAdminReportsRunMock(...args),
-  },
   enableAssessments: {
     run: (...args: unknown[]) => enableAssessmentsRunMock(...args),
   },
@@ -143,7 +138,6 @@ describe('org layout persona flags', () => {
     mapOrgSubjectRowsToOptionsMock.mockReset();
     buildAdminMenuSectionsMock.mockReset();
     enableAdminActivityFeedAuditRunMock.mockReset();
-    enableAdminReportsRunMock.mockReset();
     enableAssessmentsRunMock.mockReset();
     shouldRedirectToAuthResumeMock.mockReset();
     resolveOrgDashboardPathMock.mockReset();
@@ -187,7 +181,6 @@ describe('org layout persona flags', () => {
     mapOrgSubjectRowsToOptionsMock.mockReturnValue([]);
     buildAdminMenuSectionsMock.mockReturnValue([]);
     enableAdminActivityFeedAuditRunMock.mockResolvedValue(false);
-    enableAdminReportsRunMock.mockResolvedValue(false);
     enableAssessmentsRunMock.mockResolvedValue(false);
     resolveOrgDashboardPathMock.mockResolvedValue('/iconic-academy');
   });
@@ -204,7 +197,7 @@ describe('org layout persona flags', () => {
     expect(sidebarShellElement?.props?.isPersonaAddEnabled).toBe(true);
     expect(buildAdminMenuSectionsMock).toHaveBeenCalledWith('/iconic-academy', {
       includeActivityFeedAudit: false,
-      includeReports: true,
+      includeReports: false,
       includeAssessments: false,
     });
   });

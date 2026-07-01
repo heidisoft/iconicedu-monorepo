@@ -50,14 +50,6 @@ describe('buildAdminMenuSections', () => {
     );
   });
 
-  it('does not include reports when the flag is off', () => {
-    const sections = buildAdminMenuSections('/iconic-academy', {
-      includeReports: false,
-    });
-
-    expect(sections.map((section) => section.title)).not.toContain('Reports');
-  });
-
   it('does not include activity feed audit when the flag is off', () => {
     const sections = buildAdminMenuSections('/iconic-academy', {
       includeActivityFeedAudit: false,
@@ -70,34 +62,10 @@ describe('buildAdminMenuSections', () => {
     expect(activitySection?.links.map((link) => link.title)).toContain('Activity logs');
   });
 
-  it('includes reports by default', () => {
+  it('does not include reports', () => {
     const sections = buildAdminMenuSections('/iconic-academy');
 
-    expect(sections).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          title: 'Reports',
-          links: [
-            { title: 'Overview', url: '/iconic-academy/admin/reports' },
-            { title: 'Users', url: '/iconic-academy/admin/reports/users' },
-            {
-              title: 'Classrooms & sessions',
-              url: '/iconic-academy/admin/reports/classrooms',
-            },
-            { title: 'Channels', url: '/iconic-academy/admin/reports/channels' },
-            { title: 'Activity', url: '/iconic-academy/admin/reports/activity' },
-          ],
-        }),
-      ]),
-    );
-  });
-
-  it('places reports immediately before settings', () => {
-    const titles = buildAdminMenuSections('/iconic-academy').map(
-      (section) => section.title,
-    );
-
-    expect(titles.indexOf('Reports')).toBe(titles.indexOf('Settings') - 1);
+    expect(sections.map((section) => section.title)).not.toContain('Reports');
   });
 
   it('only links to implemented admin pages', () => {
@@ -107,11 +75,6 @@ describe('buildAdminMenuSections', () => {
       '/admin/attendance/sessions',
       '/admin/channels',
       '/admin/classrooms',
-      '/admin/reports',
-      '/admin/reports/activity',
-      '/admin/reports/channels',
-      '/admin/reports/classrooms',
-      '/admin/reports/users',
       '/admin/settings/activity',
       '/admin/settings/roles',
       '/admin/settings/subjects',

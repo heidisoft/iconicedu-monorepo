@@ -14,7 +14,6 @@ export * from './vm/channel';
 export * from './vm/activity-feed';
 export * from './vm/activity-event';
 export * from './vm/admin-menu';
-export * from './vm/admin-reports';
 export * from './vm/roles';
 export * from './vm/family';
 export * from './vm/account';

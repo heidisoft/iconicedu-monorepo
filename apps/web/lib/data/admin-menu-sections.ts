@@ -43,17 +43,6 @@ export function buildAdminMenuSections(
       links: activityLinks,
     },
     {
-      title: 'Reports',
-      iconKey: 'reports',
-      links: [
-        { title: 'Overview', url: `${basePath}/admin/reports` },
-        { title: 'Users', url: `${basePath}/admin/reports/users` },
-        { title: 'Classrooms & sessions', url: `${basePath}/admin/reports/classrooms` },
-        { title: 'Channels', url: `${basePath}/admin/reports/channels` },
-        { title: 'Activity', url: `${basePath}/admin/reports/activity` },
-      ],
-    },
-    {
       title: 'Settings',
       iconKey: 'system',
       links: [
