@@ -23,7 +23,7 @@ import {
   listActiveOrgSubjectCatalog,
   mapOrgSubjectRowsToOptions,
 } from '@iconicedu/web/lib/subjects/queries/org-subject-catalog.query';
-import { enableAdminActivityFeedAudit, enableAssessments } from '@iconicedu/web/flags';
+import { enableAssessments } from '@iconicedu/web/flags';
 
 export const metadata: Metadata = {
   title: {
@@ -109,9 +109,6 @@ export default async function Layout({
     account.org_id,
   );
   const subjectOptions = mapOrgSubjectRowsToOptions(subjectCatalogResponse.data);
-  const includeActivityFeedAudit = await enableAdminActivityFeedAudit.run({
-    identify: { profileId: familyViewResolution.effectiveProfile.id },
-  });
   const assessmentsEnabled = await enableAssessments.run({
     identify: { profileId: familyViewResolution.effectiveProfile.id },
   });
@@ -125,7 +122,6 @@ export default async function Layout({
         isPersonaSwitchEnabled
         isPersonaAddEnabled
         adminSections={buildAdminMenuSections(`/${orgSlug}`, {
-          includeActivityFeedAudit,
           includeReports,
           includeAssessments: assessmentsEnabled,
         })}

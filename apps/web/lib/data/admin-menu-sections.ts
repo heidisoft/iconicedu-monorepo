@@ -3,16 +3,16 @@ import type { AdminMenuSectionVM } from '@iconicedu/shared-types';
 export function buildAdminMenuSections(
   basePath: string,
   options: {
-    includeActivityFeedAudit?: boolean;
     includeReports?: boolean;
     includeAssessments?: boolean;
   } = {},
 ): AdminMenuSectionVM[] {
   const activityLinks = [
-    ...(options.includeActivityFeedAudit === false
-      ? []
-      : [{ title: 'Activity feed', url: `${basePath}/admin/activity/feed` }]),
-    { title: 'Activity logs', url: `${basePath}/admin/activity/logs` },
+    { title: 'Activity feed', url: `${basePath}/admin/activity/feed` },
+    {
+      title: 'Push notifications',
+      url: `${basePath}/admin/activity/notifications`,
+    },
   ];
 
   const sections: AdminMenuSectionVM[] = [

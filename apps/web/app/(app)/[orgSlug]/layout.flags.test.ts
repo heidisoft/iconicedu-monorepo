@@ -13,7 +13,6 @@ const {
   listActiveOrgSubjectCatalogMock,
   mapOrgSubjectRowsToOptionsMock,
   buildAdminMenuSectionsMock,
-  enableAdminActivityFeedAuditRunMock,
   enableAssessmentsRunMock,
   shouldRedirectToAuthResumeMock,
   resolveOrgDashboardPathMock,
@@ -32,7 +31,6 @@ const {
   listActiveOrgSubjectCatalogMock: vi.fn(),
   mapOrgSubjectRowsToOptionsMock: vi.fn(),
   buildAdminMenuSectionsMock: vi.fn(),
-  enableAdminActivityFeedAuditRunMock: vi.fn(),
   enableAssessmentsRunMock: vi.fn(),
   shouldRedirectToAuthResumeMock: vi.fn(),
   resolveOrgDashboardPathMock: vi.fn(),
@@ -94,9 +92,6 @@ vi.mock('@iconicedu/web/lib/data/admin-menu-sections', () => ({
 }));
 
 vi.mock('@iconicedu/web/flags', () => ({
-  enableAdminActivityFeedAudit: {
-    run: (...args: unknown[]) => enableAdminActivityFeedAuditRunMock(...args),
-  },
   enableAssessments: {
     run: (...args: unknown[]) => enableAssessmentsRunMock(...args),
   },
@@ -137,7 +132,6 @@ describe('org layout persona flags', () => {
     listActiveOrgSubjectCatalogMock.mockReset();
     mapOrgSubjectRowsToOptionsMock.mockReset();
     buildAdminMenuSectionsMock.mockReset();
-    enableAdminActivityFeedAuditRunMock.mockReset();
     enableAssessmentsRunMock.mockReset();
     shouldRedirectToAuthResumeMock.mockReset();
     resolveOrgDashboardPathMock.mockReset();
@@ -180,7 +174,6 @@ describe('org layout persona flags', () => {
     listActiveOrgSubjectCatalogMock.mockResolvedValue({ data: [], error: null });
     mapOrgSubjectRowsToOptionsMock.mockReturnValue([]);
     buildAdminMenuSectionsMock.mockReturnValue([]);
-    enableAdminActivityFeedAuditRunMock.mockResolvedValue(false);
     enableAssessmentsRunMock.mockResolvedValue(false);
     resolveOrgDashboardPathMock.mockResolvedValue('/iconic-academy');
   });
@@ -196,7 +189,6 @@ describe('org layout persona flags', () => {
     expect(sidebarShellElement?.props?.isPersonaSwitchEnabled).toBe(true);
     expect(sidebarShellElement?.props?.isPersonaAddEnabled).toBe(true);
     expect(buildAdminMenuSectionsMock).toHaveBeenCalledWith('/iconic-academy', {
-      includeActivityFeedAudit: false,
       includeReports: false,
       includeAssessments: false,
     });

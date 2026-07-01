@@ -7,7 +7,6 @@ vi.mock('@iconicedu/web/lib/flags/posthog-flags', () => ({
 }));
 
 import {
-  enableAdminActivityFeedAudit,
   enableChannelCommunications,
   enableClassScheduleStaffCancel,
   enableClassScheduleStaffEdit,
@@ -36,12 +35,6 @@ describe('web flags', () => {
     expect(enableChannelCommunications.key).toBe('enable-channel-communications');
     expect(enableChannelCommunications.defaultValue).toBe(false);
     expect(webFlags.enableChannelCommunications).toBe(enableChannelCommunications);
-  });
-
-  it('declares the admin activity feed audit flag with stable metadata', () => {
-    expect(enableAdminActivityFeedAudit.key).toBe('enable-admin-activity-feed-audit');
-    expect(enableAdminActivityFeedAudit.defaultValue).toBe(false);
-    expect(webFlags.enableAdminActivityFeedAudit).toBe(enableAdminActivityFeedAudit);
   });
 
   it('declares the message type composer flag with stable metadata', () => {
@@ -144,7 +137,6 @@ describe('web flags', () => {
     const providerData = await getFlagsProviderData();
 
     expect(providerData).toBeTruthy();
-    expect(JSON.stringify(providerData)).toContain('enable-admin-activity-feed-audit');
     expect(JSON.stringify(providerData)).toContain('enable-channel-communications');
     expect(JSON.stringify(providerData)).toContain('enable-class-schedule-staff-cancel');
     expect(JSON.stringify(providerData)).toContain('enable-class-schedule-staff-edit');
