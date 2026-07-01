@@ -13,7 +13,12 @@ import {
 import { AssessmentTestsService } from './assessment-tests.service';
 import { AuthGuard } from '@iconicedu/api/modules/auth/auth.guard';
 import type { AuthenticatedRequest } from '@iconicedu/api/lib/http/authenticated-request';
-import { requireAssessmentOrgManager } from '@iconicedu/api/modules/assessments/assessment-access';
+import {
+  requireAssessmentOrgManager,
+  requireAssessmentSectionManager,
+  requireAssessmentSkillPoolManager,
+  requireAssessmentTestManager,
+} from '@iconicedu/api/modules/assessments/assessment-access';
 
 @Controller('assessment-tests')
 export class AssessmentTestsController {
@@ -97,7 +102,8 @@ export class AssessmentTestsController {
   // Sections
   @Post(':id/sections')
   @UseGuards(AuthGuard)
-  addSection(
+  async addSection(
+    @Req() req: AuthenticatedRequest,
     @Param('id') testId: string,
     @Body()
     body: {
@@ -107,46 +113,58 @@ export class AssessmentTestsController {
       itemsToShow?: number;
     },
   ) {
+    await requireAssessmentTestManager(req.user.id, testId);
     return this.service.addSection(testId, body);
   }
 
   @Delete('sections/:sectionId')
   @UseGuards(AuthGuard)
-  deleteSection(@Param('sectionId') sectionId: string) {
+  async deleteSection(
+    @Req() req: AuthenticatedRequest,
+    @Param('sectionId') sectionId: string,
+  ) {
+    await requireAssessmentSectionManager(req.user.id, sectionId);
     return this.service.deleteSection(sectionId);
   }
 
   @Post('sections/:sectionId/items')
   @UseGuards(AuthGuard)
-  addItemToSection(
+  async addItemToSection(
+    @Req() req: AuthenticatedRequest,
     @Param('sectionId') sectionId: string,
     @Body() body: { itemId: string; orderPosition?: number; points?: number },
   ) {
-    return this.service.addItemToSection(sectionId, body);
+    const actor = await requireAssessmentSectionManager(req.user.id, sectionId);
+    return this.service.addItemToSection(sectionId, body, actor.orgId);
   }
 
   @Delete('sections/:sectionId/items/:itemId')
   @UseGuards(AuthGuard)
-  removeItemFromSection(
+  async removeItemFromSection(
+    @Req() req: AuthenticatedRequest,
     @Param('sectionId') sectionId: string,
     @Param('itemId') itemId: string,
   ) {
+    await requireAssessmentSectionManager(req.user.id, sectionId);
     return this.service.removeItemFromSection(sectionId, itemId);
   }
 
   @Put('sections/:sectionId/items/reorder')
   @UseGuards(AuthGuard)
-  reorderSectionItems(
+  async reorderSectionItems(
+    @Req() req: AuthenticatedRequest,
     @Param('sectionId') sectionId: string,
     @Body() body: { items: { itemId: string; orderPosition: number }[] },
   ) {
+    await requireAssessmentSectionManager(req.user.id, sectionId);
     return this.service.reorderSectionItems(sectionId, body.items);
   }
 
   // Skill pools (adaptive)
   @Post(':id/skill-pools')
   @UseGuards(AuthGuard)
-  addSkillPool(
+  async addSkillPool(
+    @Req() req: AuthenticatedRequest,
     @Param('id') testId: string,
     @Body()
     body: {
@@ -158,12 +176,14 @@ export class AssessmentTestsController {
       orderPosition?: number;
     },
   ) {
-    return this.service.addSkillPool(testId, body);
+    const actor = await requireAssessmentTestManager(req.user.id, testId);
+    return this.service.addSkillPool(testId, body, actor.orgId);
   }
 
   @Put('skill-pools/:poolId')
   @UseGuards(AuthGuard)
-  updateSkillPool(
+  async updateSkillPool(
+    @Req() req: AuthenticatedRequest,
     @Param('poolId') poolId: string,
     @Body()
     body: {
@@ -174,12 +194,17 @@ export class AssessmentTestsController {
       orderPosition?: number;
     },
   ) {
+    await requireAssessmentSkillPoolManager(req.user.id, poolId);
     return this.service.updateSkillPool(poolId, body);
   }
 
   @Delete('skill-pools/:poolId')
   @UseGuards(AuthGuard)
-  removeSkillPool(@Param('poolId') poolId: string) {
+  async removeSkillPool(
+    @Req() req: AuthenticatedRequest,
+    @Param('poolId') poolId: string,
+  ) {
+    await requireAssessmentSkillPoolManager(req.user.id, poolId);
     return this.service.removeSkillPool(poolId);
   }
 }

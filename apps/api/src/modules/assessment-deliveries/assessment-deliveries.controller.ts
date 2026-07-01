@@ -13,7 +13,10 @@ import {
 import { AssessmentDeliveriesService } from './assessment-deliveries.service';
 import { AuthGuard } from '@iconicedu/api/modules/auth/auth.guard';
 import type { AuthenticatedRequest } from '@iconicedu/api/lib/http/authenticated-request';
-import { requireAssessmentOrgManager } from '@iconicedu/api/modules/assessments/assessment-access';
+import {
+  requireAssessmentDeliveryManager,
+  requireAssessmentOrgManager,
+} from '@iconicedu/api/modules/assessments/assessment-access';
 
 @Controller('assessment-deliveries')
 export class AssessmentDeliveriesController {
@@ -111,11 +114,13 @@ export class AssessmentDeliveriesController {
 
   @Post(':id/participants')
   @UseGuards(AuthGuard)
-  addParticipants(
+  async addParticipants(
+    @Req() req: AuthenticatedRequest,
     @Param('id') deliveryId: string,
     @Body() body: { profileIds: string[] },
   ) {
-    return this.service.addParticipants(deliveryId, body.profileIds);
+    const actor = await requireAssessmentDeliveryManager(req.user.id, deliveryId);
+    return this.service.addParticipants(deliveryId, actor.orgId, body.profileIds);
   }
 
   @Get(':id/results')

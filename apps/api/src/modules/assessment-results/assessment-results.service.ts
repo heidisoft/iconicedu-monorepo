@@ -181,34 +181,13 @@ export class AssessmentResultsService {
 
       // Update skill mastery for authenticated users
       if (session.profile_id) {
-        await supabase.from('assessment_skill_mastery').upsert(
-          {
-            profile_id: session.profile_id,
-            skill_id: skillId,
-            org_id: deliveryRow?.org_id,
-            level: masteryLevel,
-            best_percentage: pct,
-            attempts: 1,
-            last_assessed_at: new Date().toISOString(),
-          },
-          {
-            onConflict: 'profile_id,skill_id',
-            ignoreDuplicates: false,
-          },
-        );
-        // Increment attempts and update best
-        await supabase
-          .rpc('upsert_skill_mastery', {
-            p_profile_id: session.profile_id,
-            p_skill_id: skillId,
-            p_org_id: session.assessment_deliveries.org_id,
-            p_percentage: pct,
-            p_level: masteryLevel,
-          })
-          .then(
-            () => null,
-            () => null,
-          );
+        await this.upsertSkillMastery({
+          profileId: session.profile_id,
+          skillId,
+          orgId: deliveryRow?.org_id,
+          percentage: pct,
+          level: masteryLevel,
+        });
       }
     }
 
@@ -406,6 +385,63 @@ export class AssessmentResultsService {
       map[r.skill_id].push(r.prerequisite_skill_id);
     }
     return map;
+  }
+
+  private async upsertSkillMastery(input: {
+    profileId: string;
+    skillId: string;
+    orgId?: string | null;
+    percentage: number;
+    level: AssessmentMasteryLevel;
+  }) {
+    if (!input.orgId) {
+      throw new BadRequestException('Assessment delivery org is required');
+    }
+
+    const supabase = createSupabaseServiceClient();
+    const assessedAt = new Date().toISOString();
+    const { data: existing, error: existingError } = await supabase
+      .from('assessment_skill_mastery')
+      .select('id, best_percentage, attempts')
+      .eq('profile_id', input.profileId)
+      .eq('skill_id', input.skillId)
+      .maybeSingle<{
+        id: string;
+        best_percentage: number | null;
+        attempts: number | null;
+      }>();
+
+    if (existingError) throw new BadRequestException(existingError.message);
+
+    if (existing) {
+      const { error } = await supabase
+        .from('assessment_skill_mastery')
+        .update({
+          org_id: input.orgId,
+          level: input.level,
+          best_percentage: Math.max(existing.best_percentage ?? 0, input.percentage),
+          attempts: (existing.attempts ?? 0) + 1,
+          last_assessed_at: assessedAt,
+          updated_at: assessedAt,
+        })
+        .eq('id', existing.id);
+
+      if (error) throw new BadRequestException(error.message);
+      return;
+    }
+
+    const { error } = await supabase.from('assessment_skill_mastery').insert({
+      profile_id: input.profileId,
+      skill_id: input.skillId,
+      org_id: input.orgId,
+      level: input.level,
+      best_percentage: input.percentage,
+      attempts: 1,
+      last_assessed_at: assessedAt,
+      updated_at: assessedAt,
+    });
+
+    if (error) throw new BadRequestException(error.message);
   }
 
   private mapSkillScore(row: Record<string, unknown>): AssessmentSkillScoreVM {

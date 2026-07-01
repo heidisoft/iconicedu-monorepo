@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 import type {
   AssessmentTestVM,
@@ -312,8 +317,12 @@ export class AssessmentTestsService {
   async addItemToSection(
     sectionId: string,
     body: { itemId: string; orderPosition?: number; points?: number },
+    orgId?: string,
   ): Promise<void> {
     const supabase = createSupabaseServiceClient();
+    if (orgId) {
+      await this.assertItemBelongsToOrg(body.itemId, orgId);
+    }
     const { error } = await supabase.from('assessment_test_section_items').insert({
       section_id: sectionId,
       item_id: body.itemId,
@@ -409,8 +418,12 @@ export class AssessmentTestsService {
       startDifficulty?: number;
       orderPosition?: number;
     },
+    orgId?: string,
   ): Promise<AssessmentSkillPoolVM> {
     const supabase = createSupabaseServiceClient();
+    if (orgId) {
+      await this.assertSkillBelongsToOrg(body.skillId, orgId);
+    }
     const { data, error } = await supabase
       .from('assessment_test_skill_pools')
       .insert({
@@ -542,5 +555,32 @@ export class AssessmentTestsService {
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
+  }
+
+  private async assertItemBelongsToOrg(itemId: string, orgId: string): Promise<void> {
+    const supabase = createSupabaseServiceClient();
+    const { data, error } = await supabase
+      .from('assessment_items')
+      .select('id')
+      .eq('id', itemId)
+      .eq('org_id', orgId)
+      .is('deleted_at', null)
+      .maybeSingle<{ id: string }>();
+
+    if (error) throw new BadRequestException(error.message);
+    if (!data) throw new ForbiddenException('Assessment item is not in this org');
+  }
+
+  private async assertSkillBelongsToOrg(skillId: string, orgId: string): Promise<void> {
+    const supabase = createSupabaseServiceClient();
+    const { data, error } = await supabase
+      .from('assessment_skills')
+      .select('id')
+      .eq('id', skillId)
+      .eq('org_id', orgId)
+      .maybeSingle<{ id: string }>();
+
+    if (error) throw new BadRequestException(error.message);
+    if (!data) throw new ForbiddenException('Assessment skill is not in this org');
   }
 }

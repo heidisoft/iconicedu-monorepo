@@ -76,6 +76,87 @@ export async function requireAssessmentOrgManager(
   };
 }
 
+async function resolveOrgIdFromTable(
+  table: string,
+  id: string,
+  notFoundMessage: string,
+): Promise<string> {
+  if (!id) throw new BadRequestException('Missing resource id');
+  const supabase = createSupabaseServiceClient();
+  const { data, error } = await supabase
+    .from(table)
+    .select('org_id')
+    .eq('id', id)
+    .is('deleted_at', null)
+    .maybeSingle<{ org_id: string | null }>();
+
+  if (error) throw new BadRequestException(error.message);
+  if (!data?.org_id) throw new NotFoundException(notFoundMessage);
+  return data.org_id;
+}
+
+async function resolveTestOrgId(testId: string): Promise<string> {
+  return resolveOrgIdFromTable('assessment_tests', testId, 'Test not found');
+}
+
+export async function requireAssessmentTestManager(
+  accountId: string,
+  testId: string,
+): Promise<AssessmentActor> {
+  const orgId = await resolveTestOrgId(testId);
+  return requireAssessmentOrgManager(accountId, orgId);
+}
+
+export async function requireAssessmentSectionManager(
+  accountId: string,
+  sectionId: string,
+): Promise<AssessmentActor> {
+  if (!sectionId) throw new BadRequestException('Missing section id');
+  const supabase = createSupabaseServiceClient();
+  const { data, error } = await supabase
+    .from('assessment_test_sections')
+    .select('test_id')
+    .eq('id', sectionId)
+    .maybeSingle<{ test_id: string | null }>();
+
+  if (error) throw new BadRequestException(error.message);
+  if (!data?.test_id) throw new NotFoundException('Test section not found');
+
+  const orgId = await resolveTestOrgId(data.test_id);
+  return requireAssessmentOrgManager(accountId, orgId);
+}
+
+export async function requireAssessmentSkillPoolManager(
+  accountId: string,
+  poolId: string,
+): Promise<AssessmentActor> {
+  if (!poolId) throw new BadRequestException('Missing skill pool id');
+  const supabase = createSupabaseServiceClient();
+  const { data, error } = await supabase
+    .from('assessment_test_skill_pools')
+    .select('test_id')
+    .eq('id', poolId)
+    .maybeSingle<{ test_id: string | null }>();
+
+  if (error) throw new BadRequestException(error.message);
+  if (!data?.test_id) throw new NotFoundException('Skill pool not found');
+
+  const orgId = await resolveTestOrgId(data.test_id);
+  return requireAssessmentOrgManager(accountId, orgId);
+}
+
+export async function requireAssessmentDeliveryManager(
+  accountId: string,
+  deliveryId: string,
+): Promise<AssessmentActor> {
+  const orgId = await resolveOrgIdFromTable(
+    'assessment_deliveries',
+    deliveryId,
+    'Delivery not found',
+  );
+  return requireAssessmentOrgManager(accountId, orgId);
+}
+
 export async function resolveAssessmentActorProfile(
   accountId: string,
   orgIdInput: string | undefined | null,

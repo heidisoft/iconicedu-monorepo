@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 import type {
@@ -197,8 +202,28 @@ export class AssessmentDeliveriesService {
     return { accessToken: token, publicUrl: `/a/${token}` };
   }
 
-  async addParticipants(deliveryId: string, profileIds: string[]): Promise<void> {
+  async addParticipants(
+    deliveryId: string,
+    orgId: string,
+    profileIds: string[],
+  ): Promise<void> {
+    if (!profileIds.length) return;
     const supabase = createSupabaseServiceClient();
+    const uniqueProfileIds = Array.from(new Set(profileIds));
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('org_id', orgId)
+      .in('id', uniqueProfileIds);
+
+    if (profilesError) throw new BadRequestException(profilesError.message);
+
+    const allowedIds = new Set((profiles ?? []).map((profile) => profile.id as string));
+    const hasExternalProfile = uniqueProfileIds.some((id) => !allowedIds.has(id));
+    if (hasExternalProfile) {
+      throw new ForbiddenException('Assessment participants must belong to this org');
+    }
+
     const rows = profileIds.map((pid) => ({ delivery_id: deliveryId, profile_id: pid }));
     const { error } = await supabase
       .from('assessment_delivery_participants')
