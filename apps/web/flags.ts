@@ -106,26 +106,6 @@ export const enableMobileAppleSignIn = flag<boolean, { profileId?: string | null
   },
 });
 
-export const enableClassScheduleStaffCancel = flag<
-  boolean,
-  { profileId?: string | null }
->({
-  key: 'enable-class-schedule-staff-cancel',
-  description:
-    'Allows staff users to cancel class schedule sessions from the calendar surface.',
-  options: [
-    { label: 'Off', value: false },
-    { label: 'On', value: true },
-  ],
-  defaultValue: true,
-  async decide({ entities }) {
-    return evaluateWebBooleanFlag({
-      flagKey: 'enable-class-schedule-staff-cancel',
-      profileId: entities?.profileId,
-    });
-  },
-});
-
 export const enableClassScheduleStaffEdit = flag<boolean, { profileId?: string | null }>({
   key: 'enable-class-schedule-staff-edit',
   description:
@@ -160,23 +140,6 @@ export const enableMarketingSitePages = flag<boolean, { profileId?: string | nul
   },
 });
 
-export const enableAuthMobileAppPrompt = flag<boolean, { profileId?: string | null }>({
-  key: 'auth-mobile-app-prompt',
-  description:
-    'Shows a mobile app download prompt on auth pages (login, get-started) when accessed from a mobile or tablet device.',
-  options: [
-    { label: 'Off', value: false },
-    { label: 'On', value: true },
-  ],
-  defaultValue: true,
-  async decide({ entities }) {
-    return evaluateWebBooleanFlag({
-      flagKey: 'auth-mobile-app-prompt',
-      profileId: entities?.profileId,
-    });
-  },
-});
-
 export const enableAssessments = flag<boolean, { profileId?: string | null }>({
   key: 'assessments-enabled',
   description:
@@ -196,9 +159,7 @@ export const enableAssessments = flag<boolean, { profileId?: string | null }>({
 
 export const webFlags = {
   enableAssessments,
-  enableAuthMobileAppPrompt,
   enableChannelCommunications,
-  enableClassScheduleStaffCancel,
   enableClassScheduleStaffEdit,
   enableMarketingSitePages,
   enableMessageTypeComposer,

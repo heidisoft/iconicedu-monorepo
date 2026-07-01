@@ -8,7 +8,6 @@ vi.mock('@iconicedu/web/lib/flags/posthog-flags', () => ({
 
 import {
   enableChannelCommunications,
-  enableClassScheduleStaffCancel,
   enableClassScheduleStaffEdit,
   enableMarketingSitePages,
   enableMessageTypeComposer,
@@ -57,12 +56,6 @@ describe('web flags', () => {
     expect(enableMobileAppleSignIn.key).toBe('enable-mobile-apple-sign-in');
     expect(enableMobileAppleSignIn.defaultValue).toBe(false);
     expect(webFlags.enableMobileAppleSignIn).toBe(enableMobileAppleSignIn);
-  });
-
-  it('declares the class schedule cancel flag with stable metadata', () => {
-    expect(enableClassScheduleStaffCancel.key).toBe('enable-class-schedule-staff-cancel');
-    expect(enableClassScheduleStaffCancel.defaultValue).toBe(true);
-    expect(webFlags.enableClassScheduleStaffCancel).toBe(enableClassScheduleStaffCancel);
   });
 
   it('declares the class schedule edit flag with stable metadata', () => {
@@ -138,7 +131,6 @@ describe('web flags', () => {
 
     expect(providerData).toBeTruthy();
     expect(JSON.stringify(providerData)).toContain('enable-channel-communications');
-    expect(JSON.stringify(providerData)).toContain('enable-class-schedule-staff-cancel');
     expect(JSON.stringify(providerData)).toContain('enable-class-schedule-staff-edit');
     expect(JSON.stringify(providerData)).toContain('enable-marketing-site-pages');
     expect(JSON.stringify(providerData)).toContain('enable-message-type-composer');
