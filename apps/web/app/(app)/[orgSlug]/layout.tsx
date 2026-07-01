@@ -23,7 +23,7 @@ import {
   listActiveOrgSubjectCatalog,
   mapOrgSubjectRowsToOptions,
 } from '@iconicedu/web/lib/subjects/queries/org-subject-catalog.query';
-import { enableAdminActivityFeedAudit, enableAdminReports } from '@iconicedu/web/flags';
+import { enableAdminActivityFeedAudit } from '@iconicedu/web/flags';
 
 export const metadata: Metadata = {
   title: {
@@ -109,13 +109,9 @@ export default async function Layout({
     account.org_id,
   );
   const subjectOptions = mapOrgSubjectRowsToOptions(subjectCatalogResponse.data);
-  await enableAdminReports.run({
-    identify: { profileId: familyViewResolution.effectiveProfile.id },
-  });
   const includeActivityFeedAudit = await enableAdminActivityFeedAudit.run({
     identify: { profileId: familyViewResolution.effectiveProfile.id },
   });
-  const includeReports = true;
 
   return (
     <SidebarProvider>
@@ -126,7 +122,6 @@ export default async function Layout({
         isPersonaAddEnabled
         adminSections={buildAdminMenuSections(`/${orgSlug}`, {
           includeActivityFeedAudit,
-          includeReports,
         })}
         subjectOptions={subjectOptions}
       >
