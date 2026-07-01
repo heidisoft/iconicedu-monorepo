@@ -415,7 +415,7 @@ jobs:
     if: github.event.action != 'closed'
     needs: [build, bundle-size]
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 5
     permissions:
       contents: read
       pull-requests: write
