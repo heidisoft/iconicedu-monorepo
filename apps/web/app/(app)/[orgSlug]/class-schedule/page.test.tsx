@@ -11,6 +11,7 @@ const buildClassSchedulesByOrgMock = vi.fn();
 const getDashboardAccountContextMock = vi.fn();
 const getDashboardProfileContextMock = vi.fn();
 const classScheduleClientMock = vi.fn(() => null);
+const isSelfServeSessionChangesEnabledMock = vi.fn();
 
 vi.mock('@iconicedu/web/lib/schedules/builders/class-schedule.builder', () => ({
   buildClassSchedulesByOrg: (...args: unknown[]) => buildClassSchedulesByOrgMock(...args),
@@ -29,6 +30,11 @@ vi.mock(
     ClassScheduleClient: (props: unknown) => classScheduleClientMock(props),
   }),
 );
+
+vi.mock('@iconicedu/web/flags', () => ({
+  isSelfServeSessionChangesEnabled: (...args: unknown[]) =>
+    isSelfServeSessionChangesEnabledMock(...args),
+}));
 
 function createSchedule(input: {
   id: string;
@@ -63,6 +69,8 @@ describe('class schedule page viewer scoping', () => {
     getDashboardAccountContextMock.mockReset();
     getDashboardProfileContextMock.mockReset();
     classScheduleClientMock.mockReset();
+    isSelfServeSessionChangesEnabledMock.mockReset();
+    isSelfServeSessionChangesEnabledMock.mockResolvedValue(false);
 
     getDashboardAccountContextMock.mockResolvedValue({
       supabase: {},
@@ -106,6 +114,7 @@ describe('class schedule page viewer scoping', () => {
       expect.objectContaining({
         canCancelSessions: false,
         canEditSessions: false,
+        canSelfServeSessionChanges: false,
         orgSlug: 'iconic-academy',
         timezone: 'America/New_York',
         events: [
@@ -156,6 +165,7 @@ describe('class schedule page viewer scoping', () => {
       expect.objectContaining({
         canCancelSessions: false,
         canEditSessions: false,
+        canSelfServeSessionChanges: false,
         orgSlug: 'iconic-academy',
         events: [
           expect.objectContaining({
@@ -201,6 +211,7 @@ describe('class schedule page viewer scoping', () => {
       expect.objectContaining({
         canCancelSessions: true,
         canEditSessions: true,
+        canSelfServeSessionChanges: false,
         orgSlug: 'iconic-academy',
       }),
     );
@@ -238,6 +249,7 @@ describe('class schedule page viewer scoping', () => {
       expect.objectContaining({
         canCancelSessions: true,
         canEditSessions: true,
+        canSelfServeSessionChanges: false,
         orgSlug: 'iconic-academy',
       }),
     );

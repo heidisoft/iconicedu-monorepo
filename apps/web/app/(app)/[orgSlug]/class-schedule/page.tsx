@@ -6,6 +6,7 @@ import {
   getDashboardAccountContext,
   getDashboardProfileContext,
 } from '@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth';
+import { isSelfServeSessionChangesEnabled } from '@iconicedu/web/flags';
 
 export const metadata: Metadata = {
   title: 'Class Schedule',
@@ -69,6 +70,9 @@ export default async function ClassSchedulePage({
   const events = filterSchedulesForViewerProfile(allEvents, currentUserProfile);
   const canManageSessions =
     account.primary_role === 'staff' || account.primary_role === 'owner';
+  const selfServeSessionChangesEnabled = await isSelfServeSessionChangesEnabled(
+    currentUserProfile?.ids.id ?? null,
+  );
 
   return (
     <ClassScheduleClient
@@ -77,6 +81,7 @@ export default async function ClassSchedulePage({
       orgSlug={orgSlug}
       canCancelSessions={canManageSessions}
       canEditSessions={canManageSessions}
+      canSelfServeSessionChanges={selfServeSessionChangesEnabled && !canManageSessions}
     />
   );
 }

@@ -519,6 +519,44 @@ export function buildPersonalizedSessionCopy(
     };
   }
 
+  if (
+    eventType === 'class.session.reschedule_requested' ||
+    eventType === 'class.session.cancel_requested'
+  ) {
+    const requester = firstDefinedString(payload.requestedByName) ?? 'A participant';
+    const requestType =
+      eventType === 'class.session.cancel_requested'
+        ? 'cancel this session'
+        : 'reschedule this session';
+    const sessionLabel = formatSessionDateTime(
+      firstDefinedString(payload.startAt, payload.currentStartAt),
+      payload,
+    );
+    return {
+      title: classTitle,
+      summary: sessionLabel
+        ? `${requester} requested to ${requestType} for ${sessionLabel}.`
+        : `${requester} requested to ${requestType}.`,
+    };
+  }
+
+  if (
+    eventType === 'class.session.change_request.approved' ||
+    eventType === 'class.session.change_request.rejected'
+  ) {
+    const decidedBy = firstDefinedString(payload.decidedByName) ?? 'A participant';
+    const decision =
+      eventType === 'class.session.change_request.approved' ? 'approved' : 'declined';
+    const requestType =
+      firstDefinedString(payload.requestType) === 'cancel'
+        ? 'cancellation'
+        : 'reschedule';
+    return {
+      title: classTitle,
+      summary: `${decidedBy} ${decision} the session ${requestType} request.`,
+    };
+  }
+
   if (eventType === 'session.reminder.sent') {
     const startAt = firstDefinedString(
       payload.sessionDateTime,

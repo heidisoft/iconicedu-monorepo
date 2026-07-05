@@ -12,6 +12,10 @@ import { ScheduleDisplayTimeZoneProvider } from '@iconicedu/ui-web/components/sh
 import type { DisplayClassScheduleVM } from '@iconicedu/ui-web/lib/class-schedule-utils';
 import { toScheduleDisplayDate } from '@iconicedu/ui-web/lib/schedule-display-timezone';
 import { cancelClassScheduleSessionAction } from '@iconicedu/web/app/actions/cancel-class-schedule-session';
+import {
+  selfServeCancelClassSessionAction,
+  selfServeRescheduleClassSessionAction,
+} from '@iconicedu/web/app/actions/self-serve-class-session-change';
 import { updateClassScheduleSessionAction } from '@iconicedu/web/app/actions/update-class-schedule-session';
 import {
   applyCancelledSessionToSchedules,
@@ -25,6 +29,7 @@ type ClassScheduleClientProps = {
   orgSlug: string;
   canCancelSessions: boolean;
   canEditSessions: boolean;
+  canSelfServeSessionChanges?: boolean;
   timezone?: string | null;
 };
 
@@ -33,6 +38,7 @@ export function ClassScheduleClient({
   orgSlug,
   canCancelSessions,
   canEditSessions,
+  canSelfServeSessionChanges = false,
   timezone,
 }: ClassScheduleClientProps) {
   const router = useRouter();
@@ -75,17 +81,37 @@ export function ClassScheduleClient({
     input: CancelSessionActionInput,
   ) => {
     try {
-      const result = await cancelClassScheduleSessionAction({
-        orgSlug,
-        scheduleId: getBaseScheduleId(event.ids.id),
-        occurrenceKey: getEventOccurrenceKey(event),
-        reason: input.reason,
-      });
+      const scheduleId = getBaseScheduleId(event.ids.id);
+      const occurrenceKey = getEventOccurrenceKey(event);
+      const result = canCancelSessions
+        ? await cancelClassScheduleSessionAction({
+            orgSlug,
+            scheduleId,
+            occurrenceKey,
+            reason: input.reason,
+          })
+        : await selfServeCancelClassSessionAction({
+            orgSlug,
+            scheduleId,
+            occurrenceKey,
+            note: input.reason,
+          });
 
-      setScheduleEvents((currentEvents) =>
-        applyCancelledSessionToSchedules(currentEvents, result),
-      );
-      toast.success('Session cancelled.');
+      if ('approvalRequired' in result && result.approvalRequired) {
+        toast.success('Cancellation request sent for approval.');
+      } else if (canCancelSessions) {
+        setScheduleEvents((currentEvents) =>
+          applyCancelledSessionToSchedules(currentEvents, {
+            scheduleId,
+            occurrenceKey,
+            reason: input.reason ?? null,
+            mode: result.mode ?? 'single',
+          }),
+        );
+        toast.success('Session cancelled.');
+      } else {
+        toast.success('Session cancelled.');
+      }
       startTransition(() => router.refresh());
     } catch (error) {
       toast.error(
@@ -100,21 +126,40 @@ export function ClassScheduleClient({
     input: EditSessionActionInput,
   ) => {
     try {
-      const result = await updateClassScheduleSessionAction({
-        orgSlug,
-        scheduleId: getBaseScheduleId(event.ids.id),
-        occurrenceKey: getEventOccurrenceKey(event),
-        date: input.date,
-        startTime: input.startTime,
-        endTime: input.endTime,
-        timezone: input.timezone,
-        reason: input.reason,
-      });
+      const scheduleId = getBaseScheduleId(event.ids.id);
+      const occurrenceKey = getEventOccurrenceKey(event);
+      const result = canEditSessions
+        ? await updateClassScheduleSessionAction({
+            orgSlug,
+            scheduleId,
+            occurrenceKey,
+            date: input.date,
+            startTime: input.startTime,
+            endTime: input.endTime,
+            timezone: input.timezone,
+            reason: input.reason,
+          })
+        : await selfServeRescheduleClassSessionAction({
+            orgSlug,
+            scheduleId,
+            occurrenceKey,
+            date: input.date,
+            startTime: input.startTime,
+            endTime: input.endTime,
+            timezone: input.timezone,
+            note: input.reason,
+          });
 
-      setScheduleEvents((currentEvents) =>
-        applyUpdatedSessionToSchedules(currentEvents, result),
-      );
-      toast.success('Session updated.');
+      if ('approvalRequired' in result && result.approvalRequired) {
+        toast.success('Reschedule request sent for approval.');
+      } else if (canEditSessions && !('approvalRequired' in result)) {
+        setScheduleEvents((currentEvents) =>
+          applyUpdatedSessionToSchedules(currentEvents, result),
+        );
+        toast.success('Session updated.');
+      } else {
+        toast.success('Session updated.');
+      }
       startTransition(() => router.refresh());
     } catch (error) {
       toast.error(
@@ -134,11 +179,17 @@ export function ClassScheduleClient({
           onViewChange={setView}
           onDateSelect={setCurrentDate}
           events={scheduleEvents}
-          canCancelSessions={canCancelSessions}
-          canEditSessions={canEditSessions}
+          canCancelSessions={canCancelSessions || canSelfServeSessionChanges}
+          canEditSessions={canEditSessions || canSelfServeSessionChanges}
           editFullScheduleHref={canEditSessions ? `/${orgSlug}/admin/classrooms` : null}
-          onCancelSession={handleCancelSession}
-          onEditSession={handleEditSession}
+          onCancelSession={
+            canCancelSessions || canSelfServeSessionChanges
+              ? handleCancelSession
+              : undefined
+          }
+          onEditSession={
+            canEditSessions || canSelfServeSessionChanges ? handleEditSession : undefined
+          }
         />
       </div>
     </ScheduleDisplayTimeZoneProvider>

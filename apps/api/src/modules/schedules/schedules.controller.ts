@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  Param,
   Post,
   Query,
   Req,
@@ -16,9 +17,12 @@ import {
 } from '@iconicedu/api/lib/http/authenticated-request';
 import {
   parseCancelSessionDto,
+  parseDecideSessionChangeRequestDto,
   parseDeleteSchedulesDto,
   parseReplaceSchedulesDto,
   parseRescheduleSessionDto,
+  parseSelfServeCancelSessionDto,
+  parseSelfServeRescheduleSessionDto,
 } from '@iconicedu/api/modules/schedules/dto';
 
 @Controller()
@@ -90,6 +94,73 @@ export class SchedulesController {
     const dto = parseRescheduleSessionDto(body);
     return this.schedulesService.rescheduleScheduleSession(
       extractBearerToken(req.headers.authorization),
+      dto,
+    );
+  }
+
+  @Get('schedules/session/change-requests')
+  @UseGuards(AuthGuard)
+  listSessionChangeRequests(
+    @Req() req: AuthenticatedRequest,
+    @Query('orgId') orgId: string,
+    @Query('channelId') channelId?: string,
+    @Query('scheduleId') scheduleId?: string,
+  ) {
+    if (!orgId || typeof orgId !== 'string') {
+      throw new BadRequestException('orgId is required');
+    }
+    return this.schedulesService.listSessionChangeRequests(
+      extractBearerToken(req.headers.authorization),
+      { orgId, channelId, scheduleId },
+    );
+  }
+
+  @Post('schedules/session/self-serve/cancel')
+  @UseGuards(AuthGuard)
+  selfServeCancelSession(@Req() req: AuthenticatedRequest, @Body() body: unknown) {
+    const dto = parseSelfServeCancelSessionDto(body);
+    return this.schedulesService.selfServeCancelSession(
+      extractBearerToken(req.headers.authorization),
+      dto,
+    );
+  }
+
+  @Post('schedules/session/self-serve/reschedule')
+  @UseGuards(AuthGuard)
+  selfServeRescheduleSession(@Req() req: AuthenticatedRequest, @Body() body: unknown) {
+    const dto = parseSelfServeRescheduleSessionDto(body);
+    return this.schedulesService.selfServeRescheduleSession(
+      extractBearerToken(req.headers.authorization),
+      dto,
+    );
+  }
+
+  @Post('schedules/session/change-requests/:id/approve')
+  @UseGuards(AuthGuard)
+  approveSessionChangeRequest(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
+    const dto = parseDecideSessionChangeRequestDto(body);
+    return this.schedulesService.approveSessionChangeRequest(
+      extractBearerToken(req.headers.authorization),
+      id,
+      dto,
+    );
+  }
+
+  @Post('schedules/session/change-requests/:id/reject')
+  @UseGuards(AuthGuard)
+  rejectSessionChangeRequest(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
+    const dto = parseDecideSessionChangeRequestDto(body);
+    return this.schedulesService.rejectSessionChangeRequest(
+      extractBearerToken(req.headers.authorization),
+      id,
       dto,
     );
   }

@@ -91,3 +91,42 @@ describe('buildPersonalizedSessionCopy completion checks', () => {
     expect(copy?.summary).toContain('After 3 days');
   });
 });
+
+describe('buildPersonalizedSessionCopy session change requests', () => {
+  it('describes reschedule approval requests', () => {
+    const copy = buildPersonalizedSessionCopy(
+      'class.session.reschedule_requested',
+      {
+        title: 'Algebra',
+        requestedByName: 'Priya Parent',
+        startAt: '2030-03-06T21:00:00.000Z',
+        viewerTimezone: 'America/New_York',
+      },
+      'teacher-1',
+    );
+
+    expect(copy).toEqual({
+      title: 'Algebra',
+      summary: expect.stringContaining(
+        'Priya Parent requested to reschedule this session',
+      ),
+    });
+  });
+
+  it('describes rejected change requests', () => {
+    const copy = buildPersonalizedSessionCopy(
+      'class.session.change_request.rejected',
+      {
+        title: 'Algebra',
+        requestType: 'cancel',
+        decidedByName: 'Ms. Chen',
+      },
+      'guardian-1',
+    );
+
+    expect(copy).toEqual({
+      title: 'Algebra',
+      summary: 'Ms. Chen declined the session cancellation request.',
+    });
+  });
+});

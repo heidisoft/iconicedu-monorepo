@@ -12,7 +12,10 @@ import type {
   ThemeKey,
 } from '@iconicedu/shared-types';
 import { apiGet, apiPost } from '@/lib/api/http-client';
-import { supabase } from '@/lib/supabase/client';
+import type {
+  SelfServeSessionChangeResultVM,
+  SessionChangeRequestVM,
+} from '@iconicedu/shared-types';
 
 export type CancelRecurringSessionOccurrenceInput = {
   orgId: string;
@@ -24,6 +27,19 @@ export type CancelRecurringSessionOccurrenceInput = {
 export type CancelRecurringSessionOccurrenceResult = {
   occurrenceKey: string;
   reason?: string;
+};
+
+export type SelfServeCancelSessionInput = {
+  orgId: string;
+  scheduleId: string;
+  occurrenceKey?: string | null;
+  note?: string | null;
+};
+
+export type SelfServeRescheduleSessionInput = SelfServeCancelSessionInput & {
+  startAt: string;
+  endAt: string;
+  timezone?: string | null;
 };
 
 function mapClassScheduleRow(row: Record<string, unknown>): ClassScheduleVM {
@@ -124,23 +140,6 @@ function mapClassScheduleRow(row: Record<string, unknown>): ClassScheduleVM {
   };
 }
 
-const CLASS_SCHEDULE_SELECT = `
-  id, org_id, title, description, location, meeting_link,
-  start_at, end_at, timezone, status, visibility, theme_key,
-  source_kind, source_learning_space_id, source_channel_id,
-  source_session_id, source_owner_user_id, source_created_by_user_id,
-  source_related_learning_space_id,
-  created_at, created_by, updated_at, updated_by,
-  participants:class_schedule_participants(
-    id, org_id, profile_id, role, status, display_name, avatar_url, theme_key
-  ),
-  recurrence:class_schedule_recurrence(
-    id, org_id, frequency, interval, count, until, timezone, byday,
-    exceptions:class_schedule_recurrence_exceptions(id, occurrence_key, reason),
-    overrides:class_schedule_recurrence_overrides(id, occurrence_key, patch)
-  )
-`;
-
 export async function fetchSpaceSchedulesByChannelId(
   channelId: string,
   orgId: string,
@@ -174,4 +173,64 @@ export async function cancelRecurringSessionOccurrence(
     occurrenceKey: (data?.occurrence_key as string) ?? input.occurrenceKey,
     reason: ((data?.reason as string | null) ?? input.reason?.trim()) || undefined,
   };
+}
+
+export async function selfServeCancelSession(
+  input: SelfServeCancelSessionInput,
+): Promise<SelfServeSessionChangeResultVM> {
+  return apiPost<SelfServeSessionChangeResultVM>('/schedules/session/self-serve/cancel', {
+    orgId: input.orgId,
+    scheduleId: input.scheduleId,
+    occurrenceKey: input.occurrenceKey ?? null,
+    note: input.note ?? null,
+  });
+}
+
+export async function selfServeRescheduleSession(
+  input: SelfServeRescheduleSessionInput,
+): Promise<SelfServeSessionChangeResultVM> {
+  return apiPost<SelfServeSessionChangeResultVM>(
+    '/schedules/session/self-serve/reschedule',
+    {
+      orgId: input.orgId,
+      scheduleId: input.scheduleId,
+      occurrenceKey: input.occurrenceKey ?? null,
+      startAt: input.startAt,
+      endAt: input.endAt,
+      timezone: input.timezone ?? null,
+      note: input.note ?? null,
+    },
+  );
+}
+
+export async function fetchSessionChangeRequests(input: {
+  orgId: string;
+  channelId?: string | null;
+  scheduleId?: string | null;
+}): Promise<SessionChangeRequestVM[]> {
+  return apiGet<SessionChangeRequestVM[]>('/schedules/session/change-requests', {
+    orgId: input.orgId,
+    channelId: input.channelId,
+    scheduleId: input.scheduleId,
+  });
+}
+
+export async function approveSessionChangeRequest(input: {
+  requestId: string;
+  note?: string | null;
+}): Promise<SelfServeSessionChangeResultVM> {
+  return apiPost<SelfServeSessionChangeResultVM>(
+    `/schedules/session/change-requests/${input.requestId}/approve`,
+    { note: input.note ?? null },
+  );
+}
+
+export async function rejectSessionChangeRequest(input: {
+  requestId: string;
+  note?: string | null;
+}): Promise<SelfServeSessionChangeResultVM> {
+  return apiPost<SelfServeSessionChangeResultVM>(
+    `/schedules/session/change-requests/${input.requestId}/reject`,
+    { note: input.note ?? null },
+  );
 }

@@ -10,6 +10,7 @@ export * from './shared/learning-space-icons';
 export * from './shared/feature-flags';
 export * from './shared/class-request';
 export * from './vm/class-schedule';
+export * from './vm/session-change-request';
 export * from './vm/channel';
 export * from './vm/activity-feed';
 export * from './vm/activity-event';

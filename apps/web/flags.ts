@@ -140,6 +140,25 @@ export const enableAssessments = flag<boolean, { profileId?: string | null }>({
   },
 });
 
+export const enableSelfServeSessionChanges = flag<boolean, { profileId?: string | null }>(
+  {
+    key: 'self-serve-session-changes',
+    description:
+      'Enables participant self-serve session reschedule and cancellation requests.',
+    options: [
+      { label: 'Off', value: false },
+      { label: 'On', value: true },
+    ],
+    defaultValue: false,
+    async decide({ entities }) {
+      return evaluateWebBooleanFlag({
+        flagKey: 'self-serve-session-changes',
+        profileId: entities?.profileId,
+      });
+    },
+  },
+);
+
 export const webFlags = {
   enableAssessments,
   enableChannelCommunications,
@@ -148,9 +167,17 @@ export const webFlags = {
   enableMobileAppleSignIn,
   enableMobileDirectMessageStart,
   enableMobileGoogleSignIn,
+  enableSelfServeSessionChanges,
 } as const;
 
 export type WebFlagKey = keyof typeof webFlags;
+
+export async function isSelfServeSessionChangesEnabled(profileId?: string | null) {
+  return evaluateWebBooleanFlag({
+    flagKey: 'self-serve-session-changes',
+    profileId,
+  });
+}
 
 export function isVercelFlagsSdkConfigured() {
   const posthogKey =
