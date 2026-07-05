@@ -10,6 +10,17 @@ const args = new Set(process.argv.slice(2));
 const assumeYes = args.has('--yes') || args.has('-y');
 const ready = args.has('--ready');
 const includeFullDiff = args.has('--full-diff');
+const branchPrefixes = new Set([
+  'fix',
+  'feat',
+  'chore',
+  'docs',
+  'test',
+  'refactor',
+  'perf',
+  'build',
+  'ci',
+]);
 
 function argValue(name, fallback) {
   const prefix = `${name}=`;
@@ -52,6 +63,20 @@ function slugify(value) {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 60);
+}
+
+function normalizeBranchName(value, fallback) {
+  const raw = String(value ?? '')
+    .trim()
+    .toLowerCase();
+  const [maybePrefix, ...rest] = raw.split('/');
+  const prefix = branchPrefixes.has(maybePrefix) ? maybePrefix : 'chore';
+  const description = branchPrefixes.has(maybePrefix)
+    ? rest.join('/')
+    : raw.replace(/^codex\//, '');
+  const slug = slugify(description) || slugify(fallback) || 'local-changes';
+
+  return `${prefix}/${slug}`;
 }
 
 function extractJson(value) {
@@ -107,15 +132,16 @@ function aiSummary(context) {
   const prompt = `You generate git and GitHub PR metadata from a compact local-change summary.
 Return JSON only, with this exact shape:
 {
-  "branch": "codex/short-kebab-description",
+  "branch": "fix/short-kebab-description",
   "commit": "Terse imperative commit message",
   "title": "[codex] PR title",
   "body": "Markdown PR body with Summary and Tests sections"
 }
 
 Rules:
-- Branch must start with codex/.
-- Branch must be lowercase kebab-case after codex/.
+- Branch must use one of these prefixes: fix/, feat/, chore/, docs/, test/, refactor/, perf/, build/, ci/.
+- Choose the branch prefix from the change type. Examples: fix/ for bug fixes, feat/ for user-facing features, chore/ for tooling or maintenance.
+- Branch description after the prefix must be lowercase kebab-case.
 - Commit message should be concise and imperative.
 - Body should mention what changed and why.
 - If validation is not visible in the summary, use a Tests section with "- Not run (not provided)."
@@ -135,12 +161,11 @@ ${context}`;
   }
 
   const suggestion = extractJson(readFileSync(outputFile, 'utf8'));
-  const branchTail = slugify(String(suggestion.branch ?? '').replace(/^codex\//, ''));
-  const fallbackBranch = slugify(String(suggestion.commit ?? 'local changes'));
+  const commit = String(suggestion.commit ?? 'Update local changes').trim();
 
   return {
-    branch: `codex/${branchTail || fallbackBranch || 'local-changes'}`,
-    commit: String(suggestion.commit ?? 'Update local changes').trim(),
+    branch: normalizeBranchName(suggestion.branch, commit),
+    commit,
     title: String(suggestion.title ?? `[codex] ${suggestion.commit}`).trim(),
     body: String(suggestion.body ?? '').trim(),
   };
