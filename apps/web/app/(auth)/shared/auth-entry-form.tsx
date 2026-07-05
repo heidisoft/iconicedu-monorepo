@@ -18,6 +18,8 @@ import { Loader2 } from 'lucide-react';
 type OAuthProvider = 'apple' | 'google';
 type OAuthActionVerb = 'login' | 'sign-up';
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 type AuthEntryFormProps = React.ComponentProps<'div'> & {
   title: string;
   subtitle: string;
@@ -111,11 +113,16 @@ export function AuthEntryForm({
   ...props
 }: AuthEntryFormProps) {
   const [email, setEmail] = React.useState(initialEmail);
+  const [emailDirty, setEmailDirty] = React.useState(false);
   const [isEmailSubmitting, setIsEmailSubmitting] = React.useState(false);
   const [oauthSubmittingProvider, setOauthSubmittingProvider] =
     React.useState<OAuthProvider | null>(null);
 
+  const trimmedEmail = email.trim();
+  const isValidEmail = EMAIL_RE.test(trimmedEmail);
+  const showEmailError = emailDirty && trimmedEmail.length > 0 && !isValidEmail;
   const isSubmitting = isEmailSubmitting || oauthSubmittingProvider !== null;
+  const isEmailSubmitDisabled = isSubmitting || !isValidEmail;
   const showOAuthOptions = enableGoogleSignIn || enableAppleSignIn;
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -123,9 +130,13 @@ export function AuthEntryForm({
     if (!onEmailLogin) {
       return;
     }
+    setEmailDirty(true);
+    if (!isValidEmail) {
+      return;
+    }
     setIsEmailSubmitting(true);
     try {
-      await onEmailLogin(email);
+      await onEmailLogin(trimmedEmail);
     } finally {
       setIsEmailSubmitting(false);
     }
@@ -181,14 +192,24 @@ export function AuthEntryForm({
             <Input
               id="email"
               type="email"
-              placeholder="you@email.com"
+              placeholder="Email"
               required
               value={email}
               onChange={(event) => {
                 setEmail(event.target.value);
                 onEmailChange?.(event.target.value);
               }}
+              onBlur={() => {
+                if (email.trim()) {
+                  setEmailDirty(true);
+                }
+              }}
             />
+            {showEmailError ? (
+              <p className="text-sm font-medium text-destructive">
+                Please enter a valid email address
+              </p>
+            ) : null}
             {errorMessage || statusMessage ? (
               <div
                 role={errorMessage ? 'alert' : 'status'}
@@ -208,7 +229,7 @@ export function AuthEntryForm({
             <Button
               type="submit"
               variant="secondary"
-              disabled={isSubmitting}
+              disabled={isEmailSubmitDisabled}
               className="hover:bg-primary/90 hover:text-primary-foreground"
             >
               {isSubmitting ? (
@@ -280,7 +301,7 @@ export function AuthEntryForm({
         </FieldGroup>
       </form>
       <FieldDescription className="px-6 text-center">
-        By continuing, you agree to our <a href="#">Terms of Service</a> and{' '}
+        By continuing, you agree to our <a href="#">Terms</a> and{' '}
         <a href="#">Privacy Policy</a>.
       </FieldDescription>
     </div>

@@ -1,11 +1,18 @@
-import { describe, expect, it, vi } from 'vitest';
+import React from 'react';
+import { render } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const authEntryFormPropsMock = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: vi.fn() }),
 }));
 
 vi.mock('@iconicedu/web/app/(auth)/shared/auth-entry-form', () => ({
-  AuthEntryForm: () => null,
+  AuthEntryForm: (props: Record<string, unknown>) => {
+    authEntryFormPropsMock(props);
+    return <div data-testid="auth-entry-form" />;
+  },
 }));
 
 vi.mock('@iconicedu/web/lib/supabase/client', () => ({
@@ -22,7 +29,13 @@ vi.mock('@iconicedu/web/app/(auth)/shared/code-entry-utils', () => ({
   shouldCreateUserForIntent: vi.fn(() => true),
 }));
 
-import { resolveGetStartedCallbackUrl } from './get-started-auth-client';
+import GetStartedAuthClient, {
+  resolveGetStartedCallbackUrl,
+} from './get-started-auth-client';
+
+beforeEach(() => {
+  authEntryFormPropsMock.mockClear();
+});
 
 describe('resolveGetStartedCallbackUrl', () => {
   it('builds callback URL with get-started intent', () => {
@@ -33,5 +46,22 @@ describe('resolveGetStartedCallbackUrl', () => {
         : `${window.location.origin}/auth/callback?intent=get-started&source=self-signup`;
 
     expect(callback).toBe(expected);
+  });
+});
+
+describe('GetStartedAuthClient', () => {
+  it('passes the mobile-aligned sign-up copy to the auth entry form', () => {
+    render(<GetStartedAuthClient />);
+
+    expect(authEntryFormPropsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Personalized tutoring for every child',
+        subtitle:
+          'Book trusted 1-on-1 academic support that helps students build skills, confidence, and future readiness.',
+        submitLabel: 'Get Started',
+        submitLoadingLabel: 'Sending...',
+        oauthActionVerb: 'sign-up',
+      }),
+    );
   });
 });

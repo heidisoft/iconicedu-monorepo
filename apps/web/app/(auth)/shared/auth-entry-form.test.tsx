@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react';
-import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { AuthEntryForm } from './auth-entry-form';
 
@@ -51,7 +51,7 @@ describe('AuthEntryForm', () => {
       />,
     );
 
-    expect(screen.getByPlaceholderText('you@email.com')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Email')).toBeInTheDocument();
     expect(screen.getByText('Qualified, vetted tutors')).toBeInTheDocument();
     expect(
       screen.getByText('Schedules, sessions & homework in one place'),
@@ -60,5 +60,37 @@ describe('AuthEntryForm', () => {
       screen.getByText('Real-time messages, updates & payments'),
     ).toBeInTheDocument();
     expect(screen.getByText(/By continuing, you agree to our/i)).toBeInTheDocument();
+  });
+
+  it('requires a valid email before submitting', async () => {
+    const onEmailLogin = vi.fn();
+    render(
+      <AuthEntryForm
+        {...BASE_PROPS}
+        onEmailLogin={onEmailLogin}
+        enableGoogleSignIn={false}
+        enableAppleSignIn={false}
+      />,
+    );
+
+    const emailInput = screen.getByPlaceholderText('Email');
+    const submitButton = screen.getByRole('button', { name: 'Send code' });
+
+    expect(submitButton).toBeDisabled();
+
+    fireEvent.change(emailInput, { target: { value: 'not-an-email' } });
+    fireEvent.blur(emailInput);
+
+    expect(screen.getByText('Please enter a valid email address')).toBeInTheDocument();
+    expect(submitButton).toBeDisabled();
+
+    fireEvent.change(emailInput, { target: { value: ' parent@example.com ' } });
+    expect(submitButton).toBeEnabled();
+
+    fireEvent.click(submitButton);
+
+    await waitFor(() => {
+      expect(onEmailLogin).toHaveBeenCalledWith('parent@example.com');
+    });
   });
 });
