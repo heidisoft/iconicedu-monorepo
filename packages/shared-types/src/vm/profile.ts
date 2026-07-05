@@ -127,6 +127,10 @@ export type NotificationKey =
   | 'class.schedule.ended'
   | 'class.session.rescheduled'
   | 'class.session.canceled'
+  | 'class.session.reschedule_requested'
+  | 'class.session.cancel_requested'
+  | 'class.session.change_request.approved'
+  | 'class.session.change_request.rejected'
   | 'session.reminder.sent'
   | 'session.feedback_request.sent'
   | 'session.completed';

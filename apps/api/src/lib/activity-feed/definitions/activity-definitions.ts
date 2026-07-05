@@ -548,7 +548,15 @@ function renderReactionItem(event: ActivityEventRow) {
 }
 
 type ScheduleRenderVariant = 'created' | 'ended';
-type SessionRenderVariant = 'rescheduled' | 'canceled' | 'reminder' | 'feedback';
+type SessionRenderVariant =
+  | 'rescheduled'
+  | 'canceled'
+  | 'reschedule_requested'
+  | 'cancel_requested'
+  | 'change_request_approved'
+  | 'change_request_rejected'
+  | 'reminder'
+  | 'feedback';
 
 function renderScheduleItem(event: ActivityEventRow, variant: ScheduleRenderVariant) {
   const payload = asRecord(event.payload);
@@ -646,6 +654,11 @@ function renderSessionItem(event: ActivityEventRow, variant: SessionRenderVarian
     payload.reason,
   );
   const canceledReason = firstOptionalString(payload.canceledReason, payload.reason);
+  const requestedStartAt = firstOptionalString(payload.requestedStartAt);
+  const requestedLabel = formatSessionDateTime(requestedStartAt, payload);
+  const requestedByName = firstOptionalString(payload.requestedByName);
+  const requestNote = firstOptionalString(payload.requestedNote);
+  const decisionNote = firstOptionalString(payload.decisionNote);
   const reminderSessionLabel = formatSessionDateTime(
     firstOptionalString(
       payload.sessionDateTime,
@@ -687,6 +700,62 @@ function renderSessionItem(event: ActivityEventRow, variant: SessionRenderVarian
         ? `${classTitle} session ${sessionLabel} was canceled`
         : `${classTitle} session was canceled`,
       expandedContent: canceledReason ? `Reason: ${canceledReason}` : undefined,
+      actionLabel: 'Open class',
+    },
+    reschedule_requested: {
+      verb: 'class.session.reschedule_requested' as const,
+      iconKey: 'CalendarCheck' as const,
+      tone: 'warning' as const,
+      primary: classTitle,
+      secondary: joinSecondaryParts([
+        requestedByName
+          ? `${requestedByName} requested a reschedule`
+          : 'reschedule requested',
+        roleContext,
+        requestedLabel ? `Requested time: ${requestedLabel}` : undefined,
+      ]),
+      summary: requestedLabel
+        ? `${classTitle} reschedule requested for ${requestedLabel}`
+        : `${classTitle} reschedule requested`,
+      expandedContent: requestNote ? `Note: ${requestNote}` : undefined,
+      actionLabel: 'Open class',
+    },
+    cancel_requested: {
+      verb: 'class.session.cancel_requested' as const,
+      iconKey: 'CalendarX' as const,
+      tone: 'warning' as const,
+      primary: classTitle,
+      secondary: joinSecondaryParts([
+        requestedByName
+          ? `${requestedByName} requested a cancellation`
+          : 'cancellation requested',
+        roleContext,
+        sessionLabel,
+      ]),
+      summary: sessionLabel
+        ? `${classTitle} cancellation requested for ${sessionLabel}`
+        : `${classTitle} cancellation requested`,
+      expandedContent: requestNote ? `Note: ${requestNote}` : undefined,
+      actionLabel: 'Open class',
+    },
+    change_request_approved: {
+      verb: 'class.session.change_request.approved' as const,
+      iconKey: 'CheckCircle2' as const,
+      tone: 'success' as const,
+      primary: classTitle,
+      secondary: joinSecondaryParts(['session change approved', roleContext]),
+      summary: `${classTitle} session change approved`,
+      expandedContent: decisionNote ? `Decision note: ${decisionNote}` : undefined,
+      actionLabel: 'Open class',
+    },
+    change_request_rejected: {
+      verb: 'class.session.change_request.rejected' as const,
+      iconKey: 'AlertCircle' as const,
+      tone: 'warning' as const,
+      primary: classTitle,
+      secondary: joinSecondaryParts(['session change declined', roleContext]),
+      summary: `${classTitle} session change declined`,
+      expandedContent: decisionNote ? `Decision note: ${decisionNote}` : undefined,
       actionLabel: 'Open class',
     },
     reminder: {
@@ -910,6 +979,50 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     },
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => renderSessionItem(event, 'canceled'),
+  },
+  'class.session.reschedule_requested': {
+    eventType: 'class.session.reschedule_requested',
+    tabKey: 'classes',
+    importance: 'important',
+    notification: {
+      defaultChannels: ['push', 'email'],
+      timing: 'immediate',
+    },
+    resolveRecipients: DEFAULT_RECIPIENTS,
+    render: (event) => renderSessionItem(event, 'reschedule_requested'),
+  },
+  'class.session.cancel_requested': {
+    eventType: 'class.session.cancel_requested',
+    tabKey: 'classes',
+    importance: 'important',
+    notification: {
+      defaultChannels: ['push', 'email'],
+      timing: 'immediate',
+    },
+    resolveRecipients: DEFAULT_RECIPIENTS,
+    render: (event) => renderSessionItem(event, 'cancel_requested'),
+  },
+  'class.session.change_request.approved': {
+    eventType: 'class.session.change_request.approved',
+    tabKey: 'classes',
+    importance: 'important',
+    notification: {
+      defaultChannels: ['push', 'email'],
+      timing: 'immediate',
+    },
+    resolveRecipients: DEFAULT_RECIPIENTS,
+    render: (event) => renderSessionItem(event, 'change_request_approved'),
+  },
+  'class.session.change_request.rejected': {
+    eventType: 'class.session.change_request.rejected',
+    tabKey: 'classes',
+    importance: 'important',
+    notification: {
+      defaultChannels: ['push', 'email'],
+      timing: 'immediate',
+    },
+    resolveRecipients: DEFAULT_RECIPIENTS,
+    render: (event) => renderSessionItem(event, 'change_request_rejected'),
   },
   'session.reminder.sent': {
     eventType: 'session.reminder.sent',

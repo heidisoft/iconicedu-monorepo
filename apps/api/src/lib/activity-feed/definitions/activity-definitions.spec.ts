@@ -259,6 +259,55 @@ describe('API activity definitions context rendering', () => {
     expect(rendered.summary).toContain('was canceled');
   });
 
+  it('renders class session change request events in the classes tab', () => {
+    const requestDefinition = getActivityEventDefinition(
+      'class.session.reschedule_requested',
+    );
+    const decisionDefinition = getActivityEventDefinition(
+      'class.session.change_request.approved',
+    );
+
+    expect(requestDefinition).toBeDefined();
+    expect(decisionDefinition).toBeDefined();
+
+    const requestRendered = requestDefinition!.render(
+      makeEvent('class.session.reschedule_requested', {
+        requestedByName: 'Anika Rao',
+        requestedStartAt: '2026-05-08T15:00:00.000Z',
+        requestedNote: 'School event',
+      }),
+    );
+    const decisionRendered = decisionDefinition!.render(
+      makeEvent('class.session.change_request.approved', {
+        decisionNote: 'Works for me',
+      }),
+    );
+
+    expect(requestDefinition!.tabKey).toBe('classes');
+    expect(requestDefinition!.notification).toMatchObject({
+      defaultChannels: ['push', 'email'],
+      timing: 'immediate',
+    });
+    expect(requestRendered.leading).toMatchObject({
+      kind: 'icon',
+      iconKey: 'CalendarCheck',
+      tone: 'warning',
+    });
+    expect(requestRendered.headline.secondary).toContain(
+      'Anika Rao requested a reschedule',
+    );
+    expect(requestRendered.expandedContent).toBe('Note: School event');
+
+    expect(decisionDefinition!.tabKey).toBe('classes');
+    expect(decisionRendered.leading).toMatchObject({
+      kind: 'icon',
+      iconKey: 'CheckCircle2',
+      tone: 'success',
+    });
+    expect(decisionRendered.summary).toBe('Algebra I session change approved');
+    expect(decisionRendered.expandedContent).toBe('Decision note: Works for me');
+  });
+
   it('renders session reminders and feedback requests in the classes tab', () => {
     const reminderDefinition = getActivityEventDefinition('session.reminder.sent');
     const feedbackDefinition = getActivityEventDefinition(

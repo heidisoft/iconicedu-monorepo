@@ -43,6 +43,7 @@ export interface SessionChangeRequestVM {
   currentEndAt: ISODateTime;
   requestedStartAt: ISODateTime | null;
   requestedEndAt: ISODateTime | null;
+  requestedTimezone: string | null;
   approvalRequiredFrom: SessionChangeApprovalTargetVM;
   decidedByProfileId: UUID | null;
   decisionNote: string | null;

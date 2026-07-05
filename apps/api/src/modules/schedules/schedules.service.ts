@@ -102,6 +102,12 @@ type SessionActor = {
   roleKeys: string[];
 };
 
+type OrgMembershipActor = {
+  accountId: string;
+  profileId: string | null;
+  roleKeys: string[];
+};
+
 type SessionChangeRequestRow = {
   id: string;
   org_id: string;
@@ -118,6 +124,7 @@ type SessionChangeRequestRow = {
   current_end_at: string;
   requested_start_at: string | null;
   requested_end_at: string | null;
+  requested_timezone: string | null;
   approval_required_from: SessionChangeApprovalTargetVM;
   decided_by_profile_id: string | null;
   decision_note: string | null;
@@ -562,8 +569,23 @@ export class SchedulesService {
     accessToken: string,
     input: { orgId: string; channelId?: string; scheduleId?: string },
   ): Promise<SessionChangeRequestVM[]> {
-    await this.requireOrgMembership(accessToken, input.orgId);
+    const actor = await this.requireOrgMembershipActor(accessToken, input.orgId);
     const supabase = createSupabaseServiceClient();
+    const isManager = actor.roleKeys.some((role) =>
+      ['owner', 'admin', 'staff'].includes(role),
+    );
+    const participantScheduleIds = isManager
+      ? []
+      : await this.listParticipantScheduleIdsForActor(supabase, {
+          orgId: input.orgId,
+          profileId: actor.profileId,
+          scheduleId: input.scheduleId,
+        });
+
+    if (!isManager && participantScheduleIds.length === 0) {
+      return [];
+    }
+
     let query = supabase
       .from('class_session_change_requests')
       .select('*')
@@ -573,6 +595,7 @@ export class SchedulesService {
 
     if (input.channelId) query = query.eq('channel_id', input.channelId);
     if (input.scheduleId) query = query.eq('schedule_id', input.scheduleId);
+    if (!isManager) query = query.in('schedule_id', participantScheduleIds);
 
     const { data, error } = await query.returns<SessionChangeRequestRow[]>();
     if (error) throw new InternalServerErrorException(error.message);
@@ -652,7 +675,7 @@ export class SchedulesService {
             occurrenceKey: request.occurrence_key,
             startAt: request.requested_start_at!,
             endAt: request.requested_end_at!,
-            timezone: null,
+            timezone: request.requested_timezone,
             note: this.buildChangeNote({
               action: 'approved reschedule',
               actor,
@@ -763,6 +786,7 @@ export class SchedulesService {
       currentEndAt: row.current_end_at,
       requestedStartAt: row.requested_start_at,
       requestedEndAt: row.requested_end_at,
+      requestedTimezone: row.requested_timezone,
       approvalRequiredFrom: row.approval_required_from,
       decidedByProfileId: row.decided_by_profile_id,
       decisionNote: row.decision_note,
@@ -887,6 +911,62 @@ export class SchedulesService {
     if (error) throw new InternalServerErrorException(error.message);
     if (!data) throw new ForbiddenException('Not a member of this organization');
     return data;
+  }
+
+  private async requireOrgMembershipActor(
+    accessToken: string,
+    orgId: string,
+  ): Promise<OrgMembershipActor> {
+    const account = await this.requireOrgMembership(accessToken, orgId);
+    const profileId =
+      account.active_profile_id ??
+      (await this.resolveFallbackActorProfileId(orgId, account.id));
+
+    const { data: roles, error } = await createSupabaseServiceClient()
+      .from('user_roles')
+      .select('role_key')
+      .eq('account_id', account.id)
+      .eq('org_id', orgId)
+      .is('deleted_at', null)
+      .returns<Array<{ role_key: string | null }>>();
+    if (error) throw new InternalServerErrorException(error.message);
+
+    return {
+      accountId: account.id,
+      profileId,
+      roleKeys: (roles ?? [])
+        .map((role) => role.role_key)
+        .filter((role): role is string => Boolean(role)),
+    };
+  }
+
+  private async listParticipantScheduleIdsForActor(
+    supabase: SupabaseServiceClient,
+    input: {
+      orgId: string;
+      profileId: string | null;
+      scheduleId?: string;
+    },
+  ) {
+    if (!input.profileId) return [];
+
+    let query = supabase
+      .from('class_schedule_participants')
+      .select('schedule_id')
+      .eq('org_id', input.orgId)
+      .eq('profile_id', input.profileId)
+      .is('deleted_at', null);
+
+    if (input.scheduleId) {
+      query = query.eq('schedule_id', input.scheduleId);
+    }
+
+    const { data, error } = await query.returns<Array<{ schedule_id: string }>>();
+    if (error) throw new InternalServerErrorException(error.message);
+
+    return Array.from(
+      new Set((data ?? []).map((row) => row.schedule_id).filter(Boolean)),
+    );
   }
 
   private async requireSessionParticipantActor(
@@ -1039,6 +1119,7 @@ export class SchedulesService {
       type: SessionChangeRequestTypeVM;
       startAt: string | null;
       endAt: string | null;
+      timezone: string | null;
       note: string | null;
     };
     currentStartAt: string;
@@ -1063,6 +1144,7 @@ export class SchedulesService {
         current_end_at: input.currentEndAt,
         requested_start_at: input.input.startAt,
         requested_end_at: input.input.endAt,
+        requested_timezone: input.input.timezone,
         approval_required_from: input.approvalRequiredFrom,
         created_at: now,
         created_by: input.actor.profileId,
@@ -1440,6 +1522,8 @@ export class SchedulesService {
         endAt: input.request.current_end_at,
         requestedStartAt: input.request.requested_start_at,
         requestedEndAt: input.request.requested_end_at,
+        requestedTimezone: input.request.requested_timezone,
+        timezone: input.request.requested_timezone,
       },
       dedupeKey: `class.session.change_request:${input.request.id}:created`,
       createdBy: input.actor.profileId,
@@ -1484,6 +1568,8 @@ export class SchedulesService {
         endAt: input.request.current_end_at,
         requestedStartAt: input.request.requested_start_at,
         requestedEndAt: input.request.requested_end_at,
+        requestedTimezone: input.request.requested_timezone,
+        timezone: input.request.requested_timezone,
       },
       dedupeKey: `class.session.change_request:${input.request.id}:${input.approved ? 'approved' : 'rejected'}`,
       createdBy: input.actor.profileId,

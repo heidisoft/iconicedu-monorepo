@@ -920,6 +920,230 @@ describe('SchedulesService authorization', () => {
       },
     ]);
   });
+
+  it('scopes listed self-serve change requests to the active participant profile', async () => {
+    createSupabaseSessionClientMock.mockReturnValue({
+      auth: {
+        getUser: jest.fn(async () => ({
+          data: { user: { id: 'auth-user-1' } },
+          error: null,
+        })),
+      },
+    } as never);
+
+    const requestInMock = jest.fn(() => requestQuery);
+    const participantQuery = {
+      select: jest.fn(() => participantQuery),
+      eq: jest.fn(() => participantQuery),
+      is: jest.fn(() => participantQuery),
+      returns: jest.fn(async () => ({
+        data: [{ schedule_id: 'schedule-allowed' }],
+        error: null,
+      })),
+    };
+    const requestQuery = {
+      select: jest.fn(() => requestQuery),
+      eq: jest.fn(() => requestQuery),
+      is: jest.fn(() => requestQuery),
+      order: jest.fn(() => requestQuery),
+      in: requestInMock,
+      returns: jest.fn(async () => ({
+        data: [
+          {
+            id: 'request-1',
+            org_id: 'org-1',
+            schedule_id: 'schedule-allowed',
+            occurrence_key: null,
+            learning_space_id: 'space-1',
+            channel_id: 'channel-1',
+            request_type: 'cancel',
+            status: 'pending',
+            requested_by_profile_id: 'guardian-1',
+            requested_by_role: 'guardian',
+            requested_note: 'Sick',
+            current_start_at: '2030-03-06T10:00:00.000Z',
+            current_end_at: '2030-03-06T11:00:00.000Z',
+            requested_start_at: null,
+            requested_end_at: null,
+            requested_timezone: null,
+            approval_required_from: 'educator',
+            decided_by_profile_id: null,
+            decision_note: null,
+            decided_at: null,
+            applied_at: null,
+            created_at: '2030-03-01T00:00:00.000Z',
+          },
+        ],
+        error: null,
+      })),
+    };
+    const mainClient = {
+      from: jest.fn((table: string) =>
+        table === 'class_schedule_participants' ? participantQuery : requestQuery,
+      ),
+    };
+
+    createSupabaseServiceClientMock
+      .mockReturnValueOnce(
+        makeSingleResult({
+          id: 'account-1',
+          active_profile_id: 'guardian-1',
+        }) as never,
+      )
+      .mockReturnValueOnce(makeSingleResult([{ role_key: 'guardian' }]) as never)
+      .mockReturnValueOnce(mainClient as never);
+
+    const service = new SchedulesService();
+    await expect(
+      service.listSessionChangeRequests('token-1', { orgId: 'org-1' }),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        id: 'request-1',
+        scheduleId: 'schedule-allowed',
+        requestedTimezone: null,
+      }),
+    ]);
+
+    expect(requestInMock).toHaveBeenCalledWith('schedule_id', ['schedule-allowed']);
+  });
+
+  it('preserves requested timezone when approving a pending reschedule', async () => {
+    createSupabaseSessionClientMock.mockReturnValue({
+      auth: {
+        getUser: jest.fn(async () => ({
+          data: { user: { id: 'auth-user-1' } },
+          error: null,
+        })),
+      },
+    } as never);
+
+    const updates: Array<{ table: string; payload: unknown }> = [];
+    const requestRow = {
+      id: 'request-1',
+      org_id: 'org-1',
+      schedule_id: 'schedule-1',
+      occurrence_key: null,
+      learning_space_id: 'space-1',
+      channel_id: 'channel-1',
+      request_type: 'reschedule',
+      status: 'pending',
+      requested_by_profile_id: 'guardian-1',
+      requested_by_role: 'guardian',
+      requested_note: 'Can we move this?',
+      current_start_at: '2030-03-06T10:00:00.000Z',
+      current_end_at: '2030-03-06T11:00:00.000Z',
+      requested_start_at: '2030-03-06T12:00:00.000Z',
+      requested_end_at: '2030-03-06T13:00:00.000Z',
+      requested_timezone: 'America/New_York',
+      approval_required_from: 'educator',
+      decided_by_profile_id: null,
+      decision_note: null,
+      decided_at: null,
+      applied_at: null,
+      created_at: '2030-03-01T00:00:00.000Z',
+    };
+    const mainClient = {
+      from: jest.fn((table: string) => {
+        const query = {
+          select: jest.fn(() => query),
+          eq: jest.fn(() => query),
+          is: jest.fn(() => query),
+          update: jest.fn((payload: unknown) => {
+            updates.push({ table, payload });
+            return query;
+          }),
+          maybeSingle: jest.fn(async () => {
+            if (table === 'class_session_change_requests') {
+              return { data: requestRow, error: null };
+            }
+            if (table === 'class_schedules') {
+              return {
+                data: {
+                  id: 'schedule-1',
+                  title: 'Algebra I',
+                  start_at: '2030-03-06T10:00:00.000Z',
+                  end_at: '2030-03-06T11:00:00.000Z',
+                  timezone: 'America/New_York',
+                  source_learning_space_id: 'space-1',
+                  source_channel_id: 'channel-1',
+                  participants: [],
+                },
+                error: null,
+              };
+            }
+            if (table === 'class_schedule_recurrence') {
+              return { data: null, error: null };
+            }
+            return { data: null, error: null };
+          }),
+          single: jest.fn(async () => ({
+            data: {
+              ...requestRow,
+              status: 'applied',
+              decision_note: 'Approved',
+              decided_by_profile_id: 'educator-1',
+              decided_at: '2030-03-01T01:00:00.000Z',
+              applied_at: '2030-03-01T01:00:00.000Z',
+            },
+            error: null,
+          })),
+        };
+        return query;
+      }),
+    };
+    const participantClient = {
+      from: jest.fn((table: string) => {
+        const query = {
+          select: jest.fn(() => query),
+          eq: jest.fn(() => query),
+          is: jest.fn(() => query),
+          maybeSingle: jest.fn(async () => ({
+            data:
+              table === 'class_schedule_participants'
+                ? { role: 'educator', display_name: 'Ms. Chen' }
+                : null,
+            error: null,
+          })),
+          returns: jest.fn(async () => ({
+            data: table === 'user_roles' ? [{ role_key: 'educator' }] : [],
+            error: null,
+          })),
+        };
+        return query;
+      }),
+    };
+
+    createSupabaseServiceClientMock
+      .mockReturnValueOnce(mainClient as never)
+      .mockReturnValueOnce(
+        makeSingleResult({
+          id: 'account-educator',
+          active_profile_id: 'educator-1',
+        }) as never,
+      )
+      .mockReturnValueOnce(participantClient as never);
+
+    const service = new SchedulesService();
+    await expect(
+      service.approveSessionChangeRequest('token-1', 'request-1', {
+        note: 'Approved',
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        status: 'applied',
+        request: expect.objectContaining({
+          requestedTimezone: 'America/New_York',
+        }),
+      }),
+    );
+
+    expect(updates).toContainEqual({
+      table: 'class_schedules',
+      payload: expect.objectContaining({
+        timezone: 'America/New_York',
+      }),
+    });
+  });
 });
 
 function makeReplaceSchedulesClient(input: {
