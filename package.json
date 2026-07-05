@@ -66,6 +66,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "format:check:changed": "node scripts/prettier-check-changed.mjs",
+    "pr:ai": "node scripts/ai-pr.mjs",
     "guard:activity-feed-writes": "node scripts/check-activity-feed-writes.mjs",
     "guard:feature-flags": "node scripts/check-feature-flag-gating.mjs",
     "test:guard:activity-feed-writes": "node --test scripts/check-activity-feed-writes.test.mjs",

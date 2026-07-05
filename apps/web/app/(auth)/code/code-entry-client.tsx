@@ -80,7 +80,7 @@ export default function CodeEntryClient() {
   const verifyCode = React.useCallback(
     async (nextOtp: string) => {
       if (!email || nextOtp.length !== 6) {
-        setErrorMessage('Enter the 6-digit verification code to continue.');
+        setErrorMessage('Please enter the full 6-digit code');
         return;
       }
 
@@ -108,7 +108,7 @@ export default function CodeEntryClient() {
 
       router.replace(`/auth/callback?${callbackParams.toString()}`);
     },
-    [callbackParams, email, intent, orgSlug, router, supabase],
+    [callbackParams, email, intent, router, supabase],
   );
 
   React.useEffect(() => {
@@ -121,7 +121,7 @@ export default function CodeEntryClient() {
     event.preventDefault();
 
     if (!email || otp.length !== 6) {
-      setErrorMessage('Enter the 6-digit verification code to continue.');
+      setErrorMessage('Please enter the full 6-digit code');
       return;
     }
     await verifyCode(otp);
@@ -149,7 +149,7 @@ export default function CodeEntryClient() {
       return;
     }
 
-    setStatusMessage(`We sent a new verification code to ${email}.`);
+    setStatusMessage(`We sent a new 6-digit code to ${email}.`);
     setResendCooldown(RESEND_COOLDOWN_SECONDS);
     setIsResending(false);
   };
@@ -164,9 +164,9 @@ export default function CodeEntryClient() {
                 <SiteLogoFull className="h-16 w-auto sm:h-18" />
                 <span className="sr-only">ICONIC Academy LLC.</span>
               </a>
-              <h1 className="text-xl font-bold">Enter verification code</h1>
+              <h1 className="text-xl font-bold">Check your email</h1>
               <FieldDescription className="text-center">
-                Enter the 6-digit code we sent to {email || 'your email address'}.{' '}
+                We sent a 6-digit code to {email || 'your email address'}.{' '}
                 <Link
                   href={backHref}
                   className="font-medium text-foreground underline underline-offset-4"
@@ -235,7 +235,7 @@ export default function CodeEntryClient() {
                   ? 'Resending...'
                   : resendCooldown > 0
                     ? `Resend in ${resendCooldown}s`
-                    : 'Resend code'}
+                    : 'Resend'}
               </button>
             </FieldDescription>
           </Field>
@@ -257,15 +257,12 @@ export default function CodeEntryClient() {
             </Button>
           </Field>
           <div className="space-y-1 text-center text-xs text-muted-foreground">
-            <p>
-              Secure verification. No password required. Continue once your code is
-              confirmed.
-            </p>
+            <p>Secure verification. No password required.</p>
           </div>
         </FieldGroup>
       </form>
       <FieldDescription className="px-6 text-center">
-        By clicking continue, you agree to our <a href="#">Terms of Service</a> and{' '}
+        By continuing, you agree to our <a href="#">Terms</a> and{' '}
         <a href="#">Privacy Policy</a>.
       </FieldDescription>
     </div>
