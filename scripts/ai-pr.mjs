@@ -9,6 +9,15 @@ import { stdin as input, stdout as output } from 'node:process';
 const args = new Set(process.argv.slice(2));
 const assumeYes = args.has('--yes') || args.has('-y');
 const ready = args.has('--ready');
+const includeFullDiff = args.has('--full-diff');
+
+function argValue(name, fallback) {
+  const prefix = `${name}=`;
+  const value = process.argv.slice(2).find((arg) => arg.startsWith(prefix));
+  return value ? value.slice(prefix.length) : fallback;
+}
+
+const maxDiffBytes = Number(argValue('--max-diff-bytes', '20000'));
 
 function run(command, commandArgs, options = {}) {
   return execFileSync(command, commandArgs, {
@@ -56,6 +65,14 @@ function extractJson(value) {
   return JSON.parse(raw.slice(start, end + 1));
 }
 
+function truncate(value, maxBytes) {
+  const buffer = Buffer.from(value);
+  if (buffer.byteLength <= maxBytes) {
+    return value;
+  }
+  return `${buffer.subarray(0, maxBytes).toString()}\n\n[truncated at ${maxBytes} bytes]`;
+}
+
 async function confirm(message) {
   if (assumeYes || !process.stdin.isTTY) {
     return true;
@@ -66,9 +83,28 @@ async function confirm(message) {
   return answer.trim().toLowerCase() === 'y';
 }
 
-function aiSummary(diff) {
+function buildAiContext() {
+  const sections = [
+    ['Current branch', git(['branch', '--show-current'])],
+    ['Changed files', git(['status', '--short'])],
+    ['Diff stat', git(['diff', '--stat'])],
+    ['Name status', git(['diff', '--name-status'])],
+    ['Numstat', git(['diff', '--numstat'])],
+  ];
+
+  if (includeFullDiff) {
+    sections.push([
+      `Full diff (truncated to ${maxDiffBytes} bytes)`,
+      truncate(git(['diff', '--unified=1']), maxDiffBytes),
+    ]);
+  }
+
+  return sections.map(([title, body]) => `## ${title}\n${body || '(none)'}`).join('\n\n');
+}
+
+function aiSummary(context) {
   const outputFile = join(tmpdir(), `ai-pr-${Date.now()}.json`);
-  const prompt = `You generate git and GitHub PR metadata from a local diff.
+  const prompt = `You generate git and GitHub PR metadata from a compact local-change summary.
 Return JSON only, with this exact shape:
 {
   "branch": "codex/short-kebab-description",
@@ -81,10 +117,12 @@ Rules:
 - Branch must start with codex/.
 - Branch must be lowercase kebab-case after codex/.
 - Commit message should be concise and imperative.
-- Body should mention what changed, why, and validation if visible.
+- Body should mention what changed and why.
+- If validation is not visible in the summary, use a Tests section with "- Not run (not provided)."
+- Infer from filenames and stats. Do not ask for the full diff unless the summary is truly ambiguous.
 
-Diff:
-${diff}`;
+Local-change summary:
+${context}`;
 
   const result = spawnSync(
     'codex',
@@ -120,14 +158,15 @@ async function main() {
   run('gh', ['--version']);
   passthrough('gh', ['auth', 'status']);
 
-  const diff = git(['diff', '--stat']) + '\n\n' + git(['diff']);
-  const suggestion = aiSummary(diff);
+  const context = buildAiContext();
+  const suggestion = aiSummary(context);
 
   console.log('\nFiles to publish:');
   for (const file of files) {
     console.log(`- ${file}`);
   }
   console.log('\nAI suggestion:');
+  console.log(`Mode: ${includeFullDiff ? 'full diff' : 'compact summary'}`);
   console.log(`Branch: ${suggestion.branch}`);
   console.log(`Commit: ${suggestion.commit}`);
   console.log(`PR: ${suggestion.title}`);
