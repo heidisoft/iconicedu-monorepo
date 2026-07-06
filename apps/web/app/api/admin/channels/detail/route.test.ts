@@ -42,4 +42,21 @@ describe('POST /api/admin/channels/detail', () => {
       data: { ids: { id: 'channel-1', orgId: 'org-1' } },
     });
   });
+
+  it('returns 403 when admin authorization fails', async () => {
+    getChannelDetail.mockRejectedValueOnce(new Error('Forbidden'));
+
+    const response = await POST(
+      new Request(`${APP_URL}/api/admin/channels/detail`, {
+        method: 'POST',
+        body: JSON.stringify({ channelId: 'channel-1' }),
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      success: false,
+      message: 'Forbidden',
+    });
+  });
 });

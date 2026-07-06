@@ -20,6 +20,18 @@ export async function POST(request: Request) {
     const detail = await getLearningSpaceDetail(learningSpaceId);
     return NextResponse.json({ success: true, data: detail });
   } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json(
+        { success: false, message: error.message },
+        { status: 401 },
+      );
+    }
+    if (error instanceof Error && error.message === 'Forbidden') {
+      return NextResponse.json(
+        { success: false, message: error.message },
+        { status: 403 },
+      );
+    }
     return NextResponse.json(
       {
         success: false,
