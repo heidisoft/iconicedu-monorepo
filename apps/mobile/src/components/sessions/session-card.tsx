@@ -917,7 +917,6 @@ const s = StyleSheet.create({
     gap: 10,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    borderWidth: 1,
     padding: 16,
     paddingBottom: 28,
   },
