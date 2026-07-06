@@ -20,6 +20,7 @@ import {
   User,
   BriefcaseBusiness,
   CalendarClock,
+  MoreHorizontal,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/providers/theme-provider';
@@ -234,6 +235,7 @@ export function SessionCard({
     joinHref: string;
     providerLabel: string | null;
   } | null>(null);
+  const [actionMenuVisible, setActionMenuVisible] = useState(false);
   const [isResolvingJoin, setIsResolvingJoin] = useState(false);
 
   const { isLive, isPast } = session;
@@ -336,6 +338,10 @@ export function SessionCard({
   const canJoin =
     !isPast && !isDisabled && (!!session.meetingLink || !!session.channelId);
   const joinIsActive = canJoin && joinEnabled && !isResolvingJoin;
+  const hasSessionActions = Boolean(rescheduleAction || cancelAction);
+  const openActionMenu = useCallback(() => {
+    if (hasSessionActions) setActionMenuVisible(true);
+  }, [hasSessionActions]);
   return (
     <>
       <TouchableOpacity
@@ -352,7 +358,8 @@ export function SessionCard({
         accessibilityRole="button"
         accessibilityLabel="Open session details"
         onPress={handlePress}
-        disabled={!session.channelId || !enableCardPress}
+        onLongPress={hasSessionActions ? openActionMenu : undefined}
+        disabled={!handlePress && !hasSessionActions}
         activeOpacity={0.75}
       >
         {/* Day badge */}
@@ -580,53 +587,104 @@ export function SessionCard({
               <Text style={[s.joinBtnTxt, { color: colors.textMuted }]}>Recording</Text>
             </TouchableOpacity>
           ) : null}
-          {rescheduleAction ? (
+          {hasSessionActions ? (
             <TouchableOpacity
               style={[
-                s.rescheduleBtn,
+                s.moreBtn,
                 {
-                  backgroundColor: rescheduleAction.disabled
-                    ? colors.inputBg
-                    : colors.card,
-                  borderColor: colors.teal,
-                  opacity: rescheduleAction.disabled ? 0.6 : 1,
+                  backgroundColor: colors.card,
+                  borderColor: colors.border,
                 },
               ]}
-              onPress={rescheduleAction.onPress}
-              disabled={rescheduleAction.disabled}
+              onPress={openActionMenu}
               activeOpacity={0.7}
-              accessibilityLabel={
-                rescheduleAction.accessibilityLabel ?? 'Reschedule session'
-              }
+              accessibilityLabel="Session options"
             >
-              <CalendarClock size={11} color={colors.teal} />
-              <Text style={[s.rescheduleBtnTxt, { color: colors.teal }]}>
-                {rescheduleAction.label ?? 'Move'}
-              </Text>
-            </TouchableOpacity>
-          ) : null}
-          {cancelAction ? (
-            <TouchableOpacity
-              style={[
-                s.cancelBtn,
-                {
-                  backgroundColor: cancelAction.disabled ? colors.inputBg : colors.card,
-                  borderColor: colors.red,
-                  opacity: cancelAction.disabled ? 0.6 : 1,
-                },
-              ]}
-              onPress={cancelAction.onPress}
-              disabled={cancelAction.disabled}
-              activeOpacity={0.7}
-              accessibilityLabel={cancelAction.accessibilityLabel ?? 'Cancel session'}
-            >
-              <Text style={[s.cancelBtnTxt, { color: colors.red }]}>
-                {cancelAction.label ?? 'Cancel'}
-              </Text>
+              <MoreHorizontal size={17} color={colors.textMuted} />
             </TouchableOpacity>
           ) : null}
         </View>
       </TouchableOpacity>
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={actionMenuVisible}
+        onRequestClose={() => setActionMenuVisible(false)}
+      >
+        <Pressable style={s.actionBackdrop} onPress={() => setActionMenuVisible(false)}>
+          <Pressable
+            style={[
+              s.actionSheet,
+              { backgroundColor: colors.card, borderColor: colors.border },
+            ]}
+            onPress={(event) => event.stopPropagation()}
+          >
+            <View style={s.actionSheetHeader}>
+              <Text style={[s.actionSheetTitle, { color: colors.text }]}>
+                Session options
+              </Text>
+              <TouchableOpacity
+                style={[
+                  s.actionCloseButton,
+                  { backgroundColor: colors.inputBg, borderColor: colors.border },
+                ]}
+                onPress={() => setActionMenuVisible(false)}
+                accessibilityLabel="Close session options"
+              >
+                <X size={16} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            {rescheduleAction ? (
+              <TouchableOpacity
+                style={[
+                  s.actionOption,
+                  {
+                    backgroundColor: colors.inputBg,
+                    borderColor: colors.border,
+                    opacity: rescheduleAction.disabled ? 0.55 : 1,
+                  },
+                ]}
+                disabled={rescheduleAction.disabled}
+                onPress={() => {
+                  setActionMenuVisible(false);
+                  rescheduleAction.onPress();
+                }}
+                accessibilityLabel={
+                  rescheduleAction.accessibilityLabel ?? 'Reschedule session'
+                }
+              >
+                <CalendarClock size={18} color={colors.teal} />
+                <Text style={[s.actionOptionText, { color: colors.text }]}>
+                  {rescheduleAction.label ?? 'Reschedule'}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+            {cancelAction ? (
+              <TouchableOpacity
+                style={[
+                  s.actionOption,
+                  {
+                    backgroundColor: colors.inputBg,
+                    borderColor: colors.border,
+                    opacity: cancelAction.disabled ? 0.55 : 1,
+                  },
+                ]}
+                disabled={cancelAction.disabled}
+                onPress={() => {
+                  setActionMenuVisible(false);
+                  cancelAction.onPress();
+                }}
+                accessibilityLabel={cancelAction.accessibilityLabel ?? 'Cancel session'}
+              >
+                <X size={18} color={colors.red} />
+                <Text style={[s.actionOptionText, { color: colors.red }]}>
+                  {cancelAction.label ?? 'Cancel'}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+          </Pressable>
+        </Pressable>
+      </Modal>
       <Modal
         animationType="fade"
         transparent={true}
@@ -854,7 +912,7 @@ const s = StyleSheet.create({
     gap: 6,
     flexShrink: 0,
   },
-  iconBtn: {
+  moreBtn: {
     width: 28,
     height: 28,
     alignItems: 'center',
@@ -862,30 +920,48 @@ const s = StyleSheet.create({
     borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  cancelBtn: {
-    minHeight: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 10,
+  actionBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(15, 23, 42, 0.42)',
   },
-  cancelBtnTxt: {
-    fontSize: 12,
-    fontWeight: '700',
+  actionSheet: {
+    gap: 10,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderWidth: 1,
+    padding: 16,
+    paddingBottom: 28,
   },
-  rescheduleBtn: {
-    minHeight: 28,
+  actionSheetHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  actionSheetTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  actionCloseButton: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 16,
+  },
+  actionOption: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
     borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
   },
-  rescheduleBtnTxt: {
-    fontSize: 12,
+  actionOptionText: {
+    fontSize: 15,
     fontWeight: '700',
   },
   joinBtn: {

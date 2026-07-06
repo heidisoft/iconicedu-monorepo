@@ -28,6 +28,10 @@ jest.mock('@tanstack/react-query', () => ({
     isPending: false,
     refetch: mockRefetchOrgSchedules,
   }),
+  useMutation: () => ({
+    mutate: jest.fn(),
+    isPending: false,
+  }),
 }));
 
 jest.mock('expo-router', () => ({

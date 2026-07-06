@@ -1,5 +1,8 @@
 import React, { useState, useCallback, useRef } from 'react';
 import {
+  Alert,
+  Modal,
+  Pressable,
   View,
   Text,
   Image,
@@ -14,7 +17,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   CalendarClock,
   CalendarCheck,
@@ -38,7 +41,7 @@ import { useSupportChannel } from '@/hooks/use-support-channel';
 import { useTheme } from '@/providers/theme-provider';
 import { useFamilyView } from '@/providers/family-view-provider';
 import { PulseBox } from '@/components/skeletons/pulse-box';
-import { SessionCard } from '@/components/sessions/session-card';
+import { SessionCard, type ClassSession } from '@/components/sessions/session-card';
 import { AppSupportFooter } from '@/components/support/app-support-footer';
 import { QueryError } from '@/components/errors/query-error';
 import {
@@ -46,7 +49,13 @@ import {
   buildHomeUpcomingSessionsMetricDisplay,
   splitHomeSessionsByTimeline,
 } from '@/lib/home-metrics';
-import { fetchOrgSessions, queryKeys, submitClassRequest } from '@/lib/api/queries';
+import {
+  fetchOrgSessions,
+  queryKeys,
+  selfServeCancelSession,
+  selfServeRescheduleSession,
+  submitClassRequest,
+} from '@/lib/api/queries';
 import {
   OTHER_SUBJECT_OPTION,
   STANDARD_SUBJECT_OPTIONS,
@@ -110,10 +119,40 @@ type RequestableStudent = {
   displayName: string;
 };
 
+type SessionChangeModalState =
+  | { kind: 'cancel'; session: ClassSession; note: string }
+  | {
+      kind: 'reschedule';
+      session: ClassSession;
+      date: string;
+      startTime: string;
+      endTime: string;
+      note: string;
+    }
+  | null;
+
 function toggleSelectedValue(values: string[], value: string) {
   return values.includes(value)
     ? values.filter((item) => item !== value)
     : [...values, value];
+}
+
+function formatSessionDateInput(iso: string): string {
+  return iso.slice(0, 10);
+}
+
+function formatSessionTimeInput(iso: string): string {
+  const date = new Date(iso);
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
+function combineSessionLocalDateTime(dateValue: string, timeValue: string): string {
+  const [year, month, day] = dateValue.split('-').map(Number);
+  const [hour, minute] = timeValue.split(':').map(Number);
+  if (!year || !month || !day || hour == null || minute == null) {
+    throw new Error('Enter a valid date and time.');
+  }
+  return new Date(year, month - 1, day, hour, minute).toISOString();
 }
 
 function ClassRequestSheet({
@@ -607,6 +646,71 @@ function makeStyles(C: AppColors) {
       fontSize: 15,
       fontWeight: '800',
     },
+    changeModalBackdrop: {
+      flex: 1,
+      justifyContent: 'center',
+      paddingHorizontal: 18,
+      backgroundColor: 'rgba(15, 23, 42, 0.42)',
+    },
+    changeModalCard: {
+      gap: 12,
+      padding: 16,
+      borderRadius: 16,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: C.border,
+      backgroundColor: C.card,
+    },
+    changeModalTitle: {
+      fontSize: 17,
+      fontWeight: '700',
+      color: C.text,
+    },
+    changeModalInputRow: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    changeModalInput: {
+      minHeight: 42,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: C.border,
+      borderRadius: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      color: C.text,
+      backgroundColor: C.inputBg,
+      fontSize: 14,
+    },
+    changeModalTextArea: {
+      minHeight: 82,
+      textAlignVertical: 'top',
+    },
+    changeModalActions: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      gap: 10,
+    },
+    changeModalSecondaryBtn: {
+      minHeight: 38,
+      justifyContent: 'center',
+      borderRadius: 19,
+      paddingHorizontal: 16,
+      backgroundColor: C.inputBg,
+    },
+    changeModalSecondaryTxt: {
+      color: C.text,
+      fontWeight: '700',
+    },
+    changeModalPrimaryBtn: {
+      minHeight: 38,
+      justifyContent: 'center',
+      borderRadius: 19,
+      paddingHorizontal: 16,
+      backgroundColor: C.teal,
+    },
+    changeModalPrimaryTxt: {
+      color: C.tealFg,
+      fontWeight: '700',
+    },
     requestSheet: {
       paddingHorizontal: 18,
       paddingBottom: 24,
@@ -836,6 +940,8 @@ export default function HomeScreen() {
   const thisWeekSessions = sessionBuckets.thisWeek;
   const nextWeekSessions = sessionBuckets.nextWeek;
   const [classRequestOpen, setClassRequestOpen] = useState(false);
+  const [sessionChangeModal, setSessionChangeModal] =
+    useState<SessionChangeModalState>(null);
   const requestableStudents = React.useMemo<RequestableStudent[]>(() => {
     const children = familySwitchOptions
       .filter((option) => option.kind === 'child')
@@ -938,6 +1044,105 @@ export default function HomeScreen() {
     setRefreshing(true);
     refreshHomeData().finally(() => setRefreshing(false));
   }, [refreshHomeData]);
+  const invalidateSessionData = useCallback(async () => {
+    if (!orgId) return;
+    await Promise.all([
+      refetchSessions(),
+      refetchOrgSchedules(),
+      queryClient.invalidateQueries({ queryKey: queryKeys.orgSessions(orgId) }),
+    ]);
+  }, [orgId, queryClient, refetchOrgSchedules, refetchSessions]);
+  const cancelSessionMutation = useMutation({
+    mutationFn: (input: { session: ClassSession; note?: string | null }) =>
+      selfServeCancelSession({
+        orgId: orgId ?? '',
+        scheduleId: input.session.scheduleId ?? input.session.id,
+        occurrenceKey: input.session.occurrenceKey ?? null,
+        note: input.note ?? null,
+      }),
+    onSuccess: async (result) => {
+      setSessionChangeModal(null);
+      await invalidateSessionData();
+      Alert.alert(
+        result.approvalRequired ? 'Request sent' : 'Session canceled',
+        result.approvalRequired
+          ? 'This change is waiting for approval.'
+          : 'The session was updated.',
+      );
+    },
+    onError: (error) => {
+      Alert.alert(
+        'Unable to cancel',
+        error instanceof Error ? error.message : 'Please try again.',
+      );
+    },
+  });
+  const rescheduleSessionMutation = useMutation({
+    mutationFn: (input: {
+      session: ClassSession;
+      date: string;
+      startTime: string;
+      endTime: string;
+      note?: string | null;
+    }) =>
+      selfServeRescheduleSession({
+        orgId: orgId ?? '',
+        scheduleId: input.session.scheduleId ?? input.session.id,
+        occurrenceKey: input.session.occurrenceKey ?? null,
+        startAt: combineSessionLocalDateTime(input.date, input.startTime),
+        endAt: combineSessionLocalDateTime(input.date, input.endTime),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        note: input.note ?? null,
+      }),
+    onSuccess: async (result) => {
+      setSessionChangeModal(null);
+      await invalidateSessionData();
+      Alert.alert(
+        result.approvalRequired ? 'Request sent' : 'Session rescheduled',
+        result.approvalRequired
+          ? 'This change is waiting for approval.'
+          : 'The session was updated.',
+      );
+    },
+    onError: (error) => {
+      Alert.alert(
+        'Unable to reschedule',
+        error instanceof Error ? error.message : 'Please try again.',
+      );
+    },
+  });
+  const buildSessionCardActions = useCallback(
+    (session: ClassSession) => {
+      if (session.isPast || session.disabled || !orgId) {
+        return { cancelAction: null, rescheduleAction: null };
+      }
+
+      return {
+        cancelAction: {
+          onPress: () =>
+            setSessionChangeModal({
+              kind: 'cancel',
+              session,
+              note: '',
+            }),
+          disabled: cancelSessionMutation.isPending,
+        },
+        rescheduleAction: {
+          onPress: () =>
+            setSessionChangeModal({
+              kind: 'reschedule',
+              session,
+              date: formatSessionDateInput(session.startAt),
+              startTime: formatSessionTimeInput(session.startAt),
+              endTime: formatSessionTimeInput(session.endAt),
+              note: '',
+            }),
+          disabled: rescheduleSessionMutation.isPending,
+        },
+      };
+    },
+    [cancelSessionMutation.isPending, orgId, rescheduleSessionMutation.isPending],
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -1273,14 +1478,19 @@ export default function HomeScreen() {
               </View>
             ) : (
               <View style={{ gap: 6 }}>
-                {todaySessions.map((session) => (
-                  <SessionCard
-                    key={session.id}
-                    session={session}
-                    pressTarget="messages"
-                    titleVariant="message-list"
-                  />
-                ))}
+                {todaySessions.map((session) => {
+                  const actions = buildSessionCardActions(session);
+                  return (
+                    <SessionCard
+                      key={session.id}
+                      session={session}
+                      pressTarget="messages"
+                      titleVariant="message-list"
+                      cancelAction={actions.cancelAction}
+                      rescheduleAction={actions.rescheduleAction}
+                    />
+                  );
+                })}
               </View>
             )}
           </View>
@@ -1322,14 +1532,19 @@ export default function HomeScreen() {
               </View>
             ) : (
               <View style={{ gap: 6 }}>
-                {thisWeekSessions.map((session) => (
-                  <SessionCard
-                    key={session.id}
-                    session={session}
-                    pressTarget="messages"
-                    titleVariant="message-list"
-                  />
-                ))}
+                {thisWeekSessions.map((session) => {
+                  const actions = buildSessionCardActions(session);
+                  return (
+                    <SessionCard
+                      key={session.id}
+                      session={session}
+                      pressTarget="messages"
+                      titleVariant="message-list"
+                      cancelAction={actions.cancelAction}
+                      rescheduleAction={actions.rescheduleAction}
+                    />
+                  );
+                })}
               </View>
             )}
           </View>
@@ -1367,15 +1582,20 @@ export default function HomeScreen() {
             </View>
           ) : nextWeekSessions.length > 0 ? (
             <View style={{ gap: 6 }}>
-              {nextWeekSessions.map((session) => (
-                <SessionCard
-                  key={session.id}
-                  session={session}
-                  pressTarget="messages"
-                  titleVariant="message-list"
-                  showJoinButton={false}
-                />
-              ))}
+              {nextWeekSessions.map((session) => {
+                const actions = buildSessionCardActions(session);
+                return (
+                  <SessionCard
+                    key={session.id}
+                    session={session}
+                    pressTarget="messages"
+                    titleVariant="message-list"
+                    showJoinButton={false}
+                    cancelAction={actions.cancelAction}
+                    rescheduleAction={actions.rescheduleAction}
+                  />
+                );
+              })}
             </View>
           ) : shouldShowClassRequestCta ? (
             <View style={s.boostCard}>
@@ -1416,6 +1636,102 @@ export default function HomeScreen() {
 
         <AppSupportFooter isLoading={supportFooterLoading} />
       </ScrollView>
+      <Modal
+        transparent
+        animationType="fade"
+        visible={Boolean(sessionChangeModal)}
+        onRequestClose={() => setSessionChangeModal(null)}
+      >
+        <Pressable
+          style={s.changeModalBackdrop}
+          onPress={() => setSessionChangeModal(null)}
+        >
+          <Pressable
+            style={s.changeModalCard}
+            onPress={(event) => event.stopPropagation()}
+          >
+            <Text style={s.changeModalTitle}>
+              {sessionChangeModal?.kind === 'cancel'
+                ? 'Cancel session'
+                : 'Reschedule session'}
+            </Text>
+            {sessionChangeModal?.kind === 'reschedule' ? (
+              <>
+                <TextInput
+                  value={sessionChangeModal.date}
+                  onChangeText={(date) =>
+                    setSessionChangeModal({ ...sessionChangeModal, date })
+                  }
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor={colors.textMuted}
+                  style={s.changeModalInput}
+                />
+                <View style={s.changeModalInputRow}>
+                  <TextInput
+                    value={sessionChangeModal.startTime}
+                    onChangeText={(startTime) =>
+                      setSessionChangeModal({ ...sessionChangeModal, startTime })
+                    }
+                    placeholder="Start"
+                    placeholderTextColor={colors.textMuted}
+                    style={[s.changeModalInput, { flex: 1 }]}
+                  />
+                  <TextInput
+                    value={sessionChangeModal.endTime}
+                    onChangeText={(endTime) =>
+                      setSessionChangeModal({ ...sessionChangeModal, endTime })
+                    }
+                    placeholder="End"
+                    placeholderTextColor={colors.textMuted}
+                    style={[s.changeModalInput, { flex: 1 }]}
+                  />
+                </View>
+              </>
+            ) : null}
+            <TextInput
+              value={sessionChangeModal?.note ?? ''}
+              onChangeText={(note) =>
+                sessionChangeModal
+                  ? setSessionChangeModal({ ...sessionChangeModal, note })
+                  : undefined
+              }
+              placeholder="Add a note"
+              placeholderTextColor={colors.textMuted}
+              multiline
+              style={[s.changeModalInput, s.changeModalTextArea]}
+            />
+            <View style={s.changeModalActions}>
+              <TouchableOpacity
+                style={s.changeModalSecondaryBtn}
+                onPress={() => setSessionChangeModal(null)}
+              >
+                <Text style={s.changeModalSecondaryTxt}>Close</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={s.changeModalPrimaryBtn}
+                disabled={
+                  cancelSessionMutation.isPending || rescheduleSessionMutation.isPending
+                }
+                onPress={() => {
+                  if (!sessionChangeModal) return;
+                  if (sessionChangeModal.kind === 'cancel') {
+                    cancelSessionMutation.mutate({
+                      session: sessionChangeModal.session,
+                      note: sessionChangeModal.note,
+                    });
+                    return;
+                  }
+                  rescheduleSessionMutation.mutate(sessionChangeModal);
+                }}
+              >
+                <Text style={s.changeModalPrimaryTxt}>
+                  {sessionChangeModal?.kind === 'cancel' ? 'Send' : 'Request'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
       <BottomSheet
         visible={familySwitchOpen}
         onClose={() => setFamilySwitchOpen(false)}

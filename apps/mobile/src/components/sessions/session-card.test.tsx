@@ -60,6 +60,14 @@ jest.mock('lucide-react-native', () => ({
     const { View } = require('react-native');
     return <View testID={testID ?? 'briefcasebusiness-icon'} />;
   },
+  CalendarClock: ({ testID }: { testID?: string }) => {
+    const { View } = require('react-native');
+    return <View testID={testID ?? 'calendarclock-icon'} />;
+  },
+  MoreHorizontal: ({ testID }: { testID?: string }) => {
+    const { View } = require('react-native');
+    return <View testID={testID ?? 'more-icon'} />;
+  },
   Sparkles: ({ testID }: { testID?: string }) => {
     const { View } = require('react-native');
     return <View testID={testID ?? 'sparkles-icon'} />;
@@ -277,7 +285,7 @@ describe('SessionCard', () => {
     expect(screen.getByText('Recording')).toBeTruthy();
   });
 
-  it('renders a cancel button when a cancel action is provided', () => {
+  it('renders session options when a cancel action is provided', () => {
     render(
       <SessionCard
         session={baseSession}
@@ -285,6 +293,8 @@ describe('SessionCard', () => {
       />,
     );
 
+    expect(screen.getByLabelText('Session options')).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Session options'));
     expect(screen.getByText('Cancel')).toBeTruthy();
     expect(screen.getByLabelText('Cancel class session')).toBeTruthy();
   });
@@ -292,8 +302,16 @@ describe('SessionCard', () => {
   it('fires the provided cancel callback', () => {
     const onCancel = jest.fn();
     render(<SessionCard session={baseSession} cancelAction={{ onPress: onCancel }} />);
+    fireEvent.press(screen.getByLabelText('Session options'));
     fireEvent.press(screen.getByLabelText('Cancel session'));
     expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens session options on long press', () => {
+    render(<SessionCard session={baseSession} cancelAction={{ onPress: jest.fn() }} />);
+    fireEvent(screen.getByLabelText('Open session details'), 'longPress');
+    expect(screen.getByText('Session options')).toBeTruthy();
+    expect(screen.getByText('Cancel')).toBeTruthy();
   });
 
   it('shows Canceled badge for exception variant', () => {

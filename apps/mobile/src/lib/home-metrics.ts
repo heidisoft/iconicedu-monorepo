@@ -425,6 +425,10 @@ function buildHomeScopedSchedules(input: {
 
     return {
       id: schedule.ids.id,
+      scheduleId: schedule.ids.id.includes('__')
+        ? schedule.ids.id.slice(0, schedule.ids.id.indexOf('__'))
+        : schedule.ids.id,
+      occurrenceKey: schedule.uiState?.originalStartAt ?? null,
       label: schedule.title,
       time: formatTimeBadge(schedule.startAt),
       participantLabel: getParticipantLabel({ schedule, profileKind: input.profileKind }),
