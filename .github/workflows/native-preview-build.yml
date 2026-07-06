@@ -86,6 +86,25 @@ jobs:
               > mobile-build-env/.env.local
           }
 
+          wait_for_preview_api() {
+            local api_url="$1"
+            local health_url="${api_url%/}/healthz"
+            echo "Waiting for preview API readiness at ${health_url}."
+
+            for attempt in {1..30}; do
+              if curl -fsS --max-time 10 "${health_url}" >/dev/null; then
+                echo "Preview API is ready."
+                return 0
+              fi
+
+              echo "Preview API is not ready yet (${attempt}/30)."
+              sleep 10
+            done
+
+            echo "::error::Preview API did not become ready at ${health_url}."
+            return 1
+          }
+
           if [[ -z "${PR_NUMBER}" ]]; then
             if [[ "${BRANCH_NAME}" != "main" ]]; then
               echo "::error::PR number is required when building a branch other than main."
@@ -205,6 +224,9 @@ jobs:
             exit 1
           fi
 
+          API_URL="https://${API_HOST}"
+          wait_for_preview_api "${API_URL}"
+
           PROJECT_ID="${VERCEL_PROJECT_ID:-}"
           ORG_ID="${VERCEL_ORG_ID:-}"
           TEAM_AMP=""
@@ -257,7 +279,7 @@ jobs:
           write_env_file \
             "https://${PROJECT_REF}.supabase.co" \
             "${ANON_KEY}" \
-            "https://${API_HOST}" \
+            "${API_URL}" \
             "${WEB_URL}"
 
       - name: Upload resolved mobile env

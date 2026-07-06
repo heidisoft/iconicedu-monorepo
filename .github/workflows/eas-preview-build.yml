@@ -30,7 +30,7 @@ jobs:
   eas-build:
     name: 'Create EAS Build'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     permissions:
       contents: read
       issues: write
@@ -195,6 +195,24 @@ jobs:
           API_URL=$(normalize_url "${CONFIGURED_API_URL:-}")
           RAILWAY_GQL="https://backboard.railway.app/graphql/v2"
 
+          wait_for_preview_api() {
+            local health_url="${API_URL%/}/healthz"
+            echo "Waiting for preview API readiness at ${health_url}."
+
+            for attempt in {1..30}; do
+              if curl -fsS --max-time 10 "${health_url}" >/dev/null; then
+                echo "Preview API is ready."
+                return 0
+              fi
+
+              echo "Preview API is not ready yet (${attempt}/30)."
+              sleep 10
+            done
+
+            echo "::error::Preview API did not become ready at ${health_url}."
+            return 1
+          }
+
           railway_api() {
             local body="$1"
             local resp
@@ -257,6 +275,10 @@ jobs:
             fi
 
             API_URL="https://${API_HOST}"
+          fi
+
+          if [[ "${USE_PRODUCTION_URLS}" != "true" ]]; then
+            wait_for_preview_api
           fi
 
           if [[ "${USE_PRODUCTION_URLS}" == "true" ]]; then
@@ -389,6 +411,8 @@ jobs:
             const profile = '${{ steps.context.outputs.build_profile }}';
             const buildUrl = '${{ steps.eas-build.outputs.build_url }}';
             const supabaseUrl = '${{ steps.supabase-creds.outputs.api_url }}';
+            const apiUrl = '${{ steps.app-urls.outputs.api_url }}';
+            const webUrl = '${{ steps.app-urls.outputs.web_url }}';
 
             const platformLabel =
               platform === 'all'
@@ -404,6 +428,8 @@ jobs:
               `**Platform:** ${platformLabel}`,
               `**Profile:** ${profileLabel}`,
               `**Supabase URL:** \`${supabaseUrl}\``,
+              `**API URL:** \`${apiUrl}\``,
+              `**Web URL:** \`${webUrl}\``,
               '',
               `${buildLink} - install via internal distribution once the build completes.`,
             ].join('\n');
