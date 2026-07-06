@@ -4,7 +4,7 @@ import { cn } from '@iconicedu/ui-native/lib/utils';
 import * as DialogPrimitive from '@rn-primitives/dialog';
 import { X } from 'lucide-react-native';
 import * as React from 'react';
-import { Platform, Text, View, type ViewProps } from 'react-native';
+import { Platform, StyleSheet, Text, View, type ViewProps } from 'react-native';
 import { FadeIn, FadeOut } from 'react-native-reanimated';
 import { FullWindowOverlay as RNFullWindowOverlay } from 'react-native-screens';
 
@@ -36,15 +36,16 @@ function DialogOverlay({
           className,
         )}
         {...props}
-        asChild={Platform.OS !== 'web'}
       >
         <NativeOnlyAnimatedView
           entering={FadeIn.duration(200)}
           exiting={FadeOut.duration(150)}
+          style={styles.centeredOverlayFrame}
         >
           <NativeOnlyAnimatedView
             entering={FadeIn.delay(50)}
             exiting={FadeOut.duration(150)}
+            style={styles.centeredContentFrame}
           >
             <>{children}</>
           </NativeOnlyAnimatedView>
@@ -152,3 +153,16 @@ export {
   DialogTitle,
   DialogTrigger,
 };
+
+const styles = StyleSheet.create({
+  centeredOverlayFrame: {
+    flex: 1,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  centeredContentFrame: {
+    width: '100%',
+    alignItems: 'center',
+  },
+});
