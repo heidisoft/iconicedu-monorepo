@@ -1,6 +1,8 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import {
   Alert,
+  Modal,
+  Pressable,
   View,
   Text,
   TouchableOpacity,
@@ -10,14 +12,7 @@ import {
   TextInput,
 } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@iconicedu/ui-native';
-import { CalendarDays, ChevronDown, CheckCircle2 } from 'lucide-react-native';
+import { CalendarDays, ChevronDown, CheckCircle2, X } from 'lucide-react-native';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 import type {
@@ -835,67 +830,106 @@ export function SpaceSessionsTab({
           })}
         </ScrollView>
       )}
-      <Dialog
-        open={Boolean(changeModal)}
-        onOpenChange={(open: boolean) => {
-          if (!open) setChangeModal(null);
-        }}
+      <Modal
+        transparent
+        animationType="fade"
+        visible={Boolean(changeModal)}
+        onRequestClose={() => setChangeModal(null)}
       >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {changeModal?.kind === 'cancel' ? 'Cancel session' : 'Reschedule session'}
-            </DialogTitle>
-          </DialogHeader>
-          {changeModal?.kind === 'reschedule' ? (
-            <>
-              <TextInput
-                value={changeModal.date}
-                onChangeText={(date) => setChangeModal({ ...changeModal, date })}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={colors.textMuted}
-                style={s.modalInput}
-              />
-              <View style={s.modalInputRow}>
+        <Pressable style={s.modalBackdrop} onPress={() => setChangeModal(null)}>
+          <Pressable
+            style={[
+              s.modalCard,
+              { backgroundColor: colors.card, borderColor: colors.border },
+            ]}
+            onPress={(event) => event.stopPropagation()}
+          >
+            <View style={s.modalHeading}>
+              <Text style={s.modalTitle}>
+                {changeModal?.kind === 'cancel' ? 'Cancel session' : 'Reschedule session'}
+              </Text>
+              <Text style={s.modalDescription}>
+                {changeModal?.kind === 'cancel'
+                  ? 'Add a note and send the cancellation request.'
+                  : 'Pick the new date and time, then add a note for the class.'}
+              </Text>
+            </View>
+            {changeModal?.kind === 'reschedule' ? (
+              <>
                 <TextInput
-                  value={changeModal.startTime}
-                  onChangeText={(startTime) =>
-                    setChangeModal({ ...changeModal, startTime })
-                  }
-                  placeholder="Start"
+                  value={changeModal.date}
+                  onChangeText={(date) => setChangeModal({ ...changeModal, date })}
+                  placeholder="YYYY-MM-DD"
                   placeholderTextColor={colors.textMuted}
-                  style={[s.modalInput, { flex: 1 }]}
+                  style={[
+                    s.modalInput,
+                    { backgroundColor: colors.inputBg, borderColor: colors.border },
+                  ]}
                 />
-                <TextInput
-                  value={changeModal.endTime}
-                  onChangeText={(endTime) => setChangeModal({ ...changeModal, endTime })}
-                  placeholder="End"
-                  placeholderTextColor={colors.textMuted}
-                  style={[s.modalInput, { flex: 1 }]}
-                />
-              </View>
-            </>
-          ) : null}
-          <TextInput
-            value={changeModal?.note ?? ''}
-            onChangeText={(note) =>
-              changeModal ? setChangeModal({ ...changeModal, note }) : undefined
-            }
-            placeholder="Add a note"
-            placeholderTextColor={colors.textMuted}
-            multiline
-            style={[s.modalInput, s.modalTextArea]}
-          />
-          <DialogFooter>
+                <View style={s.modalInputRow}>
+                  <TextInput
+                    value={changeModal.startTime}
+                    onChangeText={(startTime) =>
+                      setChangeModal({ ...changeModal, startTime })
+                    }
+                    placeholder="Start"
+                    placeholderTextColor={colors.textMuted}
+                    style={[
+                      s.modalInput,
+                      {
+                        flex: 1,
+                        backgroundColor: colors.inputBg,
+                        borderColor: colors.border,
+                      },
+                    ]}
+                  />
+                  <TextInput
+                    value={changeModal.endTime}
+                    onChangeText={(endTime) =>
+                      setChangeModal({ ...changeModal, endTime })
+                    }
+                    placeholder="End"
+                    placeholderTextColor={colors.textMuted}
+                    style={[
+                      s.modalInput,
+                      {
+                        flex: 1,
+                        backgroundColor: colors.inputBg,
+                        borderColor: colors.border,
+                      },
+                    ]}
+                  />
+                </View>
+              </>
+            ) : null}
+            <TextInput
+              value={changeModal?.note ?? ''}
+              onChangeText={(note) =>
+                changeModal ? setChangeModal({ ...changeModal, note }) : undefined
+              }
+              placeholder="Add a note"
+              placeholderTextColor={colors.textMuted}
+              multiline
+              style={[
+                s.modalInput,
+                s.modalTextArea,
+                { backgroundColor: colors.inputBg, borderColor: colors.border },
+              ]}
+            />
             <View style={s.modalActions}>
               <TouchableOpacity
-                style={s.modalSecondaryBtn}
+                style={[
+                  s.modalButton,
+                  s.modalSecondaryBtn,
+                  { backgroundColor: colors.inputBg, borderColor: colors.border },
+                ]}
                 onPress={() => setChangeModal(null)}
+                activeOpacity={0.85}
               >
                 <Text style={s.modalSecondaryTxt}>Close</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={s.modalPrimaryBtn}
+                style={[s.modalButton, s.modalPrimaryBtn]}
                 disabled={cancelMutation.isPending || rescheduleMutation.isPending}
                 onPress={() => {
                   if (!changeModal) return;
@@ -913,10 +947,21 @@ export function SpaceSessionsTab({
                   {changeModal?.kind === 'cancel' ? 'Send' : 'Request'}
                 </Text>
               </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  s.modalCloseIconButton,
+                  { backgroundColor: colors.inputBg, borderColor: colors.border },
+                ]}
+                onPress={() => setChangeModal(null)}
+                activeOpacity={0.85}
+                accessibilityLabel="Close session change dialog"
+              >
+                <X size={16} color={colors.text} />
+              </TouchableOpacity>
             </View>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -1101,12 +1146,37 @@ function makeStyles(C: AppColors) {
       flexDirection: 'row',
       gap: 8,
     },
+    modalBackdrop: {
+      flex: 1,
+      justifyContent: 'center',
+      paddingHorizontal: 20,
+      backgroundColor: 'rgba(15, 23, 42, 0.42)',
+    },
+    modalCard: {
+      gap: 16,
+      borderRadius: 24,
+      borderWidth: 1,
+      padding: 20,
+    },
+    modalHeading: {
+      gap: 8,
+    },
+    modalTitle: {
+      fontSize: 20,
+      fontWeight: '700',
+      color: C.text,
+    },
+    modalDescription: {
+      fontSize: 15,
+      lineHeight: 20,
+      color: C.textMuted,
+    },
     modalInput: {
       minHeight: 42,
       borderWidth: hairline,
       borderColor: C.border,
-      borderRadius: 10,
-      paddingHorizontal: 12,
+      borderRadius: 18,
+      paddingHorizontal: 14,
       paddingVertical: 8,
       color: C.text,
       backgroundColor: C.inputBg,
@@ -1119,29 +1189,45 @@ function makeStyles(C: AppColors) {
     modalActions: {
       flexDirection: 'row',
       justifyContent: 'flex-end',
+      flexWrap: 'wrap',
       gap: 10,
     },
-    modalSecondaryBtn: {
-      minHeight: 38,
+    modalButton: {
+      minWidth: 104,
+      minHeight: 42,
+      alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: 19,
-      paddingHorizontal: 16,
+      flexDirection: 'row',
+      gap: 8,
+      borderRadius: 18,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+    },
+    modalSecondaryBtn: {
+      borderWidth: 1,
       backgroundColor: C.inputBg,
     },
     modalSecondaryTxt: {
       color: C.text,
-      fontWeight: '700',
+      fontSize: 15,
+      fontWeight: '600',
     },
     modalPrimaryBtn: {
-      minHeight: 38,
-      justifyContent: 'center',
-      borderRadius: 19,
-      paddingHorizontal: 16,
       backgroundColor: C.teal,
     },
     modalPrimaryTxt: {
       color: '#fff',
+      fontSize: 15,
       fontWeight: '700',
+    },
+    modalCloseIconButton: {
+      width: 42,
+      height: 42,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 21,
+      borderWidth: 1,
+      backgroundColor: C.inputBg,
     },
   });
 }

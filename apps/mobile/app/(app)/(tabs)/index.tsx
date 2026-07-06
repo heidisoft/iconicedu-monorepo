@@ -1,6 +1,8 @@
 import React, { useState, useCallback, useRef } from 'react';
 import {
   Alert,
+  Modal,
+  Pressable,
   View,
   Text,
   Image,
@@ -26,19 +28,10 @@ import {
   LifeBuoy,
   ArrowRightLeft,
   Check,
+  X,
   Sparkles,
 } from 'lucide-react-native';
-import {
-  BottomSheet,
-  Card,
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  IconButton,
-  SiteLogo,
-} from '@iconicedu/ui-native';
+import { BottomSheet, Card, IconButton, SiteLogo } from '@iconicedu/ui-native';
 import { useAuth } from '@/providers/auth-provider';
 import { useAccount } from '@/hooks/use-account';
 import { useProfile } from '@/hooks/use-profile';
@@ -658,12 +651,37 @@ function makeStyles(C: AppColors) {
       flexDirection: 'row',
       gap: 8,
     },
+    changeModalBackdrop: {
+      flex: 1,
+      justifyContent: 'center',
+      paddingHorizontal: 20,
+      backgroundColor: 'rgba(15, 23, 42, 0.42)',
+    },
+    changeModalCard: {
+      gap: 16,
+      borderRadius: 24,
+      borderWidth: 1,
+      padding: 20,
+    },
+    changeModalHeading: {
+      gap: 8,
+    },
+    changeModalTitle: {
+      fontSize: 20,
+      fontWeight: '700',
+      color: C.text,
+    },
+    changeModalDescription: {
+      fontSize: 15,
+      lineHeight: 20,
+      color: C.textMuted,
+    },
     changeModalInput: {
       minHeight: 42,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: C.border,
-      borderRadius: 10,
-      paddingHorizontal: 12,
+      borderRadius: 18,
+      paddingHorizontal: 14,
       paddingVertical: 8,
       color: C.text,
       backgroundColor: C.inputBg,
@@ -676,29 +694,45 @@ function makeStyles(C: AppColors) {
     changeModalActions: {
       flexDirection: 'row',
       justifyContent: 'flex-end',
+      flexWrap: 'wrap',
       gap: 10,
     },
-    changeModalSecondaryBtn: {
-      minHeight: 38,
+    changeModalButton: {
+      minWidth: 104,
+      minHeight: 42,
+      alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: 19,
-      paddingHorizontal: 16,
+      flexDirection: 'row',
+      gap: 8,
+      borderRadius: 18,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+    },
+    changeModalSecondaryBtn: {
+      borderWidth: 1,
       backgroundColor: C.inputBg,
     },
     changeModalSecondaryTxt: {
       color: C.text,
-      fontWeight: '700',
+      fontSize: 15,
+      fontWeight: '600',
     },
     changeModalPrimaryBtn: {
-      minHeight: 38,
-      justifyContent: 'center',
-      borderRadius: 19,
-      paddingHorizontal: 16,
       backgroundColor: C.teal,
     },
     changeModalPrimaryTxt: {
       color: C.tealFg,
+      fontSize: 15,
       fontWeight: '700',
+    },
+    changeModalCloseIconButton: {
+      width: 42,
+      height: 42,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 21,
+      borderWidth: 1,
+      backgroundColor: C.inputBg,
     },
     requestSheet: {
       paddingHorizontal: 18,
@@ -1625,75 +1659,115 @@ export default function HomeScreen() {
 
         <AppSupportFooter isLoading={supportFooterLoading} />
       </ScrollView>
-      <Dialog
-        open={Boolean(sessionChangeModal)}
-        onOpenChange={(open: boolean) => {
-          if (!open) setSessionChangeModal(null);
-        }}
+      <Modal
+        transparent
+        animationType="fade"
+        visible={Boolean(sessionChangeModal)}
+        onRequestClose={() => setSessionChangeModal(null)}
       >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {sessionChangeModal?.kind === 'cancel'
-                ? 'Cancel session'
-                : 'Reschedule session'}
-            </DialogTitle>
-          </DialogHeader>
-          {sessionChangeModal?.kind === 'reschedule' ? (
-            <>
-              <TextInput
-                value={sessionChangeModal.date}
-                onChangeText={(date) =>
-                  setSessionChangeModal({ ...sessionChangeModal, date })
-                }
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={colors.textMuted}
-                style={s.changeModalInput}
-              />
-              <View style={s.changeModalInputRow}>
+        <Pressable
+          style={s.changeModalBackdrop}
+          onPress={() => setSessionChangeModal(null)}
+        >
+          <Pressable
+            style={[
+              s.changeModalCard,
+              { backgroundColor: colors.card, borderColor: colors.border },
+            ]}
+            onPress={(event) => event.stopPropagation()}
+          >
+            <View style={s.changeModalHeading}>
+              <Text style={s.changeModalTitle}>
+                {sessionChangeModal?.kind === 'cancel'
+                  ? 'Cancel session'
+                  : 'Reschedule session'}
+              </Text>
+              <Text style={s.changeModalDescription}>
+                {sessionChangeModal?.kind === 'cancel'
+                  ? 'Add a note and send the cancellation request.'
+                  : 'Pick the new date and time, then add a note for the class.'}
+              </Text>
+            </View>
+            {sessionChangeModal?.kind === 'reschedule' ? (
+              <>
                 <TextInput
-                  value={sessionChangeModal.startTime}
-                  onChangeText={(startTime) =>
-                    setSessionChangeModal({ ...sessionChangeModal, startTime })
+                  value={sessionChangeModal.date}
+                  onChangeText={(date) =>
+                    setSessionChangeModal({ ...sessionChangeModal, date })
                   }
-                  placeholder="Start"
+                  placeholder="YYYY-MM-DD"
                   placeholderTextColor={colors.textMuted}
-                  style={[s.changeModalInput, { flex: 1 }]}
+                  style={[
+                    s.changeModalInput,
+                    { backgroundColor: colors.inputBg, borderColor: colors.border },
+                  ]}
                 />
-                <TextInput
-                  value={sessionChangeModal.endTime}
-                  onChangeText={(endTime) =>
-                    setSessionChangeModal({ ...sessionChangeModal, endTime })
-                  }
-                  placeholder="End"
-                  placeholderTextColor={colors.textMuted}
-                  style={[s.changeModalInput, { flex: 1 }]}
-                />
-              </View>
-            </>
-          ) : null}
-          <TextInput
-            value={sessionChangeModal?.note ?? ''}
-            onChangeText={(note) =>
-              sessionChangeModal
-                ? setSessionChangeModal({ ...sessionChangeModal, note })
-                : undefined
-            }
-            placeholder="Add a note"
-            placeholderTextColor={colors.textMuted}
-            multiline
-            style={[s.changeModalInput, s.changeModalTextArea]}
-          />
-          <DialogFooter>
+                <View style={s.changeModalInputRow}>
+                  <TextInput
+                    value={sessionChangeModal.startTime}
+                    onChangeText={(startTime) =>
+                      setSessionChangeModal({ ...sessionChangeModal, startTime })
+                    }
+                    placeholder="Start"
+                    placeholderTextColor={colors.textMuted}
+                    style={[
+                      s.changeModalInput,
+                      {
+                        flex: 1,
+                        backgroundColor: colors.inputBg,
+                        borderColor: colors.border,
+                      },
+                    ]}
+                  />
+                  <TextInput
+                    value={sessionChangeModal.endTime}
+                    onChangeText={(endTime) =>
+                      setSessionChangeModal({ ...sessionChangeModal, endTime })
+                    }
+                    placeholder="End"
+                    placeholderTextColor={colors.textMuted}
+                    style={[
+                      s.changeModalInput,
+                      {
+                        flex: 1,
+                        backgroundColor: colors.inputBg,
+                        borderColor: colors.border,
+                      },
+                    ]}
+                  />
+                </View>
+              </>
+            ) : null}
+            <TextInput
+              value={sessionChangeModal?.note ?? ''}
+              onChangeText={(note) =>
+                sessionChangeModal
+                  ? setSessionChangeModal({ ...sessionChangeModal, note })
+                  : undefined
+              }
+              placeholder="Add a note"
+              placeholderTextColor={colors.textMuted}
+              multiline
+              style={[
+                s.changeModalInput,
+                s.changeModalTextArea,
+                { backgroundColor: colors.inputBg, borderColor: colors.border },
+              ]}
+            />
             <View style={s.changeModalActions}>
               <TouchableOpacity
-                style={s.changeModalSecondaryBtn}
+                style={[
+                  s.changeModalButton,
+                  s.changeModalSecondaryBtn,
+                  { backgroundColor: colors.inputBg, borderColor: colors.border },
+                ]}
                 onPress={() => setSessionChangeModal(null)}
+                activeOpacity={0.85}
               >
                 <Text style={s.changeModalSecondaryTxt}>Close</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={s.changeModalPrimaryBtn}
+                style={[s.changeModalButton, s.changeModalPrimaryBtn]}
                 disabled={
                   cancelSessionMutation.isPending || rescheduleSessionMutation.isPending
                 }
@@ -1713,10 +1787,21 @@ export default function HomeScreen() {
                   {sessionChangeModal?.kind === 'cancel' ? 'Send' : 'Request'}
                 </Text>
               </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  s.changeModalCloseIconButton,
+                  { backgroundColor: colors.inputBg, borderColor: colors.border },
+                ]}
+                onPress={() => setSessionChangeModal(null)}
+                activeOpacity={0.85}
+                accessibilityLabel="Close session change dialog"
+              >
+                <X size={16} color={colors.text} />
+              </TouchableOpacity>
             </View>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </Pressable>
+        </Pressable>
+      </Modal>
       <BottomSheet
         visible={familySwitchOpen}
         onClose={() => setFamilySwitchOpen(false)}
