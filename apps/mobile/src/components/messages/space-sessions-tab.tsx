@@ -16,7 +16,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@iconicedu/ui-native/components/ui/dialog';
+} from '@iconicedu/ui-native';
 import { CalendarDays, ChevronDown, CheckCircle2 } from 'lucide-react-native';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';

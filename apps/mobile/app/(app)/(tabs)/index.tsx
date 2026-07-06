@@ -28,14 +28,17 @@ import {
   Check,
   Sparkles,
 } from 'lucide-react-native';
-import { BottomSheet, Card, IconButton, SiteLogo } from '@iconicedu/ui-native';
 import {
+  BottomSheet,
+  Card,
   Dialog,
   DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@iconicedu/ui-native/components/ui/dialog';
+  IconButton,
+  SiteLogo,
+} from '@iconicedu/ui-native';
 import { useAuth } from '@/providers/auth-provider';
 import { useAccount } from '@/hooks/use-account';
 import { useProfile } from '@/hooks/use-profile';
