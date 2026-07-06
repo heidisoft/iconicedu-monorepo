@@ -7,11 +7,16 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
-  Modal,
-  Pressable,
   TextInput,
 } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@iconicedu/ui-native/components/ui/dialog';
 import { CalendarDays, ChevronDown, CheckCircle2 } from 'lucide-react-native';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
@@ -830,58 +835,58 @@ export function SpaceSessionsTab({
           })}
         </ScrollView>
       )}
-      <Modal
-        transparent
-        animationType="fade"
-        visible={Boolean(changeModal)}
-        onRequestClose={() => setChangeModal(null)}
+      <Dialog
+        open={Boolean(changeModal)}
+        onOpenChange={(open: boolean) => {
+          if (!open) setChangeModal(null);
+        }}
       >
-        <Pressable style={s.modalBackdrop} onPress={() => setChangeModal(null)}>
-          <Pressable style={s.modalCard} onPress={(event) => event.stopPropagation()}>
-            <Text style={s.modalTitle}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
               {changeModal?.kind === 'cancel' ? 'Cancel session' : 'Reschedule session'}
-            </Text>
-            {changeModal?.kind === 'reschedule' ? (
-              <>
+            </DialogTitle>
+          </DialogHeader>
+          {changeModal?.kind === 'reschedule' ? (
+            <>
+              <TextInput
+                value={changeModal.date}
+                onChangeText={(date) => setChangeModal({ ...changeModal, date })}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={colors.textMuted}
+                style={s.modalInput}
+              />
+              <View style={s.modalInputRow}>
                 <TextInput
-                  value={changeModal.date}
-                  onChangeText={(date) => setChangeModal({ ...changeModal, date })}
-                  placeholder="YYYY-MM-DD"
+                  value={changeModal.startTime}
+                  onChangeText={(startTime) =>
+                    setChangeModal({ ...changeModal, startTime })
+                  }
+                  placeholder="Start"
                   placeholderTextColor={colors.textMuted}
-                  style={s.modalInput}
+                  style={[s.modalInput, { flex: 1 }]}
                 />
-                <View style={s.modalInputRow}>
-                  <TextInput
-                    value={changeModal.startTime}
-                    onChangeText={(startTime) =>
-                      setChangeModal({ ...changeModal, startTime })
-                    }
-                    placeholder="Start"
-                    placeholderTextColor={colors.textMuted}
-                    style={[s.modalInput, { flex: 1 }]}
-                  />
-                  <TextInput
-                    value={changeModal.endTime}
-                    onChangeText={(endTime) =>
-                      setChangeModal({ ...changeModal, endTime })
-                    }
-                    placeholder="End"
-                    placeholderTextColor={colors.textMuted}
-                    style={[s.modalInput, { flex: 1 }]}
-                  />
-                </View>
-              </>
-            ) : null}
-            <TextInput
-              value={changeModal?.note ?? ''}
-              onChangeText={(note) =>
-                changeModal ? setChangeModal({ ...changeModal, note }) : undefined
-              }
-              placeholder="Add a note"
-              placeholderTextColor={colors.textMuted}
-              multiline
-              style={[s.modalInput, s.modalTextArea]}
-            />
+                <TextInput
+                  value={changeModal.endTime}
+                  onChangeText={(endTime) => setChangeModal({ ...changeModal, endTime })}
+                  placeholder="End"
+                  placeholderTextColor={colors.textMuted}
+                  style={[s.modalInput, { flex: 1 }]}
+                />
+              </View>
+            </>
+          ) : null}
+          <TextInput
+            value={changeModal?.note ?? ''}
+            onChangeText={(note) =>
+              changeModal ? setChangeModal({ ...changeModal, note }) : undefined
+            }
+            placeholder="Add a note"
+            placeholderTextColor={colors.textMuted}
+            multiline
+            style={[s.modalInput, s.modalTextArea]}
+          />
+          <DialogFooter>
             <View style={s.modalActions}>
               <TouchableOpacity
                 style={s.modalSecondaryBtn}
@@ -909,9 +914,9 @@ export function SpaceSessionsTab({
                 </Text>
               </TouchableOpacity>
             </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </View>
   );
 }
@@ -1091,25 +1096,6 @@ function makeStyles(C: AppColors) {
     requestBtnTxt: {
       fontSize: 12,
       fontWeight: '700',
-    },
-    modalBackdrop: {
-      flex: 1,
-      justifyContent: 'center',
-      paddingHorizontal: 18,
-      backgroundColor: 'rgba(15, 23, 42, 0.42)',
-    },
-    modalCard: {
-      gap: 12,
-      padding: 16,
-      borderRadius: 16,
-      borderWidth: hairline,
-      borderColor: C.border,
-      backgroundColor: C.card,
-    },
-    modalTitle: {
-      fontSize: 17,
-      fontWeight: '700',
-      color: C.text,
     },
     modalInputRow: {
       flexDirection: 'row',

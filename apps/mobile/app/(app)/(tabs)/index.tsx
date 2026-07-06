@@ -1,8 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
 import {
   Alert,
-  Modal,
-  Pressable,
   View,
   Text,
   Image,
@@ -31,6 +29,13 @@ import {
   Sparkles,
 } from 'lucide-react-native';
 import { BottomSheet, Card, IconButton, SiteLogo } from '@iconicedu/ui-native';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@iconicedu/ui-native/components/ui/dialog';
 import { useAuth } from '@/providers/auth-provider';
 import { useAccount } from '@/hooks/use-account';
 import { useProfile } from '@/hooks/use-profile';
@@ -645,25 +650,6 @@ function makeStyles(C: AppColors) {
       color: C.tealFg,
       fontSize: 15,
       fontWeight: '800',
-    },
-    changeModalBackdrop: {
-      flex: 1,
-      justifyContent: 'center',
-      paddingHorizontal: 18,
-      backgroundColor: 'rgba(15, 23, 42, 0.42)',
-    },
-    changeModalCard: {
-      gap: 12,
-      padding: 16,
-      borderRadius: 16,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: C.border,
-      backgroundColor: C.card,
-    },
-    changeModalTitle: {
-      fontSize: 17,
-      fontWeight: '700',
-      color: C.text,
     },
     changeModalInputRow: {
       flexDirection: 'row',
@@ -1636,70 +1622,66 @@ export default function HomeScreen() {
 
         <AppSupportFooter isLoading={supportFooterLoading} />
       </ScrollView>
-      <Modal
-        transparent
-        animationType="fade"
-        visible={Boolean(sessionChangeModal)}
-        onRequestClose={() => setSessionChangeModal(null)}
+      <Dialog
+        open={Boolean(sessionChangeModal)}
+        onOpenChange={(open: boolean) => {
+          if (!open) setSessionChangeModal(null);
+        }}
       >
-        <Pressable
-          style={s.changeModalBackdrop}
-          onPress={() => setSessionChangeModal(null)}
-        >
-          <Pressable
-            style={s.changeModalCard}
-            onPress={(event) => event.stopPropagation()}
-          >
-            <Text style={s.changeModalTitle}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
               {sessionChangeModal?.kind === 'cancel'
                 ? 'Cancel session'
                 : 'Reschedule session'}
-            </Text>
-            {sessionChangeModal?.kind === 'reschedule' ? (
-              <>
+            </DialogTitle>
+          </DialogHeader>
+          {sessionChangeModal?.kind === 'reschedule' ? (
+            <>
+              <TextInput
+                value={sessionChangeModal.date}
+                onChangeText={(date) =>
+                  setSessionChangeModal({ ...sessionChangeModal, date })
+                }
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={colors.textMuted}
+                style={s.changeModalInput}
+              />
+              <View style={s.changeModalInputRow}>
                 <TextInput
-                  value={sessionChangeModal.date}
-                  onChangeText={(date) =>
-                    setSessionChangeModal({ ...sessionChangeModal, date })
+                  value={sessionChangeModal.startTime}
+                  onChangeText={(startTime) =>
+                    setSessionChangeModal({ ...sessionChangeModal, startTime })
                   }
-                  placeholder="YYYY-MM-DD"
+                  placeholder="Start"
                   placeholderTextColor={colors.textMuted}
-                  style={s.changeModalInput}
+                  style={[s.changeModalInput, { flex: 1 }]}
                 />
-                <View style={s.changeModalInputRow}>
-                  <TextInput
-                    value={sessionChangeModal.startTime}
-                    onChangeText={(startTime) =>
-                      setSessionChangeModal({ ...sessionChangeModal, startTime })
-                    }
-                    placeholder="Start"
-                    placeholderTextColor={colors.textMuted}
-                    style={[s.changeModalInput, { flex: 1 }]}
-                  />
-                  <TextInput
-                    value={sessionChangeModal.endTime}
-                    onChangeText={(endTime) =>
-                      setSessionChangeModal({ ...sessionChangeModal, endTime })
-                    }
-                    placeholder="End"
-                    placeholderTextColor={colors.textMuted}
-                    style={[s.changeModalInput, { flex: 1 }]}
-                  />
-                </View>
-              </>
-            ) : null}
-            <TextInput
-              value={sessionChangeModal?.note ?? ''}
-              onChangeText={(note) =>
-                sessionChangeModal
-                  ? setSessionChangeModal({ ...sessionChangeModal, note })
-                  : undefined
-              }
-              placeholder="Add a note"
-              placeholderTextColor={colors.textMuted}
-              multiline
-              style={[s.changeModalInput, s.changeModalTextArea]}
-            />
+                <TextInput
+                  value={sessionChangeModal.endTime}
+                  onChangeText={(endTime) =>
+                    setSessionChangeModal({ ...sessionChangeModal, endTime })
+                  }
+                  placeholder="End"
+                  placeholderTextColor={colors.textMuted}
+                  style={[s.changeModalInput, { flex: 1 }]}
+                />
+              </View>
+            </>
+          ) : null}
+          <TextInput
+            value={sessionChangeModal?.note ?? ''}
+            onChangeText={(note) =>
+              sessionChangeModal
+                ? setSessionChangeModal({ ...sessionChangeModal, note })
+                : undefined
+            }
+            placeholder="Add a note"
+            placeholderTextColor={colors.textMuted}
+            multiline
+            style={[s.changeModalInput, s.changeModalTextArea]}
+          />
+          <DialogFooter>
             <View style={s.changeModalActions}>
               <TouchableOpacity
                 style={s.changeModalSecondaryBtn}
@@ -1729,9 +1711,9 @@ export default function HomeScreen() {
                 </Text>
               </TouchableOpacity>
             </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <BottomSheet
         visible={familySwitchOpen}
         onClose={() => setFamilySwitchOpen(false)}

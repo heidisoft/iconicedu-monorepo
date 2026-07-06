@@ -22,6 +22,7 @@ import {
   CalendarClock,
   MoreHorizontal,
 } from 'lucide-react-native';
+import { BottomSheet } from '@iconicedu/ui-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/providers/theme-provider';
 import { usePushConsent } from '@/providers/push-consent-provider';
@@ -605,86 +606,78 @@ export function SessionCard({
           ) : null}
         </View>
       </TouchableOpacity>
-      <Modal
-        animationType="fade"
-        transparent={true}
+      <BottomSheet
         visible={actionMenuVisible}
-        onRequestClose={() => setActionMenuVisible(false)}
+        onClose={() => setActionMenuVisible(false)}
+        partialHeight={230}
+        sheetStyle={{ backgroundColor: colors.card }}
       >
-        <Pressable style={s.actionBackdrop} onPress={() => setActionMenuVisible(false)}>
-          <Pressable
-            style={[
-              s.actionSheet,
-              { backgroundColor: colors.card, borderColor: colors.border },
-            ]}
-            onPress={(event) => event.stopPropagation()}
-          >
-            <View style={s.actionSheetHeader}>
-              <Text style={[s.actionSheetTitle, { color: colors.text }]}>
-                Session options
+        <View style={s.actionSheet}>
+          <View style={s.actionSheetHeader}>
+            <Text style={[s.actionSheetTitle, { color: colors.text }]}>
+              Session options
+            </Text>
+            <TouchableOpacity
+              style={[
+                s.actionCloseButton,
+                { backgroundColor: colors.inputBg, borderColor: colors.border },
+              ]}
+              onPress={() => setActionMenuVisible(false)}
+              accessibilityLabel="Close session options"
+            >
+              <X size={16} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+          {rescheduleAction ? (
+            <TouchableOpacity
+              style={[
+                s.actionOption,
+                {
+                  backgroundColor: colors.inputBg,
+                  borderColor: colors.border,
+                  opacity: rescheduleAction.disabled ? 0.55 : 1,
+                },
+              ]}
+              disabled={rescheduleAction.disabled}
+              onPress={() => {
+                setActionMenuVisible(false);
+                rescheduleAction.onPress();
+              }}
+              accessibilityLabel={
+                rescheduleAction.accessibilityLabel ?? 'Reschedule session'
+              }
+            >
+              <CalendarClock size={18} color={colors.teal} />
+              <Text style={[s.actionOptionText, { color: colors.text }]}>
+                {rescheduleAction.label ?? 'Reschedule'}
               </Text>
-              <TouchableOpacity
-                style={[
-                  s.actionCloseButton,
-                  { backgroundColor: colors.inputBg, borderColor: colors.border },
-                ]}
-                onPress={() => setActionMenuVisible(false)}
-                accessibilityLabel="Close session options"
-              >
-                <X size={16} color={colors.text} />
-              </TouchableOpacity>
-            </View>
-            {rescheduleAction ? (
-              <TouchableOpacity
-                style={[
-                  s.actionOption,
-                  {
-                    backgroundColor: colors.inputBg,
-                    borderColor: colors.border,
-                    opacity: rescheduleAction.disabled ? 0.55 : 1,
-                  },
-                ]}
-                disabled={rescheduleAction.disabled}
-                onPress={() => {
-                  setActionMenuVisible(false);
-                  rescheduleAction.onPress();
-                }}
-                accessibilityLabel={
-                  rescheduleAction.accessibilityLabel ?? 'Reschedule session'
-                }
-              >
-                <CalendarClock size={18} color={colors.teal} />
-                <Text style={[s.actionOptionText, { color: colors.text }]}>
-                  {rescheduleAction.label ?? 'Reschedule'}
-                </Text>
-              </TouchableOpacity>
-            ) : null}
-            {cancelAction ? (
-              <TouchableOpacity
-                style={[
-                  s.actionOption,
-                  {
-                    backgroundColor: colors.inputBg,
-                    borderColor: colors.border,
-                    opacity: cancelAction.disabled ? 0.55 : 1,
-                  },
-                ]}
-                disabled={cancelAction.disabled}
-                onPress={() => {
-                  setActionMenuVisible(false);
-                  cancelAction.onPress();
-                }}
-                accessibilityLabel={cancelAction.accessibilityLabel ?? 'Cancel session'}
-              >
-                <X size={18} color={colors.red} />
-                <Text style={[s.actionOptionText, { color: colors.red }]}>
-                  {cancelAction.label ?? 'Cancel'}
-                </Text>
-              </TouchableOpacity>
-            ) : null}
-          </Pressable>
-        </Pressable>
-      </Modal>
+            </TouchableOpacity>
+          ) : null}
+          {cancelAction ? (
+            <TouchableOpacity
+              style={[
+                s.actionOption,
+                {
+                  backgroundColor: colors.inputBg,
+                  borderColor: colors.border,
+                  opacity: cancelAction.disabled ? 0.55 : 1,
+                },
+              ]}
+              disabled={cancelAction.disabled}
+              onPress={() => {
+                setActionMenuVisible(false);
+                cancelAction.onPress();
+              }}
+              accessibilityLabel={cancelAction.accessibilityLabel ?? 'Cancel session'}
+            >
+              <X size={18} color={colors.red} />
+              <Text style={[s.actionOptionText, { color: colors.red }]}>
+                {cancelAction.label ?? 'Cancel'}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      </BottomSheet>
       <Modal
         animationType="fade"
         transparent={true}
@@ -919,11 +912,6 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
-  },
-  actionBackdrop: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(15, 23, 42, 0.42)',
   },
   actionSheet: {
     gap: 10,

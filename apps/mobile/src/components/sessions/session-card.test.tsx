@@ -22,6 +22,16 @@ jest.mock('@/providers/theme-provider', () => ({
   }),
 }));
 
+jest.mock('@iconicedu/ui-native', () => ({
+  BottomSheet: ({
+    children,
+    visible,
+  }: {
+    children: React.ReactNode;
+    visible: boolean;
+  }) => (visible ? <>{children}</> : null),
+}));
+
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }));
 jest.mock('@/lib/api/queries', () => ({
   fetchSpaceChannelMetaByChannelId: (...args: unknown[]) =>
