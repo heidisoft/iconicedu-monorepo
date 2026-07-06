@@ -23,6 +23,7 @@ import {
   parseRescheduleSessionDto,
   parseSelfServeCancelSessionDto,
   parseSelfServeRescheduleSessionDto,
+  parseUpsertSelfServePolicyDto,
 } from '@iconicedu/api/modules/schedules/dto';
 
 @Controller()
@@ -130,6 +131,28 @@ export class SchedulesController {
   selfServeRescheduleSession(@Req() req: AuthenticatedRequest, @Body() body: unknown) {
     const dto = parseSelfServeRescheduleSessionDto(body);
     return this.schedulesService.selfServeRescheduleSession(
+      extractBearerToken(req.headers.authorization),
+      dto,
+    );
+  }
+
+  @Get('schedules/session/self-serve/policies')
+  @UseGuards(AuthGuard)
+  listSelfServePolicies(@Req() req: AuthenticatedRequest, @Query('orgId') orgId: string) {
+    if (!orgId || typeof orgId !== 'string') {
+      throw new BadRequestException('orgId is required');
+    }
+    return this.schedulesService.listSelfServePolicies(
+      extractBearerToken(req.headers.authorization),
+      orgId,
+    );
+  }
+
+  @Post('schedules/session/self-serve/policies')
+  @UseGuards(AuthGuard)
+  upsertSelfServePolicy(@Req() req: AuthenticatedRequest, @Body() body: unknown) {
+    const dto = parseUpsertSelfServePolicyDto(body);
+    return this.schedulesService.upsertSelfServePolicy(
       extractBearerToken(req.headers.authorization),
       dto,
     );

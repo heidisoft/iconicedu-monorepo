@@ -578,6 +578,9 @@ export default function ChannelConversationScreen() {
             schedules={schedules}
             isLoading={isLoadingSessions}
             error={sessionsError}
+            orgId={orgId}
+            channelId={channelId ?? ''}
+            enableSelfServeActions
           />
         </View>
       ) : (

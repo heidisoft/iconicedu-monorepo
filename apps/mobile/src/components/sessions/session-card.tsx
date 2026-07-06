@@ -19,6 +19,7 @@ import {
   ShieldUser,
   User,
   BriefcaseBusiness,
+  CalendarClock,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/providers/theme-provider';
@@ -204,6 +205,7 @@ export function SessionCard({
   pressTarget = 'sessions',
   enableCardPress = true,
   cancelAction,
+  rescheduleAction,
 }: {
   session: ClassSession;
   style?: ViewStyle;
@@ -213,6 +215,12 @@ export function SessionCard({
   pressTarget?: 'sessions' | 'messages';
   enableCardPress?: boolean;
   cancelAction?: {
+    label?: string;
+    onPress: () => void;
+    disabled?: boolean;
+    accessibilityLabel?: string;
+  } | null;
+  rescheduleAction?: {
     label?: string;
     onPress: () => void;
     disabled?: boolean;
@@ -572,6 +580,31 @@ export function SessionCard({
               <Text style={[s.joinBtnTxt, { color: colors.textMuted }]}>Recording</Text>
             </TouchableOpacity>
           ) : null}
+          {rescheduleAction ? (
+            <TouchableOpacity
+              style={[
+                s.rescheduleBtn,
+                {
+                  backgroundColor: rescheduleAction.disabled
+                    ? colors.inputBg
+                    : colors.card,
+                  borderColor: colors.teal,
+                  opacity: rescheduleAction.disabled ? 0.6 : 1,
+                },
+              ]}
+              onPress={rescheduleAction.onPress}
+              disabled={rescheduleAction.disabled}
+              activeOpacity={0.7}
+              accessibilityLabel={
+                rescheduleAction.accessibilityLabel ?? 'Reschedule session'
+              }
+            >
+              <CalendarClock size={11} color={colors.teal} />
+              <Text style={[s.rescheduleBtnTxt, { color: colors.teal }]}>
+                {rescheduleAction.label ?? 'Move'}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
           {cancelAction ? (
             <TouchableOpacity
               style={[
@@ -838,6 +871,20 @@ const s = StyleSheet.create({
     paddingHorizontal: 10,
   },
   cancelBtnTxt: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  rescheduleBtn: {
+    minHeight: 28,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 10,
+  },
+  rescheduleBtnTxt: {
     fontSize: 12,
     fontWeight: '700',
   },

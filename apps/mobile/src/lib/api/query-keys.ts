@@ -29,6 +29,9 @@ export const queryKeys = {
     ['childProfiles', orgId, accountIds] as const,
   spaceSchedules: (channelId: string, orgId: string) =>
     ['space-sessions', channelId, orgId] as const,
+  sessionChangeRequests: (orgId: string, channelId = '') =>
+    ['session-change-requests', orgId, channelId] as const,
+  selfServePolicies: (orgId: string) => ['self-serve-policies', orgId] as const,
   orgSessions: (orgId: string) => ['org-sessions', orgId] as const,
   supervisedDirectMessages: (orgId: string, accountId: string) =>
     ['supervisedDirectMessages', orgId, accountId] as const,

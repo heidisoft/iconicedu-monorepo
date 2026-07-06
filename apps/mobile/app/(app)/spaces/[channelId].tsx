@@ -634,6 +634,9 @@ export default function SpaceDetailScreen() {
             schedules={schedules ?? []}
             isLoading={isLoadingSessions}
             error={sessionsError}
+            orgId={orgId}
+            channelId={channelId ?? ''}
+            enableSelfServeActions
           />
         </View>
       )}

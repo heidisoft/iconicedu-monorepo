@@ -1,20 +1,34 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import {
+  Alert,
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   ScrollView,
   ActivityIndicator,
+  Modal,
+  Pressable,
+  TextInput,
 } from 'react-native';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarDays, ChevronDown, CheckCircle2 } from 'lucide-react-native';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 import type {
   ArchiveAwareClassScheduleVM,
   ClassScheduleVM,
+  SessionChangeRequestVM,
 } from '@iconicedu/shared-types';
 import { applyArchiveCutoffToDisplaySchedules } from '@iconicedu/shared-types';
+import {
+  approveSessionChangeRequest,
+  fetchSessionChangeRequests,
+  queryKeys,
+  rejectSessionChangeRequest,
+  selfServeCancelSession,
+  selfServeRescheduleSession,
+} from '@/lib/api/queries';
 import {
   ClassSession,
   SessionCard,
@@ -43,6 +57,18 @@ type MonthProgressStats = {
 };
 
 export type DisplaySchedule = ArchiveAwareClassScheduleVM;
+
+type ChangeModalState =
+  | { kind: 'cancel'; session: ClassSession; note: string }
+  | {
+      kind: 'reschedule';
+      session: ClassSession;
+      date: string;
+      startTime: string;
+      endTime: string;
+      note: string;
+    }
+  | null;
 
 // ─── Recurring expansion helpers ───────────────────────────────────────────────
 
@@ -85,6 +111,55 @@ function occurrenceIdentity(schedule: DisplaySchedule): string {
   }
 
   return `${baseId}|${schedule.startAt}`;
+}
+
+function getBaseScheduleId(scheduleId: string): string {
+  return scheduleId.includes('__')
+    ? scheduleId.slice(0, scheduleId.indexOf('__'))
+    : scheduleId;
+}
+
+function getOccurrenceKey(schedule: DisplaySchedule): string | null {
+  if (schedule.uiState?.originalStartAt) return schedule.uiState.originalStartAt;
+  if (!schedule.ids.id.includes('__')) return null;
+  return schedule.ids.id.split('__')[1] || null;
+}
+
+function formatDateInput(iso: string): string {
+  return iso.slice(0, 10);
+}
+
+function formatTimeInput(iso: string): string {
+  const date = new Date(iso);
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
+function combineLocalDateTime(dateValue: string, timeValue: string): string {
+  const [year, month, day] = dateValue.split('-').map(Number);
+  const [hour, minute] = timeValue.split(':').map(Number);
+  if (!year || !month || !day || hour == null || minute == null) {
+    throw new Error('Enter a valid date and time.');
+  }
+  return new Date(year, month - 1, day, hour, minute).toISOString();
+}
+
+function formatRequestWindow(request: SessionChangeRequestVM): string {
+  const current = new Date(request.currentStartAt).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+  if (request.type === 'cancel') return `Cancel ${current}`;
+  const next = request.requestedStartAt
+    ? new Date(request.requestedStartAt).toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      })
+    : 'new time';
+  return `${current} → ${next}`;
 }
 
 function getCalendarWeekOfMonth(date: Date): number {
@@ -321,6 +396,8 @@ function splitAndGroupSessions(schedules: ClassScheduleVM[]): {
         const isPast = endMs < nowMs;
         return {
           id: s.ids.id,
+          scheduleId: getBaseScheduleId(s.ids.id),
+          occurrenceKey: getOccurrenceKey(s),
           label: `${monthLabel} · Week ${weekNumber} · Session ${nextSessionNumber}`,
           time: formatTimeBadge(s.startAt),
           dayName: start.toLocaleDateString('en-US', { weekday: 'short' }),
@@ -370,16 +447,24 @@ export function SpaceSessionsTab({
   schedules,
   isLoading,
   error,
+  orgId,
+  channelId,
+  enableSelfServeActions = false,
 }: {
   schedules: ClassScheduleVM[];
   isLoading?: boolean;
   error?: string | null;
+  orgId?: string;
+  channelId?: string;
+  enableSelfServeActions?: boolean;
 }) {
   const { colors } = useTheme();
   const s = useMemo(() => makeStyles(colors), [colors]);
+  const queryClient = useQueryClient();
 
   const [activeSubTab, setActiveSubTab] = useState<SessionSubTab>('upcoming');
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
+  const [changeModal, setChangeModal] = useState<ChangeModalState>(null);
   const autoSwitchedRef = useRef(false);
 
   const { upcoming, past, monthProgressStatsByKey } = useMemo(
@@ -423,6 +508,99 @@ export function SpaceSessionsTab({
     setExpandedMonths(target ? new Set([target.monthKey]) : new Set());
   }, [activeSubTab, upcoming, past]);
 
+  const groups = activeSubTab === 'upcoming' ? upcoming.slice(0, 4) : past;
+  const requestsQuery = useQuery({
+    queryKey: queryKeys.sessionChangeRequests(orgId ?? '', channelId ?? ''),
+    queryFn: () =>
+      fetchSessionChangeRequests({
+        orgId: orgId ?? '',
+        channelId: channelId ?? null,
+      }),
+    enabled: Boolean(orgId && channelId && enableSelfServeActions),
+    staleTime: 30_000,
+  });
+  const pendingRequests =
+    requestsQuery.data?.filter((request) => request.status === 'pending') ?? [];
+  const invalidateSessionData = async () => {
+    if (!orgId || !channelId) return;
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.spaceSchedules(channelId, orgId),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.sessionChangeRequests(orgId, channelId),
+      }),
+    ]);
+  };
+  const cancelMutation = useMutation({
+    mutationFn: (session: ClassSession & { note?: string | null }) =>
+      selfServeCancelSession({
+        orgId: orgId ?? '',
+        scheduleId: session.scheduleId ?? session.id,
+        occurrenceKey: session.occurrenceKey ?? null,
+        note: session.note ?? null,
+      }),
+    onSuccess: async (result) => {
+      setChangeModal(null);
+      await invalidateSessionData();
+      Alert.alert(
+        result.approvalRequired ? 'Request sent' : 'Session canceled',
+        result.approvalRequired
+          ? 'This change is waiting for approval.'
+          : 'The session was updated.',
+      );
+    },
+  });
+  const rescheduleMutation = useMutation({
+    mutationFn: (input: {
+      session: ClassSession;
+      date: string;
+      startTime: string;
+      endTime: string;
+      note?: string | null;
+    }) =>
+      selfServeRescheduleSession({
+        orgId: orgId ?? '',
+        scheduleId: input.session.scheduleId ?? input.session.id,
+        occurrenceKey: input.session.occurrenceKey ?? null,
+        startAt: combineLocalDateTime(input.date, input.startTime),
+        endAt: combineLocalDateTime(input.date, input.endTime),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        note: input.note ?? null,
+      }),
+    onSuccess: async (result) => {
+      setChangeModal(null);
+      await invalidateSessionData();
+      Alert.alert(
+        result.approvalRequired ? 'Request sent' : 'Session rescheduled',
+        result.approvalRequired
+          ? 'This change is waiting for approval.'
+          : 'The session was updated.',
+      );
+    },
+    onError: (mutationError) => {
+      Alert.alert(
+        'Unable to reschedule',
+        mutationError instanceof Error ? mutationError.message : 'Please try again.',
+      );
+    },
+  });
+  const decisionMutation = useMutation({
+    mutationFn: (input: { requestId: string; decision: 'approve' | 'reject' }) =>
+      input.decision === 'approve'
+        ? approveSessionChangeRequest({ requestId: input.requestId })
+        : rejectSessionChangeRequest({ requestId: input.requestId }),
+    onSuccess: async () => {
+      await invalidateSessionData();
+    },
+    onError: (mutationError) => {
+      Alert.alert(
+        'Unable to update request',
+        mutationError instanceof Error ? mutationError.message : 'Please try again.',
+      );
+    },
+  });
+
   if (isLoading) {
     return (
       <View style={s.emptyState}>
@@ -439,8 +617,6 @@ export function SpaceSessionsTab({
       </View>
     );
   }
-
-  const groups = activeSubTab === 'upcoming' ? upcoming.slice(0, 4) : past;
 
   return (
     <View style={s.container}>
@@ -494,6 +670,52 @@ export function SpaceSessionsTab({
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingVertical: 12 }}
         >
+          {pendingRequests.length > 0 ? (
+            <View style={s.requestSection}>
+              <Text style={s.requestSectionTitle}>Session change requests</Text>
+              {pendingRequests.map((request) => (
+                <View key={request.id} style={s.requestRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.requestTitle}>
+                      {request.type === 'cancel'
+                        ? 'Cancel request'
+                        : 'Reschedule request'}
+                    </Text>
+                    <Text style={s.requestMeta}>{formatRequestWindow(request)}</Text>
+                    {request.requestedNote ? (
+                      <Text style={s.requestMeta}>{request.requestedNote}</Text>
+                    ) : null}
+                  </View>
+                  <TouchableOpacity
+                    style={[s.requestBtn, { borderColor: colors.teal }]}
+                    disabled={decisionMutation.isPending}
+                    onPress={() =>
+                      decisionMutation.mutate({
+                        requestId: request.id,
+                        decision: 'approve',
+                      })
+                    }
+                    activeOpacity={0.75}
+                  >
+                    <Text style={[s.requestBtnTxt, { color: colors.teal }]}>Approve</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[s.requestBtn, { borderColor: colors.red }]}
+                    disabled={decisionMutation.isPending}
+                    onPress={() =>
+                      decisionMutation.mutate({
+                        requestId: request.id,
+                        decision: 'reject',
+                      })
+                    }
+                    activeOpacity={0.75}
+                  >
+                    <Text style={[s.requestBtnTxt, { color: colors.red }]}>Reject</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          ) : null}
           {groups.map((group) => {
             const isOpen = expandedMonths.has(group.monthKey);
             const progressStats = monthProgressStatsByKey.get(group.monthKey);
@@ -566,6 +788,41 @@ export function SpaceSessionsTab({
                           ? false
                           : session.id === activeJoinSessionId
                       }
+                      cancelAction={
+                        enableSelfServeActions &&
+                        activeSubTab === 'upcoming' &&
+                        !session.isPast &&
+                        !session.disabled
+                          ? {
+                              onPress: () =>
+                                setChangeModal({
+                                  kind: 'cancel',
+                                  session,
+                                  note: '',
+                                }),
+                              disabled: cancelMutation.isPending,
+                            }
+                          : null
+                      }
+                      rescheduleAction={
+                        enableSelfServeActions &&
+                        activeSubTab === 'upcoming' &&
+                        !session.isPast &&
+                        !session.disabled
+                          ? {
+                              onPress: () =>
+                                setChangeModal({
+                                  kind: 'reschedule',
+                                  session,
+                                  date: formatDateInput(session.startAt),
+                                  startTime: formatTimeInput(session.startAt),
+                                  endTime: formatTimeInput(session.endAt),
+                                  note: '',
+                                }),
+                              disabled: rescheduleMutation.isPending,
+                            }
+                          : null
+                      }
                     />
                   ))}
               </View>
@@ -573,6 +830,88 @@ export function SpaceSessionsTab({
           })}
         </ScrollView>
       )}
+      <Modal
+        transparent
+        animationType="fade"
+        visible={Boolean(changeModal)}
+        onRequestClose={() => setChangeModal(null)}
+      >
+        <Pressable style={s.modalBackdrop} onPress={() => setChangeModal(null)}>
+          <Pressable style={s.modalCard} onPress={(event) => event.stopPropagation()}>
+            <Text style={s.modalTitle}>
+              {changeModal?.kind === 'cancel' ? 'Cancel session' : 'Reschedule session'}
+            </Text>
+            {changeModal?.kind === 'reschedule' ? (
+              <>
+                <TextInput
+                  value={changeModal.date}
+                  onChangeText={(date) => setChangeModal({ ...changeModal, date })}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor={colors.textMuted}
+                  style={s.modalInput}
+                />
+                <View style={s.modalInputRow}>
+                  <TextInput
+                    value={changeModal.startTime}
+                    onChangeText={(startTime) =>
+                      setChangeModal({ ...changeModal, startTime })
+                    }
+                    placeholder="Start"
+                    placeholderTextColor={colors.textMuted}
+                    style={[s.modalInput, { flex: 1 }]}
+                  />
+                  <TextInput
+                    value={changeModal.endTime}
+                    onChangeText={(endTime) =>
+                      setChangeModal({ ...changeModal, endTime })
+                    }
+                    placeholder="End"
+                    placeholderTextColor={colors.textMuted}
+                    style={[s.modalInput, { flex: 1 }]}
+                  />
+                </View>
+              </>
+            ) : null}
+            <TextInput
+              value={changeModal?.note ?? ''}
+              onChangeText={(note) =>
+                changeModal ? setChangeModal({ ...changeModal, note }) : undefined
+              }
+              placeholder="Add a note"
+              placeholderTextColor={colors.textMuted}
+              multiline
+              style={[s.modalInput, s.modalTextArea]}
+            />
+            <View style={s.modalActions}>
+              <TouchableOpacity
+                style={s.modalSecondaryBtn}
+                onPress={() => setChangeModal(null)}
+              >
+                <Text style={s.modalSecondaryTxt}>Close</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={s.modalPrimaryBtn}
+                disabled={cancelMutation.isPending || rescheduleMutation.isPending}
+                onPress={() => {
+                  if (!changeModal) return;
+                  if (changeModal.kind === 'cancel') {
+                    cancelMutation.mutate({
+                      ...changeModal.session,
+                      note: changeModal.note,
+                    });
+                    return;
+                  }
+                  rescheduleMutation.mutate(changeModal);
+                }}
+              >
+                <Text style={s.modalPrimaryTxt}>
+                  {changeModal?.kind === 'cancel' ? 'Send' : 'Request'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -709,6 +1048,114 @@ function makeStyles(C: AppColors) {
     sessionCardItem: {
       marginHorizontal: 12,
       marginBottom: 6,
+    },
+    requestSection: {
+      gap: 8,
+      paddingHorizontal: 12,
+      paddingBottom: 12,
+    },
+    requestSectionTitle: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: C.textMuted,
+      paddingHorizontal: 4,
+    },
+    requestRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderWidth: hairline,
+      borderColor: C.border,
+      borderRadius: 12,
+      backgroundColor: C.card,
+    },
+    requestTitle: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: C.text,
+    },
+    requestMeta: {
+      marginTop: 2,
+      fontSize: 12,
+      color: C.textMuted,
+    },
+    requestBtn: {
+      minHeight: 30,
+      justifyContent: 'center',
+      borderWidth: hairline,
+      borderRadius: 15,
+      paddingHorizontal: 10,
+    },
+    requestBtnTxt: {
+      fontSize: 12,
+      fontWeight: '700',
+    },
+    modalBackdrop: {
+      flex: 1,
+      justifyContent: 'center',
+      paddingHorizontal: 18,
+      backgroundColor: 'rgba(15, 23, 42, 0.42)',
+    },
+    modalCard: {
+      gap: 12,
+      padding: 16,
+      borderRadius: 16,
+      borderWidth: hairline,
+      borderColor: C.border,
+      backgroundColor: C.card,
+    },
+    modalTitle: {
+      fontSize: 17,
+      fontWeight: '700',
+      color: C.text,
+    },
+    modalInputRow: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    modalInput: {
+      minHeight: 42,
+      borderWidth: hairline,
+      borderColor: C.border,
+      borderRadius: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      color: C.text,
+      backgroundColor: C.inputBg,
+      fontSize: 14,
+    },
+    modalTextArea: {
+      minHeight: 82,
+      textAlignVertical: 'top',
+    },
+    modalActions: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      gap: 10,
+    },
+    modalSecondaryBtn: {
+      minHeight: 38,
+      justifyContent: 'center',
+      borderRadius: 19,
+      paddingHorizontal: 16,
+      backgroundColor: C.inputBg,
+    },
+    modalSecondaryTxt: {
+      color: C.text,
+      fontWeight: '700',
+    },
+    modalPrimaryBtn: {
+      minHeight: 38,
+      justifyContent: 'center',
+      borderRadius: 19,
+      paddingHorizontal: 16,
+      backgroundColor: C.teal,
+    },
+    modalPrimaryTxt: {
+      color: '#fff',
+      fontWeight: '700',
     },
   });
 }

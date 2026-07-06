@@ -82,6 +82,7 @@ export default async function ClassSchedulePage({
       canCancelSessions={canManageSessions}
       canEditSessions={canManageSessions}
       canSelfServeSessionChanges={selfServeSessionChangesEnabled && !canManageSessions}
+      canReviewSessionChangeRequests={canManageSessions || selfServeSessionChangesEnabled}
     />
   );
 }

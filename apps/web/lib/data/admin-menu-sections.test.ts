@@ -83,6 +83,7 @@ describe('buildAdminMenuSections', () => {
       '/admin/classrooms',
       '/admin/settings/activity',
       '/admin/settings/roles',
+      '/admin/settings/session-changes',
       '/admin/settings/subjects',
       '/admin/tools',
       '/admin/users',

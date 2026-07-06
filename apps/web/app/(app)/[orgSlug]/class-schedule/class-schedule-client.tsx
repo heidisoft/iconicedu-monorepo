@@ -3,7 +3,11 @@
 import { startTransition, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ClassScheduleContainer, DashboardHeader, toast } from '@iconicedu/ui-web';
-import type { ClassScheduleViewVM, ClassScheduleVM } from '@iconicedu/shared-types';
+import type {
+  ClassScheduleViewVM,
+  ClassScheduleVM,
+  SessionChangeRequestVM,
+} from '@iconicedu/shared-types';
 import type {
   CancelSessionActionInput,
   EditSessionActionInput,
@@ -13,6 +17,9 @@ import type { DisplayClassScheduleVM } from '@iconicedu/ui-web/lib/class-schedul
 import { toScheduleDisplayDate } from '@iconicedu/ui-web/lib/schedule-display-timezone';
 import { cancelClassScheduleSessionAction } from '@iconicedu/web/app/actions/cancel-class-schedule-session';
 import {
+  approveSessionChangeRequestAction,
+  listSessionChangeRequestsAction,
+  rejectSessionChangeRequestAction,
   selfServeCancelClassSessionAction,
   selfServeRescheduleClassSessionAction,
 } from '@iconicedu/web/app/actions/self-serve-class-session-change';
@@ -30,6 +37,7 @@ type ClassScheduleClientProps = {
   canCancelSessions: boolean;
   canEditSessions: boolean;
   canSelfServeSessionChanges?: boolean;
+  canReviewSessionChangeRequests?: boolean;
   timezone?: string | null;
 };
 
@@ -39,6 +47,7 @@ export function ClassScheduleClient({
   canCancelSessions,
   canEditSessions,
   canSelfServeSessionChanges = false,
+  canReviewSessionChangeRequests = false,
   timezone,
 }: ClassScheduleClientProps) {
   const router = useRouter();
@@ -173,6 +182,12 @@ export function ClassScheduleClient({
     <ScheduleDisplayTimeZoneProvider timezone={timezone}>
       <div className="flex flex-col h-[calc(100vh-3.5rem)]">
         <DashboardHeader title="Calendar" />
+        {canReviewSessionChangeRequests ? (
+          <SessionChangeRequestInbox
+            orgSlug={orgSlug}
+            onChanged={() => router.refresh()}
+          />
+        ) : null}
         <ClassScheduleContainer
           currentDate={currentDate}
           view={view}
@@ -193,5 +208,140 @@ export function ClassScheduleClient({
         />
       </div>
     </ScheduleDisplayTimeZoneProvider>
+  );
+}
+
+function formatChangeRequestSummary(request: SessionChangeRequestVM) {
+  const current = new Date(request.currentStartAt).toLocaleString([], {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+  if (request.type === 'cancel') return `Cancel ${current}`;
+  const requested = request.requestedStartAt
+    ? new Date(request.requestedStartAt).toLocaleString([], {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      })
+    : 'new time';
+  return `${current} to ${requested}`;
+}
+
+function SessionChangeRequestInbox({
+  orgSlug,
+  onChanged,
+}: {
+  orgSlug: string;
+  onChanged: () => void;
+}) {
+  const [requests, setRequests] = useState<SessionChangeRequestVM[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busyRequestId, setBusyRequestId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    listSessionChangeRequestsAction({ orgSlug })
+      .then((items) => {
+        if (active) {
+          setRequests(items.filter((item) => item.status === 'pending'));
+        }
+      })
+      .catch((error) => {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : 'Unable to load session change requests.',
+        );
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [orgSlug]);
+
+  const decide = async (requestId: string, decision: 'approve' | 'reject') => {
+    setBusyRequestId(requestId);
+    try {
+      if (decision === 'approve') {
+        await approveSessionChangeRequestAction({ orgSlug, requestId });
+        toast.success('Session change approved.');
+      } else {
+        await rejectSessionChangeRequestAction({ orgSlug, requestId });
+        toast.success('Session change rejected.');
+      }
+      setRequests((current) => current.filter((request) => request.id !== requestId));
+      startTransition(onChanged);
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'Unable to update session change request.',
+      );
+    } finally {
+      setBusyRequestId(null);
+    }
+  };
+
+  if (loading || requests.length === 0) return null;
+
+  return (
+    <section className="border-b bg-background px-4 py-3">
+      <div className="mx-auto flex max-w-6xl flex-col gap-3">
+        <div>
+          <h2 className="text-sm font-semibold text-foreground">
+            Session change requests
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            Review pending cancellations and reschedules.
+          </p>
+        </div>
+        <div className="grid gap-2 md:grid-cols-2">
+          {requests.map((request) => (
+            <div
+              key={request.id}
+              className="flex items-center justify-between gap-3 rounded-md border bg-card p-3"
+            >
+              <div className="min-w-0">
+                <div className="text-sm font-medium">
+                  {request.type === 'cancel' ? 'Cancel request' : 'Reschedule request'}
+                </div>
+                <div className="truncate text-xs text-muted-foreground">
+                  {formatChangeRequestSummary(request)}
+                </div>
+                {request.requestedNote ? (
+                  <div className="truncate text-xs text-muted-foreground">
+                    {request.requestedNote}
+                  </div>
+                ) : null}
+              </div>
+              <div className="flex shrink-0 gap-2">
+                <button
+                  type="button"
+                  className="rounded-md border border-emerald-600 px-3 py-1.5 text-xs font-semibold text-emerald-700 disabled:opacity-50"
+                  disabled={busyRequestId === request.id}
+                  onClick={() => void decide(request.id, 'approve')}
+                >
+                  Approve
+                </button>
+                <button
+                  type="button"
+                  className="rounded-md border border-destructive px-3 py-1.5 text-xs font-semibold text-destructive disabled:opacity-50"
+                  disabled={busyRequestId === request.id}
+                  onClick={() => void decide(request.id, 'reject')}
+                >
+                  Reject
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }

@@ -66,12 +66,19 @@ export {
 } from './onboarding/queries';
 export {
   cancelRecurringSessionOccurrence,
+  approveSessionChangeRequest,
+  fetchSessionChangeRequests,
   fetchOrgSessions,
   fetchSpaceSchedulesByChannelId,
+  rejectSessionChangeRequest,
+  selfServeCancelSession,
+  selfServeRescheduleSession,
 } from './schedules/queries';
 export type {
   CancelRecurringSessionOccurrenceInput,
   CancelRecurringSessionOccurrenceResult,
+  SelfServeCancelSessionInput,
+  SelfServeRescheduleSessionInput,
 } from './schedules/queries';
 export {
   fetchActivityFeed,

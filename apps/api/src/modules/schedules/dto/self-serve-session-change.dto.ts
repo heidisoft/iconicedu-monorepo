@@ -17,6 +17,17 @@ export type DecideSessionChangeRequestDto = {
   note: string | null;
 };
 
+export type UpsertSelfServePolicyDto = {
+  orgId: string;
+  learningSpaceId: string;
+  enabled: boolean;
+  cutoffHours: number;
+  allowGuardian: boolean;
+  allowEducator: boolean;
+  allowChild: boolean;
+  withinCutoffRequiresApproval: boolean;
+};
+
 function asBody(input: unknown) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw new BadRequestException('Invalid request body');
@@ -35,6 +46,16 @@ function requiredString(body: Record<string, unknown>, key: string) {
 function optionalString(body: Record<string, unknown>, key: string) {
   const value = body[key];
   return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function optionalBoolean(body: Record<string, unknown>, key: string, fallback: boolean) {
+  const value = body[key];
+  return typeof value === 'boolean' ? value : fallback;
+}
+
+function optionalNumber(body: Record<string, unknown>, key: string, fallback: number) {
+  const value = body[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
 
 export function parseSelfServeCancelSessionDto(
@@ -67,5 +88,28 @@ export function parseDecideSessionChangeRequestDto(
   const body = asBody(input);
   return {
     note: optionalString(body, 'note'),
+  };
+}
+
+export function parseUpsertSelfServePolicyDto(input: unknown): UpsertSelfServePolicyDto {
+  const body = asBody(input);
+  const cutoffHours = Math.round(optionalNumber(body, 'cutoffHours', 48));
+  if (cutoffHours < 0 || cutoffHours > 720) {
+    throw new BadRequestException('cutoffHours must be between 0 and 720');
+  }
+
+  return {
+    orgId: requiredString(body, 'orgId'),
+    learningSpaceId: requiredString(body, 'learningSpaceId'),
+    enabled: optionalBoolean(body, 'enabled', true),
+    cutoffHours,
+    allowGuardian: optionalBoolean(body, 'allowGuardian', true),
+    allowEducator: optionalBoolean(body, 'allowEducator', true),
+    allowChild: optionalBoolean(body, 'allowChild', true),
+    withinCutoffRequiresApproval: optionalBoolean(
+      body,
+      'withinCutoffRequiresApproval',
+      true,
+    ),
   };
 }

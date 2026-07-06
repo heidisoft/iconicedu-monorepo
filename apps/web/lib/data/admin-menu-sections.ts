@@ -48,6 +48,7 @@ export function buildAdminMenuSections(
       links: [
         { title: 'Subjects', url: `${basePath}/admin/settings/subjects` },
         { title: 'Activity controls', url: `${basePath}/admin/settings/activity` },
+        { title: 'Session changes', url: `${basePath}/admin/settings/session-changes` },
         { title: 'Roles & policies', url: `${basePath}/admin/settings/roles` },
         { title: 'Tools', url: `${basePath}/admin/tools` },
       ],

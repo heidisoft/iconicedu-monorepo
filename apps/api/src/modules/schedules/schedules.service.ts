@@ -22,6 +22,7 @@ import type {
   ScheduleRowInput,
   SelfServeCancelSessionDto,
   SelfServeRescheduleSessionDto,
+  UpsertSelfServePolicyDto,
 } from '@iconicedu/api/modules/schedules/dto';
 import type {
   ClassScheduleSelfServePolicyVM,
@@ -142,6 +143,13 @@ type SelfServePolicyRow = {
   allow_educator: boolean;
   allow_child: boolean;
   within_cutoff_requires_approval: boolean;
+};
+
+type LearningSpacePolicyRow = {
+  id: string;
+  title: string | null;
+  status: string | null;
+  archived_at: string | null;
 };
 
 @Injectable()
@@ -602,6 +610,86 @@ export class SchedulesService {
     return (data ?? []).map(this.mapSessionChangeRequest);
   }
 
+  async listSelfServePolicies(
+    accessToken: string,
+    orgId: string,
+  ): Promise<Array<ClassScheduleSelfServePolicyVM & { title: string | null }>> {
+    const actor = await this.requireOrgMembershipActor(accessToken, orgId);
+    this.assertCanManageSelfServePolicies(actor);
+    const supabase = createSupabaseServiceClient();
+    const [spacesResponse, policiesResponse] = await Promise.all([
+      supabase
+        .from('learning_spaces')
+        .select('id, title, status, archived_at')
+        .eq('org_id', orgId)
+        .is('deleted_at', null)
+        .order('title', { ascending: true })
+        .returns<LearningSpacePolicyRow[]>(),
+      supabase
+        .from('class_schedule_self_serve_policies')
+        .select('*')
+        .eq('org_id', orgId)
+        .is('deleted_at', null)
+        .returns<SelfServePolicyRow[]>(),
+    ]);
+
+    if (spacesResponse.error) {
+      throw new InternalServerErrorException(spacesResponse.error.message);
+    }
+    if (policiesResponse.error) {
+      throw new InternalServerErrorException(policiesResponse.error.message);
+    }
+
+    const policiesBySpace = new Map(
+      (policiesResponse.data ?? []).map((policy) => [policy.learning_space_id, policy]),
+    );
+
+    return (spacesResponse.data ?? [])
+      .filter((space) => !space.archived_at && space.status !== 'archived')
+      .map((space) => ({
+        ...this.mapSelfServePolicy(
+          orgId,
+          space.id,
+          policiesBySpace.get(space.id) ?? null,
+        ),
+        title: space.title,
+      }));
+  }
+
+  async upsertSelfServePolicy(
+    accessToken: string,
+    dto: UpsertSelfServePolicyDto,
+  ): Promise<ClassScheduleSelfServePolicyVM> {
+    const actor = await this.requireOrgMembershipActor(accessToken, dto.orgId);
+    this.assertCanManageSelfServePolicies(actor);
+    const supabase = createSupabaseServiceClient();
+    await this.assertLearningSpaceActive(supabase, dto.orgId, dto.learningSpaceId);
+    const now = new Date().toISOString();
+    const { data, error } = await supabase
+      .from('class_schedule_self_serve_policies')
+      .upsert(
+        {
+          org_id: dto.orgId,
+          learning_space_id: dto.learningSpaceId,
+          enabled: dto.enabled,
+          cutoff_hours: dto.cutoffHours,
+          allow_guardian: dto.allowGuardian,
+          allow_educator: dto.allowEducator,
+          allow_child: dto.allowChild,
+          within_cutoff_requires_approval: dto.withinCutoffRequiresApproval,
+          updated_at: now,
+          updated_by: actor.profileId,
+          deleted_at: null,
+          deleted_by: null,
+        },
+        { onConflict: 'org_id,learning_space_id' },
+      )
+      .select('*')
+      .single<SelfServePolicyRow>();
+    if (error) throw new InternalServerErrorException(error.message);
+    return this.mapSelfServePolicy(dto.orgId, dto.learningSpaceId, data);
+  }
+
   async selfServeCancelSession(
     accessToken: string,
     dto: SelfServeCancelSessionDto,
@@ -793,6 +881,23 @@ export class SchedulesService {
       decidedAt: row.decided_at,
       appliedAt: row.applied_at,
       createdAt: row.created_at,
+    };
+  }
+
+  private mapSelfServePolicy(
+    orgId: string,
+    learningSpaceId: string,
+    row: SelfServePolicyRow | null,
+  ): ClassScheduleSelfServePolicyVM {
+    return {
+      orgId,
+      learningSpaceId,
+      enabled: row?.enabled ?? true,
+      cutoffHours: row?.cutoff_hours ?? 48,
+      allowGuardian: row?.allow_guardian ?? true,
+      allowEducator: row?.allow_educator ?? true,
+      allowChild: row?.allow_child ?? true,
+      withinCutoffRequiresApproval: row?.within_cutoff_requires_approval ?? true,
     };
   }
 
@@ -1027,16 +1132,16 @@ export class SchedulesService {
       .maybeSingle<SelfServePolicyRow>();
     if (error) throw new InternalServerErrorException(error.message);
 
-    return {
-      orgId,
-      learningSpaceId,
-      enabled: data?.enabled ?? true,
-      cutoffHours: data?.cutoff_hours ?? 48,
-      allowGuardian: data?.allow_guardian ?? true,
-      allowEducator: data?.allow_educator ?? true,
-      allowChild: data?.allow_child ?? true,
-      withinCutoffRequiresApproval: data?.within_cutoff_requires_approval ?? true,
-    };
+    return this.mapSelfServePolicy(orgId, learningSpaceId, data ?? null);
+  }
+
+  private assertCanManageSelfServePolicies(actor: OrgMembershipActor) {
+    const canManage = actor.roleKeys.some((role) =>
+      ['owner', 'admin', 'staff'].includes(role),
+    );
+    if (!canManage) {
+      throw new ForbiddenException('Only staff can manage self-serve policies');
+    }
   }
 
   private assertPolicyAllowsActor(
