@@ -26,7 +26,10 @@ import {
 } from '@iconicedu/web/lib/admin/learning-space-schedule-hash';
 import { buildUserProfileById } from '@iconicedu/web/lib/profile/builders/user-profile.builder';
 import { getAdminLiveSessionConfig } from '@iconicedu/web/lib/admin/live-session-config';
-import { requireAdminOrgContext } from '@iconicedu/web/lib/admin/require-admin-org-context';
+import {
+  requireAdminOrgContext,
+  throwAdminOrgContextError,
+} from '@iconicedu/web/lib/admin/require-admin-org-context';
 
 export type LearningSpaceDetail = {
   ids: { id: string; orgId: string };
@@ -153,9 +156,7 @@ export async function getLearningSpaceDetail(learningSpaceId: string) {
 
   const orgId = accountResponse.data.org_id;
   const authContext = await requireAdminOrgContext(orgId);
-  if (!authContext.ok) {
-    throw new Error(authContext.message);
-  }
+  throwAdminOrgContextError(authContext);
 
   const { data: learningSpace, error: learningSpaceError } = await supabase
     .from('learning_spaces')
