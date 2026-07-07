@@ -309,6 +309,116 @@ describe('SchedulesService authorization', () => {
     });
   });
 
+  it('builds self-serve reschedule options from educator availability', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2030-03-04T12:00:00.000Z'));
+    const mainClient = {
+      from: jest.fn((table: string) => {
+        const query = {
+          select: jest.fn(() => query),
+          eq: jest.fn(() => query),
+          is: jest.fn(() => query),
+          maybeSingle: jest.fn(async () => {
+            if (table === 'profiles') {
+              return {
+                data: { display_name: 'Ms. Chen', timezone: 'UTC' },
+                error: null,
+              };
+            }
+            if (table === 'educator_availabilities') {
+              return {
+                data: {
+                  availability: {
+                    Mon: [10, 15],
+                    Tue: [15],
+                    Wed: [],
+                    Thu: [],
+                    Fri: [],
+                    Sat: [],
+                    Sun: [],
+                  },
+                },
+                error: null,
+              };
+            }
+            return { data: null, error: null };
+          }),
+        };
+        return query;
+      }),
+    };
+    createSupabaseServiceClientMock.mockReturnValueOnce(mainClient as never);
+
+    const service = new SchedulesService();
+    jest
+      .spyOn(
+        service as unknown as { requireSessionParticipantActor: jest.Mock },
+        'requireSessionParticipantActor',
+      )
+      .mockResolvedValue({
+        accountId: 'account-guardian',
+        profileId: 'profile-guardian',
+        role: 'guardian',
+        displayName: 'Taylor Parent',
+        roleKeys: ['guardian'],
+      });
+    jest
+      .spyOn(
+        service as unknown as { loadRescheduleActivityContext: jest.Mock },
+        'loadRescheduleActivityContext',
+      )
+      .mockResolvedValue({
+        scheduleId: 'schedule-1',
+        title: 'Algebra I',
+        startAt: '2030-03-04T10:00:00.000Z',
+        endAt: '2030-03-04T11:00:00.000Z',
+        timezone: 'UTC',
+        learningSpaceId: 'space-1',
+        channelId: 'channel-1',
+        members: [
+          {
+            profileId: 'teacher-1',
+            role: 'educator',
+            displayName: 'Ms. Chen',
+            avatarUrl: null,
+            themeKey: null,
+          },
+        ],
+      });
+    jest
+      .spyOn(
+        service as unknown as { assertLearningSpaceActive: jest.Mock },
+        'assertLearningSpaceActive',
+      )
+      .mockResolvedValue(undefined);
+
+    const result = await service.getSelfServeRescheduleOptions('token-1', {
+      orgId: 'org-1',
+      scheduleId: 'schedule-1',
+      occurrenceKey: null,
+    });
+
+    expect(result).toMatchObject({
+      timezone: 'UTC',
+      durationMinutes: 60,
+      educatorProfileId: 'teacher-1',
+      educatorName: 'Ms. Chen',
+    });
+    expect(result.days).toHaveLength(10);
+    expect(result.days[0]).toMatchObject({
+      date: '2030-03-04',
+      weekdayKey: 'Mon',
+      slots: [
+        {
+          startAt: '2030-03-04T15:00:00.000Z',
+          endAt: '2030-03-04T16:00:00.000Z',
+          label: '3:00 PM',
+          hour: 15,
+        },
+      ],
+    });
+    jest.useRealTimers();
+  });
+
   it('falls back to the account profile when active_profile_id is missing', async () => {
     createSupabaseSessionClientMock.mockReturnValue({
       auth: {

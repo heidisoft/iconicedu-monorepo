@@ -58,3 +58,25 @@ export interface SelfServeSessionChangeResultVM {
   mode: 'single' | 'recurring' | null;
   approvalRequired: boolean;
 }
+
+export interface SelfServeRescheduleAvailabilitySlotVM {
+  startAt: ISODateTime;
+  endAt: ISODateTime;
+  label: string;
+  hour: number;
+}
+
+export interface SelfServeRescheduleAvailabilityDayVM {
+  date: string;
+  label: string;
+  weekdayKey: string;
+  slots: SelfServeRescheduleAvailabilitySlotVM[];
+}
+
+export interface SelfServeRescheduleOptionsVM {
+  timezone: string;
+  durationMinutes: number;
+  educatorProfileId: UUID | null;
+  educatorName: string | null;
+  days: SelfServeRescheduleAvailabilityDayVM[];
+}

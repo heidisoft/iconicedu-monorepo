@@ -6,6 +6,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
+import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
 import { publishActivityEvent } from '@iconicedu/api/lib/activity-feed/activity-publisher';
 import {
@@ -27,6 +28,9 @@ import type {
 } from '@iconicedu/api/modules/schedules/dto';
 import type {
   ClassScheduleSelfServePolicyVM,
+  DayAvailability,
+  DayKey,
+  SelfServeRescheduleOptionsVM,
   SelfServeSessionChangeResultVM,
   SessionChangeApprovalTargetVM,
   SessionChangeRequestVM,
@@ -108,6 +112,8 @@ type SessionParticipantActorLookup = {
   role: ScheduleParticipantRole;
   displayName: string | null;
 };
+
+const WEEKDAY_KEYS: DayKey[] = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 type OrgMembershipActor = {
   accountId: string;
@@ -843,6 +849,80 @@ export class SchedulesService {
     return { success: true, mode: 'recurring' };
   }
 
+  async getSelfServeRescheduleOptions(
+    accessToken: string,
+    input: { orgId: string; scheduleId: string; occurrenceKey?: string | null },
+  ): Promise<SelfServeRescheduleOptionsVM> {
+    await this.requireSessionParticipantActor(accessToken, input);
+    const supabase = createSupabaseServiceClient();
+    const context = await this.loadRescheduleActivityContext(
+      supabase,
+      input.orgId,
+      input.scheduleId,
+    );
+    if (!context?.learningSpaceId) {
+      throw new BadRequestException('Class session not found');
+    }
+
+    await this.assertLearningSpaceActive(supabase, input.orgId, context.learningSpaceId);
+
+    const educatorMember = context.members.find(
+      (member) => member.role === 'educator' || member.role === 'teacher',
+    );
+    const durationMs = Math.max(
+      new Date(context.endAt).getTime() - new Date(context.startAt).getTime(),
+      30 * 60 * 1000,
+    );
+    const durationMinutes = Math.round(durationMs / 60000);
+
+    if (!educatorMember?.profileId) {
+      return {
+        timezone: context.timezone ?? 'UTC',
+        durationMinutes,
+        educatorProfileId: null,
+        educatorName: null,
+        days: this.buildRescheduleAvailabilityDays({
+          availability: null,
+          timezone: context.timezone ?? 'UTC',
+          durationMs,
+        }),
+      };
+    }
+
+    const { data: profileRow, error: profileError } = await supabase
+      .from('profiles')
+      .select('display_name, timezone')
+      .eq('org_id', input.orgId)
+      .eq('id', educatorMember.profileId)
+      .is('deleted_at', null)
+      .maybeSingle<{ display_name: string | null; timezone: string | null }>();
+    if (profileError) throw new InternalServerErrorException(profileError.message);
+
+    const timezone = profileRow?.timezone ?? context.timezone ?? 'UTC';
+    const { data: availabilityRow, error: availabilityError } = await supabase
+      .from('educator_availabilities')
+      .select('availability')
+      .eq('org_id', input.orgId)
+      .eq('profile_id', educatorMember.profileId)
+      .is('deleted_at', null)
+      .maybeSingle<{ availability: DayAvailability | null }>();
+    if (availabilityError) {
+      throw new InternalServerErrorException(availabilityError.message);
+    }
+
+    return {
+      timezone,
+      durationMinutes,
+      educatorProfileId: educatorMember.profileId,
+      educatorName: profileRow?.display_name ?? educatorMember.displayName ?? null,
+      days: this.buildRescheduleAvailabilityDays({
+        availability: availabilityRow?.availability ?? null,
+        timezone,
+        durationMs,
+      }),
+    };
+  }
+
   async approveSessionChangeRequest(
     accessToken: string,
     requestId: string,
@@ -1331,6 +1411,68 @@ export class SchedulesService {
       role: 'guardian',
       displayName: guardianProfile?.display_name ?? null,
     };
+  }
+
+  private buildRescheduleAvailabilityDays(input: {
+    availability: DayAvailability | null;
+    timezone: string;
+    durationMs: number;
+  }): SelfServeRescheduleOptionsVM['days'] {
+    const now = new Date();
+    const todayText = formatInTimeZone(now, input.timezone, 'yyyy-MM-dd');
+
+    return Array.from({ length: 10 }, (_, dayOffset) => {
+      const date = this.addDaysToDateText(todayText, dayOffset);
+      const weekdayKey = this.weekdayKeyForDateText(date);
+      const noonUtc = fromZonedTime(`${date}T12:00:00`, input.timezone);
+      const hours = Array.from(
+        new Set(
+          (input.availability?.[weekdayKey] ?? []).filter(
+            (hour): hour is number => Number.isInteger(hour) && hour >= 0 && hour <= 23,
+          ),
+        ),
+      ).sort((a, b) => a - b);
+
+      const slots = hours
+        .map((hour) => {
+          const startAt = fromZonedTime(
+            `${date}T${String(hour).padStart(2, '0')}:00:00`,
+            input.timezone,
+          );
+          const endAt = new Date(startAt.getTime() + input.durationMs);
+          return {
+            startAt,
+            endAt,
+            label: formatInTimeZone(startAt, input.timezone, 'h:mm a'),
+            hour,
+          };
+        })
+        .filter((slot) => slot.startAt.getTime() > now.getTime())
+        .map((slot) => ({
+          startAt: slot.startAt.toISOString(),
+          endAt: slot.endAt.toISOString(),
+          label: slot.label,
+          hour: slot.hour,
+        }));
+
+      return {
+        date,
+        label: formatInTimeZone(noonUtc, input.timezone, 'EEE, MMM d'),
+        weekdayKey,
+        slots,
+      };
+    });
+  }
+
+  private addDaysToDateText(dateText: string, days: number) {
+    const date = new Date(`${dateText}T12:00:00.000Z`);
+    date.setUTCDate(date.getUTCDate() + days);
+    return date.toISOString().slice(0, 10);
+  }
+
+  private weekdayKeyForDateText(dateText: string): DayKey {
+    const date = new Date(`${dateText}T12:00:00.000Z`);
+    return WEEKDAY_KEYS[date.getUTCDay()] ?? 'Mon';
   }
 
   private async loadSelfServePolicy(

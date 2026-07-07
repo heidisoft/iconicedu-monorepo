@@ -23,6 +23,7 @@ import type {
 import { applyArchiveCutoffToDisplaySchedules } from '@iconicedu/shared-types';
 import {
   approveSessionChangeRequest,
+  fetchSelfServeRescheduleOptions,
   fetchSessionChangeRequests,
   queryKeys,
   rejectSessionChangeRequest,
@@ -37,6 +38,7 @@ import {
   formatOriginalTime,
   formatOriginalDate,
 } from '@/components/sessions/session-card';
+import { RescheduleAvailabilityPicker } from '@/components/sessions/reschedule-availability-picker';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -67,6 +69,9 @@ type ChangeModalState =
       date: string;
       startTime: string;
       endTime: string;
+      startAtIso?: string | null;
+      endAtIso?: string | null;
+      timezone?: string | null;
       note: string;
     }
   | null;
@@ -477,6 +482,44 @@ export function SpaceSessionsTab({
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
   const [changeModal, setChangeModal] = useState<ChangeModalState>(null);
   const autoSwitchedRef = useRef(false);
+  const rescheduleModalSession =
+    changeModal?.kind === 'reschedule' ? changeModal.session : null;
+  const rescheduleModalScheduleId = rescheduleModalSession
+    ? (rescheduleModalSession.scheduleId ?? rescheduleModalSession.id)
+    : '';
+  const rescheduleModalOccurrenceKey = rescheduleModalSession?.occurrenceKey ?? '';
+  const rescheduleOptionsQuery = useQuery({
+    queryKey: queryKeys.selfServeRescheduleOptions(
+      orgId ?? '',
+      rescheduleModalScheduleId,
+      rescheduleModalOccurrenceKey,
+    ),
+    enabled: Boolean(orgId && rescheduleModalSession && rescheduleModalScheduleId),
+    queryFn: () =>
+      fetchSelfServeRescheduleOptions({
+        orgId: orgId!,
+        scheduleId: rescheduleModalScheduleId,
+        occurrenceKey: rescheduleModalOccurrenceKey || null,
+      }),
+  });
+
+  useEffect(() => {
+    if (!changeModal || changeModal.kind !== 'reschedule') return;
+    if (changeModal.startAtIso) return;
+    const firstSlot = rescheduleOptionsQuery.data?.days
+      .flatMap((day) => day.slots)
+      .find(Boolean);
+    if (!firstSlot) return;
+    setChangeModal({
+      ...changeModal,
+      date: formatDateInput(firstSlot.startAt),
+      startTime: formatTimeInput(firstSlot.startAt),
+      endTime: formatTimeInput(firstSlot.endAt),
+      startAtIso: firstSlot.startAt,
+      endAtIso: firstSlot.endAt,
+      timezone: rescheduleOptionsQuery.data?.timezone ?? null,
+    });
+  }, [changeModal, rescheduleOptionsQuery.data]);
 
   const { upcoming, past, monthProgressStatsByKey } = useMemo(
     () => splitAndGroupSessions(schedules),
@@ -568,15 +611,18 @@ export function SpaceSessionsTab({
       date: string;
       startTime: string;
       endTime: string;
+      startAtIso?: string | null;
+      endAtIso?: string | null;
+      timezone?: string | null;
       note?: string | null;
     }) =>
       selfServeRescheduleSession({
         orgId: orgId ?? '',
         scheduleId: input.session.scheduleId ?? input.session.id,
         occurrenceKey: input.session.occurrenceKey ?? null,
-        startAt: combineLocalDateTime(input.date, input.startTime),
-        endAt: combineLocalDateTime(input.date, input.endTime),
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        startAt: input.startAtIso ?? combineLocalDateTime(input.date, input.startTime),
+        endAt: input.endAtIso ?? combineLocalDateTime(input.date, input.endTime),
+        timezone: input.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
         note: input.note ?? null,
       }),
     onSuccess: async (result) => {
@@ -638,6 +684,9 @@ export function SpaceSessionsTab({
         date: formatDateInput(current.session.startAt),
         startTime: formatTimeInput(current.session.startAt),
         endTime: formatTimeInput(current.session.endAt),
+        startAtIso: null,
+        endAtIso: null,
+        timezone: null,
         note: current.note,
       };
     });
@@ -867,6 +916,9 @@ export function SpaceSessionsTab({
                                     date: formatDateInput(session.startAt),
                                     startTime: formatTimeInput(session.startAt),
                                     endTime: formatTimeInput(session.endAt),
+                                    startAtIso: null,
+                                    endAtIso: null,
+                                    timezone: null,
                                     note: '',
                                   }),
                                 disabled: rescheduleMutation.isPending,
@@ -914,52 +966,43 @@ export function SpaceSessionsTab({
               </Text>
             </View>
             {changeModal?.kind === 'reschedule' ? (
-              <>
-                <TextInput
-                  value={changeModal.date}
-                  onChangeText={(date) => setChangeModal({ ...changeModal, date })}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor={colors.textMuted}
-                  style={[
-                    s.modalInput,
-                    { backgroundColor: colors.inputBg, borderColor: colors.border },
-                  ]}
-                />
-                <View style={s.modalInputRow}>
-                  <TextInput
-                    value={changeModal.startTime}
-                    onChangeText={(startTime) =>
-                      setChangeModal({ ...changeModal, startTime })
-                    }
-                    placeholder="Start"
-                    placeholderTextColor={colors.textMuted}
-                    style={[
-                      s.modalInput,
-                      {
-                        flex: 1,
-                        backgroundColor: colors.inputBg,
-                        borderColor: colors.border,
-                      },
-                    ]}
-                  />
-                  <TextInput
-                    value={changeModal.endTime}
-                    onChangeText={(endTime) =>
-                      setChangeModal({ ...changeModal, endTime })
-                    }
-                    placeholder="End"
-                    placeholderTextColor={colors.textMuted}
-                    style={[
-                      s.modalInput,
-                      {
-                        flex: 1,
-                        backgroundColor: colors.inputBg,
-                        borderColor: colors.border,
-                      },
-                    ]}
-                  />
-                </View>
-              </>
+              <RescheduleAvailabilityPicker
+                colors={colors}
+                options={rescheduleOptionsQuery.data}
+                isLoading={rescheduleOptionsQuery.isLoading}
+                selectedDate={changeModal.date}
+                selectedStartAt={changeModal.startAtIso}
+                onSelectDay={(date) => {
+                  const day = rescheduleOptionsQuery.data?.days.find(
+                    (option) => option.date === date,
+                  );
+                  const firstSlot = day?.slots[0];
+                  setChangeModal({
+                    ...changeModal,
+                    date,
+                    startTime: firstSlot
+                      ? formatTimeInput(firstSlot.startAt)
+                      : changeModal.startTime,
+                    endTime: firstSlot
+                      ? formatTimeInput(firstSlot.endAt)
+                      : changeModal.endTime,
+                    startAtIso: firstSlot?.startAt ?? null,
+                    endAtIso: firstSlot?.endAt ?? null,
+                    timezone: rescheduleOptionsQuery.data?.timezone ?? null,
+                  });
+                }}
+                onSelectSlot={(slot) =>
+                  setChangeModal({
+                    ...changeModal,
+                    date: formatDateInput(slot.startAt),
+                    startTime: formatTimeInput(slot.startAt),
+                    endTime: formatTimeInput(slot.endAt),
+                    startAtIso: slot.startAt,
+                    endAtIso: slot.endAt,
+                    timezone: rescheduleOptionsQuery.data?.timezone ?? null,
+                  })
+                }
+              />
             ) : null}
             <TextInput
               value={changeModal?.note ?? ''}
@@ -1000,7 +1043,11 @@ export function SpaceSessionsTab({
               ) : null}
               <TouchableOpacity
                 style={[s.modalButton, s.modalPrimaryBtn]}
-                disabled={cancelMutation.isPending || rescheduleMutation.isPending}
+                disabled={
+                  cancelMutation.isPending ||
+                  rescheduleMutation.isPending ||
+                  (changeModal?.kind === 'reschedule' && !changeModal.startAtIso)
+                }
                 onPress={() => {
                   if (!changeModal) return;
                   if (changeModal.kind === 'cancel') {

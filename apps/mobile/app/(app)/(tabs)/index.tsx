@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   Alert,
   Modal,
@@ -43,6 +43,7 @@ import { useTheme } from '@/providers/theme-provider';
 import { useFamilyView } from '@/providers/family-view-provider';
 import { PulseBox } from '@/components/skeletons/pulse-box';
 import { SessionCard, type ClassSession } from '@/components/sessions/session-card';
+import { RescheduleAvailabilityPicker } from '@/components/sessions/reschedule-availability-picker';
 import { AppSupportFooter } from '@/components/support/app-support-footer';
 import { QueryError } from '@/components/errors/query-error';
 import {
@@ -52,6 +53,7 @@ import {
 } from '@/lib/home-metrics';
 import {
   fetchOrgSessions,
+  fetchSelfServeRescheduleOptions,
   queryKeys,
   selfServeCancelSession,
   selfServeRescheduleSession,
@@ -129,6 +131,9 @@ type SessionChangeModalState =
       date: string;
       startTime: string;
       endTime: string;
+      startAtIso?: string | null;
+      endAtIso?: string | null;
+      timezone?: string | null;
       note: string;
     }
   | null;
@@ -966,6 +971,43 @@ export default function HomeScreen() {
   const [classRequestOpen, setClassRequestOpen] = useState(false);
   const [sessionChangeModal, setSessionChangeModal] =
     useState<SessionChangeModalState>(null);
+  const rescheduleModalSession =
+    sessionChangeModal?.kind === 'reschedule' ? sessionChangeModal.session : null;
+  const rescheduleModalScheduleId = rescheduleModalSession
+    ? (rescheduleModalSession.scheduleId ?? rescheduleModalSession.id)
+    : '';
+  const rescheduleModalOccurrenceKey = rescheduleModalSession?.occurrenceKey ?? '';
+  const rescheduleOptionsQuery = useQuery({
+    queryKey: queryKeys.selfServeRescheduleOptions(
+      orgId ?? '',
+      rescheduleModalScheduleId,
+      rescheduleModalOccurrenceKey,
+    ),
+    enabled: Boolean(orgId && rescheduleModalSession && rescheduleModalScheduleId),
+    queryFn: () =>
+      fetchSelfServeRescheduleOptions({
+        orgId: orgId!,
+        scheduleId: rescheduleModalScheduleId,
+        occurrenceKey: rescheduleModalOccurrenceKey || null,
+      }),
+  });
+  useEffect(() => {
+    if (!sessionChangeModal || sessionChangeModal.kind !== 'reschedule') return;
+    if (sessionChangeModal.startAtIso) return;
+    const firstSlot = rescheduleOptionsQuery.data?.days
+      .flatMap((day) => day.slots)
+      .find(Boolean);
+    if (!firstSlot) return;
+    setSessionChangeModal({
+      ...sessionChangeModal,
+      date: formatSessionDateInput(firstSlot.startAt),
+      startTime: formatSessionTimeInput(firstSlot.startAt),
+      endTime: formatSessionTimeInput(firstSlot.endAt),
+      startAtIso: firstSlot.startAt,
+      endAtIso: firstSlot.endAt,
+      timezone: rescheduleOptionsQuery.data?.timezone ?? null,
+    });
+  }, [rescheduleOptionsQuery.data, sessionChangeModal]);
   const requestableStudents = React.useMemo<RequestableStudent[]>(() => {
     const children = familySwitchOptions
       .filter((option) => option.kind === 'child')
@@ -1107,15 +1149,19 @@ export default function HomeScreen() {
       date: string;
       startTime: string;
       endTime: string;
+      startAtIso?: string | null;
+      endAtIso?: string | null;
+      timezone?: string | null;
       note?: string | null;
     }) =>
       selfServeRescheduleSession({
         orgId: orgId ?? '',
         scheduleId: input.session.scheduleId ?? input.session.id,
         occurrenceKey: input.session.occurrenceKey ?? null,
-        startAt: combineSessionLocalDateTime(input.date, input.startTime),
-        endAt: combineSessionLocalDateTime(input.date, input.endTime),
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        startAt:
+          input.startAtIso ?? combineSessionLocalDateTime(input.date, input.startTime),
+        endAt: input.endAtIso ?? combineSessionLocalDateTime(input.date, input.endTime),
+        timezone: input.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
         note: input.note ?? null,
       }),
     onSuccess: async (result) => {
@@ -1198,6 +1244,9 @@ export default function HomeScreen() {
               date: formatSessionDateInput(session.startAt),
               startTime: formatSessionTimeInput(session.startAt),
               endTime: formatSessionTimeInput(session.endAt),
+              startAtIso: null,
+              endAtIso: null,
+              timezone: null,
               note: '',
             }),
           disabled: rescheduleSessionMutation.isPending,
@@ -1222,6 +1271,9 @@ export default function HomeScreen() {
         date: formatSessionDateInput(current.session.startAt),
         startTime: formatSessionTimeInput(current.session.startAt),
         endTime: formatSessionTimeInput(current.session.endAt),
+        startAtIso: null,
+        endAtIso: null,
+        timezone: null,
         note: current.note,
       };
     });
@@ -1752,54 +1804,43 @@ export default function HomeScreen() {
               </Text>
             </View>
             {sessionChangeModal?.kind === 'reschedule' ? (
-              <>
-                <TextInput
-                  value={sessionChangeModal.date}
-                  onChangeText={(date) =>
-                    setSessionChangeModal({ ...sessionChangeModal, date })
-                  }
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor={colors.textMuted}
-                  style={[
-                    s.changeModalInput,
-                    { backgroundColor: colors.inputBg, borderColor: colors.border },
-                  ]}
-                />
-                <View style={s.changeModalInputRow}>
-                  <TextInput
-                    value={sessionChangeModal.startTime}
-                    onChangeText={(startTime) =>
-                      setSessionChangeModal({ ...sessionChangeModal, startTime })
-                    }
-                    placeholder="Start"
-                    placeholderTextColor={colors.textMuted}
-                    style={[
-                      s.changeModalInput,
-                      {
-                        flex: 1,
-                        backgroundColor: colors.inputBg,
-                        borderColor: colors.border,
-                      },
-                    ]}
-                  />
-                  <TextInput
-                    value={sessionChangeModal.endTime}
-                    onChangeText={(endTime) =>
-                      setSessionChangeModal({ ...sessionChangeModal, endTime })
-                    }
-                    placeholder="End"
-                    placeholderTextColor={colors.textMuted}
-                    style={[
-                      s.changeModalInput,
-                      {
-                        flex: 1,
-                        backgroundColor: colors.inputBg,
-                        borderColor: colors.border,
-                      },
-                    ]}
-                  />
-                </View>
-              </>
+              <RescheduleAvailabilityPicker
+                colors={colors}
+                options={rescheduleOptionsQuery.data}
+                isLoading={rescheduleOptionsQuery.isLoading}
+                selectedDate={sessionChangeModal.date}
+                selectedStartAt={sessionChangeModal.startAtIso}
+                onSelectDay={(date) => {
+                  const day = rescheduleOptionsQuery.data?.days.find(
+                    (option) => option.date === date,
+                  );
+                  const firstSlot = day?.slots[0];
+                  setSessionChangeModal({
+                    ...sessionChangeModal,
+                    date,
+                    startTime: firstSlot
+                      ? formatSessionTimeInput(firstSlot.startAt)
+                      : sessionChangeModal.startTime,
+                    endTime: firstSlot
+                      ? formatSessionTimeInput(firstSlot.endAt)
+                      : sessionChangeModal.endTime,
+                    startAtIso: firstSlot?.startAt ?? null,
+                    endAtIso: firstSlot?.endAt ?? null,
+                    timezone: rescheduleOptionsQuery.data?.timezone ?? null,
+                  });
+                }}
+                onSelectSlot={(slot) =>
+                  setSessionChangeModal({
+                    ...sessionChangeModal,
+                    date: formatSessionDateInput(slot.startAt),
+                    startTime: formatSessionTimeInput(slot.startAt),
+                    endTime: formatSessionTimeInput(slot.endAt),
+                    startAtIso: slot.startAt,
+                    endAtIso: slot.endAt,
+                    timezone: rescheduleOptionsQuery.data?.timezone ?? null,
+                  })
+                }
+              />
             ) : null}
             <TextInput
               value={sessionChangeModal?.note ?? ''}
@@ -1847,7 +1888,10 @@ export default function HomeScreen() {
               <TouchableOpacity
                 style={[s.changeModalButton, s.changeModalPrimaryBtn]}
                 disabled={
-                  cancelSessionMutation.isPending || rescheduleSessionMutation.isPending
+                  cancelSessionMutation.isPending ||
+                  rescheduleSessionMutation.isPending ||
+                  (sessionChangeModal?.kind === 'reschedule' &&
+                    !sessionChangeModal.startAtIso)
                 }
                 onPress={() => {
                   if (!sessionChangeModal) return;

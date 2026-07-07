@@ -32,6 +32,8 @@ export const queryKeys = {
   sessionChangeRequests: (orgId: string, channelId = '') =>
     ['session-change-requests', orgId, channelId] as const,
   selfServePolicies: (orgId: string) => ['self-serve-policies', orgId] as const,
+  selfServeRescheduleOptions: (orgId: string, scheduleId: string, occurrenceKey = '') =>
+    ['self-serve-reschedule-options', orgId, scheduleId, occurrenceKey] as const,
   orgSessions: (orgId: string) => ['org-sessions', orgId] as const,
   supervisedDirectMessages: (orgId: string, accountId: string) =>
     ['supervisedDirectMessages', orgId, accountId] as const,

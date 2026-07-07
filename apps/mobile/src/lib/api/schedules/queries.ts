@@ -14,6 +14,7 @@ import type {
 import { apiGet, apiPost } from '@/lib/api/http-client';
 import type {
   SelfServeSessionChangeResultVM,
+  SelfServeRescheduleOptionsVM,
   SessionChangeRequestVM,
 } from '@iconicedu/shared-types';
 
@@ -212,6 +213,21 @@ export async function selfServeUndoCancelSession(
 ): Promise<{ success: true; mode: 'single' | 'recurring' }> {
   return apiPost<{ success: true; mode: 'single' | 'recurring' }>(
     '/schedules/session/self-serve/undo-cancel',
+    {
+      orgId: input.orgId,
+      scheduleId: input.scheduleId,
+      occurrenceKey: input.occurrenceKey ?? null,
+    },
+  );
+}
+
+export async function fetchSelfServeRescheduleOptions(input: {
+  orgId: string;
+  scheduleId: string;
+  occurrenceKey?: string | null;
+}): Promise<SelfServeRescheduleOptionsVM> {
+  return apiGet<SelfServeRescheduleOptionsVM>(
+    '/schedules/session/self-serve/reschedule-options',
     {
       orgId: input.orgId,
       scheduleId: input.scheduleId,

@@ -137,6 +137,33 @@ export class SchedulesController {
     );
   }
 
+  @Get('schedules/session/self-serve/reschedule-options')
+  @UseGuards(AuthGuard)
+  getSelfServeRescheduleOptions(
+    @Req() req: AuthenticatedRequest,
+    @Query('orgId') orgId: string,
+    @Query('scheduleId') scheduleId: string,
+    @Query('occurrenceKey') occurrenceKey?: string,
+  ) {
+    if (!orgId || typeof orgId !== 'string') {
+      throw new BadRequestException('orgId is required');
+    }
+    if (!scheduleId || typeof scheduleId !== 'string') {
+      throw new BadRequestException('scheduleId is required');
+    }
+    return this.schedulesService.getSelfServeRescheduleOptions(
+      extractBearerToken(req.headers.authorization),
+      {
+        orgId,
+        scheduleId,
+        occurrenceKey:
+          typeof occurrenceKey === 'string' && occurrenceKey.trim()
+            ? occurrenceKey.trim()
+            : null,
+      },
+    );
+  }
+
   @Post('schedules/session/self-serve/undo-cancel')
   @UseGuards(AuthGuard)
   selfServeUndoCancelSession(@Req() req: AuthenticatedRequest, @Body() body: unknown) {

@@ -67,6 +67,7 @@ export {
 export {
   cancelRecurringSessionOccurrence,
   approveSessionChangeRequest,
+  fetchSelfServeRescheduleOptions,
   fetchSessionChangeRequests,
   fetchOrgSessions,
   fetchSpaceSchedulesByChannelId,
