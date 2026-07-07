@@ -133,6 +133,23 @@ function makeSupabase(event: ActivityEventRow) {
           if (table === 'learning_space_participants') {
             return { data: [], error: null };
           }
+          if (table === 'channel_members') {
+            const payload =
+              event.payload && typeof event.payload === 'object'
+                ? (event.payload as Record<string, unknown>)
+                : {};
+            const testChannelMemberIds = Array.isArray(payload.testChannelMemberIds)
+              ? payload.testChannelMemberIds.filter(
+                  (value): value is string => typeof value === 'string',
+                )
+              : null;
+            return {
+              data: (testChannelMemberIds ?? ['teacher-1', 'student-1']).map(
+                (profile_id) => ({ profile_id }),
+              ),
+              error: null,
+            };
+          }
           if (table === 'family_links') {
             return {
               data: [
@@ -217,5 +234,62 @@ describe('projectActivityEvents context rendering', () => {
     expect(content?.summary?.length).toBeLessThanOrEqual(150);
     expect(content?.preview?.text?.length).toBeLessThanOrEqual(150);
     expect(row!.summary).toMatch(/\.\.\.$/);
+  });
+
+  it('projects restored cancellation activity to the educator on the class channel', async () => {
+    const event = makeEvent();
+    event.event_type = 'class.session.cancel_restored';
+    event.actor_profile_id = 'teacher-1';
+    event.scope = { kind: 'learning_space', learningSpaceId: 'space-1' };
+    event.payload = {
+      ...(event.payload as Record<string, unknown>),
+      restoredStartAt: '2030-03-06T21:00:00.000Z',
+    };
+    event.audience_rules = [{ kind: 'all_in_scope' }];
+    const { supabase, upsertedRows } = makeSupabase(event);
+
+    await projectActivityEvents(supabase, { eventIds: ['event-1'], limit: 1 });
+
+    const teacherRow = upsertedRows.find(
+      (row) => row.recipient_profile_id === 'teacher-1',
+    );
+    const content = teacherRow?.content as
+      | { summary?: string; headline?: { secondary?: string } }
+      | undefined;
+
+    expect(teacherRow).toBeDefined();
+    expect(teacherRow?.is_read).toBe(true);
+    expect(content?.summary).toContain('Algebra I session');
+    expect(content?.summary).toContain('is back on the calendar');
+    expect(content?.headline?.secondary).toContain('cancellation was restored');
+  });
+
+  it('projects restored cancellation activity to guardians from schedule members', async () => {
+    const event = makeEvent();
+    event.event_type = 'class.session.cancel_restored';
+    event.actor_profile_id = 'teacher-1';
+    event.scope = { kind: 'learning_space', learningSpaceId: 'space-1' };
+    event.payload = {
+      ...(event.payload as Record<string, unknown>),
+      restoredStartAt: '2030-03-06T21:00:00.000Z',
+      testChannelMemberIds: ['teacher-1'],
+    };
+    event.audience_rules = [{ kind: 'all_in_scope' }];
+    const { supabase, upsertedRows } = makeSupabase(event);
+
+    await projectActivityEvents(supabase, { eventIds: ['event-1'], limit: 1 });
+
+    const guardianRow = upsertedRows.find(
+      (row) => row.recipient_profile_id === 'guardian-1',
+    );
+    const content = guardianRow?.content as
+      | { summary?: string; headline?: { secondary?: string } }
+      | undefined;
+
+    expect(guardianRow).toBeDefined();
+    expect(guardianRow?.is_read).toBe(false);
+    expect(content?.summary).toContain('Algebra I session');
+    expect(content?.summary).toContain('is back on the calendar');
+    expect(content?.headline?.secondary).toContain('For Priya with Ms. Chen');
   });
 });

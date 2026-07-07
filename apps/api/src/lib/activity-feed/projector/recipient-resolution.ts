@@ -61,9 +61,32 @@ function unique(values: string[]) {
   return Array.from(new Set(values.filter(Boolean)));
 }
 
-const CHANNEL_SCOPED_LIVE_SESSION_EVENTS = new Set<string>();
+function profileIdsFromPayloadMembers(payload: Record<string, unknown>) {
+  const members = [
+    ...(Array.isArray(payload.members) ? payload.members : []),
+    ...(Array.isArray(payload.invitedMembers) ? payload.invitedMembers : []),
+  ];
 
-const INCLUDE_ACTOR_LIVE_SESSION_EVENTS = new Set<string>();
+  return unique(
+    members
+      .map((member) => {
+        if (!member || typeof member !== 'object' || Array.isArray(member)) {
+          return null;
+        }
+        const profileId = (member as Record<string, unknown>).profileId;
+        return typeof profileId === 'string' ? profileId : null;
+      })
+      .filter((profileId): profileId is string => Boolean(profileId)),
+  );
+}
+
+const CHANNEL_SCOPED_LIVE_SESSION_EVENTS = new Set<string>([
+  'class.session.cancel_restored',
+]);
+
+const INCLUDE_ACTOR_LIVE_SESSION_EVENTS = new Set<string>([
+  'class.session.cancel_restored',
+]);
 
 type UsersOnlyAudienceRule = {
   kind: 'users_only';
@@ -283,6 +306,20 @@ export async function resolveRecipientsForActivityEvent(
   } else {
     const usersOnlyRule = audienceRules.find(isUsersOnlyAudienceRule);
     scopedRecipients = usersOnlyRule ? toStringUserIds(usersOnlyRule.userIds) : [];
+  }
+
+  const payloadMemberIds = profileIdsFromPayloadMembers(payload);
+  if (payloadMemberIds.length) {
+    const payloadGuardianIds = await loadGuardianProfileIdsForChildProfileIds(
+      supabase,
+      event.org_id,
+      payloadMemberIds,
+    );
+    scopedRecipients = unique([
+      ...scopedRecipients,
+      ...payloadMemberIds,
+      ...payloadGuardianIds,
+    ]);
   }
 
   const usersOnlyScoped = applyUsersOnlyRule(scopedRecipients, audienceRules);

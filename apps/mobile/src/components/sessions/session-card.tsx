@@ -700,13 +700,11 @@ export function SessionCard({
                 setActionMenuVisible(false);
                 undoCancelAction.onPress();
               }}
-              accessibilityLabel={
-                undoCancelAction.accessibilityLabel ?? 'Undo cancellation'
-              }
+              accessibilityLabel={undoCancelAction.accessibilityLabel ?? 'Keep session'}
             >
               <RotateCcw size={18} color={colors.teal} />
               <Text style={[s.actionOptionText, { color: colors.text }]}>
-                {undoCancelAction.label ?? 'Undo cancel'}
+                {undoCancelAction.label ?? 'Keep session'}
               </Text>
             </TouchableOpacity>
           ) : null}

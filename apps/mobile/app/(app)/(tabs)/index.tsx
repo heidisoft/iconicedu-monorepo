@@ -1144,11 +1144,11 @@ export default function HomeScreen() {
       }),
     onSuccess: async () => {
       await invalidateSessionData();
-      Alert.alert('Cancellation undone', 'The session is back on the calendar.');
+      Alert.alert('Session kept', 'The session is back on the calendar.');
     },
     onError: (error) => {
       Alert.alert(
-        'Unable to undo cancellation',
+        'Unable to keep session',
         error instanceof Error ? error.message : 'Please try again.',
       );
     },

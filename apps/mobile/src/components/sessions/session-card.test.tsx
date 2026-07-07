@@ -194,7 +194,7 @@ describe('SessionCard', () => {
     );
 
     fireEvent.press(screen.getByLabelText('Session options'));
-    fireEvent.press(screen.getByText('Undo cancel'));
+    fireEvent.press(screen.getByText('Keep session'));
 
     expect(onUndo).toHaveBeenCalledTimes(1);
   });

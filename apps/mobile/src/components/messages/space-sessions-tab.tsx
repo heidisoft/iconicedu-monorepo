@@ -620,11 +620,11 @@ export function SpaceSessionsTab({
       }),
     onSuccess: async () => {
       await invalidateSessionData();
-      Alert.alert('Cancellation undone', 'The session is back on the calendar.');
+      Alert.alert('Session kept', 'The session is back on the calendar.');
     },
     onError: (mutationError) => {
       Alert.alert(
-        'Unable to undo cancellation',
+        'Unable to keep session',
         mutationError instanceof Error ? mutationError.message : 'Please try again.',
       );
     },
