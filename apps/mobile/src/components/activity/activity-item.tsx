@@ -122,6 +122,8 @@ export function getIconKey(item: ActivityFeedItemVM): InboxIconKeyVM {
       return 'CalendarCheck';
     case 'class.session.canceled':
       return 'CalendarX';
+    case 'class.session.cancel_restored':
+      return 'CalendarCheck';
     case 'session.reminder.sent':
       return 'Bell';
     case 'session.feedback_request.sent':
@@ -269,6 +271,26 @@ export function makeActivityItemStyles(C: AppColors) {
       paddingHorizontal: 12,
       paddingVertical: 6,
     },
+    decisionActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginLeft: 42,
+      marginTop: 10,
+      flexWrap: 'wrap',
+    },
+    decisionBtn: {
+      minHeight: 34,
+      borderRadius: 17,
+      borderWidth: 1,
+      paddingHorizontal: 13,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    decisionBtnText: {
+      fontSize: 13,
+      fontWeight: '800',
+    },
   });
 }
 
@@ -287,6 +309,12 @@ type ActivityItemProps = {
   expandedIds: Set<string>;
   onToggle: (id: string) => void;
   onActionPress?: (item: ActivityFeedItemVM) => void;
+  onSessionChangeDecision?: (
+    item: ActivityFeedItemVM,
+    decision: 'approve' | 'reject',
+  ) => void;
+  pendingSessionChangeRequestIds?: Set<string>;
+  decisionInFlightRequestId?: string | null;
   isSubActivity?: boolean;
   viewerTimezone?: string | null;
   currentProfileId?: string | null;
@@ -574,6 +602,98 @@ function ActivityActionButton({
   );
 }
 
+function getSessionChangeRequestId(item: ActivityFeedItemVM): string | null {
+  if (
+    item.verb !== 'class.session.reschedule_requested' &&
+    item.verb !== 'class.session.cancel_requested'
+  ) {
+    return null;
+  }
+
+  const metadata =
+    item.metadata && typeof item.metadata === 'object' && !Array.isArray(item.metadata)
+      ? (item.metadata as Record<string, unknown>)
+      : {};
+  return typeof metadata.requestId === 'string' && metadata.requestId.length > 0
+    ? metadata.requestId
+    : null;
+}
+
+function canShowSessionChangeDecisionActions(input: {
+  item: ActivityFeedItemVM;
+  currentProfileId?: string | null;
+  pendingSessionChangeRequestIds?: Set<string>;
+}) {
+  const requestId = getSessionChangeRequestId(input.item);
+  if (!requestId || !input.pendingSessionChangeRequestIds?.has(requestId)) {
+    return false;
+  }
+
+  const metadata =
+    input.item.metadata &&
+    typeof input.item.metadata === 'object' &&
+    !Array.isArray(input.item.metadata)
+      ? (input.item.metadata as Record<string, unknown>)
+      : {};
+  const requestedByProfileId =
+    typeof metadata.requestedByProfileId === 'string'
+      ? metadata.requestedByProfileId
+      : null;
+
+  return Boolean(
+    input.currentProfileId && input.currentProfileId !== requestedByProfileId,
+  );
+}
+
+function ActivitySessionChangeDecisionActions({
+  colors,
+  disabled,
+  onDecision,
+  s,
+}: {
+  colors: AppColors;
+  disabled: boolean;
+  onDecision: (decision: 'approve' | 'reject') => void;
+  s: ActivityItemStyles;
+}) {
+  return (
+    <View style={s.decisionActions}>
+      <TouchableOpacity
+        style={[
+          s.decisionBtn,
+          {
+            borderColor: colors.teal,
+            backgroundColor: colors.tealBg,
+            opacity: disabled ? 0.55 : 1,
+          },
+        ]}
+        disabled={disabled}
+        onPress={() => onDecision('approve')}
+        accessibilityRole="button"
+        accessibilityLabel="Approve session change request"
+      >
+        <Text style={[s.decisionBtnText, { color: colors.teal }]}>Approve</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[
+          s.decisionBtn,
+          {
+            borderColor: colors.red,
+            backgroundColor: colors.inputBg,
+            opacity: disabled ? 0.55 : 1,
+          },
+        ]}
+        disabled={disabled}
+        onPress={() => onDecision('reject')}
+        accessibilityRole="button"
+        accessibilityLabel="Deny session change request"
+      >
+        <Text style={[s.decisionBtnText, { color: colors.red }]}>Deny</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 export function ActivityItem({
   item,
   colors,
@@ -583,6 +703,9 @@ export function ActivityItem({
   expandedIds,
   onToggle,
   onActionPress,
+  onSessionChangeDecision,
+  pendingSessionChangeRequestIds,
+  decisionInFlightRequestId,
   isSubActivity = false,
   viewerTimezone,
   currentProfileId,
@@ -612,6 +735,14 @@ export function ActivityItem({
   const hidesDefaultContent = canShowFeedbackRequest || canShowCompletionCheck;
   const shouldShowPreviewText = hasPreviewText && !hidesDefaultContent;
   const shouldShowActionButton = hasActionBtn && !hidesDefaultContent;
+  const sessionChangeRequestId = getSessionChangeRequestId(item);
+  const shouldShowSessionChangeDecisionActions =
+    !isSubActivity &&
+    canShowSessionChangeDecisionActions({
+      item,
+      currentProfileId,
+      pendingSessionChangeRequestIds,
+    });
   const primary = formatActivityPrimaryHeadline(item, viewerTimezone);
   const { secondary, emphasis } = item.content.headline;
   const tabLabel = TAB_LABELS[item.tabKey] ?? item.tabKey;
@@ -624,6 +755,10 @@ export function ActivityItem({
   const handleActionPress = () => {
     if (!isRead) onMarkRead(item.ids.id);
     onActionPress?.(item);
+  };
+  const handleSessionChangeDecision = (decision: 'approve' | 'reject') => {
+    if (!isRead) onMarkRead(item.ids.id);
+    onSessionChangeDecision?.(item, decision);
   };
 
   // Sub-activity: full leaf view matching web
@@ -769,6 +904,18 @@ export function ActivityItem({
             isSubActivity={false}
             label={item.content.actionButton!.label}
             onPress={handleActionPress}
+            s={s}
+          />
+        )}
+
+        {shouldShowSessionChangeDecisionActions && (
+          <ActivitySessionChangeDecisionActions
+            colors={colors}
+            disabled={
+              Boolean(decisionInFlightRequestId) &&
+              decisionInFlightRequestId === sessionChangeRequestId
+            }
+            onDecision={handleSessionChangeDecision}
             s={s}
           />
         )}

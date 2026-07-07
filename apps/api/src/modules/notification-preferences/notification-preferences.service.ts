@@ -24,6 +24,7 @@ export class NotificationPreferencesService {
     { prefKey: 'class.schedule.ended', channels: ['push', 'email'] },
     { prefKey: 'class.session.rescheduled', channels: ['push', 'email'] },
     { prefKey: 'class.session.canceled', channels: ['push', 'email'] },
+    { prefKey: 'class.session.cancel_restored', channels: ['push', 'email'] },
     { prefKey: 'class.session.reschedule_requested', channels: ['push', 'email'] },
     { prefKey: 'class.session.cancel_requested', channels: ['push', 'email'] },
     { prefKey: 'class.session.change_request.approved', channels: ['push', 'email'] },

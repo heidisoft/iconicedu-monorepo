@@ -86,6 +86,229 @@ describe('SchedulesService authorization', () => {
     );
   });
 
+  it('allows guardians to self-serve sessions for linked child participants', async () => {
+    createSupabaseSessionClientMock.mockReturnValue({
+      auth: {
+        getUser: jest.fn(async () => ({
+          data: { user: { id: 'auth-user-guardian' } },
+          error: null,
+        })),
+      },
+    } as never);
+
+    const participantLookups = [
+      { data: null, error: null },
+      { data: { profile_id: 'profile-child' }, error: null },
+    ];
+    const mainClient = {
+      from: jest.fn((table: string) => {
+        const query = {
+          select: jest.fn(() => query),
+          eq: jest.fn(() => query),
+          in: jest.fn(() => query),
+          is: jest.fn(() => query),
+          limit: jest.fn(() => query),
+          maybeSingle: jest.fn(async () => {
+            if (table === 'class_schedule_participants') {
+              return participantLookups.shift() ?? { data: null, error: null };
+            }
+            if (table === 'profiles') {
+              return { data: { display_name: 'Taylor Parent' }, error: null };
+            }
+            return { data: null, error: null };
+          }),
+          returns: jest.fn(async () => {
+            if (table === 'family_links') {
+              return { data: [{ child_account_id: 'account-child' }], error: null };
+            }
+            if (table === 'profiles') {
+              return { data: [{ id: 'profile-child' }], error: null };
+            }
+            if (table === 'user_roles') {
+              return { data: [{ role_key: 'guardian' }], error: null };
+            }
+            return { data: [], error: null };
+          }),
+        };
+        return query;
+      }),
+    };
+
+    createSupabaseServiceClientMock
+      .mockReturnValueOnce(
+        makeSingleResult({
+          id: 'account-guardian',
+          active_profile_id: 'profile-guardian',
+        }) as never,
+      )
+      .mockReturnValueOnce(mainClient as never);
+
+    const service = new SchedulesService();
+    const actor = await (
+      service as unknown as {
+        requireSessionParticipantActor(
+          accessToken: string,
+          input: { orgId: string; scheduleId: string },
+        ): Promise<{
+          accountId: string;
+          profileId: string;
+          role: string;
+          displayName: string | null;
+          roleKeys: string[];
+        }>;
+      }
+    ).requireSessionParticipantActor('token-1', {
+      orgId: 'org-1',
+      scheduleId: 'schedule-1',
+    });
+
+    expect(actor).toEqual({
+      accountId: 'account-guardian',
+      profileId: 'profile-guardian',
+      role: 'guardian',
+      displayName: 'Taylor Parent',
+      roleKeys: ['guardian'],
+    });
+    expect(mainClient.from).toHaveBeenCalledWith('family_links');
+  });
+
+  it('lets the original self-serve canceller undo a recurring cancellation', async () => {
+    createSupabaseSessionClientMock.mockReturnValue({
+      auth: {
+        getUser: jest.fn(async () => ({
+          data: { user: { id: 'auth-user-guardian' } },
+          error: null,
+        })),
+      },
+    } as never);
+
+    const deletes: Array<{ table: string; filters: Array<[string, unknown]> }> = [];
+    const mainClient = {
+      from: jest.fn((table: string) => {
+        const filters: Array<[string, unknown]> = [];
+        const query = {
+          select: jest.fn(() => query),
+          eq: jest.fn((key: string, value: unknown) => {
+            filters.push([key, value]);
+            return query;
+          }),
+          is: jest.fn(() => query),
+          delete: jest.fn(() => {
+            deletes.push({ table, filters });
+            return query;
+          }),
+          maybeSingle: jest.fn(async () => {
+            if (table === 'class_schedules') {
+              return {
+                data: {
+                  id: 'schedule-1',
+                  title: 'Algebra I',
+                  start_at: '2030-03-06T10:00:00.000Z',
+                  end_at: '2030-03-06T11:00:00.000Z',
+                  timezone: 'America/New_York',
+                  source_learning_space_id: 'space-1',
+                  source_channel_id: 'channel-1',
+                  participants: [],
+                },
+                error: null,
+              };
+            }
+            if (table === 'learning_spaces') {
+              return { data: { status: 'active', archived_at: null }, error: null };
+            }
+            if (table === 'class_schedule_recurrence') {
+              return { data: { id: 'recurrence-1' }, error: null };
+            }
+            if (table === 'class_schedule_recurrence_exceptions') {
+              return {
+                data: { id: 'exception-1', created_by: 'profile-guardian' },
+                error: null,
+              };
+            }
+            return { data: null, error: null };
+          }),
+        };
+        return query;
+      }),
+    };
+    const participantClient = {
+      from: jest.fn((table: string) => {
+        const query = {
+          select: jest.fn(() => query),
+          eq: jest.fn(() => query),
+          is: jest.fn(() => query),
+          maybeSingle: jest.fn(async () => ({
+            data:
+              table === 'class_schedule_participants'
+                ? { role: 'guardian', display_name: 'Taylor Parent' }
+                : null,
+            error: null,
+          })),
+          returns: jest.fn(async () => ({
+            data: table === 'user_roles' ? [{ role_key: 'guardian' }] : [],
+            error: null,
+          })),
+        };
+        return query;
+      }),
+    };
+    const reconcileNextReminderJobForSchedule = jest.fn(async () => ({
+      action: 'inserted',
+    }));
+
+    createSupabaseServiceClientMock
+      .mockReturnValueOnce(mainClient as never)
+      .mockReturnValueOnce(
+        makeSingleResult({
+          id: 'account-guardian',
+          active_profile_id: 'profile-guardian',
+        }) as never,
+      )
+      .mockReturnValueOnce(participantClient as never);
+
+    const service = new SchedulesService({
+      reconcileNextReminderJobForSchedule,
+    } as never);
+    await expect(
+      service.selfServeUndoCancelSession('token-1', {
+        orgId: 'org-1',
+        scheduleId: 'schedule-1',
+        occurrenceKey: '2030-03-06T10:00:00.000Z',
+      }),
+    ).resolves.toEqual({ success: true, mode: 'recurring' });
+
+    expect(deletes).toContainEqual({
+      table: 'class_schedule_recurrence_exceptions',
+      filters: expect.arrayContaining([
+        ['id', 'exception-1'],
+        ['org_id', 'org-1'],
+      ]),
+    });
+    expect(publishActivityEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'class.session.cancel_restored',
+        actorProfileId: 'profile-guardian',
+        scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+        audienceRules: [{ kind: 'all_in_scope' }],
+        dedupeKey:
+          'class.session.cancel_restored:org-1:schedule-1:2030-03-06T10:00:00.000Z',
+        refreshOnDedupe: true,
+        payload: expect.objectContaining({
+          title: 'Algebra I',
+          channelId: 'channel-1',
+          learningSpaceId: 'space-1',
+          restoredStartAt: '2030-03-06T10:00:00.000Z',
+          restoredEndAt: '2030-03-06T11:00:00.000Z',
+          timezone: 'America/New_York',
+        }),
+      }),
+    );
+    expect(reconcileNextReminderJobForSchedule).toHaveBeenCalledWith({
+      orgId: 'org-1',
+      scheduleId: 'schedule-1',
+    });
+  });
+
   it('falls back to the account profile when active_profile_id is missing', async () => {
     createSupabaseSessionClientMock.mockReturnValue({
       auth: {

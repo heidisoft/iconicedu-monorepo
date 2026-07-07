@@ -78,6 +78,10 @@ jest.mock('lucide-react-native', () => ({
     const { View } = require('react-native');
     return <View testID={testID ?? 'more-icon'} />;
   },
+  RotateCcw: ({ testID }: { testID?: string }) => {
+    const { View } = require('react-native');
+    return <View testID={testID ?? 'rotateccw-icon'} />;
+  },
   Sparkles: ({ testID }: { testID?: string }) => {
     const { View } = require('react-native');
     return <View testID={testID ?? 'sparkles-icon'} />;
@@ -173,6 +177,26 @@ describe('SessionCard', () => {
     expect(screen.getByText('LIVE')).toBeTruthy();
     expect(screen.getByText('Today')).toBeTruthy();
     expect(screen.getByText('Join Now')).toBeTruthy();
+  });
+
+  it('opens undo cancellation from the more button', () => {
+    const onUndo = jest.fn();
+    render(
+      <SessionCard
+        session={{
+          ...baseSession,
+          status: 'cancelled',
+          disabled: true,
+          cancelledByProfileId: 'profile-1',
+        }}
+        undoCancelAction={{ onPress: onUndo }}
+      />,
+    );
+
+    fireEvent.press(screen.getByLabelText('Session options'));
+    fireEvent.press(screen.getByText('Undo cancel'));
+
+    expect(onUndo).toHaveBeenCalledTimes(1);
   });
 
   it('shows Join button for upcoming sessions', () => {

@@ -42,6 +42,8 @@ export type SelfServeRescheduleSessionInput = SelfServeCancelSessionInput & {
   timezone?: string | null;
 };
 
+export type SelfServeUndoCancelSessionInput = Omit<SelfServeCancelSessionInput, 'note'>;
+
 function mapClassScheduleRow(row: Record<string, unknown>): ClassScheduleVM {
   const orgId = row.org_id as string;
   const recurrenceRows = row.recurrence as Record<string, unknown>[] | null;
@@ -64,6 +66,8 @@ function mapClassScheduleRow(row: Record<string, unknown>): ClassScheduleVM {
           (exception) => ({
             occurrenceKey: exception.occurrence_key as string,
             reason: (exception.reason as string | null) ?? undefined,
+            createdBy: (exception.created_by as string | null) ?? undefined,
+            updatedBy: (exception.updated_by as string | null) ?? undefined,
           }),
         ),
         overrides: ((recurrenceRow.overrides as Record<string, unknown>[]) ?? []).map(
@@ -199,6 +203,19 @@ export async function selfServeRescheduleSession(
       endAt: input.endAt,
       timezone: input.timezone ?? null,
       note: input.note ?? null,
+    },
+  );
+}
+
+export async function selfServeUndoCancelSession(
+  input: SelfServeUndoCancelSessionInput,
+): Promise<{ success: true; mode: 'single' | 'recurring' }> {
+  return apiPost<{ success: true; mode: 'single' | 'recurring' }>(
+    '/schedules/session/self-serve/undo-cancel',
+    {
+      orgId: input.orgId,
+      scheduleId: input.scheduleId,
+      occurrenceKey: input.occurrenceKey ?? null,
     },
   );
 }

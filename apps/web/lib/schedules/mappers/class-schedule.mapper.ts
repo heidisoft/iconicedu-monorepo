@@ -53,6 +53,8 @@ export function mapClassScheduleRecurrenceRow(
     input?.exceptions?.map((exception) => ({
       occurrenceKey: exception.occurrence_key,
       reason: exception.reason ?? undefined,
+      createdBy: exception.created_by ?? undefined,
+      updatedBy: exception.updated_by ?? undefined,
     })) ?? [];
 
   const overrides: RecurrenceOverrideVM[] =

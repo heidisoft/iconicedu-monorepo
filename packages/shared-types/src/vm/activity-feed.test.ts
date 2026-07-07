@@ -19,6 +19,7 @@ describe('ActivityVerbVM', () => {
     expectTypeOf<'class.schedule.ended'>().toMatchTypeOf<ActivityVerbVM>();
     expectTypeOf<'class.session.rescheduled'>().toMatchTypeOf<ActivityVerbVM>();
     expectTypeOf<'class.session.canceled'>().toMatchTypeOf<ActivityVerbVM>();
+    expectTypeOf<'class.session.cancel_restored'>().toMatchTypeOf<ActivityVerbVM>();
     expectTypeOf<'session.reminder.sent'>().toMatchTypeOf<ActivityVerbVM>();
     expectTypeOf<'session.feedback_request.sent'>().toMatchTypeOf<ActivityVerbVM>();
   });

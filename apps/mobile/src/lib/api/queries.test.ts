@@ -11,6 +11,7 @@ import {
   sendFileMessage,
   sendFilesMessage,
   sendTextMessage,
+  selfServeUndoCancelSession,
   toggleReaction,
   queryKeys,
 } from './queries';
@@ -308,6 +309,32 @@ describe('cancelRecurringSessionOccurrence', () => {
       occurrenceKey: '2026-03-10T14:30:00.000Z',
       reason: 'Staffing conflict',
     });
+  });
+});
+
+describe('selfServeUndoCancelSession', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('posts an undo cancel request through the API', async () => {
+    mockApiPost.mockResolvedValue({ success: true, mode: 'recurring' });
+
+    const result = await selfServeUndoCancelSession({
+      orgId: ORG_ID,
+      scheduleId: 'schedule-1',
+      occurrenceKey: '2026-03-10T14:30:00.000Z',
+    });
+
+    expect(mockApiPost).toHaveBeenCalledWith(
+      '/schedules/session/self-serve/undo-cancel',
+      {
+        orgId: ORG_ID,
+        scheduleId: 'schedule-1',
+        occurrenceKey: '2026-03-10T14:30:00.000Z',
+      },
+    );
+    expect(result).toEqual({ success: true, mode: 'recurring' });
   });
 });
 

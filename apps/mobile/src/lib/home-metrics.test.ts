@@ -18,6 +18,7 @@ function makeSchedule(input: {
   endAt: string;
   participants: Array<{ id: string; role: 'child' | 'educator' }>;
   status?: ClassScheduleVM['status'];
+  recurrence?: ClassScheduleVM['recurrence'];
 }): ClassScheduleVM {
   return {
     ids: { id: input.id, orgId: 'org-1' },
@@ -44,7 +45,7 @@ function makeSchedule(input: {
       avatarUrl: null,
       themeKey: null,
     })),
-    recurrence: undefined,
+    recurrence: input.recurrence,
   };
 }
 
@@ -396,5 +397,38 @@ describe('buildHomeUpcomingSessions', () => {
       'child-1',
       'teacher-1',
     ]);
+  });
+
+  it('includes occurrence keys for normal recurring homepage session tiles', () => {
+    const result = buildHomeUpcomingSessions({
+      schedules: [
+        makeSchedule({
+          id: 'weekly-session',
+          learningSpaceId: 'space-math',
+          startAt: '2026-03-16T14:00:00.000Z',
+          endAt: '2026-03-16T15:00:00.000Z',
+          participants: [
+            { id: 'child-1', role: 'child' },
+            { id: 'teacher-1', role: 'educator' },
+          ],
+          recurrence: {
+            ids: { id: 'recurrence-1', orgId: 'org-1' },
+            rule: {
+              frequency: 'weekly',
+              interval: 1,
+              byWeekday: ['MO'],
+            },
+            exceptions: [],
+            overrides: [],
+          },
+        }),
+      ],
+      profileKind: 'child',
+      profileId: 'child-1',
+      now: BASE_NOW,
+    });
+
+    expect(result[0]?.scheduleId).toBe('weekly-session');
+    expect(result[0]?.occurrenceKey).toBe('2026-03-23T14:00:00.000Z');
   });
 });

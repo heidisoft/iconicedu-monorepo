@@ -28,6 +28,7 @@ import {
   rejectSessionChangeRequest,
   selfServeCancelSession,
   selfServeRescheduleSession,
+  selfServeUndoCancelSession,
 } from '@/lib/api/queries';
 import {
   ClassSession,
@@ -227,6 +228,7 @@ export function expandRecurringSchedules(
           kind: 'exception',
           disabled: true,
           reason: exc.reason ?? null,
+          cancelledByProfileId: exc.createdBy ?? exc.updatedBy ?? null,
           originalStartAt: originalStart.toISOString(),
           originalEndAt: originalEnd.toISOString(),
         },
@@ -295,7 +297,11 @@ export function expandRecurringSchedules(
               originalStartAt: occurrenceKey,
               originalEndAt: occurrenceEnd.toISOString(),
             }
-          : { kind: 'default' },
+          : {
+              kind: 'default',
+              originalStartAt: occurrenceKey,
+              originalEndAt: occurrenceEnd.toISOString(),
+            },
       });
 
       occurrenceCount++;
@@ -412,6 +418,9 @@ function splitAndGroupSessions(schedules: ClassScheduleVM[]): {
           variant: s.uiState?.kind ?? 'default',
           disabled: s.uiState?.disabled ?? false,
           reason: s.uiState?.reason ?? null,
+          cancelledByProfileId:
+            s.uiState?.cancelledByProfileId ??
+            (s.status === 'cancelled' ? (s.audit?.updatedBy ?? null) : null),
           originalTime: s.uiState?.originalStartAt
             ? formatOriginalTime(s.uiState.originalStartAt)
             : null,
@@ -449,6 +458,7 @@ export function SpaceSessionsTab({
   error,
   orgId,
   channelId,
+  currentProfileId,
   enableSelfServeActions = false,
 }: {
   schedules: ClassScheduleVM[];
@@ -456,6 +466,7 @@ export function SpaceSessionsTab({
   error?: string | null;
   orgId?: string;
   channelId?: string;
+  currentProfileId?: string | null;
   enableSelfServeActions?: boolean;
 }) {
   const { colors } = useTheme();
@@ -600,6 +611,37 @@ export function SpaceSessionsTab({
       );
     },
   });
+  const undoCancelMutation = useMutation({
+    mutationFn: (session: ClassSession) =>
+      selfServeUndoCancelSession({
+        orgId: orgId ?? '',
+        scheduleId: session.scheduleId ?? session.id,
+        occurrenceKey: session.occurrenceKey ?? null,
+      }),
+    onSuccess: async () => {
+      await invalidateSessionData();
+      Alert.alert('Cancellation undone', 'The session is back on the calendar.');
+    },
+    onError: (mutationError) => {
+      Alert.alert(
+        'Unable to undo cancellation',
+        mutationError instanceof Error ? mutationError.message : 'Please try again.',
+      );
+    },
+  });
+  const switchCancelModalToReschedule = () => {
+    setChangeModal((current) => {
+      if (!current || current.kind !== 'cancel') return current;
+      return {
+        kind: 'reschedule',
+        session: current.session,
+        date: formatDateInput(current.session.startAt),
+        startTime: formatTimeInput(current.session.startAt),
+        endTime: formatTimeInput(current.session.endAt),
+        note: current.note,
+      };
+    });
+  };
 
   if (isLoading) {
     return (
@@ -777,54 +819,71 @@ export function SpaceSessionsTab({
 
                 {/* Session cards */}
                 {isOpen &&
-                  group.sessions.map((session) => (
-                    <SessionCard
-                      key={session.id}
-                      session={session}
-                      style={s.sessionCardItem}
-                      enableCardPress={false}
-                      joinEnabled={
-                        activeSubTab !== 'upcoming'
-                          ? false
-                          : session.id === activeJoinSessionId
-                      }
-                      cancelAction={
-                        enableSelfServeActions &&
-                        activeSubTab === 'upcoming' &&
-                        !session.isPast &&
-                        !session.disabled
-                          ? {
-                              onPress: () =>
-                                setChangeModal({
-                                  kind: 'cancel',
-                                  session,
-                                  note: '',
-                                }),
-                              disabled: cancelMutation.isPending,
-                            }
-                          : null
-                      }
-                      rescheduleAction={
-                        enableSelfServeActions &&
-                        activeSubTab === 'upcoming' &&
-                        !session.isPast &&
-                        !session.disabled
-                          ? {
-                              onPress: () =>
-                                setChangeModal({
-                                  kind: 'reschedule',
-                                  session,
-                                  date: formatDateInput(session.startAt),
-                                  startTime: formatTimeInput(session.startAt),
-                                  endTime: formatTimeInput(session.endAt),
-                                  note: '',
-                                }),
-                              disabled: rescheduleMutation.isPending,
-                            }
-                          : null
-                      }
-                    />
-                  ))}
+                  group.sessions.map((session) => {
+                    const canChange =
+                      enableSelfServeActions &&
+                      activeSubTab === 'upcoming' &&
+                      !session.isPast &&
+                      !session.disabled;
+                    const canUndoCancel =
+                      enableSelfServeActions &&
+                      activeSubTab === 'upcoming' &&
+                      !session.isPast &&
+                      session.status === 'cancelled' &&
+                      Boolean(currentProfileId) &&
+                      session.cancelledByProfileId === currentProfileId;
+
+                    return (
+                      <SessionCard
+                        key={session.id}
+                        session={session}
+                        style={s.sessionCardItem}
+                        enableCardPress={false}
+                        joinEnabled={
+                          activeSubTab !== 'upcoming'
+                            ? false
+                            : session.id === activeJoinSessionId
+                        }
+                        cancelAction={
+                          canChange
+                            ? {
+                                onPress: () =>
+                                  setChangeModal({
+                                    kind: 'cancel',
+                                    session,
+                                    note: '',
+                                  }),
+                                disabled: cancelMutation.isPending,
+                              }
+                            : null
+                        }
+                        rescheduleAction={
+                          canChange
+                            ? {
+                                onPress: () =>
+                                  setChangeModal({
+                                    kind: 'reschedule',
+                                    session,
+                                    date: formatDateInput(session.startAt),
+                                    startTime: formatTimeInput(session.startAt),
+                                    endTime: formatTimeInput(session.endAt),
+                                    note: '',
+                                  }),
+                                disabled: rescheduleMutation.isPending,
+                              }
+                            : null
+                        }
+                        undoCancelAction={
+                          canUndoCancel
+                            ? {
+                                onPress: () => undoCancelMutation.mutate(session),
+                                disabled: undoCancelMutation.isPending,
+                              }
+                            : null
+                        }
+                      />
+                    );
+                  })}
               </View>
             );
           })}
@@ -850,7 +909,7 @@ export function SpaceSessionsTab({
               </Text>
               <Text style={s.modalDescription}>
                 {changeModal?.kind === 'cancel'
-                  ? 'Add a note and send the cancellation request.'
+                  ? 'Rescheduling keeps the class on the calendar. If that does not work, you can cancel and everyone will be notified.'
                   : 'Pick the new date and time, then add a note for the class.'}
               </Text>
             </View>
@@ -917,34 +976,42 @@ export function SpaceSessionsTab({
               ]}
             />
             <View style={s.modalActions}>
-              <TouchableOpacity
-                style={[
-                  s.modalButton,
-                  s.modalSecondaryBtn,
-                  { backgroundColor: colors.inputBg, borderColor: colors.border },
-                ]}
-                onPress={() => setChangeModal(null)}
-                activeOpacity={0.85}
-              >
-                <Text style={s.modalSecondaryTxt}>Close</Text>
-              </TouchableOpacity>
+              {changeModal?.kind === 'cancel' ? (
+                <TouchableOpacity
+                  style={[
+                    s.modalButton,
+                    s.modalSecondaryBtn,
+                    { backgroundColor: colors.inputBg, borderColor: colors.red },
+                  ]}
+                  disabled={cancelMutation.isPending || rescheduleMutation.isPending}
+                  onPress={() => {
+                    if (!changeModal || changeModal.kind !== 'cancel') return;
+                    cancelMutation.mutate({
+                      ...changeModal.session,
+                      note: changeModal.note,
+                    });
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <Text style={[s.modalSecondaryTxt, { color: colors.red }]}>
+                    Cancel anyway
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
               <TouchableOpacity
                 style={[s.modalButton, s.modalPrimaryBtn]}
                 disabled={cancelMutation.isPending || rescheduleMutation.isPending}
                 onPress={() => {
                   if (!changeModal) return;
                   if (changeModal.kind === 'cancel') {
-                    cancelMutation.mutate({
-                      ...changeModal.session,
-                      note: changeModal.note,
-                    });
+                    switchCancelModalToReschedule();
                     return;
                   }
                   rescheduleMutation.mutate(changeModal);
                 }}
               >
                 <Text style={s.modalPrimaryTxt}>
-                  {changeModal?.kind === 'cancel' ? 'Send' : 'Request'}
+                  {changeModal?.kind === 'cancel' ? 'Reschedule' : 'Request'}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity

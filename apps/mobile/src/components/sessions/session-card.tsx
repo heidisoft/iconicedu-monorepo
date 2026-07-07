@@ -21,6 +21,7 @@ import {
   BriefcaseBusiness,
   CalendarClock,
   MoreHorizontal,
+  RotateCcw,
 } from 'lucide-react-native';
 import { BottomSheet } from '@iconicedu/ui-native';
 import { useRouter } from 'expo-router';
@@ -64,6 +65,7 @@ export type ClassSession = {
   variant: 'default' | 'exception' | 'override';
   disabled: boolean;
   reason?: string | null;
+  cancelledByProfileId?: string | null;
   originalTime?: string | null;
   originalDate?: string | null;
   startAt: string;
@@ -208,6 +210,7 @@ export function SessionCard({
   enableCardPress = true,
   cancelAction,
   rescheduleAction,
+  undoCancelAction,
 }: {
   session: ClassSession;
   style?: ViewStyle;
@@ -223,6 +226,12 @@ export function SessionCard({
     accessibilityLabel?: string;
   } | null;
   rescheduleAction?: {
+    label?: string;
+    onPress: () => void;
+    disabled?: boolean;
+    accessibilityLabel?: string;
+  } | null;
+  undoCancelAction?: {
     label?: string;
     onPress: () => void;
     disabled?: boolean;
@@ -339,7 +348,7 @@ export function SessionCard({
   const canJoin =
     !isPast && !isDisabled && (!!session.meetingLink || !!session.channelId);
   const joinIsActive = canJoin && joinEnabled && !isResolvingJoin;
-  const hasSessionActions = Boolean(rescheduleAction || cancelAction);
+  const hasSessionActions = Boolean(rescheduleAction || cancelAction || undoCancelAction);
   const openActionMenu = useCallback(() => {
     if (hasSessionActions) setActionMenuVisible(true);
   }, [hasSessionActions]);
@@ -673,6 +682,31 @@ export function SessionCard({
               <X size={18} color={colors.red} />
               <Text style={[s.actionOptionText, { color: colors.red }]}>
                 {cancelAction.label ?? 'Cancel'}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+          {undoCancelAction ? (
+            <TouchableOpacity
+              style={[
+                s.actionOption,
+                {
+                  backgroundColor: colors.inputBg,
+                  borderColor: colors.border,
+                  opacity: undoCancelAction.disabled ? 0.55 : 1,
+                },
+              ]}
+              disabled={undoCancelAction.disabled}
+              onPress={() => {
+                setActionMenuVisible(false);
+                undoCancelAction.onPress();
+              }}
+              accessibilityLabel={
+                undoCancelAction.accessibilityLabel ?? 'Undo cancellation'
+              }
+            >
+              <RotateCcw size={18} color={colors.teal} />
+              <Text style={[s.actionOptionText, { color: colors.text }]}>
+                {undoCancelAction.label ?? 'Undo cancel'}
               </Text>
             </TouchableOpacity>
           ) : null}

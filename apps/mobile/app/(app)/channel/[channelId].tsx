@@ -580,6 +580,7 @@ export default function ChannelConversationScreen() {
             error={sessionsError}
             orgId={orgId}
             channelId={channelId ?? ''}
+            currentProfileId={profileId}
             enableSelfServeActions
           />
         </View>

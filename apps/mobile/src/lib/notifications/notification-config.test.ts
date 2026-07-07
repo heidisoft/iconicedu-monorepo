@@ -69,6 +69,7 @@ describe('NOTIFICATION_REGISTRY', () => {
   it.each([
     'class.session.rescheduled',
     'class.session.canceled',
+    'class.session.cancel_restored',
     'session.reminder.sent',
   ])('routes %s to the class space', (prefKey) => {
     const route = NOTIFICATION_REGISTRY[prefKey].getRoute({

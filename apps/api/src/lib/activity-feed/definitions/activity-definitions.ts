@@ -551,6 +551,7 @@ type ScheduleRenderVariant = 'created' | 'ended';
 type SessionRenderVariant =
   | 'rescheduled'
   | 'canceled'
+  | 'cancel_restored'
   | 'reschedule_requested'
   | 'cancel_requested'
   | 'change_request_approved'
@@ -642,6 +643,7 @@ function renderSessionItem(event: ActivityEventRow, variant: SessionRenderVarian
   const sessionStartAt = firstOptionalString(
     payload.sessionDateTime,
     payload.canceledStartAt,
+    payload.restoredStartAt,
     payload.startAt,
     payload.occurrenceStart,
     payload.firstSessionStartAt,
@@ -654,6 +656,7 @@ function renderSessionItem(event: ActivityEventRow, variant: SessionRenderVarian
     payload.reason,
   );
   const canceledReason = firstOptionalString(payload.canceledReason, payload.reason);
+  const restoredReason = firstOptionalString(payload.restoredReason, payload.reason);
   const requestedStartAt = firstOptionalString(payload.requestedStartAt);
   const requestedLabel = formatSessionDateTime(requestedStartAt, payload);
   const requestedByName = firstOptionalString(payload.requestedByName);
@@ -700,6 +703,23 @@ function renderSessionItem(event: ActivityEventRow, variant: SessionRenderVarian
         ? `${classTitle} session ${sessionLabel} was canceled`
         : `${classTitle} session was canceled`,
       expandedContent: canceledReason ? `Reason: ${canceledReason}` : undefined,
+      actionLabel: 'Open class',
+    },
+    cancel_restored: {
+      verb: 'class.session.cancel_restored' as const,
+      iconKey: 'CalendarCheck' as const,
+      tone: 'success' as const,
+      primary: classTitle,
+      secondary: sessionLabel
+        ? joinSecondaryParts([
+            `session ${sessionLabel} cancellation was restored`,
+            roleContext,
+          ])
+        : joinSecondaryParts(['session cancellation was restored', roleContext]),
+      summary: sessionLabel
+        ? `${classTitle} session ${sessionLabel} is back on the calendar`
+        : `${classTitle} session is back on the calendar`,
+      expandedContent: restoredReason ? `Reason: ${restoredReason}` : undefined,
       actionLabel: 'Open class',
     },
     reschedule_requested: {
@@ -979,6 +999,17 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     },
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => renderSessionItem(event, 'canceled'),
+  },
+  'class.session.cancel_restored': {
+    eventType: 'class.session.cancel_restored',
+    tabKey: 'classes',
+    importance: 'important',
+    notification: {
+      defaultChannels: ['push', 'email'],
+      timing: 'immediate',
+    },
+    resolveRecipients: DEFAULT_RECIPIENTS,
+    render: (event) => renderSessionItem(event, 'cancel_restored'),
   },
   'class.session.reschedule_requested': {
     eventType: 'class.session.reschedule_requested',

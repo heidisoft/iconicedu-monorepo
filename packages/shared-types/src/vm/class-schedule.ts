@@ -89,6 +89,8 @@ export interface RecurrenceRuleVM {
 export interface RecurrenceExceptionVM {
   occurrenceKey: ISODateTime;
   reason?: string;
+  createdBy?: UUID;
+  updatedBy?: UUID;
 }
 
 export interface RecurrenceOverrideVM {
@@ -177,6 +179,7 @@ export type ArchiveAwareClassScheduleVM = ClassScheduleVM & {
     kind?: 'default' | 'exception' | 'override';
     disabled?: boolean;
     reason?: string | null;
+    cancelledByProfileId?: UUID | null;
     originalStartAt?: string;
     originalEndAt?: string;
   };

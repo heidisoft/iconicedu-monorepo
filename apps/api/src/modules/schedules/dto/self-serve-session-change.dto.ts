@@ -7,6 +7,8 @@ export type SelfServeCancelSessionDto = {
   note: string | null;
 };
 
+export type SelfServeUndoCancelSessionDto = Omit<SelfServeCancelSessionDto, 'note'>;
+
 export type SelfServeRescheduleSessionDto = SelfServeCancelSessionDto & {
   startAt: string;
   endAt: string;
@@ -67,6 +69,17 @@ export function parseSelfServeCancelSessionDto(
     scheduleId: requiredString(body, 'scheduleId'),
     occurrenceKey: optionalString(body, 'occurrenceKey'),
     note: optionalString(body, 'note'),
+  };
+}
+
+export function parseSelfServeUndoCancelSessionDto(
+  input: unknown,
+): SelfServeUndoCancelSessionDto {
+  const body = asBody(input);
+  return {
+    orgId: requiredString(body, 'orgId'),
+    scheduleId: requiredString(body, 'scheduleId'),
+    occurrenceKey: optionalString(body, 'occurrenceKey'),
   };
 }
 

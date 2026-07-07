@@ -1,10 +1,14 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ActivityFeedItemVM, ActivityFeedVM } from '@iconicedu/shared-types';
 
 const mockMarkRead = jest.fn();
 const mockRefetchFeed = jest.fn(() => Promise.resolve());
 const mockRouterPush = jest.fn();
+const mockFetchSessionChangeRequests = jest.fn(async () => []);
+const mockApproveSessionChangeRequest = jest.fn();
+const mockRejectSessionChangeRequest = jest.fn();
 let mockFeed: ActivityFeedVM;
 let mockSearchParams: Record<string, unknown>;
 
@@ -25,6 +29,14 @@ jest.mock('@/hooks/use-profile', () => ({
     data: {
       id: 'profile-1',
       timezone: 'America/New_York',
+    },
+  }),
+}));
+
+jest.mock('@/hooks/use-account', () => ({
+  useAccount: () => ({
+    data: {
+      org_id: 'org-1',
     },
   }),
 }));
@@ -59,6 +71,22 @@ jest.mock('@/components/skeletons', () => ({
   ActivityFeedSkeleton: () => null,
 }));
 
+jest.mock('@/lib/api/queries', () => ({
+  approveSessionChangeRequest: (...args: unknown[]) =>
+    mockApproveSessionChangeRequest(...args),
+  fetchSessionChangeRequests: (...args: unknown[]) =>
+    mockFetchSessionChangeRequests(...args),
+  rejectSessionChangeRequest: (...args: unknown[]) =>
+    mockRejectSessionChangeRequest(...args),
+  queryKeys: {
+    sessionChangeRequests: (orgId: string, channelId = '') => [
+      'session-change-requests',
+      orgId,
+      channelId,
+    ],
+  },
+}));
+
 jest.mock('@/lib/header-surface', () => ({
   createHeaderSurface: () => ({}),
 }));
@@ -82,6 +110,17 @@ jest.mock('lucide-react-native', () => {
 });
 
 import InboxScreen from './inbox';
+
+function renderInbox() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <InboxScreen />
+    </QueryClientProvider>,
+  );
+}
 
 function makeActivity(input: {
   id: string;
@@ -145,12 +184,13 @@ function makeFeed(): ActivityFeedVM {
 describe('InboxScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockFetchSessionChangeRequests.mockResolvedValue([]);
     mockFeed = makeFeed();
     mockSearchParams = {};
   });
 
   it('does not mark notifications read just by rendering the tab', () => {
-    render(<InboxScreen />);
+    renderInbox();
 
     expect(screen.getByText('Class update')).toBeTruthy();
     expect(screen.getByText('Payment update')).toBeTruthy();
@@ -158,7 +198,7 @@ describe('InboxScreen', () => {
   });
 
   it('marks a notification read when its row is pressed', () => {
-    render(<InboxScreen />);
+    renderInbox();
 
     fireEvent.press(screen.getByText('Class update'));
 
@@ -166,7 +206,7 @@ describe('InboxScreen', () => {
   });
 
   it('marks only unread notifications in the active tab when using Mark all read', () => {
-    render(<InboxScreen />);
+    renderInbox();
 
     fireEvent.press(screen.getAllByText('Classes')[0]);
     fireEvent.press(screen.getByLabelText('Mark all notifications as read'));
@@ -194,7 +234,7 @@ describe('InboxScreen', () => {
       ],
     };
 
-    render(<InboxScreen />);
+    renderInbox();
 
     fireEvent.press(screen.getByText('Open class'));
 
@@ -225,7 +265,7 @@ describe('InboxScreen', () => {
       ],
     };
 
-    render(<InboxScreen />);
+    renderInbox();
 
     fireEvent.press(screen.getByText('Reply'));
 
@@ -268,7 +308,7 @@ describe('InboxScreen', () => {
       ],
     };
 
-    render(<InboxScreen />);
+    renderInbox();
 
     fireEvent.press(screen.getByText('Reply'));
 
@@ -301,7 +341,7 @@ describe('InboxScreen', () => {
       ],
     };
 
-    render(<InboxScreen />);
+    renderInbox();
 
     expect(screen.getByText('Rate your session')).toBeTruthy();
     expect(screen.queryByText('Give feedback')).toBeNull();
@@ -335,7 +375,7 @@ describe('InboxScreen', () => {
       ],
     };
 
-    render(<InboxScreen />);
+    renderInbox();
 
     expect(screen.getByText('Share feedback for Algebra I')).toBeTruthy();
     expect(screen.getByText('Rate your session')).toBeTruthy();

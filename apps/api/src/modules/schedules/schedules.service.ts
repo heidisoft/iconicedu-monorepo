@@ -22,6 +22,7 @@ import type {
   ScheduleRowInput,
   SelfServeCancelSessionDto,
   SelfServeRescheduleSessionDto,
+  SelfServeUndoCancelSessionDto,
   UpsertSelfServePolicyDto,
 } from '@iconicedu/api/modules/schedules/dto';
 import type {
@@ -44,7 +45,7 @@ const CLASS_SCHEDULE_SELECT = `
   ),
   recurrence:class_schedule_recurrence(
     id, org_id, frequency, interval, count, until, timezone, byday,
-    exceptions:class_schedule_recurrence_exceptions(id, occurrence_key, reason),
+    exceptions:class_schedule_recurrence_exceptions(id, occurrence_key, reason, created_by, updated_by),
     overrides:class_schedule_recurrence_overrides(id, occurrence_key, patch)
   )
 `;
@@ -101,6 +102,11 @@ type SessionActor = {
   role: ScheduleParticipantRole;
   displayName: string | null;
   roleKeys: string[];
+};
+
+type SessionParticipantActorLookup = {
+  role: ScheduleParticipantRole;
+  displayName: string | null;
 };
 
 type OrgMembershipActor = {
@@ -722,6 +728,121 @@ export class SchedulesService {
     });
   }
 
+  async selfServeUndoCancelSession(
+    accessToken: string,
+    dto: SelfServeUndoCancelSessionDto,
+  ): Promise<{ success: true; mode: 'single' | 'recurring' }> {
+    const supabase = createSupabaseServiceClient();
+    const actor = await this.requireSessionParticipantActor(accessToken, dto);
+    const context = await this.loadRescheduleActivityContext(
+      supabase,
+      dto.orgId,
+      dto.scheduleId,
+    );
+    if (!context?.learningSpaceId) {
+      throw new BadRequestException('Class session not found');
+    }
+
+    await this.assertLearningSpaceActive(supabase, dto.orgId, context.learningSpaceId);
+    const currentStartAt = dto.occurrenceKey ?? context.startAt;
+    this.assertFutureSession(currentStartAt);
+
+    const { data: recurrenceRow, error: recurrenceError } = await supabase
+      .from('class_schedule_recurrence')
+      .select('id')
+      .eq('org_id', dto.orgId)
+      .eq('schedule_id', dto.scheduleId)
+      .is('deleted_at', null)
+      .maybeSingle<{ id: string }>();
+    if (recurrenceError) {
+      throw new InternalServerErrorException(recurrenceError.message);
+    }
+
+    const now = new Date().toISOString();
+    if (!recurrenceRow) {
+      const { data: scheduleRow, error: scheduleError } = await supabase
+        .from('class_schedules')
+        .select('status, updated_by')
+        .eq('id', dto.scheduleId)
+        .eq('org_id', dto.orgId)
+        .is('deleted_at', null)
+        .maybeSingle<{ status: string | null; updated_by: string | null }>();
+      if (scheduleError) throw new InternalServerErrorException(scheduleError.message);
+      if (!scheduleRow || scheduleRow.status !== 'cancelled') {
+        throw new BadRequestException('Session is not canceled');
+      }
+      if (scheduleRow.updated_by !== actor.profileId) {
+        throw new ForbiddenException(
+          'Only the person who canceled this session can undo it',
+        );
+      }
+
+      const { error: updateError } = await supabase
+        .from('class_schedules')
+        .update({
+          status: 'scheduled',
+          updated_at: now,
+          updated_by: actor.profileId,
+        })
+        .eq('id', dto.scheduleId)
+        .eq('org_id', dto.orgId)
+        .is('deleted_at', null);
+      if (updateError) throw new InternalServerErrorException(updateError.message);
+      await this.publishSessionCancelRestoredActivity({
+        supabase,
+        orgId: dto.orgId,
+        actorProfileId: actor.profileId,
+        context,
+        restoredStartAt: context.startAt,
+        restoredEndAt: context.endAt,
+        dedupeKey: `class.session.cancel_restored:${dto.orgId}:${dto.scheduleId}:${context.startAt ?? 'single'}`,
+      });
+      await this.reconcileRemindersForSchedule(dto.orgId, dto.scheduleId);
+      return { success: true, mode: 'single' };
+    }
+
+    if (!dto.occurrenceKey) {
+      throw new BadRequestException('occurrenceKey is required for recurring sessions');
+    }
+
+    const { data: exceptionRow, error: exceptionError } = await supabase
+      .from('class_schedule_recurrence_exceptions')
+      .select('id, created_by')
+      .eq('org_id', dto.orgId)
+      .eq('recurrence_id', recurrenceRow.id)
+      .eq('occurrence_key', dto.occurrenceKey)
+      .maybeSingle<{ id: string; created_by: string | null }>();
+    if (exceptionError) {
+      throw new InternalServerErrorException(exceptionError.message);
+    }
+    if (!exceptionRow) {
+      throw new BadRequestException('Session is not canceled');
+    }
+    if (exceptionRow.created_by !== actor.profileId) {
+      throw new ForbiddenException(
+        'Only the person who canceled this session can undo it',
+      );
+    }
+
+    const { error: deleteError } = await supabase
+      .from('class_schedule_recurrence_exceptions')
+      .delete()
+      .eq('id', exceptionRow.id)
+      .eq('org_id', dto.orgId);
+    if (deleteError) throw new InternalServerErrorException(deleteError.message);
+    await this.publishSessionCancelRestoredActivity({
+      supabase,
+      orgId: dto.orgId,
+      actorProfileId: actor.profileId,
+      context,
+      restoredStartAt: dto.occurrenceKey,
+      restoredEndAt: this.shiftOccurrenceEnd(dto.occurrenceKey, context),
+      dedupeKey: `class.session.cancel_restored:${dto.orgId}:${dto.scheduleId}:${dto.occurrenceKey}`,
+    });
+    await this.reconcileRemindersForSchedule(dto.orgId, dto.scheduleId);
+    return { success: true, mode: 'recurring' };
+  }
+
   async approveSessionChangeRequest(
     accessToken: string,
     requestId: string,
@@ -1085,7 +1206,7 @@ export class SchedulesService {
     if (!profileId) throw new ForbiddenException('Active profile is required');
 
     const supabase = createSupabaseServiceClient();
-    const { data: participant, error } = await supabase
+    const { data: directParticipant, error } = await supabase
       .from('class_schedule_participants')
       .select('role, display_name')
       .eq('org_id', input.orgId)
@@ -1094,6 +1215,19 @@ export class SchedulesService {
       .is('deleted_at', null)
       .maybeSingle<{ role: ScheduleParticipantRole; display_name: string | null }>();
     if (error) throw new InternalServerErrorException(error.message);
+
+    const participant: SessionParticipantActorLookup | null = directParticipant
+      ? {
+          role: directParticipant.role,
+          displayName: directParticipant.display_name,
+        }
+      : await this.resolveGuardianSessionParticipantActor(supabase, {
+          orgId: input.orgId,
+          scheduleId: input.scheduleId,
+          guardianAccountId: account.id,
+          guardianProfileId: profileId,
+        });
+
     if (!participant) {
       throw new ForbiddenException('Only class participants can change this session');
     }
@@ -1111,10 +1245,91 @@ export class SchedulesService {
       accountId: account.id,
       profileId,
       role: participant.role,
-      displayName: participant.display_name,
+      displayName: participant.displayName,
       roleKeys: (roles ?? [])
         .map((role) => role.role_key)
         .filter((role): role is string => Boolean(role)),
+    };
+  }
+
+  private async resolveGuardianSessionParticipantActor(
+    supabase: SupabaseServiceClient,
+    input: {
+      orgId: string;
+      scheduleId: string;
+      guardianAccountId: string;
+      guardianProfileId: string;
+    },
+  ): Promise<SessionParticipantActorLookup | null> {
+    const { data: familyLinks, error: familyLinksError } = await supabase
+      .from('family_links')
+      .select('child_account_id')
+      .eq('org_id', input.orgId)
+      .eq('guardian_account_id', input.guardianAccountId)
+      .is('deleted_at', null)
+      .returns<Array<{ child_account_id: string | null }>>();
+    if (familyLinksError) {
+      throw new InternalServerErrorException(familyLinksError.message);
+    }
+
+    const childAccountIds = Array.from(
+      new Set(
+        (familyLinks ?? [])
+          .map((link) => link.child_account_id)
+          .filter((childAccountId): childAccountId is string => Boolean(childAccountId)),
+      ),
+    );
+    if (childAccountIds.length === 0) return null;
+
+    const { data: childProfiles, error: childProfilesError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('org_id', input.orgId)
+      .eq('kind', 'child')
+      .in('account_id', childAccountIds)
+      .is('deleted_at', null)
+      .returns<Array<{ id: string | null }>>();
+    if (childProfilesError) {
+      throw new InternalServerErrorException(childProfilesError.message);
+    }
+
+    const childProfileIds = Array.from(
+      new Set(
+        (childProfiles ?? [])
+          .map((profile) => profile.id)
+          .filter((profileId): profileId is string => Boolean(profileId)),
+      ),
+    );
+    if (childProfileIds.length === 0) return null;
+
+    const { data: childParticipant, error: childParticipantError } = await supabase
+      .from('class_schedule_participants')
+      .select('profile_id')
+      .eq('org_id', input.orgId)
+      .eq('schedule_id', input.scheduleId)
+      .in('profile_id', childProfileIds)
+      .is('deleted_at', null)
+      .limit(1)
+      .maybeSingle<{ profile_id: string | null }>();
+    if (childParticipantError) {
+      throw new InternalServerErrorException(childParticipantError.message);
+    }
+    if (!childParticipant) return null;
+
+    const { data: guardianProfile, error: guardianProfileError } = await supabase
+      .from('profiles')
+      .select('display_name')
+      .eq('org_id', input.orgId)
+      .eq('id', input.guardianProfileId)
+      .is('deleted_at', null)
+      .maybeSingle<{ display_name: string | null }>();
+    if (guardianProfileError) {
+      throw new InternalServerErrorException(guardianProfileError.message);
+    }
+
+    return {
+      role: 'guardian',
+      displayName: guardianProfile?.display_name ?? null,
     };
   }
 
@@ -1589,6 +1804,53 @@ export class SchedulesService {
     });
   }
 
+  private async publishSessionCancelRestoredActivity(input: {
+    supabase: SupabaseServiceClient;
+    orgId: string;
+    actorProfileId: string | null;
+    context: RescheduleActivityContext | null;
+    restoredStartAt: string | null;
+    restoredEndAt: string | null;
+    dedupeKey: string;
+  }) {
+    if (!input.context?.learningSpaceId || !input.context.channelId) return;
+
+    await publishActivityEvent({
+      supabase: input.supabase,
+      orgId: input.orgId,
+      eventType: 'class.session.cancel_restored',
+      sourceKind: input.actorProfileId ? 'profile' : 'system',
+      actorProfileId: input.actorProfileId,
+      scope: {
+        kind: 'learning_space',
+        learningSpaceId: input.context.learningSpaceId,
+      },
+      objectRef: {
+        kind: 'session',
+        id: input.restoredStartAt ?? input.context.scheduleId,
+      },
+      targetRef: { kind: 'learning_space', id: input.context.learningSpaceId },
+      audienceRules: [{ kind: 'all_in_scope' }],
+      payload: {
+        learningSpaceId: input.context.learningSpaceId,
+        channelId: input.context.channelId,
+        scheduleId: input.context.scheduleId,
+        title: input.context.title,
+        learningSpaceTitle: input.context.title,
+        channelRouteKind: 'space',
+        startAt: input.restoredStartAt,
+        endAt: input.restoredEndAt,
+        restoredStartAt: input.restoredStartAt,
+        restoredEndAt: input.restoredEndAt,
+        timezone: input.context.timezone,
+        members: input.context.members,
+      },
+      dedupeKey: input.dedupeKey,
+      refreshOnDedupe: true,
+      createdBy: input.actorProfileId,
+    });
+  }
+
   private async publishSessionChangeRequestActivity(input: {
     supabase: SupabaseServiceClient;
     request: SessionChangeRequestRow;
@@ -1656,7 +1918,12 @@ export class SchedulesService {
       targetRef: input.request.learning_space_id
         ? { kind: 'learning_space', id: input.request.learning_space_id }
         : null,
-      audienceRules: [{ kind: 'all_in_scope' }],
+      audienceRules: [
+        {
+          kind: 'users_only',
+          userIds: [input.request.requested_by_profile_id],
+        },
+      ],
       payload: {
         requestId: input.request.id,
         scheduleId: input.request.schedule_id,

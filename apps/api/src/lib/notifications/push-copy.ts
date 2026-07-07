@@ -519,6 +519,25 @@ export function buildPersonalizedSessionCopy(
     };
   }
 
+  if (eventType === 'class.session.cancel_restored') {
+    const sessionLabel = formatSessionDateTime(
+      firstDefinedString(
+        payload.restoredStartAt,
+        payload.sessionDateTime,
+        payload.startAt,
+        payload.occurrenceStart,
+        payload.firstSessionStartAt,
+      ),
+      payload,
+    );
+    return {
+      title: classTitle,
+      summary: sessionLabel
+        ? `${classTitle} session ${sessionLabel} is back on the calendar.`
+        : `${classTitle} session is back on the calendar.`,
+    };
+  }
+
   if (
     eventType === 'class.session.reschedule_requested' ||
     eventType === 'class.session.cancel_requested'

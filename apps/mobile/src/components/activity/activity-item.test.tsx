@@ -112,6 +112,7 @@ describe('ActivityItem', () => {
   it.each([
     ['class.session.rescheduled', 'CalendarCheck', CalendarCheck],
     ['class.session.canceled', 'CalendarX', CalendarX],
+    ['class.session.cancel_restored', 'CalendarCheck', CalendarCheck],
     ['message.unviewed_intended_participants', 'AlertCircle', AlertCircle],
     ['session.reminder.sent', 'Bell', Bell],
     ['session.feedback_request.sent', 'Star', Star],
@@ -139,6 +140,7 @@ describe('ActivityItem', () => {
   it.each([
     ['class.session.rescheduled', 'CalendarCheck'],
     ['class.session.canceled', 'CalendarX'],
+    ['class.session.cancel_restored', 'CalendarCheck'],
     ['message.unviewed_intended_participants', 'AlertCircle'],
     ['session.reminder.sent', 'Bell'],
     ['session.feedback_request.sent', 'Star'],
@@ -271,6 +273,37 @@ describe('ActivityItem', () => {
     fireEvent.press(screen.getByText('Open class'));
 
     expect(onActionPress).toHaveBeenCalledWith(item);
+  });
+
+  it('shows approve and deny buttons for pending session change request activities', () => {
+    const onSessionChangeDecision = jest.fn();
+    const item = {
+      ...makeBaseActivity(),
+      verb: 'class.session.reschedule_requested',
+      metadata: {
+        requestId: 'request-1',
+        requestedByProfileId: 'profile-parent',
+      },
+      content: {
+        ...makeBaseActivity().content,
+        headline: {
+          primary: 'Algebra I',
+          secondary: 'Anika requested a reschedule',
+        },
+      },
+    } as ActivityFeedItemVM;
+
+    renderActivity(item, {
+      currentProfileId: 'profile-teacher',
+      pendingSessionChangeRequestIds: new Set(['request-1']),
+      onSessionChangeDecision,
+    });
+
+    fireEvent.press(screen.getByLabelText('Approve session change request'));
+    fireEvent.press(screen.getByLabelText('Deny session change request'));
+
+    expect(onSessionChangeDecision).toHaveBeenNthCalledWith(1, item, 'approve');
+    expect(onSessionChangeDecision).toHaveBeenNthCalledWith(2, item, 'reject');
   });
 
   it('renders feedback requests in the preview position without an action button', () => {

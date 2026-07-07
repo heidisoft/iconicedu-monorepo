@@ -23,6 +23,7 @@ import {
   parseRescheduleSessionDto,
   parseSelfServeCancelSessionDto,
   parseSelfServeRescheduleSessionDto,
+  parseSelfServeUndoCancelSessionDto,
   parseUpsertSelfServePolicyDto,
 } from '@iconicedu/api/modules/schedules/dto';
 
@@ -131,6 +132,16 @@ export class SchedulesController {
   selfServeRescheduleSession(@Req() req: AuthenticatedRequest, @Body() body: unknown) {
     const dto = parseSelfServeRescheduleSessionDto(body);
     return this.schedulesService.selfServeRescheduleSession(
+      extractBearerToken(req.headers.authorization),
+      dto,
+    );
+  }
+
+  @Post('schedules/session/self-serve/undo-cancel')
+  @UseGuards(AuthGuard)
+  selfServeUndoCancelSession(@Req() req: AuthenticatedRequest, @Body() body: unknown) {
+    const dto = parseSelfServeUndoCancelSessionDto(body);
+    return this.schedulesService.selfServeUndoCancelSession(
       extractBearerToken(req.headers.authorization),
       dto,
     );

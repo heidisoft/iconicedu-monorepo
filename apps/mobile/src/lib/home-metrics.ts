@@ -41,6 +41,7 @@ type ScopedDisplaySchedule = ClassScheduleVM & {
     kind?: 'default' | 'exception' | 'override';
     disabled?: boolean;
     reason?: string | null;
+    cancelledByProfileId?: string | null;
     originalStartAt?: string;
     originalEndAt?: string;
   };
@@ -456,6 +457,9 @@ function buildHomeScopedSchedules(input: {
       variant: schedule.uiState?.kind ?? 'default',
       disabled: schedule.uiState?.disabled ?? false,
       reason: schedule.uiState?.reason ?? null,
+      cancelledByProfileId:
+        schedule.uiState?.cancelledByProfileId ??
+        (schedule.status === 'cancelled' ? (schedule.audit?.updatedBy ?? null) : null),
       originalTime: schedule.uiState?.originalStartAt
         ? formatOriginalTime(schedule.uiState.originalStartAt)
         : null,

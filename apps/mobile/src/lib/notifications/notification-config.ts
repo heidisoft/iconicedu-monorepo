@@ -71,6 +71,7 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationConfig> = {
   'class.schedule.ended': classNotificationConfig,
   'class.session.rescheduled': classNotificationConfig,
   'class.session.canceled': classNotificationConfig,
+  'class.session.cancel_restored': classNotificationConfig,
   'session.reminder.sent': classNotificationConfig,
   'session.feedback_request.sent': feedbackNotificationConfig,
   'session.completion_check.sent': feedbackNotificationConfig,

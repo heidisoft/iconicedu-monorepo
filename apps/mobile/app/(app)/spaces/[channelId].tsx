@@ -636,6 +636,7 @@ export default function SpaceDetailScreen() {
             error={sessionsError}
             orgId={orgId}
             channelId={channelId ?? ''}
+            currentProfileId={profileId}
             enableSelfServeActions
           />
         </View>

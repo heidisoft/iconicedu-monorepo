@@ -93,6 +93,23 @@ describe('buildPersonalizedSessionCopy completion checks', () => {
 });
 
 describe('buildPersonalizedSessionCopy session change requests', () => {
+  it('describes restored session cancellations', () => {
+    const copy = buildPersonalizedSessionCopy(
+      'class.session.cancel_restored',
+      {
+        title: 'Algebra',
+        restoredStartAt: '2030-03-06T21:00:00.000Z',
+        viewerTimezone: 'America/New_York',
+      },
+      'guardian-1',
+    );
+
+    expect(copy).toEqual({
+      title: 'Algebra',
+      summary: 'Algebra session Mar 6 at 4:00 PM is back on the calendar.',
+    });
+  });
+
   it('describes reschedule approval requests', () => {
     const copy = buildPersonalizedSessionCopy(
       'class.session.reschedule_requested',

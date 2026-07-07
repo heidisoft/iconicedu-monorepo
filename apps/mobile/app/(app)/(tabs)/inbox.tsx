@@ -1,18 +1,24 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
+  Alert,
+  Modal,
+  Pressable,
   View,
   Text,
   SectionList,
   TouchableOpacity,
   StyleSheet,
   RefreshControl,
+  TextInput,
 } from 'react-native';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bell } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/providers/theme-provider';
 import { useActivityFeed, useMarkActivityFeedRead } from '@/hooks/use-activity-feed';
 import { useProfile } from '@/hooks/use-profile';
+import { useAccount } from '@/hooks/use-account';
 import { ActivityFeedSkeleton } from '@/components/skeletons';
 import { QueryError } from '@/components/errors/query-error';
 import { createHeaderSurface } from '@/lib/header-surface';
@@ -28,6 +34,12 @@ import {
 } from '@/lib/notifications/notification-config';
 import { usePushNudge } from '@/hooks/use-push-nudge';
 import { PushNudgeSheet } from '@/components/notifications/push-nudge-sheet';
+import {
+  approveSessionChangeRequest,
+  fetchSessionChangeRequests,
+  queryKeys,
+  rejectSessionChangeRequest,
+} from '@/lib/api/queries';
 
 // ---------------------------------------------------------------------------
 // Styles
@@ -106,6 +118,60 @@ function makeStyles(C: AppColors) {
     // Spacer between cards
     separator: { height: 8 },
 
+    modalBackdrop: {
+      flex: 1,
+      justifyContent: 'center',
+      paddingHorizontal: 20,
+      backgroundColor: 'rgba(15, 23, 42, 0.42)',
+    },
+    modalCard: {
+      gap: 14,
+      borderRadius: 22,
+      borderWidth: 1,
+      borderColor: C.border,
+      backgroundColor: C.card,
+      padding: 18,
+    },
+    modalTitle: { fontSize: 19, fontWeight: '800', color: C.text },
+    modalDescription: {
+      fontSize: 14,
+      lineHeight: 20,
+      color: C.textMuted,
+    },
+    reasonInput: {
+      minHeight: 92,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: C.border,
+      backgroundColor: C.inputBg,
+      color: C.text,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      fontSize: 15,
+      textAlignVertical: 'top',
+    },
+    modalActions: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      gap: 10,
+      flexWrap: 'wrap',
+    },
+    modalButton: {
+      minHeight: 42,
+      borderRadius: 21,
+      paddingHorizontal: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    modalButtonSecondary: {
+      borderWidth: 1,
+      borderColor: C.border,
+      backgroundColor: C.inputBg,
+    },
+    modalButtonPrimary: { backgroundColor: C.teal },
+    modalButtonDanger: { backgroundColor: C.red },
+    modalButtonText: { fontSize: 15, fontWeight: '800' },
+
     // Empty state
     emptyWrap: {
       flex: 1,
@@ -151,6 +217,11 @@ export default function InboxScreen() {
   const s = React.useMemo(() => makeStyles(colors), [colors]);
   const activityS = React.useMemo(() => makeActivityItemStyles(colors), [colors]);
   const { data: profile, isError: profileError } = useProfile();
+  const { data: account } = useAccount();
+  const queryClient = useQueryClient();
+  const orgId = (account as Record<string, unknown> | undefined)?.org_id as
+    | string
+    | undefined;
 
   const {
     data: feed,
@@ -163,6 +234,11 @@ export default function InboxScreen() {
   const [activeTab, setActiveTab] = useState<InboxTabKeyVM>('all');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [refreshing, setRefreshing] = useState(false);
+  const [decisionModal, setDecisionModal] = useState<{
+    activity: ActivityFeedItemVM;
+    decision: 'approve' | 'reject';
+    reason: string;
+  } | null>(null);
   const sectionListRef = useRef<SectionList<ActivityFeedItemVM, FeedSection>>(null);
   const lastScrolledTargetRef = useRef<string | null>(null);
   const targetActivityId = Array.isArray(params.activityId)
@@ -172,8 +248,31 @@ export default function InboxScreen() {
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     setExpandedIds(new Set());
-    refetchFeed().finally(() => setRefreshing(false));
-  }, [refetchFeed]);
+    Promise.all([
+      refetchFeed(),
+      orgId
+        ? queryClient.invalidateQueries({
+            queryKey: queryKeys.sessionChangeRequests(orgId, ''),
+          })
+        : Promise.resolve(),
+    ]).finally(() => setRefreshing(false));
+  }, [orgId, queryClient, refetchFeed]);
+
+  const pendingRequestsQuery = useQuery({
+    queryKey: queryKeys.sessionChangeRequests(orgId ?? '', ''),
+    queryFn: () => fetchSessionChangeRequests({ orgId: orgId ?? '' }),
+    enabled: Boolean(orgId),
+    staleTime: 30_000,
+  });
+  const pendingSessionChangeRequestIds = useMemo(
+    () =>
+      new Set(
+        (pendingRequestsQuery.data ?? [])
+          .filter((request) => request.status === 'pending')
+          .map((request) => request.id),
+      ),
+    [pendingRequestsQuery.data],
+  );
 
   const onToggle = useCallback((id: string) => {
     setExpandedIds((prev) => {
@@ -186,6 +285,48 @@ export default function InboxScreen() {
 
   // Press-to-read: immediately mark via mutation (optimistic cache update)
   const onMarkRead = useCallback((id: string) => markRead([id]), [markRead]);
+  const getActivityRequestId = useCallback((item: ActivityFeedItemVM) => {
+    const metadata =
+      item.metadata && typeof item.metadata === 'object' && !Array.isArray(item.metadata)
+        ? (item.metadata as Record<string, unknown>)
+        : {};
+    return typeof metadata.requestId === 'string' ? metadata.requestId : null;
+  }, []);
+  const decisionMutation = useMutation({
+    mutationFn: async (input: {
+      item: ActivityFeedItemVM;
+      decision: 'approve' | 'reject';
+      reason: string;
+    }) => {
+      const requestId = getActivityRequestId(input.item);
+      if (!requestId) throw new Error('Request not found');
+      const note = input.reason.trim();
+      if (!note) throw new Error('Reason is required');
+      return input.decision === 'approve'
+        ? approveSessionChangeRequest({ requestId, note })
+        : rejectSessionChangeRequest({ requestId, note });
+    },
+    onSuccess: async () => {
+      setDecisionModal(null);
+      await Promise.all([
+        refetchFeed(),
+        orgId
+          ? queryClient.invalidateQueries({
+              queryKey: queryKeys.sessionChangeRequests(orgId, ''),
+            })
+          : Promise.resolve(),
+      ]);
+    },
+    onError: (error) => {
+      Alert.alert(
+        'Unable to send decision',
+        error instanceof Error ? error.message : 'Please try again.',
+      );
+    },
+  });
+  const decisionInFlightRequestId = decisionMutation.variables
+    ? getActivityRequestId(decisionMutation.variables.item)
+    : null;
 
   const feedSections = useMemo(() => feed?.sections ?? [], [feed?.sections]);
   const feedTabs =
@@ -461,6 +602,11 @@ export default function InboxScreen() {
               expandedIds={expandedIds}
               onToggle={onToggle}
               onActionPress={handleActivityAction}
+              onSessionChangeDecision={(activity, decision) =>
+                setDecisionModal({ activity, decision, reason: '' })
+              }
+              pendingSessionChangeRequestIds={pendingSessionChangeRequestIds}
+              decisionInFlightRequestId={decisionInFlightRequestId}
               viewerTimezone={profile?.timezone ?? null}
               currentProfileId={profile?.id ?? null}
             />
@@ -477,6 +623,78 @@ export default function InboxScreen() {
         onOpenSettings={handleNudgeOpenSettings}
         onDismiss={handleNudgeDismiss}
       />
+      <Modal
+        animationType="fade"
+        transparent
+        visible={Boolean(decisionModal)}
+        onRequestClose={() => setDecisionModal(null)}
+      >
+        <Pressable style={s.modalBackdrop} onPress={() => setDecisionModal(null)}>
+          <Pressable style={s.modalCard} onPress={(event) => event.stopPropagation()}>
+            <View style={{ gap: 6 }}>
+              <Text style={s.modalTitle}>
+                {decisionModal?.decision === 'approve'
+                  ? 'Approve request'
+                  : 'Deny request'}
+              </Text>
+              <Text style={s.modalDescription}>
+                Add a reason to include with the activity sent to the family.
+              </Text>
+            </View>
+            <TextInput
+              style={s.reasonInput}
+              value={decisionModal?.reason ?? ''}
+              onChangeText={(reason) =>
+                setDecisionModal((current) =>
+                  current ? { ...current, reason } : current,
+                )
+              }
+              placeholder="Reason"
+              placeholderTextColor={colors.textMuted}
+              multiline
+              editable={!decisionMutation.isPending}
+            />
+            <View style={s.modalActions}>
+              <TouchableOpacity
+                style={[s.modalButton, s.modalButtonSecondary]}
+                onPress={() => setDecisionModal(null)}
+                disabled={decisionMutation.isPending}
+                activeOpacity={0.85}
+              >
+                <Text style={[s.modalButtonText, { color: colors.text }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  s.modalButton,
+                  decisionModal?.decision === 'approve'
+                    ? s.modalButtonPrimary
+                    : s.modalButtonDanger,
+                  {
+                    opacity:
+                      decisionMutation.isPending || !decisionModal?.reason.trim()
+                        ? 0.55
+                        : 1,
+                  },
+                ]}
+                disabled={decisionMutation.isPending || !decisionModal?.reason.trim()}
+                onPress={() => {
+                  if (!decisionModal) return;
+                  decisionMutation.mutate({
+                    item: decisionModal.activity,
+                    decision: decisionModal.decision,
+                    reason: decisionModal.reason,
+                  });
+                }}
+                activeOpacity={0.85}
+              >
+                <Text style={[s.modalButtonText, { color: '#ffffff' }]}>
+                  {decisionModal?.decision === 'approve' ? 'Approve' : 'Deny'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }

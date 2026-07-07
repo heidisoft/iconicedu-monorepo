@@ -20,6 +20,7 @@ export type ActivityVerbVM =
   | 'class.schedule.ended'
   | 'class.session.rescheduled'
   | 'class.session.canceled'
+  | 'class.session.cancel_restored'
   | 'class.session.reschedule_requested'
   | 'class.session.cancel_requested'
   | 'class.session.change_request.approved'

@@ -259,6 +259,31 @@ describe('API activity definitions context rendering', () => {
     expect(rendered.summary).toContain('was canceled');
   });
 
+  it('renders class session cancel restore with success tone', () => {
+    const definition = getActivityEventDefinition('class.session.cancel_restored');
+    expect(definition).toBeDefined();
+
+    const rendered = definition!.render(
+      makeEvent('class.session.cancel_restored', {
+        restoredStartAt: '2026-05-07T14:00:00.000Z',
+      }),
+    );
+
+    expect(rendered.leading).toMatchObject({
+      kind: 'icon',
+      iconKey: 'CalendarCheck',
+      tone: 'success',
+    });
+    expect(rendered.headline.primary).toBe('Algebra I');
+    expect(rendered.headline.secondary).toContain(
+      'session May 7 at 2:00 PM cancellation was restored',
+    );
+    expect(rendered.headline.secondary).toContain('For Priya with Ms. Chen');
+    expect(rendered.summary).toContain('Algebra I session');
+    expect(rendered.summary).toContain('is back on the calendar');
+    expect(rendered.actionButton?.label).toBe('Open class');
+  });
+
   it('renders class session change request events in the classes tab', () => {
     const requestDefinition = getActivityEventDefinition(
       'class.session.reschedule_requested',

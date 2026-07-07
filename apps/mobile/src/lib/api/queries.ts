@@ -73,12 +73,14 @@ export {
   rejectSessionChangeRequest,
   selfServeCancelSession,
   selfServeRescheduleSession,
+  selfServeUndoCancelSession,
 } from './schedules/queries';
 export type {
   CancelRecurringSessionOccurrenceInput,
   CancelRecurringSessionOccurrenceResult,
   SelfServeCancelSessionInput,
   SelfServeRescheduleSessionInput,
+  SelfServeUndoCancelSessionInput,
 } from './schedules/queries';
 export {
   fetchActivityFeed,

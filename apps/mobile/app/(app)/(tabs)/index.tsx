@@ -55,6 +55,7 @@ import {
   queryKeys,
   selfServeCancelSession,
   selfServeRescheduleSession,
+  selfServeUndoCancelSession,
   submitClassRequest,
 } from '@/lib/api/queries';
 import {
@@ -1134,10 +1135,49 @@ export default function HomeScreen() {
       );
     },
   });
+  const undoCancelSessionMutation = useMutation({
+    mutationFn: (session: ClassSession) =>
+      selfServeUndoCancelSession({
+        orgId: orgId ?? '',
+        scheduleId: session.scheduleId ?? session.id,
+        occurrenceKey: session.occurrenceKey ?? null,
+      }),
+    onSuccess: async () => {
+      await invalidateSessionData();
+      Alert.alert('Cancellation undone', 'The session is back on the calendar.');
+    },
+    onError: (error) => {
+      Alert.alert(
+        'Unable to undo cancellation',
+        error instanceof Error ? error.message : 'Please try again.',
+      );
+    },
+  });
   const buildSessionCardActions = useCallback(
     (session: ClassSession) => {
-      if (session.isPast || session.disabled || !orgId) {
-        return { cancelAction: null, rescheduleAction: null };
+      if (!orgId) {
+        return { cancelAction: null, rescheduleAction: null, undoCancelAction: null };
+      }
+
+      const canUndoCancel =
+        !session.isPast &&
+        session.status === 'cancelled' &&
+        Boolean(profileData?.id) &&
+        session.cancelledByProfileId === profileData?.id;
+
+      if (canUndoCancel) {
+        return {
+          cancelAction: null,
+          rescheduleAction: null,
+          undoCancelAction: {
+            onPress: () => undoCancelSessionMutation.mutate(session),
+            disabled: undoCancelSessionMutation.isPending,
+          },
+        };
+      }
+
+      if (session.isPast || session.disabled) {
+        return { cancelAction: null, rescheduleAction: null, undoCancelAction: null };
       }
 
       return {
@@ -1162,10 +1202,30 @@ export default function HomeScreen() {
             }),
           disabled: rescheduleSessionMutation.isPending,
         },
+        undoCancelAction: null,
       };
     },
-    [cancelSessionMutation.isPending, orgId, rescheduleSessionMutation.isPending],
+    [
+      cancelSessionMutation.isPending,
+      orgId,
+      profileData?.id,
+      rescheduleSessionMutation.isPending,
+      undoCancelSessionMutation,
+    ],
   );
+  const switchCancelModalToReschedule = useCallback(() => {
+    setSessionChangeModal((current) => {
+      if (!current || current.kind !== 'cancel') return current;
+      return {
+        kind: 'reschedule',
+        session: current.session,
+        date: formatSessionDateInput(current.session.startAt),
+        startTime: formatSessionTimeInput(current.session.startAt),
+        endTime: formatSessionTimeInput(current.session.endAt),
+        note: current.note,
+      };
+    });
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -1511,6 +1571,7 @@ export default function HomeScreen() {
                       titleVariant="message-list"
                       cancelAction={actions.cancelAction}
                       rescheduleAction={actions.rescheduleAction}
+                      undoCancelAction={actions.undoCancelAction}
                     />
                   );
                 })}
@@ -1565,6 +1626,7 @@ export default function HomeScreen() {
                       titleVariant="message-list"
                       cancelAction={actions.cancelAction}
                       rescheduleAction={actions.rescheduleAction}
+                      undoCancelAction={actions.undoCancelAction}
                     />
                   );
                 })}
@@ -1616,6 +1678,7 @@ export default function HomeScreen() {
                     showJoinButton={false}
                     cancelAction={actions.cancelAction}
                     rescheduleAction={actions.rescheduleAction}
+                    undoCancelAction={actions.undoCancelAction}
                   />
                 );
               })}
@@ -1684,7 +1747,7 @@ export default function HomeScreen() {
               </Text>
               <Text style={s.changeModalDescription}>
                 {sessionChangeModal?.kind === 'cancel'
-                  ? 'Add a note and send the cancellation request.'
+                  ? 'Rescheduling keeps the class on the calendar. If that does not work, you can cancel and everyone will be notified.'
                   : 'Pick the new date and time, then add a note for the class.'}
               </Text>
             </View>
@@ -1755,17 +1818,32 @@ export default function HomeScreen() {
               ]}
             />
             <View style={s.changeModalActions}>
-              <TouchableOpacity
-                style={[
-                  s.changeModalButton,
-                  s.changeModalSecondaryBtn,
-                  { backgroundColor: colors.inputBg, borderColor: colors.border },
-                ]}
-                onPress={() => setSessionChangeModal(null)}
-                activeOpacity={0.85}
-              >
-                <Text style={s.changeModalSecondaryTxt}>Close</Text>
-              </TouchableOpacity>
+              {sessionChangeModal?.kind === 'cancel' ? (
+                <TouchableOpacity
+                  style={[
+                    s.changeModalButton,
+                    s.changeModalSecondaryBtn,
+                    { backgroundColor: colors.inputBg, borderColor: colors.red },
+                  ]}
+                  disabled={
+                    cancelSessionMutation.isPending || rescheduleSessionMutation.isPending
+                  }
+                  onPress={() => {
+                    if (!sessionChangeModal || sessionChangeModal.kind !== 'cancel') {
+                      return;
+                    }
+                    cancelSessionMutation.mutate({
+                      session: sessionChangeModal.session,
+                      note: sessionChangeModal.note,
+                    });
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <Text style={[s.changeModalSecondaryTxt, { color: colors.red }]}>
+                    Cancel anyway
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
               <TouchableOpacity
                 style={[s.changeModalButton, s.changeModalPrimaryBtn]}
                 disabled={
@@ -1774,17 +1852,14 @@ export default function HomeScreen() {
                 onPress={() => {
                   if (!sessionChangeModal) return;
                   if (sessionChangeModal.kind === 'cancel') {
-                    cancelSessionMutation.mutate({
-                      session: sessionChangeModal.session,
-                      note: sessionChangeModal.note,
-                    });
+                    switchCancelModalToReschedule();
                     return;
                   }
                   rescheduleSessionMutation.mutate(sessionChangeModal);
                 }}
               >
                 <Text style={s.changeModalPrimaryTxt}>
-                  {sessionChangeModal?.kind === 'cancel' ? 'Send' : 'Request'}
+                  {sessionChangeModal?.kind === 'cancel' ? 'Reschedule' : 'Request'}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
