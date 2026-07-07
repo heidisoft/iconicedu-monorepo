@@ -2,6 +2,30 @@ import { requireEffectiveActorContext } from '@iconicedu/web/lib/family-view/act
 import { getUserRoles } from '@iconicedu/web/lib/profile/queries/roles.query';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 
+export type AdminOrgContextSuccess = {
+  ok: true;
+  orgId: string;
+  actorProfileId: string;
+};
+
+export type AdminOrgContextFailure = {
+  ok: false;
+  status: number;
+  message: string;
+};
+
+export type AdminOrgContextResult = AdminOrgContextSuccess | AdminOrgContextFailure;
+
+export class AdminOrgContextError extends Error {
+  status: number;
+
+  constructor(context: AdminOrgContextFailure) {
+    super(context.message);
+    this.name = 'AdminOrgContextError';
+    this.status = context.status;
+  }
+}
+
 function isAllowedAdminRole(roleKey: string | null | undefined) {
   return roleKey === 'owner' || roleKey === 'admin' || roleKey === 'staff';
 }
@@ -9,7 +33,7 @@ function isAllowedAdminRole(roleKey: string | null | undefined) {
 export async function requireAdminOrgContext(
   orgId: string,
   _options?: { allowStaff?: boolean },
-) {
+): Promise<AdminOrgContextResult> {
   const supabase = await createSupabaseServerClient();
   let actor;
   try {
@@ -46,4 +70,12 @@ export async function requireAdminOrgContext(
     orgId,
     actorProfileId: actor.profile.id,
   };
+}
+
+export function throwAdminOrgContextError(
+  context: AdminOrgContextResult,
+): asserts context is AdminOrgContextSuccess {
+  if (!context.ok) {
+    throw new AdminOrgContextError(context);
+  }
 }

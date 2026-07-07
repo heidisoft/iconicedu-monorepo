@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { getAdminFamilyRows } from '@iconicedu/web/lib/admin/families';
+import { requireAdminOrgContext } from '@iconicedu/web/lib/admin/require-admin-org-context';
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 
@@ -28,6 +29,14 @@ export async function GET(request: Request) {
       return NextResponse.json(
         { success: false, message: 'Org not found' },
         { status: 404 },
+      );
+    }
+
+    const authContext = await requireAdminOrgContext(org.id);
+    if (!authContext.ok) {
+      return NextResponse.json(
+        { success: false, message: authContext.message },
+        { status: authContext.status },
       );
     }
 

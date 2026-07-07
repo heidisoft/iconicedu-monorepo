@@ -16,6 +16,10 @@ import {
   getChannelParticipantsByChannelIds,
 } from '@iconicedu/web/lib/channels/queries/channels.query';
 import { getAdminLiveSessionConfig } from '@iconicedu/web/lib/admin/live-session-config';
+import {
+  requireAdminOrgContext,
+  throwAdminOrgContextError,
+} from '@iconicedu/web/lib/admin/require-admin-org-context';
 
 export type ChannelDetail = {
   ids: { id: string; orgId: string };
@@ -55,6 +59,9 @@ export async function getChannelDetail(channelId: string): Promise<ChannelDetail
   }
 
   const orgId = accountResponse.data.org_id;
+  const authContext = await requireAdminOrgContext(orgId);
+  throwAdminOrgContextError(authContext);
+
   const channelResponse = await getChannelById(supabase, orgId, channelId);
 
   if (channelResponse.error) {
