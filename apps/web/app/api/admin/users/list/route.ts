@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 
 import { getAdminUserRowsPaginated } from '@iconicedu/web/lib/admin/users';
+import {
+  AdminOrgContextError,
+  requireAdminOrgContext,
+} from '@iconicedu/web/lib/admin/require-admin-org-context';
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 
@@ -34,6 +38,14 @@ export async function GET(request: Request) {
       );
     }
 
+    const authContext = await requireAdminOrgContext(org.id);
+    if (!authContext.ok) {
+      return NextResponse.json(
+        { success: false, message: authContext.message },
+        { status: authContext.status },
+      );
+    }
+
     const { rows, total, pageCount } = await getAdminUserRowsPaginated(org.id, {
       page,
       pageSize: PAGE_SIZE,
@@ -45,6 +57,12 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ success: true, rows, total, pageCount });
   } catch (error) {
+    if (error instanceof AdminOrgContextError) {
+      return NextResponse.json(
+        { success: false, message: error.message },
+        { status: error.status },
+      );
+    }
     return NextResponse.json(
       {
         success: false,

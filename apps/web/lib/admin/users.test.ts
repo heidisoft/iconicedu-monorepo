@@ -22,6 +22,15 @@ vi.mock('@iconicedu/web/lib/supabase/service', () => ({
 
 vi.mock('@iconicedu/web/lib/admin/require-admin-org-context', () => ({
   requireAdminOrgContext: (...args: unknown[]) => requireAdminOrgContextMock(...args),
+  throwAdminOrgContextError: (context: {
+    ok: boolean;
+    status?: number;
+    message?: string;
+  }) => {
+    if (!context.ok) {
+      throw new Error(context.message);
+    }
+  },
 }));
 
 vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
