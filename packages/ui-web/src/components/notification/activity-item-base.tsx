@@ -43,6 +43,13 @@ type ActivityItemBaseProps = {
   activity: ActivityFeedItemVM;
   onMarkRead: (id: string, event: React.MouseEvent) => void;
   onAutoRead?: (id: string) => void;
+  onSessionChangeDecision?: (
+    activity: ActivityFeedItemVM,
+    decision: 'approve' | 'reject',
+  ) => void;
+  pendingSessionChangeRequestIds?: Set<string>;
+  decisionInFlightRequestId?: string | null;
+  currentProfileId?: string | null;
   onToggle?: (event: React.MouseEvent) => void;
   isSubActivity?: boolean;
   parentExpanded?: boolean;
@@ -150,10 +157,73 @@ const formatRelativeTime = (occurredAt: string) => {
 const getActivityPreviewText = (activity: ActivityFeedItemVM) =>
   activity.content.summary?.trim() || activity.content.preview?.text?.trim() || '';
 
+function getActivityMetadata(activity: ActivityFeedItemVM) {
+  return activity.metadata && typeof activity.metadata === 'object'
+    ? activity.metadata
+    : {};
+}
+
+function getSessionChangeRequestId(activity: ActivityFeedItemVM): string | null {
+  if (
+    activity.verb !== 'class.session.reschedule_requested' &&
+    activity.verb !== 'class.session.cancel_requested'
+  ) {
+    return null;
+  }
+  const metadata = getActivityMetadata(activity);
+  return typeof metadata.requestId === 'string' && metadata.requestId
+    ? metadata.requestId
+    : null;
+}
+
+function canCurrentViewerDecideSessionChange(activity: ActivityFeedItemVM) {
+  const metadata = getActivityMetadata(activity);
+  const requestedByRole =
+    typeof metadata.requestedByRole === 'string' ? metadata.requestedByRole : null;
+  const viewerRole = typeof metadata.viewerRole === 'string' ? metadata.viewerRole : null;
+
+  if (!requestedByRole || !viewerRole) return false;
+  if (requestedByRole === 'educator' || requestedByRole === 'teacher') {
+    return viewerRole === 'guardian' || viewerRole === 'child';
+  }
+  if (requestedByRole === 'guardian' || requestedByRole === 'child') {
+    return viewerRole === 'educator' || viewerRole === 'teacher';
+  }
+  return false;
+}
+
+function shouldShowSessionChangeActions(input: {
+  activity: ActivityFeedItemVM;
+  currentProfileId?: string | null;
+  pendingSessionChangeRequestIds?: Set<string>;
+}) {
+  const requestId = getSessionChangeRequestId(input.activity);
+  if (!requestId || !input.pendingSessionChangeRequestIds?.has(requestId)) {
+    return false;
+  }
+  const metadata = getActivityMetadata(input.activity);
+  const requestedByProfileId =
+    typeof metadata.requestedByProfileId === 'string'
+      ? metadata.requestedByProfileId
+      : null;
+  if (
+    input.currentProfileId &&
+    requestedByProfileId &&
+    input.currentProfileId === requestedByProfileId
+  ) {
+    return false;
+  }
+  return canCurrentViewerDecideSessionChange(input.activity);
+}
+
 export function ActivityItemBase({
   activity,
   onMarkRead,
   onAutoRead,
+  onSessionChangeDecision,
+  pendingSessionChangeRequestIds,
+  decisionInFlightRequestId,
+  currentProfileId,
   onToggle,
   isSubActivity = false,
   parentExpanded = false,
@@ -192,6 +262,15 @@ export function ActivityItemBase({
     activity.kind === 'leaf' && activity.verb === 'session.completion_check.batch.sent';
   const canShowDisputeReport =
     activity.kind === 'leaf' && activity.verb === 'session.completion.dispute_reported';
+  const sessionChangeRequestId = getSessionChangeRequestId(activity);
+  const canShowSessionChangeActions = shouldShowSessionChangeActions({
+    activity,
+    currentProfileId,
+    pendingSessionChangeRequestIds,
+  });
+  const sessionChangeDecisionDisabled =
+    Boolean(decisionInFlightRequestId) &&
+    decisionInFlightRequestId === sessionChangeRequestId;
   const rootRef = useRef<HTMLDivElement>(null);
   const autoReadTriggeredRef = useRef(false);
 
@@ -344,6 +423,37 @@ export function ActivityItemBase({
           </div>
 
           {showActionButton && <ActivityWithButton activity={activity} />}
+
+          {canShowSessionChangeActions ? (
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7 border-emerald-600 px-3 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+                disabled={sessionChangeDecisionDisabled}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onSessionChangeDecision?.(activity, 'approve');
+                }}
+              >
+                Approve
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7 border-destructive px-3 text-xs font-semibold text-destructive hover:bg-destructive/10 hover:text-destructive"
+                disabled={sessionChangeDecisionDisabled}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onSessionChangeDecision?.(activity, 'reject');
+                }}
+              >
+                Deny
+              </Button>
+            </div>
+          ) : null}
 
           {canShowFeedbackRequest ? (
             <ActivityFeedbackRequest activity={activity} />

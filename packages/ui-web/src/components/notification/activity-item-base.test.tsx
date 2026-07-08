@@ -119,6 +119,69 @@ describe('ActivityItemBase', () => {
     expect(screen.queryByText('Projected preview')).not.toBeInTheDocument();
   });
 
+  it('renders session change decision buttons for an educator reviewing a parent request', () => {
+    const activity = {
+      ...createActivity(),
+      verb: 'class.session.reschedule_requested',
+      metadata: {
+        requestId: 'request-1',
+        requestedByProfileId: 'guardian-1',
+        requestedByRole: 'guardian',
+        viewerRole: 'educator',
+      },
+      content: {
+        ...createActivity().content,
+        headline: {
+          primary: 'Session change request',
+          secondary: 'Lura H requested a reschedule',
+        },
+      },
+    } as ActivityFeedItemVM;
+    const onDecision = vi.fn();
+
+    render(
+      <ActivityItemBase
+        activity={activity}
+        onMarkRead={vi.fn()}
+        currentProfileId="teacher-1"
+        pendingSessionChangeRequestIds={new Set(['request-1'])}
+        onSessionChangeDecision={onDecision}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Deny' }));
+
+    expect(onDecision).toHaveBeenNthCalledWith(1, activity, 'approve');
+    expect(onDecision).toHaveBeenNthCalledWith(2, activity, 'reject');
+  });
+
+  it('does not render session change actions for the requester', () => {
+    const activity = {
+      ...createActivity(),
+      verb: 'class.session.reschedule_requested',
+      metadata: {
+        requestId: 'request-1',
+        requestedByProfileId: 'guardian-1',
+        requestedByRole: 'guardian',
+        viewerRole: 'guardian',
+      },
+    } as ActivityFeedItemVM;
+
+    render(
+      <ActivityItemBase
+        activity={activity}
+        onMarkRead={vi.fn()}
+        currentProfileId="guardian-1"
+        pendingSessionChangeRequestIds={new Set(['request-1'])}
+        onSessionChangeDecision={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Deny' })).not.toBeInTheDocument();
+  });
+
   it('hides preview text when summary and preview are blank', () => {
     const activity = createActivity();
     activity.content.summary = '   ';

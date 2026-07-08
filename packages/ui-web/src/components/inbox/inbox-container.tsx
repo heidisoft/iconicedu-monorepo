@@ -171,11 +171,22 @@ export function InboxContainer({
   feed,
   markReadEndpoint = '/api/activity-feed/read',
   showMarkAllAsRead = false,
+  onSessionChangeDecision,
+  pendingSessionChangeRequestIds,
+  decisionInFlightRequestId,
+  currentProfileId,
 }: {
   feed: ActivityFeedVM;
   markReadEndpoint?: string;
   timezone?: string | null;
   showMarkAllAsRead?: boolean;
+  onSessionChangeDecision?: (
+    activity: ActivityFeedItemVM,
+    decision: 'approve' | 'reject',
+  ) => void;
+  pendingSessionChangeRequestIds?: Set<string>;
+  decisionInFlightRequestId?: string | null;
+  currentProfileId?: string | null;
 }) {
   const [sections, setSections] = useState(feed.sections);
   const [activeTab, setActiveTab] = useState<InboxTabKeyVM>(feed.activeTab);
@@ -322,6 +333,10 @@ export function InboxContainer({
           activity={displayActivity}
           onMarkRead={markAsRead}
           onAutoRead={autoMarkAsRead}
+          onSessionChangeDecision={onSessionChangeDecision}
+          pendingSessionChangeRequestIds={pendingSessionChangeRequestIds}
+          decisionInFlightRequestId={decisionInFlightRequestId}
+          currentProfileId={currentProfileId}
           showActionButton={Boolean(displayActivity.content.actionButton)}
         />
       );
@@ -332,6 +347,10 @@ export function InboxContainer({
         activity={displayActivity}
         onMarkRead={markAsRead}
         onAutoRead={autoMarkAsRead}
+        onSessionChangeDecision={onSessionChangeDecision}
+        pendingSessionChangeRequestIds={pendingSessionChangeRequestIds}
+        decisionInFlightRequestId={decisionInFlightRequestId}
+        currentProfileId={currentProfileId}
       />
     );
   };

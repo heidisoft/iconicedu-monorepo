@@ -5,17 +5,30 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { NotificationsPageClient } from './notifications-page-client';
 
-const { inboxContainerMock } = vi.hoisted(() => ({
+const { inboxContainerMock, listSessionChangeRequestsActionMock } = vi.hoisted(() => ({
   inboxContainerMock: vi.fn(
-    ({ feed, showMarkAllAsRead }: { feed: unknown; showMarkAllAsRead?: boolean }) => (
+    ({
+      feed,
+      showMarkAllAsRead,
+      pendingSessionChangeRequestIds,
+      currentProfileId,
+    }: {
+      feed: unknown;
+      showMarkAllAsRead?: boolean;
+      pendingSessionChangeRequestIds?: Set<string>;
+      currentProfileId?: string | null;
+    }) => (
       <div
         data-testid="notifications-container"
         data-mark-all={String(showMarkAllAsRead)}
+        data-profile-id={currentProfileId ?? ''}
+        data-pending-requests={Array.from(pendingSessionChangeRequestIds ?? []).join(',')}
       >
         {JSON.stringify(feed)}
       </div>
     ),
   ),
+  listSessionChangeRequestsActionMock: vi.fn(),
 }));
 
 const refresh = vi.fn();
@@ -43,12 +56,24 @@ vi.mock('@iconicedu/web/lib/supabase/client', () => ({
 vi.mock('@iconicedu/ui-web', () => ({
   DashboardHeader: ({ title }: { title: string }) => <div>{title}</div>,
   InboxContainer: inboxContainerMock,
+  toast: {
+    error: vi.fn(),
+    success: vi.fn(),
+  },
+}));
+
+vi.mock('@iconicedu/web/app/actions/self-serve-class-session-change', () => ({
+  approveSessionChangeRequestAction: vi.fn(),
+  rejectSessionChangeRequestAction: vi.fn(),
+  listSessionChangeRequestsAction: (...args: unknown[]) =>
+    listSessionChangeRequestsActionMock(...args),
 }));
 
 describe('NotificationsPageClient', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
+    listSessionChangeRequestsActionMock.mockResolvedValue([]);
   });
 
   it('subscribes to notification-related realtime tables and cleans up on unmount', () => {
@@ -160,6 +185,45 @@ describe('NotificationsPageClient', () => {
     expect(getByTestId('notifications-container')).toHaveAttribute(
       'data-mark-all',
       'true',
+    );
+  });
+
+  it('passes pending session change request ids to the inbox', async () => {
+    listSessionChangeRequestsActionMock.mockResolvedValue([
+      {
+        id: 'request-1',
+        status: 'pending',
+      },
+      {
+        id: 'request-2',
+        status: 'approved',
+      },
+    ]);
+
+    const { getByTestId } = render(
+      <NotificationsPageClient
+        orgId="org-1"
+        orgSlug="iconic-academy"
+        profileId="profile-1"
+        feed={{
+          activeTab: 'all',
+          tabs: [],
+          sections: [],
+          unreadCount: 0,
+          nextCursor: null,
+        }}
+      />,
+    );
+
+    await act(async () => {});
+
+    expect(getByTestId('notifications-container')).toHaveAttribute(
+      'data-pending-requests',
+      'request-1',
+    );
+    expect(getByTestId('notifications-container')).toHaveAttribute(
+      'data-profile-id',
+      'profile-1',
     );
   });
 });

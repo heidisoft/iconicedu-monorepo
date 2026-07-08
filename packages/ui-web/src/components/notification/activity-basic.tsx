@@ -8,6 +8,13 @@ type ActivityBasicProps = {
   activity: ActivityFeedItemVM;
   onMarkRead: (id: string, event: React.MouseEvent) => void;
   onAutoRead?: (id: string) => void;
+  onSessionChangeDecision?: (
+    activity: ActivityFeedItemVM,
+    decision: 'approve' | 'reject',
+  ) => void;
+  pendingSessionChangeRequestIds?: Set<string>;
+  decisionInFlightRequestId?: string | null;
+  currentProfileId?: string | null;
   isSubActivity?: boolean;
   parentExpanded?: boolean;
   showTimelineConnector?: boolean;
@@ -18,6 +25,10 @@ export function ActivityBasic({
   activity,
   onMarkRead,
   onAutoRead,
+  onSessionChangeDecision,
+  pendingSessionChangeRequestIds,
+  decisionInFlightRequestId,
+  currentProfileId,
   isSubActivity,
   parentExpanded,
   showTimelineConnector,
@@ -28,6 +39,10 @@ export function ActivityBasic({
       activity={activity}
       onMarkRead={onMarkRead}
       onAutoRead={onAutoRead}
+      onSessionChangeDecision={onSessionChangeDecision}
+      pendingSessionChangeRequestIds={pendingSessionChangeRequestIds}
+      decisionInFlightRequestId={decisionInFlightRequestId}
+      currentProfileId={currentProfileId}
       isSubActivity={isSubActivity}
       parentExpanded={parentExpanded}
       showTimelineConnector={showTimelineConnector}

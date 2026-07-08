@@ -9,6 +9,13 @@ type ActivityBasicWithExpandedContentProps = {
   activity: ActivityFeedItemVM;
   onMarkRead: (id: string, event: React.MouseEvent) => void;
   onAutoRead?: (id: string) => void;
+  onSessionChangeDecision?: (
+    activity: ActivityFeedItemVM,
+    decision: 'approve' | 'reject',
+  ) => void;
+  pendingSessionChangeRequestIds?: Set<string>;
+  decisionInFlightRequestId?: string | null;
+  currentProfileId?: string | null;
   showActionButton?: boolean;
   isSubActivity?: boolean;
   parentExpanded?: boolean;
@@ -21,6 +28,10 @@ export function ActivityBasicWithExpandedContent({
   activity,
   onMarkRead,
   onAutoRead,
+  onSessionChangeDecision,
+  pendingSessionChangeRequestIds,
+  decisionInFlightRequestId,
+  currentProfileId,
   showActionButton = false,
   isSubActivity,
   parentExpanded,
@@ -41,6 +52,10 @@ export function ActivityBasicWithExpandedContent({
       activity={activity}
       onMarkRead={onMarkRead}
       onAutoRead={onAutoRead}
+      onSessionChangeDecision={onSessionChangeDecision}
+      pendingSessionChangeRequestIds={pendingSessionChangeRequestIds}
+      decisionInFlightRequestId={decisionInFlightRequestId}
+      currentProfileId={currentProfileId}
       onToggle={handleToggle}
       isSubActivity={isSubActivity}
       parentExpanded={parentExpanded}
