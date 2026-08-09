@@ -17,6 +17,7 @@ type OrgLoginClientProps = {
   loginReason?: 'session-expired' | null;
   enableGoogleSignIn?: boolean;
   enableAppleSignIn?: boolean;
+  recaptchaSiteKey?: string;
 };
 
 export function resolveOrgLoginCallbackUrl(orgSlug: string): string {
@@ -44,6 +45,7 @@ export default function OrgLoginClient({
   loginReason = null,
   enableGoogleSignIn = false,
   enableAppleSignIn = false,
+  recaptchaSiteKey,
 }: OrgLoginClientProps) {
   const router = useRouter();
   const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
@@ -56,7 +58,7 @@ export default function OrgLoginClient({
       'web_incomplete_onboarding_reauth=; path=/; max-age=0; SameSite=Lax;';
   }, []);
 
-  const handleEmailLogin = async (email: string) => {
+  const handleEmailLogin = async (email: string, captchaToken?: string) => {
     setErrorMessage(null);
     setStatusMessage(null);
 
@@ -101,6 +103,7 @@ export default function OrgLoginClient({
       email,
       options: {
         shouldCreateUser: shouldCreateUserForIntent('login'),
+        captchaToken,
       },
     });
 
@@ -152,6 +155,7 @@ export default function OrgLoginClient({
       submitLoadingLabel="Sending code..."
       enableGoogleSignIn={enableGoogleSignIn}
       enableAppleSignIn={enableAppleSignIn}
+      recaptchaSiteKey={recaptchaSiteKey}
       featureBullets={[
         'Qualified, vetted tutors',
         'Schedules, sessions & homework in one place',

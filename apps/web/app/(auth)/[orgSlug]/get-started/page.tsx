@@ -9,7 +9,11 @@ import { resolveOrgDashboardPath } from '@iconicedu/web/lib/org/resolve-dashboar
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
-import { enableMobileAppleSignIn, enableMobileGoogleSignIn } from '@iconicedu/web/flags';
+import {
+  enableMobileAppleSignIn,
+  enableMobileGoogleSignIn,
+  enableWebRecaptcha,
+} from '@iconicedu/web/flags';
 import { isMobileOrTablet } from '@iconicedu/web/lib/mobile/detect-mobile';
 
 export const metadata: Metadata = {
@@ -61,10 +65,19 @@ export default async function OrgGetStartedPage({
 
   const isMobile = isMobileOrTablet(await headers());
 
-  const [showGoogleSignIn, showAppleSignIn] = await Promise.all([
+  const [showGoogleSignIn, showAppleSignIn, showRecaptcha] = await Promise.all([
     enableMobileGoogleSignIn(),
     enableMobileAppleSignIn(),
+    enableWebRecaptcha(),
   ]);
+  const recaptchaSiteKey = showRecaptcha
+    ? process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY?.trim()
+    : undefined;
+  if (showRecaptcha && !recaptchaSiteKey) {
+    throw new Error(
+      'NEXT_PUBLIC_RECAPTCHA_SITE_KEY is required when enable-web-recaptcha is on.',
+    );
+  }
 
   return (
     <div className="bg-background flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
@@ -76,6 +89,7 @@ export default async function OrgGetStartedPage({
           initialEmail={initialEmail}
           enableGoogleSignIn={showGoogleSignIn}
           enableAppleSignIn={showAppleSignIn}
+          recaptchaSiteKey={recaptchaSiteKey}
         />
       </div>
     </div>

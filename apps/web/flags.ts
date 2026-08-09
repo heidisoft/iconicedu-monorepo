@@ -106,6 +106,22 @@ export const enableMobileAppleSignIn = flag<boolean, { profileId?: string | null
   },
 });
 
+export const enableWebRecaptcha = flag<boolean, { profileId?: string | null }>({
+  key: 'enable-web-recaptcha',
+  description: 'Requires Google reCAPTCHA for web email login and sign-up submissions.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: 'enable-web-recaptcha',
+      profileId: entities?.profileId,
+    });
+  },
+});
+
 export const enableMarketingSitePages = flag<boolean, { profileId?: string | null }>({
   key: 'enable-marketing-site-pages',
   description:
@@ -148,6 +164,7 @@ export const webFlags = {
   enableMobileAppleSignIn,
   enableMobileDirectMessageStart,
   enableMobileGoogleSignIn,
+  enableWebRecaptcha,
 } as const;
 
 export type WebFlagKey = keyof typeof webFlags;
