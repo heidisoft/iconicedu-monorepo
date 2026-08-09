@@ -41,14 +41,8 @@ type AuthState = {
   user: User | null;
   loading: boolean;
   sessionExpiryMessage: string | null;
-  signInWithOtp: (
-    email: string,
-    captchaToken?: string,
-  ) => Promise<{ error: string | null }>;
-  signUpWithOtp: (
-    email: string,
-    captchaToken?: string,
-  ) => Promise<{ error: string | null }>;
+  signInWithOtp: (email: string) => Promise<{ error: string | null }>;
+  signUpWithOtp: (email: string) => Promise<{ error: string | null }>;
   verifyOtp: (email: string, token: string) => Promise<{ error: string | null }>;
   verifySignupOtp: (email: string, token: string) => Promise<{ error: string | null }>;
   signInWithGoogle: () => Promise<{ error: string | null }>;
@@ -275,14 +269,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [analytics, session, signOutForExpiredIncompleteOnboarding]);
 
   /** Send a sign-in OTP. Only works for accounts that already exist. */
-  const signInWithOtp = useCallback(async (email: string, captchaToken?: string) => {
+  const signInWithOtp = useCallback(async (email: string) => {
     setSessionExpiryMessage(null);
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: {
-        shouldCreateUser: false,
-        ...(captchaToken ? { captchaToken } : {}),
-      },
+      options: { shouldCreateUser: false },
     });
 
     if (error) {
@@ -304,14 +295,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error: null };
   }, []);
 
-  const signUpWithOtp = useCallback(async (email: string, captchaToken?: string) => {
+  const signUpWithOtp = useCallback(async (email: string) => {
     setSessionExpiryMessage(null);
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: {
-        shouldCreateUser: true,
-        ...(captchaToken ? { captchaToken } : {}),
-      },
+      options: { shouldCreateUser: true },
     });
 
     return { error: error?.message ?? null };

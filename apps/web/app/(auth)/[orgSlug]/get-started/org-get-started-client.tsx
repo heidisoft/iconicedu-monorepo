@@ -16,7 +16,6 @@ type OrgGetStartedClientProps = {
   initialEmail?: string;
   enableGoogleSignIn?: boolean;
   enableAppleSignIn?: boolean;
-  turnstileSiteKey?: string;
 };
 
 export function resolveOrgGetStartedCallbackUrl(orgSlug: string): string {
@@ -36,14 +35,13 @@ export default function OrgGetStartedClient({
   initialEmail,
   enableGoogleSignIn = false,
   enableAppleSignIn = false,
-  turnstileSiteKey,
 }: OrgGetStartedClientProps) {
   const router = useRouter();
   const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
   const [statusMessage, setStatusMessage] = React.useState<string | null>(null);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
-  const handleEmailLogin = async (email: string, captchaToken?: string) => {
+  const handleEmailLogin = async (email: string) => {
     setErrorMessage(null);
     setStatusMessage(null);
 
@@ -51,7 +49,6 @@ export default function OrgGetStartedClient({
       email,
       options: {
         shouldCreateUser: shouldCreateUserForIntent('get-started'),
-        captchaToken,
       },
     });
 
@@ -98,7 +95,6 @@ export default function OrgGetStartedClient({
       oauthActionVerb="sign-up"
       enableGoogleSignIn={enableGoogleSignIn}
       enableAppleSignIn={enableAppleSignIn}
-      turnstileSiteKey={turnstileSiteKey}
       submitLabel="Get Started"
       submitLoadingLabel="Sending..."
       footerLinkIntro="Already have an account?"

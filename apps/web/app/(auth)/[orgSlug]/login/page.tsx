@@ -10,13 +10,8 @@ import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
 import { resolveOrgLoginReason } from '@iconicedu/web/app/(auth)/[orgSlug]/login/login-reason';
-import {
-  enableMobileAppleSignIn,
-  enableMobileGoogleSignIn,
-  enableWebTurnstile,
-} from '@iconicedu/web/flags';
+import { enableMobileAppleSignIn, enableMobileGoogleSignIn } from '@iconicedu/web/flags';
 import { isMobileOrTablet } from '@iconicedu/web/lib/mobile/detect-mobile';
-import { resolveTurnstileSiteKey } from '@iconicedu/web/lib/auth/turnstile-config';
 
 export const metadata: Metadata = {
   title: 'Organization Login | ICONIC Academy',
@@ -64,12 +59,10 @@ export default async function OrgLoginPage({
 
   const isMobile = isMobileOrTablet(await headers());
 
-  const [showGoogleSignIn, showAppleSignIn, showTurnstile] = await Promise.all([
+  const [showGoogleSignIn, showAppleSignIn] = await Promise.all([
     enableMobileGoogleSignIn(),
     enableMobileAppleSignIn(),
-    enableWebTurnstile(),
   ]);
-  const turnstileSiteKey = resolveTurnstileSiteKey(showTurnstile);
 
   return (
     <div className="bg-background flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
@@ -81,7 +74,6 @@ export default async function OrgLoginPage({
           loginReason={resolveOrgLoginReason(resolvedSearchParams?.reason)}
           enableGoogleSignIn={showGoogleSignIn}
           enableAppleSignIn={showAppleSignIn}
-          turnstileSiteKey={turnstileSiteKey}
         />
       </div>
     </div>

@@ -1,11 +1,10 @@
 // @vitest-environment jsdom
 import React from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockReplace = vi.fn();
 const mockVerifyOtp = vi.fn();
-const mockSignInWithOtp = vi.fn();
 const mockSearchParams = new URLSearchParams({
   email: 'iconicedudev+parent@gmail.com',
   intent: 'login',
@@ -25,21 +24,13 @@ vi.mock('@iconicedu/web/lib/supabase/client', () => ({
   createSupabaseBrowserClient: () => ({
     auth: {
       verifyOtp: mockVerifyOtp,
-      signInWithOtp: mockSignInWithOtp,
+      signInWithOtp: vi.fn(),
     },
   }),
 }));
 
 vi.mock('@iconicedu/ui-web/components/branding/site-logo-full', () => ({
   SiteLogoFull: () => <div data-testid="site-logo" />,
-}));
-
-vi.mock('@iconicedu/ui-web/components/turnstile', () => ({
-  Turnstile: ({ onTokenChange }: { onTokenChange: (token: string) => void }) => (
-    <button type="button" onClick={() => onTokenChange('turnstile-token')}>
-      Complete Turnstile
-    </button>
-  ),
 }));
 
 vi.mock('@iconicedu/ui-web/ui/button', () => ({
@@ -91,8 +82,6 @@ describe('CodeEntryClient', () => {
     mockReplace.mockReset();
     mockVerifyOtp.mockReset();
     mockVerifyOtp.mockResolvedValue({ error: null });
-    mockSignInWithOtp.mockReset();
-    mockSignInWithOtp.mockResolvedValue({ error: null });
   });
 
   it('automatically verifies once all 6 digits are entered', async () => {
@@ -113,32 +102,5 @@ describe('CodeEntryClient', () => {
     await waitFor(() => {
       expect(mockReplace).toHaveBeenCalledWith('/auth/callback?intent=login');
     });
-  });
-
-  it('requires a fresh Turnstile token when resending an OTP', async () => {
-    vi.useFakeTimers();
-    render(<CodeEntryClient turnstileSiteKey="site-key" />);
-
-    for (let second = 0; second < 30; second += 1) {
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(1_000);
-      });
-    }
-    const resendButton = screen.getByRole('button', { name: 'Resend' });
-    expect(resendButton).toBeDisabled();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Complete Turnstile' }));
-    expect(resendButton).toBeEnabled();
-    await act(async () => {
-      fireEvent.click(resendButton);
-    });
-    expect(mockSignInWithOtp).toHaveBeenCalledWith({
-      email: 'iconicedudev+parent@gmail.com',
-      options: {
-        shouldCreateUser: false,
-        captchaToken: 'turnstile-token',
-      },
-    });
-    vi.useRealTimers();
   });
 });

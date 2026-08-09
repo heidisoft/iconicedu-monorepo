@@ -8,7 +8,6 @@ import { Loader2 } from 'lucide-react';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 import { SiteLogoFull } from '@iconicedu/ui-web/components/branding/site-logo-full';
 import { Button } from '@iconicedu/ui-web/ui/button';
-import { Turnstile } from '@iconicedu/ui-web/components/turnstile';
 import {
   Field,
   FieldDescription,
@@ -36,11 +35,7 @@ function resolveIntent(value: string | null): AuthIntent {
   return value === 'login' ? 'login' : 'get-started';
 }
 
-type CodeEntryClientProps = {
-  turnstileSiteKey?: string;
-};
-
-export default function CodeEntryClient({ turnstileSiteKey }: CodeEntryClientProps) {
+export default function CodeEntryClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
@@ -69,8 +64,6 @@ export default function CodeEntryClient({ turnstileSiteKey }: CodeEntryClientPro
   const [isVerifying, setIsVerifying] = React.useState(false);
   const [isResending, setIsResending] = React.useState(false);
   const [resendCooldown, setResendCooldown] = React.useState(RESEND_COOLDOWN_SECONDS);
-  const [captchaToken, setCaptchaToken] = React.useState<string | null>(null);
-  const [captchaResetKey, setCaptchaResetKey] = React.useState(0);
 
   React.useEffect(() => {
     if (resendCooldown <= 0) {
@@ -135,7 +128,7 @@ export default function CodeEntryClient({ turnstileSiteKey }: CodeEntryClientPro
   };
 
   const handleResend = async () => {
-    if (!email || resendCooldown > 0 || (turnstileSiteKey && !captchaToken)) {
+    if (!email || resendCooldown > 0) {
       return;
     }
 
@@ -147,11 +140,8 @@ export default function CodeEntryClient({ turnstileSiteKey }: CodeEntryClientPro
       email,
       options: {
         shouldCreateUser: shouldCreateUserForIntent(intent),
-        captchaToken: captchaToken ?? undefined,
       },
     });
-
-    if (turnstileSiteKey) setCaptchaResetKey((key) => key + 1);
 
     if (error) {
       setErrorMessage(error.message);
@@ -233,23 +223,12 @@ export default function CodeEntryClient({ turnstileSiteKey }: CodeEntryClientPro
                 {errorMessage ?? statusMessage}
               </div>
             ) : null}
-            {turnstileSiteKey ? (
-              <Turnstile
-                siteKey={turnstileSiteKey}
-                onTokenChange={setCaptchaToken}
-                resetKey={captchaResetKey}
-              />
-            ) : null}
             <FieldDescription className="text-center">
               Didn&apos;t receive the code?{' '}
               <button
                 type="button"
                 onClick={handleResend}
-                disabled={
-                  resendCooldown > 0 ||
-                  isResending ||
-                  Boolean(turnstileSiteKey && !captchaToken)
-                }
+                disabled={resendCooldown > 0 || isResending}
                 className="font-medium text-foreground underline decoration-current underline-offset-4 disabled:pointer-events-none disabled:opacity-60"
               >
                 {isResending
