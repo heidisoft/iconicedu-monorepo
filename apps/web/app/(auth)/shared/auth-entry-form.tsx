@@ -13,6 +13,7 @@ import {
 } from '@iconicedu/ui-web/ui/field';
 import { Input } from '@iconicedu/ui-web/ui/input';
 import { SiteLogoFull } from '@iconicedu/ui-web/components/branding/site-logo-full';
+import { Turnstile } from '@iconicedu/ui-web/components/turnstile';
 import { Loader2 } from 'lucide-react';
 
 type OAuthProvider = 'apple' | 'google';
@@ -25,7 +26,7 @@ type AuthEntryFormProps = React.ComponentProps<'div'> & {
   subtitle: string;
   introText: string;
   trustLine: string;
-  onEmailLogin?: (email: string) => Promise<void> | void;
+  onEmailLogin?: (email: string, captchaToken?: string) => Promise<void> | void;
   onEmailChange?: (email: string) => void;
   onOAuthLogin?: (provider: OAuthProvider) => Promise<void> | void;
   statusMessage?: string | null;
@@ -40,6 +41,7 @@ type AuthEntryFormProps = React.ComponentProps<'div'> & {
   footerLinkHref?: string;
   footerLinkIntro?: string;
   initialEmail?: string;
+  turnstileSiteKey?: string;
 };
 
 function GoogleIcon() {
@@ -110,6 +112,7 @@ export function AuthEntryForm({
   footerLinkHref,
   footerLinkIntro,
   initialEmail = '',
+  turnstileSiteKey,
   ...props
 }: AuthEntryFormProps) {
   const [email, setEmail] = React.useState(initialEmail);
@@ -117,12 +120,16 @@ export function AuthEntryForm({
   const [isEmailSubmitting, setIsEmailSubmitting] = React.useState(false);
   const [oauthSubmittingProvider, setOauthSubmittingProvider] =
     React.useState<OAuthProvider | null>(null);
+  const [captchaToken, setCaptchaToken] = React.useState<string | null>(null);
+  const [captchaResetKey, setCaptchaResetKey] = React.useState(0);
 
   const trimmedEmail = email.trim();
   const isValidEmail = EMAIL_RE.test(trimmedEmail);
   const showEmailError = emailDirty && trimmedEmail.length > 0 && !isValidEmail;
   const isSubmitting = isEmailSubmitting || oauthSubmittingProvider !== null;
-  const isEmailSubmitDisabled = isSubmitting || !isValidEmail;
+  const isCaptchaRequired = Boolean(turnstileSiteKey);
+  const isEmailSubmitDisabled =
+    isSubmitting || !isValidEmail || (isCaptchaRequired && !captchaToken);
   const showOAuthOptions = enableGoogleSignIn || enableAppleSignIn;
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -136,9 +143,16 @@ export function AuthEntryForm({
     }
     setIsEmailSubmitting(true);
     try {
-      await onEmailLogin(trimmedEmail);
+      if (isCaptchaRequired) {
+        await onEmailLogin(trimmedEmail, captchaToken ?? undefined);
+      } else {
+        await onEmailLogin(trimmedEmail);
+      }
     } finally {
       setIsEmailSubmitting(false);
+      if (isCaptchaRequired) {
+        setCaptchaResetKey((key) => key + 1);
+      }
     }
   };
 
@@ -209,6 +223,13 @@ export function AuthEntryForm({
               <p className="text-sm font-medium text-destructive">
                 Please enter a valid email address
               </p>
+            ) : null}
+            {turnstileSiteKey ? (
+              <Turnstile
+                siteKey={turnstileSiteKey}
+                onTokenChange={setCaptchaToken}
+                resetKey={captchaResetKey}
+              />
             ) : null}
             {errorMessage || statusMessage ? (
               <div

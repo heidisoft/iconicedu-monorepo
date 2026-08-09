@@ -5,6 +5,14 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { AuthEntryForm } from './auth-entry-form';
 
+vi.mock('@iconicedu/ui-web/components/turnstile', () => ({
+  Turnstile: ({ onTokenChange }: { onTokenChange: (token: string) => void }) => (
+    <button type="button" onClick={() => onTokenChange('captcha-token')}>
+      Complete CAPTCHA
+    </button>
+  ),
+}));
+
 const BASE_PROPS = {
   title: 'Sign in',
   subtitle: 'Welcome back.',
@@ -91,6 +99,31 @@ describe('AuthEntryForm', () => {
 
     await waitFor(() => {
       expect(onEmailLogin).toHaveBeenCalledWith('parent@example.com');
+    });
+  });
+
+  it('requires and submits a Turnstile token when configured', async () => {
+    const onEmailLogin = vi.fn();
+    render(
+      <AuthEntryForm
+        {...BASE_PROPS}
+        onEmailLogin={onEmailLogin}
+        turnstileSiteKey="site-key"
+      />,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText('Email'), {
+      target: { value: 'parent@example.com' },
+    });
+    const submitButton = screen.getByRole('button', { name: 'Send code' });
+    expect(submitButton).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Complete CAPTCHA' }));
+    expect(submitButton).toBeEnabled();
+    fireEvent.click(submitButton);
+
+    await waitFor(() => {
+      expect(onEmailLogin).toHaveBeenCalledWith('parent@example.com', 'captcha-token');
     });
   });
 });

@@ -16,8 +16,14 @@ import { useAnalytics } from '@/providers/analytics-provider';
 import { AnalyticsEvent } from '@iconicedu/utils';
 import { fetchOnboardingStatus } from '@/lib/api/queries';
 import type { AppColors } from '@/lib/theme';
+import { TurnstileWidget } from '@/components/auth/turnstile-widget';
 
 const OTP_LENGTH = 6;
+const TURNSTILE_SITE_KEY = process.env.EXPO_PUBLIC_TURNSTILE_SITE_KEY?.trim();
+const TURNSTILE_BASE_URL =
+  process.env.EXPO_PUBLIC_TURNSTILE_BASE_URL?.trim() ||
+  process.env.EXPO_PUBLIC_WEB_URL?.trim() ||
+  'https://localhost';
 
 function makeStyles(C: AppColors) {
   return StyleSheet.create({
@@ -76,6 +82,8 @@ export default function OtpScreen() {
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaResetKey, setCaptchaResetKey] = useState(0);
   const isVerifyingRef = React.useRef(false);
   const { verifySignupOtp, signUpWithOtp, setOnboardingCompletionStatus } = useAuth();
   const router = useRouter();
@@ -147,9 +155,11 @@ export default function OtpScreen() {
     if (!email) return;
     setError(null);
     analytics.capture(AnalyticsEvent.OTP_RESENT);
-    const { error: resendError } = await signUpWithOtp(email);
+    if (TURNSTILE_SITE_KEY && !captchaToken) return;
+    const { error: resendError } = await signUpWithOtp(email, captchaToken ?? undefined);
+    if (TURNSTILE_SITE_KEY) setCaptchaResetKey((key) => key + 1);
     if (resendError) setError(resendError);
-  }, [email, signUpWithOtp, analytics]);
+  }, [analytics, captchaToken, email, signUpWithOtp]);
 
   return (
     <SafeAreaView style={s.safe}>
@@ -204,10 +214,23 @@ export default function OtpScreen() {
             <Text style={s.ctaTxt}>{loading ? 'Verifying…' : 'Verify code'}</Text>
           </TouchableOpacity>
 
+          {TURNSTILE_SITE_KEY ? (
+            <TurnstileWidget
+              siteKey={TURNSTILE_SITE_KEY}
+              baseUrl={TURNSTILE_BASE_URL}
+              onTokenChange={setCaptchaToken}
+              resetKey={captchaResetKey}
+            />
+          ) : null}
+
           {/* Resend */}
           <View style={s.resendRow}>
             <Text style={s.resendHint}>{"Didn't get a code? "}</Text>
-            <TouchableOpacity onPress={handleResend} hitSlop={8}>
+            <TouchableOpacity
+              onPress={handleResend}
+              hitSlop={8}
+              disabled={Boolean(TURNSTILE_SITE_KEY && !captchaToken)}
+            >
               <Text style={s.resendLink}>Resend</Text>
             </TouchableOpacity>
           </View>

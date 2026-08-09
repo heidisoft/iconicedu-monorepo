@@ -23,18 +23,20 @@ export function resolveGetStartedCallbackUrl(): string {
 type GetStartedAuthClientProps = {
   enableGoogleSignIn?: boolean;
   enableAppleSignIn?: boolean;
+  turnstileSiteKey?: string;
 };
 
 export default function GetStartedAuthClient({
   enableGoogleSignIn = false,
   enableAppleSignIn = false,
+  turnstileSiteKey,
 }: GetStartedAuthClientProps) {
   const router = useRouter();
   const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
   const [statusMessage, setStatusMessage] = React.useState<string | null>(null);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
-  const handleEmailLogin = async (email: string) => {
+  const handleEmailLogin = async (email: string, captchaToken?: string) => {
     setErrorMessage(null);
     setStatusMessage(null);
 
@@ -42,6 +44,7 @@ export default function GetStartedAuthClient({
       email,
       options: {
         shouldCreateUser: shouldCreateUserForIntent('get-started'),
+        captchaToken,
       },
     });
 
@@ -88,6 +91,7 @@ export default function GetStartedAuthClient({
       oauthActionVerb="sign-up"
       enableGoogleSignIn={enableGoogleSignIn}
       enableAppleSignIn={enableAppleSignIn}
+      turnstileSiteKey={turnstileSiteKey}
     />
   );
 }
