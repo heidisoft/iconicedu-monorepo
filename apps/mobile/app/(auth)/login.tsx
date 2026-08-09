@@ -21,14 +21,8 @@ import type { AppColors } from '@/lib/theme';
 import { useAnalytics } from '@/providers/analytics-provider';
 import { useAuth } from '@/providers/auth-provider';
 import { useTheme } from '@/providers/theme-provider';
-import { TurnstileWidget } from '@/components/auth/turnstile-widget';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const TURNSTILE_SITE_KEY = process.env.EXPO_PUBLIC_TURNSTILE_SITE_KEY?.trim();
-const TURNSTILE_BASE_URL =
-  process.env.EXPO_PUBLIC_TURNSTILE_BASE_URL?.trim() ||
-  process.env.EXPO_PUBLIC_WEB_URL?.trim() ||
-  'https://localhost';
 
 function makeStyles(
   C: AppColors,
@@ -152,8 +146,6 @@ export default function LoginScreen() {
   const [emailDirty, setEmailDirty] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
-  const [captchaResetKey, setCaptchaResetKey] = useState(0);
   const { signUpWithOtp, sessionExpiryMessage, clearSessionExpiryMessage } = useAuth();
   const router = useRouter();
   const { colors } = useTheme();
@@ -208,10 +200,7 @@ export default function LoginScreen() {
       setError(null);
       clearSessionExpiryMessage();
       analytics.capture(AnalyticsEvent.LOGIN_OTP_REQUESTED, { method: 'email' });
-      const { error: signInError } = await signUpWithOtp(
-        email.trim(),
-        captchaToken ?? undefined,
-      );
+      const { error: signInError } = await signUpWithOtp(email.trim());
 
       if (signInError) {
         analytics.capture(AnalyticsEvent.LOGIN_ERROR, {
@@ -232,14 +221,12 @@ export default function LoginScreen() {
       setError(message);
     } finally {
       setLoading(false);
-      if (TURNSTILE_SITE_KEY) setCaptchaResetKey((key) => key + 1);
     }
-  }, [analytics, captchaToken, clearSessionExpiryMessage, email, router, signUpWithOtp]);
+  }, [analytics, clearSessionExpiryMessage, email, router, signUpWithOtp]);
 
   const isValidEmail = EMAIL_RE.test(email.trim());
   const showEmailError = emailDirty && email.trim().length > 0 && !isValidEmail;
-  const isDisabled =
-    !isValidEmail || loading || Boolean(TURNSTILE_SITE_KEY && !captchaToken);
+  const isDisabled = !isValidEmail || loading;
 
   return (
     <View style={s.safe}>
@@ -313,15 +300,6 @@ export default function LoginScreen() {
                 <Text style={s.errorTxt}>{sessionExpiryMessage}</Text>
               ) : null}
             </View>
-
-            {TURNSTILE_SITE_KEY ? (
-              <TurnstileWidget
-                siteKey={TURNSTILE_SITE_KEY}
-                baseUrl={TURNSTILE_BASE_URL}
-                onTokenChange={setCaptchaToken}
-                resetKey={captchaResetKey}
-              />
-            ) : null}
 
             <TouchableOpacity
               style={[s.cta, isDisabled ? s.ctaDim : undefined]}

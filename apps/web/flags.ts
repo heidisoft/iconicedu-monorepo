@@ -106,22 +106,6 @@ export const enableMobileAppleSignIn = flag<boolean, { profileId?: string | null
   },
 });
 
-export const enableWebTurnstile = flag<boolean, { profileId?: string | null }>({
-  key: 'enable-web-turnstile',
-  description: 'Requires Cloudflare Turnstile for web email authentication requests.',
-  options: [
-    { label: 'Off', value: false },
-    { label: 'On', value: true },
-  ],
-  defaultValue: false,
-  async decide({ entities }) {
-    return evaluateWebBooleanFlag({
-      flagKey: 'enable-web-turnstile',
-      profileId: entities?.profileId,
-    });
-  },
-});
-
 export const enableMarketingSitePages = flag<boolean, { profileId?: string | null }>({
   key: 'enable-marketing-site-pages',
   description:
@@ -164,7 +148,6 @@ export const webFlags = {
   enableMobileAppleSignIn,
   enableMobileDirectMessageStart,
   enableMobileGoogleSignIn,
-  enableWebTurnstile,
 } as const;
 
 export type WebFlagKey = keyof typeof webFlags;

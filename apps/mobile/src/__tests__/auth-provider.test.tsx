@@ -149,28 +149,6 @@ describe('AuthProvider', () => {
     });
   });
 
-  it('passes a CAPTCHA token when requesting an OTP', async () => {
-    const { result } = renderHook(() => useAuth(), { wrapper });
-    await waitFor(() => {
-      expect(result.current.loading).toBe(false);
-    });
-
-    await act(async () => {
-      await result.current.signInWithOtp(
-        'iconicedudev+test@gmail.com',
-        'turnstile-token',
-      );
-    });
-
-    expect(mockSignInWithOtp).toHaveBeenCalledWith({
-      email: 'iconicedudev+test@gmail.com',
-      options: {
-        shouldCreateUser: false,
-        captchaToken: 'turnstile-token',
-      },
-    });
-  });
-
   it('verifyOtp calls supabase', async () => {
     const { result } = renderHook(() => useAuth(), { wrapper });
     await waitFor(() => {

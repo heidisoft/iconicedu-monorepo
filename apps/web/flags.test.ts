@@ -13,7 +13,6 @@ import {
   enableMobileAppleSignIn,
   enableMobileDirectMessageStart,
   enableMobileGoogleSignIn,
-  enableWebTurnstile,
   getFlagsProviderData,
   isVercelFlagsSdkConfigured,
   webFlags,
@@ -62,12 +61,6 @@ describe('web flags', () => {
     expect(enableMarketingSitePages.key).toBe('enable-marketing-site-pages');
     expect(enableMarketingSitePages.defaultValue).toBe(false);
     expect(webFlags.enableMarketingSitePages).toBe(enableMarketingSitePages);
-  });
-
-  it('declares the web Turnstile flag with stable metadata', () => {
-    expect(enableWebTurnstile.key).toBe('enable-web-turnstile');
-    expect(enableWebTurnstile.defaultValue).toBe(false);
-    expect(webFlags.enableWebTurnstile).toBe(enableWebTurnstile);
   });
 
   it('does not require FLAGS env to load the catalog', () => {
