@@ -23,13 +23,13 @@ export function resolveGetStartedCallbackUrl(): string {
 type GetStartedAuthClientProps = {
   enableGoogleSignIn?: boolean;
   enableAppleSignIn?: boolean;
-  recaptchaSiteKey?: string;
+  turnstileSiteKey?: string;
 };
 
 export default function GetStartedAuthClient({
   enableGoogleSignIn = false,
   enableAppleSignIn = false,
-  recaptchaSiteKey,
+  turnstileSiteKey,
 }: GetStartedAuthClientProps) {
   const router = useRouter();
   const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
@@ -91,7 +91,7 @@ export default function GetStartedAuthClient({
       oauthActionVerb="sign-up"
       enableGoogleSignIn={enableGoogleSignIn}
       enableAppleSignIn={enableAppleSignIn}
-      recaptchaSiteKey={recaptchaSiteKey}
+      turnstileSiteKey={turnstileSiteKey}
     />
   );
 }

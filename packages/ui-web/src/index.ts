@@ -1,6 +1,6 @@
 export * from '@iconicedu/ui-web/components/sidebar/sidebar-left';
 export * from '@iconicedu/ui-web/components/login-form';
-export * from '@iconicedu/ui-web/components/google-recaptcha';
+export * from '@iconicedu/ui-web/components/turnstile';
 export * from '@iconicedu/ui-web/components/sidebar/nav-learning-spaces';
 export * from '@iconicedu/ui-web/components/sidebar/nav-secondary';
 export * from '@iconicedu/ui-web/components/sidebar/nav-user';

@@ -5,8 +5,8 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { AuthEntryForm } from './auth-entry-form';
 
-vi.mock('@iconicedu/ui-web/components/google-recaptcha', () => ({
-  GoogleRecaptcha: ({ onTokenChange }: { onTokenChange: (token: string) => void }) => (
+vi.mock('@iconicedu/ui-web/components/turnstile', () => ({
+  Turnstile: ({ onTokenChange }: { onTokenChange: (token: string) => void }) => (
     <button type="button" onClick={() => onTokenChange('captcha-token')}>
       Complete CAPTCHA
     </button>
@@ -102,13 +102,13 @@ describe('AuthEntryForm', () => {
     });
   });
 
-  it('requires and submits a reCAPTCHA token when configured', async () => {
+  it('requires and submits a Turnstile token when configured', async () => {
     const onEmailLogin = vi.fn();
     render(
       <AuthEntryForm
         {...BASE_PROPS}
         onEmailLogin={onEmailLogin}
-        recaptchaSiteKey="site-key"
+        turnstileSiteKey="site-key"
       />,
     );
 

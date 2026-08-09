@@ -13,7 +13,7 @@ import {
 } from '@iconicedu/ui-web/ui/field';
 import { Input } from '@iconicedu/ui-web/ui/input';
 import { SiteLogoFull } from '@iconicedu/ui-web/components/branding/site-logo-full';
-import { GoogleRecaptcha } from '@iconicedu/ui-web/components/google-recaptcha';
+import { Turnstile } from '@iconicedu/ui-web/components/turnstile';
 import { Loader2 } from 'lucide-react';
 
 type OAuthProvider = 'apple' | 'google';
@@ -41,7 +41,7 @@ type AuthEntryFormProps = React.ComponentProps<'div'> & {
   footerLinkHref?: string;
   footerLinkIntro?: string;
   initialEmail?: string;
-  recaptchaSiteKey?: string;
+  turnstileSiteKey?: string;
 };
 
 function GoogleIcon() {
@@ -112,7 +112,7 @@ export function AuthEntryForm({
   footerLinkHref,
   footerLinkIntro,
   initialEmail = '',
-  recaptchaSiteKey,
+  turnstileSiteKey,
   ...props
 }: AuthEntryFormProps) {
   const [email, setEmail] = React.useState(initialEmail);
@@ -127,7 +127,7 @@ export function AuthEntryForm({
   const isValidEmail = EMAIL_RE.test(trimmedEmail);
   const showEmailError = emailDirty && trimmedEmail.length > 0 && !isValidEmail;
   const isSubmitting = isEmailSubmitting || oauthSubmittingProvider !== null;
-  const isCaptchaRequired = Boolean(recaptchaSiteKey);
+  const isCaptchaRequired = Boolean(turnstileSiteKey);
   const isEmailSubmitDisabled =
     isSubmitting || !isValidEmail || (isCaptchaRequired && !captchaToken);
   const showOAuthOptions = enableGoogleSignIn || enableAppleSignIn;
@@ -224,9 +224,9 @@ export function AuthEntryForm({
                 Please enter a valid email address
               </p>
             ) : null}
-            {recaptchaSiteKey ? (
-              <GoogleRecaptcha
-                siteKey={recaptchaSiteKey}
+            {turnstileSiteKey ? (
+              <Turnstile
+                siteKey={turnstileSiteKey}
                 onTokenChange={setCaptchaToken}
                 resetKey={captchaResetKey}
               />

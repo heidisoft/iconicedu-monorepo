@@ -47,11 +47,12 @@ The Next.js web app is designed to deploy on [Vercel](https://vercel.com). It us
 
 ### Environment variables (Vercel dashboard)
 
-| Variable                        | Where to find it                    |
-| ------------------------------- | ----------------------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`      | Supabase dashboard → Settings → API |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase dashboard → Settings → API |
-| `SUPABASE_SERVICE_ROLE_KEY`     | Supabase dashboard → Settings → API |
+| Variable                         | Where to find it                    |
+| -------------------------------- | ----------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`       | Supabase dashboard → Settings → API |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY`  | Supabase dashboard → Settings → API |
+| `SUPABASE_SERVICE_ROLE_KEY`      | Supabase dashboard → Settings → API |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Cloudflare dashboard → Turnstile    |
 
 ### Deploying
 
@@ -358,17 +359,20 @@ Supabase automatically takes daily backups on paid plans. For additional safety,
 
 ## Environment Variables Reference
 
-| Variable                        | Web                     | Mobile | API | Notes                               |
-| ------------------------------- | ----------------------- | ------ | --- | ----------------------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`      | ✅                      | —      | —   | Public, browser-safe                |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅                      | —      | —   | Public, browser-safe                |
-| `SUPABASE_SERVICE_ROLE_KEY`     | ✅ (server)             | —      | ✅  | Never expose client-side            |
-| `EXPO_PUBLIC_SUPABASE_URL`      | —                       | ✅     | —   | Inlined at build time               |
-| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | —                       | ✅     | —   | Inlined at build time               |
-| `DATABASE_URL`                  | —                       | —      | ✅  | Pooled Postgres URL                 |
-| `DIRECT_URL`                    | —                       | —      | ✅  | Non-pooled, for migrations          |
-| `SUPABASE_URL`                  | —                       | —      | ✅  |                                     |
-| `SUPABASE_JWT_SECRET`           | —                       | —      | ✅  | From Supabase JWT settings          |
-| `INTERNAL_EVENTS_TOKEN`         | ✅ (server/admin tools) | —      | ✅  | Match Supabase Edge Function secret |
-| `INTERNAL_REMINDERS_TOKEN`      | ✅ (server/admin tools) | —      | ✅  | Match Supabase Edge Function secret |
-| `EXPO_ACCESS_TOKEN`             | —                       | —      | ✅  | Expo push provider token            |
+| Variable                         | Web                     | Mobile | API | Notes                                |
+| -------------------------------- | ----------------------- | ------ | --- | ------------------------------------ |
+| `NEXT_PUBLIC_SUPABASE_URL`       | ✅                      | —      | —   | Public, browser-safe                 |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY`  | ✅                      | —      | —   | Public, browser-safe                 |
+| `SUPABASE_SERVICE_ROLE_KEY`      | ✅ (server)             | —      | ✅  | Never expose client-side             |
+| `EXPO_PUBLIC_SUPABASE_URL`       | —                       | ✅     | —   | Inlined at build time                |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY`  | —                       | ✅     | —   | Inlined at build time                |
+| `DATABASE_URL`                   | —                       | —      | ✅  | Pooled Postgres URL                  |
+| `DIRECT_URL`                     | —                       | —      | ✅  | Non-pooled, for migrations           |
+| `SUPABASE_URL`                   | —                       | —      | ✅  |                                      |
+| `SUPABASE_JWT_SECRET`            | —                       | —      | ✅  | From Supabase JWT settings           |
+| `INTERNAL_EVENTS_TOKEN`          | ✅ (server/admin tools) | —      | ✅  | Match Supabase Edge Function secret  |
+| `INTERNAL_REMINDERS_TOKEN`       | ✅ (server/admin tools) | —      | ✅  | Match Supabase Edge Function secret  |
+| `EXPO_ACCESS_TOKEN`              | —                       | —      | ✅  | Expo push provider token             |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | ✅                      | —      | —   | Public Cloudflare Turnstile site key |
+| `EXPO_PUBLIC_TURNSTILE_SITE_KEY` | —                       | ✅     | —   | Public mobile Turnstile site key     |
+| `EXPO_PUBLIC_TURNSTILE_BASE_URL` | —                       | ✅     | —   | HTTPS origin allowed by the widget   |

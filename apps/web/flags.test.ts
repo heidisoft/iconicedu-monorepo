@@ -13,7 +13,7 @@ import {
   enableMobileAppleSignIn,
   enableMobileDirectMessageStart,
   enableMobileGoogleSignIn,
-  enableWebRecaptcha,
+  enableWebTurnstile,
   getFlagsProviderData,
   isVercelFlagsSdkConfigured,
   webFlags,
@@ -64,10 +64,10 @@ describe('web flags', () => {
     expect(webFlags.enableMarketingSitePages).toBe(enableMarketingSitePages);
   });
 
-  it('declares the web reCAPTCHA flag with stable metadata', () => {
-    expect(enableWebRecaptcha.key).toBe('enable-web-recaptcha');
-    expect(enableWebRecaptcha.defaultValue).toBe(false);
-    expect(webFlags.enableWebRecaptcha).toBe(enableWebRecaptcha);
+  it('declares the web Turnstile flag with stable metadata', () => {
+    expect(enableWebTurnstile.key).toBe('enable-web-turnstile');
+    expect(enableWebTurnstile.defaultValue).toBe(false);
+    expect(webFlags.enableWebTurnstile).toBe(enableWebTurnstile);
   });
 
   it('does not require FLAGS env to load the catalog', () => {

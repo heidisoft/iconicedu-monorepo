@@ -106,9 +106,9 @@ export const enableMobileAppleSignIn = flag<boolean, { profileId?: string | null
   },
 });
 
-export const enableWebRecaptcha = flag<boolean, { profileId?: string | null }>({
-  key: 'enable-web-recaptcha',
-  description: 'Requires Google reCAPTCHA for web email login and sign-up submissions.',
+export const enableWebTurnstile = flag<boolean, { profileId?: string | null }>({
+  key: 'enable-web-turnstile',
+  description: 'Requires Cloudflare Turnstile for web email authentication requests.',
   options: [
     { label: 'Off', value: false },
     { label: 'On', value: true },
@@ -116,7 +116,7 @@ export const enableWebRecaptcha = flag<boolean, { profileId?: string | null }>({
   defaultValue: false,
   async decide({ entities }) {
     return evaluateWebBooleanFlag({
-      flagKey: 'enable-web-recaptcha',
+      flagKey: 'enable-web-turnstile',
       profileId: entities?.profileId,
     });
   },
@@ -164,7 +164,7 @@ export const webFlags = {
   enableMobileAppleSignIn,
   enableMobileDirectMessageStart,
   enableMobileGoogleSignIn,
-  enableWebRecaptcha,
+  enableWebTurnstile,
 } as const;
 
 export type WebFlagKey = keyof typeof webFlags;

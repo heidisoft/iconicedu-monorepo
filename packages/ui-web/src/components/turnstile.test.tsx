@@ -3,35 +3,37 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { GoogleRecaptcha } from './google-recaptcha';
+import { Turnstile } from './turnstile';
 
-describe('GoogleRecaptcha', () => {
+describe('Turnstile', () => {
   afterEach(() => {
-    document.getElementById('google-recaptcha-script')?.remove();
-    delete (window as typeof window & { grecaptcha?: unknown }).grecaptcha;
+    document.getElementById('cloudflare-turnstile-script')?.remove();
+    delete (window as typeof window & { turnstile?: unknown }).turnstile;
   });
 
   it('loads and renders the widget, then reports token changes', () => {
     const onTokenChange = vi.fn();
     const renderWidget = vi.fn((_container, options) => {
       options.callback('verified-token');
-      return 7;
+      return 'widget-id';
     });
-    (window as typeof window & { grecaptcha?: unknown }).grecaptcha = {
+    (window as typeof window & { turnstile?: unknown }).turnstile = {
       render: renderWidget,
       reset: vi.fn(),
     };
 
-    render(<GoogleRecaptcha siteKey="site-key" onTokenChange={onTokenChange} />);
-    const script = document.getElementById('google-recaptcha-script');
+    render(<Turnstile siteKey="site-key" onTokenChange={onTokenChange} />);
+    const script = document.getElementById('cloudflare-turnstile-script');
     expect(script).toHaveAttribute(
       'src',
-      'https://www.google.com/recaptcha/api.js?render=explicit',
+      'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit',
     );
 
     fireEvent.load(script as HTMLScriptElement);
 
-    expect(screen.getByLabelText('reCAPTCHA verification')).toBeInTheDocument();
+    expect(
+      screen.getByLabelText('Cloudflare Turnstile verification'),
+    ).toBeInTheDocument();
     expect(renderWidget).toHaveBeenCalledWith(
       expect.any(HTMLElement),
       expect.objectContaining({ sitekey: 'site-key' }),

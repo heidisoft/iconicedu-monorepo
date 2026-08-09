@@ -297,6 +297,9 @@ SUPABASE_URL=https://your-project-ref.supabase.co
 
 # Keep this secret — never expose to the browser
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+
+# Configure the matching secret in Supabase Auth before enabling the feature flag
+NEXT_PUBLIC_TURNSTILE_SITE_KEY=your-turnstile-site-key
 ```
 
 When synced from local Supabase, the command writes:
@@ -318,6 +321,8 @@ cp apps/mobile/.env.example apps/mobile/.env
 # EXPO_PUBLIC_ prefix is required — variables are inlined at build time
 EXPO_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+EXPO_PUBLIC_TURNSTILE_SITE_KEY=your-turnstile-site-key
+EXPO_PUBLIC_TURNSTILE_BASE_URL=https://your-web-app.example.com
 ```
 
 When synced from local Supabase, the command writes:

@@ -2,10 +2,11 @@
 
 import * as React from 'react';
 
-const RECAPTCHA_SCRIPT_ID = 'google-recaptcha-script';
-const RECAPTCHA_SCRIPT_SRC = 'https://www.google.com/recaptcha/api.js?render=explicit';
+const TURNSTILE_SCRIPT_ID = 'cloudflare-turnstile-script';
+const TURNSTILE_SCRIPT_SRC =
+  'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
 
-type RecaptchaApi = {
+type TurnstileApi = {
   render: (
     container: HTMLElement,
     parameters: {
@@ -14,29 +15,25 @@ type RecaptchaApi = {
       'expired-callback': () => void;
       'error-callback': () => void;
     },
-  ) => number;
-  reset: (widgetId: number) => void;
+  ) => string;
+  reset: (widgetId: string) => void;
 };
 
-function getRecaptchaApi(): RecaptchaApi | undefined {
-  return (window as typeof window & { grecaptcha?: RecaptchaApi }).grecaptcha;
+function getTurnstileApi(): TurnstileApi | undefined {
+  return (window as typeof window & { turnstile?: TurnstileApi }).turnstile;
 }
 
-export type GoogleRecaptchaProps = {
+export type TurnstileProps = {
   siteKey: string;
   onTokenChange: (token: string | null) => void;
   resetKey?: number;
 };
 
-export function GoogleRecaptcha({
-  siteKey,
-  onTokenChange,
-  resetKey = 0,
-}: GoogleRecaptchaProps) {
+export function Turnstile({ siteKey, onTokenChange, resetKey = 0 }: TurnstileProps) {
   const containerRef = React.useRef<HTMLDivElement>(null);
-  const widgetIdRef = React.useRef<number | null>(null);
-  const hasMountedRef = React.useRef(false);
+  const widgetIdRef = React.useRef<string | null>(null);
   const onTokenChangeRef = React.useRef(onTokenChange);
+  const hasMountedRef = React.useRef(false);
 
   React.useEffect(() => {
     onTokenChangeRef.current = onTokenChange;
@@ -44,10 +41,9 @@ export function GoogleRecaptcha({
 
   React.useEffect(() => {
     const renderWidget = () => {
-      const api = getRecaptchaApi();
-      if (!api || !containerRef.current || widgetIdRef.current !== null) {
-        return;
-      }
+      const api = getTurnstileApi();
+      if (!api || !containerRef.current || widgetIdRef.current !== null) return;
+
       widgetIdRef.current = api.render(containerRef.current, {
         sitekey: siteKey,
         callback: (token) => onTokenChangeRef.current(token),
@@ -56,24 +52,20 @@ export function GoogleRecaptcha({
       });
     };
 
-    const existingScript = document.getElementById(RECAPTCHA_SCRIPT_ID);
+    const existingScript = document.getElementById(TURNSTILE_SCRIPT_ID);
     if (existingScript) {
-      if (getRecaptchaApi()) {
-        renderWidget();
-      } else {
-        existingScript.addEventListener('load', renderWidget);
-      }
+      if (getTurnstileApi()) renderWidget();
+      else existingScript.addEventListener('load', renderWidget);
       return () => existingScript.removeEventListener('load', renderWidget);
     }
 
     const script = document.createElement('script');
-    script.id = RECAPTCHA_SCRIPT_ID;
-    script.src = RECAPTCHA_SCRIPT_SRC;
+    script.id = TURNSTILE_SCRIPT_ID;
+    script.src = TURNSTILE_SCRIPT_SRC;
     script.async = true;
     script.defer = true;
     script.addEventListener('load', renderWidget);
     document.head.appendChild(script);
-
     return () => script.removeEventListener('load', renderWidget);
   }, [siteKey]);
 
@@ -83,14 +75,14 @@ export function GoogleRecaptcha({
       return;
     }
     if (widgetIdRef.current !== null) {
-      getRecaptchaApi()?.reset(widgetIdRef.current);
+      getTurnstileApi()?.reset(widgetIdRef.current);
       onTokenChangeRef.current(null);
     }
   }, [resetKey]);
 
   return (
-    <div className="flex min-h-[78px] justify-center overflow-hidden">
-      <div ref={containerRef} aria-label="reCAPTCHA verification" />
+    <div className="flex min-h-[65px] justify-center overflow-hidden">
+      <div ref={containerRef} aria-label="Cloudflare Turnstile verification" />
     </div>
   );
 }
