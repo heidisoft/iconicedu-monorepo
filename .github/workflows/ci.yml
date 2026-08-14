@@ -528,6 +528,7 @@ jobs:
       contents: read
       pull-requests: write
       deployments: write
+      statuses: write
     outputs:
       web-url: ${{ steps.vercel.outputs.vercel_url }}
       api-url: ${{ steps.railway.outputs.railway_api_url }}
@@ -929,7 +930,6 @@ jobs:
       # branch-local Supabase function secrets.
       - name: Configure Vercel preview env vars
         id: vercel
-        continue-on-error: true
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
@@ -960,35 +960,34 @@ jobs:
             fail_vercel_config "Vercel project preflight failed (HTTP ${PROJECT_STATUS})."
           fi
 
-          set_vercel_env() {
-            local KEY="$1" VALUE="$2"
-            EXISTING_ID=$(curl -sf \
-              -H "Authorization: Bearer $VERCEL_TOKEN" \
-              "https://api.vercel.com/v10/projects/${PROJECT_ID}/env?gitBranch=${BRANCH}${TEAM_AMP}" \
-              | jq -r --arg k "$KEY" '.envs[] | select(.key==$k) | .id' 2>/dev/null || echo "")
-            if [[ -n "$EXISTING_ID" ]]; then
-              curl -sf -X DELETE \
-                -H "Authorization: Bearer $VERCEL_TOKEN" \
-                "https://api.vercel.com/v10/projects/${PROJECT_ID}/env/${EXISTING_ID}${TEAM_Q}" > /dev/null
-            fi
-            POST_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
-              -H "Authorization: Bearer $VERCEL_TOKEN" \
-              -H "Content-Type: application/json" \
-              "https://api.vercel.com/v10/projects/${PROJECT_ID}/env${TEAM_Q}" \
-              -d "$(jq -n --arg k "$KEY" --arg v "$VALUE" --arg b "$BRANCH" \
-                '{"key":$k,"value":$v,"target":["preview"],"gitBranch":$b,"type":"encrypted"}')")
-            if [[ ! "$POST_STATUS" =~ ^2[0-9][0-9]$ ]]; then
-              echo "::error::Vercel env write failed for $KEY (HTTP $POST_STATUS)"
-              exit 1
-            fi
-          }
+          # One upsert request is faster and atomic from the workflow's point of
+          # view. It also avoids a delete/create gap that could leave a branch
+          # without configuration when a write is interrupted.
+          VERCEL_ENV_PAYLOAD=$(jq -n \
+            --arg branch "$BRANCH" \
+            --arg api_url "${{ steps.railway.outputs.railway_api_url }}" \
+            --arg events_token "${{ secrets.INTERNAL_EVENTS_TOKEN }}" \
+            --arg reminders_token "${{ secrets.INTERNAL_REMINDERS_TOKEN }}" \
+            '[
+              {key:"API_URL", value:$api_url},
+              {key:"NEXT_PUBLIC_API_URL", value:$api_url},
+              {key:"EXPO_PUBLIC_API_URL", value:$api_url},
+              {key:"NEXT_PUBLIC_APP_ENV", value:"preview"},
+              {key:"INTERNAL_EVENTS_TOKEN", value:$events_token},
+              {key:"INTERNAL_REMINDERS_TOKEN", value:$reminders_token}
+            ] | map(. + {target:["preview"], gitBranch:$branch, type:"encrypted"})')
 
-          set_vercel_env "API_URL" "${{ steps.railway.outputs.railway_api_url }}"
-          set_vercel_env "NEXT_PUBLIC_API_URL" "${{ steps.railway.outputs.railway_api_url }}"
-          set_vercel_env "EXPO_PUBLIC_API_URL" "${{ steps.railway.outputs.railway_api_url }}"
-          set_vercel_env "NEXT_PUBLIC_APP_ENV" "preview"
-          set_vercel_env "INTERNAL_EVENTS_TOKEN" "${{ secrets.INTERNAL_EVENTS_TOKEN }}"
-          set_vercel_env "INTERNAL_REMINDERS_TOKEN" "${{ secrets.INTERNAL_REMINDERS_TOKEN }}"
+          RESPONSE_FILE=$(mktemp)
+          POST_STATUS=$(curl -sS -o "$RESPONSE_FILE" -w "%{http_code}" -X POST \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            -H "Content-Type: application/json" \
+            "https://api.vercel.com/v10/projects/${PROJECT_ID}/env?upsert=true${TEAM_AMP}" \
+            -d "$VERCEL_ENV_PAYLOAD")
+          if [[ ! "$POST_STATUS" =~ ^2[0-9][0-9]$ ]]; then
+            ERROR_CODE=$(jq -r '.error.code // "unknown"' "$RESPONSE_FILE" 2>/dev/null || echo "unknown")
+            echo "::error::Vercel env upsert failed (HTTP $POST_STATUS, code $ERROR_CODE)"
+            exit 1
+          fi
 
           LATEST_DEPLOYMENT_JSON=$(curl -sf \
             -H "Authorization: Bearer $VERCEL_TOKEN" \
