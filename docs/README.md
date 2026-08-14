@@ -47,7 +47,6 @@ Internal engineers, operators, and AI assistants.
 - [Deployment](operations/deployment.md)
 - [Reminders Runbook](operations/reminders.md)
 - [Local Event Pipeline Testing](operations/local-event-pipeline-testing.md)
-- [Security and RLS Report](reports/security-rls.md)
 
 ### AI Agent
 
@@ -100,13 +99,6 @@ Internal engineers, operators, and AI assistants.
 
 - [AI Guidance](internal/ai/agents.md)
 
-### Reports and Archive
-
-- [Production Improvements](reports/production-improvements.md)
-- [Security and RLS Report](reports/security-rls.md)
-
-Reports describe an audit at a point in time and may contain findings that have since been resolved. Use canonical getting-started, architecture, standards, and operations documents for current instructions.
-
 ## Documentation Maintenance
 
 - Update docs in the same PR as the behavior they describe.
@@ -114,3 +106,5 @@ Reports describe an audit at a point in time and may contain findings that have 
 - Use repository-relative links; never commit machine-specific absolute paths.
 - Change `Last Updated` only after reviewing the complete document.
 - Add new canonical pages to this hub and keep subsystem runbooks beside the code they operate.
+- Track planned work and point-in-time audit findings in GitHub issues instead of `docs/todos` or `docs/reports`.
+- Remove superseded pages and their inbound links rather than keeping an unlabeled archive in the current documentation tree.

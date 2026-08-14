@@ -17,7 +17,6 @@ Engineers changing database schema, RLS, Prisma, or Supabase-backed data access.
 - [Documentation Hub](../README.md)
 - [Architecture Overview](overview.md)
 - [Deployment](../operations/deployment.md)
-- [Security and RLS Report](../reports/security-rls.md)
 
 Overview of the IconicEdu database schema, migration workflow, and Supabase conventions.
 
