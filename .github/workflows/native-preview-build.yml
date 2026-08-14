@@ -39,7 +39,7 @@ jobs:
 
     steps:
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 20.19.0
 
@@ -261,7 +261,7 @@ jobs:
             "${WEB_URL}"
 
       - name: Upload resolved mobile env
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mobile-build-env-${{ github.run_id }}
           path: mobile-build-env/.env.local
@@ -280,15 +280,15 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           version: 10.33.0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 20.19.0
           cache: pnpm
@@ -303,7 +303,7 @@ jobs:
         run: npm install -g eas-cli --silent
 
       - name: Download resolved mobile env
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: mobile-build-env-${{ github.run_id }}
           path: /tmp/mobile-build-env
@@ -325,7 +325,7 @@ jobs:
             --output ./build/app.apk
 
       - name: Upload Android artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: android-apk-${{ github.run_number }}-${{ inputs.profile }}
           path: apps/mobile/build/app.apk
@@ -343,15 +343,15 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           version: 10.33.0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 20.19.0
           cache: pnpm
@@ -380,7 +380,7 @@ jobs:
         run: npm install -g eas-cli --silent
 
       - name: Download resolved mobile env
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: mobile-build-env-${{ github.run_id }}
           path: /tmp/mobile-build-env
@@ -402,7 +402,7 @@ jobs:
             --output ./build/app.ipa
 
       - name: Upload iOS artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ios-ipa-${{ github.run_number }}-${{ inputs.profile }}
           path: apps/mobile/build/app.ipa
@@ -425,7 +425,7 @@ jobs:
 
     steps:
       - name: Post artifact links to PR
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const prNumber = parseInt('${{ inputs.pr_number }}', 10);

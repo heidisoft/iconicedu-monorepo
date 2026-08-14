@@ -42,6 +42,17 @@
         "POSTGRES_DATABASE"
       ]
     },
+    "export:bundle": {
+      "dependsOn": ["^build"],
+      "outputs": [".expo/dist/**"],
+      "env": [
+        "EXPO_PUBLIC_API_URL",
+        "EXPO_PUBLIC_SUPABASE_URL",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY",
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+        "EXPO_NO_TELEMETRY"
+      ]
+    },
     "dev": {
       "dependsOn": ["^build"],
       "cache": false,

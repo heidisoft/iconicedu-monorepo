@@ -219,9 +219,11 @@ Preview CI now deploys the required Supabase Edge Functions and sets branch-loca
 - `EVENTS_DISPATCH_URL=https://<api-domain>/internal/events/dispatch`
 - `INTERNAL_EVENTS_TOKEN=<same value in apps/api and Supabase Edge Functions>`
 
-Preview CI applies migrations, sets branch-local Edge Function secrets, deploys
-functions, deletes deprecated remote functions, runs
-`public.configure_edge_function_cron(...)`, and verifies the active cron set.
+When a preview branch is new or `supabase/**` changes, preview CI applies
+migrations, sets branch-local Edge Function secrets, deploys functions, deletes
+deprecated remote functions, runs `public.configure_edge_function_cron(...)`,
+and verifies the active cron set. Application-only pushes reuse the existing
+preview schema and run preview provisioning alongside the application build.
 Production configuration runs automatically after a PR is merged to `main`, waits
 for the GitHub `production` Environment approval, then uses
 `ops/env/production.env.json` and GitHub Actions secrets to configure Railway,
@@ -266,6 +268,17 @@ Production GitHub Actions secrets:
 | Production values   | `EXPO_ACCESS_TOKEN` or `EXPO_TOKEN`                                | Required for authenticated Expo push sends                             |
 | Optional telemetry  | `POSTHOG_KEY`                                                      | Optional PostHog key                                                   |
 | Optional telemetry  | `POSTHOG_HOST`                                                     | Optional PostHog host                                                  |
+
+Optional CI cache configuration:
+
+| Where               | Variable / value | Notes                                            |
+| ------------------- | ---------------- | ------------------------------------------------ |
+| Repository secret   | `TURBO_TOKEN`    | Authenticates an optional Turborepo remote cache |
+| Repository variable | `TURBO_TEAM`     | Team slug associated with the remote cache       |
+
+Without these optional values, CI still shares `.turbo` build outputs through
+the GitHub Actions cache. Do not reuse an unrelated platform token or guess the
+team slug.
 
 When a PR introduces a new production env var, add it to
 `ops/env/production.env.json` and add the matching GitHub Actions secret or

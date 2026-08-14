@@ -254,7 +254,9 @@ Branch protection requires:
 - `Test`; and
 - `Build`.
 
-It also requires one approving review and resolved conversations; pushing new changes dismisses a stale approval. The quality job validates the PR title. `Bundle Size` provides additional change visibility. The preview job provisions or verifies the Supabase branch, Railway API environment, and Vercel preview after the required CI work succeeds. Mobile binaries are created separately through the `Create EAS Build` workflow when needed.
+It also requires one approving review and resolved conversations; pushing new changes dismisses a stale approval. The quality job validates the PR title and formats only changed files. `Bundle Size` provides additional change visibility.
+
+CI classifies changed paths before starting expensive work. Documentation-only PRs keep the required `Build` check green as a fast no-op and skip bundle analysis and preview provisioning. For code changes, application builds and preview provisioning start in parallel after quality and tests pass. A small summary job joins their results and updates the single preview comment. Mobile binaries are created separately through the `Create EAS Build` workflow when needed.
 
 Use the `Preview Environment Ready` PR comment as the source of truth for preview URLs and test credentials. Smoke-test the affected role and platform, not only the happy path.
 

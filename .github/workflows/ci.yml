@@ -5,15 +5,68 @@ on:
     branches: [main]
     types: [opened, synchronize, reopened, closed]
 
-# Cancel in-progress runs for the same branch/PR when a new push comes in
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 env:
   TURBO_TELEMETRY_DISABLED: 1
+  # Empty values keep local caching active when remote-cache credentials have
+  # not been configured (for example, on pull requests from forks).
+  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+  TURBO_TEAM: ${{ vars.TURBO_TEAM }}
 
 jobs:
+  # Classify the PR once so expensive jobs can become successful no-ops for
+  # documentation-only changes. Keep the workflow itself running because
+  # branch protection requires named checks from this workflow.
+  changes:
+    name: Detect Changes
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: ci-changes-${{ github.ref }}
+      cancel-in-progress: true
+    outputs:
+      code: ${{ steps.classify.outputs.code }}
+      supabase: ${{ steps.classify.outputs.supabase }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Classify changed files
+        id: classify
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+
+          code=false
+          supabase=false
+          changed_files=$(git diff --name-only --diff-filter=ACMRD "${BASE_SHA}...HEAD")
+
+          while IFS= read -r file; do
+            [[ -z "$file" ]] && continue
+            echo "Changed: $file"
+
+            case "$file" in
+              supabase/*)
+                supabase=true
+                code=true
+                ;;
+              docs/*|*.md|LICENSE|LICENSE.*)
+                ;;
+              *)
+                code=true
+                ;;
+            esac
+          done <<< "$changed_files"
+
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "supabase=$supabase" >> "$GITHUB_OUTPUT"
+          echo "Code changes: $code"
+          echo "Supabase changes: $supabase"
+
   # ──────────────────────────────────────────────────────────────
   # Job 1: Code quality — format · lint · typecheck
   # PRs: affected packages only (fast feedback)
@@ -26,21 +79,24 @@ jobs:
     if: github.event.action != 'closed'
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    concurrency:
+      group: ci-quality-${{ github.ref }}
+      cancel-in-progress: true
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # Fetch enough history for turbo --affected to compare against the base
           fetch-depth: 0
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           version: 10.33.0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 20.19.0
           cache: pnpm
@@ -54,7 +110,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Restore Turbo cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .turbo
           key: turbo-quality-${{ runner.os }}-${{ github.sha }}
@@ -70,9 +126,8 @@ jobs:
       - name: Build shared packages
         run: pnpm build:packages
 
-      # Always check all files — prettier is fast enough to run unconditionally.
-      - name: Format check
-        run: pnpm format:check
+      - name: Format changed files
+        run: pnpm format:check:changed
 
       # Temporarily disabled in GitHub Actions. Keep the local script in package.json
       # so the guard can be re-enabled here without reintroducing the implementation.
@@ -98,20 +153,23 @@ jobs:
     if: github.event.action != 'closed'
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    concurrency:
+      group: ci-test-${{ github.ref }}
+      cancel-in-progress: true
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           version: 10.33.0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 20.19.0
           cache: pnpm
@@ -120,7 +178,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Restore Turbo cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .turbo
           key: turbo-test-${{ runner.os }}-${{ github.sha }}
@@ -148,32 +206,46 @@ jobs:
   # ──────────────────────────────────────────────────────────────
   bundle-size:
     name: Bundle Size
-    if: github.event.action != 'closed'
-    needs: [build]
+    if: >
+      github.event.action != 'closed' &&
+      needs.changes.outputs.code == 'true' &&
+      needs.build.result == 'success'
+    needs: [changes, build]
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 15
+    concurrency:
+      group: ci-bundle-${{ github.ref }}
+      cancel-in-progress: true
     permissions:
       contents: read
 
     steps:
       - name: Checkout PR branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           version: 10.33.0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 20.19.0
           cache: pnpm
 
+      - name: Restore Turbo build cache
+        uses: actions/cache@v6
+        with:
+          path: .turbo
+          key: turbo-build-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            turbo-build-${{ runner.os }}-
+
       - name: Download PR sizes artifact from build job
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: pr-sizes
           path: /tmp
@@ -219,7 +291,7 @@ jobs:
       # the key changes and we rebuild the base sizes once.
       - name: Restore main branch sizes from cache
         id: cache-restore
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: /tmp/base-sizes.json
           key: bundle-sizes-base-${{ runner.os }}-${{ github.event.pull_request.base.sha }}
@@ -262,10 +334,8 @@ jobs:
         continue-on-error: true
         run: |
           pnpm --filter api db:generate || true
-          pnpm build:packages
-          pnpm --filter web build
-          (cd apps/mobile && npx expo export --platform android --output-dir .expo/dist) || true
-          pnpm --filter api build || true
+          pnpm exec turbo run build --filter=web... --filter=api...
+          pnpm exec turbo run export:bundle --filter=mobile || true
         env:
           EXPO_NO_TELEMETRY: 1
           TURBO_TELEMETRY_DISABLED: 1
@@ -276,7 +346,7 @@ jobs:
 
       - name: Save base branch sizes to cache
         if: steps.cache-restore.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: /tmp/base-sizes.json
           key: bundle-sizes-base-${{ runner.os }}-${{ github.event.pull_request.base.sha }}
@@ -295,7 +365,7 @@ jobs:
           "
 
       - name: Upload bundle sizes artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: bundle-sizes
           path: /tmp/bundle-sizes.json
@@ -312,32 +382,50 @@ jobs:
     # scripts/github/apply-branch-protection.sh in the same change.
     name: Build
     if: github.event.action != 'closed'
-    needs: [quality, test]
+    needs: [changes, quality, test]
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 15
+    concurrency:
+      group: ci-build-${{ github.ref }}
+      cancel-in-progress: true
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        if: needs.changes.outputs.code == 'true'
+        uses: actions/checkout@v7
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        if: needs.changes.outputs.code == 'true'
+        uses: pnpm/action-setup@v6
         with:
           version: 10.33.0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        if: needs.changes.outputs.code == 'true'
+        uses: actions/setup-node@v7
         with:
           node-version: 20.19.0
           cache: pnpm
 
       - name: Install dependencies
+        if: needs.changes.outputs.code == 'true'
         run: pnpm install --frozen-lockfile
 
+      - name: Restore Turbo build cache
+        if: needs.changes.outputs.code == 'true'
+        uses: actions/cache@v6
+        with:
+          path: .turbo
+          key: turbo-build-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            turbo-build-${{ runner.os }}-
+
       - name: Generate Prisma client
+        if: needs.changes.outputs.code == 'true'
         run: pnpm --filter api db:generate
 
       - name: Set build env vars
+        if: needs.changes.outputs.code == 'true'
         run: |
           echo "SUPABASE_URL=${_URL:-https://placeholder.supabase.co}" >> "$GITHUB_ENV"
           echo "NEXT_PUBLIC_SUPABASE_URL=${_URL:-https://placeholder.supabase.co}" >> "$GITHUB_ENV"
@@ -355,6 +443,7 @@ jobs:
           _SRK: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
       - name: Write measurement script
+        if: needs.changes.outputs.code == 'true'
         run: |
           cat > /tmp/measure.js << 'EOF'
           const fs = require('fs'), path = require('path'), zlib = require('zlib');
@@ -390,11 +479,10 @@ jobs:
           EOF
 
       - name: Build all apps (PR branch)
+        if: needs.changes.outputs.code == 'true'
         run: |
-          pnpm build:packages
-          pnpm --filter web build
-          (cd apps/mobile && npx expo export --platform android --output-dir .expo/dist)
-          pnpm --filter api build
+          pnpm exec turbo run build --filter=web... --filter=api...
+          pnpm exec turbo run export:bundle --filter=mobile
         env:
           API_URL: ${{ vars.API_URL || secrets.API_URL || 'https://placeholder-api.iconicedu.test' }}
           NEXT_PUBLIC_API_URL: ${{ vars.API_URL || secrets.API_URL || 'https://placeholder-api.iconicedu.test' }}
@@ -403,50 +491,56 @@ jobs:
           TURBO_TELEMETRY_DISABLED: 1
 
       - name: Measure PR branch sizes
+        if: needs.changes.outputs.code == 'true'
         run: node /tmp/measure.js > /tmp/pr-sizes.json
 
       - name: Upload PR sizes artifact
-        uses: actions/upload-artifact@v4
+        if: needs.changes.outputs.code == 'true'
+        uses: actions/upload-artifact@v7
         with:
           name: pr-sizes
           path: /tmp/pr-sizes.json
           retention-days: 7
 
+      - name: Skip application build
+        if: needs.changes.outputs.code != 'true'
+        run: echo "Documentation-only change; application build is not required."
+
   # ──────────────────────────────────────────────────────────────
   # Job 5: Verify Preview Environment Status
-  # Runs after build + bundle-size both complete. Creates a
-  # Supabase preview branch, deploys Railway API, configures
-  # Vercel env vars, and posts a unified PR comment.
+  # Runs beside build + bundle-size after fast checks complete. Creates a
+  # Supabase preview branch, deploys Railway API, and configures Vercel.
   # ──────────────────────────────────────────────────────────────
   preview-environment:
     name: Verify Preview Environment Status
-    if: github.event.action != 'closed'
-    needs: [build, bundle-size]
+    if: >
+      github.event.action != 'closed' &&
+      needs.changes.outputs.code == 'true' &&
+      needs.quality.result == 'success' &&
+      needs.test.result == 'success'
+    needs: [changes, quality, test]
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
+    concurrency:
+      group: preview-pr-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
     permissions:
       contents: read
       pull-requests: write
       deployments: write
+    outputs:
+      web-url: ${{ steps.vercel.outputs.vercel_url }}
+      api-url: ${{ steps.railway.outputs.railway_api_url }}
+      branch-ref: ${{ steps.supabase-branch.outputs.branch_ref }}
 
     env:
       PR_NUMBER: ${{ github.event.pull_request.number }}
       BRANCH_NAME: ${{ github.head_ref }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
-
-      # bundle-sizes is produced by the bundle-size job in this same run —
-      # no run-id needed; download-artifact defaults to the current workflow run.
-      - name: Download bundle sizes artifact
-        id: bundle-artifact
-        continue-on-error: true
-        uses: actions/download-artifact@v4
-        with:
-          name: bundle-sizes
-          path: /tmp/artifacts
 
       - uses: supabase/setup-cli@v1
         with:
@@ -675,6 +769,7 @@ jobs:
 
       # 3. Link the CLI to the preview branch so repo migrations can be applied there.
       - name: Link Supabase preview branch
+        if: steps.supabase-branch.outputs.branch_new == 'true' || needs.changes.outputs.supabase == 'true'
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
@@ -684,6 +779,7 @@ jobs:
 
       # 4. Ensure preview branches receive repo migrations added in the PR.
       - name: Apply preview branch migrations
+        if: steps.supabase-branch.outputs.branch_new == 'true' || needs.changes.outputs.supabase == 'true'
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
@@ -939,7 +1035,10 @@ jobs:
 
       # 7. Set branch-specific Edge Function secrets so preview functions talk to preview services.
       - name: Configure Supabase preview function secrets
-        if: steps.railway.outputs.railway_api_url != '' && steps.railway.outputs.railway_api_url != 'pending'
+        if: >
+          steps.railway.outputs.railway_api_url != '' &&
+          steps.railway.outputs.railway_api_url != 'pending' &&
+          (steps.supabase-branch.outputs.branch_new == 'true' || needs.changes.outputs.supabase == 'true')
         env:
           BRANCH_API_URL: ${{ steps.branch-creds.outputs.branch_api_url }}
           BRANCH_PROJECT_REF: ${{ steps.supabase-branch.outputs.branch_ref }}
@@ -977,7 +1076,10 @@ jobs:
 
       # 8. Deploy preview branch Edge Functions after secrets are in place.
       - name: Deploy Supabase preview Edge Functions
-        if: steps.railway.outputs.railway_api_url != '' && steps.railway.outputs.railway_api_url != 'pending'
+        if: >
+          steps.railway.outputs.railway_api_url != '' &&
+          steps.railway.outputs.railway_api_url != 'pending' &&
+          (steps.supabase-branch.outputs.branch_new == 'true' || needs.changes.outputs.supabase == 'true')
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
@@ -1000,7 +1102,10 @@ jobs:
 
       # 9. Create or refresh branch-local cron jobs with the preview branch URL.
       - name: Configure Supabase preview cron jobs
-        if: steps.railway.outputs.railway_api_url != '' && steps.railway.outputs.railway_api_url != 'pending'
+        if: >
+          steps.railway.outputs.railway_api_url != '' &&
+          steps.railway.outputs.railway_api_url != 'pending' &&
+          (steps.supabase-branch.outputs.branch_new == 'true' || needs.changes.outputs.supabase == 'true')
         env:
           ADMIN_DATABASE_URL: ${{ steps.branch-creds.outputs.admin_database_url }}
           BRANCH_API_URL: ${{ steps.branch-creds.outputs.branch_api_url }}
@@ -1041,16 +1146,43 @@ jobs:
               end if;
             end \$\$;"
 
-      # 10. Post / update the single unified PR comment
+  # Join preview provisioning and bundle analysis without putting them on the
+  # same critical path. This job still updates one stable PR comment.
+  preview-summary:
+    name: Preview Summary
+    if: >
+      always() &&
+      github.event.action != 'closed' &&
+      needs.changes.outputs.code == 'true' &&
+      needs.preview-environment.result == 'success'
+    needs: [changes, bundle-size, preview-environment]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: ci-preview-summary-${{ github.ref }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Download bundle sizes
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          name: bundle-sizes
+          path: /tmp/artifacts
+
+      # Post / update the single unified PR comment.
       - name: Post preview environment comment
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');
             const prNumber  = context.payload.pull_request.number;
-            const webUrl    = '${{ steps.vercel.outputs.vercel_url }}';
-            const apiUrl    = '${{ steps.railway.outputs.railway_api_url }}';
-            const branchRef = '${{ steps.supabase-branch.outputs.branch_ref }}';
+            const webUrl    = '${{ needs.preview-environment.outputs.web-url }}';
+            const apiUrl    = '${{ needs.preview-environment.outputs.api-url }}';
+            const branchRef = '${{ needs.preview-environment.outputs.branch-ref }}';
             const studioUrl = `https://supabase.com/dashboard/project/${branchRef}`;
             const apiReady = apiUrl && apiUrl !== 'pending';
 
@@ -1153,16 +1285,19 @@ jobs:
       github.event.pull_request.base.ref == 'main'
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    concurrency:
+      group: production-config-main
+      cancel-in-progress: false
     environment: production
     permissions:
       contents: read
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 20.19.0
 
@@ -1690,6 +1825,9 @@ jobs:
     if: github.event.action == 'closed'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    concurrency:
+      group: preview-pr-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
     permissions:
       contents: read
       pull-requests: write
@@ -1699,7 +1837,7 @@ jobs:
       BRANCH_NAME: ${{ github.head_ref }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: supabase/setup-cli@v1
         with:
@@ -1804,7 +1942,7 @@ jobs:
 
       # ── 4. Post cleanup comment ─────────────────────────────────
       - name: Post cleanup comment
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             await github.rest.issues.createComment({
