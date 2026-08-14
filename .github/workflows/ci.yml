@@ -578,23 +578,7 @@ jobs:
           EXISTING_STATUS=$(echo "$BRANCH_DATA" | jq -r '.status // ""')
 
           if [[ -n "$EXISTING_ID" && "$EXISTING_STATUS" == "MIGRATIONS_FAILED" ]]; then
-            echo "::warning::Existing Supabase branch is stuck in MIGRATIONS_FAILED; deleting and recreating it once."
-            supabase branches delete "$EXISTING_ID" \
-              --project-ref "$SUPABASE_PROJECT_REF" \
-              --yes
-
-            for i in $(seq 1 12); do
-              BRANCH_DATA=$(get_branch_data)
-              EXISTING_ID=$(echo "$BRANCH_DATA" | jq -r '.id // ""')
-              if [[ -z "$EXISTING_ID" ]]; then
-                break
-              fi
-              if [[ $i -eq 12 ]]; then
-                echo "::error::Timed out waiting for failed Supabase branch deletion"
-                exit 1
-              fi
-              sleep 5
-            done
+            echo "::warning::Supabase hosted migrations report MIGRATIONS_FAILED; retaining the branch because explicit repository migrations are authoritative."
           fi
 
           BRANCH_DATA=$(get_branch_data)
@@ -627,7 +611,7 @@ jobs:
               fi
               break
             elif [[ "$STATUS" == "MIGRATIONS_FAILED" ]]; then
-              echo "::warning::Supabase hosted branch migrations failed; running explicit repo migration push next for actionable logs."
+              echo "::warning::Supabase hosted branch migrations failed; using the explicit repository migration state."
               echo "branch_id=$BRANCH_ID" >> "$GITHUB_OUTPUT"
               BRANCH_REF=$(echo "$BRANCH_DATA" | jq -r '.project_ref // .ref // ""')
               echo "branch_ref=$BRANCH_REF" >> "$GITHUB_OUTPUT"
