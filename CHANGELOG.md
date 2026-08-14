@@ -10,6 +10,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Conventional Commit validation for local commits and pull request titles
+- A single `pnpm setup:local` onboarding path with environment synchronization
+- API-first architecture and contributor workflow diagrams
 - PR template, issue templates, and GitHub Actions CI workflow
 - `SECURITY.md`, `CODE_OF_CONDUCT.md`, `CHANGELOG.md`
 - `docs/getting-started/setup.md` — full local environment setup guide with Supabase instructions
@@ -33,8 +36,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Contributor, setup, architecture, testing, security, and deployment documentation reviewed and aligned with current repository automation
+- Branch protection now requires one approval and resolved review conversations
 - `README.md` rewritten as a lean hub document with accurate versions and quick-start
-- Expo SDK upgraded to 54 (React Native 0.81.5, React 19.1.0)
+- Expo SDK upgraded to 55 (React Native 0.83.2, React 19.2.4)
 - Mobile auth migrated to `expo-secure-store` for token persistence
 
 ### Fixed

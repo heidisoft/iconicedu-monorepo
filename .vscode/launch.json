@@ -4,22 +4,32 @@
     {
       "type": "node",
       "request": "launch",
-      "name": "Web: (Next + Turbopack)",
-      "runtimeExecutable": "node",
-      "runtimeArgs": ["--inspect=9201"],
-      "program": "${workspaceFolder}/apps/web/node_modules/next/dist/bin/next",
-      "args": ["dev", "--turbopack", "-p", "3001"],
-      "cwd": "${workspaceFolder}/apps/web",
+      "name": "Web: Next.js",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "web", "dev"],
+      "cwd": "${workspaceFolder}",
+      "autoAttachChildProcesses": true,
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen",
-      "presentation": { "hidden": true },
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "API: NestJS",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "api", "start:debug"],
+      "cwd": "${workspaceFolder}",
+      "autoAttachChildProcesses": true,
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
       "skipFiles": ["<node_internals>/**"]
     }
   ],
   "compounds": [
     {
       "name": "Dev: all apps",
-      "configurations": ["Web: (Next + Turbopack)"],
+      "configurations": ["Web: Next.js", "API: NestJS"],
       "stopAll": true
     }
   ]

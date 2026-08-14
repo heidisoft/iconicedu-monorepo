@@ -2,273 +2,295 @@
 
 ## Purpose
 
-This document is the canonical workflow guide for local development, testing, preview environments, and CI expectations.
+This document defines the day-to-day path from selecting work to merging a reviewed change.
 
 ## Intended Audience
 
-Internal engineers working day to day in the monorepo.
+Engineers and reviewers contributing to the monorepo.
 
 ## Last Updated
 
-2026-05-05
+2026-08-14
 
 ## Related Docs
 
-- [Documentation Hub](../README.md)
 - [Local Setup](setup.md)
 - [Contributing](../../CONTRIBUTING.md)
+- [Architecture Overview](../architecture/overview.md)
+- [Best Practices](../standards/best-practices.md)
 - [Deployment](../operations/deployment.md)
 
-## Local Workflow
+## Workflow At A Glance
 
-Run the full stack or individual applications from the repo root:
+1. Start from an up-to-date `main`.
+2. Create a short-lived, conventionally named branch.
+3. Implement vertically across shared types, API, and frontend as required.
+4. Run focused checks while iterating.
+5. Commit in coherent units with Conventional Commits.
+6. Push, open a draft PR early, and complete the PR template.
+7. Run full validation, address review, and squash merge.
+
+`main` must remain deployable. Do not commit directly to it or mix unrelated work in one branch.
+
+## 1. Select And Clarify The Work
+
+Before coding, ensure the issue or task has:
+
+- a user or operational problem statement;
+- testable acceptance criteria;
+- the expected app or package ownership;
+- security, data, migration, analytics, rollout, and accessibility considerations where relevant; and
+- a clear out-of-scope boundary.
+
+For a large feature, split the work into independently reviewable vertical slices. Prefer a small API-plus-UI path that works end to end over separate long-running frontend and backend branches.
+
+## 2. Update `main` And Create A Branch
+
+Keep uncommitted work safe, then update without creating a merge commit:
+
+```bash
+git switch main
+git pull --ff-only
+git switch -c feat/guardian-dashboard-filters
+```
+
+Use `<type>/<short-kebab-description>`:
+
+| Prefix      | Use for                                            |
+| ----------- | -------------------------------------------------- |
+| `feat/`     | User-facing capability                             |
+| `fix/`      | Defect correction                                  |
+| `docs/`     | Documentation only                                 |
+| `refactor/` | Structural change without intended behavior change |
+| `perf/`     | Performance improvement                            |
+| `test/`     | Test-only change                                   |
+| `build/`    | Build system or dependency packaging               |
+| `ci/`       | CI/CD workflow                                     |
+| `chore/`    | Maintenance not covered above                      |
+| `style/`    | Formatting-only source change                      |
+
+Add an issue number when useful, for example `feat/184-guardian-dashboard-filters`. Do not use names such as `updates`, `work`, or `final-fix`.
+
+## 3. Implement Within Repository Boundaries
+
+For a data-backed feature, use this order:
+
+1. define or update cross-app VMs and payloads in `packages/shared-types`;
+2. add validation, business logic, and table access in `apps/api`;
+3. expose or update a typed API endpoint;
+4. call it through the web or mobile API helper;
+5. build reusable UI in `packages/ui-web` or `packages/ui-native`; and
+6. add tests alongside every changed behavior.
+
+Frontend apps may contact Supabase directly only for Auth, Realtime subscriptions, and Storage. All table reads and writes go through `apps/api`. Do not import one app from another.
+
+Web features use `createApiClient` from `apps/web/lib/api/http-client.ts`. Mobile features use `apiGet`, `apiPost`, `apiPut`, and `apiDelete` from `apps/mobile/src/lib/api/http-client.ts`.
+
+New web user-facing behavior must be introduced behind a flag in `apps/web/flags.ts`, defaulting to off, unless the PR documents a valid maintenance exemption.
+
+## 4. Run The Development Stack
+
+From the repository root:
 
 ```bash
 pnpm dev
 pnpm dev:web
-pnpm dev:mobile
 pnpm dev:api
+pnpm dev:mobile
 ```
 
-`pnpm dev:mobile` is the preferred mobile workflow because it preserves Expo's interactive terminal controls such as `i` for the iOS Simulator and `a` for the Android Emulator. `pnpm dev` also starts mobile with the same direct Expo path while keeping the rest of the stack running in parallel.
+Use the scoped command for faster iteration. Use `pnpm dev:mobile` for the first native build or when interactive Expo controls are needed. Run `pnpm build:packages` after structural changes to a shared package if a watcher does not pick them up.
 
-Shared packages should be built before first app startup or after structural package changes:
+Stable local app URLs are:
 
-```bash
-pnpm build:packages
-```
+| Service | URL                          |
+| ------- | ---------------------------- |
+| Web     | `http://localhost:3000`      |
+| API     | `http://localhost:3001`      |
+| Swagger | `http://localhost:3001/docs` |
 
-## Local Service URLs
+Use `supabase status` for Supabase Studio, Mailpit, database, and API URLs.
 
-App URLs are stable:
+## 5. Database Changes
 
-| Service | URL                        |
-| ------- | -------------------------- |
-| Web app | http://localhost:3000      |
-| API     | http://localhost:3001      |
-| Swagger | http://localhost:3001/docs |
-
-Supabase local service URLs should be read from the running stack instead of assumed from memory:
+Never edit an existing Supabase migration after it has been created and shared. Every schema, RLS, function, trigger, storage, or cron correction gets a new, uniquely timestamped forward migration.
 
 ```bash
-supabase status
-```
-
-Use that output to open the current local endpoints for:
-
-- Supabase Studio
-- Mailpit
-- Supabase API
-- Database
-
-If you need machine-readable values for scripts or env syncing, use:
-
-```bash
-supabase status --output json
-```
-
-## Seed Credentials
-
-Use these seeded test emails for local auth flows:
-
-| Email                              | Role     | Profile   |
-| ---------------------------------- | -------- | --------- |
-| `iconicedudev@gmail.com`           | Owner    | Marc F    |
-| `iconicedudev+guardian1@gmail.com` | Guardian | Lura H    |
-| `iconicedudev+educator1@gmail.com` | Educator | Denise R  |
-| `iconicedudev+educator2@gmail.com` | Educator | Barbara Y |
-| `iconicedudev+staff1@gmail.com`    | Staff    | Harold B  |
-| `iconicedudev+guardian2@gmail.com` | Guardian | Jessica K |
-
-For local email OTP or magic-link login:
-
-1. Run `supabase start` if the local stack is not already running.
-2. Run `supabase status` and open the Mailpit URL from the output.
-3. Start the app and enter one of the seeded test emails in the login flow.
-4. Open the captured email in Mailpit.
-5. Copy the OTP code or use the magic link from the email to complete sign-in.
-
-If you are exercising password-based auth instead of OTP, the seeded password is `Seed123!`.
-
-## Database Workflow
-
-```bash
+supabase migration new add_guardian_dashboard_preferences
 supabase db reset
 pnpm --filter api db:generate
-pnpm --filter api db:migrate
-pnpm --filter api db:studio
 ```
 
-When adding a migration:
+When the API needs the changed schema, update `apps/api/prisma/schema.prisma` in the same PR. Supabase migrations remain the source of truth; do not use Prisma migrations or `prisma db push` for repository schema changes.
+
+Review generated SQL, RLS behavior, indexes, existing data compatibility, and rollback-by-forward-migration before requesting review.
+
+## 6. Test During Development
+
+Use the smallest useful loop first:
 
 ```bash
-supabase migration new <description>
-supabase db reset
-```
-
-## Testing and Quality
-
-```bash
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm run ci
-```
-
-Scoped checks:
-
-```bash
-pnpm run ci:web
-pnpm run ci:mobile
-pnpm run ci:api
-pnpm test:affected
-pnpm test:staged
+pnpm test:web
+pnpm test:mobile
+pnpm test:api
+pnpm --filter web test:watch
 pnpm --filter web test:e2e
 ```
 
-## Trunk-Based Development
-
-The repository uses trunk-based development. `main` should stay deployable.
-
-Workflow:
-
-1. Branch from `main`.
-2. Keep changes focused and short-lived.
-3. Open a PR early.
-4. Ensure required checks pass.
-5. Squash merge when approved.
-
-## Required PR Checks
-
-GitHub branch protection for `main` should require these CI checks before merge:
-
-- `Quality (format · lint · typecheck)`
-- `Test`
-- `Build`
-
-The protection payload is tracked in [`.github/branch-protection/main.json`](../../.github/branch-protection/main.json), and can be applied with [`scripts/github/apply-branch-protection.sh`](../../scripts/github/apply-branch-protection.sh).
-
-## Preview Environments
-
-Every PR can provision an isolated preview stack:
-
-- Supabase branch
-- Railway API environment
-- Vercel web preview
-- Optional EAS preview build for mobile
-
-The preview stack is provisioned by the `preview-environment` job in [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml). Mobile preview binaries are created separately by [`.github/workflows/eas-preview-build.yml`](../../.github/workflows/eas-preview-build.yml).
-
-Preview environment behavior:
-
-1. A PR triggers the `CI` workflow first.
-2. Preview provisioning runs only after `CI` completes successfully for that PR.
-3. Create or reuse a Supabase preview branch.
-4. Deploy a Railway preview environment for the API.
-5. Redeploy web against the preview backend.
-6. Comment on the PR with URLs and seed credentials.
-
-Cleanup runs automatically when the PR closes or merges.
-
-### Preview Testing Credentials
-
-For shared stage or preview testing, use:
-
-- Email: `iconicedudev@gmail.com`
-- Password: `Iconic@2026`
-
-If the preview environment is seeded with the standard test dataset, these additional aliases are useful for role-based testing:
-
-| Email                              | Role     | Use for                                               |
-| ---------------------------------- | -------- | ----------------------------------------------------- |
-| `iconicedudev@gmail.com`           | Owner    | Admin settings, org bootstrap, cross-role smoke tests |
-| `iconicedudev+guardian1@gmail.com` | Guardian | Parent and family flows                               |
-| `iconicedudev+educator1@gmail.com` | Educator | Teacher/classroom flows                               |
-| `iconicedudev+educator2@gmail.com` | Educator | Multi-educator and secondary class scenarios          |
-| `iconicedudev+staff1@gmail.com`    | Staff    | Staff-only tooling such as schedule management        |
-| `iconicedudev+guardian2@gmail.com` | Guardian | Second-family and multi-household scenarios           |
-
-Notes:
-
-- Local Supabase resets use the same Gmail aliases from [`supabase/seed.sql`](../../supabase/seed.sql), but the local seed password remains `Seed123!`.
-- Hosted preview or stage environments may expose only the shared login unless the branch/project has been seeded with the full dataset.
-- When a PR preview comment includes explicit environment details, treat that comment as the source of truth for that PR.
-
-### How To Use A PR Preview
-
-1. Open the PR and wait for `CI` to finish successfully.
-2. Wait for the PR comment titled `Preview Environment Ready`.
-3. Open the `Web (Vercel)` URL from that comment to test the preview web app.
-4. Use the `API (Railway)` URL from that comment for backend checks. Appending `/healthz` is the fastest smoke test.
-5. Open the `Supabase Studio` link from that comment to inspect the preview database branch.
-6. If you need a mobile binary, run the `Create EAS Build` workflow from GitHub Actions after the preview environment is ready.
-
-### How To Create A Mobile Preview Build
-
-There are two supported paths:
-
-1. Local/terminal build
+Validate all affected workspaces before pushing:
 
 ```bash
-pnpm mobile:eas:build:preview
+pnpm lint:affected
+pnpm typecheck:affected
+pnpm test:affected
 ```
 
-2. GitHub Actions build for a PR preview
-
-- Open `Actions` in GitHub.
-- Run `Create EAS Build`.
-- Set `pr_number` to the PR number when building a non-`main` branch.
-- Choose `ios`, `android`, or `all`.
-- Wait for the workflow to post the Expo build link back to the PR.
-
-### Preview Mobile Environment Notes
-
-The preview EAS workflow now injects these values automatically for PR-based builds:
-
-- `EXPO_PUBLIC_SUPABASE_URL`
-- `EXPO_PUBLIC_SUPABASE_ANON_KEY`
-- `EXPO_PUBLIC_APP_ENV=preview`
-- `EXPO_PUBLIC_API_URL`
-- `EXPO_PUBLIC_WEB_URL`
-
-For PR-based preview or development builds, the workflow resolves the Railway
-and Vercel URLs directly from their CLIs using the current branch:
-
-- Feature branches use the PR Railway environment and matching Vercel branch deployment
-- `main` uses the Railway `production` environment and the latest Vercel deployment for `main`
-
-All EAS build profiles also pin to their matching named EAS environment
-(`development`, `preview`, `production`) via `apps/mobile/eas.json`, so values
-like `EXPO_PUBLIC_API_URL` can be managed centrally in Expo for non-PR builds.
-
-Use:
-
-- The Vercel preview URL for web-hosted flows opened from mobile
-- The Railway preview API URL for NestJS-backed server calls
-- The Supabase preview branch URL and anon key for auth, RLS-safe reads, and narrowly-scoped mobile writes
-
-## Mobile Native Builds
+Run the full local pipeline before requesting review:
 
 ```bash
-pnpm mobile:ios
-pnpm mobile:android
-pnpm mobile:eas:build:dev
-pnpm mobile:eas:build:preview
-pnpm mobile:eas:build:prod
-pnpm mobile:eas:submit
+pnpm run ci
 ```
 
-## Git Hooks
+If a check cannot be run locally, state exactly which check was omitted and why in the PR. Do not describe an unrun check as passing.
 
-- `pre-commit` runs `pnpm lint-staged`
-- `pre-push` runs `pnpm prepush:check`
+## 7. Write Conventional Commits
 
-## Required GitHub Secrets
+Every authored commit uses:
 
-Preview environments depend on repository secrets for Supabase, Railway, Vercel, PostHog, and internal tokens. Keep the workflow file and environment setup documentation aligned when new secrets are introduced.
+```text
+<type>(<optional-scope>): <imperative description>
+```
 
-Key secrets used by the CI workflow:
+Examples:
 
-- `INTERNAL_EVENTS_TOKEN` — authenticates the `events-dispatch` edge function to the NestJS API. Required for preview and production environments.
-- `CI_SECRETS_JSON` — a JSON blob injected by GitHub Actions containing all repository secrets; used by the production deploy job to forward secrets into the Railway environment without listing them individually.
-- `ADMIN_DATABASE_URL` — derived at runtime by the CI workflow from Supabase pooler credentials; not a secret you set manually in GitHub. It is used by CI to run `configure_edge_function_cron()` and other admin SQL steps against the preview or production database.
+```text
+feat(web): add guardian dashboard filters
+fix(api): reject duplicate channel members
+docs(workflow): explain Android device networking
+refactor(shared-types): separate assessment payloads
+ci: validate conventional PR titles
+feat(api)!: remove the legacy schedules endpoint
+```
+
+Allowed types are `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `style`, and `revert`.
+
+Guidelines:
+
+- Use a lowercase type and scope.
+- Write the subject in imperative mood: `add`, `prevent`, `remove`; not `added` or `adds`.
+- Start the subject with lowercase and do not end it with a period.
+- Keep the complete header at 100 characters or fewer.
+- Use a scope that helps reviewers, commonly `web`, `mobile`, `api`, `ui-web`, `ui-native`, `shared-types`, `utils`, `supabase`, `deps`, or `workflow`.
+- Add a body after a blank line when the reason, constraints, or behavior are not obvious.
+- Use footers such as `Refs: #184` or `Closes: #184` when applicable.
+- Mark breaking changes with `!` and include a `BREAKING CHANGE:` footer explaining migration impact.
+
+Example with body and footer:
+
+```text
+fix(api): prevent duplicate channel members
+
+Enforce the existing tenant-scoped uniqueness rule before emitting the
+membership event so retries remain idempotent.
+
+Closes: #184
+```
+
+The `commit-msg` hook validates the header. Test a message manually with:
+
+```bash
+pnpm commitlint -- --text "feat(web): add guardian dashboard filters"
+```
+
+Do not bypass hooks to make an invalid commit. Fix the message instead. Git-generated merge and revert commit subjects are accepted.
+
+## 8. Understand Git Hooks
+
+Installing dependencies configures Husky:
+
+| Hook         | Runs                                                      | Purpose                                                |
+| ------------ | --------------------------------------------------------- | ------------------------------------------------------ |
+| `pre-commit` | lint-staged formatting, affected lint, affected typecheck | Catch quick local problems before a commit is recorded |
+| `commit-msg` | Conventional Commit validation                            | Keep history and squash titles consistent              |
+| `pre-push`   | affected guards, lint, typecheck, and tests               | Catch branch-level failures before CI                  |
+
+Hooks support the workflow but do not replace the full CI run. If a hook reports unrelated baseline failures, document the evidence and coordinate with a maintainer; do not silently skip it.
+
+## 9. Open And Maintain The Pull Request
+
+Push the branch and open a draft PR as soon as the shape of the change is reviewable:
+
+```bash
+git push -u origin feat/guardian-dashboard-filters
+```
+
+PR titles must use the same Conventional Commit format as commits because the normal merge strategy is squash merge. The final PR title becomes the commit on `main`.
+
+Complete the PR template with:
+
+- the problem and outcome;
+- implementation and architecture notes;
+- exact automated and manual validation;
+- screenshots or recordings for UI changes;
+- migration, environment, rollout, and rollback details;
+- accessibility and security impact; and
+- related issues.
+
+Keep the PR focused. Separate drive-by refactors, formatting, and dependency upgrades unless they are required for the feature.
+
+The optional helper can propose a conventional branch, commit, title, and PR body from local changes:
+
+```bash
+pnpm pr:ai
+```
+
+Review its proposed scope and wording before allowing it to commit or publish anything.
+
+## 10. CI, Preview, And Review
+
+Branch protection requires:
+
+- `Quality (format · lint · typecheck)`;
+- `Test`; and
+- `Build`.
+
+It also requires one approving review and resolved conversations; pushing new changes dismisses a stale approval. The quality job validates the PR title. `Bundle Size` provides additional change visibility. The preview job provisions or verifies the Supabase branch, Railway API environment, and Vercel preview after the required CI work succeeds. Mobile binaries are created separately through the `Create EAS Build` workflow when needed.
+
+Use the `Preview Environment Ready` PR comment as the source of truth for preview URLs and test credentials. Smoke-test the affected role and platform, not only the happy path.
+
+As an author:
+
+1. respond to every review thread;
+2. push fixes as focused conventional commits;
+3. resolve threads only when the concern is addressed or agreement is explicit;
+4. rerun affected manual checks after material changes; and
+5. re-request review when ready.
+
+As a reviewer, prioritize correctness, data access, auth, tenant isolation, migration safety, tests, usability, accessibility, and maintainability. Prefix optional polish with `nit:` so blocking feedback is unambiguous.
+
+## 11. Merge And Clean Up
+
+Before merge:
+
+- all required checks are green;
+- required review is complete;
+- conversations are resolved;
+- the PR title is a valid Conventional Commit;
+- preview verification is recorded; and
+- migrations and environment changes have an approved rollout path.
+
+Use squash merge for normal feature work. Delete the branch after merge, switch back to `main`, and fast-forward before beginning the next task:
+
+```bash
+git switch main
+git pull --ff-only
+git branch -d feat/guardian-dashboard-filters
+```
+
+Production configuration and deployment behavior are documented in the [deployment guide](../operations/deployment.md). Merging a PR does not authorize bypassing protected-environment approvals.
+
+## Seed And Preview Accounts
+
+Local accounts come from [`supabase/seed.sql`](../../supabase/seed.sql) and use password `Seed123!`. The owner login is `iconicedudev@gmail.com`; role aliases are listed in the [setup guide](setup.md#6-sign-in-with-seed-data).
+
+Hosted preview credentials may differ. Read the generated PR preview comment and do not copy shared credentials into public issues, logs, screenshots, or documentation.

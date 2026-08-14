@@ -30,7 +30,6 @@ pnpm --filter mobile test -- --testPathPattern="<pattern>"
 # Database
 supabase db reset
 pnpm --filter api db:generate
-pnpm --filter api db:migrate
 supabase migration new <description>
 ```
 
@@ -62,7 +61,7 @@ Local URLs: Web → `localhost:3000`, API → `localhost:3001`, Swagger → `loc
 | `supabase.from('table').*`       | ❌            | Belongs in `apps/api` only                 |
 | Service-role key                 | ❌            | Never in FE; `apps/api` only               |
 
-Any `supabase.from(...)` call in `apps/web` or `apps/mobile` is a violation. The only exception is in `apps/web` route handlers that call Supabase via `createServerClient()` (anon-role, RLS enforced) for read-heavy operations that don't require NestJS.
+Any `supabase.from(...)` call in `apps/web` or `apps/mobile` is a violation. Move the table operation to an `apps/api` endpoint.
 
 **HTTP clients:** Web calls API via `createApiClient(supabase)` from `apps/web/lib/api/http-client.ts`. Mobile uses `apiGet/apiPost/apiPut/apiDelete` from `apps/mobile/src/lib/api/http-client.ts`. No cross-app imports.
 

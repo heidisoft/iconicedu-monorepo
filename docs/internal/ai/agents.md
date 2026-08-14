@@ -10,7 +10,7 @@ AI coding agents and engineers maintaining agent-facing repo guidance.
 
 ## Last Updated
 
-2026-05-04
+2026-08-14
 
 ## Related Docs
 
@@ -101,8 +101,8 @@ Both FE apps have a typed HTTP client. Use it — do not add raw `fetch` calls p
 ### 4.5 Additional Data Rules
 
 - Supabase RLS must remain enabled for all tables.
-- All user/auth-related mutations (invites, role changes, MFA, OAuth admin) go through `apps/web/lib/auth/admin-actions.ts`. Review it before adding new helpers.
-- Admin pages use `apps/web/lib/<domain>` helpers (not inline Supabase queries) so the UI stays DB-agnostic.
+- All user/auth-related business mutations (invites, role changes, MFA, OAuth admin) need an `apps/api` endpoint; web actions may only adapt the UI request to that endpoint.
+- Admin pages use `apps/web/lib/<domain>` helpers backed by `createApiClient` so the UI stays DB-agnostic.
 - When adding DB access for a new entity in `apps/api`, mirror the `lib/user` structure: `queries/`, `mappers/`, `builders/`, `constants/`, `derive.ts`.
 
 ## 5. TypeScript & API Design Rules
@@ -148,7 +148,7 @@ Both FE apps have a typed HTTP client. Use it — do not add raw `fetch` calls p
 - For every new file and any updated file, add unit tests that cover basic usage and edge cases.
 - Co-locate tests with the owning package/app conventions and keep them deterministic.
 - Run relevant test suites for the changes and ensure they pass; if failures occur, fix them before finishing.
-- After every code change, run `pnpm turbo run test` and fix any failures before finishing.
+- After every code change, run `pnpm test` and fix any failures before finishing.
 
 ## 11. Feature Toggle Policy (Web)
 

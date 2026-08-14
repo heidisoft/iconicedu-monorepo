@@ -10,7 +10,7 @@ Engineers changing database schema, RLS, Prisma, or Supabase-backed data access.
 
 ## Last Updated
 
-2026-05-05
+2026-08-14
 
 ## Related Docs
 
@@ -155,7 +155,7 @@ The `accounts.role` field drives additional visibility:
 
 ### Service role bypass
 
-The `SUPABASE_SERVICE_ROLE_KEY` bypasses RLS entirely. It is only used server-side (NestJS API, Next.js Server Actions). Never pass it to client-side code or mobile apps.
+The `SUPABASE_SERVICE_ROLE_KEY` bypasses RLS entirely. Only `apps/api` may use it for privileged operations. Never place it in a frontend app, browser bundle, mobile build, log, issue, or PR.
 
 ### Testing RLS
 
@@ -295,11 +295,12 @@ Mobile subscription pattern — see `apps/mobile/src/hooks/use-messages.ts`.
 
 Supabase Storage is used for:
 
-| Bucket     | Contents                      | Access                           |
-| ---------- | ----------------------------- | -------------------------------- |
-| `avatars`  | Profile pictures              | Public read, authenticated write |
-| `homework` | Student homework file uploads | Private, owner + educator        |
+| Bucket                      | Contents                        | Access                                                     |
+| --------------------------- | ------------------------------- | ---------------------------------------------------------- |
+| `public-message-thumbnails` | Preview-safe message thumbnails | Public read; policy-controlled write                       |
+| `channel-files`             | Channel attachments             | Private; membership policies apply                         |
+| `public-avatars`            | Profile avatar objects          | Private by default in local config; policies govern access |
 
 Storage policies mirror the RLS logic but apply to file paths. See `supabase/migrations/*_storage_avatar_policies*.sql` for examples.
 
-File uploads from the mobile app use the Supabase Storage JS client. Direct browser uploads from web use signed URLs generated server-side to avoid exposing the service role key.
+Web and mobile may use the Supabase Storage client directly under bucket RLS policies. Any operation that needs elevated credentials belongs in `apps/api`; frontend code must never receive the service-role key.

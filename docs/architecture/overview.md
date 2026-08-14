@@ -10,7 +10,7 @@ Engineers who need a system-level mental model before changing features or infra
 
 ## Last Updated
 
-2026-05-05
+2026-08-14
 
 ## Related Docs
 
@@ -35,30 +35,22 @@ Engineers who need a system-level mental model before changing features or infra
 │   └────────┬────────┘       └────────────┬────────────┘    │
 │            │                             │                  │
 └────────────┼─────────────────────────────┼──────────────────┘
-             │                             │
-             │  HTTPS / WebSocket          │  HTTPS / WebSocket
-             │                             │
-┌────────────▼─────────────────────────────▼──────────────────┐
-│                     Supabase                                 │
-│                                                              │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐  │
-│  │  PostgreSQL   │  │     Auth     │  │     Storage      │  │
-│  │  + RLS        │  │  (JWT/OAuth) │  │  (avatars, files)│  │
-│  └──────────────┘  └──────────────┘  └──────────────────┘  │
-│                                                              │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │               Realtime (WebSocket)                    │   │
-│  │          (live message updates for mobile)            │   │
-│  └──────────────────────────────────────────────────────┘   │
-└──────────────────────────────────────────────────────────────┘
-             │
-             │  Postgres (Prisma)
-             │
-┌────────────▼──────────────────────────────────────────────┐
+             │ HTTPS (Bearer session)       │
+             ├──────────────────────────────┤
+             ▼                              ▼
+┌───────────────────────────────────────────────────────────┐
 │                    NestJS API                              │
-│              (server-side business logic)                  │
+│       validation · business logic · all table access       │
 │         http://localhost:3001 / Swagger at /docs           │
+└────────────────────────────┬──────────────────────────────┘
+                             │ Postgres (Prisma)
+                             ▼
+┌───────────────────────────────────────────────────────────┐
+│ Supabase: PostgreSQL + RLS · Auth · Realtime · Storage     │
 └───────────────────────────────────────────────────────────┘
+
+Web and mobile also connect directly to Supabase Auth, Realtime, and Storage.
+They never use the Supabase table API directly.
 ```
 
 ---
@@ -69,17 +61,16 @@ Engineers who need a system-level mental model before changing features or infra
 
 - **Framework:** Next.js 15 with App Router
 - **Rendering:** Default to React Server Components; `'use client'` only where needed
-- **Data access:** Supabase SSR client directly in Server Components and Route Handlers
+- **Data access:** `createApiClient` for all table-backed reads and writes
 - **Auth:** Supabase Auth with cookie-based sessions via `@supabase/ssr`
+- **Direct Supabase:** Auth, Realtime, and Storage only
 - **UI:** `@iconicedu/ui-web` (shadcn/Radix components + Tailwind CSS)
 - **Deployed to:** Vercel
-
-The web app talks directly to Supabase for most operations. The NestJS API is called for complex business logic that requires the service role or cross-table transactions.
 
 ### Mobile (`apps/mobile`)
 
 - **Framework:** Expo 55 with Expo Router v7 (file-based routing)
-- **Data access:** React Query + Supabase JS client with `expo-secure-store` for session persistence
+- **Data access:** React Query + typed NestJS API helpers
 - **Real-time:** Supabase Realtime WebSocket subscriptions for live message updates
 - **Auth:** Supabase OTP (email) and Google OAuth (via `expo-web-browser`)
 - **UI:** `@iconicedu/ui-native` (NativeWind v4 components)
@@ -89,9 +80,9 @@ The web app talks directly to Supabase for most operations. The NestJS API is ca
 
 - **Framework:** NestJS 11
 - **ORM:** Prisma 7 (type-safe queries against Supabase Postgres)
-- **Auth:** Validates Supabase JWTs via `@nestjs/passport` + `jsonwebtoken`
+- **Auth:** Receives Supabase bearer sessions and establishes request identity in the API guard
 - **API docs:** Swagger at `/docs`
-- **Used for:** Operations requiring the service role, scheduled jobs, complex business logic
+- **Used for:** All table reads and writes, input validation, business logic, scheduled jobs, and privileged operations
 
 ---
 
@@ -116,15 +107,15 @@ See [packages.md](packages.md) for a full breakdown.
 A core design principle is that **each layer of the stack uses a different type shape**:
 
 ```
-Database (Supabase)
+Database (Supabase Postgres)
     │
-    ▼ supabase.from('messages').select(...)
-  Row types          — raw DB shapes, null-heavy, snake_case
+    ▼ Prisma inside apps/api
+  API model/result   — database-facing shapes
     │
-    ▼ Builder functions (e.g. buildMessageVM)
+    ▼ API service + mapper
   View Model (VM)    — rich UI-ready types, camelCase, nested objects
     │
-    ▼ Props / render
+    ▼ typed HTTP response
   Components         — consume VMs, never Rows directly
 ```
 
@@ -142,7 +133,7 @@ All shared types live in `@iconicedu/shared-types`.
 Browser → Supabase Auth (email OTP or OAuth)
        → Supabase sets HttpOnly cookie
        → Next.js middleware reads cookie on every request
-       → Server Components get authenticated Supabase client
+       → Server Components use the session when calling apps/api
 ```
 
 ### Mobile
@@ -152,7 +143,7 @@ Device → Supabase Auth (email OTP or Google OAuth via expo-web-browser)
        → Supabase returns JWT session
        → Session stored in expo-secure-store
        → Supabase client auto-refreshes tokens
-       → On login: accounts.status set to 'active'
+       → On login: apps/api activates and returns the account
 ```
 
 ---
@@ -162,19 +153,18 @@ Device → Supabase Auth (email OTP or Google OAuth via expo-web-browser)
 ```
 User types message
        │
-       ▼ (mobile: React Query mutation / web: Server Action)
-sendTextMessage(channelId, profileId, orgId, text)
+       ▼ web/mobile typed API client
+POST /messages/text with validated payload + bearer session
        │
-       ▼ Supabase JS client
-INSERT into messages (type='text', channel_id, profile_id, ...)
-INSERT into message_text (message_id, payload={text})
+       ▼ NestJS controller → service → Prisma transaction
+INSERT messages + message_text and emit the domain event
        │
        ├──▶ (mobile) Realtime subscription fires
        │            → new message appended to React Query cache
        │            → UI updates instantly
        │
-       └──▶ (web) Polling / manual refetch
-                   → message list refreshes
+       └──▶ API response returns a shared MessageVM
+                    → client cache/UI reconciles
 ```
 
 ---
@@ -191,7 +181,7 @@ Users belong to exactly one organisation. Within that org, an account has a `rol
 | `advisor`  | A    | Assigned families' data                               |
 | `staff`    | ST   | Broad read for admin operations                       |
 
-RLS policies enforce these boundaries at the database level — not just in application code.
+API authorization is the primary application boundary. RLS remains enabled as defense in depth for permitted Supabase Realtime and Storage access.
 
 ---
 

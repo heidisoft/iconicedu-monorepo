@@ -16,6 +16,12 @@ assignees: ''
 2.
 3.
 
+## Reproducibility
+
+- [ ] Always
+- [ ] Intermittent
+- [ ] Regression from previously working behavior
+
 ## Expected behaviour
 
 <!-- What should have happened? -->
@@ -38,6 +44,10 @@ assignees: ''
 | pnpm version                 |                                |
 | Browser (web)                |                                |
 | Device / OS version (mobile) |                                |
+
+## Logs and data safety
+
+<!-- Include relevant sanitized logs. Remove access tokens, cookies, database URLs, personal data, service-role keys, and internal secrets. -->
 
 ## Additional context
 

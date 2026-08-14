@@ -10,7 +10,7 @@ Engineers implementing or reviewing production code.
 
 ## Last Updated
 
-2026-03-23
+2026-08-14
 
 ## Related Docs
 
@@ -159,22 +159,25 @@ export function MessageInput({ onSend }: Props) {
 }
 ```
 
-### Supabase in Server Components
+### API access in Server Components
 
-Use the SSR client, not the browser client, in Server Components and route handlers:
+Use the Supabase SSR client to obtain the current session, then call `apps/api` through the repository HTTP client. Do not query a table from a Server Component or route handler:
 
 ```ts
-import { createServerClient } from '@/lib/supabase/server';
+import { createApiClient } from '@/lib/api/http-client';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 export default async function Page() {
-  const supabase = await createServerClient();
-  const { data } = await supabase.from('channels').select('*');
+  const supabase = await createSupabaseServerClient();
+  const api = createApiClient(supabase);
+  const channels = await api.get<ChannelVM[]>('/channels/list');
+  return <ChannelList channels={channels} />;
 }
 ```
 
 ### Route handlers
 
-Route handlers for sensitive operations (anything needing the service role) live in `app/api/`. Use `createAdminClient()` for service-role operations. Never expose the service role key to the client.
+Web route handlers may act as thin HTTP adapters when Next.js routing is required, but table access, validation, and business logic still live in `apps/api`. Service-role operations belong only in the API and the service-role key must never be exposed to a frontend app.
 
 ### Data fetching
 
@@ -324,17 +327,18 @@ Never disable RLS for convenience. If you need to bypass RLS for a service opera
 
 ### Supabase client usage
 
-| Context                                       | Client to use                              |
-| --------------------------------------------- | ------------------------------------------ |
-| Web Server Components / Route handlers (read) | `createServerClient()`                     |
-| Web Route handlers (admin/service operations) | `createAdminClient()` (service role)       |
-| Web Client Components                         | `createBrowserClient()`                    |
-| Mobile                                        | `supabase` singleton from `@/lib/supabase` |
-| NestJS API                                    | Prisma client (`PrismaService`)            |
+| Context                   | Approved client                            |
+| ------------------------- | ------------------------------------------ |
+| Web table reads/writes    | `createApiClient(supabase)`                |
+| Mobile table reads/writes | `apiGet`, `apiPost`, `apiPut`, `apiDelete` |
+| Web/mobile authentication | App-local Supabase Auth client             |
+| Web/mobile Realtime       | App-local Supabase channel client with RLS |
+| Web/mobile file transfer  | App-local Supabase Storage client with RLS |
+| NestJS table access       | Prisma client (`PrismaService`)            |
 
 ### Real-time subscriptions
 
-Real-time is used in mobile (via Supabase Realtime channels) and will eventually be added to web. Follow the pattern in `useMessages`:
+Realtime channels notify clients that state changed. Fetch canonical table-backed data through `apps/api`; do not turn a Realtime callback into direct table access. Follow the existing subscription lifecycle pattern:
 
 ```ts
 useEffect(() => {

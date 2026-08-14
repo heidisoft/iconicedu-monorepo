@@ -145,8 +145,8 @@ Check off each item as it is verified. Mark with **FAIL** and a note if somethin
 
 ## 6. Notifications Settings
 
-> Key file: [apps/mobile/app/(app)/settings/notifications.tsx](<apps/mobile/app/(app)/settings/notifications.tsx>)  
-> Key hook: [apps/mobile/src/hooks/use-push-toggle.ts](apps/mobile/src/hooks/use-push-toggle.ts)
+> Key file: [apps/mobile/app/(app)/settings/notifications.tsx](<../../apps/mobile/app/(app)/settings/notifications.tsx>)
+> Key hook: [apps/mobile/src/hooks/use-push-toggle.ts](../../apps/mobile/src/hooks/use-push-toggle.ts)
 
 ### 6.1 Master Push Toggle
 
@@ -288,7 +288,7 @@ Check off each item as it is verified. Mark with **FAIL** and a note if somethin
 
 ## 15. Automated Test Coverage Reference
 
-The following automated tests already exist; run `pnpm test` in `apps/mobile` to verify:
+The following automated tests already exist; run `pnpm test:mobile` from the repository root to verify:
 
 | Test file                                | What it covers                                  |
 | ---------------------------------------- | ----------------------------------------------- |

@@ -264,7 +264,7 @@ export function assertSupabaseResult<T>(
 
 ### P1 — `UUID` and `ISODateTime` are bare string aliases
 
-**File**: [packages/shared-types/src/shared/shared.ts](../packages/shared-types/src/shared/shared.ts:1-3)
+**File**: [packages/shared-types/src/shared/shared.ts](../../packages/shared-types/src/shared/shared.ts)
 
 ```ts
 export type UUID = string;
@@ -285,7 +285,7 @@ Then expose `asUUID(s: string): UUID` and `asISODateTime(s: string): ISODateTime
 
 ### P1 — `NotificationDefaultsVM` is an open `Record<string, ...>`
 
-**File**: [packages/shared-types/src/vm/profile.ts](../packages/shared-types/src/vm/profile.ts:70)
+**File**: [packages/shared-types/src/vm/profile.ts](../../packages/shared-types/src/vm/profile.ts)
 
 ```ts
 export type NotificationDefaultsVM = Record<string, NotificationPreferenceVM>;
@@ -327,7 +327,7 @@ Narrow the guard's decoded value to a typed interface matching the Supabase JWT 
 
 ### P1 — `messages.ts` is a single 1000+ line file mixing multiple concerns
 
-**File**: [apps/web/app/actions/messages.ts](../apps/web/app/actions/messages.ts)
+**File**: [apps/web/app/actions/messages.ts](../../apps/web/app/actions/messages.ts)
 
 This file handles: text sending, file uploads, reactions, saved messages, homework detection, mention notifications, link previews, and activity event publishing. Each of these is a distinct domain concern.
 
@@ -347,7 +347,7 @@ Internal helpers (`sanitizeMentions`, `deriveHomeworkMessageIntent`, `createMent
 
 ### P2 — Homework detection regex has a stateful `lastIndex` bug
 
-**File**: [apps/web/app/actions/messages.ts](../apps/web/app/actions/messages.ts:55)
+**File**: [apps/web/app/actions/messages.ts](../../apps/web/app/actions/messages.ts)
 
 ```ts
 const HOMEWORK_TRIGGER_PATTERN = /(^|\s)@(homework|homeowork)\b/gi; // global flag
@@ -439,7 +439,7 @@ Several `ui-web` components pass a `ref` prop but are not wrapped in `React.forw
 
 ### P2 — Tailwind content path in `ui-web` scans `apps/web`
 
-**File**: [packages/ui-web/tailwind.config.ts](../packages/ui-web/tailwind.config.ts)
+**File**: [packages/ui-web/tailwind.config.ts](../../packages/ui-web/tailwind.config.ts)
 
 ```ts
 content: [
@@ -564,7 +564,7 @@ Pin the required Node.js version alongside the `pnpm` version to prevent CI fail
 ```json
 "engines": {
   "node": ">=22.0.0",
-  "pnpm": "9.12.0"
+  "pnpm": "10.33.0"
 }
 ```
 
@@ -605,7 +605,7 @@ These findings are distinct from the architectural issues above — they are con
 
 ### 13A. Row type audit fields copy-pasted 13 times
 
-**File**: [packages/shared-types/src/rows/message.ts](../packages/shared-types/src/rows/message.ts:88-278)
+**File**: [packages/shared-types/src/rows/message.ts](../../packages/shared-types/src/rows/message.ts)
 
 Every single message payload row interface — `MessageTextRow`, `MessageImageRow`, `MessageFileRow`, `MessageDesignFileUpdateRow`, `MessagePaymentReminderRow`, `MessageEventReminderRow`, `MessageFeedbackRequestRow`, `MessageLessonAssignmentRow`, `MessageProgressUpdateRow`, `MessageSessionBookingRow`, `MessageSessionCompleteRow`, `MessageSessionSummaryRow`, `MessageHomeworkSubmissionRow`, `MessageLinkPreviewRow`, `MessageAudioRecordingRow`, `MessageLiveSessionStartedRow` — has an identical body:
 
@@ -660,7 +660,7 @@ The same `AuditRow` base would also reduce duplication across `profile.ts` rows 
 
 ### 13B. `ChildProfileRow` has both `communication_style` and `communication_styles`
 
-**File**: [packages/shared-types/src/rows/profile.ts](../packages/shared-types/src/rows/profile.ts:69-74)
+**File**: [packages/shared-types/src/rows/profile.ts](../../packages/shared-types/src/rows/profile.ts)
 
 ```ts
 export interface ChildProfileRow {
@@ -671,7 +671,7 @@ export interface ChildProfileRow {
 }
 ```
 
-These are two different fields. The select constant [apps/web/lib/profile/constants/selects.ts](../apps/web/lib/profile/constants/selects.ts:84-89) fetches both. This is either:
+These are two different fields. The select constant [apps/web/lib/profile/constants/selects.ts](../../apps/web/lib/profile/constants/selects.ts) fetches both. This is either:
 
 - A migration left-behind (singular was later replaced by plural and should be dropped), or
 - A real distinction (single preferred style vs a ranked list) that needs documentation.
@@ -682,7 +682,7 @@ Either way, one of them should be removed or the distinction must be documented.
 
 ### 13C. Admin helper auth boilerplate duplicated across 6 files
 
-**Files**: [apps/web/lib/admin/learning-space-archive.ts](../apps/web/lib/admin/learning-space-archive.ts), [learning-space-unarchive.ts](../apps/web/lib/admin/learning-space-unarchive.ts), [learning-space-delete.ts](../apps/web/lib/admin/learning-space-delete.ts), [channel-archive.ts](../apps/web/lib/admin/channel-archive.ts), [channel-unarchive.ts](../apps/web/lib/admin/channel-unarchive.ts), [channel-delete.ts](../apps/web/lib/admin/channel-delete.ts)
+**Files**: [apps/web/lib/admin/learning-space-archive.ts](../../apps/web/lib/admin/learning-space-archive.ts), [learning-space-unarchive.ts](../../apps/web/lib/admin/learning-space-unarchive.ts), [learning-space-delete.ts](../../apps/web/lib/admin/learning-space-delete.ts), [channel-archive.ts](../../apps/web/lib/admin/channel-archive.ts), [channel-unarchive.ts](../../apps/web/lib/admin/channel-unarchive.ts), [channel-delete.ts](../../apps/web/lib/admin/channel-delete.ts)
 
 Lines 1-26 are **identical** across all 6 files:
 
@@ -779,9 +779,9 @@ export async function setEntityStatus(
 
 The same generic groupBy utility is independently authored in:
 
-- [apps/web/lib/messages/builders/thread.builder.ts](../apps/web/lib/messages/builders/thread.builder.ts:113-125) — `function groupBy<T, K extends string>`
-- [apps/web/lib/spaces/builders/learning-space.builder.ts](../apps/web/lib/spaces/builders/learning-space.builder.ts) — another `function groupBy<T, K extends string>`, identical body
-- [apps/web/lib/schedules/builders/class-schedule.builder.ts](../apps/web/lib/schedules/builders/class-schedule.builder.ts) — `groupParticipantsBySchedule` and `groupRecurrenceExceptions`, same logic but non-generic
+- [apps/web/lib/messages/builders/thread.builder.ts](../../apps/web/lib/messages/builders/thread.builder.ts) — `function groupBy<T, K extends string>`
+- [apps/web/lib/spaces/builders/learning-space.builder.ts](../../apps/web/lib/spaces/builders/learning-space.builder.ts) — another `function groupBy<T, K extends string>`, identical body
+- [apps/web/lib/schedules/builders/class-schedule.builder.ts](../../apps/web/lib/schedules/builders/class-schedule.builder.ts) — `groupParticipantsBySchedule` and `groupRecurrenceExceptions`, same logic but non-generic
 
 All three do the same thing: `rows.forEach → map.get(key) ?? [] → push → map.set`. This belongs in `packages/utils/src/index.ts` and should be imported everywhere.
 
@@ -789,7 +789,7 @@ All three do the same thing: `rows.forEach → map.get(key) ?? [] → push → m
 
 ### 13F. `resolveChannels` fetches the primary channel twice
 
-**File**: [apps/web/lib/spaces/builders/learning-space.builder.ts](../apps/web/lib/spaces/builders/learning-space.builder.ts:41-71)
+**File**: [apps/web/lib/spaces/builders/learning-space.builder.ts](../../apps/web/lib/spaces/builders/learning-space.builder.ts)
 
 ```ts
 // Step 1: fetch ALL channels (including primary)
@@ -811,7 +811,7 @@ const primaryChannel =
 
 ### 13G. `PROFILE_SELECT` and `PROFILE_SUMMARY_SELECT` share 12 fields with no shared base
 
-**File**: [apps/web/lib/profile/constants/selects.ts](../apps/web/lib/profile/constants/selects.ts:3-45)
+**File**: [apps/web/lib/profile/constants/selects.ts](../../apps/web/lib/profile/constants/selects.ts)
 
 ```ts
 export const PROFILE_SELECT = [
@@ -925,7 +925,7 @@ Pick one format. The array form is preferable because individual fields are visi
 
 ### 13I. `CHILD_PROFILE_SELECT` and `CHILD_PROFILE_ROWS_SELECT` select the same fields except one
 
-**File**: [apps/web/lib/profile/constants/selects.ts](../apps/web/lib/profile/constants/selects.ts:79-115)
+**File**: [apps/web/lib/profile/constants/selects.ts](../../apps/web/lib/profile/constants/selects.ts)
 
 ```ts
 export const CHILD_PROFILE_SELECT = [
@@ -962,7 +962,7 @@ export const CHILD_PROFILE_ROWS_SELECT = [
 
 ### 13J. Profile builder pattern is structurally identical but not abstracted
 
-**Files**: [apps/web/lib/profile/builders/educator.builder.ts](../apps/web/lib/profile/builders/educator.builder.ts), [guardian.builder.ts](../apps/web/lib/profile/builders/guardian.builder.ts), [child.builder.ts](../apps/web/lib/profile/builders/child.builder.ts), [staff.builder.ts](../apps/web/lib/profile/builders/staff.builder.ts)
+**Files**: [apps/web/lib/profile/builders/educator.builder.ts](../../apps/web/lib/profile/builders/educator.builder.ts), [guardian.builder.ts](../../apps/web/lib/profile/builders/guardian.builder.ts), [child.builder.ts](../../apps/web/lib/profile/builders/child.builder.ts), [staff.builder.ts](../../apps/web/lib/profile/builders/staff.builder.ts)
 
 Every builder follows the same shape:
 
@@ -1003,7 +1003,7 @@ export function createEnumNormalizer<T extends string>(allowedValues: readonly T
 
 ### 13K. `resolveParticipants` in `learning-space.builder.ts` repeats the N-query pattern
 
-**File**: [apps/web/lib/spaces/builders/learning-space.builder.ts](../apps/web/lib/spaces/builders/learning-space.builder.ts:73-80)
+**File**: [apps/web/lib/spaces/builders/learning-space.builder.ts](../../apps/web/lib/spaces/builders/learning-space.builder.ts)
 
 ```ts
 async function resolveParticipants(supabase, rows) {
@@ -1020,7 +1020,7 @@ This is the same N-query anti-pattern as `resolveProfilesById` in `thread.builde
 
 ### 13L. `lib/data/` directory is a catch-all with no clear ownership
 
-**Files**: [apps/web/lib/data/inbox-activities.ts](../apps/web/lib/data/inbox-activities.ts), [apps/web/lib/data/support-channel.ts](../apps/web/lib/data/support-channel.ts), [apps/web/lib/data/admin-menu-sections.test.ts](../apps/web/lib/data/admin-menu-sections.test.ts)
+**Files**: [apps/web/lib/data/inbox-activities.ts](../../apps/web/lib/data/inbox-activities.ts), [apps/web/lib/data/support-channel.ts](../../apps/web/lib/data/support-channel.ts), [apps/web/lib/data/admin-menu-sections.test.ts](../../apps/web/lib/data/admin-menu-sections.test.ts)
 
 `lib/data/` contains heterogeneous files: static UI configuration (admin menu sections), business logic (inbox activities), and utility helpers (support channel). This breaks the consistent `lib/<domain>/` organization pattern used everywhere else. The files belong in:
 
@@ -1032,7 +1032,7 @@ This is the same N-query anti-pattern as `resolveProfilesById` in `thread.builde
 
 ### 13M. Sidebar unread helpers duplicate immutable update logic
 
-**Files**: [apps/web/lib/sidebar/direct-message-unread.ts](../apps/web/lib/sidebar/direct-message-unread.ts), [apps/web/lib/sidebar/learning-space-unread.ts](../apps/web/lib/sidebar/learning-space-unread.ts)
+**Files**: [apps/web/lib/sidebar/direct-message-unread.ts](../../apps/web/lib/sidebar/direct-message-unread.ts), [apps/web/lib/sidebar/learning-space-unread.ts](../../apps/web/lib/sidebar/learning-space-unread.ts)
 
 Both files contain `applyIncomingXXXUnread()` and `markXXXChannelRead()` functions that perform identical immutable channel updates — only the outer VM shape differs (DM channel vs learning space). The core logic of "given a channel ID, return a new sidebar state with an updated `unreadCount`" is duplicated. Extract a shared updater and have each file call it with a path accessor.
 
@@ -1046,14 +1046,14 @@ These are confirmed by grepping the entire codebase. Each finding has been verif
 
 ### 14A. `EDUCATOR_AVAILABILITY_SELECT` fetches 6 audit columns that are never mapped
 
-**File**: [apps/web/lib/profile/constants/selects.ts:76-77](../apps/web/lib/profile/constants/selects.ts#L76-L77)
+**File**: [apps/web/lib/profile/constants/selects.ts:76-77](../../apps/web/lib/profile/constants/selects.ts#L76-L77)
 
 ```ts
 export const EDUCATOR_AVAILABILITY_SELECT =
   'profile_id, org_id, class_types, weekly_commitment, availability, created_at, created_by, updated_at, updated_by, deleted_at, deleted_by';
 ```
 
-The mapper in [apps/web/lib/profile/builders/educator.builder.ts:72-77](../apps/web/lib/profile/builders/educator.builder.ts#L72-L77) only reads three fields (`class_types`, `weekly_commitment`, `availability`). The remaining 6 audit columns are fetched on every educator profile load and immediately discarded.
+The mapper in [apps/web/lib/profile/builders/educator.builder.ts:72-77](../../apps/web/lib/profile/builders/educator.builder.ts#L72-L77) only reads three fields (`class_types`, `weekly_commitment`, `availability`). The remaining 6 audit columns are fetched on every educator profile load and immediately discarded.
 
 Fix — trim the select:
 
@@ -1066,7 +1066,7 @@ export const EDUCATOR_AVAILABILITY_SELECT =
 
 ### 14B. `StaffProfileRow.working_hours_rules` and `working_hours_schedule` are defined but never selected or mapped
 
-**File**: [packages/shared-types/src/rows/profile.ts:103-104](../packages/shared-types/src/rows/profile.ts#L103-L104)
+**File**: [packages/shared-types/src/rows/profile.ts:103-104](../../packages/shared-types/src/rows/profile.ts#L103-L104)
 
 ```ts
 export interface StaffProfileRow {
@@ -1075,14 +1075,14 @@ export interface StaffProfileRow {
 }
 ```
 
-[apps/web/lib/profile/constants/selects.ts:93-94](../apps/web/lib/profile/constants/selects.ts#L93-L94):
+[apps/web/lib/profile/constants/selects.ts:93-94](../../apps/web/lib/profile/constants/selects.ts#L93-L94):
 
 ```ts
 export const STAFF_PROFILE_SELECT =
   'department, manager_staff_id, job_title, permissions_scope, weekly_availability';
 ```
 
-Neither field appears anywhere in the codebase outside its definition. They are never selected, never mapped to a VM, never rendered. The `workingHoursScheduleToDayAvailability` utility in [packages/shared-types/src/shared/working-hours.ts](../packages/shared-types/src/shared/working-hours.ts) is also never called.
+Neither field appears anywhere in the codebase outside its definition. They are never selected, never mapped to a VM, never rendered. The `workingHoursScheduleToDayAvailability` utility in [packages/shared-types/src/shared/working-hours.ts](../../packages/shared-types/src/shared/working-hours.ts) is also never called.
 
 **Action**: Remove from `StaffProfileRow` and drop `workingHoursScheduleToDayAvailability` if the DB columns are also unused.
 
@@ -1090,7 +1090,7 @@ Neither field appears anywhere in the codebase outside its definition. They are 
 
 ### 14C. `UserInternalVM` fields (`notesInternal`, `leadSource`) are mapped but never displayed
 
-**File**: [packages/shared-types/src/vm/profile.ts:81-84](../packages/shared-types/src/vm/profile.ts#L81-L84)
+**File**: [packages/shared-types/src/vm/profile.ts:81-84](../../packages/shared-types/src/vm/profile.ts#L81-L84)
 
 ```ts
 export interface UserInternalVM {
@@ -1099,7 +1099,7 @@ export interface UserInternalVM {
 }
 ```
 
-These are mapped in [apps/web/lib/profile/mappers/base-profile.mapper.ts:78-81](../apps/web/lib/profile/mappers/base-profile.mapper.ts#L78-L81) and included on every `UserProfileVM`. A full codebase search across `apps/web/app/**` and `packages/ui-web/src/**` finds **zero** references to `internal.notesInternal` or `internal.leadSource` in any page, component, or admin route — only in mock data (`apps/web/lib/data/profiles.ts`).
+These are mapped in [apps/web/lib/profile/mappers/base-profile.mapper.ts:78-81](../../apps/web/lib/profile/mappers/base-profile.mapper.ts#L78-L81) and included on every `UserProfileVM`. A full codebase search across `apps/web/app/**` and `packages/ui-web/src/**` finds **zero** references to `internal.notesInternal` or `internal.leadSource` in any page, component, or admin route — only in mock data (`apps/web/lib/data/profiles.ts`).
 
 The fields are selected from the DB on every profile load (`notes_internal`, `lead_source` are in `PROFILE_SELECT`), included in every VM, and silently discarded by the UI. Wasted bandwidth on every profile fetch.
 
@@ -1112,7 +1112,7 @@ Options:
 
 ### 14D. `UserLocationVM.streetAddress` is in the VM type but never populated from the DB
 
-**File**: [packages/shared-types/src/vm/profile.ts:75](../packages/shared-types/src/vm/profile.ts#L75)
+**File**: [packages/shared-types/src/vm/profile.ts:75](../../packages/shared-types/src/vm/profile.ts#L75)
 
 ```ts
 export interface UserLocationVM {
@@ -1135,7 +1135,7 @@ Fix: either add a `street_address` DB column + migration + mapper, or remove `st
 
 ### 14E. `ChildProfileRow.communication_style` (singular) is fetched but never mapped
 
-**File**: [packages/shared-types/src/rows/profile.ts:69](../packages/shared-types/src/rows/profile.ts#L69)
+**File**: [packages/shared-types/src/rows/profile.ts:69](../../packages/shared-types/src/rows/profile.ts#L69)
 
 ```ts
 export interface ChildProfileRow {
@@ -1153,9 +1153,9 @@ If `communication_style` is a superseded column, drop it from `CHILD_PROFILE_SEL
 
 ### 14F. 12 of the 13 message payload row type aliases are structural no-ops
 
-**File**: [packages/shared-types/src/rows/message.ts:88-278](../packages/shared-types/src/rows/message.ts#L88-L278)
+**File**: [packages/shared-types/src/rows/message.ts:88-278](../../packages/shared-types/src/rows/message.ts#L88-L278)
 
-The 13 `MessageXxxRow` interfaces (Text, Image, File, DesignFileUpdate, etc.) are used only as `.returns<MessageXxxRow[]>()` type annotations in [apps/web/lib/messages/queries/messages.query.ts](../apps/web/lib/messages/queries/messages.query.ts). Since all 13 interfaces have identical bodies, none of them add type safety beyond a single `MessagePayloadRow` alias. `MessageLiveSessionStartedRow` is also imported in mobile but for the same purpose.
+The 13 `MessageXxxRow` interfaces (Text, Image, File, DesignFileUpdate, etc.) are used only as `.returns<MessageXxxRow[]>()` type annotations in [apps/web/lib/messages/queries/messages.query.ts](../../apps/web/lib/messages/queries/messages.query.ts). Since all 13 interfaces have identical bodies, none of them add type safety beyond a single `MessagePayloadRow` alias. `MessageLiveSessionStartedRow` is also imported in mobile but for the same purpose.
 
 These types do not constrain anything the others don't — swapping any one for another would not break the TypeScript compiler. Collapse as described in §13A. The `.returns<MessagePayloadRow[]>()` annotation is equally type-safe.
 
@@ -1163,7 +1163,7 @@ These types do not constrain anything the others don't — swapping any one for 
 
 ### 14G. `EducatorProfileVM.joinedDate` shadows `meta.createdAt` in most cases
 
-**File**: [apps/web/lib/profile/builders/educator.builder.ts:88](../apps/web/lib/profile/builders/educator.builder.ts#L88)
+**File**: [apps/web/lib/profile/builders/educator.builder.ts:88](../../apps/web/lib/profile/builders/educator.builder.ts#L88)
 
 ```ts
 joinedDate: educator.data?.joined_date ?? profileRow.created_at,
@@ -1183,7 +1183,7 @@ These items don't affect end-user functionality but directly affect how fast and
 
 ### 15A. Husky hooks are wired but empty — `lint-staged` never runs
 
-`husky` and `lint-staged` are both installed ([package.json:63-65](../package.json)) and `"prepare": "husky"` is set, but `.husky/` contains only the internal `_/` bootstrap directory — **no actual hook files exist**.
+`husky` and `lint-staged` are both installed ([package.json:63-65](../../package.json)) and `"prepare": "husky"` is set, but `.husky/` contains only the internal `_/` bootstrap directory — **no actual hook files exist**.
 
 `lint-staged` has no config (no `.lintstagedrc.*` anywhere). Result: nothing is validated before a commit, and the two packages are dead weight.
 
@@ -1223,7 +1223,7 @@ Then import generated types in row files instead of hand-writing them, and add t
 
 ### 15C. No `.prettierignore` — `pnpm format` formats everything
 
-`prettier --write .` ([package.json:48](../package.json)) will format `dist/`, `.next/`, `node_modules/.cache/`, `apps/mobile/android/`, and any generated files. There is no `.prettierignore`.
+`prettier --write .` ([package.json:48](../../package.json)) will format `dist/`, `.next/`, `node_modules/.cache/`, `apps/mobile/android/`, and any generated files. There is no `.prettierignore`.
 
 **Fix — create `.prettierignore`:**
 
@@ -1242,7 +1242,7 @@ pnpm-lock.yaml
 
 ### 15D. `.vscode/settings.json` is nearly empty
 
-[.vscode/settings.json](../.vscode/settings.json) contains only `"cSpell.words": ["iconicedu"]`. Missing settings that would immediately improve productivity for every developer:
+[.vscode/settings.json](../../.vscode/settings.json) contains only `"cSpell.words": ["iconicedu"]`. Missing settings that would immediately improve productivity for every developer:
 
 ```json
 {
@@ -1276,7 +1276,7 @@ The `typescript.tsdk` setting is especially important in a monorepo — without 
 
 ### 15E. `.vscode/extensions.json` is missing
 
-There is no [.vscode/extensions.json](../.vscode/extensions.json). New team members get no prompt to install the project's required extensions. Create it:
+There is no [.vscode/extensions.json](../../.vscode/extensions.json). New team members get no prompt to install the project's required extensions. Create it:
 
 ```json
 {
@@ -1297,7 +1297,7 @@ There is no [.vscode/extensions.json](../.vscode/extensions.json). New team memb
 
 ### 15F. `launch.json` is incomplete — only Next.js is debuggable
 
-[.vscode/launch.json](../.vscode/launch.json) has one configuration (Next.js) and a compound that references only it. NestJS API and Expo mobile have no debug configurations.
+[.vscode/launch.json](../../.vscode/launch.json) has one configuration (Next.js) and a compound that references only it. NestJS API and Expo mobile have no debug configurations.
 
 **Add to `configurations`:**
 
@@ -1398,7 +1398,7 @@ IDE autocomplete on `env.NEXT_PUBLIC_SUPABASE_URL`, and throws at startup if any
 
 ### 15I. CI caches nothing beyond `pnpm install` — Turbo remote caching not configured
 
-[.github/workflows/ci.yml](../.github/workflows/ci.yml) caches the pnpm store (`cache: pnpm`) but does not configure Turbo remote caching. Without it, every CI run rebuilds everything from scratch — packages, typecheck, test.
+[.github/workflows/ci.yml](../../.github/workflows/ci.yml) caches the pnpm store (`cache: pnpm`) but does not configure Turbo remote caching. Without it, every CI run rebuilds everything from scratch — packages, typecheck, test.
 
 Turbo remote caching stores task outputs in a shared cache (Vercel or self-hosted):
 
@@ -1472,7 +1472,7 @@ Mocking patterns like `vi.mock('next/navigation', ...)`, `vi.mock('@supabase/ssr
 
 ### 15N. Mobile `Constants.expoConfig?.extra` is untyped — `any` at the source
 
-**File**: [apps/mobile/src/lib/supabase/client.ts](../apps/mobile/src/lib/supabase/client.ts)
+**File**: [apps/mobile/src/lib/supabase/client.ts](../../apps/mobile/src/lib/supabase/client.ts)
 
 ```ts
 const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl; // type: any

@@ -12,7 +12,7 @@ Internal engineers, operators, and AI assistants working in this monorepo.
 
 ## Last Updated
 
-2026-03-23
+2026-08-14
 
 ## Key Docs
 
@@ -28,9 +28,9 @@ Internal engineers, operators, and AI assistants working in this monorepo.
 ```text
 iconicedu-monorepo/
 ├── apps/
-│   ├── web/            # Next.js 15 application
-│   ├── mobile/         # Expo / React Native application
-│   └── api/            # NestJS backend
+│   ├── web/            # Next.js 15 frontend
+│   ├── mobile/         # Expo 55 / React Native 0.83.2 frontend
+│   └── api/            # NestJS 11 backend and business logic
 ├── packages/
 │   ├── shared-types/   # Shared rows, VMs, payloads
 │   ├── ui-web/         # Shared web UI library
@@ -44,13 +44,15 @@ iconicedu-monorepo/
 ## Quick Start
 
 ```bash
+nvm install
 nvm use
-pnpm install
+corepack enable
+pnpm setup:local
 pnpm build:packages
-pnpm dev:web
+pnpm dev
 ```
 
-For full environment setup, Supabase configuration, and troubleshooting, use [docs/getting-started/setup.md](docs/getting-started/setup.md).
+Start Docker before `pnpm setup:local`. For platform prerequisites, environment behavior, seed accounts, device networking, and troubleshooting, use the [local setup guide](docs/getting-started/setup.md).
 
 ## Common Commands
 
@@ -63,7 +65,17 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm run ci
+pnpm commitlint -- --text "feat(web): add an example"
 ```
+
+## Contribution Path
+
+1. Branch from an up-to-date `main` using a name such as `feat/guardian-dashboard-filters`.
+2. Keep table access and business logic in `apps/api`; web and mobile call the typed API clients.
+3. Commit with Conventional Commits, for example `feat(web): add guardian dashboard filters`.
+4. Run `pnpm run ci`, open a PR with a conventional title, and use squash merge after review.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) and the [development workflow](docs/getting-started/development-workflow.md) for the complete process.
 
 ## Documentation Model
 

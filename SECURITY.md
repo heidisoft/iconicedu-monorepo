@@ -15,7 +15,7 @@ If you discover a security vulnerability — especially one involving user data,
 
 ### How to report
 
-Email: **security@iconicedu.com** _(replace with your actual contact)_
+Use GitHub's private vulnerability reporting flow from the repository's **Security** tab. If private reporting is unavailable, contact a repository maintainer or organization owner privately and ask for a secure reporting channel. Do not include vulnerability details in a public issue.
 
 Include as much of the following as possible:
 

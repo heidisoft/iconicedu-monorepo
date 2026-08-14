@@ -45,6 +45,11 @@ jobs:
           node-version: 20.19.0
           cache: pnpm
 
+      - name: Validate Conventional Commit PR title
+        run: node scripts/check-commit-message.mjs --env CONVENTIONAL_COMMIT_TEXT
+        env:
+          CONVENTIONAL_COMMIT_TEXT: ${{ github.event.pull_request.title }}
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -124,6 +129,9 @@ jobs:
 
       - name: Build shared packages
         run: pnpm build:packages
+
+      - name: Test repository workflow scripts
+        run: pnpm test:commitlint
 
       # PRs: only affected packages. Push to main: all packages.
       - name: Test
