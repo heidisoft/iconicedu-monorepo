@@ -26,12 +26,27 @@ assignees: ''
 - [ ] Database schema
 - [ ] Shared packages
 
+## Architecture and delivery considerations
+
+<!-- Note expected API endpoints/contracts, migrations or RLS, feature flags, analytics, rollout, accessibility, and security/privacy constraints. -->
+
+- API / shared contract:
+- Data / migration / RLS:
+- Rollout / feature flag:
+- Analytics / observability:
+- Accessibility:
+- Security / privacy:
+
 ## Acceptance criteria
 
 <!-- How will we know this feature is "done"? List specific, testable conditions. -->
 
 - [ ]
 - [ ]
+
+## Out of scope
+
+<!-- Explicitly list adjacent work that should not be included. -->
 
 ## Additional context
 

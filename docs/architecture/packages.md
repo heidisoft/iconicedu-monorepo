@@ -10,7 +10,7 @@ Engineers changing shared types, UI packages, utilities, or workspace configurat
 
 ## Last Updated
 
-2026-03-23
+2026-08-14
 
 ## Related Docs
 
@@ -33,13 +33,13 @@ Central repository for all cross-app TypeScript types. The type system has three
 
 ### Rows
 
-Raw database shapes — what Supabase query results look like. Properties are `snake_case` and match column names exactly. Values are nullable where the DB column is nullable.
+Raw database shapes used by API data access and mapping code. Properties are `snake_case` and match column names exactly. Values are nullable where the DB column is nullable.
 
 ```ts
 import type { MessageRow } from '@iconicedu/shared-types';
 ```
 
-Only the query/builder layer should use Row types. Components receive VMs.
+Only `apps/api` database and mapping layers should introduce new Row usage. Frontend components receive VMs or purpose-built response types and never query tables with Row types.
 
 ### View Models (VMs)
 
@@ -68,6 +68,7 @@ import type { AccountRole, AccountStatus, MessageType } from '@iconicedu/shared-
 1. Add to the appropriate file in `packages/shared-types/src/`
 2. Re-export from `packages/shared-types/src/index.ts`
 3. Run `pnpm build:packages`
+4. Update API and frontend contract tests for the changed shape
 
 ---
 

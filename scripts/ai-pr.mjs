@@ -20,6 +20,7 @@ const branchPrefixes = new Set([
   'perf',
   'build',
   'ci',
+  'style',
 ]);
 
 function argValue(name, fallback) {
@@ -133,8 +134,8 @@ function aiSummary(context) {
 Return JSON only, with this exact shape:
 {
   "branch": "fix/short-kebab-description",
-  "commit": "Terse imperative commit message",
-  "title": "[codex] PR title",
+  "commit": "feat(scope): terse imperative description",
+  "title": "feat(scope): terse imperative description",
   "body": "Markdown PR body with Summary and Tests sections"
 }
 
@@ -142,7 +143,9 @@ Rules:
 - Branch must use one of these prefixes: fix/, feat/, chore/, docs/, test/, refactor/, perf/, build/, ci/.
 - Choose the branch prefix from the change type. Examples: fix/ for bug fixes, feat/ for user-facing features, chore/ for tooling or maintenance.
 - Branch description after the prefix must be lowercase kebab-case.
-- Commit message should be concise and imperative.
+- Commit and PR title must use Conventional Commits: <type>(<optional-scope>): <imperative description>.
+- Allowed types: feat, fix, docs, refactor, perf, test, build, ci, chore, style, revert.
+- Keep the commit and PR title headers at 100 characters or fewer.
 - Body should mention what changed and why.
 - If validation is not visible in the summary, use a Tests section with "- Not run (not provided)."
 - Infer from filenames and stats. Do not ask for the full diff unless the summary is truly ambiguous.
@@ -161,12 +164,12 @@ ${context}`;
   }
 
   const suggestion = extractJson(readFileSync(outputFile, 'utf8'));
-  const commit = String(suggestion.commit ?? 'Update local changes').trim();
+  const commit = String(suggestion.commit ?? 'chore: update local changes').trim();
 
   return {
     branch: normalizeBranchName(suggestion.branch, commit),
     commit,
-    title: String(suggestion.title ?? `[codex] ${suggestion.commit}`).trim(),
+    title: String(suggestion.title ?? commit).trim(),
     body: String(suggestion.body ?? '').trim(),
   };
 }

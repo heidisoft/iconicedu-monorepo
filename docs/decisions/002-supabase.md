@@ -50,7 +50,7 @@ All database schema changes are managed via migration files in `supabase/migrati
 
 - RLS policies enforce access control at the DB level — a compromised API key cannot bypass row-level restrictions
 - Single platform handles auth, database, real-time, and storage — less infrastructure to manage
-- Supabase JS client works identically on web and mobile
+- Supabase client SDKs provide consistent Auth, Realtime, and Storage integrations on web and mobile
 - `supabase/migrations/` provides a full audit trail of schema evolution
 - Local development is excellent via `supabase start` (Docker-based local stack)
 - Supabase dashboard makes it easy to inspect data, run queries, and manage users
@@ -72,3 +72,4 @@ All database schema changes are managed via migration files in `supabase/migrati
 
 - `supabase/migrations/` — all schema migrations
 - `docs/architecture/database.md` — migration workflow and RLS patterns
+- `docs/decisions/004-api-first-frontend-boundary.md` — application table access boundary

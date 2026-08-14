@@ -2,162 +2,157 @@
 
 ## Purpose
 
-This document defines how engineers contribute changes to the ICONICEDU monorepo.
+This is the contributor entry point for the IconicEdu monorepo. Detailed commands and examples live in the linked canonical guides.
 
 ## Intended Audience
 
-Internal engineers and trusted contributors opening branches, pull requests, and production-facing changes.
+Engineers opening branches, commits, and pull requests against the repository.
 
 ## Last Updated
 
-2026-03-23
+2026-08-14
 
-## Related Docs
+## Start Here
 
-- [Documentation Hub](docs/README.md)
-- [Local Setup](docs/getting-started/setup.md)
-- [Development Workflow](docs/getting-started/development-workflow.md)
-- [Architecture Overview](docs/architecture/overview.md)
-- [Best Practices](docs/standards/best-practices.md)
+1. Complete [local setup](docs/getting-started/setup.md).
+2. Read the [development workflow](docs/getting-started/development-workflow.md).
+3. Understand the [architecture boundaries](docs/architecture/overview.md).
+4. Follow the [engineering standards](docs/standards/best-practices.md).
 
-## Before You Start
+## Non-Negotiable Architecture Rules
 
-1. Complete local setup in [docs/getting-started/setup.md](docs/getting-started/setup.md).
-2. Review the development workflow in [docs/getting-started/development-workflow.md](docs/getting-started/development-workflow.md).
-3. Read the architecture summary in [docs/architecture/overview.md](docs/architecture/overview.md).
-4. Follow the code conventions in [docs/standards/best-practices.md](docs/standards/best-practices.md).
+- `apps/web` and `apps/mobile` are frontend-only. Direct Supabase access is limited to Auth, Realtime, and Storage.
+- All table reads, writes, validation, and business logic go through `apps/api`.
+- Web uses `createApiClient`; mobile uses the typed API helpers in its `src/lib/api` directory.
+- Apps never import from each other. Shared contracts and utilities belong in `packages/*`.
+- Reusable web UI belongs in `packages/ui-web`; reusable native UI belongs in `packages/ui-native`.
+- Existing Supabase migrations are immutable. Every database correction is a new forward migration with a unique timestamp prefix.
 
-## Branch Naming
+## Branches And Commits
 
-Use a prefix that describes the change type, followed by a short kebab-case description.
-
-| Prefix      | Use for                                     |
-| ----------- | ------------------------------------------- |
-| `feature/`  | New functionality                           |
-| `fix/`      | Bug fixes                                   |
-| `chore/`    | Tooling, config, dependency updates         |
-| `docs/`     | Documentation-only changes                  |
-| `refactor/` | Structural changes without behavior changes |
-| `test/`     | Adding or fixing tests                      |
-
-Examples:
-
-```text
-feature/avatar-upload
-fix/thread-duplicate-parent-message
-chore/upgrade-expo-sdk-54
-docs/restructure-engineering-docs
-refactor/message-list-virtualization
-```
-
-## Commit Messages
-
-Follow Conventional Commits:
-
-```text
-<type>(<scope>): <short description>
-```
-
-Common types:
-
-- `feat`
-- `fix`
-- `chore`
-- `docs`
-- `refactor`
-- `test`
-- `style`
-- `perf`
-- `ci`
-
-Guidelines:
-
-- Use imperative mood.
-- Keep the subject under 72 characters.
-- Do not end the subject with a period.
-- Reference issues in the footer when relevant.
-
-## Pull Requests
-
-Keep PRs focused on one concern.
-
-Before opening a PR, run the relevant checks:
+Create a short-lived branch from an up-to-date `main`:
 
 ```bash
+git switch main
+git pull --ff-only
+git switch -c feat/guardian-dashboard-filters
+```
+
+Branch names use `<type>/<kebab-description>`, normally `feat/`, `fix/`, `docs/`, `refactor/`, `perf/`, `test/`, `build/`, `ci/`, `chore/`, or `style/`.
+
+Authored commits and PR titles use Conventional Commits:
+
+```text
+<type>(<optional-scope>): <imperative description>
+```
+
+```text
+feat(web): add guardian dashboard filters
+fix(api): reject duplicate channel members
+docs(workflow): explain local setup
+```
+
+The repository validates commit headers locally and PR titles in CI. See [Conventional Commits](docs/getting-started/development-workflow.md#7-write-conventional-commits) for types, scopes, breaking changes, bodies, and footers.
+
+## Implementing A Feature
+
+For data-backed work, change the layers in this order:
+
+1. shared VM/payload contract in `packages/shared-types`;
+2. API DTO, validation, service, and controller in `apps/api`;
+3. typed web/mobile API call;
+4. shared and app-level UI; and
+5. unit, integration, and relevant end-to-end tests.
+
+Every new web user-facing feature defaults off behind a catalogued feature flag unless the PR documents a maintenance-only exemption.
+
+## Validation
+
+Use scoped checks during iteration and the full pipeline before review:
+
+```bash
+pnpm lint:affected
+pnpm typecheck:affected
+pnpm test:affected
 pnpm run ci
+```
+
+Area-specific commands include:
+
+```bash
 pnpm run ci:web
 pnpm run ci:mobile
 pnpm run ci:api
+pnpm --filter web test:e2e
 ```
 
-PR expectations:
-
-- Use a Conventional Commit style PR title.
-- Explain why the change exists, not just what changed.
-- Include screenshots or recordings for UI changes.
-- List manual verification steps when review depends on them.
-
-## PR Checklist
-
-- [ ] `pnpm lint`
-- [ ] `pnpm typecheck`
-- [ ] `pnpm test`
-- [ ] `pnpm build:packages`
-- [ ] Fresh migration validation with `supabase db reset` if schema changed
-- [ ] `.env.*.example` updates if new environment variables were introduced
-- [ ] No secrets or credentials committed
-
-## Code Review
-
-For reviewers:
-
-- Focus on correctness, maintainability, and consistency.
-- Mark non-blocking feedback with `nit:`.
-- Approve only when the change is genuinely ready.
-
-For authors:
-
-- Respond to every comment.
-- Do not silently ignore nits.
-- Re-request review after material changes.
-
-## Dependencies
-
-Always add dependencies to the correct workspace with `pnpm --filter`.
-
-Examples:
+When schema or RLS changes:
 
 ```bash
-pnpm --filter web add <pkg>
-pnpm --filter mobile add <pkg>
-pnpm --filter api add <pkg>
-pnpm --filter @iconicedu/ui-web add <pkg>
+supabase db reset
+pnpm --filter api db:generate
 ```
 
-Use `workspace:*` for internal packages.
+If a check was not run, say so in the PR and explain why.
 
-## Merge Strategy
+## Pull Requests
 
-- Use squash merge for normal feature work.
-- Use merge commits only when preserving branch history is intentionally required.
+- Open a draft early for cross-cutting or high-risk work.
+- Keep one problem and one coherent outcome per PR.
+- Use a Conventional Commit PR title; squash merge makes it the `main` commit subject.
+- Explain why the change exists and call out non-obvious design decisions.
+- Include screenshots or recordings for visible changes.
+- List exact automated and manual verification.
+- Document migrations, new env vars, rollout flags, rollback strategy, security impact, and known limitations.
+- Link the issue with `Closes: #<number>` when merge should close it.
 
-## Branch Protection
+The optional `pnpm pr:ai` helper proposes a branch, commit, title, and draft PR body. Review all generated metadata before publishing.
 
-`main` should be protected so PRs cannot merge until CI completes successfully.
+## Review And Merge
 
-Required status checks:
+Authors respond to every review thread and re-request review after material changes. Reviewers distinguish blocking concerns from optional `nit:` feedback and check architecture, tenant isolation, auth, migration safety, tests, accessibility, and maintainability.
+
+Required branch-protection checks are:
 
 - `Quality (format · lint · typecheck)`
 - `Test`
 - `Build`
 
-`Build` already depends on `Quality` and `Test`, but all three are listed as required checks so GitHub blocks merges while any part of the CI pipeline is still pending or failing.
+At least one approving review is required, stale approvals are dismissed after new changes, and review conversations must be resolved. Use squash merge for normal work and delete the merged branch. Merge commits require an explicit reason to preserve branch history.
 
-To apply the protection through the GitHub API:
+## Dependencies
+
+Add dependencies to the owning workspace and commit the lockfile:
 
 ```bash
-export GITHUB_TOKEN=<repo-admin-token>
-bash scripts/github/apply-branch-protection.sh
+pnpm --filter web add <package>
+pnpm --filter mobile add <package>
+pnpm --filter api add <package>
+pnpm --filter @iconicedu/ui-web add <package>
 ```
 
-The source of truth for this protection is [`main.json`](/Users/hwanigasooriya/Workspace/hobby/iconicedu-monorepo/.github/branch-protection/main.json).
+Use `workspace:*` for internal packages. Explain major runtime dependencies in the PR and avoid adding the same utility to multiple workspaces without considering `packages/*` ownership.
+
+## Documentation
+
+Update documentation in the same PR when behavior, configuration, architecture, commands, environment variables, workflows, or operational responsibilities change. Keep subsystem-specific detail beside the subsystem and link it from the [documentation hub](docs/README.md).
+
+Do not update a `Last Updated` field unless the document's content was actually reviewed and remains accurate.
+
+## Repository Governance
+
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Security Policy](SECURITY.md)
+- [Branch protection configuration](.github/branch-protection/main.json)
+- [CODEOWNERS](.github/CODEOWNERS)
+
+## Maintainer Checklist For A New Developer
+
+- Grant the least GitHub repository permission needed for their role.
+- Add them to the appropriate GitHub team and replace individual `CODEOWNERS` entries with team handles as ownership grows.
+- Confirm branch protection is applied from `.github/branch-protection/main.json`.
+- Have the developer complete `pnpm setup:local` and `pnpm run ci` before assigning a feature.
+- Provide only non-production credentials for optional providers the feature needs; do not distribute production database or service-role credentials.
+- Grant preview/QA access separately for Supabase, Railway, Vercel, and Expo, using provider roles rather than shared personal accounts.
+- Keep production environment approval limited to designated maintainers.
+- Start with a small vertical slice and pair on the first migration, auth change, or release workflow.

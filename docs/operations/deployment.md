@@ -10,7 +10,7 @@ Internal engineers and operators responsible for shipping or validating producti
 
 ## Last Updated
 
-2026-03-23
+2026-08-14
 
 ## Related Docs
 
@@ -47,11 +47,11 @@ The Next.js web app is designed to deploy on [Vercel](https://vercel.com). It us
 
 ### Environment variables (Vercel dashboard)
 
-| Variable                        | Where to find it                    |
-| ------------------------------- | ----------------------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`      | Supabase dashboard → Settings → API |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase dashboard → Settings → API |
-| `SUPABASE_SERVICE_ROLE_KEY`     | Supabase dashboard → Settings → API |
+| Variable                               | Source                        |
+| -------------------------------------- | ----------------------------- |
+| `API_URL` / `NEXT_PUBLIC_API_URL`      | Railway API origin            |
+| `NEXT_PUBLIC_SUPABASE_URL`             | Supabase project API settings |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase project API settings |
 
 ### Deploying
 
@@ -79,7 +79,7 @@ The Expo mobile app is built and distributed via [EAS (Expo Application Services
 ### Prerequisites
 
 ```bash
-npm install -g eas-cli
+pnpm add --global eas-cli
 eas login
 ```
 
@@ -122,10 +122,10 @@ pnpm mobile:eas:build:preview
 pnpm mobile:eas:build:prod
 
 # iOS only
-pnpm mobile:eas:build:ios
+pnpm --filter mobile eas:build:ios
 
 # Android only
-pnpm mobile:eas:build:android
+pnpm --filter mobile eas:build:android
 ```
 
 ### Submit to stores
@@ -135,10 +135,10 @@ pnpm mobile:eas:build:android
 pnpm mobile:eas:submit
 
 # iOS to App Store Connect
-pnpm mobile:eas:submit:ios
+pnpm --filter mobile eas:submit:ios
 
 # Android to Play Store
-pnpm mobile:eas:submit:android
+pnpm --filter mobile eas:submit:android
 ```
 
 ### OTA updates (EAS Update)
@@ -146,7 +146,7 @@ pnpm mobile:eas:submit:android
 For JavaScript-only changes (no native code changes), you can push an over-the-air update without a full store release:
 
 ```bash
-pnpm mobile:eas:update
+pnpm --filter mobile eas:update
 ```
 
 ### Environment variables in EAS
@@ -159,7 +159,7 @@ Mobile env vars (`EXPO_PUBLIC_*`) are set in `apps/mobile/eas.json` under the `e
     "production": {
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://your-project.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "your-anon-key"
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "your-publishable-key"
       }
     }
   }
@@ -184,45 +184,17 @@ pnpm --filter api build
 ### Run in production
 
 ```bash
-node apps/api/dist/main.js
+pnpm --filter api start:prod
 ```
 
-### Recommended platforms
-
-| Platform                                       | Notes                                           |
-| ---------------------------------------------- | ----------------------------------------------- |
-| [Railway](https://railway.app)                 | Simple, good for early-stage; auto-detects Node |
-| [Render](https://render.com)                   | Free tier available; deploy from GitHub         |
-| [Fly.io](https://fly.io)                       | More control; good if you need edge regions     |
-| [AWS ECS / App Runner](https://aws.amazon.com) | For scale                                       |
-
-### Docker (recommended for consistency)
-
-Create `apps/api/Dockerfile`:
-
-```dockerfile
-FROM node:20-alpine AS builder
-WORKDIR /app
-COPY . .
-RUN npm install -g pnpm
-RUN pnpm install --frozen-lockfile
-RUN pnpm --filter api build
-
-FROM node:20-alpine
-WORKDIR /app
-COPY --from=builder /app/apps/api/dist ./dist
-COPY --from=builder /app/apps/api/package.json .
-COPY --from=builder /app/node_modules ./node_modules
-EXPOSE 3001
-CMD ["node", "dist/main.js"]
-```
+The current production host is Railway. Repository CI configures the Railway service and environment; do not introduce an alternate deployment path without documenting ownership, health checks, migrations, and rollback.
 
 ### Environment variables
 
 | Variable                    | Description                                   |
 | --------------------------- | --------------------------------------------- |
 | `DATABASE_URL`              | Supabase Postgres connection string (pooled)  |
-| `DIRECT_URL`                | Non-pooled URL for Prisma migrations          |
+| `DIRECT_URL`                | Non-pooled URL for Prisma schema tooling      |
 | `SUPABASE_URL`              | Supabase project URL                          |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service role key (bypasses RLS)               |
 | `SUPABASE_JWT_SECRET`       | From Supabase → Settings → API → JWT Settings |
@@ -231,14 +203,7 @@ CMD ["node", "dist/main.js"]
 | `EXPO_ACCESS_TOKEN`         | Expo push API token                           |
 | `PORT`                      | HTTP port (default `3001`)                    |
 
-### Prisma in production
-
-Run migrations before starting the server. Never run `prisma migrate dev` in production — use `prisma migrate deploy`:
-
-```bash
-npx prisma migrate deploy
-node dist/main.js
-```
+Prisma does not own production migrations. Generate the client during the build, apply the forward-only files in `supabase/migrations`, then start the API. Never run `prisma migrate dev`, `prisma migrate deploy`, or `prisma db push` against a repository environment.
 
 ---
 
@@ -254,9 +219,11 @@ Preview CI now deploys the required Supabase Edge Functions and sets branch-loca
 - `EVENTS_DISPATCH_URL=https://<api-domain>/internal/events/dispatch`
 - `INTERNAL_EVENTS_TOKEN=<same value in apps/api and Supabase Edge Functions>`
 
-Preview CI applies migrations, sets branch-local Edge Function secrets, deploys
-functions, deletes deprecated remote functions, runs
-`public.configure_edge_function_cron(...)`, and verifies the active cron set.
+When a preview branch is new or `supabase/**` changes, preview CI applies
+migrations, sets branch-local Edge Function secrets, deploys functions, deletes
+deprecated remote functions, runs `public.configure_edge_function_cron(...)`,
+and verifies the active cron set. Application-only pushes reuse the existing
+preview schema and run preview provisioning alongside the application build.
 Production configuration runs automatically after a PR is merged to `main`, waits
 for the GitHub `production` Environment approval, then uses
 `ops/env/production.env.json` and GitHub Actions secrets to configure Railway,
@@ -301,6 +268,22 @@ Production GitHub Actions secrets:
 | Production values   | `EXPO_ACCESS_TOKEN` or `EXPO_TOKEN`                                | Required for authenticated Expo push sends                             |
 | Optional telemetry  | `POSTHOG_KEY`                                                      | Optional PostHog key                                                   |
 | Optional telemetry  | `POSTHOG_HOST`                                                     | Optional PostHog host                                                  |
+
+The Vercel user that created `VERCEL_TOKEN` must connect its GitHub account under
+**Vercel Account Settings → Authentication**. Vercel rejects branch-scoped preview
+environment variables with `no_github_account_connected` until that connection exists;
+CI reports this as a warning and does not redeploy the preview with stale variables.
+
+Optional CI cache configuration:
+
+| Where               | Variable / value | Notes                                            |
+| ------------------- | ---------------- | ------------------------------------------------ |
+| Repository secret   | `TURBO_TOKEN`    | Authenticates an optional Turborepo remote cache |
+| Repository variable | `TURBO_TEAM`     | Team slug associated with the remote cache       |
+
+Without these optional values, CI still shares `.turbo` build outputs through
+the GitHub Actions cache. Do not reuse an unrelated platform token or guess the
+team slug.
 
 When a PR introduces a new production env var, add it to
 `ops/env/production.env.json` and add the matching GitHub Actions secret or
@@ -352,23 +335,23 @@ Supabase supports database branching for preview deployments. Each Vercel previe
 
 ### Backups
 
-Supabase automatically takes daily backups on paid plans. For additional safety, schedule periodic `pg_dump` exports via a cron job or Supabase's scheduled functions.
+Confirm the production project's current backup and point-in-time recovery configuration in Supabase before a risky migration. A migration plan must not assume that a backup exists merely because the project is hosted.
 
 ---
 
 ## Environment Variables Reference
 
-| Variable                        | Web                     | Mobile | API | Notes                               |
-| ------------------------------- | ----------------------- | ------ | --- | ----------------------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`      | ✅                      | —      | —   | Public, browser-safe                |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅                      | —      | —   | Public, browser-safe                |
-| `SUPABASE_SERVICE_ROLE_KEY`     | ✅ (server)             | —      | ✅  | Never expose client-side            |
-| `EXPO_PUBLIC_SUPABASE_URL`      | —                       | ✅     | —   | Inlined at build time               |
-| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | —                       | ✅     | —   | Inlined at build time               |
-| `DATABASE_URL`                  | —                       | —      | ✅  | Pooled Postgres URL                 |
-| `DIRECT_URL`                    | —                       | —      | ✅  | Non-pooled, for migrations          |
-| `SUPABASE_URL`                  | —                       | —      | ✅  |                                     |
-| `SUPABASE_JWT_SECRET`           | —                       | —      | ✅  | From Supabase JWT settings          |
-| `INTERNAL_EVENTS_TOKEN`         | ✅ (server/admin tools) | —      | ✅  | Match Supabase Edge Function secret |
-| `INTERNAL_REMINDERS_TOKEN`      | ✅ (server/admin tools) | —      | ✅  | Match Supabase Edge Function secret |
-| `EXPO_ACCESS_TOKEN`             | —                       | —      | ✅  | Expo push provider token            |
+| Variable                               | Web                     | Mobile | API | Notes                               |
+| -------------------------------------- | ----------------------- | ------ | --- | ----------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`             | ✅                      | —      | —   | Public, browser-safe                |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | ✅                      | —      | —   | Public, browser-safe                |
+| `SUPABASE_SERVICE_ROLE_KEY`            | —                       | —      | ✅  | API-only privileged credential      |
+| `EXPO_PUBLIC_SUPABASE_URL`             | —                       | ✅     | —   | Inlined at build time               |
+| `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | —                       | ✅     | —   | Inlined at build time               |
+| `DATABASE_URL`                         | —                       | —      | ✅  | Pooled Postgres URL                 |
+| `DIRECT_URL`                           | —                       | —      | ✅  | Non-pooled schema tooling URL       |
+| `SUPABASE_URL`                         | —                       | —      | ✅  |                                     |
+| `SUPABASE_JWT_SECRET`                  | —                       | —      | ✅  | From Supabase JWT settings          |
+| `INTERNAL_EVENTS_TOKEN`                | ✅ (server/admin tools) | —      | ✅  | Match Supabase Edge Function secret |
+| `INTERNAL_REMINDERS_TOKEN`             | ✅ (server/admin tools) | —      | ✅  | Match Supabase Edge Function secret |
+| `EXPO_ACCESS_TOKEN`                    | —                       | —      | ✅  | Expo push provider token            |

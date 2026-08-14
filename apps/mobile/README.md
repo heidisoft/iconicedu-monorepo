@@ -3,6 +3,12 @@
 This app is developed with local development builds, not Expo Go. The
 `pnpm dev:mobile` command guides you through the full setup.
 
+For machine prerequisites and local Supabase setup, start with the [repository setup guide](../../docs/getting-started/setup.md).
+
+## Architecture boundary
+
+Mobile uses the typed helpers in `src/lib/api/http-client.ts` for every table-backed read and write. Direct Supabase use is limited to Auth, Realtime subscriptions, and Storage. Add missing server behavior to `apps/api`; never call `apps/web` routes.
+
 ## Quick start
 
 ```sh
@@ -97,12 +103,7 @@ Use `development` for engineer iteration and `preview` for installable QA builds
 
 ### Preview build testing accounts
 
-For shared preview or stage testing, use:
-
-- `iconicedudev@gmail.com`
-- Password: `Iconic@2026`
-
-If the target preview environment includes the seeded role data, these aliases are available for role-specific testing:
+Use the credentials and URLs in the PR's `Preview Environment Ready` comment. Do not keep hosted passwords in tracked documentation. If the target preview environment includes the standard role data, these aliases are available for role-specific testing:
 
 - `iconicedudev@gmail.com` — owner coverage
 - `iconicedudev+guardian1@gmail.com` — guardian flows
@@ -111,7 +112,7 @@ If the target preview environment includes the seeded role data, these aliases a
 - `iconicedudev+staff1@gmail.com` — staff-only flows
 - `iconicedudev+guardian2@gmail.com` — second guardian household coverage
 
-For local Supabase resets, the same aliases come from `supabase/seed.sql`, but the local password is `Seed123!`, not `Iconic@2026`.
+For local Supabase resets, the same aliases come from `supabase/seed.sql` and use the local-only password documented in the [setup guide](../../docs/getting-started/setup.md#6-sign-in-with-seed-data).
 
 ### Creating preview builds
 
@@ -135,7 +136,7 @@ GitHub Actions builds:
 PR-based preview EAS builds now inject:
 
 - `EXPO_PUBLIC_SUPABASE_URL`
-- `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+- `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (with the legacy anon key accepted as fallback)
 - `EXPO_PUBLIC_APP_ENV=preview`
 - `EXPO_PUBLIC_API_URL`
 - `EXPO_PUBLIC_WEB_URL`
@@ -189,16 +190,16 @@ Do not rebuild for normal JS-only work such as:
 Use `expo prebuild` only when native configuration has changed.
 
 ```sh
-pnpm --filter mobile prebuild
+pnpm mobile:prebuild
 ```
 
 Use a clean prebuild only when you need to fully regenerate native projects:
 
 ```sh
-pnpm --filter mobile prebuild:clean
+pnpm mobile:prebuild:clean
 ```
 
-Do not clean or prebuild on every run. It slows iteration down and creates unnecessary native churn.
+Do not clean or prebuild on every run. It slows iteration down and creates unnecessary native churn. The mobile package intentionally calls these scripts `native:prebuild*`; npm reserves `prebuild` as an automatic lifecycle hook before every `build`.
 
 ## Local Supabase URL rewriting
 
@@ -216,12 +217,14 @@ Keep `EXPO_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321` in your local `.env`.
 The rewrite only activates when `EXPO_PUBLIC_APP_ENV=local` — EAS builds and
 cloud Supabase projects are unaffected.
 
+The API URL is not rewritten. Use `http://10.0.2.2:3001` for the standard Android emulator or the development machine's LAN IP for a physical device, then restart Metro.
+
 ## Environment expectations
 
 The `development` EAS profile is configured as a dev client and includes:
 
 - `EXPO_PUBLIC_SUPABASE_URL`
-- `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+- `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (or the supported anon-key fallback)
 - `EXPO_PUBLIC_APP_ENV=development`
 - `EXPO_PUBLIC_API_URL` for the NestJS API (`apps/api`, default local dev `http://localhost:3001`)
 - `EXPO_PUBLIC_WEB_URL` for web-hosted pages opened from mobile (`apps/web`, default local dev `http://localhost:3000`)

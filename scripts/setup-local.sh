@@ -54,6 +54,27 @@ check_cmd() {
   success "$cmd found ($(${cmd} --version 2>&1 | head -1))"
 }
 
+check_pinned_versions() {
+  local expected_node actual_node expected_pnpm actual_pnpm
+  expected_node=$(tr -d '[:space:]' < .nvmrc)
+  actual_node=$(node -p "process.versions.node")
+  expected_pnpm=$(node -p "require('./package.json').packageManager.split('@').at(-1)")
+  actual_pnpm=$(pnpm --version)
+
+  if ! node -e 'const [major, minor] = process.versions.node.split(".").map(Number); process.exit(major === 20 && minor >= 19 ? 0 : 1)'; then
+    error "Node.js >=20.19.0 <21 is required by package.json; found $actual_node. Run 'nvm install && nvm use'."
+    exit 1
+  fi
+  if [[ "$actual_node" != "$expected_node" ]]; then
+    warn "Node.js $expected_node is pinned for CI parity; found $actual_node. Compatible Node 20 patch releases may work, or run 'nvm install && nvm use'."
+  fi
+  if [[ "$actual_pnpm" != "$expected_pnpm" ]]; then
+    error "pnpm $expected_pnpm is required by package.json; found $actual_pnpm. Use Corepack to activate the pinned version."
+    exit 1
+  fi
+  success "Node.js is compatible and the pinned pnpm version matches"
+}
+
 check_sync_prereqs() {
   info "Checking prerequisites for env sync..."
   check_cmd node "Install Node.js >= 20 from https://nodejs.org"
@@ -64,9 +85,10 @@ check_sync_prereqs() {
 check_bootstrap_prereqs() {
   info "Checking prerequisites..."
   check_cmd node "Install Node.js >= 20 from https://nodejs.org"
-  check_cmd pnpm "Install pnpm: npm install -g pnpm@9.12.0"
+  check_cmd pnpm "Enable Corepack, then run: corepack prepare pnpm@10.33.0 --activate"
   check_cmd supabase "Install Supabase CLI: brew install supabase/tap/supabase"
   check_cmd docker "Install Docker Desktop from https://www.docker.com/products/docker-desktop"
+  check_pinned_versions
 
   if ! docker info &>/dev/null; then
     error "Docker daemon is not running. Start Docker Desktop and try again."
@@ -254,6 +276,9 @@ read_supabase_status() {
   API_URL=$(json_get "API_URL")
   DB_URL=$(json_get "DB_URL")
   JWT_SECRET=$(json_get "JWT_SECRET")
+  if [[ -z "$JWT_SECRET" ]]; then
+    JWT_SECRET=$(json_get "SUPABASE_JWT_SECRET")
+  fi
   PUBLISHABLE_KEY=$(json_get "PUBLISHABLE_KEY")
   ANON_KEY=$(json_get "ANON_KEY")
   SECRET_KEY=$(json_get "SECRET_KEY")
@@ -364,6 +389,21 @@ ensure_env_var() {
   printf '%s' "$default_value"
 }
 
+ensure_secret_env_var() {
+  local file="$1" key="$2"
+  local current_value
+  current_value=$(env_get_value "$file" "$key")
+  if [[ -n "$current_value" && "$current_value" != replace-with-* && "$current_value" != your-* ]]; then
+    printf '%s' "$current_value"
+    return 0
+  fi
+
+  local generated
+  generated=$(generate_secret)
+  set_env_var "$file" "$key" "$generated"
+  printf '%s' "$generated"
+}
+
 sync_env_files() {
   info "Syncing local env files in place..."
 
@@ -376,12 +416,11 @@ sync_env_files() {
   set_env_var "$API_ENV_FILE" "SUPABASE_URL" "$API_URL"
   set_env_var "$API_ENV_FILE" "SUPABASE_SERVICE_ROLE_KEY" "$SERVICE_ROLE_KEY"
   set_env_var "$API_ENV_FILE" "SUPABASE_ANON_KEY" "$ANON_KEY"
-  set_env_var "$API_ENV_FILE" "JWT_SECRET" "$JWT_SECRET"
+  set_env_var "$API_ENV_FILE" "SUPABASE_JWT_SECRET" "$JWT_SECRET"
 
-  ensure_env_var "$API_ENV_FILE" "INTERNAL_REMINDERS_TOKEN_API" "$(generate_secret)" >/dev/null
-  ensure_env_var "$API_ENV_FILE" "INTERNAL_ACTIVITY_FEED_TOKEN" "$(generate_secret)" >/dev/null
-  ensure_env_var "$API_ENV_FILE" "INTERNAL_ACTIVITY_PROJECTOR_TOKEN" "$(generate_secret)" >/dev/null
-  ensure_env_var "$API_ENV_FILE" "INTERNAL_NOTIFICATIONS_TOKEN_API" "$(generate_secret)" >/dev/null
+  local reminders_token events_token
+  reminders_token=$(ensure_secret_env_var "$API_ENV_FILE" "INTERNAL_REMINDERS_TOKEN")
+  events_token=$(ensure_secret_env_var "$API_ENV_FILE" "INTERNAL_EVENTS_TOKEN")
 
   set_env_var "$WEB_ENV_FILE" "NEXT_PUBLIC_SUPABASE_URL" "$API_URL"
   set_env_var "$WEB_ENV_FILE" "SUPABASE_URL" "$API_URL"
@@ -390,10 +429,14 @@ sync_env_files() {
     set_env_var "$WEB_ENV_FILE" "NEXT_PUBLIC_SUPABASE_ANON_KEY" "$ANON_KEY"
   fi
   set_env_var "$WEB_ENV_FILE" "SUPABASE_SERVICE_ROLE_KEY" "$SERVICE_ROLE_KEY"
+  set_env_var "$WEB_ENV_FILE" "INTERNAL_REMINDERS_TOKEN" "$reminders_token"
+  set_env_var "$WEB_ENV_FILE" "INTERNAL_EVENTS_TOKEN" "$events_token"
   ensure_env_var "$WEB_ENV_FILE" "NEXT_PUBLIC_APP_URL" "$LOCAL_WEB_APP_URL" >/dev/null
 
   set_env_var "$MOBILE_ENV_FILE" "EXPO_PUBLIC_SUPABASE_URL" "$LOCAL_MOBILE_SUPABASE_URL"
+  set_env_var "$MOBILE_ENV_FILE" "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY" "$PUBLISHABLE_KEY"
   set_env_var "$MOBILE_ENV_FILE" "EXPO_PUBLIC_SUPABASE_ANON_KEY" "$ANON_KEY"
+  set_env_var "$MOBILE_ENV_FILE" "EXPO_PUBLIC_APP_ENV" "local"
 
   success "Local env sync complete."
   echo ""
@@ -499,12 +542,12 @@ print_status_summary() {
 
 print_seed_credentials() {
   echo -e "${BOLD}Seed credentials${RESET} (password: ${BOLD}Seed123!${RESET} for all)"
-  echo "  owner.marc@example.com       — Owner (Marc F)"
-  echo "  guardian.lura@example.com    — Guardian (Lura H)"
-  echo "  educator.denise@example.com  — Educator (Denise R)"
-  echo "  educator.barbara@example.com — Educator (Barbara Y)"
-  echo "  staff.harold@example.com     — Staff (Harold B)"
-  echo "  guardian.jessica@example.com — Guardian (Jessica K)"
+  echo "  iconicedudev@gmail.com           — Owner (Marc F)"
+  echo "  iconicedudev+guardian1@gmail.com — Guardian (Lura H)"
+  echo "  iconicedudev+educator1@gmail.com — Educator (Denise R)"
+  echo "  iconicedudev+educator2@gmail.com — Educator (Barbara Y)"
+  echo "  iconicedudev+staff1@gmail.com    — Staff (Harold B)"
+  echo "  iconicedudev+guardian2@gmail.com — Guardian (Jessica K)"
   echo ""
 }
 
@@ -513,7 +556,7 @@ print_next_steps() {
   echo "  1. Review optional unset env vars above if you need those integrations locally"
   echo "  2. pnpm dev:api    — start NestJS API"
   echo "  3. pnpm dev:web    — start Next.js web app"
-  echo "  4. pnpm mobile:start — start Expo mobile app"
+  echo "  4. pnpm dev:mobile — start the guided Expo mobile workflow"
   echo "  OR: pnpm dev       — start all three in parallel"
   echo ""
 }
