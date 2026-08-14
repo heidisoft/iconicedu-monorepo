@@ -269,6 +269,11 @@ Production GitHub Actions secrets:
 | Optional telemetry  | `POSTHOG_KEY`                                                      | Optional PostHog key                                                   |
 | Optional telemetry  | `POSTHOG_HOST`                                                     | Optional PostHog host                                                  |
 
+The Vercel user that created `VERCEL_TOKEN` must connect its GitHub account under
+**Vercel Account Settings → Authentication**. Vercel rejects branch-scoped preview
+environment variables with `no_github_account_connected` until that connection exists;
+CI reports this as a warning and does not redeploy the preview with stale variables.
+
 Optional CI cache configuration:
 
 | Where               | Variable / value | Notes                                            |

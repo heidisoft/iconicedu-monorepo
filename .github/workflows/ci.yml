@@ -978,6 +978,7 @@ jobs:
             ] | map(. + {target:["preview"], gitBranch:$branch, type:"encrypted"})')
 
           RESPONSE_FILE=$(mktemp)
+          VERCEL_ENV_CONFIGURED=true
           POST_STATUS=$(curl -sS -o "$RESPONSE_FILE" -w "%{http_code}" -X POST \
             -H "Authorization: Bearer $VERCEL_TOKEN" \
             -H "Content-Type: application/json" \
@@ -985,8 +986,13 @@ jobs:
             -d "$VERCEL_ENV_PAYLOAD")
           if [[ ! "$POST_STATUS" =~ ^2[0-9][0-9]$ ]]; then
             ERROR_CODE=$(jq -r '.error.code // "unknown"' "$RESPONSE_FILE" 2>/dev/null || echo "unknown")
-            echo "::error::Vercel env upsert failed (HTTP $POST_STATUS, code $ERROR_CODE)"
-            exit 1
+            if [[ "$ERROR_CODE" == "no_github_account_connected" ]]; then
+              echo "::warning::Vercel skipped branch env vars because the VERCEL_TOKEN owner has no GitHub login connection. Connect GitHub in Vercel Account Settings > Authentication, then rerun this workflow."
+              VERCEL_ENV_CONFIGURED=false
+            else
+              echo "::error::Vercel env upsert failed (HTTP $POST_STATUS, code $ERROR_CODE)"
+              exit 1
+            fi
           fi
 
           LATEST_DEPLOYMENT_JSON=$(curl -sf \
@@ -996,7 +1002,7 @@ jobs:
           LATEST_DEPLOYMENT_ID=$(echo "$LATEST_DEPLOYMENT_JSON" | jq -r '.deployments[0].uid // ""')
           LATEST_DEPLOYMENT_URL=$(echo "$LATEST_DEPLOYMENT_JSON" | jq -r '.deployments[0].url // ""')
 
-          if [[ -n "$LATEST_DEPLOYMENT_ID" ]]; then
+          if [[ "$VERCEL_ENV_CONFIGURED" == "true" && -n "$LATEST_DEPLOYMENT_ID" ]]; then
             REDEPLOY_URL=$(curl -sf -X POST \
               -H "Authorization: Bearer $VERCEL_TOKEN" \
               -H "Content-Type: application/json" \
