@@ -47,6 +47,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `fetchChannels` broken join on non-existent `content` column replaced with `fetchLastMessages` helper
 - Thread replies duplicating the parent message (added `.neq('id', parentMessageId)` filter)
 - Mobile inline thread alignment for own messages
+- Restored `anon`, `authenticated`, and `service_role` grants on the `public` schema so
+  PostgREST can read newly provisioned databases; current Supabase Postgres images no longer
+  grant these by default, which left every web page returning 404 after a fresh
+  `supabase db reset`
 
 ---
 
