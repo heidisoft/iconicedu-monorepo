@@ -308,6 +308,7 @@ A symptom of missing table privileges, not of routing. Confirm it by querying Po
 directly with the service-role key from `apps/web/.env.local`:
 
 ```bash
+KEY=$(grep SUPABASE_SERVICE_ROLE_KEY apps/web/.env.local | cut -d= -f2)
 curl -i "http://127.0.0.1:54321/rest/v1/orgs?slug=eq.i&select=slug" \
   -H "apikey: $KEY" -H "Authorization: Bearer $KEY"
 ```
