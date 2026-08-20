@@ -302,6 +302,31 @@ If the Supabase CLI changed its status output, compare `supabase status --output
 
 Confirm `DATABASE_URL` and `DIRECT_URL` in `apps/api/.env` match the database URL from `supabase status --output json`, then restart the API.
 
+### Every web page returns 404 and the API is healthy
+
+A symptom of missing table privileges, not of routing. Confirm it by querying PostgREST
+directly with the service-role key from `apps/web/.env.local`:
+
+```bash
+curl -i "http://127.0.0.1:54321/rest/v1/orgs?slug=eq.i&select=slug" \
+  -H "apikey: $KEY" -H "Authorization: Bearer $KEY"
+```
+
+A `42501 permission denied for table orgs` response means the API roles lack privileges on
+the `public` schema. PostgREST checks table grants before row level security, so a missing
+grant fails before any policy runs. The API is unaffected because Prisma connects as
+`postgres`, which owns the tables.
+
+Current Supabase Postgres images no longer grant DML on postgres-created tables in `public`
+to `anon`, `authenticated`, and `service_role` by default. Migration
+`20260820000000_restore_api_role_grants_public_schema.sql` restores those grants and sets the
+matching default privileges for future tables. If the query above fails, the local database
+predates that migration:
+
+```bash
+supabase db reset
+```
+
 ### Mobile cannot reach the API
 
 - iOS Simulator: `http://localhost:3001` normally works.

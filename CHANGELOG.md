@@ -8,6 +8,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Restored `anon`, `authenticated`, and `service_role` grants on the `public` schema so
+  PostgREST can read newly provisioned databases; current Supabase Postgres images no longer
+  grant these by default, which left every web page returning 404 after a fresh
+  `supabase db reset`
+
 ### Added
 
 - Conventional Commit validation for local commits and pull request titles
