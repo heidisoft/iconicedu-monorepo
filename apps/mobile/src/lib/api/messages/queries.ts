@@ -5,7 +5,6 @@ import type {
   MessageSendTextInput,
   MessageVM,
 } from '@iconicedu/shared-types';
-export { filterVisibleMessageRows } from '@iconicedu/shared-types';
 import { apiDelete, apiGet, apiPost } from '@/lib/api/http-client';
 import { supabase } from '@/lib/supabase/client';
 

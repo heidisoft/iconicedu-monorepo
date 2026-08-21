@@ -768,6 +768,9 @@ importers:
 
   packages/utils:
     dependencies:
+      '@iconicedu/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
       countries-and-timezones:
         specifier: ^3.6.0
         version: 3.8.0

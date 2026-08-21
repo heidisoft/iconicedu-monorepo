@@ -60,6 +60,8 @@ export {
   shouldRequireReauthOnReturn,
 } from './session-reauth';
 
+export { buildSenderProfile, mapRowToMessageVM } from './message-mappers';
+
 export function groupBy<T, K extends string>(
   rows: T[],
   getKey: (row: T) => K,

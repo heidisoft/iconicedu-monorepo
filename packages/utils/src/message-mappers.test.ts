@@ -1,11 +1,11 @@
+import type {
+  RawMessageRow,
+  RawSenderProfile,
+  ReactionVM,
+  ThreadVM,
+} from '@iconicedu/shared-types';
 import { describe, expect, it } from 'vitest';
-import type { RawMessageRow, RawSenderProfile } from '../rows/message';
-import type { ReactionVM, ThreadVM } from '../vm/message';
-import {
-  buildSenderProfile,
-  filterVisibleMessageRows,
-  mapRowToMessageVM,
-} from './message-mappers';
+import { buildSenderProfile, mapRowToMessageVM } from './message-mappers';
 
 const BASE_SENDER: RawSenderProfile = {
   id: 'profile-1',
@@ -99,47 +99,6 @@ describe('buildSenderProfile', () => {
       displayName: '',
       avatar: { source: 'seed', seed: 'seed-1' },
     });
-  });
-});
-
-describe('filterVisibleMessageRows', () => {
-  it('keeps non-targeted rows and allowed targeted rows in their original order', () => {
-    const rows = [
-      { ...makeRow({ id: 'all' }), marker: 1 },
-      {
-        ...makeRow({
-          id: 'allowed',
-          visibility_type: 'specific-users',
-          visibility_user_ids: ['profile-current'],
-        }),
-        marker: 2,
-      },
-      {
-        ...makeRow({
-          id: 'denied',
-          visibility_type: 'specific-users',
-          visibility_user_ids: ['profile-other'],
-        }),
-        marker: 3,
-      },
-      { ...makeRow({ id: 'legacy-null', visibility_type: null }), marker: 4 },
-    ];
-
-    const result = filterVisibleMessageRows(rows, 'profile-current');
-
-    expect(result.map((row) => row.id)).toEqual(['all', 'allowed', 'legacy-null']);
-    expect(result.map((row) => row.marker)).toEqual([1, 2, 4]);
-    expect(result[1]).toBe(rows[1]);
-  });
-
-  it('hides targeted rows when the current profile or allow-list is absent', () => {
-    const targeted = makeRow({
-      visibility_type: 'specific-users',
-      visibility_user_ids: null,
-    });
-
-    expect(filterVisibleMessageRows([targeted])).toEqual([]);
-    expect(filterVisibleMessageRows([targeted], 'profile-current')).toEqual([]);
   });
 });
 

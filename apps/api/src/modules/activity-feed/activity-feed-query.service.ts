@@ -28,7 +28,7 @@ import type {
   ReminderDispatchLogRow,
   ReminderJobRow,
 } from '@iconicedu/shared-types';
-import { buildSenderProfile } from '@iconicedu/shared-types';
+import { buildSenderProfile } from '@iconicedu/utils';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 

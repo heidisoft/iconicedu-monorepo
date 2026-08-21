@@ -40,7 +40,7 @@ export type RawSenderProfile = {
   ui_theme_key?: string | null;
 };
 
-/** Raw messages query result consumed by the shared row-to-VM mapper. */
+/** Raw messages query result consumed by the framework-neutral row-to-VM utility. */
 export type RawMessageRow = Pick<
   MessageRow,
   | 'id'

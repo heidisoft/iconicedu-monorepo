@@ -7,14 +7,12 @@ import {
   fetchSpaceSchedulesByChannelId,
   fetchActivityFeed,
   fetchSupervisedDirectMessages,
-  filterVisibleMessageRows,
   sendFileMessage,
   sendFilesMessage,
   sendTextMessage,
   toggleReaction,
   queryKeys,
 } from './queries';
-import { mapRowToMessageVM, type RawMessageRow } from '@iconicedu/shared-types';
 
 // ─── Supabase mock ──────────────────────────────────────────────────────────────
 
@@ -811,155 +809,6 @@ describe('fetchChannelMetaByChannelId', () => {
     ).resolves.toBeNull();
 
     expect(mockApiGet).not.toHaveBeenCalled();
-  });
-});
-
-describe('filterVisibleMessageRows', () => {
-  it('keeps public rows visible to everyone', () => {
-    const rows = [
-      {
-        id: 'msg-public-1',
-        org_id: ORG_ID,
-        channel_id: CHANNEL_ID,
-        sender_profile_id: 'profile-staff-1',
-        visibility_type: 'all' as const,
-        visibility_user_ids: null,
-        type: 'text',
-        created_at: '2026-03-01T10:00:00Z',
-        updated_at: '2026-03-01T10:00:00Z',
-        sender: {
-          id: 'profile-staff-1',
-          display_name: 'Support',
-          first_name: null,
-          last_name: null,
-          avatar_url: null,
-          avatar_seed: null,
-          kind: 'staff',
-        },
-      },
-    ];
-
-    expect(filterVisibleMessageRows(rows, 'profile-child-1')).toEqual(rows);
-  });
-
-  it('hides specific-users rows when the effective profile is not allowed', () => {
-    const rows = [
-      {
-        id: 'msg-private-1',
-        org_id: ORG_ID,
-        channel_id: CHANNEL_ID,
-        sender_profile_id: 'profile-other-child-1',
-        visibility_type: 'specific-users' as const,
-        visibility_user_ids: ['profile-other-child-1', 'profile-staff-1'],
-        type: 'text',
-        created_at: '2026-03-01T10:00:00Z',
-        updated_at: '2026-03-01T10:00:00Z',
-        sender: {
-          id: 'profile-other-child-1',
-          display_name: 'Other Child',
-          first_name: null,
-          last_name: null,
-          avatar_url: null,
-          avatar_seed: null,
-          kind: 'child',
-        },
-      },
-    ];
-
-    expect(filterVisibleMessageRows(rows, 'profile-child-1')).toEqual([]);
-  });
-
-  it('keeps specific-users rows when the effective profile is allowed', () => {
-    const rows = [
-      {
-        id: 'msg-private-1',
-        org_id: ORG_ID,
-        channel_id: CHANNEL_ID,
-        sender_profile_id: 'profile-child-1',
-        visibility_type: 'specific-users' as const,
-        visibility_user_ids: ['profile-child-1', 'profile-staff-1'],
-        type: 'text',
-        created_at: '2026-03-01T10:00:00Z',
-        updated_at: '2026-03-01T10:00:00Z',
-        sender: {
-          id: 'profile-child-1',
-          display_name: 'My Child',
-          first_name: null,
-          last_name: null,
-          avatar_url: null,
-          avatar_seed: null,
-          kind: 'child',
-        },
-      },
-    ];
-
-    expect(filterVisibleMessageRows(rows, 'profile-child-1')).toEqual(rows);
-  });
-});
-
-describe('mapRowToMessageVM', () => {
-  it('preserves audio-recording text captions from the payload', () => {
-    const message = mapRowToMessageVM(
-      {
-        id: 'msg-audio-1',
-        org_id: 'org-1',
-        channel_id: 'channel-1',
-        sender_profile_id: 'profile-1',
-        type: 'audio-recording',
-        created_at: '2026-01-01T00:00:00Z',
-        updated_at: '2026-01-01T00:00:00Z',
-        sender: {
-          id: 'profile-1',
-          display_name: 'Tutor One',
-          first_name: null,
-          last_name: null,
-          avatar_url: null,
-          avatar_seed: 'profile-1',
-          kind: 'educator',
-          timezone: null,
-        },
-      } as RawMessageRow,
-      {
-        url: 'org-1/channel-1/audio.m4a',
-        storagePath: 'org-1/channel-1/audio.m4a',
-        durationSeconds: 12,
-        mimeType: 'audio/mp4',
-        text: 'Audio caption text.',
-      },
-      [],
-    );
-
-    expect((message as { content?: { text?: string } }).content?.text).toBe(
-      'Audio caption text.',
-    );
-  });
-
-  it('maps sender timezone into the profile preview VM', () => {
-    const message = mapRowToMessageVM(
-      {
-        id: 'msg-text-1',
-        org_id: 'org-1',
-        channel_id: 'channel-1',
-        sender_profile_id: 'profile-1',
-        type: 'text',
-        created_at: '2026-01-01T00:00:00Z',
-        updated_at: '2026-01-01T00:00:00Z',
-        sender: {
-          id: 'profile-1',
-          display_name: 'Tutor One',
-          first_name: null,
-          last_name: null,
-          avatar_url: null,
-          avatar_seed: 'profile-1',
-          kind: 'educator',
-          timezone: 'Asia/Colombo',
-        },
-      } as RawMessageRow,
-      { text: 'Hello' },
-      [],
-    );
-
-    expect(message.core.sender.prefs?.timezone).toBe('Asia/Colombo');
   });
 });
 

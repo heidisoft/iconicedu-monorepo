@@ -1,6 +1,11 @@
-import type { RawMessageRow, RawSenderProfile } from '../rows/message';
-import type { MessageVM, ReactionVM, ThreadVM } from '../vm/message';
-import type { UserProfileVM } from '../vm/profile';
+import type {
+  MessageVM,
+  RawMessageRow,
+  RawSenderProfile,
+  ReactionVM,
+  ThreadVM,
+  UserProfileVM,
+} from '@iconicedu/shared-types';
 
 export function buildSenderProfile(
   sender: RawSenderProfile,
@@ -23,17 +28,6 @@ export function buildSenderProfile(
     ui: { themeKey: sender.ui_theme_key ?? null },
     meta: { createdAt: '', updatedAt: '' },
   } as unknown as UserProfileVM;
-}
-
-export function filterVisibleMessageRows<T extends RawMessageRow>(
-  rows: T[],
-  currentProfileId = '',
-): T[] {
-  return rows.filter((row) => {
-    if (row.visibility_type !== 'specific-users') return true;
-    if (!currentProfileId) return false;
-    return (row.visibility_user_ids ?? []).includes(currentProfileId);
-  });
 }
 
 /**

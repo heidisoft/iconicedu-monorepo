@@ -6,26 +6,25 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import {
-  buildSenderProfile,
-  filterVisibleMessageRows,
-  mapRowToMessageVM,
-  type RawMessageRow,
-  type RawSenderProfile,
-  type AudienceRuleVM,
-  type FeedScopeVM,
-  type MessageVM,
-  type MessageMentionVM,
-  type MessageSendFileInput,
-  type MessageSendFilesInput,
-  type MessageSendTextInput,
-  type ReactionVM,
-  type ThreadVM,
+import type {
+  RawMessageRow,
+  RawSenderProfile,
+  AudienceRuleVM,
+  FeedScopeVM,
+  MessageVM,
+  MessageMentionVM,
+  MessageSendFileInput,
+  MessageSendFilesInput,
+  MessageSendTextInput,
+  ReactionVM,
+  ThreadVM,
 } from '@iconicedu/shared-types';
+import { buildSenderProfile, mapRowToMessageVM } from '@iconicedu/utils';
 import {
   resolveActivityChannelContext,
   resolveVisibilityAudienceFromMessageRow,
 } from '@iconicedu/api/lib/messages/message-activity';
+import { filterVisibleMessageRows } from '@iconicedu/api/lib/messages/message-visibility';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
 

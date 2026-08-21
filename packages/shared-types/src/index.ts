@@ -27,7 +27,6 @@ export * from './vm/availability';
 export * from './vm/live-session';
 export * from './vm/org-subject-catalog';
 export * from './rows';
-export * from './mappers/message-mappers';
 export * from './shared/grades';
 export * from './payloads/learning-space';
 export * from './payloads/channel';
