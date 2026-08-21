@@ -6,7 +6,7 @@
 
 - Primary style: **API-first, multi-frontend monorepo** — two thin frontend clients (web, mobile) that hold no business logic, talking to one backend (`apps/api`) that owns all data access; feature-based module organization within each app rather than strict horizontal layering.
 - Why this classification: enforced explicitly as ADR-004 ("API-First Frontend Data Boundary") and the "Web And Mobile Are Frontend-Only" hard rule in `AGENTS.md`; verified in practice — `apps/api` modules mix direct Prisma (`PrismaService`) and Supabase-client (`createSupabaseServiceClient`/`createSupabaseSessionClient`) access, while `apps/web`/`apps/mobile` route table-backed reads/writes through typed HTTP clients.
-- Primary constraints: (1) Row Level Security enabled on every Postgres table as defense-in-depth even though API authorization is the primary boundary (`docs/architecture/database.md`); (2) Supabase migrations are the schema source of truth, Prisma schema is a mirror, never the reverse (`docs/architecture/database.md`); (3) new user-facing web features must ship behind a PostHog-backed feature flag defaulting off (`apps/web/flags.ts`, `scripts/check-feature-flag-gating.mjs`).
+- Primary constraints: (1) Row Level Security enabled on every Postgres table as defense-in-depth even though API authorization is the primary boundary (`supabase/migrations/`); (2) Supabase migrations are the schema source of truth, Prisma schema is a mirror, never the reverse (`apps/api/prisma/schema.prisma`); (3) new user-facing web features must ship behind a PostHog-backed feature flag defaulting off (`apps/web/flags.ts`, `scripts/check-feature-flag-gating.mjs`).
 
 ### 2) System Flow
 
@@ -30,7 +30,7 @@ Web/Mobile UI (Server Component or screen)
 | `apps/api/src/observability/`                           | Global exception filter, request logging interceptor, request-context propagation                | Business logic                                                                          | `apps/api/src/observability/global-exception.filter.ts`            |
 | `apps/api/src/modules/events/event-pipeline.service.ts` | Leases and dispatches `event_pipeline_jobs` rows (activity generation, notifications, reminders) | —                                                                                       | `apps/api/src/modules/events/event-pipeline.service.ts`            |
 | `supabase/functions/*`                                  | pg_cron-triggered thin bridges that call `apps/api` internal endpoints (token-authed)            | Direct table writes bypassing `apps/api` (explicitly forbidden in `reminders-dispatch`) | `supabase/functions/reminders-dispatch/index.ts:4-7`               |
-| `packages/shared-types`                                 | Rows (snake_case, DB-facing) / VMs (camelCase, UI-facing) / Payloads (mutation inputs)           | App-specific logic                                                                      | `docs/architecture/overview.md` (Type System section)              |
+| `packages/shared-types`                                 | Rows (snake_case, DB-facing) / VMs (camelCase, UI-facing) / Payloads (mutation inputs)           | App-specific logic                                                                      | `packages/shared-types/src/{rows,vm,payloads}`                     |
 
 ### 4) Reused Patterns
 
@@ -54,7 +54,7 @@ Web/Mobile UI (Server Component or screen)
 - `apps/api/src/main.ts`, `apps/api/src/app.module.ts`
 - `apps/api/src/modules/auth/auth.guard.ts`, `apps/api/src/modules/events/event-pipeline.service.ts`
 - `apps/web/lib/api/http-client.ts`, `apps/mobile/src/lib/api/http-client.ts`
-- `docs/architecture/overview.md`, `docs/decisions/004-api-first-frontend-boundary.md`
+- `docs/decisions/004-api-first-frontend-boundary.md`
 
 ## Extended Sections (Optional)
 
