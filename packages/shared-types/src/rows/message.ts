@@ -24,6 +24,39 @@ export interface MessageRow {
   deleted_by?: UUID | null;
 }
 
+/**
+ * Profile fields selected alongside a message for lightweight sender previews.
+ * This intentionally models the query projection, not the complete profiles row.
+ */
+export type RawSenderProfile = {
+  id: UUID;
+  display_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  avatar_url: string | null;
+  avatar_seed: string | null;
+  kind?: string | null;
+  timezone?: string | null;
+  ui_theme_key?: string | null;
+};
+
+/** Raw messages query result consumed by the framework-neutral row-to-VM utility. */
+export type RawMessageRow = Pick<
+  MessageRow,
+  | 'id'
+  | 'org_id'
+  | 'channel_id'
+  | 'sender_profile_id'
+  | 'type'
+  | 'created_at'
+  | 'updated_at'
+  | 'thread_parent_id'
+> & {
+  visibility_type?: 'all' | 'specific-users' | null;
+  visibility_user_ids?: UUID[] | null;
+  sender: RawSenderProfile | null;
+};
+
 export interface MessageSaveRow extends AuditRow {
   id: UUID;
   org_id: UUID;

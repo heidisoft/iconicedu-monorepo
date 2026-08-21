@@ -7,18 +7,6 @@ import type {
 } from '@iconicedu/shared-types';
 import { apiDelete, apiGet, apiPost } from '@/lib/api/http-client';
 import { supabase } from '@/lib/supabase/client';
-import { type RawMessageRow } from '@/lib/api/map-row-to-vm';
-
-export function filterVisibleMessageRows<T extends RawMessageRow>(
-  rows: T[],
-  currentProfileId = '',
-): T[] {
-  return rows.filter((row) => {
-    if (row.visibility_type !== 'specific-users') return true;
-    if (!currentProfileId) return false;
-    return (row.visibility_user_ids ?? []).includes(currentProfileId);
-  });
-}
 
 export async function fetchChannelMessages(
   orgId: string,

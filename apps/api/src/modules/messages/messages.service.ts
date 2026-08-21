@@ -7,6 +7,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type {
+  RawMessageRow,
+  RawSenderProfile,
   AudienceRuleVM,
   FeedScopeVM,
   MessageVM,
@@ -17,19 +19,14 @@ import type {
   ReactionVM,
   ThreadVM,
 } from '@iconicedu/shared-types';
+import { buildSenderProfile, mapRowToMessageVM } from '@iconicedu/utils';
 import {
   resolveActivityChannelContext,
   resolveVisibilityAudienceFromMessageRow,
 } from '@iconicedu/api/lib/messages/message-activity';
+import { filterVisibleMessageRows } from '@iconicedu/api/lib/messages/message-visibility';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
-import {
-  filterVisibleMessageRows,
-  mapRowToMessageVM,
-  type RawMessageRow,
-  type RawSenderProfile,
-  buildSenderProfile,
-} from '@iconicedu/api/lib/mobile-data/message-mappers';
 
 const BASE_MESSAGE_SELECT = `
   id, org_id, channel_id, sender_profile_id, visibility_type, visibility_user_ids, type, created_at, updated_at, thread_parent_id,

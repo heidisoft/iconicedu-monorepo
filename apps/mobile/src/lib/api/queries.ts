@@ -33,7 +33,6 @@ export {
   fetchChannelMessages,
   fetchChannelReadState,
   fetchThreadMessages,
-  filterVisibleMessageRows,
   markChannelReadState,
   markChannelsReadByIds,
   markThreadReadState,
