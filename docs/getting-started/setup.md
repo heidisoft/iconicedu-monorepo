@@ -301,15 +301,15 @@ If the Supabase CLI changed its status output, compare `supabase status --output
 
 Confirm `DATABASE_URL` and `DIRECT_URL` in `apps/api/.env` match the database URL from `supabase status --output json`, then restart the API.
 
-### Every web page returns 404 and the API is healthy
+### A service-role PostgREST request returns `permission denied`
 
-A symptom of missing table privileges, not of routing. Confirm it by querying PostgREST
-directly with the service-role key from `apps/web/.env.local`:
+Confirm the local service-role grant by querying PostgREST directly. Use only the local key
+reported by `supabase status`; never place a service-role key in a frontend environment file:
 
 ```bash
-KEY=$(grep SUPABASE_SERVICE_ROLE_KEY apps/web/.env.local | cut -d= -f2)
 curl -i "http://127.0.0.1:54321/rest/v1/orgs?slug=eq.i&select=slug" \
-  -H "apikey: $KEY" -H "Authorization: Bearer $KEY"
+  -H "apikey: <local-service-role-key>" \
+  -H "Authorization: Bearer <local-service-role-key>"
 ```
 
 A `42501 permission denied for table orgs` response means the API roles lack privileges on
@@ -319,9 +319,12 @@ grant fails before any policy runs. The API is unaffected because Prisma connect
 
 Current Supabase Postgres images no longer grant DML on postgres-created tables in `public`
 to `anon`, `authenticated`, and `service_role` by default. Migration
-`20260820000000_restore_api_role_grants_public_schema.sql` restores those grants and sets the
-matching default privileges for future tables. If the query above fails, the local database
-predates that migration:
+`20260820000000_restore_api_role_grants_public_schema.sql` restores the grants needed by
+existing PostgREST callers. The forward hardening migration
+`20260820010000_harden_public_api_role_grants.sql` then removes direct `anon` table access,
+removes broad future defaults for `anon` and `authenticated`, and keeps service-role access
+for API-owned flows. If the service-role query above fails, the local database predates those
+migrations:
 
 ```bash
 supabase db reset

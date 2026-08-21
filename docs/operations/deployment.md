@@ -320,14 +320,35 @@ only the known deprecated functions after deployment:
 supabase link --project-ref <production-project-ref>
 
 # Push pending migrations
-supabase db push
+supabase db push --include-all
 ```
+
+`--include-all` is required because migration versions are immutable and the repository
+contains historical migrations whose timestamp sorts before migrations already recorded by
+hosted environments. Review the pending migration list in the command output before
+confirming a manual production push.
+
+For newly created preview branches, hosted migration history can briefly lag behind the
+branch status. CI retries only the resulting duplicate `schema_migrations_pkey` error; all
+SQL errors and unrelated push failures remain fatal. Never delete or repair migration-history
+rows to work around this provisioning race.
 
 Always test migrations locally first:
 
 ```bash
 supabase db reset   # wipe + reapply all migrations locally
 ```
+
+Public-schema access must remain fail-closed:
+
+- Public and unauthenticated product flows go through `apps/api`; `anon` has no direct table
+  or sequence privileges in `public`.
+- New tables enable RLS in the same migration and receive only explicit per-object grants
+  needed by a reviewed caller.
+- Do not restore default table or sequence privileges for `anon` or `authenticated`.
+- Public views use `security_invoker = true`; materialized views stay outside `public`.
+- Run `pnpm guard:supabase-access-control` before pushing migration changes. An exceptional
+  anonymous grant or policy requires the review annotation described by the guard output.
 
 ### Branching (preview environments)
 
