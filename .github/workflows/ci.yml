@@ -129,6 +129,9 @@ jobs:
       - name: Format changed files
         run: pnpm format:check:changed
 
+      - name: Guard Supabase access control
+        run: pnpm guard:supabase-access-control
+
       # Temporarily disabled in GitHub Actions. Keep the local script in package.json
       # so the guard can be re-enabled here without reintroducing the implementation.
       # - name: Guard feature flags
@@ -189,7 +192,9 @@ jobs:
         run: pnpm build:packages
 
       - name: Test repository workflow scripts
-        run: pnpm test:commitlint
+        run: |
+          pnpm test:commitlint
+          pnpm test:guard:supabase-access-control
 
       # PRs: only affected packages. Push to main: all packages.
       - name: Test
@@ -770,7 +775,8 @@ jobs:
         run: |
           set -euo pipefail
           supabase db push \
-            --linked
+            --linked \
+            --include-all
 
       # 5. Configure Railway PR environment env vars and deploy.
       # Uses the Railway GraphQL API to:
@@ -1752,7 +1758,7 @@ jobs:
             --project-ref "$SUPABASE_PROJECT_ID" \
             --env-file /tmp/iconicedu-production-env/supabase.env
 
-          supabase db push --linked
+          supabase db push --linked --include-all
 
           supabase functions deploy \
             --project-ref "$SUPABASE_PROJECT_ID" \
