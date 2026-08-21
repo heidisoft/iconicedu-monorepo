@@ -9,7 +9,7 @@
 | Files              | kebab-case everywhere (routes, components, services, hooks)                                  | `apps/mobile/src/providers/auth-provider.tsx`, `apps/api/src/modules/schedules/dto/replace-schedules.dto.ts` | Cross-app file sweep                                                                       |
 | API modules        | `*.controller.ts` / `*.service.ts` / `*.module.ts` / `*.guard.ts`, DTOs in per-module `dto/` | `apps/api/src/modules/channels/channels.controller.ts`                                                       | `apps/api/src/modules/*`                                                                   |
 | Functions/methods  | camelCase, verb-first for actions                                                            | `extractBearerToken()`, `resolveApiBaseUrl()`                                                                | `apps/api/src/lib/http/authenticated-request.ts`, `apps/mobile/src/lib/api/http-client.ts` |
-| Types/interfaces   | `type` preferred for domain objects/unions; `interface` for component props/class contracts  | `type MessageVM = {...}` vs `type ButtonProps = {...}`                                                       | `docs/standards/best-practices.md`                                                         |
+| Types/interfaces   | `type` preferred for domain objects/unions; `interface` for component props/class contracts  | `type MessageVM = {...}` vs `type ButtonProps = {...}`                                                       | `packages/shared-types/src/vm/`                                                            |
 | Constants/env vars | `SCREAMING_SNAKE_CASE` for env vars; grouped per-app `.env.example`                          | `INTERNAL_EVENTS_TOKEN`, `EXPO_PUBLIC_API_URL`                                                               | `apps/api/.env.example`, `apps/mobile/.env.example`                                        |
 
 ### 2) Formatting and Linting
@@ -32,7 +32,7 @@
 - API logging: plain NestJS `Logger` (no Winston/Pino) — `error` level for 5xx, `warn` otherwise; `RequestLoggingInterceptor` (`apps/api/src/observability/request-logging.interceptor.ts`) logs and captures analytics per request, flags slow requests via `API_SLOW_REQUEST_THRESHOLD_MS`.
 - Web/mobile HTTP clients: throw a plain `Error` on non-OK responses (`API error {status}` or server-provided `message`); 204/empty/non-JSON responses resolve to `undefined` — no client-side retry/backoff observed.
 - Sensitive-data redaction: `AGENTS.md` mandates user-safe error messages to clients with diagnostic detail retained server-side only; service-role keys and JWT secrets must never appear in logs, fixtures, or PRs.
-- TypeScript null policy: database rows use `null` (matching Postgres), function parameters/optional fields use `undefined`; explicit `?? false` required where RN accessibility props reject `null` (`docs/standards/best-practices.md`).
+- TypeScript null policy: database rows use `null` (matching Postgres), function parameters/optional fields use `undefined`; explicit `?? false` required where RN accessibility props reject `null`.
 
 ### 5) Testing Conventions
 
@@ -45,7 +45,6 @@
 - `eslint.config.mjs`, `.prettierrc`, `tsconfig.base.json`
 - `apps/api/src/observability/global-exception.filter.ts`, `apps/api/src/observability/request-logging.interceptor.ts`
 - `apps/web/lib/api/http-client.ts`, `apps/mobile/src/lib/api/http-client.ts`
-- `docs/standards/best-practices.md`
 
 ## Extended Sections (Optional)
 

@@ -191,7 +191,7 @@ See the [development workflow](../../getting-started/development-workflow.md) fo
 
 - `docs/README.md` is the canonical documentation index.
 - Update documentation in the same PR as behavior, commands, environment variables, architecture, or operational ownership.
-- Keep durable guidance in `getting-started`, `architecture`, `standards`, and `operations`.
+- Keep durable guidance in `getting-started`, `codebase`, and `operations`.
 - Keep accepted ADRs as historical records; supersede them with a new ADR when a decision changes.
 - Track planned work and audit findings in GitHub issues, not long-lived `docs/todos` or `docs/reports` files.
 - Remove superseded pages and all inbound links in the same change.
