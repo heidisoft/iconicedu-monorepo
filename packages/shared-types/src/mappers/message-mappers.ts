@@ -1,35 +1,6 @@
-import type {
-  MessageVM,
-  ReactionVM,
-  ThreadVM,
-  UserProfileVM,
-} from '@iconicedu/shared-types';
-
-export type RawMessageRow = {
-  id: string;
-  org_id: string;
-  channel_id: string;
-  sender_profile_id: string;
-  visibility_type?: 'all' | 'specific-users' | null;
-  visibility_user_ids?: string[] | null;
-  type: string;
-  created_at: string;
-  updated_at: string;
-  thread_parent_id?: string | null;
-  sender: {
-    id: string;
-    display_name: string | null;
-    first_name: string | null;
-    last_name: string | null;
-    avatar_url: string | null;
-    avatar_seed: string | null;
-    kind?: string | null;
-    timezone?: string | null;
-    ui_theme_key?: string | null;
-  } | null;
-};
-
-export type RawSenderProfile = NonNullable<RawMessageRow['sender']>;
+import type { RawMessageRow, RawSenderProfile } from '../rows/message';
+import type { MessageVM, ReactionVM, ThreadVM } from '../vm/message';
+import type { UserProfileVM } from '../vm/profile';
 
 export function buildSenderProfile(
   sender: RawSenderProfile,
@@ -65,6 +36,10 @@ export function filterVisibleMessageRows<T extends RawMessageRow>(
   });
 }
 
+/**
+ * Map a message row and its separately loaded payload, reactions, and optional thread
+ * into the UI-facing message contract.
+ */
 export function mapRowToMessageVM(
   row: RawMessageRow,
   payload: Record<string, unknown> | null,

@@ -14,7 +14,7 @@ import {
   toggleReaction,
   queryKeys,
 } from './queries';
-import { mapRowToMessageVM, type RawMessageRow } from './map-row-to-vm';
+import { mapRowToMessageVM, type RawMessageRow } from '@iconicedu/shared-types';
 
 // ─── Supabase mock ──────────────────────────────────────────────────────────────
 

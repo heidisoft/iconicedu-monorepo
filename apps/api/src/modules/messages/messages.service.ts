@@ -6,16 +6,21 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import type {
-  AudienceRuleVM,
-  FeedScopeVM,
-  MessageVM,
-  MessageMentionVM,
-  MessageSendFileInput,
-  MessageSendFilesInput,
-  MessageSendTextInput,
-  ReactionVM,
-  ThreadVM,
+import {
+  buildSenderProfile,
+  filterVisibleMessageRows,
+  mapRowToMessageVM,
+  type RawMessageRow,
+  type RawSenderProfile,
+  type AudienceRuleVM,
+  type FeedScopeVM,
+  type MessageVM,
+  type MessageMentionVM,
+  type MessageSendFileInput,
+  type MessageSendFilesInput,
+  type MessageSendTextInput,
+  type ReactionVM,
+  type ThreadVM,
 } from '@iconicedu/shared-types';
 import {
   resolveActivityChannelContext,
@@ -23,13 +28,6 @@ import {
 } from '@iconicedu/api/lib/messages/message-activity';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
-import {
-  filterVisibleMessageRows,
-  mapRowToMessageVM,
-  type RawMessageRow,
-  type RawSenderProfile,
-  buildSenderProfile,
-} from '@iconicedu/api/lib/mobile-data/message-mappers';
 
 const BASE_MESSAGE_SELECT = `
   id, org_id, channel_id, sender_profile_id, visibility_type, visibility_user_ids, type, created_at, updated_at, thread_parent_id,

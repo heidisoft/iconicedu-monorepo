@@ -28,9 +28,9 @@ import type {
   ReminderDispatchLogRow,
   ReminderJobRow,
 } from '@iconicedu/shared-types';
+import { buildSenderProfile } from '@iconicedu/shared-types';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
-import { buildSenderProfile } from '@iconicedu/api/lib/mobile-data/message-mappers';
 
 const ACTIVITY_FEED_ITEM_SELECT = [
   'id',
