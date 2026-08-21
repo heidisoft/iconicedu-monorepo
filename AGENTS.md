@@ -10,6 +10,8 @@ The canonical long-form guidance is [docs/internal/ai/agents.md](docs/internal/a
 - [Architecture Overview](docs/codebase/ARCHITECTURE.md)
 - [Conventions](docs/codebase/CONVENTIONS.md)
 
+For a quick topic-scoped pointer instead of the full canonical doc, see `.agents/`: [testing](.agents/testing.md), [conventions](.agents/conventions.md), [architecture](.agents/architecture.md), [security](.agents/security.md), [integrations](.agents/integrations.md), [stack](.agents/stack.md), [concerns](.agents/concerns.md).
+
 ## Source Of Truth
 
 When guidance disagrees, use this order:
