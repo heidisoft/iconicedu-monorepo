@@ -1,2 +1,3 @@
+pnpm guard:no-direct-main
 pnpm exec lint-staged
 pnpm exec turbo run lint typecheck --affected
