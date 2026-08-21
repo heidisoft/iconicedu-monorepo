@@ -774,9 +774,35 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
           set -euo pipefail
-          supabase db push \
-            --linked \
-            --include-all
+          MIGRATION_LOG=$(mktemp)
+
+          for ATTEMPT in 1 2 3; do
+            : > "$MIGRATION_LOG"
+
+            if supabase db push \
+              --linked \
+              --include-all \
+              --yes 2>&1 | tee "$MIGRATION_LOG"; then
+              break
+            fi
+
+            # A newly provisioned hosted branch can report ready just before its
+            # migration-history copy finishes. Retry only that exact race; SQL
+            # errors and every other failure must still stop the deployment.
+            if ! grep -q 'schema_migrations_pkey' "$MIGRATION_LOG" || \
+              ! grep -Eq 'Key \(version\)=\([0-9]+\) already exists' "$MIGRATION_LOG"; then
+              exit 1
+            fi
+
+            if [[ "$ATTEMPT" -eq 3 ]]; then
+              echo "::error::Supabase migration history did not stabilize after $ATTEMPT attempts"
+              exit 1
+            fi
+
+            RETRY_DELAY=$((ATTEMPT * 15))
+            echo "::warning::Supabase migration history is still synchronizing; retrying in ${RETRY_DELAY}s"
+            sleep "$RETRY_DELAY"
+          done
 
       # 5. Configure Railway PR environment env vars and deploy.
       # Uses the Railway GraphQL API to:

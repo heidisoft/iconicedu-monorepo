@@ -328,6 +328,11 @@ contains historical migrations whose timestamp sorts before migrations already r
 hosted environments. Review the pending migration list in the command output before
 confirming a manual production push.
 
+For newly created preview branches, hosted migration history can briefly lag behind the
+branch status. CI retries only the resulting duplicate `schema_migrations_pkey` error; all
+SQL errors and unrelated push failures remain fatal. Never delete or repair migration-history
+rows to work around this provisioning race.
+
 Always test migrations locally first:
 
 ```bash

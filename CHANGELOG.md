@@ -55,6 +55,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   privileges, and public view security
 - Enabled ordered deployment of all pending immutable migrations with Supabase
   `--include-all`
+- Added a bounded preview migration retry for Supabase's branch-provisioning history race
 
 ---
 
