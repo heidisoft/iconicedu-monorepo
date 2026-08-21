@@ -71,5 +71,5 @@ All database schema changes are managed via migration files in `supabase/migrati
 ## References
 
 - `supabase/migrations/` — all schema migrations
-- `docs/architecture/database.md` — migration workflow and RLS patterns
+- `docs/codebase/INTEGRATIONS.md` — data store and Supabase integration summary
 - `docs/decisions/004-api-first-frontend-boundary.md` — application table access boundary

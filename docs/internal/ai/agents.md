@@ -18,8 +18,8 @@ AI coding agents and engineers maintaining agent-facing repository guidance.
 - [Documentation Hub](../../README.md)
 - [Local Setup](../../getting-started/setup.md)
 - [Development Workflow](../../getting-started/development-workflow.md)
-- [Architecture Overview](../../architecture/overview.md)
-- [Best Practices](../../standards/best-practices.md)
+- [Architecture Overview](../../codebase/ARCHITECTURE.md)
+- [Conventions](../../codebase/CONVENTIONS.md)
 
 ## 1. Start With Evidence
 

@@ -20,8 +20,8 @@ Internal engineers, operators, and AI assistants working in this monorepo.
 - [Local Setup](docs/getting-started/setup.md)
 - [Development Workflow](docs/getting-started/development-workflow.md)
 - [Contributing](CONTRIBUTING.md)
-- [Architecture Overview](docs/architecture/overview.md)
-- [Best Practices](docs/standards/best-practices.md)
+- [Architecture Overview](docs/codebase/ARCHITECTURE.md)
+- [Conventions](docs/codebase/CONVENTIONS.md)
 
 ## Repo Layout
 

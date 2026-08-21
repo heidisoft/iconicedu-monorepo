@@ -45,6 +45,5 @@ Reviews and repository guards should reject new `supabase.from(...)` use in `app
 ## References
 
 - [`AGENTS.md`](../../AGENTS.md)
-- [Architecture Overview](../architecture/overview.md)
-- [Control Flows](../architecture/swimlanes.md)
+- [Architecture Overview](../codebase/ARCHITECTURE.md)
 - [Development Workflow](../getting-started/development-workflow.md)

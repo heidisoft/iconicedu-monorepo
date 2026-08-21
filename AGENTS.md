@@ -7,8 +7,8 @@ The canonical long-form guidance is [docs/internal/ai/agents.md](docs/internal/a
 - [Documentation Hub](docs/README.md)
 - [Local Setup](docs/getting-started/setup.md)
 - [Development Workflow](docs/getting-started/development-workflow.md)
-- [Architecture Overview](docs/architecture/overview.md)
-- [Best Practices](docs/standards/best-practices.md)
+- [Architecture Overview](docs/codebase/ARCHITECTURE.md)
+- [Conventions](docs/codebase/CONVENTIONS.md)
 
 ## Source Of Truth
 
@@ -89,7 +89,7 @@ For documentation-only changes, run formatting, link validation where available,
 ## Documentation Lifecycle
 
 - `docs/README.md` is the canonical documentation index.
-- Keep durable guidance in `docs/getting-started`, `docs/architecture`, `docs/standards`, and `docs/operations`.
+- Keep durable guidance in `docs/getting-started`, `docs/codebase`, and `docs/operations`.
 - Record architectural decisions in `docs/decisions`; accepted ADRs are retained and superseded by a new ADR rather than rewritten away.
 - Track future work in GitHub issues, not `docs/todos`.
 - Do not keep point-in-time audit dumps or review notes as current documentation. Convert durable findings into issues or canonical guidance, then remove the stale report.

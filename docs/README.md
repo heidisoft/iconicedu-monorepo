@@ -25,21 +25,21 @@ Internal engineers, operators, and AI assistants.
 - [Local Setup](getting-started/setup.md)
 - [Development Workflow](getting-started/development-workflow.md)
 - [Contributing](../CONTRIBUTING.md)
-- [Architecture Overview](architecture/overview.md)
-- [Best Practices](standards/best-practices.md)
+- [Architecture Overview](codebase/ARCHITECTURE.md)
+- [Conventions](codebase/CONVENTIONS.md)
 
 ### Feature Developer
 
-- [Architecture Overview](architecture/overview.md)
-- [Shared Packages](architecture/packages.md)
-- [Best Practices](standards/best-practices.md)
+- [Architecture Overview](codebase/ARCHITECTURE.md)
+- [Codebase Structure](codebase/STRUCTURE.md)
+- [Conventions](codebase/CONVENTIONS.md)
 - [Architecture Decisions](decisions/README.md)
 
 ### Mobile Engineer
 
 - [Local Setup](getting-started/setup.md)
 - [Development Workflow](getting-started/development-workflow.md)
-- [Architecture Overview](architecture/overview.md)
+- [Architecture Overview](codebase/ARCHITECTURE.md)
 - [Deployment](operations/deployment.md)
 
 ### Operator
@@ -61,21 +61,15 @@ Internal engineers, operators, and AI assistants.
 - [Development Workflow](getting-started/development-workflow.md)
 - [Contributing](../CONTRIBUTING.md)
 
-### Architecture
+### Codebase Reference
 
-- [Overview](architecture/overview.md)
-- [Shared Packages](architecture/packages.md)
-- [Database](architecture/database.md)
-- [Assessments](architecture/assessments.md)
-- [Diagrams](architecture/diagrams.md)
-- [Swimlanes](architecture/swimlanes.md)
-- [Activity Feed Contract](architecture/activity-feed.md)
-- [Activity Feed Variants](architecture/activity-feed-variants.md)
-- [Event Pipeline Scalability](architecture/event-pipeline-scalability.md)
-
-### Standards
-
-- [Best Practices](standards/best-practices.md)
+- [Stack](codebase/STACK.md)
+- [Structure](codebase/STRUCTURE.md)
+- [Architecture](codebase/ARCHITECTURE.md)
+- [Conventions](codebase/CONVENTIONS.md)
+- [Integrations](codebase/INTEGRATIONS.md)
+- [Testing](codebase/TESTING.md)
+- [Concerns](codebase/CONCERNS.md)
 
 ### Operations
 

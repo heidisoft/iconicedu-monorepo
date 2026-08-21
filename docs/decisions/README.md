@@ -15,7 +15,7 @@ Engineers who need rationale for technical choices or need to record a new decis
 ## Related Docs
 
 - [Documentation Hub](../README.md)
-- [Architecture Overview](../architecture/overview.md)
+- [Architecture Overview](../codebase/ARCHITECTURE.md)
 
 An Architecture Decision Record (ADR) documents a significant architectural choice: the context that led to it, the decision made, and the consequences.
 

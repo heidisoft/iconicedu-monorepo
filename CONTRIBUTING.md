@@ -16,8 +16,8 @@ Engineers opening branches, commits, and pull requests against the repository.
 
 1. Complete [local setup](docs/getting-started/setup.md).
 2. Read the [development workflow](docs/getting-started/development-workflow.md).
-3. Understand the [architecture boundaries](docs/architecture/overview.md).
-4. Follow the [engineering standards](docs/standards/best-practices.md).
+3. Understand the [architecture boundaries](docs/codebase/ARCHITECTURE.md).
+4. Follow the [engineering standards](docs/codebase/CONVENTIONS.md).
 
 ## Non-Negotiable Architecture Rules
 

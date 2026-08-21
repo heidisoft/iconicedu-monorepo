@@ -11,7 +11,6 @@ End-to-end reference for Expo push notifications: how tokens are managed on devi
 ## Related Docs
 
 - [Reminders Cron Ops](reminders.md)
-- [Activity Feed Architecture](../architecture/activity-feed.md)
 - [Documentation Hub](../README.md)
 
 ---

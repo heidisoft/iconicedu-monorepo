@@ -11,7 +11,6 @@ Quick reference for every push notification the app sends: what text goes out, h
 ## Related Docs
 
 - [Push Notifications](push-notifications.md)
-- [Activity Feed Architecture](../architecture/activity-feed.md)
 
 ---
 

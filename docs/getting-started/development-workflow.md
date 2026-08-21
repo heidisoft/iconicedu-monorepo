@@ -16,8 +16,8 @@ Engineers and reviewers contributing to the monorepo.
 
 - [Local Setup](setup.md)
 - [Contributing](../../CONTRIBUTING.md)
-- [Architecture Overview](../architecture/overview.md)
-- [Best Practices](../standards/best-practices.md)
+- [Architecture Overview](../codebase/ARCHITECTURE.md)
+- [Conventions](../codebase/CONVENTIONS.md)
 - [Deployment](../operations/deployment.md)
 
 ## Workflow At A Glance

@@ -16,8 +16,7 @@ Engineers setting up the repository for web, API, mobile, or database work.
 
 - [Development Workflow](development-workflow.md)
 - [Contributing](../../CONTRIBUTING.md)
-- [Architecture Overview](../architecture/overview.md)
-- [Database Guide](../architecture/database.md)
+- [Architecture Overview](../codebase/ARCHITECTURE.md)
 - [Mobile Workflow](../../apps/mobile/README.md)
 
 ## What The Local Stack Includes
@@ -249,7 +248,7 @@ Inspect local data with Supabase Studio from `supabase status` or Prisma Studio:
 pnpm --filter api db:studio
 ```
 
-Do not use `prisma migrate dev` or `prisma db push` for repository schema changes. Create a new forward-only Supabase migration instead; see the [database guide](../architecture/database.md#migration-workflow).
+Do not use `prisma migrate dev` or `prisma db push` for repository schema changes. Create a new forward-only Supabase migration instead in `supabase/migrations/`.
 
 ## 8. Hosted Development Option
 
