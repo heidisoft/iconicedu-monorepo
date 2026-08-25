@@ -57,12 +57,19 @@ export function ClassScheduleContainer({
   );
 
   const classScheduleEventsForDots = useMemo(
-    () => getClassScheduleEventsForMonthRange(events, classScheduleMonthAnchor, 1, 1),
-    [events, classScheduleMonthAnchor],
+    () =>
+      getClassScheduleEventsForMonthRange(
+        events,
+        classScheduleMonthAnchor,
+        1,
+        1,
+        timezone,
+      ),
+    [events, classScheduleMonthAnchor, timezone],
   );
   const classScheduleEventsForView = useMemo(
-    () => getClassScheduleEventsForView(events, currentDate, view),
-    [events, currentDate, view],
+    () => getClassScheduleEventsForView(events, currentDate, view, timezone),
+    [events, currentDate, view, timezone],
   );
 
   const hasClasses = events.length > 0;

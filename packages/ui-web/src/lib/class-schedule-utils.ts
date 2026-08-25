@@ -11,6 +11,8 @@ import {
   formatScheduleDisplayTimeWithZone,
   formatScheduleDisplayValue,
   getScheduleDisplayDateParts,
+  getScheduleDisplayDayKey,
+  resolveScheduleDisplayTimeZone,
   toScheduleDisplayDate,
   getScheduleDisplayMinutes,
   type ScheduleDisplayTimeZoneInput,
@@ -365,9 +367,6 @@ export function getHiddenEventOverflowGroups(
   });
 }
 
-const startOfDay = (date: Date) =>
-  new Date(date.getFullYear(), date.getMonth(), date.getDate());
-
 const addDays = (date: Date, days: number) => {
   const next = new Date(date);
   next.setDate(next.getDate() + days);
@@ -457,9 +456,68 @@ const dedupeExpandedEvents = (schedules: DisplayClassScheduleVM[]) => {
   return Array.from(deduped.values());
 };
 
-const isWithinRange = (date: Date, rangeStart: Date, rangeEnd: Date) => {
-  const day = startOfDay(date).getTime();
-  return day >= rangeStart.getTime() && day <= rangeEnd.getTime();
+// --- Viewer-local calendar range model -------------------------------------
+//
+// Calendar ranges are expressed as viewer-local `YYYY-MM-DD` keys rather than
+// `Date` midnights. A `Date` carries an instant, so any midnight built from it
+// is a *runtime* midnight; comparing occurrences against it makes the calendar
+// depend on the machine timezone instead of the viewer's. Day keys remove the
+// instant from the comparison entirely.
+
+/** Applies the documented viewer -> schedule -> browser -> UTC fallback chain. */
+const resolveViewerTimeZone = (viewerTimezone?: string | null) =>
+  resolveScheduleDisplayTimeZone({ viewerTimezone });
+
+const toRuntimeDayKey = (date: Date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
+    date.getDate(),
+  ).padStart(2, '0')}`;
+
+const toViewerDayKey = (value: Date | string, viewerTimezone: string) =>
+  getScheduleDisplayDayKey(value, viewerTimezone) ??
+  toRuntimeDayKey(value instanceof Date ? value : new Date(value));
+
+const addDaysToDayKey = (dayKey: string, days: number) =>
+  toDateKey(new Date(parseDateKey(dayKey).getTime() + days * 24 * 60 * 60 * 1000));
+
+const getWeekdayIndexFromDateKey = (dayKey: string) => parseDateKey(dayKey).getUTCDay();
+
+/** Weeks start on Monday, matching `getWeekDays`. */
+const getViewerWeekStartKey = (dayKey: string) => {
+  const weekday = getWeekdayIndexFromDateKey(dayKey);
+  return addDaysToDayKey(dayKey, -(weekday === 0 ? 6 : weekday - 1));
+};
+
+const isDayKeyWithinRange = (
+  dayKey: string,
+  rangeStartKey: string,
+  rangeEndKey: string,
+) => dayKey >= rangeStartKey && dayKey <= rangeEndKey;
+
+/**
+ * Offsets span UTC-12 to UTC+14, so a viewer day boundary can sit up to 26
+ * hours away from the same boundary in the schedule timezone. Padding the
+ * schedule-local iteration window by two days guarantees that occurrences
+ * which cross a viewer date boundary are still generated before the final
+ * viewer-key filter decides whether they belong in the range.
+ */
+const ITERATION_PADDING_DAYS = 2;
+
+const toScheduleDayKeyFromViewerDayKey = (
+  viewerDayKey: string,
+  viewerTimezone: string,
+  scheduleTimezone: string,
+  edge: 'start' | 'end',
+) => {
+  const iso = toUtcFromLocal(
+    viewerDayKey,
+    edge === 'start' ? '00:00' : '23:59',
+    viewerTimezone,
+  );
+  if (!iso) {
+    return viewerDayKey;
+  }
+  return getLocalDate(iso, scheduleTimezone) ?? viewerDayKey;
 };
 
 const getMinDate = (dates: Date[]) =>
@@ -468,33 +526,38 @@ const getMinDate = (dates: Date[]) =>
 const getMaxDate = (dates: Date[]) =>
   dates.reduce((max, current) => (current > max ? current : max), dates[0]!);
 
-const getWeekStart = (date: Date) => {
-  const start = new Date(date);
-  const day = start.getDay();
-  const diff = start.getDate() - day + (day === 0 ? -6 : 1);
-  start.setDate(diff);
-  return startOfDay(start);
-};
-
-const getMonthRange = (date: Date) => {
-  const start = new Date(date.getFullYear(), date.getMonth(), 1);
-  const end = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-  return { start: startOfDay(start), end: startOfDay(end) };
-};
-
 export const expandRecurringEvents = (
   events: ClassScheduleVM[],
   rangeStart: Date,
   rangeEnd: Date,
+  viewerTimezone?: string | null,
+) => {
+  const resolvedViewerTimezone = resolveViewerTimeZone(viewerTimezone);
+  return expandRecurringEventsForDayKeyRange(
+    events,
+    toViewerDayKey(rangeStart, resolvedViewerTimezone),
+    toViewerDayKey(rangeEnd, resolvedViewerTimezone),
+    resolvedViewerTimezone,
+  );
+};
+
+const expandRecurringEventsForDayKeyRange = (
+  events: ClassScheduleVM[],
+  rangeStartKey: string,
+  rangeEndKey: string,
+  viewerTimezone: string,
 ) => {
   const expanded: DisplayClassScheduleVM[] = [];
-  const rangeStartDay = startOfDay(rangeStart);
-  const rangeEndDay = startOfDay(rangeEnd);
 
   events.forEach((event) => {
     if (!event.recurrence) {
-      const eventDate = startOfDay(new Date(event.startAt));
-      if (isWithinRange(eventDate, rangeStartDay, rangeEndDay)) {
+      if (
+        isDayKeyWithinRange(
+          toViewerDayKey(event.startAt, viewerTimezone),
+          rangeStartKey,
+          rangeEndKey,
+        )
+      ) {
         const isCancelled = event.status === 'cancelled';
         expanded.push({
           ...event,
@@ -559,11 +622,27 @@ export const expandRecurringEvents = (
       recurrence.exceptions?.map((exception) =>
         getScheduleLocalDayKey(exception.occurrenceKey, event),
       ) ?? [];
-    const rangeStartLocalDate =
-      getLocalDate(rangeStart.toISOString(), scheduleTimezone) ??
-      toDateKey(rangeStartDay);
-    const rangeEndLocalDate =
-      getLocalDate(rangeEnd.toISOString(), scheduleTimezone) ?? toDateKey(rangeEndDay);
+    // Translate the viewer range into the schedule timezone and pad it, so a
+    // viewer Sunday that is still Saturday in the schedule timezone (or vice
+    // versa) cannot end iteration before the occurrence is generated.
+    const rangeStartLocalDate = addDaysToDayKey(
+      toScheduleDayKeyFromViewerDayKey(
+        rangeStartKey,
+        viewerTimezone,
+        scheduleTimezone,
+        'start',
+      ),
+      -ITERATION_PADDING_DAYS,
+    );
+    const rangeEndLocalDate = addDaysToDayKey(
+      toScheduleDayKeyFromViewerDayKey(
+        rangeEndKey,
+        viewerTimezone,
+        scheduleTimezone,
+        'end',
+      ),
+      ITERATION_PADDING_DAYS,
+    );
     const iterationStart = getMinDate(
       [
         parseDateKey(baseLocalDate),
@@ -703,28 +782,61 @@ export const expandRecurringEvents = (
 
   return applyArchiveCutoffToDisplaySchedules(
     dedupeExpandedEvents(expanded).filter((schedule) =>
-      isWithinRange(new Date(schedule.startAt), rangeStartDay, rangeEndDay),
+      isDayKeyWithinRange(
+        toViewerDayKey(schedule.startAt, viewerTimezone),
+        rangeStartKey,
+        rangeEndKey,
+      ),
     ),
   );
+};
+
+/** Builds a `YYYY-MM-DD` key for the first day of a month offset from `dayKey`. */
+const getMonthBoundaryKey = (
+  dayKey: string,
+  monthOffset: number,
+  edge: 'start' | 'end',
+) => {
+  const [year = 1970, month = 1] = dayKey.split('-').map(Number);
+  const anchor =
+    edge === 'start'
+      ? new Date(Date.UTC(year, month - 1 + monthOffset, 1, 12))
+      : new Date(Date.UTC(year, month + monthOffset, 0, 12));
+  return toDateKey(anchor);
 };
 
 export const getClassScheduleEventsForView = (
   events: ClassScheduleVM[],
   currentDate: Date,
   view: ClassScheduleViewVM,
+  viewerTimezone?: string | null,
 ) => {
-  const rangeStart =
-    view === 'week' ? getWeekStart(currentDate) : startOfDay(currentDate);
-  const rangeEnd = view === 'week' ? addDays(rangeStart, 6) : startOfDay(currentDate);
-  return expandRecurringEvents(events, rangeStart, rangeEnd);
+  const resolvedViewerTimezone = resolveViewerTimeZone(viewerTimezone);
+  const currentDayKey = toViewerDayKey(currentDate, resolvedViewerTimezone);
+  const rangeStartKey =
+    view === 'week' ? getViewerWeekStartKey(currentDayKey) : currentDayKey;
+  const rangeEndKey = view === 'week' ? addDaysToDayKey(rangeStartKey, 6) : currentDayKey;
+  return expandRecurringEventsForDayKeyRange(
+    events,
+    rangeStartKey,
+    rangeEndKey,
+    resolvedViewerTimezone,
+  );
 };
 
 export const getClassScheduleEventsForMonth = (
   events: ClassScheduleVM[],
   currentDate: Date,
+  viewerTimezone?: string | null,
 ) => {
-  const { start, end } = getMonthRange(currentDate);
-  return expandRecurringEvents(events, start, end);
+  const resolvedViewerTimezone = resolveViewerTimeZone(viewerTimezone);
+  const currentDayKey = toViewerDayKey(currentDate, resolvedViewerTimezone);
+  return expandRecurringEventsForDayKeyRange(
+    events,
+    getMonthBoundaryKey(currentDayKey, 0, 'start'),
+    getMonthBoundaryKey(currentDayKey, 0, 'end'),
+    resolvedViewerTimezone,
+  );
 };
 
 export const getClassScheduleEventsForMonthRange = (
@@ -732,18 +844,16 @@ export const getClassScheduleEventsForMonthRange = (
   currentDate: Date,
   monthsBefore = 1,
   monthsAfter = 1,
+  viewerTimezone?: string | null,
 ) => {
-  const start = new Date(
-    currentDate.getFullYear(),
-    currentDate.getMonth() - monthsBefore,
-    1,
+  const resolvedViewerTimezone = resolveViewerTimeZone(viewerTimezone);
+  const currentDayKey = toViewerDayKey(currentDate, resolvedViewerTimezone);
+  return expandRecurringEventsForDayKeyRange(
+    events,
+    getMonthBoundaryKey(currentDayKey, -monthsBefore, 'start'),
+    getMonthBoundaryKey(currentDayKey, monthsAfter, 'end'),
+    resolvedViewerTimezone,
   );
-  const end = new Date(
-    currentDate.getFullYear(),
-    currentDate.getMonth() + monthsAfter + 1,
-    0,
-  );
-  return expandRecurringEvents(events, startOfDay(start), startOfDay(end));
 };
 
 export const isEventLive = (event: ClassScheduleVM): boolean => {
