@@ -7,6 +7,7 @@ import Page from '@iconicedu/web/app/(app)/[orgSlug]/s/[channelId]/page';
 const learningSpaceShellMock = vi.fn(() => null);
 const buildChannelByIdMock = vi.fn();
 const enableMessageTypeComposerRunMock = vi.fn(async () => true);
+const enableAnyVisibleClassSessionJoinRunMock = vi.fn(async () => false);
 
 vi.mock('@iconicedu/ui-web', () => ({
   DashboardHeader: () => null,
@@ -48,6 +49,9 @@ vi.mock('@iconicedu/web/lib/spaces/builders/learning-space.builder', () => ({
 vi.mock('@iconicedu/web/flags', () => ({
   enableMessageTypeComposer: {
     run: (...args: unknown[]) => enableMessageTypeComposerRunMock(...args),
+  },
+  enableAnyVisibleClassSessionJoin: {
+    run: (...args: unknown[]) => enableAnyVisibleClassSessionJoinRunMock(...args),
   },
 }));
 

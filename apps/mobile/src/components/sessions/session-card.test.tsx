@@ -5,7 +5,8 @@ import { SessionCard, type ClassSession } from './session-card';
 
 const mockPush = jest.fn();
 const mockOpenURL = jest.fn();
-const mockFetchSpaceChannelMetaByChannelId = jest.fn();
+const mockJoinChannelLiveSession = jest.fn();
+const mockJoinClassSessionOccurrence = jest.fn();
 
 jest.mock('@/providers/theme-provider', () => ({
   useTheme: () => ({
@@ -24,8 +25,12 @@ jest.mock('@/providers/theme-provider', () => ({
 
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }));
 jest.mock('@/lib/api/queries', () => ({
-  fetchSpaceChannelMetaByChannelId: (...args: unknown[]) =>
-    mockFetchSpaceChannelMetaByChannelId(...args),
+  joinChannelLiveSession: (...args: unknown[]) => mockJoinChannelLiveSession(...args),
+  joinClassSessionOccurrence: (...args: unknown[]) =>
+    mockJoinClassSessionOccurrence(...args),
+}));
+jest.mock('@/hooks/use-account', () => ({
+  useAccount: () => ({ data: { id: 'account-1', org_id: 'org-1' } }),
 }));
 jest.mock('lucide-react-native', () => ({
   Video: ({ testID }: { testID?: string }) => {
@@ -90,7 +95,8 @@ describe('SessionCard', () => {
   beforeEach(() => {
     mockPush.mockClear();
     mockOpenURL.mockClear();
-    mockFetchSpaceChannelMetaByChannelId.mockReset();
+    mockJoinChannelLiveSession.mockReset();
+    mockJoinClassSessionOccurrence.mockReset();
   });
 
   it('renders without crashing', () => {
@@ -199,14 +205,13 @@ describe('SessionCard', () => {
     expect(mockOpenURL).toHaveBeenCalledWith('http://localhost:3000/live-sessions/abc');
   });
 
-  it('shows the external join dialog from channel live session config', async () => {
-    mockFetchSpaceChannelMetaByChannelId.mockResolvedValue({
-      liveSession: {
-        enabled: true,
-        provider: 'zoom',
-        mode: 'video',
-        joinUrl: 'https://zoom.us/j/from-channel',
-      },
+  it('shows the external join dialog for an external provider join path', async () => {
+    mockJoinChannelLiveSession.mockResolvedValue({
+      sessionId: 'live-1',
+      joinPath: 'https://zoom.us/j/from-channel',
+      status: 'live',
+      created: true,
+      provider: 'zoom',
     });
 
     render(<SessionCard session={baseSession} />);
@@ -216,21 +221,23 @@ describe('SessionCard', () => {
     });
 
     await waitFor(() =>
-      expect(mockFetchSpaceChannelMetaByChannelId).toHaveBeenCalledWith('channel-1'),
+      expect(mockJoinChannelLiveSession).toHaveBeenCalledWith({
+        orgId: 'org-1',
+        channelId: 'channel-1',
+      }),
     );
     expect(await screen.findByText('Session ready to join')).toBeTruthy();
     expect(await screen.findByText('https://zoom.us/j/from-channel')).toBeTruthy();
     expect(mockPush).not.toHaveBeenCalled();
   });
 
-  it('opens internal channel join urls directly from the join button', async () => {
-    mockFetchSpaceChannelMetaByChannelId.mockResolvedValue({
-      liveSession: {
-        enabled: true,
-        provider: 'daily',
-        mode: 'video',
-        joinUrl: '/acme/live-sessions/abc',
-      },
+  it('opens internal join paths directly from the join button', async () => {
+    mockJoinChannelLiveSession.mockResolvedValue({
+      sessionId: 'live-1',
+      joinPath: '/acme/live-sessions/abc',
+      status: 'live',
+      created: true,
+      provider: 'daily',
     });
 
     render(<SessionCard session={baseSession} />);
@@ -239,9 +246,7 @@ describe('SessionCard', () => {
       fireEvent.press(screen.getByLabelText('Join session'));
     });
 
-    await waitFor(() =>
-      expect(mockFetchSpaceChannelMetaByChannelId).toHaveBeenCalledWith('channel-1'),
-    );
+    await waitFor(() => expect(mockJoinChannelLiveSession).toHaveBeenCalled());
     await waitFor(() =>
       expect(mockOpenURL).toHaveBeenCalledWith(
         'http://localhost:3000/acme/live-sessions/abc',
@@ -249,10 +254,8 @@ describe('SessionCard', () => {
     );
   });
 
-  it('falls back to the classroom sessions tab when no meeting link is present', async () => {
-    mockFetchSpaceChannelMetaByChannelId.mockResolvedValue({
-      liveSession: null,
-    });
+  it('falls back to the classroom sessions tab when the join request fails', async () => {
+    mockJoinChannelLiveSession.mockRejectedValue(new Error('not_authorized'));
 
     render(<SessionCard session={baseSession} />);
 
@@ -261,15 +264,73 @@ describe('SessionCard', () => {
     });
 
     expect(screen.getByText('Mar · Week 2')).toBeTruthy();
-    await waitFor(() =>
-      expect(mockFetchSpaceChannelMetaByChannelId).toHaveBeenCalledWith('channel-1'),
-    );
+    await waitFor(() => expect(mockJoinChannelLiveSession).toHaveBeenCalled());
     await waitFor(() =>
       expect(mockPush).toHaveBeenCalledWith({
         pathname: '/(app)/spaces/[channelId]',
         params: { channelId: 'channel-1', tab: 'sessions' },
       }),
     );
+  });
+
+  it('joins the exact occurrence when the rollout flag is on', async () => {
+    mockJoinClassSessionOccurrence.mockResolvedValue({
+      sessionId: 'live-1',
+      joinPath: '/acme/live-sessions/live-1',
+      status: 'live',
+      created: true,
+      provider: 'daily',
+      occurrence: {
+        orgId: 'org-1',
+        channelId: 'channel-1',
+        scheduleId: 'schedule-1',
+        occurrenceKey: '2025-03-10T14:30:00.000Z',
+      },
+    });
+
+    render(
+      <SessionCard
+        session={{
+          ...baseSession,
+          scheduleId: 'schedule-1',
+          occurrenceKey: '2025-03-10T14:30:00.000Z',
+        }}
+        joinOccurrenceEnabled
+      />,
+    );
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Join session'));
+    });
+
+    await waitFor(() =>
+      expect(mockJoinClassSessionOccurrence).toHaveBeenCalledWith({
+        orgId: 'org-1',
+        scheduleId: 'schedule-1',
+        occurrenceKey: '2025-03-10T14:30:00.000Z',
+      }),
+    );
+    // A dated card must never fall back to the channel-scoped huddle.
+    expect(mockJoinChannelLiveSession).not.toHaveBeenCalled();
+  });
+
+  it('uses the channel join when the card carries no occurrence identity', async () => {
+    mockJoinChannelLiveSession.mockResolvedValue({
+      sessionId: 'live-1',
+      joinPath: '/acme/live-sessions/live-1',
+      status: 'live',
+      created: true,
+      provider: 'daily',
+    });
+
+    render(<SessionCard session={baseSession} joinOccurrenceEnabled />);
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Join session'));
+    });
+
+    await waitFor(() => expect(mockJoinChannelLiveSession).toHaveBeenCalled());
+    expect(mockJoinClassSessionOccurrence).not.toHaveBeenCalled();
   });
 
   it('shows Recording button for past sessions', () => {

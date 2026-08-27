@@ -10,6 +10,7 @@ import {
   enableChannelCommunications,
   enableMarketingSitePages,
   enableMessageTypeComposer,
+  enableAnyVisibleClassSessionJoin,
   enableMobileAppleSignIn,
   enableMobileDirectMessageStart,
   enableMobileGoogleSignIn,
@@ -55,6 +56,16 @@ describe('web flags', () => {
     expect(enableMobileAppleSignIn.key).toBe('enable-mobile-apple-sign-in');
     expect(enableMobileAppleSignIn.defaultValue).toBe(false);
     expect(webFlags.enableMobileAppleSignIn).toBe(enableMobileAppleSignIn);
+  });
+
+  it('declares the any-visible class session join flag off by default', () => {
+    expect(enableAnyVisibleClassSessionJoin.key).toBe(
+      'enable-any-visible-class-session-join',
+    );
+    expect(enableAnyVisibleClassSessionJoin.defaultValue).toBe(false);
+    expect(webFlags.enableAnyVisibleClassSessionJoin).toBe(
+      enableAnyVisibleClassSessionJoin,
+    );
   });
 
   it('declares the marketing site pages flag with stable metadata', () => {

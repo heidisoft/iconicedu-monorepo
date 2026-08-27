@@ -93,6 +93,28 @@ describe('mobile feature flags', () => {
     ).toBe(true);
   });
 
+  it('defaults the any-visible class session join rollout to off', () => {
+    delete process.env.EXPO_PUBLIC_ENABLE_ANY_VISIBLE_CLASS_SESSION_JOIN;
+    delete process.env.EXPO_PUBLIC_APP_ENV;
+
+    expect(
+      getLocalMobileFeatureFlagFallback(
+        mobileFeatureFlagKeys.enableAnyVisibleClassSessionJoin,
+      ),
+    ).toBe(false);
+  });
+
+  it('enables the any-visible class session join rollout from an Expo public env flag', () => {
+    delete process.env.EXPO_PUBLIC_APP_ENV;
+    process.env.EXPO_PUBLIC_ENABLE_ANY_VISIBLE_CLASS_SESSION_JOIN = 'true';
+
+    expect(
+      getLocalMobileFeatureFlagFallback(
+        mobileFeatureFlagKeys.enableAnyVisibleClassSessionJoin,
+      ),
+    ).toBe(true);
+  });
+
   it('normalizes PostHog boolean-style values', () => {
     expect(parseBooleanFeatureFlag(true)).toBe(true);
     expect(parseBooleanFeatureFlag('on')).toBe(true);

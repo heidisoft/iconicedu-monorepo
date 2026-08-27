@@ -5,7 +5,10 @@ import { Clock3, Loader2, MessageSquareText, Video } from 'lucide-react';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { Badge } from '@iconicedu/ui-web/ui/badge';
-import { useOptionalMessagesState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
+import {
+  useOptionalMessagesState,
+  type ClassSessionOccurrenceRef,
+} from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
 import { ExternalLiveSessionJoinDialog } from '@iconicedu/ui-web/components/messages/external-live-session-join-dialog';
 import { useExternalLiveSessionJoinDialog } from '@iconicedu/ui-web/components/messages/use-external-live-session-join-dialog';
 import type { ClassSession } from './messages-schedule-tab.utils';
@@ -16,8 +19,14 @@ interface SessionCardProps {
   canJoin?: boolean;
   showJoinButton?: boolean;
   actionOrder?: 'message-first' | 'join-first';
-  joinLiveSession?: () => Promise<void>;
+  joinLiveSession?: (occurrence?: ClassSessionOccurrenceRef) => Promise<void>;
   joinHref?: string | null;
+  /**
+   * Occurrence this card joins. Supplied only under
+   * `enable-any-visible-class-session-join`; without it the handler falls back to
+   * the channel's current-window session (issue #195).
+   */
+  joinOccurrence?: ClassSessionOccurrenceRef;
   classroomChatHref?: string;
   openClassroomChat?: () => Promise<void> | void;
 }
@@ -55,6 +64,7 @@ export function SessionCard({
   actionOrder = 'message-first',
   joinLiveSession: joinLiveSessionOverride,
   joinHref,
+  joinOccurrence,
   classroomChatHref,
   openClassroomChat,
 }: SessionCardProps) {
@@ -117,7 +127,7 @@ export function SessionCard({
     if (joinLiveSession) {
       setIsJoinPending(true);
       try {
-        await joinLiveSession();
+        await joinLiveSession(joinOccurrence);
       } finally {
         setIsJoinPending(false);
       }

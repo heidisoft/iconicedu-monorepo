@@ -7,6 +7,8 @@ import { render, waitFor } from '@testing-library/react';
 import { HomePageContent } from './home-page-content';
 
 const dashboardHomeInfographicSectionMock = vi.fn(() => null);
+const enableAnyVisibleClassSessionJoinRunMock = vi.fn(async () => false);
+const listClassSessionJoinAvailabilityMock = vi.fn(async () => []);
 const buildDashboardHomeInfographicMetricsMock = vi.fn();
 const getDashboardAccountContextMock = vi.fn(async () => ({
   supabase: { key: 'supabase-client' },
@@ -51,6 +53,19 @@ vi.mock('./_shared/dashboard-auth', () => ({
     getDashboardAccountContextMock(...args),
   getDashboardProfileContext: (...args: unknown[]) =>
     getDashboardProfileContextMock(...args),
+}));
+
+vi.mock('@iconicedu/web/flags', () => ({
+  enableAnyVisibleClassSessionJoin: {
+    run: (...args: unknown[]) => enableAnyVisibleClassSessionJoinRunMock(...args),
+  },
+}));
+
+vi.mock('@iconicedu/web/lib/live-sessions/api-client', () => ({
+  createLiveSessionsApiClient: () => ({
+    listClassSessionJoinAvailability: (...args: unknown[]) =>
+      listClassSessionJoinAvailabilityMock(...args),
+  }),
 }));
 
 vi.mock('../../../lib/dashboard/home-infographic-metrics', () => ({

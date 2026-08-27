@@ -30,6 +30,8 @@ export const queryKeys = {
   spaceSchedules: (channelId: string, orgId: string) =>
     ['space-sessions', channelId, orgId] as const,
   orgSessions: (orgId: string) => ['org-sessions', orgId] as const,
+  classSessionJoinAvailability: (orgId: string, fromAt: string, toAt: string) =>
+    ['classSessionJoinAvailability', orgId, fromAt, toAt] as const,
   supervisedDirectMessages: (orgId: string, accountId: string) =>
     ['supervisedDirectMessages', orgId, accountId] as const,
 } as const;

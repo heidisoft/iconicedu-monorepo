@@ -77,3 +77,11 @@ export {
   fetchUnreadBadgeCount,
   markActivityFeedRead,
 } from './activity-feed/queries';
+export {
+  buildClassSessionJoinAvailabilityKey,
+  buildJoinEligibilityIndex,
+  fetchClassSessionJoinAvailability,
+  joinChannelLiveSession,
+  joinClassSessionOccurrence,
+} from './live-sessions/queries';
+export type { ClassSessionOccurrenceRef } from './live-sessions/queries';

@@ -12,8 +12,41 @@ interface MonthSectionProps {
   group: MonthGroup;
   isCurrentMonth: boolean;
   defaultOpen?: boolean;
+  /**
+   * Legacy single-occurrence gate. Ignored when `anyVisibleJoinEnabled` is true.
+   */
   joinableSessionId?: string | null;
+  /**
+   * `enable-any-visible-class-session-join`. When on, every eligible occurrence in
+   * the group is independently joinable rather than only the earliest one.
+   */
+  anyVisibleJoinEnabled?: boolean;
   progressStats?: MonthProgressStats;
+}
+
+/**
+ * Join visibility for one occurrence card (issue #195).
+ *
+ * The legacy behaviour rendered Join on every occurrence but enabled it only for
+ * `joinableSessionId`, leaving permanently disabled buttons on the rest. With the
+ * flag on, a card either shows an actionable Join or shows none at all.
+ */
+export function resolveSessionJoinState(input: {
+  sessionId: string;
+  disabled: boolean;
+  joinVisible: boolean;
+  joinableSessionId: string | null;
+  anyVisibleJoinEnabled: boolean;
+}): { canJoin: boolean; showJoinButton: boolean } {
+  if (!input.anyVisibleJoinEnabled) {
+    return {
+      canJoin: input.joinVisible && input.sessionId === input.joinableSessionId,
+      showJoinButton: input.joinVisible,
+    };
+  }
+
+  const canJoin = input.joinVisible && !input.disabled;
+  return { canJoin, showJoinButton: canJoin };
 }
 
 export function shouldMonthSectionStartOpen(
@@ -53,6 +86,7 @@ export function MonthSection({
   isCurrentMonth,
   defaultOpen = false,
   joinableSessionId = null,
+  anyVisibleJoinEnabled = false,
   progressStats,
 }: MonthSectionProps) {
   const messagesState = useOptionalMessagesState();
@@ -122,16 +156,34 @@ export function MonthSection({
 
       {isOpen ? (
         <div className="space-y-2 px-1 pt-2">
-          {group.sessions.map((session, index) => (
-            <SessionCard
-              key={session.id}
-              session={session}
-              index={index}
-              canJoin={joinAction.visible && session.id === joinableSessionId}
-              showJoinButton={joinAction.visible}
-              joinHref={joinAction.joinHref}
-            />
-          ))}
+          {group.sessions.map((session, index) => {
+            const joinState = resolveSessionJoinState({
+              sessionId: session.id,
+              disabled: Boolean(session.disabled) || session.isPast,
+              joinVisible: joinAction.visible,
+              joinableSessionId,
+              anyVisibleJoinEnabled,
+            });
+
+            return (
+              <SessionCard
+                key={session.id}
+                session={session}
+                index={index}
+                canJoin={joinState.canJoin}
+                showJoinButton={joinState.showJoinButton}
+                joinHref={joinAction.joinHref}
+                joinOccurrence={
+                  anyVisibleJoinEnabled
+                    ? {
+                        scheduleId: session.scheduleId,
+                        occurrenceKey: session.occurrenceKey,
+                      }
+                    : undefined
+                }
+              />
+            );
+          })}
         </div>
       ) : null}
     </section>

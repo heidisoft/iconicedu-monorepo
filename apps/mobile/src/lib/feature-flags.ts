@@ -39,6 +39,12 @@ export function getLocalMobileFeatureFlagFallback(key: MobileFeatureFlagKey): bo
     return parseBooleanFeatureFlag(process.env.EXPO_PUBLIC_ENABLE_MOBILE_GOOGLE_SIGN_IN);
   }
 
+  if (key === mobileFeatureFlagKeys.enableAnyVisibleClassSessionJoin) {
+    return parseBooleanFeatureFlag(
+      process.env.EXPO_PUBLIC_ENABLE_ANY_VISIBLE_CLASS_SESSION_JOIN,
+    );
+  }
+
   if (key === mobileFeatureFlagKeys.enableMobileAppleSignIn) {
     return parseBooleanFeatureFlag(process.env.EXPO_PUBLIC_ENABLE_MOBILE_APPLE_SIGN_IN);
   }

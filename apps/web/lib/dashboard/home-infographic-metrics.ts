@@ -35,6 +35,12 @@ export interface DashboardUpcomingSessionListItem {
   joinHref: string;
   chatHref: string;
   weekBucket: 'today' | 'this-week' | 'next-week';
+  /** Base schedule that owns this occurrence (issue #195). */
+  scheduleId?: string | null;
+  /** Original occurrence start, used to join this exact occurrence. */
+  occurrenceKey?: string | null;
+  /** API-decided join eligibility; stamped in by the page, not derived here. */
+  joinEligible?: boolean;
 }
 
 export interface DashboardUpcomingSessionsSectionPage {
@@ -272,6 +278,8 @@ function buildUpcomingSessionPage(input: {
       joinHref:
         joinHrefByScheduleId.get(session.id) ?? `/${input.orgSlug}/class-schedule`,
       chatHref: chatHrefByScheduleId.get(session.id) ?? `/${input.orgSlug}/s`,
+      scheduleId: session.scheduleId,
+      occurrenceKey: session.occurrenceKey,
       weekBucket: session.isToday
         ? 'today'
         : sessionWeekStart === currentWeekStart

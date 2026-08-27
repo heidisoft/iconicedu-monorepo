@@ -101,6 +101,11 @@ export interface MessagesContainerProps {
   currentUserProfile?: UserProfileVM | null;
   readOnly?: boolean;
   showCreateMessageTypeButton?: boolean;
+  /**
+   * `enable-any-visible-class-session-join`. Forwarded to the messages state so
+   * every session-card surface in the shell agrees on the rollout (issue #195).
+   */
+  anyVisibleJoinEnabled?: boolean;
   realtimeClient?: MessagesRealtimeClient | null;
   messageWriteClient?: MessageWriteClient | null;
   uploadFileMessage?: (input: {

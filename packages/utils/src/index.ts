@@ -84,3 +84,13 @@ export function createEnumNormalizer<T extends string>(allowedValues: readonly T
     return null;
   };
 }
+
+export {
+  type DisplayClassScheduleVM,
+  addDays,
+  expandRecurringEvents,
+  getClassScheduleOccurrenceIdentity,
+  getMonthRange,
+  getWeekStart,
+  startOfDay,
+} from './class-schedule-occurrences';

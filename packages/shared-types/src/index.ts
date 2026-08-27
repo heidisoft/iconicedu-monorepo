@@ -34,6 +34,7 @@ export * from './payloads/activity-feed';
 export * from './payloads/notification-preferences';
 export * from './payloads/session-feedback';
 export * from './payloads/org-subject-catalog';
+export * from './payloads/live-session';
 export * from './vm/assessment-curriculum';
 export * from './vm/assessment-item';
 export * from './vm/assessment-test';

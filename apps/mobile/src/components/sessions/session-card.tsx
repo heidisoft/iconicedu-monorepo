@@ -23,7 +23,8 @@ import {
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/providers/theme-provider';
 import { usePushConsent } from '@/providers/push-consent-provider';
-import { fetchSpaceChannelMetaByChannelId } from '@/lib/api/queries';
+import { joinChannelLiveSession, joinClassSessionOccurrence } from '@/lib/api/queries';
+import { useAccount } from '@/hooks/use-account';
 import {
   MESSAGE_TITLE_FONT_SIZE,
   MESSAGE_TITLE_FONT_WEIGHT,
@@ -201,6 +202,7 @@ export function SessionCard({
   titleVariant = 'default',
   showJoinButton = true,
   joinEnabled = true,
+  joinOccurrenceEnabled = false,
   pressTarget = 'sessions',
   enableCardPress = true,
   cancelAction,
@@ -210,6 +212,12 @@ export function SessionCard({
   titleVariant?: 'default' | 'message-list';
   showJoinButton?: boolean;
   joinEnabled?: boolean;
+  /**
+   * `enable-any-visible-class-session-join`. When on, Join targets this card's
+   * exact occurrence through the API instead of resolving a channel-wide meeting
+   * link client-side (issue #195).
+   */
+  joinOccurrenceEnabled?: boolean;
   pressTarget?: 'sessions' | 'messages';
   enableCardPress?: boolean;
   cancelAction?: {
@@ -221,6 +229,8 @@ export function SessionCard({
 }) {
   const { colors } = useTheme();
   const { requestPushConsent } = usePushConsent();
+  const { data: account } = useAccount();
+  const orgId = (account as { org_id?: string } | undefined)?.org_id ?? '';
   const router = useRouter();
   const [externalJoinTarget, setExternalJoinTarget] = useState<{
     joinHref: string;
@@ -290,13 +300,26 @@ export function SessionCard({
             return;
           }
 
-          if (session.channelId) {
+          if (session.channelId && orgId) {
             setIsResolvingJoin(true);
             try {
-              const channelMeta = await fetchSpaceChannelMetaByChannelId(
-                session.channelId,
-              );
-              const joinHref = channelMeta?.liveSession?.joinUrl?.trim() || null;
+              // The API owns join authorization and occurrence identity. A dated
+              // card joins its own occurrence; the fallback joins whichever
+              // occurrence the channel currently has in its window (issue #195).
+              const occurrence =
+                joinOccurrenceEnabled && session.scheduleId && session.occurrenceKey
+                  ? {
+                      scheduleId: session.scheduleId,
+                      occurrenceKey: session.occurrenceKey,
+                    }
+                  : null;
+              const result = occurrence
+                ? await joinClassSessionOccurrence({ orgId, ...occurrence })
+                : await joinChannelLiveSession({
+                    orgId,
+                    channelId: session.channelId,
+                  });
+              const joinHref = result.joinPath?.trim() || null;
 
               if (joinHref) {
                 if (isExternalJoinHref(joinHref)) {
@@ -312,7 +335,7 @@ export function SessionCard({
                 return;
               }
             } catch {
-              // Best effort join resolution. Fall back to the classroom if the lookup fails.
+              // Fall through to the classroom rather than leaving the tap dead.
             } finally {
               setIsResolvingJoin(false);
             }

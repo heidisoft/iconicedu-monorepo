@@ -6,6 +6,7 @@ import { DashboardHomeInfographicSection } from '@iconicedu/ui-web';
 import type { DashboardUpcomingSessionListItem } from '@iconicedu/ui-web/components/dashboard/dashboard-home-infographic-section';
 import { ExternalLiveSessionJoinDialog } from '@iconicedu/ui-web/components/messages/external-live-session-join-dialog';
 import { useExternalLiveSessionJoinDialog } from '@iconicedu/ui-web/components/messages/use-external-live-session-join-dialog';
+import { requestLiveSessionJoin } from '@iconicedu/web/lib/live-sessions/join-client';
 
 type HomePageInfographicClientProps = ComponentProps<
   typeof DashboardHomeInfographicSection
@@ -26,36 +27,26 @@ export function HomePageInfographicClient(props: HomePageInfographicClientProps)
         return;
       }
 
-      if (!item.channelId) {
+      const occurrence =
+        props.anyVisibleJoinEnabled && item.scheduleId && item.occurrenceKey
+          ? { scheduleId: item.scheduleId, occurrenceKey: item.occurrenceKey }
+          : null;
+
+      if (!occurrence && !item.channelId) {
         handleResolvedJoinHref(item.joinHref);
 
         return;
       }
 
-      const response = await window.fetch(
-        `/api/channels/${item.channelId}/live-sessions/join`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ orgSlug: props.orgSlug }),
-        },
-      );
+      const joinPath = await requestLiveSessionJoin({
+        orgSlug: props.orgSlug,
+        channelId: item.channelId,
+        occurrence,
+      });
 
-      const payload = (await response.json().catch(() => null)) as {
-        success?: boolean;
-        joinPath?: string;
-        error?: string;
-      } | null;
-
-      if (!response.ok || !payload?.success || !payload.joinPath) {
-        throw new Error(payload?.error ?? 'Failed to join live session');
-      }
-
-      handleResolvedJoinHref(payload.joinPath);
+      handleResolvedJoinHref(joinPath);
     },
-    [handleResolvedJoinHref, props.orgSlug],
+    [handleResolvedJoinHref, props.anyVisibleJoinEnabled, props.orgSlug],
   );
 
   return (
