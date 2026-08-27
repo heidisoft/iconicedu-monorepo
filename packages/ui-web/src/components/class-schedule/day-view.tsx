@@ -4,6 +4,7 @@ import type { ClassScheduleVM } from '@iconicedu/shared-types';
 import {
   type DisplayClassScheduleVM,
   eventTimeToMinutes,
+  getDisplayNow,
   isSameDay,
   getEventDate,
   formatEventTimeForSchedule,
@@ -83,7 +84,7 @@ export function DayView({
     timezone,
   );
 
-  const today = new Date();
+  const today = getDisplayNow(timezone);
   const isToday = isSameDay(currentDate, today);
   const currentHour = today.getHours();
   const currentMinutes = today.getMinutes();

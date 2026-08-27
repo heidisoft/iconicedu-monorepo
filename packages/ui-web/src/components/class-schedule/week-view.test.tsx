@@ -101,4 +101,57 @@ describe('WeekView', () => {
     expect(badges[0]?.parentElement).toHaveStyle({ top: '640px' });
     expect(badges[1]?.parentElement).toHaveStyle({ top: '704px' });
   });
+
+  /**
+   * Regression coverage for #194 root cause 4. `2026-08-27T18:45Z` is Thursday
+   * 14:45 in New York but already Friday 00:15 in Colombo, so "today" and the
+   * current-time line must follow the viewer timezone rather than the clock.
+   */
+  describe('viewer-timezone today and current-time indicator', () => {
+    const instant = new Date('2026-08-27T18:45:00.000Z');
+
+    function renderWeek(timezone: string) {
+      return render(
+        <ScheduleDisplayTimeZoneProvider timezone={timezone}>
+          <WeekView currentDate={new Date(2026, 7, 26)} events={[]} />
+        </ScheduleDisplayTimeZoneProvider>,
+      );
+    }
+
+    it('marks the viewer date as today when the viewer is behind the instant', () => {
+      vi.setSystemTime(instant);
+      renderWeek('America/New_York');
+
+      expect(screen.getByText('27').className).toContain('bg-primary');
+      expect(screen.getByText('28').className).not.toContain('bg-primary');
+    });
+
+    it('marks the viewer date as today when the viewer is ahead of the instant', () => {
+      vi.setSystemTime(instant);
+      renderWeek('Asia/Colombo');
+
+      expect(screen.getByText('28').className).toContain('bg-primary');
+      expect(screen.getByText('27').className).not.toContain('bg-primary');
+    });
+
+    it('positions the current-time line at the viewer wall-clock time', () => {
+      vi.setSystemTime(instant);
+      const { container } = renderWeek('America/New_York');
+
+      // 14:45 -> (14 * 2 + 45 / 30) * 32
+      expect(container.querySelector('.border-destructive')).toHaveStyle({
+        top: '944px',
+      });
+    });
+
+    it('positions the current-time line past midnight for a viewer a day ahead', () => {
+      vi.setSystemTime(instant);
+      const { container } = renderWeek('Asia/Colombo');
+
+      // 00:15 -> (0 * 2 + 15 / 30) * 32
+      expect(container.querySelector('.border-destructive')).toHaveStyle({
+        top: '16px',
+      });
+    });
+  });
 });

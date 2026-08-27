@@ -15,6 +15,7 @@ import {
   eventTimeToMinutes,
   getClassScheduleEventsForMonthRange,
   getClassScheduleEventsForView,
+  getDisplayNow,
   getEventDate,
 } from '@iconicedu/ui-web/lib/class-schedule-utils';
 
@@ -89,7 +90,8 @@ export function ClassScheduleContainer({
 
   const handleNavigate = (direction: 'prev' | 'next' | 'today') => {
     if (direction === 'today') {
-      onDateSelect(new Date());
+      // The viewer's today, not the browser's; near midnight they differ.
+      onDateSelect(getDisplayNow(timezone));
       return;
     }
 

@@ -172,6 +172,19 @@ export function getEventDate(event: ClassScheduleVM, timezone?: string | null): 
   );
 }
 
+/**
+ * "Now" as a display date: a runtime-local `Date` whose fields carry the
+ * viewer's wall-clock values, matching what `getEventDate` returns.
+ *
+ * Views must use this rather than `new Date()`. A raw `Date` reports the
+ * browser's clock, so "today" highlighting and the current-time indicator
+ * would follow the machine timezone while the events around them follow the
+ * viewer's — the two can land on different calendar days.
+ */
+export function getDisplayNow(timezone?: string | null): Date {
+  return toScheduleDisplayDate(new Date(), timezone) ?? new Date();
+}
+
 export function isSameDay(date1: Date, date2: Date): boolean {
   return (
     date1.getDate() === date2.getDate() &&

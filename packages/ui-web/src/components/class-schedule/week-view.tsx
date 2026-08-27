@@ -5,6 +5,7 @@ import {
   eventTimeToMinutes,
   getWeekDays,
   formatDayName,
+  getDisplayNow,
   isSameDay,
   getEventDate,
   getTimeSlots,
@@ -51,7 +52,7 @@ export function WeekView({
   const timezone = useScheduleDisplayTimeZone();
   const weekDays = getWeekDays(currentDate);
   const timeSlots = getTimeSlots();
-  const today = new Date();
+  const today = getDisplayNow(timezone);
 
   const currentHour = today.getHours();
   const currentMinutes = today.getMinutes();

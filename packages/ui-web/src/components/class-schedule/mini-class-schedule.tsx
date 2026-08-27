@@ -4,9 +4,11 @@ import { Button } from '@iconicedu/ui-web/ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   getDaysInMonth,
+  getDisplayNow,
   getEventDate,
   isSameDay,
 } from '@iconicedu/ui-web/lib/class-schedule-utils';
+import { useScheduleDisplayTimeZone } from '@iconicedu/ui-web/components/shared/schedule-display-timezone-context';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 import type { ClassScheduleVM } from '@iconicedu/shared-types';
 import { useState, useEffect } from 'react';
@@ -27,6 +29,7 @@ export function MiniClassSchedule({
   events = [],
   onMonthChange,
 }: MiniClassScheduleProps) {
+  const timezone = useScheduleDisplayTimeZone();
   const [displayMonth, setDisplayMonth] = useState(currentDate.getMonth());
   const [displayYear, setDisplayYear] = useState(currentDate.getFullYear());
 
@@ -43,7 +46,7 @@ export function MiniClassSchedule({
   });
 
   const weekDays = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
-  const today = new Date();
+  const today = getDisplayNow(timezone);
 
   const handlePrevMonth = () => {
     if (displayMonth === 0) {
@@ -68,7 +71,7 @@ export function MiniClassSchedule({
   };
 
   const dayHasEvents = (day: Date) => {
-    return events.some((event) => isSameDay(getEventDate(event), day));
+    return events.some((event) => isSameDay(getEventDate(event, timezone), day));
   };
 
   return (
