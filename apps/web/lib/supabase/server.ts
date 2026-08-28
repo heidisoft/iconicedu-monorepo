@@ -19,20 +19,16 @@ export const createSupabaseServerClient = async ({
 
   return createServerClient(supabaseUrl, supabasePublishableKey, {
     cookies: {
-      get(name) {
-        return resolvedCookieStore.get(name)?.value;
+      getAll() {
+        return resolvedCookieStore.getAll();
       },
-      set(name, value, options) {
+      setAll(cookiesToSet) {
         if (!allowCookieModification || !('set' in resolvedCookieStore)) {
           return;
         }
-        resolvedCookieStore.set({ name, value, ...options });
-      },
-      remove(name, options) {
-        if (!allowCookieModification || !('set' in resolvedCookieStore)) {
-          return;
-        }
-        resolvedCookieStore.set({ name, value: '', ...options, maxAge: 0 });
+        cookiesToSet.forEach(({ name, value, options }) => {
+          resolvedCookieStore.set({ name, value, ...options });
+        });
       },
     },
   });

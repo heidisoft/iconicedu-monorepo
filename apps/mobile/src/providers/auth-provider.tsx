@@ -70,6 +70,11 @@ type UserAccount = {
   org_id?: string | null;
 };
 
+async function signOutCurrentSession(): Promise<void> {
+  const { error } = await supabase.auth.signOut({ scope: 'local' });
+  if (error) throw error;
+}
+
 /** Check that the signed-in user has an account row with an org assigned. */
 async function checkOrgAssignment(): Promise<string | null> {
   const account = (await withTimeout(
@@ -78,12 +83,12 @@ async function checkOrgAssignment(): Promise<string | null> {
   )) as UserAccount | null;
 
   if (!account) {
-    await supabase.auth.signOut();
+    await signOutCurrentSession();
     return 'No ICONIC Academy account is linked to this sign-in. Please register first or contact your administrator.';
   }
 
   if (!account.org_id) {
-    await supabase.auth.signOut();
+    await signOutCurrentSession();
     return 'Your account is not linked to an organisation. Please contact your administrator.';
   }
 
@@ -99,6 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const onboardingCompleteRef = useRef<boolean | null>(null);
   const backgroundedAtRef = useRef<number | null>(null);
   const previousAppState = useRef<AppStateStatus>(AppState.currentState);
+  const hasSession = Boolean(session);
 
   const setOnboardingCompletionStatus = useCallback((isComplete: boolean | null) => {
     onboardingCompleteRef.current = isComplete;
@@ -114,7 +120,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     backgroundedAtRef.current = null;
     analytics.reset();
     try {
-      await supabase.auth.signOut({ scope: 'local' });
+      await signOutCurrentSession();
     } catch (error) {
       reportObservedError({
         error,
@@ -210,8 +216,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       analytics.capture(AnalyticsEvent.SIGNED_OUT, {
         reason: 'incomplete-onboarding-expired',
       });
+      await signOutCurrentSession();
       analytics.reset();
-      await supabase.auth.signOut();
     } catch (error) {
       analytics.capture(AnalyticsEvent.INCOMPLETE_ONBOARDING_REAUTH_FAILED, {
         source: 'mobile-appstate-return',
@@ -229,16 +235,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [analytics, session?.user.id]);
 
   useEffect(() => {
+    if (AppState.currentState === 'active') {
+      void supabase.auth.startAutoRefresh();
+    } else {
+      void supabase.auth.stopAutoRefresh();
+    }
+
     const subscription = AppState.addEventListener('change', (nextState) => {
       const previousState = previousAppState.current;
       previousAppState.current = nextState;
 
       if (nextState === 'background' || nextState === 'inactive') {
+        void supabase.auth.stopAutoRefresh();
         backgroundedAtRef.current = markLastActiveAt();
         return;
       }
 
-      if (nextState !== 'active' || previousState === 'active' || !session) {
+      if (nextState === 'active') {
+        void supabase.auth.startAutoRefresh();
+      }
+
+      if (nextState !== 'active' || previousState === 'active' || !hasSession) {
         return;
       }
 
@@ -265,8 +282,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       backgroundedAtRef.current = null;
     });
 
-    return () => subscription.remove();
-  }, [analytics, session, signOutForExpiredIncompleteOnboarding]);
+    return () => {
+      subscription.remove();
+      void supabase.auth.stopAutoRefresh();
+    };
+  }, [analytics, hasSession, signOutForExpiredIncompleteOnboarding]);
 
   /** Send a sign-in OTP. Only works for accounts that already exist. */
   const signInWithOtp = useCallback(async (email: string) => {
@@ -308,6 +328,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   /** Verify OTP code and confirm org membership before allowing access. */
   const verifyOtpCode = useCallback(
     async (email: string, token: string, options: { requireLinkedAccount: boolean }) => {
+      let shouldRollbackSession = false;
       try {
         setSessionExpiryMessage(null);
         const { data, error } = await supabase.auth.verifyOtp({
@@ -318,13 +339,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (error) return { error: error.message };
 
+        shouldRollbackSession = Boolean(data.session);
+
         // Explicitly commit the session so the SecureStore adapter has the tokens
         // persisted before the subsequent accounts query (avoids RLS race condition).
         if (data.session) {
-          await supabase.auth.setSession({
+          const { error: sessionError } = await supabase.auth.setSession({
             access_token: data.session.access_token,
             refresh_token: data.session.refresh_token,
           });
+          if (sessionError) throw sessionError;
         }
 
         if (options.requireLinkedAccount && data.user) {
@@ -342,6 +366,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         return { error: null };
       } catch (error) {
+        if (shouldRollbackSession && options.requireLinkedAccount) {
+          try {
+            await signOutCurrentSession();
+          } catch (signOutError) {
+            reportObservedError({
+              error: signOutError,
+              source: 'mobile.auth.verify_otp.rollback',
+              message: 'Failed to clear the local session after OTP sign-in failed',
+            });
+          }
+        }
         reportObservedError({
           error,
           source: 'mobile.auth.verify_otp',
@@ -474,16 +509,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     onboardingCompleteRef.current = null;
     backgroundedAtRef.current = null;
     analytics.capture(AnalyticsEvent.SIGNED_OUT);
-    analytics.reset();
     try {
       const token = await getStoredPushToken();
       if (token) await revokePushToken(token);
     } catch {
       // Token revocation is best-effort; never block sign-out
     }
+    await signOutCurrentSession();
     await clearUserNotificationState();
     queryClient.clear();
-    await supabase.auth.signOut();
+    analytics.reset();
   }, [analytics, queryClient]);
 
   const value = useMemo<AuthState>(

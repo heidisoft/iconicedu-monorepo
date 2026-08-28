@@ -100,7 +100,7 @@ export class AuthAdminService {
     return this.client.auth.admin.generateLink(params);
   }
 
-  signOutUser(jwt: string, scope?: AdminSignOutScope) {
+  signOutUser(jwt: string, scope: AdminSignOutScope) {
     return this.client.auth.admin.signOut(jwt, scope);
   }
 
