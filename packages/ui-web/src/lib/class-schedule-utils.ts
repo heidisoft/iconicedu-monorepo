@@ -178,6 +178,15 @@ export function isSameDay(date1: Date, date2: Date): boolean {
   );
 }
 
+const CALENDAR_SLOT_MINUTES = 30;
+const CALENDAR_SLOT_HEIGHT_PX = 32;
+const CALENDAR_SCROLL_CONTEXT_MINUTES = 60;
+
+export function getCalendarTimelineScrollTop(minutes: number): number {
+  const scrollToMinutes = Math.max(0, minutes - CALENDAR_SCROLL_CONTEXT_MINUTES);
+  return (scrollToMinutes / CALENDAR_SLOT_MINUTES) * CALENDAR_SLOT_HEIGHT_PX;
+}
+
 export function timeToMinutes(
   input: string | Pick<ClassScheduleVM, 'startAt' | 'timezone' | 'recurrence'>,
   timezone?: string | null,

@@ -10,6 +10,7 @@ import {
   getTimeSlots,
   getEventLayout,
   getHiddenEventOverflowGroups,
+  getCalendarTimelineScrollTop,
 } from '@iconicedu/ui-web/lib/class-schedule-utils';
 import { EventCard } from '@iconicedu/ui-web/components/class-schedule/event-card';
 import { MiniClassSchedule } from '@iconicedu/ui-web/components/class-schedule/mini-class-schedule';
@@ -24,9 +25,13 @@ import {
 } from '@iconicedu/ui-web/ui/empty';
 import { ArrowRight, CalendarX, UserPlus } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@iconicedu/ui-web/ui/popover';
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useScheduleDisplayTimeZone } from '@iconicedu/ui-web/components/shared/schedule-display-timezone-context';
-import { formatScheduleDisplayValue } from '@iconicedu/ui-web/lib/schedule-display-timezone';
+import {
+  formatScheduleDisplayValue,
+  getScheduleDisplayMinutes,
+  toScheduleDisplayDate,
+} from '@iconicedu/ui-web/lib/schedule-display-timezone';
 import type {
   CancelSessionActionInput,
   EditSessionActionInput,
@@ -69,8 +74,9 @@ export function DayView({
 }: DayViewProps) {
   const timezone = useScheduleDisplayTimeZone();
   const timeSlots = getTimeSlots();
-  const dayEvents = events.filter((event) =>
-    isSameDay(getEventDate(event, timezone), currentDate),
+  const dayEvents = useMemo(
+    () => events.filter((event) => isSameDay(getEventDate(event, timezone), currentDate)),
+    [currentDate, events, timezone],
   );
   const miniScheduleEvents = classScheduleEvents ?? events;
   const hasChildren = childrenCount === undefined ? true : childrenCount > 0;
@@ -83,11 +89,11 @@ export function DayView({
     timezone,
   );
 
-  const today = new Date();
-  const isToday = isSameDay(currentDate, today);
-  const currentHour = today.getHours();
-  const currentMinutes = today.getMinutes();
-  const currentTimeOffset = (currentHour * 2 + currentMinutes / 30) * 32;
+  const now = new Date();
+  const displayNow = toScheduleDisplayDate(now, timezone) ?? now;
+  const isToday = isSameDay(currentDate, displayNow);
+  const currentTimeMinutes = getScheduleDisplayMinutes(now, timezone);
+  const currentTimeOffset = (currentTimeMinutes / 30) * 32;
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const hasInitialScrolled = useRef(false);
@@ -100,7 +106,6 @@ export function DayView({
     ) as HTMLElement;
     if (!container) return;
 
-    // Calculate scroll position
     let scrollTop = 8 * 2 * 32; // Default to 8 AM
 
     if (dayEvents.length > 0) {
@@ -111,19 +116,21 @@ export function DayView({
       });
 
       const eventMinutes = eventTimeToMinutes(earliestEvent, 'startAt', timezone);
-      const scrollToMinutes = Math.max(0, eventMinutes - 60);
-      scrollTop = (scrollToMinutes / 30) * 32;
+      scrollTop = getCalendarTimelineScrollTop(eventMinutes);
     }
 
     if (!hasInitialScrolled.current) {
       hasInitialScrolled.current = true;
+      if (isToday) {
+        scrollTop = getCalendarTimelineScrollTop(currentTimeMinutes);
+      }
       setTimeout(() => {
         container.scrollTo({ top: scrollTop, behavior: 'smooth' });
       }, 100);
     } else {
       container.scrollTo({ top: scrollTop, behavior: 'smooth' });
     }
-  }, [currentDate, dayEvents, timezone]);
+  }, [currentDate, currentTimeMinutes, dayEvents, isToday, timezone]);
 
   return (
     <div className="flex flex-1 overflow-hidden">

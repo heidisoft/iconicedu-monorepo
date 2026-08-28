@@ -10,12 +10,17 @@ import {
   getTimeSlots,
   getEventLayout,
   getHiddenEventOverflowGroups,
+  getCalendarTimelineScrollTop,
 } from '@iconicedu/ui-web/lib/class-schedule-utils';
 import { EventCard } from '@iconicedu/ui-web/components/class-schedule/event-card';
 import { cn } from '@iconicedu/ui-web/lib/utils';
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@iconicedu/ui-web/ui/popover';
 import { useScheduleDisplayTimeZone } from '@iconicedu/ui-web/components/shared/schedule-display-timezone-context';
+import {
+  getScheduleDisplayMinutes,
+  toScheduleDisplayDate,
+} from '@iconicedu/ui-web/lib/schedule-display-timezone';
 import type {
   CancelSessionActionInput,
   EditSessionActionInput,
@@ -49,13 +54,14 @@ export function WeekView({
   onEditSession,
 }: WeekViewProps) {
   const timezone = useScheduleDisplayTimeZone();
-  const weekDays = getWeekDays(currentDate);
+  const weekDays = useMemo(() => getWeekDays(currentDate), [currentDate]);
   const timeSlots = getTimeSlots();
-  const today = new Date();
+  const now = new Date();
+  const today = toScheduleDisplayDate(now, timezone) ?? now;
 
-  const currentHour = today.getHours();
-  const currentMinutes = today.getMinutes();
-  const currentTimeOffset = (currentHour * 2 + currentMinutes / 30) * 32;
+  const currentTimeMinutes = getScheduleDisplayMinutes(now, timezone);
+  const currentTimeOffset = (currentTimeMinutes / 30) * 32;
+  const includesToday = weekDays.some((day) => isSameDay(day, today));
   const columnGap = 6;
   const overlapPx = 12;
   const maxVisibleColumns = 3;
@@ -79,14 +85,16 @@ export function WeekView({
       });
 
       const eventMinutes = eventTimeToMinutes(earliestEvent, 'startAt', timezone);
-      const scrollToMinutes = Math.max(0, eventMinutes - 60);
-      scrollTop = (scrollToMinutes / 30) * 32;
+      scrollTop = getCalendarTimelineScrollTop(eventMinutes);
     } else {
       scrollTop = 8 * 2 * 32;
     }
 
     // Add delay on initial mount to ensure DOM is ready
     if (!hasMountedRef.current) {
+      if (includesToday) {
+        scrollTop = getCalendarTimelineScrollTop(currentTimeMinutes);
+      }
       setTimeout(() => {
         scrollContainerRef.current?.scrollTo({ top: scrollTop, behavior: 'smooth' });
       }, 100);
@@ -94,7 +102,7 @@ export function WeekView({
     } else {
       scrollContainerRef.current.scrollTo({ top: scrollTop, behavior: 'smooth' });
     }
-  }, [currentDate, events, weekDays, timezone]);
+  }, [currentDate, currentTimeMinutes, events, includesToday, weekDays, timezone]);
 
   const handleCellClick = (day: Date) => {
     if (onDateSelect) {
