@@ -201,7 +201,6 @@ export class CompletionCheckDispatcherService {
       supabase,
       orgId,
       guardianProfileId,
-      guardian,
       currentScheduleId,
       currentOccurrenceStart,
       currentEndAt,

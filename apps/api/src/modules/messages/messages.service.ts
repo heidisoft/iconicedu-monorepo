@@ -9,8 +9,6 @@ import {
 import type {
   RawMessageRow,
   RawSenderProfile,
-  AudienceRuleVM,
-  FeedScopeVM,
   MessageVM,
   MessageMentionVM,
   MessageSendFileInput,
@@ -20,10 +18,7 @@ import type {
   ThreadVM,
 } from '@iconicedu/shared-types';
 import { buildSenderProfile, mapRowToMessageVM } from '@iconicedu/utils';
-import {
-  resolveActivityChannelContext,
-  resolveVisibilityAudienceFromMessageRow,
-} from '@iconicedu/api/lib/messages/message-activity';
+import { resolveActivityChannelContext } from '@iconicedu/api/lib/messages/message-activity';
 import { filterVisibleMessageRows } from '@iconicedu/api/lib/messages/message-visibility';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
@@ -98,20 +93,6 @@ type HomeworkMessageIntent = {
   dueAt: string;
   subject: string;
 };
-
-function buildWritableProfileDisplayName(profile: WritableProfileRow) {
-  const displayName = profile.display_name?.trim();
-  if (displayName) {
-    return displayName;
-  }
-
-  const fullName = [profile.first_name?.trim(), profile.last_name?.trim()]
-    .filter((value): value is string => Boolean(value))
-    .join(' ')
-    .trim();
-
-  return fullName || 'Someone';
-}
 
 const URL_PATTERN = /(https?:\/\/[^\s]+)/i;
 const PRIVATE_HOST_PATTERN =
@@ -1445,15 +1426,6 @@ export class MessagesService {
         );
       }
 
-      const visibilityAudience = resolveVisibilityAudienceFromMessageRow({
-        visibilityType:
-          (messageInsert.data as { visibility_type?: string | null }).visibility_type ??
-          null,
-        visibilityUserIds:
-          (messageInsert.data as { visibility_user_ids?: string[] | null })
-            .visibility_user_ids ?? null,
-      });
-
       const payloadInsert = await serviceSupabase
         .from(
           homeworkIntent
@@ -1729,15 +1701,6 @@ export class MessagesService {
         }
       }
 
-      const visibilityAudience = resolveVisibilityAudienceFromMessageRow({
-        visibilityType:
-          (messageInsert.data as { visibility_type?: string | null }).visibility_type ??
-          null,
-        visibilityUserIds:
-          (messageInsert.data as { visibility_user_ids?: string[] | null })
-            .visibility_user_ids ?? null,
-      });
-
       await this.bumpThreadReplyCount({
         accessToken,
         threadId,
@@ -1980,15 +1943,6 @@ export class MessagesService {
       if (assetInsert.error) {
         throw new InternalServerErrorException(assetInsert.error.message);
       }
-
-      const visibilityAudience = resolveVisibilityAudienceFromMessageRow({
-        visibilityType:
-          (messageInsert.data as { visibility_type?: string | null }).visibility_type ??
-          null,
-        visibilityUserIds:
-          (messageInsert.data as { visibility_user_ids?: string[] | null })
-            .visibility_user_ids ?? null,
-      });
 
       await this.bumpThreadReplyCount({
         accessToken,

@@ -1,4 +1,4 @@
-import { formatDateTime, formatTime, resolveViewerTimezone } from '@iconicedu/utils';
+import { formatDateTime, resolveViewerTimezone } from '@iconicedu/utils';
 import { formatSessionReminderStartCopy } from '@iconicedu/api/lib/notifications/session-reminder-copy';
 import { buildSessionCompletionCopy } from '@iconicedu/api/lib/notifications/session-completion-copy';
 
@@ -99,44 +99,6 @@ function formatSessionDateTime(value: unknown, payload: Record<string, unknown>)
     resolveViewerTimezone(extractDisplayTimezone(payload)),
     'natural',
   );
-}
-
-function formatSessionWeekday(value: unknown, payload: Record<string, unknown>) {
-  if (typeof value !== 'string' || value.length === 0) {
-    return undefined;
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return undefined;
-  }
-
-  return new Intl.DateTimeFormat('en-US', {
-    timeZone: resolveViewerTimezone(extractDisplayTimezone(payload)),
-    weekday: 'long',
-  }).format(date);
-}
-
-function formatSessionWeeklyRecurrence(value: unknown, payload: Record<string, unknown>) {
-  if (typeof value !== 'string' || value.length === 0) {
-    return undefined;
-  }
-
-  const weekday = formatSessionWeekday(value, payload);
-  if (!weekday) {
-    return undefined;
-  }
-
-  const timeLabel = formatTime(
-    value,
-    resolveViewerTimezone(extractDisplayTimezone(payload)),
-    'withZone',
-  );
-  if (!timeLabel) {
-    return undefined;
-  }
-
-  return `Every ${weekday} at ${timeLabel}`;
 }
 
 function appendReason(summary: string | undefined, reason: string | undefined) {
@@ -240,22 +202,6 @@ function buildSessionAudienceLabel(input: {
   }
 
   return classTitle;
-}
-
-function getScheduledSessionSummary(payload: Record<string, unknown>) {
-  const startAt = firstDefinedString(payload.startAt, payload.firstSessionStartAt);
-  const recurringLabel = formatSessionWeeklyRecurrence(startAt, payload);
-  const exactLabel = formatSessionDateTime(startAt, payload);
-
-  if (recurringLabel && exactLabel) {
-    return `${recurringLabel}. First session ${exactLabel}.`;
-  }
-
-  if (exactLabel) {
-    return `Scheduled for ${exactLabel}.`;
-  }
-
-  return undefined;
 }
 
 function getRescheduledSessionSummary(payload: Record<string, unknown>) {

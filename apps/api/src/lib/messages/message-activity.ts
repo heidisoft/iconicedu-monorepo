@@ -671,7 +671,6 @@ export async function publishChannelMessageActivity(input: {
     }));
   const isDmRoute = activityContext.channelRouteKind === 'dm';
   const eventType = 'message.posted';
-  const dedupePrefix = 'message.posted';
   const dmRecipients = isDmRoute
     ? await resolveDmActivityRecipientProfileIds({
         supabase: readSupabase,

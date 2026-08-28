@@ -8,7 +8,6 @@ import {
 import type {
   ClassScheduleParticipantVM,
   ClassScheduleVM,
-  FeedScopeVM,
   ParticipantRoleVM,
   RecurrenceVM,
   ReminderJobRow,
