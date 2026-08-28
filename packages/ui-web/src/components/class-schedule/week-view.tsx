@@ -134,7 +134,7 @@ export function WeekView({
                   )}
                 >
                   <div className="text-sm text-muted-foreground">
-                    {formatDayName(day, timezone)}
+                    {formatDayName(day)}
                   </div>
                   <div
                     className={cn(

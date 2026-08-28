@@ -59,8 +59,21 @@ export function formatDate(date: Date, timezone?: string | null): string {
   );
 }
 
-export function formatDayName(date: Date, timezone?: string | null): string {
-  return formatScheduleDisplayValue(date, timezone, { weekday: 'short' }) ?? '';
+/**
+ * Formats the weekday of a *display date* — a runtime-local `Date` whose fields
+ * already carry the viewer's wall-clock values, as produced by `getEventDate`
+ * and `getDisplayNow`.
+ *
+ * Such a value must be read from its local fields. Passing it through an `Intl`
+ * formatter with an explicit `timeZone` converts an already-converted value a
+ * second time and can shift the result by a day, which is how the calendar came
+ * to label a Monday column "Sun". The week range label in the header has always
+ * used local fields for exactly this reason.
+ */
+export function formatDayName(date: Date): string {
+  return Number.isNaN(date.getTime())
+    ? ''
+    : new Intl.DateTimeFormat('en-US', { weekday: 'short' }).format(date);
 }
 
 export function formatMonthYear(date: Date, timezone?: string | null): string {

@@ -154,4 +154,41 @@ describe('WeekView', () => {
       });
     });
   });
+
+  /**
+   * The weekday name and the date number in each column header are produced by
+   * different code paths, so they can disagree. 2026-08-24 is a Monday; an
+   * early-morning viewer wall-clock time used to render it as "Sun 24".
+   */
+  describe('column headers', () => {
+    it.each([['America/New_York'], ['Asia/Colombo'], ['UTC']])(
+      'labels each column with the weekday matching its date for %s',
+      (timezone) => {
+        vi.setSystemTime(new Date('2026-08-27T18:45:00.000Z'));
+
+        render(
+          <ScheduleDisplayTimeZoneProvider timezone={timezone}>
+            {/* An early wall-clock hour is what exposed the double conversion. */}
+            <WeekView currentDate={new Date(2026, 7, 28, 3, 48)} events={[]} />
+          </ScheduleDisplayTimeZoneProvider>,
+        );
+
+        const expected = [
+          ['Mon', '24'],
+          ['Tue', '25'],
+          ['Wed', '26'],
+          ['Thu', '27'],
+          ['Fri', '28'],
+          ['Sat', '29'],
+          ['Sun', '30'],
+        ];
+
+        for (const [weekday, dayNumber] of expected) {
+          const header = screen.getByText(dayNumber!).closest('button');
+          expect(header).not.toBeNull();
+          expect(header?.textContent).toContain(weekday);
+        }
+      },
+    );
+  });
 });
