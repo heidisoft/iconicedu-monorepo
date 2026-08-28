@@ -10,7 +10,7 @@ AI coding agents and engineers maintaining agent-facing repository guidance.
 
 ## Last Updated
 
-2026-08-14
+2026-08-28
 
 ## Related Docs
 
@@ -200,3 +200,14 @@ See the [development workflow](../../getting-started/development-workflow.md) fo
 - Update `Last Updated` only after reviewing the entire page.
 
 If a document conflicts with code, correct or remove it rather than adding another document that repeats the disagreement.
+
+## 11. Repository Skills
+
+Repository-scoped Codex skills live in `.agents/skills` so they are available from any
+workspace in this monorepo.
+
+- Use [`pr-risk-review`](../../../.agents/skills/pr-risk-review/SKILL.md) to review a pull
+  request or branch diff across requirements, correctness, architecture, tests, and security.
+  It combines observed CI status with semantic findings and routes LOW risk to a human skim
+  and MEDIUM/HIGH risk to targeted lead review. It does not publish or modify a PR unless that
+  separate action is explicitly requested.

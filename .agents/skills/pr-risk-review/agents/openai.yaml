@@ -1,0 +1,4 @@
+interface:
+  display_name: 'PR Risk Review'
+  short_description: 'Review PR diffs and route risk to humans'
+  default_prompt: 'Use $pr-risk-review to review this pull request and produce a risk report.'
