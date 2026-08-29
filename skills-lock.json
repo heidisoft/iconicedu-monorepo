@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "review-pr": {
+      "source": "warpdotdev/common-skills",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/review-pr/SKILL.md",
+      "computedHash": "f1e389e40df08b22a70013756f40147c9a4a4d3641e08c28c40028ceef0a632e"
+    }
+  }
+}
