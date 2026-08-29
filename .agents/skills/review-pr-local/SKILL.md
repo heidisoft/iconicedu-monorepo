@@ -7,6 +7,8 @@ description: Apply ICONIC Academy architecture, security, privacy, accessibility
 
 Supplement the core `review-pr` skill with repository-specific review priorities. Do not change its `review.json` schema, annotated-diff contract, required comment labels, evidence rules, suggestion-block constraints, verdict values, or validator requirements.
 
+If this companion is invoked directly, first read `.agents/skills/review-pr/SKILL.md` and apply it as the controlling review workflow and output contract. The repository-local core skill and its helper scripts are the source of truth; do not depend on a globally installed copy.
+
 Before reviewing, read the repository-root `AGENTS.md` and the topic guidance relevant to the diff under `.agents/`. Always read [references/iconic-academy-review.md](references/iconic-academy-review.md) for the domain risk model.
 
 ## Priority Mapping
