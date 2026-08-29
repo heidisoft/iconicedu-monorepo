@@ -79,7 +79,6 @@ Internal engineers, operators, and AI assistants.
 - [Push Notifications](operations/push-notifications.md)
 - [Push Notification Catalog](operations/push-notification-catalog.md)
 - [Schedule Event Flow](operations/schedule-event-flow.md)
-- [Class-Session Join Rollout](operations/class-session-join-rollout.md)
 
 ### Testing
 

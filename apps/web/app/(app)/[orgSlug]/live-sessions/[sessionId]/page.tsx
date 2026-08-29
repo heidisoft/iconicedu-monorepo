@@ -6,7 +6,7 @@ import {
 } from '@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth';
 import { LiveSessionHost } from '@iconicedu/web/components/live-sessions/live-session-host';
 import { getLiveSessionReturnPath } from '@iconicedu/web/components/live-sessions/live-session-host.utils';
-import { createLiveSessionsApiClient } from '@iconicedu/web/lib/live-sessions/api-client';
+import { resolveLiveSessionJoinAccess } from '@iconicedu/web/lib/live-sessions/service';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 
 function parseLiveSessionMode(value: unknown): 'video' | 'audio' | null {
@@ -39,17 +39,11 @@ export default async function Page({
 
   try {
     const serviceSupabase = createSupabaseServiceClient();
-    const room = await createLiveSessionsApiClient(supabase).resolveRoomJoinAccess({
-      orgSlug,
+    const { joinAccess, session } = await resolveLiveSessionJoinAccess({
+      serviceSupabase,
       liveSessionId: sessionId,
-      actingProfileId: profileResponse.data.id,
+      profile: profileResponse.data,
     });
-    const { joinAccess } = room;
-    const session = {
-      channel_id: room.channelId,
-      org_id: account.org_id,
-      provider: room.provider,
-    };
     const channelResponse = await serviceSupabase
       .from('channels')
       .select('topic, purpose, kind, live_session_config')

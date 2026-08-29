@@ -3,7 +3,6 @@
 import { useMemo, useState } from 'react';
 import type { ClassScheduleVM } from '@iconicedu/shared-types';
 import { useScheduleDisplayTimeZone } from '@iconicedu/ui-web/components/shared/schedule-display-timezone-context';
-import { useOptionalMessagesState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
 import { EmptyMessagesState } from '@iconicedu/ui-web/components/messages/empty-state';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { ScrollArea } from '@iconicedu/ui-web/ui/scroll-area';
@@ -26,11 +25,6 @@ interface MessagesScheduleTabProps {
   isLoading: boolean;
   error: string | null;
   timezone?: string | null;
-  /**
-   * `enable-any-visible-class-session-join`. When on, every eligible upcoming
-   * occurrence is independently joinable instead of only the earliest (issue #195).
-   */
-  anyVisibleJoinEnabled?: boolean;
 }
 
 const MONTH_PAGE_SIZE = 4;
@@ -40,11 +34,7 @@ export function MessagesScheduleTab({
   isLoading,
   error,
   timezone,
-  anyVisibleJoinEnabled,
 }: MessagesScheduleTabProps) {
-  const messagesState = useOptionalMessagesState();
-  const isAnyVisibleJoinEnabled =
-    anyVisibleJoinEnabled ?? messagesState?.anyVisibleJoinEnabled ?? false;
   const displayTimezone = useScheduleDisplayTimeZone(timezone);
   const [activeTab, setActiveTab] = useState<ScheduleSubTabKey>('upcoming');
   const [upcomingMonthLimit, setUpcomingMonthLimit] = useState(MONTH_PAGE_SIZE);
@@ -163,7 +153,6 @@ export function MessagesScheduleTab({
                     isCurrentMonth={group.monthKey === currentMonthKey}
                     defaultOpen={index === 0}
                     joinableSessionId={joinableSessionId}
-                    anyVisibleJoinEnabled={isAnyVisibleJoinEnabled}
                     progressStats={monthProgressStatsByKey.get(group.monthKey)}
                   />
                 ))

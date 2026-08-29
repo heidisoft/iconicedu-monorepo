@@ -23,8 +23,6 @@ import type {
 import { MessagesShell } from '@iconicedu/ui-web';
 import { ExternalLiveSessionJoinDialog } from '@iconicedu/ui-web/components/messages/external-live-session-join-dialog';
 import { useExternalLiveSessionJoinDialog } from '@iconicedu/ui-web/components/messages/use-external-live-session-join-dialog';
-import type { ClassSessionOccurrenceRef } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
-import { requestLiveSessionJoin } from '@iconicedu/web/lib/live-sessions/join-client';
 
 import { createSupabaseMessagesRealtimeClient } from '@iconicedu/web/lib/messages/realtime/supabase-messages-realtime-client';
 import { createSupabaseBrowserClient } from '@iconicedu/web/lib/supabase/client';
@@ -144,7 +142,6 @@ type MessagesShellClientProps = {
   currentUserProfile?: UserProfileVM | null;
   readOnly?: boolean;
   showCreateMessageTypeButton?: boolean;
-  anyVisibleJoinEnabled?: boolean;
   panelRegistry?: Partial<
     MessagesRightPanelRegistry<ComponentType<{ intent: MessagesRightPanelIntent }>>
   >;
@@ -177,7 +174,6 @@ export function MessagesShellClient({
   currentUserProfile,
   readOnly = false,
   showCreateMessageTypeButton = true,
-  anyVisibleJoinEnabled = false,
   panelRegistry,
   sendTextMessage,
   sendFileMessage,
@@ -407,24 +403,34 @@ export function MessagesShellClient({
     ],
   );
 
-  const joinLiveSession = useCallback(
-    async (occurrence?: ClassSessionOccurrenceRef) => {
-      if (typeof window === 'undefined') {
-        return;
-      }
+  const joinLiveSession = useCallback(async () => {
+    if (typeof window === 'undefined') {
+      return;
+    }
 
-      // A dated session card passes its occurrence; the classroom header does not
-      // and joins whichever occurrence is in its window (issue #195).
-      const joinPath = await requestLiveSessionJoin({
-        orgSlug,
-        channelId: channelState.ids.id,
-        occurrence,
-      });
+    const response = await window.fetch(
+      `/api/channels/${channelState.ids.id}/live-sessions/join`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ orgSlug }),
+      },
+    );
 
-      handleResolvedJoinHref(joinPath);
-    },
-    [channelState.ids.id, handleResolvedJoinHref, orgSlug],
-  );
+    const payload = (await response.json().catch(() => null)) as {
+      success?: boolean;
+      joinPath?: string;
+      error?: string;
+    } | null;
+
+    if (!response.ok || !payload?.success || !payload.joinPath) {
+      throw new Error(payload?.error ?? 'Failed to join live session');
+    }
+
+    handleResolvedJoinHref(payload.joinPath);
+  }, [channelState.ids.id, handleResolvedJoinHref, orgSlug]);
 
   useEffect(() => {
     setChannelState(channel);
@@ -512,7 +518,6 @@ export function MessagesShellClient({
         currentUserProfile={currentUserProfile}
         readOnly={readOnly}
         showCreateMessageTypeButton={showCreateMessageTypeButton}
-        anyVisibleJoinEnabled={anyVisibleJoinEnabled}
         panelRegistry={panelRegistry}
         realtimeClient={realtimeClient}
         messageWriteClient={messageWriteClient}

@@ -9,8 +9,6 @@ import {
 } from 'react-native';
 import { CalendarDays, ChevronDown, CheckCircle2 } from 'lucide-react-native';
 import { useTheme } from '@/providers/theme-provider';
-import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
-import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
 import type { AppColors } from '@/lib/theme';
 import type {
   ArchiveAwareClassScheduleVM,
@@ -366,34 +364,6 @@ function splitAndGroupSessions(schedules: ClassScheduleVM[]): {
   };
 }
 
-/**
- * Join visibility for one occurrence row (issue #195).
- *
- * With the flag on, a row shows an actionable Join or none at all — never a
- * permanently disabled one just because another occurrence is earlier.
- */
-export function resolveSessionTabJoinState(input: {
-  session: Pick<ClassSession, 'id' | 'disabled' | 'isPast' | 'meetingLink' | 'channelId'>;
-  isUpcomingTab: boolean;
-  activeJoinSessionId: string | null;
-  anyVisibleJoinEnabled: boolean;
-}): { joinEnabled: boolean; showJoinButton: boolean } {
-  if (!input.anyVisibleJoinEnabled) {
-    return {
-      joinEnabled: input.isUpcomingTab && input.session.id === input.activeJoinSessionId,
-      showJoinButton: true,
-    };
-  }
-
-  const joinable =
-    input.isUpcomingTab &&
-    !input.session.disabled &&
-    !input.session.isPast &&
-    Boolean(input.session.meetingLink || input.session.channelId);
-
-  return { joinEnabled: joinable, showJoinButton: joinable };
-}
-
 // ─── Main component ─────────────────────────────────────────────────────────────
 
 export function SpaceSessionsTab({
@@ -407,9 +377,6 @@ export function SpaceSessionsTab({
 }) {
   const { colors } = useTheme();
   const s = useMemo(() => makeStyles(colors), [colors]);
-  const anyVisibleJoinEnabled = useMobileFeatureFlag(
-    mobileFeatureFlagKeys.enableAnyVisibleClassSessionJoin,
-  );
 
   const [activeSubTab, setActiveSubTab] = useState<SessionSubTab>('upcoming');
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
@@ -419,11 +386,6 @@ export function SpaceSessionsTab({
     () => splitAndGroupSessions(schedules),
     [schedules],
   );
-  /**
-   * Legacy single-occurrence gate: only the earliest joinable upcoming occurrence
-   * was actionable, leaving the rest visible but permanently disabled. Used only
-   * on the `enable-any-visible-class-session-join` OFF branch (issue #195).
-   */
   const activeJoinSessionId = useMemo(() => {
     for (const group of upcoming) {
       const joinable = group.sessions.find(
@@ -593,26 +555,19 @@ export function SpaceSessionsTab({
 
                 {/* Session cards */}
                 {isOpen &&
-                  group.sessions.map((session) => {
-                    const joinState = resolveSessionTabJoinState({
-                      session,
-                      isUpcomingTab: activeSubTab === 'upcoming',
-                      activeJoinSessionId,
-                      anyVisibleJoinEnabled,
-                    });
-
-                    return (
-                      <SessionCard
-                        key={session.id}
-                        session={session}
-                        style={s.sessionCardItem}
-                        enableCardPress={false}
-                        showJoinButton={joinState.showJoinButton}
-                        joinEnabled={joinState.joinEnabled}
-                        joinOccurrenceEnabled={anyVisibleJoinEnabled}
-                      />
-                    );
-                  })}
+                  group.sessions.map((session) => (
+                    <SessionCard
+                      key={session.id}
+                      session={session}
+                      style={s.sessionCardItem}
+                      enableCardPress={false}
+                      joinEnabled={
+                        activeSubTab !== 'upcoming'
+                          ? false
+                          : session.id === activeJoinSessionId
+                      }
+                    />
+                  ))}
               </View>
             );
           })}

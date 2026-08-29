@@ -106,26 +106,6 @@ export const enableMobileAppleSignIn = flag<boolean, { profileId?: string | null
   },
 });
 
-export const enableAnyVisibleClassSessionJoin = flag<
-  boolean,
-  { profileId?: string | null }
->({
-  key: platformFeatureFlagKeys.enableAnyVisibleClassSessionJoin,
-  description:
-    'Makes every class-session occurrence the API marks eligible independently joinable, instead of only the first upcoming one.',
-  options: [
-    { label: 'Off', value: false },
-    { label: 'On', value: true },
-  ],
-  defaultValue: false,
-  async decide({ entities }) {
-    return evaluateWebBooleanFlag({
-      flagKey: platformFeatureFlagKeys.enableAnyVisibleClassSessionJoin,
-      profileId: entities?.profileId,
-    });
-  },
-});
-
 export const enableMarketingSitePages = flag<boolean, { profileId?: string | null }>({
   key: 'enable-marketing-site-pages',
   description:
@@ -161,7 +141,6 @@ export const enableAssessments = flag<boolean, { profileId?: string | null }>({
 });
 
 export const webFlags = {
-  enableAnyVisibleClassSessionJoin,
   enableAssessments,
   enableChannelCommunications,
   enableMarketingSitePages,

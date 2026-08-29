@@ -3,10 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
-import {
-  DashboardHomeInfographicSection,
-  resolveDashboardSessionJoinState,
-} from './dashboard-home-infographic-section';
+import { DashboardHomeInfographicSection } from './dashboard-home-infographic-section';
 
 const sessionItems = [
   {
@@ -234,8 +231,49 @@ describe('DashboardHomeInfographicSection', () => {
     );
   });
 
+  it('opens the existing session link from a staff homepage tile', async () => {
+    const onJoinSession = vi.fn();
+    const user = userEvent.setup();
+    const staffSessionPage = {
+      ...sessionPage,
+      today: {
+        ...sessionPage.today,
+        items: sessionPage.today.items.map((item) => ({
+          ...item,
+          session: {
+            ...item.session,
+            meetingLink: 'https://zoom.us/j/staff-session',
+          },
+        })),
+      },
+    };
+
+    render(
+      <DashboardHomeInfographicSection
+        orgSlug="iconic-academy"
+        isStaffView
+        topMetrics={{
+          upcomingSessionsThisWeek: 1,
+          completedClassesThisMonth: 10,
+          activeSubjectsCount: 3,
+          activeSubjectsLabel: 'Math, ELA, Science',
+        }}
+        upcomingSessionsPage={staffSessionPage}
+        calendarHref="/iconic-academy/class-schedule"
+        notificationsHref="/iconic-academy/notifications"
+        browseHref="/iconic-academy/admin/channels"
+        onJoinSession={onJoinSession}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Join' }));
+
+    expect(screen.getByText('Session ready to join')).toBeInTheDocument();
+    expect(screen.getByText('https://zoom.us/j/staff-session')).toBeInTheDocument();
+    expect(onJoinSession).not.toHaveBeenCalled();
+  });
+
   it('hides join button for next week sessions while keeping message actions', () => {
-    // Legacy behaviour with `enable-any-visible-class-session-join` off.
     render(
       <DashboardHomeInfographicSection
         orgSlug="iconic-academy"
@@ -254,144 +292,6 @@ describe('DashboardHomeInfographicSection', () => {
 
     expect(screen.getAllByRole('button', { name: /Join/i })).toHaveLength(2);
     expect(screen.getAllByRole('button', { name: 'Message' })).toHaveLength(3);
-  });
-
-  describe('with enable-any-visible-class-session-join on', () => {
-    const eligibleSessionPage = {
-      today: {
-        items: sessionItems
-          .filter((item) => item.weekBucket === 'today')
-          .map((item) => ({ ...item, joinEligible: true })),
-        total: 1,
-        pageSize: 3,
-        totalPages: 1,
-      },
-      thisWeek: {
-        items: sessionItems
-          .filter((item) => item.weekBucket === 'this-week')
-          .map((item) => ({ ...item, joinEligible: true })),
-        total: 1,
-        pageSize: 3,
-        totalPages: 1,
-      },
-      nextWeek: {
-        items: sessionItems
-          .filter((item) => item.weekBucket === 'next-week')
-          .map((item) => ({ ...item, joinEligible: true })),
-        total: 1,
-        pageSize: 3,
-        totalPages: 1,
-      },
-    };
-
-    function renderSection(
-      page: typeof eligibleSessionPage,
-      onJoinSession?: (item: unknown) => void,
-    ) {
-      render(
-        <DashboardHomeInfographicSection
-          orgSlug="iconic-academy"
-          topMetrics={{
-            upcomingSessionsThisWeek: 2,
-            completedClassesThisMonth: 10,
-            activeSubjectsCount: 3,
-            activeSubjectsLabel: 'Math, ELA, Science',
-          }}
-          upcomingSessionsPage={page}
-          calendarHref="/iconic-academy/class-schedule"
-          notificationsHref="/iconic-academy/notifications"
-          browseHref="/iconic-academy/s"
-          anyVisibleJoinEnabled
-          onJoinSession={onJoinSession}
-        />,
-      );
-    }
-
-    it('renders an enabled Join for an eligible next-week occurrence', () => {
-      renderSection(eligibleSessionPage);
-
-      const joinButtons = screen.getAllByRole('button', { name: /Join/i });
-      expect(joinButtons).toHaveLength(3);
-      joinButtons.forEach((button) => expect(button).toBeEnabled());
-    });
-
-    it('renders no Join at all for an occurrence the API marked ineligible', () => {
-      renderSection({
-        ...eligibleSessionPage,
-        nextWeek: {
-          ...eligibleSessionPage.nextWeek,
-          items: eligibleSessionPage.nextWeek.items.map((item) => ({
-            ...item,
-            joinEligible: false,
-          })),
-        },
-      });
-
-      // Never a permanently disabled Join — the card simply omits the control.
-      expect(screen.getAllByRole('button', { name: /Join/i })).toHaveLength(2);
-      expect(screen.getByText('Science 301')).toBeInTheDocument();
-    });
-
-    it('passes the clicked occurrence identity to the join handler', async () => {
-      const onJoinSession = vi.fn();
-      const user = userEvent.setup();
-      renderSection(
-        {
-          ...eligibleSessionPage,
-          today: {
-            ...eligibleSessionPage.today,
-            items: eligibleSessionPage.today.items.map((item) => ({
-              ...item,
-              scheduleId: 'schedule-1',
-              occurrenceKey: '2026-03-13T16:00:00.000Z',
-            })),
-          },
-        },
-        onJoinSession,
-      );
-
-      await user.click(screen.getAllByRole('button', { name: /Join/i })[0]!);
-
-      expect(onJoinSession).toHaveBeenCalledWith(
-        expect.objectContaining({
-          scheduleId: 'schedule-1',
-          occurrenceKey: '2026-03-13T16:00:00.000Z',
-        }),
-      );
-    });
-  });
-
-  describe('resolveDashboardSessionJoinState', () => {
-    it('keeps the legacy next-week gate when the flag is off', () => {
-      expect(
-        resolveDashboardSessionJoinState({
-          weekBucket: 'next-week',
-          joinEligible: true,
-          anyVisibleJoinEnabled: false,
-        }),
-      ).toEqual({ canJoin: false, showJoinButton: false });
-    });
-
-    it('defers to API eligibility when the flag is on', () => {
-      expect(
-        resolveDashboardSessionJoinState({
-          weekBucket: 'next-week',
-          joinEligible: true,
-          anyVisibleJoinEnabled: true,
-        }),
-      ).toEqual({ canJoin: true, showJoinButton: true });
-    });
-
-    it('never renders a visible-but-disabled Join', () => {
-      const state = resolveDashboardSessionJoinState({
-        weekBucket: 'today',
-        joinEligible: false,
-        anyVisibleJoinEnabled: true,
-      });
-
-      expect(state.showJoinButton).toBe(state.canJoin);
-      expect(state.showJoinButton).toBe(false);
-    });
   });
 
   it('shows Active Students tile for tutor view', () => {

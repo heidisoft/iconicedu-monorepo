@@ -11,39 +11,6 @@ import {
   mapOrgSubjectRowsToOptions,
 } from '@iconicedu/web/lib/subjects/queries/org-subject-catalog.query';
 import { HomePageInfographicClient } from './home-page-infographic-client';
-import { enableAnyVisibleClassSessionJoin } from '@iconicedu/web/flags';
-import { applyJoinAvailabilityToUpcomingSessions } from '@iconicedu/web/lib/dashboard/apply-join-availability';
-import { createLiveSessionsApiClient } from '@iconicedu/web/lib/live-sessions/api-client';
-
-const UPCOMING_JOIN_AVAILABILITY_LOOKAHEAD_DAYS = 21;
-
-/**
- * Ask the API which of the dashboard's upcoming occurrences this viewer can
- * actually join. One batched call for the whole page; a failure degrades to
- * "no Join controls" rather than rendering ones that would be rejected.
- */
-async function loadUpcomingJoinAvailability(input: {
-  supabase: Parameters<typeof createLiveSessionsApiClient>[0];
-  orgSlug: string;
-  profileId: string | null;
-  now: Date;
-}) {
-  const toAt = new Date(input.now);
-  toAt.setDate(toAt.getDate() + UPCOMING_JOIN_AVAILABILITY_LOOKAHEAD_DAYS);
-
-  try {
-    return await createLiveSessionsApiClient(
-      input.supabase,
-    ).listClassSessionJoinAvailability({
-      orgSlug: input.orgSlug,
-      actingProfileId: input.profileId,
-      fromAt: input.now.toISOString(),
-      toAt: toAt.toISOString(),
-    });
-  } catch {
-    return [];
-  }
-}
 
 function resolveRequestRole(kind: string | undefined): ClassRequestRole {
   if (kind === 'guardian') {
@@ -65,21 +32,6 @@ export async function HomePageContent({ orgSlug }: { orgSlug: string }) {
     currentUserProfile,
     timezone: currentUserProfile?.prefs.timezone ?? null,
   });
-
-  const anyVisibleJoinEnabled = await enableAnyVisibleClassSessionJoin.run({
-    identify: { profileId: currentUserProfile?.ids.id ?? null },
-  });
-  const upcomingSessionsPage = anyVisibleJoinEnabled
-    ? applyJoinAvailabilityToUpcomingSessions(
-        metrics.upcomingSessionsPage,
-        await loadUpcomingJoinAvailability({
-          supabase,
-          orgSlug,
-          profileId: currentUserProfile?.ids.id ?? null,
-          now: new Date(),
-        }),
-      )
-    : metrics.upcomingSessionsPage;
 
   const requestRole = resolveRequestRole(currentUserProfile?.kind);
   const canRequestClasses = requestRole === 'parents' || requestRole === 'students';
@@ -111,8 +63,7 @@ export async function HomePageContent({ orgSlug }: { orgSlug: string }) {
       isStudentView={!metrics.isStaffView && metrics.activeRole === 'students'}
       isTutorView={!metrics.isStaffView && metrics.activeRole === 'tutors'}
       topMetrics={metrics.metricsByRole[metrics.activeRole]}
-      upcomingSessionsPage={upcomingSessionsPage}
-      anyVisibleJoinEnabled={anyVisibleJoinEnabled}
+      upcomingSessionsPage={metrics.upcomingSessionsPage}
       calendarHref={metrics.calendarHref}
       notificationsHref={metrics.notificationsHref}
       browseHref={metrics.browseHref}

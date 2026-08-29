@@ -39,8 +39,6 @@ import { useTheme } from '@/providers/theme-provider';
 import { useFamilyView } from '@/providers/family-view-provider';
 import { PulseBox } from '@/components/skeletons/pulse-box';
 import { SessionCard } from '@/components/sessions/session-card';
-import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
-import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
 import { AppSupportFooter } from '@/components/support/app-support-footer';
 import { QueryError } from '@/components/errors/query-error';
 import {
@@ -748,9 +746,6 @@ export default function HomeScreen() {
     staleTime: 5 * 60 * 1000,
   });
   const { colors } = useTheme();
-  const anyVisibleJoinEnabled = useMobileFeatureFlag(
-    mobileFeatureFlagKeys.enableAnyVisibleClassSessionJoin,
-  );
   const router = useRouter();
   const s = React.useMemo(() => makeStyles(colors), [colors]);
   const supportPalette = React.useMemo(() => getSupportPalette(colors), [colors]);
@@ -1284,7 +1279,6 @@ export default function HomeScreen() {
                     session={session}
                     pressTarget="messages"
                     titleVariant="message-list"
-                    joinOccurrenceEnabled={anyVisibleJoinEnabled}
                   />
                 ))}
               </View>
@@ -1334,7 +1328,6 @@ export default function HomeScreen() {
                     session={session}
                     pressTarget="messages"
                     titleVariant="message-list"
-                    joinOccurrenceEnabled={anyVisibleJoinEnabled}
                   />
                 ))}
               </View>
@@ -1380,11 +1373,7 @@ export default function HomeScreen() {
                   session={session}
                   pressTarget="messages"
                   titleVariant="message-list"
-                  // Next-week occurrences were hard-gated client-side. With the
-                  // rollout flag on they are joinable like any other eligible
-                  // occurrence, and the API is the one that says no (issue #195).
-                  showJoinButton={anyVisibleJoinEnabled}
-                  joinOccurrenceEnabled={anyVisibleJoinEnabled}
+                  showJoinButton={false}
                 />
               ))}
             </View>

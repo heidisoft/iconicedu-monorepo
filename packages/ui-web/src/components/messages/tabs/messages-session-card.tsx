@@ -5,10 +5,7 @@ import { Clock3, Loader2, MessageSquareText, Video } from 'lucide-react';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { Badge } from '@iconicedu/ui-web/ui/badge';
-import {
-  useOptionalMessagesState,
-  type ClassSessionOccurrenceRef,
-} from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
+import { useOptionalMessagesState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
 import { ExternalLiveSessionJoinDialog } from '@iconicedu/ui-web/components/messages/external-live-session-join-dialog';
 import { useExternalLiveSessionJoinDialog } from '@iconicedu/ui-web/components/messages/use-external-live-session-join-dialog';
 import type { ClassSession } from './messages-schedule-tab.utils';
@@ -19,14 +16,8 @@ interface SessionCardProps {
   canJoin?: boolean;
   showJoinButton?: boolean;
   actionOrder?: 'message-first' | 'join-first';
-  joinLiveSession?: (occurrence?: ClassSessionOccurrenceRef) => Promise<void>;
+  joinLiveSession?: () => Promise<void>;
   joinHref?: string | null;
-  /**
-   * Occurrence this card joins. Supplied only under
-   * `enable-any-visible-class-session-join`; without it the handler falls back to
-   * the channel's current-window session (issue #195).
-   */
-  joinOccurrence?: ClassSessionOccurrenceRef;
   classroomChatHref?: string;
   openClassroomChat?: () => Promise<void> | void;
 }
@@ -63,8 +54,7 @@ export function SessionCard({
   showJoinButton = true,
   actionOrder = 'message-first',
   joinLiveSession: joinLiveSessionOverride,
-  joinHref,
-  joinOccurrence,
+  joinHref: configuredJoinHref,
   classroomChatHref,
   openClassroomChat,
 }: SessionCardProps) {
@@ -74,6 +64,7 @@ export function SessionCard({
   const [isJoinPending, setIsJoinPending] = useState(false);
   const { externalJoinTarget, closeExternalJoinDialog, handleResolvedJoinHref } =
     useExternalLiveSessionJoinDialog();
+  const joinHref = session.meetingLink?.trim() || configuredJoinHref;
   const isJoinButtonDisabled = isSessionJoinButtonDisabled({
     session,
     hasJoinAction: Boolean(joinLiveSession || joinHref),
@@ -124,17 +115,18 @@ export function SessionCard({
     if (isJoinPending) {
       return;
     }
+    if (joinHref) {
+      handleResolvedJoinHref(joinHref);
+      return;
+    }
     if (joinLiveSession) {
       setIsJoinPending(true);
       try {
-        await joinLiveSession(joinOccurrence);
+        await joinLiveSession();
       } finally {
         setIsJoinPending(false);
       }
       return;
-    }
-    if (joinHref) {
-      handleResolvedJoinHref(joinHref);
     }
   };
 

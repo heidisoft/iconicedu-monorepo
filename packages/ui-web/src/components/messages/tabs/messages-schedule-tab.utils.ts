@@ -4,7 +4,6 @@ import type {
 } from '@iconicedu/shared-types';
 import { applyArchiveCutoffToDisplaySchedules } from '@iconicedu/shared-types';
 import { getLocalDate } from '@iconicedu/utils';
-import { getClassScheduleOccurrenceIdentity } from '@iconicedu/utils';
 import { expandRecurringEvents } from '@iconicedu/ui-web/lib/class-schedule-utils';
 import {
   formatScheduleDisplayTimeWithZone,
@@ -167,10 +166,6 @@ function dedupeDisplaySchedules(
 
 export interface ClassSession {
   id: string;
-  /** Base schedule that owns this occurrence (issue #195). */
-  scheduleId: string;
-  /** Original occurrence start, used to join this exact occurrence. */
-  occurrenceKey: string;
   label: string;
   time: string;
   dayName: string;
@@ -622,11 +617,8 @@ export function toMonthGroups(
         formatScheduleDisplayValue(schedule.startAt, displayTimezone, {
           weekday: 'short',
         }) ?? '';
-      const occurrenceIdentity = getClassScheduleOccurrenceIdentity(schedule);
       return {
         id: schedule.ids.id,
-        scheduleId: occurrenceIdentity.scheduleId,
-        occurrenceKey: occurrenceIdentity.occurrenceKey,
         label: `${monthLabel} · Week ${weekNumber} · Session ${nextSessionNumber}`,
         time: `${dayLabel} ${formatCompactMeridiemTime(
           schedule.startAt,
@@ -683,13 +675,6 @@ export function toMonthGroups(
   });
 }
 
-/**
- * Legacy single-occurrence gate: only the earliest non-disabled upcoming occurrence
- * was joinable, leaving every later card with a permanently disabled Join.
- *
- * Retained for the `enable-any-visible-class-session-join` OFF branch only; remove
- * with the flag once the rollout completes (issue #195).
- */
 export function getJoinableSessionId(schedules: DisplaySchedule[]): string | null {
   const nextJoinable = schedules.find(
     (schedule) => !(schedule.uiState?.disabled ?? false),

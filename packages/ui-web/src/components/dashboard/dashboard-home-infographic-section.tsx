@@ -29,16 +29,6 @@ export interface DashboardUpcomingSessionListItem {
   joinHref: string;
   chatHref: string;
   weekBucket: 'today' | 'this-week' | 'next-week';
-  /** Base schedule that owns this occurrence (issue #195). */
-  scheduleId?: string | null;
-  /** Original occurrence start, used to join this exact occurrence. */
-  occurrenceKey?: string | null;
-  /**
-   * API-decided join eligibility. When `enableAnyVisibleClassSessionJoin` is on,
-   * the Join control is rendered if and only if this is true — never rendered
-   * disabled.
-   */
-  joinEligible?: boolean;
 }
 
 export interface DashboardUpcomingSessionsSectionPage {
@@ -76,32 +66,6 @@ export interface DashboardHomeInfographicSectionProps {
   subjectOptions?: string[];
   onClassRequestCreated?: (channelId: string) => void;
   onJoinSession?: (item: DashboardUpcomingSessionListItem) => void | Promise<void>;
-  /**
-   * `enable-any-visible-class-session-join`. When on, every occurrence the API
-   * marks eligible renders an actionable Join — including next-week ones.
-   */
-  anyVisibleJoinEnabled?: boolean;
-}
-
-/**
- * Join visibility for one dashboard session card (issue #195).
- *
- * Legacy behaviour hard-coded "next-week is never joinable" in the client. With
- * the flag on the client stops deciding: it renders an enabled Join exactly when
- * the API said the occurrence is eligible, and renders none otherwise.
- */
-export function resolveDashboardSessionJoinState(input: {
-  weekBucket: DashboardUpcomingSessionListItem['weekBucket'];
-  joinEligible: boolean | undefined;
-  anyVisibleJoinEnabled: boolean;
-}): { canJoin: boolean; showJoinButton: boolean } {
-  if (!input.anyVisibleJoinEnabled) {
-    const legacyJoinable = input.weekBucket !== 'next-week';
-    return { canJoin: legacyJoinable, showJoinButton: legacyJoinable };
-  }
-
-  const eligible = input.joinEligible !== false;
-  return { canJoin: eligible, showJoinButton: eligible };
 }
 
 const DEFAULT_SUBJECT_OPTIONS = [...STANDARD_SUBJECT_OPTIONS, OTHER_SUBJECT_OPTION];
@@ -123,7 +87,6 @@ export function DashboardHomeInfographicSection({
   subjectOptions = DEFAULT_SUBJECT_OPTIONS,
   onClassRequestCreated,
   onJoinSession,
-  anyVisibleJoinEnabled = false,
 }: DashboardHomeInfographicSectionProps) {
   const quickActionIconClassName = 'size-5 shrink-0';
   const [currentPage, setCurrentPage] = useState(1);
@@ -344,36 +307,28 @@ export function DashboardHomeInfographicSection({
                       {section.label}
                     </p>
                   </div>
-                  {section.items.map((item, index) => {
-                    const joinState = resolveDashboardSessionJoinState({
-                      weekBucket: item.weekBucket,
-                      joinEligible: item.joinEligible,
-                      anyVisibleJoinEnabled,
-                    });
-
-                    return (
-                      <SessionCard
-                        key={item.session.id}
-                        session={item.session}
-                        index={index}
-                        canJoin={joinState.canJoin}
-                        showJoinButton={joinState.showJoinButton}
-                        actionOrder="join-first"
-                        classroomChatHref={item.chatHref}
-                        joinLiveSession={
-                          joinState.canJoin
-                            ? async () => {
-                                if (onJoinSession) {
-                                  await onJoinSession(item);
-                                  return;
-                                }
-                                handleResolvedJoinHref(item.joinHref);
+                  {section.items.map((item, index) => (
+                    <SessionCard
+                      key={item.session.id}
+                      session={item.session}
+                      index={index}
+                      canJoin={item.weekBucket !== 'next-week'}
+                      showJoinButton={item.weekBucket !== 'next-week'}
+                      actionOrder="join-first"
+                      classroomChatHref={item.chatHref}
+                      joinLiveSession={
+                        item.weekBucket !== 'next-week'
+                          ? async () => {
+                              if (onJoinSession) {
+                                await onJoinSession(item);
+                                return;
                               }
-                            : undefined
-                        }
-                      />
-                    );
-                  })}
+                              handleResolvedJoinHref(item.joinHref);
+                            }
+                          : undefined
+                      }
+                    />
+                  ))}
                 </div>
               ))
             ) : (

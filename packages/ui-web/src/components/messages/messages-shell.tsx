@@ -59,7 +59,6 @@ export const MessagesShell = memo(function MessagesShell(props: MessagesShellPro
       currentUserId={props.currentUserId}
       isReadOnly={props.readOnly}
       showCreateMessageTypeButton={props.showCreateMessageTypeButton}
-      anyVisibleJoinEnabled={props.anyVisibleJoinEnabled}
     >
       <MessagesShellLayout {...props} registry={rightPanelRegistry} />
     </MessagesStateProvider>

@@ -38,11 +38,6 @@ interface MessagesStateContextValue {
   messages: MessageVM[];
   messageFilter: MessageFilterKey | null;
   showCreateMessageTypeButton: boolean;
-  /**
-   * `enable-any-visible-class-session-join`. Read by session-card surfaces so the
-   * rollout flag does not have to be drilled through the whole messages shell.
-   */
-  anyVisibleJoinEnabled: boolean;
   createTextMessage: (
     content: string,
     mentions?: MessageMentionVM[],
@@ -120,19 +115,7 @@ export type SendFileMessageHandler = (input: {
   threadParentId?: string | null;
 }) => Promise<MessageVM | null>;
 
-/**
- * Identity of one exact class-session occurrence (issue #195). Omitted by callers
- * that mean "the class happening now" — the classroom header — and supplied by a
- * dated session card so the room is created under that occurrence's scope.
- */
-export type ClassSessionOccurrenceRef = {
-  scheduleId: string;
-  occurrenceKey: string;
-};
-
-export type JoinLiveSessionHandler = (
-  occurrence?: ClassSessionOccurrenceRef,
-) => Promise<void>;
+export type JoinLiveSessionHandler = () => Promise<void>;
 
 export type MessageFilterKey = 'homework' | 'session-summary';
 
@@ -158,14 +141,12 @@ export function MessagesStateProvider({
   currentUserId: initialCurrentUserId = '',
   isReadOnly = false,
   showCreateMessageTypeButton = true,
-  anyVisibleJoinEnabled = false,
   children,
 }: {
   channel: ChannelVM;
   currentUserId?: string;
   isReadOnly?: boolean;
   showCreateMessageTypeButton?: boolean;
-  anyVisibleJoinEnabled?: boolean;
   children: React.ReactNode;
 }) {
   const [state, setState] = useState<MessagesRightSidebarState>({
@@ -317,7 +298,6 @@ export function MessagesStateProvider({
       messages,
       messageFilter,
       showCreateMessageTypeButton,
-      anyVisibleJoinEnabled,
       createTextMessage,
       sendTextMessage,
       sendFileMessage,
@@ -357,7 +337,6 @@ export function MessagesStateProvider({
       messages,
       messageFilter,
       showCreateMessageTypeButton,
-      anyVisibleJoinEnabled,
       createTextMessage,
       sendTextMessage,
       sendFileMessage,

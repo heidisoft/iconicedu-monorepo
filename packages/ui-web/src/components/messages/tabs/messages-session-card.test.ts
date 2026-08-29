@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
 import type { ClassSession } from './messages-schedule-tab.utils';
 import {
   getSessionCardState,
@@ -123,5 +124,28 @@ describe('messages-session-card', () => {
       joinButton.compareDocumentPosition(messageButton) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+  });
+
+  it('opens the existing session link for a read-only staff tile without calling the role-sensitive handler', async () => {
+    const joinLiveSession = vi.fn(async () => {});
+    const user = userEvent.setup();
+
+    render(
+      React.createElement(SessionCard, {
+        session: {
+          ...baseSession,
+          meetingLink: 'https://meet.google.com/staff-session',
+        },
+        index: 0,
+        canJoin: true,
+        joinLiveSession,
+      }),
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Join' }));
+
+    expect(screen.getByText('Session ready to join')).toBeInTheDocument();
+    expect(screen.getByText('https://meet.google.com/staff-session')).toBeInTheDocument();
+    expect(joinLiveSession).not.toHaveBeenCalled();
   });
 });

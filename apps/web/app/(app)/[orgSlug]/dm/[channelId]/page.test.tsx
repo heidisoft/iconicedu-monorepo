@@ -12,7 +12,6 @@ const buildChannelByIdMock = vi.fn();
 const buildChannelByDmKeyMock = vi.fn();
 const resolveOrgDashboardPathMock = vi.fn(async () => '/iconic-academy');
 const enableMessageTypeComposerRunMock = vi.fn(async () => true);
-const enableAnyVisibleClassSessionJoinRunMock = vi.fn(async () => false);
 
 vi.mock('next/navigation', () => ({
   notFound: () => {
@@ -75,9 +74,6 @@ vi.mock('@iconicedu/web/lib/org/resolve-dashboard-path', () => ({
 vi.mock('@iconicedu/web/flags', () => ({
   enableMessageTypeComposer: {
     run: (...args: unknown[]) => enableMessageTypeComposerRunMock(...args),
-  },
-  enableAnyVisibleClassSessionJoin: {
-    run: (...args: unknown[]) => enableAnyVisibleClassSessionJoinRunMock(...args),
   },
 }));
 

@@ -1,18 +1,21 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProfileRow } from '@iconicedu/shared-types';
 
-jest.mock('@iconicedu/api/lib/live-sessions/scope', () => ({
-  resolveChannelLiveSessionScope: jest.fn(),
-  resolveClassSessionOccurrenceScope: jest.fn(),
-  buildOccurrenceScopeKey: (occurrenceKey: string) => `occurrence:${occurrenceKey}`,
+vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
+  getProfilesByIds: vi.fn(),
 }));
 
-jest.mock('@iconicedu/api/lib/live-sessions/providers', () => ({
-  getLiveSessionProvider: jest.fn(() => ({
-    createSession: jest.fn(async ({ sessionId }: { sessionId: string }) => ({
+vi.mock('@iconicedu/web/lib/live-sessions/scope', () => ({
+  resolveChannelLiveSessionScope: vi.fn(),
+}));
+
+vi.mock('@iconicedu/web/lib/live-sessions/providers', () => ({
+  getLiveSessionProvider: vi.fn(() => ({
+    createSession: vi.fn(async ({ sessionId }: { sessionId: string }) => ({
       providerSessionId: `provider-${sessionId}`,
       providerMetadata: {},
     })),
-    getJoinAccess: jest.fn(async ({ sessionId }: { sessionId: string }) => ({
+    getJoinAccess: vi.fn(async ({ sessionId }: { sessionId: string }) => ({
       joinUrl: `https://meet.example.com/${sessionId}`,
       token: 'join-token',
       metadata: {},
@@ -20,11 +23,12 @@ jest.mock('@iconicedu/api/lib/live-sessions/providers', () => ({
   })),
 }));
 
-import { resolveChannelLiveSessionScope } from '@iconicedu/api/lib/live-sessions/scope';
+import { getProfilesByIds } from '@iconicedu/web/lib/profile/queries/profiles.query';
+import { resolveChannelLiveSessionScope } from '@iconicedu/web/lib/live-sessions/scope';
 import {
   createOrJoinLiveSession,
   resolveLiveSessionJoinAccess,
-} from '@iconicedu/api/modules/live-sessions/live-sessions.service';
+} from '@iconicedu/web/lib/live-sessions/service';
 
 const DEFAULT_ACTOR = {
   authUserId: 'auth-user-1',
@@ -409,9 +413,20 @@ function createImmediateScheduler() {
 
 describe('createOrJoinLiveSession', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
+    vi.mocked(getProfilesByIds).mockResolvedValue({
+      data: [
+        {
+          id: 'profile-1',
+          display_name: 'Taylor Reed',
+          avatar_url: null,
+          ui_theme_key: null,
+        },
+      ],
+      error: null,
+    } as never);
 
-    jest.mocked(resolveChannelLiveSessionScope).mockResolvedValue({
+    vi.mocked(resolveChannelLiveSessionScope).mockResolvedValue({
       scopeKey: 'channel:channel-1',
       occurrenceKey: '2026-03-02T10:00:00.000Z',
       occurrenceLabel: 'Mar 2, 10:00 AM',
@@ -508,7 +523,7 @@ describe('createOrJoinLiveSession', () => {
   });
 
   it('does not publish removed session start activity when reusing an outside-schedule huddle session', async () => {
-    jest.mocked(resolveChannelLiveSessionScope).mockResolvedValueOnce({
+    vi.mocked(resolveChannelLiveSessionScope).mockResolvedValueOnce({
       scopeKey: 'channel:channel-1',
       occurrenceKey: null,
       occurrenceLabel: null,
@@ -580,6 +595,18 @@ describe('createOrJoinLiveSession', () => {
   });
 
   it('allows guardians to join when a linked child is a channel member', async () => {
+    vi.mocked(getProfilesByIds).mockResolvedValueOnce({
+      data: [
+        {
+          id: 'profile-guardian-1',
+          display_name: 'Riley Guardian',
+          avatar_url: null,
+          ui_theme_key: null,
+        },
+      ],
+      error: null,
+    } as never);
+
     const serviceSupabase = createServiceSupabaseStub({
       memberProfileIds: ['profile-child-1'],
       familyLinks: [
@@ -653,7 +680,7 @@ describe('createOrJoinLiveSession', () => {
   });
 
   it('uses schedule-derived learningSpaceId and scheduleId when channel metadata is missing', async () => {
-    jest.mocked(resolveChannelLiveSessionScope).mockResolvedValueOnce({
+    vi.mocked(resolveChannelLiveSessionScope).mockResolvedValueOnce({
       scopeKey: 'occurrence:2026-03-02T10:00:00.000Z',
       occurrenceKey: '2026-03-02T10:00:00.000Z',
       occurrenceLabel: 'Mar 2, 10:00 AM',
@@ -722,7 +749,7 @@ describe('createOrJoinLiveSession', () => {
   it('returns successfully without legacy activity publishing', async () => {
     const serviceSupabase = createServiceSupabaseStub();
     const scheduler = createImmediateScheduler();
-    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const result = await createOrJoinLiveSession({
       serviceSupabase: serviceSupabase as never,

@@ -17,10 +17,7 @@ import {
   getDashboardAccountContext,
   getDashboardProfileContext,
 } from '@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth';
-import {
-  enableAnyVisibleClassSessionJoin,
-  enableMessageTypeComposer,
-} from '@iconicedu/web/flags';
+import { enableMessageTypeComposer } from '@iconicedu/web/flags';
 
 const INITIAL_MESSAGES_PAGE_SIZE = 40;
 
@@ -53,9 +50,6 @@ export default async function Page({
   const showCreateMessageTypeButton = await enableMessageTypeComposer.run({
     identify: { profileId: profileResponse.data?.id ?? null },
   });
-  const anyVisibleJoinEnabled = await enableAnyVisibleClassSessionJoin.run({
-    identify: { profileId: profileResponse.data?.id ?? null },
-  });
   const isStaffReadOnly = isStaffObserverReadOnlyChannel(
     channel,
     account.id,
@@ -72,7 +66,6 @@ export default async function Page({
         currentUserProfile={currentUserProfile}
         readOnly={isStaffReadOnly}
         showCreateMessageTypeButton={showCreateMessageTypeButton}
-        anyVisibleJoinEnabled={anyVisibleJoinEnabled}
         sendTextMessage={sendTextMessageAction}
         sendFileMessage={sendFileMessageAction}
         sendFilesMessage={sendFilesMessageAction}

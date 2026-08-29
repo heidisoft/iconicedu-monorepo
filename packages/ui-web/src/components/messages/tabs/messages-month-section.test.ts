@@ -1,75 +1,122 @@
+import React from 'react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
+import type { ChannelVM } from '@iconicedu/shared-types';
+import { MessagesStateProvider } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
+import type { MonthGroup } from './messages-schedule-tab.utils';
+import {
+  formatMonthSectionProgressLabel,
+  getMonthSectionStats,
+  MonthSection,
+  shouldMonthSectionStartOpen,
+} from './messages-month-section';
 
-import { resolveSessionJoinState } from './messages-month-section';
-
-const BASE = {
-  sessionId: 'schedule-1__2026-04-10T10:00:00.000Z',
-  disabled: false,
-  joinVisible: true,
-  joinableSessionId: 'schedule-1__2026-04-03T10:00:00.000Z',
+const monthGroup: MonthGroup = {
+  monthKey: '2026-03',
+  month: 'March',
+  year: '2026',
+  totalCount: 4,
+  completedCount: 3,
+  sessions: [],
 };
 
-describe('resolveSessionJoinState', () => {
-  describe('with enable-any-visible-class-session-join off', () => {
-    it('enables Join only on the single selected occurrence', () => {
-      expect(resolveSessionJoinState({ ...BASE, anyVisibleJoinEnabled: false })).toEqual({
-        canJoin: false,
-        showJoinButton: true,
-      });
+describe('messages-month-section', () => {
+  it('calculates progress and completion flags', () => {
+    expect(getMonthSectionStats(monthGroup)).toEqual({
+      progressPercent: 75,
+      allComplete: false,
+      scheduledCount: 4,
+      completedCount: 3,
     });
-
-    it('enables Join on the selected occurrence itself', () => {
-      expect(
-        resolveSessionJoinState({
-          ...BASE,
-          sessionId: BASE.joinableSessionId,
-          anyVisibleJoinEnabled: false,
-        }),
-      ).toEqual({ canJoin: true, showJoinButton: true });
+    expect(getMonthSectionStats({ ...monthGroup, completedCount: 4 })).toEqual({
+      progressPercent: 100,
+      allComplete: true,
+      scheduledCount: 4,
+      completedCount: 4,
     });
   });
 
-  describe('with enable-any-visible-class-session-join on', () => {
-    it('makes a later upcoming occurrence independently joinable', () => {
-      expect(resolveSessionJoinState({ ...BASE, anyVisibleJoinEnabled: true })).toEqual({
-        canJoin: true,
-        showJoinButton: true,
-      });
+  it('prefers provided scheduled-vs-completed month stats for the progress bar', () => {
+    expect(
+      getMonthSectionStats(monthGroup, {
+        scheduledCount: 6,
+        completedCount: 3,
+      }),
+    ).toEqual({
+      progressPercent: 50,
+      allComplete: false,
+      scheduledCount: 6,
+      completedCount: 3,
     });
+  });
 
-    it('omits Join entirely for a disabled occurrence rather than showing a dead one', () => {
-      expect(
-        resolveSessionJoinState({
-          ...BASE,
-          disabled: true,
-          anyVisibleJoinEnabled: true,
+  it('opens first/current sections by default when requested', () => {
+    expect(shouldMonthSectionStartOpen(true, false)).toBe(true);
+    expect(shouldMonthSectionStartOpen(false, true)).toBe(true);
+    expect(shouldMonthSectionStartOpen(false, false)).toBe(false);
+  });
+
+  it('formats the month progress label with percent and ratio', () => {
+    expect(formatMonthSectionProgressLabel(50, 3, 6)).toBe('50% 3/6');
+  });
+
+  it('opens the exact session link from a read-only staff classroom tile', async () => {
+    const user = userEvent.setup();
+    const staffChannel = {
+      ids: { id: 'channel-1', orgId: 'org-1' },
+      context: {
+        liveSession: {
+          enabled: true,
+          joinUrl: 'https://zoom.us/j/channel-default',
+        },
+      },
+      ui: { quickActions: [] },
+    } as unknown as ChannelVM;
+    const staffMonthGroup: MonthGroup = {
+      monthKey: '2026-03',
+      month: 'March',
+      year: '2026',
+      totalCount: 1,
+      completedCount: 0,
+      sessions: [
+        {
+          id: 'session-1',
+          label: 'Math session',
+          time: 'Tue 4:00pm',
+          dayName: 'Tue',
+          dayNum: '3',
+          isToday: false,
+          isLive: false,
+          isPast: false,
+          endAt: '2026-03-03T17:00:00.000Z',
+          status: 'scheduled',
+          meetingLink: 'https://meet.google.com/exact-session',
+        },
+      ],
+    };
+
+    render(
+      React.createElement(
+        MessagesStateProvider,
+        {
+          channel: staffChannel,
+          isReadOnly: true,
+        } as React.ComponentProps<typeof MessagesStateProvider>,
+        React.createElement(MonthSection, {
+          group: staffMonthGroup,
+          isCurrentMonth: true,
+          joinableSessionId: 'session-1',
         }),
-      ).toEqual({ canJoin: false, showJoinButton: false });
-    });
+      ),
+    );
 
-    it('omits Join when live sessions are not available on the channel', () => {
-      expect(
-        resolveSessionJoinState({
-          ...BASE,
-          joinVisible: false,
-          anyVisibleJoinEnabled: true,
-        }),
-      ).toEqual({ canJoin: false, showJoinButton: false });
-    });
+    await user.click(screen.getByRole('button', { name: 'Join' }));
 
-    it('never produces a visible-but-disabled Join', () => {
-      const cases = [true, false].flatMap((disabled) =>
-        [true, false].map((joinVisible) =>
-          resolveSessionJoinState({
-            ...BASE,
-            disabled,
-            joinVisible,
-            anyVisibleJoinEnabled: true,
-          }),
-        ),
-      );
-
-      cases.forEach((state) => expect(state.showJoinButton).toBe(state.canJoin));
-    });
+    expect(screen.getByText('Session ready to join')).toBeInTheDocument();
+    expect(screen.getByText('https://meet.google.com/exact-session')).toBeInTheDocument();
+    expect(
+      screen.queryByText('https://zoom.us/j/channel-default'),
+    ).not.toBeInTheDocument();
   });
 });

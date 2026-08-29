@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import type { ClassScheduleVM } from '@iconicedu/shared-types';
 import {
   calculateScheduleCompletionPercent,
-  expandSchedulesForDisplay,
   createGoogleCalendarUrl,
   formatScheduleDateBadge,
   formatScheduleDateTime,
@@ -535,57 +534,6 @@ describe('messages-schedule-tab.utils', () => {
     expect(stats.get('2026-03')).toEqual({
       scheduledCount: 2,
       completedCount: 1,
-    });
-  });
-
-  describe('occurrence identity on session cards', () => {
-    it('exposes the base schedule and original occurrence key for a one-off session', () => {
-      const schedule = buildSchedule('schedule-1', '2026-03-04T16:00:00.000Z');
-      const groups = toMonthGroups(
-        groupSchedulesByMonth(expandSchedulesForDisplay([schedule])),
-        new Date('2026-03-01T10:00:00.000Z'),
-      );
-      const session = groups[0]!.sessions[0]!;
-
-      expect(session.scheduleId).toBe('schedule-1');
-      expect(session.occurrenceKey).toBe('2026-03-04T16:00:00.000Z');
-    });
-
-    it('strips the expansion suffix so a recurring occurrence addresses its base schedule', () => {
-      const schedule: ClassScheduleVM = {
-        ...buildSchedule('schedule-1', '2026-03-06T16:00:00.000Z'),
-        recurrence: {
-          ids: { id: 'recurrence-1', orgId: 'org-1' },
-          rule: {
-            frequency: 'weekly',
-            interval: 1,
-            byWeekday: ['FR'],
-            timezone: 'UTC',
-          },
-        },
-        timezone: 'UTC',
-      };
-      const groups = toMonthGroups(
-        groupSchedulesByMonth(
-          expandSchedulesForDisplay([schedule], new Date('2026-03-01T10:00:00.000Z'), {
-            rangeStart: new Date('2026-03-01T00:00:00.000Z'),
-            rangeEnd: new Date('2026-03-31T23:59:59.000Z'),
-          }),
-        ),
-        new Date('2026-03-01T10:00:00.000Z'),
-      );
-      const sessions = groups[0]!.sessions;
-
-      expect(sessions.length).toBeGreaterThan(1);
-      sessions.forEach((session) => {
-        expect(session.scheduleId).toBe('schedule-1');
-        expect(session.occurrenceKey).not.toContain('__');
-      });
-      // Each card addresses a distinct occurrence, so two cards in one channel
-      // never collapse onto the same live room (issue #195).
-      expect(new Set(sessions.map((session) => session.occurrenceKey)).size).toBe(
-        sessions.length,
-      );
     });
   });
 
