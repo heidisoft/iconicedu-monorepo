@@ -838,7 +838,7 @@ export const getClassScheduleEventsForView = (
   viewerTimezone?: string | null,
 ) => {
   const resolvedViewerTimezone = resolveViewerTimeZone(viewerTimezone);
-  const currentDayKey = toViewerDayKey(currentDate, resolvedViewerTimezone);
+  const currentDayKey = toRuntimeDayKey(currentDate);
   const rangeStartKey =
     view === 'week' ? getViewerWeekStartKey(currentDayKey) : currentDayKey;
   const rangeEndKey = view === 'week' ? addDaysToDayKey(rangeStartKey, 6) : currentDayKey;
