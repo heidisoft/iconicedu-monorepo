@@ -51,6 +51,7 @@ function renderDayView(events: ClassScheduleVM[]) {
 describe('DayView', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-02T15:30:00.000Z'));
     HTMLElement.prototype.scrollTo = vi.fn();
   });
 
@@ -58,6 +59,24 @@ describe('DayView', () => {
     vi.runOnlyPendingTimers();
     vi.useRealTimers();
     vi.restoreAllMocks();
+  });
+
+  it('initially scrolls the current day to the current time', () => {
+    renderDayView([
+      buildEvent(
+        'morning-event',
+        'Morning event',
+        '2026-03-02T09:00:00.000Z',
+        '2026-03-02T10:00:00.000Z',
+      ),
+    ]);
+
+    vi.runAllTimers();
+
+    expect(HTMLElement.prototype.scrollTo).toHaveBeenCalledWith({
+      top: 928,
+      behavior: 'smooth',
+    });
   });
 
   it('renders separate overflow badges aligned to each hidden start time', () => {
