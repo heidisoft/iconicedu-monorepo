@@ -198,6 +198,18 @@ export function getDisplayNow(timezone?: string | null): Date {
   return toScheduleDisplayDate(new Date(), timezone) ?? new Date();
 }
 
+/**
+ * Minutes since midnight read from a *display date's* local fields.
+ *
+ * Use this rather than `getScheduleDisplayMinutes` whenever the input is
+ * already a display date (`getDisplayNow`, `getEventDate`, the `currentDate`
+ * prop). Those helpers convert an instant through a timezone, which would
+ * convert an already-converted value a second time.
+ */
+export function getDisplayMinutes(displayDate: Date): number {
+  return displayDate.getHours() * 60 + displayDate.getMinutes();
+}
+
 export function isSameDay(date1: Date, date2: Date): boolean {
   return (
     date1.getDate() === date2.getDate() &&
@@ -865,7 +877,7 @@ export const getClassScheduleEventsForMonth = (
   viewerTimezone?: string | null,
 ) => {
   const resolvedViewerTimezone = resolveViewerTimeZone(viewerTimezone);
-  const currentDayKey = toViewerDayKey(currentDate, resolvedViewerTimezone);
+  const currentDayKey = toRuntimeDayKey(currentDate);
   return expandRecurringEventsForDayKeyRange(
     events,
     getMonthBoundaryKey(currentDayKey, 0, 'start'),
@@ -882,7 +894,7 @@ export const getClassScheduleEventsForMonthRange = (
   viewerTimezone?: string | null,
 ) => {
   const resolvedViewerTimezone = resolveViewerTimeZone(viewerTimezone);
-  const currentDayKey = toViewerDayKey(currentDate, resolvedViewerTimezone);
+  const currentDayKey = toRuntimeDayKey(currentDate);
   return expandRecurringEventsForDayKeyRange(
     events,
     getMonthBoundaryKey(currentDayKey, -monthsBefore, 'start'),

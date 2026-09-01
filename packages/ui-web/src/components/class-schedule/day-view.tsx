@@ -4,6 +4,7 @@ import type { ClassScheduleVM } from '@iconicedu/shared-types';
 import {
   type DisplayClassScheduleVM,
   eventTimeToMinutes,
+  getDisplayMinutes,
   getDisplayNow,
   isSameDay,
   getEventDate,
@@ -28,11 +29,7 @@ import { ArrowRight, CalendarX, UserPlus } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@iconicedu/ui-web/ui/popover';
 import { useEffect, useMemo, useRef } from 'react';
 import { useScheduleDisplayTimeZone } from '@iconicedu/ui-web/components/shared/schedule-display-timezone-context';
-import {
-  formatScheduleDisplayValue,
-  getScheduleDisplayMinutes,
-  toScheduleDisplayDate,
-} from '@iconicedu/ui-web/lib/schedule-display-timezone';
+import { formatScheduleDisplayValue } from '@iconicedu/ui-web/lib/schedule-display-timezone';
 import type {
   CancelSessionActionInput,
   EditSessionActionInput,
@@ -92,9 +89,8 @@ export function DayView({
 
   const today = getDisplayNow(timezone);
   const isToday = isSameDay(currentDate, today);
-  const currentHour = today.getHours();
-  const currentMinutes = today.getMinutes();
-  const currentTimeOffset = (currentHour * 2 + currentMinutes / 30) * 32;
+  const currentTimeMinutes = getDisplayMinutes(today);
+  const currentTimeOffset = (currentTimeMinutes / 30) * 32;
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const hasInitialScrolled = useRef(false);

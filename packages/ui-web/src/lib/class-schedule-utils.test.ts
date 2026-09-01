@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ClassScheduleVM } from '@iconicedu/shared-types';
 import { getLocalDate, getLocalTime, toUtcFromLocal } from '@iconicedu/utils';
+import { getScheduleDisplayDateParts } from './schedule-display-timezone';
 
 import {
   expandRecurringEvents,
@@ -894,6 +895,115 @@ describe('viewer-timezone calendar ranges', () => {
           (event) => event.ids.id.startsWith(schedule.ids.id),
         ),
       ).toBe(true);
+    });
+  });
+
+  /**
+   * Regression coverage for the review finding on #194.
+   *
+   * `ClassScheduleClient`, the Today action, and mini-calendar navigation all
+   * supply `currentDate` as a *display date*: a runtime-local `Date` whose
+   * fields already represent the selected viewer day, built by
+   * `toScheduleDisplayDate`. Re-converting that value through the viewer
+   * timezone shifts it by a day whenever the browser is ahead of the profile,
+   * which dropped the selected day's sessions from day view and moved the
+   * week/month ranges across a boundary.
+   *
+   * These cases construct `currentDate` exactly the way the callers do.
+   */
+  describe('range helpers accept caller display dates', () => {
+    /** Mirrors `toScheduleDisplayDate(instant, viewerTimezone)`. */
+    const asDisplayDate = (instant: string, timezone: string) => {
+      const parts = getScheduleDisplayDateParts(instant, timezone)!;
+      return new Date(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute);
+    };
+
+    // 2026-08-27T07:00Z is 03:00 on Aug 27 in New York and 12:30 the same day
+    // in Colombo, so a New York viewer's display date reads Aug 27 03:00. Its
+    // underlying instant, read back as New York, is Aug 26 — the shift.
+    const newYorkEarlyMorning = '2026-08-27T07:00:00.000Z';
+
+    const thursdaySession = (): ClassScheduleVM => ({
+      ids: { id: 'schedule-display-date', orgId: 'org-1' },
+      title: 'Thursday session',
+      // New York Thursday 2026-08-27 10:00.
+      startAt: '2026-08-27T14:00:00.000Z',
+      endAt: '2026-08-27T15:00:00.000Z',
+      status: 'scheduled',
+      visibility: 'private',
+      participants: [],
+      source: {
+        kind: 'class_session',
+        learningSpaceId: 'space-1',
+        channelId: 'channel-1',
+      },
+      timezone: NEW_YORK,
+      audit: { createdAt: '2026-08-01T00:00:00.000Z', createdBy: 'user-1' },
+    });
+
+    it('keeps the selected day in day view', () => {
+      const currentDate = asDisplayDate(newYorkEarlyMorning, NEW_YORK);
+      expect(currentDate.getDate()).toBe(27);
+
+      const events = getClassScheduleEventsForView(
+        [thursdaySession()],
+        currentDate,
+        'day',
+        NEW_YORK,
+      );
+
+      expect(events.map((event) => event.startAt)).toEqual(['2026-08-27T14:00:00.000Z']);
+    });
+
+    it('keeps the selected day inside the week range', () => {
+      const events = getClassScheduleEventsForView(
+        [thursdaySession()],
+        asDisplayDate(newYorkEarlyMorning, NEW_YORK),
+        'week',
+        NEW_YORK,
+      );
+
+      expect(events.map((event) => event.startAt)).toEqual(['2026-08-27T14:00:00.000Z']);
+    });
+
+    it('keeps the selected day inside the month and month-range helpers', () => {
+      const currentDate = asDisplayDate(newYorkEarlyMorning, NEW_YORK);
+
+      expect(
+        getClassScheduleEventsForMonth([thursdaySession()], currentDate, NEW_YORK).map(
+          (event) => event.startAt,
+        ),
+      ).toEqual(['2026-08-27T14:00:00.000Z']);
+
+      expect(
+        getClassScheduleEventsForMonthRange(
+          [thursdaySession()],
+          currentDate,
+          1,
+          1,
+          NEW_YORK,
+        ).map((event) => event.startAt),
+      ).toEqual(['2026-08-27T14:00:00.000Z']);
+    });
+
+    it('does not shift a month boundary selected on the first of the month', () => {
+      // New York 2026-09-01 01:00 — an early-hours display date on a month edge.
+      const currentDate = asDisplayDate('2026-09-01T05:00:00.000Z', NEW_YORK);
+      expect(currentDate.getMonth()).toBe(8);
+      expect(currentDate.getDate()).toBe(1);
+
+      const septemberSession: ClassScheduleVM = {
+        ...thursdaySession(),
+        ids: { id: 'schedule-september', orgId: 'org-1' },
+        startAt: '2026-09-03T14:00:00.000Z',
+        endAt: '2026-09-03T15:00:00.000Z',
+      };
+
+      expect(
+        getClassScheduleEventsForMonth([septemberSession], currentDate, NEW_YORK).map(
+          (event) => event.startAt,
+        ),
+      ).toEqual(['2026-09-03T14:00:00.000Z']);
     });
   });
 });

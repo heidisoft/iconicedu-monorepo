@@ -5,6 +5,7 @@ import {
   eventTimeToMinutes,
   getWeekDays,
   formatDayName,
+  getDisplayMinutes,
   getDisplayNow,
   isSameDay,
   getEventDate,
@@ -18,10 +19,6 @@ import { cn } from '@iconicedu/ui-web/lib/utils';
 import { useEffect, useMemo, useRef } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@iconicedu/ui-web/ui/popover';
 import { useScheduleDisplayTimeZone } from '@iconicedu/ui-web/components/shared/schedule-display-timezone-context';
-import {
-  getScheduleDisplayMinutes,
-  toScheduleDisplayDate,
-} from '@iconicedu/ui-web/lib/schedule-display-timezone';
 import type {
   CancelSessionActionInput,
   EditSessionActionInput,
@@ -59,7 +56,7 @@ export function WeekView({
   const timeSlots = getTimeSlots();
   const today = getDisplayNow(timezone);
 
-  const currentTimeMinutes = getScheduleDisplayMinutes(now, timezone);
+  const currentTimeMinutes = getDisplayMinutes(today);
   const currentTimeOffset = (currentTimeMinutes / 30) * 32;
   const includesToday = weekDays.some((day) => isSameDay(day, today));
   const columnGap = 6;
