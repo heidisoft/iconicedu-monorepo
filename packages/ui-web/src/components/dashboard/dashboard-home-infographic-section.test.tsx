@@ -231,6 +231,48 @@ describe('DashboardHomeInfographicSection', () => {
     );
   });
 
+  it('opens the existing session link from a staff homepage tile', async () => {
+    const onJoinSession = vi.fn();
+    const user = userEvent.setup();
+    const staffSessionPage = {
+      ...sessionPage,
+      today: {
+        ...sessionPage.today,
+        items: sessionPage.today.items.map((item) => ({
+          ...item,
+          session: {
+            ...item.session,
+            meetingLink: 'https://zoom.us/j/staff-session',
+          },
+        })),
+      },
+    };
+
+    render(
+      <DashboardHomeInfographicSection
+        orgSlug="iconic-academy"
+        isStaffView
+        topMetrics={{
+          upcomingSessionsThisWeek: 1,
+          completedClassesThisMonth: 10,
+          activeSubjectsCount: 3,
+          activeSubjectsLabel: 'Math, ELA, Science',
+        }}
+        upcomingSessionsPage={staffSessionPage}
+        calendarHref="/iconic-academy/class-schedule"
+        notificationsHref="/iconic-academy/notifications"
+        browseHref="/iconic-academy/admin/channels"
+        onJoinSession={onJoinSession}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Join' }));
+
+    expect(screen.getByText('Session ready to join')).toBeInTheDocument();
+    expect(screen.getByText('https://zoom.us/j/staff-session')).toBeInTheDocument();
+    expect(onJoinSession).not.toHaveBeenCalled();
+  });
+
   it('hides join button for next week sessions while keeping message actions', () => {
     render(
       <DashboardHomeInfographicSection

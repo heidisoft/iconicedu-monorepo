@@ -17,6 +17,10 @@ interface SessionCardProps {
   showJoinButton?: boolean;
   actionOrder?: 'message-first' | 'join-first';
   joinLiveSession?: () => Promise<void>;
+  /**
+   * Channel-level fallback link, used only when the occurrence carries no
+   * meeting link and no join handler is wired up.
+   */
   joinHref?: string | null;
   classroomChatHref?: string;
   openClassroomChat?: () => Promise<void> | void;
@@ -54,7 +58,7 @@ export function SessionCard({
   showJoinButton = true,
   actionOrder = 'message-first',
   joinLiveSession: joinLiveSessionOverride,
-  joinHref,
+  joinHref: configuredJoinHref,
   classroomChatHref,
   openClassroomChat,
 }: SessionCardProps) {
@@ -64,9 +68,10 @@ export function SessionCard({
   const [isJoinPending, setIsJoinPending] = useState(false);
   const { externalJoinTarget, closeExternalJoinDialog, handleResolvedJoinHref } =
     useExternalLiveSessionJoinDialog();
+  const occurrenceJoinHref = session.meetingLink?.trim() || null;
   const isJoinButtonDisabled = isSessionJoinButtonDisabled({
     session,
-    hasJoinAction: Boolean(joinLiveSession || joinHref),
+    hasJoinAction: Boolean(occurrenceJoinHref || joinLiveSession || configuredJoinHref),
     isJoinPending,
     canJoin,
   });
@@ -114,6 +119,13 @@ export function SessionCard({
     if (isJoinPending) {
       return;
     }
+    // Precedence: this occurrence's own link, then the server join handler
+    // (which creates or reuses the live session and records attendance), then
+    // the channel-level fallback link.
+    if (occurrenceJoinHref) {
+      handleResolvedJoinHref(occurrenceJoinHref);
+      return;
+    }
     if (joinLiveSession) {
       setIsJoinPending(true);
       try {
@@ -123,8 +135,8 @@ export function SessionCard({
       }
       return;
     }
-    if (joinHref) {
-      handleResolvedJoinHref(joinHref);
+    if (configuredJoinHref) {
+      handleResolvedJoinHref(configuredJoinHref);
     }
   };
 
