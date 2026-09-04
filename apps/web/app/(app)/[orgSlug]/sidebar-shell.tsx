@@ -79,6 +79,7 @@ import {
   WEB_INCOMPLETE_ONBOARDING_REAUTH_COOKIE,
 } from '@iconicedu/web/app/(app)/[orgSlug]/layout-auth-gate';
 import { reportWebObservedError } from '@iconicedu/web/lib/analytics/report-error';
+import { signOutCurrentSession } from '@iconicedu/web/lib/auth/sign-out';
 import {
   AnalyticsEvent,
   INCOMPLETE_ONBOARDING_REAUTH_AFTER_MS,
@@ -210,7 +211,7 @@ export function SidebarShell({
   }, [initialOnboardingStatus]);
 
   const handleLogout = React.useCallback(async () => {
-    await supabase.auth.signOut();
+    await signOutCurrentSession(supabase);
     window.location.assign('/');
   }, [supabase]);
 
@@ -263,7 +264,7 @@ export function SidebarShell({
       });
       document.cookie = `${WEB_INCOMPLETE_ONBOARDING_REAUTH_COOKIE}=1; path=/; max-age=5; SameSite=Lax;`;
       try {
-        await supabase.auth.signOut();
+        await signOutCurrentSession(supabase);
       } catch (error) {
         reportWebObservedError({
           error,

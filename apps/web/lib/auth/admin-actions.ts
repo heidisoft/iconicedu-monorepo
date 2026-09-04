@@ -224,7 +224,7 @@ export async function generateEmailLinkAction(payload: GenerateLinkPayload) {
   return runAction('generate-link', (service) => service.generateEmailLink(params));
 }
 
-type SignOutPayload = { jwt: string; scope?: AdminSignOutScope };
+type SignOutPayload = { jwt: string; scope: AdminSignOutScope };
 
 export async function signOutUserAction(payload: SignOutPayload) {
   return runAction('sign-out-user', (service) =>

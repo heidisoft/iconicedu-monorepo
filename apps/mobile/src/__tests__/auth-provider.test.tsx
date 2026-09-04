@@ -26,7 +26,9 @@ const mockVerifyOtp = jest.fn().mockResolvedValue({
   error: null,
 });
 const mockSetSession = jest.fn().mockResolvedValue({ error: null });
-const mockSignOut = jest.fn().mockResolvedValue({});
+const mockSignOut = jest.fn().mockResolvedValue({ error: null });
+const mockStartAutoRefresh = jest.fn().mockResolvedValue(undefined);
+const mockStopAutoRefresh = jest.fn().mockResolvedValue(undefined);
 const mockOpenAuthSessionAsync = jest.fn().mockResolvedValue({
   type: 'success',
   url: 'iconicedu://auth-callback#access_token=access-token&refresh_token=refresh-token',
@@ -71,6 +73,8 @@ jest.mock('../lib/supabase/client', () => ({
       verifyOtp: (params: unknown) => mockVerifyOtp(params),
       setSession: (params: unknown) => mockSetSession(params),
       signOut: (params?: unknown) => mockSignOut(params),
+      startAutoRefresh: () => mockStartAutoRefresh(),
+      stopAutoRefresh: () => mockStopAutoRefresh(),
     },
     from: (table: unknown) => mockFrom(table),
   },
@@ -114,6 +118,9 @@ describe('AuthProvider', () => {
       type: 'success',
       url: 'iconicedu://auth-callback#access_token=access-token&refresh_token=refresh-token',
     });
+    mockSignOut.mockResolvedValue({ error: null });
+    mockSetSession.mockResolvedValue({ error: null });
+    mockActivateAccount.mockResolvedValue(undefined);
   });
 
   it('starts in loading state', async () => {
@@ -165,6 +172,102 @@ describe('AuthProvider', () => {
       type: 'email',
     });
     expect(mockActivateAccount).toHaveBeenCalled();
+    expect(mockSignOut).not.toHaveBeenCalled();
+  });
+
+  it('clears only the new mobile session when OTP login has no linked account', async () => {
+    mockVerifyOtp.mockResolvedValueOnce({
+      data: {
+        session: { access_token: 'access-token', refresh_token: 'refresh-token' },
+        user: { id: 'user-1' },
+      },
+      error: null,
+    });
+    mockFetchUserAccount.mockResolvedValueOnce(null);
+
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    let response: { error: string | null } = { error: null };
+    await act(async () => {
+      response = await result.current.verifyOtp('iconicedudev+test@gmail.com', '123456');
+    });
+
+    expect(response.error).toContain('No ICONIC Academy account');
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+    expect(mockSignOut).toHaveBeenCalledWith({ scope: 'local' });
+    expect(mockActivateAccount).not.toHaveBeenCalled();
+  });
+
+  it('clears only the new mobile session when OTP login has no organisation', async () => {
+    mockVerifyOtp.mockResolvedValueOnce({
+      data: {
+        session: { access_token: 'access-token', refresh_token: 'refresh-token' },
+        user: { id: 'user-1' },
+      },
+      error: null,
+    });
+    mockFetchUserAccount.mockResolvedValueOnce({ org_id: null });
+
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    let response: { error: string | null } = { error: null };
+    await act(async () => {
+      response = await result.current.verifyOtp('iconicedudev+test@gmail.com', '123456');
+    });
+
+    expect(response.error).toContain('not linked to an organisation');
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+    expect(mockSignOut).toHaveBeenCalledWith({ scope: 'local' });
+    expect(mockActivateAccount).not.toHaveBeenCalled();
+  });
+
+  it('rolls back only the new mobile session when account lookup fails', async () => {
+    mockVerifyOtp.mockResolvedValueOnce({
+      data: {
+        session: { access_token: 'access-token', refresh_token: 'refresh-token' },
+        user: { id: 'user-1' },
+      },
+      error: null,
+    });
+    mockFetchUserAccount.mockRejectedValueOnce(new Error('API error 503'));
+
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    let response: { error: string | null } = { error: null };
+    await act(async () => {
+      response = await result.current.verifyOtp('iconicedudev+test@gmail.com', '123456');
+    });
+
+    expect(response.error).toBe('API error 503');
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+    expect(mockSignOut).toHaveBeenCalledWith({ scope: 'local' });
+    expect(mockActivateAccount).not.toHaveBeenCalled();
+  });
+
+  it('rolls back only the new mobile session when account activation fails', async () => {
+    mockVerifyOtp.mockResolvedValueOnce({
+      data: {
+        session: { access_token: 'access-token', refresh_token: 'refresh-token' },
+        user: { id: 'user-1' },
+      },
+      error: null,
+    });
+    mockActivateAccount.mockRejectedValueOnce(new Error('Activation failed'));
+
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    let response: { error: string | null } = { error: null };
+    await act(async () => {
+      response = await result.current.verifyOtp('iconicedudev+test@gmail.com', '123456');
+    });
+
+    expect(response.error).toBe('Activation failed');
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+    expect(mockSignOut).toHaveBeenCalledWith({ scope: 'local' });
   });
 
   it('signInWithApple starts Supabase OAuth through the in-app auth session', async () => {
@@ -228,7 +331,7 @@ describe('AuthProvider', () => {
       await result.current.signOut();
     });
 
-    expect(mockSignOut).toHaveBeenCalled();
+    expect(mockSignOut).toHaveBeenCalledWith({ scope: 'local' });
   });
 
   it('returns error from signInWithOtp on failure', async () => {
@@ -278,7 +381,7 @@ describe('AuthProvider', () => {
     });
 
     await waitFor(() => {
-      expect(mockSignOut).toHaveBeenCalled();
+      expect(mockSignOut).toHaveBeenCalledWith({ scope: 'local' });
     });
     expect(mockCapture).toHaveBeenCalledWith(
       AnalyticsEvent.INCOMPLETE_ONBOARDING_REAUTH_TRIGGERED,
@@ -349,6 +452,26 @@ describe('AuthProvider', () => {
 
     expect(mockSignOut).not.toHaveBeenCalled();
     nowSpy.mockRestore();
+  });
+
+  it('runs auto refresh only while the app is active', async () => {
+    const { result, unmount } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(mockStartAutoRefresh).toHaveBeenCalled();
+
+    act(() => {
+      appStateChangeListener?.('background');
+    });
+    expect(mockStopAutoRefresh).toHaveBeenCalled();
+
+    act(() => {
+      appStateChangeListener?.('active');
+    });
+    expect(mockStartAutoRefresh).toHaveBeenCalledTimes(2);
+
+    unmount();
+    expect(mockStopAutoRefresh).toHaveBeenCalledTimes(2);
   });
 
   it('clears a cached session when Supabase Auth no longer recognizes it', async () => {

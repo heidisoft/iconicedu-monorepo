@@ -25,7 +25,7 @@
 
 ### 2) Entry Points
 
-- Web: `apps/web/app/layout.tsx` (root layout) via Next.js App Router; no `middleware.ts` exists.
+- Web: `apps/web/app/layout.tsx` (root layout) via Next.js App Router; `apps/web/middleware.ts` refreshes Supabase Auth cookies before matched application requests.
 - Mobile: `expo-router/entry` (declared as `"main"` in `apps/mobile/package.json`) → `apps/mobile/app/_layout.tsx` (root layout).
 - API: `apps/api/src/main.ts` — bootstraps `AppModule`, applies request-context middleware, global `ValidationPipe`, mounts Swagger at `/docs`, listens on `PORT` (default 3001 locally).
 - Secondary entry points: Supabase edge functions (`supabase/functions/*/index.ts`), root dev orchestrator `scripts/dev.mjs` (`pnpm dev`), API script `apps/api/scripts/dev.mjs`.

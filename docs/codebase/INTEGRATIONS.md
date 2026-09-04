@@ -51,6 +51,14 @@
 - `apps/api/.env.example`, `apps/web/.env.local.example`, `apps/mobile/.env.example`
 - `apps/api/src/observability/global-exception.filter.ts`
 
+### 7) Supabase Auth session policy
+
+- A user may keep independent web and mobile sessions. Signing in with an email code, magic link, or OAuth provider must not revoke an existing session on another browser or device.
+- User-initiated logout and automatic cleanup for an invalid or incomplete login use `supabase.auth.signOut({ scope: 'local' })`. `global` and `others` scopes are reserved for explicit security or administrator actions. `scripts/check-auth-signout-scopes.mjs` prevents frontend code from relying on Supabase's default global scope.
+- Web requests pass through `apps/web/middleware.ts`; its Supabase cookie adapter copies rotated session cookies to both the request and response. Server Components use `apps/web/lib/supabase/server.ts` to read that request-scoped session.
+- Mobile persists the session in SecureStore. `apps/mobile/src/providers/auth-provider.tsx` starts token auto-refresh while the app is active and stops it while the app is inactive or backgrounded.
+- Keep the hosted Supabase Auth settings aligned with this policy: **Enforce single session per user** off, session time-box `0` (never), inactivity timeout `0` (never), access-token expiry `3600` seconds, compromised refresh-token detection on, and refresh-token reuse interval `10` seconds. Changing the time-box or inactivity values to non-zero intentionally adds reauthentication independent of concurrent-device support.
+
 ## Extended Sections (Optional)
 
 Not populated — the inventory above covers every integration point surfaced by the investigation; a deeper per-endpoint catalog was not required for onboarding purposes.
