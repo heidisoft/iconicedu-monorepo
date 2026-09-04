@@ -125,13 +125,16 @@ export function getScheduleDisplayDateParts(
     return null;
   }
 
+  // `hour12: false` resolves to the h24 cycle in en-US, which reports local
+  // midnight as hour 24. Feeding that into `new Date` rolls the calendar day
+  // forward, so pin the h23 cycle and normalize any residual 24 below.
   const formatter = buildFormatter(timezone, {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
-    hour12: false,
+    hourCycle: 'h23',
     weekday: 'short',
   });
 
@@ -142,7 +145,8 @@ export function getScheduleDisplayDateParts(
   const year = Number(lookup('year'));
   const month = Number(lookup('month'));
   const day = Number(lookup('day'));
-  const hour = Number(lookup('hour'));
+  const rawHour = Number(lookup('hour'));
+  const hour = rawHour === 24 ? 0 : rawHour;
   const minute = Number(lookup('minute'));
   const weekdayShort = lookup('weekday');
 

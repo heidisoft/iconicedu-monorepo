@@ -127,4 +127,45 @@ describe('DayView', () => {
     expect(badges[0]?.parentElement).toHaveStyle({ top: '640px' });
     expect(badges[1]?.parentElement).toHaveStyle({ top: '704px' });
   });
+
+  /**
+   * Regression coverage for #194 root cause 4. `2026-08-27T18:45Z` is Thursday
+   * 14:45 in New York but already Friday 00:15 in Colombo.
+   */
+  describe('viewer-timezone today and current-time indicator', () => {
+    const instant = new Date('2026-08-27T18:45:00.000Z');
+
+    function renderDay(timezone: string) {
+      return render(
+        <ScheduleDisplayTimeZoneProvider timezone={timezone}>
+          <DayView
+            currentDate={new Date(2026, 7, 27)}
+            events={[]}
+            classScheduleEvents={[]}
+            hasClasses
+            childrenCount={1}
+            onDateSelect={vi.fn()}
+          />
+        </ScheduleDisplayTimeZoneProvider>,
+      );
+    }
+
+    it('treats the viewer date as today and places the line at viewer time', () => {
+      vi.setSystemTime(instant);
+      const { container } = renderDay('America/New_York');
+
+      // Viewer is on Aug 27, so the indicator renders at 14:45.
+      expect(container.querySelector('.border-destructive')).toHaveStyle({
+        top: '944px',
+      });
+    });
+
+    it('hides the indicator when the viewer has moved past the shown day', () => {
+      vi.setSystemTime(instant);
+      const { container } = renderDay('Asia/Colombo');
+
+      // Viewer is already on Aug 28, so Aug 27 is no longer today.
+      expect(container.querySelector('.border-destructive')).toBeNull();
+    });
+  });
 });
