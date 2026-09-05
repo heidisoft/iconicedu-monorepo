@@ -59,6 +59,13 @@ type FamilyLinkSummaryRow = {
   child_account_id: string;
 };
 
+type EffectiveOccurrence = {
+  sessionEndAt: string;
+  sessionTitle: string | null;
+  channelId: string | null;
+  learningSpaceId: string | null;
+};
+
 function unique(values: string[]) {
   return Array.from(new Set(values.filter(Boolean)));
 }
@@ -102,9 +109,11 @@ export class CompletionCheckDispatcherService {
       return [];
     }
 
-    // Check idempotency: skip if votes already exist for this session+occurrence
-    const existingVotes = await supabase
-      .from('class_session_completion_votes')
+    // Check idempotency: skip if a class_session_completions row already exists for
+    // this session+occurrence (replaces the old check against
+    // class_session_completion_votes now that the new table is the source of truth).
+    const existingCompletions = await supabase
+      .from('class_session_completions')
       .select('id')
       .eq('org_id', job.org_id)
       .eq('schedule_id', scheduleId)
@@ -112,9 +121,33 @@ export class CompletionCheckDispatcherService {
       .is('deleted_at', null)
       .limit(1);
 
-    if (existingVotes.data && existingVotes.data.length > 0) {
+    if (existingCompletions.data && existingCompletions.data.length > 0) {
       this.logger.log(
-        `completion_check: votes already exist for ${scheduleId}/${occurrenceStart}, skipping`,
+        `completion_check: rows already exist for ${scheduleId}/${occurrenceStart}, skipping`,
+      );
+      return [];
+    }
+
+    // Re-resolve current cancel/reschedule state right before dispatching — closes a
+    // real race the old system had: reminder-job *enqueue* timing is reconciled on
+    // cancel/reschedule via DB triggers (up to ~1 min lag), but nothing previously
+    // stopped an already-queued job from firing stale. A cancelled session must never
+    // get a completion prompt; a rescheduled one must be timed off its new end, not
+    // the original occurrence_key time.
+    const effectiveOccurrence = await this.resolveEffectiveOccurrence({
+      supabase,
+      orgId: job.org_id,
+      scheduleId,
+      occurrenceStart,
+      fallbackEndAt: endAt,
+      fallbackTitle: payload.title,
+      fallbackChannelId: payload.channelId,
+      fallbackLearningSpaceId: payload.learningSpaceId ?? null,
+    });
+
+    if (!effectiveOccurrence) {
+      this.logger.log(
+        `completion_check: ${scheduleId}/${occurrenceStart} was cancelled, skipping dispatch`,
       );
       return [];
     }
@@ -132,6 +165,20 @@ export class CompletionCheckDispatcherService {
 
     // Dispatch individual events for non-guardians (educators, students, staff)
     for (const member of nonGuardians) {
+      const sessionCompletionId = await this.upsertSessionCompletion({
+        supabase,
+        orgId: job.org_id,
+        scheduleId,
+        occurrenceKey: occurrenceStart,
+        profileId: member.profileId,
+        role: member.role ?? 'observer',
+        sessionEndAt: effectiveOccurrence.sessionEndAt,
+        sessionTitle: effectiveOccurrence.sessionTitle,
+        channelId: effectiveOccurrence.channelId,
+        learningSpaceId: effectiveOccurrence.learningSpaceId,
+      });
+      if (!sessionCompletionId) continue;
+
       const event = await publishActivityEvent({
         supabase,
         orgId: job.org_id,
@@ -156,6 +203,7 @@ export class CompletionCheckDispatcherService {
           channelRouteKind: payload.channelRouteKind ?? 'space',
           members,
           feedbackUiEnabled: true,
+          sessionCompletionId,
         },
         dedupeKey: `session.completion_check:${job.org_id}:${scheduleId}:${occurrenceStart}:${member.profileId}`,
         refreshOnDedupe: false,
@@ -178,6 +226,7 @@ export class CompletionCheckDispatcherService {
         currentOccurrenceStart: occurrenceStart,
         currentEndAt: endAt,
         currentPayload: payload,
+        currentEffectiveOccurrence: effectiveOccurrence,
         systemProfileId,
       });
       activityEventIds.push(...batchedIds);
@@ -195,6 +244,7 @@ export class CompletionCheckDispatcherService {
     currentOccurrenceStart: string;
     currentEndAt: string | null;
     currentPayload: ReminderJobPayload;
+    currentEffectiveOccurrence: EffectiveOccurrence;
     systemProfileId: string;
   }): Promise<string[]> {
     const {
@@ -206,6 +256,7 @@ export class CompletionCheckDispatcherService {
       currentOccurrenceStart,
       currentEndAt,
       currentPayload,
+      currentEffectiveOccurrence,
       systemProfileId,
     } = input;
 
@@ -239,6 +290,20 @@ export class CompletionCheckDispatcherService {
 
     if (concurrentSessions.length === 0) {
       // No concurrent sessions — dispatch single event
+      const sessionCompletionId = await this.upsertSessionCompletion({
+        supabase,
+        orgId,
+        scheduleId: currentScheduleId,
+        occurrenceKey: currentOccurrenceStart,
+        profileId: guardianProfileId,
+        role: 'guardian',
+        sessionEndAt: currentEffectiveOccurrence.sessionEndAt,
+        sessionTitle: currentEffectiveOccurrence.sessionTitle,
+        channelId: currentEffectiveOccurrence.channelId,
+        learningSpaceId: currentEffectiveOccurrence.learningSpaceId,
+      });
+      if (!sessionCompletionId) return [];
+
       const event = await publishActivityEvent({
         supabase,
         orgId,
@@ -263,6 +328,7 @@ export class CompletionCheckDispatcherService {
           channelRouteKind: currentPayload.channelRouteKind ?? 'space',
           members: currentPayload.members ?? [],
           feedbackUiEnabled: true,
+          sessionCompletionId,
         },
         dedupeKey: `session.completion_check:${orgId}:${currentScheduleId}:${currentOccurrenceStart}:${guardianProfileId}`,
         refreshOnDedupe: false,
@@ -277,6 +343,19 @@ export class CompletionCheckDispatcherService {
     // in this window share the same batch event.
     const batchDedupeKey = `session.completion_check.batch:${orgId}:${guardianProfileId}:${windowStart}`;
 
+    const currentSessionCompletionId = await this.upsertSessionCompletion({
+      supabase,
+      orgId,
+      scheduleId: currentScheduleId,
+      occurrenceKey: currentOccurrenceStart,
+      profileId: guardianProfileId,
+      role: 'guardian',
+      sessionEndAt: currentEffectiveOccurrence.sessionEndAt,
+      sessionTitle: currentEffectiveOccurrence.sessionTitle,
+      channelId: currentEffectiveOccurrence.channelId,
+      learningSpaceId: currentEffectiveOccurrence.learningSpaceId,
+    });
+
     const currentSessionEntry = {
       channelId: currentPayload.channelId,
       learningSpaceId: currentPayload.learningSpaceId ?? null,
@@ -290,27 +369,49 @@ export class CompletionCheckDispatcherService {
         | 'channel',
       members: currentPayload.members ?? [],
       feedbackUiEnabled: true,
+      sessionCompletionId: currentSessionCompletionId,
     };
 
-    const concurrentEntries = concurrentSessions.map((s) => ({
-      channelId: s.source_channel_id ?? '',
-      learningSpaceId: s.source_learning_space_id ?? null,
-      scheduleId: s.id,
-      occurrenceStart: s.end_at,
-      title: s.title,
-      summary: null,
-      channelRouteKind: 'space' as const,
-      members: s.participants.map((p) => ({
-        profileId: p.profile_id,
-        role: p.role as 'educator' | 'child' | 'guardian' | 'staff' | 'observer' | null,
-        displayName: p.display_name,
-        avatarUrl: p.avatar_url,
-        themeKey: p.theme_key,
+    // Each concurrent session was fetched fresh (excluding 'cancelled') just above, so
+    // its own end_at is already current — no separate re-resolution needed here.
+    const concurrentEntries = await Promise.all(
+      concurrentSessions.map(async (s) => ({
+        channelId: s.source_channel_id ?? '',
+        learningSpaceId: s.source_learning_space_id ?? null,
+        scheduleId: s.id,
+        occurrenceStart: s.end_at,
+        title: s.title,
+        summary: null,
+        channelRouteKind: 'space' as const,
+        members: s.participants.map((p) => ({
+          profileId: p.profile_id,
+          role: p.role as 'educator' | 'child' | 'guardian' | 'staff' | 'observer' | null,
+          displayName: p.display_name,
+          avatarUrl: p.avatar_url,
+          themeKey: p.theme_key,
+        })),
+        feedbackUiEnabled: true,
+        sessionCompletionId: await this.upsertSessionCompletion({
+          supabase,
+          orgId,
+          scheduleId: s.id,
+          occurrenceKey: s.end_at,
+          profileId: guardianProfileId,
+          role: 'guardian',
+          sessionEndAt: s.end_at,
+          sessionTitle: s.title,
+          channelId: s.source_channel_id ?? null,
+          learningSpaceId: s.source_learning_space_id ?? null,
+        }),
       })),
-      feedbackUiEnabled: true,
-    }));
+    );
 
     const allSessions = [currentSessionEntry, ...concurrentEntries];
+    const sessionCompletionIds = allSessions
+      .map((s) => s.sessionCompletionId)
+      .filter((id): id is string => Boolean(id));
+
+    if (!sessionCompletionIds.length) return [];
 
     const event = await publishActivityEvent({
       supabase,
@@ -323,6 +424,7 @@ export class CompletionCheckDispatcherService {
       payload: {
         sessions: allSessions,
         sessionCount: allSessions.length,
+        sessionCompletionIds,
       },
       dedupeKey: batchDedupeKey,
       refreshOnDedupe: true,
@@ -424,5 +526,178 @@ export class CompletionCheckDispatcherService {
       );
 
     return [...explicitGuardians, ...linkedGuardians];
+  }
+
+  /**
+   * Re-resolves current cancel/reschedule state for (scheduleId, occurrenceStart) right
+   * before dispatch, closing the race described where an already-queued job could
+   * otherwise fire stale. Returns null if the occurrence was cancelled (dispatch must
+   * be aborted entirely); otherwise returns the effective session_end_at to use —
+   * the override's patched end time for a rescheduled recurring occurrence, or the
+   * schedule's own current end_at for a one-off session (reschedules on those are
+   * already reflected in-place).
+   */
+  private async resolveEffectiveOccurrence(input: {
+    supabase: SupabaseServiceClient;
+    orgId: string;
+    scheduleId: string;
+    occurrenceStart: string;
+    fallbackEndAt: string | null;
+    fallbackTitle: string;
+    fallbackChannelId: string;
+    fallbackLearningSpaceId: string | null;
+  }): Promise<EffectiveOccurrence | null> {
+    const { supabase, orgId, scheduleId, occurrenceStart } = input;
+
+    const { data: schedule } = await supabase
+      .from('class_schedules')
+      .select('id, title, status, end_at, source_channel_id, source_learning_space_id')
+      .eq('org_id', orgId)
+      .eq('id', scheduleId)
+      .is('deleted_at', null)
+      .maybeSingle<{
+        id: string;
+        title: string;
+        status: string;
+        end_at: string;
+        source_channel_id: string | null;
+        source_learning_space_id: string | null;
+      }>();
+
+    if (!schedule) {
+      // Schedule was hard-deleted since the job was queued — nothing to dispatch for.
+      return null;
+    }
+    if (schedule.status === 'cancelled') {
+      return null;
+    }
+
+    const { data: recurrence } = await supabase
+      .from('class_schedule_recurrence')
+      .select('id')
+      .eq('org_id', orgId)
+      .eq('schedule_id', scheduleId)
+      .is('deleted_at', null)
+      .maybeSingle<{ id: string }>();
+
+    if (!recurrence) {
+      // One-off session: reschedules mutate start_at/end_at in place, so the freshly
+      // fetched row is already current — no separate override lookup needed.
+      return {
+        sessionEndAt: schedule.end_at,
+        sessionTitle: schedule.title,
+        channelId: schedule.source_channel_id,
+        learningSpaceId: schedule.source_learning_space_id,
+      };
+    }
+
+    const { data: exception } = await supabase
+      .from('class_schedule_recurrence_exceptions')
+      .select('id')
+      .eq('org_id', orgId)
+      .eq('recurrence_id', recurrence.id)
+      .eq('occurrence_key', occurrenceStart)
+      .is('deleted_at', null)
+      .maybeSingle<{ id: string }>();
+
+    if (exception) {
+      // This occurrence was cancelled after the job was queued.
+      return null;
+    }
+
+    const { data: override } = await supabase
+      .from('class_schedule_recurrence_overrides')
+      .select('patch')
+      .eq('org_id', orgId)
+      .eq('recurrence_id', recurrence.id)
+      .eq('occurrence_key', occurrenceStart)
+      .is('deleted_at', null)
+      .maybeSingle<{ patch: { endAt?: string | null } | null }>();
+
+    const overrideEndAt = override?.patch?.endAt ?? null;
+
+    return {
+      sessionEndAt: overrideEndAt ?? input.fallbackEndAt ?? occurrenceStart,
+      sessionTitle: input.fallbackTitle,
+      channelId: input.fallbackChannelId,
+      learningSpaceId: input.fallbackLearningSpaceId,
+    };
+  }
+
+  /**
+   * Idempotent upsert into class_session_completions — the new source of truth,
+   * inserted BEFORE the notification is published. Clients can no longer insert their
+   * own row (RLS restricts insert to the service role), so this upsert must be safe to
+   * run again after a partial dispatch failure: `on conflict ... do nothing` means an
+   * already-created row is untouched and a retried dispatch simply fills in whatever's
+   * still missing, rather than ever leaving a participant with no row to act on.
+   */
+  private async upsertSessionCompletion(input: {
+    supabase: SupabaseServiceClient;
+    orgId: string;
+    scheduleId: string;
+    occurrenceKey: string;
+    profileId: string;
+    role: string;
+    sessionEndAt: string;
+    sessionTitle: string | null;
+    channelId: string | null;
+    learningSpaceId: string | null;
+  }): Promise<string | null> {
+    const now = new Date().toISOString();
+    const expiresAt = new Date(
+      new Date(input.sessionEndAt).getTime() + 3 * 24 * 60 * 60 * 1000,
+    ).toISOString();
+
+    const { data, error } = await input.supabase
+      .from('class_session_completions')
+      .upsert(
+        {
+          org_id: input.orgId,
+          schedule_id: input.scheduleId,
+          occurrence_key: input.occurrenceKey,
+          profile_id: input.profileId,
+          role: input.role,
+          status: 'pending',
+          channel_id: input.channelId,
+          learning_space_id: input.learningSpaceId,
+          session_title: input.sessionTitle,
+          session_end_at: input.sessionEndAt,
+          notified_at: now,
+          expires_at: expiresAt,
+          created_at: now,
+          updated_at: now,
+        },
+        {
+          onConflict: 'org_id,schedule_id,occurrence_key,profile_id',
+          ignoreDuplicates: true,
+        },
+      )
+      .select('id')
+      .maybeSingle<{ id: string }>();
+
+    if (error) {
+      this.logger.error(
+        `upsertSessionCompletion failed scheduleId=${input.scheduleId} profileId=${input.profileId}: ${error.message}`,
+      );
+      return null;
+    }
+
+    if (data?.id) {
+      return data.id;
+    }
+
+    // ignoreDuplicates suppresses the row from `.select()` on a pre-existing conflict —
+    // fetch it so the caller still gets a sessionCompletionId to stamp into the event.
+    const { data: existing } = await input.supabase
+      .from('class_session_completions')
+      .select('id')
+      .eq('org_id', input.orgId)
+      .eq('schedule_id', input.scheduleId)
+      .eq('occurrence_key', input.occurrenceKey)
+      .eq('profile_id', input.profileId)
+      .maybeSingle<{ id: string }>();
+
+    return existing?.id ?? null;
   }
 }

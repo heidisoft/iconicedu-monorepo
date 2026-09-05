@@ -10,6 +10,7 @@ import { MessagesModule } from '@iconicedu/api/modules/messages/messages.module'
 import { RemindersModule } from '@iconicedu/api/modules/reminders/reminders.module';
 import { AnalyticsModule } from '@iconicedu/api/analytics/analytics.module';
 import { ActivityFeedModule } from '@iconicedu/api/modules/activity-feed/activity-feed.module';
+import { SessionCompletionsModule } from '@iconicedu/api/modules/session-completions/session-completions.module';
 import { ReactionsModule } from '@iconicedu/api/modules/reactions/reactions.module';
 import { PushTokensModule } from '@iconicedu/api/modules/push-tokens/push-tokens.module';
 import { ThreadsModule } from '@iconicedu/api/modules/threads/threads.module';
@@ -41,6 +42,7 @@ import { RequestLoggingInterceptor } from '@iconicedu/api/observability/request-
     ClassesModule,
     MessagesModule,
     ActivityFeedModule,
+    SessionCompletionsModule,
     RemindersModule,
     ReactionsModule,
     PushTokensModule,

@@ -7,6 +7,7 @@ export * from './base';
 export * from './channel';
 export * from './class-session-completion-vote';
 export * from './class-session-feedback';
+export * from './class-session-completion';
 export * from './class-schedule';
 export * from './educator-availability';
 export * from './event-pipeline';
