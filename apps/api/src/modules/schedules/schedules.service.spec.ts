@@ -864,7 +864,7 @@ describe('SchedulesService authorization', () => {
     ]);
   });
 
-  it('soft-deletes learning-space schedules that have completion votes', async () => {
+  it('soft-deletes learning-space schedules that have session completions', async () => {
     createSupabaseSessionClientMock.mockReturnValue({
       auth: {
         getUser: jest.fn(async () => ({
@@ -878,7 +878,7 @@ describe('SchedulesService authorization', () => {
     const mainClient = makeReplaceSchedulesClient({
       previousSchedules: [{ id: 'schedule-with-votes' }, { id: 'schedule-free' }],
       cascadeSchedules: [],
-      completionVoteRows: [{ schedule_id: 'schedule-with-votes' }],
+      sessionCompletionRows: [{ schedule_id: 'schedule-with-votes' }],
       operations,
     });
     createSupabaseServiceClientMock
@@ -926,7 +926,7 @@ function makeReplaceSchedulesClient(input: {
   previousSchedules: unknown[];
   cascadeSchedules: unknown[];
   cascadeRecurrences?: unknown[];
-  completionVoteRows?: unknown[];
+  sessionCompletionRows?: unknown[];
   operations?: Array<{ table: string; action: string; payload?: unknown }>;
 }) {
   let classSchedulesSelectCount = 0;
@@ -963,8 +963,8 @@ function makeReplaceSchedulesClient(input: {
           if (table === 'class_schedule_recurrence') {
             return { data: input.cascadeRecurrences ?? [], error: null };
           }
-          if (table === 'class_session_completion_votes') {
-            return { data: input.completionVoteRows ?? [], error: null };
+          if (table === 'class_session_completions') {
+            return { data: input.sessionCompletionRows ?? [], error: null };
           }
           return { data: [], error: null };
         }),

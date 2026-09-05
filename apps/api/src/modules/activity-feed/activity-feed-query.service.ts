@@ -27,6 +27,7 @@ import type {
   ProfileRow,
   ReminderDispatchLogRow,
   ReminderJobRow,
+  ClassSessionCompletionRow,
 } from '@iconicedu/shared-types';
 import { buildSenderProfile } from '@iconicedu/utils';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
@@ -74,30 +75,6 @@ type RawActivityActorProfile = {
   avatar_url: string | null;
   avatar_seed: string | null;
   kind?: string | null;
-};
-
-type RawClassSessionFeedbackRow = {
-  source_event_id: string | null;
-  message_id: string | null;
-  class_session_id: string;
-  classroom_id: string;
-  channel_id: string;
-  occurrence_start_at: string | null;
-  rating: number;
-  comment: string | null;
-  submitted_at: string;
-};
-
-type RawClassSessionCompletionVoteRow = {
-  schedule_id: string;
-  occurrence_key: string;
-  profile_id: string;
-  role: string;
-  status: 'confirmed' | 'disputed';
-  dispute_category: string | null;
-  dispute_reason: string | null;
-  reschedule_requested: boolean;
-  voted_at: string;
 };
 
 type AdminAccountRoleContext = {
@@ -230,30 +207,18 @@ function normalizeOccurrenceValue(value: string) {
   return Number.isNaN(timestamp) ? value : new Date(timestamp).toISOString();
 }
 
-function completionVoteKey(scheduleId: string, occurrenceStart: string) {
+function sessionCompletionKey(scheduleId: string, occurrenceStart: string) {
   return `${scheduleId}:${normalizeOccurrenceKey(occurrenceStart)}`;
 }
 
-function feedbackResponseKey(classSessionId: string, occurrenceStart: string | null) {
-  return `${classSessionId}:${normalizeOccurrenceKey(occurrenceStart)}`;
+function sessionCompletionIdKey(id: string) {
+  return `id:${id}`;
 }
 
-function mapFeedbackResponse(row: RawClassSessionFeedbackRow) {
+function mapSessionCompletion(row: ClassSessionCompletionRow) {
   return {
-    sourceEventId: row.source_event_id,
-    messageId: row.message_id,
-    classSessionId: row.class_session_id,
-    classroomId: row.classroom_id,
-    channelId: row.channel_id,
-    occurrenceStartAt: row.occurrence_start_at,
-    rating: row.rating,
-    comment: row.comment,
-    submittedAt: row.submitted_at,
-  };
-}
-
-function mapCompletionVote(row: RawClassSessionCompletionVoteRow) {
-  return {
+    id: row.id,
+    orgId: row.org_id,
     scheduleId: row.schedule_id,
     occurrenceKey: normalizeOccurrenceValue(row.occurrence_key),
     profileId: row.profile_id,
@@ -262,7 +227,18 @@ function mapCompletionVote(row: RawClassSessionCompletionVoteRow) {
     disputeCategory: row.dispute_category,
     disputeReason: row.dispute_reason,
     rescheduleRequested: row.reschedule_requested,
-    votedAt: row.voted_at,
+    rating: row.rating,
+    ratingComment: row.rating_comment,
+    channelId: row.channel_id,
+    learningSpaceId: row.learning_space_id,
+    sessionTitle: row.session_title,
+    sessionEndAt: row.session_end_at,
+    notifiedAt: row.notified_at,
+    confirmedAt: row.confirmed_at,
+    disputedAt: row.disputed_at,
+    ratedAt: row.rated_at,
+    resolvedAt: row.resolved_at,
+    expiresAt: row.expires_at,
   };
 }
 
@@ -653,22 +629,29 @@ export class ActivityFeedQueryService {
     };
   }
 
-  private collectCompletionTargets(items: ActivityFeedItemVM[]) {
+  private collectSessionCompletionTargets(items: ActivityFeedItemVM[]) {
     const targets = new Map<string, { scheduleId: string; occurrenceStart: string }>();
 
     items
       .filter((item) => item.kind === 'leaf')
       .filter(
         (item) =>
+          item.verb === 'session.feedback_request.sent' ||
           item.verb === 'session.completion_check.sent' ||
           item.verb === 'session.completion_check.batch.sent',
       )
       .forEach((item) => {
-        if (item.verb === 'session.completion_check.sent') {
-          const scheduleId = getCompletionScheduleId(item);
-          const occurrenceStart = getCompletionOccurrenceStart(item);
+        if (item.verb !== 'session.completion_check.batch.sent') {
+          const scheduleId =
+            item.verb === 'session.feedback_request.sent'
+              ? getFeedbackClassSessionId(item)
+              : getCompletionScheduleId(item);
+          const occurrenceStart =
+            item.verb === 'session.feedback_request.sent'
+              ? getFeedbackOccurrenceStart(item)
+              : getCompletionOccurrenceStart(item);
           if (scheduleId && occurrenceStart) {
-            targets.set(completionVoteKey(scheduleId, occurrenceStart), {
+            targets.set(sessionCompletionKey(scheduleId, occurrenceStart), {
               scheduleId,
               occurrenceStart,
             });
@@ -683,7 +666,7 @@ export class ActivityFeedQueryService {
           const scheduleId = sessionRecord.scheduleId;
           const occurrenceStart = sessionRecord.occurrenceStart;
           if (typeof scheduleId === 'string' && typeof occurrenceStart === 'string') {
-            targets.set(completionVoteKey(scheduleId, occurrenceStart), {
+            targets.set(sessionCompletionKey(scheduleId, occurrenceStart), {
               scheduleId,
               occurrenceStart,
             });
@@ -694,84 +677,36 @@ export class ActivityFeedQueryService {
     return Array.from(targets.values());
   }
 
-  private async loadFeedbackResponses(
-    accessToken: string,
+  private async loadSessionCompletions(
     orgId: string,
     profileId: string,
     items: ActivityFeedItemVM[],
-  ): Promise<Map<string, RawClassSessionFeedbackRow>> {
-    const feedbackClassSessionIds = Array.from(
-      new Set(
-        items
-          .filter((item) => item.kind === 'leaf')
-          .filter((item) => item.verb === 'session.feedback_request.sent')
-          .map(getFeedbackClassSessionId)
-          .filter(isNonEmptyString),
-      ),
-    );
-    if (!feedbackClassSessionIds.length) return new Map();
-
-    const supabase = createSupabaseSessionClient(accessToken);
-    const { data, error } = await supabase
-      .from('class_session_feedback')
-      .select(
-        'source_event_id, message_id, class_session_id, classroom_id, channel_id, occurrence_start_at, rating, comment, submitted_at',
-      )
-      .eq('org_id', orgId)
-      .eq('recipient_profile_id', profileId)
-      .is('deleted_at', null)
-      .in('class_session_id', feedbackClassSessionIds)
-      .returns<RawClassSessionFeedbackRow[]>();
-    if (error) throw new InternalServerErrorException(error.message);
-
-    const responses = new Map<string, RawClassSessionFeedbackRow>();
-    (data ?? []).forEach((row) => {
-      responses.set(
-        feedbackResponseKey(row.class_session_id, row.occurrence_start_at),
-        row,
-      );
-
-      if (!responses.has(row.class_session_id)) {
-        responses.set(row.class_session_id, row);
-      }
-    });
-
-    return responses;
-  }
-
-  private async loadCompletionVotes(
-    orgId: string,
-    profileId: string,
-    items: ActivityFeedItemVM[],
-  ): Promise<Map<string, RawClassSessionCompletionVoteRow>> {
-    const targets = this.collectCompletionTargets(items);
+  ): Promise<Map<string, ClassSessionCompletionRow>> {
+    const targets = this.collectSessionCompletionTargets(items);
     if (!targets.length) return new Map();
 
     const scheduleIds = Array.from(new Set(targets.map((target) => target.scheduleId)));
-    const occurrenceStarts = Array.from(
-      new Set(targets.map((target) => target.occurrenceStart)),
-    );
 
     const supabase = createSupabaseServiceClient();
     const { data, error } = await supabase
-      .from('class_session_completion_votes')
-      .select(
-        'schedule_id, occurrence_key, profile_id, role, status, dispute_category, dispute_reason, reschedule_requested, voted_at',
-      )
+      .from('class_session_completions')
+      .select('*')
       .eq('org_id', orgId)
       .eq('profile_id', profileId)
       .is('deleted_at', null)
       .in('schedule_id', scheduleIds)
-      .in('occurrence_key', occurrenceStarts)
-      .returns<RawClassSessionCompletionVoteRow[]>();
+      .returns<ClassSessionCompletionRow[]>();
     if (error) throw new InternalServerErrorException(error.message);
 
-    return new Map(
-      (data ?? []).map((row) => [
-        completionVoteKey(row.schedule_id, row.occurrence_key),
-        row,
-      ]),
-    );
+    const completions = new Map<string, ClassSessionCompletionRow>();
+    (data ?? []).forEach((row) => {
+      completions.set(sessionCompletionIdKey(row.id), row);
+      completions.set(sessionCompletionKey(row.schedule_id, row.occurrence_key), row);
+      if (!completions.has(row.schedule_id)) {
+        completions.set(row.schedule_id, row);
+      }
+    });
+    return completions;
   }
 
   private async loadActivityFeedActors(
@@ -884,63 +819,47 @@ export class ActivityFeedQueryService {
       } as ActivityFeedItemVM;
     });
 
-    const feedbackResponses = await this.loadFeedbackResponses(
-      accessToken,
+    const sessionCompletions = await this.loadSessionCompletions(
       orgId,
       profileId,
       mappedItems,
     );
-    const feedbackItems = mappedItems.map((item) => {
-      if (item.kind !== 'leaf' || item.verb !== 'session.feedback_request.sent') {
-        return item;
-      }
-
-      const feedbackClassSessionId = getFeedbackClassSessionId(item);
-      if (!feedbackClassSessionId) return item;
-
-      const feedbackOccurrenceStart = getFeedbackOccurrenceStart(item);
-      const feedbackResponse =
-        feedbackResponses.get(
-          feedbackResponseKey(feedbackClassSessionId, feedbackOccurrenceStart),
-        ) ??
-        (feedbackOccurrenceStart ? null : feedbackResponses.get(feedbackClassSessionId));
-      if (!feedbackResponse) return item;
-
-      return {
-        ...item,
-        metadata: {
-          ...(item.metadata ?? {}),
-          feedbackResponse: mapFeedbackResponse(feedbackResponse),
-        },
-      } as ActivityFeedLeafItemVM;
-    });
-    const completionVotes = await this.loadCompletionVotes(
-      orgId,
-      profileId,
-      feedbackItems,
-    );
-    const hydratedItems = feedbackItems.map((item) => {
+    const hydratedItems = mappedItems.map((item) => {
       if (
         item.kind !== 'leaf' ||
-        (item.verb !== 'session.completion_check.sent' &&
+        (item.verb !== 'session.feedback_request.sent' &&
+          item.verb !== 'session.completion_check.sent' &&
           item.verb !== 'session.completion_check.batch.sent')
       ) {
         return item;
       }
 
-      if (item.verb === 'session.completion_check.sent') {
-        const scheduleId = getCompletionScheduleId(item);
-        const occurrenceStart = getCompletionOccurrenceStart(item);
-        if (!scheduleId || !occurrenceStart) return item;
-
-        const vote = completionVotes.get(completionVoteKey(scheduleId, occurrenceStart));
-        if (!vote) return item;
+      if (item.verb !== 'session.completion_check.batch.sent') {
+        const metadata = asRecord(item.metadata);
+        const completionId = getString(metadata.sessionCompletionId);
+        const scheduleId =
+          item.verb === 'session.feedback_request.sent'
+            ? getFeedbackClassSessionId(item)
+            : getCompletionScheduleId(item);
+        const occurrenceStart =
+          item.verb === 'session.feedback_request.sent'
+            ? getFeedbackOccurrenceStart(item)
+            : getCompletionOccurrenceStart(item);
+        const completion =
+          (completionId
+            ? sessionCompletions.get(sessionCompletionIdKey(completionId))
+            : null) ??
+          (scheduleId && occurrenceStart
+            ? sessionCompletions.get(sessionCompletionKey(scheduleId, occurrenceStart))
+            : null) ??
+          (scheduleId ? sessionCompletions.get(scheduleId) : null);
+        if (!completion) return item;
 
         return {
           ...item,
           metadata: {
             ...(item.metadata ?? {}),
-            completionVote: mapCompletionVote(vote),
+            sessionCompletion: mapSessionCompletion(completion),
           },
         } as ActivityFeedLeafItemVM;
       }
@@ -960,14 +879,17 @@ export class ActivityFeedQueryService {
               return session;
             }
 
-            const vote = completionVotes.get(
-              completionVoteKey(scheduleId, occurrenceStart),
-            );
-            if (!vote) return session;
+            const completionId = getString(sessionRecord.sessionCompletionId);
+            const completion =
+              (completionId
+                ? sessionCompletions.get(sessionCompletionIdKey(completionId))
+                : null) ??
+              sessionCompletions.get(sessionCompletionKey(scheduleId, occurrenceStart));
+            if (!completion) return session;
 
             return {
               ...sessionRecord,
-              completionVote: mapCompletionVote(vote),
+              sessionCompletion: mapSessionCompletion(completion),
             };
           }),
         },

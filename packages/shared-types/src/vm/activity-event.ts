@@ -151,11 +151,13 @@ export interface SessionCompletionCheckSentActivityEventPayload {
   channelRouteKind?: 'space' | 'dm' | 'channel' | null;
   members?: SessionCompletionCheckMember[] | null;
   feedbackUiEnabled: boolean;
+  sessionCompletionId?: UUID | null;
 }
 
 export interface SessionCompletionCheckBatchSentActivityEventPayload {
   sessions: SessionCompletionCheckSentActivityEventPayload[];
   sessionCount: number;
+  sessionCompletionIds?: UUID[];
 }
 
 export interface SessionCompletionDisputeReportedActivityEventPayload {
@@ -171,6 +173,7 @@ export interface SessionCompletionDisputeReportedActivityEventPayload {
   disputeReason?: string | null;
   rescheduleRequested: boolean;
   recipientRole: 'educator' | 'staff';
+  sessionCompletionId?: UUID | null;
 }
 
 export interface MessageActivityEventPayload {

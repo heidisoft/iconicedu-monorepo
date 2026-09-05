@@ -10,6 +10,7 @@ import {
   enableChannelCommunications,
   enableMarketingSitePages,
   enableMessageTypeComposer,
+  enableSessionCompletionCarousel,
   enableMobileAppleSignIn,
   enableMobileDirectMessageStart,
   enableMobileGoogleSignIn,
@@ -61,6 +62,14 @@ describe('web flags', () => {
     expect(enableMarketingSitePages.key).toBe('enable-marketing-site-pages');
     expect(enableMarketingSitePages.defaultValue).toBe(false);
     expect(webFlags.enableMarketingSitePages).toBe(enableMarketingSitePages);
+  });
+
+  it('declares the session completion carousel flag off by default', () => {
+    expect(enableSessionCompletionCarousel.key).toBe('session-completion-carousel');
+    expect(enableSessionCompletionCarousel.defaultValue).toBe(false);
+    expect(webFlags.enableSessionCompletionCarousel).toBe(
+      enableSessionCompletionCarousel,
+    );
   });
 
   it('does not require FLAGS env to load the catalog', () => {
@@ -127,5 +136,6 @@ describe('web flags', () => {
     expect(JSON.stringify(providerData)).toContain('enable-marketing-site-pages');
     expect(JSON.stringify(providerData)).toContain('enable-message-type-composer');
     expect(JSON.stringify(providerData)).toContain('enable-mobile-direct-message-start');
+    expect(JSON.stringify(providerData)).toContain('session-completion-carousel');
   });
 });

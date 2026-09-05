@@ -20,16 +20,14 @@ import {
 } from './activity-item';
 import { lightColors } from '@/lib/theme';
 
-const mockSubmitActivityFeedFeedback = jest.fn();
-const mockSubmitCompletionVote = jest.fn();
+const mockRateSessionCompletion = jest.fn();
+const mockConfirmSessionCompletion = jest.fn();
+const mockDisputeSessionCompletion = jest.fn();
 
-jest.mock('@/lib/api/activity-feed/feedback', () => ({
-  submitActivityFeedFeedback: (...args: unknown[]) =>
-    mockSubmitActivityFeedFeedback(...args),
-}));
-
-jest.mock('@/lib/api/activity-feed/completion-vote', () => ({
-  submitCompletionVote: (...args: unknown[]) => mockSubmitCompletionVote(...args),
+jest.mock('@/lib/api/session-completions', () => ({
+  rateSessionCompletion: (...args: unknown[]) => mockRateSessionCompletion(...args),
+  confirmSessionCompletion: (...args: unknown[]) => mockConfirmSessionCompletion(...args),
+  disputeSessionCompletion: (...args: unknown[]) => mockDisputeSessionCompletion(...args),
 }));
 
 function makeBaseActivity(): ActivityFeedItemVM {
@@ -97,8 +95,9 @@ function renderActivity(
 describe('ActivityItem', () => {
   afterEach(() => {
     jest.useRealTimers();
-    mockSubmitActivityFeedFeedback.mockReset();
-    mockSubmitCompletionVote.mockReset();
+    mockRateSessionCompletion.mockReset();
+    mockConfirmSessionCompletion.mockReset();
+    mockDisputeSessionCompletion.mockReset();
   });
 
   it('renders the activity row without inline avatars', () => {
@@ -285,6 +284,7 @@ describe('ActivityItem', () => {
       },
       metadata: {
         feedbackUiEnabled: true,
+        sessionCompletionId: 'completion-1',
         sourceEventId: 'event-1',
         classSessionId: 'session-1',
         classroomId: 'space-1',
@@ -313,6 +313,7 @@ describe('ActivityItem', () => {
       },
       metadata: {
         feedbackUiEnabled: true,
+        sessionCompletionId: 'completion-1',
         sourceEventId: 'event-1',
         scheduleId: 'session-1',
         learningSpaceId: 'space-1',
@@ -331,7 +332,7 @@ describe('ActivityItem', () => {
 
   it('autosaves low-rating comments and uses a button to collapse to the submitted state', async () => {
     jest.useFakeTimers();
-    mockSubmitActivityFeedFeedback
+    mockRateSessionCompletion
       .mockResolvedValueOnce({
         submittedAt: '2026-04-02T12:05:00.000Z',
         rating: 4,
@@ -351,6 +352,7 @@ describe('ActivityItem', () => {
       },
       metadata: {
         feedbackUiEnabled: true,
+        sessionCompletionId: 'completion-1',
         sourceEventId: 'event-1',
         classSessionId: 'session-1',
         classroomId: 'space-1',
@@ -366,7 +368,7 @@ describe('ActivityItem', () => {
       fireEvent.press(screen.getByLabelText('Rate 4 stars'));
     });
 
-    expect(mockSubmitActivityFeedFeedback).toHaveBeenCalledTimes(1);
+    expect(mockRateSessionCompletion).toHaveBeenCalledTimes(1);
     expect(screen.queryByText('Saving...')).toBeNull();
     expect(screen.getByText('Submit feedback')).toBeTruthy();
 
@@ -379,7 +381,7 @@ describe('ActivityItem', () => {
       jest.advanceTimersByTime(600);
     });
 
-    expect(mockSubmitActivityFeedFeedback).toHaveBeenCalledTimes(2);
+    expect(mockRateSessionCompletion).toHaveBeenCalledTimes(2);
     expect(screen.getByText('Submit feedback')).toBeTruthy();
     expect(screen.queryByText('Rating saved. Comments save automatically.')).toBeNull();
 
@@ -389,11 +391,11 @@ describe('ActivityItem', () => {
 
     expect(screen.getByText('Thank you for your feedback.')).toBeTruthy();
     expect(screen.queryByPlaceholderText('Tell us what could be better...')).toBeNull();
-    expect(mockSubmitActivityFeedFeedback).toHaveBeenLastCalledWith(
+    expect(mockRateSessionCompletion).toHaveBeenLastCalledWith(
       expect.objectContaining({
         rating: 4,
         comment: 'Helpful, but a little fast.',
-        recipientProfileId: 'profile-1',
+        sessionCompletionId: 'completion-1',
       }),
     );
   });
@@ -459,7 +461,8 @@ describe('ActivityItem', () => {
             title: 'Math Foundations',
             channelId: 'channel-1',
             learningSpaceId: 'space-1',
-            completionVote: { status: 'confirmed' },
+            sessionCompletionId: 'completion-1',
+            sessionCompletion: { id: 'completion-1', status: 'confirmed' },
           },
           {
             scheduleId: 'schedule-1',
@@ -467,27 +470,27 @@ describe('ActivityItem', () => {
             title: 'Math Foundations',
             channelId: 'channel-1',
             learningSpaceId: 'space-1',
+            sessionCompletionId: 'completion-2',
           },
         ],
       },
     } as ActivityFeedItemVM;
 
     renderActivity(item);
-    mockSubmitCompletionVote.mockResolvedValue({ feedbackEnabled: true });
+    mockConfirmSessionCompletion.mockResolvedValue({ feedbackEnabled: true });
 
     expect(screen.getByText('1 of 2 confirmed')).toBeTruthy();
 
     fireEvent.press(screen.getByLabelText('Math Foundations — resolved'));
-    expect(
-      screen.getByText("You've already responded — thanks for letting us know!"),
-    ).toBeTruthy();
+    expect(screen.getByText('Great! How was the session?')).toBeTruthy();
+    expect(screen.getByText('Rate your session')).toBeTruthy();
 
     fireEvent.press(screen.getByLabelText('Math Foundations — needs confirmation'));
     expect(screen.getByText('Confirm Lesson')).toBeTruthy();
   });
 
-  it('submits completion votes for the current inbox profile', async () => {
-    mockSubmitCompletionVote.mockResolvedValue({ feedbackEnabled: true });
+  it('submits completion confirmation by stable row id', async () => {
+    mockConfirmSessionCompletion.mockResolvedValue({ feedbackEnabled: true });
     const item = {
       ...makeBaseActivity(),
       verb: 'session.completion_check.sent',
@@ -501,6 +504,7 @@ describe('ActivityItem', () => {
         occurrenceStart: '2026-03-19T22:00:00.000Z',
         roleContext: 'guardian',
         completionCheckUiEnabled: true,
+        sessionCompletionId: 'completion-1',
       },
     } as ActivityFeedItemVM;
 
@@ -509,14 +513,10 @@ describe('ActivityItem', () => {
     fireEvent.press(screen.getByText('Confirm Lesson'));
 
     await waitFor(() => {
-      expect(mockSubmitCompletionVote).toHaveBeenCalledWith(
+      expect(mockConfirmSessionCompletion).toHaveBeenCalledWith(
         expect.objectContaining({
           orgId: 'org-1',
-          scheduleId: 'schedule-1',
-          occurrenceKey: '2026-03-19T22:00:00.000Z',
-          role: 'guardian',
-          status: 'confirmed',
-          recipientProfileId: 'profile-1',
+          sessionCompletionId: 'completion-1',
         }),
       );
     });

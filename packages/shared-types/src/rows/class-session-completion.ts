@@ -1,4 +1,5 @@
 import type { ISODateTime, UUID } from '../shared/shared';
+import type { ParticipantRoleVM } from '../vm/class-schedule';
 
 export type ClassSessionCompletionStatus =
   | 'pending'
@@ -18,7 +19,7 @@ export interface ClassSessionCompletionRow {
   schedule_id: UUID;
   occurrence_key: ISODateTime;
   profile_id: UUID;
-  role: string;
+  role: ParticipantRoleVM;
   status: ClassSessionCompletionStatus;
   dispute_category?: ClassSessionCompletionDisputeCategory | null;
   dispute_reason?: string | null;

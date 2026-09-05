@@ -22,6 +22,7 @@ export interface ReminderJobRow {
   next_attempt_at?: ISODateTime | null;
   last_error?: string | null;
   dispatched_at?: ISODateTime | null;
+  completion_reconciled_at?: ISODateTime | null;
   created_at: ISODateTime;
   created_by?: UUID | null;
   updated_at: ISODateTime;

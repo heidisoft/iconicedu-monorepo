@@ -1,37 +1,14 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Logger,
-  Post,
-  Query,
-  Req,
-  UseGuards,
-} from '@nestjs/common';
-import type {
-  SubmitCompletionVoteInput,
-  SubmitSessionFeedbackInput,
-} from '@iconicedu/shared-types';
+import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@iconicedu/api/modules/auth/auth.guard';
-import { ActivityFeedService } from '@iconicedu/api/modules/activity-feed/activity-feed.service';
 import { ActivityFeedQueryService } from '@iconicedu/api/modules/activity-feed/activity-feed-query.service';
 import {
   extractBearerToken,
   type AuthenticatedRequest,
 } from '@iconicedu/api/lib/http/authenticated-request';
 
-type SubmitSessionFeedbackRequest = SubmitSessionFeedbackInput & {
-  recipientProfileId?: string | null;
-};
-
 @Controller('activity-feed')
 export class ActivityFeedController {
-  private readonly logger = new Logger(ActivityFeedController.name);
-
-  constructor(
-    private readonly activityFeedService: ActivityFeedService,
-    private readonly activityFeedQueryService: ActivityFeedQueryService,
-  ) {}
+  constructor(private readonly activityFeedQueryService: ActivityFeedQueryService) {}
 
   @Get()
   @UseGuards(AuthGuard)
@@ -66,31 +43,6 @@ export class ActivityFeedController {
     return this.activityFeedQueryService.fetchAdminActivityFeedAudit(req.user.id, orgId, {
       limit: Number.isFinite(parsedLimit) ? parsedLimit : undefined,
     });
-  }
-
-  @Post('feedback')
-  @UseGuards(AuthGuard)
-  submitFeedback(
-    @Req() req: AuthenticatedRequest,
-    @Body() body: SubmitSessionFeedbackRequest,
-  ) {
-    extractBearerToken(req.headers.authorization);
-    this.logger.log(
-      `submitFeedback authUserId=${req.user.id} orgId=${body.orgId} recipientProfileId=${body.recipientProfileId ?? 'none'} rating=${body.rating} sourceEventId=${body.sourceEventId ?? 'none'} messageId=${body.messageId ?? 'none'}`,
-    );
-    return this.activityFeedService.submitFeedback(req.user.id, body);
-  }
-
-  @Post('session-completion-vote')
-  @UseGuards(AuthGuard)
-  submitCompletionVote(
-    @Req() req: AuthenticatedRequest,
-    @Body() body: SubmitCompletionVoteInput,
-  ) {
-    this.logger.log(
-      `submitCompletionVote authUserId=${req.user.id} orgId=${body.orgId} scheduleId=${body.scheduleId} status=${body.status}`,
-    );
-    return this.activityFeedService.submitCompletionVote(req.user.id, body);
   }
 
   @Post('read')

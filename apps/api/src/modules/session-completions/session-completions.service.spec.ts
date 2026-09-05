@@ -1,4 +1,8 @@
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { SessionCompletionsService } from '@iconicedu/api/modules/session-completions/session-completions.service';
 import { publishActivityEvent } from '@iconicedu/api/lib/activity-feed/activity-publisher';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
@@ -41,18 +45,14 @@ describe('SessionCompletionsService', () => {
     return chain;
   }
 
-  function makeUpdateChain() {
+  function makeUpdateChain(updated: { id: string } | null = { id: COMPLETION_ID }) {
     const chain: Record<string, jest.Mock> = {
       update: jest.fn(() => chain),
       eq: jest.fn(() => chain),
-      in: jest.fn(async () => ({ error: null })),
+      in: jest.fn(() => chain),
+      select: jest.fn(() => chain),
+      maybeSingle: jest.fn(async () => ({ data: updated, error: null })),
     };
-    // Terminal call may be `.eq(...)` chained three times ending without `.in()`
-    // (confirm/dispute) — make the final `.eq()` awaitable too.
-    chain.eq = jest.fn(() => {
-      const thenable = Object.assign(Promise.resolve({ error: null }), chain);
-      return thenable;
-    });
     return chain;
   }
 
@@ -61,6 +61,8 @@ describe('SessionCompletionsService', () => {
     accountRow?: Record<string, unknown> | null;
     profileRow?: Record<string, unknown> | null;
     familyLinkRow?: Record<string, unknown> | null;
+    updatedRow?: { id: string } | null;
+    rpcRows?: Array<Record<string, unknown>>;
   }) {
     const accountChain = makeChain({
       data: input.accountRow ?? { id: ACCOUNT_ID, org_id: ORG_ID },
@@ -75,7 +77,9 @@ describe('SessionCompletionsService', () => {
       },
     });
     const familyLinkChain = makeChain({ data: input.familyLinkRow ?? null });
-    const updateChain = makeUpdateChain();
+    const updateChain = makeUpdateChain(
+      input.updatedRow === undefined ? { id: COMPLETION_ID } : input.updatedRow,
+    );
 
     const from = jest.fn((table: string) => {
       if (table === 'accounts') return accountChain;
@@ -87,8 +91,9 @@ describe('SessionCompletionsService', () => {
       throw new Error(`Unexpected table: ${table}`);
     });
 
-    createSupabaseServiceClientMock.mockReturnValue({ from, rpc: jest.fn() } as never);
-    return { from, updateChain };
+    const rpc = jest.fn(async () => ({ data: input.rpcRows ?? [], error: null }));
+    createSupabaseServiceClientMock.mockReturnValue({ from, rpc } as never);
+    return { from, updateChain, rpc };
   }
 
   function baseCompletionRow(overrides: Record<string, unknown> = {}) {
@@ -115,6 +120,63 @@ describe('SessionCompletionsService', () => {
     };
   }
 
+  describe('listForProfile', () => {
+    it('returns a bounded cursor page from the consolidated source', async () => {
+      const first = { ...baseCompletionRow(), order_key: '2030-03-06T11:00:00.000Z' };
+      const second = {
+        ...baseCompletionRow({
+          id: '00000000-0000-4000-8000-000000000008',
+          session_end_at: '2030-03-05T11:00:00.000Z',
+        }),
+        order_key: '2030-03-05T11:00:00.000Z',
+      };
+      const { rpc } = makeSupabase({
+        completionRow: null,
+        rpcRows: [first, second],
+      });
+      const service = new SessionCompletionsService();
+
+      const result = await service.listForProfile(AUTH_USER_ID, {
+        orgId: ORG_ID,
+        profileId: PROFILE_ID,
+        limit: 1.9,
+      });
+
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0]).toMatchObject({
+        id: COMPLETION_ID,
+        scheduleId: SCHEDULE_ID,
+        status: 'pending',
+      });
+      expect(result.nextCursor).toEqual(expect.any(String));
+      expect(rpc).toHaveBeenCalledWith('list_class_session_completions_for_profile', {
+        p_org_id: ORG_ID,
+        p_profile_id: PROFILE_ID,
+        p_limit: 2,
+        p_cursor_order_key: null,
+        p_cursor_id: null,
+      });
+    });
+
+    it('rejects a cursor with invalid timestamp and identifier values', async () => {
+      const { rpc } = makeSupabase({ completionRow: null });
+      const service = new SessionCompletionsService();
+      const cursor = Buffer.from(
+        JSON.stringify({ orderKey: 'not-a-date', id: 'not-a-uuid' }),
+        'utf8',
+      ).toString('base64url');
+
+      await expect(
+        service.listForProfile(AUTH_USER_ID, {
+          orgId: ORG_ID,
+          profileId: PROFILE_ID,
+          cursor,
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(rpc).not.toHaveBeenCalled();
+    });
+  });
+
   describe('confirm', () => {
     it('confirms a pending row', async () => {
       makeSupabase({ completionRow: baseCompletionRow({ status: 'pending' }) });
@@ -138,6 +200,21 @@ describe('SessionCompletionsService', () => {
           sessionCompletionId: COMPLETION_ID,
         }),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects a stale confirm when another request resolves the row first', async () => {
+      makeSupabase({
+        completionRow: baseCompletionRow({ status: 'pending' }),
+        updatedRow: null,
+      });
+      const service = new SessionCompletionsService();
+
+      await expect(
+        service.confirm(AUTH_USER_ID, {
+          orgId: ORG_ID,
+          sessionCompletionId: COMPLETION_ID,
+        }),
+      ).rejects.toThrow(ConflictException);
     });
 
     it('rejects when the requesting account does not own the profile and has no family link', async () => {

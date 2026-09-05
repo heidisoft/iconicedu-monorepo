@@ -812,19 +812,20 @@ export class SchedulesService {
       throw new InternalServerErrorException(cancelJobsError.message);
     }
 
-    const { data: completionVoteRows, error: completionVotesError } = await supabase
-      .from('class_session_completion_votes')
+    const { data: completionRows, error: completionsError } = await supabase
+      .from('class_session_completions')
       .select('schedule_id')
       .eq('org_id', orgId)
       .in('schedule_id', scheduleIds)
+      .is('deleted_at', null)
       .returns<Array<{ schedule_id: string }>>();
 
-    if (completionVotesError) {
-      throw new InternalServerErrorException(completionVotesError.message);
+    if (completionsError) {
+      throw new InternalServerErrorException(completionsError.message);
     }
 
     const referencedScheduleIds = new Set(
-      (completionVoteRows ?? []).map((row) => row.schedule_id),
+      (completionRows ?? []).map((row) => row.schedule_id),
     );
     const softDeleteScheduleIds = scheduleIds.filter((id) =>
       referencedScheduleIds.has(id),

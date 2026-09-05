@@ -22,6 +22,8 @@ import { useExternalLiveSessionJoinDialog } from '@iconicedu/ui-web/components/m
 import type { ClassSession } from '@iconicedu/ui-web/components/messages/tabs/messages-schedule-tab.utils';
 import { DotPattern } from '@iconicedu/ui-web/ui/dot-pattern';
 import { OTHER_SUBJECT_OPTION, STANDARD_SUBJECT_OPTIONS } from '@iconicedu/shared-types';
+import type { SessionCompletionVM } from '@iconicedu/shared-types';
+import { SessionCompletedCarousel } from '@iconicedu/ui-web/components/dashboard/session-completed-carousel';
 
 export interface DashboardUpcomingSessionListItem {
   session: ClassSession;
@@ -57,6 +59,7 @@ export interface DashboardHomeInfographicSectionProps {
     activeSubjectsLabel: string;
   };
   upcomingSessionsPage: DashboardUpcomingSessionsPage;
+  completedSessionsPending?: SessionCompletionVM[];
   calendarHref: string;
   notificationsHref: string;
   browseHref: string;
@@ -78,6 +81,7 @@ export function DashboardHomeInfographicSection({
   isTutorView = false,
   topMetrics,
   upcomingSessionsPage,
+  completedSessionsPending = [],
   calendarHref,
   notificationsHref,
   browseHref,
@@ -293,6 +297,8 @@ export function DashboardHomeInfographicSection({
           </div>
         </article>
       </div>
+
+      <SessionCompletedCarousel completions={completedSessionsPending} />
 
       <div className="grid gap-4 lg:grid-cols-[13fr_7fr]">
         <article className="rounded-3xl border border-border bg-card/80 p-6">

@@ -20,7 +20,6 @@ import {
   getMessagePaymentRemindersByMessageIds,
   getMessageEventRemindersByMessageIds,
   getMessageFeedbackRequestsByMessageIds,
-  getClassSessionFeedbackByMessageIds,
   getMessageLessonAssignmentsByMessageIds,
   getMessageProgressUpdatesByMessageIds,
   getMessageSessionBookingsByMessageIds,
@@ -37,6 +36,7 @@ import { buildUserProfileById } from '@iconicedu/web/lib/profile/builders/user-p
 import { mapMessageRowToVM } from '@iconicedu/web/lib/messages/mappers/message.mapper';
 import { buildThreadById } from '@iconicedu/web/lib/messages/builders/thread.builder';
 import { getProfilesByAccountIds } from '@iconicedu/web/lib/profile/queries/profiles.query';
+import { listSessionCompletions } from '@iconicedu/web/lib/api/session-completions';
 
 type MessageBuildOptions = {
   threadsById?: Map<string, ThreadVM>;
@@ -433,29 +433,46 @@ async function applySessionFeedbackResponsesToPayloads(
     return;
   }
 
-  const response = await getClassSessionFeedbackByMessageIds(
-    supabase,
+  const response = await listSessionCompletions(supabase, {
     orgId,
     profileId,
-    messageIds,
+    limit: 50,
+  });
+  const normalizeIso = (value: string) => {
+    const timestamp = new Date(value).getTime();
+    return Number.isNaN(timestamp) ? null : new Date(timestamp).toISOString();
+  };
+  const byOccurrence = new Map(
+    response.items.flatMap((completion) => {
+      const occurrenceKey = normalizeIso(completion.occurrenceKey);
+      return occurrenceKey
+        ? ([[`${completion.scheduleId}:${occurrenceKey}`, completion]] as const)
+        : [];
+    }),
   );
-  const rows = response.data ?? [];
+  const bySchedule = new Map(
+    response.items.map((completion) => [completion.scheduleId, completion]),
+  );
 
-  rows.forEach((row) => {
-    if (!row.message_id) {
-      return;
-    }
-    const existing = payloadsById.get(row.message_id) ?? {};
-    payloadsById.set(row.message_id, {
+  messageIds.forEach((messageId) => {
+    const existing = payloadsById.get(messageId);
+    if (!existing || typeof existing.scheduleId !== 'string') return;
+    const occurrenceStart =
+      typeof existing.occurrenceStart === 'string'
+        ? normalizeIso(existing.occurrenceStart)
+        : null;
+    const completion =
+      (occurrenceStart
+        ? byOccurrence.get(`${existing.scheduleId}:${occurrenceStart}`)
+        : null) ?? bySchedule.get(existing.scheduleId);
+    if (!completion) return;
+
+    payloadsById.set(messageId, {
       ...existing,
-      sourceEventId: row.source_event_id ?? null,
-      scheduleId: row.class_session_id,
-      learningSpaceId: row.classroom_id,
-      channelId: row.channel_id,
-      occurrenceStart: row.occurrence_start_at ?? null,
-      submittedAt: row.submitted_at,
-      rating: row.rating,
-      comment: row.comment ?? null,
+      sessionCompletionId: completion.id,
+      submittedAt: completion.ratedAt ?? null,
+      rating: completion.rating ?? null,
+      comment: completion.ratingComment ?? null,
     });
   });
 }

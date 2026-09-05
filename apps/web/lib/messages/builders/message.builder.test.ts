@@ -19,6 +19,11 @@ const getMessageReactionCountsByMessageIds = vi.fn(async () => ({ data: [] }));
 const getMessageSavesByMessageIds = vi.fn(async () => ({ data: [] }));
 const getMessagesByChannelId = vi.fn(async () => ({ data: [] }));
 const getProfilesByAccountIds = vi.fn(async () => ({ data: [] }));
+const listSessionCompletions = vi.fn(async () => ({
+  items: [],
+  nextCursor: null,
+  total: null,
+}));
 
 vi.mock('@iconicedu/web/lib/messages/queries/messages.query', () => ({
   getMessageById: (...args: unknown[]) => getMessageById(...args),
@@ -32,7 +37,6 @@ vi.mock('@iconicedu/web/lib/messages/queries/messages.query', () => ({
   getMessagePaymentRemindersByMessageIds: vi.fn(async () => ({ data: [] })),
   getMessageEventRemindersByMessageIds: vi.fn(async () => ({ data: [] })),
   getMessageFeedbackRequestsByMessageIds: vi.fn(async () => ({ data: [] })),
-  getClassSessionFeedbackByMessageIds: vi.fn(async () => ({ data: [] })),
   getMessageLessonAssignmentsByMessageIds: vi.fn(async () => ({ data: [] })),
   getMessageProgressUpdatesByMessageIds: vi.fn(async () => ({ data: [] })),
   getMessageSessionBookingsByMessageIds: vi.fn(async () => ({ data: [] })),
@@ -50,6 +54,10 @@ vi.mock('@iconicedu/web/lib/messages/queries/messages.query', () => ({
     getMessageReactionCountsByMessageIds(...args),
   getMessageSavesByMessageIds: (...args: unknown[]) =>
     getMessageSavesByMessageIds(...args),
+}));
+
+vi.mock('@iconicedu/web/lib/api/session-completions', () => ({
+  listSessionCompletions: (...args: unknown[]) => listSessionCompletions(...args),
 }));
 
 vi.mock('@iconicedu/web/lib/profile/builders/user-profile.builder', () => ({
@@ -83,6 +91,11 @@ describe('buildMessageById', () => {
     getMessageSavesByMessageIds.mockResolvedValue({ data: [] });
     getMessagesByChannelId.mockResolvedValue({ data: [] });
     getProfilesByAccountIds.mockResolvedValue({ data: [] });
+    listSessionCompletions.mockResolvedValue({
+      items: [],
+      nextCursor: null,
+      total: null,
+    });
   });
 
   it('returns null when message does not exist', async () => {

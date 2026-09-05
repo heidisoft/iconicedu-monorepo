@@ -83,6 +83,68 @@ function buildDisplayName(profile: ProfileSummaryRow) {
 export class CompletionCheckDispatcherService {
   private readonly logger = new Logger(CompletionCheckDispatcherService.name);
 
+  async reconcileRecentCompletionChecks(input: {
+    supabase: SupabaseServiceClient;
+    limit?: number;
+  }): Promise<{ checked: number; reconciled: number; failed: number }> {
+    const cutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+    const { data, error } = await input.supabase
+      .from('reminder_jobs')
+      .select('*')
+      .eq('job_type', 'session.completion_check')
+      .eq('status', 'succeeded')
+      .is('completion_reconciled_at', null)
+      .is('deleted_at', null)
+      .gte('dispatched_at', cutoff)
+      .order('dispatched_at', { ascending: true })
+      .limit(Math.min(Math.max(input.limit ?? 50, 1), 100))
+      .returns<ReminderJobRow[]>();
+
+    if (error) throw new Error(error.message);
+
+    let reconciled = 0;
+    let failed = 0;
+    for (const job of data ?? []) {
+      try {
+        if (!job.updated_by) {
+          throw new Error(`Completion-check job ${job.id} has no system profile`);
+        }
+        await this.dispatchCompletionCheck({
+          supabase: input.supabase,
+          job,
+          payload: (job.payload ?? {}) as ReminderJobPayload,
+          systemProfileId: job.updated_by,
+        });
+
+        const reconciledAt = new Date().toISOString();
+        const response = await input.supabase
+          .from('reminder_jobs')
+          .update({
+            completion_reconciled_at: reconciledAt,
+            updated_at: reconciledAt,
+            updated_by: job.updated_by,
+          })
+          .eq('id', job.id)
+          .eq('org_id', job.org_id)
+          .eq('status', 'succeeded')
+          .is('completion_reconciled_at', null);
+        if (response.error) throw new Error(response.error.message);
+        reconciled += 1;
+      } catch (reconcileError) {
+        failed += 1;
+        this.logger.warn(
+          `completion_check reconciliation failed jobId=${job.id}: ${
+            reconcileError instanceof Error
+              ? reconcileError.message
+              : String(reconcileError)
+          }`,
+        );
+      }
+    }
+
+    return { checked: (data ?? []).length, reconciled, failed };
+  }
+
   /**
    * Called from RemindersService when a session.completion_check job is dequeued.
    * Dispatches per-participant completion-check activity events, batching guardians
@@ -105,25 +167,6 @@ export class CompletionCheckDispatcherService {
     if (!scheduleId || !occurrenceStart) {
       this.logger.warn(
         `completion_check: missing scheduleId or occurrenceStart for job ${job.id}`,
-      );
-      return [];
-    }
-
-    // Check idempotency: skip if a class_session_completions row already exists for
-    // this session+occurrence (replaces the old check against
-    // class_session_completion_votes now that the new table is the source of truth).
-    const existingCompletions = await supabase
-      .from('class_session_completions')
-      .select('id')
-      .eq('org_id', job.org_id)
-      .eq('schedule_id', scheduleId)
-      .eq('occurrence_key', occurrenceStart)
-      .is('deleted_at', null)
-      .limit(1);
-
-    if (existingCompletions.data && existingCompletions.data.length > 0) {
-      this.logger.log(
-        `completion_check: rows already exist for ${scheduleId}/${occurrenceStart}, skipping`,
       );
       return [];
     }
@@ -221,7 +264,6 @@ export class CompletionCheckDispatcherService {
         supabase,
         orgId: job.org_id,
         guardianProfileId: guardian.profileId,
-        guardian,
         currentScheduleId: scheduleId,
         currentOccurrenceStart: occurrenceStart,
         currentEndAt: endAt,
@@ -239,7 +281,6 @@ export class CompletionCheckDispatcherService {
     supabase: SupabaseServiceClient;
     orgId: string;
     guardianProfileId: string;
-    guardian: NonNullable<ReminderJobPayload['members']>[number];
     currentScheduleId: string;
     currentOccurrenceStart: string;
     currentEndAt: string | null;
@@ -251,7 +292,6 @@ export class CompletionCheckDispatcherService {
       supabase,
       orgId,
       guardianProfileId,
-      guardian,
       currentScheduleId,
       currentOccurrenceStart,
       currentEndAt,
@@ -643,7 +683,7 @@ export class CompletionCheckDispatcherService {
     sessionTitle: string | null;
     channelId: string | null;
     learningSpaceId: string | null;
-  }): Promise<string | null> {
+  }): Promise<string> {
     const now = new Date().toISOString();
     const expiresAt = new Date(
       new Date(input.sessionEndAt).getTime() + 3 * 24 * 60 * 60 * 1000,
@@ -680,7 +720,7 @@ export class CompletionCheckDispatcherService {
       this.logger.error(
         `upsertSessionCompletion failed scheduleId=${input.scheduleId} profileId=${input.profileId}: ${error.message}`,
       );
-      return null;
+      throw new Error(error.message);
     }
 
     if (data?.id) {
@@ -689,7 +729,7 @@ export class CompletionCheckDispatcherService {
 
     // ignoreDuplicates suppresses the row from `.select()` on a pre-existing conflict —
     // fetch it so the caller still gets a sessionCompletionId to stamp into the event.
-    const { data: existing } = await input.supabase
+    const { data: existing, error: existingError } = await input.supabase
       .from('class_session_completions')
       .select('id')
       .eq('org_id', input.orgId)
@@ -698,6 +738,15 @@ export class CompletionCheckDispatcherService {
       .eq('profile_id', input.profileId)
       .maybeSingle<{ id: string }>();
 
-    return existing?.id ?? null;
+    if (existingError) {
+      throw new Error(existingError.message);
+    }
+    if (!existing?.id) {
+      throw new Error(
+        `Session completion upsert returned no row for ${input.scheduleId}/${input.profileId}`,
+      );
+    }
+
+    return existing.id;
   }
 }

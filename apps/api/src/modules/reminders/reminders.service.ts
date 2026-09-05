@@ -208,6 +208,11 @@ type StaleActivityCleanupResult = {
   sessions_marked_completed?: number | null;
 };
 
+type SessionCompletionExpirySweepResult = {
+  completions_auto_confirmed?: number | null;
+  sessions_marked_completed?: number | null;
+};
+
 const CLASS_SCHEDULE_SELECT = `
   id, org_id, title, description, location, meeting_link,
   start_at, end_at, timezone, status, visibility, theme_key,
@@ -700,6 +705,22 @@ export class RemindersService {
       }
     }
 
+    try {
+      const reconciliation =
+        await this.completionCheckDispatcher.reconcileRecentCompletionChecks({
+          supabase,
+        });
+      this.analytics.capture('api completion checks reconciled', reconciliation);
+    } catch (reconciliationError) {
+      this.logger.warn(
+        `completion-check reconciliation scan failed: ${
+          reconciliationError instanceof Error
+            ? reconciliationError.message
+            : String(reconciliationError)
+        }`,
+      );
+    }
+
     const staleCleanup = await this.runStaleActivityCleanup(supabase);
     const durationMs = Date.now() - startedAt;
 
@@ -713,6 +734,9 @@ export class RemindersService {
       staleNotificationsMarkedRead: staleCleanup.notificationsMarkedRead,
       staleCompletionVotesMarkedCompleted: staleCleanup.completionVotesMarkedCompleted,
       staleSessionsMarkedCompleted: staleCleanup.sessionsMarkedCompleted,
+      legacyCompletionVotesMarkedCompleted:
+        staleCleanup.legacyCompletionVotesMarkedCompleted,
+      legacySessionsMarkedCompleted: staleCleanup.legacySessionsMarkedCompleted,
       staleCleanupFailed: staleCleanup.failed,
       durationMs,
       leaseOwner: input.leaseOwner,
@@ -731,33 +755,49 @@ export class RemindersService {
   }
 
   private async runStaleActivityCleanup(supabase: SupabaseServiceClient) {
+    let legacy: StaleActivityCleanupResult = {};
+    let completionSweep: SessionCompletionExpirySweepResult = {};
+    let failed = false;
+
     try {
       const response = await supabase.rpc('run_stale_activity_cleanup');
       if (response.error) {
         throw new Error(response.error.message);
       }
-
-      const rows = (response.data ?? []) as StaleActivityCleanupResult[];
-      const row = rows[0] ?? {};
-      return {
-        notificationsMarkedRead: row.notifications_marked_read ?? 0,
-        completionVotesMarkedCompleted: row.completion_votes_marked_completed ?? 0,
-        sessionsMarkedCompleted: row.sessions_marked_completed ?? 0,
-        failed: false,
-      };
+      legacy = ((response.data ?? []) as StaleActivityCleanupResult[])[0] ?? {};
     } catch (error) {
+      failed = true;
       this.logger.warn(
-        `stale activity cleanup failed: ${
+        `legacy stale activity cleanup failed: ${
           error instanceof Error ? error.message : String(error)
         }`,
       );
-      return {
-        notificationsMarkedRead: 0,
-        completionVotesMarkedCompleted: 0,
-        sessionsMarkedCompleted: 0,
-        failed: true,
-      };
     }
+
+    try {
+      const response = await supabase.rpc('run_class_session_completion_expiry_sweep');
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+      completionSweep =
+        ((response.data ?? []) as SessionCompletionExpirySweepResult[])[0] ?? {};
+    } catch (error) {
+      failed = true;
+      this.logger.warn(
+        `session completion expiry sweep failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+
+    return {
+      notificationsMarkedRead: legacy.notifications_marked_read ?? 0,
+      completionVotesMarkedCompleted: completionSweep.completions_auto_confirmed ?? 0,
+      sessionsMarkedCompleted: completionSweep.sessions_marked_completed ?? 0,
+      legacyCompletionVotesMarkedCompleted: legacy.completion_votes_marked_completed ?? 0,
+      legacySessionsMarkedCompleted: legacy.sessions_marked_completed ?? 0,
+      failed,
+    };
   }
 
   private async requireOrgActor(accessToken: string, orgId: string) {

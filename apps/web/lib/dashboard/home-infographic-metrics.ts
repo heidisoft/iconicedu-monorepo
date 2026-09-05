@@ -4,6 +4,7 @@ import type {
   ClassSchedulePatchVM,
   EventSourceVM,
   RecurrenceVM,
+  SessionCompletionVM,
   UserProfileVM,
 } from '@iconicedu/shared-types';
 import {
@@ -18,6 +19,7 @@ import {
   type ClassSession,
 } from '@iconicedu/ui-web/components/messages/tabs/messages-schedule-tab.utils';
 import { createApiClient } from '@iconicedu/web/lib/api/http-client';
+import { listSessionCompletions } from '@iconicedu/web/lib/api/session-completions';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 export type DashboardInfographicRole = 'parents' | 'students' | 'tutors';
@@ -55,6 +57,7 @@ export interface DashboardHomeInfographicMetrics {
   isStaffView: boolean;
   metricsByRole: Record<DashboardInfographicRole, DashboardInfographicRoleMetrics>;
   upcomingSessionsPage: DashboardUpcomingSessionsPage;
+  completedSessionsPending: SessionCompletionVM[];
   browseHref: string;
   calendarHref: string;
   notificationsHref: string;
@@ -592,6 +595,7 @@ export async function buildDashboardHomeInfographicMetrics(input: {
   now?: Date;
   pageSize?: number;
   timezone?: string | null;
+  sessionCompletionCarouselEnabled?: boolean;
 }): Promise<DashboardHomeInfographicMetrics> {
   const now = input.now ?? new Date();
   const pageSize = Math.max(1, Math.floor(input.pageSize ?? DEFAULT_PAGE_SIZE));
@@ -612,6 +616,22 @@ export async function buildDashboardHomeInfographicMetrics(input: {
     pageSize,
     timezone: input.timezone ?? input.currentUserProfile?.prefs?.timezone ?? null,
   });
+  const completedSessionsPending =
+    input.sessionCompletionCarouselEnabled && input.currentUserProfile?.ids.id
+      ? (
+          await listSessionCompletions(input.supabase, {
+            orgId: input.orgId,
+            profileId: input.currentUserProfile.ids.id,
+            limit: 50,
+          })
+        ).items.filter(
+          (completion) =>
+            completion.status === 'pending' ||
+            ((completion.status === 'confirmed' ||
+              completion.status === 'auto_confirmed') &&
+              completion.rating == null),
+        )
+      : [];
 
   return {
     activeRole,
@@ -622,6 +642,7 @@ export async function buildDashboardHomeInfographicMetrics(input: {
       tutors: activeRole === 'tutors' ? activeRoleData.metrics : cloneZeroMetrics(),
     },
     upcomingSessionsPage: activeRoleData.upcomingSessionsPage,
+    completedSessionsPending,
     browseHref: isStaffView ? `/${input.orgSlug}/admin/channels` : `/${input.orgSlug}/s`,
     calendarHref: isStaffView
       ? `/${input.orgSlug}/admin/attendance/sessions`

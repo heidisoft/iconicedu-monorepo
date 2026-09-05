@@ -43,5 +43,11 @@ export function getLocalMobileFeatureFlagFallback(key: MobileFeatureFlagKey): bo
     return parseBooleanFeatureFlag(process.env.EXPO_PUBLIC_ENABLE_MOBILE_APPLE_SIGN_IN);
   }
 
+  if (key === mobileFeatureFlagKeys.sessionCompletionCarousel) {
+    return parseBooleanFeatureFlag(
+      process.env.EXPO_PUBLIC_ENABLE_SESSION_COMPLETION_CAROUSEL,
+    );
+  }
+
   return false;
 }

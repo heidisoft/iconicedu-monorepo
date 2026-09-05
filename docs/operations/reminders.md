@@ -26,8 +26,10 @@ The API endpoint performs lease-based due-job claiming and dispatching.
 Current class-session timing behavior:
 
 - `session.reminder` jobs: 12 hours and 30 minutes before session start.
-- `session.feedback_request` jobs: 15 minutes after session end
-  (falls back to 15 minutes after start if end time is invalid).
+- `session.completion_check` jobs: 10 minutes after session end. Dispatch creates
+  one `class_session_completions` row per recipient before publishing the activity.
+- Pending completion rows expire three days after the effective session end and
+  are then auto-confirmed by `run_class_session_completion_expiry_sweep()`.
 
 Reminder reconciliation and dispatch are split on purpose:
 
@@ -175,11 +177,27 @@ Execution:
 4. If the source classroom is archived before the job's `run_at`, mark the job `canceled`, clear lease fields, and write a `reminder_dispatch_logs` row with `idempotent_hit`.
 5. Map job type to activity event:
    - `session.reminder` -> `session.reminder.sent`
-   - `session.feedback_request` -> `session.feedback_request.sent`
+   - `session.completion_check` -> a per-recipient
+     `session.completion_check.sent` event (or a guardian batch), with the stable
+     `sessionCompletionId` included in event metadata.
 6. Create or reuse the activity event through the API-owned activity generation path with `sourceKind='system'`, learning-space/channel scope, payload schedule metadata, and dedupe key `<reminder_jobs.dedupe_key>:activity`.
 7. `activity.project`, `notification.prepare`, and `notification.deliver` jobs turn that event into feed rows and notification delivery through the normal event pipeline.
-8. Mark the reminder job `succeeded`, set `dispatched_at`, clear lease/error fields, and write a successful `reminder_dispatch_logs` row with the `activity_event_id`.
-9. If processing throws, increment `attempt_count`, set `failed` with `next_attempt_at` for retryable errors, or `dead_letter` when non-retryable/max attempts are reached.
+
+After due jobs are processed, the worker performs two bounded maintenance passes:
+
+- It re-runs each recent successful completion-check job once through the
+  idempotent dispatcher, then records `completion_reconciled_at`. This fills any
+  participant row missed by a partial dispatch without duplicating completion
+  rows or activity events.
+- During the migration bake period, it runs both the legacy stale-activity cleanup
+  and the new completion expiry sweep so their counts can be compared. Remove the
+  legacy sweep only with the Phase 4 table cleanup after at least two weeks without
+  integrity alerts.
+
+The home carousel is controlled by the PostHog flag
+`session-completion-carousel`, which defaults off on web and mobile. Mobile may
+use `EXPO_PUBLIC_ENABLE_SESSION_COMPLETION_CAROUSEL` as its local-development
+fallback. 8. Mark the reminder job `succeeded`, set `dispatched_at`, clear lease/error fields, and write a successful `reminder_dispatch_logs` row with the `activity_event_id`. 9. If processing throws, increment `attempt_count`, set `failed` with `next_attempt_at` for retryable errors, or `dead_letter` when non-retryable/max attempts are reached.
 
 Reminder retry behavior uses exponential backoff from 15 seconds capped at 10
 minutes, with `max_attempts=8` by default. Dispatch counters are captured to

@@ -3,7 +3,10 @@ import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-nativ
 import { Check, CheckCircle2, XCircle } from 'lucide-react-native';
 import type { ActivityFeedLeafItemVM } from '@iconicedu/shared-types';
 import type { AppColors } from '@/lib/theme';
-import { submitCompletionVote } from '@/lib/api/activity-feed/completion-vote';
+import {
+  confirmSessionCompletion,
+  disputeSessionCompletion,
+} from '@/lib/api/session-completions';
 import { ActivityFeedbackRequest } from '@/components/activity/activity-feedback-request';
 
 type Step =
@@ -16,7 +19,7 @@ type Step =
   | 'already_responded';
 
 type DisputeCategory = 'teacher_absent' | 'student_absent' | 'technical_issue' | 'other';
-type CompletionVoteStatus = 'confirmed' | 'disputed';
+type CompletionStatus = 'pending' | 'confirmed' | 'disputed' | 'auto_confirmed';
 
 const DISPUTE_CATEGORIES: { key: DisputeCategory; label: string }[] = [
   { key: 'teacher_absent', label: 'Teacher absent' },
@@ -27,19 +30,25 @@ const DISPUTE_CATEGORIES: { key: DisputeCategory; label: string }[] = [
 
 function getMetadata(activity: ActivityFeedLeafItemVM) {
   const m = (activity.metadata ?? {}) as Record<string, unknown>;
-  const vote =
-    m.completionVote && typeof m.completionVote === 'object'
-      ? (m.completionVote as Record<string, unknown>)
+  const sessionCompletion =
+    m.sessionCompletion && typeof m.sessionCompletion === 'object'
+      ? (m.sessionCompletion as Record<string, unknown>)
       : null;
-  const completionVoteStatus =
-    vote?.status === 'confirmed' || vote?.status === 'disputed'
-      ? (vote.status as CompletionVoteStatus)
+  const sessionCompletionStatus =
+    sessionCompletion?.status === 'pending' ||
+    sessionCompletion?.status === 'confirmed' ||
+    sessionCompletion?.status === 'disputed' ||
+    sessionCompletion?.status === 'auto_confirmed'
+      ? (sessionCompletion.status as CompletionStatus)
       : null;
   return {
     orgId: typeof m.orgId === 'string' ? m.orgId : activity.ids.orgId,
-    scheduleId: typeof m.scheduleId === 'string' ? m.scheduleId : null,
-    occurrenceStart: typeof m.occurrenceStart === 'string' ? m.occurrenceStart : null,
-    role: typeof m.roleContext === 'string' ? m.roleContext : 'child',
+    sessionCompletionId:
+      typeof sessionCompletion?.id === 'string'
+        ? sessionCompletion.id
+        : typeof m.sessionCompletionId === 'string'
+          ? m.sessionCompletionId
+          : null,
     promptTitle:
       typeof m.completionPromptTitle === 'string'
         ? m.completionPromptTitle
@@ -49,7 +58,7 @@ function getMetadata(activity: ActivityFeedLeafItemVM) {
         ? m.completionPromptBody
         : 'How did your class go? Confirm, leave feedback, or report a problem.',
     feedbackUiEnabled: m.feedbackUiEnabled !== false,
-    completionVoteStatus,
+    sessionCompletionStatus,
   };
 }
 
@@ -57,55 +66,53 @@ type Props = {
   activity: ActivityFeedLeafItemVM;
   colors: AppColors;
   currentProfileId?: string | null;
-  onCompletionSubmit?: (status: CompletionVoteStatus) => void;
+  onCompletionSubmit?: (status: 'confirmed' | 'disputed') => void;
+  onRatingSubmit?: () => void;
 };
 
-function getInitialStep(status: CompletionVoteStatus | null): Step {
-  if (status === 'confirmed' || status === 'disputed') return 'already_responded';
+function getInitialStep(status: CompletionStatus | null): Step {
+  if (status === 'confirmed' || status === 'auto_confirmed') return 'confirmed';
+  if (status === 'disputed') return 'already_responded';
   return 'prompt';
 }
 
 export function ActivityCompletionCheck({
   activity,
   colors,
-  currentProfileId,
   onCompletionSubmit,
+  onRatingSubmit,
 }: Props) {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const metadata = useMemo(() => getMetadata(activity), [activity]);
 
   const [step, setStep] = useState<Step>(() =>
-    getInitialStep(metadata.completionVoteStatus),
+    getInitialStep(metadata.sessionCompletionStatus),
   );
   const [disputeCategory, setDisputeCategory] = useState<DisputeCategory | null>(null);
   const [disputeReason, setDisputeReason] = useState('');
   const [rescheduleRequested, setRescheduleRequested] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const canSubmit = Boolean(metadata.scheduleId && metadata.occurrenceStart);
+  const canSubmit = Boolean(metadata.sessionCompletionId);
 
   useEffect(() => {
-    if (metadata.completionVoteStatus) {
+    if (metadata.sessionCompletionStatus) {
       setStep((prev) => {
         // After a fresh in-session submit (confirmed/disputed), don't revert to already_responded
         if (prev === 'confirmed' || prev === 'disputed') return prev;
-        return getInitialStep(metadata.completionVoteStatus);
+        return getInitialStep(metadata.sessionCompletionStatus);
       });
     }
-  }, [metadata.completionVoteStatus]);
+  }, [metadata.sessionCompletionStatus]);
 
   const handleConfirm = useCallback(async () => {
     if (!canSubmit) return;
     setStep('submitting_confirm');
     setError(null);
     try {
-      await submitCompletionVote({
+      await confirmSessionCompletion({
         orgId: metadata.orgId,
-        scheduleId: metadata.scheduleId!,
-        occurrenceKey: metadata.occurrenceStart!,
-        role: metadata.role,
-        status: 'confirmed',
-        recipientProfileId: currentProfileId ?? null,
+        sessionCompletionId: metadata.sessionCompletionId!,
       });
       setStep('confirmed');
       onCompletionSubmit?.('confirmed');
@@ -113,20 +120,16 @@ export function ActivityCompletionCheck({
       setError(err instanceof Error ? err.message : 'Failed to submit');
       setStep('prompt');
     }
-  }, [canSubmit, currentProfileId, metadata, onCompletionSubmit]);
+  }, [canSubmit, metadata, onCompletionSubmit]);
 
   const handleDisputeSubmit = useCallback(async () => {
     if (!canSubmit || !disputeCategory) return;
     setStep('submitting_dispute');
     setError(null);
     try {
-      await submitCompletionVote({
+      await disputeSessionCompletion({
         orgId: metadata.orgId,
-        scheduleId: metadata.scheduleId!,
-        occurrenceKey: metadata.occurrenceStart!,
-        role: metadata.role,
-        status: 'disputed',
-        recipientProfileId: currentProfileId ?? null,
+        sessionCompletionId: metadata.sessionCompletionId!,
         disputeCategory,
         disputeReason: disputeReason.trim() || null,
         rescheduleRequested,
@@ -139,7 +142,6 @@ export function ActivityCompletionCheck({
     }
   }, [
     canSubmit,
-    currentProfileId,
     disputeCategory,
     disputeReason,
     metadata,
@@ -213,7 +215,7 @@ export function ActivityCompletionCheck({
           <ActivityFeedbackRequest
             activity={activity}
             colors={colors}
-            currentProfileId={currentProfileId}
+            onRatingSubmit={onRatingSubmit}
           />
         ) : null}
       </View>

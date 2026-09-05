@@ -262,6 +262,7 @@ export function mapMessageRowToVM(row: MessageRow, input: MessageMapperInput): M
           channelId: (payload?.channelId as string | null) ?? null,
           occurrenceStart: (payload?.occurrenceStart as string | null) ?? null,
           sourceEventId: (payload?.sourceEventId as string | null) ?? null,
+          sessionCompletionId: (payload?.sessionCompletionId as string | null) ?? null,
           submittedAt: (payload?.submittedAt as string | null) ?? null,
           rating: (payload?.rating as number | null) ?? null,
           comment: (payload?.comment as string | null) ?? null,

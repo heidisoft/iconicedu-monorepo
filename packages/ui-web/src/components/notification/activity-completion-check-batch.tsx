@@ -12,13 +12,14 @@ type SessionEntry = {
   title: string;
   channelId: string;
   learningSpaceId?: string | null;
-  completionVote?: {
-    status?: 'confirmed' | 'disputed';
+  sessionCompletion?: {
+    id?: string;
+    status?: 'pending' | 'confirmed' | 'disputed' | 'auto_confirmed';
   } | null;
 };
 
 function getSessionResponseKey(session: SessionEntry) {
-  return session.occurrenceStart;
+  return `${session.scheduleId}:${session.occurrenceStart}`;
 }
 
 function getSessions(activity: ActivityFeedLeafItemVM): SessionEntry[] {
@@ -45,8 +46,9 @@ export function ActivityCompletionCheckBatch({ activity }: Props) {
         sessions
           .filter(
             (session) =>
-              session.completionVote?.status === 'confirmed' ||
-              session.completionVote?.status === 'disputed',
+              session.sessionCompletion?.status === 'confirmed' ||
+              session.sessionCompletion?.status === 'disputed' ||
+              session.sessionCompletion?.status === 'auto_confirmed',
           )
           .map(getSessionResponseKey),
       ),
@@ -86,7 +88,8 @@ export function ActivityCompletionCheckBatch({ activity }: Props) {
             learningSpaceId: session.learningSpaceId ?? null,
             feedbackUiEnabled: true,
             completionCheckUiEnabled: true,
-            completionVote: session.completionVote ?? null,
+            sessionCompletionId: session.sessionCompletion?.id ?? null,
+            sessionCompletion: session.sessionCompletion ?? null,
           },
         };
 

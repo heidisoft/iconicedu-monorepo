@@ -140,10 +140,17 @@ function buildRawWeeklyRecurringSchedule(
   });
 }
 
-function mockApi(schedules: RawScheduleRow[], spaces: Record<string, unknown>[]) {
+function mockApi(
+  schedules: RawScheduleRow[],
+  spaces: Record<string, unknown>[],
+  completions: Record<string, unknown>[] = [],
+) {
   apiGetMock.mockImplementation((path: string) => {
     if (path === '/schedules') return Promise.resolve(schedules);
     if (path === '/spaces') return Promise.resolve(spaces);
+    if (path === '/session-completions') {
+      return Promise.resolve({ items: completions, nextCursor: null, total: null });
+    }
     return Promise.resolve([]);
   });
 }
@@ -151,6 +158,85 @@ function mockApi(schedules: RawScheduleRow[], spaces: Record<string, unknown>[])
 describe('buildDashboardHomeInfographicMetrics', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('keeps the completed-session query off when its rollout flag is disabled', async () => {
+    mockApi([], []);
+
+    const result = await buildDashboardHomeInfographicMetrics({
+      supabase: {} as never,
+      orgId: 'org-1',
+      orgSlug: 'iconic-academy',
+      now: NOW,
+      currentUserProfile: {
+        kind: 'child',
+        ids: { id: 'child-1', orgId: 'org-1', accountId: 'account-c1' },
+      } as never,
+      sessionCompletionCarouselEnabled: false,
+    });
+
+    expect(result.completedSessionsPending).toEqual([]);
+    expect(apiGetMock).not.toHaveBeenCalledWith(
+      '/session-completions',
+      expect.anything(),
+    );
+  });
+
+  it('returns only actionable completions when the rollout flag is enabled', async () => {
+    const baseCompletion = {
+      id: 'completion-pending',
+      orgId: 'org-1',
+      scheduleId: 'schedule-1',
+      occurrenceKey: '2026-03-12T15:00:00.000Z',
+      profileId: 'child-1',
+      role: 'child',
+      status: 'pending',
+      rating: null,
+      ratingComment: null,
+      sessionEndAt: '2026-03-12T16:00:00.000Z',
+      expiresAt: '2026-03-15T16:00:00.000Z',
+    };
+    mockApi(
+      [],
+      [],
+      [
+        baseCompletion,
+        {
+          ...baseCompletion,
+          id: 'completion-auto-confirmed',
+          status: 'auto_confirmed',
+        },
+        {
+          ...baseCompletion,
+          id: 'completion-rated',
+          status: 'confirmed',
+          rating: 5,
+        },
+        { ...baseCompletion, id: 'completion-disputed', status: 'disputed' },
+      ],
+    );
+
+    const result = await buildDashboardHomeInfographicMetrics({
+      supabase: {} as never,
+      orgId: 'org-1',
+      orgSlug: 'iconic-academy',
+      now: NOW,
+      currentUserProfile: {
+        kind: 'child',
+        ids: { id: 'child-1', orgId: 'org-1', accountId: 'account-c1' },
+      } as never,
+      sessionCompletionCarouselEnabled: true,
+    });
+
+    expect(result.completedSessionsPending.map((item) => item.id)).toEqual([
+      'completion-pending',
+      'completion-auto-confirmed',
+    ]);
+    expect(apiGetMock).toHaveBeenCalledWith('/session-completions', {
+      orgId: 'org-1',
+      profileId: 'child-1',
+      limit: 50,
+    });
   });
 
   it('builds guardian metrics from linked child participation and zeros other tabs', async () => {

@@ -58,8 +58,8 @@ describe('CompletionCheckDispatcherService', () => {
   ) {
     const existingCompletionsQuery = makeQuery({ data: [], error: null });
     if (overrides.existingCompletion) {
-      existingCompletionsQuery.__setLimitResult({
-        data: [overrides.existingCompletion],
+      existingCompletionsQuery.__setMaybeSingleResult({
+        data: overrides.existingCompletion,
         error: null,
       });
     }
@@ -217,6 +217,49 @@ describe('CompletionCheckDispatcherService', () => {
     ],
   };
 
+  it('re-runs each unreconciled successful job once and records the marker', async () => {
+    const job = {
+      id: 'job-reconcile-1',
+      org_id: 'org-1',
+      job_type: 'session.completion_check',
+      status: 'succeeded',
+      payload: basePayload,
+      updated_by: 'system-profile-1',
+    };
+    const selectChain = {
+      eq: jest.fn(() => selectChain),
+      is: jest.fn(() => selectChain),
+      gte: jest.fn(() => selectChain),
+      order: jest.fn(() => selectChain),
+      limit: jest.fn(() => selectChain),
+      returns: jest.fn(async () => ({ data: [job], error: null })),
+    };
+    const updateChain = {
+      eq: jest.fn(() => updateChain),
+      is: jest.fn(async () => ({ error: null })),
+    };
+    const supabase = {
+      from: jest.fn(() => ({
+        select: jest.fn(() => selectChain),
+        update: jest.fn(() => updateChain),
+      })),
+    };
+    const service = new CompletionCheckDispatcherService();
+    const dispatch = jest
+      .spyOn(service, 'dispatchCompletionCheck')
+      .mockResolvedValue(['activity-1']);
+
+    const result = await service.reconcileRecentCompletionChecks({
+      supabase: supabase as never,
+    });
+
+    expect(result).toEqual({ checked: 1, reconciled: 1, failed: 0 });
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ job, systemProfileId: 'system-profile-1' }),
+    );
+    expect(updateChain.is).toHaveBeenCalledWith('completion_reconciled_at', null);
+  });
+
   it('dispatches completion checks to linked parents even when they are not schedule participants', async () => {
     const { supabase } = makeSupabase({ upsertedId: 'completion-1' });
     const service = new CompletionCheckDispatcherService();
@@ -314,7 +357,7 @@ describe('CompletionCheckDispatcherService', () => {
     );
   });
 
-  it('skips dispatch when a class_session_completions row already exists for this occurrence (idempotent)', async () => {
+  it('reuses existing rows and republishes deduped events during a partial-failure retry', async () => {
     const { supabase } = makeSupabase({
       existingCompletion: { id: 'completion-existing' },
     });
@@ -327,7 +370,16 @@ describe('CompletionCheckDispatcherService', () => {
       payload: basePayload,
     });
 
-    expect(result).toEqual([]);
-    expect(publishActivityEventMock).not.toHaveBeenCalled();
+    expect(result).toHaveLength(3);
+    expect(publishActivityEventMock).toHaveBeenCalledTimes(3);
+    expect(publishActivityEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dedupeKey:
+          'session.completion_check:org-1:schedule-1:2030-03-06T10:00:00.000Z:child-1',
+        payload: expect.objectContaining({
+          sessionCompletionId: 'completion-existing',
+        }),
+      }),
+    );
   });
 });

@@ -1,4 +1,5 @@
 import type { ISODateTime, UUID } from '../shared/shared';
+import type { ParticipantRoleVM } from './class-schedule';
 import type {
   ClassSessionCompletionDisputeCategory,
   ClassSessionCompletionStatus,
@@ -13,7 +14,7 @@ export interface SessionCompletionVM {
   scheduleId: UUID;
   occurrenceKey: ISODateTime;
   profileId: UUID;
-  role: string;
+  role: ParticipantRoleVM;
   status: ClassSessionCompletionStatus;
   disputeCategory?: ClassSessionCompletionDisputeCategory | null;
   disputeReason?: string | null;
@@ -24,6 +25,10 @@ export interface SessionCompletionVM {
   learningSpaceId?: UUID | null;
   sessionTitle?: string | null;
   sessionEndAt: ISODateTime;
+  notifiedAt?: ISODateTime | null;
+  confirmedAt?: ISODateTime | null;
+  disputedAt?: ISODateTime | null;
+  ratedAt?: ISODateTime | null;
   resolvedAt?: ISODateTime | null;
   expiresAt: ISODateTime;
 }

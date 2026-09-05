@@ -15,15 +15,11 @@ const EDIT_WINDOW_MS = 60_000;
 
 type ActivityFeedbackRequestProps = {
   activity: ActivityFeedLeafItemVM;
+  onRatingSubmit?: () => void;
 };
 
 type FeedbackMetadata = {
-  sourceEventId: string | null;
-  messageId: string | null;
-  classSessionId: string | null;
-  classroomId: string | null;
-  channelId: string | null;
-  occurrenceStart: string | null;
+  sessionCompletionId: string | null;
   feedbackUiEnabled: boolean;
 };
 
@@ -43,28 +39,13 @@ function asRecord(value: unknown): Record<string, unknown> {
 
 function getFeedbackMetadata(activity: ActivityFeedLeafItemVM): FeedbackMetadata {
   const metadata = asRecord(activity.metadata);
+  const sessionCompletion = asRecord(metadata.sessionCompletion);
   return {
-    sourceEventId:
-      typeof metadata.sourceEventId === 'string' ? metadata.sourceEventId : null,
-    messageId: typeof metadata.messageId === 'string' ? metadata.messageId : null,
-    classSessionId:
-      typeof metadata.classSessionId === 'string'
-        ? metadata.classSessionId
-        : typeof metadata.scheduleId === 'string'
-          ? metadata.scheduleId
-          : null,
-    classroomId:
-      typeof metadata.classroomId === 'string'
-        ? metadata.classroomId
-        : typeof metadata.learningSpaceId === 'string'
-          ? metadata.learningSpaceId
-          : null,
-    channelId: typeof metadata.channelId === 'string' ? metadata.channelId : null,
-    occurrenceStart:
-      typeof metadata.occurrenceStart === 'string'
-        ? metadata.occurrenceStart
-        : typeof metadata.startAt === 'string'
-          ? metadata.startAt
+    sessionCompletionId:
+      typeof sessionCompletion.id === 'string'
+        ? sessionCompletion.id
+        : typeof metadata.sessionCompletionId === 'string'
+          ? metadata.sessionCompletionId
           : null,
     feedbackUiEnabled: metadata.feedbackUiEnabled !== false,
   };
@@ -72,12 +53,12 @@ function getFeedbackMetadata(activity: ActivityFeedLeafItemVM): FeedbackMetadata
 
 function getInitialFeedback(activity: ActivityFeedLeafItemVM): FeedbackState {
   const metadata = asRecord(activity.metadata);
-  const feedback = asRecord(metadata.feedbackResponse);
+  const feedback = asRecord(metadata.sessionCompletion);
 
   return {
     rating: typeof feedback.rating === 'number' ? feedback.rating : 0,
-    comment: typeof feedback.comment === 'string' ? feedback.comment : '',
-    submittedAt: typeof feedback.submittedAt === 'string' ? feedback.submittedAt : null,
+    comment: typeof feedback.ratingComment === 'string' ? feedback.ratingComment : '',
+    submittedAt: typeof feedback.ratedAt === 'string' ? feedback.ratedAt : null,
   };
 }
 
@@ -120,10 +101,14 @@ function formatSubmittedAtTooltip(submittedAt: string | null) {
 }
 
 export function canRenderActivityFeedbackRequest(activity: ActivityFeedLeafItemVM) {
-  return getFeedbackMetadata(activity).feedbackUiEnabled;
+  const metadata = getFeedbackMetadata(activity);
+  return metadata.feedbackUiEnabled && Boolean(metadata.sessionCompletionId);
 }
 
-export function ActivityFeedbackRequest({ activity }: ActivityFeedbackRequestProps) {
+export function ActivityFeedbackRequest({
+  activity,
+  onRatingSubmit,
+}: ActivityFeedbackRequestProps) {
   const initialFeedback = useMemo(() => getInitialFeedback(activity), [activity]);
   const metadata = useMemo(() => getFeedbackMetadata(activity), [activity]);
 
@@ -186,14 +171,7 @@ export function ActivityFeedbackRequest({ activity }: ActivityFeedbackRequestPro
     return () => window.clearTimeout(timer);
   }, [submittedAt]);
 
-  const hasSource = Boolean(metadata.sourceEventId);
-  const hasMessage = Boolean(metadata.messageId);
-  const canSubmit =
-    metadata.feedbackUiEnabled &&
-    (hasSource || hasMessage) &&
-    Boolean(metadata.classSessionId) &&
-    Boolean(metadata.classroomId) &&
-    Boolean(metadata.channelId);
+  const canSubmit = metadata.feedbackUiEnabled && Boolean(metadata.sessionCompletionId);
   const isSubmitted = Boolean(submittedAt) && !isEditing;
   const displayRating = hoveredRating || rating;
   const trimmedComment = comment.trim();
@@ -207,29 +185,21 @@ export function ActivityFeedbackRequest({ activity }: ActivityFeedbackRequestPro
     setIsSubmitting(true);
     setError(null);
     try {
-      const response = await fetch('/api/activity-feed/feedback', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          orgId: activity.ids.orgId,
-          classSessionId: metadata.classSessionId,
-          classroomId: metadata.classroomId,
-          channelId: metadata.channelId,
-          sourceEventId: hasSource ? metadata.sourceEventId : null,
-          messageId: hasMessage ? metadata.messageId : null,
-          occurrenceStartAt: metadata.occurrenceStart,
-          rating: nextRating,
-          comment: nextComment ?? null,
-        }),
-      });
+      const response = await fetch(
+        `/api/session-completions/${metadata.sessionCompletionId}/rate`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            orgId: activity.ids.orgId,
+            rating: nextRating,
+            comment: nextComment ?? null,
+          }),
+        },
+      );
 
       const payload = (await response.json().catch(() => null)) as {
         error?: string;
-        data?: {
-          submittedAt?: string | null;
-          rating?: number;
-          comment?: string | null;
-        };
       } | null;
 
       if (!response.ok) {
@@ -237,8 +207,8 @@ export function ActivityFeedbackRequest({ activity }: ActivityFeedbackRequestPro
         return;
       }
 
-      const nextSubmittedAt = payload?.data?.submittedAt ?? new Date().toISOString();
-      const nextResolvedComment = payload?.data?.comment ?? nextComment ?? '';
+      const nextSubmittedAt = new Date().toISOString();
+      const nextResolvedComment = nextComment ?? '';
       setRating(nextRating);
       setComment(nextResolvedComment);
       setSubmittedAt(nextSubmittedAt);
@@ -246,6 +216,7 @@ export function ActivityFeedbackRequest({ activity }: ActivityFeedbackRequestPro
       setHoveredRating(0);
       setIsEditing(false);
       setIsEditWindowOpen(true);
+      onRatingSubmit?.();
     } catch {
       setError('Unable to submit feedback');
     } finally {

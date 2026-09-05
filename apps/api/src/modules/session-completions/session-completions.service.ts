@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   InternalServerErrorException,
@@ -19,14 +20,6 @@ import {
   type SupabaseServiceClient,
 } from '@iconicedu/api/lib/supabase/service';
 import { publishActivityEvent } from '@iconicedu/api/lib/activity-feed/activity-publisher';
-
-// NOTE (Phase 1, additive): this service intentionally duplicates the account/profile
-// permission-resolution logic already private to ActivityFeedService (submitFeedback /
-// submitCompletionVote), rather than extracting a shared helper — those old methods are
-// deleted wholesale in Phase 3 once callers cut over, so a shared extraction now would
-// just be thrown away. The archived-classroom and message-membership checks those old
-// methods duplicated across apps/api/apps/web/apps/mobile ARE consolidated here, once,
-// per the plan.
 
 type AccountRow = { id: string; org_id: string };
 type ProfileRow = {
@@ -81,6 +74,10 @@ function toVM(row: ClassSessionCompletionRow): SessionCompletionVM {
     learningSpaceId: row.learning_space_id ?? null,
     sessionTitle: row.session_title ?? null,
     sessionEndAt: row.session_end_at,
+    notifiedAt: row.notified_at ?? null,
+    confirmedAt: row.confirmed_at ?? null,
+    disputedAt: row.disputed_at ?? null,
+    ratedAt: row.rated_at ?? null,
     resolvedAt: row.resolved_at ?? null,
     expiresAt: row.expires_at,
   };
@@ -105,7 +102,8 @@ export class SessionCompletionsService {
     const account = await this.resolveAccount(supabase, authUserId, params.orgId);
     await this.resolvePermittedProfile(supabase, account, params.orgId, params.profileId);
 
-    const limit = Math.min(Math.max(params.limit ?? DEFAULT_PAGE_SIZE, 1), MAX_PAGE_SIZE);
+    const requestedLimit = Math.floor(params.limit ?? DEFAULT_PAGE_SIZE);
+    const limit = Math.min(Math.max(requestedLimit, 1), MAX_PAGE_SIZE);
     let cursorOrderKey: string | null = null;
     let cursorId: string | null = null;
     if (params.cursor) {
@@ -151,7 +149,7 @@ export class SessionCompletionsService {
 
     const supabase = createSupabaseServiceClient();
     const now = new Date().toISOString();
-    const { error } = await supabase
+    const { data: updated, error } = await supabase
       .from('class_session_completions')
       .update({
         status: 'confirmed',
@@ -162,9 +160,14 @@ export class SessionCompletionsService {
       })
       .eq('id', row.id)
       .eq('org_id', body.orgId)
-      .eq('status', 'pending'); // re-check in the WHERE clause too, closing a race with a concurrent request
+      .eq('status', 'pending')
+      .select('id')
+      .maybeSingle<{ id: string }>();
 
     if (error) throw new InternalServerErrorException(error.message);
+    if (!updated) {
+      throw new ConflictException('Session completion was already resolved');
+    }
 
     this.logger.log(
       `session completion confirmed id=${row.id} profileId=${row.profile_id}`,
@@ -187,7 +190,7 @@ export class SessionCompletionsService {
 
     const supabase = createSupabaseServiceClient();
     const now = new Date().toISOString();
-    const { error } = await supabase
+    const { data: updated, error } = await supabase
       .from('class_session_completions')
       .update({
         status: 'disputed',
@@ -201,9 +204,14 @@ export class SessionCompletionsService {
       })
       .eq('id', row.id)
       .eq('org_id', body.orgId)
-      .eq('status', 'pending');
+      .eq('status', 'pending')
+      .select('id')
+      .maybeSingle<{ id: string }>();
 
     if (error) throw new InternalServerErrorException(error.message);
+    if (!updated) {
+      throw new ConflictException('Session completion was already resolved');
+    }
 
     this.logger.log(
       `session completion disputed id=${row.id} profileId=${row.profile_id}`,
@@ -249,8 +257,8 @@ export class SessionCompletionsService {
       const archivedAt = classroom?.archived_at ?? null;
       if (archivedAt || classroom?.status === 'archived') {
         const archivedMs = archivedAt ? new Date(archivedAt).getTime() : Number.NaN;
-        const sessionEndMs = new Date(row.session_end_at).getTime();
-        if (!Number.isFinite(archivedMs) || sessionEndMs > archivedMs) {
+        const occurrenceMs = new Date(row.occurrence_key).getTime();
+        if (!Number.isFinite(archivedMs) || occurrenceMs > archivedMs) {
           throw new ForbiddenException(
             'Archived classrooms cannot receive feedback for future sessions',
           );
@@ -259,7 +267,7 @@ export class SessionCompletionsService {
     }
 
     const now = new Date().toISOString();
-    const { error } = await supabase
+    const { data: updated, error } = await supabase
       .from('class_session_completions')
       .update({
         rating: body.rating,
@@ -270,9 +278,14 @@ export class SessionCompletionsService {
       })
       .eq('id', row.id)
       .eq('org_id', body.orgId)
-      .in('status', ['confirmed', 'auto_confirmed']);
+      .in('status', ['confirmed', 'auto_confirmed'])
+      .select('id')
+      .maybeSingle<{ id: string }>();
 
     if (error) throw new InternalServerErrorException(error.message);
+    if (!updated) {
+      throw new ConflictException('Session completion can no longer be rated');
+    }
 
     this.logger.log(`session completion rated id=${row.id} rating=${body.rating}`);
     return { success: true };
@@ -441,7 +454,14 @@ export class SessionCompletionsService {
         orderKey?: string;
         id?: string;
       };
-      if (!decoded.orderKey || !decoded.id) throw new Error('malformed cursor');
+      if (
+        !decoded.orderKey ||
+        !decoded.id ||
+        !Number.isFinite(Date.parse(decoded.orderKey)) ||
+        !isUuid(decoded.id)
+      ) {
+        throw new Error('malformed cursor');
+      }
       return { orderKey: decoded.orderKey, id: decoded.id };
     } catch {
       throw new BadRequestException('Invalid cursor');

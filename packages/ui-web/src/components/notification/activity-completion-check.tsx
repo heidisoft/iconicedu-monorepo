@@ -16,7 +16,7 @@ type Step =
   | 'disputed'
   | 'already_responded';
 type DisputeCategory = 'teacher_absent' | 'student_absent' | 'technical_issue' | 'other';
-type CompletionVoteStatus = 'confirmed' | 'disputed';
+type SessionCompletionStatus = 'pending' | 'confirmed' | 'disputed' | 'auto_confirmed';
 
 const DISPUTE_CATEGORIES: { key: DisputeCategory; label: string }[] = [
   { key: 'teacher_absent', label: 'Teacher absent' },
@@ -27,19 +27,25 @@ const DISPUTE_CATEGORIES: { key: DisputeCategory; label: string }[] = [
 
 function getMetadata(activity: ActivityFeedLeafItemVM) {
   const m = (activity.metadata ?? {}) as Record<string, unknown>;
-  const vote =
-    m.completionVote && typeof m.completionVote === 'object'
-      ? (m.completionVote as Record<string, unknown>)
+  const sessionCompletion =
+    m.sessionCompletion && typeof m.sessionCompletion === 'object'
+      ? (m.sessionCompletion as Record<string, unknown>)
       : null;
-  const completionVoteStatus =
-    vote?.status === 'confirmed' || vote?.status === 'disputed'
-      ? (vote.status as CompletionVoteStatus)
+  const sessionCompletionStatus =
+    sessionCompletion?.status === 'pending' ||
+    sessionCompletion?.status === 'confirmed' ||
+    sessionCompletion?.status === 'disputed' ||
+    sessionCompletion?.status === 'auto_confirmed'
+      ? (sessionCompletion.status as SessionCompletionStatus)
       : null;
   return {
     orgId: typeof m.orgId === 'string' ? m.orgId : activity.ids.orgId,
-    scheduleId: typeof m.scheduleId === 'string' ? m.scheduleId : null,
-    occurrenceStart: typeof m.occurrenceStart === 'string' ? m.occurrenceStart : null,
-    role: typeof m.roleContext === 'string' ? m.roleContext : 'child',
+    sessionCompletionId:
+      typeof sessionCompletion?.id === 'string'
+        ? sessionCompletion.id
+        : typeof m.sessionCompletionId === 'string'
+          ? m.sessionCompletionId
+          : null,
     promptTitle:
       typeof m.completionPromptTitle === 'string'
         ? m.completionPromptTitle
@@ -49,66 +55,71 @@ function getMetadata(activity: ActivityFeedLeafItemVM) {
         ? m.completionPromptBody
         : 'How did your class go? Confirm, leave feedback, or report a problem.',
     feedbackUiEnabled: m.feedbackUiEnabled !== false,
-    completionVoteStatus,
+    sessionCompletionStatus,
   };
 }
 
 type Props = {
   activity: ActivityFeedLeafItemVM;
-  onVoteSubmit?: () => void;
+  onVoteSubmit?: (status: 'confirmed' | 'disputed') => void;
+  onRatingSubmit?: () => void;
 };
 
 export function canRenderActivityCompletionCheck(activity: ActivityFeedLeafItemVM) {
   const m = (activity.metadata ?? {}) as Record<string, unknown>;
   return (
     m.completionCheckUiEnabled === true &&
-    typeof m.scheduleId === 'string' &&
-    typeof m.occurrenceStart === 'string'
+    (typeof m.sessionCompletionId === 'string' ||
+      (typeof m.sessionCompletion === 'object' && m.sessionCompletion !== null))
   );
 }
 
-function getInitialStep(status: CompletionVoteStatus | null): Step {
-  if (status === 'confirmed' || status === 'disputed') return 'already_responded';
+function getInitialStep(status: SessionCompletionStatus | null): Step {
+  if (status === 'confirmed' || status === 'auto_confirmed') return 'confirmed';
+  if (status === 'disputed') return 'already_responded';
   return 'prompt';
 }
 
-export function ActivityCompletionCheck({ activity, onVoteSubmit }: Props) {
+export function ActivityCompletionCheck({
+  activity,
+  onVoteSubmit,
+  onRatingSubmit,
+}: Props) {
   const metadata = useMemo(() => getMetadata(activity), [activity]);
   const [step, setStep] = useState<Step>(() =>
-    getInitialStep(metadata.completionVoteStatus),
+    getInitialStep(metadata.sessionCompletionStatus),
   );
   const [disputeCategory, setDisputeCategory] = useState<DisputeCategory | null>(null);
   const [disputeReason, setDisputeReason] = useState('');
   const [rescheduleRequested, setRescheduleRequested] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const canSubmit = Boolean(metadata.scheduleId && metadata.occurrenceStart);
+  const canSubmit = Boolean(metadata.sessionCompletionId);
 
   useEffect(() => {
-    if (metadata.completionVoteStatus) {
+    if (metadata.sessionCompletionStatus) {
       setStep((prev) => {
         if (prev === 'confirmed' || prev === 'disputed') return prev;
-        return getInitialStep(metadata.completionVoteStatus);
+        return getInitialStep(metadata.sessionCompletionStatus);
       });
     }
-  }, [metadata.completionVoteStatus]);
+  }, [metadata.sessionCompletionStatus]);
 
   const handleConfirm = useCallback(async () => {
     if (!canSubmit) return;
     setStep('submitting');
     setError(null);
     try {
-      const response = await fetch('/api/activity-feed/session-completion-vote', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          orgId: metadata.orgId,
-          scheduleId: metadata.scheduleId,
-          occurrenceKey: metadata.occurrenceStart,
-          role: metadata.role,
-          status: 'confirmed',
-        }),
-      });
+      const response = await fetch(
+        `/api/session-completions/${metadata.sessionCompletionId}/confirm`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            orgId: metadata.orgId,
+          }),
+        },
+      );
       if (!response.ok) {
         const payload = (await response.json().catch(() => null)) as {
           error?: string;
@@ -116,7 +127,7 @@ export function ActivityCompletionCheck({ activity, onVoteSubmit }: Props) {
         throw new Error(payload?.error ?? 'Failed to submit');
       }
       setStep('confirmed');
-      onVoteSubmit?.();
+      onVoteSubmit?.('confirmed');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit');
       setStep('prompt');
@@ -128,20 +139,19 @@ export function ActivityCompletionCheck({ activity, onVoteSubmit }: Props) {
     setStep('submitting');
     setError(null);
     try {
-      const response = await fetch('/api/activity-feed/session-completion-vote', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          orgId: metadata.orgId,
-          scheduleId: metadata.scheduleId,
-          occurrenceKey: metadata.occurrenceStart,
-          role: metadata.role,
-          status: 'disputed',
-          disputeCategory,
-          disputeReason: disputeReason.trim() || null,
-          rescheduleRequested,
-        }),
-      });
+      const response = await fetch(
+        `/api/session-completions/${metadata.sessionCompletionId}/dispute`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            orgId: metadata.orgId,
+            disputeCategory,
+            disputeReason: disputeReason.trim() || null,
+            rescheduleRequested,
+          }),
+        },
+      );
       if (!response.ok) {
         const payload = (await response.json().catch(() => null)) as {
           error?: string;
@@ -149,7 +159,7 @@ export function ActivityCompletionCheck({ activity, onVoteSubmit }: Props) {
         throw new Error(payload?.error ?? 'Failed to submit');
       }
       setStep('disputed');
-      onVoteSubmit?.();
+      onVoteSubmit?.('disputed');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit');
       setStep('dispute_form');
@@ -221,7 +231,7 @@ export function ActivityCompletionCheck({ activity, onVoteSubmit }: Props) {
           </p>
         </div>
         {metadata.feedbackUiEnabled ? (
-          <ActivityFeedbackRequest activity={activity} />
+          <ActivityFeedbackRequest activity={activity} onRatingSubmit={onRatingSubmit} />
         ) : null}
       </div>
     );

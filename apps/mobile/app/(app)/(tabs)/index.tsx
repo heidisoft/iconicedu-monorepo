@@ -32,6 +32,8 @@ import { useAuth } from '@/providers/auth-provider';
 import { useAccount } from '@/hooks/use-account';
 import { useProfile } from '@/hooks/use-profile';
 import { useUpcomingSessions } from '@/hooks/use-upcoming-sessions';
+import { useCompletedSessions } from '@/hooks/use-completed-sessions';
+import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
 import { useFamilyLinks } from '@/hooks/use-family-links';
 import { useLearningSpaces } from '@/hooks/use-learning-spaces';
 import { useSupportChannel } from '@/hooks/use-support-channel';
@@ -39,6 +41,7 @@ import { useTheme } from '@/providers/theme-provider';
 import { useFamilyView } from '@/providers/family-view-provider';
 import { PulseBox } from '@/components/skeletons/pulse-box';
 import { SessionCard } from '@/components/sessions/session-card';
+import { SessionCompletedCarousel } from '@/components/sessions/session-completed-carousel';
 import { AppSupportFooter } from '@/components/support/app-support-footer';
 import { QueryError } from '@/components/errors/query-error';
 import {
@@ -54,6 +57,7 @@ import {
 } from '@iconicedu/shared-types';
 import type { AppColors } from '@/lib/theme';
 import { profileAvatarColors } from '@/lib/profile-avatar-colors';
+import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
 
 // ---------------------------------------------------------------------------
 // Avatar color helpers — ui_theme_key → hex, fallback to seed palette
@@ -696,6 +700,9 @@ function makeStyles(C: AppColors) {
 
 export default function HomeScreen() {
   const { user } = useAuth();
+  const sessionCompletionCarouselEnabled = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.sessionCompletionCarousel,
+  );
   const scrollRef = useRef<ScrollView>(null);
   const queryClient = useQueryClient();
   const { familySwitchOptions, switchFamilyView, isViewingAsChild } = useFamilyView();
@@ -710,6 +717,8 @@ export default function HomeScreen() {
     isPending: sessionsLoading,
     refetch: refetchSessions,
   } = useUpcomingSessions();
+  const { sessions: completedSessions, refetch: refetchCompletedSessions } =
+    useCompletedSessions(sessionCompletionCarouselEnabled);
   const {
     data: account,
     isPending: accountLoading,
@@ -903,6 +912,7 @@ export default function HomeScreen() {
         refetchAccount(),
         refetchProfile(),
         refetchSessions(),
+        ...(sessionCompletionCarouselEnabled ? [refetchCompletedSessions()] : []),
         refetchLearningSpaces(),
         refetchSupportChannel(),
         refetchOrgSchedules(),
@@ -927,11 +937,13 @@ export default function HomeScreen() {
       orgId,
       queryClient,
       refetchAccount,
+      refetchCompletedSessions,
       refetchLearningSpaces,
       refetchOrgSchedules,
       refetchProfile,
       refetchSessions,
       refetchSupportChannel,
+      sessionCompletionCarouselEnabled,
     ],
   );
   const onRefresh = useCallback(() => {
@@ -1235,6 +1247,14 @@ export default function HomeScreen() {
             </ScrollView>
           )}
         </View>
+
+        {sessionCompletionCarouselEnabled ? (
+          <SessionCompletedCarousel
+            sessions={completedSessions}
+            colors={colors}
+            width={Math.max(280, windowWidth - 66)}
+          />
+        ) : null}
 
         {/* Upcoming sessions */}
         {showTodaySection && (
