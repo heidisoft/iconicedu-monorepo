@@ -12,6 +12,7 @@ import type {
   ConfirmSessionCompletionInput,
   DisputeSessionCompletionInput,
   RateSessionCompletionInput,
+  UndoSessionCompletionInput,
 } from '@iconicedu/shared-types';
 import { AuthGuard } from '@iconicedu/api/modules/auth/auth.guard';
 import { SessionCompletionsService } from '@iconicedu/api/modules/session-completions/session-completions.service';
@@ -73,6 +74,19 @@ export class SessionCompletionsController {
     @Body() body: RateSessionCompletionInput,
   ) {
     return this.sessionCompletionsService.rate(req.user.id, {
+      ...body,
+      sessionCompletionId: id,
+    });
+  }
+
+  @Post(':id/undo')
+  @UseGuards(AuthGuard)
+  undo(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() body: UndoSessionCompletionInput,
+  ) {
+    return this.sessionCompletionsService.undo(req.user.id, {
       ...body,
       sessionCompletionId: id,
     });

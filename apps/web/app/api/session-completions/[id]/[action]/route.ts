@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createApiClient } from '@iconicedu/web/lib/api/http-client';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 
-const ACTIONS = new Set(['confirm', 'dispute', 'rate']);
+const ACTIONS = new Set(['confirm', 'dispute', 'rate', 'undo']);
 
 export async function POST(
   request: Request,

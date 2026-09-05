@@ -18,6 +18,17 @@ type Step =
 type DisputeCategory = 'teacher_absent' | 'student_absent' | 'technical_issue' | 'other';
 type SessionCompletionStatus = 'pending' | 'confirmed' | 'disputed' | 'auto_confirmed';
 
+// Same window ActivityFeedbackRequest already uses for its "Edit rating" button —
+// applied here to let a fresh confirm/dispute be undone for a short time.
+const UNDO_WINDOW_MS = 60_000;
+
+function resolveUndoWindowOpen(resolvedAt: string | null) {
+  if (!resolvedAt) return false;
+  const resolvedTimestamp = new Date(resolvedAt).getTime();
+  if (Number.isNaN(resolvedTimestamp)) return false;
+  return resolvedTimestamp + UNDO_WINDOW_MS > Date.now();
+}
+
 const DISPUTE_CATEGORIES: { key: DisputeCategory; label: string }[] = [
   { key: 'teacher_absent', label: 'Teacher absent' },
   { key: 'student_absent', label: 'Student absent' },
@@ -56,6 +67,11 @@ function getMetadata(activity: ActivityFeedLeafItemVM) {
         : 'How did your class go? Confirm, leave feedback, or report a problem.',
     feedbackUiEnabled: m.feedbackUiEnabled !== false,
     sessionCompletionStatus,
+    resolvedAt:
+      typeof sessionCompletion?.resolvedAt === 'string'
+        ? sessionCompletion.resolvedAt
+        : null,
+    hasRating: typeof sessionCompletion?.rating === 'number',
   };
 }
 
@@ -93,6 +109,12 @@ export function ActivityCompletionCheck({
   const [disputeReason, setDisputeReason] = useState('');
   const [rescheduleRequested, setRescheduleRequested] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [localResolvedAt, setLocalResolvedAt] = useState<string | null>(null);
+  const effectiveResolvedAt = localResolvedAt ?? metadata.resolvedAt;
+  const [isUndoWindowOpen, setIsUndoWindowOpen] = useState(
+    () => resolveUndoWindowOpen(effectiveResolvedAt) && !metadata.hasRating,
+  );
+  const [isUndoing, setIsUndoing] = useState(false);
 
   const canSubmit = Boolean(metadata.sessionCompletionId);
 
@@ -104,6 +126,39 @@ export function ActivityCompletionCheck({
       });
     }
   }, [metadata.sessionCompletionStatus]);
+
+  // Mirrors ActivityFeedbackRequest's edit-window timer: close the Undo option once
+  // UNDO_WINDOW_MS has elapsed since resolution, whether that's a fresh in-session
+  // confirm/dispute or one resumed after a reload.
+  useEffect(() => {
+    if (metadata.hasRating) {
+      setIsUndoWindowOpen(false);
+      return;
+    }
+    if (!effectiveResolvedAt) {
+      setIsUndoWindowOpen(false);
+      return;
+    }
+
+    const resolvedTimestamp = new Date(effectiveResolvedAt).getTime();
+    if (Number.isNaN(resolvedTimestamp)) {
+      setIsUndoWindowOpen(false);
+      return;
+    }
+
+    const remainingMs = resolvedTimestamp + UNDO_WINDOW_MS - Date.now();
+    if (remainingMs <= 0) {
+      setIsUndoWindowOpen(false);
+      return;
+    }
+
+    setIsUndoWindowOpen(true);
+    const timer = window.setTimeout(() => {
+      setIsUndoWindowOpen(false);
+    }, remainingMs);
+
+    return () => window.clearTimeout(timer);
+  }, [effectiveResolvedAt, metadata.hasRating]);
 
   const handleConfirm = useCallback(async () => {
     if (!canSubmit) return;
@@ -126,6 +181,7 @@ export function ActivityCompletionCheck({
         } | null;
         throw new Error(payload?.error ?? 'Failed to submit');
       }
+      setLocalResolvedAt(new Date().toISOString());
       setStep('confirmed');
       onVoteSubmit?.('confirmed');
     } catch (err) {
@@ -158,6 +214,7 @@ export function ActivityCompletionCheck({
         } | null;
         throw new Error(payload?.error ?? 'Failed to submit');
       }
+      setLocalResolvedAt(new Date().toISOString());
       setStep('disputed');
       onVoteSubmit?.('disputed');
     } catch (err) {
@@ -172,6 +229,38 @@ export function ActivityCompletionCheck({
     rescheduleRequested,
     onVoteSubmit,
   ]);
+
+  const handleUndo = useCallback(async () => {
+    if (!canSubmit || isUndoing) return;
+    setIsUndoing(true);
+    setError(null);
+    try {
+      const response = await fetch(
+        `/api/session-completions/${metadata.sessionCompletionId}/undo`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ orgId: metadata.orgId }),
+        },
+      );
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        throw new Error(payload?.error ?? 'Failed to undo');
+      }
+      setLocalResolvedAt(null);
+      setIsUndoWindowOpen(false);
+      setDisputeCategory(null);
+      setDisputeReason('');
+      setRescheduleRequested(false);
+      setStep('prompt');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to undo');
+    } finally {
+      setIsUndoing(false);
+    }
+  }, [canSubmit, isUndoing, metadata]);
 
   if (step === 'prompt' || (step === 'submitting' && disputeCategory === null)) {
     const isLoading = step === 'submitting';
@@ -224,15 +313,31 @@ export function ActivityCompletionCheck({
   if (step === 'confirmed') {
     return (
       <div className="w-full rounded-xl border border-border/80 bg-background/95 p-4 md:max-w-[420px]">
-        <div className="mb-3 flex items-center gap-1.5">
-          <CheckCircle2 className="size-4 text-emerald-600" />
-          <p className="text-sm font-semibold text-emerald-700">
-            Great! How was the session?
-          </p>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-1.5">
+            <CheckCircle2 className="size-4 text-emerald-600" />
+            <p className="text-sm font-semibold text-emerald-700">
+              Great! How was the session?
+            </p>
+          </div>
+          {isUndoWindowOpen ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => void handleUndo()}
+              disabled={isUndoing}
+              data-action-button="true"
+              className="text-xs"
+            >
+              {isUndoing ? 'Undoing...' : 'Undo'}
+            </Button>
+          ) : null}
         </div>
         {metadata.feedbackUiEnabled ? (
           <ActivityFeedbackRequest activity={activity} onRatingSubmit={onRatingSubmit} />
         ) : null}
+        {error ? <p className="mt-2 text-xs text-rose-600">{error}</p> : null}
       </div>
     );
   }
@@ -240,7 +345,23 @@ export function ActivityCompletionCheck({
   if (step === 'disputed') {
     return (
       <div className="w-full rounded-xl border border-border/80 bg-muted/40 p-4 text-xs text-muted-foreground md:max-w-[420px]">
-        Reported — the educator and admin team have been notified.
+        <div className="flex items-center justify-between gap-3">
+          <p>Reported — the educator and admin team have been notified.</p>
+          {isUndoWindowOpen ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => void handleUndo()}
+              disabled={isUndoing}
+              data-action-button="true"
+              className="shrink-0 text-xs"
+            >
+              {isUndoing ? 'Undoing...' : 'Undo'}
+            </Button>
+          ) : null}
+        </div>
+        {error ? <p className="mt-2 text-rose-600">{error}</p> : null}
       </div>
     );
   }

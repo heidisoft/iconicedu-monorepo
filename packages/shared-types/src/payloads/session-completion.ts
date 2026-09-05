@@ -26,3 +26,11 @@ export type RateSessionCompletionInput = {
   rating: number;
   comment?: string | null;
 };
+
+// Reverts a just-confirmed or just-disputed row back to 'pending'. Only allowed
+// server-side within a short window after resolution and before a rating exists —
+// see UNDO_WINDOW_MS in session-completions.service.ts.
+export type UndoSessionCompletionInput = {
+  orgId: UUID;
+  sessionCompletionId: UUID;
+};

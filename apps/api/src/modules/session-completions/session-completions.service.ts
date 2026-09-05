@@ -14,6 +14,7 @@ import type {
   DisputeSessionCompletionInput,
   RateSessionCompletionInput,
   SessionCompletionVM,
+  UndoSessionCompletionInput,
 } from '@iconicedu/shared-types';
 import {
   createSupabaseServiceClient,
@@ -31,6 +32,9 @@ type ProfileRow = {
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 50;
+// Matches the "Edit rating" window already used by ActivityFeedbackRequest — same
+// pattern, applied to undoing a confirm/dispute instead of editing a rating.
+const UNDO_WINDOW_MS = 60_000;
 
 const DISPUTE_CATEGORIES = [
   'teacher_absent',
@@ -226,6 +230,66 @@ export class SessionCompletionsService {
     });
 
     return { success: true, feedbackEnabled: false };
+  }
+
+  /**
+   * Reverts a just-confirmed or just-disputed row back to 'pending', mirroring the
+   * short "Edit rating" window ActivityFeedbackRequest already offers after a rating
+   * — same idea, applied to confirm/dispute. Enforced server-side (not just a hidden
+   * client button) via resolved_at age, so a stale client can't call this after the
+   * window the UI showed has closed.
+   */
+  async undo(authUserId: string, body: UndoSessionCompletionInput) {
+    const row = await this.loadOwnedRow(authUserId, body.orgId, body.sessionCompletionId);
+
+    if (row.status !== 'confirmed' && row.status !== 'disputed') {
+      throw new BadRequestException(
+        `Cannot undo a session completion in status '${row.status}'`,
+      );
+    }
+    if (row.rating !== null && row.rating !== undefined) {
+      throw new BadRequestException('Cannot undo after a rating has been submitted');
+    }
+
+    const resolvedAtMs = row.resolved_at
+      ? new Date(row.resolved_at).getTime()
+      : Number.NaN;
+    if (!Number.isFinite(resolvedAtMs) || Date.now() - resolvedAtMs > UNDO_WINDOW_MS) {
+      throw new BadRequestException('Undo window has expired');
+    }
+
+    const supabase = createSupabaseServiceClient();
+    const now = new Date().toISOString();
+    const { data: updated, error } = await supabase
+      .from('class_session_completions')
+      .update({
+        status: 'pending',
+        confirmed_at: null,
+        disputed_at: null,
+        resolved_at: null,
+        dispute_category: null,
+        dispute_reason: null,
+        reschedule_requested: false,
+        updated_at: now,
+        updated_by: row.profile_id,
+      })
+      .eq('id', row.id)
+      .eq('org_id', body.orgId)
+      .eq('status', row.status)
+      .select('id')
+      .maybeSingle<{ id: string }>();
+
+    if (error) throw new InternalServerErrorException(error.message);
+    if (!updated) {
+      throw new ConflictException(
+        'Session completion state changed before undo could be applied',
+      );
+    }
+
+    this.logger.log(
+      `session completion undone id=${row.id} previousStatus=${row.status}`,
+    );
+    return { success: true };
   }
 
   async rate(authUserId: string, body: RateSessionCompletionInput) {

@@ -4,6 +4,7 @@ import type {
   DisputeSessionCompletionInput,
   RateSessionCompletionInput,
   SessionCompletionVM,
+  UndoSessionCompletionInput,
 } from '@iconicedu/shared-types';
 import { apiGet, apiPost } from '@/lib/api/http-client';
 
@@ -42,6 +43,15 @@ export function rateSessionCompletion(input: RateSessionCompletionInput) {
       orgId: input.orgId,
       rating: input.rating,
       comment: input.comment ?? null,
+    },
+  );
+}
+
+export function undoSessionCompletion(input: UndoSessionCompletionInput) {
+  return apiPost<{ success: true }>(
+    `/session-completions/${input.sessionCompletionId}/undo`,
+    {
+      orgId: input.orgId,
     },
   );
 }
