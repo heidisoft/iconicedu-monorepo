@@ -96,6 +96,7 @@ alter table public.class_session_completions enable row level security;
 create policy "profile_read_own_completion"
   on public.class_session_completions
   for select
+  to authenticated
   using (
     profile_id in (
       select p.id from public.profiles p
@@ -107,6 +108,7 @@ create policy "profile_read_own_completion"
 create policy "profile_update_own_completion"
   on public.class_session_completions
   for update
+  to authenticated
   using (
     profile_id in (
       select p.id from public.profiles p
@@ -130,5 +132,6 @@ create policy "profile_update_own_completion"
 create policy "service_role_all_class_session_completions"
   on public.class_session_completions
   for all
+  to service_role
   using (auth.role() = 'service_role')
   with check (auth.role() = 'service_role');
