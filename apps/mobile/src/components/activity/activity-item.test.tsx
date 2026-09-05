@@ -330,6 +330,7 @@ describe('ActivityItem', () => {
   });
 
   it('autosaves low-rating comments and uses a button to collapse to the submitted state', async () => {
+    jest.useFakeTimers();
     mockSubmitActivityFeedFeedback
       .mockResolvedValueOnce({
         submittedAt: '2026-04-02T12:05:00.000Z',
@@ -361,54 +362,32 @@ describe('ActivityItem', () => {
       currentProfileId: 'profile-1',
     });
 
-    fireEvent.press(screen.getByLabelText('Rate 4 stars'));
-
-    await waitFor(() => {
-      expect(mockSubmitActivityFeedFeedback).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Rate 4 stars'));
     });
-    await waitFor(
-      () => {
-        expect(screen.queryByText('Saving...')).toBeNull();
-        expect(screen.getByText('Submit feedback')).toBeTruthy();
-      },
-      { timeout: 5000 },
+
+    expect(mockSubmitActivityFeedFeedback).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('Saving...')).toBeNull();
+    expect(screen.getByText('Submit feedback')).toBeTruthy();
+
+    fireEvent.changeText(
+      screen.getByPlaceholderText('Tell us what could be better...'),
+      'Helpful, but a little fast.',
     );
 
-    const realSetTimeout = global.setTimeout;
-    const setTimeoutSpy = jest
-      .spyOn(global, 'setTimeout')
-      .mockImplementation(((
-        handler: TimerHandler,
-        timeout?: number,
-        ...args: unknown[]
-      ) =>
-        realSetTimeout(
-          handler,
-          timeout === 600 ? 0 : timeout,
-          ...args,
-        )) as typeof setTimeout);
-    try {
-      fireEvent.changeText(
-        screen.getByPlaceholderText('Tell us what could be better...'),
-        'Helpful, but a little fast.',
-      );
-
-      await act(async () => {
-        await new Promise((resolve) => realSetTimeout(resolve, 0));
-      });
-    } finally {
-      setTimeoutSpy.mockRestore();
-    }
+    await act(async () => {
+      jest.advanceTimersByTime(600);
+    });
 
     expect(mockSubmitActivityFeedFeedback).toHaveBeenCalledTimes(2);
     expect(screen.getByText('Submit feedback')).toBeTruthy();
     expect(screen.queryByText('Rating saved. Comments save automatically.')).toBeNull();
 
-    fireEvent.press(screen.getByText('Submit feedback'));
-
-    await waitFor(() => {
-      expect(screen.getByText('Thank you for your feedback.')).toBeTruthy();
+    await act(async () => {
+      fireEvent.press(screen.getByText('Submit feedback'));
     });
+
+    expect(screen.getByText('Thank you for your feedback.')).toBeTruthy();
     expect(screen.queryByPlaceholderText('Tell us what could be better...')).toBeNull();
     expect(mockSubmitActivityFeedFeedback).toHaveBeenLastCalledWith(
       expect.objectContaining({
