@@ -298,11 +298,11 @@ export function DashboardHomeInfographicSection({
         </article>
       </div>
 
-      <SessionCompletedCarousel completions={completedSessionsPending} />
-
       <div className="grid gap-4 lg:grid-cols-[13fr_7fr]">
         <article className="rounded-3xl border border-border bg-card/80 p-6">
-          <h2 className="font-semibold tracking-tight">Upcoming Sessions</h2>
+          <SessionCompletedCarousel completions={completedSessionsPending} />
+
+          <h2 className="mt-6 font-semibold tracking-tight">Upcoming Sessions</h2>
 
           <div className="mt-5 space-y-3">
             {totalUpcomingSessions > 0 ? (

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Star } from 'lucide-react';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { Textarea } from '@iconicedu/ui-web/ui/textarea';
@@ -12,10 +12,16 @@ import {
 import type { ActivityFeedLeafItemVM } from '@iconicedu/shared-types';
 
 const EDIT_WINDOW_MS = 60_000;
+// Lets the just-picked stars stay visible (filled, disabled) for a beat before the
+// "Thank you" confirmation replaces them — without this, submitting looked like the
+// stars just vanished, since the confirmation appeared the instant the API resolved.
+const CONFIRMATION_REVEAL_DELAY_MS = 500;
 
 type ActivityFeedbackRequestProps = {
   activity: ActivityFeedLeafItemVM;
   onRatingSubmit?: () => void;
+  /** See ActivityCompletionCheck's `embedded` prop — same idea, same reason. */
+  embedded?: boolean;
 };
 
 type FeedbackMetadata = {
@@ -108,6 +114,7 @@ export function canRenderActivityFeedbackRequest(activity: ActivityFeedLeafItemV
 export function ActivityFeedbackRequest({
   activity,
   onRatingSubmit,
+  embedded = false,
 }: ActivityFeedbackRequestProps) {
   const initialFeedback = useMemo(() => getInitialFeedback(activity), [activity]);
   const metadata = useMemo(() => getFeedbackMetadata(activity), [activity]);
@@ -129,6 +136,12 @@ export function ActivityFeedbackRequest({
   const [isEditWindowOpen, setIsEditWindowOpen] = useState(() =>
     resolveEditWindowOpen(initialFeedback.submittedAt),
   );
+  // True immediately when resuming an already-submitted rating (no artificial delay
+  // on page load) — only set with a delay for a fresh, in-session submit.
+  const [showConfirmation, setShowConfirmation] = useState(() =>
+    Boolean(initialFeedback.submittedAt),
+  );
+  const confirmationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setRating(initialFeedback.rating);
@@ -143,7 +156,16 @@ export function ActivityFeedbackRequest({
     setError(null);
     setIsEditing(false);
     setIsEditWindowOpen(resolveEditWindowOpen(initialFeedback.submittedAt));
+    setShowConfirmation(Boolean(initialFeedback.submittedAt));
   }, [initialFeedback]);
+
+  useEffect(() => {
+    return () => {
+      if (confirmationTimeoutRef.current) {
+        clearTimeout(confirmationTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!submittedAt) {
@@ -216,6 +238,14 @@ export function ActivityFeedbackRequest({
       setHoveredRating(0);
       setIsEditing(false);
       setIsEditWindowOpen(true);
+      setShowConfirmation(false);
+      if (confirmationTimeoutRef.current) {
+        clearTimeout(confirmationTimeoutRef.current);
+      }
+      confirmationTimeoutRef.current = setTimeout(() => {
+        confirmationTimeoutRef.current = null;
+        setShowConfirmation(true);
+      }, CONFIRMATION_REVEAL_DELAY_MS);
       onRatingSubmit?.();
     } catch {
       setError('Unable to submit feedback');
@@ -260,12 +290,19 @@ export function ActivityFeedbackRequest({
   }
 
   return (
-    <div className="w-full rounded-xl border border-border/80 bg-background/95 p-4 text-xs md:max-w-[420px]">
+    <div
+      className={cn(
+        'w-full text-xs',
+        embedded
+          ? undefined
+          : 'rounded-xl border border-border/80 bg-background/95 p-4 md:max-w-[420px]',
+      )}
+    >
       <div className="flex items-start justify-between gap-3">
         <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
           Rate your session
         </p>
-        {isSubmitted && isEditWindowOpen ? (
+        {isSubmitted && isEditWindowOpen && showConfirmation ? (
           <Button
             type="button"
             size="sm"
@@ -343,7 +380,7 @@ export function ActivityFeedbackRequest({
         </div>
       ) : null}
 
-      {isSubmitted ? (
+      {isSubmitted && showConfirmation ? (
         <div
           className="mt-2 rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground"
           title={submittedTooltip ?? undefined}

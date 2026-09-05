@@ -85,6 +85,14 @@ type Props = {
   currentProfileId?: string | null;
   onCompletionSubmit?: (status: 'confirmed' | 'disputed') => void;
   onRatingSubmit?: () => void;
+  /**
+   * When true, drops the left indent kept for aligning under an avatar in the
+   * notification feed — the card keeps its own border/background (matching
+   * SessionCard's look in the homepage's Today/This week/Next week sections) but
+   * fills the full width instead of appearing shifted right. The default (false)
+   * keeps the standalone notification-feed appearance unchanged.
+   */
+  embedded?: boolean;
 };
 
 function getInitialStep(status: CompletionStatus | null): Step {
@@ -98,9 +106,11 @@ export function ActivityCompletionCheck({
   colors,
   onCompletionSubmit,
   onRatingSubmit,
+  embedded = false,
 }: Props) {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const metadata = useMemo(() => getMetadata(activity), [activity]);
+  const cardStyle = [styles.card, embedded && styles.cardEmbedded];
 
   const [step, setStep] = useState<Step>(() =>
     getInitialStep(metadata.sessionCompletionStatus),
@@ -232,10 +242,15 @@ export function ActivityCompletionCheck({
   if (step === 'prompt' || step === 'submitting_confirm') {
     const isLoading = step === 'submitting_confirm';
     return (
-      <View style={styles.card}>
-        <Text style={[styles.question, { color: colors.textMuted }]}>
-          {metadata.promptTitle}
-        </Text>
+      <View style={cardStyle}>
+        {/* When embedded (the homepage tile), the tile itself already shows a
+            "Completed" badge next to the session title — repeating "Session
+            Completed" here would just say the same thing twice. */}
+        {embedded ? null : (
+          <Text style={[styles.question, { color: colors.textMuted }]}>
+            {metadata.promptTitle}
+          </Text>
+        )}
         <Text style={[styles.promptBody, { color: colors.textMuted }]}>
           {metadata.promptBody}
         </Text>
@@ -284,7 +299,7 @@ export function ActivityCompletionCheck({
 
   if (step === 'confirmed') {
     return (
-      <View style={styles.card}>
+      <View style={cardStyle}>
         <View style={styles.confirmedHeaderRow}>
           <View style={styles.confirmedHeader}>
             <CheckCircle2 size={16} color={colors.teal} />
@@ -320,7 +335,7 @@ export function ActivityCompletionCheck({
 
   if (step === 'disputed') {
     return (
-      <View style={[styles.card, { backgroundColor: colors.inputBg }]}>
+      <View style={[...cardStyle, !embedded && { backgroundColor: colors.inputBg }]}>
         <View style={styles.disputedRow}>
           <Text style={[styles.submittedText, { color: colors.textMuted }]}>
             {"Got it — we've notified the educator and admin team."}
@@ -346,7 +361,7 @@ export function ActivityCompletionCheck({
 
   if (step === 'already_responded') {
     return (
-      <View style={[styles.card, { backgroundColor: colors.inputBg }]}>
+      <View style={[...cardStyle, !embedded && { backgroundColor: colors.inputBg }]}>
         <Text style={[styles.submittedText, { color: colors.textMuted }]}>
           {"You've already responded — thanks for letting us know!"}
         </Text>
@@ -357,7 +372,7 @@ export function ActivityCompletionCheck({
   // dispute_form or submitting_dispute
   const isSubmittingDispute = step === 'submitting_dispute';
   return (
-    <View style={styles.card}>
+    <View style={cardStyle}>
       <Text style={[styles.question, { color: colors.textMuted }]}>What happened?</Text>
       <View style={styles.chipRow}>
         {DISPUTE_CATEGORIES.map((cat) => {
@@ -478,6 +493,19 @@ function makeStyles(colors: AppColors) {
       padding: 16,
       gap: 12,
     },
+    cardEmbedded: {
+      // Drop this component's own chrome entirely — used inside
+      // SessionCompletedTile, which now supplies ONE outer card (date chip +
+      // title + meta + this widget). Keeping a second nested border/background
+      // here produced two visually disconnected boxes once the homepage carousel
+      // switched to a peeking card-stack, since the stack's placeholder cards are
+      // sized to the tile's full bounding box, not just this inner widget.
+      marginTop: 0,
+      marginLeft: 0,
+      borderWidth: 0,
+      backgroundColor: 'transparent',
+      padding: 0,
+    },
     question: {
       fontSize: 10,
       lineHeight: 14,
@@ -492,10 +520,11 @@ function makeStyles(colors: AppColors) {
     buttonRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 8,
+      gap: 12,
     },
     yesButton: {
       flex: 1,
+      maxWidth: 200,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
@@ -514,6 +543,7 @@ function makeStyles(colors: AppColors) {
     },
     noButton: {
       flex: 1,
+      maxWidth: 200,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',

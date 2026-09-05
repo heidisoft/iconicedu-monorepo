@@ -47,13 +47,7 @@ const completion: SessionCompletionVM = {
 
 describe('SessionCompletedCarousel', () => {
   it('keeps a confirmed card for rating, then removes it after rating', async () => {
-    render(
-      <SessionCompletedCarousel
-        sessions={[completion]}
-        colors={lightColors}
-        width={320}
-      />,
-    );
+    render(<SessionCompletedCarousel sessions={[completion]} colors={lightColors} />);
 
     fireEvent.press(screen.getByLabelText('Confirm lesson'));
     expect(await screen.findByText('Great! How was the session?')).toBeTruthy();
@@ -64,9 +58,18 @@ describe('SessionCompletedCarousel', () => {
 
     fireEvent.press(screen.getByLabelText('Rate 5 stars'));
 
-    await waitFor(() => {
-      expect(screen.queryByLabelText('Session Completed')).toBeNull();
-    });
+    // The rated card holds on screen briefly (so its "Thank you" confirmation is
+    // actually visible) before advancing — it must not vanish the instant the
+    // rating succeeds.
+    expect(await screen.findByText('Thank you for your feedback.')).toBeTruthy();
+    expect(screen.getByText('Recently completed')).toBeTruthy();
+
+    await waitFor(
+      () => {
+        expect(screen.queryByText('Recently completed')).toBeNull();
+      },
+      { timeout: 3000 },
+    );
     expect(rateSessionCompletion).toHaveBeenCalledWith({
       orgId: completion.orgId,
       sessionCompletionId: completion.id,

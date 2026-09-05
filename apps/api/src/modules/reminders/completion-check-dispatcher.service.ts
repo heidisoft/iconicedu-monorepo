@@ -79,6 +79,29 @@ function buildDisplayName(profile: ProfileSummaryRow) {
   return profile.display_name?.trim() || fullName || null;
 }
 
+// Which other participants' names are relevant to show *this* viewer, mirroring
+// the homepage's own "Upcoming Sessions" tile (getViewerParticipantNames in
+// apps/web/lib/dashboard/home-infographic-metrics.ts): an educator sees their
+// student(s); a student sees their educator(s); staff/observer (no privacy
+// boundary of their own) see the full roster. Guardians are handled separately
+// (computeStudentNameForGuardian below) since their child-name half needs
+// family_links privacy scoping that plain role-matching can't provide.
+function computeContextParticipantNames(
+  members: CompletionCheckMember[],
+  viewerRole: string | null | undefined,
+): string | null {
+  const matchesViewer = (member: CompletionCheckMember) => {
+    if (!member.displayName?.trim()) return false;
+    if (viewerRole === 'child') return member.role === 'educator';
+    if (viewerRole === 'educator') return member.role === 'child';
+    return true;
+  };
+  const names = unique(
+    members.filter(matchesViewer).map((member) => member.displayName!.trim()),
+  );
+  return names.length ? names.join(', ') : null;
+}
+
 @Injectable()
 export class CompletionCheckDispatcherService {
   private readonly logger = new Logger(CompletionCheckDispatcherService.name);
@@ -217,6 +240,7 @@ export class CompletionCheckDispatcherService {
         role: member.role ?? 'observer',
         sessionEndAt: effectiveOccurrence.sessionEndAt,
         sessionTitle: effectiveOccurrence.sessionTitle,
+        studentName: computeContextParticipantNames(members, member.role),
         channelId: effectiveOccurrence.channelId,
         learningSpaceId: effectiveOccurrence.learningSpaceId,
       });
@@ -330,6 +354,12 @@ export class CompletionCheckDispatcherService {
 
     if (concurrentSessions.length === 0) {
       // No concurrent sessions — dispatch single event
+      const studentName = await this.computeStudentNameForGuardian({
+        supabase,
+        orgId,
+        guardianProfileId,
+        members: currentPayload.members ?? [],
+      });
       const sessionCompletionId = await this.upsertSessionCompletion({
         supabase,
         orgId,
@@ -339,6 +369,7 @@ export class CompletionCheckDispatcherService {
         role: 'guardian',
         sessionEndAt: currentEffectiveOccurrence.sessionEndAt,
         sessionTitle: currentEffectiveOccurrence.sessionTitle,
+        studentName,
         channelId: currentEffectiveOccurrence.channelId,
         learningSpaceId: currentEffectiveOccurrence.learningSpaceId,
       });
@@ -383,6 +414,12 @@ export class CompletionCheckDispatcherService {
     // in this window share the same batch event.
     const batchDedupeKey = `session.completion_check.batch:${orgId}:${guardianProfileId}:${windowStart}`;
 
+    const currentStudentName = await this.computeStudentNameForGuardian({
+      supabase,
+      orgId,
+      guardianProfileId,
+      members: currentPayload.members ?? [],
+    });
     const currentSessionCompletionId = await this.upsertSessionCompletion({
       supabase,
       orgId,
@@ -392,6 +429,7 @@ export class CompletionCheckDispatcherService {
       role: 'guardian',
       sessionEndAt: currentEffectiveOccurrence.sessionEndAt,
       sessionTitle: currentEffectiveOccurrence.sessionTitle,
+      studentName: currentStudentName,
       channelId: currentEffectiveOccurrence.channelId,
       learningSpaceId: currentEffectiveOccurrence.learningSpaceId,
     });
@@ -415,35 +453,45 @@ export class CompletionCheckDispatcherService {
     // Each concurrent session was fetched fresh (excluding 'cancelled') just above, so
     // its own end_at is already current — no separate re-resolution needed here.
     const concurrentEntries = await Promise.all(
-      concurrentSessions.map(async (s) => ({
-        channelId: s.source_channel_id ?? '',
-        learningSpaceId: s.source_learning_space_id ?? null,
-        scheduleId: s.id,
-        occurrenceStart: s.end_at,
-        title: s.title,
-        summary: null,
-        channelRouteKind: 'space' as const,
-        members: s.participants.map((p) => ({
+      concurrentSessions.map(async (s) => {
+        const members = s.participants.map((p) => ({
           profileId: p.profile_id,
           role: p.role as 'educator' | 'child' | 'guardian' | 'staff' | 'observer' | null,
           displayName: p.display_name,
           avatarUrl: p.avatar_url,
           themeKey: p.theme_key,
-        })),
-        feedbackUiEnabled: true,
-        sessionCompletionId: await this.upsertSessionCompletion({
+        }));
+        const studentName = await this.computeStudentNameForGuardian({
           supabase,
           orgId,
-          scheduleId: s.id,
-          occurrenceKey: s.end_at,
-          profileId: guardianProfileId,
-          role: 'guardian',
-          sessionEndAt: s.end_at,
-          sessionTitle: s.title,
-          channelId: s.source_channel_id ?? null,
+          guardianProfileId,
+          members,
+        });
+        return {
+          channelId: s.source_channel_id ?? '',
           learningSpaceId: s.source_learning_space_id ?? null,
-        }),
-      })),
+          scheduleId: s.id,
+          occurrenceStart: s.end_at,
+          title: s.title,
+          summary: null,
+          channelRouteKind: 'space' as const,
+          members,
+          feedbackUiEnabled: true,
+          sessionCompletionId: await this.upsertSessionCompletion({
+            supabase,
+            orgId,
+            scheduleId: s.id,
+            occurrenceKey: s.end_at,
+            profileId: guardianProfileId,
+            role: 'guardian',
+            sessionEndAt: s.end_at,
+            sessionTitle: s.title,
+            studentName,
+            channelId: s.source_channel_id ?? null,
+            learningSpaceId: s.source_learning_space_id ?? null,
+          }),
+        };
+      }),
     );
 
     const allSessions = [currentSessionEntry, ...concurrentEntries];
@@ -569,6 +617,81 @@ export class CompletionCheckDispatcherService {
   }
 
   /**
+   * Resolves the name(s) shown on a guardian's completion tile: the educator(s')
+   * name(s) (not privacy-sensitive — every participant in the class already sees
+   * their own class's educator) plus ONLY the children in `members` that are
+   * linked to this specific guardian via `family_links` — never the full session
+   * roster. That child-scoping is what prevents a guardian in a group class from
+   * seeing another family's child's name on their own completion tile. Mirrors
+   * the "parents" branch of getViewerParticipantNames (targetRoles = child +
+   * educator) in apps/web/lib/dashboard/home-infographic-metrics.ts.
+   */
+  private async computeStudentNameForGuardian(input: {
+    supabase: SupabaseServiceClient;
+    orgId: string;
+    guardianProfileId: string;
+    members: CompletionCheckMember[];
+  }): Promise<string | null> {
+    const educatorNames = unique(
+      input.members
+        .filter((member) => member.role === 'educator' && member.displayName?.trim())
+        .map((member) => member.displayName!.trim()),
+    );
+    const fallbackToEducatorsOnly = () =>
+      educatorNames.length ? educatorNames.join(', ') : null;
+
+    const childMembers = input.members.filter(
+      (member) => member.role === 'child' && member.displayName?.trim(),
+    );
+    if (!childMembers.length) return fallbackToEducatorsOnly();
+
+    const { data: guardianProfile } = await input.supabase
+      .from('profiles')
+      .select('account_id')
+      .eq('org_id', input.orgId)
+      .eq('id', input.guardianProfileId)
+      .is('deleted_at', null)
+      .maybeSingle<{ account_id: string }>();
+    if (!guardianProfile?.account_id) return fallbackToEducatorsOnly();
+
+    const childProfileIds = unique(childMembers.map((member) => member.profileId));
+    const { data: childProfiles, error } = await input.supabase
+      .from('profiles')
+      .select('id, account_id')
+      .eq('org_id', input.orgId)
+      .in('id', childProfileIds)
+      .is('deleted_at', null)
+      .returns<Array<{ id: string; account_id: string }>>();
+    if (error) throw new Error(error.message);
+
+    const childAccountIdByProfileId = new Map(
+      (childProfiles ?? []).map((profile) => [profile.id, profile.account_id]),
+    );
+    const childAccountIds = unique(Array.from(childAccountIdByProfileId.values()));
+    if (!childAccountIds.length) return fallbackToEducatorsOnly();
+
+    const { data: links, error: linksError } = await input.supabase
+      .from('family_links')
+      .select('child_account_id')
+      .eq('org_id', input.orgId)
+      .eq('guardian_account_id', guardianProfile.account_id)
+      .in('child_account_id', childAccountIds)
+      .is('deleted_at', null)
+      .returns<Array<{ child_account_id: string }>>();
+    if (linksError) throw new Error(linksError.message);
+
+    const linkedAccountIds = new Set((links ?? []).map((link) => link.child_account_id));
+    const linkedChildNames = childMembers
+      .filter((member) =>
+        linkedAccountIds.has(childAccountIdByProfileId.get(member.profileId) ?? ''),
+      )
+      .map((member) => member.displayName!.trim());
+
+    const names = unique([...linkedChildNames, ...educatorNames]);
+    return names.length ? names.join(', ') : null;
+  }
+
+  /**
    * Re-resolves current cancel/reschedule state for (scheduleId, occurrenceStart) right
    * before dispatch, closing the race described where an already-queued job could
    * otherwise fire stale. Returns null if the occurrence was cancelled (dispatch must
@@ -681,6 +804,7 @@ export class CompletionCheckDispatcherService {
     role: string;
     sessionEndAt: string;
     sessionTitle: string | null;
+    studentName?: string | null;
     channelId: string | null;
     learningSpaceId: string | null;
   }): Promise<string> {
@@ -702,6 +826,7 @@ export class CompletionCheckDispatcherService {
           channel_id: input.channelId,
           learning_space_id: input.learningSpaceId,
           session_title: input.sessionTitle,
+          student_name: input.studentName ?? null,
           session_end_at: input.sessionEndAt,
           notified_at: now,
           expires_at: expiresAt,

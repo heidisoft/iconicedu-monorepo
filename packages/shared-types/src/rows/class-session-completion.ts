@@ -29,6 +29,13 @@ export interface ClassSessionCompletionRow {
   channel_id?: UUID | null;
   learning_space_id?: UUID | null;
   session_title?: string | null;
+  // Comma-joined name(s) of the OTHER participant(s) relevant to this row's
+  // viewer — mirrors the homepage's "Upcoming Sessions" tile
+  // (getViewerParticipantNames): an educator's row shows the student(s); a
+  // child's row shows their educator(s); a guardian's row shows their own
+  // linked child(ren) (never other families' children in a group class) plus
+  // the educator(s); staff/observer rows show the full roster.
+  student_name?: string | null;
   session_end_at: ISODateTime;
   notified_at?: ISODateTime | null;
   confirmed_at?: ISODateTime | null;

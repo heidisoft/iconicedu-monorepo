@@ -77,6 +77,7 @@ function toVM(row: ClassSessionCompletionRow): SessionCompletionVM {
     channelId: row.channel_id ?? null,
     learningSpaceId: row.learning_space_id ?? null,
     sessionTitle: row.session_title ?? null,
+    studentName: row.student_name ?? null,
     sessionEndAt: row.session_end_at,
     notifiedAt: row.notified_at ?? null,
     confirmedAt: row.confirmed_at ?? null,

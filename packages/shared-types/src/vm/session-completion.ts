@@ -24,6 +24,7 @@ export interface SessionCompletionVM {
   channelId?: UUID | null;
   learningSpaceId?: UUID | null;
   sessionTitle?: string | null;
+  studentName?: string | null;
   sessionEndAt: ISODateTime;
   notifiedAt?: ISODateTime | null;
   confirmedAt?: ISODateTime | null;

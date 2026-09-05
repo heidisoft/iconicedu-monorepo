@@ -44,13 +44,22 @@ describe('SessionCompletedCarousel', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Confirm Lesson' }));
     expect(await screen.findByText('Great! How was the session?')).toBeInTheDocument();
-    expect(screen.getByText('Session Completed')).toBeInTheDocument();
+    expect(screen.getByText('Recently completed')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Rate 5 stars' }));
 
-    await waitFor(() => {
-      expect(screen.queryByText('Session Completed')).not.toBeInTheDocument();
-    });
+    // The rated tile holds on screen briefly (so its "Thank you" confirmation is
+    // actually visible) before advancing — it must not vanish the instant the
+    // rating succeeds.
+    expect(await screen.findByText('Thank you for your feedback.')).toBeInTheDocument();
+    expect(screen.getByText('Recently completed')).toBeInTheDocument();
+
+    await waitFor(
+      () => {
+        expect(screen.queryByText('Recently completed')).not.toBeInTheDocument();
+      },
+      { timeout: 3000 },
+    );
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
       `/api/session-completions/${completion.id}/confirm`,

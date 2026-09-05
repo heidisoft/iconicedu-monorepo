@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { CheckCircle2, XCircle } from 'lucide-react';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { Textarea } from '@iconicedu/ui-web/ui/textarea';
@@ -79,7 +79,42 @@ type Props = {
   activity: ActivityFeedLeafItemVM;
   onVoteSubmit?: (status: 'confirmed' | 'disputed') => void;
   onRatingSubmit?: () => void;
+  /**
+   * When true, renders without its own bordered/max-width card shell — just the
+   * prompt/action content — so a parent (e.g. the homepage's session-completed
+   * tile, styled like SessionCard) can provide the surrounding chrome and let it
+   * fill the full width available instead of being capped at 420px. The default
+   * (false) keeps the standalone notification-feed appearance unchanged.
+   */
+  embedded?: boolean;
 };
+
+function Chrome({
+  embedded,
+  tone = 'default',
+  className,
+  children,
+}: {
+  embedded: boolean;
+  tone?: 'default' | 'muted';
+  className?: string;
+  children: ReactNode;
+}) {
+  if (embedded) {
+    return <div className={cn('w-full', className)}>{children}</div>;
+  }
+  return (
+    <div
+      className={cn(
+        'w-full rounded-xl border border-border/80 p-4 md:max-w-[420px]',
+        tone === 'muted' ? 'bg-muted/40' : 'bg-background/95',
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
+}
 
 export function canRenderActivityCompletionCheck(activity: ActivityFeedLeafItemVM) {
   const m = (activity.metadata ?? {}) as Record<string, unknown>;
@@ -100,6 +135,7 @@ export function ActivityCompletionCheck({
   activity,
   onVoteSubmit,
   onRatingSubmit,
+  embedded = false,
 }: Props) {
   const metadata = useMemo(() => getMetadata(activity), [activity]);
   const [step, setStep] = useState<Step>(() =>
@@ -265,11 +301,16 @@ export function ActivityCompletionCheck({
   if (step === 'prompt' || (step === 'submitting' && disputeCategory === null)) {
     const isLoading = step === 'submitting';
     return (
-      <div className="w-full rounded-xl border border-border/80 bg-background/95 p-4 md:max-w-[420px]">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-          {metadata.promptTitle}
-        </p>
-        <p className="mt-2 text-sm leading-5 text-muted-foreground">
+      <Chrome embedded={embedded}>
+        {/* When embedded (the homepage tile), the tile itself already shows a
+            "Completed" badge next to the session title — repeating "Session
+            Completed" here would just say the same thing twice. */}
+        {embedded ? null : (
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            {metadata.promptTitle}
+          </p>
+        )}
+        <p className={cn('text-sm leading-5 text-muted-foreground', !embedded && 'mt-2')}>
           {metadata.promptBody}
         </p>
         <div className="mt-3 flex gap-2">
@@ -279,10 +320,12 @@ export function ActivityCompletionCheck({
             onClick={() => void handleConfirm()}
             disabled={isLoading}
             data-action-button="true"
-            className="flex-1 gap-1.5"
+            className="max-w-[120px] flex-1 gap-1.5 overflow-hidden"
           >
-            <CheckCircle2 className="size-3.5" />
-            {isLoading ? 'Saving...' : 'Confirm Lesson'}
+            <CheckCircle2 className="size-3.5 shrink-0" />
+            <span className="min-w-0 flex-1 truncate">
+              {isLoading ? 'Saving...' : 'Confirm Lesson'}
+            </span>
           </Button>
           <Button
             type="button"
@@ -291,28 +334,28 @@ export function ActivityCompletionCheck({
             onClick={() => setStep('dispute_form')}
             disabled={isLoading}
             data-action-button="true"
-            className="flex-1 gap-1.5"
+            className="max-w-[120px] flex-1 gap-1.5 overflow-hidden"
           >
-            <XCircle className="size-3.5" />
-            Report a Problem
+            <XCircle className="size-3.5 shrink-0" />
+            <span className="min-w-0 flex-1 truncate">Report a Problem</span>
           </Button>
         </div>
         {error ? <p className="mt-2 text-xs text-rose-600">{error}</p> : null}
-      </div>
+      </Chrome>
     );
   }
 
   if (step === 'already_responded') {
     return (
-      <div className="w-full rounded-xl border border-border/80 bg-muted/40 p-4 text-xs text-muted-foreground md:max-w-[420px]">
+      <Chrome embedded={embedded} tone="muted" className="text-xs text-muted-foreground">
         You&apos;ve already responded — thanks for letting us know!
-      </div>
+      </Chrome>
     );
   }
 
   if (step === 'confirmed') {
     return (
-      <div className="w-full rounded-xl border border-border/80 bg-background/95 p-4 md:max-w-[420px]">
+      <Chrome embedded={embedded}>
         <div className="mb-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-1.5">
             <CheckCircle2 className="size-4 text-emerald-600" />
@@ -335,16 +378,20 @@ export function ActivityCompletionCheck({
           ) : null}
         </div>
         {metadata.feedbackUiEnabled ? (
-          <ActivityFeedbackRequest activity={activity} onRatingSubmit={onRatingSubmit} />
+          <ActivityFeedbackRequest
+            activity={activity}
+            onRatingSubmit={onRatingSubmit}
+            embedded={embedded}
+          />
         ) : null}
         {error ? <p className="mt-2 text-xs text-rose-600">{error}</p> : null}
-      </div>
+      </Chrome>
     );
   }
 
   if (step === 'disputed') {
     return (
-      <div className="w-full rounded-xl border border-border/80 bg-muted/40 p-4 text-xs text-muted-foreground md:max-w-[420px]">
+      <Chrome embedded={embedded} tone="muted" className="text-xs text-muted-foreground">
         <div className="flex items-center justify-between gap-3">
           <p>Reported — the educator and admin team have been notified.</p>
           {isUndoWindowOpen ? (
@@ -362,14 +409,14 @@ export function ActivityCompletionCheck({
           ) : null}
         </div>
         {error ? <p className="mt-2 text-rose-600">{error}</p> : null}
-      </div>
+      </Chrome>
     );
   }
 
   // dispute_form
   const isSubmitting = step === 'submitting';
   return (
-    <div className="w-full rounded-xl border border-border/80 bg-background/95 p-4 md:max-w-[420px]">
+    <Chrome embedded={embedded}>
       <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
         What happened?
       </p>
@@ -432,6 +479,6 @@ export function ActivityCompletionCheck({
       ) : null}
 
       {error ? <p className="mt-2 text-xs text-rose-600">{error}</p> : null}
-    </div>
+    </Chrome>
   );
 }

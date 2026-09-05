@@ -14,6 +14,11 @@ import { rateSessionCompletion } from '@/lib/api/session-completions';
 
 const EDIT_WINDOW_MS = 60_000;
 const COMMENT_AUTOSAVE_MS = 600;
+// Lets the just-picked stars stay visible (filled, disabled) for a beat before the
+// "Thank you" confirmation replaces them — mirrors the web ActivityFeedbackRequest.
+// Without this, submitting looked like the stars just vanished, since the
+// confirmation appeared the instant the API resolved.
+const CONFIRMATION_REVEAL_DELAY_MS = 500;
 
 type ActivityFeedbackRequestProps = {
   activity: ActivityFeedLeafItemVM;
@@ -117,6 +122,12 @@ export function ActivityFeedbackRequest({
       !initialFeedback.submittedAt,
   );
   const commentAutosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // True immediately when resuming an already-submitted rating (no artificial delay
+  // on screen load) — only set with a delay for a fresh, in-session submit.
+  const [showConfirmation, setShowConfirmation] = useState(() =>
+    Boolean(initialFeedback.submittedAt),
+  );
+  const confirmationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setRating(initialFeedback.rating);
@@ -132,12 +143,16 @@ export function ActivityFeedbackRequest({
         initialFeedback.rating < 5 &&
         !initialFeedback.submittedAt,
     );
+    setShowConfirmation(Boolean(initialFeedback.submittedAt));
   }, [initialFeedback]);
 
   useEffect(() => {
     return () => {
       if (commentAutosaveTimerRef.current) {
         clearTimeout(commentAutosaveTimerRef.current);
+      }
+      if (confirmationTimeoutRef.current) {
+        clearTimeout(confirmationTimeoutRef.current);
       }
     };
   }, []);
@@ -209,6 +224,22 @@ export function ActivityFeedbackRequest({
         setIsEditing(false);
         setIsEditWindowOpen(true);
         setIsCommentOpen(Boolean(options?.keepCommentOpen && nextRating < 5));
+
+        if (options?.savingComment) {
+          // A comment autosave on an already-submitted rating — the confirmation
+          // card is already showing (or about to be), don't hide/re-delay it, that
+          // would just flicker while the user is typing.
+          setShowConfirmation(true);
+        } else {
+          setShowConfirmation(false);
+          if (confirmationTimeoutRef.current) {
+            clearTimeout(confirmationTimeoutRef.current);
+          }
+          confirmationTimeoutRef.current = setTimeout(() => {
+            confirmationTimeoutRef.current = null;
+            setShowConfirmation(true);
+          }, CONFIRMATION_REVEAL_DELAY_MS);
+        }
         onRatingSubmit?.();
       } catch (submitError) {
         setError(
@@ -309,7 +340,7 @@ export function ActivityFeedbackRequest({
     <View style={styles.card}>
       <View style={styles.cardHeader}>
         <Text style={styles.kicker}>Rate your session</Text>
-        {isSubmitted && isEditWindowOpen ? (
+        {isSubmitted && isEditWindowOpen && showConfirmation ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Edit rating"
@@ -397,7 +428,7 @@ export function ActivityFeedbackRequest({
         </View>
       ) : null}
 
-      {isSubmitted ? (
+      {isSubmitted && showConfirmation ? (
         <View style={[styles.submittedCard, { backgroundColor: colors.inputBg }]}>
           <Text style={[styles.submittedTitle, { color: colors.text }]}>
             Thank you for your feedback.

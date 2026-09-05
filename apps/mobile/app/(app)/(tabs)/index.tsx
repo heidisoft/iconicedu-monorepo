@@ -1249,11 +1249,7 @@ export default function HomeScreen() {
         </View>
 
         {sessionCompletionCarouselEnabled ? (
-          <SessionCompletedCarousel
-            sessions={completedSessions}
-            colors={colors}
-            width={Math.max(280, windowWidth - 66)}
-          />
+          <SessionCompletedCarousel sessions={completedSessions} colors={colors} />
         ) : null}
 
         {/* Upcoming sessions */}

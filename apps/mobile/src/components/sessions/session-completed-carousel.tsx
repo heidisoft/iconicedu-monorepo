@@ -1,135 +1,211 @@
-import React, { useEffect, useState } from 'react';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
-import type {
-  ActivityFeedLeafItemVM,
-  SessionCompletionVM,
-} from '@iconicedu/shared-types';
+import React, { useEffect, useRef, useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  Easing,
+  FadeIn,
+  FadeOut,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
+import type { SessionCompletionVM } from '@iconicedu/shared-types';
 import type { AppColors } from '@/lib/theme';
-import { ActivityCompletionCheck } from '@/components/activity/activity-completion-check';
+import { SessionCompletedTile } from '@/components/sessions/session-completed-tile';
 
-function toActivity(completion: SessionCompletionVM): ActivityFeedLeafItemVM {
-  const title = completion.sessionTitle?.trim() || 'Session';
-  return {
-    kind: 'leaf',
-    ids: { id: completion.id, orgId: completion.orgId },
-    timestamps: {
-      occurredAt: completion.sessionEndAt,
-      createdAt: completion.notifiedAt ?? completion.sessionEndAt,
-    },
-    tabKey: 'classes',
-    audience: { scope: { kind: 'global' }, visibility: 'direct' },
-    verb: 'session.completion_check.sent',
-    refs: { object: { kind: 'session', id: completion.scheduleId } },
-    content: {
-      headline: { primary: 'Session Completed', secondary: title },
-      summary: 'Confirm the session, then share a rating.',
-    },
-    metadata: {
-      orgId: completion.orgId,
-      scheduleId: completion.scheduleId,
-      occurrenceStart: completion.occurrenceKey,
-      channelId: completion.channelId ?? null,
-      learningSpaceId: completion.learningSpaceId ?? null,
-      sessionCompletionId: completion.id,
-      sessionCompletion: completion,
-      completionCheckUiEnabled: true,
-      feedbackUiEnabled: true,
-      completionPromptTitle: 'Session Completed',
-      completionPromptBody: `${title} has ended. Please confirm that it took place.`,
-    },
-  };
+// How long the tile's own "Thank you" / "Reported" confirmation stays on screen
+// before it advances — mirrors the web carousel (session-completed-carousel.tsx in
+// packages/ui-web). Without this pause, scheduling removal in the same tick as the
+// confirmation appearing meant the confirmation never actually got seen.
+const ADVANCE_DELAY_MS = 1400;
+
+// How many cards deep the stack renders — the front (interactive) card plus this
+// many peeking placeholders behind it. Matches the web card-stack depth.
+const STACK_DEPTH = 2;
+
+// How long a card takes to glide from one depth slot to the next (e.g. the
+// second card easing forward into the front slot once the first resolves).
+const STACK_TRANSITION_MS = 320;
+const STACK_EASING = Easing.out(Easing.cubic);
+
+// A single card in the stack. Depth-based opacity/scale/offset are driven by a
+// shared value animated with `withTiming` (rather than plain inline style
+// numbers) so that when a card's `depth` prop changes — e.g. it moves from the
+// second slot into the front slot — it glides there instead of snapping
+// instantly to the new values.
+function StackedCard({
+  depth,
+  zIndex,
+  isFront,
+  children,
+}: {
+  depth: number;
+  zIndex: number;
+  isFront: boolean;
+  children: React.ReactNode;
+}) {
+  const depthValue = useSharedValue(depth);
+
+  useEffect(() => {
+    depthValue.value = withTiming(depth, {
+      duration: STACK_TRANSITION_MS,
+      easing: STACK_EASING,
+    });
+  }, [depth, depthValue]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: 1 - depthValue.value * 0.35,
+    transform: [
+      { scale: 1 - depthValue.value * 0.05 },
+      { translateY: depthValue.value * -8 },
+    ],
+  }));
+
+  return (
+    <Animated.View
+      entering={FadeIn.duration(280)}
+      exiting={FadeOut.duration(280)}
+      pointerEvents={isFront ? 'auto' : 'none'}
+      style={[isFront ? styles.frontCard : styles.behindCard, { zIndex }, animatedStyle]}
+    >
+      {children}
+    </Animated.View>
+  );
 }
 
+// Card-stack visual, not a manually-paged list: only the front card is
+// interactive, the rest peek out from behind it (decreasing scale/opacity,
+// offset upward) like a physical deck. Resolving the front card (rating or
+// disputing — a bare confirm still shows the rating widget in the same slot, it
+// doesn't advance) holds on the confirmation message briefly, then fades it out;
+// every card behind glides forward into the next slot. With none left, the whole
+// section fades away. Matches the web carousel's stack depth/timing
+// (packages/ui-web/src/components/dashboard/session-completed-carousel.tsx).
 export function SessionCompletedCarousel({
   sessions,
   colors,
-  width,
 }: {
   sessions: SessionCompletionVM[];
   colors: AppColors;
-  width: number;
 }) {
   const [visibleSessions, setVisibleSessions] = useState(sessions);
+  const pendingTimeouts = useRef(new Set<ReturnType<typeof setTimeout>>());
 
   useEffect(() => {
     setVisibleSessions(sessions);
   }, [sessions]);
 
-  if (!visibleSessions.length) return null;
+  useEffect(() => {
+    const timeouts = pendingTimeouts.current;
+    return () => {
+      timeouts.forEach((timeout) => clearTimeout(timeout));
+      timeouts.clear();
+    };
+  }, []);
 
-  const remove = (id: string) => {
-    setVisibleSessions((current) => current.filter((item) => item.id !== id));
+  const scheduleRemove = (id: string) => {
+    const timeout = setTimeout(() => {
+      pendingTimeouts.current.delete(timeout);
+      setVisibleSessions((current) => current.filter((item) => item.id !== id));
+    }, ADVANCE_DELAY_MS);
+    pendingTimeouts.current.add(timeout);
   };
 
+  const current = visibleSessions[0] ?? null;
+
+  if (!current) {
+    return null;
+  }
+
+  const stack = visibleSessions.slice(0, STACK_DEPTH + 1);
+
   return (
-    <View
-      accessibilityLabel="Session Completed"
-      style={[
-        styles.section,
-        { borderColor: colors.border, backgroundColor: colors.card },
-      ]}
-    >
+    <Animated.View exiting={FadeOut.duration(300)} style={styles.section}>
       <View style={styles.header}>
-        <View style={styles.headerCopy}>
-          <Text style={[styles.title, { color: colors.text }]}>Session Completed</Text>
-          <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-            Confirm, then rate
-          </Text>
-        </View>
-        <View style={[styles.count, { backgroundColor: colors.tealBg }]}>
+        <Text style={[styles.sectionLabel, { color: colors.textFaint }]}>
+          Recently completed
+        </Text>
+        <View style={[styles.countBadge, { backgroundColor: colors.tealBg }]}>
           <Text style={[styles.countText, { color: colors.teal }]}>
             {visibleSessions.length}
           </Text>
         </View>
       </View>
-      <FlatList
-        horizontal
-        pagingEnabled
-        snapToInterval={width}
-        decelerationRate="fast"
-        showsHorizontalScrollIndicator={false}
-        data={visibleSessions}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <View style={{ width }}>
-            <ActivityCompletionCheck
-              activity={toActivity(item)}
-              colors={colors}
-              onCompletionSubmit={(status) => {
-                if (status === 'disputed') remove(item.id);
-              }}
-              onRatingSubmit={() => remove(item.id)}
-            />
-          </View>
-        )}
-      />
-    </View>
+
+      <View style={styles.stackWrap}>
+        {stack.map((item, depth) => {
+          const isFront = depth === 0;
+          return (
+            <StackedCard
+              key={item.id}
+              depth={depth}
+              zIndex={stack.length - depth}
+              isFront={isFront}
+            >
+              {isFront ? (
+                <SessionCompletedTile
+                  completion={item}
+                  colors={colors}
+                  onCompletionSubmit={(status) => {
+                    if (status === 'disputed') scheduleRemove(item.id);
+                  }}
+                  onRatingSubmit={() => scheduleRemove(item.id)}
+                />
+              ) : (
+                <View
+                  style={[
+                    styles.placeholderCard,
+                    { borderColor: colors.border, backgroundColor: colors.inputBg },
+                  ]}
+                />
+              )}
+            </StackedCard>
+          );
+        })}
+      </View>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   section: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 16,
-    paddingVertical: 16,
-    overflow: 'hidden',
+    gap: 10,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    marginBottom: 12,
   },
-  headerCopy: { gap: 2 },
-  title: { fontSize: 17, fontWeight: '800' },
-  subtitle: { fontSize: 13 },
-  count: {
-    minWidth: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
+  sectionLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  countText: { fontSize: 13, fontWeight: '800' },
+  countBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  countText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  stackWrap: {
+    position: 'relative',
+  },
+  frontCard: {
+    position: 'relative',
+  },
+  behindCard: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  placeholderCard: {
+    flex: 1,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
 });
