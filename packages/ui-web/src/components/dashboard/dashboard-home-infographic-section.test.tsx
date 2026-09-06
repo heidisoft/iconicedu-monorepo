@@ -196,9 +196,9 @@ describe('DashboardHomeInfographicSection', () => {
     const summary = screen.getByRole('article', {
       name: 'Session completion summary',
     });
-    expect(summary).toHaveTextContent('Session completion');
-    expect(summary).toHaveTextContent('78%');
-    expect(summary).toHaveTextContent('7 completed · 2 pending');
+    expect(summary).toHaveTextContent('Sessions completed');
+    expect(summary).toHaveTextContent('7');
+    expect(summary).toHaveTextContent('2 pending completion');
     expect(summary).not.toHaveTextContent('Classes conducted');
   });
 
