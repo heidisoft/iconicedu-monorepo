@@ -59,6 +59,10 @@ export interface DashboardHomeInfographicSectionProps {
   };
   upcomingSessionsPage: DashboardUpcomingSessionsPage;
   completedSessionsPending?: SessionCompletionVM[];
+  sessionCompletionSummary?: {
+    completed: number;
+    pending: number;
+  } | null;
   calendarHref: string;
   notificationsHref: string;
   browseHref: string;
@@ -81,6 +85,7 @@ export function DashboardHomeInfographicSection({
   topMetrics,
   upcomingSessionsPage,
   completedSessionsPending = [],
+  sessionCompletionSummary = null,
   calendarHref,
   notificationsHref,
   browseHref,
@@ -208,18 +213,57 @@ export function DashboardHomeInfographicSection({
           </div>
         </article>
 
-        <article className={`${infographicCardClassName} bg-primary-subtle`}>
+        <article
+          className={`${infographicCardClassName} bg-primary-subtle`}
+          aria-label="Session completion summary"
+        >
           <div className={infographicContentClassName}>
             <div className="mb-3 flex items-center justify-between gap-2">
-              <p className="text-base font-semibold text-foreground">Completed Classes</p>
+              <p className="text-base font-semibold text-foreground">
+                {sessionCompletionSummary ? 'Session Completion' : 'Completed Classes'}
+              </p>
               <div className={`${infographicChipClassName} text-primary`}>
                 <CalendarCheck className="size-5" aria-hidden="true" />
               </div>
             </div>
-            <p className="mt-2 text-4xl font-semibold tracking-tight text-foreground">
-              {topMetrics.completedClassesThisMonth}
-            </p>
-            <p className="mt-1 text-sm font-medium text-primary/80">This month</p>
+            {sessionCompletionSummary ? (
+              <>
+                <p className="mt-2 text-4xl font-semibold tracking-tight text-foreground">
+                  {sessionCompletionSummary.completed}
+                </p>
+                <p className="mt-1 text-sm font-medium text-primary/80">
+                  Sessions completed
+                </p>
+
+                <div className="mt-4 grid grid-cols-2 border-t border-primary/15 pt-3">
+                  <div className="pr-3">
+                    <p className="text-xl font-semibold tracking-tight text-foreground">
+                      {topMetrics.completedClassesThisMonth}
+                    </p>
+                    <p className="mt-0.5 text-xs font-medium text-muted-foreground">
+                      Classes conducted
+                    </p>
+                    <p className="text-[10px] text-muted-foreground/75">This month</p>
+                  </div>
+                  <div className="border-l border-primary/15 pl-3">
+                    <p className="text-xl font-semibold tracking-tight text-foreground">
+                      {sessionCompletionSummary.pending}
+                    </p>
+                    <p className="mt-0.5 text-xs font-medium text-muted-foreground">
+                      Pending completion
+                    </p>
+                    <p className="text-[10px] text-muted-foreground/75">Needs review</p>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="mt-2 text-4xl font-semibold tracking-tight text-foreground">
+                  {topMetrics.completedClassesThisMonth}
+                </p>
+                <p className="mt-1 text-sm font-medium text-primary/80">This month</p>
+              </>
+            )}
           </div>
         </article>
 

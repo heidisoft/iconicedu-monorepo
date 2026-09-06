@@ -58,6 +58,10 @@ export interface DashboardHomeInfographicMetrics {
   metricsByRole: Record<DashboardInfographicRole, DashboardInfographicRoleMetrics>;
   upcomingSessionsPage: DashboardUpcomingSessionsPage;
   completedSessionsPending: SessionCompletionVM[];
+  sessionCompletionSummary: {
+    completed: number;
+    pending: number;
+  } | null;
   browseHref: string;
   calendarHref: string;
   notificationsHref: string;
@@ -616,7 +620,7 @@ export async function buildDashboardHomeInfographicMetrics(input: {
     pageSize,
     timezone: input.timezone ?? input.currentUserProfile?.prefs?.timezone ?? null,
   });
-  const completedSessionsPending =
+  const sessionCompletions =
     input.sessionCompletionCarouselEnabled && input.currentUserProfile?.ids.id
       ? (
           await listSessionCompletions(input.supabase, {
@@ -624,14 +628,14 @@ export async function buildDashboardHomeInfographicMetrics(input: {
             profileId: input.currentUserProfile.ids.id,
             limit: 50,
           })
-        ).items.filter(
-          (completion) =>
-            completion.status === 'pending' ||
-            ((completion.status === 'confirmed' ||
-              completion.status === 'auto_confirmed') &&
-              completion.rating == null),
-        )
+        ).items
       : [];
+  const completedSessionsPending = sessionCompletions.filter(
+    (completion) =>
+      completion.status === 'pending' ||
+      ((completion.status === 'confirmed' || completion.status === 'auto_confirmed') &&
+        completion.rating == null),
+  );
 
   return {
     activeRole,
@@ -643,6 +647,17 @@ export async function buildDashboardHomeInfographicMetrics(input: {
     },
     upcomingSessionsPage: activeRoleData.upcomingSessionsPage,
     completedSessionsPending,
+    sessionCompletionSummary: input.sessionCompletionCarouselEnabled
+      ? {
+          completed: sessionCompletions.filter(
+            (completion) =>
+              completion.status === 'confirmed' || completion.status === 'auto_confirmed',
+          ).length,
+          pending: sessionCompletions.filter(
+            (completion) => completion.status === 'pending',
+          ).length,
+        }
+      : null,
     browseHref: isStaffView ? `/${input.orgSlug}/admin/channels` : `/${input.orgSlug}/s`,
     calendarHref: isStaffView
       ? `/${input.orgSlug}/admin/attendance/sessions`
