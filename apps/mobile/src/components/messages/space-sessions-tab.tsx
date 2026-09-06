@@ -642,7 +642,7 @@ function makeStyles(C: AppColors) {
       borderBottomColor: C.border,
     },
     monthSectionCurrent: {
-      backgroundColor: C.primarySubtle,
+      backgroundColor: C.actionSubtle,
     },
     monthHeader: {
       flexDirection: 'row',
@@ -652,7 +652,7 @@ function makeStyles(C: AppColors) {
       gap: 8,
     },
     monthHeaderCurrent: {
-      backgroundColor: C.primarySubtle,
+      backgroundColor: C.actionSubtle,
     },
     monthTitleRow: {
       flexDirection: 'row',
@@ -670,7 +670,7 @@ function makeStyles(C: AppColors) {
       marginTop: 1,
     },
     currentMonthBadge: {
-      backgroundColor: C.primarySubtle,
+      backgroundColor: C.primary,
       paddingHorizontal: 8,
       paddingVertical: 2,
       borderRadius: 999,
@@ -678,7 +678,7 @@ function makeStyles(C: AppColors) {
     currentMonthBadgeTxt: {
       fontSize: 10,
       fontWeight: '700',
-      color: C.primary,
+      color: C.primaryForeground,
     },
 
     // Progress bar
