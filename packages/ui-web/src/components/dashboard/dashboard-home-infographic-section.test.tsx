@@ -175,7 +175,7 @@ describe('DashboardHomeInfographicSection', () => {
     expect(screen.getByText('Page 2 of 3')).toBeInTheDocument();
   });
 
-  it('shows completed, conducted, and pending session values in one summary tile', () => {
+  it('shows completed and pending session values in one summary tile', () => {
     render(
       <DashboardHomeInfographicSection
         orgSlug="iconic-academy"
@@ -196,9 +196,9 @@ describe('DashboardHomeInfographicSection', () => {
     const summary = screen.getByRole('article', {
       name: 'Session completion summary',
     });
-    expect(summary).toHaveTextContent('Session Completion');
-    expect(summary).toHaveTextContent('7Sessions completed');
-    expect(summary).toHaveTextContent('2Pending completion');
+    expect(summary).toHaveTextContent('Sessions completed');
+    expect(summary).toHaveTextContent('7');
+    expect(summary).toHaveTextContent('2 pending completion');
     expect(summary).not.toHaveTextContent('Classes conducted');
   });
 

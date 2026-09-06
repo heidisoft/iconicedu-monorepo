@@ -218,30 +218,26 @@ export function DashboardHomeInfographicSection({
           aria-label="Session completion summary"
         >
           <div className={infographicContentClassName}>
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <p className="text-base font-semibold text-foreground">
-                {sessionCompletionSummary ? 'Session Completion' : 'Completed Classes'}
-              </p>
+            <div className="mb-3 flex items-center gap-3">
               <div className={`${infographicChipClassName} text-primary`}>
                 <CalendarCheck className="size-5" aria-hidden="true" />
               </div>
+              <p className="text-base font-semibold text-foreground">
+                {sessionCompletionSummary ? 'Sessions completed' : 'Completed Classes'}
+              </p>
             </div>
             {sessionCompletionSummary ? (
-              <div className="mt-5 grid grid-cols-[minmax(0,1fr)_auto] items-end">
-                <div className="pr-4">
-                  <p className="text-4xl font-semibold tracking-tight text-foreground">
-                    {sessionCompletionSummary.completed}
-                  </p>
-                  <p className="mt-1 text-sm font-medium text-primary/80">
-                    Sessions completed
-                  </p>
-                </div>
-                <div className="border-l border-primary/15 pl-4">
-                  <p className="text-xl font-semibold tracking-tight text-foreground">
-                    {sessionCompletionSummary.pending}
-                  </p>
-                  <p className="mt-1 text-sm font-medium text-muted-foreground">
-                    Pending completion
+              <div className="mt-5">
+                <p className="text-5xl font-medium tracking-tight text-foreground">
+                  {sessionCompletionSummary.completed}
+                </p>
+                <div className="mt-3 flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <CalendarClock className="size-3.5 text-primary" aria-hidden="true" />
+                  <p>
+                    <span className="font-semibold text-primary">
+                      {sessionCompletionSummary.pending}
+                    </span>{' '}
+                    pending completion
                   </p>
                 </div>
               </div>

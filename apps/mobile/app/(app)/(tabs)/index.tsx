@@ -532,33 +532,29 @@ function makeStyles(C: AppColors) {
       lineHeight: 38,
     },
     metricLabel: { fontSize: 13, color: C.textMuted, lineHeight: 17 },
-    metricSummaryRow: {
+    metricTitleGroup: {
       flexDirection: 'row',
-      alignItems: 'flex-end',
+      alignItems: 'center',
+      flex: 1,
+      gap: 10,
+    },
+    metricCompletionBody: {
       marginTop: 14,
     },
-    metricSummaryCell: { flex: 1 },
-    metricSummarySupportingCell: {
-      flex: 0,
-      minWidth: 104,
+    metricPendingRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      marginTop: 8,
     },
-    metricSummaryCellDivider: {
-      borderLeftWidth: StyleSheet.hairlineWidth,
-      borderLeftColor: C.border,
-      paddingLeft: 10,
-      marginLeft: 10,
-    },
-    metricSummaryLabel: {
-      fontSize: 11,
-      fontWeight: '600',
+    metricPendingText: {
+      fontSize: 13,
       color: C.textMuted,
-      lineHeight: 14,
+      lineHeight: 17,
     },
-    metricSummaryValue: {
-      fontSize: 20,
-      fontWeight: '800',
-      color: C.text,
-      lineHeight: 24,
+    metricPendingCount: {
+      fontWeight: '700',
+      color: C.primary,
     },
     activityHeader: {
       flexDirection: 'row',
@@ -1295,36 +1291,30 @@ export default function HomeScreen() {
                 ]}
               >
                 <View style={s.metricHeader}>
-                  <Text style={s.metricTitle}>
-                    {sessionCompletionCarouselEnabled
-                      ? 'Session Completion'
-                      : 'Completed Classes'}
-                  </Text>
-                  <View style={s.metricIconWrap}>
-                    <CalendarCheck size={18} color={colors.primary} />
+                  <View style={s.metricTitleGroup}>
+                    <View style={s.metricIconWrap}>
+                      <CalendarCheck size={18} color={colors.primary} />
+                    </View>
+                    <Text style={s.metricTitle}>
+                      {sessionCompletionCarouselEnabled
+                        ? 'Sessions completed'
+                        : 'Completed Classes'}
+                    </Text>
                   </View>
                 </View>
                 {sessionCompletionCarouselEnabled ? (
-                  <View style={s.metricSummaryRow}>
-                    <View style={s.metricSummaryCell}>
-                      <Text style={s.metricValue}>
-                        {sessionCompletionSummary.completed}
+                  <View style={s.metricCompletionBody}>
+                    <Text style={s.metricValue}>
+                      {sessionCompletionSummary.completed}
+                    </Text>
+                    <View style={s.metricPendingRow}>
+                      <CalendarClock size={14} color={colors.primary} />
+                      <Text style={s.metricPendingText}>
+                        <Text style={s.metricPendingCount}>
+                          {sessionCompletionSummary.pending}
+                        </Text>{' '}
+                        pending completion
                       </Text>
-                      <Text style={[s.metricLabel, { color: colors.primary }]}>
-                        Sessions completed
-                      </Text>
-                    </View>
-                    <View
-                      style={[
-                        s.metricSummaryCell,
-                        s.metricSummarySupportingCell,
-                        s.metricSummaryCellDivider,
-                      ]}
-                    >
-                      <Text style={s.metricSummaryValue}>
-                        {sessionCompletionSummary.pending}
-                      </Text>
-                      <Text style={s.metricSummaryLabel}>Pending completion</Text>
                     </View>
                   </View>
                 ) : (
