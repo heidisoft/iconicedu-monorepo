@@ -316,11 +316,11 @@ export function ActivityCompletionCheck({
         <div className="mt-3 flex gap-2">
           <Button
             type="button"
-            size="sm"
+            size={embedded ? 'lg' : 'sm'}
             onClick={() => void handleConfirm()}
             disabled={isLoading}
             data-action-button="true"
-            className="max-w-[120px] flex-1 gap-1.5 overflow-hidden"
+            className={cn('flex-1 gap-1.5 overflow-hidden', !embedded && 'max-w-[120px]')}
           >
             <CheckCircle2 className="size-3.5 shrink-0" />
             <span className="min-w-0 flex-1 truncate">
@@ -329,12 +329,12 @@ export function ActivityCompletionCheck({
           </Button>
           <Button
             type="button"
-            size="sm"
+            size={embedded ? 'lg' : 'sm'}
             variant="outline"
             onClick={() => setStep('dispute_form')}
             disabled={isLoading}
             data-action-button="true"
-            className="max-w-[120px] flex-1 gap-1.5 overflow-hidden"
+            className={cn('flex-1 gap-1.5 overflow-hidden', !embedded && 'max-w-[120px]')}
           >
             <XCircle className="size-3.5 shrink-0" />
             <span className="min-w-0 flex-1 truncate">Report a Problem</span>

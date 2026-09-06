@@ -42,7 +42,15 @@ describe('SessionCompletedCarousel', () => {
 
     render(<SessionCompletedCarousel completions={[completion]} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm Lesson' }));
+    const confirmButton = screen.getByRole('button', { name: 'Confirm Lesson' });
+    const reportButton = screen.getByRole('button', { name: 'Report a Problem' });
+
+    expect(confirmButton).toHaveAttribute('data-size', 'lg');
+    expect(reportButton).toHaveAttribute('data-size', 'lg');
+    expect(confirmButton).toHaveClass('flex-1');
+    expect(reportButton).toHaveClass('flex-1');
+
+    fireEvent.click(confirmButton);
     expect(await screen.findByText('Great! How was the session?')).toBeInTheDocument();
     expect(screen.getByText('Recently completed')).toBeInTheDocument();
 
