@@ -46,6 +46,13 @@ export function LiveSessionAttendanceTable({
           </TableRow>
         </TableHeader>
         <TableBody>
+          {rows.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={11} className="h-32 text-center text-muted-foreground">
+                No sessions match the selected filters.
+              </TableCell>
+            </TableRow>
+          )}
           {rows.map((row) => (
             <TableRow key={row.ids.id}>
               <TableCell>

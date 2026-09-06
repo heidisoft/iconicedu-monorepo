@@ -51,6 +51,7 @@ export async function getAdminLiveSessionAttendanceList(
         : null,
       participants: participantsBySessionId.get(session.id) ?? [],
       starterProfile: profileById.get(session.started_by_profile_id) ?? null,
+      profiles: rows.profiles,
     });
   });
 }

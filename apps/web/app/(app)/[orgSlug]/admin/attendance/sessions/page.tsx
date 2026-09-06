@@ -4,7 +4,10 @@ import { notFound } from 'next/navigation';
 import { DashboardHeader } from '@iconicedu/ui-web';
 
 import { LiveSessionAttendanceTable } from '@iconicedu/web/app/(app)/[orgSlug]/admin/attendance/sessions/live-session-attendance-table';
+import { SessionAttendanceDashboard } from '@iconicedu/web/app/(app)/[orgSlug]/admin/attendance/sessions/session-attendance-dashboard';
+import { enableAdminSessionAttendanceAnalytics } from '@iconicedu/web/flags';
 import { getAdminLiveSessionAttendanceList } from '@iconicedu/web/lib/admin/live-session-attendance';
+import { requireAdminOrgContext } from '@iconicedu/web/lib/admin/require-admin-org-context';
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 
@@ -27,6 +30,12 @@ export default async function AdminLiveSessionAttendancePage({
   }
 
   const rows = await getAdminLiveSessionAttendanceList(org.id);
+  const adminContext = await requireAdminOrgContext(org.id);
+  const analyticsEnabled =
+    adminContext.ok &&
+    (await enableAdminSessionAttendanceAnalytics.run({
+      identify: { profileId: adminContext.actorProfileId },
+    }));
 
   return (
     <div className="flex flex-1 flex-col">
@@ -40,7 +49,11 @@ export default async function AdminLiveSessionAttendancePage({
             </p>
           </div>
         </div>
-        <LiveSessionAttendanceTable orgSlug={orgSlug} rows={rows} />
+        {analyticsEnabled ? (
+          <SessionAttendanceDashboard orgSlug={orgSlug} rows={rows} />
+        ) : (
+          <LiveSessionAttendanceTable orgSlug={orgSlug} rows={rows} />
+        )}
       </div>
     </div>
   );
