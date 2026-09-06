@@ -61,12 +61,12 @@ check_pinned_versions() {
   expected_pnpm=$(node -p "require('./package.json').packageManager.split('@').at(-1)")
   actual_pnpm=$(pnpm --version)
 
-  if ! node -e 'const [major, minor] = process.versions.node.split(".").map(Number); process.exit(major === 20 && minor >= 19 ? 0 : 1)'; then
-    error "Node.js >=20.19.0 <21 is required by package.json; found $actual_node. Run 'nvm install && nvm use'."
+  if ! node -e 'const major = Number(process.versions.node.split(".")[0]); process.exit(major === 24 ? 0 : 1)'; then
+    error "Node.js 24.x is required by package.json; found $actual_node. Run 'nvm install && nvm use'."
     exit 1
   fi
   if [[ "$actual_node" != "$expected_node" ]]; then
-    warn "Node.js $expected_node is pinned for CI parity; found $actual_node. Compatible Node 20 patch releases may work, or run 'nvm install && nvm use'."
+    warn "Node.js $expected_node is pinned for CI parity; found $actual_node. Compatible Node 24 patch releases may work, or run 'nvm install && nvm use'."
   fi
   if [[ "$actual_pnpm" != "$expected_pnpm" ]]; then
     error "pnpm $expected_pnpm is required by package.json; found $actual_pnpm. Use Corepack to activate the pinned version."
@@ -77,14 +77,14 @@ check_pinned_versions() {
 
 check_sync_prereqs() {
   info "Checking prerequisites for env sync..."
-  check_cmd node "Install Node.js >= 20 from https://nodejs.org"
+  check_cmd node "Install Node.js 24 from https://nodejs.org"
   check_cmd supabase "Install Supabase CLI: brew install supabase/tap/supabase"
   echo ""
 }
 
 check_bootstrap_prereqs() {
   info "Checking prerequisites..."
-  check_cmd node "Install Node.js >= 20 from https://nodejs.org"
+  check_cmd node "Install Node.js 24 from https://nodejs.org"
   check_cmd pnpm "Enable Corepack, then run: corepack prepare pnpm@10.33.0 --activate"
   check_cmd supabase "Install Supabase CLI: brew install supabase/tap/supabase"
   check_cmd docker "Install Docker Desktop from https://www.docker.com/products/docker-desktop"

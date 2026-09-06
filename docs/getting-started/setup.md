@@ -33,11 +33,11 @@ Use `supabase status` as the source of truth for Supabase ports and URLs.
 
 ## Prerequisites
 
-The repository files take precedence over versions written in documentation. Use the pinned Node version for CI parity; compatible Node 20 patch releases are accepted by `package.json`.
+The repository files take precedence over versions written in documentation. Use the pinned Node version for CI parity; compatible Node 24 patch releases are accepted by `package.json`.
 
 | Tool         | Recommended or required version                        | Source of truth                                          |
 | ------------ | ------------------------------------------------------ | -------------------------------------------------------- |
-| Node.js      | `20.19.0`                                              | [`.nvmrc`](../../.nvmrc)                                 |
+| Node.js      | `24.19.0`                                              | [`.nvmrc`](../../.nvmrc)                                 |
 | pnpm         | `10.33.0`                                              | `packageManager` in [`package.json`](../../package.json) |
 | Git          | Current supported release                              | Local installation                                       |
 | Docker       | Current Docker Desktop/Engine                          | Required for local Supabase                              |
@@ -76,7 +76,7 @@ node --version
 pnpm --version
 ```
 
-The CI-parity versions are Node `v20.19.0` and pnpm `10.33.0`. Compatible Node 20 patch releases are accepted, while pnpm must match exactly. The repository uses pnpm's hoisted node linker for Expo compatibility; do not install it with npm or Yarn.
+The CI-parity versions are Node `v24.19.0` and pnpm `10.33.0`. Compatible Node 24 patch releases are accepted, while pnpm must match exactly. The repository uses pnpm's hoisted node linker for Expo compatibility; do not install it with npm or Yarn.
 
 If Corepack reports a permissions error, install Node through a user-scoped version manager such as nvm and retry. Avoid running package-manager commands with `sudo`.
 
