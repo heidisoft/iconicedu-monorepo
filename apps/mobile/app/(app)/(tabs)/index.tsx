@@ -12,6 +12,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Circle } from 'react-native-svg';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -58,6 +59,11 @@ import {
 import type { AppColors } from '@/lib/theme';
 import { profileAvatarColors } from '@/lib/profile-avatar-colors';
 import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
+
+const COMPLETION_RING_SIZE = 88;
+const COMPLETION_RING_STROKE_WIDTH = 8;
+const COMPLETION_RING_RADIUS = (COMPLETION_RING_SIZE - COMPLETION_RING_STROKE_WIDTH) / 2;
+const COMPLETION_RING_CIRCUMFERENCE = 2 * Math.PI * COMPLETION_RING_RADIUS;
 
 // ---------------------------------------------------------------------------
 // Avatar color helpers — ui_theme_key → hex, fallback to seed palette
@@ -485,7 +491,7 @@ function makeStyles(C: AppColors) {
       textTransform: 'uppercase',
       letterSpacing: 0.5,
     },
-    metricsRow: { gap: 12, paddingRight: 16 },
+    metricsRow: { gap: 12, paddingRight: 16, alignItems: 'stretch' },
     metricCard: {
       minHeight: 148,
       backgroundColor: C.card,
@@ -533,13 +539,29 @@ function makeStyles(C: AppColors) {
     },
     metricLabel: { fontSize: 13, color: C.textMuted, lineHeight: 17 },
     metricCompletionBody: {
-      marginTop: 14,
+      alignItems: 'center',
+      marginTop: 10,
+    },
+    metricCompletionRing: {
+      width: COMPLETION_RING_SIZE,
+      height: COMPLETION_RING_SIZE,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    metricCompletionPercentage: {
+      position: 'absolute',
+      fontSize: 20,
+      fontWeight: '800',
+      color: C.text,
+      lineHeight: 24,
     },
     metricPendingRow: {
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: C.border,
       marginTop: 10,
       paddingTop: 10,
+      width: '100%',
+      alignItems: 'center',
     },
     metricPendingCount: {
       fontWeight: '700',
@@ -866,6 +888,14 @@ export default function HomeScreen() {
       profileData?.timezone,
     ],
   );
+  const sessionCompletionTotal =
+    sessionCompletionSummary.completed + sessionCompletionSummary.pending;
+  const sessionCompletionPercentage =
+    sessionCompletionTotal > 0
+      ? Math.round((sessionCompletionSummary.completed / sessionCompletionTotal) * 100)
+      : 0;
+  const sessionCompletionStrokeOffset =
+    COMPLETION_RING_CIRCUMFERENCE * (1 - sessionCompletionPercentage / 100);
   const metricCardWidth = Math.max(160, (windowWidth - 40 - 12) / 2);
   const ThirdMetricIcon =
     topMetrics.thirdMetricTitle === 'Active Subjects'
@@ -1271,7 +1301,7 @@ export default function HomeScreen() {
               <View
                 accessibilityLabel={
                   sessionCompletionCarouselEnabled
-                    ? `Session completion summary. ${sessionCompletionSummary.completed} sessions completed, ${sessionCompletionSummary.pending} pending completion.`
+                    ? `Session completion, ${sessionCompletionPercentage} percent. ${sessionCompletionSummary.completed} sessions completed, ${sessionCompletionSummary.pending} pending completion.`
                     : undefined
                 }
                 style={[
@@ -1282,7 +1312,7 @@ export default function HomeScreen() {
                 <View style={s.metricHeader}>
                   <Text style={s.metricTitle}>
                     {sessionCompletionCarouselEnabled
-                      ? 'Sessions completed'
+                      ? 'Session completion'
                       : 'Completed Classes'}
                   </Text>
                   <View style={s.metricIconWrap}>
@@ -1291,15 +1321,48 @@ export default function HomeScreen() {
                 </View>
                 {sessionCompletionCarouselEnabled ? (
                   <View style={s.metricCompletionBody}>
-                    <Text style={s.metricValue}>
-                      {sessionCompletionSummary.completed}
-                    </Text>
+                    <View style={s.metricCompletionRing}>
+                      <Svg
+                        width={COMPLETION_RING_SIZE}
+                        height={COMPLETION_RING_SIZE}
+                        viewBox={`0 0 ${COMPLETION_RING_SIZE} ${COMPLETION_RING_SIZE}`}
+                      >
+                        <Circle
+                          cx={COMPLETION_RING_SIZE / 2}
+                          cy={COMPLETION_RING_SIZE / 2}
+                          r={COMPLETION_RING_RADIUS}
+                          fill="none"
+                          stroke={colors.border}
+                          strokeWidth={COMPLETION_RING_STROKE_WIDTH}
+                        />
+                        <Circle
+                          cx={COMPLETION_RING_SIZE / 2}
+                          cy={COMPLETION_RING_SIZE / 2}
+                          r={COMPLETION_RING_RADIUS}
+                          fill="none"
+                          stroke={colors.primary}
+                          strokeWidth={COMPLETION_RING_STROKE_WIDTH}
+                          strokeLinecap="round"
+                          strokeDasharray={`${COMPLETION_RING_CIRCUMFERENCE} ${COMPLETION_RING_CIRCUMFERENCE}`}
+                          strokeDashoffset={sessionCompletionStrokeOffset}
+                          rotation="-90"
+                          origin={`${COMPLETION_RING_SIZE / 2}, ${COMPLETION_RING_SIZE / 2}`}
+                        />
+                      </Svg>
+                      <Text style={s.metricCompletionPercentage}>
+                        {sessionCompletionPercentage}%
+                      </Text>
+                    </View>
                     <View style={s.metricPendingRow}>
                       <Text style={s.metricLabel}>
                         <Text style={s.metricPendingCount}>
+                          {sessionCompletionSummary.completed}
+                        </Text>{' '}
+                        completed ·{' '}
+                        <Text style={{ fontWeight: '700', color: colors.text }}>
                           {sessionCompletionSummary.pending}
                         </Text>{' '}
-                        pending completion
+                        pending
                       </Text>
                     </View>
                   </View>

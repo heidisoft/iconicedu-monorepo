@@ -169,6 +169,13 @@ export function DashboardHomeInfographicSection({
           value: activeNextWeekSessionCount,
           label: 'Next week',
         };
+  const sessionCompletionTotal = sessionCompletionSummary
+    ? sessionCompletionSummary.completed + sessionCompletionSummary.pending
+    : 0;
+  const sessionCompletionPercentage =
+    sessionCompletionTotal > 0 && sessionCompletionSummary
+      ? Math.round((sessionCompletionSummary.completed / sessionCompletionTotal) * 100)
+      : 0;
 
   const openFamilySettings = () => {
     window.dispatchEvent(
@@ -224,7 +231,7 @@ export function DashboardHomeInfographicSection({
           <div className={infographicContentClassName}>
             <div className="mb-3 flex items-center justify-between gap-2">
               <p className={infographicTitleClassName}>
-                {sessionCompletionSummary ? 'Sessions completed' : 'Completed Classes'}
+                {sessionCompletionSummary ? 'Session completion' : 'Completed Classes'}
               </p>
               <div className={`${infographicChipClassName} text-primary`}>
                 <CalendarCheck className="size-5" aria-hidden="true" />
@@ -232,17 +239,51 @@ export function DashboardHomeInfographicSection({
             </div>
             {sessionCompletionSummary ? (
               <div>
-                <p className={infographicValueClassName}>
-                  {sessionCompletionSummary.completed}
-                </p>
+                <div className="mt-3 flex justify-center">
+                  <div className="relative size-24">
+                    <svg
+                      viewBox="0 0 36 36"
+                      className="size-full -rotate-90"
+                      aria-hidden="true"
+                    >
+                      <circle
+                        cx="18"
+                        cy="18"
+                        r="15.5"
+                        fill="none"
+                        strokeWidth="3"
+                        className="stroke-primary/15"
+                      />
+                      <circle
+                        cx="18"
+                        cy="18"
+                        r="15.5"
+                        pathLength="100"
+                        fill="none"
+                        strokeWidth="3"
+                        strokeLinecap="round"
+                        strokeDasharray="100"
+                        strokeDashoffset={100 - sessionCompletionPercentage}
+                        className="stroke-primary"
+                      />
+                    </svg>
+                    <p className="absolute inset-0 flex items-center justify-center text-xl font-semibold text-foreground">
+                      {sessionCompletionPercentage}%
+                    </p>
+                  </div>
+                </div>
                 <div
-                  className={`mt-3 border-t border-primary/15 pt-3 ${infographicFooterClassName} text-muted-foreground`}
+                  className={`mt-3 border-t border-primary/15 pt-3 text-center ${infographicFooterClassName} text-muted-foreground`}
                 >
                   <p>
                     <span className="font-semibold text-primary">
+                      {sessionCompletionSummary.completed}
+                    </span>{' '}
+                    completed ·{' '}
+                    <span className="font-semibold text-foreground">
                       {sessionCompletionSummary.pending}
                     </span>{' '}
-                    pending completion
+                    pending
                   </p>
                 </div>
               </div>
