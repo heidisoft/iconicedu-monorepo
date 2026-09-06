@@ -33,3 +33,12 @@ export interface SessionCompletionVM {
   resolvedAt?: ISODateTime | null;
   expiresAt: ISODateTime;
 }
+
+// One schedule occurrence that at least one participant (educator/teacher,
+// guardian/parent, or staff) has confirmed complete. Powers the classroom
+// Sessions tab's completed state — an occurrence is done the moment ANY party
+// confirms it (`status` 'confirmed' or 'auto_confirmed'); disputes are ignored.
+export interface ChannelSessionCompletionVM {
+  scheduleId: UUID;
+  occurrenceKey: ISODateTime;
+}

@@ -1,7 +1,10 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import type { ClassScheduleVM } from '@iconicedu/shared-types';
+import type {
+  ChannelSessionCompletionVM,
+  ClassScheduleVM,
+} from '@iconicedu/shared-types';
 import { useScheduleDisplayTimeZone } from '@iconicedu/ui-web/components/shared/schedule-display-timezone-context';
 import { EmptyMessagesState } from '@iconicedu/ui-web/components/messages/empty-state';
 import { Button } from '@iconicedu/ui-web/ui/button';
@@ -9,6 +12,7 @@ import { ScrollArea } from '@iconicedu/ui-web/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@iconicedu/ui-web/ui/tabs';
 import { CalendarDays, Loader2 } from 'lucide-react';
 import {
+  buildScheduleCompletionLookup,
   getResolvedScheduleDisplayMonthKey,
   getJoinableSessionId,
   getMonthProgressStatsByKey,
@@ -25,6 +29,17 @@ interface MessagesScheduleTabProps {
   isLoading: boolean;
   error: string | null;
   timezone?: string | null;
+  /**
+   * Occurrences any participant (teacher / parent / staff) has confirmed
+   * complete via class_session_completions. Counted as complete even before they
+   * elapse.
+   */
+  sessionCompletions?: ChannelSessionCompletionVM[];
+  /**
+   * Occurrences a participant has disputed. Never counted as complete, even once
+   * elapsed.
+   */
+  disputedSessions?: ChannelSessionCompletionVM[];
 }
 
 const MONTH_PAGE_SIZE = 4;
@@ -34,8 +49,20 @@ export function MessagesScheduleTab({
   isLoading,
   error,
   timezone,
+  sessionCompletions,
+  disputedSessions,
 }: MessagesScheduleTabProps) {
   const displayTimezone = useScheduleDisplayTimeZone(timezone);
+  const completionOptions = useMemo(
+    () => ({
+      completionLookup: buildScheduleCompletionLookup(sessionCompletions),
+      disputedLookup: buildScheduleCompletionLookup(disputedSessions),
+      // A past session counts as complete once it has elapsed unless a party
+      // disputed it — confirmations from class_session_completions still count.
+      treatElapsedAsComplete: true as const,
+    }),
+    [sessionCompletions, disputedSessions],
+  );
   const [activeTab, setActiveTab] = useState<ScheduleSubTabKey>('upcoming');
   const [upcomingMonthLimit, setUpcomingMonthLimit] = useState(MONTH_PAGE_SIZE);
   const [pastMonthLimit, setPastMonthLimit] = useState(MONTH_PAGE_SIZE);
@@ -60,8 +87,14 @@ export function MessagesScheduleTab({
     [displayTimezone, past],
   );
   const monthProgressStatsByKey = useMemo(
-    () => getMonthProgressStatsByKey(allDisplaySchedules, now, displayTimezone),
-    [allDisplaySchedules, displayTimezone, now],
+    () =>
+      getMonthProgressStatsByKey(
+        allDisplaySchedules,
+        now,
+        displayTimezone,
+        completionOptions,
+      ),
+    [allDisplaySchedules, completionOptions, displayTimezone, now],
   );
 
   const upcomingGroups = useMemo(
@@ -70,8 +103,9 @@ export function MessagesScheduleTab({
         takeMonthGroups(upcomingMonthGroups, upcomingMonthLimit),
         now,
         displayTimezone,
+        completionOptions,
       ),
-    [displayTimezone, upcomingMonthGroups, upcomingMonthLimit, now],
+    [completionOptions, displayTimezone, upcomingMonthGroups, upcomingMonthLimit, now],
   );
   const joinableSessionId = useMemo(() => getJoinableSessionId(upcoming), [upcoming]);
 
@@ -81,8 +115,9 @@ export function MessagesScheduleTab({
         takeMonthGroups(pastMonthGroups, pastMonthLimit),
         now,
         displayTimezone,
+        completionOptions,
       ),
-    [displayTimezone, pastMonthGroups, pastMonthLimit, now],
+    [completionOptions, displayTimezone, pastMonthGroups, pastMonthLimit, now],
   );
 
   const canLoadMoreUpcoming = useMemo(

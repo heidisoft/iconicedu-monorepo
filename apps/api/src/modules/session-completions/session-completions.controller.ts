@@ -22,6 +22,19 @@ import type { AuthenticatedRequest } from '@iconicedu/api/lib/http/authenticated
 export class SessionCompletionsController {
   constructor(private readonly sessionCompletionsService: SessionCompletionsService) {}
 
+  @Get('channel-states')
+  @UseGuards(AuthGuard)
+  listChannelStates(
+    @Req() req: AuthenticatedRequest,
+    @Query('orgId') orgId: string,
+    @Query('channelId') channelId: string,
+  ) {
+    return this.sessionCompletionsService.listChannelCompletionStates(req.user.id, {
+      orgId,
+      channelId,
+    });
+  }
+
   @Get()
   @UseGuards(AuthGuard)
   list(

@@ -52,6 +52,15 @@ export function isSessionJoinButtonDisabled(input: {
   return !input.canJoin || !input.hasJoinAction || input.isJoinPending;
 }
 
+export function getPastSessionCompletionLabel(
+  session: Pick<ClassSession, 'status' | 'isCompleted' | 'isDisputed'>,
+): 'Completed' | 'Disputed' | 'Pending completion' {
+  if (session.isCompleted || session.status === 'completed') {
+    return 'Completed';
+  }
+  return session.isDisputed ? 'Disputed' : 'Pending completion';
+}
+
 export function SessionCard({
   session,
   canJoin = false,
@@ -214,7 +223,7 @@ export function SessionCard({
             ) : null}
             {isPast && session.variant !== 'exception' ? (
               <Badge variant="secondary" className="rounded-full px-2 py-0 text-[10px]">
-                Completed
+                {getPastSessionCompletionLabel(session)}
               </Badge>
             ) : null}
           </div>

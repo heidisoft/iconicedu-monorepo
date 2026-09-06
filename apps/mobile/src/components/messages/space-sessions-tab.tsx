@@ -12,6 +12,7 @@ import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 import type {
   ArchiveAwareClassScheduleVM,
+  ChannelSessionCompletionVM,
   ClassScheduleVM,
 } from '@iconicedu/shared-types';
 import { applyArchiveCutoffToDisplaySchedules } from '@iconicedu/shared-types';
@@ -85,6 +86,67 @@ function occurrenceIdentity(schedule: DisplaySchedule): string {
   }
 
   return `${baseId}|${schedule.startAt}`;
+}
+
+/**
+ * `${baseScheduleId}|${epochMs}` key for one occurrence — the instant is
+ * normalised through Date so a Postgres `timestamptz` and a JS `.toISOString()`
+ * for the same moment collide. Mirrors the web tab's key shape.
+ */
+function completionKeyForSchedule(schedule: DisplaySchedule): string | null {
+  const baseId = schedule.ids.id.includes('__')
+    ? schedule.ids.id.slice(0, schedule.ids.id.indexOf('__'))
+    : schedule.ids.id;
+  const rawInstant =
+    schedule.uiState?.originalStartAt ??
+    (schedule.ids.id.includes('__')
+      ? (schedule.ids.id.split('__')[1] ?? schedule.startAt)
+      : schedule.startAt);
+  const epochMs = new Date(rawInstant).getTime();
+  if (!Number.isFinite(epochMs)) return null;
+  return `${baseId}|${epochMs}`;
+}
+
+function buildCompletionLookup(
+  completions: ChannelSessionCompletionVM[] | undefined,
+): Set<string> {
+  const lookup = new Set<string>();
+  (completions ?? []).forEach((completion) => {
+    const epochMs = new Date(completion.occurrenceKey).getTime();
+    if (!Number.isFinite(epochMs)) return;
+    lookup.add(`${completion.scheduleId}|${epochMs}`);
+  });
+  return lookup;
+}
+
+function matchesLookup(schedule: DisplaySchedule, lookup: Set<string>): boolean {
+  if (!lookup.size) return false;
+  const key = completionKeyForSchedule(schedule);
+  return key ? lookup.has(key) : false;
+}
+
+function isScheduleDisputed(
+  schedule: DisplaySchedule,
+  disputedLookup: Set<string>,
+): boolean {
+  return matchesLookup(schedule, disputedLookup);
+}
+
+/**
+ * A session counts as complete when a party confirmed it, or when it has simply
+ * elapsed without a dispute. Mirrors the web tab's isDisplayScheduleCompleted.
+ */
+function isScheduleCompleted(
+  schedule: DisplaySchedule,
+  completionLookup: Set<string>,
+  disputedLookup: Set<string>,
+  nowMs: number,
+): boolean {
+  if (schedule.status === 'completed') return true;
+  if (schedule.status === 'cancelled') return false;
+  if (matchesLookup(schedule, disputedLookup)) return false;
+  if (matchesLookup(schedule, completionLookup)) return true;
+  return new Date(schedule.endAt).getTime() < nowMs;
 }
 
 function getCalendarWeekOfMonth(date: Date): number {
@@ -244,7 +306,11 @@ export function expandRecurringSchedules(
 
 // ─── Split + group ──────────────────────────────────────────────────────────────
 
-function splitAndGroupSessions(schedules: ClassScheduleVM[]): {
+function splitAndGroupSessions(
+  schedules: ClassScheduleVM[],
+  completionLookup: Set<string>,
+  disputedLookup: Set<string>,
+): {
   upcoming: MonthGroup[];
   past: MonthGroup[];
   monthProgressStatsByKey: Map<string, MonthProgressStats>;
@@ -284,10 +350,7 @@ function splitAndGroupSessions(schedules: ClassScheduleVM[]): {
       current.scheduledCount += 1;
     }
 
-    if (
-      schedule.status === 'completed' ||
-      (schedule.status !== 'cancelled' && new Date(schedule.endAt).getTime() < nowMs)
-    ) {
+    if (isScheduleCompleted(schedule, completionLookup, disputedLookup, nowMs)) {
       current.completedCount += 1;
     }
 
@@ -328,6 +391,8 @@ function splitAndGroupSessions(schedules: ClassScheduleVM[]): {
           isToday: startDay === nowDay,
           isLive,
           isPast,
+          isCompleted: isScheduleCompleted(s, completionLookup, disputedLookup, nowMs),
+          isDisputed: isScheduleDisputed(s, disputedLookup),
           status: s.status,
           meetingLink: s.meetingLink ?? null,
           themeKey: s.themeKey ?? null,
@@ -351,6 +416,9 @@ function splitAndGroupSessions(schedules: ClassScheduleVM[]): {
         month: monthDate.toLocaleDateString('en-US', { month: 'long' }),
         year: String(y),
         totalCount: sessions.length,
+        // Strict status fallback — the tab always passes progressStats, so this
+        // is only read when none are supplied. Per-occurrence confirmation state
+        // lives on `session.isCompleted`.
         completedCount: sessions.filter((s) => s.status === 'completed').length,
         isCurrentMonth: key === currentMonthKey,
         sessions,
@@ -369,10 +437,14 @@ function splitAndGroupSessions(schedules: ClassScheduleVM[]): {
 
 export function SpaceSessionsTab({
   schedules,
+  sessionCompletions,
+  disputedSessions,
   isLoading,
   error,
 }: {
   schedules: ClassScheduleVM[];
+  sessionCompletions?: ChannelSessionCompletionVM[];
+  disputedSessions?: ChannelSessionCompletionVM[];
   isLoading?: boolean;
   error?: string | null;
 }) {
@@ -384,8 +456,13 @@ export function SpaceSessionsTab({
   const autoSwitchedRef = useRef(false);
 
   const { upcoming, past, monthProgressStatsByKey } = useMemo(
-    () => splitAndGroupSessions(schedules),
-    [schedules],
+    () =>
+      splitAndGroupSessions(
+        schedules,
+        buildCompletionLookup(sessionCompletions),
+        buildCompletionLookup(disputedSessions),
+      ),
+    [schedules, sessionCompletions, disputedSessions],
   );
   const activeJoinSessionId = useMemo(() => {
     for (const group of upcoming) {

@@ -65,6 +65,7 @@ export {
 } from './onboarding/queries';
 export {
   cancelRecurringSessionOccurrence,
+  fetchChannelSessionCompletions,
   fetchOrgSessions,
   fetchSpaceSchedulesByChannelId,
 } from './schedules/queries';

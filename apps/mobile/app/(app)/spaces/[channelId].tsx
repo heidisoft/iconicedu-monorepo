@@ -161,6 +161,8 @@ export default function SpaceDetailScreen() {
 
   const {
     schedules,
+    sessionCompletions,
+    disputedSessions,
     isLoading: isLoadingSessions,
     error: sessionsError,
   } = useSpaceSessions(channelId ?? '', orgId);
@@ -632,6 +634,8 @@ export default function SpaceDetailScreen() {
         <View style={[s.flex, { backgroundColor: colors.pageBg }]}>
           <SpaceSessionsTab
             schedules={schedules ?? []}
+            sessionCompletions={sessionCompletions}
+            disputedSessions={disputedSessions}
             isLoading={isLoadingSessions}
             error={sessionsError}
           />

@@ -8,6 +8,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type {
+  ChannelSessionCompletionVM,
   ClassSessionCompletionRow,
   ConfirmSessionCompletionInput,
   ConnectionVM,
@@ -142,6 +143,62 @@ export class SessionCompletionsService {
       nextCursor: hasMore && last ? this.encodeCursor(last.order_key, last.id) : null,
       total: null,
     };
+  }
+
+  /**
+   * Cross-party completion state for a classroom channel's Sessions tab. RLS on
+   * class_session_completions only exposes a viewer's own rows, so this reads
+   * through the service client after verifying the caller is a member of the
+   * channel. Role is not filtered — mirroring the "either party" rule the tab
+   * presents:
+   *   - `completions`: any participant confirmed it ('confirmed'/'auto_confirmed').
+   *   - `disputed`: any participant filed a dispute ('disputed'). The tab treats an
+   *     elapsed session as complete unless it appears here.
+   */
+  async listChannelCompletionStates(
+    authUserId: string,
+    params: { orgId: string; channelId: string },
+  ): Promise<{
+    completions: ChannelSessionCompletionVM[];
+    disputed: ChannelSessionCompletionVM[];
+  }> {
+    if (!params?.orgId || !isUuid(params.orgId)) {
+      throw new BadRequestException('Invalid orgId');
+    }
+    if (!params?.channelId || !isUuid(params.channelId)) {
+      throw new BadRequestException('Invalid channelId');
+    }
+
+    const supabase = createSupabaseServiceClient();
+    const account = await this.resolveAccount(supabase, authUserId, params.orgId);
+    await this.assertChannelMember(supabase, account, params.orgId, params.channelId);
+
+    const { data, error } = await supabase
+      .from('class_session_completions')
+      .select('schedule_id, occurrence_key, status')
+      .eq('org_id', params.orgId)
+      .eq('channel_id', params.channelId)
+      .in('status', ['confirmed', 'auto_confirmed', 'disputed'])
+      .is('deleted_at', null)
+      .returns<Array<{ schedule_id: string; occurrence_key: string; status: string }>>();
+
+    if (error) throw new InternalServerErrorException(error.message);
+
+    const seen = { completed: new Set<string>(), disputed: new Set<string>() };
+    const completions: ChannelSessionCompletionVM[] = [];
+    const disputed: ChannelSessionCompletionVM[] = [];
+    for (const row of data ?? []) {
+      const key = `${row.schedule_id}|${row.occurrence_key}`;
+      const bucket = row.status === 'disputed' ? 'disputed' : 'completed';
+      if (seen[bucket].has(key)) continue;
+      seen[bucket].add(key);
+      (bucket === 'disputed' ? disputed : completions).push({
+        scheduleId: row.schedule_id,
+        occurrenceKey: row.occurrence_key,
+      });
+    }
+
+    return { completions, disputed };
   }
 
   async confirm(authUserId: string, body: ConfirmSessionCompletionInput) {
@@ -451,6 +508,40 @@ export class SessionCompletionsService {
 
     await this.resolvePermittedProfile(supabase, account, orgId, row.profile_id);
     return row;
+  }
+
+  /** Verifies the requesting account has a membership row in the given channel. */
+  private async assertChannelMember(
+    supabase: SupabaseServiceClient,
+    account: AccountRow,
+    orgId: string,
+    channelId: string,
+  ): Promise<void> {
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('account_id', account.id)
+      .eq('org_id', orgId)
+      .is('deleted_at', null)
+      .returns<Array<{ id: string }>>();
+
+    if (profilesError) throw new InternalServerErrorException(profilesError.message);
+
+    const profileIds = (profiles ?? []).map((profile) => profile.id);
+    if (!profileIds.length) throw new ForbiddenException('Forbidden');
+
+    const { data: membership, error: membershipError } = await supabase
+      .from('channel_members')
+      .select('id')
+      .eq('org_id', orgId)
+      .eq('channel_id', channelId)
+      .in('profile_id', profileIds)
+      .is('deleted_at', null)
+      .limit(1)
+      .maybeSingle<{ id: string }>();
+
+    if (membershipError) throw new InternalServerErrorException(membershipError.message);
+    if (!membership) throw new ForbiddenException('Forbidden');
   }
 
   private async resolveAccount(

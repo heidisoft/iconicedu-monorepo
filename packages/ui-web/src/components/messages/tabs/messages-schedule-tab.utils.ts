@@ -173,6 +173,14 @@ export interface ClassSession {
   isToday: boolean;
   isLive: boolean;
   isPast: boolean;
+  /**
+   * True when this occurrence counts as complete for the Sessions tab: any
+   * participant (teacher / parent / staff) confirmed it, or it simply elapsed
+   * without a dispute. Independent of `status`.
+   */
+  isCompleted?: boolean;
+  /** True when a participant filed a dispute against this occurrence. */
+  isDisputed?: boolean;
   endAt: string;
   status: ClassScheduleVM['status'];
   meetingLink?: string | null;
@@ -204,15 +212,104 @@ export interface ScheduleDisplayRange {
   timezone?: string | null;
 }
 
-function isScheduleCompletedForProgress(schedule: DisplaySchedule, now: Date): boolean {
+export interface ScheduleOccurrenceCompletion {
+  scheduleId: string;
+  occurrenceKey: string;
+}
+
+/**
+ * Stable `${baseScheduleId}|${epochMs}` key for one occurrence, normalising the
+ * instant through Date so a Postgres `timestamptz` (`…+00:00`) and a JS
+ * `.toISOString()` (`…000Z`) for the same moment collide.
+ */
+export function getScheduleOccurrenceCompletionKey(
+  schedule: DisplaySchedule,
+): string | null {
+  const baseId = getDisplayScheduleBaseId(schedule);
+  const separatorIndex = schedule.ids.id.indexOf('__');
+  const rawInstant =
+    schedule.uiState?.originalStartAt ??
+    (separatorIndex === -1
+      ? schedule.startAt
+      : (schedule.ids.id.split('__')[1] ?? schedule.startAt));
+  const epochMs = new Date(rawInstant).getTime();
+  if (!Number.isFinite(epochMs)) return null;
+  return `${baseId}|${epochMs}`;
+}
+
+export function buildScheduleCompletionLookup(
+  completions: ScheduleOccurrenceCompletion[] | null | undefined,
+): Set<string> {
+  const lookup = new Set<string>();
+  (completions ?? []).forEach((completion) => {
+    const epochMs = new Date(completion.occurrenceKey).getTime();
+    if (!Number.isFinite(epochMs)) return;
+    lookup.add(`${completion.scheduleId}|${epochMs}`);
+  });
+  return lookup;
+}
+
+export interface ScheduleCompletionOptions {
+  now?: Date;
+  /**
+   * Occurrences a participant (teacher / parent / staff) confirmed via
+   * class_session_completions. These count as complete even before they elapse.
+   */
+  completionLookup?: Set<string>;
+  /**
+   * Occurrences a participant filed a dispute against. A disputed occurrence is
+   * never counted as complete, overriding the elapsed fallback below.
+   */
+  disputedLookup?: Set<string>;
+  /**
+   * When true (the default), a non-cancelled, non-disputed occurrence whose end
+   * time has passed counts as complete even without a confirmation row — so the
+   * month progress reflects sessions that have simply happened. Pass `false` to
+   * require an explicit confirmation.
+   */
+  treatElapsedAsComplete?: boolean;
+}
+
+function matchesLookup(
+  schedule: DisplaySchedule,
+  lookup: Set<string> | undefined,
+): boolean {
+  if (!lookup?.size) return false;
+  const key = getScheduleOccurrenceCompletionKey(schedule);
+  return key ? lookup.has(key) : false;
+}
+
+export function isDisplayScheduleDisputed(
+  schedule: DisplaySchedule,
+  disputedLookup?: Set<string>,
+): boolean {
+  return matchesLookup(schedule, disputedLookup);
+}
+
+export function isDisplayScheduleCompleted(
+  schedule: DisplaySchedule,
+  options: ScheduleCompletionOptions = {},
+): boolean {
   if (schedule.status === 'completed') {
     return true;
   }
-
   if (schedule.status === 'cancelled') {
     return false;
   }
 
+  if (matchesLookup(schedule, options.disputedLookup)) {
+    return false;
+  }
+
+  if (matchesLookup(schedule, options.completionLookup)) {
+    return true;
+  }
+
+  if (options.treatElapsedAsComplete === false) {
+    return false;
+  }
+
+  const now = options.now ?? new Date();
   return new Date(schedule.endAt).getTime() < now.getTime();
 }
 
@@ -589,6 +686,7 @@ export function toMonthGroups(
   groups: MonthScheduleGroup[],
   now = new Date(),
   timezone?: string | null,
+  options: Omit<ScheduleCompletionOptions, 'now'> = {},
 ): MonthGroup[] {
   const nowMs = now.getTime();
   const resolvedViewerTimezone = resolveScheduleDisplayTimeZone(timezone);
@@ -634,6 +732,8 @@ export function toMonthGroups(
           new Date(schedule.startAt).getTime() <= nowMs &&
           nowMs < new Date(schedule.endAt).getTime(),
         isPast: new Date(schedule.endAt).getTime() < nowMs,
+        isCompleted: isDisplayScheduleCompleted(schedule, { ...options, now }),
+        isDisputed: isDisplayScheduleDisputed(schedule, options.disputedLookup),
         endAt: schedule.endAt,
         status: schedule.status,
         meetingLink: schedule.meetingLink ?? null,
@@ -671,6 +771,10 @@ export function toMonthGroups(
         }) ?? '',
       year,
       totalCount: sessions.length,
+      // Kept as a strict status count for backward compatibility — the Sessions
+      // tab always feeds MonthSection an explicit progressStats, so this fallback
+      // value is only read when no stats are supplied. Per-occurrence completion
+      // (teacher/parent/staff confirmation) lives on `session.isCompleted`.
       completedCount: sessions.filter((session) => session.status === 'completed').length,
       sessions,
     };
@@ -688,6 +792,7 @@ export function getMonthProgressStatsByKey(
   schedules: DisplaySchedule[],
   now = new Date(),
   timezone?: string | null,
+  options: Omit<ScheduleCompletionOptions, 'now'> = {},
 ): Map<string, MonthProgressStats> {
   const statsByMonthKey = new Map<string, MonthProgressStats>();
 
@@ -702,7 +807,7 @@ export function getMonthProgressStatsByKey(
       current.scheduledCount += 1;
     }
 
-    if (isScheduleCompletedForProgress(schedule, now)) {
+    if (isDisplayScheduleCompleted(schedule, { ...options, now })) {
       current.completedCount += 1;
     }
 

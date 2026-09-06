@@ -5,6 +5,7 @@ import type { ClassScheduleVM } from '@iconicedu/shared-types';
 // ─── Mocks ──────────────────────────────────────────────────────────────────────
 
 const mockFetchSpaceSchedules = jest.fn();
+const mockFetchChannelSessionCompletions = jest.fn();
 const mockUseQuery = jest.fn();
 
 jest.mock('@tanstack/react-query', () => ({
@@ -14,9 +15,16 @@ jest.mock('@tanstack/react-query', () => ({
 jest.mock('@/lib/api/queries', () => ({
   fetchSpaceSchedulesByChannelId: (...args: unknown[]) =>
     mockFetchSpaceSchedules(...args),
+  fetchChannelSessionCompletions: (...args: unknown[]) =>
+    mockFetchChannelSessionCompletions(...args),
   queryKeys: {
     spaceSchedules: (channelId: string, orgId: string) => [
       'space-sessions',
+      channelId,
+      orgId,
+    ],
+    spaceSessionCompletions: (channelId: string, orgId: string) => [
+      'space-session-completions',
       channelId,
       orgId,
     ],
@@ -149,5 +157,28 @@ describe('useSpaceSessions', () => {
     renderHook(() => useSpaceSessions('ch-abc', 'org-xyz'));
 
     expect(mockFetchSpaceSchedules).toHaveBeenCalledWith('ch-abc', 'org-xyz');
+    expect(mockFetchChannelSessionCompletions).toHaveBeenCalledWith('ch-abc', 'org-xyz');
+  });
+
+  it('exposes confirmed and disputed occurrences and defaults them to empty arrays', () => {
+    mockFetchSpaceSchedules.mockReturnValue(fakeSchedules);
+    mockFetchChannelSessionCompletions.mockReturnValue({
+      completions: [{ scheduleId: 'sched-1', occurrenceKey: '2026-03-01T10:00:00Z' }],
+      disputed: [{ scheduleId: 'sched-2', occurrenceKey: '2026-03-08T10:00:00Z' }],
+    });
+
+    const { result } = renderHook(() => useSpaceSessions('ch-1', 'org-1'));
+
+    expect(result.current.sessionCompletions).toEqual([
+      { scheduleId: 'sched-1', occurrenceKey: '2026-03-01T10:00:00Z' },
+    ]);
+    expect(result.current.disputedSessions).toEqual([
+      { scheduleId: 'sched-2', occurrenceKey: '2026-03-08T10:00:00Z' },
+    ]);
+
+    mockFetchChannelSessionCompletions.mockReturnValue(undefined);
+    const { result: emptyResult } = renderHook(() => useSpaceSessions('ch-1', 'org-1'));
+    expect(emptyResult.current.sessionCompletions).toEqual([]);
+    expect(emptyResult.current.disputedSessions).toEqual([]);
   });
 });

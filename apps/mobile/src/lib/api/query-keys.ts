@@ -29,6 +29,8 @@ export const queryKeys = {
     ['childProfiles', orgId, accountIds] as const,
   spaceSchedules: (channelId: string, orgId: string) =>
     ['space-sessions', channelId, orgId] as const,
+  spaceSessionCompletions: (channelId: string, orgId: string) =>
+    ['space-session-completions', channelId, orgId] as const,
   orgSessions: (orgId: string) => ['org-sessions', orgId] as const,
   sessionCompletions: (orgId: string, profileId: string) =>
     ['session-completions', orgId, profileId] as const,

@@ -23,6 +23,7 @@ const COMPLETION_ID = '00000000-0000-4000-8000-000000000004';
 const OTHER_PROFILE_ID = '00000000-0000-4000-8000-000000000005';
 const OTHER_ACCOUNT_ID = '00000000-0000-4000-8000-000000000006';
 const SCHEDULE_ID = '00000000-0000-4000-8000-000000000007';
+const CHANNEL_ID = '00000000-0000-4000-8000-000000000009';
 
 describe('SessionCompletionsService', () => {
   const createSupabaseServiceClientMock = jest.mocked(createSupabaseServiceClient);
@@ -401,6 +402,109 @@ describe('SessionCompletionsService', () => {
       expect(publishActivityEventMock).toHaveBeenCalledWith(
         expect.objectContaining({ eventType: 'session.completion.dispute_reported' }),
       );
+    });
+  });
+
+  describe('listChannelCompletionStates', () => {
+    function makeChannelSupabase(input: {
+      profileRows?: Array<{ id: string }> | null;
+      membershipRow?: { id: string } | null;
+      completionRows?: Array<{
+        schedule_id: string;
+        occurrence_key: string;
+        status: string;
+      }>;
+    }) {
+      const accountChain = makeChain({ data: { id: ACCOUNT_ID, org_id: ORG_ID } });
+      const profilesChain = makeChain({
+        data: input.profileRows === undefined ? [{ id: PROFILE_ID }] : input.profileRows,
+      });
+      const membershipChain = makeChain({
+        data:
+          input.membershipRow === undefined ? { id: 'member-1' } : input.membershipRow,
+      });
+      const completionsChain = makeChain({ data: input.completionRows ?? [] });
+
+      const from = jest.fn((table: string) => {
+        if (table === 'accounts') return accountChain;
+        if (table === 'profiles') return profilesChain;
+        if (table === 'channel_members') return membershipChain;
+        if (table === 'class_session_completions') return completionsChain;
+        throw new Error(`Unexpected table: ${table}`);
+      });
+
+      createSupabaseServiceClientMock.mockReturnValue({ from } as never);
+      return { from, completionsChain, membershipChain };
+    }
+
+    it('splits confirmed and disputed occurrences and de-duplicates each', async () => {
+      const { completionsChain } = makeChannelSupabase({
+        completionRows: [
+          {
+            schedule_id: SCHEDULE_ID,
+            occurrence_key: '2030-03-06T10:00:00+00:00',
+            status: 'confirmed',
+          },
+          {
+            schedule_id: SCHEDULE_ID,
+            occurrence_key: '2030-03-06T10:00:00+00:00',
+            status: 'auto_confirmed',
+          },
+          {
+            schedule_id: SCHEDULE_ID,
+            occurrence_key: '2030-03-13T10:00:00+00:00',
+            status: 'disputed',
+          },
+          {
+            schedule_id: SCHEDULE_ID,
+            occurrence_key: '2030-03-13T10:00:00+00:00',
+            status: 'disputed',
+          },
+        ],
+      });
+      const service = new SessionCompletionsService();
+
+      const result = await service.listChannelCompletionStates(AUTH_USER_ID, {
+        orgId: ORG_ID,
+        channelId: CHANNEL_ID,
+      });
+
+      expect(completionsChain.in).toHaveBeenCalledWith('status', [
+        'confirmed',
+        'auto_confirmed',
+        'disputed',
+      ]);
+      expect(result.completions).toEqual([
+        { scheduleId: SCHEDULE_ID, occurrenceKey: '2030-03-06T10:00:00+00:00' },
+      ]);
+      expect(result.disputed).toEqual([
+        { scheduleId: SCHEDULE_ID, occurrenceKey: '2030-03-13T10:00:00+00:00' },
+      ]);
+    });
+
+    it('rejects a caller who is not a member of the channel', async () => {
+      makeChannelSupabase({ membershipRow: null });
+      const service = new SessionCompletionsService();
+
+      await expect(
+        service.listChannelCompletionStates(AUTH_USER_ID, {
+          orgId: ORG_ID,
+          channelId: CHANNEL_ID,
+        }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('rejects an invalid channelId before touching the database', async () => {
+      const { from } = makeChannelSupabase({});
+      const service = new SessionCompletionsService();
+
+      await expect(
+        service.listChannelCompletionStates(AUTH_USER_ID, {
+          orgId: ORG_ID,
+          channelId: 'not-a-uuid',
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(from).not.toHaveBeenCalled();
     });
   });
 

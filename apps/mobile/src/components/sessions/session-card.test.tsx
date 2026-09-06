@@ -314,6 +314,44 @@ describe('SessionCard', () => {
     expect(screen.getByText('Recording')).toBeTruthy();
   });
 
+  it('shows a Completed pill for a past session that counts as complete', () => {
+    render(<SessionCard session={{ ...baseSession, isPast: true, isCompleted: true }} />);
+    expect(screen.getByText('Completed')).toBeTruthy();
+    expect(screen.queryByText('Pending')).toBeNull();
+    expect(screen.queryByText('Disputed')).toBeNull();
+  });
+
+  it('shows a Disputed pill for a past session a party disputed', () => {
+    render(
+      <SessionCard
+        session={{
+          ...baseSession,
+          isPast: true,
+          isCompleted: false,
+          isDisputed: true,
+        }}
+      />,
+    );
+    expect(screen.getByText('Disputed')).toBeTruthy();
+    expect(screen.queryByText('Completed')).toBeNull();
+  });
+
+  it('shows a Pending pill for a past session that is neither complete nor disputed', () => {
+    render(
+      <SessionCard session={{ ...baseSession, isPast: true, isCompleted: false }} />,
+    );
+    expect(screen.getByText('Pending')).toBeTruthy();
+    expect(screen.queryByText('Completed')).toBeNull();
+  });
+
+  it('does not show a completion pill for a cancelled past session', () => {
+    render(
+      <SessionCard session={{ ...baseSession, isPast: true, status: 'cancelled' }} />,
+    );
+    expect(screen.queryByText('Pending')).toBeNull();
+    expect(screen.queryByText('Completed')).toBeNull();
+  });
+
   it('renders a cancel button when a cancel action is provided', () => {
     render(
       <SessionCard

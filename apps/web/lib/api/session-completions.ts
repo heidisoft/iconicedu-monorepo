@@ -1,4 +1,8 @@
-import type { ConnectionVM, SessionCompletionVM } from '@iconicedu/shared-types';
+import type {
+  ChannelSessionCompletionVM,
+  ConnectionVM,
+  SessionCompletionVM,
+} from '@iconicedu/shared-types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createApiClient } from '@iconicedu/web/lib/api/http-client';
 
@@ -15,4 +19,14 @@ export function listSessionCompletions(
     '/session-completions',
     input,
   );
+}
+
+export function listChannelSessionCompletions(
+  supabase: SupabaseClient,
+  input: { orgId: string; channelId: string },
+) {
+  return createApiClient(supabase).get<{
+    completions: ChannelSessionCompletionVM[];
+    disputed: ChannelSessionCompletionVM[];
+  }>('/session-completions/channel-states', input);
 }
