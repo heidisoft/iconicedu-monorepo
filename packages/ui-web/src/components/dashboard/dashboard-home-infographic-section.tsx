@@ -227,7 +227,7 @@ export function DashboardHomeInfographicSection({
               </div>
             </div>
             {sessionCompletionSummary ? (
-              <div className="mt-5 grid grid-cols-2">
+              <div className="mt-5 grid grid-cols-[minmax(0,1fr)_auto] items-end">
                 <div className="pr-4">
                   <p className="text-4xl font-semibold tracking-tight text-foreground">
                     {sessionCompletionSummary.completed}
@@ -237,7 +237,7 @@ export function DashboardHomeInfographicSection({
                   </p>
                 </div>
                 <div className="border-l border-primary/15 pl-4">
-                  <p className="text-4xl font-semibold tracking-tight text-foreground">
+                  <p className="text-xl font-semibold tracking-tight text-foreground">
                     {sessionCompletionSummary.pending}
                   </p>
                   <p className="mt-1 text-sm font-medium text-muted-foreground">

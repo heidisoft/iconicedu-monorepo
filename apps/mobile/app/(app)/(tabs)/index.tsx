@@ -534,9 +534,14 @@ function makeStyles(C: AppColors) {
     metricLabel: { fontSize: 13, color: C.textMuted, lineHeight: 17 },
     metricSummaryRow: {
       flexDirection: 'row',
+      alignItems: 'flex-end',
       marginTop: 14,
     },
     metricSummaryCell: { flex: 1 },
+    metricSummarySupportingCell: {
+      flex: 0,
+      minWidth: 104,
+    },
     metricSummaryCellDivider: {
       borderLeftWidth: StyleSheet.hairlineWidth,
       borderLeftColor: C.border,
@@ -548,6 +553,12 @@ function makeStyles(C: AppColors) {
       fontWeight: '600',
       color: C.textMuted,
       lineHeight: 14,
+    },
+    metricSummaryValue: {
+      fontSize: 20,
+      fontWeight: '800',
+      color: C.text,
+      lineHeight: 24,
     },
     activityHeader: {
       flexDirection: 'row',
@@ -1303,8 +1314,14 @@ export default function HomeScreen() {
                         Sessions completed
                       </Text>
                     </View>
-                    <View style={[s.metricSummaryCell, s.metricSummaryCellDivider]}>
-                      <Text style={s.metricValue}>
+                    <View
+                      style={[
+                        s.metricSummaryCell,
+                        s.metricSummarySupportingCell,
+                        s.metricSummaryCellDivider,
+                      ]}
+                    >
+                      <Text style={s.metricSummaryValue}>
                         {sessionCompletionSummary.pending}
                       </Text>
                       <Text style={s.metricSummaryLabel}>Pending completion</Text>
