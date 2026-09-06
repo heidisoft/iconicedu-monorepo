@@ -525,11 +525,11 @@ function makeStyles(C: AppColors) {
       elevation: 1,
     },
     metricValue: {
-      fontSize: 34,
+      fontSize: 44,
       fontWeight: '800',
       color: C.text,
       letterSpacing: 0,
-      lineHeight: 38,
+      lineHeight: 48,
     },
     metricLabel: { fontSize: 13, color: C.textMuted, lineHeight: 17 },
     metricCompletionBody: {
@@ -540,17 +540,6 @@ function makeStyles(C: AppColors) {
       borderTopColor: C.border,
       marginTop: 10,
       paddingTop: 10,
-    },
-    metricCompletionValue: {
-      fontSize: 44,
-      fontWeight: '800',
-      color: C.text,
-      lineHeight: 48,
-    },
-    metricPendingText: {
-      fontSize: 13,
-      color: C.textMuted,
-      lineHeight: 17,
     },
     metricPendingCount: {
       fontWeight: '700',
@@ -1302,11 +1291,11 @@ export default function HomeScreen() {
                 </View>
                 {sessionCompletionCarouselEnabled ? (
                   <View style={s.metricCompletionBody}>
-                    <Text style={s.metricCompletionValue}>
+                    <Text style={s.metricValue}>
                       {sessionCompletionSummary.completed}
                     </Text>
                     <View style={s.metricPendingRow}>
-                      <Text style={s.metricPendingText}>
+                      <Text style={s.metricLabel}>
                         <Text style={s.metricPendingCount}>
                           {sessionCompletionSummary.pending}
                         </Text>{' '}
