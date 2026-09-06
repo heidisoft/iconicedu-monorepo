@@ -4,12 +4,12 @@
 
 ### 1) Runtime Summary
 
-| Area                | Value                                                                                                    | Evidence                                                                  |
-| ------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| Primary language    | TypeScript (strict)                                                                                      | `tsconfig.base.json`                                                      |
-| Runtime + version   | Node `>=20.19.0 <21` (`.nvmrc` pins `20.19.0`)                                                           | `.nvmrc`, `.tool-versions`, `package.json:engines`                        |
-| Package manager     | pnpm `10.33.0` (root `package.json` also lists `pnpm@9.12.0` in prior memory — current pin is `10.33.0`) | `.tool-versions`, `package.json:engines.pnpm`                             |
-| Module/build system | pnpm workspaces + Turborepo `^2.9.14` task pipeline                                                      | `pnpm-workspace.yaml`, `turbo.json`, `package.json:devDependencies.turbo` |
+| Area                | Value                                                                                              | Evidence                                                                  |
+| ------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| Primary language    | TypeScript (strict)                                                                                | `tsconfig.base.json`                                                      |
+| Runtime + version   | Node `24.x` (`.nvmrc` pins `24.19.0`)                                                              | `.nvmrc`, `.tool-versions`, `package.json:engines`                        |
+| Package manager     | pnpm `10.33.0` for local development and CI; compatible pnpm 10 releases are accepted by `engines` | `.tool-versions`, `package.json:packageManager`, `package.json:engines`   |
+| Module/build system | pnpm workspaces + Turborepo `^2.9.14` task pipeline                                                | `pnpm-workspace.yaml`, `turbo.json`, `package.json:devDependencies.turbo` |
 
 ### 2) Production Frameworks and Dependencies
 
