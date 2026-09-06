@@ -110,9 +110,9 @@
   --accent-foreground: #244a39;
   --destructive: #dc2626;
   --destructive-foreground: #ffffff;
-  --success: #16a34a;
+  --success: #0f7a3a;
   --success-foreground: #f0fdf4;
-  --warning: #d97706;
+  --warning: #b45309;
   --warning-foreground: #fffbeb;
   --info: #3f6cc4;
   --info-foreground: #eef2fb;
@@ -314,7 +314,7 @@
   --theme-surface: #f7f1ec;
   --theme-outline: #e4cab9;
   --theme-bg: #cf7a4e;
-  --theme-fg: #ffffff;
+  --theme-fg: #1f2a26;
   --theme-border: #cf7a4e;
 }
 
@@ -322,7 +322,7 @@
   --theme-surface: #f7f2eb;
   --theme-outline: #e0ceb4;
   --theme-bg: #c08a3e;
-  --theme-fg: #ffffff;
+  --theme-fg: #1f2a26;
   --theme-border: #c08a3e;
 }
 
@@ -338,7 +338,7 @@
   --theme-surface: #f3f4ec;
   --theme-outline: #cfd5b7;
   --theme-bg: #86a049;
-  --theme-fg: #ffffff;
+  --theme-fg: #1f2a26;
   --theme-border: #86a049;
 }
 

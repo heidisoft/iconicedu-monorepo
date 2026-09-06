@@ -252,9 +252,9 @@ const avatarStyles = StyleSheet.create({
 });
 
 // Deterministic color per sender name (Slack-style)
-// Muted, flat sender-name tints — same earthy family as the avatar palette,
-// darkened for legibility as text on the light message surface.
-const NAME_COLORS = ['#456489', '#615584', '#91556d', '#936c34', '#33735c', '#9c4a43'];
+// Muted, flat sender-name tints — the earthy avatar mid-tones, which stay legible
+// on both the light and dark message surface without reading as an error colour.
+const NAME_COLORS = ['#547fb4', '#7a6aac', '#bd6a8c', '#4f9d62', '#c08a3e', '#cc5b52'];
 export function senderColor(name: string): string {
   let h = 0;
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
