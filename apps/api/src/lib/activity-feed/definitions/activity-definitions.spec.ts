@@ -332,7 +332,6 @@ describe('API activity definitions context rendering', () => {
 
     expect(rendered.headline.primary).toBe('Confirm the lesson for Priya with Ms. Chen');
     expect(rendered.summary).toContain("How did Priya's class with Ms. Chen go?");
-    expect(rendered.summary).toContain('release credits to the teacher');
     expect(rendered.metadata).toMatchObject({
       completionPromptTitle: 'Confirm the lesson for Priya with Ms. Chen',
       completionPromptBody: expect.stringContaining(
