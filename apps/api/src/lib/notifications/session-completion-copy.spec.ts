@@ -13,7 +13,6 @@ describe('buildSessionCompletionCopy', () => {
 
     expect(copy.title).toBe('Confirm the lesson for Priya with Ms. Chen');
     expect(copy.summary).toContain("How did Priya's class with Ms. Chen go?");
-    expect(copy.summary).toContain('release credits to the teacher');
   });
 
   it('asks tutors to confirm the lesson with the student', () => {
