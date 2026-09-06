@@ -5,7 +5,11 @@ export type ReleaseNotes = {
 };
 
 export const currentReleaseNotes: ReleaseNotes = {
-  id: '2026-06-13-whats-new-screen',
+  id: '2026-09-05-session-completions',
   title: "What's new",
-  items: ['Bug fixes.', 'Update to the join meeting flow.'],
+  items: [
+    'Review recently completed classes from Home or Notifications.',
+    'Confirm a class, report an issue, or undo your response when needed.',
+    'Share a rating after confirming a completed class.',
+  ],
 };
