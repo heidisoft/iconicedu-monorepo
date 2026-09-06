@@ -218,6 +218,13 @@ export class CompletionCheckDispatcherService {
       return [];
     }
 
+    if (new Date(effectiveOccurrence.sessionEndAt).getTime() > Date.now()) {
+      this.logger.log(
+        `completion_check: ${scheduleId}/${occurrenceStart} now ends in the future, skipping dispatch`,
+      );
+      return [];
+    }
+
     const members = payload.members ?? [];
     const activityEventIds: string[] = [];
 
@@ -712,7 +719,7 @@ export class CompletionCheckDispatcherService {
   }): Promise<EffectiveOccurrence | null> {
     const { supabase, orgId, scheduleId, occurrenceStart } = input;
 
-    const { data: schedule } = await supabase
+    const { data: schedule, error: scheduleError } = await supabase
       .from('class_schedules')
       .select('id, title, status, end_at, source_channel_id, source_learning_space_id')
       .eq('org_id', orgId)
@@ -727,6 +734,8 @@ export class CompletionCheckDispatcherService {
         source_learning_space_id: string | null;
       }>();
 
+    if (scheduleError) throw new Error(scheduleError.message);
+
     if (!schedule) {
       // Schedule was hard-deleted since the job was queued — nothing to dispatch for.
       return null;
@@ -735,13 +744,15 @@ export class CompletionCheckDispatcherService {
       return null;
     }
 
-    const { data: recurrence } = await supabase
+    const { data: recurrence, error: recurrenceError } = await supabase
       .from('class_schedule_recurrence')
       .select('id')
       .eq('org_id', orgId)
       .eq('schedule_id', scheduleId)
       .is('deleted_at', null)
       .maybeSingle<{ id: string }>();
+
+    if (recurrenceError) throw new Error(recurrenceError.message);
 
     if (!recurrence) {
       // One-off session: reschedules mutate start_at/end_at in place, so the freshly
@@ -754,7 +765,7 @@ export class CompletionCheckDispatcherService {
       };
     }
 
-    const { data: exception } = await supabase
+    const { data: exception, error: exceptionError } = await supabase
       .from('class_schedule_recurrence_exceptions')
       .select('id')
       .eq('org_id', orgId)
@@ -763,12 +774,14 @@ export class CompletionCheckDispatcherService {
       .is('deleted_at', null)
       .maybeSingle<{ id: string }>();
 
+    if (exceptionError) throw new Error(exceptionError.message);
+
     if (exception) {
       // This occurrence was cancelled after the job was queued.
       return null;
     }
 
-    const { data: override } = await supabase
+    const { data: override, error: overrideError } = await supabase
       .from('class_schedule_recurrence_overrides')
       .select('patch')
       .eq('org_id', orgId)
@@ -776,6 +789,8 @@ export class CompletionCheckDispatcherService {
       .eq('occurrence_key', occurrenceStart)
       .is('deleted_at', null)
       .maybeSingle<{ patch: { endAt?: string | null } | null }>();
+
+    if (overrideError) throw new Error(overrideError.message);
 
     const overrideEndAt = override?.patch?.endAt ?? null;
 

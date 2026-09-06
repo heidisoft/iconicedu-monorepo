@@ -10,11 +10,23 @@ describe('CompletionCheckDispatcherService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest
+      .spyOn(Date, 'now')
+      .mockReturnValue(new Date('2030-03-08T00:00:00.000Z').getTime());
   });
 
-  function makeQuery<T>(initial: { data: T; error: null }) {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  type QueryError = { message: string } | null;
+
+  function makeQuery<T>(initial: { data: T; error: QueryError }) {
     let limitResult = initial;
-    let maybeSingleResult: { data: unknown; error: null } = { data: null, error: null };
+    let maybeSingleResult: { data: unknown; error: QueryError } = {
+      data: null,
+      error: null,
+    };
     const query = {
       select: jest.fn(() => query),
       eq: jest.fn(() => query),
@@ -54,6 +66,7 @@ describe('CompletionCheckDispatcherService', () => {
       override?: { patch: { endAt?: string | null } | null } | null;
       existingCompletion?: { id: string } | null;
       upsertedId?: string | null;
+      lookupError?: 'schedule' | 'recurrence' | 'exception' | 'override';
     } = {},
   ) {
     const existingCompletionsQuery = makeQuery({ data: [], error: null });
@@ -88,26 +101,41 @@ describe('CompletionCheckDispatcherService', () => {
     };
 
     const scheduleQuery = makeQuery({ data: [], error: null });
-    scheduleQuery.__setMaybeSingleResult({ data: scheduleRow, error: null });
+    scheduleQuery.__setMaybeSingleResult({
+      data: scheduleRow,
+      error:
+        overrides.lookupError === 'schedule'
+          ? { message: 'schedule lookup failed' }
+          : null,
+    });
 
     const concurrentSchedulesQuery = makeQuery({ data: [], error: null });
 
     const recurrenceQuery = makeQuery({ data: [], error: null });
     recurrenceQuery.__setMaybeSingleResult({
       data: overrides.recurrence ?? null,
-      error: null,
+      error:
+        overrides.lookupError === 'recurrence'
+          ? { message: 'recurrence lookup failed' }
+          : null,
     });
 
     const exceptionQuery = makeQuery({ data: [], error: null });
     exceptionQuery.__setMaybeSingleResult({
       data: overrides.exception ?? null,
-      error: null,
+      error:
+        overrides.lookupError === 'exception'
+          ? { message: 'exception lookup failed' }
+          : null,
     });
 
     const overrideQuery = makeQuery({ data: [], error: null });
     overrideQuery.__setMaybeSingleResult({
       data: overrides.override ?? null,
-      error: null,
+      error:
+        overrides.lookupError === 'override'
+          ? { message: 'override lookup failed' }
+          : null,
     });
 
     const childProfilesQuery = makeQuery({
@@ -331,6 +359,34 @@ describe('CompletionCheckDispatcherService', () => {
     expect(publishActivityEventMock).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['schedule', {}, 'schedule lookup failed'],
+    ['recurrence', {}, 'recurrence lookup failed'],
+    ['exception', { recurrence: { id: 'recurrence-1' } }, 'exception lookup failed'],
+    ['override', { recurrence: { id: 'recurrence-1' } }, 'override lookup failed'],
+  ] as const)(
+    'propagates %s lookup errors so the reminder job can retry',
+    async (lookupError, setup, expectedMessage) => {
+      const { supabase } = makeSupabase({ ...setup, lookupError });
+      const service = new CompletionCheckDispatcherService();
+
+      await expect(
+        service.dispatchCompletionCheck({
+          supabase: supabase as never,
+          systemProfileId: 'system-profile-1',
+          job: {
+            id: 'job-1',
+            org_id: 'org-1',
+            source_schedule_id: 'schedule-1',
+          } as never,
+          payload: basePayload,
+        }),
+      ).rejects.toThrow(expectedMessage);
+
+      expect(publishActivityEventMock).not.toHaveBeenCalled();
+    },
+  );
+
   it('uses the override patched end time, not the original occurrence time, for a rescheduled recurring occurrence', async () => {
     const { supabase } = makeSupabase({
       recurrence: { id: 'recurrence-1' },
@@ -356,6 +412,41 @@ describe('CompletionCheckDispatcherService', () => {
       }),
     );
   });
+
+  it.each([
+    ['one-off session', { schedule: { end_at: '2030-03-09T11:00:00.000Z' } }],
+    [
+      'recurring override',
+      {
+        recurrence: { id: 'recurrence-1' },
+        override: { patch: { endAt: '2030-03-09T11:00:00.000Z' } },
+      },
+    ],
+  ] as const)(
+    'skips dispatch when the effective end time for a future %s has not passed',
+    async (_kind, setup) => {
+      const { supabase, getClassSessionCompletionsCallCount } = makeSupabase({
+        ...setup,
+        upsertedId: 'completion-future',
+      });
+      const service = new CompletionCheckDispatcherService();
+
+      const result = await service.dispatchCompletionCheck({
+        supabase: supabase as never,
+        systemProfileId: 'system-profile-1',
+        job: {
+          id: 'job-1',
+          org_id: 'org-1',
+          source_schedule_id: 'schedule-1',
+        } as never,
+        payload: basePayload,
+      });
+
+      expect(result).toEqual([]);
+      expect(getClassSessionCompletionsCallCount()).toBe(0);
+      expect(publishActivityEventMock).not.toHaveBeenCalled();
+    },
+  );
 
   it('reuses existing rows and republishes deduped events during a partial-failure retry', async () => {
     const { supabase } = makeSupabase({
