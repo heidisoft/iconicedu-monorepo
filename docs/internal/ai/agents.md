@@ -46,7 +46,7 @@ IconicEdu is a pnpm/Turborepo TypeScript monorepo for a multi-platform education
 - Platform services: Supabase PostgreSQL, Auth, RLS, Realtime, and Storage.
 - Shared state/data fetching: TanStack Query where client-side caching is needed.
 - UI: Tailwind/shadcn for web and NativeWind for mobile.
-- Runtime: Node `>=20.19.0 <21` and pnpm `10.33.0`; `package.json` is authoritative.
+- Runtime: Node `24.x` (`.nvmrc` pins `24.19.0`) and pnpm `10.33.0`; `package.json` is authoritative.
 
 Use `pnpm setup:local` for first-time setup. Common commands are:
 

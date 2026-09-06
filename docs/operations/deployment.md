@@ -57,6 +57,8 @@ The Next.js web app is designed to deploy on [Vercel](https://vercel.com). It us
 
 Every push to `main` triggers an automatic production deployment. PRs get preview deployments automatically.
 
+Vercel uses Node `24.x` from the root `package.json`. Its pnpm 10 auto-detection may select a different compatible patch release than the `packageManager` version pinned for local development and CI; the root `engines.pnpm` range permits supported pnpm 10 releases for this reason.
+
 To deploy manually:
 
 ```bash
