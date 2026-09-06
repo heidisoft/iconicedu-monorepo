@@ -67,7 +67,7 @@ function makeStyles(C: AppColors) {
     valueText: { fontSize: 14, color: C.textMuted, maxWidth: 160, textAlign: 'right' },
     verifiedRow: { alignItems: 'flex-end', gap: 3 },
     verifiedBadge: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-    verifiedTxt: { fontSize: 12, fontWeight: '600', color: '#16a34a' },
+    verifiedTxt: { fontSize: 12, fontWeight: '600', color: C.success },
     unverifiedTxt: { fontSize: 12, color: C.textFaint },
   });
 }
@@ -82,7 +82,7 @@ function VerifiedBadge({
   if (verified) {
     return (
       <View style={s.verifiedBadge}>
-        <CheckCircle size={14} color="#16a34a" />
+        <CheckCircle size={14} color={s.verifiedTxt.color as string} />
         <Text style={s.verifiedTxt}>Verified</Text>
       </View>
     );

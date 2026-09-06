@@ -61,7 +61,7 @@ export function EventCard({
         'text-foreground',
         displayState.kind === 'exception' &&
           'border-dashed border-muted-foreground/30 bg-muted/30 text-muted-foreground opacity-75',
-        displayState.kind === 'override' && 'ring-1 ring-amber-500/20',
+        displayState.kind === 'override' && 'ring-1 ring-warning/20',
         themeClassName,
       )}
       style={themeStyle}
@@ -77,7 +77,7 @@ export function EventCard({
             </span>
           )}
           {displayState.kind === 'override' && (
-            <span className="rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-700 dark:text-amber-300">
+            <span className="rounded-full bg-warning/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-warning">
               Changed
             </span>
           )}
@@ -94,7 +94,7 @@ export function EventCard({
               </span>
             )}
             {displayState.kind === 'override' && (
-              <span className="rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-700 dark:text-amber-300">
+              <span className="rounded-full bg-warning/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-warning">
                 Changed
               </span>
             )}

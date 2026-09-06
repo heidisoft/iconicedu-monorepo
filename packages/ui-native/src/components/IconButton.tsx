@@ -4,12 +4,22 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@iconicedu/ui-native/lib/utils';
 import { useUiTracking } from '@iconicedu/ui-native/lib/tracking-context';
 
+const COLOR_UTILITY = /^(?:[\w-]+:)*(?:bg-|border-(?!0$|2$|4$|8$))/;
+
+function withoutLocalButtonColors(className?: string) {
+  return className
+    ?.split(/\s+/)
+    .filter((classToken) => !COLOR_UTILITY.test(classToken))
+    .join(' ');
+}
+
 const iconButtonVariants = cva(
   'items-center justify-center rounded-full active:opacity-70',
   {
     variants: {
       variant: {
-        default: 'bg-secondary',
+        default: 'bg-action',
+        secondary: 'bg-ink',
         ghost: 'bg-transparent',
         outline: 'border border-border bg-transparent',
       },
@@ -26,7 +36,7 @@ const iconButtonVariants = cva(
   },
 );
 
-export type IconButtonProps = PressableProps &
+export type IconButtonProps = Omit<PressableProps, 'style'> &
   VariantProps<typeof iconButtonVariants> & {
     icon: React.ReactNode;
     /** Accessibility label — also used as the analytics event label. */
@@ -59,7 +69,7 @@ export const IconButton: React.FC<IconButtonProps> = ({
       className={cn(
         iconButtonVariants({ variant, size }),
         disabled && 'opacity-50',
-        className,
+        withoutLocalButtonColors(className),
       )}
       disabled={disabled}
       accessibilityRole="button"

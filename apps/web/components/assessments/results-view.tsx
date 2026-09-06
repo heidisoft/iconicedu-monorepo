@@ -25,12 +25,12 @@ interface Props {
 }
 
 const MASTERY_COLOR: Record<string, string> = {
-  mastered: 'text-green-600 bg-green-50',
-  proficient: 'text-green-500 bg-green-50',
-  approaching: 'text-yellow-600 bg-yellow-50',
-  developing: 'text-orange-500 bg-orange-50',
-  emerging: 'text-red-500 bg-red-50',
-  not_started: 'text-gray-400 bg-gray-50',
+  mastered: 'text-success bg-success/10',
+  proficient: 'text-success bg-success/10',
+  approaching: 'text-warning bg-warning/10',
+  developing: 'text-warning bg-warning/10',
+  emerging: 'text-destructive bg-destructive/10',
+  not_started: 'text-muted-foreground bg-muted',
 };
 
 const MASTERY_LABEL: Record<string, string> = {
@@ -179,7 +179,7 @@ function SkillScorecard({ skillScores }: { skillScores: AssessmentSkillScoreVM[]
                   </p>
                   <div className="mt-2 h-1.5 w-full max-w-xs rounded-full bg-muted overflow-hidden">
                     <div
-                      className={`h-full rounded-full transition-all ${pct >= 80 ? 'bg-green-500' : pct >= 70 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                      className={`h-full rounded-full transition-all ${pct >= 80 ? 'bg-success' : pct >= 70 ? 'bg-warning' : 'bg-destructive'}`}
                       style={{ width: `${pct}%` }}
                     />
                   </div>
@@ -220,7 +220,7 @@ function ParentReportCard({ report }: { report: ParentReport }) {
       {report.highlights.map((h, i) => (
         <div
           key={i}
-          className={`rounded-xl border bg-card px-4 py-4 ${h.type === 'strength' ? 'border-green-200' : 'border-orange-200'}`}
+          className={`rounded-xl border bg-card px-4 py-4 ${h.type === 'strength' ? 'border-success/30' : 'border-warning/30'}`}
         >
           <div className="flex items-start gap-3">
             <span className="text-xl">{h.type === 'strength' ? '⭐' : '📈'}</span>
@@ -315,9 +315,7 @@ function TutorReportCard({ report }: { report: TutorReport }) {
                 </div>
               </div>
               {skill.recommendedAction && (
-                <p className="text-xs text-blue-600 mt-1.5">
-                  💡 {skill.recommendedAction}
-                </p>
+                <p className="text-xs text-action mt-1.5">💡 {skill.recommendedAction}</p>
               )}
             </div>
           ))}

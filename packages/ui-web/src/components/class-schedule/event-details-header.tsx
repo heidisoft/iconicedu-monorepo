@@ -80,7 +80,7 @@ export function EventDetailsHeader({ event }: EventDetailsHeaderProps) {
                 'rounded-full px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide',
                 displayState.kind === 'exception'
                   ? 'bg-muted text-muted-foreground'
-                  : 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
+                  : 'bg-warning/10 text-warning',
               )}
             >
               {displayState.kind === 'exception' ? 'Skipped' : 'Changed'}

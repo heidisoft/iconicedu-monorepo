@@ -125,8 +125,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                   style={[
                     styles.toast,
                     {
-                      backgroundColor: isError ? colors.card : colors.tealBg,
-                      borderColor: isError ? colors.red : colors.teal,
+                      backgroundColor: isError ? colors.card : colors.successSubtle,
+                      borderColor: isError ? colors.red : colors.success,
                     },
                   ]}
                 >

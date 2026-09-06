@@ -43,14 +43,14 @@ export function ActivityDisputeReport({ activity }: Props) {
     : null;
 
   return (
-    <div className="w-full rounded-xl border border-amber-200 bg-amber-50/60 p-4 text-xs md:max-w-[420px]">
+    <div className="w-full rounded-xl border border-warning/30 bg-warning/10 p-4 text-xs md:max-w-[420px]">
       <div className="flex items-start gap-2">
-        <AlertCircle className="mt-0.5 size-4 shrink-0 text-amber-600" />
+        <AlertCircle className="mt-0.5 size-4 shrink-0 text-warning" />
         <div className="min-w-0 flex-1 space-y-1">
           {d.reportedByDisplayName && d.title ? (
             <p className="font-semibold text-foreground">
               {d.reportedByDisplayName} reported{' '}
-              <span className="text-amber-700">{d.title}</span> didn&apos;t happen
+              <span className="text-warning">{d.title}</span> didn&apos;t happen
             </p>
           ) : null}
 
@@ -64,7 +64,7 @@ export function ActivityDisputeReport({ activity }: Props) {
             <span
               className={cn(
                 'inline-flex rounded-full border px-2.5 py-0.5 font-semibold',
-                'border-amber-300 bg-amber-100 text-amber-800',
+                'border-warning/40 bg-warning/15 text-warning',
               )}
             >
               {categoryLabel}

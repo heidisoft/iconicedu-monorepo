@@ -53,7 +53,7 @@ type ActivityItemBaseProps = {
 };
 
 const READ_ICON_CLASS = 'bg-muted text-muted-foreground';
-const UNREAD_ICON_CLASS = 'bg-sky-100 text-sky-700';
+const UNREAD_ICON_CLASS = 'bg-action-subtle text-action';
 const AUTO_READ_VIEW_DELAY_MS = 2000;
 const INBOX_ICON_MAP: Record<
   InboxIconKeyVM,
@@ -81,10 +81,10 @@ const INBOX_ICON_MAP: Record<
 
 const TONE_CLASSNAMES = {
   neutral: 'bg-muted text-muted-foreground',
-  success: 'bg-emerald-100 text-emerald-700',
-  warning: 'bg-amber-100 text-amber-700',
-  danger: 'bg-rose-100 text-rose-700',
-  info: 'bg-blue-100 text-blue-700',
+  success: 'bg-success/15 text-success',
+  warning: 'bg-warning/15 text-warning',
+  danger: 'bg-destructive/15 text-destructive',
+  info: 'bg-info/15 text-info',
 };
 
 const getDefaultIconKey = (activity: ActivityFeedItemVM): InboxIconKeyVM => {
@@ -336,7 +336,7 @@ export function ActivityItemBase({
 
             {isSubActivity && !activity.state?.isRead ? (
               <span
-                className="inline-flex size-1.5 shrink-0 rounded-full bg-rose-500"
+                className="inline-flex size-1.5 shrink-0 rounded-full bg-destructive"
                 aria-label="Unread"
                 title="Unread"
               />

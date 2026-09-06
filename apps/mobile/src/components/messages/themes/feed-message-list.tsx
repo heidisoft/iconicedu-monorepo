@@ -79,14 +79,17 @@ import { supabase } from '@/lib/supabase/client';
 
 const CHANNEL_FILES_BUCKET = 'channel-files';
 
+// Classroom feed palette. Fixed light (the feed theme has no dark variant), but
+// aligned to the shared forest-green + pastel tokens in @/lib/theme.
 const FEED = {
-  page: '#FFFFFF',
-  text: '#1F2937',
-  muted: '#8B9098',
-  border: '#E5E7EB',
-  blue: '#4F7DF3',
-  bubbleOther: 'rgba(148, 163, 184, 0.16)',
-  bubbleOwn: 'rgba(45, 212, 168, 0.22)',
+  page: '#ffffff',
+  text: '#1f2a26',
+  muted: '#6b7469',
+  border: '#e4e6dd',
+  blue: '#25493c',
+  warn: '#d97706',
+  bubbleOther: '#eceffa',
+  bubbleOwn: '#e2f0e2',
   gap: 16,
   radius: 12,
   avatar: 44,
@@ -2038,7 +2041,7 @@ const styles = StyleSheet.create({
   },
   unsupportedAudioText: {
     marginBottom: 8,
-    color: '#f59e0b',
+    color: FEED.warn,
     fontSize: 12,
     fontWeight: '600',
   },

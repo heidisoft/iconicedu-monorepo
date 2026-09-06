@@ -14,7 +14,7 @@ const MOBILE_SCREENSHOTS = [
 
 function MobileScreenshotCard({ src, alt }: (typeof MOBILE_SCREENSHOTS)[number]) {
   return (
-    <div className="overflow-hidden rounded-[2rem] border border-border/70 bg-slate-50 shadow-sm">
+    <div className="overflow-hidden rounded-[2rem] border border-transparent bg-muted shadow-soft">
       <img
         src={src}
         alt={alt}

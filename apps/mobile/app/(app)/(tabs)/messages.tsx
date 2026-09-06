@@ -96,57 +96,57 @@ function getDmPresenceProfileId(item: ChannelListItem): string | null {
 }
 
 const THEME_TEXT_COLORS: Record<string, string> = {
-  slate: '#64748b',
-  gray: '#6b7280',
-  zinc: '#71717a',
-  neutral: '#737373',
-  stone: '#78716c',
-  red: '#ef4444',
-  orange: '#f97316',
-  amber: '#f59e0b',
-  yellow: '#ca8a04',
-  lime: '#65a30d',
-  green: '#16a34a',
-  emerald: '#059669',
-  teal: '#0d9488',
-  cyan: '#0891b2',
-  sky: '#0284c7',
-  blue: '#2563eb',
-  indigo: '#4f46e5',
-  violet: '#7c3aed',
-  purple: '#9333ea',
-  fuchsia: '#c026d3',
-  pink: '#db2777',
-  rose: '#e11d48',
+  slate: '#525c69',
+  gray: '#585c60',
+  zinc: '#5c5c60',
+  neutral: '#5d5b57',
+  stone: '#625d55',
+  red: '#9c4a43',
+  orange: '#9e6140',
+  amber: '#936c34',
+  yellow: '#887839',
+  lime: '#697c3c',
+  green: '#427a4e',
+  emerald: '#33735c',
+  teal: '#36766f',
+  cyan: '#39717a',
+  sky: '#43718e',
+  blue: '#456489',
+  indigo: '#505281',
+  violet: '#615584',
+  purple: '#6a537f',
+  fuchsia: '#805077',
+  pink: '#91556d',
+  rose: '#975058',
 };
 
 const THEME_AVATAR_COLORS: Record<string, { bg: string; fg: string }> = {
-  slate: { bg: '#64748b', fg: '#ffffff' },
-  gray: { bg: '#6b7280', fg: '#ffffff' },
-  zinc: { bg: '#71717a', fg: '#ffffff' },
-  neutral: { bg: '#737373', fg: '#ffffff' },
-  stone: { bg: '#78716c', fg: '#ffffff' },
-  red: { bg: '#ef4444', fg: '#ffffff' },
-  orange: { bg: '#f97316', fg: '#ffffff' },
-  amber: { bg: '#f59e0b', fg: '#1f2937' },
-  yellow: { bg: '#eab308', fg: '#1f2937' },
-  lime: { bg: '#84cc16', fg: '#1f2937' },
-  green: { bg: '#22c55e', fg: '#ffffff' },
-  emerald: { bg: '#10b981', fg: '#ffffff' },
-  teal: { bg: '#14b8a6', fg: '#ffffff' },
-  cyan: { bg: '#06b6d4', fg: '#ffffff' },
-  sky: { bg: '#0ea5e9', fg: '#ffffff' },
-  blue: { bg: '#3b82f6', fg: '#ffffff' },
-  indigo: { bg: '#6366f1', fg: '#ffffff' },
-  violet: { bg: '#8b5cf6', fg: '#ffffff' },
-  purple: { bg: '#a855f7', fg: '#ffffff' },
-  fuchsia: { bg: '#d946ef', fg: '#ffffff' },
-  pink: { bg: '#ec4899', fg: '#ffffff' },
-  rose: { bg: '#f43f5e', fg: '#ffffff' },
+  slate: { bg: '#667487', fg: '#ffffff' },
+  gray: { bg: '#6e737a', fg: '#ffffff' },
+  zinc: { bg: '#73737a', fg: '#ffffff' },
+  neutral: { bg: '#75726e', fg: '#ffffff' },
+  stone: { bg: '#7c756b', fg: '#ffffff' },
+  red: { bg: '#cc5b52', fg: '#ffffff' },
+  orange: { bg: '#cf7a4e', fg: '#ffffff' },
+  amber: { bg: '#c08a3e', fg: '#ffffff' },
+  yellow: { bg: '#b09a44', fg: '#1f2a26' },
+  lime: { bg: '#86a049', fg: '#ffffff' },
+  green: { bg: '#4f9d62', fg: '#ffffff' },
+  emerald: { bg: '#3a9375', fg: '#ffffff' },
+  teal: { bg: '#3f978f', fg: '#ffffff' },
+  cyan: { bg: '#43919e', fg: '#ffffff' },
+  sky: { bg: '#5090bb', fg: '#ffffff' },
+  blue: { bg: '#547fb4', fg: '#ffffff' },
+  indigo: { bg: '#6266a8', fg: '#ffffff' },
+  violet: { bg: '#7a6aac', fg: '#ffffff' },
+  purple: { bg: '#8767a6', fg: '#ffffff' },
+  fuchsia: { bg: '#a5629a', fg: '#ffffff' },
+  pink: { bg: '#bd6a8c', fg: '#ffffff' },
+  rose: { bg: '#c56370', fg: '#ffffff' },
 };
 
 function themeTextColor(themeKey?: string | null, fallback?: string): string {
-  return (themeKey && THEME_TEXT_COLORS[themeKey]) || fallback || '#64748b';
+  return (themeKey && THEME_TEXT_COLORS[themeKey]) || fallback || '#6b7469';
 }
 
 function themeAvatarColor(
@@ -156,8 +156,8 @@ function themeAvatarColor(
 ): { bg: string; fg: string } {
   return (
     (themeKey && THEME_AVATAR_COLORS[themeKey]) || {
-      bg: fallbackBg || '#f8fafc',
-      fg: fallbackFg || '#0f172a',
+      bg: fallbackBg || '#eef0ea',
+      fg: fallbackFg || '#1f2a26',
     }
   );
 }
@@ -308,7 +308,7 @@ function makeStyles(C: AppColors) {
       minWidth: 18,
       height: 18,
       borderRadius: 9,
-      backgroundColor: '#ef4444',
+      backgroundColor: C.red,
       alignItems: 'center',
       justifyContent: 'center',
       paddingHorizontal: 4,
@@ -377,7 +377,7 @@ function makeStyles(C: AppColors) {
       width: 14,
       height: 14,
       borderRadius: 7,
-      backgroundColor: '#22c55e',
+      backgroundColor: C.success,
       borderWidth: 2,
       borderColor: C.bg,
     },
@@ -393,6 +393,9 @@ function makeStyles(C: AppColors) {
       borderWidth: 2,
       borderColor: C.bg,
     },
+    statusBadgeAway: { backgroundColor: C.warning },
+    statusBadgeBusy: { backgroundColor: C.red },
+    statusBadgeOffline: { backgroundColor: C.textMuted },
 
     // ── DM avatar — group (stacked) ────────────────────────────────────────────
     groupWrap: { width: 50, height: 50, flexShrink: 0, position: 'relative' },
@@ -550,14 +553,14 @@ function PresenceBadge({
   }
 
   if (status === 'away' || status === 'idle') {
-    return <View style={[s.statusBadge, { backgroundColor: '#eab308' }]} />;
+    return <View style={[s.statusBadge, s.statusBadgeAway]} />;
   }
 
   if (status === 'busy') {
-    return <View style={[s.statusBadge, { backgroundColor: '#dc2626' }]} />;
+    return <View style={[s.statusBadge, s.statusBadgeBusy]} />;
   }
 
-  return <View style={[s.statusBadge, { backgroundColor: '#4b5563' }]} />;
+  return <View style={[s.statusBadge, s.statusBadgeOffline]} />;
 }
 
 // ─── DM avatar ────────────────────────────────────────────────────────────────

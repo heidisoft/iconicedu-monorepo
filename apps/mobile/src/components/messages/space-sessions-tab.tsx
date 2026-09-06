@@ -330,6 +330,7 @@ function splitAndGroupSessions(schedules: ClassScheduleVM[]): {
           isPast,
           status: s.status,
           meetingLink: s.meetingLink ?? null,
+          themeKey: s.themeKey ?? null,
           channelId:
             s.source.kind === 'class_session' ? (s.source.channelId ?? null) : null,
           variant: s.uiState?.kind ?? 'default',
@@ -470,7 +471,7 @@ export function SpaceSessionsTab({
           </Text>
           {activeSubTab === 'upcoming' && past.length > 0 && (
             <TouchableOpacity onPress={() => setActiveSubTab('past')} activeOpacity={0.7}>
-              <Text style={[s.emptySubtitle, { color: colors.teal }]}>
+              <Text style={[s.emptySubtitle, { color: colors.action }]}>
                 View {past.reduce((n, g) => n + g.totalCount, 0)} past sessions →
               </Text>
             </TouchableOpacity>
@@ -480,7 +481,7 @@ export function SpaceSessionsTab({
               onPress={() => setActiveSubTab('upcoming')}
               activeOpacity={0.7}
             >
-              <Text style={[s.emptySubtitle, { color: colors.teal }]}>
+              <Text style={[s.emptySubtitle, { color: colors.action }]}>
                 View {upcoming.reduce((n, g) => n + g.totalCount, 0)} upcoming sessions →
               </Text>
             </TouchableOpacity>
@@ -525,7 +526,7 @@ export function SpaceSessionsTab({
                           <Text style={s.currentMonthBadgeTxt}>Current</Text>
                         </View>
                       )}
-                      {allComplete && <CheckCircle2 size={14} color={colors.teal} />}
+                      {allComplete && <CheckCircle2 size={14} color={colors.success} />}
                     </View>
                     <Text style={s.monthMeta}>
                       {scheduledCount} {scheduledCount === 1 ? 'session' : 'sessions'}
@@ -602,7 +603,7 @@ function makeStyles(C: AppColors) {
       backgroundColor: C.inputBg,
     },
     subTabBtnActive: {
-      backgroundColor: C.teal,
+      backgroundColor: C.ink,
     },
     subTabLabel: {
       fontSize: 14,
@@ -610,7 +611,7 @@ function makeStyles(C: AppColors) {
       color: C.textMuted,
     },
     subTabLabelActive: {
-      color: '#fff',
+      color: C.inkForeground,
     },
 
     // Empty state
@@ -641,7 +642,7 @@ function makeStyles(C: AppColors) {
       borderBottomColor: C.border,
     },
     monthSectionCurrent: {
-      backgroundColor: C.tealBg + '30',
+      backgroundColor: C.primarySubtle,
     },
     monthHeader: {
       flexDirection: 'row',
@@ -651,7 +652,7 @@ function makeStyles(C: AppColors) {
       gap: 8,
     },
     monthHeaderCurrent: {
-      backgroundColor: C.tealBg + '40',
+      backgroundColor: C.primarySubtle,
     },
     monthTitleRow: {
       flexDirection: 'row',
@@ -669,15 +670,15 @@ function makeStyles(C: AppColors) {
       marginTop: 1,
     },
     currentMonthBadge: {
-      backgroundColor: C.tealBg,
-      paddingHorizontal: 6,
+      backgroundColor: C.primarySubtle,
+      paddingHorizontal: 8,
       paddingVertical: 2,
-      borderRadius: 99,
+      borderRadius: 999,
     },
     currentMonthBadgeTxt: {
       fontSize: 10,
       fontWeight: '700',
-      color: C.teal,
+      color: C.primary,
     },
 
     // Progress bar
@@ -695,7 +696,7 @@ function makeStyles(C: AppColors) {
     },
     progressBarFill: {
       height: 5,
-      backgroundColor: C.teal,
+      backgroundColor: C.primary,
       borderRadius: 2.5,
     },
     progressPct: {
@@ -708,7 +709,7 @@ function makeStyles(C: AppColors) {
     // SessionCard spacing within the channel sessions list
     sessionCardItem: {
       marginHorizontal: 12,
-      marginBottom: 6,
+      marginBottom: 8,
     },
   });
 }

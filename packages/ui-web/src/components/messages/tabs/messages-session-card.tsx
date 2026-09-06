@@ -153,27 +153,28 @@ export function SessionCard({
   return (
     <>
       <div
+        data-classroom-theme={session.themeKey ?? 'default'}
         className={cn(
-          'group relative flex items-center gap-4 rounded-xl border px-4 py-3 transition-all',
+          'group relative flex items-center gap-4 rounded-2xl border border-transparent px-4 py-3.5 transition-all',
           isDisabled
-            ? 'border-border/50 bg-muted/25 opacity-75'
+            ? 'bg-muted/25 opacity-75'
             : isLive
               ? 'border-primary/30 bg-primary/5 shadow-sm shadow-primary/10'
               : isPast
-                ? 'border-border/50 bg-muted/40'
-                : 'border-border bg-card hover:border-primary/20 hover:shadow-sm',
+                ? 'bg-muted/40'
+                : 'bg-card shadow-soft hover:shadow-soft-lg',
         )}
       >
         <div
           className={cn(
-            'flex min-w-[4.5rem] flex-col items-center rounded-lg px-3 py-2',
+            'flex min-w-[4.5rem] flex-col items-center rounded-xl px-3 py-2',
             isDisabled
               ? 'bg-muted/70 text-muted-foreground'
               : isLive
                 ? 'bg-primary text-primary-foreground'
                 : isPast
                   ? 'bg-muted text-muted-foreground'
-                  : 'bg-secondary text-secondary-foreground',
+                  : 'bg-ink-subtle text-foreground',
           )}
         >
           {isLive ? (
@@ -196,22 +197,23 @@ export function SessionCard({
               {session.label}
             </h3>
             {isLive ? (
-              <Badge className="animate-pulse bg-primary px-1.5 py-0 text-[10px] font-semibold text-primary-foreground">
-                LIVE
-              </Badge>
+              <span className="inline-flex items-center gap-1 rounded-full bg-primary-subtle px-2 py-0.5 text-[10px] font-semibold text-primary">
+                <span className="size-1.5 animate-pulse rounded-full bg-primary" />
+                Live
+              </span>
             ) : null}
             {session.variant === 'exception' ? (
-              <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
+              <Badge variant="secondary" className="rounded-full px-2 py-0 text-[10px]">
                 Skipped
               </Badge>
             ) : null}
             {session.variant === 'override' ? (
-              <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
+              <Badge variant="outline" className="rounded-full px-2 py-0 text-[10px]">
                 Changed
               </Badge>
             ) : null}
             {isPast && session.variant !== 'exception' ? (
-              <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
+              <Badge variant="secondary" className="rounded-full px-2 py-0 text-[10px]">
                 Completed
               </Badge>
             ) : null}

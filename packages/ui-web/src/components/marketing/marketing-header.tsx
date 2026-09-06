@@ -27,7 +27,7 @@ export function MarketingHeader({
   const ctaHref = isAuthenticated ? dashboardHref : loginHref;
 
   return (
-    <header className="sticky top-0 z-50 border-b border-emerald-100/70 bg-emerald-50/70 backdrop-blur dark:border-emerald-800/55 dark:bg-emerald-950/30">
+    <header className="sticky top-0 z-50 border-b border-border/70 bg-background/80 backdrop-blur">
       <nav
         className={`${MARKETING_CONTAINER_CLASS} flex items-center justify-between py-5`}
       >
@@ -42,7 +42,7 @@ export function MarketingHeader({
             <a
               key={item.label}
               href={item.href}
-              className="text-foreground transition-colors hover:text-primary"
+              className="text-foreground transition-colors hover:text-action"
             >
               {item.label}
             </a>
@@ -50,28 +50,24 @@ export function MarketingHeader({
         </div>
 
         <div className="flex items-center gap-2">
-          <Button
-            variant={'outline'}
-            asChild
-            className="rounded-full px-4 bg-transparent border-emerald-500/70 text-emerald-700 hover:bg-emerald-100/70 hover:border-emerald-500 sm:px-6"
-          >
+          <Button variant={'outline'} asChild className="rounded-full px-4 sm:px-6">
             <a href={ctaHref}>{ctaLabel}</a>
           </Button>
           <ThemeToggle />
           <details className="group relative md:hidden">
             <summary
               aria-label="Open menu"
-              className="inline-flex size-9 cursor-pointer list-none items-center justify-center rounded-4xl border border-emerald-500/70 bg-transparent text-emerald-700 transition-colors hover:border-emerald-500 hover:bg-emerald-100/70 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden"
+              className="inline-flex size-9 cursor-pointer list-none items-center justify-center rounded-4xl border border-border bg-transparent text-foreground transition-colors hover:bg-muted focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden"
             >
               <Menu className="size-4" aria-hidden="true" />
             </summary>
-            <div className="absolute right-0 top-12 w-56 overflow-hidden rounded-2xl border border-emerald-100/80 bg-background shadow-lg ring-1 ring-black/5 dark:border-emerald-800/60">
+            <div className="absolute right-0 top-12 w-56 overflow-hidden rounded-2xl border border-border bg-background shadow-lg ring-1 ring-black/5">
               <div className="flex flex-col py-2">
                 {NAV_ITEMS.map((item) => (
                   <a
                     key={item.label}
                     href={item.href}
-                    className="px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-emerald-50 hover:text-primary dark:hover:bg-emerald-950/50"
+                    className="px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted hover:text-action"
                   >
                     {item.label}
                   </a>

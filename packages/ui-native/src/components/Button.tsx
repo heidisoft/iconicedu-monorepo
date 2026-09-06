@@ -10,13 +10,23 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn, TextClassContext } from '@iconicedu/ui-native/lib/utils';
 import { useUiTracking } from '@iconicedu/ui-native/lib/tracking-context';
 
+const COLOR_UTILITY =
+  /^(?:[\w-]+:)*(?:bg-|border-(?!0$|2$|4$|8$)|text-(?:action|ink|primary|secondary|muted|accent|destructive|foreground|background|card|popover|black|white|slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose))/;
+
+function withoutLocalButtonColors(className?: string) {
+  return className
+    ?.split(/\s+/)
+    .filter((classToken) => !COLOR_UTILITY.test(classToken))
+    .join(' ');
+}
+
 const buttonVariants = cva(
   'flex-row items-center justify-center rounded-2xl active:opacity-80',
   {
     variants: {
       variant: {
-        default: 'bg-primary',
-        secondary: 'bg-secondary',
+        default: 'bg-action',
+        secondary: 'bg-ink',
         ghost: 'bg-transparent',
         destructive: 'bg-destructive',
         outline: 'border border-border bg-transparent',
@@ -37,8 +47,8 @@ const buttonVariants = cva(
 const buttonTextVariants = cva('font-medium', {
   variants: {
     variant: {
-      default: 'text-primary-foreground',
-      secondary: 'text-secondary-foreground',
+      default: 'text-action-foreground',
+      secondary: 'text-ink-foreground',
       ghost: 'text-muted-foreground',
       destructive: 'text-destructive-foreground',
       outline: 'text-foreground',
@@ -55,7 +65,7 @@ const buttonTextVariants = cva('font-medium', {
   },
 });
 
-export type ButtonProps = PressableProps &
+export type ButtonProps = Omit<PressableProps, 'style'> &
   VariantProps<typeof buttonVariants> & {
     /** Text label — for backward compat. Prefer children instead. */
     label?: string;
@@ -81,7 +91,10 @@ export const Button: React.FC<ButtonProps> = ({
   onPress,
   ...rest
 }) => {
-  const textClass = cn(buttonTextVariants({ variant, size }), textClassName);
+  const textClass = cn(
+    buttonTextVariants({ variant, size }),
+    withoutLocalButtonColors(textClassName),
+  );
   const track = useUiTracking();
 
   const handlePress = useCallback(
@@ -105,7 +118,7 @@ export const Button: React.FC<ButtonProps> = ({
         className={cn(
           buttonVariants({ variant, size }),
           disabled && 'opacity-50',
-          className,
+          withoutLocalButtonColors(className),
         )}
         disabled={disabled || loading}
         accessibilityRole="button"
@@ -117,7 +130,15 @@ export const Button: React.FC<ButtonProps> = ({
         {loading ? (
           <ActivityIndicator
             size="small"
-            color={variant === 'ghost' || variant === 'outline' ? '#a1a1aa' : '#ffffff'}
+            className={
+              variant === 'ghost' || variant === 'outline'
+                ? 'text-muted-foreground'
+                : variant === 'destructive'
+                  ? 'text-destructive-foreground'
+                  : variant === 'secondary'
+                    ? 'text-ink-foreground'
+                    : 'text-action-foreground'
+            }
           />
         ) : children ? (
           typeof children === 'string' ? (

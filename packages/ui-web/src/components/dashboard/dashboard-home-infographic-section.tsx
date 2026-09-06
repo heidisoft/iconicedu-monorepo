@@ -20,7 +20,6 @@ import { ExternalLiveSessionJoinDialog } from '@iconicedu/ui-web/components/mess
 import { SessionCard } from '@iconicedu/ui-web/components/messages/tabs/messages-session-card';
 import { useExternalLiveSessionJoinDialog } from '@iconicedu/ui-web/components/messages/use-external-live-session-join-dialog';
 import type { ClassSession } from '@iconicedu/ui-web/components/messages/tabs/messages-schedule-tab.utils';
-import { DotPattern } from '@iconicedu/ui-web/ui/dot-pattern';
 import { OTHER_SUBJECT_OPTION, STANDARD_SUBJECT_OPTIONS } from '@iconicedu/shared-types';
 
 export interface DashboardUpcomingSessionListItem {
@@ -178,69 +177,49 @@ export function DashboardHomeInfographicSection({
   };
 
   const infographicCardClassName =
-    'relative overflow-hidden rounded-2xl border border-border bg-card p-5';
+    'relative overflow-hidden rounded-2xl border border-transparent p-5 shadow-soft';
+  const infographicChipClassName = 'inline-flex rounded-xl bg-card p-2.5 shadow-soft';
   const infographicContentClassName = 'relative z-10';
-  const infographicPatternClassName =
-    'text-primary/20 [mask-image:radial-gradient(250px_circle_at_center,black,transparent_78%)]';
   const shouldShowBoostLearningSection = isParentView || isStudentView;
 
   return (
     <section aria-label="Dashboard classroom sessions" className="space-y-4">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <article className={infographicCardClassName}>
-          <DotPattern
-            width={20}
-            height={20}
-            cr={3.5}
-            glow={true}
-            className={infographicPatternClassName}
-          />
+        <article className={`${infographicCardClassName} bg-accent-periwinkle`}>
           <div className={infographicContentClassName}>
             <div className="mb-3 flex items-center justify-between gap-2">
               <p className="text-base font-semibold text-foreground">Upcoming Sessions</p>
-              <div className="inline-flex rounded-xl bg-primary/15 p-2.5 text-primary/80">
+              <div
+                className={`${infographicChipClassName} text-accent-periwinkle-foreground`}
+              >
                 <CalendarClock className="size-5" aria-hidden="true" />
               </div>
             </div>
-            <p className="mt-2 text-4xl font-semibold tracking-tight">
+            <p className="mt-2 text-4xl font-semibold tracking-tight text-foreground">
               {upcomingSessionsMetric.value}
             </p>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-1 text-sm font-medium text-accent-periwinkle-foreground/80">
               {upcomingSessionsMetric.label}
             </p>
           </div>
         </article>
 
-        <article className={infographicCardClassName}>
-          <DotPattern
-            width={20}
-            height={20}
-            cr={3.5}
-            glow={true}
-            className={`${infographicPatternClassName} text-emerald-500/20`}
-          />
+        <article className={`${infographicCardClassName} bg-primary-subtle`}>
           <div className={infographicContentClassName}>
             <div className="mb-3 flex items-center justify-between gap-2">
               <p className="text-base font-semibold text-foreground">Completed Classes</p>
-              <div className="inline-flex rounded-xl bg-primary/15 p-2.5 text-primary/80">
+              <div className={`${infographicChipClassName} text-primary`}>
                 <CalendarCheck className="size-5" aria-hidden="true" />
               </div>
             </div>
-            <p className="mt-2 text-4xl font-semibold tracking-tight">
+            <p className="mt-2 text-4xl font-semibold tracking-tight text-foreground">
               {topMetrics.completedClassesThisMonth}
             </p>
-            <p className="mt-1 text-sm text-muted-foreground">This month</p>
+            <p className="mt-1 text-sm font-medium text-primary/80">This month</p>
           </div>
         </article>
 
-        <article className={infographicCardClassName}>
-          <DotPattern
-            width={20}
-            height={20}
-            cr={3.5}
-            glow={true}
-            className={`${infographicPatternClassName} text-sky-500/20`}
-          />
+        <article className={`${infographicCardClassName} bg-accent-peach`}>
           <div className={infographicContentClassName}>
             <div className="mb-3 flex items-center justify-between gap-2">
               <p className="text-base font-semibold text-foreground">
@@ -250,20 +229,20 @@ export function DashboardHomeInfographicSection({
                     ? 'Active Students'
                     : 'Active Subjects'}
               </p>
-              <div className="inline-flex rounded-xl bg-primary/15 p-2.5 text-primary/80">
+              <div className={`${infographicChipClassName} text-accent-peach-foreground`}>
                 <BookOpenCheck className="size-5" aria-hidden="true" />
               </div>
             </div>
-            <p className="mt-2 text-4xl font-semibold tracking-tight">
+            <p className="mt-2 text-4xl font-semibold tracking-tight text-foreground">
               {topMetrics.activeSubjectsCount}
             </p>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-1 text-sm font-medium text-accent-peach-foreground/80">
               {topMetrics.activeSubjectsLabel}
             </p>
           </div>
         </article>
 
-        <article className="relative overflow-hidden rounded-2xl border border-border bg-primary/10 p-5">
+        <article className="relative overflow-hidden rounded-2xl border border-transparent bg-primary-subtle p-5 shadow-soft">
           <div className={infographicContentClassName}>
             <p className="text-base font-semibold text-foreground">
               {isParentView ? 'Manage my family' : 'Manage my account'}
@@ -295,13 +274,13 @@ export function DashboardHomeInfographicSection({
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[13fr_7fr]">
-        <article className="rounded-3xl border border-border bg-card/80 p-6">
+        <article className="rounded-3xl border border-transparent bg-card p-6 shadow-soft">
           <h2 className="font-semibold tracking-tight">Upcoming Sessions</h2>
 
-          <div className="mt-5 space-y-3">
+          <div className="mt-5 space-y-4">
             {totalUpcomingSessions > 0 ? (
               visibleSessionSections.map((section) => (
-                <div key={section.key} className="space-y-3">
+                <div key={section.key} className="space-y-2">
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                       {section.label}
@@ -358,7 +337,7 @@ export function DashboardHomeInfographicSection({
           </div>
         </article>
 
-        <aside className="rounded-3xl border border-border bg-card/80 p-6">
+        <aside className="rounded-3xl border border-transparent bg-card p-6 shadow-soft">
           <h2 className="text-base font-semibold text-foreground">Quick Actions</h2>
           <p className="mt-2 text-sm text-muted-foreground">
             Common tasks at your fingertips

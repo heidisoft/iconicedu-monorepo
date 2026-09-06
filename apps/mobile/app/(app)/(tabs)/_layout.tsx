@@ -78,7 +78,7 @@ function SideRail({ state, navigation, inboxUnreadCount }: SideRailProps) {
               alignItems: 'center',
               justifyContent: 'center',
               borderRadius: 14,
-              backgroundColor: isFocused ? colors.tealBg : 'transparent',
+              backgroundColor: isFocused ? colors.primarySubtle : 'transparent',
             }}
           >
             <View style={{ position: 'relative' }}>
@@ -93,7 +93,7 @@ function SideRail({ state, navigation, inboxUnreadCount }: SideRailProps) {
                     height: 18,
                     paddingHorizontal: 4,
                     borderRadius: 9,
-                    backgroundColor: '#ef4444',
+                    backgroundColor: colors.red,
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
@@ -240,7 +240,7 @@ export default function TabsLayout() {
                 : messagesUnreadCount
               : undefined,
           tabBarBadgeStyle: {
-            backgroundColor: '#ef4444',
+            backgroundColor: colors.red,
             color: '#fff',
             fontSize: 11,
             fontWeight: '700',
@@ -259,7 +259,7 @@ export default function TabsLayout() {
                 : inboxUnreadCount
               : undefined,
           tabBarBadgeStyle: {
-            backgroundColor: '#ef4444',
+            backgroundColor: colors.red,
             color: '#fff',
             fontSize: 11,
             fontWeight: '700',

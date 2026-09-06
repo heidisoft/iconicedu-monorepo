@@ -5,22 +5,22 @@ export function MarketingHeroPatternBackground() {
       aria-hidden="true"
       data-testid="hero-background"
     >
-      <div className="absolute inset-0 bg-gradient-to-br from-emerald-100/65 via-transparent to-emerald-50/50 dark:from-emerald-900/35 dark:to-emerald-950/30" />
+      <div className="absolute inset-0 bg-gradient-to-br from-action-subtle/70 via-transparent to-primary-subtle/60" />
 
       <div
         className="absolute right-[-4rem] top-[-3rem] h-[90%] w-[82%]"
         data-testid="hero-pattern-cluster"
       >
         <div className="absolute -left-[80%] top-[0%] grid grid-cols-3 gap-2 md:-left-[10%] md:top-[4%]">
-          <div className="h-[4.5rem] w-[4.5rem] rounded-full bg-emerald-500/90" />
-          <div className="h-[4.5rem] w-[4.5rem] rounded-full bg-emerald-300/90" />
-          <div className="h-[4.5rem] w-[4.5rem] rounded-full bg-emerald-200/90" />
-          <div className="h-[4.5rem] w-[4.5rem] rounded-full bg-emerald-300/90" />
+          <div className="h-[4.5rem] w-[4.5rem] rounded-full bg-action/90" />
+          <div className="h-[4.5rem] w-[4.5rem] rounded-full bg-action/60" />
+          <div className="h-[4.5rem] w-[4.5rem] rounded-full bg-primary/70" />
+          <div className="h-[4.5rem] w-[4.5rem] rounded-full bg-primary/50" />
           <div className="h-[4.5rem] w-[4.5rem] rounded-full bg-slate-300/90 dark:bg-slate-600/70" />
-          <div className="h-[4.5rem] w-[4.5rem] rounded-tl-[4rem] rounded-br-[4rem] bg-emerald-500/85" />
+          <div className="h-[4.5rem] w-[4.5rem] rounded-tl-[4rem] rounded-br-[4rem] bg-action/85" />
         </div>
 
-        <div className="absolute right-[1%] top-[3%] h-40 w-40 rounded-full border-[26px] border-emerald-500/90 dark:border-emerald-400/75 md:right-[10%] md:top-[10%]">
+        <div className="absolute right-[1%] top-[3%] h-40 w-40 rounded-full border-[26px] border-action/80 md:right-[10%] md:top-[10%]">
           <div className="absolute inset-6 rounded-full bg-slate-800/90 dark:bg-slate-900/90" />
         </div>
 

@@ -218,7 +218,7 @@ export function AuthEntryForm({
                   'rounded-2xl border px-3 py-2 text-sm font-medium',
                   errorMessage
                     ? 'border-destructive/40 bg-destructive/10 text-destructive'
-                    : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+                    : 'border-success/30 bg-success/10 text-success',
                 )}
               >
                 {errorMessage ?? statusMessage}

@@ -86,7 +86,7 @@ function makeStyles(C: AppColors) {
       minWidth: 18,
       height: 18,
       borderRadius: 9,
-      backgroundColor: '#ef4444',
+      backgroundColor: C.red,
       alignItems: 'center',
       justifyContent: 'center',
       paddingHorizontal: 4,

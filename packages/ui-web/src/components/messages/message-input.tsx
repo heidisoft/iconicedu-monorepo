@@ -1140,9 +1140,7 @@ export function MessageInput({
                     <span
                       className={cn(
                         'inline-block h-2.5 w-2.5 rounded-full',
-                        isRecordingAudio
-                          ? 'bg-destructive animate-pulse'
-                          : 'bg-amber-500',
+                        isRecordingAudio ? 'bg-destructive animate-pulse' : 'bg-warning',
                       )}
                     />
                     {isRecordingAudio ? 'Recording voice message' : 'Recording paused'}

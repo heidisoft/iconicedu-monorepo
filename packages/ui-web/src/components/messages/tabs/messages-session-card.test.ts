@@ -24,6 +24,20 @@ const baseSession: ClassSession = {
 };
 
 describe('messages-session-card', () => {
+  it('renders a plain card with no classroom accent bar', () => {
+    render(
+      React.createElement(SessionCard, {
+        session: { ...baseSession, themeKey: 'violet' },
+        index: 0,
+      }),
+    );
+
+    const tile = document.querySelector('[data-classroom-theme="violet"]');
+    expect(tile).not.toHaveClass('theme-violet');
+    expect(tile).toHaveClass('bg-card');
+    expect(screen.queryByTestId('session-accent-edge')).toBeNull();
+  });
+
   it('marks sessions as live only when currently active and not past', () => {
     expect(getSessionCardState({ ...baseSession, isLive: false, isPast: false })).toEqual(
       {

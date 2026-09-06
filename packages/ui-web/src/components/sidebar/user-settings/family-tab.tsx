@@ -648,7 +648,7 @@ export function FamilyTab({
                             size={26}
                             initialOffset={8}
                             borderWidth={2}
-                            className="from-transparent via-amber-700 to-transparent"
+                            className="from-transparent via-warning to-transparent"
                             transition={{ type: 'spring', stiffness: 60, damping: 20 }}
                           />
                         ) : null}
@@ -672,7 +672,7 @@ export function FamilyTab({
                         size={26}
                         initialOffset={8}
                         borderWidth={2}
-                        className="from-transparent via-amber-700 to-transparent"
+                        className="from-transparent via-warning to-transparent"
                         transition={{ type: 'spring', stiffness: 60, damping: 20 }}
                       />
                     ) : null}
@@ -701,7 +701,7 @@ export function FamilyTab({
                             size={52}
                             initialOffset={8}
                             borderWidth={2}
-                            className="from-transparent via-amber-700 to-transparent"
+                            className="from-transparent via-warning to-transparent"
                             transition={{ type: 'spring', stiffness: 60, damping: 20 }}
                           />
                         ) : null}
@@ -723,7 +723,7 @@ export function FamilyTab({
                             size={52}
                             initialOffset={8}
                             borderWidth={2}
-                            className="from-transparent via-amber-700 to-transparent"
+                            className="from-transparent via-warning to-transparent"
                             transition={{ type: 'spring', stiffness: 60, damping: 20 }}
                           />
                         ) : null}
@@ -746,7 +746,7 @@ export function FamilyTab({
                             size={52}
                             initialOffset={8}
                             borderWidth={2}
-                            className="from-transparent via-amber-700 to-transparent"
+                            className="from-transparent via-warning to-transparent"
                             transition={{ type: 'spring', stiffness: 60, damping: 20 }}
                           />
                         ) : null}
@@ -776,7 +776,7 @@ export function FamilyTab({
                             size={52}
                             initialOffset={8}
                             borderWidth={2}
-                            className="from-transparent via-amber-700 to-transparent"
+                            className="from-transparent via-warning to-transparent"
                             transition={{ type: 'spring', stiffness: 60, damping: 20 }}
                           />
                         ) : null}
@@ -882,7 +882,7 @@ export function FamilyTab({
                         size={26}
                         initialOffset={8}
                         borderWidth={2}
-                        className="from-transparent via-amber-700 to-transparent"
+                        className="from-transparent via-warning to-transparent"
                         transition={{ type: 'spring', stiffness: 60, damping: 20 }}
                       />
                     ) : null}
@@ -1139,7 +1139,7 @@ export function FamilyTab({
                         </div>
                       ) : null}
                       {isChildMember && !member.email && !member.hasAuthAccount ? (
-                        <div className="space-y-1 rounded-lg border border-dashed border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs text-amber-900 dark:text-amber-200">
+                        <div className="space-y-1 rounded-lg border border-dashed border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
                           <p>This child profile does not have an email yet.</p>
                           <p>
                             Add the child&apos;s email first, then send an invite so their

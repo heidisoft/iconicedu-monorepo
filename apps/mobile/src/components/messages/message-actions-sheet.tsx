@@ -104,7 +104,7 @@ const bubbleStyles = StyleSheet.create({
 
 function makeStyles(C: AppColors) {
   return StyleSheet.create({
-    overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
+    overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: C.modalOverlay },
     sheet: {
       backgroundColor: C.pageBg,
       borderTopLeftRadius: 24,
@@ -154,7 +154,7 @@ function makeStyles(C: AppColors) {
     actionIcon: { fontSize: 20, width: 28, textAlign: 'center' },
     actionLabel: { fontSize: 17, color: C.text },
     savedLabel: { fontSize: 17, color: C.teal, fontWeight: '600' },
-    destructive: { color: '#ef4444' },
+    destructive: { color: C.red },
     divider: {
       height: StyleSheet.hairlineWidth,
       backgroundColor: C.border,
