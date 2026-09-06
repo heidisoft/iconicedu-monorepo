@@ -25,7 +25,6 @@ import type {
   MessageLinkPreviewRow,
   MessageAudioRecordingRow,
   MessageLiveSessionStartedRow,
-  ClassSessionFeedbackRow,
 } from '@iconicedu/shared-types';
 
 import {
@@ -406,26 +405,6 @@ export async function getMessageFeedbackRequestsByMessageIds(
     .in('message_id', messageIds)
     .is('deleted_at', null)
     .returns<MessageFeedbackRequestRow[]>();
-}
-
-export async function getClassSessionFeedbackByMessageIds(
-  supabase: SupabaseClient,
-  orgId: string,
-  profileId: string,
-  messageIds: string[],
-) {
-  if (!messageIds.length) {
-    return { data: [] as ClassSessionFeedbackRow[] };
-  }
-
-  return supabase
-    .from('class_session_feedback')
-    .select('*')
-    .eq('org_id', orgId)
-    .eq('recipient_profile_id', profileId)
-    .in('message_id', messageIds)
-    .is('deleted_at', null)
-    .returns<ClassSessionFeedbackRow[]>();
 }
 
 export async function getMessageLessonAssignmentsByMessageIds(

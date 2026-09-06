@@ -132,6 +132,18 @@ jest.mock('react-native-reanimated', () => {
     useDerivedValue: (updater) => ({ value: updater() }),
     useAnimatedStyle: (updater) => updater(),
     withTiming: (value) => value,
+    // Real Reanimated wraps these as worklets; tests never actually run the
+    // easing curve (withTiming above just snaps to the target value), so an
+    // identity stand-in is enough to satisfy call sites like
+    // `Easing.out(Easing.cubic)` without crashing.
+    Easing: {
+      linear: (t) => t,
+      ease: (t) => t,
+      cubic: (t) => t,
+      out: (fn) => fn,
+      in: (fn) => fn,
+      inOut: (fn) => fn,
+    },
   };
 });
 

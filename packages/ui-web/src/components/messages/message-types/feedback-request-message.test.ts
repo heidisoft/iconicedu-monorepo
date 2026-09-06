@@ -10,13 +10,11 @@ describe('FeedbackRequestMessage', () => {
     'utf8',
   );
 
-  it('submits feedback through unified activity feedback API', () => {
-    expect(source).toContain("fetch('/api/activity-feed/feedback'");
-    expect(source).toContain('classSessionId');
-    expect(source).toContain('classroomId');
-    expect(source).toContain('channelId');
-    expect(source).toContain('messageId');
-    expect(source).toContain('sourceEventId');
+  it('submits feedback through the session completion API', () => {
+    expect(source).toContain(
+      '`/api/session-completions/${feedback.sessionCompletionId}/rate`',
+    );
+    expect(source).toContain('sessionCompletionId');
   });
 
   it('supports immediate five-star and comment flow for lower ratings', () => {

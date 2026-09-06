@@ -43,7 +43,7 @@ describe('ActivityFeedQueryService', () => {
     jest.clearAllMocks();
   });
 
-  it('hydrates saved feedback responses onto feedback request activity items', async () => {
+  it('hydrates saved ratings from session completions onto feedback requests', async () => {
     const activityRows = [
       {
         id: 'activity-1',
@@ -82,63 +82,70 @@ describe('ActivityFeedQueryService', () => {
         deleted_at: null,
       },
     ];
-    const feedbackRows = [
+    const completionRows = [
       {
-        source_event_id: 'event-old',
-        message_id: null,
-        class_session_id: 'schedule-1',
-        classroom_id: 'space-1',
-        channel_id: 'channel-1',
-        occurrence_start_at: '2026-05-04T11:00:00.000Z',
-        rating: 2,
-        comment: 'Different occurrence',
-        submitted_at: '2026-05-04T12:10:00.000Z',
-      },
-      {
-        source_event_id: 'event-1',
-        message_id: null,
-        class_session_id: 'schedule-1',
-        classroom_id: 'space-1',
-        channel_id: 'channel-1',
-        occurrence_start_at: '2026-05-05T11:00:00.000Z',
+        id: 'completion-1',
+        org_id: 'org-1',
+        schedule_id: 'schedule-1',
+        occurrence_key: '2026-05-05T11:00:00+00:00',
+        profile_id: 'profile-1',
+        role: 'guardian',
+        status: 'confirmed',
+        dispute_category: null,
+        dispute_reason: null,
+        reschedule_requested: false,
         rating: 4,
-        comment: 'Helpful pacing',
-        submitted_at: '2026-05-05T12:10:00.000Z',
+        rating_comment: 'Helpful pacing',
+        channel_id: 'channel-1',
+        learning_space_id: 'space-1',
+        session_title: 'Algebra I',
+        session_end_at: '2026-05-05T12:00:00.000Z',
+        notified_at: '2026-05-05T12:00:00.000Z',
+        confirmed_at: '2026-05-05T12:05:00.000Z',
+        disputed_at: null,
+        rated_at: '2026-05-05T12:10:00.000Z',
+        resolved_at: '2026-05-05T12:05:00.000Z',
+        expires_at: '2026-05-08T12:00:00.000Z',
       },
     ];
     const activityQuery = makeQuery(activityRows);
-    const feedbackQuery = makeQuery(feedbackRows);
-    const from = jest.fn((table: string) => {
+    const completionQuery = makeQuery(completionRows);
+    const sessionFrom = jest.fn((table: string) => {
       if (table === 'activity_feed_items') return activityQuery;
-      if (table === 'class_session_feedback') return feedbackQuery;
       throw new Error(`Unexpected table ${table}`);
     });
-    createSupabaseSessionClientMock.mockReturnValue({ from } as never);
+    const serviceFrom = jest.fn((table: string) => {
+      if (table === 'class_session_completions') return completionQuery;
+      throw new Error(`Unexpected service table ${table}`);
+    });
+    createSupabaseSessionClientMock.mockReturnValue({ from: sessionFrom } as never);
+    createSupabaseServiceClientMock.mockReturnValue({ from: serviceFrom } as never);
 
     const service = new ActivityFeedQueryService();
     const feed = await service.fetchFeed('token-1', 'org-1', 'profile-1');
 
-    expect(feedbackQuery.in).toHaveBeenCalledWith('class_session_id', ['schedule-1']);
+    expect(completionQuery.in).toHaveBeenCalledWith('schedule_id', ['schedule-1']);
     expect(feed.sections[0]?.items[0]).toMatchObject({
       kind: 'leaf',
       verb: 'session.feedback_request.sent',
       metadata: {
-        feedbackResponse: {
-          sourceEventId: 'event-1',
-          messageId: null,
-          classSessionId: 'schedule-1',
-          classroomId: 'space-1',
+        sessionCompletion: {
+          id: 'completion-1',
+          scheduleId: 'schedule-1',
+          occurrenceKey: '2026-05-05T11:00:00.000Z',
+          profileId: 'profile-1',
+          status: 'confirmed',
+          learningSpaceId: 'space-1',
           channelId: 'channel-1',
-          occurrenceStartAt: '2026-05-05T11:00:00.000Z',
           rating: 4,
-          comment: 'Helpful pacing',
-          submittedAt: '2026-05-05T12:10:00.000Z',
+          ratingComment: 'Helpful pacing',
+          ratedAt: '2026-05-05T12:10:00.000Z',
         },
       },
     });
   });
 
-  it('hydrates saved completion votes onto completion check activity items', async () => {
+  it('hydrates session completions onto completion check activity items', async () => {
     const activityRows = [
       {
         id: 'activity-1',
@@ -177,8 +184,10 @@ describe('ActivityFeedQueryService', () => {
         deleted_at: null,
       },
     ];
-    const completionVoteRows = [
+    const completionRows = [
       {
+        id: 'completion-1',
+        org_id: 'org-1',
         schedule_id: 'schedule-1',
         occurrence_key: '2026-05-05T11:00:00+00:00',
         profile_id: 'profile-1',
@@ -187,17 +196,28 @@ describe('ActivityFeedQueryService', () => {
         dispute_category: 'teacher_absent',
         dispute_reason: 'Teacher did not join',
         reschedule_requested: true,
-        voted_at: '2026-05-05T12:10:00.000Z',
+        rating: null,
+        rating_comment: null,
+        channel_id: 'channel-1',
+        learning_space_id: 'space-1',
+        session_title: 'Algebra I',
+        session_end_at: '2026-05-05T12:00:00.000Z',
+        notified_at: '2026-05-05T12:00:00.000Z',
+        confirmed_at: null,
+        disputed_at: '2026-05-05T12:10:00.000Z',
+        rated_at: null,
+        resolved_at: '2026-05-05T12:10:00.000Z',
+        expires_at: '2026-05-08T12:00:00.000Z',
       },
     ];
     const activityQuery = makeQuery(activityRows);
-    const completionVoteQuery = makeQuery(completionVoteRows);
+    const completionQuery = makeQuery(completionRows);
     const sessionFrom = jest.fn((table: string) => {
       if (table === 'activity_feed_items') return activityQuery;
       throw new Error(`Unexpected session table ${table}`);
     });
     const serviceFrom = jest.fn((table: string) => {
-      if (table === 'class_session_completion_votes') return completionVoteQuery;
+      if (table === 'class_session_completions') return completionQuery;
       throw new Error(`Unexpected service table ${table}`);
     });
     createSupabaseSessionClientMock.mockReturnValue({ from: sessionFrom } as never);
@@ -206,15 +226,13 @@ describe('ActivityFeedQueryService', () => {
     const service = new ActivityFeedQueryService();
     const feed = await service.fetchFeed('token-1', 'org-1', 'profile-1');
 
-    expect(completionVoteQuery.in).toHaveBeenCalledWith('schedule_id', ['schedule-1']);
-    expect(completionVoteQuery.in).toHaveBeenCalledWith('occurrence_key', [
-      '2026-05-05T11:00:00.000Z',
-    ]);
+    expect(completionQuery.in).toHaveBeenCalledWith('schedule_id', ['schedule-1']);
     expect(feed.sections[0]?.items[0]).toMatchObject({
       kind: 'leaf',
       verb: 'session.completion_check.sent',
       metadata: {
-        completionVote: {
+        sessionCompletion: {
+          id: 'completion-1',
           scheduleId: 'schedule-1',
           occurrenceKey: '2026-05-05T11:00:00.000Z',
           profileId: 'profile-1',
@@ -223,7 +241,7 @@ describe('ActivityFeedQueryService', () => {
           disputeCategory: 'teacher_absent',
           disputeReason: 'Teacher did not join',
           rescheduleRequested: true,
-          votedAt: '2026-05-05T12:10:00.000Z',
+          disputedAt: '2026-05-05T12:10:00.000Z',
         },
       },
     });

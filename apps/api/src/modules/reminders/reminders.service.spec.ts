@@ -24,6 +24,11 @@ describe('RemindersService', () => {
   };
   const completionCheckDispatcher = {
     dispatchCompletionCheck: jest.fn(async () => ['activity-event-1']),
+    reconcileRecentCompletionChecks: jest.fn(async () => ({
+      checked: 0,
+      reconciled: 0,
+      failed: 0,
+    })),
   };
   const createSupabaseServiceClientMock = jest.mocked(createSupabaseServiceClient);
   const createSupabaseSessionClientMock = jest.mocked(createSupabaseSessionClient);
@@ -550,6 +555,17 @@ describe('RemindersService', () => {
             error: null,
           };
         }
+        if (fn === 'run_class_session_completion_expiry_sweep') {
+          return {
+            data: [
+              {
+                completions_auto_confirmed: 4,
+                sessions_marked_completed: 2,
+              },
+            ],
+            error: null,
+          };
+        }
         throw new Error(`Unexpected rpc ${fn}`);
       }),
       from: jest.fn((table: string) => {
@@ -591,8 +607,10 @@ describe('RemindersService', () => {
     expect(result.succeeded).toBe(1);
     expect(result.staleCleanup).toEqual({
       notificationsMarkedRead: 2,
-      completionVotesMarkedCompleted: 3,
-      sessionsMarkedCompleted: 1,
+      completionVotesMarkedCompleted: 4,
+      sessionsMarkedCompleted: 2,
+      legacyCompletionVotesMarkedCompleted: 3,
+      legacySessionsMarkedCompleted: 1,
       failed: false,
     });
     expect(publishActivityEventMock).toHaveBeenCalledWith(
@@ -612,6 +630,9 @@ describe('RemindersService', () => {
       p_lease_seconds: 90,
     });
     expect(supabase.rpc).toHaveBeenCalledWith('run_stale_activity_cleanup');
+    expect(supabase.rpc).toHaveBeenCalledWith(
+      'run_class_session_completion_expiry_sweep',
+    );
     expect(supabase.from).not.toHaveBeenCalledWith('class_schedules');
   });
 });

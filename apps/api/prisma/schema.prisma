@@ -7,12 +7,68 @@ generator client {
 }
 
 model Profile {
-  id        String   @id @db.Uuid
-  fullName  String?  @map("full_name")
-  appRole   String   @map("app_role")
-  createdAt DateTime @default(now()) @map("created_at")
+  id                 String                   @id @db.Uuid
+  fullName           String?                  @map("full_name")
+  appRole            String                   @map("app_role")
+  createdAt          DateTime                 @default(now()) @map("created_at")
+  sessionCompletions ClassSessionCompletion[]
 
   @@map("profiles")
+}
+
+enum ClassSessionCompletionStatus {
+  pending
+  confirmed
+  disputed
+  auto_confirmed
+
+  @@map("class_session_completion_status")
+}
+
+enum ClassScheduleParticipantRole {
+  educator
+  child
+  guardian
+  staff
+  observer
+
+  @@map("class_schedule_participant_role")
+}
+
+model ClassSessionCompletion {
+  id                  String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId               String                       @map("org_id") @db.Uuid
+  scheduleId          String                       @map("schedule_id") @db.Uuid
+  occurrenceKey       DateTime                     @map("occurrence_key") @db.Timestamptz(6)
+  profileId           String                       @map("profile_id") @db.Uuid
+  profile             Profile                      @relation(fields: [profileId], references: [id])
+  role                ClassScheduleParticipantRole
+  status              ClassSessionCompletionStatus @default(pending)
+  disputeCategory     String?                      @map("dispute_category")
+  disputeReason       String?                      @map("dispute_reason")
+  rescheduleRequested Boolean                      @default(false) @map("reschedule_requested")
+  rating              Int?                         @db.SmallInt
+  ratingComment       String?                      @map("rating_comment")
+  channelId           String?                      @map("channel_id") @db.Uuid
+  learningSpaceId     String?                      @map("learning_space_id") @db.Uuid
+  sessionTitle        String?                      @map("session_title")
+  studentName         String?                      @map("student_name")
+  sessionEndAt        DateTime                     @map("session_end_at") @db.Timestamptz(6)
+  notifiedAt          DateTime?                    @map("notified_at") @db.Timestamptz(6)
+  confirmedAt         DateTime?                    @map("confirmed_at") @db.Timestamptz(6)
+  disputedAt          DateTime?                    @map("disputed_at") @db.Timestamptz(6)
+  ratedAt             DateTime?                    @map("rated_at") @db.Timestamptz(6)
+  resolvedAt          DateTime?                    @map("resolved_at") @db.Timestamptz(6)
+  expiresAt           DateTime                     @map("expires_at") @db.Timestamptz(6)
+  createdAt           DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy           String?                      @map("created_by") @db.Uuid
+  updatedAt           DateTime                     @default(now()) @map("updated_at") @db.Timestamptz(6)
+  updatedBy           String?                      @map("updated_by") @db.Uuid
+  deletedAt           DateTime?                    @map("deleted_at") @db.Timestamptz(6)
+  deletedBy           String?                      @map("deleted_by") @db.Uuid
+
+  @@unique([orgId, scheduleId, occurrenceKey, profileId])
+  @@map("class_session_completions")
 }
 
 model Channel {

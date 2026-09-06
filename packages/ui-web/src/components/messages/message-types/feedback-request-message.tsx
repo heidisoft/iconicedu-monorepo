@@ -37,12 +37,8 @@ export const FeedbackRequestMessage = memo(function FeedbackRequestMessage(
 
   const isFiveStar = rating === 5;
   const canSubmit =
-    typeof feedback.classSessionId === 'string' &&
-    feedback.classSessionId.length > 0 &&
-    typeof feedback.classroomId === 'string' &&
-    feedback.classroomId.length > 0 &&
-    typeof feedback.channelId === 'string' &&
-    feedback.channelId.length > 0;
+    typeof feedback.sessionCompletionId === 'string' &&
+    feedback.sessionCompletionId.length > 0;
 
   const headerLabel = useMemo(() => {
     if (feedback.sessionTitle) {
@@ -59,21 +55,18 @@ export const FeedbackRequestMessage = memo(function FeedbackRequestMessage(
     setIsSubmitting(true);
     setError(null);
     try {
-      const response = await fetch('/api/activity-feed/feedback', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          orgId: message.ids.orgId,
-          classSessionId: feedback.classSessionId,
-          classroomId: feedback.classroomId,
-          channelId: feedback.channelId,
-          messageId: message.ids.id,
-          sourceEventId: feedback.sourceEventId ?? null,
-          occurrenceStartAt: feedback.occurrenceStart ?? null,
-          rating: nextRating,
-          comment: nextComment ?? null,
-        }),
-      });
+      const response = await fetch(
+        `/api/session-completions/${feedback.sessionCompletionId}/rate`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            orgId: message.ids.orgId,
+            rating: nextRating,
+            comment: nextComment ?? null,
+          }),
+        },
+      );
 
       const payload = (await response.json().catch(() => null)) as {
         error?: string;

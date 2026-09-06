@@ -2,8 +2,6 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type {
   ActivityFeedItemRow,
   ActivityFeedSectionRow,
-  ClassSessionCompletionVoteRow,
-  ClassSessionFeedbackRow,
 } from '@iconicedu/shared-types';
 
 import {
@@ -57,68 +55,4 @@ export async function getActivityFeedSectionsByOrg(
     .eq('org_id', orgId)
     .order('created_at', { ascending: true })
     .returns<ActivityFeedSectionRow[]>();
-}
-
-export async function getClassSessionFeedbackByProfileAndSessions(
-  supabase: SupabaseClient,
-  orgId: string,
-  recipientProfileId: string,
-  classSessionIds: string[],
-) {
-  return supabase
-    .from('class_session_feedback')
-    .select(
-      'source_event_id, message_id, class_session_id, classroom_id, channel_id, occurrence_start_at, rating, comment, submitted_at',
-    )
-    .eq('org_id', orgId)
-    .eq('recipient_profile_id', recipientProfileId)
-    .is('deleted_at', null)
-    .in('class_session_id', classSessionIds)
-    .returns<
-      Pick<
-        ClassSessionFeedbackRow,
-        | 'source_event_id'
-        | 'message_id'
-        | 'class_session_id'
-        | 'classroom_id'
-        | 'channel_id'
-        | 'occurrence_start_at'
-        | 'rating'
-        | 'comment'
-        | 'submitted_at'
-      >[]
-    >();
-}
-
-export async function getClassSessionCompletionVotesByProfileAndTargets(
-  supabase: SupabaseClient,
-  orgId: string,
-  profileId: string,
-  scheduleIds: string[],
-  occurrenceKeys: string[],
-) {
-  return supabase
-    .from('class_session_completion_votes')
-    .select(
-      'schedule_id, occurrence_key, profile_id, role, status, dispute_category, dispute_reason, reschedule_requested, voted_at',
-    )
-    .eq('org_id', orgId)
-    .eq('profile_id', profileId)
-    .is('deleted_at', null)
-    .in('schedule_id', scheduleIds)
-    .in('occurrence_key', occurrenceKeys)
-    .returns<
-      Pick<
-        ClassSessionCompletionVoteRow,
-        | 'schedule_id'
-        | 'occurrence_key'
-        | 'profile_id'
-        | 'role'
-        | 'status'
-        | 'dispute_category'
-        | 'dispute_reason'
-        | 'reschedule_requested'
-        | 'voted_at'
-      >[]
-    >();
 }

@@ -290,6 +290,7 @@ describe('InboxScreen', () => {
               actionLabel: 'Give feedback',
               metadata: {
                 feedbackUiEnabled: true,
+                sessionCompletionId: 'completion-1',
                 sourceEventId: 'event-1',
                 classSessionId: 'session-1',
                 classroomId: 'space-1',
@@ -324,6 +325,7 @@ describe('InboxScreen', () => {
               actionLabel: 'Give feedback',
               metadata: {
                 feedbackUiEnabled: true,
+                sessionCompletionId: 'completion-1',
                 sourceEventId: 'event-1',
                 classSessionId: 'session-1',
                 classroomId: 'space-1',

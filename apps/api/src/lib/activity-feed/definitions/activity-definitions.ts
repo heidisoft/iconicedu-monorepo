@@ -759,6 +759,7 @@ function renderSessionItem(event: ActivityEventRow, variant: SessionRenderVarian
               payload.startAt,
               sessionStartAt,
             ),
+            sessionCompletionId: asOptionalString(payload.sessionCompletionId),
             feedbackUiEnabled: payload.feedbackUiEnabled !== false,
           }
         : {}),
@@ -974,6 +975,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
           scheduleId: asOptionalString(payload.scheduleId),
           occurrenceStart: firstOptionalString(payload.occurrenceStart, payload.startAt),
           feedbackUiEnabled: payload.feedbackUiEnabled !== false,
+          sessionCompletionId: asOptionalString(payload.sessionCompletionId),
           completionCheckUiEnabled: true,
           roleContext: getActivityContext(payload).viewerRole,
           completionPromptTitle: completionCopy.promptTitle,
@@ -1012,6 +1014,9 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
           roleContext: getActivityContext(payload).viewerRole,
           sessions: payload.sessions ?? [],
           sessionCount,
+          sessionCompletionIds: Array.isArray(payload.sessionCompletionIds)
+            ? payload.sessionCompletionIds
+            : [],
         },
       } satisfies ActivityRenderResult;
     },
@@ -1084,6 +1089,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
           disputeCategory,
           disputeReason: asOptionalString(payload.disputeReason),
           rescheduleRequested: payload.rescheduleRequested === true,
+          sessionCompletionId: asOptionalString(payload.sessionCompletionId),
           recipientRole,
         },
       } satisfies ActivityRenderResult;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Star } from 'lucide-react';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { Textarea } from '@iconicedu/ui-web/ui/textarea';
@@ -12,18 +12,20 @@ import {
 import type { ActivityFeedLeafItemVM } from '@iconicedu/shared-types';
 
 const EDIT_WINDOW_MS = 60_000;
+// Lets the just-picked stars stay visible (filled, disabled) for a beat before the
+// "Thank you" confirmation replaces them — without this, submitting looked like the
+// stars just vanished, since the confirmation appeared the instant the API resolved.
+const CONFIRMATION_REVEAL_DELAY_MS = 500;
 
 type ActivityFeedbackRequestProps = {
   activity: ActivityFeedLeafItemVM;
+  onRatingSubmit?: () => void;
+  /** See ActivityCompletionCheck's `embedded` prop — same idea, same reason. */
+  embedded?: boolean;
 };
 
 type FeedbackMetadata = {
-  sourceEventId: string | null;
-  messageId: string | null;
-  classSessionId: string | null;
-  classroomId: string | null;
-  channelId: string | null;
-  occurrenceStart: string | null;
+  sessionCompletionId: string | null;
   feedbackUiEnabled: boolean;
 };
 
@@ -43,28 +45,13 @@ function asRecord(value: unknown): Record<string, unknown> {
 
 function getFeedbackMetadata(activity: ActivityFeedLeafItemVM): FeedbackMetadata {
   const metadata = asRecord(activity.metadata);
+  const sessionCompletion = asRecord(metadata.sessionCompletion);
   return {
-    sourceEventId:
-      typeof metadata.sourceEventId === 'string' ? metadata.sourceEventId : null,
-    messageId: typeof metadata.messageId === 'string' ? metadata.messageId : null,
-    classSessionId:
-      typeof metadata.classSessionId === 'string'
-        ? metadata.classSessionId
-        : typeof metadata.scheduleId === 'string'
-          ? metadata.scheduleId
-          : null,
-    classroomId:
-      typeof metadata.classroomId === 'string'
-        ? metadata.classroomId
-        : typeof metadata.learningSpaceId === 'string'
-          ? metadata.learningSpaceId
-          : null,
-    channelId: typeof metadata.channelId === 'string' ? metadata.channelId : null,
-    occurrenceStart:
-      typeof metadata.occurrenceStart === 'string'
-        ? metadata.occurrenceStart
-        : typeof metadata.startAt === 'string'
-          ? metadata.startAt
+    sessionCompletionId:
+      typeof sessionCompletion.id === 'string'
+        ? sessionCompletion.id
+        : typeof metadata.sessionCompletionId === 'string'
+          ? metadata.sessionCompletionId
           : null,
     feedbackUiEnabled: metadata.feedbackUiEnabled !== false,
   };
@@ -72,12 +59,12 @@ function getFeedbackMetadata(activity: ActivityFeedLeafItemVM): FeedbackMetadata
 
 function getInitialFeedback(activity: ActivityFeedLeafItemVM): FeedbackState {
   const metadata = asRecord(activity.metadata);
-  const feedback = asRecord(metadata.feedbackResponse);
+  const feedback = asRecord(metadata.sessionCompletion);
 
   return {
     rating: typeof feedback.rating === 'number' ? feedback.rating : 0,
-    comment: typeof feedback.comment === 'string' ? feedback.comment : '',
-    submittedAt: typeof feedback.submittedAt === 'string' ? feedback.submittedAt : null,
+    comment: typeof feedback.ratingComment === 'string' ? feedback.ratingComment : '',
+    submittedAt: typeof feedback.ratedAt === 'string' ? feedback.ratedAt : null,
   };
 }
 
@@ -120,10 +107,15 @@ function formatSubmittedAtTooltip(submittedAt: string | null) {
 }
 
 export function canRenderActivityFeedbackRequest(activity: ActivityFeedLeafItemVM) {
-  return getFeedbackMetadata(activity).feedbackUiEnabled;
+  const metadata = getFeedbackMetadata(activity);
+  return metadata.feedbackUiEnabled && Boolean(metadata.sessionCompletionId);
 }
 
-export function ActivityFeedbackRequest({ activity }: ActivityFeedbackRequestProps) {
+export function ActivityFeedbackRequest({
+  activity,
+  onRatingSubmit,
+  embedded = false,
+}: ActivityFeedbackRequestProps) {
   const initialFeedback = useMemo(() => getInitialFeedback(activity), [activity]);
   const metadata = useMemo(() => getFeedbackMetadata(activity), [activity]);
 
@@ -144,6 +136,12 @@ export function ActivityFeedbackRequest({ activity }: ActivityFeedbackRequestPro
   const [isEditWindowOpen, setIsEditWindowOpen] = useState(() =>
     resolveEditWindowOpen(initialFeedback.submittedAt),
   );
+  // True immediately when resuming an already-submitted rating (no artificial delay
+  // on page load) — only set with a delay for a fresh, in-session submit.
+  const [showConfirmation, setShowConfirmation] = useState(() =>
+    Boolean(initialFeedback.submittedAt),
+  );
+  const confirmationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setRating(initialFeedback.rating);
@@ -158,7 +156,16 @@ export function ActivityFeedbackRequest({ activity }: ActivityFeedbackRequestPro
     setError(null);
     setIsEditing(false);
     setIsEditWindowOpen(resolveEditWindowOpen(initialFeedback.submittedAt));
+    setShowConfirmation(Boolean(initialFeedback.submittedAt));
   }, [initialFeedback]);
+
+  useEffect(() => {
+    return () => {
+      if (confirmationTimeoutRef.current) {
+        clearTimeout(confirmationTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!submittedAt) {
@@ -186,14 +193,7 @@ export function ActivityFeedbackRequest({ activity }: ActivityFeedbackRequestPro
     return () => window.clearTimeout(timer);
   }, [submittedAt]);
 
-  const hasSource = Boolean(metadata.sourceEventId);
-  const hasMessage = Boolean(metadata.messageId);
-  const canSubmit =
-    metadata.feedbackUiEnabled &&
-    (hasSource || hasMessage) &&
-    Boolean(metadata.classSessionId) &&
-    Boolean(metadata.classroomId) &&
-    Boolean(metadata.channelId);
+  const canSubmit = metadata.feedbackUiEnabled && Boolean(metadata.sessionCompletionId);
   const isSubmitted = Boolean(submittedAt) && !isEditing;
   const displayRating = hoveredRating || rating;
   const trimmedComment = comment.trim();
@@ -207,29 +207,21 @@ export function ActivityFeedbackRequest({ activity }: ActivityFeedbackRequestPro
     setIsSubmitting(true);
     setError(null);
     try {
-      const response = await fetch('/api/activity-feed/feedback', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          orgId: activity.ids.orgId,
-          classSessionId: metadata.classSessionId,
-          classroomId: metadata.classroomId,
-          channelId: metadata.channelId,
-          sourceEventId: hasSource ? metadata.sourceEventId : null,
-          messageId: hasMessage ? metadata.messageId : null,
-          occurrenceStartAt: metadata.occurrenceStart,
-          rating: nextRating,
-          comment: nextComment ?? null,
-        }),
-      });
+      const response = await fetch(
+        `/api/session-completions/${metadata.sessionCompletionId}/rate`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            orgId: activity.ids.orgId,
+            rating: nextRating,
+            comment: nextComment ?? null,
+          }),
+        },
+      );
 
       const payload = (await response.json().catch(() => null)) as {
         error?: string;
-        data?: {
-          submittedAt?: string | null;
-          rating?: number;
-          comment?: string | null;
-        };
       } | null;
 
       if (!response.ok) {
@@ -237,8 +229,8 @@ export function ActivityFeedbackRequest({ activity }: ActivityFeedbackRequestPro
         return;
       }
 
-      const nextSubmittedAt = payload?.data?.submittedAt ?? new Date().toISOString();
-      const nextResolvedComment = payload?.data?.comment ?? nextComment ?? '';
+      const nextSubmittedAt = new Date().toISOString();
+      const nextResolvedComment = nextComment ?? '';
       setRating(nextRating);
       setComment(nextResolvedComment);
       setSubmittedAt(nextSubmittedAt);
@@ -246,6 +238,15 @@ export function ActivityFeedbackRequest({ activity }: ActivityFeedbackRequestPro
       setHoveredRating(0);
       setIsEditing(false);
       setIsEditWindowOpen(true);
+      setShowConfirmation(false);
+      if (confirmationTimeoutRef.current) {
+        clearTimeout(confirmationTimeoutRef.current);
+      }
+      confirmationTimeoutRef.current = setTimeout(() => {
+        confirmationTimeoutRef.current = null;
+        setShowConfirmation(true);
+      }, CONFIRMATION_REVEAL_DELAY_MS);
+      onRatingSubmit?.();
     } catch {
       setError('Unable to submit feedback');
     } finally {
@@ -289,12 +290,19 @@ export function ActivityFeedbackRequest({ activity }: ActivityFeedbackRequestPro
   }
 
   return (
-    <div className="w-full rounded-xl border border-border/80 bg-background/95 p-4 text-xs md:max-w-[420px]">
+    <div
+      className={cn(
+        'w-full text-xs',
+        embedded
+          ? undefined
+          : 'rounded-xl border border-border/80 bg-background/95 p-4 md:max-w-[420px]',
+      )}
+    >
       <div className="flex items-start justify-between gap-3">
         <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
           Rate your session
         </p>
-        {isSubmitted && isEditWindowOpen ? (
+        {isSubmitted && isEditWindowOpen && showConfirmation ? (
           <Button
             type="button"
             size="sm"
@@ -372,7 +380,7 @@ export function ActivityFeedbackRequest({ activity }: ActivityFeedbackRequestPro
         </div>
       ) : null}
 
-      {isSubmitted ? (
+      {isSubmitted && showConfirmation ? (
         <div
           className="mt-2 rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground"
           title={submittedTooltip ?? undefined}

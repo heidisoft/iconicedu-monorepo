@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { CheckCircle2, XCircle } from 'lucide-react';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { Textarea } from '@iconicedu/ui-web/ui/textarea';
@@ -16,7 +16,18 @@ type Step =
   | 'disputed'
   | 'already_responded';
 type DisputeCategory = 'teacher_absent' | 'student_absent' | 'technical_issue' | 'other';
-type CompletionVoteStatus = 'confirmed' | 'disputed';
+type SessionCompletionStatus = 'pending' | 'confirmed' | 'disputed' | 'auto_confirmed';
+
+// Same window ActivityFeedbackRequest already uses for its "Edit rating" button —
+// applied here to let a fresh confirm/dispute be undone for a short time.
+const UNDO_WINDOW_MS = 60_000;
+
+function resolveUndoWindowOpen(resolvedAt: string | null) {
+  if (!resolvedAt) return false;
+  const resolvedTimestamp = new Date(resolvedAt).getTime();
+  if (Number.isNaN(resolvedTimestamp)) return false;
+  return resolvedTimestamp + UNDO_WINDOW_MS > Date.now();
+}
 
 const DISPUTE_CATEGORIES: { key: DisputeCategory; label: string }[] = [
   { key: 'teacher_absent', label: 'Teacher absent' },
@@ -27,19 +38,25 @@ const DISPUTE_CATEGORIES: { key: DisputeCategory; label: string }[] = [
 
 function getMetadata(activity: ActivityFeedLeafItemVM) {
   const m = (activity.metadata ?? {}) as Record<string, unknown>;
-  const vote =
-    m.completionVote && typeof m.completionVote === 'object'
-      ? (m.completionVote as Record<string, unknown>)
+  const sessionCompletion =
+    m.sessionCompletion && typeof m.sessionCompletion === 'object'
+      ? (m.sessionCompletion as Record<string, unknown>)
       : null;
-  const completionVoteStatus =
-    vote?.status === 'confirmed' || vote?.status === 'disputed'
-      ? (vote.status as CompletionVoteStatus)
+  const sessionCompletionStatus =
+    sessionCompletion?.status === 'pending' ||
+    sessionCompletion?.status === 'confirmed' ||
+    sessionCompletion?.status === 'disputed' ||
+    sessionCompletion?.status === 'auto_confirmed'
+      ? (sessionCompletion.status as SessionCompletionStatus)
       : null;
   return {
     orgId: typeof m.orgId === 'string' ? m.orgId : activity.ids.orgId,
-    scheduleId: typeof m.scheduleId === 'string' ? m.scheduleId : null,
-    occurrenceStart: typeof m.occurrenceStart === 'string' ? m.occurrenceStart : null,
-    role: typeof m.roleContext === 'string' ? m.roleContext : 'child',
+    sessionCompletionId:
+      typeof sessionCompletion?.id === 'string'
+        ? sessionCompletion.id
+        : typeof m.sessionCompletionId === 'string'
+          ? m.sessionCompletionId
+          : null,
     promptTitle:
       typeof m.completionPromptTitle === 'string'
         ? m.completionPromptTitle
@@ -49,74 +66,160 @@ function getMetadata(activity: ActivityFeedLeafItemVM) {
         ? m.completionPromptBody
         : 'How did your class go? Confirm, leave feedback, or report a problem.',
     feedbackUiEnabled: m.feedbackUiEnabled !== false,
-    completionVoteStatus,
+    sessionCompletionStatus,
+    resolvedAt:
+      typeof sessionCompletion?.resolvedAt === 'string'
+        ? sessionCompletion.resolvedAt
+        : null,
+    hasRating: typeof sessionCompletion?.rating === 'number',
   };
 }
 
 type Props = {
   activity: ActivityFeedLeafItemVM;
-  onVoteSubmit?: () => void;
+  onVoteSubmit?: (status: 'confirmed' | 'disputed') => void;
+  onRatingSubmit?: () => void;
+  /**
+   * When true, renders without its own bordered/max-width card shell — just the
+   * prompt/action content — so a parent (e.g. the homepage's session-completed
+   * tile, styled like SessionCard) can provide the surrounding chrome and let it
+   * fill the full width available instead of being capped at 420px. The default
+   * (false) keeps the standalone notification-feed appearance unchanged.
+   */
+  embedded?: boolean;
 };
+
+function Chrome({
+  embedded,
+  tone = 'default',
+  className,
+  children,
+}: {
+  embedded: boolean;
+  tone?: 'default' | 'muted';
+  className?: string;
+  children: ReactNode;
+}) {
+  if (embedded) {
+    return <div className={cn('w-full', className)}>{children}</div>;
+  }
+  return (
+    <div
+      className={cn(
+        'w-full rounded-xl border border-border/80 p-4 md:max-w-[420px]',
+        tone === 'muted' ? 'bg-muted/40' : 'bg-background/95',
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
+}
 
 export function canRenderActivityCompletionCheck(activity: ActivityFeedLeafItemVM) {
   const m = (activity.metadata ?? {}) as Record<string, unknown>;
   return (
     m.completionCheckUiEnabled === true &&
-    typeof m.scheduleId === 'string' &&
-    typeof m.occurrenceStart === 'string'
+    (typeof m.sessionCompletionId === 'string' ||
+      (typeof m.sessionCompletion === 'object' && m.sessionCompletion !== null))
   );
 }
 
-function getInitialStep(status: CompletionVoteStatus | null): Step {
-  if (status === 'confirmed' || status === 'disputed') return 'already_responded';
+function getInitialStep(status: SessionCompletionStatus | null): Step {
+  if (status === 'confirmed' || status === 'auto_confirmed') return 'confirmed';
+  if (status === 'disputed') return 'already_responded';
   return 'prompt';
 }
 
-export function ActivityCompletionCheck({ activity, onVoteSubmit }: Props) {
+export function ActivityCompletionCheck({
+  activity,
+  onVoteSubmit,
+  onRatingSubmit,
+  embedded = false,
+}: Props) {
   const metadata = useMemo(() => getMetadata(activity), [activity]);
   const [step, setStep] = useState<Step>(() =>
-    getInitialStep(metadata.completionVoteStatus),
+    getInitialStep(metadata.sessionCompletionStatus),
   );
   const [disputeCategory, setDisputeCategory] = useState<DisputeCategory | null>(null);
   const [disputeReason, setDisputeReason] = useState('');
   const [rescheduleRequested, setRescheduleRequested] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [localResolvedAt, setLocalResolvedAt] = useState<string | null>(null);
+  const effectiveResolvedAt = localResolvedAt ?? metadata.resolvedAt;
+  const [isUndoWindowOpen, setIsUndoWindowOpen] = useState(
+    () => resolveUndoWindowOpen(effectiveResolvedAt) && !metadata.hasRating,
+  );
+  const [isUndoing, setIsUndoing] = useState(false);
 
-  const canSubmit = Boolean(metadata.scheduleId && metadata.occurrenceStart);
+  const canSubmit = Boolean(metadata.sessionCompletionId);
 
   useEffect(() => {
-    if (metadata.completionVoteStatus) {
+    if (metadata.sessionCompletionStatus) {
       setStep((prev) => {
         if (prev === 'confirmed' || prev === 'disputed') return prev;
-        return getInitialStep(metadata.completionVoteStatus);
+        return getInitialStep(metadata.sessionCompletionStatus);
       });
     }
-  }, [metadata.completionVoteStatus]);
+  }, [metadata.sessionCompletionStatus]);
+
+  // Mirrors ActivityFeedbackRequest's edit-window timer: close the Undo option once
+  // UNDO_WINDOW_MS has elapsed since resolution, whether that's a fresh in-session
+  // confirm/dispute or one resumed after a reload.
+  useEffect(() => {
+    if (metadata.hasRating) {
+      setIsUndoWindowOpen(false);
+      return;
+    }
+    if (!effectiveResolvedAt) {
+      setIsUndoWindowOpen(false);
+      return;
+    }
+
+    const resolvedTimestamp = new Date(effectiveResolvedAt).getTime();
+    if (Number.isNaN(resolvedTimestamp)) {
+      setIsUndoWindowOpen(false);
+      return;
+    }
+
+    const remainingMs = resolvedTimestamp + UNDO_WINDOW_MS - Date.now();
+    if (remainingMs <= 0) {
+      setIsUndoWindowOpen(false);
+      return;
+    }
+
+    setIsUndoWindowOpen(true);
+    const timer = window.setTimeout(() => {
+      setIsUndoWindowOpen(false);
+    }, remainingMs);
+
+    return () => window.clearTimeout(timer);
+  }, [effectiveResolvedAt, metadata.hasRating]);
 
   const handleConfirm = useCallback(async () => {
     if (!canSubmit) return;
     setStep('submitting');
     setError(null);
     try {
-      const response = await fetch('/api/activity-feed/session-completion-vote', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          orgId: metadata.orgId,
-          scheduleId: metadata.scheduleId,
-          occurrenceKey: metadata.occurrenceStart,
-          role: metadata.role,
-          status: 'confirmed',
-        }),
-      });
+      const response = await fetch(
+        `/api/session-completions/${metadata.sessionCompletionId}/confirm`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            orgId: metadata.orgId,
+          }),
+        },
+      );
       if (!response.ok) {
         const payload = (await response.json().catch(() => null)) as {
           error?: string;
         } | null;
         throw new Error(payload?.error ?? 'Failed to submit');
       }
+      setLocalResolvedAt(new Date().toISOString());
       setStep('confirmed');
-      onVoteSubmit?.();
+      onVoteSubmit?.('confirmed');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit');
       setStep('prompt');
@@ -128,28 +231,28 @@ export function ActivityCompletionCheck({ activity, onVoteSubmit }: Props) {
     setStep('submitting');
     setError(null);
     try {
-      const response = await fetch('/api/activity-feed/session-completion-vote', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          orgId: metadata.orgId,
-          scheduleId: metadata.scheduleId,
-          occurrenceKey: metadata.occurrenceStart,
-          role: metadata.role,
-          status: 'disputed',
-          disputeCategory,
-          disputeReason: disputeReason.trim() || null,
-          rescheduleRequested,
-        }),
-      });
+      const response = await fetch(
+        `/api/session-completions/${metadata.sessionCompletionId}/dispute`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            orgId: metadata.orgId,
+            disputeCategory,
+            disputeReason: disputeReason.trim() || null,
+            rescheduleRequested,
+          }),
+        },
+      );
       if (!response.ok) {
         const payload = (await response.json().catch(() => null)) as {
           error?: string;
         } | null;
         throw new Error(payload?.error ?? 'Failed to submit');
       }
+      setLocalResolvedAt(new Date().toISOString());
       setStep('disputed');
-      onVoteSubmit?.();
+      onVoteSubmit?.('disputed');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit');
       setStep('dispute_form');
@@ -163,82 +266,157 @@ export function ActivityCompletionCheck({ activity, onVoteSubmit }: Props) {
     onVoteSubmit,
   ]);
 
+  const handleUndo = useCallback(async () => {
+    if (!canSubmit || isUndoing) return;
+    setIsUndoing(true);
+    setError(null);
+    try {
+      const response = await fetch(
+        `/api/session-completions/${metadata.sessionCompletionId}/undo`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ orgId: metadata.orgId }),
+        },
+      );
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        throw new Error(payload?.error ?? 'Failed to undo');
+      }
+      setLocalResolvedAt(null);
+      setIsUndoWindowOpen(false);
+      setDisputeCategory(null);
+      setDisputeReason('');
+      setRescheduleRequested(false);
+      setStep('prompt');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to undo');
+    } finally {
+      setIsUndoing(false);
+    }
+  }, [canSubmit, isUndoing, metadata]);
+
   if (step === 'prompt' || (step === 'submitting' && disputeCategory === null)) {
     const isLoading = step === 'submitting';
     return (
-      <div className="w-full rounded-xl border border-border/80 bg-background/95 p-4 md:max-w-[420px]">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-          {metadata.promptTitle}
-        </p>
-        <p className="mt-2 text-sm leading-5 text-muted-foreground">
+      <Chrome embedded={embedded}>
+        {/* When embedded (the homepage tile), the tile itself already shows a
+            "Completed" badge next to the session title — repeating "Session
+            Completed" here would just say the same thing twice. */}
+        {embedded ? null : (
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            {metadata.promptTitle}
+          </p>
+        )}
+        <p className={cn('text-sm leading-5 text-muted-foreground', !embedded && 'mt-2')}>
           {metadata.promptBody}
         </p>
         <div className="mt-3 flex gap-2">
           <Button
             type="button"
-            size="sm"
+            size={embedded ? 'lg' : 'sm'}
             onClick={() => void handleConfirm()}
             disabled={isLoading}
             data-action-button="true"
-            className="flex-1 gap-1.5"
+            className={cn('flex-1 gap-1.5 overflow-hidden', !embedded && 'max-w-[120px]')}
           >
-            <CheckCircle2 className="size-3.5" />
-            {isLoading ? 'Saving...' : 'Confirm Lesson'}
+            <CheckCircle2 className="size-3.5 shrink-0" />
+            <span className="min-w-0 flex-1 truncate">
+              {isLoading ? 'Saving...' : 'Confirm Lesson'}
+            </span>
           </Button>
           <Button
             type="button"
-            size="sm"
+            size={embedded ? 'lg' : 'sm'}
             variant="outline"
             onClick={() => setStep('dispute_form')}
             disabled={isLoading}
             data-action-button="true"
-            className="flex-1 gap-1.5"
+            className={cn('flex-1 gap-1.5 overflow-hidden', !embedded && 'max-w-[120px]')}
           >
-            <XCircle className="size-3.5" />
-            Report a Problem
+            <XCircle className="size-3.5 shrink-0" />
+            <span className="min-w-0 flex-1 truncate">Report a Problem</span>
           </Button>
         </div>
         {error ? <p className="mt-2 text-xs text-destructive">{error}</p> : null}
-      </div>
+      </Chrome>
     );
   }
 
   if (step === 'already_responded') {
     return (
-      <div className="w-full rounded-xl border border-border/80 bg-muted/40 p-4 text-xs text-muted-foreground md:max-w-[420px]">
+      <Chrome embedded={embedded} tone="muted" className="text-xs text-muted-foreground">
         You&apos;ve already responded — thanks for letting us know!
-      </div>
+      </Chrome>
     );
   }
 
   if (step === 'confirmed') {
     return (
-      <div className="w-full rounded-xl border border-border/80 bg-background/95 p-4 md:max-w-[420px]">
-        <div className="mb-3 flex items-center gap-1.5">
-          <CheckCircle2 className="size-4 text-success" />
-          <p className="text-sm font-semibold text-success">
-            Great! How was the session?
-          </p>
+      <Chrome embedded={embedded}>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-1.5">
+            <CheckCircle2 className="size-4 text-success" />
+            <p className="text-sm font-semibold text-success">
+              Great! How was the session?
+            </p>
+          </div>
+          {isUndoWindowOpen ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => void handleUndo()}
+              disabled={isUndoing}
+              data-action-button="true"
+              className="text-xs"
+            >
+              {isUndoing ? 'Undoing...' : 'Undo'}
+            </Button>
+          ) : null}
         </div>
         {metadata.feedbackUiEnabled ? (
-          <ActivityFeedbackRequest activity={activity} />
+          <ActivityFeedbackRequest
+            activity={activity}
+            onRatingSubmit={onRatingSubmit}
+            embedded={embedded}
+          />
         ) : null}
-      </div>
+        {error ? <p className="mt-2 text-xs text-destructive">{error}</p> : null}
+      </Chrome>
     );
   }
 
   if (step === 'disputed') {
     return (
-      <div className="w-full rounded-xl border border-border/80 bg-muted/40 p-4 text-xs text-muted-foreground md:max-w-[420px]">
-        Reported — the educator and admin team have been notified.
-      </div>
+      <Chrome embedded={embedded} tone="muted" className="text-xs text-muted-foreground">
+        <div className="flex items-center justify-between gap-3">
+          <p>Reported — the educator and admin team have been notified.</p>
+          {isUndoWindowOpen ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => void handleUndo()}
+              disabled={isUndoing}
+              data-action-button="true"
+              className="shrink-0 text-xs"
+            >
+              {isUndoing ? 'Undoing...' : 'Undo'}
+            </Button>
+          ) : null}
+        </div>
+        {error ? <p className="mt-2 text-destructive">{error}</p> : null}
+      </Chrome>
     );
   }
 
   // dispute_form
   const isSubmitting = step === 'submitting';
   return (
-    <div className="w-full rounded-xl border border-border/80 bg-background/95 p-4 md:max-w-[420px]">
+    <Chrome embedded={embedded}>
       <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
         What happened?
       </p>
@@ -301,6 +479,6 @@ export function ActivityCompletionCheck({ activity, onVoteSubmit }: Props) {
       ) : null}
 
       {error ? <p className="mt-2 text-xs text-destructive">{error}</p> : null}
-    </div>
+    </Chrome>
   );
 }

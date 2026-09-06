@@ -226,6 +226,7 @@ export interface FeedbackRequestMessageVM extends BaseMessageVM {
     channelId?: UUID | null;
     occurrenceStart?: ISODateTime | null;
     sourceEventId?: UUID | null;
+    sessionCompletionId?: UUID | null;
     submittedAt?: ISODateTime | null;
     rating?: number | null;
     comment?: string | null;

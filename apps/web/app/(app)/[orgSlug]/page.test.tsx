@@ -58,6 +58,12 @@ vi.mock('../../../lib/dashboard/home-infographic-metrics', () => ({
     buildDashboardHomeInfographicMetricsMock(...args),
 }));
 
+vi.mock('@iconicedu/web/flags', () => ({
+  enableSessionCompletionCarousel: {
+    run: vi.fn(async () => false),
+  },
+}));
+
 describe('d home page', () => {
   it('loads dashboard infographic metrics and renders infographic component', async () => {
     buildDashboardHomeInfographicMetricsMock.mockResolvedValueOnce({

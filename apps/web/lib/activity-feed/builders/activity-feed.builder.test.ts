@@ -3,18 +3,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildActivityFeedForProfile } from '@iconicedu/web/lib/activity-feed/builders/activity-feed.builder';
 
 const getActivityFeedItemsByOrg = vi.fn();
-const getClassSessionFeedbackByProfileAndSessions = vi.fn();
-const getClassSessionCompletionVotesByProfileAndTargets = vi.fn();
+const listSessionCompletions = vi.fn();
 const getProfilesByIds = vi.fn();
 const buildUserProfileFromRow = vi.fn();
-const createSupabaseServiceClient = vi.fn();
 
 vi.mock('@iconicedu/web/lib/activity-feed/queries/activity-feed.query', () => ({
   getActivityFeedItemsByOrg: (...args: unknown[]) => getActivityFeedItemsByOrg(...args),
-  getClassSessionFeedbackByProfileAndSessions: (...args: unknown[]) =>
-    getClassSessionFeedbackByProfileAndSessions(...args),
-  getClassSessionCompletionVotesByProfileAndTargets: (...args: unknown[]) =>
-    getClassSessionCompletionVotesByProfileAndTargets(...args),
+}));
+
+vi.mock('@iconicedu/web/lib/api/session-completions', () => ({
+  listSessionCompletions: (...args: unknown[]) => listSessionCompletions(...args),
 }));
 
 vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
@@ -25,9 +23,33 @@ vi.mock('@iconicedu/web/lib/profile/builders/user-profile.builder', () => ({
   buildUserProfileFromRow: (...args: unknown[]) => buildUserProfileFromRow(...args),
 }));
 
-vi.mock('@iconicedu/web/lib/supabase/service', () => ({
-  createSupabaseServiceClient: () => createSupabaseServiceClient(),
-}));
+function completion(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'completion-1',
+    orgId: 'org-1',
+    scheduleId: 'schedule-1',
+    occurrenceKey: '2026-03-03T11:00:00.000Z',
+    profileId: 'profile-1',
+    role: 'guardian',
+    status: 'confirmed',
+    disputeCategory: null,
+    disputeReason: null,
+    rescheduleRequested: false,
+    rating: null,
+    ratingComment: null,
+    channelId: 'channel-1',
+    learningSpaceId: 'space-1',
+    sessionTitle: 'Algebra I',
+    sessionEndAt: '2026-03-03T12:00:00.000Z',
+    notifiedAt: '2026-03-03T12:00:00.000Z',
+    confirmedAt: '2026-03-03T12:10:00.000Z',
+    disputedAt: null,
+    ratedAt: null,
+    resolvedAt: '2026-03-03T12:10:00.000Z',
+    expiresAt: '2026-03-06T12:00:00.000Z',
+    ...overrides,
+  };
+}
 
 describe('buildActivityFeedForProfile', () => {
   beforeEach(() => {
@@ -43,9 +65,11 @@ describe('buildActivityFeedForProfile', () => {
         avatar: { source: 'generated', seed: 'actor-1' },
       },
     });
-    getClassSessionFeedbackByProfileAndSessions.mockResolvedValue({ data: [] });
-    getClassSessionCompletionVotesByProfileAndTargets.mockResolvedValue({ data: [] });
-    createSupabaseServiceClient.mockReturnValue({ from: vi.fn() });
+    listSessionCompletions.mockResolvedValue({
+      items: [],
+      nextCursor: null,
+      total: null,
+    });
   });
 
   it('requests inbox rows scoped to the current recipient profile', async () => {
@@ -83,7 +107,7 @@ describe('buildActivityFeedForProfile', () => {
     expect(feed.sections[0]?.items[0]?.ids.id).toBe('item-1');
   });
 
-  it('hydrates saved feedback responses for feedback request activity items', async () => {
+  it('hydrates saved ratings for feedback request activity items', async () => {
     getActivityFeedItemsByOrg.mockResolvedValue({
       data: [
         {
@@ -115,60 +139,42 @@ describe('buildActivityFeedForProfile', () => {
         },
       ],
     });
-    getClassSessionFeedbackByProfileAndSessions.mockResolvedValue({
-      data: [
-        {
-          source_event_id: 'event-old',
-          message_id: null,
-          class_session_id: 'schedule-1',
-          classroom_id: 'space-1',
-          channel_id: 'channel-1',
-          occurrence_start_at: '2026-03-02T11:00:00.000Z',
-          rating: 2,
-          comment: 'Different occurrence',
-          submitted_at: '2026-03-02T12:10:00.000Z',
-        },
-        {
-          source_event_id: 'event-1',
-          message_id: null,
-          class_session_id: 'schedule-1',
-          classroom_id: 'space-1',
-          channel_id: 'channel-1',
-          occurrence_start_at: '2026-03-03T11:00:00.000Z',
+    listSessionCompletions.mockResolvedValue({
+      items: [
+        completion({
           rating: 4,
-          comment: 'Helpful pacing',
-          submitted_at: '2026-03-03T12:10:00.000Z',
-        },
+          ratingComment: 'Helpful pacing',
+          ratedAt: '2026-03-03T12:10:00.000Z',
+        }),
       ],
+      nextCursor: null,
+      total: null,
     });
 
     const feed = await buildActivityFeedForProfile({} as never, 'org-1', 'profile-1');
 
-    expect(getClassSessionFeedbackByProfileAndSessions).toHaveBeenCalledWith(
-      expect.anything(),
-      'org-1',
-      'profile-1',
-      ['schedule-1'],
-    );
+    expect(listSessionCompletions).toHaveBeenCalledWith(expect.anything(), {
+      orgId: 'org-1',
+      profileId: 'profile-1',
+      limit: 50,
+    });
     expect(feed.sections[0]?.items[0]).toMatchObject({
       verb: 'session.feedback_request.sent',
       metadata: {
-        feedbackResponse: {
-          sourceEventId: 'event-1',
-          messageId: null,
-          classSessionId: 'schedule-1',
-          classroomId: 'space-1',
+        sessionCompletion: {
+          id: 'completion-1',
+          scheduleId: 'schedule-1',
           channelId: 'channel-1',
-          occurrenceStartAt: '2026-03-03T11:00:00.000Z',
+          occurrenceKey: '2026-03-03T11:00:00.000Z',
           rating: 4,
-          comment: 'Helpful pacing',
-          submittedAt: '2026-03-03T12:10:00.000Z',
+          ratingComment: 'Helpful pacing',
+          ratedAt: '2026-03-03T12:10:00.000Z',
         },
       },
     });
   });
 
-  it('hydrates saved completion votes for single completion checks', async () => {
+  it('hydrates session completions for single completion checks', async () => {
     getActivityFeedItemsByOrg.mockResolvedValue({
       data: [
         {
@@ -199,36 +205,24 @@ describe('buildActivityFeedForProfile', () => {
         },
       ],
     });
-    getClassSessionCompletionVotesByProfileAndTargets.mockResolvedValue({
-      data: [
-        {
-          schedule_id: 'schedule-1',
-          occurrence_key: '2026-03-03T11:00:00+00:00',
-          profile_id: 'profile-1',
-          role: 'guardian',
-          status: 'confirmed',
-          dispute_category: null,
-          dispute_reason: null,
-          reschedule_requested: false,
-          voted_at: '2026-03-03T12:10:00.000Z',
-        },
-      ],
+    listSessionCompletions.mockResolvedValue({
+      items: [completion()],
+      nextCursor: null,
+      total: null,
     });
 
     const feed = await buildActivityFeedForProfile({} as never, 'org-1', 'profile-1');
 
-    expect(createSupabaseServiceClient).toHaveBeenCalledTimes(1);
-    expect(getClassSessionCompletionVotesByProfileAndTargets).toHaveBeenCalledWith(
-      expect.anything(),
-      'org-1',
-      'profile-1',
-      ['schedule-1'],
-      ['2026-03-03T11:00:00.000Z'],
-    );
+    expect(listSessionCompletions).toHaveBeenCalledWith(expect.anything(), {
+      orgId: 'org-1',
+      profileId: 'profile-1',
+      limit: 50,
+    });
     expect(feed.sections[0]?.items[0]).toMatchObject({
       verb: 'session.completion_check.sent',
       metadata: {
-        completionVote: {
+        sessionCompletion: {
+          id: 'completion-1',
           scheduleId: 'schedule-1',
           occurrenceKey: '2026-03-03T11:00:00.000Z',
           profileId: 'profile-1',
@@ -237,13 +231,13 @@ describe('buildActivityFeedForProfile', () => {
           disputeCategory: null,
           disputeReason: null,
           rescheduleRequested: false,
-          votedAt: '2026-03-03T12:10:00.000Z',
+          confirmedAt: '2026-03-03T12:10:00.000Z',
         },
       },
     });
   });
 
-  it('hydrates saved completion votes into batch completion check sessions by occurrence', async () => {
+  it('hydrates session completions into batch completion check sessions by occurrence', async () => {
     getActivityFeedItemsByOrg.mockResolvedValue({
       data: [
         {
@@ -285,20 +279,15 @@ describe('buildActivityFeedForProfile', () => {
         },
       ],
     });
-    getClassSessionCompletionVotesByProfileAndTargets.mockResolvedValue({
-      data: [
-        {
-          schedule_id: 'schedule-1',
-          occurrence_key: '2026-03-04T11:00:00+00:00',
-          profile_id: 'profile-1',
-          role: 'guardian',
-          status: 'confirmed',
-          dispute_category: null,
-          dispute_reason: null,
-          reschedule_requested: false,
-          voted_at: '2026-03-04T12:10:00.000Z',
-        },
+    listSessionCompletions.mockResolvedValue({
+      items: [
+        completion({
+          occurrenceKey: '2026-03-04T11:00:00.000Z',
+          confirmedAt: '2026-03-04T12:10:00.000Z',
+        }),
       ],
+      nextCursor: null,
+      total: null,
     });
 
     const feed = await buildActivityFeedForProfile({} as never, 'org-1', 'profile-1');
@@ -306,15 +295,13 @@ describe('buildActivityFeedForProfile', () => {
     const sessions = (item?.metadata as { sessions?: Array<Record<string, unknown>> })
       ?.sessions;
 
-    expect(getClassSessionCompletionVotesByProfileAndTargets).toHaveBeenCalledWith(
-      expect.anything(),
-      'org-1',
-      'profile-1',
-      ['schedule-1'],
-      ['2026-03-03T11:00:00.000Z', '2026-03-04T11:00:00.000Z'],
-    );
-    expect(sessions?.[0]?.completionVote).toBeUndefined();
-    expect(sessions?.[1]?.completionVote).toMatchObject({
+    expect(listSessionCompletions).toHaveBeenCalledWith(expect.anything(), {
+      orgId: 'org-1',
+      profileId: 'profile-1',
+      limit: 50,
+    });
+    expect(sessions?.[0]?.sessionCompletion).toBeUndefined();
+    expect(sessions?.[1]?.sessionCompletion).toMatchObject({
       scheduleId: 'schedule-1',
       occurrenceKey: '2026-03-04T11:00:00.000Z',
       status: 'confirmed',

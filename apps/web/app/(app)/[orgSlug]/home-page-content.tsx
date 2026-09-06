@@ -11,6 +11,7 @@ import {
   mapOrgSubjectRowsToOptions,
 } from '@iconicedu/web/lib/subjects/queries/org-subject-catalog.query';
 import { HomePageInfographicClient } from './home-page-infographic-client';
+import { enableSessionCompletionCarousel } from '@iconicedu/web/flags';
 
 function resolveRequestRole(kind: string | undefined): ClassRequestRole {
   if (kind === 'guardian') {
@@ -25,12 +26,16 @@ function resolveRequestRole(kind: string | undefined): ClassRequestRole {
 export async function HomePageContent({ orgSlug }: { orgSlug: string }) {
   const { supabase, account } = await getDashboardAccountContext(orgSlug);
   const { currentUserProfile } = await getDashboardProfileContext(supabase, account.id);
+  const sessionCompletionCarouselEnabled = await enableSessionCompletionCarousel.run({
+    identify: { profileId: currentUserProfile?.ids.id ?? null },
+  });
   const metrics = await buildDashboardHomeInfographicMetrics({
     supabase,
     orgId: account.org_id,
     orgSlug,
     currentUserProfile,
     timezone: currentUserProfile?.prefs.timezone ?? null,
+    sessionCompletionCarouselEnabled,
   });
 
   const requestRole = resolveRequestRole(currentUserProfile?.kind);
@@ -64,6 +69,7 @@ export async function HomePageContent({ orgSlug }: { orgSlug: string }) {
       isTutorView={!metrics.isStaffView && metrics.activeRole === 'tutors'}
       topMetrics={metrics.metricsByRole[metrics.activeRole]}
       upcomingSessionsPage={metrics.upcomingSessionsPage}
+      completedSessionsPending={metrics.completedSessionsPending}
       calendarHref={metrics.calendarHref}
       notificationsHref={metrics.notificationsHref}
       browseHref={metrics.browseHref}

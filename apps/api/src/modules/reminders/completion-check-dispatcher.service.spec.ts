@@ -10,9 +10,23 @@ describe('CompletionCheckDispatcherService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest
+      .spyOn(Date, 'now')
+      .mockReturnValue(new Date('2030-03-08T00:00:00.000Z').getTime());
   });
 
-  function makeQuery<T>(result: { data: T; error: null }) {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  type QueryError = { message: string } | null;
+
+  function makeQuery<T>(initial: { data: T; error: QueryError }) {
+    let limitResult = initial;
+    let maybeSingleResult: { data: unknown; error: QueryError } = {
+      data: null,
+      error: null,
+    };
     const query = {
       select: jest.fn(() => query),
       eq: jest.fn(() => query),
@@ -21,14 +35,109 @@ describe('CompletionCheckDispatcherService', () => {
       neq: jest.fn(() => query),
       gte: jest.fn(() => query),
       lte: jest.fn(() => query),
-      limit: jest.fn(async () => result),
-      returns: jest.fn(async () => result),
+      upsert: jest.fn(() => query),
+      limit: jest.fn(async () => limitResult),
+      returns: jest.fn(async () => initial),
+      maybeSingle: jest.fn(async () => maybeSingleResult),
+      __setLimitResult: (result: typeof initial) => {
+        limitResult = result;
+      },
+      __setMaybeSingleResult: (result: typeof maybeSingleResult) => {
+        maybeSingleResult = result;
+      },
     };
     return query;
   }
 
-  function makeSupabase() {
-    const existingVotesQuery = makeQuery({ data: [], error: null });
+  type ScheduleRow = {
+    id: string;
+    title: string;
+    status: string;
+    end_at: string;
+    source_channel_id: string | null;
+    source_learning_space_id: string | null;
+  };
+
+  function makeSupabase(
+    overrides: {
+      schedule?: Partial<ScheduleRow>;
+      recurrence?: { id: string } | null;
+      exception?: { id: string } | null;
+      override?: { patch: { endAt?: string | null } | null } | null;
+      existingCompletion?: { id: string } | null;
+      upsertedId?: string | null;
+      lookupError?: 'schedule' | 'recurrence' | 'exception' | 'override';
+    } = {},
+  ) {
+    const existingCompletionsQuery = makeQuery({ data: [], error: null });
+    if (overrides.existingCompletion) {
+      existingCompletionsQuery.__setMaybeSingleResult({
+        data: overrides.existingCompletion,
+        error: null,
+      });
+    }
+
+    const upsertResultQuery = makeQuery({ data: null, error: null });
+    upsertResultQuery.__setMaybeSingleResult({
+      data: overrides.upsertedId ? { id: overrides.upsertedId } : null,
+      error: null,
+    });
+
+    const classSessionCompletionsQuery = {
+      select: jest.fn(() => existingCompletionsQuery),
+      upsert: jest.fn(() => ({
+        select: jest.fn(() => upsertResultQuery),
+      })),
+    };
+
+    const scheduleRow: ScheduleRow = {
+      id: 'schedule-1',
+      title: 'Math with Ms. Shenaly',
+      status: 'scheduled',
+      end_at: '2030-03-06T11:00:00.000Z',
+      source_channel_id: 'channel-1',
+      source_learning_space_id: 'space-1',
+      ...overrides.schedule,
+    };
+
+    const scheduleQuery = makeQuery({ data: [], error: null });
+    scheduleQuery.__setMaybeSingleResult({
+      data: scheduleRow,
+      error:
+        overrides.lookupError === 'schedule'
+          ? { message: 'schedule lookup failed' }
+          : null,
+    });
+
+    const concurrentSchedulesQuery = makeQuery({ data: [], error: null });
+
+    const recurrenceQuery = makeQuery({ data: [], error: null });
+    recurrenceQuery.__setMaybeSingleResult({
+      data: overrides.recurrence ?? null,
+      error:
+        overrides.lookupError === 'recurrence'
+          ? { message: 'recurrence lookup failed' }
+          : null,
+    });
+
+    const exceptionQuery = makeQuery({ data: [], error: null });
+    exceptionQuery.__setMaybeSingleResult({
+      data: overrides.exception ?? null,
+      error:
+        overrides.lookupError === 'exception'
+          ? { message: 'exception lookup failed' }
+          : null,
+    });
+
+    const overrideQuery = makeQuery({ data: [], error: null });
+    overrideQuery.__setMaybeSingleResult({
+      data: overrides.override ?? null,
+      error:
+        overrides.lookupError === 'override'
+          ? { message: 'override lookup failed' }
+          : null,
+    });
+
     const childProfilesQuery = makeQuery({
       data: [{ id: 'child-1', account_id: 'account-child-1', kind: 'child' }],
       error: null,
@@ -57,19 +166,38 @@ describe('CompletionCheckDispatcherService', () => {
       ],
       error: null,
     });
-    const concurrentSchedulesQuery = makeQuery({ data: [], error: null });
+
     let profilesCallCount = 0;
+    let classSchedulesCallCount = 0;
+    let classSessionCompletionsCallCount = 0;
 
     const supabase = {
       from: jest.fn((table: string) => {
-        if (table === 'class_session_completion_votes') {
-          return { select: jest.fn(() => existingVotesQuery) };
+        if (table === 'class_session_completions') {
+          classSessionCompletionsCallCount += 1;
+          return classSessionCompletionsQuery;
         }
         if (table === 'family_links') {
           return { select: jest.fn(() => familyLinksQuery) };
         }
         if (table === 'class_schedules') {
-          return { select: jest.fn(() => concurrentSchedulesQuery) };
+          classSchedulesCallCount += 1;
+          // Call 1: resolveEffectiveOccurrence's single-schedule fetch (.maybeSingle()).
+          // Call 2+: dispatchGuardianCompletionCheck's concurrent-sessions lookup (.returns()).
+          return {
+            select: jest.fn(() =>
+              classSchedulesCallCount === 1 ? scheduleQuery : concurrentSchedulesQuery,
+            ),
+          };
+        }
+        if (table === 'class_schedule_recurrence') {
+          return { select: jest.fn(() => recurrenceQuery) };
+        }
+        if (table === 'class_schedule_recurrence_exceptions') {
+          return { select: jest.fn(() => exceptionQuery) };
+        }
+        if (table === 'class_schedule_recurrence_overrides') {
+          return { select: jest.fn(() => overrideQuery) };
         }
         if (table === 'profiles') {
           profilesCallCount += 1;
@@ -83,48 +211,92 @@ describe('CompletionCheckDispatcherService', () => {
       }),
     };
 
-    return { supabase };
+    return {
+      supabase,
+      getClassSessionCompletionsCallCount: () => classSessionCompletionsCallCount,
+    };
   }
 
+  const basePayload = {
+    title: 'Math with Ms. Shenaly',
+    summary: 'How was your class?',
+    channelId: 'channel-1',
+    learningSpaceId: 'space-1',
+    scheduleId: 'schedule-1',
+    occurrenceStart: '2030-03-06T10:00:00.000Z',
+    startAt: '2030-03-06T10:00:00.000Z',
+    endAt: '2030-03-06T11:00:00.000Z',
+    channelRouteKind: 'space' as const,
+    members: [
+      {
+        profileId: 'child-1',
+        role: 'child' as const,
+        displayName: 'Arya A',
+        avatarUrl: null,
+        themeKey: null,
+      },
+      {
+        profileId: 'teacher-1',
+        role: 'educator' as const,
+        displayName: 'Ms. Shenaly',
+        avatarUrl: null,
+        themeKey: null,
+      },
+    ],
+  };
+
+  it('re-runs each unreconciled successful job once and records the marker', async () => {
+    const job = {
+      id: 'job-reconcile-1',
+      org_id: 'org-1',
+      job_type: 'session.completion_check',
+      status: 'succeeded',
+      payload: basePayload,
+      updated_by: 'system-profile-1',
+    };
+    const selectChain = {
+      eq: jest.fn(() => selectChain),
+      is: jest.fn(() => selectChain),
+      gte: jest.fn(() => selectChain),
+      order: jest.fn(() => selectChain),
+      limit: jest.fn(() => selectChain),
+      returns: jest.fn(async () => ({ data: [job], error: null })),
+    };
+    const updateChain = {
+      eq: jest.fn(() => updateChain),
+      is: jest.fn(async () => ({ error: null })),
+    };
+    const supabase = {
+      from: jest.fn(() => ({
+        select: jest.fn(() => selectChain),
+        update: jest.fn(() => updateChain),
+      })),
+    };
+    const service = new CompletionCheckDispatcherService();
+    const dispatch = jest
+      .spyOn(service, 'dispatchCompletionCheck')
+      .mockResolvedValue(['activity-1']);
+
+    const result = await service.reconcileRecentCompletionChecks({
+      supabase: supabase as never,
+    });
+
+    expect(result).toEqual({ checked: 1, reconciled: 1, failed: 0 });
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ job, systemProfileId: 'system-profile-1' }),
+    );
+    expect(updateChain.is).toHaveBeenCalledWith('completion_reconciled_at', null);
+  });
+
   it('dispatches completion checks to linked parents even when they are not schedule participants', async () => {
-    const { supabase } = makeSupabase();
+    const { supabase } = makeSupabase({ upsertedId: 'completion-1' });
     const service = new CompletionCheckDispatcherService();
 
     await service.dispatchCompletionCheck({
       supabase: supabase as never,
       systemProfileId: 'system-profile-1',
-      job: {
-        id: 'job-1',
-        org_id: 'org-1',
-        source_schedule_id: 'schedule-1',
-      } as never,
-      payload: {
-        title: 'Math with Ms. Shenaly',
-        summary: 'How was your class?',
-        channelId: 'channel-1',
-        learningSpaceId: 'space-1',
-        scheduleId: 'schedule-1',
-        occurrenceStart: '2030-03-06T10:00:00.000Z',
-        startAt: '2030-03-06T10:00:00.000Z',
-        endAt: '2030-03-06T11:00:00.000Z',
-        channelRouteKind: 'space',
-        members: [
-          {
-            profileId: 'child-1',
-            role: 'child',
-            displayName: 'Arya A',
-            avatarUrl: null,
-            themeKey: null,
-          },
-          {
-            profileId: 'teacher-1',
-            role: 'educator',
-            displayName: 'Ms. Shenaly',
-            avatarUrl: null,
-            themeKey: null,
-          },
-        ],
-      },
+      job: { id: 'job-1', org_id: 'org-1', source_schedule_id: 'schedule-1' } as never,
+      payload: basePayload,
     });
 
     expect(publishActivityEventMock).toHaveBeenCalledTimes(3);
@@ -136,6 +308,7 @@ describe('CompletionCheckDispatcherService', () => {
           'session.completion_check:org-1:schedule-1:2030-03-06T10:00:00.000Z:guardian-1',
         payload: expect.objectContaining({
           title: 'Math with Ms. Shenaly',
+          sessionCompletionId: 'completion-1',
           members: expect.arrayContaining([
             expect.objectContaining({
               profileId: 'child-1',
@@ -148,6 +321,154 @@ describe('CompletionCheckDispatcherService', () => {
               displayName: 'Ms. Shenaly',
             }),
           ]),
+        }),
+      }),
+    );
+  });
+
+  it('skips dispatch entirely and never publishes when the session was cancelled', async () => {
+    const { supabase } = makeSupabase({ schedule: { status: 'cancelled' } });
+    const service = new CompletionCheckDispatcherService();
+
+    const result = await service.dispatchCompletionCheck({
+      supabase: supabase as never,
+      systemProfileId: 'system-profile-1',
+      job: { id: 'job-1', org_id: 'org-1', source_schedule_id: 'schedule-1' } as never,
+      payload: basePayload,
+    });
+
+    expect(result).toEqual([]);
+    expect(publishActivityEventMock).not.toHaveBeenCalled();
+  });
+
+  it('skips a recurring occurrence with an exception (cancelled instance) even though the series is scheduled', async () => {
+    const { supabase } = makeSupabase({
+      recurrence: { id: 'recurrence-1' },
+      exception: { id: 'exception-1' },
+    });
+    const service = new CompletionCheckDispatcherService();
+
+    const result = await service.dispatchCompletionCheck({
+      supabase: supabase as never,
+      systemProfileId: 'system-profile-1',
+      job: { id: 'job-1', org_id: 'org-1', source_schedule_id: 'schedule-1' } as never,
+      payload: basePayload,
+    });
+
+    expect(result).toEqual([]);
+    expect(publishActivityEventMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['schedule', {}, 'schedule lookup failed'],
+    ['recurrence', {}, 'recurrence lookup failed'],
+    ['exception', { recurrence: { id: 'recurrence-1' } }, 'exception lookup failed'],
+    ['override', { recurrence: { id: 'recurrence-1' } }, 'override lookup failed'],
+  ] as const)(
+    'propagates %s lookup errors so the reminder job can retry',
+    async (lookupError, setup, expectedMessage) => {
+      const { supabase } = makeSupabase({ ...setup, lookupError });
+      const service = new CompletionCheckDispatcherService();
+
+      await expect(
+        service.dispatchCompletionCheck({
+          supabase: supabase as never,
+          systemProfileId: 'system-profile-1',
+          job: {
+            id: 'job-1',
+            org_id: 'org-1',
+            source_schedule_id: 'schedule-1',
+          } as never,
+          payload: basePayload,
+        }),
+      ).rejects.toThrow(expectedMessage);
+
+      expect(publishActivityEventMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it('uses the override patched end time, not the original occurrence time, for a rescheduled recurring occurrence', async () => {
+    const { supabase } = makeSupabase({
+      recurrence: { id: 'recurrence-1' },
+      override: { patch: { endAt: '2030-03-07T11:00:00.000Z' } },
+      upsertedId: 'completion-2',
+    });
+    const service = new CompletionCheckDispatcherService();
+
+    await service.dispatchCompletionCheck({
+      supabase: supabase as never,
+      systemProfileId: 'system-profile-1',
+      job: { id: 'job-1', org_id: 'org-1', source_schedule_id: 'schedule-1' } as never,
+      payload: { ...basePayload, members: [basePayload.members[1]] },
+    });
+
+    expect(publishActivityEventMock).toHaveBeenCalledTimes(1);
+    // The occurrence_key (dedupeKey/payload.occurrenceStart) stays the ORIGINAL time —
+    // only the effective session_end_at used for the completions row changes.
+    expect(publishActivityEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dedupeKey:
+          'session.completion_check:org-1:schedule-1:2030-03-06T10:00:00.000Z:teacher-1',
+      }),
+    );
+  });
+
+  it.each([
+    ['one-off session', { schedule: { end_at: '2030-03-09T11:00:00.000Z' } }],
+    [
+      'recurring override',
+      {
+        recurrence: { id: 'recurrence-1' },
+        override: { patch: { endAt: '2030-03-09T11:00:00.000Z' } },
+      },
+    ],
+  ] as const)(
+    'skips dispatch when the effective end time for a future %s has not passed',
+    async (_kind, setup) => {
+      const { supabase, getClassSessionCompletionsCallCount } = makeSupabase({
+        ...setup,
+        upsertedId: 'completion-future',
+      });
+      const service = new CompletionCheckDispatcherService();
+
+      const result = await service.dispatchCompletionCheck({
+        supabase: supabase as never,
+        systemProfileId: 'system-profile-1',
+        job: {
+          id: 'job-1',
+          org_id: 'org-1',
+          source_schedule_id: 'schedule-1',
+        } as never,
+        payload: basePayload,
+      });
+
+      expect(result).toEqual([]);
+      expect(getClassSessionCompletionsCallCount()).toBe(0);
+      expect(publishActivityEventMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it('reuses existing rows and republishes deduped events during a partial-failure retry', async () => {
+    const { supabase } = makeSupabase({
+      existingCompletion: { id: 'completion-existing' },
+    });
+    const service = new CompletionCheckDispatcherService();
+
+    const result = await service.dispatchCompletionCheck({
+      supabase: supabase as never,
+      systemProfileId: 'system-profile-1',
+      job: { id: 'job-1', org_id: 'org-1', source_schedule_id: 'schedule-1' } as never,
+      payload: basePayload,
+    });
+
+    expect(result).toHaveLength(3);
+    expect(publishActivityEventMock).toHaveBeenCalledTimes(3);
+    expect(publishActivityEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dedupeKey:
+          'session.completion_check:org-1:schedule-1:2030-03-06T10:00:00.000Z:child-1',
+        payload: expect.objectContaining({
+          sessionCompletionId: 'completion-existing',
         }),
       }),
     );

@@ -99,4 +99,16 @@ describe('mobile feature flags', () => {
     expect(parseBooleanFeatureFlag(1)).toBe(true);
     expect(parseBooleanFeatureFlag('')).toBe(false);
   });
+
+  it('keeps the session completion carousel off unless explicitly enabled', () => {
+    delete process.env.EXPO_PUBLIC_ENABLE_SESSION_COMPLETION_CAROUSEL;
+    expect(
+      getLocalMobileFeatureFlagFallback(mobileFeatureFlagKeys.sessionCompletionCarousel),
+    ).toBe(false);
+
+    process.env.EXPO_PUBLIC_ENABLE_SESSION_COMPLETION_CAROUSEL = 'true';
+    expect(
+      getLocalMobileFeatureFlagFallback(mobileFeatureFlagKeys.sessionCompletionCarousel),
+    ).toBe(true);
+  });
 });

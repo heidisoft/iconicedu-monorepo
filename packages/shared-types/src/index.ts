@@ -33,6 +33,8 @@ export * from './payloads/channel';
 export * from './payloads/activity-feed';
 export * from './payloads/notification-preferences';
 export * from './payloads/session-feedback';
+export * from './payloads/session-completion';
+export * from './vm/session-completion';
 export * from './payloads/org-subject-catalog';
 export * from './vm/assessment-curriculum';
 export * from './vm/assessment-item';

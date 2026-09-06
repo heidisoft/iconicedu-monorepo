@@ -140,6 +140,7 @@ describe('ActivityItemBase', () => {
       },
       metadata: {
         feedbackUiEnabled: true,
+        sessionCompletionId: 'completion-1',
         sourceEventId: 'event-1',
         classSessionId: 'session-1',
         classroomId: 'space-1',
@@ -164,6 +165,7 @@ describe('ActivityItemBase', () => {
       },
       metadata: {
         feedbackUiEnabled: true,
+        sessionCompletionId: 'completion-1',
         sourceEventId: 'event-1',
         scheduleId: 'session-1',
         learningSpaceId: 'space-1',
@@ -197,7 +199,10 @@ describe('ActivityItemBase', () => {
             title: 'Math Foundations',
             channelId: 'channel-1',
             learningSpaceId: 'space-1',
-            completionVote: { status: 'confirmed' },
+            sessionCompletion: {
+              id: '00000000-0000-4000-8000-000000000001',
+              status: 'confirmed',
+            },
           },
           {
             scheduleId: 'schedule-1',
@@ -216,9 +221,8 @@ describe('ActivityItemBase', () => {
 
     const sessionButtons = screen.getAllByRole('button', { name: /Math Foundations/ });
     fireEvent.click(sessionButtons[0]!);
-    expect(
-      screen.getByText("You've already responded — thanks for letting us know!"),
-    ).toBeInTheDocument();
+    expect(screen.getByText('Great! How was the session?')).toBeInTheDocument();
+    expect(screen.getByText('Rate your session')).toBeInTheDocument();
 
     fireEvent.click(sessionButtons[1]!);
     expect(screen.getByText('Confirm Lesson')).toBeInTheDocument();

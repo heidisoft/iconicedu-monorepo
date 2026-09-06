@@ -140,11 +140,31 @@ export const enableAssessments = flag<boolean, { profileId?: string | null }>({
   },
 });
 
+export const enableSessionCompletionCarousel = flag<
+  boolean,
+  { profileId?: string | null }
+>({
+  key: platformFeatureFlagKeys.sessionCompletionCarousel,
+  description: 'Shows actionable completed sessions on the web home dashboard.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: platformFeatureFlagKeys.sessionCompletionCarousel,
+      profileId: entities?.profileId,
+    });
+  },
+});
+
 export const webFlags = {
   enableAssessments,
   enableChannelCommunications,
   enableMarketingSitePages,
   enableMessageTypeComposer,
+  enableSessionCompletionCarousel,
   enableMobileAppleSignIn,
   enableMobileDirectMessageStart,
   enableMobileGoogleSignIn,
