@@ -487,11 +487,10 @@ function makeStyles(C: AppColors) {
     },
     metricsRow: { gap: 12, paddingRight: 16 },
     metricCard: {
-      minHeight: 148,
+      minHeight: 175,
       backgroundColor: C.card,
       borderRadius: 20,
       padding: 16,
-      justifyContent: 'space-between',
       shadowColor: '#1f2a26',
       shadowOpacity: 0.06,
       shadowRadius: 12,
@@ -532,7 +531,7 @@ function makeStyles(C: AppColors) {
       lineHeight: 48,
     },
     metricLabel: { fontSize: 13, color: C.textMuted, lineHeight: 17 },
-    metricCompletionBody: {
+    metricBody: {
       marginTop: 14,
     },
     metricPendingRow: {
@@ -1260,7 +1259,7 @@ export default function HomeScreen() {
                     <CalendarClock size={18} color={colors.periwinkleFg} />
                   </View>
                 </View>
-                <View>
+                <View style={s.metricBody}>
                   <Text style={s.metricValue}>{upcomingSessionsMetric.value}</Text>
                   <Text style={[s.metricLabel, { color: colors.periwinkleFg }]}>
                     {upcomingSessionsMetric.label}
@@ -1290,7 +1289,7 @@ export default function HomeScreen() {
                   </View>
                 </View>
                 {sessionCompletionCarouselEnabled ? (
-                  <View style={s.metricCompletionBody}>
+                  <View style={s.metricBody}>
                     <Text style={s.metricValue}>
                       {sessionCompletionSummary.completed}
                     </Text>
@@ -1304,7 +1303,7 @@ export default function HomeScreen() {
                     </View>
                   </View>
                 ) : (
-                  <View>
+                  <View style={s.metricBody}>
                     <Text style={s.metricValue}>
                       {topMetrics.completedClassesThisMonth}
                     </Text>
@@ -1327,7 +1326,7 @@ export default function HomeScreen() {
                     <ThirdMetricIcon size={18} color={colors.peachFg} />
                   </View>
                 </View>
-                <View>
+                <View style={s.metricBody}>
                   <Text style={s.metricValue}>{topMetrics.thirdMetricValue}</Text>
                   <Text style={[s.metricLabel, { color: colors.peachFg }]}>
                     {topMetrics.thirdMetricLabel}
