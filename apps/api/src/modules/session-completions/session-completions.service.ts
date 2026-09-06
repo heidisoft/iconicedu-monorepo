@@ -177,6 +177,7 @@ export class SessionCompletionsService {
     this.logger.log(
       `session completion confirmed id=${row.id} profileId=${row.profile_id}`,
     );
+    await this.markRelatedActivityFeedItemsRead(supabase, body.orgId, row);
     return { success: true, feedbackEnabled: true };
   }
 
@@ -229,6 +230,7 @@ export class SessionCompletionsService {
       disputeReason,
       rescheduleRequested: body.rescheduleRequested ?? false,
     });
+    await this.markRelatedActivityFeedItemsRead(supabase, body.orgId, row);
 
     return { success: true, feedbackEnabled: false };
   }
@@ -353,7 +355,74 @@ export class SessionCompletionsService {
     }
 
     this.logger.log(`session completion rated id=${row.id} rating=${body.rating}`);
+    await this.markRelatedActivityFeedItemsRead(supabase, body.orgId, row);
     return { success: true };
+  }
+
+  /**
+   * Best-effort sync: resolving a completion check from ANY surface (the
+   * homepage tile or the notification-feed card — both drive the same
+   * confirm/dispute/rate endpoints) should mark the notification(s) that
+   * announced it as read, so it doesn't linger unread in the inbox just
+   * because the user never opened the Notifications tab. A completion-check
+   * notification's `metadata.sessionCompletionId` (single-session dispatch) or
+   * `metadata.sessions[].sessionCompletionId` (guardian batch dispatch) is
+   * what ties it back to this row — see completion-check-dispatcher.service.ts.
+   * Failures here are logged, not thrown: this must never block the actual
+   * confirm/dispute/rate action from succeeding.
+   */
+  private async markRelatedActivityFeedItemsRead(
+    supabase: SupabaseServiceClient,
+    orgId: string,
+    row: ClassSessionCompletionRow,
+  ): Promise<void> {
+    try {
+      const { data, error } = await supabase
+        .from('activity_feed_items')
+        .select('id, metadata')
+        .eq('org_id', orgId)
+        .eq('recipient_profile_id', row.profile_id)
+        .eq('is_read', false)
+        .is('deleted_at', null)
+        .in('verb', [
+          'session.completion_check.sent',
+          'session.completion_check.batch.sent',
+        ])
+        .returns<Array<{ id: string; metadata: Record<string, unknown> | null }>>();
+
+      if (error) throw new Error(error.message);
+
+      const matchingIds = (data ?? [])
+        .filter((item) => {
+          const metadata = item.metadata ?? {};
+          if (metadata.sessionCompletionId === row.id) return true;
+          const sessions = Array.isArray(metadata.sessions) ? metadata.sessions : [];
+          return sessions.some(
+            (session) =>
+              session &&
+              typeof session === 'object' &&
+              (session as Record<string, unknown>).sessionCompletionId === row.id,
+          );
+        })
+        .map((item) => item.id);
+
+      if (!matchingIds.length) return;
+
+      const now = new Date().toISOString();
+      const { error: updateError } = await supabase
+        .from('activity_feed_items')
+        .update({ is_read: true, read_at: now, updated_at: now })
+        .eq('org_id', orgId)
+        .in('id', matchingIds);
+
+      if (updateError) throw new Error(updateError.message);
+    } catch (err) {
+      this.logger.warn(
+        `failed to mark notifications read for sessionCompletionId=${row.id}: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
   }
 
   private async loadOwnedRow(

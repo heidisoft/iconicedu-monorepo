@@ -56,6 +56,17 @@ describe('SessionCompletionsService', () => {
     return chain;
   }
 
+  // No `.select()/.maybeSingle()` on this one — markRelatedActivityFeedItemsRead
+  // awaits the update chain directly (matching the real Supabase query shape).
+  function makeMarkReadUpdateChain() {
+    const chain: Record<string, jest.Mock> = {
+      update: jest.fn(() => chain),
+      eq: jest.fn(() => chain),
+      in: jest.fn(() => chain),
+    };
+    return chain;
+  }
+
   function makeSupabase(input: {
     completionRow: Record<string, unknown> | null;
     accountRow?: Record<string, unknown> | null;
@@ -63,6 +74,7 @@ describe('SessionCompletionsService', () => {
     familyLinkRow?: Record<string, unknown> | null;
     updatedRow?: { id: string } | null;
     rpcRows?: Array<Record<string, unknown>>;
+    activityFeedItems?: Array<{ id: string; metadata: unknown }>;
   }) {
     const accountChain = makeChain({
       data: input.accountRow ?? { id: ACCOUNT_ID, org_id: ORG_ID },
@@ -80,6 +92,10 @@ describe('SessionCompletionsService', () => {
     const updateChain = makeUpdateChain(
       input.updatedRow === undefined ? { id: COMPLETION_ID } : input.updatedRow,
     );
+    const activityFeedItemsSelectChain = makeChain({
+      data: input.activityFeedItems ?? [],
+    });
+    const activityFeedItemsUpdateChain = makeMarkReadUpdateChain();
 
     const from = jest.fn((table: string) => {
       if (table === 'accounts') return accountChain;
@@ -88,12 +104,18 @@ describe('SessionCompletionsService', () => {
       }
       if (table === 'profiles') return profileChain;
       if (table === 'family_links') return familyLinkChain;
+      if (table === 'activity_feed_items') {
+        return {
+          select: jest.fn(() => activityFeedItemsSelectChain),
+          update: activityFeedItemsUpdateChain.update,
+        };
+      }
       throw new Error(`Unexpected table: ${table}`);
     });
 
     const rpc = jest.fn(async () => ({ data: input.rpcRows ?? [], error: null }));
     createSupabaseServiceClientMock.mockReturnValue({ from, rpc } as never);
-    return { from, updateChain, rpc };
+    return { from, updateChain, activityFeedItemsUpdateChain, rpc };
   }
 
   function baseCompletionRow(overrides: Record<string, unknown> = {}) {
@@ -178,6 +200,61 @@ describe('SessionCompletionsService', () => {
   });
 
   describe('confirm', () => {
+    it('marks the originating notification(s) as read, single and batched alike', async () => {
+      const { activityFeedItemsUpdateChain } = makeSupabase({
+        completionRow: baseCompletionRow({ status: 'pending' }),
+        activityFeedItems: [
+          { id: 'item-single', metadata: { sessionCompletionId: COMPLETION_ID } },
+          {
+            id: 'item-batch',
+            metadata: { sessions: [{ sessionCompletionId: COMPLETION_ID }] },
+          },
+          { id: 'item-unrelated', metadata: { sessionCompletionId: 'some-other-id' } },
+        ],
+      });
+      const service = new SessionCompletionsService();
+
+      await service.confirm(AUTH_USER_ID, {
+        orgId: ORG_ID,
+        sessionCompletionId: COMPLETION_ID,
+      });
+
+      expect(activityFeedItemsUpdateChain.update).toHaveBeenCalledWith(
+        expect.objectContaining({ is_read: true, read_at: expect.any(String) }),
+      );
+      expect(activityFeedItemsUpdateChain.in).toHaveBeenCalledWith('id', [
+        'item-single',
+        'item-batch',
+      ]);
+    });
+
+    it('does not fail the confirm itself if marking notifications read errors', async () => {
+      const { from } = makeSupabase({
+        completionRow: baseCompletionRow({ status: 'pending' }),
+      });
+      const originalFrom = from.getMockImplementation()!;
+      const erroringSelectChain: Record<string, jest.Mock> = {
+        eq: jest.fn(() => erroringSelectChain),
+        is: jest.fn(() => erroringSelectChain),
+        in: jest.fn(() => erroringSelectChain),
+        returns: jest.fn(async () => ({ data: null, error: { message: 'boom' } })),
+      };
+      from.mockImplementation((table: string) => {
+        if (table === 'activity_feed_items') {
+          return { select: jest.fn(() => erroringSelectChain) };
+        }
+        return originalFrom(table);
+      });
+      const service = new SessionCompletionsService();
+
+      const result = await service.confirm(AUTH_USER_ID, {
+        orgId: ORG_ID,
+        sessionCompletionId: COMPLETION_ID,
+      });
+
+      expect(result).toEqual({ success: true, feedbackEnabled: true });
+    });
+
     it('confirms a pending row', async () => {
       makeSupabase({ completionRow: baseCompletionRow({ status: 'pending' }) });
       const service = new SessionCompletionsService();
