@@ -13,7 +13,7 @@ export function MarketingHeroSection({
   return (
     <section
       id="home"
-      className="relative overflow-hidden bg-gradient-to-b from-emerald-50/70 via-background to-background pb-16 pt-0 dark:from-emerald-950/25 dark:via-background dark:to-background"
+      className="relative overflow-hidden bg-gradient-to-b from-action-subtle/60 via-background to-background pb-16 pt-0"
     >
       <MarketingHeroPatternBackground />
       <div className={`${MARKETING_CONTAINER_CLASS} relative z-10 pt-20`}>
@@ -25,17 +25,17 @@ export function MarketingHeroSection({
             more — with support aligned to U.S. state standards, school goals, and each
             child&apos;s learning pace.
           </p>
-          <div className="mx-auto max-w-3xl rounded-3xl border border-border/60 bg-primary/25 p-8 shadow-sm dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:shadow-emerald-950/20 md:p-12">
+          <div className="mx-auto max-w-3xl rounded-3xl border border-transparent bg-action-subtle p-8 shadow-soft md:p-12">
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
               <a
                 href={loginHref}
-                className="inline-flex min-h-12 items-center justify-center rounded-full bg-primary px-8 py-3 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
+                className="inline-flex min-h-12 items-center justify-center rounded-full bg-action px-8 py-3 text-sm font-semibold text-action-foreground transition hover:opacity-90"
               >
                 Find the right tutor
               </a>
               <a
                 href="/programs"
-                className="inline-flex min-h-12 items-center justify-center rounded-full border border-border bg-background px-8 py-3 text-sm font-semibold text-foreground transition hover:bg-muted dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:hover:bg-emerald-900/35"
+                className="inline-flex min-h-12 items-center justify-center rounded-full border border-border bg-background px-8 py-3 text-sm font-semibold text-foreground transition hover:bg-muted"
               >
                 Explore programs
               </a>

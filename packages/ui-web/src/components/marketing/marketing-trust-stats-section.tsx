@@ -8,7 +8,7 @@ export function MarketingTrustStatsSection() {
         {TRUST_STATS.map((item) => (
           <div
             key={item.label}
-            className="rounded-2xl border border-border/60 bg-card p-5"
+            className="rounded-2xl border border-transparent bg-card p-5 shadow-soft"
           >
             <p className="text-2xl font-bold text-primary">{item.value}</p>
             <p className="mt-1 text-sm text-card-foreground/80">{item.label}</p>

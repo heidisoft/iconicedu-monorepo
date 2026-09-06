@@ -85,73 +85,46 @@ function buildMessagesTopSurfaceStyle(
   if (useMutedBackground) {
     return {
       borderColor: 'var(--messages-top-border)',
-      ['--messages-top-surface-bg' as string]:
-        'color-mix(in oklab, var(--muted) 60%, var(--background) 40%)',
-      ['--messages-top-border' as string]:
-        'color-mix(in oklab, var(--border) 82%, var(--muted) 18%)',
-      ['--messages-top-pattern-stroke' as string]:
-        'color-mix(in oklab, var(--muted-foreground) 10%, transparent)',
-      ['--messages-top-pattern-fill' as string]:
-        'color-mix(in oklab, var(--muted-foreground) 4%, transparent)',
+      ['--messages-top-surface-bg' as string]: 'var(--muted)',
+      ['--messages-top-border' as string]: 'var(--border)',
+      ['--messages-top-pattern-stroke' as string]: 'var(--border)',
+      ['--messages-top-pattern-fill' as string]: 'var(--muted)',
       ['--messages-top-indicator' as string]: 'var(--foreground)',
-      ['--messages-top-tab-hover' as string]:
-        'color-mix(in oklab, var(--foreground) 5%, transparent)',
-      ['--messages-top-tabs-bg' as string]:
-        'color-mix(in oklab, var(--background) 48%, transparent)',
-      ['--messages-top-tabs-border' as string]:
-        'color-mix(in oklab, var(--muted-foreground) 8%, transparent)',
-      ['--messages-top-tab-active-bg' as string]:
-        'color-mix(in oklab, var(--background) 70%, transparent)',
-      ['--messages-top-tab-active-border' as string]:
-        'color-mix(in oklab, var(--muted-foreground) 8%, transparent)',
+      ['--messages-top-tab-hover' as string]: 'var(--background)',
+      ['--messages-top-tabs-bg' as string]: 'var(--background)',
+      ['--messages-top-tabs-border' as string]: 'var(--border)',
+      ['--messages-top-tab-active-bg' as string]: 'var(--background)',
+      ['--messages-top-tab-active-border' as string]: 'var(--border)',
     };
   }
 
   if (hasTheme) {
     return {
       borderColor: 'var(--messages-top-border)',
-      ['--messages-top-surface-bg' as string]:
-        'color-mix(in oklab, var(--theme-bg) 6%, var(--background) 94%)',
-      ['--messages-top-border' as string]:
-        'color-mix(in oklab, var(--theme-bg) 18%, var(--border) 82%)',
-      ['--messages-top-pattern-stroke' as string]:
-        'color-mix(in oklab, var(--theme-bg) 18%, transparent)',
-      ['--messages-top-pattern-fill' as string]:
-        'color-mix(in oklab, var(--theme-bg) 8%, transparent)',
+      ['--messages-top-surface-bg' as string]: 'var(--theme-surface)',
+      ['--messages-top-border' as string]: 'var(--theme-outline)',
+      ['--messages-top-pattern-stroke' as string]: 'var(--theme-outline)',
+      ['--messages-top-pattern-fill' as string]: 'var(--theme-surface)',
       ['--messages-top-indicator' as string]: 'var(--theme-bg)',
-      ['--messages-top-tab-hover' as string]:
-        'color-mix(in oklab, var(--theme-bg) 10%, transparent)',
-      ['--messages-top-tabs-bg' as string]:
-        'color-mix(in oklab, var(--theme-bg) 7%, transparent)',
-      ['--messages-top-tabs-border' as string]:
-        'color-mix(in oklab, var(--theme-bg) 12%, transparent)',
-      ['--messages-top-tab-active-bg' as string]:
-        'color-mix(in oklab, var(--theme-bg) 10%, var(--background) 72%)',
-      ['--messages-top-tab-active-border' as string]:
-        'color-mix(in oklab, var(--theme-bg) 14%, transparent)',
+      ['--messages-top-tab-hover' as string]: 'var(--theme-surface)',
+      ['--messages-top-tabs-bg' as string]: 'var(--theme-surface)',
+      ['--messages-top-tabs-border' as string]: 'var(--theme-outline)',
+      ['--messages-top-tab-active-bg' as string]: 'var(--background)',
+      ['--messages-top-tab-active-border' as string]: 'var(--theme-outline)',
     };
   }
 
   return {
     borderColor: 'var(--messages-top-border)',
-    ['--messages-top-surface-bg' as string]:
-      'color-mix(in oklab, var(--muted) 58%, var(--background) 42%)',
-    ['--messages-top-border' as string]:
-      'color-mix(in oklab, var(--border) 82%, var(--muted) 18%)',
-    ['--messages-top-pattern-stroke' as string]:
-      'color-mix(in oklab, var(--muted-foreground) 10%, transparent)',
-    ['--messages-top-pattern-fill' as string]:
-      'color-mix(in oklab, var(--muted-foreground) 4%, transparent)',
+    ['--messages-top-surface-bg' as string]: 'var(--muted)',
+    ['--messages-top-border' as string]: 'var(--border)',
+    ['--messages-top-pattern-stroke' as string]: 'var(--border)',
+    ['--messages-top-pattern-fill' as string]: 'var(--muted)',
     ['--messages-top-indicator' as string]: 'var(--foreground)',
-    ['--messages-top-tab-hover' as string]:
-      'color-mix(in oklab, var(--foreground) 5%, transparent)',
-    ['--messages-top-tabs-bg' as string]:
-      'color-mix(in oklab, var(--background) 48%, transparent)',
-    ['--messages-top-tabs-border' as string]:
-      'color-mix(in oklab, var(--muted-foreground) 8%, transparent)',
-    ['--messages-top-tab-active-bg' as string]:
-      'color-mix(in oklab, var(--background) 70%, transparent)',
-    ['--messages-top-tab-active-border' as string]:
-      'color-mix(in oklab, var(--muted-foreground) 8%, transparent)',
+    ['--messages-top-tab-hover' as string]: 'var(--background)',
+    ['--messages-top-tabs-bg' as string]: 'var(--background)',
+    ['--messages-top-tabs-border' as string]: 'var(--border)',
+    ['--messages-top-tab-active-bg' as string]: 'var(--background)',
+    ['--messages-top-tab-active-border' as string]: 'var(--border)',
   };
 }

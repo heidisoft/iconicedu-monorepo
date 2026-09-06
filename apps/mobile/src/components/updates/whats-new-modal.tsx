@@ -54,9 +54,11 @@ export function WhatsNewModal({ visible, releaseNotes, onDismiss }: WhatsNewModa
             <Pressable
               accessibilityRole="button"
               onPress={onDismiss}
-              style={[styles.button, { backgroundColor: colors.teal }]}
+              style={[styles.button, { backgroundColor: colors.action }]}
             >
-              <Text style={[styles.buttonText, { color: colors.tealFg }]}>Got it</Text>
+              <Text style={[styles.buttonText, { color: colors.actionForeground }]}>
+                Got it
+              </Text>
             </Pressable>
           </Pressable>
         </Pressable>

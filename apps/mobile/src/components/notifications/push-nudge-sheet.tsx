@@ -7,10 +7,6 @@ import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 import type { NudgeVariant } from '@/hooks/use-push-nudge';
 
-const AMBER_BG_LIGHT = '#fffbeb';
-const AMBER_BG_DARK = '#2d1900';
-const AMBER_ICON = '#f59e0b';
-
 function makeStyles(C: AppColors, bottomInset: number) {
   return StyleSheet.create({
     content: {
@@ -78,19 +74,15 @@ export function PushNudgeSheet({
   onOpenSettings,
   onDismiss,
 }: Props) {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const s = useMemo(() => makeStyles(colors, insets.bottom), [colors, insets.bottom]);
 
   const isRequestVariant = variant === 'request-permission';
   const isEnableInAppVariant = variant === 'enable-in-app';
 
-  const iconBg = isRequestVariant
-    ? colors.tealBg
-    : isDark
-      ? AMBER_BG_DARK
-      : AMBER_BG_LIGHT;
-  const iconColor = isRequestVariant ? colors.teal : AMBER_ICON;
+  const iconBg = isRequestVariant ? colors.tealBg : colors.warningSubtle;
+  const iconColor = isRequestVariant ? colors.teal : colors.warning;
 
   const iosBody =
     'To get class reminders, tutor messages, and schedule changes, go to Settings → Notifications → ICONIC Academy and turn on Allow Notifications.';

@@ -35,15 +35,15 @@ export const SessionSummaryMessage = memo(function SessionSummaryMessage(
   };
 
   return (
-    <MessageBase message={message} {...baseProps} className="bg-indigo-500/5">
+    <MessageBase message={message} {...baseProps} className="bg-info/5">
       {message.content?.text && (
         <MessageTextContent text={message.content.text} className="mb-2" />
       )}
-      <div className="rounded-xl border border-indigo-500/20 bg-card overflow-hidden max-w-md">
+      <div className="rounded-xl border border-info/20 bg-card overflow-hidden max-w-md">
         <div className="p-4">
           <div className="flex items-start gap-3 mb-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/10">
-              <ClipboardList className="h-5 w-5 text-indigo-600" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-info/10">
+              <ClipboardList className="h-5 w-5 text-info" />
             </div>
             <div className="flex-1">
               <p className="text-xs font-medium text-muted-foreground mb-0.5">

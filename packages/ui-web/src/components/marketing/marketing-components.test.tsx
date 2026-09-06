@@ -24,7 +24,7 @@ describe('marketing components', () => {
   it('renders marketing header navigation and cta', () => {
     const { container } = render(<MarketingHeader loginHref="/acme/login" />);
 
-    expect(container.querySelector('header')).toHaveClass('bg-emerald-50/70');
+    expect(container.querySelector('header')).toHaveClass('bg-background/80');
     expect(container.querySelector('svg')?.getAttribute('viewBox')).toBe(
       '0 0 215.11 77.39',
     );

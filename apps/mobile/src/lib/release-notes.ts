@@ -5,7 +5,12 @@ export type ReleaseNotes = {
 };
 
 export const currentReleaseNotes: ReleaseNotes = {
-  id: '2026-06-13-whats-new-screen',
-  title: "What's new",
-  items: ['Bug fixes.', 'Update to the join meeting flow.'],
+  id: '2026-09-06-fresh-look',
+  title: 'A fresh new look',
+  items: [
+    'Refreshed the whole app with a calmer forest-green and sage colour theme.',
+    'Redesigned session cards, home overview tiles and chat bubbles.',
+    'Softer, more consistent cards, badges and status pills throughout.',
+    'Improved contrast and polish in dark mode.',
+  ],
 };

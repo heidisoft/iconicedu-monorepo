@@ -5,11 +5,10 @@ import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 
 function getSupportPalette(C: AppColors) {
-  const isDark = C.bg === C.pageBg && C.text === '#FFFFFF';
   return {
-    bg: isDark ? '#f59e0b22' : '#fff7ed',
-    border: isDark ? '#f59e0b55' : '#fdba74',
-    text: isDark ? '#fbbf24' : '#c2410c',
+    bg: C.warningSubtle,
+    border: C.warning,
+    text: C.warning,
   };
 }
 
@@ -65,7 +64,7 @@ function makeStyles(C: AppColors) {
       height: 28,
       transform: [{ rotate: '45deg' }],
       borderWidth: 6,
-      borderColor: '#f59e0b22',
+      borderColor: C.warning + '22',
     },
     eyebrowRow: {
       flexDirection: 'row',

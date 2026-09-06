@@ -10,15 +10,22 @@ const mockFetchSpaceChannelMetaByChannelId = jest.fn();
 jest.mock('@/providers/theme-provider', () => ({
   useTheme: () => ({
     colors: {
-      teal: '#14b8a6',
-      tealBg: '#f0fdfa',
+      primary: '#2f7d4a',
+      primaryForeground: '#ffffff',
+      primarySubtle: '#e2f0e2',
+      action: '#25493c',
+      actionForeground: '#ffffff',
+      teal: '#25493c',
+      tealBg: '#e7efe9',
       card: '#ffffff',
+      inkSubtle: '#eef0ea',
       inputBg: '#f1f5f9',
       border: '#e2e8f0',
       text: '#0f172a',
       textMuted: '#64748b',
       textFaint: '#94a3b8',
     },
+    isDark: false,
   }),
 }));
 
@@ -109,6 +116,36 @@ describe('SessionCard', () => {
     expect(screen.getByText('2:30 PM')).toBeTruthy();
   });
 
+  it('renders a plain card with no classroom accent bar', () => {
+    render(<SessionCard session={{ ...baseSession, themeKey: 'blue' }} />);
+
+    expect(screen.queryByTestId('session-accent-edge')).toBeNull();
+    expect(
+      StyleSheet.flatten(screen.getByTestId('session-card').props.style),
+    ).toMatchObject({
+      backgroundColor: '#ffffff',
+      borderWidth: 0,
+    });
+    expect(
+      StyleSheet.flatten(screen.getByTestId('session-date-block').props.style),
+    ).toMatchObject({ backgroundColor: '#eef0ea', borderColor: 'transparent' });
+  });
+
+  it('uses semantic action colors for an enabled join button', () => {
+    render(
+      <SessionCard
+        session={{ ...baseSession, meetingLink: 'https://meet.example.com/abc' }}
+      />,
+    );
+
+    expect(
+      StyleSheet.flatten(screen.getByLabelText('Join session').props.style),
+    ).toMatchObject({
+      backgroundColor: '#25493c',
+      borderColor: '#25493c',
+    });
+  });
+
   it('keeps the default session tile title size', () => {
     render(<SessionCard session={baseSession} />);
 
@@ -150,9 +187,9 @@ describe('SessionCard', () => {
     expect(screen.getByTestId('user-icon')).toBeTruthy();
   });
 
-  it('shows LIVE badge when isLive', () => {
+  it('shows the live status pill when isLive', () => {
     render(<SessionCard session={{ ...baseSession, isLive: true }} />);
-    expect(screen.getByText('LIVE')).toBeTruthy();
+    expect(screen.getByText('Live')).toBeTruthy();
     expect(screen.getByText('Today')).toBeTruthy();
     expect(screen.getByText('Join Now')).toBeTruthy();
   });

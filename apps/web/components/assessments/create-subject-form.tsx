@@ -24,7 +24,7 @@ const SUBJECT_ICONS = ['📚', '🔢', '🔬', '📖', '🌍', '🎨', '🎵', '
 const SUBJECT_COLORS = [
   '#3b82f6',
   '#8b5cf6',
-  '#10b981',
+  '#2dd4a8',
   '#f59e0b',
   '#ef4444',
   '#ec4899',

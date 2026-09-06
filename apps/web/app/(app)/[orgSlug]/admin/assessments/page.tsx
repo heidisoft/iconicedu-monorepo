@@ -157,7 +157,7 @@ export default async function AssessmentsOverviewPage({
                     className="group flex items-center gap-4 px-6 py-4 hover:bg-muted/30 transition-colors"
                   >
                     {step.done ? (
-                      <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
+                      <CheckCircle2 className="h-5 w-5 text-success shrink-0" />
                     ) : (
                       <Circle className="h-5 w-5 text-muted-foreground/30 shrink-0" />
                     )}

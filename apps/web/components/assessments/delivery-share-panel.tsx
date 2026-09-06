@@ -75,7 +75,7 @@ export function DeliverySharePanel({
             <Button variant="outline" size="sm" onClick={handleCopy} className="shrink-0">
               {copied ? (
                 <>
-                  <Check className="mr-1.5 h-3.5 w-3.5 text-emerald-500" /> Copied
+                  <Check className="mr-1.5 h-3.5 w-3.5 text-success" /> Copied
                 </>
               ) : (
                 <>

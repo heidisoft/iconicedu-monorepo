@@ -482,8 +482,21 @@ export function ChatImageViewer({
                         <View style={styles.centerState}>
                           <Text style={styles.errorTitle}>Unable to load image</Text>
                           <Text style={styles.errorBody}>{error}</Text>
-                          <Pressable onPress={handleRetry} style={styles.retryButton}>
-                            <Text style={styles.retryButtonText}>Retry</Text>
+                          <Pressable
+                            onPress={handleRetry}
+                            style={[
+                              styles.retryButton,
+                              { backgroundColor: colors.action },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.retryButtonText,
+                                { color: colors.actionForeground },
+                              ]}
+                            >
+                              Retry
+                            </Text>
                           </Pressable>
                         </View>
                       ) : (
@@ -597,6 +610,7 @@ export function ChatImageViewer({
                     disabled={strokes.length === 0 || sendAnnotationBusy}
                     style={[
                       styles.sendButton,
+                      { backgroundColor: colors.action },
                       (strokes.length === 0 || sendAnnotationBusy) &&
                         styles.buttonDisabled,
                     ]}
@@ -808,7 +822,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#14b8a6',
   },
   buttonDisabled: {
     opacity: 0.4,
@@ -847,7 +860,6 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   errorTitle: {
-    color: '#fff',
     fontSize: 20,
     fontWeight: '700',
   },
@@ -860,7 +872,6 @@ const styles = StyleSheet.create({
   retryButton: {
     marginTop: 8,
     borderRadius: 999,
-    backgroundColor: '#14b8a6',
     paddingHorizontal: 18,
     paddingVertical: 10,
   },

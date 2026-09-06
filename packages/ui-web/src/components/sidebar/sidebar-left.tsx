@@ -901,7 +901,7 @@ export function SidebarLeft({
                   <span className="inline-flex items-center gap-2">
                     <span>Classrooms</span>
                     {totalLearningSpacesUnread > 0 ? (
-                      <Badge className="h-4 px-1.5 text-[10px] bg-rose-500 text-white">
+                      <Badge className="h-4 px-1.5 text-[10px] bg-destructive text-white">
                         {totalLearningSpacesUnread}
                       </Badge>
                     ) : null}

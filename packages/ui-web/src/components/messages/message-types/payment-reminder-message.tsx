@@ -22,17 +22,17 @@ const statusConfig = {
   pending: {
     icon: Clock,
     label: 'Pending',
-    color: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
+    color: 'bg-warning/10 text-warning border-warning/20',
   },
   paid: {
     icon: CheckCircle2,
     label: 'Paid',
-    color: 'bg-green-500/10 text-green-600 border-green-500/20',
+    color: 'bg-success/10 text-success border-success/20',
   },
   overdue: {
     icon: AlertCircle,
     label: 'Overdue',
-    color: 'bg-red-500/10 text-red-600 border-red-500/20',
+    color: 'bg-destructive/10 text-destructive border-destructive/20',
   },
 };
 
@@ -60,13 +60,13 @@ export const PaymentReminderMessage = memo(function PaymentReminderMessage(
   };
 
   return (
-    <MessageBase message={message} {...baseProps} className="bg-amber-500/5">
-      <div className="rounded-xl border border-amber-500/20 bg-card overflow-hidden max-w-sm">
+    <MessageBase message={message} {...baseProps} className="bg-warning/5">
+      <div className="rounded-xl border border-warning/20 bg-card overflow-hidden max-w-sm">
         <div className="p-4">
           <div className="flex items-start justify-between gap-3 mb-3">
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/10">
-                <CreditCard className="h-4 w-4 text-amber-600" />
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-warning/10">
+                <CreditCard className="h-4 w-4 text-warning" />
               </div>
               <div>
                 <p className="text-xs font-medium text-muted-foreground">

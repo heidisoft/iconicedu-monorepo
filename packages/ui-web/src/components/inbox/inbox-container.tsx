@@ -349,7 +349,7 @@ export function InboxContainer({
             <TabsTrigger key={tab.key} value={tab.key} className="gap-2">
               <span>{tab.label}</span>
               {tabCounts[tab.key] > 0 && (
-                <Badge className="h-4 bg-rose-500 px-1.5 text-[10px] text-white">
+                <Badge className="h-4 bg-destructive px-1.5 text-[10px] text-white">
                   {tabCounts[tab.key]}
                 </Badge>
               )}

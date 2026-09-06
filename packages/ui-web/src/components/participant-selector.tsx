@@ -103,7 +103,7 @@ export function ParticipantSelector({
             variant="outline"
             role="combobox"
             aria-expanded={open}
-            className="h-12 w-full justify-start gap-2 border-2 border-blue-500 bg-background px-4 hover:bg-background focus-visible:ring-2 focus-visible:ring-blue-500"
+            className="h-12 w-full justify-start gap-2 border-2 px-4 focus-visible:ring-2"
           >
             <UserPlus className="size-5 text-muted-foreground" />
             <span className="text-muted-foreground">{placeholder}</span>

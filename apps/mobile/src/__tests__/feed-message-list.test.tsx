@@ -314,12 +314,12 @@ describe('FeedMessageList', () => {
     const cards = screen.getAllByTestId('feed-text-card');
     expect(StyleSheet.flatten(cards[0].props.style)).toEqual(
       expect.objectContaining({
-        backgroundColor: 'rgba(148, 163, 184, 0.16)',
+        backgroundColor: '#eceffa',
       }),
     );
     expect(StyleSheet.flatten(cards[1].props.style)).toEqual(
       expect.objectContaining({
-        backgroundColor: 'rgba(45, 212, 168, 0.22)',
+        backgroundColor: '#e2f0e2',
       }),
     );
   });

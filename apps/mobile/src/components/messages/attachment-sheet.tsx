@@ -161,7 +161,7 @@ function makeStyles(C: AppColors) {
     overlay: {
       flex: 1,
       justifyContent: 'flex-end',
-      backgroundColor: 'rgba(0,0,0,0.5)',
+      backgroundColor: C.modalOverlay,
     },
     sheet: {
       backgroundColor: C.pageBg,
@@ -240,7 +240,7 @@ function makeStyles(C: AppColors) {
       width: 64,
       height: 64,
       borderRadius: 32,
-      backgroundColor: '#ef4444',
+      backgroundColor: C.red,
       alignItems: 'center',
       justifyContent: 'center',
     },

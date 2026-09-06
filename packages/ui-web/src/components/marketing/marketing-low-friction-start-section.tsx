@@ -31,7 +31,7 @@ export function MarketingLowFrictionStartSection({
 }: MarketingLowFrictionStartSectionProps) {
   return (
     <section className={MARKETING_SECTION_CLASS}>
-      <div className={`${MARKETING_PANEL_CLASS} bg-emerald-50/50 dark:bg-emerald-950/20`}>
+      <div className={`${MARKETING_PANEL_CLASS} bg-action-subtle/50`}>
         <div className="max-w-3xl">
           <p className="text-sm font-semibold uppercase text-primary">
             Easy ways to start

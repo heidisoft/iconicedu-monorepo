@@ -22,15 +22,15 @@ interface LessonAssignmentMessageProps extends Omit<
 const difficultyConfig = {
   beginner: {
     label: 'Beginner',
-    color: 'bg-green-500/10 text-green-600 border-green-500/20',
+    color: 'bg-success/10 text-success border-success/20',
   },
   intermediate: {
     label: 'Intermediate',
-    color: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
+    color: 'bg-warning/10 text-warning border-warning/20',
   },
   advanced: {
     label: 'Advanced',
-    color: 'bg-red-500/10 text-red-600 border-red-500/20',
+    color: 'bg-destructive/10 text-destructive border-destructive/20',
   },
 };
 

@@ -21,7 +21,7 @@ describe('marketing sections', () => {
         'Personalized K-12 tutoring for school success, confidence, and future-ready skills.',
       ),
     ).toBeInTheDocument();
-    expect(container.querySelector('section#home')).toHaveClass('from-emerald-50/70');
+    expect(container.querySelector('section#home')).toHaveClass('from-action-subtle/60');
     expect(screen.getByTestId('hero-background')).toBeInTheDocument();
     expect(screen.getByTestId('hero-pattern-cluster')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Find the right tutor' })).toHaveAttribute(

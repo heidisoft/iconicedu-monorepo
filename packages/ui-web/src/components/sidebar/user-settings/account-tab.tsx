@@ -152,7 +152,7 @@ export function AccountTab({
     isVerified ? (
       <Tooltip>
         <TooltipTrigger asChild>
-          <Badge className="bg-green-100 text-green-700 hover:bg-green-100">
+          <Badge className="bg-success/15 text-success hover:bg-success/15">
             <BadgeCheck className="h-3 w-3" />
             <span className="sr-only">Verified</span>
           </Badge>

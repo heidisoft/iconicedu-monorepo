@@ -44,11 +44,11 @@ const ITEM_TYPE_COLORS: Record<string, string> = {
 const DIFFICULTY_LABELS = ['', 'Beginner', 'Easy', 'Medium', 'Hard', 'Expert'];
 const DIFFICULTY_COLORS = [
   '',
-  'text-emerald-600',
-  'text-green-600',
-  'text-amber-600',
-  'text-orange-600',
-  'text-red-600',
+  'text-success',
+  'text-success',
+  'text-warning',
+  'text-warning',
+  'text-destructive',
 ];
 
 export default async function ItemBankPage({

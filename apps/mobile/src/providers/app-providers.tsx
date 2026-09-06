@@ -5,7 +5,7 @@ import { getScreenName } from '@/lib/screen-name';
 import { AuthProvider } from '@/providers/auth-provider';
 import { FamilyViewProvider } from '@/providers/family-view-provider';
 import { QueryProvider } from '@/providers/query-provider';
-import { ThemeProvider } from '@/providers/theme-provider';
+import { ThemeProvider, useTheme } from '@/providers/theme-provider';
 import { AnalyticsProvider, useAnalytics } from '@/providers/analytics-provider';
 import { ToastProvider } from '@/providers/toast-provider';
 import { CrashBoundary } from '@/components/analytics/crash-boundary';
@@ -37,7 +37,12 @@ function UiTrackingBridge({ children }: { children: React.ReactNode }) {
  */
 function CrashBoundaryBridge({ children }: { children: React.ReactNode }) {
   const analytics = useAnalytics();
-  return <CrashBoundary analyticsCapture={analytics.capture}>{children}</CrashBoundary>;
+  const { colors } = useTheme();
+  return (
+    <CrashBoundary analyticsCapture={analytics.capture} colors={colors}>
+      {children}
+    </CrashBoundary>
+  );
 }
 
 export function AppProviders({ children }: { children: React.ReactNode }) {
