@@ -176,6 +176,7 @@ export interface ClassSession {
   endAt: string;
   status: ClassScheduleVM['status'];
   meetingLink?: string | null;
+  themeKey?: ClassScheduleVM['themeKey'];
   variant?: 'default' | 'exception' | 'override';
   disabled?: boolean;
   reason?: string | null;
@@ -636,6 +637,7 @@ export function toMonthGroups(
         endAt: schedule.endAt,
         status: schedule.status,
         meetingLink: schedule.meetingLink ?? null,
+        themeKey: schedule.themeKey ?? null,
         variant: schedule.uiState?.kind ?? 'default',
         disabled: schedule.uiState?.disabled ?? false,
         reason: schedule.uiState?.reason ?? null,

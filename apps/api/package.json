@@ -4,8 +4,10 @@
   "private": true,
   "scripts": {
     "build": "prisma generate && nest build",
+    "predev": "prisma generate",
     "dev": "node scripts/dev.mjs",
     "start": "node dist/apps/api/src/main.js",
+    "prestart:dev": "prisma generate",
     "start:dev": "node scripts/dev.mjs",
     "start:debug": "node --inspect scripts/dev.mjs",
     "start:prod": "node dist/apps/api/src/main.js",

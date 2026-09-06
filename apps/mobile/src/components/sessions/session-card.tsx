@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -22,6 +22,7 @@ import {
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/providers/theme-provider';
+import type { AppColors } from '@/lib/theme';
 import { usePushConsent } from '@/providers/push-consent-provider';
 import { fetchSpaceChannelMetaByChannelId } from '@/lib/api/queries';
 import {
@@ -29,6 +30,7 @@ import {
   MESSAGE_TITLE_FONT_WEIGHT,
 } from '@/lib/message-title-typography';
 import type { ClassScheduleVM, ParticipantRoleVM } from '@iconicedu/shared-types';
+import { profileAvatarColors } from '@/lib/profile-avatar-colors';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -54,6 +56,8 @@ export type ClassSession = {
   isPast: boolean;
   status: ClassScheduleVM['status'];
   meetingLink?: string | null;
+  /** Classroom accent selected in learning-space settings. */
+  themeKey?: string | null;
   /** Source channel ID — used to navigate to the class */
   channelId?: string | null;
   /** Child participants with optional theme color */
@@ -98,33 +102,6 @@ export function formatOriginalDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-// ─── Theme color helper ─────────────────────────────────────────────────────────
-
-const THEME_COLORS: Record<string, string> = {
-  slate: '#64748b',
-  gray: '#6b7280',
-  zinc: '#71717a',
-  neutral: '#737373',
-  stone: '#78716c',
-  red: '#ef4444',
-  orange: '#f97316',
-  amber: '#f59e0b',
-  yellow: '#ca8a04',
-  lime: '#65a30d',
-  green: '#16a34a',
-  emerald: '#059669',
-  teal: '#0d9488',
-  cyan: '#0891b2',
-  sky: '#0284c7',
-  blue: '#2563eb',
-  indigo: '#4f46e5',
-  violet: '#7c3aed',
-  purple: '#9333ea',
-  fuchsia: '#c026d3',
-  pink: '#db2777',
-  rose: '#e11d48',
-};
-
 const SESSION_PARTICIPANT_GROUP_ORDER: Array<
   Extract<ParticipantRoleVM, 'educator' | 'guardian' | 'child' | 'staff'>
 > = ['educator', 'guardian', 'child', 'staff'];
@@ -140,7 +117,9 @@ const SESSION_PARTICIPANT_ICON_MAP: Record<
 };
 
 function themeKeyColor(themeKey?: string | null, fallback?: string): string {
-  return (themeKey && THEME_COLORS[themeKey]) || fallback || '#64748b';
+  return themeKey
+    ? profileAvatarColors({ themeKey, seed: themeKey }).bg
+    : (fallback ?? '#64748b');
 }
 
 function buildParticipantGroups(
@@ -193,8 +172,6 @@ function resolveJoinHrefForMobile(joinHref: string): string {
 
 // ─── SessionCard ────────────────────────────────────────────────────────────────
 
-const hairline = StyleSheet.hairlineWidth;
-
 export function SessionCard({
   session,
   style,
@@ -220,6 +197,7 @@ export function SessionCard({
   } | null;
 }) {
   const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
   const { requestPushConsent } = usePushConsent();
   const router = useRouter();
   const [externalJoinTarget, setExternalJoinTarget] = useState<{
@@ -235,18 +213,28 @@ export function SessionCard({
   const participants =
     session.participants?.filter((participant) => participant.name.trim()) ?? [];
   const participantGroups = buildParticipantGroups(participants);
-
-  const badgeBg = isLive ? colors.teal : colors.pageBg;
+  // Date chip — a filled pale-green block by default (matches the theme's tile
+  // language); solid primary when live.
+  const badgeBg = isLive
+    ? colors.primary
+    : isPast || isDisabled
+      ? colors.card
+      : colors.inkSubtle;
   const badgeTxt = isLive
-    ? '#fff'
+    ? colors.primaryForeground
     : isPast || isDisabled
       ? colors.textMuted
       : colors.text;
-  const badgeBorderColor = isLive ? colors.teal : colors.border;
+  const badgeBorderColor = 'transparent';
 
-  const cardBorderColor = isLive ? colors.teal : colors.border;
-  const cardBorderWidth = isLive ? 1.5 : hairline;
-  const cardBg = isLive ? colors.tealBg : isPast ? colors.inputBg : colors.card;
+  // Card — a clean, soft floating surface. No left accent bar, no border unless live.
+  const cardBorderColor = isLive ? colors.primary : 'transparent';
+  const cardBorderWidth = isLive ? 1 : 0;
+  const cardBg = isLive
+    ? colors.primarySubtle
+    : isPast || isDisabled
+      ? colors.inkSubtle
+      : colors.card;
 
   const handlePress =
     session.channelId && enableCardPress
@@ -331,6 +319,7 @@ export function SessionCard({
   return (
     <>
       <TouchableOpacity
+        testID="session-card"
         style={[
           s.sessionCard,
           {
@@ -349,15 +338,17 @@ export function SessionCard({
       >
         {/* Day badge */}
         <View
+          testID="session-date-block"
           style={[
             s.sessionDayBadge,
-            {
-              backgroundColor: badgeBg,
-              borderColor: badgeBorderColor,
-            },
+            { backgroundColor: badgeBg, borderColor: badgeBorderColor },
           ]}
         >
-          {isLive && <Text style={[s.sessionDayExtra, { color: '#fff' }]}>Today</Text>}
+          {isLive && (
+            <Text style={[s.sessionDayExtra, { color: colors.primaryForeground }]}>
+              Today
+            </Text>
+          )}
           <Text style={[s.sessionDayName, { color: badgeTxt }]}>{session.dayName}</Text>
           <Text style={[s.sessionDayNum, { color: badgeTxt }]}>{session.dayNum}</Text>
         </View>
@@ -382,26 +373,21 @@ export function SessionCard({
               {session.label}
             </Text>
             {isLive && (
-              <View style={[s.liveBadge, { backgroundColor: colors.teal }]}>
-                <Text style={s.liveBadgeText}>LIVE</Text>
+              <View style={[s.statusPill, { backgroundColor: colors.primarySubtle }]}>
+                <View style={[s.statusDot, { backgroundColor: colors.primary }]} />
+                <Text style={[s.statusPillText, { color: colors.primary }]}>Live</Text>
               </View>
             )}
             {(session.status === 'cancelled' || session.variant === 'exception') && (
-              <View style={[s.variantBadge, { backgroundColor: colors.inputBg }]}>
-                <Text style={[s.variantBadgeText, { color: colors.textMuted }]}>
+              <View style={[s.statusPill, { backgroundColor: colors.inkSubtle }]}>
+                <Text style={[s.statusPillText, { color: colors.textMuted }]}>
                   Canceled
                 </Text>
               </View>
             )}
             {(session.status === 'rescheduled' || session.variant === 'override') && (
-              <View
-                style={[
-                  s.variantBadge,
-                  s.variantBadgeOutline,
-                  { borderColor: colors.border },
-                ]}
-              >
-                <Text style={[s.variantBadgeText, { color: colors.textMuted }]}>
+              <View style={[s.statusPill, { backgroundColor: colors.inkSubtle }]}>
+                <Text style={[s.statusPillText, { color: colors.textMuted }]}>
                   Rescheduled
                 </Text>
               </View>
@@ -513,12 +499,8 @@ export function SessionCard({
               style={[
                 s.joinBtn,
                 {
-                  backgroundColor: joinIsActive
-                    ? isLive
-                      ? colors.teal
-                      : colors.tealBg
-                    : colors.inputBg,
-                  borderColor: joinIsActive ? colors.teal : colors.border,
+                  backgroundColor: joinIsActive ? colors.action : colors.inputBg,
+                  borderColor: joinIsActive ? colors.action : colors.border,
                   opacity: joinIsActive ? 1 : 0.6,
                 },
               ]}
@@ -529,17 +511,13 @@ export function SessionCard({
             >
               <Video
                 size={11}
-                color={joinIsActive ? (isLive ? '#fff' : colors.teal) : colors.textMuted}
+                color={joinIsActive ? colors.actionForeground : colors.textMuted}
               />
               <Text
                 style={[
                   s.joinBtnTxt,
                   {
-                    color: joinIsActive
-                      ? isLive
-                        ? '#fff'
-                        : colors.teal
-                      : colors.textMuted,
+                    color: joinIsActive ? colors.actionForeground : colors.textMuted,
                   },
                 ]}
               >
@@ -561,16 +539,15 @@ export function SessionCard({
               <Text style={[s.joinBtnTxt, { color: colors.textMuted }]}>Unavailable</Text>
             </View>
           ) : showJoinButton ? (
-            <TouchableOpacity
+            <View
               style={[
                 s.joinBtn,
                 { backgroundColor: colors.inputBg, borderColor: colors.border },
               ]}
-              activeOpacity={0.7}
             >
               <Video size={11} color={colors.textMuted} />
               <Text style={[s.joinBtnTxt, { color: colors.textMuted }]}>Recording</Text>
-            </TouchableOpacity>
+            </View>
           ) : null}
           {cancelAction ? (
             <TouchableOpacity
@@ -647,7 +624,7 @@ export function SessionCard({
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[s.modalButton, s.modalButtonPrimary]}
+                style={[s.modalButton, { backgroundColor: colors.action }]}
                 onPress={() => {
                   if (externalJoinTarget?.joinHref) {
                     void requestPushConsent();
@@ -662,8 +639,10 @@ export function SessionCard({
                     : 'Open session'
                 }
               >
-                <Video size={16} color="#ffffff" />
-                <Text style={s.modalButtonPrimaryText}>
+                <Video size={16} color={colors.actionForeground} />
+                <Text
+                  style={[s.modalButtonPrimaryText, { color: colors.actionForeground }]}
+                >
                   {externalJoinTarget?.providerLabel
                     ? `Join ${externalJoinTarget.providerLabel}`
                     : 'Join session'}
@@ -688,259 +667,259 @@ export function SessionCard({
   );
 }
 
-const s = StyleSheet.create({
-  sessionCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 12,
-  },
-  sessionCardPast: {
-    opacity: 0.85,
-  },
-  sessionDayBadge: {
-    minWidth: 44,
-    paddingHorizontal: 6,
-    paddingVertical: 6,
-    borderRadius: 10,
-    borderWidth: hairline,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  sessionDayExtra: {
-    fontSize: 9,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-  },
-  sessionDayName: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  sessionDayNum: {
-    fontSize: 17,
-    fontWeight: '700',
-    lineHeight: 20,
-  },
-  sessionInfo: {
-    flex: 1,
-    gap: 3,
-  },
-  sessionTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    flexWrap: 'wrap',
-  },
-  sessionTitleRowMessageList: {
-    marginBottom: 2,
-  },
-  sessionLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  sessionLabelMessageList: {
-    fontSize: MESSAGE_TITLE_FONT_SIZE,
-    fontWeight: MESSAGE_TITLE_FONT_WEIGHT,
-  },
-  sessionTimeRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    flexWrap: 'wrap',
-    gap: 3,
-  },
-  sessionTimeTxt: {
-    fontSize: 12,
-  },
-  sessionParticipantWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 8,
-    flexShrink: 1,
-    minWidth: 0,
-  },
-  sessionParticipantGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    minWidth: 0,
-  },
-  sessionParticipantNames: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexShrink: 1,
-    minWidth: 0,
-  },
-  sessionParticipantName: {
-    fontSize: 12,
-    lineHeight: 17,
-    color: '#64748b',
-    fontWeight: '600',
-  },
-  sessionOriginalTimeTxt: {
-    fontSize: 12,
-  },
-  sessionOriginalTimeStrike: {
-    textDecorationLine: 'line-through',
-  },
-  sessionReasonTxt: {
-    fontSize: 12,
-    fontStyle: 'italic',
-  },
-  liveBadge: {
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 4,
-  },
-  liveBadgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  variantBadge: {
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 4,
-  },
-  variantBadgeOutline: {
-    backgroundColor: 'transparent',
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  variantBadgeText: {
-    fontSize: 10,
-    fontWeight: '500',
-  },
-  sessionActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    flexShrink: 0,
-  },
-  iconBtn: {
-    width: 28,
-    height: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  cancelBtn: {
-    minHeight: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 10,
-  },
-  cancelBtnTxt: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  joinBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 20,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  joinBtnTxt: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  modalBackdrop: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-    backgroundColor: 'rgba(15, 23, 42, 0.42)',
-  },
-  modalCard: {
-    gap: 16,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    backgroundColor: '#ffffff',
-    padding: 20,
-  },
-  modalHeading: { gap: 8 },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#0f172a',
-  },
-  modalDescription: {
-    fontSize: 15,
-    lineHeight: 20,
-    color: '#64748b',
-  },
-  modalLinkBox: {
-    gap: 6,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    backgroundColor: '#f1f5f9',
-    padding: 14,
-  },
-  modalLinkLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-    color: '#64748b',
-  },
-  modalLinkValue: {
-    fontSize: 14,
-    lineHeight: 19,
-    color: '#0f172a',
-  },
-  modalFooter: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  modalButton: {
-    minWidth: 104,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 8,
-    borderRadius: 18,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  modalButtonSecondary: {
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    backgroundColor: '#f1f5f9',
-  },
-  modalButtonPrimary: {
-    backgroundColor: '#14b8a6',
-  },
-  modalButtonSecondaryText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#0f172a',
-  },
-  modalButtonPrimaryText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  modalCloseIconButton: {
-    width: 42,
-    height: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 21,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    backgroundColor: '#f1f5f9',
-  },
-});
+function makeStyles(C: AppColors) {
+  return StyleSheet.create({
+    sessionCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      borderRadius: 20,
+      shadowColor: '#1f2a26',
+      shadowOpacity: 0.06,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 2,
+    },
+    sessionCardPast: {
+      opacity: 0.85,
+      shadowOpacity: 0,
+      elevation: 0,
+    },
+    sessionDayBadge: {
+      minWidth: 48,
+      minHeight: 58,
+      paddingHorizontal: 8,
+      paddingVertical: 7,
+      borderRadius: 14,
+      borderWidth: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+    },
+    sessionDayExtra: {
+      fontSize: 9,
+      fontWeight: '700',
+      letterSpacing: 0.5,
+      textTransform: 'uppercase',
+    },
+    sessionDayName: {
+      fontSize: 11,
+      fontWeight: '600',
+    },
+    sessionDayNum: {
+      fontSize: 17,
+      fontWeight: '700',
+      lineHeight: 20,
+    },
+    sessionInfo: {
+      flex: 1,
+      gap: 3,
+    },
+    sessionTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      flexWrap: 'wrap',
+    },
+    sessionTitleRowMessageList: {
+      marginBottom: 2,
+    },
+    sessionLabel: {
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    sessionLabelMessageList: {
+      fontSize: MESSAGE_TITLE_FONT_SIZE,
+      fontWeight: MESSAGE_TITLE_FONT_WEIGHT,
+    },
+    sessionTimeRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      flexWrap: 'wrap',
+      gap: 3,
+    },
+    sessionTimeTxt: {
+      fontSize: 12,
+    },
+    sessionParticipantWrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      gap: 8,
+      flexShrink: 1,
+      minWidth: 0,
+    },
+    sessionParticipantGroup: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      minWidth: 0,
+    },
+    sessionParticipantNames: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexShrink: 1,
+      minWidth: 0,
+    },
+    sessionParticipantName: {
+      fontSize: 12,
+      lineHeight: 17,
+      color: C.textMuted,
+      fontWeight: '600',
+    },
+    sessionOriginalTimeTxt: {
+      fontSize: 12,
+    },
+    sessionOriginalTimeStrike: {
+      textDecorationLine: 'line-through',
+    },
+    sessionReasonTxt: {
+      fontSize: 12,
+      fontStyle: 'italic',
+    },
+    statusPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 999,
+    },
+    statusDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+    },
+    statusPillText: {
+      fontSize: 10,
+      fontWeight: '700',
+      letterSpacing: 0.3,
+    },
+    sessionActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      flexShrink: 0,
+    },
+    iconBtn: {
+      width: 28,
+      height: 28,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 14,
+      borderWidth: StyleSheet.hairlineWidth,
+    },
+    cancelBtn: {
+      minHeight: 28,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 14,
+      borderWidth: StyleSheet.hairlineWidth,
+      paddingHorizontal: 10,
+    },
+    cancelBtnTxt: {
+      fontSize: 12,
+      fontWeight: '700',
+    },
+    joinBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+      borderRadius: 999,
+      borderWidth: 1,
+    },
+    joinBtnTxt: {
+      fontSize: 12,
+      fontWeight: '700',
+    },
+    modalBackdrop: {
+      flex: 1,
+      justifyContent: 'center',
+      paddingHorizontal: 20,
+      backgroundColor: C.modalOverlay,
+    },
+    modalCard: {
+      gap: 16,
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor: C.border,
+      backgroundColor: C.card,
+      padding: 20,
+    },
+    modalHeading: { gap: 8 },
+    modalTitle: {
+      fontSize: 20,
+      fontWeight: '700',
+      color: C.text,
+    },
+    modalDescription: {
+      fontSize: 15,
+      lineHeight: 20,
+      color: C.textMuted,
+    },
+    modalLinkBox: {
+      gap: 6,
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: C.border,
+      backgroundColor: C.inputBg,
+      padding: 14,
+    },
+    modalLinkLabel: {
+      fontSize: 12,
+      fontWeight: '700',
+      letterSpacing: 0.5,
+      textTransform: 'uppercase',
+      color: C.textMuted,
+    },
+    modalLinkValue: {
+      fontSize: 14,
+      lineHeight: 19,
+      color: C.text,
+    },
+    modalFooter: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      flexWrap: 'wrap',
+      gap: 10,
+    },
+    modalButton: {
+      minWidth: 104,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexDirection: 'row',
+      gap: 8,
+      borderRadius: 999,
+      paddingHorizontal: 16,
+      paddingVertical: 11,
+    },
+    modalButtonSecondary: {
+      borderWidth: 1,
+      borderColor: C.border,
+      backgroundColor: C.inputBg,
+    },
+    modalButtonSecondaryText: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: C.text,
+    },
+    modalButtonPrimaryText: {
+      fontSize: 15,
+      fontWeight: '700',
+    },
+    modalCloseIconButton: {
+      width: 42,
+      height: 42,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 21,
+      borderWidth: 1,
+      borderColor: C.border,
+      backgroundColor: C.inputBg,
+    },
+  });
+}

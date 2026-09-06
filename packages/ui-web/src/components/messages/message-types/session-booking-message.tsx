@@ -32,17 +32,17 @@ interface SessionBookingMessageProps extends Omit<
 const sessionStatusConfig = {
   scheduled: {
     label: 'Scheduled',
-    color: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
+    color: 'bg-info/10 text-info border-info/20',
     icon: Clock,
   },
   confirmed: {
     label: 'Confirmed',
-    color: 'bg-green-500/10 text-green-600 border-green-500/20',
+    color: 'bg-success/10 text-success border-success/20',
     icon: CheckCircle2,
   },
   cancelled: {
     label: 'Cancelled',
-    color: 'bg-red-500/10 text-red-600 border-red-500/20',
+    color: 'bg-destructive/10 text-destructive border-destructive/20',
     icon: AlertCircle,
   },
   completed: {
@@ -81,16 +81,16 @@ export const SessionBookingMessage = memo(function SessionBookingMessage(
   };
 
   return (
-    <MessageBase message={message} {...baseProps} className="bg-blue-500/5">
+    <MessageBase message={message} {...baseProps} className="bg-info/5">
       {message.content?.text && (
         <MessageTextContent text={message.content.text} className="mb-2" />
       )}
-      <div className="rounded-xl border border-blue-500/20 bg-card overflow-hidden max-w-md">
+      <div className="rounded-xl border border-info/20 bg-card overflow-hidden max-w-md">
         <div className="p-4">
           <div className="flex items-start justify-between gap-3 mb-3">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10">
-                <GraduationCap className="h-5 w-5 text-blue-600" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-info/10">
+                <GraduationCap className="h-5 w-5 text-info" />
               </div>
               <div>
                 <p className="text-xs font-medium text-muted-foreground">

@@ -24,7 +24,7 @@ export function NavMain({ items }: { items: SidebarNavItem[] }) {
               </a>
             </SidebarMenuButton>
             {item.count && (
-              <SidebarMenuBadge className="px-1.5 text-[10px] bg-rose-500 text-white peer-hover/menu-button:text-white peer-data-active/menu-button:text-white">
+              <SidebarMenuBadge className="px-1.5 text-[10px] bg-destructive text-white peer-hover/menu-button:text-white peer-data-active/menu-button:text-white">
                 {item.count}
               </SidebarMenuBadge>
             )}

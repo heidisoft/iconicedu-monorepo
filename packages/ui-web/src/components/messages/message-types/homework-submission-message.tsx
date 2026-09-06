@@ -20,17 +20,17 @@ interface HomeworkSubmissionMessageProps extends Omit<
 const homeworkStatusConfig = {
   submitted: {
     label: 'Submitted',
-    color: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
+    color: 'bg-info/10 text-info border-info/20',
     icon: Send,
   },
   graded: {
     label: 'Graded',
-    color: 'bg-green-500/10 text-green-600 border-green-500/20',
+    color: 'bg-success/10 text-success border-success/20',
     icon: Award,
   },
   'needs-revision': {
     label: 'Needs Revision',
-    color: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
+    color: 'bg-warning/10 text-warning border-warning/20',
     icon: AlertCircle,
   },
 };
@@ -55,16 +55,16 @@ export const HomeworkSubmissionMessage = memo(function HomeworkSubmissionMessage
   };
 
   return (
-    <MessageBase message={message} {...baseProps} className="bg-blue-500/5">
+    <MessageBase message={message} {...baseProps} className="bg-info/5">
       {message.content?.text && (
         <MessageTextContent text={message.content.text} className="mb-2" />
       )}
-      <div className="rounded-xl border border-blue-500/20 bg-card overflow-hidden max-w-md">
+      <div className="rounded-xl border border-info/20 bg-card overflow-hidden max-w-md">
         <div className="p-4">
           <div className="flex items-start justify-between gap-3 mb-3">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10">
-                <FileText className="h-5 w-5 text-blue-600" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-info/10">
+                <FileText className="h-5 w-5 text-info" />
               </div>
               <div>
                 <p className="text-xs font-medium text-muted-foreground">

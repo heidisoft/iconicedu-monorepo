@@ -429,11 +429,18 @@ export function ChatPdfViewer({
                       <Text style={styles.errorBody}>{error}</Text>
                       <Pressable
                         onPress={retryLoad}
-                        style={styles.retryButton}
+                        style={[styles.retryButton, { backgroundColor: colors.action }]}
                         accessibilityLabel="Retry PDF preview"
                       >
-                        <RefreshCcw size={16} color="#fff" />
-                        <Text style={styles.retryButtonText}>Retry</Text>
+                        <RefreshCcw size={16} color={colors.actionForeground} />
+                        <Text
+                          style={[
+                            styles.retryButtonText,
+                            { color: colors.actionForeground },
+                          ]}
+                        >
+                          Retry
+                        </Text>
                       </Pressable>
                     </>
                   )}
@@ -502,6 +509,7 @@ export function ChatPdfViewer({
                     disabled={strokes.length === 0 || sendAnnotationBusy}
                     style={[
                       styles.sendButton,
+                      { backgroundColor: colors.action },
                       (strokes.length === 0 || sendAnnotationBusy) &&
                         styles.buttonDisabled,
                     ]}
@@ -574,7 +582,7 @@ export function ChatPdfViewer({
                       style={[
                         styles.bottomBarButton,
                         isSaveDisabled && saveState === 'idle' && styles.buttonDisabled,
-                        saveState === 'done' && styles.bottomBarButtonDone,
+                        saveState === 'done' && { backgroundColor: colors.action },
                       ]}
                       accessibilityLabel="Save PDF"
                       accessibilityState={{ disabled: isSaveDisabled }}
@@ -711,12 +719,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     borderRadius: 999,
-    backgroundColor: '#14b8a6',
     paddingHorizontal: 18,
     paddingVertical: 10,
   },
   retryButtonText: {
-    color: '#fff',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -766,16 +772,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.12)',
   },
-  bottomBarButtonDone: {
-    backgroundColor: '#14b8a6',
-  },
   sendButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#14b8a6',
   },
   buttonDisabled: {
     opacity: 0.4,

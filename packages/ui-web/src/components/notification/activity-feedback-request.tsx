@@ -336,7 +336,7 @@ export function ActivityFeedbackRequest({
               className={cn(
                 'flex h-8 w-8 items-center justify-center rounded-full border border-border bg-background transition-colors duration-150',
                 canSubmit && !isSubmitting && !isSubmitted
-                  ? 'cursor-pointer hover:border-amber-300 hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2'
+                  ? 'cursor-pointer hover:border-warning/40 hover:bg-warning/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2'
                   : 'cursor-default',
               )}
               aria-label={`Rate ${value} star${value === 1 ? '' : 's'}`}
@@ -346,7 +346,7 @@ export function ActivityFeedbackRequest({
               <Star
                 className={cn(
                   'h-4 w-4 transition-colors duration-150',
-                  isActive ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground',
+                  isActive ? 'fill-warning text-warning' : 'text-muted-foreground',
                 )}
               />
             </button>
@@ -401,7 +401,7 @@ export function ActivityFeedbackRequest({
         </p>
       ) : null}
 
-      {error ? <p className="mt-2 text-xs text-rose-600">{error}</p> : null}
+      {error ? <p className="mt-2 text-xs text-destructive">{error}</p> : null}
     </div>
   );
 }

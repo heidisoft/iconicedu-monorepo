@@ -3,6 +3,16 @@ import { cn } from '@iconicedu/ui-native/lib/utils';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { Platform, Pressable } from 'react-native';
 
+const COLOR_UTILITY =
+  /^(?:[\w-]+:)*(?:bg-|border-(?!0$|2$|4$|8$)|text-(?:action|ink|primary|secondary|muted|accent|destructive|foreground|background|card|popover|black|white|slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose))/;
+
+function withoutLocalButtonColors(className?: string) {
+  return className
+    ?.split(/\s+/)
+    .filter((classToken) => !COLOR_UTILITY.test(classToken))
+    .join(' ');
+}
+
 const buttonVariants = cva(
   cn(
     'group shrink-0 flex-row items-center justify-center gap-2 rounded-md shadow-none',
@@ -14,8 +24,8 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: cn(
-          'bg-primary active:bg-primary/90 shadow-sm shadow-black/5',
-          Platform.select({ web: 'hover:bg-primary/90' }),
+          'bg-action active:bg-action/90 shadow-sm shadow-black/5',
+          Platform.select({ web: 'hover:bg-action/90' }),
         ),
         destructive: cn(
           'bg-destructive active:bg-destructive/90 dark:bg-destructive/60 shadow-sm shadow-black/5',
@@ -30,8 +40,8 @@ const buttonVariants = cva(
           }),
         ),
         secondary: cn(
-          'bg-secondary active:bg-secondary/80 shadow-sm shadow-black/5',
-          Platform.select({ web: 'hover:bg-secondary/80' }),
+          'bg-ink active:bg-ink/85 shadow-sm shadow-black/5',
+          Platform.select({ web: 'hover:bg-ink/85' }),
         ),
         ghost: cn(
           'active:bg-accent dark:active:bg-accent/50',
@@ -67,16 +77,16 @@ const buttonTextVariants = cva(
   {
     variants: {
       variant: {
-        default: 'text-primary-foreground',
-        destructive: 'text-white',
+        default: 'text-action-foreground',
+        destructive: 'text-destructive-foreground',
         outline: cn(
           'group-active:text-accent-foreground',
           Platform.select({ web: 'group-hover:text-accent-foreground' }),
         ),
-        secondary: 'text-secondary-foreground',
+        secondary: 'text-ink-foreground',
         ghost: 'group-active:text-accent-foreground',
         link: cn(
-          'text-primary group-active:underline',
+          'text-action group-active:underline',
           Platform.select({
             web: 'underline-offset-4 hover:underline group-hover:underline',
           }),
@@ -106,7 +116,7 @@ function Button({ className, variant, size, ...props }: ButtonProps) {
         className={cn(
           props.disabled && 'opacity-50',
           buttonVariants({ variant, size }),
-          className,
+          withoutLocalButtonColors(className),
         )}
         role="button"
         {...props}

@@ -23,11 +23,13 @@ export function QueryError({
       <Text style={[styles.message, { color: colors.textMuted }]}>{message}</Text>
       {onRetry && (
         <TouchableOpacity
-          style={[styles.btn, { backgroundColor: colors.teal }]}
+          style={[styles.btn, { backgroundColor: colors.action }]}
           onPress={onRetry}
           activeOpacity={0.85}
         >
-          <Text style={[styles.btnTxt, { color: colors.tealFg }]}>Try again</Text>
+          <Text style={[styles.btnTxt, { color: colors.actionForeground }]}>
+            Try again
+          </Text>
         </TouchableOpacity>
       )}
     </View>

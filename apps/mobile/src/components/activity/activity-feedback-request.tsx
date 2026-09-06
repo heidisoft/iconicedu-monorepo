@@ -377,8 +377,8 @@ export function ActivityFeedbackRequest({
             >
               <Star
                 size={22}
-                color={isActive ? '#f59e0b' : colors.textMuted}
-                fill={isActive ? '#f59e0b' : 'transparent'}
+                color={isActive ? colors.warning : colors.textMuted}
+                fill={isActive ? colors.warning : 'transparent'}
               />
             </Pressable>
           );
@@ -534,7 +534,7 @@ function makeStyles(colors: AppColors) {
     errorText: {
       fontSize: 13,
       lineHeight: 19,
-      color: '#dc2626',
+      color: colors.red,
     },
   });
 }

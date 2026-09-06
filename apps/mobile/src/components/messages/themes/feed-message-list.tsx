@@ -79,14 +79,42 @@ import { supabase } from '@/lib/supabase/client';
 
 const CHANNEL_FILES_BUCKET = 'channel-files';
 
+// Classroom feed palette. Aligned to the shared forest-green + pastel tokens in
+// @/lib/theme, with a dark variant so the feed follows the app theme.
+type FeedColors = {
+  page: string;
+  text: string;
+  muted: string;
+  border: string;
+  blue: string;
+  warn: string;
+  bubbleOther: string;
+  bubbleOwn: string;
+};
+
+const FEED_LIGHT: FeedColors = {
+  page: '#ffffff',
+  text: '#1f2a26',
+  muted: '#6b7469',
+  border: '#e4e6dd',
+  blue: '#25493c',
+  warn: '#b45309',
+  bubbleOther: '#eceffa',
+  bubbleOwn: '#e2f0e2',
+};
+
+const FEED_DARK: FeedColors = {
+  page: '#1c211d',
+  text: '#f3f5f0',
+  muted: '#a0a89c',
+  border: '#2c332b',
+  blue: '#8fbfa6',
+  warn: '#e8b06a',
+  bubbleOther: '#262b3a',
+  bubbleOwn: '#233026',
+};
+
 const FEED = {
-  page: '#FFFFFF',
-  text: '#1F2937',
-  muted: '#8B9098',
-  border: '#E5E7EB',
-  blue: '#4F7DF3',
-  bubbleOther: 'rgba(148, 163, 184, 0.16)',
-  bubbleOwn: 'rgba(45, 212, 168, 0.22)',
   gap: 16,
   radius: 12,
   avatar: 44,
@@ -348,7 +376,7 @@ function FeedText({
     );
 
   return (
-    <Text style={[styles.feedText, { color, fontSize: size, lineHeight }]}>
+    <Text style={[stylesLight.feedText, { color, fontSize: size, lineHeight }]}>
       {buildSegments(text, mentions).map((segment, index) =>
         segment.kind === 'mention' ? (
           <Text key={index} style={{ color: mentionColor, fontWeight: '700' }}>
@@ -375,7 +403,8 @@ function FeedHeader({
   onProfilePress?: (user: MessageVM['core']['sender']) => void;
   onMorePress?: (message: MessageVM) => void;
 }) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
+  const styles = isDark ? stylesDark : stylesLight;
   const senderName = message.core.sender.profile.displayName;
   const { url, seed } = getAvatarInfo(message);
   const RoleIcon = getRoleIcon(message.core.sender.kind);
@@ -485,7 +514,8 @@ function FeedImageGrid({
   message: MessageVM;
   onSendAnnotation?: (attachment: AttachmentPayload) => void;
 }) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
+  const styles = isDark ? stylesDark : stylesLight;
   const attachments = getImageAttachments(message);
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
   const [viewerVisible, setViewerVisible] = useState(false);
@@ -666,7 +696,8 @@ function FeedFileAttachments({
   message: MessageVM;
   onSendAnnotation?: (attachment: AttachmentPayload) => void;
 }) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
+  const styles = isDark ? stylesDark : stylesLight;
   const attachments = getFileAttachments(message);
   const [openingFile, setOpeningFile] = useState<string | null>(null);
   const [pdfViewerDocument, setPdfViewerDocument] = useState<{
@@ -777,7 +808,8 @@ function FeedFileAttachments({
 }
 
 function FeedLinkPreview({ message }: { message: MessageVM }) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
+  const styles = isDark ? stylesDark : stylesLight;
   if (message.core.type !== 'link-preview') return null;
   const linkMessage = message as LinkPreviewMessageVM;
   if (!linkMessage.link) return null;
@@ -823,7 +855,8 @@ function FeedLinkPreview({ message }: { message: MessageVM }) {
 }
 
 function FeedAudioPlayer({ message }: { message: AudioRecordingMessageVM }) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
+  const styles = isDark ? stylesDark : stylesLight;
   const audioMessage = message as AudioRecordingMessageVM;
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -981,7 +1014,8 @@ function FeedContentCard({
   compact?: boolean;
   isOwn?: boolean;
 }) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
+  const styles = isDark ? stylesDark : stylesLight;
   let text = getMessageText(message);
   if (message.core.type === 'link-preview') {
     const link = (message as LinkPreviewMessageVM).link;
@@ -1029,7 +1063,8 @@ function FeedActions({
   hideReplyButton?: boolean;
   showActionControls?: boolean;
 }) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
+  const styles = isDark ? stylesDark : stylesLight;
   const hasReactions = Boolean(message.social.reactions?.length);
   const hasThread = Boolean(
     !hideReplyButton &&
@@ -1088,7 +1123,8 @@ function FeedMessageBlock({
   onSendAnnotation?: (attachment: AttachmentPayload) => void;
   isReadOnly?: boolean;
 }) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
+  const styles = isDark ? stylesDark : stylesLight;
   const [threadExpanded, setThreadExpanded] = useState(false);
   const [threadReplies, setThreadReplies] = useState<MessageVM[]>([]);
   const [threadLoading, setThreadLoading] = useState(false);
@@ -1303,7 +1339,8 @@ function FeedComment({
   isReadOnly?: boolean;
   presenceStatus?: PresenceDisplayStatus | null;
 }) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
+  const styles = isDark ? stylesDark : stylesLight;
   const senderName = message.core.sender.profile.displayName;
   const { url, seed } = getAvatarInfo(message);
   const handleProfilePress = () => onProfilePress?.(message.core.sender);
@@ -1428,7 +1465,8 @@ function FeedPost({
   onSendAnnotation?: (attachment: AttachmentPayload) => void;
   isReadOnly?: boolean;
 }) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
+  const styles = isDark ? stylesDark : stylesLight;
   const headerMessage = messages[messages.length - 1]!;
   const senderPresenceStatus =
     presenceByProfileId.get(headerMessage.core.sender.ids.id) ?? null;
@@ -1501,7 +1539,8 @@ export const FeedMessageList: React.FC<FeedMessageListProps> = ({
   unreadCount,
   onSendAnnotation,
 }) => {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
+  const styles = isDark ? stylesDark : stylesLight;
   const flatListRef = React.useRef<FlatList<FeedMessageGroup>>(null);
   const didInitialScrollRef = React.useRef(false);
   const latestMessageIdRef = React.useRef<string | undefined>(undefined);
@@ -1775,357 +1814,361 @@ export const FeedMessageList: React.FC<FeedMessageListProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  listContent: {
-    paddingHorizontal: FEED.gap,
-    paddingTop: 14,
-    paddingBottom: 22,
-  },
-  post: {
-    position: 'relative',
-    marginBottom: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: FEED.border,
-    borderColor: FEED.border,
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-  },
-  headerText: {
-    flex: 1,
-    minWidth: 0,
-  },
-  headerTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-  },
-  headerIdentity: {
-    flex: 1,
-    minWidth: 0,
-  },
-  headerRight: {
-    flexShrink: 0,
-    alignItems: 'flex-end',
-    gap: 4,
-  },
-  headerTimeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  visibilityBadgeSlot: {
-    minHeight: 18,
-    alignItems: 'flex-end',
-  },
-  unreadDot: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: FEED.blue,
-  },
-  senderNameButton: {
-    flexShrink: 1,
-    minWidth: 0,
-  },
-  senderName: {
-    color: FEED.text,
-    fontSize: FONT.title,
-    lineHeight: FONT.titleLine,
-    fontWeight: '700',
-  },
-  commentSenderName: {
-    fontSize: FONT.title,
-    lineHeight: FONT.titleLine,
-  },
-  timestamp: {
-    color: FEED.muted,
-    fontSize: FONT.meta,
-    lineHeight: FONT.metaLine,
-  },
-  roleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 2,
-  },
-  roleText: {
-    color: FEED.muted,
-    fontSize: FONT.meta,
-    lineHeight: FONT.metaLine,
-  },
-  commentRoleText: {
-    fontSize: FONT.small,
-    lineHeight: FONT.smallLine,
-  },
-  postBody: {
-    marginTop: 16,
-    gap: 3,
-  },
-  groupedMessageBlock: {
-    gap: 8,
-  },
-  singleImageWrap: {
-    overflow: 'hidden',
-    borderRadius: FEED.radius,
-  },
-  singleImage: {
-    width: '100%',
-    aspectRatio: 4 / 3,
-    borderRadius: FEED.radius,
-  },
-  twoImageGrid: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  twoImage: {
-    flex: 1,
-    aspectRatio: 1,
-    borderRadius: FEED.radius,
-    overflow: 'hidden',
-  },
-  mediaFill: {
-    width: '100%',
-    height: '100%',
-  },
-  collageGrid: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  collageLarge: {
-    flex: 1,
-    aspectRatio: 0.78,
-    borderRadius: FEED.radius,
-    overflow: 'hidden',
-  },
-  collageSmallGrid: {
-    flex: 1,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  collageSmallWrap: {
-    width: '47%',
-    aspectRatio: 1,
-    borderRadius: FEED.radius,
-    overflow: 'hidden',
-  },
-  collageSmall: {
-    width: '100%',
-    height: '100%',
-  },
-  overflowOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(31,41,55,0.55)',
-  },
-  overflowText: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '800',
-  },
-  textCard: {
-    alignSelf: 'stretch',
-    width: '100%',
-    maxWidth: '100%',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  otherBubbleCard: {
-    backgroundColor: FEED.bubbleOther,
-  },
-  ownBubbleCard: {
-    backgroundColor: FEED.bubbleOwn,
-  },
-  feedText: {
-    width: '100%',
-    maxWidth: '100%',
-    flexShrink: 1,
-    color: FEED.text,
-  },
-  captionTextWrap: {
-    width: '100%',
-    maxWidth: '100%',
-    minWidth: 0,
-    flexShrink: 1,
-  },
-  commentTextCard: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  fileCard: {
-    overflow: 'hidden',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 12,
-  },
-  fileRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 12,
-  },
-  fileIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  linkCard: {
-    overflow: 'hidden',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 12,
-  },
-  linkImage: {
-    width: '100%',
-    aspectRatio: 16 / 9,
-  },
-  linkBody: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    padding: 12,
-  },
-  linkTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  linkDescription: {
-    marginTop: 3,
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  linkSite: {
-    marginTop: 6,
-    fontSize: 12,
-  },
-  audioCard: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-  },
-  audioRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  playButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
-  audioTimeRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  audioTime: {
-    fontSize: 12,
-  },
-  unsupportedAudioText: {
-    marginBottom: 8,
-    color: '#f59e0b',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  waveformRow: {
-    minHeight: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-  },
-  actionsRow: {
-    minHeight: 34,
-  },
-  commentActionsRow: {
-    marginTop: 8,
-  },
-  commentsWrap: {
-    gap: 12,
-    paddingTop: 8,
-  },
-  threadLoadError: {
-    fontSize: FONT.small,
-    lineHeight: FONT.smallLine,
-    paddingVertical: 4,
-  },
-  threadUnreadDot: {
-    alignSelf: 'center',
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: FEED.blue,
-    marginVertical: 2,
-  },
-  commentRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  commentBody: {
-    flex: 1,
-    gap: 0,
-  },
-  commentCard: {
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  commentHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-  },
-  commentTimestamp: {
-    color: FEED.muted,
-    fontSize: FONT.small,
-    lineHeight: FONT.smallLine,
-  },
-  commentTextWrap: {
-    marginTop: 12,
-  },
-  emptyWrap: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-    gap: 12,
-    backgroundColor: FEED.page,
-  },
-  emptyIconWrap: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyTitle: {
-    color: FEED.text,
-    fontSize: 20,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  emptyDescription: {
-    color: FEED.muted,
-    fontSize: 15,
-    lineHeight: 20,
-    textAlign: 'center',
-  },
-  loadingWrap: {
-    alignItems: 'center',
-    paddingVertical: 16,
-  },
-});
+const makeStyles = (C: FeedColors) =>
+  StyleSheet.create({
+    listContent: {
+      paddingHorizontal: FEED.gap,
+      paddingTop: 14,
+      paddingBottom: 22,
+    },
+    post: {
+      position: 'relative',
+      marginBottom: 14,
+      paddingHorizontal: 12,
+      paddingVertical: 14,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: C.border,
+      borderColor: C.border,
+      borderRadius: 12,
+      backgroundColor: '#FFFFFF',
+    },
+    headerRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 12,
+    },
+    headerText: {
+      flex: 1,
+      minWidth: 0,
+    },
+    headerTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 10,
+    },
+    headerIdentity: {
+      flex: 1,
+      minWidth: 0,
+    },
+    headerRight: {
+      flexShrink: 0,
+      alignItems: 'flex-end',
+      gap: 4,
+    },
+    headerTimeRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    visibilityBadgeSlot: {
+      minHeight: 18,
+      alignItems: 'flex-end',
+    },
+    unreadDot: {
+      position: 'absolute',
+      top: 10,
+      right: 10,
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: C.blue,
+    },
+    senderNameButton: {
+      flexShrink: 1,
+      minWidth: 0,
+    },
+    senderName: {
+      color: C.text,
+      fontSize: FONT.title,
+      lineHeight: FONT.titleLine,
+      fontWeight: '700',
+    },
+    commentSenderName: {
+      fontSize: FONT.title,
+      lineHeight: FONT.titleLine,
+    },
+    timestamp: {
+      color: C.muted,
+      fontSize: FONT.meta,
+      lineHeight: FONT.metaLine,
+    },
+    roleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      marginTop: 2,
+    },
+    roleText: {
+      color: C.muted,
+      fontSize: FONT.meta,
+      lineHeight: FONT.metaLine,
+    },
+    commentRoleText: {
+      fontSize: FONT.small,
+      lineHeight: FONT.smallLine,
+    },
+    postBody: {
+      marginTop: 16,
+      gap: 3,
+    },
+    groupedMessageBlock: {
+      gap: 8,
+    },
+    singleImageWrap: {
+      overflow: 'hidden',
+      borderRadius: FEED.radius,
+    },
+    singleImage: {
+      width: '100%',
+      aspectRatio: 4 / 3,
+      borderRadius: FEED.radius,
+    },
+    twoImageGrid: {
+      flexDirection: 'row',
+      gap: 10,
+    },
+    twoImage: {
+      flex: 1,
+      aspectRatio: 1,
+      borderRadius: FEED.radius,
+      overflow: 'hidden',
+    },
+    mediaFill: {
+      width: '100%',
+      height: '100%',
+    },
+    collageGrid: {
+      flexDirection: 'row',
+      gap: 10,
+    },
+    collageLarge: {
+      flex: 1,
+      aspectRatio: 0.78,
+      borderRadius: FEED.radius,
+      overflow: 'hidden',
+    },
+    collageSmallGrid: {
+      flex: 1,
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 10,
+    },
+    collageSmallWrap: {
+      width: '47%',
+      aspectRatio: 1,
+      borderRadius: FEED.radius,
+      overflow: 'hidden',
+    },
+    collageSmall: {
+      width: '100%',
+      height: '100%',
+    },
+    overflowOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(31,41,55,0.55)',
+    },
+    overflowText: {
+      color: '#FFFFFF',
+      fontSize: 20,
+      fontWeight: '800',
+    },
+    textCard: {
+      alignSelf: 'stretch',
+      width: '100%',
+      maxWidth: '100%',
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
+    otherBubbleCard: {
+      backgroundColor: C.bubbleOther,
+    },
+    ownBubbleCard: {
+      backgroundColor: C.bubbleOwn,
+    },
+    feedText: {
+      width: '100%',
+      maxWidth: '100%',
+      flexShrink: 1,
+      color: C.text,
+    },
+    captionTextWrap: {
+      width: '100%',
+      maxWidth: '100%',
+      minWidth: 0,
+      flexShrink: 1,
+    },
+    commentTextCard: {
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
+    fileCard: {
+      overflow: 'hidden',
+      borderWidth: StyleSheet.hairlineWidth,
+      borderRadius: 12,
+    },
+    fileRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      padding: 12,
+    },
+    fileIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 8,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    linkCard: {
+      overflow: 'hidden',
+      borderWidth: StyleSheet.hairlineWidth,
+      borderRadius: 12,
+    },
+    linkImage: {
+      width: '100%',
+      aspectRatio: 16 / 9,
+    },
+    linkBody: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 10,
+      padding: 12,
+    },
+    linkTitle: {
+      fontSize: 15,
+      fontWeight: '700',
+    },
+    linkDescription: {
+      marginTop: 3,
+      fontSize: 13,
+      lineHeight: 18,
+    },
+    linkSite: {
+      marginTop: 6,
+      fontSize: 12,
+    },
+    audioCard: {
+      borderWidth: StyleSheet.hairlineWidth,
+      borderRadius: 16,
+      paddingHorizontal: 12,
+      paddingVertical: 12,
+    },
+    audioRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    playButton: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+    },
+    audioTimeRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    audioTime: {
+      fontSize: 12,
+    },
+    unsupportedAudioText: {
+      marginBottom: 8,
+      color: C.warn,
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    waveformRow: {
+      minHeight: 20,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 2,
+    },
+    actionsRow: {
+      minHeight: 34,
+    },
+    commentActionsRow: {
+      marginTop: 8,
+    },
+    commentsWrap: {
+      gap: 12,
+      paddingTop: 8,
+    },
+    threadLoadError: {
+      fontSize: FONT.small,
+      lineHeight: FONT.smallLine,
+      paddingVertical: 4,
+    },
+    threadUnreadDot: {
+      alignSelf: 'center',
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: C.blue,
+      marginVertical: 2,
+    },
+    commentRow: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    commentBody: {
+      flex: 1,
+      gap: 0,
+    },
+    commentCard: {
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
+    commentHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 8,
+    },
+    commentTimestamp: {
+      color: C.muted,
+      fontSize: FONT.small,
+      lineHeight: FONT.smallLine,
+    },
+    commentTextWrap: {
+      marginTop: 12,
+    },
+    emptyWrap: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 32,
+      gap: 12,
+      backgroundColor: C.page,
+    },
+    emptyIconWrap: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    emptyTitle: {
+      color: C.text,
+      fontSize: 20,
+      fontWeight: '700',
+      textAlign: 'center',
+    },
+    emptyDescription: {
+      color: C.muted,
+      fontSize: 15,
+      lineHeight: 20,
+      textAlign: 'center',
+    },
+    loadingWrap: {
+      alignItems: 'center',
+      paddingVertical: 16,
+    },
+  });
+
+const stylesLight = makeStyles(FEED_LIGHT);
+const stylesDark = makeStyles(FEED_DARK);

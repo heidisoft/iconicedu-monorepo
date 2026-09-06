@@ -120,7 +120,7 @@ export function MarketingMainMenuPage({
         )}
         {(content.closingTitle || content.closingBody) && (
           <div
-            className={`mx-auto mt-10 max-w-7xl ${MARKETING_ACTION_CARD_CLASS} bg-emerald-50/60 dark:bg-emerald-950/20`}
+            className={`mx-auto mt-10 max-w-7xl ${MARKETING_ACTION_CARD_CLASS} bg-action-subtle/60`}
           >
             {content.closingTitle && (
               <h2 className="text-2xl font-semibold">{content.closingTitle}</h2>

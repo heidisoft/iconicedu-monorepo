@@ -82,11 +82,10 @@ function getGreeting() {
 }
 
 function getSupportPalette(C: AppColors) {
-  const isDark = C.bg === C.pageBg && C.text === '#FFFFFF';
   return {
-    bg: isDark ? '#f59e0b22' : '#fff7ed',
-    border: isDark ? '#f59e0b55' : '#fdba74',
-    text: isDark ? '#fbbf24' : '#c2410c',
+    bg: C.warningSubtle,
+    border: C.warning,
+    text: C.warning,
   };
 }
 
@@ -324,7 +323,7 @@ function ClassRequestSheet({
           activeOpacity={0.85}
         >
           {submitting ? (
-            <ActivityIndicator color={colors.tealFg} />
+            <ActivityIndicator color={colors.actionForeground} />
           ) : (
             <Text style={s.boostButtonText}>Submit request</Text>
           )}
@@ -490,11 +489,14 @@ function makeStyles(C: AppColors) {
     metricCard: {
       minHeight: 148,
       backgroundColor: C.card,
-      borderRadius: 14,
-      borderWidth: 1,
-      borderColor: C.border,
-      padding: 14,
+      borderRadius: 20,
+      padding: 16,
       justifyContent: 'space-between',
+      shadowColor: '#1f2a26',
+      shadowOpacity: 0.06,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 2,
     },
     metricHeader: {
       flexDirection: 'row',
@@ -512,10 +514,15 @@ function makeStyles(C: AppColors) {
     metricIconWrap: {
       width: 36,
       height: 36,
-      borderRadius: 12,
-      backgroundColor: C.tealBg,
+      borderRadius: 14,
+      backgroundColor: C.card,
       alignItems: 'center',
       justifyContent: 'center',
+      shadowColor: '#1f2a26',
+      shadowOpacity: 0.08,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 2 },
+      elevation: 1,
     },
     metricValue: {
       fontSize: 34,
@@ -529,6 +536,29 @@ function makeStyles(C: AppColors) {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
+    },
+    sessionList: {
+      gap: 8,
+    },
+    // Loading placeholder — mirrors the restyled SessionCard (borderless, soft
+    // shadow, rounded-20, filled day chip) so the list doesn't jump on load.
+    sessionSkeleton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      borderRadius: 20,
+      backgroundColor: C.card,
+      shadowColor: '#1f2a26',
+      shadowOpacity: 0.06,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 2,
+    },
+    sessionSkeletonBody: {
+      flex: 1,
+      gap: 6,
     },
     emptyWrap: {
       alignItems: 'center',
@@ -599,7 +629,7 @@ function makeStyles(C: AppColors) {
     boostButton: {
       minHeight: 44,
       borderRadius: 12,
-      backgroundColor: C.teal,
+      backgroundColor: C.action,
       alignItems: 'center',
       justifyContent: 'center',
       flexDirection: 'row',
@@ -607,7 +637,7 @@ function makeStyles(C: AppColors) {
       paddingHorizontal: 16,
     },
     boostButtonText: {
-      color: C.tealFg,
+      color: C.actionForeground,
       fontSize: 15,
       fontWeight: '800',
     },
@@ -687,7 +717,7 @@ function makeStyles(C: AppColors) {
       textAlignVertical: 'top',
     },
     requestError: {
-      color: '#ef4444',
+      color: C.red,
       fontSize: 13,
       lineHeight: 18,
     },
@@ -1184,7 +1214,7 @@ export default function HomeScreen() {
                 >
                   <View style={s.metricHeader}>
                     <PulseBox width={110} height={16} radius={4} />
-                    <PulseBox width={36} height={36} radius={12} />
+                    <PulseBox width={36} height={36} radius={14} />
                   </View>
                   <View style={{ gap: 8 }}>
                     <PulseBox width={index === 1 ? 42 : 34} height={34} radius={6} />
@@ -1200,7 +1230,10 @@ export default function HomeScreen() {
               contentContainerStyle={s.metricsRow}
             >
               <TouchableOpacity
-                style={[s.metricCard, { width: metricCardWidth }]}
+                style={[
+                  s.metricCard,
+                  { width: metricCardWidth, backgroundColor: colors.periwinkle },
+                ]}
                 onPress={handleUpcomingSessionsPress}
                 activeOpacity={0.85}
                 disabled={sessionsLoading || refreshing}
@@ -1208,40 +1241,56 @@ export default function HomeScreen() {
                 <View style={s.metricHeader}>
                   <Text style={s.metricTitle}>Upcoming Sessions</Text>
                   <View style={s.metricIconWrap}>
-                    <CalendarClock size={18} color={colors.teal} />
+                    <CalendarClock size={18} color={colors.periwinkleFg} />
                   </View>
                 </View>
                 <View>
                   <Text style={s.metricValue}>{upcomingSessionsMetric.value}</Text>
-                  <Text style={s.metricLabel}>{upcomingSessionsMetric.label}</Text>
+                  <Text style={[s.metricLabel, { color: colors.periwinkleFg }]}>
+                    {upcomingSessionsMetric.label}
+                  </Text>
                 </View>
               </TouchableOpacity>
 
-              <View style={[s.metricCard, { width: metricCardWidth }]}>
+              <View
+                style={[
+                  s.metricCard,
+                  { width: metricCardWidth, backgroundColor: colors.primarySubtle },
+                ]}
+              >
                 <View style={s.metricHeader}>
                   <Text style={s.metricTitle}>Completed Classes</Text>
                   <View style={s.metricIconWrap}>
-                    <CalendarCheck size={18} color={colors.teal} />
+                    <CalendarCheck size={18} color={colors.primary} />
                   </View>
                 </View>
                 <View>
                   <Text style={s.metricValue}>
                     {topMetrics.completedClassesThisMonth}
                   </Text>
-                  <Text style={s.metricLabel}>This month</Text>
+                  <Text style={[s.metricLabel, { color: colors.primary }]}>
+                    This month
+                  </Text>
                 </View>
               </View>
 
-              <View style={[s.metricCard, { width: metricCardWidth }]}>
+              <View
+                style={[
+                  s.metricCard,
+                  { width: metricCardWidth, backgroundColor: colors.peach },
+                ]}
+              >
                 <View style={s.metricHeader}>
                   <Text style={s.metricTitle}>{topMetrics.thirdMetricTitle}</Text>
                   <View style={s.metricIconWrap}>
-                    <ThirdMetricIcon size={18} color={colors.teal} />
+                    <ThirdMetricIcon size={18} color={colors.peachFg} />
                   </View>
                 </View>
                 <View>
                   <Text style={s.metricValue}>{topMetrics.thirdMetricValue}</Text>
-                  <Text style={s.metricLabel}>{topMetrics.thirdMetricLabel}</Text>
+                  <Text style={[s.metricLabel, { color: colors.peachFg }]}>
+                    {topMetrics.thirdMetricLabel}
+                  </Text>
                 </View>
               </View>
             </ScrollView>
@@ -1262,33 +1311,20 @@ export default function HomeScreen() {
               <Text style={s.sectionLabel}>Today</Text>
             </View>
             {sessionsLoading || refreshing ? (
-              <View style={{ gap: 6 }}>
+              <View style={s.sessionList}>
                 {[0, 1].map((i) => (
-                  <View
-                    key={`today-skeleton-${i}`}
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 10,
-                      paddingHorizontal: 14,
-                      paddingVertical: 10,
-                      borderRadius: 12,
-                      borderWidth: StyleSheet.hairlineWidth,
-                      borderColor: colors.border,
-                      backgroundColor: colors.card,
-                    }}
-                  >
-                    <PulseBox width={44} height={60} radius={10} />
-                    <View style={{ flex: 1, gap: 6 }}>
+                  <View key={`today-skeleton-${i}`} style={s.sessionSkeleton}>
+                    <PulseBox width={48} height={58} radius={14} />
+                    <View style={s.sessionSkeletonBody}>
                       <PulseBox width={i === 0 ? 140 : 120} height={13} radius={4} />
                       <PulseBox width={80} height={11} radius={4} />
                     </View>
-                    <PulseBox width={50} height={26} radius={20} />
+                    <PulseBox width={64} height={28} radius={999} />
                   </View>
                 ))}
               </View>
             ) : (
-              <View style={{ gap: 6 }}>
+              <View style={s.sessionList}>
                 {todaySessions.map((session) => (
                   <SessionCard
                     key={session.id}
@@ -1311,33 +1347,20 @@ export default function HomeScreen() {
               <Text style={s.sectionLabel}>This week</Text>
             </View>
             {sessionsLoading || refreshing ? (
-              <View style={{ gap: 6 }}>
+              <View style={s.sessionList}>
                 {[0, 1].map((i) => (
-                  <View
-                    key={i}
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 10,
-                      paddingHorizontal: 14,
-                      paddingVertical: 10,
-                      borderRadius: 12,
-                      borderWidth: StyleSheet.hairlineWidth,
-                      borderColor: colors.border,
-                      backgroundColor: colors.card,
-                    }}
-                  >
-                    <PulseBox width={44} height={60} radius={10} />
-                    <View style={{ flex: 1, gap: 6 }}>
+                  <View key={i} style={s.sessionSkeleton}>
+                    <PulseBox width={48} height={58} radius={14} />
+                    <View style={s.sessionSkeletonBody}>
                       <PulseBox width={i === 0 ? 140 : 120} height={13} radius={4} />
                       <PulseBox width={80} height={11} radius={4} />
                     </View>
-                    <PulseBox width={50} height={26} radius={20} />
+                    <PulseBox width={64} height={28} radius={999} />
                   </View>
                 ))}
               </View>
             ) : (
-              <View style={{ gap: 6 }}>
+              <View style={s.sessionList}>
                 {thisWeekSessions.map((session) => (
                   <SessionCard
                     key={session.id}
@@ -1356,33 +1379,20 @@ export default function HomeScreen() {
             <Text style={s.sectionLabel}>Next week</Text>
           </View>
           {sessionsLoading || refreshing ? (
-            <View style={{ gap: 6 }}>
+            <View style={s.sessionList}>
               {[0, 1].map((i) => (
-                <View
-                  key={`next-week-skeleton-${i}`}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 10,
-                    paddingHorizontal: 14,
-                    paddingVertical: 10,
-                    borderRadius: 12,
-                    borderWidth: StyleSheet.hairlineWidth,
-                    borderColor: colors.border,
-                    backgroundColor: colors.card,
-                  }}
-                >
-                  <PulseBox width={44} height={60} radius={10} />
-                  <View style={{ flex: 1, gap: 6 }}>
+                <View key={`next-week-skeleton-${i}`} style={s.sessionSkeleton}>
+                  <PulseBox width={48} height={58} radius={14} />
+                  <View style={s.sessionSkeletonBody}>
                     <PulseBox width={i === 0 ? 140 : 120} height={13} radius={4} />
                     <PulseBox width={80} height={11} radius={4} />
                   </View>
-                  <PulseBox width={50} height={26} radius={20} />
+                  <PulseBox width={64} height={28} radius={999} />
                 </View>
               ))}
             </View>
           ) : nextWeekSessions.length > 0 ? (
-            <View style={{ gap: 6 }}>
+            <View style={s.sessionList}>
               {nextWeekSessions.map((session) => (
                 <SessionCard
                   key={session.id}
@@ -1411,7 +1421,7 @@ export default function HomeScreen() {
                 onPress={() => setClassRequestOpen(true)}
                 activeOpacity={0.85}
               >
-                <Sparkles size={16} color={colors.tealFg} />
+                <Sparkles size={16} color={colors.actionForeground} />
                 <Text style={s.boostButtonText}>Explore More Classes</Text>
               </TouchableOpacity>
             </View>

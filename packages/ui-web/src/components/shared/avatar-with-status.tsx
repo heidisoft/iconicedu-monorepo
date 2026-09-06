@@ -14,11 +14,11 @@ import { Avatar, AvatarFallback, AvatarImage } from '@iconicedu/ui-web/ui/avatar
 import { cn } from '@iconicedu/ui-web/lib/utils';
 
 const STATUS_COLORS: Record<PresenceDisplayStatusVM, string> = {
-  online: 'bg-green-500',
-  away: 'bg-yellow-500',
-  idle: 'bg-gray-400',
-  busy: 'bg-red-600',
-  offline: 'bg-gray-600',
+  online: 'bg-success',
+  away: 'bg-warning',
+  idle: 'bg-muted-foreground/60',
+  busy: 'bg-destructive',
+  offline: 'bg-muted-foreground',
 };
 
 const LIVE_STATUS_TO_DISPLAY: Record<LiveStatusVM, PresenceDisplayStatusVM> = {

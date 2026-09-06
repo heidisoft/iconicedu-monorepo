@@ -439,6 +439,7 @@ function buildHomeScopedSchedules(input: {
       isPast: endMs < now.getTime(),
       status: schedule.status,
       meetingLink: schedule.meetingLink ?? null,
+      themeKey: schedule.themeKey ?? null,
       channelId:
         schedule.source.kind === 'class_session'
           ? (schedule.source.channelId ?? null)

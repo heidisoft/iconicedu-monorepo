@@ -426,8 +426,8 @@ function TrueFalseWidget({
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
                   isSelected
                     ? val
-                      ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm'
-                      : 'border-rose-400 bg-rose-50 text-rose-600 shadow-sm'
+                      ? 'border-success bg-success/10 text-success shadow-sm'
+                      : 'border-destructive bg-destructive/10 text-destructive shadow-sm'
                     : 'border-border hover:border-primary/40 hover:bg-muted/40 active:scale-[0.98] text-foreground',
                 ].join(' ')}
               >
@@ -822,7 +822,7 @@ function MatchingWidget({
                       isSelected
                         ? 'border-primary bg-primary/8 shadow-sm font-medium'
                         : isMatched
-                          ? 'border-emerald-400 bg-emerald-50 text-emerald-800'
+                          ? 'border-success bg-success/10 text-success'
                           : 'border-border hover:border-primary/40 hover:bg-muted/30',
                     ].join(' ')}
                     aria-pressed={isSelected}
@@ -862,7 +862,7 @@ function MatchingWidget({
                     'transition-all duration-150',
                     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1',
                     isUsed
-                      ? 'border-emerald-400 bg-emerald-50 text-emerald-800 cursor-default'
+                      ? 'border-success bg-success/10 text-success cursor-default'
                       : selected
                         ? 'border-primary/40 hover:border-primary hover:bg-primary/8 hover:shadow-sm cursor-pointer'
                         : 'border-border opacity-60 cursor-default',

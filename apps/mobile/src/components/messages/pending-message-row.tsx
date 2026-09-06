@@ -42,12 +42,12 @@ export function PendingMessageRow({ pending, colors, onRetry }: PendingMessageRo
   const { type, attachments, failed } = pending;
 
   const StatusIndicator = failed ? (
-    <AlertCircle size={18} color="#ef4444" />
+    <AlertCircle size={18} color={colors.red} />
   ) : (
     <ActivityIndicator size="small" color="#fff" />
   );
 
-  const overlayBg = failed ? 'rgba(239,68,68,0.4)' : 'rgba(0,0,0,0.38)';
+  const overlayBg = failed ? `${colors.red}66` : 'rgba(0,0,0,0.38)';
 
   return (
     <View style={styles.row}>
@@ -125,7 +125,7 @@ export function PendingMessageRow({ pending, colors, onRetry }: PendingMessageRo
             activeOpacity={0.7}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Text style={[styles.statusText, { color: '#ef4444' }]}>
+            <Text style={[styles.statusText, { color: colors.red }]}>
               Failed to send · tap to retry
             </Text>
           </TouchableOpacity>

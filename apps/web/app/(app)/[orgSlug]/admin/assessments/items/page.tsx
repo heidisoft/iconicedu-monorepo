@@ -44,11 +44,11 @@ const ITEM_TYPE_COLORS: Record<string, string> = {
 const DIFFICULTY_LABELS = ['', 'Beginner', 'Easy', 'Medium', 'Hard', 'Expert'];
 const DIFFICULTY_COLORS = [
   '',
-  'text-emerald-600',
-  'text-green-600',
-  'text-amber-600',
-  'text-orange-600',
-  'text-red-600',
+  'text-success',
+  'text-success',
+  'text-warning',
+  'text-warning',
+  'text-destructive',
 ];
 
 export default async function ItemBankPage({
@@ -163,7 +163,7 @@ export default async function ItemBankPage({
           </div>
         ) : (
           <div className="flex flex-col gap-4">
-            <div className="rounded-xl border overflow-hidden">
+            <div className="rounded-xl border bg-card overflow-hidden">
               <div className="flex items-center justify-between px-6 py-4 border-b bg-muted/30">
                 <h2 className="text-sm font-semibold">Questions ({total})</h2>
               </div>

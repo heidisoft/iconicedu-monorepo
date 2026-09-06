@@ -655,7 +655,7 @@ function makeStyles(colors: AppColors) {
     },
     errorText: {
       fontSize: 13,
-      color: '#dc2626',
+      color: colors.red,
     },
   });
 }

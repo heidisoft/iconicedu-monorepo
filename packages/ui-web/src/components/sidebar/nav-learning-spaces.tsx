@@ -199,8 +199,8 @@ export function NavLearningSpaces({
                           <span>Add to Favorites</span>
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-red-400">
-                          <ListXIcon className="text-red-500" />
+                        <DropdownMenuItem className="text-destructive">
+                          <ListXIcon className="text-destructive" />
                           <span>Hide</span>
                         </DropdownMenuItem>
                       </DropdownMenuContent>

@@ -126,7 +126,7 @@ export function NavDirectMessages({
             <Badge
               data-unread-animated={shouldAnimateUnread ? 'true' : 'false'}
               className={cn(
-                'h-4 px-1.5 text-[10px] bg-rose-500 text-white',
+                'h-4 px-1.5 text-[10px] bg-destructive text-white',
                 shouldAnimateUnread ? 'animate-pulse' : '',
               )}
             >

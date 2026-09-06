@@ -65,7 +65,7 @@ export function ActivityCompletionCheckBatch({ activity }: Props) {
           {sessions.length} classes ended
         </p>
         {resolvedCount > 0 ? (
-          <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700">
+          <span className="rounded-full bg-success/15 px-2.5 py-0.5 text-[11px] font-semibold text-success">
             {resolvedCount} of {sessions.length} confirmed
           </span>
         ) : (
@@ -109,7 +109,7 @@ export function ActivityCompletionCheckBatch({ activity }: Props) {
                 <span
                   className={cn(
                     'size-2 shrink-0 rounded-full',
-                    isResolved ? 'bg-emerald-500' : 'bg-border',
+                    isResolved ? 'bg-success' : 'bg-border',
                   )}
                 />
                 <span

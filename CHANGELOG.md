@@ -41,6 +41,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `README.md` rewritten as a lean hub document with accurate versions and quick-start
 - Expo SDK upgraded to 55 (React Native 0.83.2, React 19.2.4)
 - Mobile auth migrated to `expo-secure-store` for token persistence
+- Refreshed the web and mobile design system to a flat forest-green + sage palette
+  built entirely on theme tokens (`action`, `primary`, `ink`, `success`/`warning`/`info`,
+  pastel `accent-*`); all `oklch()` values flattened to hex and a shared `shadow-soft`
+  card treatment introduced
+- Rebuilt session cards, dashboard/home overview tiles, and chat message bubbles
+  (including the classroom feed) on theme tokens; removed the classroom accent bar
+- Retuned avatar, classroom, and activity-notification icon palettes to a muted,
+  earthy set shared across web `.theme-*` classes and mobile colour maps
+- Routed ~90 components off hardcoded Tailwind/hex colours onto semantic tokens
+  (presence, unread badges, mention pills, message-type chrome, sidebar styling)
+- Improved dark-mode contrast across both apps
 
 ### Fixed
 

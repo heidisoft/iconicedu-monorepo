@@ -340,7 +340,7 @@ export function ActivityCompletionCheck({
             <span className="min-w-0 flex-1 truncate">Report a Problem</span>
           </Button>
         </div>
-        {error ? <p className="mt-2 text-xs text-rose-600">{error}</p> : null}
+        {error ? <p className="mt-2 text-xs text-destructive">{error}</p> : null}
       </Chrome>
     );
   }
@@ -358,8 +358,8 @@ export function ActivityCompletionCheck({
       <Chrome embedded={embedded}>
         <div className="mb-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-1.5">
-            <CheckCircle2 className="size-4 text-emerald-600" />
-            <p className="text-sm font-semibold text-emerald-700">
+            <CheckCircle2 className="size-4 text-success" />
+            <p className="text-sm font-semibold text-success">
               Great! How was the session?
             </p>
           </div>
@@ -384,7 +384,7 @@ export function ActivityCompletionCheck({
             embedded={embedded}
           />
         ) : null}
-        {error ? <p className="mt-2 text-xs text-rose-600">{error}</p> : null}
+        {error ? <p className="mt-2 text-xs text-destructive">{error}</p> : null}
       </Chrome>
     );
   }
@@ -408,7 +408,7 @@ export function ActivityCompletionCheck({
             </Button>
           ) : null}
         </div>
-        {error ? <p className="mt-2 text-rose-600">{error}</p> : null}
+        {error ? <p className="mt-2 text-destructive">{error}</p> : null}
       </Chrome>
     );
   }
@@ -436,7 +436,7 @@ export function ActivityCompletionCheck({
               className={cn(
                 'rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors',
                 isActive
-                  ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                  ? 'border-success bg-success/10 text-success'
                   : 'border-border bg-background text-muted-foreground hover:border-foreground/30',
               )}
               data-action-button="true"
@@ -461,7 +461,7 @@ export function ActivityCompletionCheck({
               type="checkbox"
               checked={rescheduleRequested}
               onChange={(e) => setRescheduleRequested(e.target.checked)}
-              className="size-3.5 rounded border-border accent-emerald-600"
+              className="size-3.5 rounded border-border accent-success"
             />
             Request reschedule
           </label>
@@ -478,7 +478,7 @@ export function ActivityCompletionCheck({
         </div>
       ) : null}
 
-      {error ? <p className="mt-2 text-xs text-rose-600">{error}</p> : null}
+      {error ? <p className="mt-2 text-xs text-destructive">{error}</p> : null}
     </Chrome>
   );
 }

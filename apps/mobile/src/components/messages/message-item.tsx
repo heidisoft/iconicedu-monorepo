@@ -252,7 +252,9 @@ const avatarStyles = StyleSheet.create({
 });
 
 // Deterministic color per sender name (Slack-style)
-const NAME_COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#ef4444'];
+// Muted, flat sender-name tints — the earthy avatar mid-tones, which stay legible
+// on both the light and dark message surface without reading as an error colour.
+const NAME_COLORS = ['#547fb4', '#7a6aac', '#bd6a8c', '#4f9d62', '#c08a3e', '#cc5b52'];
 export function senderColor(name: string): string {
   let h = 0;
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
@@ -1024,7 +1026,7 @@ function AssignmentCard({
 }) {
   const { assignment } = message;
   const diffColor =
-    { beginner: '#22c55e', intermediate: '#f59e0b', advanced: '#ef4444' }[
+    { beginner: colors.success, intermediate: colors.warning, advanced: colors.red }[
       assignment.difficulty ?? 'intermediate'
     ] ?? colors.textMuted;
   return (
@@ -1226,9 +1228,9 @@ function HomeworkCard({
   const { homework } = message;
   const statusColor =
     homework.status === 'graded'
-      ? '#22c55e'
+      ? colors.success
       : homework.status === 'needs-revision'
-        ? '#f59e0b'
+        ? colors.warning
         : colors.teal;
   const statusLabel = {
     submitted: 'Submitted',
@@ -1322,8 +1324,8 @@ function SessionBookingCard({
   const statusColor =
     {
       scheduled: colors.textMuted,
-      confirmed: '#22c55e',
-      cancelled: '#ef4444',
+      confirmed: colors.success,
+      cancelled: colors.red,
       completed: colors.teal,
     }[session.status] ?? colors.textMuted;
   const statusLabel = {
@@ -1376,8 +1378,9 @@ function PaymentReminderCard({
 }) {
   const { payment } = message;
   const statusColor =
-    { pending: '#f59e0b', paid: '#22c55e', overdue: '#ef4444' }[payment.status] ??
-    colors.textMuted;
+    { pending: colors.warning, paid: colors.success, overdue: colors.red }[
+      payment.status
+    ] ?? colors.textMuted;
   const statusLabel = { pending: 'Pending', paid: 'Paid', overdue: 'Overdue' }[
     payment.status
   ];
@@ -1599,10 +1602,10 @@ function makeStyles(colors: AppColors) {
       paddingVertical: 8,
     },
     bubbleOther: {
-      backgroundColor: 'rgba(148, 163, 184, 0.16)',
+      backgroundColor: colors.bubbleOther,
     },
     bubbleOwn: {
-      backgroundColor: 'rgba(45, 212, 168, 0.22)',
+      backgroundColor: colors.bubbleOwn,
     },
 
     // ── Text inside bubble ────────────────────────────────────────────────────
@@ -2512,7 +2515,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
         {/* Inner card matches web: rounded-2xl border border-border bg-card px-3 py-3 */}
         <View style={[s.audioCard, { borderColor: cardBorder, backgroundColor: cardBg }]}>
           {isUnsupportedOnIOS && (
-            <Text style={{ fontSize: 12, color: '#f59e0b', marginBottom: 6 }}>
+            <Text style={{ fontSize: 12, color: colors.warning, marginBottom: 6 }}>
               ⚠ This audio format is not supported on iPhone
             </Text>
           )}

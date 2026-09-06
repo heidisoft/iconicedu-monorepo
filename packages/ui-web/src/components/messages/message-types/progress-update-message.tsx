@@ -23,21 +23,21 @@ export const ProgressUpdateMessage = memo(function ProgressUpdateMessage(
   const { progress } = message;
 
   const getImprovementColor = (improvement: number) => {
-    if (improvement >= 20) return 'text-green-600';
-    if (improvement >= 10) return 'text-amber-600';
+    if (improvement >= 20) return 'text-success';
+    if (improvement >= 10) return 'text-warning';
     return 'text-muted-foreground';
   };
 
   return (
-    <MessageBase message={message} {...baseProps} className="bg-green-500/5">
+    <MessageBase message={message} {...baseProps} className="bg-success/5">
       {message.content?.text && (
         <MessageTextContent text={message.content.text} className="mb-2" />
       )}
-      <div className="rounded-xl border border-green-500/20 bg-card overflow-hidden max-w-md">
+      <div className="rounded-xl border border-success/20 bg-card overflow-hidden max-w-md">
         <div className="p-4">
           <div className="flex items-start gap-3 mb-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-500/10">
-              <TrendingUp className="h-5 w-5 text-green-600" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-success/10">
+              <TrendingUp className="h-5 w-5 text-success" />
             </div>
             <div className="flex-1">
               <p className="text-xs font-medium text-muted-foreground mb-0.5">
@@ -58,7 +58,7 @@ export const ProgressUpdateMessage = memo(function ProgressUpdateMessage(
               <div className="flex items-center gap-3">
                 <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-green-500 transition-all"
+                    className="h-full bg-success transition-all"
                     style={{
                       width: `${(progress.currentValue / (progress.targetValue || 100)) * 100}%`,
                     }}

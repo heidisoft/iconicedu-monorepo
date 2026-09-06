@@ -8,27 +8,29 @@ import {
   USER_SETTINGS_TAB_TRIGGER_CLASS,
 } from './user-settings.theme';
 
-describe('user settings dark-mode theme classes', () => {
-  it('keeps dialog and drawer surfaces dark-mode aware', () => {
-    expect(USER_SETTINGS_DIALOG_SURFACE_CLASS).toContain('dark:bg-zinc-950');
-    expect(USER_SETTINGS_DIALOG_SURFACE_CLASS).toContain('dark:border-white/15');
-    expect(USER_SETTINGS_DRAWER_SURFACE_CLASS).toContain('dark:bg-zinc-950');
-    expect(USER_SETTINGS_DRAWER_SURFACE_CLASS).toContain('dark:border-white/15');
+describe('user settings theme classes', () => {
+  it('drives dialog and drawer surfaces from theme tokens', () => {
+    expect(USER_SETTINGS_DIALOG_SURFACE_CLASS).toContain('bg-popover');
+    expect(USER_SETTINGS_DIALOG_SURFACE_CLASS).toContain('text-popover-foreground');
+    expect(USER_SETTINGS_DRAWER_SURFACE_CLASS).toContain('bg-popover');
+    expect(USER_SETTINGS_DIALOG_SURFACE_CLASS).not.toContain('zinc-');
+    expect(USER_SETTINGS_DRAWER_SURFACE_CLASS).not.toContain('zinc-');
   });
 
-  it('keeps tab trigger contrast in dark mode', () => {
+  it('keeps tab trigger contrast via tokens', () => {
     expect(USER_SETTINGS_TAB_TRIGGER_CLASS).toContain(
-      'dark:data-[state=active]:bg-zinc-800',
+      'data-[state=active]:text-foreground',
     );
     expect(USER_SETTINGS_TAB_TRIGGER_CLASS).toContain(
-      'dark:data-[state=inactive]:text-zinc-300',
+      'data-[state=inactive]:text-muted-foreground',
     );
+    expect(USER_SETTINGS_TAB_TRIGGER_CLASS).not.toContain('zinc-');
   });
 
-  it('keeps section surfaces and icon badges visible in dark mode', () => {
-    expect(USER_SETTINGS_SECTION_SURFACE_CLASS).toContain('dark:bg-zinc-900/60');
-    expect(USER_SETTINGS_SECTION_SURFACE_CLASS).toContain('dark:border-white/10');
-    expect(USER_SETTINGS_SECTION_ICON_CLASS).toContain('dark:bg-zinc-800/90');
-    expect(USER_SETTINGS_SECTION_ICON_CLASS).toContain('dark:border-white/15');
+  it('keeps section surfaces and icon badges token-driven', () => {
+    expect(USER_SETTINGS_SECTION_SURFACE_CLASS).toContain('bg-card/70');
+    expect(USER_SETTINGS_SECTION_ICON_CLASS).toContain('bg-muted/40');
+    expect(USER_SETTINGS_SECTION_SURFACE_CLASS).not.toContain('zinc-');
+    expect(USER_SETTINGS_SECTION_ICON_CLASS).not.toContain('zinc-');
   });
 });

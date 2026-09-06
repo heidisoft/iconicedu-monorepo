@@ -27,7 +27,7 @@ const STATUS_CONFIG: Record<
 };
 
 function ScoreBar({ pct }: { pct: number }) {
-  const color = pct >= 80 ? 'bg-emerald-500' : pct >= 60 ? 'bg-amber-500' : 'bg-red-500';
+  const color = pct >= 80 ? 'bg-success' : pct >= 60 ? 'bg-warning' : 'bg-destructive';
   return (
     <div className="flex items-center gap-2 shrink-0">
       <span className="text-sm font-semibold tabular-nums w-9 text-right">
@@ -171,7 +171,7 @@ export default async function DeliveryResultsPage({
         )}
 
         {/* Sessions table */}
-        <div className="rounded-xl border overflow-hidden">
+        <div className="rounded-xl border bg-card overflow-hidden">
           <div className="flex items-center justify-between px-6 py-4 border-b bg-muted/30">
             <div>
               <p className="text-sm font-semibold">Sessions ({sessions.length})</p>
@@ -205,7 +205,7 @@ export default async function DeliveryResultsPage({
                   >
                     <div className="shrink-0">
                       {session.status === 'completed' ? (
-                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                        <CheckCircle2 className="h-4 w-4 text-success" />
                       ) : (
                         <Clock className="h-4 w-4 text-muted-foreground/50" />
                       )}

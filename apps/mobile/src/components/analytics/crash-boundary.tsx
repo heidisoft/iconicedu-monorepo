@@ -1,10 +1,12 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { AnalyticsEvent, type AnalyticsClient } from '@iconicedu/utils';
+import { lightColors, type AppColors } from '@/lib/theme';
 
 type Props = {
   /** analytics.capture from useAnalytics() — passed as a prop to avoid context in class. */
   analyticsCapture: AnalyticsClient['capture'];
+  colors?: AppColors;
   children: React.ReactNode;
 };
 
@@ -37,14 +39,20 @@ export class CrashBoundary extends React.Component<Props, State> {
 
   render() {
     if (this.state.crashed) {
+      const colors = this.props.colors ?? lightColors;
       return (
-        <View style={styles.container}>
-          <Text style={styles.title}>Something went wrong</Text>
-          <Text style={styles.body}>
+        <View style={[styles.container, { backgroundColor: colors.pageBg }]}>
+          <Text style={[styles.title, { color: colors.text }]}>Something went wrong</Text>
+          <Text style={[styles.body, { color: colors.textMuted }]}>
             The app ran into an unexpected error. Please try again.
           </Text>
-          <Pressable style={styles.button} onPress={this.handleReset}>
-            <Text style={styles.buttonText}>Try again</Text>
+          <Pressable
+            style={[styles.button, { backgroundColor: colors.action }]}
+            onPress={this.handleReset}
+          >
+            <Text style={[styles.buttonText, { color: colors.actionForeground }]}>
+              Try again
+            </Text>
           </Pressable>
         </View>
       );
@@ -60,30 +68,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 32,
-    backgroundColor: '#fff',
   },
   title: {
     fontSize: 22,
     fontWeight: '600',
-    color: '#18181b',
     marginBottom: 12,
     textAlign: 'center',
   },
   body: {
     fontSize: 15,
-    color: '#71717a',
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 32,
   },
   button: {
-    backgroundColor: '#2dd4a8',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 12,
   },
   buttonText: {
-    color: '#042f2e',
     fontWeight: '600',
     fontSize: 15,
   },

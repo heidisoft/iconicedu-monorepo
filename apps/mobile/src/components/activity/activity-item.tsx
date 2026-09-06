@@ -65,33 +65,35 @@ export const TAB_LABELS: Record<string, string> = {
   system: 'System',
 };
 
+// Activity / notification icon tones. Flat, muted — kept in sync with the
+// forest-green + sage theme tokens (see @/lib/theme). Dark-aware.
 export function toneColors(tone?: string): { bg: string; fg: string } {
   switch (tone) {
     case 'success':
-      return { bg: '#dcfce7', fg: '#16a34a' };
+      return { bg: '#e2f0e2', fg: '#2f7d4a' };
     case 'warning':
-      return { bg: '#fef9c3', fg: '#ca8a04' };
+      return { bg: '#f4ecdd', fg: '#a97b34' };
     case 'danger':
-      return { bg: '#fee2e2', fg: '#dc2626' };
+      return { bg: '#f5e7e4', fg: '#bf574e' };
     case 'info':
-      return { bg: '#dbeafe', fg: '#2563eb' };
+      return { bg: '#e8ecf7', fg: '#4a6a9e' };
     default:
-      return { bg: '#f1f5f9', fg: '#64748b' };
+      return { bg: '#eef0ea', fg: '#6b7469' };
   }
 }
 
 export function toneColorsDark(tone?: string): { bg: string; fg: string } {
   switch (tone) {
     case 'success':
-      return { bg: '#14532d', fg: '#4ade80' };
+      return { bg: '#1c3226', fg: '#5fb17e' };
     case 'warning':
-      return { bg: '#713f12', fg: '#fbbf24' };
+      return { bg: '#33291a', fg: '#d1a568' };
     case 'danger':
-      return { bg: '#7f1d1d', fg: '#f87171' };
+      return { bg: '#33231f', fg: '#d77f78' };
     case 'info':
-      return { bg: '#1e3a5f', fg: '#60a5fa' };
+      return { bg: '#232a3a', fg: '#8ba8d4' };
     default:
-      return { bg: '#1e293b', fg: '#94a3b8' };
+      return { bg: '#262b23', fg: '#a0a89c' };
   }
 }
 

@@ -46,28 +46,28 @@ import type { PresenceDisplayStatus } from '@/hooks/use-online-profile-ids';
 import { profileAvatarColors } from '@/lib/profile-avatar-colors';
 
 const THEME_KEY_COLORS: Record<string, { bg: string; fg: string }> = {
-  slate: { bg: '#64748b', fg: '#ffffff' },
-  gray: { bg: '#6b7280', fg: '#ffffff' },
-  zinc: { bg: '#71717a', fg: '#ffffff' },
-  neutral: { bg: '#737373', fg: '#ffffff' },
-  stone: { bg: '#78716c', fg: '#ffffff' },
-  red: { bg: '#ef4444', fg: '#ffffff' },
-  orange: { bg: '#f97316', fg: '#ffffff' },
-  amber: { bg: '#f59e0b', fg: '#1f2937' },
-  yellow: { bg: '#eab308', fg: '#1f2937' },
-  lime: { bg: '#84cc16', fg: '#1f2937' },
-  green: { bg: '#22c55e', fg: '#ffffff' },
-  emerald: { bg: '#10b981', fg: '#ffffff' },
-  teal: { bg: '#14b8a6', fg: '#ffffff' },
-  cyan: { bg: '#06b6d4', fg: '#ffffff' },
-  sky: { bg: '#0ea5e9', fg: '#ffffff' },
-  blue: { bg: '#3b82f6', fg: '#ffffff' },
-  indigo: { bg: '#6366f1', fg: '#ffffff' },
-  violet: { bg: '#8b5cf6', fg: '#ffffff' },
-  purple: { bg: '#a855f7', fg: '#ffffff' },
-  fuchsia: { bg: '#d946ef', fg: '#ffffff' },
-  pink: { bg: '#ec4899', fg: '#ffffff' },
-  rose: { bg: '#f43f5e', fg: '#ffffff' },
+  slate: { bg: '#667487', fg: '#ffffff' },
+  gray: { bg: '#6e737a', fg: '#ffffff' },
+  zinc: { bg: '#73737a', fg: '#ffffff' },
+  neutral: { bg: '#75726e', fg: '#ffffff' },
+  stone: { bg: '#7c756b', fg: '#ffffff' },
+  red: { bg: '#cc5b52', fg: '#ffffff' },
+  orange: { bg: '#cf7a4e', fg: '#1f2a26' },
+  amber: { bg: '#c08a3e', fg: '#1f2a26' },
+  yellow: { bg: '#b09a44', fg: '#1f2a26' },
+  lime: { bg: '#86a049', fg: '#1f2a26' },
+  green: { bg: '#4f9d62', fg: '#ffffff' },
+  emerald: { bg: '#3a9375', fg: '#ffffff' },
+  teal: { bg: '#3f978f', fg: '#ffffff' },
+  cyan: { bg: '#43919e', fg: '#ffffff' },
+  sky: { bg: '#5090bb', fg: '#ffffff' },
+  blue: { bg: '#547fb4', fg: '#ffffff' },
+  indigo: { bg: '#6266a8', fg: '#ffffff' },
+  violet: { bg: '#7a6aac', fg: '#ffffff' },
+  purple: { bg: '#8767a6', fg: '#ffffff' },
+  fuchsia: { bg: '#a5629a', fg: '#ffffff' },
+  pink: { bg: '#bd6a8c', fg: '#ffffff' },
+  rose: { bg: '#c56370', fg: '#ffffff' },
 };
 
 function getInitials(name: string): string {
@@ -265,7 +265,7 @@ function makeStyles(C: AppColors) {
       width: 12,
       height: 12,
       borderRadius: 6,
-      backgroundColor: '#22c55e',
+      backgroundColor: C.success,
       borderWidth: 2,
       borderColor: C.pageBg,
     },
@@ -402,7 +402,7 @@ function makeStyles(C: AppColors) {
       flex: 1,
       justifyContent: 'center',
       paddingHorizontal: 20,
-      backgroundColor: 'rgba(15, 23, 42, 0.42)',
+      backgroundColor: C.modalOverlay,
     },
     modalCard: {
       gap: 16,
@@ -490,30 +490,32 @@ function makeStyles(C: AppColors) {
   });
 }
 
+// Muted name tints — the same earthy mid-tones as the avatar palette, chosen to
+// stay legible (and not alarming) on both the light and dark header surface.
 function themeTextColor(themeKey: string | null | undefined, fallback: string): string {
   const palette: Record<string, string> = {
-    slate: '#64748b',
-    gray: '#6b7280',
-    zinc: '#71717a',
-    neutral: '#737373',
-    stone: '#78716c',
-    red: '#ef4444',
-    orange: '#f97316',
-    amber: '#f59e0b',
-    yellow: '#ca8a04',
-    lime: '#65a30d',
-    green: '#16a34a',
-    emerald: '#059669',
-    teal: '#0f766e',
-    cyan: '#0891b2',
-    sky: '#0284c7',
-    blue: '#2563eb',
-    indigo: '#4f46e5',
-    violet: '#7c3aed',
-    purple: '#9333ea',
-    fuchsia: '#c026d3',
-    pink: '#db2777',
-    rose: '#e11d48',
+    slate: '#667487',
+    gray: '#6e737a',
+    zinc: '#73737a',
+    neutral: '#75726e',
+    stone: '#7c756b',
+    red: '#cc5b52',
+    orange: '#cf7a4e',
+    amber: '#c08a3e',
+    yellow: '#b09a44',
+    lime: '#86a049',
+    green: '#4f9d62',
+    emerald: '#3a9375',
+    teal: '#3f978f',
+    cyan: '#43919e',
+    sky: '#5090bb',
+    blue: '#547fb4',
+    indigo: '#6266a8',
+    violet: '#7a6aac',
+    purple: '#8767a6',
+    fuchsia: '#a5629a',
+    pink: '#bd6a8c',
+    rose: '#c56370',
   };
   return (themeKey && palette[themeKey]) || fallback;
 }
@@ -651,13 +653,13 @@ export function ConversationHeader({
       return <View style={s.onlineDot} />;
     }
     if (presenceStatus === 'away' || presenceStatus === 'idle') {
-      return <View style={[s.statusBadge, { backgroundColor: '#eab308' }]} />;
+      return <View style={[s.statusBadge, { backgroundColor: colors.warning }]} />;
     }
     if (presenceStatus === 'busy') {
-      return <View style={[s.statusBadge, { backgroundColor: '#dc2626' }]} />;
+      return <View style={[s.statusBadge, { backgroundColor: colors.red }]} />;
     }
-    return <View style={[s.statusBadge, { backgroundColor: '#4b5563' }]} />;
-  }, [isReadOnly, presenceStatus, s]);
+    return <View style={[s.statusBadge, { backgroundColor: colors.textMuted }]} />;
+  }, [isReadOnly, presenceStatus, s, colors]);
 
   const compactStudentMeta = buildCompactStudentMeta({
     studentProfiles,

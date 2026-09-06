@@ -56,7 +56,7 @@ const loadSubject = async () => {
   return { NavSecondary, SidebarProvider };
 };
 
-const SUPPORT_HIGHLIGHT_CLASS = 'bg-amber-50/85';
+const SUPPORT_HIGHLIGHT_CLASS = 'bg-warning/10';
 
 describe('NavSecondary', () => {
   beforeEach(() => {

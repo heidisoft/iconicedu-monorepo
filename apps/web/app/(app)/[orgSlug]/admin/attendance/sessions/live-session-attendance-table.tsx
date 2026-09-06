@@ -28,7 +28,7 @@ export function LiveSessionAttendanceTable({
   rows,
 }: LiveSessionAttendanceTableProps) {
   return (
-    <div className="rounded-xl border overflow-hidden">
+    <div className="rounded-xl border bg-card overflow-hidden">
       <Table className="min-w-full">
         <TableHeader>
           <TableRow>

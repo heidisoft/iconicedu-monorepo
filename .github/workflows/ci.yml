@@ -98,7 +98,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 20.19.0
+          node-version: 24.19.0
           cache: pnpm
 
       - name: Validate Conventional Commit PR title
@@ -174,7 +174,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 20.19.0
+          node-version: 24.19.0
           cache: pnpm
 
       - name: Install dependencies
@@ -238,7 +238,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 20.19.0
+          node-version: 24.19.0
           cache: pnpm
 
       - name: Restore Turbo build cache
@@ -409,7 +409,7 @@ jobs:
         if: needs.changes.outputs.code == 'true'
         uses: actions/setup-node@v7
         with:
-          node-version: 20.19.0
+          node-version: 24.19.0
           cache: pnpm
 
       - name: Install dependencies
@@ -1320,7 +1320,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 20.19.0
+          node-version: 24.19.0
 
       - uses: supabase/setup-cli@v1
         with:

@@ -169,7 +169,7 @@ export function ActivityFeedAuditDashboard({ audit }: ActivityFeedAuditDashboard
         </div>
       </div>
 
-      <div className="rounded-xl border overflow-hidden">
+      <div className="rounded-xl border bg-card overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b bg-muted/30">
           <h2 className="text-sm font-semibold">Created per verb</h2>
         </div>
@@ -254,7 +254,7 @@ export function ActivityFeedAuditDashboard({ audit }: ActivityFeedAuditDashboard
         </div>
       </div>
 
-      <div className="rounded-xl border overflow-hidden">
+      <div className="rounded-xl border bg-card overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>

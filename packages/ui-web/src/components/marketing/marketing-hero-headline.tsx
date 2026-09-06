@@ -8,7 +8,7 @@ export function MarketingHeroHeadline() {
           <span className="block text-foreground">It&apos;s time to</span>
           <span className="mt-2 flex flex-wrap items-center justify-center gap-3 md:gap-4">
             <span className="text-foreground">unlock your</span>
-            <span className="inline-flex items-center gap-2 rounded-4xl border border-border/60 bg-primary/15 px-4 py-1 text-2xl text-primary dark:border-emerald-900/50 md:text-5xl">
+            <span className="inline-flex items-center gap-2 rounded-4xl border border-border/60 bg-primary/15 px-4 py-1 text-2xl text-primary md:text-5xl">
               <span aria-hidden="true">🎓</span>
               <span className="font-semibold text-primary">child&apos;s</span>
             </span>

@@ -138,7 +138,7 @@ export function ActivityCompletionCheckBatch({
                       backgroundColor: isConfirmed
                         ? colors.teal
                         : isDisputed
-                          ? '#f59e0b'
+                          ? colors.warning
                           : colors.border,
                     },
                   ]}

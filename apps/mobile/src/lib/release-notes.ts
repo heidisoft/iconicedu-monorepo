@@ -5,11 +5,12 @@ export type ReleaseNotes = {
 };
 
 export const currentReleaseNotes: ReleaseNotes = {
-  id: '2026-09-05-session-completions',
-  title: "What's new",
+  id: '2026-09-06-fresh-look',
+  title: 'A fresh new look',
   items: [
-    'Review recently completed classes from Home or Notifications.',
-    'Confirm a class, report an issue, or undo your response when needed.',
-    'Share a rating after confirming a completed class.',
+    'Refreshed the whole app with a calmer forest-green and sage colour theme.',
+    'Redesigned session cards, home overview tiles and chat bubbles.',
+    'Softer, more consistent cards, badges and status pills throughout.',
+    'Improved contrast and polish in dark mode.',
   ],
 };

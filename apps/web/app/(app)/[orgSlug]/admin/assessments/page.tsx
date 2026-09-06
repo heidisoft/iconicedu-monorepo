@@ -142,7 +142,7 @@ export default async function AssessmentsOverviewPage({
         {!hasAnything && (
           <>
             <Separator />
-            <div className="rounded-xl border overflow-hidden">
+            <div className="rounded-xl border bg-card overflow-hidden">
               <div className="px-6 py-4 border-b bg-muted/30">
                 <p className="text-sm font-semibold">Get started</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
@@ -157,7 +157,7 @@ export default async function AssessmentsOverviewPage({
                     className="group flex items-center gap-4 px-6 py-4 hover:bg-muted/30 transition-colors"
                   >
                     {step.done ? (
-                      <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
+                      <CheckCircle2 className="h-5 w-5 text-success shrink-0" />
                     ) : (
                       <Circle className="h-5 w-5 text-muted-foreground/30 shrink-0" />
                     )}
@@ -181,7 +181,7 @@ export default async function AssessmentsOverviewPage({
 
         {/* Recent deliveries */}
         {deliveries.total > 0 && (
-          <div className="rounded-xl border overflow-hidden">
+          <div className="rounded-xl border bg-card overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b bg-muted/30">
               <h2 className="text-sm font-semibold">Recent deliveries</h2>
               <Button asChild variant="ghost" size="sm" className="text-xs h-7 -mr-2">
