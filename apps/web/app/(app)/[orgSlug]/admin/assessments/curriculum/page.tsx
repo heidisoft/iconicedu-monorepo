@@ -80,7 +80,7 @@ export default async function CurriculumPage({
             {!hasActiveFilters && <CreateSubjectForm orgId={org.id} />}
           </div>
         ) : (
-          <div className="rounded-xl border overflow-hidden">
+          <div className="rounded-xl border bg-card overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b bg-muted/30">
               <h2 className="text-sm font-semibold">Subjects ({subjects.length})</h2>
             </div>

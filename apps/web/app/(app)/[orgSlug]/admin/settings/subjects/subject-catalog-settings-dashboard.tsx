@@ -177,7 +177,7 @@ export function SubjectCatalogSettingsDashboard({
 
   if (isLoading) {
     return (
-      <div className="rounded-xl border overflow-hidden">
+      <div className="rounded-xl border bg-card overflow-hidden">
         <div className="flex items-center gap-2 px-6 py-4 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" />
           Loading subject catalog...
@@ -188,7 +188,7 @@ export function SubjectCatalogSettingsDashboard({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="rounded-xl border overflow-hidden">
+      <div className="rounded-xl border bg-card overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b bg-muted/30">
           <h2 className="text-sm font-semibold">Subject catalog</h2>
           <p className="text-xs text-muted-foreground">
