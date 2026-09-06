@@ -532,20 +532,20 @@ function makeStyles(C: AppColors) {
       lineHeight: 38,
     },
     metricLabel: { fontSize: 13, color: C.textMuted, lineHeight: 17 },
-    metricTitleGroup: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      flex: 1,
-      gap: 10,
-    },
     metricCompletionBody: {
       marginTop: 14,
     },
     metricPendingRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 5,
-      marginTop: 8,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: C.border,
+      marginTop: 10,
+      paddingTop: 10,
+    },
+    metricCompletionValue: {
+      fontSize: 44,
+      fontWeight: '800',
+      color: C.text,
+      lineHeight: 48,
     },
     metricPendingText: {
       fontSize: 13,
@@ -1291,24 +1291,21 @@ export default function HomeScreen() {
                 ]}
               >
                 <View style={s.metricHeader}>
-                  <View style={s.metricTitleGroup}>
-                    <View style={s.metricIconWrap}>
-                      <CalendarCheck size={18} color={colors.primary} />
-                    </View>
-                    <Text style={s.metricTitle}>
-                      {sessionCompletionCarouselEnabled
-                        ? 'Sessions completed'
-                        : 'Completed Classes'}
-                    </Text>
+                  <Text style={s.metricTitle}>
+                    {sessionCompletionCarouselEnabled
+                      ? 'Sessions completed'
+                      : 'Completed Classes'}
+                  </Text>
+                  <View style={s.metricIconWrap}>
+                    <CalendarCheck size={18} color={colors.primary} />
                   </View>
                 </View>
                 {sessionCompletionCarouselEnabled ? (
                   <View style={s.metricCompletionBody}>
-                    <Text style={s.metricValue}>
+                    <Text style={s.metricCompletionValue}>
                       {sessionCompletionSummary.completed}
                     </Text>
                     <View style={s.metricPendingRow}>
-                      <CalendarClock size={14} color={colors.primary} />
                       <Text style={s.metricPendingText}>
                         <Text style={s.metricPendingCount}>
                           {sessionCompletionSummary.pending}
