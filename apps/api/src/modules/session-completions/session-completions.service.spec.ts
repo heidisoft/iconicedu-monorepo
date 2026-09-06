@@ -200,6 +200,106 @@ describe('SessionCompletionsService', () => {
     });
   });
 
+  describe('getCompletionSummaryForProfile', () => {
+    // A chainable, awaitable stand-in for a PostgREST head:count query.
+    function makeCountChain(count: number) {
+      const chain: Record<string, unknown> = {};
+      for (const method of ['select', 'eq', 'is', 'in', 'gte', 'lt']) {
+        chain[method] = jest.fn(() => chain);
+      }
+      chain.then = (resolve: (value: { count: number; error: null }) => unknown) =>
+        Promise.resolve({ count, error: null }).then(resolve);
+      return chain;
+    }
+
+    function makeSummarySupabase(input: {
+      completedCount: number;
+      pendingCount: number;
+      profileRow?: Record<string, unknown> | null;
+      familyLinkRow?: Record<string, unknown> | null;
+    }) {
+      const accountChain = makeChain({ data: { id: ACCOUNT_ID, org_id: ORG_ID } });
+      const profileChain = makeChain({
+        data:
+          input.profileRow === undefined
+            ? { id: PROFILE_ID, account_id: ACCOUNT_ID, org_id: ORG_ID, kind: 'child' }
+            : input.profileRow,
+      });
+      const familyLinkChain = makeChain({ data: input.familyLinkRow ?? null });
+
+      let completionsSelectCalls = 0;
+      const from = jest.fn((table: string) => {
+        if (table === 'accounts') return accountChain;
+        if (table === 'profiles') return profileChain;
+        if (table === 'family_links') return familyLinkChain;
+        if (table === 'class_session_completions') {
+          return {
+            // 1st select() builds the "completed" count query, 2nd the "pending" one.
+            select: jest.fn(() => {
+              completionsSelectCalls += 1;
+              return makeCountChain(
+                completionsSelectCalls === 1 ? input.completedCount : input.pendingCount,
+              );
+            }),
+          };
+        }
+        throw new Error(`Unexpected table: ${table}`);
+      });
+
+      createSupabaseServiceClientMock.mockReturnValue({ from } as never);
+      return { from };
+    }
+
+    it('returns exact confirmed and pending counts, not a page slice', async () => {
+      makeSummarySupabase({ completedCount: 137, pendingCount: 4 });
+      const service = new SessionCompletionsService();
+
+      const result = await service.getCompletionSummaryForProfile(AUTH_USER_ID, {
+        orgId: ORG_ID,
+        profileId: PROFILE_ID,
+        completedSince: '2026-03-01T00:00:00.000Z',
+        completedUntil: '2026-04-01T00:00:00.000Z',
+      });
+
+      expect(result).toEqual({ completed: 137, pending: 4 });
+    });
+
+    it('rejects an invalid profileId before querying', async () => {
+      const { from } = makeSummarySupabase({ completedCount: 0, pendingCount: 0 });
+      const service = new SessionCompletionsService();
+
+      await expect(
+        service.getCompletionSummaryForProfile(AUTH_USER_ID, {
+          orgId: ORG_ID,
+          profileId: 'not-a-uuid',
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(from).not.toHaveBeenCalled();
+    });
+
+    it('rejects a profile the requesting account may not act for', async () => {
+      makeSummarySupabase({
+        completedCount: 0,
+        pendingCount: 0,
+        profileRow: {
+          id: OTHER_PROFILE_ID,
+          account_id: OTHER_ACCOUNT_ID,
+          org_id: ORG_ID,
+          kind: 'child',
+        },
+        familyLinkRow: null,
+      });
+      const service = new SessionCompletionsService();
+
+      await expect(
+        service.getCompletionSummaryForProfile(AUTH_USER_ID, {
+          orgId: ORG_ID,
+          profileId: OTHER_PROFILE_ID,
+        }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
   describe('confirm', () => {
     it('marks the originating notification(s) as read, single and batched alike', async () => {
       const { activityFeedItemsUpdateChain } = makeSupabase({

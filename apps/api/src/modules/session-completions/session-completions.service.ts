@@ -146,6 +146,72 @@ export class SessionCompletionsService {
   }
 
   /**
+   * Aggregate completion totals for the home dashboard's "Sessions completed"
+   * tile. Deliberately NOT derived from listForProfile's page — that query is
+   * capped at MAX_PAGE_SIZE and only surfaces resolved rows from the last 3 days
+   * (its carousel/inbox visibility window), so counting it would silently drop
+   * confirmations older than 3 days and truncate large profiles. These are
+   * exact COUNTs over the whole table instead:
+   *   - `completed`: confirmed / auto_confirmed rows, optionally bounded to a
+   *     session-end window (the tile shows "this month").
+   *   - `pending`: all rows still awaiting the viewer's action (unbounded — a
+   *     pending row auto-expires via `expires_at` anyway).
+   */
+  async getCompletionSummaryForProfile(
+    authUserId: string,
+    params: {
+      orgId: string;
+      profileId: string;
+      completedSince?: string | null;
+      completedUntil?: string | null;
+    },
+  ): Promise<{ completed: number; pending: number }> {
+    if (!params?.orgId || !isUuid(params.orgId)) {
+      throw new BadRequestException('Invalid orgId');
+    }
+    if (!params?.profileId || !isUuid(params.profileId)) {
+      throw new BadRequestException('Invalid profileId');
+    }
+
+    const supabase = createSupabaseServiceClient();
+    const account = await this.resolveAccount(supabase, authUserId, params.orgId);
+    await this.resolvePermittedProfile(supabase, account, params.orgId, params.profileId);
+
+    const scopedCount = () =>
+      supabase
+        .from('class_session_completions')
+        .select('id', { count: 'exact', head: true })
+        .eq('org_id', params.orgId)
+        .eq('profile_id', params.profileId)
+        .is('deleted_at', null);
+
+    let completedQuery = scopedCount().in('status', ['confirmed', 'auto_confirmed']);
+    if (params.completedSince) {
+      completedQuery = completedQuery.gte('session_end_at', params.completedSince);
+    }
+    if (params.completedUntil) {
+      completedQuery = completedQuery.lt('session_end_at', params.completedUntil);
+    }
+
+    const [completedResult, pendingResult] = await Promise.all([
+      completedQuery,
+      scopedCount().eq('status', 'pending'),
+    ]);
+
+    if (completedResult.error) {
+      throw new InternalServerErrorException(completedResult.error.message);
+    }
+    if (pendingResult.error) {
+      throw new InternalServerErrorException(pendingResult.error.message);
+    }
+
+    return {
+      completed: completedResult.count ?? 0,
+      pending: pendingResult.count ?? 0,
+    };
+  }
+
+  /**
    * Cross-party completion state for a classroom channel's Sessions tab. RLS on
    * class_session_completions only exposes a viewer's own rows, so this reads
    * through the service client after verifying the caller is a member of the

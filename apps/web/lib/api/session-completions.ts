@@ -21,6 +21,21 @@ export function listSessionCompletions(
   );
 }
 
+export function getSessionCompletionSummary(
+  supabase: SupabaseClient,
+  input: {
+    orgId: string;
+    profileId: string;
+    completedSince?: string;
+    completedUntil?: string;
+  },
+) {
+  return createApiClient(supabase).get<{ completed: number; pending: number }>(
+    '/session-completions/summary',
+    input,
+  );
+}
+
 export function listChannelSessionCompletions(
   supabase: SupabaseClient,
   input: { orgId: string; channelId: string },

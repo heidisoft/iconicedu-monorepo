@@ -19,7 +19,10 @@ import {
   type ClassSession,
 } from '@iconicedu/ui-web/components/messages/tabs/messages-schedule-tab.utils';
 import { createApiClient } from '@iconicedu/web/lib/api/http-client';
-import { listSessionCompletions } from '@iconicedu/web/lib/api/session-completions';
+import {
+  getSessionCompletionSummary,
+  listSessionCompletions,
+} from '@iconicedu/web/lib/api/session-completions';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 export type DashboardInfographicRole = 'parents' | 'students' | 'tutors';
@@ -620,17 +623,34 @@ export async function buildDashboardHomeInfographicMetrics(input: {
     pageSize,
     timezone: input.timezone ?? input.currentUserProfile?.prefs?.timezone ?? null,
   });
-  const sessionCompletions =
-    input.sessionCompletionCarouselEnabled && input.currentUserProfile?.ids.id
-      ? (
-          await listSessionCompletions(input.supabase, {
-            orgId: input.orgId,
-            profileId: input.currentUserProfile.ids.id,
-            limit: 50,
-          })
-        ).items
-      : [];
-  const completedSessionsPending = sessionCompletions.filter(
+  const viewerProfileId = input.currentUserProfile?.ids.id;
+  const sessionCompletionQueriesEnabled = Boolean(
+    input.sessionCompletionCarouselEnabled && viewerProfileId,
+  );
+  // "Sessions completed" mirrors the "This month" completed-classes tile it
+  // replaces, so the aggregate is bounded to the current display month.
+  const completedMonthRange = getScheduleDisplayMonthRange(
+    [now],
+    input.timezone ?? input.currentUserProfile?.prefs?.timezone ?? null,
+  );
+  const [sessionCompletionsPage, sessionCompletionSummary] = await Promise.all([
+    sessionCompletionQueriesEnabled && viewerProfileId
+      ? listSessionCompletions(input.supabase, {
+          orgId: input.orgId,
+          profileId: viewerProfileId,
+          limit: 50,
+        }).then((page) => page.items)
+      : Promise.resolve<SessionCompletionVM[]>([]),
+    sessionCompletionQueriesEnabled && viewerProfileId
+      ? getSessionCompletionSummary(input.supabase, {
+          orgId: input.orgId,
+          profileId: viewerProfileId,
+          completedSince: completedMonthRange.rangeStart.toISOString(),
+          completedUntil: completedMonthRange.rangeEnd.toISOString(),
+        })
+      : Promise.resolve<{ completed: number; pending: number } | null>(null),
+  ]);
+  const completedSessionsPending = sessionCompletionsPage.filter(
     (completion) =>
       completion.status === 'pending' ||
       ((completion.status === 'confirmed' || completion.status === 'auto_confirmed') &&
@@ -648,15 +668,7 @@ export async function buildDashboardHomeInfographicMetrics(input: {
     upcomingSessionsPage: activeRoleData.upcomingSessionsPage,
     completedSessionsPending,
     sessionCompletionSummary: input.sessionCompletionCarouselEnabled
-      ? {
-          completed: sessionCompletions.filter(
-            (completion) =>
-              completion.status === 'confirmed' || completion.status === 'auto_confirmed',
-          ).length,
-          pending: sessionCompletions.filter(
-            (completion) => completion.status === 'pending',
-          ).length,
-        }
+      ? (sessionCompletionSummary ?? { completed: 0, pending: 0 })
       : null,
     browseHref: isStaffView ? `/${input.orgSlug}/admin/channels` : `/${input.orgSlug}/s`,
     calendarHref: isStaffView
