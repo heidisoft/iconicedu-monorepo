@@ -227,35 +227,24 @@ export function DashboardHomeInfographicSection({
               </div>
             </div>
             {sessionCompletionSummary ? (
-              <>
-                <p className="mt-2 text-4xl font-semibold tracking-tight text-foreground">
-                  {sessionCompletionSummary.completed}
-                </p>
-                <p className="mt-1 text-sm font-medium text-primary/80">
-                  Sessions completed
-                </p>
-
-                <div className="mt-4 grid grid-cols-2 border-t border-primary/15 pt-3">
-                  <div className="pr-3">
-                    <p className="text-xl font-semibold tracking-tight text-foreground">
-                      {topMetrics.completedClassesThisMonth}
-                    </p>
-                    <p className="mt-0.5 text-xs font-medium text-muted-foreground">
-                      Classes conducted
-                    </p>
-                    <p className="text-[10px] text-muted-foreground/75">This month</p>
-                  </div>
-                  <div className="border-l border-primary/15 pl-3">
-                    <p className="text-xl font-semibold tracking-tight text-foreground">
-                      {sessionCompletionSummary.pending}
-                    </p>
-                    <p className="mt-0.5 text-xs font-medium text-muted-foreground">
-                      Pending completion
-                    </p>
-                    <p className="text-[10px] text-muted-foreground/75">Needs review</p>
-                  </div>
+              <div className="mt-5 grid grid-cols-2">
+                <div className="pr-4">
+                  <p className="text-4xl font-semibold tracking-tight text-foreground">
+                    {sessionCompletionSummary.completed}
+                  </p>
+                  <p className="mt-1 text-sm font-medium text-primary/80">
+                    Sessions completed
+                  </p>
                 </div>
-              </>
+                <div className="border-l border-primary/15 pl-4">
+                  <p className="text-4xl font-semibold tracking-tight text-foreground">
+                    {sessionCompletionSummary.pending}
+                  </p>
+                  <p className="mt-1 text-sm font-medium text-muted-foreground">
+                    Pending completion
+                  </p>
+                </div>
+              </div>
             ) : (
               <>
                 <p className="mt-2 text-4xl font-semibold tracking-tight text-foreground">

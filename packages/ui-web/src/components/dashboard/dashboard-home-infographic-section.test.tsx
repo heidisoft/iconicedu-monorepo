@@ -198,8 +198,8 @@ describe('DashboardHomeInfographicSection', () => {
     });
     expect(summary).toHaveTextContent('Session Completion');
     expect(summary).toHaveTextContent('7Sessions completed');
-    expect(summary).toHaveTextContent('10Classes conductedThis month');
-    expect(summary).toHaveTextContent('2Pending completionNeeds review');
+    expect(summary).toHaveTextContent('2Pending completion');
+    expect(summary).not.toHaveTextContent('Classes conducted');
   });
 
   it('separates visible upcoming sessions into today and this week sections', () => {

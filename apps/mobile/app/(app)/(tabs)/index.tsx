@@ -534,10 +534,7 @@ function makeStyles(C: AppColors) {
     metricLabel: { fontSize: 13, color: C.textMuted, lineHeight: 17 },
     metricSummaryRow: {
       flexDirection: 'row',
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: C.border,
-      paddingTop: 10,
-      marginTop: 10,
+      marginTop: 14,
     },
     metricSummaryCell: { flex: 1 },
     metricSummaryCellDivider: {
@@ -546,19 +543,12 @@ function makeStyles(C: AppColors) {
       paddingLeft: 10,
       marginLeft: 10,
     },
-    metricSummaryValue: {
-      fontSize: 20,
-      fontWeight: '800',
-      color: C.text,
-      lineHeight: 24,
-    },
     metricSummaryLabel: {
       fontSize: 11,
       fontWeight: '600',
       color: C.textMuted,
       lineHeight: 14,
     },
-    metricSummaryHint: { fontSize: 10, color: C.textFaint, lineHeight: 13 },
     activityHeader: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -1285,7 +1275,7 @@ export default function HomeScreen() {
               <View
                 accessibilityLabel={
                   sessionCompletionCarouselEnabled
-                    ? `Session completion summary. ${sessionCompletionSummary.completed} sessions completed, ${topMetrics.completedClassesThisMonth} classes conducted this month, ${sessionCompletionSummary.pending} pending completion.`
+                    ? `Session completion summary. ${sessionCompletionSummary.completed} sessions completed, ${sessionCompletionSummary.pending} pending completion.`
                     : undefined
                 }
                 style={[
@@ -1304,28 +1294,20 @@ export default function HomeScreen() {
                   </View>
                 </View>
                 {sessionCompletionCarouselEnabled ? (
-                  <View>
-                    <Text style={s.metricValue}>
-                      {sessionCompletionSummary.completed}
-                    </Text>
-                    <Text style={[s.metricLabel, { color: colors.primary }]}>
-                      Sessions completed
-                    </Text>
-                    <View style={s.metricSummaryRow}>
-                      <View style={s.metricSummaryCell}>
-                        <Text style={s.metricSummaryValue}>
-                          {topMetrics.completedClassesThisMonth}
-                        </Text>
-                        <Text style={s.metricSummaryLabel}>Classes conducted</Text>
-                        <Text style={s.metricSummaryHint}>This month</Text>
-                      </View>
-                      <View style={[s.metricSummaryCell, s.metricSummaryCellDivider]}>
-                        <Text style={s.metricSummaryValue}>
-                          {sessionCompletionSummary.pending}
-                        </Text>
-                        <Text style={s.metricSummaryLabel}>Pending completion</Text>
-                        <Text style={s.metricSummaryHint}>Needs review</Text>
-                      </View>
+                  <View style={s.metricSummaryRow}>
+                    <View style={s.metricSummaryCell}>
+                      <Text style={s.metricValue}>
+                        {sessionCompletionSummary.completed}
+                      </Text>
+                      <Text style={[s.metricLabel, { color: colors.primary }]}>
+                        Sessions completed
+                      </Text>
+                    </View>
+                    <View style={[s.metricSummaryCell, s.metricSummaryCellDivider]}>
+                      <Text style={s.metricValue}>
+                        {sessionCompletionSummary.pending}
+                      </Text>
+                      <Text style={s.metricSummaryLabel}>Pending completion</Text>
                     </View>
                   </View>
                 ) : (
