@@ -175,6 +175,33 @@ describe('DashboardHomeInfographicSection', () => {
     expect(screen.getByText('Page 2 of 3')).toBeInTheDocument();
   });
 
+  it('shows completed and pending session values in one summary tile', () => {
+    render(
+      <DashboardHomeInfographicSection
+        orgSlug="iconic-academy"
+        topMetrics={{
+          upcomingSessionsThisWeek: 4,
+          completedClassesThisMonth: 10,
+          activeSubjectsCount: 3,
+          activeSubjectsLabel: 'Math, ELA, Science',
+        }}
+        sessionCompletionSummary={{ completed: 7, pending: 2 }}
+        upcomingSessionsPage={{ ...sessionPage }}
+        calendarHref="/iconic-academy/class-schedule"
+        notificationsHref="/iconic-academy/notifications"
+        browseHref="/iconic-academy/s"
+      />,
+    );
+
+    const summary = screen.getByRole('article', {
+      name: 'Session completion summary',
+    });
+    expect(summary).toHaveTextContent('Sessions completed');
+    expect(summary).toHaveTextContent('7');
+    expect(summary).toHaveTextContent('2 pending completion');
+    expect(summary).not.toHaveTextContent('Classes conducted');
+  });
+
   it('separates visible upcoming sessions into today and this week sections', () => {
     render(
       <DashboardHomeInfographicSection

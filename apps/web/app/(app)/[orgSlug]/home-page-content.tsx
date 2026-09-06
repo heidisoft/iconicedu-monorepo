@@ -70,6 +70,7 @@ export async function HomePageContent({ orgSlug }: { orgSlug: string }) {
       topMetrics={metrics.metricsByRole[metrics.activeRole]}
       upcomingSessionsPage={metrics.upcomingSessionsPage}
       completedSessionsPending={metrics.completedSessionsPending}
+      sessionCompletionSummary={metrics.sessionCompletionSummary}
       calendarHref={metrics.calendarHref}
       notificationsHref={metrics.notificationsHref}
       browseHref={metrics.browseHref}

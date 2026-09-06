@@ -5,8 +5,18 @@ import { queryKeys } from '@/lib/api/query-keys';
 import { useAccount } from '@/hooks/use-account';
 import { useProfile } from '@/hooks/use-profile';
 
+export function summarizeSessionCompletions(sessions: SessionCompletionVM[]) {
+  return {
+    completed: sessions.filter(
+      (session) => session.status === 'confirmed' || session.status === 'auto_confirmed',
+    ).length,
+    pending: sessions.filter((session) => session.status === 'pending').length,
+  };
+}
+
 export function useCompletedSessions(enabled = true): {
   sessions: SessionCompletionVM[];
+  summary: { completed: number; pending: number };
   isPending: boolean;
   isError: boolean;
   refetch: () => Promise<unknown>;
@@ -24,13 +34,16 @@ export function useCompletedSessions(enabled = true): {
     retry: 1,
   });
 
+  const allSessions = query.data?.items ?? [];
+
   return {
-    sessions: (query.data?.items ?? []).filter(
+    sessions: allSessions.filter(
       (completion) =>
         completion.status === 'pending' ||
         ((completion.status === 'confirmed' || completion.status === 'auto_confirmed') &&
           completion.rating == null),
     ),
+    summary: summarizeSessionCompletions(allSessions),
     isPending: query.isPending,
     isError: query.isError,
     refetch: query.refetch,

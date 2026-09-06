@@ -59,6 +59,10 @@ export interface DashboardHomeInfographicSectionProps {
   };
   upcomingSessionsPage: DashboardUpcomingSessionsPage;
   completedSessionsPending?: SessionCompletionVM[];
+  sessionCompletionSummary?: {
+    completed: number;
+    pending: number;
+  } | null;
   calendarHref: string;
   notificationsHref: string;
   browseHref: string;
@@ -81,6 +85,7 @@ export function DashboardHomeInfographicSection({
   topMetrics,
   upcomingSessionsPage,
   completedSessionsPending = [],
+  sessionCompletionSummary = null,
   calendarHref,
   notificationsHref,
   browseHref,
@@ -184,6 +189,10 @@ export function DashboardHomeInfographicSection({
     'relative overflow-hidden rounded-2xl border border-transparent p-5 shadow-soft';
   const infographicChipClassName = 'inline-flex rounded-xl bg-card p-2.5 shadow-soft';
   const infographicContentClassName = 'relative z-10';
+  const infographicTitleClassName = 'text-base font-semibold text-foreground';
+  const infographicValueClassName =
+    'mt-2 text-6xl font-medium tracking-tight text-foreground';
+  const infographicFooterClassName = 'text-sm font-medium';
   const shouldShowBoostLearningSection = isParentView || isStudentView;
 
   return (
@@ -192,41 +201,68 @@ export function DashboardHomeInfographicSection({
         <article className={`${infographicCardClassName} bg-accent-periwinkle`}>
           <div className={infographicContentClassName}>
             <div className="mb-3 flex items-center justify-between gap-2">
-              <p className="text-base font-semibold text-foreground">Upcoming Sessions</p>
+              <p className={infographicTitleClassName}>Upcoming Sessions</p>
               <div
                 className={`${infographicChipClassName} text-accent-periwinkle-foreground`}
               >
                 <CalendarClock className="size-5" aria-hidden="true" />
               </div>
             </div>
-            <p className="mt-2 text-4xl font-semibold tracking-tight text-foreground">
-              {upcomingSessionsMetric.value}
-            </p>
-            <p className="mt-1 text-sm font-medium text-accent-periwinkle-foreground/80">
+            <p className={infographicValueClassName}>{upcomingSessionsMetric.value}</p>
+            <p
+              className={`mt-1 ${infographicFooterClassName} text-accent-periwinkle-foreground/80`}
+            >
               {upcomingSessionsMetric.label}
             </p>
           </div>
         </article>
 
-        <article className={`${infographicCardClassName} bg-primary-subtle`}>
+        <article
+          className={`${infographicCardClassName} bg-primary-subtle`}
+          aria-label="Session completion summary"
+        >
           <div className={infographicContentClassName}>
             <div className="mb-3 flex items-center justify-between gap-2">
-              <p className="text-base font-semibold text-foreground">Completed Classes</p>
+              <p className={infographicTitleClassName}>
+                {sessionCompletionSummary ? 'Sessions completed' : 'Completed Classes'}
+              </p>
               <div className={`${infographicChipClassName} text-primary`}>
                 <CalendarCheck className="size-5" aria-hidden="true" />
               </div>
             </div>
-            <p className="mt-2 text-4xl font-semibold tracking-tight text-foreground">
-              {topMetrics.completedClassesThisMonth}
-            </p>
-            <p className="mt-1 text-sm font-medium text-primary/80">This month</p>
+            {sessionCompletionSummary ? (
+              <div>
+                <p className={infographicValueClassName}>
+                  {sessionCompletionSummary.completed}
+                </p>
+                <div
+                  className={`mt-3 border-t border-primary/15 pt-3 ${infographicFooterClassName} text-muted-foreground`}
+                >
+                  <p>
+                    <span className="font-semibold text-primary">
+                      {sessionCompletionSummary.pending}
+                    </span>{' '}
+                    pending completion
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <>
+                <p className={infographicValueClassName}>
+                  {topMetrics.completedClassesThisMonth}
+                </p>
+                <p className={`mt-1 ${infographicFooterClassName} text-primary/80`}>
+                  This month
+                </p>
+              </>
+            )}
           </div>
         </article>
 
         <article className={`${infographicCardClassName} bg-accent-peach`}>
           <div className={infographicContentClassName}>
             <div className="mb-3 flex items-center justify-between gap-2">
-              <p className="text-base font-semibold text-foreground">
+              <p className={infographicTitleClassName}>
                 {isStaffView
                   ? 'Manage Classrooms'
                   : isTutorView
@@ -237,10 +273,10 @@ export function DashboardHomeInfographicSection({
                 <BookOpenCheck className="size-5" aria-hidden="true" />
               </div>
             </div>
-            <p className="mt-2 text-4xl font-semibold tracking-tight text-foreground">
-              {topMetrics.activeSubjectsCount}
-            </p>
-            <p className="mt-1 text-sm font-medium text-accent-peach-foreground/80">
+            <p className={infographicValueClassName}>{topMetrics.activeSubjectsCount}</p>
+            <p
+              className={`mt-1 ${infographicFooterClassName} text-accent-peach-foreground/80`}
+            >
               {topMetrics.activeSubjectsLabel}
             </p>
           </div>
@@ -248,7 +284,7 @@ export function DashboardHomeInfographicSection({
 
         <article className="relative overflow-hidden rounded-2xl border border-transparent bg-primary-subtle p-5 shadow-soft">
           <div className={infographicContentClassName}>
-            <p className="text-base font-semibold text-foreground">
+            <p className={infographicTitleClassName}>
               {isParentView ? 'Manage my family' : 'Manage my account'}
             </p>
             <p className="mt-3 text-sm text-muted-foreground">

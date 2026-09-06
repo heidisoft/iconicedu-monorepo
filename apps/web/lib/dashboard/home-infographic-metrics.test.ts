@@ -176,6 +176,7 @@ describe('buildDashboardHomeInfographicMetrics', () => {
     });
 
     expect(result.completedSessionsPending).toEqual([]);
+    expect(result.sessionCompletionSummary).toBeNull();
     expect(apiGetMock).not.toHaveBeenCalledWith(
       '/session-completions',
       expect.anything(),
@@ -232,6 +233,7 @@ describe('buildDashboardHomeInfographicMetrics', () => {
       'completion-pending',
       'completion-auto-confirmed',
     ]);
+    expect(result.sessionCompletionSummary).toEqual({ completed: 2, pending: 1 });
     expect(apiGetMock).toHaveBeenCalledWith('/session-completions', {
       orgId: 'org-1',
       profileId: 'child-1',
