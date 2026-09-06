@@ -169,7 +169,7 @@ export function RolesManagementDashboard({ orgId }: RolesManagementDashboardProp
 
   if (isLoading) {
     return (
-      <div className="rounded-xl border overflow-hidden">
+      <div className="rounded-xl border bg-card overflow-hidden">
         <div className="flex items-center gap-2 px-6 py-4 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" />
           Loading role assignments...
@@ -180,7 +180,7 @@ export function RolesManagementDashboard({ orgId }: RolesManagementDashboardProp
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="rounded-xl border overflow-hidden">
+      <div className="rounded-xl border bg-card overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b bg-muted/30">
           <h2 className="text-sm font-semibold">User selector</h2>
           <p className="text-xs text-muted-foreground">
@@ -218,7 +218,7 @@ export function RolesManagementDashboard({ orgId }: RolesManagementDashboardProp
         </div>
       </div>
 
-      <div className="rounded-xl border overflow-hidden">
+      <div className="rounded-xl border bg-card overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b bg-muted/30">
           <h2 className="text-sm font-semibold">Assign role</h2>
           <p className="text-xs text-muted-foreground">
@@ -257,7 +257,7 @@ export function RolesManagementDashboard({ orgId }: RolesManagementDashboardProp
         </div>
       </div>
 
-      <div className="rounded-xl border overflow-hidden">
+      <div className="rounded-xl border bg-card overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b bg-muted/30">
           <h2 className="text-sm font-semibold">Current roles</h2>
           <p className="text-xs text-muted-foreground">

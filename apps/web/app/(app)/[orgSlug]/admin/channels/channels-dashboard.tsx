@@ -624,7 +624,7 @@ export function ChannelsDashboard({ orgSlug }: ChannelsDashboardProps) {
         ]}
       />
 
-      <div className="rounded-xl border overflow-hidden">
+      <div className="rounded-xl border bg-card overflow-hidden">
         <div className="relative">
           {loading && (
             <div className="absolute inset-0 rounded-xl bg-card/90 flex items-center justify-center z-10">
