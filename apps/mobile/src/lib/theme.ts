@@ -1,12 +1,12 @@
 import { Platform } from 'react-native';
 
 // ─── Platform-canonical dark surfaces ─────────────────────────────────────────
-// One primary dark color per platform, applied uniformly so the nav bar,
-// tab bar, and page background all share the same base tone.
+// One primary dark color per platform for the page / nav bar / tab bar base tone.
 //   iOS    → #1C1C1E  (UIColor.systemBackground in Dark Mode)
 //   Android → #121212  (Material Design 3 dark surface)
 const DARK_BASE = Platform.select({ ios: '#1C1C1E', default: '#121212' }) as string;
-// Slightly elevated surface for inputs / modals (adds depth without a second "page" color)
+// Elevated surface for cards / inputs / modals so borderless cards still read
+// against the page (mirrors the web `--card` ≠ `--background` split).
 const DARK_SURFACE = Platform.select({ ios: '#2C2C2E', default: '#1E1E1E' }) as string;
 
 export const lightColors = {
@@ -33,10 +33,11 @@ export const lightColors = {
   bubbleOther: '#eceffa',
   // Semantic status tokens — the only place a "green means good" / "amber means
   // warning" value is allowed to live. Components must consume these, never a raw hex.
-  success: '#16a34a',
+  // Light values are darkened to clear 4.5:1 on white (they double as text tones).
+  success: '#0f7a3a',
   successForeground: '#ffffff',
   successSubtle: '#e6f4ea',
-  warning: '#d97706',
+  warning: '#b45309',
   warningForeground: '#ffffff',
   warningSubtle: '#fdf0e1',
   info: '#3f6cc4',
@@ -72,7 +73,7 @@ export const lightColors = {
 export const darkColors: typeof lightColors = {
   pageBg: DARK_BASE,
   bg: DARK_BASE,
-  card: DARK_BASE,
+  card: DARK_SURFACE,
   text: '#FFFFFF',
   textMuted: '#8E8E93',
   textFaint: '#48484A',
