@@ -330,6 +330,79 @@ describe('ActivityItem', () => {
     expect(screen.queryByText('Feedback is unavailable for this session.')).toBeNull();
   });
 
+  function makeFeedbackRequest(
+    sessionCompletion: Record<string, unknown>,
+  ): ActivityFeedItemVM {
+    return {
+      ...makeBaseActivity(),
+      verb: 'session.feedback_request.sent',
+      content: {
+        ...makeBaseActivity().content,
+        summary: 'Tell us how the session went',
+      },
+      metadata: {
+        feedbackUiEnabled: true,
+        sessionCompletionId: 'completion-1',
+        sessionCompletion,
+      },
+    } as ActivityFeedItemVM;
+  }
+
+  it('drops the standalone rating tile once the session is confirmed', () => {
+    renderActivity(makeFeedbackRequest({ id: 'completion-1', status: 'confirmed' }), {
+      currentProfileId: 'profile-1',
+    });
+
+    expect(screen.queryByText('Rate your session')).toBeNull();
+  });
+
+  it('drops the standalone rating tile once the session is disputed', () => {
+    renderActivity(makeFeedbackRequest({ id: 'completion-1', status: 'disputed' }), {
+      currentProfileId: 'profile-1',
+    });
+
+    expect(screen.queryByText('Rate your session')).toBeNull();
+  });
+
+  it('auto-dismisses an untouched rating tile after a few seconds', () => {
+    jest.useFakeTimers();
+
+    renderActivity(makeFeedbackRequest({ id: 'completion-1', status: 'pending' }), {
+      currentProfileId: 'profile-1',
+    });
+
+    expect(screen.getByText('Rate your session')).toBeTruthy();
+
+    act(() => {
+      jest.advanceTimersByTime(5_000);
+    });
+
+    expect(screen.queryByText('Rate your session')).toBeNull();
+  });
+
+  it('keeps the rating tile open once the user taps a star', async () => {
+    jest.useFakeTimers();
+    mockRateSessionCompletion.mockResolvedValue({
+      submittedAt: '2026-04-02T12:05:00.000Z',
+      rating: 5,
+      comment: null,
+    });
+
+    renderActivity(makeFeedbackRequest({ id: 'completion-1', status: 'pending' }), {
+      currentProfileId: 'profile-1',
+    });
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Rate 5 stars'));
+    });
+
+    act(() => {
+      jest.advanceTimersByTime(10_000);
+    });
+
+    expect(screen.getByText('Rate your session')).toBeTruthy();
+  });
+
   it('autosaves low-rating comments and uses a button to collapse to the submitted state', async () => {
     jest.useFakeTimers();
     mockRateSessionCompletion

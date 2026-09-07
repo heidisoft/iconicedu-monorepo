@@ -19,17 +19,31 @@ const COMMENT_AUTOSAVE_MS = 600;
 // Without this, submitting looked like the stars just vanished, since the
 // confirmation appeared the instant the API resolved.
 const CONFIRMATION_REVEAL_DELAY_MS = 500;
+// Rating is optional. When the standalone "Rate your session" tile is left
+// untouched, retire it after this long so it never turns into a permanent nag in
+// the feed. Any interaction (a star, a comment keystroke) cancels the countdown.
+const AUTO_DISMISS_MS = 5_000;
+
+type CompletionStatus = 'pending' | 'confirmed' | 'disputed' | 'auto_confirmed';
 
 type ActivityFeedbackRequestProps = {
   activity: ActivityFeedLeafItemVM;
   colors: AppColors;
   currentProfileId?: string | null;
   onRatingSubmit?: () => void;
+  /**
+   * Standalone tile (the feed's `session.feedback_request.sent` row) auto-hides
+   * itself after AUTO_DISMISS_MS when untouched. The copy embedded in
+   * ActivityCompletionCheck's "confirmed" step passes `false` — there it is part
+   * of the completion flow, not a throwaway prompt.
+   */
+  autoDismiss?: boolean;
 };
 
 type FeedbackMetadata = {
   sessionCompletionId: string | null;
   feedbackUiEnabled: boolean;
+  sessionCompletionStatus: CompletionStatus | null;
 };
 
 type FeedbackState = {
@@ -49,6 +63,7 @@ function asRecord(value: unknown): Record<string, unknown> {
 function getFeedbackMetadata(activity: ActivityFeedLeafItemVM): FeedbackMetadata {
   const metadata = asRecord(activity.metadata);
   const sessionCompletion = asRecord(metadata.sessionCompletion);
+  const rawStatus = sessionCompletion.status;
   return {
     sessionCompletionId:
       typeof sessionCompletion.id === 'string'
@@ -57,6 +72,13 @@ function getFeedbackMetadata(activity: ActivityFeedLeafItemVM): FeedbackMetadata
           ? metadata.sessionCompletionId
           : null,
     feedbackUiEnabled: metadata.feedbackUiEnabled !== false,
+    sessionCompletionStatus:
+      rawStatus === 'pending' ||
+      rawStatus === 'confirmed' ||
+      rawStatus === 'disputed' ||
+      rawStatus === 'auto_confirmed'
+        ? rawStatus
+        : null,
   };
 }
 
@@ -91,13 +113,27 @@ function normalizeComment(value: string) {
 
 export function canRenderMobileActivityFeedbackRequest(activity: ActivityFeedLeafItemVM) {
   const metadata = getFeedbackMetadata(activity);
-  return metadata.feedbackUiEnabled && Boolean(metadata.sessionCompletionId);
+  if (!metadata.feedbackUiEnabled || !metadata.sessionCompletionId) {
+    return false;
+  }
+  // Once the session has been confirmed or disputed through the completion check,
+  // the standalone rating tile is redundant (confirm already offers an inline
+  // rating) or inappropriate (a disputed session). Rating is optional — drop it.
+  if (
+    metadata.sessionCompletionStatus === 'confirmed' ||
+    metadata.sessionCompletionStatus === 'auto_confirmed' ||
+    metadata.sessionCompletionStatus === 'disputed'
+  ) {
+    return false;
+  }
+  return true;
 }
 
 export function ActivityFeedbackRequest({
   activity,
   colors,
   onRatingSubmit,
+  autoDismiss = true,
 }: ActivityFeedbackRequestProps) {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const initialFeedback = useMemo(() => getInitialFeedback(activity), [activity]);
@@ -128,6 +164,10 @@ export function ActivityFeedbackRequest({
     Boolean(initialFeedback.submittedAt),
   );
   const confirmationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Sticky for the life of this instance — a dismissed tile must not reappear when
+  // the parent feed re-renders with a fresh metadata object.
+  const [isDismissed, setIsDismissed] = useState(false);
+  const autoDismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setRating(initialFeedback.rating);
@@ -146,10 +186,50 @@ export function ActivityFeedbackRequest({
     setShowConfirmation(Boolean(initialFeedback.submittedAt));
   }, [initialFeedback]);
 
+  // Optional-rating auto-dismiss: fade the untouched standalone tile out after a
+  // few seconds. Re-runs whenever the "has the user engaged?" inputs change, so
+  // the first star or comment keystroke tears the timer down via the cleanup.
+  useEffect(() => {
+    if (
+      autoDismiss === false ||
+      isDismissed ||
+      rating > 0 ||
+      submittedAt ||
+      normalizeComment(comment) ||
+      isSubmitting ||
+      isCommentSaving
+    ) {
+      return;
+    }
+
+    autoDismissTimerRef.current = setTimeout(() => {
+      autoDismissTimerRef.current = null;
+      setIsDismissed(true);
+    }, AUTO_DISMISS_MS);
+
+    return () => {
+      if (autoDismissTimerRef.current) {
+        clearTimeout(autoDismissTimerRef.current);
+        autoDismissTimerRef.current = null;
+      }
+    };
+  }, [
+    autoDismiss,
+    isDismissed,
+    rating,
+    submittedAt,
+    comment,
+    isSubmitting,
+    isCommentSaving,
+  ]);
+
   useEffect(() => {
     return () => {
       if (commentAutosaveTimerRef.current) {
         clearTimeout(commentAutosaveTimerRef.current);
+      }
+      if (autoDismissTimerRef.current) {
+        clearTimeout(autoDismissTimerRef.current);
       }
       if (confirmationTimeoutRef.current) {
         clearTimeout(confirmationTimeoutRef.current);
@@ -332,7 +412,7 @@ export function ActivityFeedbackRequest({
     submittedAt,
   ]);
 
-  if (!metadata.feedbackUiEnabled) {
+  if (!metadata.feedbackUiEnabled || isDismissed) {
     return null;
   }
 
