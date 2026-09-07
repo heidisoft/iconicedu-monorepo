@@ -198,7 +198,7 @@ describe('DashboardHomeInfographicSection', () => {
     });
     expect(summary).toHaveTextContent('Sessions completed');
     expect(summary).toHaveTextContent('7');
-    expect(summary).toHaveTextContent('2 pending completion');
+    expect(summary).toHaveTextContent('2 awaiting confirmation');
     expect(summary).not.toHaveTextContent('Classes conducted');
   });
 

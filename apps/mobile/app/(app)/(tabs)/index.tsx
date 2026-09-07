@@ -1274,7 +1274,7 @@ export default function HomeScreen() {
               <View
                 accessibilityLabel={
                   showCompletionSummary
-                    ? `Session completion summary. ${sessionCompletionSummary.completed} sessions completed, ${sessionCompletionSummary.pending} pending completion.`
+                    ? `Session completion summary. ${sessionCompletionSummary.completed} sessions completed, ${sessionCompletionSummary.pending} awaiting confirmation.`
                     : undefined
                 }
                 style={[
@@ -1300,7 +1300,7 @@ export default function HomeScreen() {
                         <Text style={s.metricPendingCount}>
                           {sessionCompletionSummary.pending}
                         </Text>{' '}
-                        pending completion
+                        awaiting confirmation
                       </Text>
                     </View>
                   </View>
