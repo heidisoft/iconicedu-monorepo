@@ -379,6 +379,7 @@ describe('SessionCompletionsService', () => {
         schedule_id: string;
         occurrence_key: string;
         status: string;
+        session_end_at?: string;
       }>;
       roleRow?: { role_key: string } | null;
       primaryRoleRow?: { id: string } | null;
@@ -416,28 +417,33 @@ describe('SessionCompletionsService', () => {
             schedule_id: SCHEDULE_ID,
             occurrence_key: '2030-03-06T10:00:00.000Z',
             status: 'confirmed',
+            session_end_at: '2030-03-06T11:00:00.000Z',
           },
           {
             schedule_id: SCHEDULE_ID,
             occurrence_key: '2030-03-06T10:00:00.000Z',
             status: 'auto_confirmed',
+            session_end_at: '2030-03-06T11:00:00.000Z',
           },
           // Occurrence B: one party confirmed, the other still pending -> completed, not pending.
           {
             schedule_id: SCHEDULE_ID,
             occurrence_key: '2030-03-13T10:00:00.000Z',
             status: 'confirmed',
+            session_end_at: '2030-03-13T11:00:00.000Z',
           },
           {
             schedule_id: SCHEDULE_ID,
             occurrence_key: '2030-03-13T10:00:00.000Z',
             status: 'pending',
+            session_end_at: '2030-03-13T11:00:00.000Z',
           },
           // Occurrence C: only pending rows -> pending.
           {
             schedule_id: '00000000-0000-4000-8000-0000000000aa',
             occurrence_key: '2030-03-20T10:00:00.000Z',
             status: 'pending',
+            session_end_at: '2030-03-20T11:00:00.000Z',
           },
         ],
       });
@@ -453,6 +459,50 @@ describe('SessionCompletionsService', () => {
         'pending',
       ]);
       expect(result).toEqual({ completed: 2, pending: 1 });
+    });
+
+    it('bounds completed to the session_end_at window but leaves pending unbounded', async () => {
+      makeOrgSummarySupabase({
+        completionRows: [
+          // In-window confirmed occurrence.
+          {
+            schedule_id: SCHEDULE_ID,
+            occurrence_key: '2030-03-10T10:00:00.000Z',
+            status: 'confirmed',
+            session_end_at: '2030-03-10T11:00:00.000Z',
+          },
+          // Confirmed but ended before the window -> not completed this month,
+          // and still excluded from pending because it is resolved.
+          {
+            schedule_id: SCHEDULE_ID,
+            occurrence_key: '2030-02-25T10:00:00.000Z',
+            status: 'confirmed',
+            session_end_at: '2030-02-25T11:00:00.000Z',
+          },
+          {
+            schedule_id: SCHEDULE_ID,
+            occurrence_key: '2030-02-25T10:00:00.000Z',
+            status: 'pending',
+            session_end_at: '2030-02-25T11:00:00.000Z',
+          },
+          // Genuinely unresolved occurrence, regardless of month.
+          {
+            schedule_id: '00000000-0000-4000-8000-0000000000bb',
+            occurrence_key: '2030-01-05T10:00:00.000Z',
+            status: 'pending',
+            session_end_at: '2030-01-05T11:00:00.000Z',
+          },
+        ],
+      });
+      const service = new SessionCompletionsService();
+
+      const result = await service.getOrgCompletionSummary(AUTH_USER_ID, {
+        orgId: ORG_ID,
+        completedSince: '2030-03-01T00:00:00.000Z',
+        completedUntil: '2030-04-01T00:00:00.000Z',
+      });
+
+      expect(result).toEqual({ completed: 1, pending: 1 });
     });
 
     it('rejects a non-admin caller', async () => {

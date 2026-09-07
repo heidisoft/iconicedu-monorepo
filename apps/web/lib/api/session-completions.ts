@@ -49,7 +49,11 @@ export function getSessionCompletionSummary(
 
 export function getOrgSessionCompletionSummary(
   supabase: SupabaseClient,
-  input: { orgId: string },
+  input: {
+    orgId: string;
+    completedSince?: string;
+    completedUntil?: string;
+  },
 ) {
   return createApiClient(supabase).get<{ completed: number; pending: number }>(
     '/session-completions/org-summary',

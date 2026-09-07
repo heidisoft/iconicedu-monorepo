@@ -762,8 +762,12 @@ export default function HomeScreen() {
   const {
     sessions: completedSessions,
     summary: sessionCompletionSummary,
+    isOrgAdminView: isCompletionOrgView,
     refetch: refetchCompletedSessions,
   } = useCompletedSessions(sessionCompletionCarouselEnabled);
+  // Staff/admins get the org-wide summary tile even when the carousel rollout
+  // flag is off for them.
+  const showCompletionSummary = sessionCompletionCarouselEnabled || isCompletionOrgView;
   const {
     data: account,
     isPending: accountLoading,
@@ -957,7 +961,7 @@ export default function HomeScreen() {
         refetchAccount(),
         refetchProfile(),
         refetchSessions(),
-        ...(sessionCompletionCarouselEnabled ? [refetchCompletedSessions()] : []),
+        ...(showCompletionSummary ? [refetchCompletedSessions()] : []),
         refetchLearningSpaces(),
         refetchSupportChannel(),
         refetchOrgSchedules(),
@@ -988,7 +992,7 @@ export default function HomeScreen() {
       refetchProfile,
       refetchSessions,
       refetchSupportChannel,
-      sessionCompletionCarouselEnabled,
+      showCompletionSummary,
     ],
   );
   const onRefresh = useCallback(() => {
@@ -1269,7 +1273,7 @@ export default function HomeScreen() {
 
               <View
                 accessibilityLabel={
-                  sessionCompletionCarouselEnabled
+                  showCompletionSummary
                     ? `Session completion summary. ${sessionCompletionSummary.completed} sessions completed, ${sessionCompletionSummary.pending} pending completion.`
                     : undefined
                 }
@@ -1280,15 +1284,13 @@ export default function HomeScreen() {
               >
                 <View style={s.metricHeader}>
                   <Text style={s.metricTitle}>
-                    {sessionCompletionCarouselEnabled
-                      ? 'Sessions completed'
-                      : 'Completed Classes'}
+                    {showCompletionSummary ? 'Sessions completed' : 'Completed Classes'}
                   </Text>
                   <View style={s.metricIconWrap}>
                     <CalendarCheck size={18} color={colors.primary} />
                   </View>
                 </View>
-                {sessionCompletionCarouselEnabled ? (
+                {showCompletionSummary ? (
                   <View style={s.metricBody}>
                     <Text style={s.metricValue}>
                       {sessionCompletionSummary.completed}

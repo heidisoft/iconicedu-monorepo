@@ -217,18 +217,22 @@ export class SessionCompletionsService {
    * Org-wide completion totals for the home dashboard's "Sessions completed"
    * tile when the viewer is staff/admin. Unlike getCompletionSummaryForProfile,
    * this is NOT scoped to a single profile — it reports every classroom session
-   * in the org, and is deliberately unbounded in time ("overall" totals rather
-   * than the per-role tile's "this month"). Rows are collapsed to session
-   * occurrences (schedule + occurrence_key) so a session confirmed by both a
-   * student and an educator counts once — mirroring listForAdmin and
-   * listChannelCompletionStates:
-   *   - `completed`: occurrences with any confirmed / auto_confirmed row.
-   *   - `pending`: occurrences still awaiting someone's action that are not
-   *     already completed by another party.
+   * in the org. Rows are collapsed to session occurrences (schedule +
+   * occurrence_key) so a session confirmed by both a student and an educator
+   * counts once — mirroring listForAdmin and listChannelCompletionStates:
+   *   - `completed`: occurrences with a confirmed / auto_confirmed row whose
+   *     `session_end_at` falls in the optional window (the tile shows "this
+   *     month", same as the per-role tile it replaces).
+   *   - `pending`: occurrences still awaiting someone's action that have no
+   *     confirmation at all (unbounded — a stale pending row auto-expires).
    */
   async getOrgCompletionSummary(
     authUserId: string,
-    params: { orgId: string },
+    params: {
+      orgId: string;
+      completedSince?: string | null;
+      completedUntil?: string | null;
+    },
   ): Promise<{ completed: number; pending: number }> {
     if (!params?.orgId || !isUuid(params.orgId)) {
       throw new BadRequestException('Invalid orgId');
@@ -240,29 +244,45 @@ export class SessionCompletionsService {
 
     const { data, error } = await supabase
       .from('class_session_completions')
-      .select('schedule_id, occurrence_key, status')
+      .select('schedule_id, occurrence_key, status, session_end_at')
       .eq('org_id', params.orgId)
       .in('status', ['confirmed', 'auto_confirmed', 'pending'])
       .is('deleted_at', null)
-      .returns<Array<{ schedule_id: string; occurrence_key: string; status: string }>>();
+      .returns<
+        Array<{
+          schedule_id: string;
+          occurrence_key: string;
+          status: string;
+          session_end_at: string;
+        }>
+      >();
 
     if (error) throw new InternalServerErrorException(error.message);
 
-    const completed = new Set<string>();
-    const pending = new Set<string>();
+    const since = params.completedSince ? Date.parse(params.completedSince) : null;
+    const until = params.completedUntil ? Date.parse(params.completedUntil) : null;
+    const confirmedOccurrences = new Set<string>();
+    const completedInWindow = new Set<string>();
+    const pendingOccurrences = new Set<string>();
     for (const row of data ?? []) {
       const key = `${row.schedule_id}|${row.occurrence_key}`;
       if (row.status === 'pending') {
-        pending.add(key);
-      } else {
-        completed.add(key);
+        pendingOccurrences.add(key);
+        continue;
+      }
+      confirmedOccurrences.add(key);
+      const endMs = Date.parse(row.session_end_at);
+      if ((since === null || endMs >= since) && (until === null || endMs < until)) {
+        completedInWindow.add(key);
       }
     }
-    for (const key of completed) {
-      pending.delete(key);
+    // A session with any confirmation is resolved — even if a co-participant's
+    // row is still pending, or the confirmation predates the window.
+    for (const key of confirmedOccurrences) {
+      pendingOccurrences.delete(key);
     }
 
-    return { completed: completed.size, pending: pending.size };
+    return { completed: completedInWindow.size, pending: pendingOccurrences.size };
   }
 
   /**
