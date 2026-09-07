@@ -344,8 +344,23 @@ export class SessionCompletionsService {
   async confirm(authUserId: string, body: ConfirmSessionCompletionInput) {
     const row = await this.loadOwnedRow(authUserId, body.orgId, body.sessionCompletionId);
     if (row.status !== 'pending') {
-      throw new BadRequestException(
-        `Cannot confirm a session completion in status '${row.status}'`,
+      // The session is no longer awaiting this person's response. Confirming an
+      // already-complete session is idempotent — it was auto-confirmed by the
+      // system, or confirmed from another device/tab. Report success (with a
+      // flag) so a client showing a stale prompt can switch to the completed
+      // state instead of surfacing a confusing error.
+      if (row.status === 'confirmed' || row.status === 'auto_confirmed') {
+        return {
+          success: true,
+          alreadyResolved: true,
+          status: row.status,
+          feedbackEnabled: true,
+        };
+      }
+      // row.status === 'disputed'
+      throw new ConflictException(
+        "This session was already reported as having a problem, so it can't be " +
+          'marked complete. Ask an admin if that needs to change.',
       );
     }
 
@@ -368,7 +383,9 @@ export class SessionCompletionsService {
 
     if (error) throw new InternalServerErrorException(error.message);
     if (!updated) {
-      throw new ConflictException('Session completion was already resolved');
+      // Lost a race with another device that resolved it first — still a success
+      // from the user's point of view.
+      return { success: true, alreadyResolved: true, feedbackEnabled: true };
     }
 
     this.logger.log(
@@ -386,8 +403,11 @@ export class SessionCompletionsService {
 
     const row = await this.loadOwnedRow(authUserId, body.orgId, body.sessionCompletionId);
     if (row.status !== 'pending') {
-      throw new BadRequestException(
-        `Cannot dispute a session completion in status '${row.status}'`,
+      throw new ConflictException(
+        row.status === 'disputed'
+          ? "You've already reported a problem with this session."
+          : "This session has already been marked complete, so a problem can't be " +
+              'reported for it here. Ask an admin if you need to change that.',
       );
     }
 
@@ -413,7 +433,10 @@ export class SessionCompletionsService {
 
     if (error) throw new InternalServerErrorException(error.message);
     if (!updated) {
-      throw new ConflictException('Session completion was already resolved');
+      throw new ConflictException(
+        'This session was just updated from another device — refresh to see its ' +
+          'current status.',
+      );
     }
 
     this.logger.log(

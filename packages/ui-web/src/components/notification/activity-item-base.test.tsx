@@ -221,7 +221,11 @@ describe('ActivityItemBase', () => {
 
     const sessionButtons = screen.getAllByRole('button', { name: /Math Foundations/ });
     fireEvent.click(sessionButtons[0]!);
-    expect(screen.getByText('Great! How was the session?')).toBeInTheDocument();
+    // Already-confirmed on load (not a fresh in-session confirm) → the plain
+    // "marked as completed" message rather than the fresh-confirm feedback prompt.
+    expect(
+      screen.getByText('This session has been marked as completed.'),
+    ).toBeInTheDocument();
     expect(screen.getByText('Rate your session')).toBeInTheDocument();
 
     fireEvent.click(sessionButtons[1]!);

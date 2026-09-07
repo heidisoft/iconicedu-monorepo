@@ -593,6 +593,26 @@ describe('SessionCompletionsService', () => {
       expect(result).toEqual({ success: true, feedbackEnabled: true });
     });
 
+    it.each(['confirmed', 'auto_confirmed'] as const)(
+      'treats confirming an already-%s row as an idempotent success',
+      async (status) => {
+        makeSupabase({ completionRow: baseCompletionRow({ status }) });
+        const service = new SessionCompletionsService();
+
+        const result = await service.confirm(AUTH_USER_ID, {
+          orgId: ORG_ID,
+          sessionCompletionId: COMPLETION_ID,
+        });
+
+        expect(result).toEqual({
+          success: true,
+          alreadyResolved: true,
+          status,
+          feedbackEnabled: true,
+        });
+      },
+    );
+
     it('rejects confirming an already-disputed row', async () => {
       makeSupabase({ completionRow: baseCompletionRow({ status: 'disputed' }) });
       const service = new SessionCompletionsService();
@@ -602,22 +622,26 @@ describe('SessionCompletionsService', () => {
           orgId: ORG_ID,
           sessionCompletionId: COMPLETION_ID,
         }),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(ConflictException);
     });
 
-    it('rejects a stale confirm when another request resolves the row first', async () => {
+    it('treats a lost confirm race as an idempotent success', async () => {
       makeSupabase({
         completionRow: baseCompletionRow({ status: 'pending' }),
         updatedRow: null,
       });
       const service = new SessionCompletionsService();
 
-      await expect(
-        service.confirm(AUTH_USER_ID, {
-          orgId: ORG_ID,
-          sessionCompletionId: COMPLETION_ID,
-        }),
-      ).rejects.toThrow(ConflictException);
+      const result = await service.confirm(AUTH_USER_ID, {
+        orgId: ORG_ID,
+        sessionCompletionId: COMPLETION_ID,
+      });
+
+      expect(result).toEqual({
+        success: true,
+        alreadyResolved: true,
+        feedbackEnabled: true,
+      });
     });
 
     it('rejects when the requesting account does not own the profile and has no family link', async () => {
@@ -659,18 +683,21 @@ describe('SessionCompletionsService', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('rejects disputing an already-confirmed row', async () => {
-      makeSupabase({ completionRow: baseCompletionRow({ status: 'confirmed' }) });
-      const service = new SessionCompletionsService();
+    it.each(['confirmed', 'auto_confirmed', 'disputed'] as const)(
+      'rejects disputing an already-%s row with a Conflict',
+      async (status) => {
+        makeSupabase({ completionRow: baseCompletionRow({ status }) });
+        const service = new SessionCompletionsService();
 
-      await expect(
-        service.dispute(AUTH_USER_ID, {
-          orgId: ORG_ID,
-          sessionCompletionId: COMPLETION_ID,
-          disputeCategory: 'technical_issue',
-        }),
-      ).rejects.toThrow(BadRequestException);
-    });
+        await expect(
+          service.dispute(AUTH_USER_ID, {
+            orgId: ORG_ID,
+            sessionCompletionId: COMPLETION_ID,
+            disputeCategory: 'technical_issue',
+          }),
+        ).rejects.toThrow(ConflictException);
+      },
+    );
 
     it('publishes a dispute-reported notification to staff on success', async () => {
       const { from } = makeSupabase({
