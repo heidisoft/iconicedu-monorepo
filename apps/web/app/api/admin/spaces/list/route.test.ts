@@ -56,4 +56,46 @@ describe('GET /api/admin/spaces/list', () => {
     });
     expect(getAdminLearningSpaceRows).not.toHaveBeenCalled();
   });
+
+  it('matches the free-text search against participant names', async () => {
+    getAdminLearningSpaceRows.mockResolvedValueOnce([
+      {
+        id: 'space-1',
+        title: 'Algebra I',
+        status: 'active',
+        subject: 'Math',
+        description: null,
+        created_at: '2025-01-01T00:00:00.000Z',
+        updated_at: '2025-01-02T00:00:00.000Z',
+        participantNames: ['Ari Stone'],
+        participantDetails: [
+          { id: 'profile-1', displayName: 'Ari Stone', kind: 'child' },
+        ],
+      },
+      {
+        id: 'space-2',
+        title: 'Creative Writing',
+        status: 'active',
+        subject: 'English',
+        description: null,
+        created_at: '2025-01-01T00:00:00.000Z',
+        updated_at: '2025-01-03T00:00:00.000Z',
+        participantNames: ['Maya Chen'],
+        participantDetails: [
+          { id: 'profile-2', displayName: 'Maya Chen', kind: 'child' },
+        ],
+      },
+    ]);
+
+    const response = await GET(
+      new Request(`${APP_URL}/api/admin/spaces/list?orgSlug=acme&search=maya`),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      total: 1,
+      rows: [{ id: 'space-2', title: 'Creative Writing' }],
+    });
+  });
 });

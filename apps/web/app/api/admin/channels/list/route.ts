@@ -13,6 +13,7 @@ export async function GET(request: Request) {
   const page = Math.max(1, Number(url.searchParams.get('page') ?? 1));
   const search = url.searchParams.get('search')?.trim() ?? '';
   const kind = url.searchParams.get('kind') ?? 'all';
+  const participantId = url.searchParams.get('participantId') ?? 'all';
 
   if (!orgSlug) {
     return NextResponse.json(
@@ -45,11 +46,21 @@ export async function GET(request: Request) {
     const normalizedSearch = search.toLowerCase();
     const filtered = allRows.filter((row) => {
       if (kind !== 'all' && row.kind !== kind) return false;
+      if (
+        participantId !== 'all' &&
+        !row.participantDetails?.some((participant) => participant.id === participantId)
+      ) {
+        return false;
+      }
       if (!normalizedSearch) return true;
       return (
         (row.topic?.toLowerCase().includes(normalizedSearch) ?? false) ||
         (row.purpose?.toLowerCase().includes(normalizedSearch) ?? false) ||
-        (row.kind?.toLowerCase().includes(normalizedSearch) ?? false)
+        (row.kind?.toLowerCase().includes(normalizedSearch) ?? false) ||
+        (row.participantDetails?.some((participant) =>
+          participant.displayName.toLowerCase().includes(normalizedSearch),
+        ) ??
+          false)
       );
     });
 

@@ -3,19 +3,9 @@
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useEffect, useRef, useState, useTransition } from 'react';
 import type { AssessmentSubjectVM } from '@iconicedu/shared-types';
-import {
-  Button,
-  Label,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-} from '@iconicedu/ui-web';
-import { Check, ChevronDown, Search, SlidersHorizontal, X } from 'lucide-react';
+import { Button, Label } from '@iconicedu/ui-web';
+import { Check } from 'lucide-react';
+import { AdminFilterBar } from '@iconicedu/web/components/admin/admin-filter-bar';
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
@@ -51,21 +41,12 @@ function parseParam(v: string | null): string[] {
 
 interface MultiSelectProps {
   label: string;
-  allLabel: string;
   options: { value: string; label: string }[];
   selected: string[];
   onChange: (values: string[]) => void;
-  inline?: boolean;
 }
 
-function MultiSelect({
-  label,
-  allLabel,
-  options,
-  selected,
-  onChange,
-  inline,
-}: MultiSelectProps) {
+function MultiSelect({ label, options, selected, onChange }: MultiSelectProps) {
   const isActive = selected.length > 0;
 
   function toggle(value: string) {
@@ -76,109 +57,43 @@ function MultiSelect({
     );
   }
 
-  // ── Inline variant — inside "More filters" dialog ──────────────────────────
-  if (inline) {
-    return (
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            {label}
-          </Label>
-          {isActive && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-auto py-0 px-1 text-xs text-muted-foreground"
-              onClick={() => onChange([])}
-            >
-              Clear
-            </Button>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {options.map((opt) => {
-            const checked = selected.includes(opt.value);
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => toggle(opt.value)}
-                className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors ${
-                  checked
-                    ? 'border-primary/40 bg-primary/5 text-foreground font-medium'
-                    : 'bg-background text-muted-foreground hover:bg-accent'
-                }`}
-              >
-                {checked && <Check className="h-3 w-3 shrink-0" />}
-                {opt.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
-
-  // ── Popover variant — in the filter bar ────────────────────────────────────
   return (
-    <div className="flex items-center gap-1.5 shrink-0">
-      <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        {label}
-      </span>
-      <Popover>
-        <PopoverTrigger asChild>
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {label}
+        </Label>
+        {isActive && (
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
-            className={isActive ? 'border-primary/40 bg-primary/5 font-semibold' : ''}
+            className="h-auto py-0 px-1 text-xs text-muted-foreground"
+            onClick={() => onChange([])}
           >
-            {isActive ? selected.length : allLabel}
-            <ChevronDown className="h-3 w-3 opacity-50" />
+            Clear
           </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-52 p-0" align="start">
-          <Command>
-            {options.length > 6 && <CommandInput placeholder="Search…" />}
-            <CommandEmpty>No results.</CommandEmpty>
-            <CommandGroup>
-              {options.map((opt) => {
-                const checked = selected.includes(opt.value);
-                return (
-                  <CommandItem
-                    key={opt.value}
-                    value={opt.value}
-                    onSelect={() => toggle(opt.value)}
-                    className="data-selected:bg-transparent gap-2.5"
-                  >
-                    <span
-                      className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
-                        checked
-                          ? 'border-primary bg-primary text-primary-foreground'
-                          : 'border-border bg-background'
-                      }`}
-                    >
-                      {checked && <Check className="h-2.5 w-2.5" />}
-                    </span>
-                    {opt.label}
-                  </CommandItem>
-                );
-              })}
-            </CommandGroup>
-          </Command>
-        </PopoverContent>
-      </Popover>
-
-      {isActive && (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-          onClick={() => onChange([])}
-          aria-label={`Clear ${label}`}
-        >
-          <X className="h-3.5 w-3.5" />
-        </Button>
-      )}
+        )}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {options.map((opt) => {
+          const checked = selected.includes(opt.value);
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => toggle(opt.value)}
+              className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+                checked
+                  ? 'border-primary/40 bg-primary/5 text-foreground font-medium'
+                  : 'bg-background text-muted-foreground hover:bg-accent'
+              }`}
+            >
+              {checked && <Check className="h-3 w-3 shrink-0" />}
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -189,6 +104,11 @@ interface Props {
   subjects: AssessmentSubjectVM[];
 }
 
+/**
+ * URL-synced wrapper around {@link AdminFilterBar} for the item bank. The
+ * multi-select facets live in the shared filter bar's `extraFilters` slot so
+ * the whole admin area uses one filter component.
+ */
 export function ItemBankFilters({ subjects }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -252,82 +172,45 @@ export function ItemBankFilters({ subjects }: Props) {
   }
 
   return (
-    <div className="flex w-full flex-col gap-2 rounded-xl border bg-card p-3 sm:flex-row sm:items-center sm:justify-end">
-      <label className="flex h-9 min-w-0 items-center gap-2 rounded-lg border bg-background px-3 focus-within:ring-2 focus-within:ring-ring sm:w-64">
-        <span className="sr-only">Search</span>
-        <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-        <input
-          className="min-w-0 flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none"
-          placeholder="Search questions"
-          value={searchValue}
-          onChange={(event) => handleSearchChange(event.target.value)}
-        />
-      </label>
-
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button variant="outline" size="sm" className="justify-center gap-2">
-            <SlidersHorizontal className="h-3.5 w-3.5" />
-            Filters
-            {activeFilterCount > 0 && (
-              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground">
-                {activeFilterCount}
-              </span>
-            )}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent align="end" className="w-[min(42rem,calc(100vw-2rem))] p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="font-semibold">Filter question bank</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Combine filters to narrow the current results.
-              </p>
-            </div>
-            {activeFilterCount > 0 && (
-              <Button variant="ghost" size="sm" onClick={clearFilters}>
-                Clear all
-              </Button>
-            )}
-          </div>
-          <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2">
+    <AdminFilterBar
+      layout="toolbar"
+      search={searchValue}
+      onSearchChange={handleSearchChange}
+      searchPlaceholder="Search questions"
+      filterTitle="Filter question bank"
+      filterDescription="Combine filters to narrow the current results."
+      extraActiveCount={activeFilterCount}
+      onClearExtraFilters={clearFilters}
+      extraFilters={
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+          <MultiSelect
+            label="Type"
+            options={ITEM_TYPES}
+            selected={current.types}
+            onChange={(values) => updateMulti('types', values)}
+          />
+          <MultiSelect
+            label="Grade"
+            options={GRADES}
+            selected={current.grades}
+            onChange={(values) => updateMulti('grades', values)}
+          />
+          <MultiSelect
+            label="Difficulty"
+            options={DIFFICULTIES}
+            selected={current.difficulties}
+            onChange={(values) => updateMulti('difficulties', values)}
+          />
+          {hasSubjects && (
             <MultiSelect
-              label="Type"
-              allLabel="All types"
-              options={ITEM_TYPES}
-              selected={current.types}
-              onChange={(values) => updateMulti('types', values)}
-              inline
+              label="Subject"
+              options={subjectOptions}
+              selected={current.subjectIds}
+              onChange={(values) => updateMulti('subjectIds', values)}
             />
-            <MultiSelect
-              label="Grade"
-              allLabel="All grades"
-              options={GRADES}
-              selected={current.grades}
-              onChange={(values) => updateMulti('grades', values)}
-              inline
-            />
-            <MultiSelect
-              label="Difficulty"
-              allLabel="All difficulties"
-              options={DIFFICULTIES}
-              selected={current.difficulties}
-              onChange={(values) => updateMulti('difficulties', values)}
-              inline
-            />
-            {hasSubjects && (
-              <MultiSelect
-                label="Subject"
-                allLabel="All subjects"
-                options={subjectOptions}
-                selected={current.subjectIds}
-                onChange={(values) => updateMulti('subjectIds', values)}
-                inline
-              />
-            )}
-          </div>
-        </PopoverContent>
-      </Popover>
-    </div>
+          )}
+        </div>
+      }
+    />
   );
 }

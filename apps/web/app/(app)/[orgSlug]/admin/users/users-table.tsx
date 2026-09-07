@@ -49,6 +49,7 @@ import {
 import { Clock3, Link2, MailPlus, MapPin } from 'lucide-react';
 
 import { AdminFilterBar } from '@iconicedu/web/components/admin/admin-filter-bar';
+import { AdminPageHeading } from '@iconicedu/web/components/admin/admin-page-layout';
 import { InviteUserDialog } from '@iconicedu/web/app/(app)/[orgSlug]/admin/users/invite-dialog';
 import { buildAdminUserDmPath } from '@iconicedu/web/app/(app)/[orgSlug]/admin/users/users-table.utils';
 import type { AdminUserRow } from '@iconicedu/web/lib/admin/users';
@@ -553,16 +554,11 @@ export function UsersTable({ orgSlug }: UsersTableProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Title row */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Users</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Manage all enrolled users, families, educators, and staff.
-          </p>
-        </div>
-        <InviteUserDialog />
-      </div>
+      <AdminPageHeading
+        title="Users"
+        description="Manage all enrolled users, families, educators, and staff."
+        actions={<InviteUserDialog />}
+      />
 
       {/* Filter bar */}
       <AdminFilterBar

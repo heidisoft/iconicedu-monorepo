@@ -38,6 +38,8 @@ export interface AdminFilterBarProps {
   searchPlaceholder?: string;
   filterGroups?: FilterGroup[];
   extraFilters?: React.ReactNode;
+  extraActiveCount?: number;
+  onClearExtraFilters?: () => void;
   layout?: 'responsive' | 'grid' | 'toolbar';
   embedded?: boolean;
   filterTitle?: string;
@@ -199,6 +201,8 @@ export function AdminFilterBar({
   searchPlaceholder = 'Search ...',
   filterGroups = [],
   extraFilters,
+  extraActiveCount = 0,
+  onClearExtraFilters,
   layout = 'responsive',
   embedded = false,
   filterTitle = 'Filters',
@@ -252,9 +256,10 @@ export function AdminFilterBar({
   }
 
   if (layout === 'toolbar') {
-    const activeCount = filterGroups.filter(
-      (group) => group.value !== group.options[0]?.value,
-    ).length;
+    const activeCount =
+      filterGroups.filter((group) => group.value !== group.options[0]?.value).length +
+      extraActiveCount;
+    const hasFilters = filterGroups.length > 0 || Boolean(extraFilters);
     return (
       <div
         className={`${embedded ? '' : 'rounded-xl border bg-card p-3'} flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-end`}
@@ -269,49 +274,60 @@ export function AdminFilterBar({
             onChange={(event) => onSearchChange(event.target.value)}
           />
         </label>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="justify-center gap-2">
-              <SlidersHorizontal className="h-3.5 w-3.5" />
-              Filters
-              {activeCount > 0 && (
-                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground">
-                  {activeCount}
-                </span>
-              )}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent
-            align="end"
-            className="w-[min(42rem,calc(100vw-2rem))] gap-5 p-5"
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="font-semibold">{filterTitle}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{filterDescription}</p>
+        {hasFilters && (
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="justify-center gap-2">
+                <SlidersHorizontal className="h-3.5 w-3.5" />
+                Filters
+                {activeCount > 0 && (
+                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground">
+                    {activeCount}
+                  </span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent
+              align="end"
+              className="w-[min(42rem,calc(100vw-2rem))] gap-5 p-5"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="font-semibold">{filterTitle}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {filterDescription}
+                  </p>
+                </div>
+                {activeCount > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      filterGroups.forEach((group) =>
+                        group.onChange(group.options[0]?.value ?? 'all'),
+                      );
+                      onClearExtraFilters?.();
+                    }}
+                  >
+                    Clear all
+                  </Button>
+                )}
               </div>
-              {activeCount > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() =>
-                    filterGroups.forEach((group) =>
-                      group.onChange(group.options[0]?.value ?? 'all'),
-                    )
-                  }
-                >
-                  Clear all
-                </Button>
+              {filterGroups.length > 0 && (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  {filterGroups.map((group) => (
+                    <FilterDropdown key={group.label} group={group} fullWidth />
+                  ))}
+                </div>
               )}
-            </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {filterGroups.map((group) => (
-                <FilterDropdown key={group.label} group={group} fullWidth />
-              ))}
-            </div>
-            {extraFilters && <div className="border-t pt-4">{extraFilters}</div>}
-          </PopoverContent>
-        </Popover>
+              {extraFilters && (
+                <div className={filterGroups.length > 0 ? 'border-t pt-4' : ''}>
+                  {extraFilters}
+                </div>
+              )}
+            </PopoverContent>
+          </Popover>
+        )}
       </div>
     );
   }

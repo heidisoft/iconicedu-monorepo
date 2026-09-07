@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, Pencil } from 'lucide-react';
-import { DashboardHeader, Button, Badge } from '@iconicedu/ui-web';
+import { Button, Badge } from '@iconicedu/ui-web';
 
 import { getDashboardAccountContext } from '@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth';
 import { getAdminUserProfilePreview } from '@iconicedu/web/lib/admin/user-profile-preview';
@@ -12,6 +12,7 @@ import { getStaffProfile } from '@iconicedu/web/lib/profile/queries/staff.query'
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 import { UserEditForm } from '@iconicedu/web/app/(app)/[orgSlug]/admin/users/[accountId]/user-edit-form';
 import type { UserEditInitialData } from '@iconicedu/web/app/(app)/[orgSlug]/admin/users/[accountId]/user-edit-form';
+import { AdminPageShell } from '@iconicedu/web/components/admin/admin-page-layout';
 
 export const metadata: Metadata = { title: 'Admin · Edit User' };
 
@@ -101,38 +102,35 @@ export default async function EditUserPage({
   };
 
   return (
-    <div className="flex flex-1 flex-col">
-      <DashboardHeader title="Edit User" />
-      <div className="flex flex-1 flex-col p-6 lg:p-8 gap-8 max-w-3xl">
-        <div className="flex flex-col gap-4">
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className="-ml-2 w-fit text-muted-foreground"
-          >
-            <Link href={`/${orgSlug}/admin/users`}>
-              <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Users
-            </Link>
-          </Button>
-          <div>
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <h1 className="text-2xl font-semibold tracking-tight">{displayName}</h1>
-              <Badge variant="secondary" className="gap-1 shrink-0">
-                <Pencil className="h-3 w-3" /> Editing
+    <AdminPageShell title="Edit User" className="max-w-3xl">
+      <div className="flex flex-col gap-4">
+        <Button
+          asChild
+          variant="ghost"
+          size="sm"
+          className="-ml-2 w-fit text-muted-foreground"
+        >
+          <Link href={`/${orgSlug}/admin/users`}>
+            <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Users
+          </Link>
+        </Button>
+        <div>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <h1 className="text-2xl font-semibold tracking-tight">{displayName}</h1>
+            <Badge variant="secondary" className="gap-1 shrink-0">
+              <Pencil className="h-3 w-3" /> Editing
+            </Badge>
+            {kind && (
+              <Badge variant="outline" className="shrink-0 capitalize">
+                {kind}
               </Badge>
-              {kind && (
-                <Badge variant="outline" className="shrink-0 capitalize">
-                  {kind}
-                </Badge>
-              )}
-            </div>
-            <p className="text-sm text-muted-foreground mt-1">{accountEmail}</p>
+            )}
           </div>
+          <p className="text-sm text-muted-foreground mt-1">{accountEmail}</p>
         </div>
-
-        <UserEditForm orgSlug={orgSlug} initialData={initialData} />
       </div>
-    </div>
+
+      <UserEditForm orgSlug={orgSlug} initialData={initialData} />
+    </AdminPageShell>
   );
 }

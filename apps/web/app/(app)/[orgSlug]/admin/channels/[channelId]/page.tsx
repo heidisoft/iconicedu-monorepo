@@ -7,6 +7,7 @@ import { Badge, Button } from '@iconicedu/ui-web';
 
 import { getChannelDetail } from '@iconicedu/web/lib/admin/channel-detail';
 import { ChannelForm } from '@iconicedu/web/app/(app)/[orgSlug]/admin/channels/channel-form';
+import { AdminPageShell } from '@iconicedu/web/components/admin/admin-page-layout';
 
 export const metadata: Metadata = {
   title: 'Admin · Edit Channel',
@@ -23,7 +24,7 @@ export default async function AdminChannelEditPage({
   if (!detail) notFound();
 
   return (
-    <div className="flex flex-1 flex-col p-6 lg:p-8 gap-6">
+    <AdminPageShell title="Edit Channel">
       <Button
         asChild
         variant="ghost"
@@ -48,6 +49,6 @@ export default async function AdminChannelEditPage({
         initialData={detail}
         channelId={channelId}
       />
-    </div>
+    </AdminPageShell>
   );
 }

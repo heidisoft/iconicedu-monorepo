@@ -55,7 +55,10 @@ export async function GET(request: Request) {
       return (
         row.title.toLowerCase().includes(normalizedSearch) ||
         (row.subject?.toLowerCase().includes(normalizedSearch) ?? false) ||
-        (row.description?.toLowerCase().includes(normalizedSearch) ?? false)
+        (row.description?.toLowerCase().includes(normalizedSearch) ?? false) ||
+        row.participantDetails.some((p) =>
+          p.displayName.toLowerCase().includes(normalizedSearch),
+        )
       );
     });
 

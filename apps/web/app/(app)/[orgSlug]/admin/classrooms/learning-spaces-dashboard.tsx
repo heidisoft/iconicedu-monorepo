@@ -18,6 +18,7 @@ import {
 } from '@iconicedu/ui-web';
 import { Check, ChevronsUpDown, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { AdminFilterBar } from '@iconicedu/web/components/admin/admin-filter-bar';
+import { AdminPageHeading } from '@iconicedu/web/components/admin/admin-page-layout';
 
 import type { AdminLearningSpaceRow } from '@iconicedu/web/lib/admin/learning-spaces';
 import { LearningSpacesTable } from '@iconicedu/web/app/(app)/[orgSlug]/admin/classrooms/learning-spaces-table';
@@ -132,25 +133,24 @@ export function LearningSpacesDashboard({ orgSlug }: LearningSpacesDashboardProp
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Classrooms</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Manage learning spaces, subjects, participants, and schedules.
-          </p>
-        </div>
-        <Button asChild size="sm" className="flex items-center gap-2">
-          <Link href={`/${orgSlug}/admin/classrooms/new`}>
-            <Plus className="size-4" />
-            Add new
-          </Link>
-        </Button>
-      </div>
+      <AdminPageHeading
+        title="Classrooms"
+        description="Manage learning spaces, subjects, participants, and schedules."
+        actions={
+          <Button asChild size="sm" className="flex items-center gap-2">
+            <Link href={`/${orgSlug}/admin/classrooms/new`}>
+              <Plus className="size-4" />
+              Add new
+            </Link>
+          </Button>
+        }
+      />
 
       <AdminFilterBar
         layout="toolbar"
         search={search}
         onSearchChange={setSearch}
+        searchPlaceholder="Search classrooms or participants"
         filterGroups={[
           {
             label: 'Status',
@@ -164,8 +164,10 @@ export function LearningSpacesDashboard({ orgSlug }: LearningSpacesDashboardProp
             onChange: setStatusFilter,
           },
         ]}
+        extraActiveCount={participantFilter === 'all' ? 0 : 1}
+        onClearExtraFilters={() => setParticipantFilter('all')}
         extraFilters={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Participant
             </span>
@@ -176,13 +178,13 @@ export function LearningSpacesDashboard({ orgSlug }: LearningSpacesDashboardProp
                   role="combobox"
                   aria-expanded={participantFilterOpen}
                   aria-label="Filter by participant"
-                  className="h-8 w-40 justify-between"
+                  className="w-full justify-between"
                 >
                   <span className="truncate">{selectedParticipantFilterLabel}</span>
                   <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-56 p-0" align="start">
+              <PopoverContent className="w-64 p-0" align="start">
                 <Command>
                   <CommandInput
                     aria-label="Search participants"

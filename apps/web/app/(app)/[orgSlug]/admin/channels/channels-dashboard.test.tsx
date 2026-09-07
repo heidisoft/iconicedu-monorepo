@@ -65,8 +65,13 @@ function makeListResponse(rows: AdminChannelRow[]) {
   } as Response;
 }
 
-function makeParticipantsResponse() {
-  return { ok: true, json: async () => ({ data: [] }) } as Response;
+function makeParticipantsResponse(
+  data: Array<{
+    ids: { id: string };
+    profile: { displayName: string };
+  }> = [],
+) {
+  return { ok: true, json: async () => ({ data }) } as Response;
 }
 
 describe('ChannelsDashboard', () => {
@@ -104,6 +109,48 @@ describe('ChannelsDashboard', () => {
 
     await waitFor(() => {
       expect(screen.getByText('No channels found.')).toBeInTheDocument();
+    });
+  });
+
+  it('filters channels by the selected participant', async () => {
+    const rows = [
+      makeRow({ id: 'channel-1', topic: 'General' }),
+      makeRow({ id: 'channel-2', topic: 'Algebra' }),
+    ];
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
+      const urlString = String(url);
+      if (urlString.includes('/api/admin/channels/list')) {
+        const participantId = new URL(urlString, 'http://localhost').searchParams.get(
+          'participantId',
+        );
+        return Promise.resolve(
+          makeListResponse(participantId === 'profile-2' ? [rows[1]] : rows),
+        );
+      }
+      return Promise.resolve(
+        makeParticipantsResponse([
+          { ids: { id: 'profile-2' }, profile: { displayName: 'Maya Chen' } },
+        ]),
+      );
+    });
+
+    const user = userEvent.setup();
+    render(<ChannelsDashboard orgSlug="iconic-academy" />);
+
+    await waitFor(() => expect(screen.getByText('General')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'Filters' }));
+    await user.click(
+      await screen.findByRole('combobox', { name: 'Filter by participant' }),
+    );
+    await user.type(screen.getByPlaceholderText('Search participants...'), 'maya');
+    await user.click(await screen.findByRole('option', { name: 'Maya Chen' }));
+
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some((call) =>
+          String(call[0]).includes('participantId=profile-2'),
+        ),
+      ).toBe(true);
     });
   });
 

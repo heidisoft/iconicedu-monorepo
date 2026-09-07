@@ -1,10 +1,12 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-import { DashboardHeader } from '@iconicedu/ui-web';
-
 import { CompletedSessionsTable } from '@iconicedu/web/app/(app)/[orgSlug]/admin/attendance/sessions/completed-sessions-table';
 import { SessionAttendanceDashboard } from '@iconicedu/web/app/(app)/[orgSlug]/admin/attendance/sessions/session-attendance-dashboard';
+import {
+  AdminPageHeading,
+  AdminPageShell,
+} from '@iconicedu/web/components/admin/admin-page-layout';
 import { enableAdminSessionAttendanceAnalytics } from '@iconicedu/web/flags';
 import { requireAdminOrgContext } from '@iconicedu/web/lib/admin/require-admin-org-context';
 import { listAdminSessionCompletions } from '@iconicedu/web/lib/api/session-completions';
@@ -38,23 +40,16 @@ export default async function AdminCompletedSessionsPage({
     }));
 
   return (
-    <div className="flex flex-1 flex-col">
-      <DashboardHeader title="Completed sessions" />
-      <div className="flex flex-1 flex-col p-6 lg:p-8 gap-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Completed sessions</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Track confirmed session completions across teachers and parents.
-            </p>
-          </div>
-        </div>
-        {analyticsEnabled ? (
-          <SessionAttendanceDashboard rows={rows} />
-        ) : (
-          <CompletedSessionsTable rows={rows} />
-        )}
-      </div>
-    </div>
+    <AdminPageShell title="Completed sessions">
+      <AdminPageHeading
+        title="Completed sessions"
+        description="Track confirmed session completions across teachers and parents."
+      />
+      {analyticsEnabled ? (
+        <SessionAttendanceDashboard rows={rows} />
+      ) : (
+        <CompletedSessionsTable rows={rows} />
+      )}
+    </AdminPageShell>
   );
 }

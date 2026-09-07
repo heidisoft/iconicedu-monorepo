@@ -1,11 +1,10 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-import { DashboardHeader } from '@iconicedu/ui-web';
-
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { UsersTable } from '@iconicedu/web/app/(app)/[orgSlug]/admin/users/users-table';
+import { AdminPageShell } from '@iconicedu/web/components/admin/admin-page-layout';
 
 export const metadata: Metadata = {
   title: 'Admin · Users',
@@ -26,11 +25,8 @@ export default async function AdminUsersPage({
   }
 
   return (
-    <div className="flex flex-1 flex-col">
-      <DashboardHeader title="Users" />
-      <div className="flex flex-1 flex-col p-6 lg:p-8 gap-6">
-        <UsersTable orgSlug={orgSlug} />
-      </div>
-    </div>
+    <AdminPageShell title="Users">
+      <UsersTable orgSlug={orgSlug} />
+    </AdminPageShell>
   );
 }
