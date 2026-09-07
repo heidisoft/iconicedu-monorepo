@@ -637,9 +637,9 @@ export async function buildDashboardHomeInfographicMetrics(input: {
   const profileCompletionQueriesEnabled = Boolean(
     input.sessionCompletionCarouselEnabled && viewerProfileId && !staffOrAdminView,
   );
-  // The per-profile "Sessions completed" tile mirrors the "This month"
-  // completed-classes tile it replaces, so that aggregate is bounded to the
-  // current display month. The staff org-wide total is deliberately unbounded.
+  // "Sessions completed" mirrors the "This month" completed-classes tile it
+  // replaces, so the completed count — per-profile and org-wide alike — is
+  // bounded to the current display month. Pending is unbounded either way.
   const completedMonthRange = getScheduleDisplayMonthRange(
     [now],
     input.timezone ?? input.currentUserProfile?.prefs?.timezone ?? null,
@@ -657,6 +657,8 @@ export async function buildDashboardHomeInfographicMetrics(input: {
         // whole home page; the tile falls back to zeros.
         getOrgSessionCompletionSummary(input.supabase, {
           orgId: input.orgId,
+          completedSince: completedMonthRange.rangeStart.toISOString(),
+          completedUntil: completedMonthRange.rangeEnd.toISOString(),
         }).catch(() => null)
       : profileCompletionQueriesEnabled && viewerProfileId
         ? getSessionCompletionSummary(input.supabase, {

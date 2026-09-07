@@ -586,6 +586,8 @@ describe('buildDashboardHomeInfographicMetrics', () => {
     expect(result.completedSessionsPending).toEqual([]);
     expect(apiGetMock).toHaveBeenCalledWith('/session-completions/org-summary', {
       orgId: 'org-1',
+      completedSince: CURRENT_MONTH_RANGE.rangeStart.toISOString(),
+      completedUntil: CURRENT_MONTH_RANGE.rangeEnd.toISOString(),
     });
     expect(apiGetMock).not.toHaveBeenCalledWith(
       '/session-completions/summary',
@@ -616,6 +618,8 @@ describe('buildDashboardHomeInfographicMetrics', () => {
     expect(result.sessionCompletionSummary).toEqual({ completed: 90, pending: 5 });
     expect(apiGetMock).toHaveBeenCalledWith('/session-completions/org-summary', {
       orgId: 'org-1',
+      completedSince: CURRENT_MONTH_RANGE.rangeStart.toISOString(),
+      completedUntil: CURRENT_MONTH_RANGE.rangeEnd.toISOString(),
     });
   });
 

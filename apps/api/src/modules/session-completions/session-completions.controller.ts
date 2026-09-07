@@ -41,9 +41,16 @@ export class SessionCompletionsController {
 
   @Get('org-summary')
   @UseGuards(AuthGuard)
-  orgSummary(@Req() req: AuthenticatedRequest, @Query('orgId') orgId: string) {
+  orgSummary(
+    @Req() req: AuthenticatedRequest,
+    @Query('orgId') orgId: string,
+    @Query('completedSince') completedSince?: string,
+    @Query('completedUntil') completedUntil?: string,
+  ) {
     return this.sessionCompletionsService.getOrgCompletionSummary(req.user.id, {
       orgId,
+      completedSince: completedSince ?? null,
+      completedUntil: completedUntil ?? null,
     });
   }
 

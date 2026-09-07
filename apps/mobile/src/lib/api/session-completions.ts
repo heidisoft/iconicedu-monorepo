@@ -17,6 +17,17 @@ export function listSessionCompletions(input: {
   return apiGet<ConnectionVM<SessionCompletionVM>>('/session-completions', input);
 }
 
+export function getOrgSessionCompletionSummary(input: {
+  orgId: string;
+  completedSince?: string;
+  completedUntil?: string;
+}) {
+  return apiGet<{ completed: number; pending: number }>(
+    '/session-completions/org-summary',
+    input,
+  );
+}
+
 export function confirmSessionCompletion(input: ConfirmSessionCompletionInput) {
   return apiPost<{ success: true; feedbackEnabled: true }>(
     `/session-completions/${input.sessionCompletionId}/confirm`,

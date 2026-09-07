@@ -242,7 +242,7 @@ export function DashboardHomeInfographicSection({
                     <span className="font-semibold text-primary">
                       {sessionCompletionSummary.pending}
                     </span>{' '}
-                    pending completion
+                    awaiting confirmation
                   </p>
                 </div>
               </div>

@@ -34,6 +34,8 @@ export const queryKeys = {
   orgSessions: (orgId: string) => ['org-sessions', orgId] as const,
   sessionCompletions: (orgId: string, profileId: string) =>
     ['session-completions', orgId, profileId] as const,
+  orgSessionCompletionSummary: (orgId: string, monthKey: string) =>
+    ['session-completions', 'org-summary', orgId, monthKey] as const,
   supervisedDirectMessages: (orgId: string, accountId: string) =>
     ['supervisedDirectMessages', orgId, accountId] as const,
 } as const;
