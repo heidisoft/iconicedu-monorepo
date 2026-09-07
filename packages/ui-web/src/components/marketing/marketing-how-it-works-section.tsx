@@ -49,7 +49,7 @@ export function MarketingHowItWorksSection({
           <div className="mt-4 flex flex-col gap-3 sm:flex-row">
             <a
               href={loginHref}
-              className="inline-flex min-h-11 items-center justify-center rounded-full bg-primary px-6 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
+              className="inline-flex min-h-11 items-center justify-center rounded-full bg-action px-6 py-2 text-sm font-semibold text-action-foreground transition hover:bg-action/85"
             >
               Explore and sign up
             </a>

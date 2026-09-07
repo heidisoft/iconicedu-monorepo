@@ -88,7 +88,7 @@ export default async function ProgramPage({ params }: ProgramPageProps) {
           <div className="mt-7 flex flex-wrap gap-3">
             <a
               href={loginHref}
-              className="inline-flex min-h-11 items-center justify-center rounded-full bg-primary px-6 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
+              className="inline-flex min-h-11 items-center justify-center rounded-full bg-action px-6 text-sm font-semibold text-action-foreground transition hover:bg-action/85"
             >
               Find the right tutor
             </a>

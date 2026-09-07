@@ -31,7 +31,7 @@ export function MarketingRegionalPage({
           </p>
           <a
             href={loginHref}
-            className="mt-8 inline-flex min-h-11 items-center justify-center rounded-full bg-primary px-6 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
+            className="mt-8 inline-flex min-h-11 items-center justify-center rounded-full bg-action px-6 text-sm font-semibold text-action-foreground transition hover:bg-action/85"
           >
             {region.ctaLabel}
           </a>

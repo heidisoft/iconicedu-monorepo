@@ -143,7 +143,7 @@ export function WeekView({
                   <div
                     className={cn(
                       'mt-1 inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-semibold transition-colors',
-                      isToday && 'bg-primary text-primary-foreground',
+                      isToday && 'bg-action text-action-foreground',
                       isSelected && !isToday && 'bg-muted text-foreground',
                     )}
                   >

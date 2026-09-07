@@ -296,7 +296,7 @@ export function DashboardHomeInfographicSection({
               <button
                 type="button"
                 onClick={openFamilySettings}
-                className="mt-6 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
+                className="mt-6 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-action px-4 py-2 text-sm font-semibold text-action-foreground transition hover:bg-action/85"
               >
                 Manage my family
               </button>
@@ -304,7 +304,7 @@ export function DashboardHomeInfographicSection({
               <button
                 type="button"
                 onClick={openAccountSettings}
-                className="mt-6 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
+                className="mt-6 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-action px-4 py-2 text-sm font-semibold text-action-foreground transition hover:bg-action/85"
               >
                 Manage my account
               </button>
@@ -388,7 +388,7 @@ export function DashboardHomeInfographicSection({
           <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <a
               href={notificationsHref}
-              className="flex min-h-36 flex-col rounded-2xl bg-primary p-5 text-primary-foreground transition hover:opacity-90"
+              className="flex min-h-36 flex-col rounded-2xl bg-action p-5 text-action-foreground transition hover:bg-action/85"
             >
               <div className="flex items-start gap-2">
                 <Bell className={quickActionIconClassName} aria-hidden="true" />
@@ -396,7 +396,7 @@ export function DashboardHomeInfographicSection({
                   Notifications
                 </p>
               </div>
-              <p className="mt-2 min-w-0 text-sm leading-snug text-primary-foreground/80 break-words">
+              <p className="mt-2 min-w-0 text-sm leading-snug text-action-foreground/80 break-words">
                 View recent updates
               </p>
             </a>
@@ -448,7 +448,7 @@ export function DashboardHomeInfographicSection({
                     <button
                       type="button"
                       onClick={openDialog}
-                      className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
+                      className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-action px-4 py-2 text-sm font-semibold text-action-foreground transition hover:bg-action/85"
                     >
                       <Sparkle className="mr-2 size-4" aria-hidden="true" />
                       Explore More Classes
@@ -456,7 +456,7 @@ export function DashboardHomeInfographicSection({
                   ) : (
                     <a
                       href={fallbackHref}
-                      className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
+                      className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-action px-4 py-2 text-sm font-semibold text-action-foreground transition hover:bg-action/85"
                     >
                       <Sparkle className="mr-2 size-4" aria-hidden="true" />
                       Explore More Classes

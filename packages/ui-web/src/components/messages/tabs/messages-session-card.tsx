@@ -93,12 +93,7 @@ export function SessionCard({
   const joinButton = showJoinButton ? (
     <Button
       size="sm"
-      className={cn(
-        'gap-1.5 rounded-full text-xs font-semibold',
-        isLive
-          ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-          : 'bg-primary/10 text-primary hover:bg-primary/20',
-      )}
+      className="gap-1.5 rounded-full text-xs font-semibold"
       variant="default"
       disabled={isJoinButtonDisabled}
       onClick={() => void handleJoin()}
@@ -180,14 +175,14 @@ export function SessionCard({
             isDisabled
               ? 'bg-muted/70 text-muted-foreground'
               : isLive
-                ? 'bg-primary text-primary-foreground'
+                ? 'bg-action text-action-foreground'
                 : isPast
                   ? 'bg-muted text-muted-foreground'
                   : 'bg-ink-subtle text-foreground',
           )}
         >
           {isLive ? (
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-primary-foreground">
+            <span className="text-[10px] font-semibold uppercase tracking-wider">
               Today
             </span>
           ) : null}
