@@ -221,28 +221,24 @@ export function SessionCard({
   const participants =
     session.participants?.filter((participant) => participant.name.trim()) ?? [];
   const participantGroups = buildParticipantGroups(participants);
-  // Date chip — a filled pale-green block by default (matches the theme's tile
-  // language); solid primary when live.
-  const badgeBg = isLive
-    ? colors.primary
-    : isPast || isDisabled
-      ? colors.card
-      : colors.inkSubtle;
+  const isMuted = isPast || isDisabled;
+  // Date chip — a filled pale block that reads against the card fill in every
+  // state; solid primary when live.
+  const badgeBg = isLive ? colors.primary : colors.inkSubtle;
   const badgeTxt = isLive
     ? colors.primaryForeground
-    : isPast || isDisabled
+    : isMuted
       ? colors.textMuted
       : colors.text;
   const badgeBorderColor = 'transparent';
 
-  // Card — a clean, soft floating surface. No left accent bar, no border unless live.
+  // Card — a clean, soft floating surface. No left accent bar, no border unless
+  // live. Past / disabled tiles stay on the opaque card fill with a hairline
+  // border (see sessionCardPast) so they keep full-contrast text instead of the
+  // washed-out look a translucent fill gave them over tinted month sections.
   const cardBorderColor = isLive ? colors.primary : 'transparent';
   const cardBorderWidth = isLive ? 1 : 0;
-  const cardBg = isLive
-    ? colors.primarySubtle
-    : isPast || isDisabled
-      ? colors.inkSubtle
-      : colors.card;
+  const cardBg = isLive ? colors.primarySubtle : colors.card;
 
   const handlePress =
     session.channelId && enableCardPress
@@ -335,7 +331,7 @@ export function SessionCard({
             borderColor: cardBorderColor,
             borderWidth: cardBorderWidth,
           },
-          isPast && s.sessionCardPast,
+          isMuted && s.sessionCardPast,
           style,
         ]}
         accessibilityRole="button"
@@ -715,9 +711,13 @@ function makeStyles(C: AppColors) {
       elevation: 2,
     },
     sessionCardPast: {
-      opacity: 0.85,
+      // Opaque fill + hairline border instead of a translucent card: past and
+      // cancelled tiles were near-invisible over the tinted current-month
+      // section. Muted text and the dropped shadow still de-emphasise them.
       shadowOpacity: 0,
       elevation: 0,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: C.border,
     },
     sessionDayBadge: {
       minWidth: 48,

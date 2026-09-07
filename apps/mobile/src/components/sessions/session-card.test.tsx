@@ -314,6 +314,38 @@ describe('SessionCard', () => {
     expect(screen.getByText('Recording')).toBeTruthy();
   });
 
+  it('keeps a past tile opaque with a hairline border for contrast over tinted sections', () => {
+    render(<SessionCard session={{ ...baseSession, isPast: true }} />);
+
+    const cardStyle = StyleSheet.flatten(screen.getByTestId('session-card').props.style);
+    expect(cardStyle).toMatchObject({
+      backgroundColor: '#ffffff',
+      borderColor: '#e2e8f0',
+    });
+    expect(cardStyle.borderWidth).toBeGreaterThan(0);
+    // No translucent fill — muted text + dropped shadow carry the de-emphasis.
+    expect(cardStyle.opacity ?? 1).toBe(1);
+    expect(cardStyle.shadowOpacity).toBe(0);
+    // The date chip stays on the pale fill so it still reads against the card.
+    expect(
+      StyleSheet.flatten(screen.getByTestId('session-date-block').props.style),
+    ).toMatchObject({ backgroundColor: '#eef0ea' });
+  });
+
+  it('applies the same opaque treatment to a disabled (cancelled) tile', () => {
+    render(
+      <SessionCard session={{ ...baseSession, disabled: true, variant: 'exception' }} />,
+    );
+
+    const cardStyle = StyleSheet.flatten(screen.getByTestId('session-card').props.style);
+    expect(cardStyle).toMatchObject({
+      backgroundColor: '#ffffff',
+      borderColor: '#e2e8f0',
+    });
+    expect(cardStyle.borderWidth).toBeGreaterThan(0);
+    expect(cardStyle.opacity ?? 1).toBe(1);
+  });
+
   it('shows a Completed pill for a past session that counts as complete', () => {
     render(<SessionCard session={{ ...baseSession, isPast: true, isCompleted: true }} />);
     expect(screen.getByText('Completed')).toBeTruthy();
