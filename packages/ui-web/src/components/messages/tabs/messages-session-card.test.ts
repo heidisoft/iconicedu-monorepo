@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { ClassSession } from './messages-schedule-tab.utils';
 import {
+  getPastSessionCompletionLabel,
   getSessionCardState,
   isSessionJoinButtonDisabled,
   SessionCard,
@@ -61,6 +62,69 @@ describe('messages-session-card', () => {
       isPast: false,
       isDisabled: true,
     });
+  });
+
+  it('labels a past session completed, disputed, or pending from its completion flags', () => {
+    expect(getPastSessionCompletionLabel({ ...baseSession, status: 'completed' })).toBe(
+      'Completed',
+    );
+    expect(
+      getPastSessionCompletionLabel({
+        ...baseSession,
+        status: 'scheduled',
+        isCompleted: true,
+      }),
+    ).toBe('Completed');
+    expect(
+      getPastSessionCompletionLabel({
+        ...baseSession,
+        status: 'scheduled',
+        isCompleted: false,
+        isDisputed: true,
+      }),
+    ).toBe('Disputed');
+    expect(
+      getPastSessionCompletionLabel({
+        ...baseSession,
+        status: 'scheduled',
+        isCompleted: false,
+      }),
+    ).toBe('Pending completion');
+  });
+
+  it('shows a disputed badge for an elapsed session a party disputed', () => {
+    render(
+      React.createElement(SessionCard, {
+        session: {
+          ...baseSession,
+          isPast: true,
+          status: 'scheduled',
+          isCompleted: false,
+          isDisputed: true,
+        },
+        index: 0,
+      }),
+    );
+
+    expect(screen.getByText('Disputed')).toBeInTheDocument();
+    expect(screen.queryByText('Completed')).toBeNull();
+  });
+
+  it('shows completed for an elapsed session that was not disputed', () => {
+    render(
+      React.createElement(SessionCard, {
+        session: {
+          ...baseSession,
+          isPast: true,
+          status: 'scheduled',
+          isCompleted: true,
+        },
+        index: 0,
+      }),
+    );
+
+    expect(screen.getByText('Completed')).toBeInTheDocument();
+    expect(screen.queryByText('Disputed')).toBeNull();
   });
 
   it('disables join only for unavailable states or when join handler is missing', () => {

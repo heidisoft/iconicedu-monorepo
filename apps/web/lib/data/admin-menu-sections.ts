@@ -29,7 +29,7 @@ export function buildAdminMenuSections(
       iconKey: 'learning_spaces',
       links: [
         { title: 'All', url: `${basePath}/admin/classrooms` },
-        { title: 'Session attendance', url: `${basePath}/admin/attendance/sessions` },
+        { title: 'Completed sessions', url: `${basePath}/admin/attendance/sessions` },
       ],
     },
     {

@@ -38,6 +38,7 @@ import { buildMessageActionState } from './message-loading-state.utils';
 import type {
   AudioRecordingMessageVM,
   ChannelFileItemVM,
+  ChannelSessionCompletionVM,
   ClassScheduleVM,
   ChannelVM,
   EducatorProfileVM,
@@ -457,6 +458,10 @@ export function MessagesContainer({
   const [loadedSchedules, setLoadedSchedules] = useState<ClassScheduleVM[] | null>(null);
   const [isLoadingSchedules, setIsLoadingSchedules] = useState(false);
   const [schedulesLoadError, setSchedulesLoadError] = useState<string | null>(null);
+  const [loadedSessionCompletions, setLoadedSessionCompletions] = useState<{
+    completions: ChannelSessionCompletionVM[];
+    disputed: ChannelSessionCompletionVM[];
+  } | null>(null);
   const pendingSavedNavigationMessageIdRef = useRef<string | null>(null);
   const [oldestCursor, setOldestCursor] = useState<string | null>(
     channelMessages[0]?.core.createdAt ?? null,
@@ -1296,6 +1301,7 @@ export function MessagesContainer({
     setLoadedSchedules(null);
     setSchedulesLoadError(null);
     setIsLoadingSchedules(false);
+    setLoadedSessionCompletions(null);
   }, [channel.ids.id, defaultTab]);
 
   useEffect(() => {
@@ -1792,6 +1798,48 @@ export function MessagesContainer({
     };
   }, [activeTab, channel.ids.id, loadedSchedules, runWithNetworkActivity]);
 
+  useEffect(() => {
+    if (activeTab !== 'schedule' || loadedSessionCompletions) {
+      return;
+    }
+    let isCancelled = false;
+    // Completion state is decorative — a failure here must never block the
+    // schedule list, so any error just yields an empty set.
+    const loadSessionCompletions = async () => {
+      try {
+        const params = new URLSearchParams({ channelId: channel.ids.id });
+        const response = await runWithNetworkActivity(() =>
+          window.fetch(`/api/messages/channel-session-completions?${params.toString()}`),
+        );
+        const payload = response.ok
+          ? ((await response.json()) as {
+              success?: boolean;
+              completions?: ChannelSessionCompletionVM[];
+              disputed?: ChannelSessionCompletionVM[];
+            })
+          : null;
+        if (!isCancelled) {
+          setLoadedSessionCompletions(
+            payload?.success
+              ? {
+                  completions: payload.completions ?? [],
+                  disputed: payload.disputed ?? [],
+                }
+              : { completions: [], disputed: [] },
+          );
+        }
+      } catch {
+        if (!isCancelled) {
+          setLoadedSessionCompletions({ completions: [], disputed: [] });
+        }
+      }
+    };
+    void loadSessionCompletions();
+    return () => {
+      isCancelled = true;
+    };
+  }, [activeTab, channel.ids.id, loadedSessionCompletions, runWithNetworkActivity]);
+
   const messageListProps = useMemo(() => {
     const emptyStateCopy = buildChannelEmptyStateCopy({
       channel,
@@ -2059,6 +2107,8 @@ export function MessagesContainer({
           isLoading={isLoadingSchedules}
           error={schedulesLoadError}
           timezone={currentUserProfile?.prefs?.timezone ?? null}
+          sessionCompletions={loadedSessionCompletions?.completions ?? []}
+          disputedSessions={loadedSessionCompletions?.disputed ?? []}
         />
       );
     }

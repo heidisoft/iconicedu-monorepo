@@ -159,7 +159,28 @@ export const enableSessionCompletionCarousel = flag<
   },
 });
 
+export const enableAdminSessionAttendanceAnalytics = flag<
+  boolean,
+  { profileId?: string | null }
+>({
+  key: 'admin-session-attendance-analytics',
+  description:
+    'Enables monthly completed-session analytics, confirmer breakdowns, and advanced filters in admin.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: 'admin-session-attendance-analytics',
+      profileId: entities?.profileId,
+    });
+  },
+});
+
 export const webFlags = {
+  enableAdminSessionAttendanceAnalytics,
   enableAssessments,
   enableChannelCommunications,
   enableMarketingSitePages,

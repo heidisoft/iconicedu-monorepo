@@ -54,6 +54,14 @@ export type ClassSession = {
   /** True while startAt <= now <= endAt — mirrors web isEventLive() */
   isLive: boolean;
   isPast: boolean;
+  /**
+   * True when this occurrence counts as complete for the Sessions tab — a party
+   * (educator/teacher, guardian/parent, or staff) confirmed it, or it elapsed
+   * without a dispute.
+   */
+  isCompleted?: boolean;
+  /** True when a participant filed a dispute against this occurrence. */
+  isDisputed?: boolean;
   status: ClassScheduleVM['status'];
   meetingLink?: string | null;
   /** Classroom accent selected in learning-space settings. */
@@ -392,6 +400,30 @@ export function SessionCard({
                 </Text>
               </View>
             )}
+            {isPast &&
+              session.variant !== 'exception' &&
+              session.status !== 'cancelled' && (
+                <View style={[s.statusPill, { backgroundColor: colors.inkSubtle }]}>
+                  <Text
+                    style={[
+                      s.statusPillText,
+                      {
+                        color: session.isCompleted
+                          ? colors.success
+                          : session.isDisputed
+                            ? colors.red
+                            : colors.textMuted,
+                      },
+                    ]}
+                  >
+                    {session.isCompleted
+                      ? 'Completed'
+                      : session.isDisputed
+                        ? 'Disputed'
+                        : 'Pending'}
+                  </Text>
+                </View>
+              )}
           </View>
 
           <View style={s.sessionTimeRow}>

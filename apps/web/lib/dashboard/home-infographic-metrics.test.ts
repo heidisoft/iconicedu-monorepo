@@ -11,8 +11,10 @@ vi.mock('@iconicedu/web/lib/api/http-client', () => ({
 }));
 
 import { buildDashboardHomeInfographicMetrics } from '@iconicedu/web/lib/dashboard/home-infographic-metrics';
+import { getScheduleDisplayMonthRange } from '@iconicedu/ui-web/components/messages/tabs/messages-schedule-tab.utils';
 
 const NOW = new Date('2026-03-13T12:00:00.000Z');
+const CURRENT_MONTH_RANGE = getScheduleDisplayMonthRange([NOW], null);
 
 type RawParticipant = {
   profile_id: string;
@@ -144,10 +146,12 @@ function mockApi(
   schedules: RawScheduleRow[],
   spaces: Record<string, unknown>[],
   completions: Record<string, unknown>[] = [],
+  summary: { completed: number; pending: number } = { completed: 0, pending: 0 },
 ) {
   apiGetMock.mockImplementation((path: string) => {
     if (path === '/schedules') return Promise.resolve(schedules);
     if (path === '/spaces') return Promise.resolve(spaces);
+    if (path === '/session-completions/summary') return Promise.resolve(summary);
     if (path === '/session-completions') {
       return Promise.resolve({ items: completions, nextCursor: null, total: null });
     }
@@ -176,8 +180,13 @@ describe('buildDashboardHomeInfographicMetrics', () => {
     });
 
     expect(result.completedSessionsPending).toEqual([]);
+    expect(result.sessionCompletionSummary).toBeNull();
     expect(apiGetMock).not.toHaveBeenCalledWith(
       '/session-completions',
+      expect.anything(),
+    );
+    expect(apiGetMock).not.toHaveBeenCalledWith(
+      '/session-completions/summary',
       expect.anything(),
     );
   });
@@ -214,6 +223,9 @@ describe('buildDashboardHomeInfographicMetrics', () => {
         },
         { ...baseCompletion, id: 'completion-disputed', status: 'disputed' },
       ],
+      // Aggregate totals come from the dedicated /summary endpoint, not the
+      // capped, 3-day-windowed carousel page.
+      { completed: 42, pending: 7 },
     );
 
     const result = await buildDashboardHomeInfographicMetrics({
@@ -232,10 +244,17 @@ describe('buildDashboardHomeInfographicMetrics', () => {
       'completion-pending',
       'completion-auto-confirmed',
     ]);
+    expect(result.sessionCompletionSummary).toEqual({ completed: 42, pending: 7 });
     expect(apiGetMock).toHaveBeenCalledWith('/session-completions', {
       orgId: 'org-1',
       profileId: 'child-1',
       limit: 50,
+    });
+    expect(apiGetMock).toHaveBeenCalledWith('/session-completions/summary', {
+      orgId: 'org-1',
+      profileId: 'child-1',
+      completedSince: CURRENT_MONTH_RANGE.rangeStart.toISOString(),
+      completedUntil: CURRENT_MONTH_RANGE.rangeEnd.toISOString(),
     });
   });
 

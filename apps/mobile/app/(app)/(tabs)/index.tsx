@@ -487,11 +487,10 @@ function makeStyles(C: AppColors) {
     },
     metricsRow: { gap: 12, paddingRight: 16 },
     metricCard: {
-      minHeight: 148,
+      minHeight: 175,
       backgroundColor: C.card,
       borderRadius: 20,
       padding: 16,
-      justifyContent: 'space-between',
       shadowColor: '#1f2a26',
       shadowOpacity: 0.06,
       shadowRadius: 12,
@@ -525,13 +524,26 @@ function makeStyles(C: AppColors) {
       elevation: 1,
     },
     metricValue: {
-      fontSize: 34,
+      fontSize: 44,
       fontWeight: '800',
       color: C.text,
       letterSpacing: 0,
-      lineHeight: 38,
+      lineHeight: 48,
     },
     metricLabel: { fontSize: 13, color: C.textMuted, lineHeight: 17 },
+    metricBody: {
+      marginTop: 14,
+    },
+    metricPendingRow: {
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: C.border,
+      marginTop: 10,
+      paddingTop: 10,
+    },
+    metricPendingCount: {
+      fontWeight: '700',
+      color: C.primary,
+    },
     activityHeader: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -747,8 +759,11 @@ export default function HomeScreen() {
     isPending: sessionsLoading,
     refetch: refetchSessions,
   } = useUpcomingSessions();
-  const { sessions: completedSessions, refetch: refetchCompletedSessions } =
-    useCompletedSessions(sessionCompletionCarouselEnabled);
+  const {
+    sessions: completedSessions,
+    summary: sessionCompletionSummary,
+    refetch: refetchCompletedSessions,
+  } = useCompletedSessions(sessionCompletionCarouselEnabled);
   const {
     data: account,
     isPending: accountLoading,
@@ -1244,7 +1259,7 @@ export default function HomeScreen() {
                     <CalendarClock size={18} color={colors.periwinkleFg} />
                   </View>
                 </View>
-                <View>
+                <View style={s.metricBody}>
                   <Text style={s.metricValue}>{upcomingSessionsMetric.value}</Text>
                   <Text style={[s.metricLabel, { color: colors.periwinkleFg }]}>
                     {upcomingSessionsMetric.label}
@@ -1253,25 +1268,50 @@ export default function HomeScreen() {
               </TouchableOpacity>
 
               <View
+                accessibilityLabel={
+                  sessionCompletionCarouselEnabled
+                    ? `Session completion summary. ${sessionCompletionSummary.completed} sessions completed, ${sessionCompletionSummary.pending} pending completion.`
+                    : undefined
+                }
                 style={[
                   s.metricCard,
                   { width: metricCardWidth, backgroundColor: colors.primarySubtle },
                 ]}
               >
                 <View style={s.metricHeader}>
-                  <Text style={s.metricTitle}>Completed Classes</Text>
+                  <Text style={s.metricTitle}>
+                    {sessionCompletionCarouselEnabled
+                      ? 'Sessions completed'
+                      : 'Completed Classes'}
+                  </Text>
                   <View style={s.metricIconWrap}>
                     <CalendarCheck size={18} color={colors.primary} />
                   </View>
                 </View>
-                <View>
-                  <Text style={s.metricValue}>
-                    {topMetrics.completedClassesThisMonth}
-                  </Text>
-                  <Text style={[s.metricLabel, { color: colors.primary }]}>
-                    This month
-                  </Text>
-                </View>
+                {sessionCompletionCarouselEnabled ? (
+                  <View style={s.metricBody}>
+                    <Text style={s.metricValue}>
+                      {sessionCompletionSummary.completed}
+                    </Text>
+                    <View style={s.metricPendingRow}>
+                      <Text style={s.metricLabel}>
+                        <Text style={s.metricPendingCount}>
+                          {sessionCompletionSummary.pending}
+                        </Text>{' '}
+                        pending completion
+                      </Text>
+                    </View>
+                  </View>
+                ) : (
+                  <View style={s.metricBody}>
+                    <Text style={s.metricValue}>
+                      {topMetrics.completedClassesThisMonth}
+                    </Text>
+                    <Text style={[s.metricLabel, { color: colors.primary }]}>
+                      This month
+                    </Text>
+                  </View>
+                )}
               </View>
 
               <View
@@ -1286,7 +1326,7 @@ export default function HomeScreen() {
                     <ThirdMetricIcon size={18} color={colors.peachFg} />
                   </View>
                 </View>
-                <View>
+                <View style={s.metricBody}>
                   <Text style={s.metricValue}>{topMetrics.thirdMetricValue}</Text>
                   <Text style={[s.metricLabel, { color: colors.peachFg }]}>
                     {topMetrics.thirdMetricLabel}

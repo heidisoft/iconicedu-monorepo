@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { ClassScheduleVM } from '@iconicedu/shared-types';
 import {
+  buildScheduleCompletionLookup,
+  isDisplayScheduleDisputed,
   calculateScheduleCompletionPercent,
   createGoogleCalendarUrl,
   formatScheduleDateBadge,
@@ -10,6 +12,7 @@ import {
   getMonthProgressStatsByKey,
   getJoinableSessionId,
   getScheduleMonthKey,
+  getScheduleOccurrenceCompletionKey,
   groupSchedulesByMonth,
   formatScheduleStatus,
   formatScheduleWeekTitle,
@@ -491,7 +494,7 @@ describe('messages-schedule-tab.utils', () => {
     expect(after[0]?.sessions[0]?.isLive).toBe(false);
   });
 
-  it('builds month progress stats from all scheduled sessions in the month', () => {
+  it('counts past non-cancelled lessons as complete for month progress by default', () => {
     const stats = getMonthProgressStatsByKey(
       [
         buildSchedule('1', '2026-03-03T16:00:00.000Z'),
@@ -518,23 +521,128 @@ describe('messages-schedule-tab.utils', () => {
     });
   });
 
-  it('counts past non-cancelled lessons as complete for month progress', () => {
+  it('keeps past sessions pending until a completion row confirms them when treatElapsedAsComplete is false', () => {
+    const schedules = [
+      buildSchedule('past-scheduled', '2026-03-03T16:00:00.000Z'),
+      buildSchedule('future-scheduled', '2026-03-20T16:00:00.000Z'),
+      {
+        ...buildSchedule('cancelled', '2026-03-05T16:00:00.000Z'),
+        status: 'cancelled' as const,
+      },
+    ];
+
+    const withoutCompletions = getMonthProgressStatsByKey(
+      schedules,
+      new Date('2026-03-10T00:00:00.000Z'),
+      undefined,
+      { treatElapsedAsComplete: false },
+    );
+    expect(withoutCompletions.get('2026-03')).toEqual({
+      scheduledCount: 2,
+      completedCount: 0,
+    });
+
+    const withCompletions = getMonthProgressStatsByKey(
+      schedules,
+      new Date('2026-03-10T00:00:00.000Z'),
+      undefined,
+      {
+        treatElapsedAsComplete: false,
+        completionLookup: buildScheduleCompletionLookup([
+          {
+            scheduleId: 'past-scheduled',
+            occurrenceKey: '2026-03-03T16:00:00.000Z',
+          },
+        ]),
+      },
+    );
+    expect(withCompletions.get('2026-03')).toEqual({
+      scheduledCount: 2,
+      completedCount: 1,
+    });
+  });
+
+  it('still counts an explicitly completed status even when treatElapsedAsComplete is false', () => {
     const stats = getMonthProgressStatsByKey(
       [
         buildSchedule('past-scheduled', '2026-03-03T16:00:00.000Z'),
-        buildSchedule('future-scheduled', '2026-03-20T16:00:00.000Z'),
         {
-          ...buildSchedule('cancelled', '2026-03-05T16:00:00.000Z'),
-          status: 'cancelled' as const,
+          ...buildSchedule('marked-complete', '2026-03-04T16:00:00.000Z'),
+          status: 'completed' as const,
         },
+        buildSchedule('future-scheduled', '2026-03-20T16:00:00.000Z'),
       ],
       new Date('2026-03-10T00:00:00.000Z'),
+      undefined,
+      { treatElapsedAsComplete: false },
     );
 
+    expect(stats.get('2026-03')).toEqual({
+      scheduledCount: 3,
+      completedCount: 1,
+    });
+  });
+
+  it('never counts a disputed occurrence as complete, even once elapsed', () => {
+    const schedules = [
+      buildSchedule('disputed-past', '2026-03-03T16:00:00.000Z'),
+      buildSchedule('elapsed-past', '2026-03-04T16:00:00.000Z'),
+    ];
+    const disputedLookup = buildScheduleCompletionLookup([
+      { scheduleId: 'disputed-past', occurrenceKey: '2026-03-03T16:00:00.000Z' },
+    ]);
+
+    const stats = getMonthProgressStatsByKey(
+      schedules,
+      new Date('2026-03-10T00:00:00.000Z'),
+      undefined,
+      { disputedLookup },
+    );
+
+    // elapsed-past counts (elapsed, undisputed); disputed-past does not.
     expect(stats.get('2026-03')).toEqual({
       scheduledCount: 2,
       completedCount: 1,
     });
+
+    const groups = toMonthGroups(
+      groupSchedulesByMonth(schedules),
+      new Date('2026-03-10T00:00:00.000Z'),
+      undefined,
+      { disputedLookup },
+    );
+    const disputedSession = groups[0]?.sessions.find((s) => s.id === 'disputed-past');
+    expect(disputedSession?.isCompleted).toBe(false);
+    expect(disputedSession?.isDisputed).toBe(true);
+  });
+
+  it('isDisplayScheduleDisputed reports whether an occurrence is in the disputed lookup', () => {
+    const disputedLookup = buildScheduleCompletionLookup([
+      { scheduleId: 'sched-9', occurrenceKey: '2026-03-03T16:00:00+00:00' },
+    ]);
+    const disputed = buildSchedule('sched-9', '2026-03-03T16:00:00.000Z');
+    const other = buildSchedule('sched-10', '2026-03-03T16:00:00.000Z');
+
+    expect(isDisplayScheduleDisputed(disputed, disputedLookup)).toBe(true);
+    expect(isDisplayScheduleDisputed(other, disputedLookup)).toBe(false);
+    expect(isDisplayScheduleDisputed(disputed, undefined)).toBe(false);
+  });
+
+  it('matches completion rows across ISO offset formats and recurring occurrence ids', () => {
+    const lookup = buildScheduleCompletionLookup([
+      { scheduleId: 'sched-1', occurrenceKey: '2026-03-03T16:00:00+00:00' },
+    ]);
+
+    const nonRecurring = buildSchedule('sched-1', '2026-03-03T16:00:00.000Z');
+    expect(getScheduleOccurrenceCompletionKey(nonRecurring)).not.toBeNull();
+    expect(lookup.has(getScheduleOccurrenceCompletionKey(nonRecurring)!)).toBe(true);
+
+    const recurringOccurrence = {
+      ...buildSchedule('sched-1__2026-03-03T16:00:00.000Z', '2026-03-03T16:00:00.000Z'),
+    };
+    expect(lookup.has(getScheduleOccurrenceCompletionKey(recurringOccurrence)!)).toBe(
+      true,
+    );
   });
 
   it('selects only the first upcoming non-disabled session as joinable', () => {

@@ -33,3 +33,37 @@ export interface SessionCompletionVM {
   resolvedAt?: ISODateTime | null;
   expiresAt: ISODateTime;
 }
+
+// One schedule occurrence that at least one participant (educator/teacher,
+// guardian/parent, or staff) has confirmed complete. Powers the classroom
+// Sessions tab's completed state — an occurrence is done the moment ANY party
+// confirms it (`status` 'confirmed' or 'auto_confirmed'); disputes are ignored.
+export interface ChannelSessionCompletionVM {
+  scheduleId: UUID;
+  occurrenceKey: ISODateTime;
+}
+
+export interface AdminSessionCompletionActorVM {
+  profileId: UUID;
+  displayName: string;
+  role: ParticipantRoleVM;
+  status: Extract<ClassSessionCompletionStatus, 'confirmed' | 'auto_confirmed'>;
+  completedAt: ISODateTime;
+}
+
+/** One completed schedule occurrence, grouped across all participant confirmations. */
+export interface AdminSessionCompletionVM {
+  id: string;
+  orgId: UUID;
+  scheduleId: UUID;
+  occurrenceKey: ISODateTime;
+  sessionEndAt: ISODateTime;
+  sessionTitle?: string | null;
+  studentNames: string[];
+  channelId?: UUID | null;
+  learningSpaceId?: UUID | null;
+  completedAt: ISODateTime;
+  completionMethod: 'confirmed' | 'auto_confirmed' | 'mixed';
+  confirmedBy: AdminSessionCompletionActorVM[];
+  averageRating?: number | null;
+}

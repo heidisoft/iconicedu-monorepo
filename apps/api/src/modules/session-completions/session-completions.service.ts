@@ -8,6 +8,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type {
+  AdminSessionCompletionActorVM,
+  AdminSessionCompletionVM,
+  ChannelSessionCompletionVM,
   ClassSessionCompletionRow,
   ConfirmSessionCompletionInput,
   ConnectionVM,
@@ -142,6 +145,128 @@ export class SessionCompletionsService {
       nextCursor: hasMore && last ? this.encodeCursor(last.order_key, last.id) : null,
       total: null,
     };
+  }
+
+  /**
+   * Aggregate completion totals for the home dashboard's "Sessions completed"
+   * tile. Deliberately NOT derived from listForProfile's page — that query is
+   * capped at MAX_PAGE_SIZE and only surfaces resolved rows from the last 3 days
+   * (its carousel/inbox visibility window), so counting it would silently drop
+   * confirmations older than 3 days and truncate large profiles. These are
+   * exact COUNTs over the whole table instead:
+   *   - `completed`: confirmed / auto_confirmed rows, optionally bounded to a
+   *     session-end window (the tile shows "this month").
+   *   - `pending`: all rows still awaiting the viewer's action (unbounded — a
+   *     pending row auto-expires via `expires_at` anyway).
+   */
+  async getCompletionSummaryForProfile(
+    authUserId: string,
+    params: {
+      orgId: string;
+      profileId: string;
+      completedSince?: string | null;
+      completedUntil?: string | null;
+    },
+  ): Promise<{ completed: number; pending: number }> {
+    if (!params?.orgId || !isUuid(params.orgId)) {
+      throw new BadRequestException('Invalid orgId');
+    }
+    if (!params?.profileId || !isUuid(params.profileId)) {
+      throw new BadRequestException('Invalid profileId');
+    }
+
+    const supabase = createSupabaseServiceClient();
+    const account = await this.resolveAccount(supabase, authUserId, params.orgId);
+    await this.resolvePermittedProfile(supabase, account, params.orgId, params.profileId);
+
+    const scopedCount = () =>
+      supabase
+        .from('class_session_completions')
+        .select('id', { count: 'exact', head: true })
+        .eq('org_id', params.orgId)
+        .eq('profile_id', params.profileId)
+        .is('deleted_at', null);
+
+    let completedQuery = scopedCount().in('status', ['confirmed', 'auto_confirmed']);
+    if (params.completedSince) {
+      completedQuery = completedQuery.gte('session_end_at', params.completedSince);
+    }
+    if (params.completedUntil) {
+      completedQuery = completedQuery.lt('session_end_at', params.completedUntil);
+    }
+
+    const [completedResult, pendingResult] = await Promise.all([
+      completedQuery,
+      scopedCount().eq('status', 'pending'),
+    ]);
+
+    if (completedResult.error) {
+      throw new InternalServerErrorException(completedResult.error.message);
+    }
+    if (pendingResult.error) {
+      throw new InternalServerErrorException(pendingResult.error.message);
+    }
+
+    return {
+      completed: completedResult.count ?? 0,
+      pending: pendingResult.count ?? 0,
+    };
+  }
+
+  /**
+   * Cross-party completion state for a classroom channel's Sessions tab. RLS on
+   * class_session_completions only exposes a viewer's own rows, so this reads
+   * through the service client after verifying the caller is a member of the
+   * channel. Role is not filtered — mirroring the "either party" rule the tab
+   * presents:
+   *   - `completions`: any participant confirmed it ('confirmed'/'auto_confirmed').
+   *   - `disputed`: any participant filed a dispute ('disputed'). The tab treats an
+   *     elapsed session as complete unless it appears here.
+   */
+  async listChannelCompletionStates(
+    authUserId: string,
+    params: { orgId: string; channelId: string },
+  ): Promise<{
+    completions: ChannelSessionCompletionVM[];
+    disputed: ChannelSessionCompletionVM[];
+  }> {
+    if (!params?.orgId || !isUuid(params.orgId)) {
+      throw new BadRequestException('Invalid orgId');
+    }
+    if (!params?.channelId || !isUuid(params.channelId)) {
+      throw new BadRequestException('Invalid channelId');
+    }
+
+    const supabase = createSupabaseServiceClient();
+    const account = await this.resolveAccount(supabase, authUserId, params.orgId);
+    await this.assertChannelMember(supabase, account, params.orgId, params.channelId);
+
+    const { data, error } = await supabase
+      .from('class_session_completions')
+      .select('schedule_id, occurrence_key, status')
+      .eq('org_id', params.orgId)
+      .eq('channel_id', params.channelId)
+      .in('status', ['confirmed', 'auto_confirmed', 'disputed'])
+      .is('deleted_at', null)
+      .returns<Array<{ schedule_id: string; occurrence_key: string; status: string }>>();
+
+    if (error) throw new InternalServerErrorException(error.message);
+
+    const seen = { completed: new Set<string>(), disputed: new Set<string>() };
+    const completions: ChannelSessionCompletionVM[] = [];
+    const disputed: ChannelSessionCompletionVM[] = [];
+    for (const row of data ?? []) {
+      const key = `${row.schedule_id}|${row.occurrence_key}`;
+      const bucket = row.status === 'disputed' ? 'disputed' : 'completed';
+      if (seen[bucket].has(key)) continue;
+      seen[bucket].add(key);
+      (bucket === 'disputed' ? disputed : completions).push({
+        scheduleId: row.schedule_id,
+        occurrenceKey: row.occurrence_key,
+      });
+    }
+
+    return { completions, disputed };
   }
 
   async confirm(authUserId: string, body: ConfirmSessionCompletionInput) {
@@ -453,6 +578,40 @@ export class SessionCompletionsService {
     return row;
   }
 
+  /** Verifies the requesting account has a membership row in the given channel. */
+  private async assertChannelMember(
+    supabase: SupabaseServiceClient,
+    account: AccountRow,
+    orgId: string,
+    channelId: string,
+  ): Promise<void> {
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('account_id', account.id)
+      .eq('org_id', orgId)
+      .is('deleted_at', null)
+      .returns<Array<{ id: string }>>();
+
+    if (profilesError) throw new InternalServerErrorException(profilesError.message);
+
+    const profileIds = (profiles ?? []).map((profile) => profile.id);
+    if (!profileIds.length) throw new ForbiddenException('Forbidden');
+
+    const { data: membership, error: membershipError } = await supabase
+      .from('channel_members')
+      .select('id')
+      .eq('org_id', orgId)
+      .eq('channel_id', channelId)
+      .in('profile_id', profileIds)
+      .is('deleted_at', null)
+      .limit(1)
+      .maybeSingle<{ id: string }>();
+
+    if (membershipError) throw new InternalServerErrorException(membershipError.message);
+    if (!membership) throw new ForbiddenException('Forbidden');
+  }
+
   private async resolveAccount(
     supabase: SupabaseServiceClient,
     authUserId: string,
@@ -504,6 +663,43 @@ export class SessionCompletionsService {
     if (familyLinkError) throw new InternalServerErrorException(familyLinkError.message);
     if (!familyLink) throw new ForbiddenException('Forbidden');
     return targetProfile;
+  }
+
+  private async assertAdminAccess(
+    supabase: SupabaseServiceClient,
+    account: AccountRow,
+    orgId: string,
+  ) {
+    const [roleResponse, accountResponse] = await Promise.all([
+      supabase
+        .from('user_roles')
+        .select('role_key')
+        .eq('org_id', orgId)
+        .eq('account_id', account.id)
+        .in('role_key', ['owner', 'admin', 'staff'])
+        .is('deleted_at', null)
+        .limit(1)
+        .maybeSingle<{ role_key: string }>(),
+      supabase
+        .from('accounts')
+        .select('id')
+        .eq('id', account.id)
+        .eq('org_id', orgId)
+        .in('primary_role', ['owner', 'admin', 'staff'])
+        .is('deleted_at', null)
+        .limit(1)
+        .maybeSingle<{ id: string }>(),
+    ]);
+
+    if (roleResponse.error) {
+      throw new InternalServerErrorException(roleResponse.error.message);
+    }
+    if (accountResponse.error) {
+      throw new InternalServerErrorException(accountResponse.error.message);
+    }
+    if (!roleResponse.data && !accountResponse.data) {
+      throw new ForbiddenException('Forbidden');
+    }
   }
 
   private async publishDisputeNotifications(input: {
@@ -600,5 +796,126 @@ export class SessionCompletionsService {
     } catch {
       throw new BadRequestException('Invalid cursor');
     }
+  }
+
+  async listForAdmin(
+    authUserId: string,
+    params: { orgId: string },
+  ): Promise<AdminSessionCompletionVM[]> {
+    if (!params?.orgId || !isUuid(params.orgId)) {
+      throw new BadRequestException('Invalid orgId');
+    }
+
+    const supabase = createSupabaseServiceClient();
+    const account = await this.resolveAccount(supabase, authUserId, params.orgId);
+    await this.assertAdminAccess(supabase, account, params.orgId);
+
+    const { data, error } = await supabase
+      .from('class_session_completions')
+      .select('*')
+      .eq('org_id', params.orgId)
+      .in('status', ['confirmed', 'auto_confirmed'])
+      .is('deleted_at', null)
+      .order('session_end_at', { ascending: false })
+      .returns<ClassSessionCompletionRow[]>();
+
+    if (error) throw new InternalServerErrorException(error.message);
+    const completionRows = data ?? [];
+    const profileIds = [...new Set(completionRows.map((row) => row.profile_id))];
+    const scheduleIds = [...new Set(completionRows.map((row) => row.schedule_id))];
+    const [profileResponse, participantResponse] = await Promise.all([
+      profileIds.length
+        ? supabase
+            .from('profiles')
+            .select('id, display_name, first_name, last_name')
+            .eq('org_id', params.orgId)
+            .in('id', profileIds)
+            .is('deleted_at', null)
+            .returns<
+              Array<{
+                id: string;
+                display_name: string | null;
+                first_name: string | null;
+                last_name: string | null;
+              }>
+            >()
+        : Promise.resolve({ data: [], error: null }),
+      scheduleIds.length
+        ? supabase
+            .from('class_schedule_participants')
+            .select('schedule_id, display_name')
+            .eq('org_id', params.orgId)
+            .in('schedule_id', scheduleIds)
+            .eq('role', 'child')
+            .is('deleted_at', null)
+            .returns<Array<{ schedule_id: string; display_name: string | null }>>()
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+
+    if (profileResponse.error) {
+      throw new InternalServerErrorException(profileResponse.error.message);
+    }
+    if (participantResponse.error) {
+      throw new InternalServerErrorException(participantResponse.error.message);
+    }
+    const names = new Map(
+      (profileResponse.data ?? []).map((profile) => [
+        profile.id,
+        profile.display_name?.trim() ||
+          [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim() ||
+          'Unknown user',
+      ]),
+    );
+    const studentNamesByScheduleId = new Map<string, string[]>();
+    (participantResponse.data ?? []).forEach((participant) => {
+      const displayName = participant.display_name?.trim();
+      if (!displayName) return;
+      const values = studentNamesByScheduleId.get(participant.schedule_id) ?? [];
+      if (!values.includes(displayName)) values.push(displayName);
+      studentNamesByScheduleId.set(participant.schedule_id, values);
+    });
+
+    const grouped = new Map<string, ClassSessionCompletionRow[]>();
+    completionRows.forEach((row) => {
+      const key = `${row.schedule_id}|${row.occurrence_key}`;
+      const bucket = grouped.get(key) ?? [];
+      bucket.push(row);
+      grouped.set(key, bucket);
+    });
+
+    return [...grouped.entries()].map(([id, rows]) => {
+      const first = rows[0]!;
+      const actors: AdminSessionCompletionActorVM[] = rows.map((row) => ({
+        profileId: row.profile_id,
+        displayName: names.get(row.profile_id) ?? 'Unknown user',
+        role: row.role,
+        status: row.status as AdminSessionCompletionActorVM['status'],
+        completedAt: row.resolved_at ?? row.confirmed_at ?? row.updated_at,
+      }));
+      const methods = new Set(actors.map((actor) => actor.status));
+      const ratings = rows
+        .map((row) => row.rating)
+        .filter((rating): rating is number => typeof rating === 'number');
+
+      return {
+        id,
+        orgId: first.org_id,
+        scheduleId: first.schedule_id,
+        occurrenceKey: first.occurrence_key,
+        sessionEndAt: first.session_end_at,
+        sessionTitle: first.session_title ?? null,
+        studentNames: studentNamesByScheduleId.get(first.schedule_id) ?? [],
+        channelId: first.channel_id ?? null,
+        learningSpaceId: first.learning_space_id ?? null,
+        completedAt: actors
+          .map((actor) => actor.completedAt)
+          .sort((left, right) => right.localeCompare(left))[0]!,
+        completionMethod: methods.size > 1 ? 'mixed' : (actors[0]?.status ?? 'confirmed'),
+        confirmedBy: actors,
+        averageRating: ratings.length
+          ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length
+          : null,
+      };
+    });
   }
 }

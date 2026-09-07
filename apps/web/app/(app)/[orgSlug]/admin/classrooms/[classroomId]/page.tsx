@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, Pencil } from 'lucide-react';
-import { DashboardHeader, Button, Badge } from '@iconicedu/ui-web';
+import { Button, Badge } from '@iconicedu/ui-web';
 
 import { getDashboardAccountContext } from '@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth';
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
@@ -13,6 +13,7 @@ import {
   mapOrgSubjectRowsToOptions,
 } from '@iconicedu/web/lib/subjects/queries/org-subject-catalog.query';
 import { LearningSpaceForm } from '@iconicedu/web/app/(app)/[orgSlug]/admin/classrooms/learning-space-form';
+import { AdminPageShell } from '@iconicedu/web/components/admin/admin-page-layout';
 
 export const metadata: Metadata = { title: 'Admin · Edit Classroom' };
 
@@ -46,46 +47,43 @@ export default async function EditClassroomPage({
   const defaultTimezone = profileResponse.data?.timezone ?? null;
 
   return (
-    <div className="flex flex-1 flex-col">
-      <DashboardHeader title="Edit Classroom" />
-      <div className="flex flex-1 flex-col p-6 lg:p-8 gap-8">
-        <div className="flex flex-col gap-4">
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className="-ml-2 w-fit text-muted-foreground"
-          >
-            <Link href={`/${orgSlug}/admin/classrooms`}>
-              <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Classrooms
-            </Link>
-          </Button>
-          <div>
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <h1 className="text-2xl font-semibold tracking-tight">
-                {detail.basics.title}
-              </h1>
-              <Badge variant="secondary" className="gap-1 shrink-0">
-                <Pencil className="h-3 w-3" /> Editing
-              </Badge>
-            </div>
-            {(detail.basics.subject ?? detail.basics.description) && (
-              <p className="text-sm text-muted-foreground mt-1">
-                {detail.basics.subject ?? detail.basics.description}
-              </p>
-            )}
+    <AdminPageShell title="Edit Classroom">
+      <div className="flex flex-col gap-4">
+        <Button
+          asChild
+          variant="ghost"
+          size="sm"
+          className="-ml-2 w-fit text-muted-foreground"
+        >
+          <Link href={`/${orgSlug}/admin/classrooms`}>
+            <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Classrooms
+          </Link>
+        </Button>
+        <div>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {detail.basics.title}
+            </h1>
+            <Badge variant="secondary" className="gap-1 shrink-0">
+              <Pencil className="h-3 w-3" /> Editing
+            </Badge>
           </div>
+          {(detail.basics.subject ?? detail.basics.description) && (
+            <p className="text-sm text-muted-foreground mt-1">
+              {detail.basics.subject ?? detail.basics.description}
+            </p>
+          )}
         </div>
-
-        <LearningSpaceForm
-          orgSlug={orgSlug}
-          participantOptions={participantOptions}
-          subjectOptions={subjectOptions}
-          defaultScheduleTimezone={defaultTimezone}
-          mode="edit"
-          initialData={detail}
-        />
       </div>
-    </div>
+
+      <LearningSpaceForm
+        orgSlug={orgSlug}
+        participantOptions={participantOptions}
+        subjectOptions={subjectOptions}
+        defaultScheduleTimezone={defaultTimezone}
+        mode="edit"
+        initialData={detail}
+      />
+    </AdminPageShell>
   );
 }

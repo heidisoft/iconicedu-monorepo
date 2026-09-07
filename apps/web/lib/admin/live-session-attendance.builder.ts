@@ -178,7 +178,12 @@ export function buildLiveSessionAttendanceListItemVM(input: {
   learningSpace: LearningSpaceRow | null;
   participants: ChannelLiveSessionParticipantRow[];
   starterProfile: ProfileRow | null;
+  profiles?: ProfileRow[];
 }): LiveSessionAttendanceListItemVM {
+  const profileById = new Map(
+    (input.profiles ?? []).map((profile) => [profile.id, profile]),
+  );
+
   return {
     ids: {
       id: input.session.id,
@@ -200,6 +205,10 @@ export function buildLiveSessionAttendanceListItemVM(input: {
     joinPath: input.session.join_path,
     reportGeneratedAt: input.session.report_generated_at ?? null,
     startedBy: toProfileSummary(input.starterProfile),
+    participants: input.participants.flatMap((participant) => {
+      const summary = toProfileSummary(profileById.get(participant.profile_id) ?? null);
+      return summary ? [summary] : [];
+    }),
     metrics: buildMetrics(input.session, input.participants),
   };
 }
@@ -261,6 +270,7 @@ export function buildLiveSessionAttendanceDetailVM(input: {
       learningSpace: input.learningSpace,
       participants: input.participants,
       starterProfile: input.starterProfile,
+      profiles: input.profiles,
     }),
     policy: resolveAttendancePolicy(input.session),
     reportGeneratedAt: input.session.report_generated_at ?? null,

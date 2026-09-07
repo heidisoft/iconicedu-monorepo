@@ -56,4 +56,67 @@ describe('GET /api/admin/channels/list', () => {
     });
     expect(getAdminChannelRows).not.toHaveBeenCalled();
   });
+
+  it('filters channels by participant before pagination', async () => {
+    getAdminChannelRows.mockResolvedValueOnce([
+      {
+        id: 'channel-1',
+        topic: 'Algebra',
+        purpose: 'learning-space',
+        kind: 'channel',
+        participantDetails: [{ id: 'profile-1', displayName: 'Ari' }],
+      },
+      {
+        id: 'channel-2',
+        topic: 'Writing',
+        purpose: 'learning-space',
+        kind: 'channel',
+        participantDetails: [{ id: 'profile-2', displayName: 'Maya' }],
+      },
+    ]);
+
+    const response = await GET(
+      new Request(
+        `${APP_URL}/api/admin/channels/list?orgSlug=acme&participantId=profile-2`,
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      total: 1,
+      pageCount: 1,
+      rows: [{ id: 'channel-2', topic: 'Writing' }],
+    });
+  });
+
+  it('matches the free-text search against participant names', async () => {
+    getAdminChannelRows.mockResolvedValueOnce([
+      {
+        id: 'channel-1',
+        topic: 'Algebra',
+        purpose: 'learning-space',
+        kind: 'channel',
+        participantDetails: [{ id: 'profile-1', displayName: 'Ari Stone' }],
+      },
+      {
+        id: 'channel-2',
+        topic: 'Writing',
+        purpose: 'learning-space',
+        kind: 'channel',
+        participantDetails: [{ id: 'profile-2', displayName: 'Maya Chen' }],
+      },
+    ]);
+
+    const response = await GET(
+      new Request(`${APP_URL}/api/admin/channels/list?orgSlug=acme&search=maya`),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      total: 1,
+      rows: [{ id: 'channel-2', topic: 'Writing' }],
+    });
+  });
 });

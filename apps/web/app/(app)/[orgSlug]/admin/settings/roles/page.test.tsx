@@ -31,13 +31,7 @@ describe('admin settings roles page', () => {
     });
     const children = (element as { props?: { children?: unknown[] } }).props
       ?.children as unknown[];
-    const contentContainer = children?.[1] as
-      | { props?: { children?: unknown } }
-      | undefined;
-    const contentChildren = contentContainer?.props?.children as unknown[];
-    const dashboardElement = contentChildren?.[1] as
-      | { props?: { orgId?: string } }
-      | undefined;
+    const dashboardElement = children?.[1] as { props?: { orgId?: string } } | undefined;
     expect(dashboardElement?.props?.orgId).toBe('org-1');
   });
 

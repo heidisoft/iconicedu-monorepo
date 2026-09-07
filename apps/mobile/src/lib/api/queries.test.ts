@@ -1,5 +1,6 @@
 import {
   cancelRecurringSessionOccurrence,
+  fetchChannelSessionCompletions,
   fetchChannelMembers,
   fetchChannelMetaByChannelId,
   fetchDirectMessageChannelMetaByChannelId,
@@ -275,6 +276,44 @@ describe('fetchSpaceSchedulesByChannelId', () => {
     await expect(fetchSpaceSchedulesByChannelId(CHANNEL_ID, ORG_ID)).rejects.toThrow(
       'Connection refused',
     );
+  });
+});
+
+describe('fetchChannelSessionCompletions', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('calls the channel-states API with org and channel filters', async () => {
+    mockApiGet.mockResolvedValue({ completions: [] });
+
+    await fetchChannelSessionCompletions(CHANNEL_ID, ORG_ID);
+
+    expect(mockApiGet).toHaveBeenCalledWith('/session-completions/channel-states', {
+      orgId: ORG_ID,
+      channelId: CHANNEL_ID,
+    });
+  });
+
+  it('returns the confirmed and disputed occurrences and defaults to empty arrays', async () => {
+    mockApiGet.mockResolvedValue({
+      completions: [
+        { scheduleId: 'sched-1', occurrenceKey: '2026-03-01T10:00:00+00:00' },
+      ],
+      disputed: [{ scheduleId: 'sched-2', occurrenceKey: '2026-03-08T10:00:00+00:00' }],
+    });
+    expect(await fetchChannelSessionCompletions(CHANNEL_ID, ORG_ID)).toEqual({
+      completions: [
+        { scheduleId: 'sched-1', occurrenceKey: '2026-03-01T10:00:00+00:00' },
+      ],
+      disputed: [{ scheduleId: 'sched-2', occurrenceKey: '2026-03-08T10:00:00+00:00' }],
+    });
+
+    mockApiGet.mockResolvedValue(undefined);
+    expect(await fetchChannelSessionCompletions(CHANNEL_ID, ORG_ID)).toEqual({
+      completions: [],
+      disputed: [],
+    });
   });
 });
 

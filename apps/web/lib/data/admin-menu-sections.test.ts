@@ -74,6 +74,14 @@ describe('buildAdminMenuSections', () => {
     expect(sections.map((section) => section.title)).not.toContain('Reports');
   });
 
+  it('labels the repurposed sessions page as completed sessions', () => {
+    const link = buildAdminMenuSections('/iconic-academy')
+      .flatMap((section) => section.links)
+      .find((item) => item.url.endsWith('/admin/attendance/sessions'));
+
+    expect(link?.title).toBe('Completed sessions');
+  });
+
   it('only links to implemented admin pages', () => {
     const implementedAdminPaths = new Set([
       '/admin/activity/feed',

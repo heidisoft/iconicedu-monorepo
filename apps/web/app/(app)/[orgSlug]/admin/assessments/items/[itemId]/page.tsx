@@ -4,9 +4,10 @@ import { notFound } from 'next/navigation';
 import { getDashboardAccountContext } from '@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth';
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
 import { createAssessmentApiClient } from '@iconicedu/web/lib/assessments/api';
-import { DashboardHeader, Badge, Button } from '@iconicedu/ui-web';
+import { Badge, Button } from '@iconicedu/ui-web';
 import { ArrowLeft, Pencil } from 'lucide-react';
 import { ItemEditor } from '@iconicedu/web/components/assessments/item-editor';
+import { AdminPageShell } from '@iconicedu/web/components/admin/admin-page-layout';
 
 export const metadata: Metadata = { title: 'Admin · Edit Question' };
 
@@ -25,37 +26,34 @@ export default async function EditItemPage({
   if (!item) notFound();
 
   return (
-    <div className="flex flex-1 flex-col">
-      <DashboardHeader title="Edit Question" />
-      <div className="flex flex-1 flex-col p-6 lg:p-8 gap-8">
-        <div className="flex flex-col gap-4">
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className="-ml-2 w-fit text-muted-foreground"
-          >
-            <Link href={`/${orgSlug}/admin/assessments/items`}>
-              <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Item Bank
-            </Link>
-          </Button>
-          <div>
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <h1 className="text-2xl font-semibold tracking-tight">{item.title}</h1>
-              <Badge variant="secondary" className="gap-1 shrink-0">
-                <Pencil className="h-3 w-3" /> Editing
-              </Badge>
-            </div>
-            <p className="text-sm text-muted-foreground mt-1">
-              {item.skillName}
-              {item.domainName ? ` · ${item.domainName}` : ''}
-              {item.grade ? ` · Grade ${item.grade}` : ''}
-            </p>
+    <AdminPageShell title="Edit Question">
+      <div className="flex flex-col gap-4">
+        <Button
+          asChild
+          variant="ghost"
+          size="sm"
+          className="-ml-2 w-fit text-muted-foreground"
+        >
+          <Link href={`/${orgSlug}/admin/assessments/items`}>
+            <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Item Bank
+          </Link>
+        </Button>
+        <div>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <h1 className="text-2xl font-semibold tracking-tight">{item.title}</h1>
+            <Badge variant="secondary" className="gap-1 shrink-0">
+              <Pencil className="h-3 w-3" /> Editing
+            </Badge>
           </div>
+          <p className="text-sm text-muted-foreground mt-1">
+            {item.skillName}
+            {item.domainName ? ` · ${item.domainName}` : ''}
+            {item.grade ? ` · Grade ${item.grade}` : ''}
+          </p>
         </div>
-
-        <ItemEditor orgId={org.id} orgSlug={orgSlug} item={item} />
       </div>
-    </div>
+
+      <ItemEditor orgId={org.id} orgSlug={orgSlug} item={item} />
+    </AdminPageShell>
   );
 }

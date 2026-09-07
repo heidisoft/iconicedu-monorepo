@@ -23,6 +23,7 @@ const COMPLETION_ID = '00000000-0000-4000-8000-000000000004';
 const OTHER_PROFILE_ID = '00000000-0000-4000-8000-000000000005';
 const OTHER_ACCOUNT_ID = '00000000-0000-4000-8000-000000000006';
 const SCHEDULE_ID = '00000000-0000-4000-8000-000000000007';
+const CHANNEL_ID = '00000000-0000-4000-8000-000000000009';
 
 describe('SessionCompletionsService', () => {
   const createSupabaseServiceClientMock = jest.mocked(createSupabaseServiceClient);
@@ -39,6 +40,7 @@ describe('SessionCompletionsService', () => {
       in: jest.fn(() => chain),
       is: jest.fn(() => chain),
       limit: jest.fn(() => chain),
+      order: jest.fn(() => chain),
       maybeSingle: jest.fn(async () => result),
       returns: jest.fn(async () => result),
     };
@@ -142,6 +144,78 @@ describe('SessionCompletionsService', () => {
     };
   }
 
+  describe('listForAdmin', () => {
+    it('groups participant confirmations into one completed occurrence', async () => {
+      const accountChain = makeChain({ data: { id: ACCOUNT_ID, org_id: ORG_ID } });
+      const roleChain = makeChain({ data: { role_key: 'admin' } });
+      const completionChain = makeChain({
+        data: [
+          baseCompletionRow({
+            profile_id: PROFILE_ID,
+            role: 'educator',
+            status: 'confirmed',
+            rating: 5,
+            student_name: 'Jamie Lee',
+            resolved_at: '2030-03-06T11:05:00.000Z',
+            updated_at: '2030-03-06T11:05:00.000Z',
+          }),
+          baseCompletionRow({
+            id: '00000000-0000-4000-8000-000000000008',
+            profile_id: OTHER_PROFILE_ID,
+            role: 'guardian',
+            status: 'auto_confirmed',
+            student_name: 'Jamie Lee',
+            resolved_at: '2030-03-06T11:03:00.000Z',
+            updated_at: '2030-03-06T11:03:00.000Z',
+          }),
+        ],
+      });
+      const profilesChain = makeChain({
+        data: [
+          {
+            id: PROFILE_ID,
+            display_name: 'Taylor Reed',
+            first_name: null,
+            last_name: null,
+          },
+          {
+            id: OTHER_PROFILE_ID,
+            display_name: 'Morgan Lee',
+            first_name: null,
+            last_name: null,
+          },
+        ],
+      });
+      const participantsChain = makeChain({
+        data: [{ schedule_id: SCHEDULE_ID, display_name: 'Jamie Lee' }],
+      });
+      const from = jest.fn((table: string) => {
+        if (table === 'accounts') return accountChain;
+        if (table === 'user_roles') return roleChain;
+        if (table === 'class_session_completions') return completionChain;
+        if (table === 'profiles') return profilesChain;
+        if (table === 'class_schedule_participants') return participantsChain;
+        throw new Error(`Unexpected table: ${table}`);
+      });
+      createSupabaseServiceClientMock.mockReturnValue({ from } as never);
+
+      const result = await new SessionCompletionsService().listForAdmin(AUTH_USER_ID, {
+        orgId: ORG_ID,
+      });
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        completionMethod: 'mixed',
+        studentNames: ['Jamie Lee'],
+        averageRating: 5,
+        confirmedBy: [
+          { displayName: 'Taylor Reed', role: 'educator' },
+          { displayName: 'Morgan Lee', role: 'guardian' },
+        ],
+      });
+    });
+  });
+
   describe('listForProfile', () => {
     it('returns a bounded cursor page from the consolidated source', async () => {
       const first = { ...baseCompletionRow(), order_key: '2030-03-06T11:00:00.000Z' };
@@ -196,6 +270,106 @@ describe('SessionCompletionsService', () => {
         }),
       ).rejects.toThrow(BadRequestException);
       expect(rpc).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getCompletionSummaryForProfile', () => {
+    // A chainable, awaitable stand-in for a PostgREST head:count query.
+    function makeCountChain(count: number) {
+      const chain: Record<string, unknown> = {};
+      for (const method of ['select', 'eq', 'is', 'in', 'gte', 'lt']) {
+        chain[method] = jest.fn(() => chain);
+      }
+      chain.then = (resolve: (value: { count: number; error: null }) => unknown) =>
+        Promise.resolve({ count, error: null }).then(resolve);
+      return chain;
+    }
+
+    function makeSummarySupabase(input: {
+      completedCount: number;
+      pendingCount: number;
+      profileRow?: Record<string, unknown> | null;
+      familyLinkRow?: Record<string, unknown> | null;
+    }) {
+      const accountChain = makeChain({ data: { id: ACCOUNT_ID, org_id: ORG_ID } });
+      const profileChain = makeChain({
+        data:
+          input.profileRow === undefined
+            ? { id: PROFILE_ID, account_id: ACCOUNT_ID, org_id: ORG_ID, kind: 'child' }
+            : input.profileRow,
+      });
+      const familyLinkChain = makeChain({ data: input.familyLinkRow ?? null });
+
+      let completionsSelectCalls = 0;
+      const from = jest.fn((table: string) => {
+        if (table === 'accounts') return accountChain;
+        if (table === 'profiles') return profileChain;
+        if (table === 'family_links') return familyLinkChain;
+        if (table === 'class_session_completions') {
+          return {
+            // 1st select() builds the "completed" count query, 2nd the "pending" one.
+            select: jest.fn(() => {
+              completionsSelectCalls += 1;
+              return makeCountChain(
+                completionsSelectCalls === 1 ? input.completedCount : input.pendingCount,
+              );
+            }),
+          };
+        }
+        throw new Error(`Unexpected table: ${table}`);
+      });
+
+      createSupabaseServiceClientMock.mockReturnValue({ from } as never);
+      return { from };
+    }
+
+    it('returns exact confirmed and pending counts, not a page slice', async () => {
+      makeSummarySupabase({ completedCount: 137, pendingCount: 4 });
+      const service = new SessionCompletionsService();
+
+      const result = await service.getCompletionSummaryForProfile(AUTH_USER_ID, {
+        orgId: ORG_ID,
+        profileId: PROFILE_ID,
+        completedSince: '2026-03-01T00:00:00.000Z',
+        completedUntil: '2026-04-01T00:00:00.000Z',
+      });
+
+      expect(result).toEqual({ completed: 137, pending: 4 });
+    });
+
+    it('rejects an invalid profileId before querying', async () => {
+      const { from } = makeSummarySupabase({ completedCount: 0, pendingCount: 0 });
+      const service = new SessionCompletionsService();
+
+      await expect(
+        service.getCompletionSummaryForProfile(AUTH_USER_ID, {
+          orgId: ORG_ID,
+          profileId: 'not-a-uuid',
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(from).not.toHaveBeenCalled();
+    });
+
+    it('rejects a profile the requesting account may not act for', async () => {
+      makeSummarySupabase({
+        completedCount: 0,
+        pendingCount: 0,
+        profileRow: {
+          id: OTHER_PROFILE_ID,
+          account_id: OTHER_ACCOUNT_ID,
+          org_id: ORG_ID,
+          kind: 'child',
+        },
+        familyLinkRow: null,
+      });
+      const service = new SessionCompletionsService();
+
+      await expect(
+        service.getCompletionSummaryForProfile(AUTH_USER_ID, {
+          orgId: ORG_ID,
+          profileId: OTHER_PROFILE_ID,
+        }),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 
@@ -401,6 +575,109 @@ describe('SessionCompletionsService', () => {
       expect(publishActivityEventMock).toHaveBeenCalledWith(
         expect.objectContaining({ eventType: 'session.completion.dispute_reported' }),
       );
+    });
+  });
+
+  describe('listChannelCompletionStates', () => {
+    function makeChannelSupabase(input: {
+      profileRows?: Array<{ id: string }> | null;
+      membershipRow?: { id: string } | null;
+      completionRows?: Array<{
+        schedule_id: string;
+        occurrence_key: string;
+        status: string;
+      }>;
+    }) {
+      const accountChain = makeChain({ data: { id: ACCOUNT_ID, org_id: ORG_ID } });
+      const profilesChain = makeChain({
+        data: input.profileRows === undefined ? [{ id: PROFILE_ID }] : input.profileRows,
+      });
+      const membershipChain = makeChain({
+        data:
+          input.membershipRow === undefined ? { id: 'member-1' } : input.membershipRow,
+      });
+      const completionsChain = makeChain({ data: input.completionRows ?? [] });
+
+      const from = jest.fn((table: string) => {
+        if (table === 'accounts') return accountChain;
+        if (table === 'profiles') return profilesChain;
+        if (table === 'channel_members') return membershipChain;
+        if (table === 'class_session_completions') return completionsChain;
+        throw new Error(`Unexpected table: ${table}`);
+      });
+
+      createSupabaseServiceClientMock.mockReturnValue({ from } as never);
+      return { from, completionsChain, membershipChain };
+    }
+
+    it('splits confirmed and disputed occurrences and de-duplicates each', async () => {
+      const { completionsChain } = makeChannelSupabase({
+        completionRows: [
+          {
+            schedule_id: SCHEDULE_ID,
+            occurrence_key: '2030-03-06T10:00:00+00:00',
+            status: 'confirmed',
+          },
+          {
+            schedule_id: SCHEDULE_ID,
+            occurrence_key: '2030-03-06T10:00:00+00:00',
+            status: 'auto_confirmed',
+          },
+          {
+            schedule_id: SCHEDULE_ID,
+            occurrence_key: '2030-03-13T10:00:00+00:00',
+            status: 'disputed',
+          },
+          {
+            schedule_id: SCHEDULE_ID,
+            occurrence_key: '2030-03-13T10:00:00+00:00',
+            status: 'disputed',
+          },
+        ],
+      });
+      const service = new SessionCompletionsService();
+
+      const result = await service.listChannelCompletionStates(AUTH_USER_ID, {
+        orgId: ORG_ID,
+        channelId: CHANNEL_ID,
+      });
+
+      expect(completionsChain.in).toHaveBeenCalledWith('status', [
+        'confirmed',
+        'auto_confirmed',
+        'disputed',
+      ]);
+      expect(result.completions).toEqual([
+        { scheduleId: SCHEDULE_ID, occurrenceKey: '2030-03-06T10:00:00+00:00' },
+      ]);
+      expect(result.disputed).toEqual([
+        { scheduleId: SCHEDULE_ID, occurrenceKey: '2030-03-13T10:00:00+00:00' },
+      ]);
+    });
+
+    it('rejects a caller who is not a member of the channel', async () => {
+      makeChannelSupabase({ membershipRow: null });
+      const service = new SessionCompletionsService();
+
+      await expect(
+        service.listChannelCompletionStates(AUTH_USER_ID, {
+          orgId: ORG_ID,
+          channelId: CHANNEL_ID,
+        }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('rejects an invalid channelId before touching the database', async () => {
+      const { from } = makeChannelSupabase({});
+      const service = new SessionCompletionsService();
+
+      await expect(
+        service.listChannelCompletionStates(AUTH_USER_ID, {
+          orgId: ORG_ID,
+          channelId: 'not-a-uuid',
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(from).not.toHaveBeenCalled();
     });
   });
 

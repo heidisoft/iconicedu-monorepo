@@ -4,6 +4,7 @@ import * as React from 'react';
 import { Button, Loader2 } from '@iconicedu/ui-web';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { AdminFilterBar } from '@iconicedu/web/components/admin/admin-filter-bar';
+import { AdminPageHeading } from '@iconicedu/web/components/admin/admin-page-layout';
 
 import type { AdminFamilyRow } from '@iconicedu/web/lib/admin/families';
 import { FamiliesTable } from '@iconicedu/web/app/(app)/[orgSlug]/admin/users/families/families-table';
@@ -73,16 +74,13 @@ export function FamiliesDashboard({ orgSlug }: FamiliesDashboardProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Families</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            View and manage family groups, guardians, and their children.
-          </p>
-        </div>
-      </div>
+      <AdminPageHeading
+        title="Families"
+        description="View and manage family groups, guardians, and their children."
+      />
 
       <AdminFilterBar
+        layout="toolbar"
         search={search}
         onSearchChange={setSearch}
         filterGroups={[

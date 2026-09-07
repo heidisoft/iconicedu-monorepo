@@ -154,7 +154,10 @@ describe('LearningSpacesDashboard', () => {
       expect(screen.getByText('Algebra Foundations')).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole('combobox', { name: 'Filter by participant' }));
+    await user.click(screen.getByRole('button', { name: 'Filters' }));
+    await user.click(
+      await screen.findByRole('combobox', { name: 'Filter by participant' }),
+    );
     await user.type(screen.getByPlaceholderText('Search participants...'), 'leo');
     await user.click(await screen.findByRole('option', { name: 'Leo Carter' }));
 

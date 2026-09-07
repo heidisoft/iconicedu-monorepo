@@ -22,6 +22,36 @@ import type { AuthenticatedRequest } from '@iconicedu/api/lib/http/authenticated
 export class SessionCompletionsController {
   constructor(private readonly sessionCompletionsService: SessionCompletionsService) {}
 
+  @Get('summary')
+  @UseGuards(AuthGuard)
+  summary(
+    @Req() req: AuthenticatedRequest,
+    @Query('orgId') orgId: string,
+    @Query('profileId') profileId: string,
+    @Query('completedSince') completedSince?: string,
+    @Query('completedUntil') completedUntil?: string,
+  ) {
+    return this.sessionCompletionsService.getCompletionSummaryForProfile(req.user.id, {
+      orgId,
+      profileId,
+      completedSince: completedSince ?? null,
+      completedUntil: completedUntil ?? null,
+    });
+  }
+
+  @Get('channel-states')
+  @UseGuards(AuthGuard)
+  listChannelStates(
+    @Req() req: AuthenticatedRequest,
+    @Query('orgId') orgId: string,
+    @Query('channelId') channelId: string,
+  ) {
+    return this.sessionCompletionsService.listChannelCompletionStates(req.user.id, {
+      orgId,
+      channelId,
+    });
+  }
+
   @Get()
   @UseGuards(AuthGuard)
   list(
@@ -90,5 +120,11 @@ export class SessionCompletionsController {
       ...body,
       sessionCompletionId: id,
     });
+  }
+
+  @Get('admin')
+  @UseGuards(AuthGuard)
+  listForAdmin(@Req() req: AuthenticatedRequest, @Query('orgId') orgId: string) {
+    return this.sessionCompletionsService.listForAdmin(req.user.id, { orgId });
   }
 }

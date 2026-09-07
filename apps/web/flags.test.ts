@@ -7,6 +7,7 @@ vi.mock('@iconicedu/web/lib/flags/posthog-flags', () => ({
 }));
 
 import {
+  enableAdminSessionAttendanceAnalytics,
   enableChannelCommunications,
   enableMarketingSitePages,
   enableMessageTypeComposer,
@@ -69,6 +70,16 @@ describe('web flags', () => {
     expect(enableSessionCompletionCarousel.defaultValue).toBe(false);
     expect(webFlags.enableSessionCompletionCarousel).toBe(
       enableSessionCompletionCarousel,
+    );
+  });
+
+  it('declares admin session attendance analytics off by default', () => {
+    expect(enableAdminSessionAttendanceAnalytics.key).toBe(
+      'admin-session-attendance-analytics',
+    );
+    expect(enableAdminSessionAttendanceAnalytics.defaultValue).toBe(false);
+    expect(webFlags.enableAdminSessionAttendanceAnalytics).toBe(
+      enableAdminSessionAttendanceAnalytics,
     );
   });
 
@@ -137,5 +148,6 @@ describe('web flags', () => {
     expect(JSON.stringify(providerData)).toContain('enable-message-type-composer');
     expect(JSON.stringify(providerData)).toContain('enable-mobile-direct-message-start');
     expect(JSON.stringify(providerData)).toContain('session-completion-carousel');
+    expect(JSON.stringify(providerData)).toContain('admin-session-attendance-analytics');
   });
 });

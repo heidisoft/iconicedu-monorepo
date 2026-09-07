@@ -76,6 +76,7 @@ export interface LiveSessionAttendanceListItemVM {
   joinPath: string;
   reportGeneratedAt?: ISODateTime | null;
   startedBy: LiveSessionProfileSummaryVM | null;
+  participants?: LiveSessionProfileSummaryVM[];
   metrics: LiveSessionAttendanceMetricsVM;
 }
 

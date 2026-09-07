@@ -3,23 +3,9 @@
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useEffect, useRef, useState, useTransition } from 'react';
 import type { AssessmentSubjectVM } from '@iconicedu/shared-types';
-import {
-  Button,
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  Label,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-} from '@iconicedu/ui-web';
-import { Check, ChevronDown, Search, SlidersHorizontal, X } from 'lucide-react';
+import { Button, Label } from '@iconicedu/ui-web';
+import { Check } from 'lucide-react';
+import { AdminFilterBar } from '@iconicedu/web/components/admin/admin-filter-bar';
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
@@ -47,48 +33,20 @@ const GRADES = Array.from({ length: 12 }, (_, i) => ({
   label: `Grade ${i + 1}`,
 }));
 
-const BP = { sm: 640, md: 768, lg: 1024, xl: 1280 } as const;
-
 function parseParam(v: string | null): string[] {
   return v ? v.split(',').filter(Boolean) : [];
-}
-
-// ─── useWindowWidth ───────────────────────────────────────────────────────────
-
-function useWindowWidth() {
-  const [width, setWidth] = useState(() =>
-    typeof window !== 'undefined' ? window.innerWidth : BP.xl,
-  );
-  useEffect(() => {
-    function onResize() {
-      setWidth(window.innerWidth);
-    }
-    onResize();
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-  return width;
 }
 
 // ─── MultiSelect ──────────────────────────────────────────────────────────────
 
 interface MultiSelectProps {
   label: string;
-  allLabel: string;
   options: { value: string; label: string }[];
   selected: string[];
   onChange: (values: string[]) => void;
-  inline?: boolean;
 }
 
-function MultiSelect({
-  label,
-  allLabel,
-  options,
-  selected,
-  onChange,
-  inline,
-}: MultiSelectProps) {
+function MultiSelect({ label, options, selected, onChange }: MultiSelectProps) {
   const isActive = selected.length > 0;
 
   function toggle(value: string) {
@@ -99,109 +57,43 @@ function MultiSelect({
     );
   }
 
-  // ── Inline variant — inside "More filters" dialog ──────────────────────────
-  if (inline) {
-    return (
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            {label}
-          </Label>
-          {isActive && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-auto py-0 px-1 text-xs text-muted-foreground"
-              onClick={() => onChange([])}
-            >
-              Clear
-            </Button>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {options.map((opt) => {
-            const checked = selected.includes(opt.value);
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => toggle(opt.value)}
-                className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors ${
-                  checked
-                    ? 'border-primary/40 bg-primary/5 text-foreground font-medium'
-                    : 'bg-background text-muted-foreground hover:bg-accent'
-                }`}
-              >
-                {checked && <Check className="h-3 w-3 shrink-0" />}
-                {opt.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
-
-  // ── Popover variant — in the filter bar ────────────────────────────────────
   return (
-    <div className="flex items-center gap-1.5 shrink-0">
-      <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        {label}
-      </span>
-      <Popover>
-        <PopoverTrigger asChild>
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {label}
+        </Label>
+        {isActive && (
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
-            className={isActive ? 'border-primary/40 bg-primary/5 font-semibold' : ''}
+            className="h-auto py-0 px-1 text-xs text-muted-foreground"
+            onClick={() => onChange([])}
           >
-            {isActive ? selected.length : allLabel}
-            <ChevronDown className="h-3 w-3 opacity-50" />
+            Clear
           </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-52 p-0" align="start">
-          <Command>
-            {options.length > 6 && <CommandInput placeholder="Search…" />}
-            <CommandEmpty>No results.</CommandEmpty>
-            <CommandGroup>
-              {options.map((opt) => {
-                const checked = selected.includes(opt.value);
-                return (
-                  <CommandItem
-                    key={opt.value}
-                    value={opt.value}
-                    onSelect={() => toggle(opt.value)}
-                    className="data-selected:bg-transparent gap-2.5"
-                  >
-                    <span
-                      className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
-                        checked
-                          ? 'border-primary bg-primary text-primary-foreground'
-                          : 'border-border bg-background'
-                      }`}
-                    >
-                      {checked && <Check className="h-2.5 w-2.5" />}
-                    </span>
-                    {opt.label}
-                  </CommandItem>
-                );
-              })}
-            </CommandGroup>
-          </Command>
-        </PopoverContent>
-      </Popover>
-
-      {isActive && (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-          onClick={() => onChange([])}
-          aria-label={`Clear ${label}`}
-        >
-          <X className="h-3.5 w-3.5" />
-        </Button>
-      )}
+        )}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {options.map((opt) => {
+          const checked = selected.includes(opt.value);
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => toggle(opt.value)}
+              className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+                checked
+                  ? 'border-primary/40 bg-primary/5 text-foreground font-medium'
+                  : 'bg-background text-muted-foreground hover:bg-accent'
+              }`}
+            >
+              {checked && <Check className="h-3 w-3 shrink-0" />}
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -212,24 +104,18 @@ interface Props {
   subjects: AssessmentSubjectVM[];
 }
 
+/**
+ * URL-synced wrapper around {@link AdminFilterBar} for the item bank. The
+ * multi-select facets live in the shared filter bar's `extraFilters` slot so
+ * the whole admin area uses one filter component.
+ */
 export function ItemBankFilters({ subjects }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [, startTransition] = useTransition();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const width = useWindowWidth();
-
   const hasSubjects = subjects.length > 0;
-  const show = {
-    type: width >= BP.sm,
-    grade: width >= BP.md,
-    difficulty: width >= BP.lg,
-    subject: width >= BP.xl && hasSubjects,
-  };
-  const anyHidden =
-    !show.type || !show.grade || !show.difficulty || (hasSubjects && !show.subject);
 
   const urlSearch = searchParams.get('search') ?? '';
   const current = {
@@ -239,11 +125,12 @@ export function ItemBankFilters({ subjects }: Props) {
     difficulties: parseParam(searchParams.get('difficulties')),
   };
 
-  const activeHiddenCount =
-    (!show.type ? current.types.length : 0) +
-    (!show.grade ? current.grades.length : 0) +
-    (!show.difficulty ? current.difficulties.length : 0) +
-    (!show.subject ? current.subjectIds.length : 0);
+  const activeFilterCount = [
+    current.types,
+    current.grades,
+    current.difficulties,
+    current.subjectIds,
+  ].filter((values) => values.length > 0).length;
 
   const [searchValue, setSearchValue] = useState(urlSearch);
   useEffect(() => {
@@ -275,155 +162,55 @@ export function ItemBankFilters({ subjects }: Props) {
     label: s.icon ? `${s.icon} ${s.name}` : s.name,
   }));
 
-  return (
-    <>
-      <div className="rounded-xl border bg-card px-4 py-3">
-        <div className="flex items-center gap-3">
-          {/* Search — always visible */}
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="hidden sm:block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Search
-            </span>
-            <div className="flex items-center gap-2 h-9 w-44 sm:w-56 rounded-lg border bg-background px-3 focus-within:ring-2 focus-within:ring-ring">
-              <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-              <input
-                className="flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none"
-                placeholder="Search…"
-                value={searchValue}
-                onChange={(e) => handleSearchChange(e.target.value)}
-              />
-            </div>
-          </div>
+  function clearFilters() {
+    const params = new URLSearchParams(searchParams.toString());
+    ['types', 'grades', 'difficulties', 'subjectIds'].forEach((key) =>
+      params.delete(key),
+    );
+    params.delete('page');
+    startTransition(() => router.replace(`${pathname}?${params.toString()}`));
+  }
 
-          {show.type && (
-            <MultiSelect
-              label="Type"
-              allLabel="All types"
-              options={ITEM_TYPES}
-              selected={current.types}
-              onChange={(v) => updateMulti('types', v)}
-            />
-          )}
-          {show.grade && (
-            <MultiSelect
-              label="Grade"
-              allLabel="All"
-              options={GRADES}
-              selected={current.grades}
-              onChange={(v) => updateMulti('grades', v)}
-            />
-          )}
-          {show.difficulty && (
-            <MultiSelect
-              label="Difficulty"
-              allLabel="All"
-              options={DIFFICULTIES}
-              selected={current.difficulties}
-              onChange={(v) => updateMulti('difficulties', v)}
-            />
-          )}
-          {show.subject && (
+  return (
+    <AdminFilterBar
+      layout="toolbar"
+      search={searchValue}
+      onSearchChange={handleSearchChange}
+      searchPlaceholder="Search questions"
+      filterTitle="Filter question bank"
+      filterDescription="Combine filters to narrow the current results."
+      extraActiveCount={activeFilterCount}
+      onClearExtraFilters={clearFilters}
+      extraFilters={
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+          <MultiSelect
+            label="Type"
+            options={ITEM_TYPES}
+            selected={current.types}
+            onChange={(values) => updateMulti('types', values)}
+          />
+          <MultiSelect
+            label="Grade"
+            options={GRADES}
+            selected={current.grades}
+            onChange={(values) => updateMulti('grades', values)}
+          />
+          <MultiSelect
+            label="Difficulty"
+            options={DIFFICULTIES}
+            selected={current.difficulties}
+            onChange={(values) => updateMulti('difficulties', values)}
+          />
+          {hasSubjects && (
             <MultiSelect
               label="Subject"
-              allLabel="All"
               options={subjectOptions}
               selected={current.subjectIds}
-              onChange={(v) => updateMulti('subjectIds', v)}
+              onChange={(values) => updateMulti('subjectIds', values)}
             />
           )}
-
-          {/* More filters — always rendered; invisible when nothing is hidden */}
-          <div className="ml-auto shrink-0">
-            <Button
-              variant="outline"
-              size="sm"
-              className={`gap-2 transition-opacity ${anyHidden ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-              onClick={() => setMobileOpen(true)}
-            >
-              <SlidersHorizontal className="h-3.5 w-3.5" />
-              More filters
-              {activeHiddenCount > 0 && (
-                <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
-                  {activeHiddenCount}
-                </span>
-              )}
-            </Button>
-          </div>
         </div>
-      </div>
-
-      {/* More filters dialog — only hidden filters */}
-      <Dialog open={mobileOpen} onOpenChange={setMobileOpen}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>More filters</DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col gap-5 py-2">
-            {!show.type && (
-              <MultiSelect
-                label="Type"
-                allLabel="All types"
-                options={ITEM_TYPES}
-                selected={current.types}
-                onChange={(v) => updateMulti('types', v)}
-                inline
-              />
-            )}
-            {!show.grade && (
-              <MultiSelect
-                label="Grade"
-                allLabel="All"
-                options={GRADES}
-                selected={current.grades}
-                onChange={(v) => updateMulti('grades', v)}
-                inline
-              />
-            )}
-            {!show.difficulty && (
-              <MultiSelect
-                label="Difficulty"
-                allLabel="All"
-                options={DIFFICULTIES}
-                selected={current.difficulties}
-                onChange={(v) => updateMulti('difficulties', v)}
-                inline
-              />
-            )}
-            {!show.subject && hasSubjects && (
-              <MultiSelect
-                label="Subject"
-                allLabel="All"
-                options={subjectOptions}
-                selected={current.subjectIds}
-                onChange={(v) => updateMulti('subjectIds', v)}
-                inline
-              />
-            )}
-          </div>
-          {activeHiddenCount > 0 && (
-            <div className="border-t pt-3">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full text-muted-foreground"
-                onClick={() => {
-                  const params = new URLSearchParams(searchParams.toString());
-                  if (!show.type) params.delete('types');
-                  if (!show.grade) params.delete('grades');
-                  if (!show.difficulty) params.delete('difficulties');
-                  if (!show.subject) params.delete('subjectIds');
-                  startTransition(() =>
-                    router.replace(`${pathname}?${params.toString()}`),
-                  );
-                  setMobileOpen(false);
-                }}
-              >
-                Clear these filters
-              </Button>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-    </>
+      }
+    />
   );
 }

@@ -1,11 +1,10 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-import { DashboardHeader } from '@iconicedu/ui-web';
-
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { LearningSpacesDashboard } from '@iconicedu/web/app/(app)/[orgSlug]/admin/classrooms/learning-spaces-dashboard';
+import { AdminPageShell } from '@iconicedu/web/components/admin/admin-page-layout';
 
 export const metadata: Metadata = {
   title: 'Admin · Classrooms',
@@ -26,11 +25,8 @@ export default async function AdminLearningSpacesPage({
   }
 
   return (
-    <div className="flex flex-1 flex-col">
-      <DashboardHeader title="Classrooms" />
-      <div className="flex flex-1 flex-col p-6 lg:p-8 gap-6">
-        <LearningSpacesDashboard orgSlug={orgSlug} />
-      </div>
-    </div>
+    <AdminPageShell title="Classrooms">
+      <LearningSpacesDashboard orgSlug={orgSlug} />
+    </AdminPageShell>
   );
 }

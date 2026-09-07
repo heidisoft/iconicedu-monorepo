@@ -1,4 +1,5 @@
 import type {
+  ChannelSessionCompletionVM,
   ClassScheduleVM,
   EventSourceVM,
   RecurrenceVM,
@@ -155,6 +156,29 @@ export async function fetchSpaceSchedulesByChannelId(
 export async function fetchOrgSessions(orgId: string): Promise<ClassScheduleVM[]> {
   const data = await apiGet<Record<string, unknown>[]>('/schedules', { orgId });
   return (data ?? []).map((row) => mapClassScheduleRow(row));
+}
+
+/**
+ * Cross-party completion state for a classroom channel's Sessions tab:
+ *   - `completions`: occurrences any participant (teacher / parent / staff)
+ *     confirmed — counted complete even before they elapse.
+ *   - `disputed`: occurrences a participant disputed — never counted complete.
+ */
+export async function fetchChannelSessionCompletions(
+  channelId: string,
+  orgId: string,
+): Promise<{
+  completions: ChannelSessionCompletionVM[];
+  disputed: ChannelSessionCompletionVM[];
+}> {
+  const data = await apiGet<{
+    completions?: ChannelSessionCompletionVM[];
+    disputed?: ChannelSessionCompletionVM[];
+  }>('/session-completions/channel-states', { orgId, channelId });
+  return {
+    completions: data?.completions ?? [],
+    disputed: data?.disputed ?? [],
+  };
 }
 
 export async function cancelRecurringSessionOccurrence(
