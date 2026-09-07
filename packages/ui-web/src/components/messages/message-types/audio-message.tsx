@@ -11,6 +11,7 @@ import {
 import { cn } from '@iconicedu/ui-web/lib/utils';
 import { buildFileAccessHref } from '@iconicedu/ui-web/components/messages/file-download.utils';
 import { MessageTextContent } from '@iconicedu/ui-web/components/messages/message-text-content';
+import { getFeedMessageBubbleClassName } from '../feed-message-bubble.styles';
 
 interface AudioMessageProps extends Omit<MessageBaseProps, 'message' | 'children'> {
   message: AudioRecordingMessageVM;
@@ -229,7 +230,12 @@ export const AudioMessage = memo(function AudioMessage(props: AudioMessageProps)
       {!isFeedTheme && message.content?.text && (
         <MessageTextContent text={message.content.text} className="mb-3" />
       )}
-      <div className="max-w-md rounded-2xl border border-border bg-card px-3 py-3">
+      <div
+        className={cn(
+          isFeedTheme ? 'w-full rounded-xl' : 'max-w-md rounded-2xl',
+          'border border-border bg-card px-3 py-3',
+        )}
+      >
         <audio
           ref={audioRef}
           src={audioSrc ?? undefined}
@@ -296,7 +302,7 @@ export const AudioMessage = memo(function AudioMessage(props: AudioMessageProps)
       {isFeedTheme && message.content?.text && (
         <MessageTextContent
           text={message.content.text}
-          className="mt-3 rounded-[10px] border border-border/70 bg-background px-4 py-3"
+          className={`mt-2 ${getFeedMessageBubbleClassName(baseProps.currentUserId === message.core.sender.ids.id)}`}
         />
       )}
     </MessageBase>

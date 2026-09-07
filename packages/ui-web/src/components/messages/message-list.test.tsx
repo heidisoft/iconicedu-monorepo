@@ -330,6 +330,14 @@ describe('MessageList', () => {
     );
 
     expect(screen.getAllByTestId('feed-message-post')).toHaveLength(1);
+    const header = screen.getByTestId('feed-post-header');
+    const body = screen.getByTestId('feed-post-body');
+    expect(body.parentElement).toBe(header.parentElement);
+    expect(header).not.toContainElement(body);
+    expect(body).toHaveClass('mt-4', 'space-y-[3px]');
+    expect(body.parentElement).toHaveClass('bg-card', 'w-full', 'px-3', 'py-3.5');
+    expect(body).toContainElement(screen.getByTestId('message-item-message-1'));
+
     expect(screen.getByTestId('message-item-message-1')).toHaveAttribute(
       'data-feed-group-position',
       'first',
@@ -835,50 +843,60 @@ describe('MessageList', () => {
     expect(screen.queryByText(/New messages/)).not.toBeInTheDocument();
   });
 
-  it('keeps feed inline replies actionable when a thread is expanded', async () => {
-    const thread: ThreadVM = {
-      ids: { id: 'thread-feed', orgId: 'org-1' },
-      parent: { messageId: 'message-parent' },
-      stats: { messageCount: 1, lastReplyAt: '2026-02-16T10:01:00.000Z' },
-      participants: [],
-    };
-    const parent = createMessage({
-      id: 'message-parent',
-      senderId: 'profile-parent',
-      createdAt: '2026-02-16T10:00:00.000Z',
-      thread,
-    });
-    const reply = createMessage({
-      id: 'reply-1',
-      senderId: 'profile-2',
-      createdAt: '2026-02-16T10:01:00.000Z',
-      thread,
-      text: 'Feed thread reply',
-    });
+  it.each(['profile-1', 'profile-2'])(
+    'styles feed inline replies for %s and keeps them actionable',
+    async (currentUserId) => {
+      const thread: ThreadVM = {
+        ids: { id: 'thread-feed', orgId: 'org-1' },
+        parent: { messageId: 'message-parent' },
+        stats: { messageCount: 1, lastReplyAt: '2026-02-16T10:01:00.000Z' },
+        participants: [],
+      };
+      const parent = createMessage({
+        id: 'message-parent',
+        senderId: 'profile-parent',
+        createdAt: '2026-02-16T10:00:00.000Z',
+        thread,
+      });
+      const reply = createMessage({
+        id: 'reply-1',
+        senderId: 'profile-2',
+        createdAt: '2026-02-16T10:01:00.000Z',
+        thread,
+        text: 'Feed thread reply',
+      });
 
-    render(
-      <MessageList
-        messages={[parent, reply]}
-        onOpenThread={
-          vi.fn() as unknown as (thread: ThreadVM, message: MessageVM) => void
-        }
-        onProfileClick={vi.fn()}
-        onToggleReaction={vi.fn()}
-        onToggleSaved={vi.fn()}
-        onToggleHidden={vi.fn()}
-        onDelete={vi.fn()}
-        currentUserId="profile-1"
-        messageUiThemeKey="feed"
-      />,
-    );
+      render(
+        <MessageList
+          messages={[parent, reply]}
+          onOpenThread={
+            vi.fn() as unknown as (thread: ThreadVM, message: MessageVM) => void
+          }
+          onProfileClick={vi.fn()}
+          onToggleReaction={vi.fn()}
+          onToggleSaved={vi.fn()}
+          onToggleHidden={vi.fn()}
+          onDelete={vi.fn()}
+          currentUserId={currentUserId}
+          messageUiThemeKey="feed"
+        />,
+      );
 
-    await act(async () => {
-      fireEvent.click(screen.getByTestId('open-thread-message-parent'));
-    });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('open-thread-message-parent'));
+      });
 
-    expect(screen.getByText('Feed thread reply')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Save message' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'More actions' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Add emoji' })).toBeInTheDocument();
-  });
+      const replyText = screen.getByText('Feed thread reply');
+      expect(replyText).toHaveClass('text-[15px]', 'leading-5', 'text-foreground');
+      expect(replyText.parentElement).toHaveClass(
+        currentUserId === 'profile-2' ? 'bg-feed-bubble-own' : 'bg-feed-bubble-other',
+        'rounded-[12px]',
+        'px-3',
+        'py-2',
+      );
+      expect(screen.getByRole('button', { name: 'Save message' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'More actions' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Add emoji' })).toBeInTheDocument();
+    },
+  );
 });

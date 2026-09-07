@@ -68,3 +68,81 @@ describe('MessageBase grouped management actions', () => {
     expect(screen.getByRole('button', { name: 'More actions' })).toBeInTheDocument();
   });
 });
+
+describe('MessageBase chat bubbles', () => {
+  it('places feed actions below the bubble without hover-only positioning', () => {
+    renderMessageBase({ messageUiThemeKey: 'feed', feedGroupPosition: 'single' });
+    const reply = screen.getByRole('button', { name: 'Reply' });
+    expect(reply.closest('[class~="group/message-bubble"]')).toBeNull();
+    expect(reply.parentElement).toHaveClass('min-h-[34px]');
+    expect(reply.parentElement).not.toHaveClass('absolute', 'opacity-0');
+    expect(
+      screen.getByRole('button', { name: 'Add emoji' }).parentElement,
+    ).toBeInTheDocument();
+  });
+
+  it.each([
+    {
+      currentUserId: 'profile-1',
+      surface: 'bg-chat-bubble-own',
+      alignment: 'justify-end',
+    },
+    {
+      currentUserId: 'profile-2',
+      surface: 'bg-chat-bubble-other',
+      alignment: 'justify-start',
+    },
+  ])(
+    'distinguishes $surface messages in channels and threads',
+    ({ currentUserId, surface, alignment }) => {
+      const { container, rerender } = renderMessageBase({ currentUserId });
+
+      expect(screen.getByText('Hello').parentElement).toHaveClass(
+        surface,
+        'rounded-[12px]',
+        'px-3',
+        'py-2',
+      );
+      expect(container.querySelector('[data-message-id]')).toHaveClass(alignment);
+
+      rerender(
+        <MessageBase
+          message={baseMessage}
+          currentUserId={currentUserId}
+          isThreadReply
+          feedGroupPosition="last"
+          onOpenThread={vi.fn()}
+          onProfileClick={vi.fn()}
+        >
+          <span>Hello</span>
+        </MessageBase>,
+      );
+
+      expect(screen.getByText('Hello').parentElement).toHaveClass(surface);
+      expect(container.querySelector('[data-message-id]')).toHaveClass(alignment);
+    },
+  );
+
+  it.each([
+    { currentUserId: 'profile-1', surface: 'bg-feed-bubble-own' },
+    { currentUserId: 'profile-2', surface: 'bg-feed-bubble-other' },
+  ])('matches mobile feed bubbles for $surface', ({ currentUserId, surface }) => {
+    renderMessageBase({
+      currentUserId,
+      messageUiThemeKey: 'feed',
+      feedGroupPosition: 'middle',
+    });
+
+    expect(screen.getByText('Hello').parentElement).toHaveClass(
+      surface,
+      'w-full',
+      'rounded-[12px]',
+      'px-3',
+      'py-2',
+    );
+    expect(screen.getByText('Hello').parentElement).not.toHaveClass(
+      'border',
+      'bg-muted/45',
+    );
+  });
+});

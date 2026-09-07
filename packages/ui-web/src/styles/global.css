@@ -28,6 +28,10 @@
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
+  --color-chat-bubble-own: var(--chat-bubble-own);
+  --color-chat-bubble-other: var(--chat-bubble-other);
+  --color-feed-bubble-own: var(--feed-bubble-own);
+  --color-feed-bubble-other: var(--feed-bubble-other);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
@@ -96,6 +100,11 @@
   --primary: #2f7d4a;
   --primary-foreground: #ffffff;
   --primary-subtle: #e2f0e2;
+  /* Match mobile chat surfaces with opaque fills for readable sender separation. */
+  --chat-bubble-own: #e2f0e2;
+  --chat-bubble-other: #eceffa;
+  --feed-bubble-own: #e2f0e2;
+  --feed-bubble-other: #eceffa;
   --action: #25493c;
   --action-foreground: #ffffff;
   --action-subtle: #e7efe9;
@@ -156,6 +165,11 @@
   --primary: #5fb17e;
   --primary-foreground: #08241a;
   --primary-subtle: #17301f;
+  --chat-bubble-own: #17301f;
+  --chat-bubble-other: #252a3a;
+  /* Mobile feed uses slightly lighter dark surfaces than classic chat. */
+  --feed-bubble-own: #233026;
+  --feed-bubble-other: #262b3a;
   --action: #6fae8a;
   --action-foreground: #0e241c;
   --action-subtle: #1e2a22;

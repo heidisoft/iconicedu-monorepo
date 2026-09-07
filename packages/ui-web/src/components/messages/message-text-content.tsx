@@ -100,7 +100,7 @@ export const MessageTextContent = memo(function MessageTextContent({
   return (
     <p
       className={cn(
-        'text-sm leading-relaxed whitespace-pre-wrap break-words text-foreground',
+        'text-[15px] leading-5 whitespace-pre-wrap [overflow-wrap:anywhere] text-foreground',
         isEmojiOnly && 'text-4xl leading-tight',
         className,
       )}

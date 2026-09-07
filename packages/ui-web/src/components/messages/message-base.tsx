@@ -34,73 +34,11 @@ import { shouldHideMessageQuickActions } from '@iconicedu/ui-web/components/mess
 import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { EmojiPicker } from '@iconicedu/ui-web/components/messages/emoji-picker';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@iconicedu/ui-web/ui/dropdown-menu';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@iconicedu/ui-web/ui/alert-dialog';
-import {
-  Bookmark,
-  BriefcaseBusiness,
-  Copy,
-  EyeOff,
-  Forward,
-  Loader2,
-  MessageCircleReply,
-  MoreHorizontal,
-  Presentation,
-  ShieldUser,
-  SmilePlus,
-  Sparkles,
-  Trash2,
-  User,
-} from 'lucide-react';
+import { Bookmark, Loader2, MessageCircleReply, SmilePlus } from 'lucide-react';
 import type { MessageActionState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
-
-function getFeedRoleLabel(kind?: MessageVM['core']['sender']['kind'] | string | null) {
-  switch (kind) {
-    case 'guardian':
-      return 'Parent';
-    case 'child':
-      return 'Student';
-    case 'educator':
-      return 'Tutor';
-    case 'staff':
-      return 'Support';
-    case 'system':
-      return 'System';
-    default:
-      return 'Member';
-  }
-}
-
-function getFeedRoleIcon(kind?: MessageVM['core']['sender']['kind'] | string | null) {
-  switch (kind) {
-    case 'educator':
-      return Presentation;
-    case 'guardian':
-      return ShieldUser;
-    case 'staff':
-      return BriefcaseBusiness;
-    case 'system':
-      return Sparkles;
-    case 'child':
-    default:
-      return User;
-  }
-}
+import { getFeedMessageBubbleClassName } from './feed-message-bubble.styles';
+import { getFeedRoleIcon, getFeedRoleLabel } from './feed-message-role';
+import { MessageManagementMenu } from './message-management-menu';
 
 export interface MessageBaseProps {
   message: MessageVM;
@@ -143,7 +81,6 @@ export const MessageBase = memo(function MessageBase({
   feedGroupPosition,
   showActionControls = true,
 }: MessageBaseProps) {
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isThreadActionPending, setIsThreadActionPending] = useState(false);
   const [isQuickActionsActive, setIsQuickActionsActive] = useState(false);
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
@@ -164,19 +101,25 @@ export const MessageBase = memo(function MessageBase({
   const shouldHideQuickActions = shouldHideMessageQuickActions(message);
   const pendingReactionEmojis = actionState?.pendingReactionEmojis ?? [];
   const isSaving = Boolean(actionState?.isSaving);
-  const isHiding = Boolean(actionState?.isHiding);
-  const isDeleting = Boolean(actionState?.isDeleting);
   const isAddingReaction = Boolean(actionState?.isAddingReaction);
   const isFeedTheme = messageUiThemeKey === 'feed';
   const isGroupedFeedChild = isFeedTheme && Boolean(feedGroupPosition);
   const isGroupedClassicChild =
     !isFeedTheme && (feedGroupPosition === 'middle' || feedGroupPosition === 'last');
+  // A feed message that shares a post card with siblings (first/middle/last, not
+  // a standalone "single") has no header of its own, so it carries its own
+  // compact save + management actions — the same rule classic grouping uses.
+  const isFeedGroupMember =
+    isFeedTheme &&
+    (feedGroupPosition === 'first' ||
+      feedGroupPosition === 'middle' ||
+      feedGroupPosition === 'last');
   const hasReactions = message.social.reactions.length > 0;
   const hasThread = !isThreadReply && Boolean(message.social.thread);
   const shouldShowQuickActionControls = showActionControls && !shouldHideQuickActions;
   const shouldShowActionsRow = hasReactions || hasThread;
   const shouldPinQuickActions = isQuickActionsActive || isEmojiPickerOpen;
-  const shouldShowCompactManagementActions = isGroupedFeedChild || isGroupedClassicChild;
+  const shouldShowCompactManagementActions = isFeedGroupMember || isGroupedClassicChild;
   const shouldFrameFeedContent =
     isFeedTheme &&
     ![
@@ -245,69 +188,18 @@ export const MessageBase = memo(function MessageBase({
     void openThread();
   }, [isInteractionDisabled, message, onOpenThread, senderName]);
 
-  const handleDeleteClick = useCallback(() => {
-    setIsDeleteDialogOpen(true);
-  }, []);
-
-  const handleConfirmDelete = useCallback(() => {
-    onDelete?.();
-    setIsDeleteDialogOpen(false);
-  }, [onDelete]);
-
-  const handleCancelDelete = useCallback(() => {
-    setIsDeleteDialogOpen(false);
-  }, []);
-
-  const actionsMenu = (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="More actions">
-          <MoreHorizontal className="h-4 w-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" sideOffset={8} className="w-48 z-[100]">
-        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="py-2">
-          <Forward className="mr-2 h-4 w-4" />
-          <span>Forward</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="py-2">
-          <Copy className="mr-2 h-4 w-4" />
-          <span>Copy text</span>
-        </DropdownMenuItem>
-        {isOwnMessage || canDeleteAnyMessages ? (
-          <>
-            <DropdownMenuSeparator />
-            {isOwnMessage ? (
-              <DropdownMenuItem
-                onClick={onToggleHidden}
-                disabled={isHiding}
-                className="py-2"
-              >
-                {isHiding ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <EyeOff className="mr-2 h-4 w-4" />
-                )}
-                <span>Hide message</span>
-              </DropdownMenuItem>
-            ) : null}
-            <DropdownMenuItem
-              onClick={handleDeleteClick}
-              disabled={isDeleting}
-              className="py-2 text-destructive focus:text-destructive"
-            >
-              {isDeleting ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Trash2 className="mr-2 h-4 w-4" />
-              )}
-              <span>Delete</span>
-            </DropdownMenuItem>
-          </>
-        ) : null}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
+  const managementProps = {
+    message,
+    currentUserId,
+    canDeleteAnyMessages,
+    isReadOnly,
+    actionState,
+    onToggleSaved,
+    onToggleHidden,
+    onDelete,
+    feed: isFeedTheme,
+  };
+  const actionsMenu = <MessageManagementMenu {...managementProps} />;
   const quickActionControls = shouldShowQuickActionControls ? (
     <>
       {isInteractionDisabled ? (
@@ -488,7 +380,7 @@ export const MessageBase = memo(function MessageBase({
     );
   }
 
-  return (
+  const renderedMessage = (
     <div
       onMouseEnter={() => setIsQuickActionsActive(true)}
       onMouseLeave={() => setIsQuickActionsActive(false)}
@@ -510,6 +402,9 @@ export const MessageBase = memo(function MessageBase({
         !isFeedTheme && (isOwnMessage ? 'justify-end' : 'justify-start'),
         className,
       )}
+      role={isFeedTheme ? 'group' : undefined}
+      aria-label={isFeedTheme ? `Message from ${senderLabel}` : undefined}
+      tabIndex={isFeedTheme ? 0 : undefined}
       data-message-id={message.ids.id}
       data-message-ui-theme={messageUiThemeKey}
     >
@@ -520,7 +415,7 @@ export const MessageBase = memo(function MessageBase({
             ? 'w-full gap-0'
             : isFeedTheme
               ? cn(
-                  'max-w-[min(56rem,100%)] gap-3 rounded-xl border border-border bg-muted/25 px-3 py-3',
+                  'max-w-[min(56rem,100%)] gap-3 rounded-xl border border-border bg-card px-3 py-3.5',
                   feedGroupPosition === 'first' && 'rounded-b-none',
                 )
               : 'max-w-[min(78ch,85%)] gap-3',
@@ -544,7 +439,7 @@ export const MessageBase = memo(function MessageBase({
                 locationLabel={getAvatarLocationLabel(message.core.sender.location)}
                 about={message.core.sender.profile.bio ?? null}
                 sizeClassName={
-                  isFeedTheme ? 'h-10 w-10 rounded-full' : 'h-9 w-9 rounded-full'
+                  isFeedTheme ? 'h-11 w-11 rounded-full' : 'h-9 w-9 rounded-full'
                 }
                 statusClassName={isFeedTheme ? 'bottom-0 right-0 h-2 w-2' : undefined}
                 fallbackClassName={isFeedTheme ? 'text-sm' : undefined}
@@ -705,16 +600,18 @@ export const MessageBase = memo(function MessageBase({
               className={cn(
                 'max-w-full text-foreground',
                 shouldFrameFeedContent
-                  ? 'block w-full rounded-xl border border-border/70 bg-muted/45 px-4 py-3 text-sm leading-relaxed'
+                  ? cn('block w-full', getFeedMessageBubbleClassName(isOwnMessage))
                   : isFeedTheme
                     ? 'block w-full text-sm leading-relaxed'
                     : 'w-fit rounded-[12px] px-3 py-2',
-                !isFeedTheme && (isOwnMessage ? 'bg-primary/22' : 'bg-muted/45'),
+                // flag-exempt: readability maintenance for existing chat bubbles; matches mobile surfaces.
+                !isFeedTheme &&
+                  (isOwnMessage ? 'bg-chat-bubble-own' : 'bg-chat-bubble-other'),
               )}
             >
               {children}
             </div>
-            {quickActionControls ? (
+            {quickActionControls && !isFeedTheme ? (
               <div
                 className={cn(
                   'pointer-events-none absolute z-20 flex items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100',
@@ -731,17 +628,18 @@ export const MessageBase = memo(function MessageBase({
             ) : null}
           </div>
 
-          {shouldShowActionsRow ? (
+          {shouldShowActionsRow || (isFeedTheme && quickActionControls) ? (
             <div
               className={cn(
                 'mt-2 flex flex-wrap items-center',
                 isFeedTheme
-                  ? 'justify-start gap-1.5 text-xs'
+                  ? 'min-h-[34px] justify-start gap-1.5 text-xs'
                   : isOwnMessage
                     ? 'justify-end gap-2'
                     : 'justify-start gap-2',
               )}
             >
+              {isFeedTheme && quickActionControls}
               <div
                 className={cn(isInteractionDisabled && 'pointer-events-none opacity-60')}
               >
@@ -766,32 +664,15 @@ export const MessageBase = memo(function MessageBase({
           ) : null}
 
           {inlineThreadContent ? (
-            <div className={cn('mt-3', isFeedTheme && 'border-t border-border/70 pt-3')}>
-              {inlineThreadContent}
-            </div>
+            <div className={isFeedTheme ? 'mt-2' : 'mt-3'}>{inlineThreadContent}</div>
           ) : null}
         </div>
       </div>
-
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete message?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This message will be permanently deleted.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleCancelDelete}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
+  );
+  return isFeedTheme ? (
+    <MessageManagementMenu {...managementProps}>{renderedMessage}</MessageManagementMenu>
+  ) : (
+    renderedMessage
   );
 });
