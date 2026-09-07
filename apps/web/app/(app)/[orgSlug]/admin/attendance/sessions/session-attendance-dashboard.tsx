@@ -1,22 +1,23 @@
 'use client';
 
 import * as React from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import type { AdminSessionCompletionVM } from '@iconicedu/shared-types';
 import { Badge } from '@iconicedu/ui-web';
 import { AdminFilterBar } from '@iconicedu/web/components/admin/admin-filter-bar';
 import { CompletedSessionsTable } from '@iconicedu/web/app/(app)/[orgSlug]/admin/attendance/sessions/completed-sessions-table';
 import {
+  ALL_COMPLETION_MONTHS,
   buildConfirmerBreakdown,
+  buildMonthFilterHref,
   buildMonthlyCompletionTrend,
   filterCompletions,
   formatCompletionMonth,
-  getCompletionMonthKey,
   summarizeCompletions,
 } from '@iconicedu/web/app/(app)/[orgSlug]/admin/attendance/sessions/session-attendance-analytics';
 
 const DEFAULT_FILTERS = {
   search: '',
-  month: 'all',
   teacherId: 'all',
   parentId: 'all',
   studentName: 'all',
@@ -193,18 +194,41 @@ function RecentCompletions({ rows }: { rows: AdminSessionCompletionVM[] }) {
 
 export function SessionAttendanceDashboard({
   rows,
+  selectedMonth,
+  monthOptions,
 }: {
   rows: AdminSessionCompletionVM[];
+  selectedMonth: string;
+  monthOptions: string[];
 }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [isMonthPending, startMonthTransition] = React.useTransition();
   const [filters, setFilters] = React.useState(DEFAULT_FILTERS);
   const update = (key: keyof typeof DEFAULT_FILTERS) => (value: string) =>
     setFilters((current) => ({ ...current, [key]: value }));
-  const filtered = React.useMemo(() => filterCompletions(rows, filters), [filters, rows]);
+
+  // Changing the month navigates so the server can load that month's rows; the
+  // other filters stay in-memory over whatever month is currently loaded.
+  const handleMonthChange = React.useCallback(
+    (value: string) => {
+      if (value === selectedMonth) return;
+      const href = buildMonthFilterHref(pathname, searchParams.toString(), value);
+      startMonthTransition(() => {
+        router.replace(href, { scroll: false });
+      });
+    },
+    [pathname, router, searchParams, selectedMonth],
+  );
+
+  // The server already scoped `rows` to `selectedMonth`; threading it through
+  // keeps the period label and trend honest, and is a no-op for "all months".
+  const filtered = React.useMemo(
+    () => filterCompletions(rows, { ...filters, month: selectedMonth }),
+    [filters, rows, selectedMonth],
+  );
   const summary = summarizeCompletions(filtered);
-  const months = [...new Set(rows.map((row) => getCompletionMonthKey(row.sessionEndAt)))]
-    .filter(Boolean)
-    .sort()
-    .reverse();
   const people = (role: 'educator' | 'guardian') =>
     new Map(
       rows.flatMap((row) =>
@@ -223,12 +247,18 @@ export function SessionAttendanceDashboard({
       .map(([value, name]) => ({ value, label: name })),
   ];
   const selectedPeriodLabel =
-    filters.month === 'all'
+    selectedMonth === ALL_COMPLETION_MONTHS
       ? 'All recorded months'
-      : formatCompletionMonth(filters.month);
+      : formatCompletionMonth(selectedMonth);
 
   return (
-    <div className="flex flex-1 flex-col gap-4">
+    <div
+      className="flex flex-1 flex-col gap-4 transition-opacity aria-busy:opacity-60"
+      aria-busy={isMonthPending}
+    >
+      <span aria-live="polite" className="sr-only">
+        {isMonthPending ? `Loading ${selectedPeriodLabel}` : ''}
+      </span>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Metric
           label="Completed lessons"
@@ -263,11 +293,11 @@ export function SessionAttendanceDashboard({
           filterGroups={[
             {
               label: 'Month',
-              value: filters.month,
-              onChange: update('month'),
+              value: selectedMonth,
+              onChange: handleMonthChange,
               options: [
-                { value: 'all', label: 'All months' },
-                ...months.map((value) => ({
+                { value: ALL_COMPLETION_MONTHS, label: 'All months' },
+                ...monthOptions.map((value) => ({
                   value,
                   label: formatCompletionMonth(value),
                 })),

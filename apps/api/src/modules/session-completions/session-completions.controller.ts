@@ -139,7 +139,16 @@ export class SessionCompletionsController {
 
   @Get('admin')
   @UseGuards(AuthGuard)
-  listForAdmin(@Req() req: AuthenticatedRequest, @Query('orgId') orgId: string) {
-    return this.sessionCompletionsService.listForAdmin(req.user.id, { orgId });
+  listForAdmin(
+    @Req() req: AuthenticatedRequest,
+    @Query('orgId') orgId: string,
+    @Query('completedSince') completedSince?: string,
+    @Query('completedUntil') completedUntil?: string,
+  ) {
+    return this.sessionCompletionsService.listForAdmin(req.user.id, {
+      orgId,
+      completedSince: completedSince ?? null,
+      completedUntil: completedUntil ?? null,
+    });
   }
 }

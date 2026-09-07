@@ -895,7 +895,11 @@ export class SessionCompletionsService {
 
   async listForAdmin(
     authUserId: string,
-    params: { orgId: string },
+    params: {
+      orgId: string;
+      completedSince?: string | null;
+      completedUntil?: string | null;
+    },
   ): Promise<AdminSessionCompletionVM[]> {
     if (!params?.orgId || !isUuid(params.orgId)) {
       throw new BadRequestException('Invalid orgId');
@@ -905,12 +909,23 @@ export class SessionCompletionsService {
     const account = await this.resolveAccount(supabase, authUserId, params.orgId);
     await this.assertAdminAccess(supabase, account, params.orgId);
 
-    const { data, error } = await supabase
+    // The admin page defaults to a single month and only widens the window when
+    // the month filter changes, so bound the read to `session_end_at` rather than
+    // loading every completion the org has ever recorded.
+    let query = supabase
       .from('class_session_completions')
       .select('*')
       .eq('org_id', params.orgId)
       .in('status', ['confirmed', 'auto_confirmed'])
-      .is('deleted_at', null)
+      .is('deleted_at', null);
+    if (params.completedSince) {
+      query = query.gte('session_end_at', params.completedSince);
+    }
+    if (params.completedUntil) {
+      query = query.lt('session_end_at', params.completedUntil);
+    }
+
+    const { data, error } = await query
       .order('session_end_at', { ascending: false })
       .returns<ClassSessionCompletionRow[]>();
 

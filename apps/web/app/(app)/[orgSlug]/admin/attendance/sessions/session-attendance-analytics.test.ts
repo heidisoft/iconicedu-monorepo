@@ -2,8 +2,13 @@ import { describe, expect, it } from 'vitest';
 import type { AdminSessionCompletionVM } from '@iconicedu/shared-types';
 import {
   buildConfirmerBreakdown,
+  buildMonthFilterHref,
   buildMonthlyCompletionTrend,
+  buildRecentCompletionMonthKeys,
+  completionMonthKeyToUtcRange,
   filterCompletions,
+  getCurrentCompletionMonthKey,
+  isCompletionMonthKey,
   summarizeCompletions,
 } from '@iconicedu/web/app/(app)/[orgSlug]/admin/attendance/sessions/session-attendance-analytics';
 
@@ -69,6 +74,39 @@ describe('completed session analytics', () => {
       },
     );
     expect(result.map((row) => row.id)).toEqual(['schedule-1|2026-03-10T14:00:00.000Z']);
+  });
+
+  it('derives the current UTC month key and a descending recent-month window', () => {
+    const reference = new Date('2026-09-07T12:00:00.000Z');
+    expect(getCurrentCompletionMonthKey(reference)).toBe('2026-09');
+    expect(buildRecentCompletionMonthKeys(4, reference)).toEqual([
+      '2026-09',
+      '2026-08',
+      '2026-07',
+      '2026-06',
+    ]);
+  });
+
+  it('maps a month key to a half-open UTC range and rejects non-keys', () => {
+    expect(completionMonthKeyToUtcRange('2026-09')).toEqual({
+      since: '2026-09-01T00:00:00.000Z',
+      until: '2026-10-01T00:00:00.000Z',
+    });
+    expect(completionMonthKeyToUtcRange('all')).toBeNull();
+    expect(completionMonthKeyToUtcRange('2026-13')).toBeNull();
+    expect(isCompletionMonthKey('2026-09')).toBe(true);
+    expect(isCompletionMonthKey('all')).toBe(false);
+  });
+
+  it('builds a month-filter href, leaving the current month implicit', () => {
+    const now = new Date('2026-09-07T12:00:00.000Z');
+    const base = '/i/admin/attendance/sessions';
+    expect(buildMonthFilterHref(base, '', '2026-07', now)).toBe(`${base}?month=2026-07`);
+    expect(buildMonthFilterHref(base, 'month=2026-07', 'all', now)).toBe(
+      `${base}?month=all`,
+    );
+    // Selecting the current month clears the param rather than pinning it.
+    expect(buildMonthFilterHref(base, 'month=2026-07', '2026-09', now)).toBe(base);
   });
 
   it('builds chronological monthly and confirmer breakdowns', () => {

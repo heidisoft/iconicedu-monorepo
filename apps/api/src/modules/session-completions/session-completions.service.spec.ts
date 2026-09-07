@@ -39,6 +39,8 @@ describe('SessionCompletionsService', () => {
       eq: jest.fn(() => chain),
       in: jest.fn(() => chain),
       is: jest.fn(() => chain),
+      gte: jest.fn(() => chain),
+      lt: jest.fn(() => chain),
       limit: jest.fn(() => chain),
       order: jest.fn(() => chain),
       maybeSingle: jest.fn(async () => result),
@@ -213,6 +215,50 @@ describe('SessionCompletionsService', () => {
           { displayName: 'Morgan Lee', role: 'guardian' },
         ],
       });
+    });
+
+    it('bounds the read to the requested session_end_at window', async () => {
+      const completionChain = makeChain({ data: [] });
+      const from = jest.fn((table: string) => {
+        if (table === 'accounts')
+          return makeChain({ data: { id: ACCOUNT_ID, org_id: ORG_ID } });
+        if (table === 'user_roles') return makeChain({ data: { role_key: 'admin' } });
+        if (table === 'class_session_completions') return completionChain;
+        throw new Error(`Unexpected table: ${table}`);
+      });
+      createSupabaseServiceClientMock.mockReturnValue({ from } as never);
+
+      await new SessionCompletionsService().listForAdmin(AUTH_USER_ID, {
+        orgId: ORG_ID,
+        completedSince: '2026-09-01T00:00:00.000Z',
+        completedUntil: '2026-10-01T00:00:00.000Z',
+      });
+
+      expect(completionChain.gte).toHaveBeenCalledWith(
+        'session_end_at',
+        '2026-09-01T00:00:00.000Z',
+      );
+      expect(completionChain.lt).toHaveBeenCalledWith(
+        'session_end_at',
+        '2026-10-01T00:00:00.000Z',
+      );
+    });
+
+    it('omits the window bounds when no range is given', async () => {
+      const completionChain = makeChain({ data: [] });
+      const from = jest.fn((table: string) => {
+        if (table === 'accounts')
+          return makeChain({ data: { id: ACCOUNT_ID, org_id: ORG_ID } });
+        if (table === 'user_roles') return makeChain({ data: { role_key: 'admin' } });
+        if (table === 'class_session_completions') return completionChain;
+        throw new Error(`Unexpected table: ${table}`);
+      });
+      createSupabaseServiceClientMock.mockReturnValue({ from } as never);
+
+      await new SessionCompletionsService().listForAdmin(AUTH_USER_ID, { orgId: ORG_ID });
+
+      expect(completionChain.gte).not.toHaveBeenCalled();
+      expect(completionChain.lt).not.toHaveBeenCalled();
     });
   });
 
