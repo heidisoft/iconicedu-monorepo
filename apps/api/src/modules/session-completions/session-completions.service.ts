@@ -214,6 +214,58 @@ export class SessionCompletionsService {
   }
 
   /**
+   * Org-wide completion totals for the home dashboard's "Sessions completed"
+   * tile when the viewer is staff/admin. Unlike getCompletionSummaryForProfile,
+   * this is NOT scoped to a single profile — it reports every classroom session
+   * in the org, and is deliberately unbounded in time ("overall" totals rather
+   * than the per-role tile's "this month"). Rows are collapsed to session
+   * occurrences (schedule + occurrence_key) so a session confirmed by both a
+   * student and an educator counts once — mirroring listForAdmin and
+   * listChannelCompletionStates:
+   *   - `completed`: occurrences with any confirmed / auto_confirmed row.
+   *   - `pending`: occurrences still awaiting someone's action that are not
+   *     already completed by another party.
+   */
+  async getOrgCompletionSummary(
+    authUserId: string,
+    params: { orgId: string },
+  ): Promise<{ completed: number; pending: number }> {
+    if (!params?.orgId || !isUuid(params.orgId)) {
+      throw new BadRequestException('Invalid orgId');
+    }
+
+    const supabase = createSupabaseServiceClient();
+    const account = await this.resolveAccount(supabase, authUserId, params.orgId);
+    await this.assertAdminAccess(supabase, account, params.orgId);
+
+    const { data, error } = await supabase
+      .from('class_session_completions')
+      .select('schedule_id, occurrence_key, status')
+      .eq('org_id', params.orgId)
+      .in('status', ['confirmed', 'auto_confirmed', 'pending'])
+      .is('deleted_at', null)
+      .returns<Array<{ schedule_id: string; occurrence_key: string; status: string }>>();
+
+    if (error) throw new InternalServerErrorException(error.message);
+
+    const completed = new Set<string>();
+    const pending = new Set<string>();
+    for (const row of data ?? []) {
+      const key = `${row.schedule_id}|${row.occurrence_key}`;
+      if (row.status === 'pending') {
+        pending.add(key);
+      } else {
+        completed.add(key);
+      }
+    }
+    for (const key of completed) {
+      pending.delete(key);
+    }
+
+    return { completed: completed.size, pending: pending.size };
+  }
+
+  /**
    * Cross-party completion state for a classroom channel's Sessions tab. RLS on
    * class_session_completions only exposes a viewer's own rows, so this reads
    * through the service client after verifying the caller is a member of the

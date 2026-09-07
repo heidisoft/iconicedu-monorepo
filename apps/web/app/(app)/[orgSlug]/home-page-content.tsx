@@ -11,7 +11,15 @@ import {
   mapOrgSubjectRowsToOptions,
 } from '@iconicedu/web/lib/subjects/queries/org-subject-catalog.query';
 import { HomePageInfographicClient } from './home-page-infographic-client';
+import { getUserRoles } from '@iconicedu/web/lib/profile/queries/roles.query';
 import { enableSessionCompletionCarousel } from '@iconicedu/web/flags';
+
+// An org admin is a role grant (owner/admin/staff), not a profile kind — mirror
+// requireAdminOrgContext so admins whose profile kind is educator/guardian still
+// get the staff-facing org-wide "Sessions completed" totals.
+function isAllowedAdminRole(roleKey: string | null | undefined) {
+  return roleKey === 'owner' || roleKey === 'admin' || roleKey === 'staff';
+}
 
 function resolveRequestRole(kind: string | undefined): ClassRequestRole {
   if (kind === 'guardian') {
@@ -29,6 +37,12 @@ export async function HomePageContent({ orgSlug }: { orgSlug: string }) {
   const sessionCompletionCarouselEnabled = await enableSessionCompletionCarousel.run({
     identify: { profileId: currentUserProfile?.ids.id ?? null },
   });
+  const rolesResponse = await getUserRoles(supabase, account.id, account.org_id);
+  const roleKeys = new Set<string | null | undefined>(
+    (rolesResponse.data ?? []).map((role) => role.role_key),
+  );
+  roleKeys.add(account.primary_role);
+  const isOrgAdminView = [...roleKeys].some(isAllowedAdminRole);
   const metrics = await buildDashboardHomeInfographicMetrics({
     supabase,
     orgId: account.org_id,
@@ -36,6 +50,7 @@ export async function HomePageContent({ orgSlug }: { orgSlug: string }) {
     currentUserProfile,
     timezone: currentUserProfile?.prefs.timezone ?? null,
     sessionCompletionCarouselEnabled,
+    isOrgAdminView,
   });
 
   const requestRole = resolveRequestRole(currentUserProfile?.kind);

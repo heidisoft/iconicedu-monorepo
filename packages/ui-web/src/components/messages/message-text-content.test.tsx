@@ -4,6 +4,26 @@ import { describe, expect, it } from 'vitest';
 import { MessageTextContent } from './message-text-content';
 
 describe('MessageTextContent', () => {
+  it('uses mobile-sized readable text and wraps long unbroken content', () => {
+    const text = 'A'.repeat(200);
+    const { container } = render(<MessageTextContent text={text} />);
+
+    expect(container.querySelector('p')).toHaveClass(
+      'text-[15px]',
+      'leading-5',
+      'whitespace-pre-wrap',
+      '[overflow-wrap:anywhere]',
+    );
+    expect(container.textContent).toBe(text);
+  });
+
+  it('keeps emoji-only messages large', () => {
+    const { container } = render(<MessageTextContent text="😀" />);
+
+    expect(container.querySelector('p')).toHaveClass('text-4xl', 'leading-tight');
+    expect(container.querySelector('p')).not.toHaveClass('text-[15px]', 'leading-5');
+  });
+
   it('renders mentions as a single styled token', async () => {
     const { container } = render(
       <MessageTextContent

@@ -47,6 +47,16 @@ export function getSessionCompletionSummary(
   );
 }
 
+export function getOrgSessionCompletionSummary(
+  supabase: SupabaseClient,
+  input: { orgId: string },
+) {
+  return createApiClient(supabase).get<{ completed: number; pending: number }>(
+    '/session-completions/org-summary',
+    input,
+  );
+}
+
 export function listChannelSessionCompletions(
   supabase: SupabaseClient,
   input: { orgId: string; channelId: string },

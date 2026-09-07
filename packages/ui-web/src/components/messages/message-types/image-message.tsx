@@ -14,6 +14,7 @@ import {
   buildImageRenderHref,
 } from '@iconicedu/ui-web/components/messages/file-download.utils';
 import { MessageTextContent } from '@iconicedu/ui-web/components/messages/message-text-content';
+import { getFeedMessageBubbleClassName } from '../feed-message-bubble.styles';
 
 interface ImageMessageProps extends Omit<MessageBaseProps, 'message' | 'children'> {
   message: ImageMessageType;
@@ -115,7 +116,7 @@ export const ImageMessage = memo(function ImageMessage(props: ImageMessageProps)
         attachments[0]!,
         0,
         'h-full w-full object-cover',
-        'group relative aspect-[4/3] min-h-[18rem] w-full overflow-hidden rounded-xl border border-border bg-muted/20 sm:min-h-[24rem] lg:min-h-[30rem]',
+        'group relative aspect-[4/3] w-full overflow-hidden rounded-xl border border-border bg-card',
       );
     }
 
@@ -192,7 +193,7 @@ export const ImageMessage = memo(function ImageMessage(props: ImageMessageProps)
       {isFeedTheme && message.content?.text && (
         <MessageTextContent
           text={message.content.text}
-          className="mt-3 rounded-[10px] border border-border/70 bg-background px-4 py-3"
+          className={`mt-2 ${getFeedMessageBubbleClassName(baseProps.currentUserId === message.core.sender.ids.id)}`}
         />
       )}
       <Dialog

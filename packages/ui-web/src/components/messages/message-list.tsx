@@ -1,3 +1,6 @@
+import { getFeedMessageBubbleClassName } from './feed-message-bubble.styles';
+import { getFeedRoleIcon, getFeedRoleLabel } from './feed-message-role';
+import { MessageManagementMenu } from './message-management-menu';
 import {
   useRef,
   useEffect,
@@ -640,8 +643,6 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
             const shouldHideQuickActions = shouldHideMessageQuickActions(reply);
             const replyActionState = getMessageActionState?.(reply.ids.id);
             const isSavingReply = Boolean(replyActionState?.isSaving);
-            const isHidingReply = Boolean(replyActionState?.isHiding);
-            const isDeletingReply = Boolean(replyActionState?.isDeleting);
             const isAddingReactionReply = Boolean(replyActionState?.isAddingReaction);
             const pendingReplyReactionEmojis =
               replyActionState?.pendingReactionEmojis ?? [];
@@ -653,7 +654,7 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                     className="my-2"
                   />
                 )}
-                <div className="flex w-full items-start gap-2.5 py-0.5">
+                <div className="flex w-full items-start gap-3">
                   <AvatarWithStatus
                     accountId={reply.core.sender.ids.accountId}
                     profileId={reply.core.sender.ids.id}
@@ -665,162 +666,119 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                     timezone={reply.core.sender.prefs?.timezone ?? null}
                     locationLabel={getAvatarLocationLabel(reply.core.sender.location)}
                     about={reply.core.sender.profile.bio ?? null}
-                    sizeClassName="h-8 w-8 rounded-full"
+                    sizeClassName="h-9 w-9 rounded-full"
                     statusClassName="bottom-0 right-0 h-2 w-2"
                     fallbackClassName="text-xs"
                     onProfileClick={() => onProfileClick(reply.core.sender.ids.id)}
                   />
-                  <div className="min-w-0 flex-1 rounded-xl border border-border bg-muted/45 px-3 py-2.5">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <span className="block truncate text-sm font-semibold leading-tight text-foreground">
-                          {isOwnReply ? 'You' : senderName}
-                        </span>
-                        <span className="mt-0.5 block truncate text-xs leading-tight text-muted-foreground">
-                          {getAvatarRoleLabel(reply.core.sender.kind)}
-                        </span>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-1">
-                        <span className="whitespace-nowrap text-xs leading-none text-muted-foreground">
-                          {formatTime(reply.core.createdAt)}
-                        </span>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          disabled={isReadOnly || isSavingReply}
-                          onClick={() => onToggleSaved?.(reply.ids.id)}
-                          aria-label={
-                            reply.state?.isSaved ? 'Unsave message' : 'Save message'
-                          }
-                        >
-                          {isSavingReply ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <Bookmark
-                              className={cn(
-                                'h-3.5 w-3.5',
-                                reply.state?.isSaved && 'fill-primary text-primary',
-                              )}
-                            />
-                          )}
-                        </Button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              aria-label="More actions"
-                            >
-                              <MoreHorizontal className="h-3.5 w-3.5" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent
-                            align="end"
-                            sideOffset={8}
-                            className="w-44 z-[100]"
-                          >
-                            <DropdownMenuItem
-                              onSelect={(e) => e.preventDefault()}
-                              className="py-2"
-                            >
-                              <Forward className="mr-2 h-4 w-4" />
-                              <span>Forward</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onSelect={(e) => e.preventDefault()}
-                              className="py-2"
-                            >
-                              <Copy className="mr-2 h-4 w-4" />
-                              <span>Copy text</span>
-                            </DropdownMenuItem>
-                            {isOwnReply || currentUserCanDeleteAnyMessages ? (
-                              <>
-                                <DropdownMenuSeparator />
-                                {isOwnReply ? (
-                                  <DropdownMenuItem
-                                    onClick={() => onToggleHidden?.(reply.ids.id)}
-                                    disabled={isHidingReply}
-                                    className="py-2"
-                                  >
-                                    {isHidingReply ? (
-                                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    ) : (
-                                      <EyeOff className="mr-2 h-4 w-4" />
-                                    )}
-                                    <span>Hide message</span>
-                                  </DropdownMenuItem>
-                                ) : null}
-                                <DropdownMenuItem
-                                  onClick={() => onDelete?.(reply.ids.id)}
-                                  disabled={isDeletingReply}
-                                  className="py-2 text-destructive focus:text-destructive"
-                                >
-                                  {isDeletingReply ? (
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  ) : (
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                  )}
-                                  <span>Delete</span>
-                                </DropdownMenuItem>
-                              </>
-                            ) : null}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </div>
-                    <p className="mt-2 break-words text-left text-sm leading-6 text-foreground/85">
-                      {getInlineReplyPreview(reply)}
-                    </p>
-                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                      <div className={cn(isReadOnly && 'pointer-events-none opacity-60')}>
-                        <ReactionBar
-                          reactions={reply.social.reactions}
-                          pendingEmojis={pendingReplyReactionEmojis}
-                          size="compact"
-                          onToggleReaction={
-                            isReadOnly
-                              ? undefined
-                              : (emoji) => onToggleReaction?.(reply.ids.id, emoji, 'bar')
-                          }
-                        />
-                      </div>
-                      {!shouldHideQuickActions ? (
-                        isReadOnly ? (
+                  <MessageManagementMenu
+                    message={reply}
+                    currentUserId={currentUserId}
+                    canDeleteAnyMessages={currentUserCanDeleteAnyMessages}
+                    isReadOnly={isReadOnly}
+                    actionState={replyActionState}
+                    onToggleSaved={() => onToggleSaved?.(reply.ids.id)}
+                    onToggleHidden={() => onToggleHidden?.(reply.ids.id)}
+                    onDelete={() => onDelete?.(reply.ids.id)}
+                    feed
+                  >
+                    <div
+                      className={cn(
+                        'min-w-0 flex-1',
+                        getFeedMessageBubbleClassName(isOwnReply),
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <span className="block truncate text-sm font-semibold leading-tight text-foreground">
+                            {isOwnReply ? 'You' : senderName}
+                          </span>
+                          <span className="mt-0.5 block truncate text-xs leading-tight text-muted-foreground">
+                            {getAvatarRoleLabel(reply.core.sender.kind)}
+                          </span>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1">
+                          <span className="whitespace-nowrap text-xs leading-none text-muted-foreground">
+                            {formatTime(reply.core.createdAt)}
+                          </span>
                           <Button
                             variant="ghost"
                             size="icon"
-                            disabled
-                            className="h-6 w-6 rounded-full border border-border bg-background/60 text-muted-foreground"
-                            aria-label="Add emoji"
-                          >
-                            <SmilePlus className="h-3.5 w-3.5" />
-                          </Button>
-                        ) : (
-                          <EmojiPicker
-                            onEmojiSelect={(emoji) =>
-                              onToggleReaction?.(reply.ids.id, emoji, 'picker')
+                            className="h-6 w-6"
+                            disabled={isReadOnly || isSavingReply}
+                            onClick={() => onToggleSaved?.(reply.ids.id)}
+                            aria-label={
+                              reply.state?.isSaved ? 'Unsave message' : 'Save message'
                             }
                           >
+                            {isSavingReply ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Bookmark
+                                className={cn(
+                                  'h-3.5 w-3.5',
+                                  reply.state?.isSaved && 'fill-primary text-primary',
+                                )}
+                              />
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                      <p className="mt-3 whitespace-pre-wrap [overflow-wrap:anywhere] text-left text-[15px] leading-5 text-foreground">
+                        {getInlineReplyPreview(reply)}
+                      </p>
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                        <div
+                          className={cn(isReadOnly && 'pointer-events-none opacity-60')}
+                        >
+                          <ReactionBar
+                            reactions={reply.social.reactions}
+                            pendingEmojis={pendingReplyReactionEmojis}
+                            size="compact"
+                            onToggleReaction={
+                              isReadOnly
+                                ? undefined
+                                : (emoji) =>
+                                    onToggleReaction?.(reply.ids.id, emoji, 'bar')
+                            }
+                          />
+                        </div>
+                        {!shouldHideQuickActions ? (
+                          isReadOnly ? (
                             <Button
                               variant="ghost"
                               size="icon"
-                              disabled={isAddingReactionReply}
-                              className="h-6 w-6 rounded-full border border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+                              disabled
+                              className="h-6 w-6 rounded-full border border-border bg-background/60 text-muted-foreground"
                               aria-label="Add emoji"
                             >
-                              {isAddingReactionReply ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              ) : (
-                                <SmilePlus className="h-3.5 w-3.5" />
-                              )}
+                              <SmilePlus className="h-3.5 w-3.5" />
                             </Button>
-                          </EmojiPicker>
-                        )
-                      ) : null}
+                          ) : (
+                            <EmojiPicker
+                              onEmojiSelect={(emoji) =>
+                                onToggleReaction?.(reply.ids.id, emoji, 'picker')
+                              }
+                            >
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                disabled={isAddingReactionReply}
+                                className="h-6 w-6 rounded-full border border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+                                aria-label="Add emoji"
+                              >
+                                {isAddingReactionReply ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <SmilePlus className="h-3.5 w-3.5" />
+                                )}
+                              </Button>
+                            </EmojiPicker>
+                          )
+                        ) : null}
+                      </div>
                     </div>
-                  </div>
+                  </MessageManagementMenu>
                 </div>
               </div>
             );
@@ -848,7 +806,7 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                       currentUserComposerProfile.location,
                     )}
                     about={currentUserComposerProfile.profile.bio ?? null}
-                    sizeClassName="h-8 w-8 rounded-full"
+                    sizeClassName="h-9 w-9 rounded-full"
                     statusClassName="bottom-0 right-0 h-2 w-2"
                     fallbackClassName="text-xs"
                     onProfileClick={
@@ -937,7 +895,13 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
     };
 
     return (
-      <ScrollArea ref={scrollAreaRootRef} className="flex-1 min-h-0">
+      <ScrollArea
+        ref={scrollAreaRootRef}
+        className={cn(
+          'flex-1 min-h-0',
+          messageUiThemeKey === 'feed' && 'bg-background pt-3.5 pb-[22px]',
+        )}
+      >
         {isLoadingMore ? (
           <div className="sticky top-0 z-10 flex justify-center py-2">
             <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground animate-pulse">
@@ -957,27 +921,41 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
         ) : null}
         {groupedMessages.map((group) => (
           <div key={group.date}>
-            <div className="relative my-4 flex items-center">
-              <div className="flex-1 border-t border-border" />
-              <span className="mx-4 bg-background px-2 text-xs font-medium text-muted-foreground">
-                {group.date}
-              </span>
-              <div className="flex-1 border-t border-border" />
-            </div>
+            {messageUiThemeKey !== 'feed' && (
+              <div className="relative my-4 flex items-center">
+                <div className="flex-1 border-t border-border" />
+                <span className="mx-4 bg-background px-2 text-xs font-medium text-muted-foreground">
+                  {group.date}
+                </span>
+                <div className="flex-1 border-t border-border" />
+              </div>
+            )}
             {messageUiThemeKey === 'feed'
-              ? buildVisualMessageGroups(group.messages).map((visualGroup) => {
+              ? buildVisualMessageGroups(
+                  // Thread replies are rendered inline under their parent post,
+                  // never as standalone feed cards of their own.
+                  group.messages.filter(
+                    (message) =>
+                      !message.social.thread ||
+                      message.social.thread.parent.messageId === message.ids.id,
+                  ),
+                ).map((visualGroup) => {
                   const headerMessage = visualGroup[visualGroup.length - 1]!;
                   const senderName = getProfileDisplayName(
                     headerMessage.core.sender.profile,
                   );
+                  const FeedRoleIcon = getFeedRoleIcon(headerMessage.core.sender.kind);
                   return (
                     <div
                       key={visualGroup.map((message) => message.ids.id).join(':')}
                       data-testid="feed-message-post"
-                      className="px-4 py-2"
+                      className="mb-3.5 px-4"
                     >
-                      <div className="max-w-[min(56rem,100%)] rounded-xl border border-border bg-muted/25 px-3 py-3">
-                        <div className="flex items-start gap-3">
+                      <div className="w-full max-w-[56rem] rounded-[12px] border border-border bg-card px-3 py-3.5">
+                        <div
+                          className="flex items-start gap-3"
+                          data-testid="feed-post-header"
+                        >
                           <AvatarWithStatus
                             accountId={headerMessage.core.sender.ids.accountId}
                             profileId={headerMessage.core.sender.ids.id}
@@ -991,55 +969,78 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                               headerMessage.core.sender.location,
                             )}
                             about={headerMessage.core.sender.profile.bio ?? null}
-                            sizeClassName="h-10 w-10 rounded-full"
+                            sizeClassName="h-11 w-11 rounded-full"
                             statusClassName="bottom-0 right-0 h-2 w-2"
                             fallbackClassName="text-sm"
                             onProfileClick={() =>
                               onProfileClick(headerMessage.core.sender.ids.id)
                             }
                           />
-                          <div className="min-w-0 flex-1">
-                            <div className="mb-2 flex w-full items-start gap-2.5">
-                              <div className="min-w-0 flex-1">
-                                <button
-                                  onClick={() =>
-                                    onProfileClick(headerMessage.core.sender.ids.id)
-                                  }
-                                  className="block max-w-full truncate text-left text-sm font-semibold leading-tight text-foreground hover:underline"
-                                >
-                                  {currentUserId === headerMessage.core.sender.ids.id
-                                    ? 'You'
-                                    : senderName}
-                                </button>
-                                <div className="mt-1 flex min-w-0 items-center gap-1 text-xs leading-none text-muted-foreground">
-                                  <span className="truncate">
-                                    {getAvatarRoleLabel(headerMessage.core.sender.kind)}
-                                  </span>
-                                </div>
+                          <div className="flex min-w-0 flex-1 flex-wrap items-start gap-x-2.5 gap-y-1">
+                            <div className="min-w-0 flex-1">
+                              <button
+                                onClick={() =>
+                                  onProfileClick(headerMessage.core.sender.ids.id)
+                                }
+                                className="block max-w-full truncate text-left text-sm font-bold leading-[17px] text-foreground hover:underline"
+                              >
+                                {currentUserId === headerMessage.core.sender.ids.id
+                                  ? 'You'
+                                  : senderName}
+                              </button>
+                              <div className="mt-0.5 flex min-w-0 items-center gap-1 text-[13px] leading-4 text-muted-foreground">
+                                <FeedRoleIcon
+                                  className="h-[13px] w-[13px] shrink-0"
+                                  aria-hidden="true"
+                                />
+                                <span className="truncate">
+                                  {getFeedRoleLabel(headerMessage.core.sender.kind)}
+                                </span>
                               </div>
-                              <div className="flex shrink-0 flex-col items-end gap-1">
-                                <span className="cursor-default whitespace-nowrap text-xs text-muted-foreground/90">
+                            </div>
+                            <div className="ml-auto flex max-w-full shrink-0 flex-col items-end gap-1">
+                              <div className="flex items-start gap-1.5">
+                                <span className="cursor-default text-right text-[13px] leading-4 text-muted-foreground">
                                   {formatFeedDate(headerMessage.core.createdAt)}
                                 </span>
-                                <VisibilityBadge message={headerMessage} />
+                                <MessageManagementMenu
+                                  message={headerMessage}
+                                  currentUserId={currentUserId}
+                                  canDeleteAnyMessages={currentUserCanDeleteAnyMessages}
+                                  isReadOnly={isReadOnly}
+                                  actionState={getMessageActionState?.(
+                                    headerMessage.ids.id,
+                                  )}
+                                  onToggleSaved={() =>
+                                    onToggleSaved?.(headerMessage.ids.id)
+                                  }
+                                  onToggleHidden={() =>
+                                    onToggleHidden?.(headerMessage.ids.id)
+                                  }
+                                  onDelete={() => onDelete?.(headerMessage.ids.id)}
+                                  feed
+                                />
                               </div>
-                            </div>
-                            <div className="space-y-0.5">
-                              {visualGroup.map((message, visualIndex) =>
-                                renderFeedMessageNode(
-                                  message,
-                                  visualGroup.length === 1
-                                    ? 'single'
-                                    : visualIndex === 0
-                                      ? 'first'
-                                      : visualIndex === visualGroup.length - 1
-                                        ? 'last'
-                                        : 'middle',
-                                  true,
-                                ),
-                              )}
+                              <VisibilityBadge message={headerMessage} />
                             </div>
                           </div>
+                        </div>
+                        <div className="mt-4 space-y-[3px]" data-testid="feed-post-body">
+                          {visualGroup.map((message, visualIndex) =>
+                            renderFeedMessageNode(
+                              message,
+                              visualGroup.length === 1
+                                ? 'single'
+                                : visualIndex === 0
+                                  ? 'first'
+                                  : visualIndex === visualGroup.length - 1
+                                    ? 'last'
+                                    : 'middle',
+                              // Every grouped feed message keeps its own action
+                              // controls, not just the last in the visual group.
+                              true,
+                            ),
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1122,7 +1123,7 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                                 className="my-2"
                               />
                             )}
-                            <div className="flex w-full items-start gap-2.5 py-0.5">
+                            <div className="flex w-full items-start gap-3">
                               <AvatarWithStatus
                                 accountId={reply.core.sender.ids.accountId}
                                 profileId={reply.core.sender.ids.id}
@@ -1136,14 +1137,19 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                                   reply.core.sender.location,
                                 )}
                                 about={reply.core.sender.profile.bio ?? null}
-                                sizeClassName="h-8 w-8 rounded-full"
+                                sizeClassName="h-9 w-9 rounded-full"
                                 statusClassName="bottom-0 right-0 h-2 w-2"
                                 fallbackClassName="text-xs"
                                 onProfileClick={() =>
                                   onProfileClick(reply.core.sender.ids.id)
                                 }
                               />
-                              <div className="min-w-0 flex-1 rounded-xl border border-border bg-muted/45 px-3 py-2.5">
+                              <div
+                                className={cn(
+                                  'min-w-0 flex-1',
+                                  getFeedMessageBubbleClassName(isOwnReply),
+                                )}
+                              >
                                 <div className="flex items-start justify-between gap-2">
                                   <div className="min-w-0">
                                     <span className="block truncate text-sm font-semibold leading-tight text-foreground">
@@ -1248,7 +1254,7 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                                     </DropdownMenu>
                                   </div>
                                 </div>
-                                <p className="mt-2 break-words text-left text-sm leading-6 text-foreground/85">
+                                <p className="mt-3 whitespace-pre-wrap [overflow-wrap:anywhere] text-left text-[15px] leading-5 text-foreground">
                                   {getInlineReplyPreview(reply)}
                                 </p>
                                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -1344,7 +1350,7 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                                   currentUserComposerProfile.location,
                                 )}
                                 about={currentUserComposerProfile.profile.bio ?? null}
-                                sizeClassName="h-8 w-8 rounded-full"
+                                sizeClassName="h-9 w-9 rounded-full"
                                 statusClassName="bottom-0 right-0 h-2 w-2"
                                 fallbackClassName="text-xs"
                                 onProfileClick={

@@ -20,6 +20,7 @@ import {
 } from '@iconicedu/ui-web/components/messages/tabs/messages-schedule-tab.utils';
 import { createApiClient } from '@iconicedu/web/lib/api/http-client';
 import {
+  getOrgSessionCompletionSummary,
   getSessionCompletionSummary,
   listSessionCompletions,
 } from '@iconicedu/web/lib/api/session-completions';
@@ -603,6 +604,7 @@ export async function buildDashboardHomeInfographicMetrics(input: {
   pageSize?: number;
   timezone?: string | null;
   sessionCompletionCarouselEnabled?: boolean;
+  isOrgAdminView?: boolean;
 }): Promise<DashboardHomeInfographicMetrics> {
   const now = input.now ?? new Date();
   const pageSize = Math.max(1, Math.floor(input.pageSize ?? DEFAULT_PAGE_SIZE));
@@ -610,6 +612,9 @@ export async function buildDashboardHomeInfographicMetrics(input: {
   const isStaffView =
     input.currentUserProfile?.kind === 'staff' ||
     input.currentUserProfile?.kind === 'system';
+  // Staff profile kind OR an owner/admin/staff role grant — either one gets the
+  // org-wide "Sessions completed" totals.
+  const staffOrAdminView = isStaffView || Boolean(input.isOrgAdminView);
   const scopedProfileIds = resolveScopedProfileIds(input.currentUserProfile, activeRole);
 
   const activeRoleData = await buildActiveRoleMetrics({
@@ -624,31 +629,43 @@ export async function buildDashboardHomeInfographicMetrics(input: {
     timezone: input.timezone ?? input.currentUserProfile?.prefs?.timezone ?? null,
   });
   const viewerProfileId = input.currentUserProfile?.ids.id;
-  const sessionCompletionQueriesEnabled = Boolean(
-    input.sessionCompletionCarouselEnabled && viewerProfileId,
+  // Staff/admins see an org-wide summary (every classroom session, all time),
+  // independent of the carousel rollout flag — it's an org KPI, not the
+  // per-student confirmation feature. Everyone else sees their own carousel page
+  // plus a per-profile summary, still gated on the flag.
+  const orgCompletionSummaryEnabled = staffOrAdminView;
+  const profileCompletionQueriesEnabled = Boolean(
+    input.sessionCompletionCarouselEnabled && viewerProfileId && !staffOrAdminView,
   );
-  // "Sessions completed" mirrors the "This month" completed-classes tile it
-  // replaces, so the aggregate is bounded to the current display month.
+  // The per-profile "Sessions completed" tile mirrors the "This month"
+  // completed-classes tile it replaces, so that aggregate is bounded to the
+  // current display month. The staff org-wide total is deliberately unbounded.
   const completedMonthRange = getScheduleDisplayMonthRange(
     [now],
     input.timezone ?? input.currentUserProfile?.prefs?.timezone ?? null,
   );
   const [sessionCompletionsPage, sessionCompletionSummary] = await Promise.all([
-    sessionCompletionQueriesEnabled && viewerProfileId
+    profileCompletionQueriesEnabled && viewerProfileId
       ? listSessionCompletions(input.supabase, {
           orgId: input.orgId,
           profileId: viewerProfileId,
           limit: 50,
         }).then((page) => page.items)
       : Promise.resolve<SessionCompletionVM[]>([]),
-    sessionCompletionQueriesEnabled && viewerProfileId
-      ? getSessionCompletionSummary(input.supabase, {
+    orgCompletionSummaryEnabled
+      ? // A permissions hiccup for an unusual profile must not take down the
+        // whole home page; the tile falls back to zeros.
+        getOrgSessionCompletionSummary(input.supabase, {
           orgId: input.orgId,
-          profileId: viewerProfileId,
-          completedSince: completedMonthRange.rangeStart.toISOString(),
-          completedUntil: completedMonthRange.rangeEnd.toISOString(),
-        })
-      : Promise.resolve<{ completed: number; pending: number } | null>(null),
+        }).catch(() => null)
+      : profileCompletionQueriesEnabled && viewerProfileId
+        ? getSessionCompletionSummary(input.supabase, {
+            orgId: input.orgId,
+            profileId: viewerProfileId,
+            completedSince: completedMonthRange.rangeStart.toISOString(),
+            completedUntil: completedMonthRange.rangeEnd.toISOString(),
+          })
+        : Promise.resolve<{ completed: number; pending: number } | null>(null),
   ]);
   const completedSessionsPending = sessionCompletionsPage.filter(
     (completion) =>
@@ -667,9 +684,10 @@ export async function buildDashboardHomeInfographicMetrics(input: {
     },
     upcomingSessionsPage: activeRoleData.upcomingSessionsPage,
     completedSessionsPending,
-    sessionCompletionSummary: input.sessionCompletionCarouselEnabled
-      ? (sessionCompletionSummary ?? { completed: 0, pending: 0 })
-      : null,
+    sessionCompletionSummary:
+      staffOrAdminView || input.sessionCompletionCarouselEnabled
+        ? (sessionCompletionSummary ?? { completed: 0, pending: 0 })
+        : null,
     browseHref: isStaffView ? `/${input.orgSlug}/admin/channels` : `/${input.orgSlug}/s`,
     calendarHref: isStaffView
       ? `/${input.orgSlug}/admin/attendance/sessions`

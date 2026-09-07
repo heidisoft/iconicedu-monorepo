@@ -147,11 +147,13 @@ function mockApi(
   spaces: Record<string, unknown>[],
   completions: Record<string, unknown>[] = [],
   summary: { completed: number; pending: number } = { completed: 0, pending: 0 },
+  orgSummary: { completed: number; pending: number } = { completed: 0, pending: 0 },
 ) {
   apiGetMock.mockImplementation((path: string) => {
     if (path === '/schedules') return Promise.resolve(schedules);
     if (path === '/spaces') return Promise.resolve(spaces);
     if (path === '/session-completions/summary') return Promise.resolve(summary);
+    if (path === '/session-completions/org-summary') return Promise.resolve(orgSummary);
     if (path === '/session-completions') {
       return Promise.resolve({ items: completions, nextCursor: null, total: null });
     }
@@ -556,6 +558,65 @@ describe('buildDashboardHomeInfographicMetrics', () => {
     expect(result.upcomingSessionsPage.today.items[0]?.session.time).toContain(
       'Staff Tutor One',
     );
+  });
+
+  it('feeds the staff "Sessions completed" tile from the org-wide summary even with the carousel flag off', async () => {
+    mockApi(
+      [],
+      [],
+      [],
+      { completed: 1, pending: 1 },
+      // Org-wide totals across every classroom session, all time.
+      { completed: 318, pending: 12 },
+    );
+
+    const result = await buildDashboardHomeInfographicMetrics({
+      supabase: {} as never,
+      orgId: 'org-1',
+      orgSlug: 'iconic-academy',
+      now: NOW,
+      currentUserProfile: {
+        kind: 'staff',
+        ids: { id: 'staff-1', orgId: 'org-1', accountId: 'account-staff' },
+      } as never,
+      sessionCompletionCarouselEnabled: false,
+    });
+
+    expect(result.sessionCompletionSummary).toEqual({ completed: 318, pending: 12 });
+    expect(result.completedSessionsPending).toEqual([]);
+    expect(apiGetMock).toHaveBeenCalledWith('/session-completions/org-summary', {
+      orgId: 'org-1',
+    });
+    expect(apiGetMock).not.toHaveBeenCalledWith(
+      '/session-completions/summary',
+      expect.anything(),
+    );
+    expect(apiGetMock).not.toHaveBeenCalledWith(
+      '/session-completions',
+      expect.anything(),
+    );
+  });
+
+  it('gives an admin whose profile kind is not staff the same org-wide summary', async () => {
+    mockApi([], [], [], { completed: 0, pending: 0 }, { completed: 90, pending: 5 });
+
+    const result = await buildDashboardHomeInfographicMetrics({
+      supabase: {} as never,
+      orgId: 'org-1',
+      orgSlug: 'iconic-academy',
+      now: NOW,
+      currentUserProfile: {
+        kind: 'educator',
+        ids: { id: 'educator-admin-1', orgId: 'org-1', accountId: 'account-ea1' },
+      } as never,
+      sessionCompletionCarouselEnabled: false,
+      isOrgAdminView: true,
+    });
+
+    expect(result.sessionCompletionSummary).toEqual({ completed: 90, pending: 5 });
+    expect(apiGetMock).toHaveBeenCalledWith('/session-completions/org-summary', {
+      orgId: 'org-1',
+    });
   });
 
   it('returns full week sessions list with pagination metadata for client-side pagination', async () => {

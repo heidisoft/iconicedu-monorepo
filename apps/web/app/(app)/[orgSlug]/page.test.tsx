@@ -58,6 +58,11 @@ vi.mock('../../../lib/dashboard/home-infographic-metrics', () => ({
     buildDashboardHomeInfographicMetricsMock(...args),
 }));
 
+const getUserRolesMock = vi.fn(async () => ({ data: [], error: null }));
+vi.mock('@iconicedu/web/lib/profile/queries/roles.query', () => ({
+  getUserRoles: (...args: unknown[]) => getUserRolesMock(...args),
+}));
+
 vi.mock('@iconicedu/web/flags', () => ({
   enableSessionCompletionCarousel: {
     run: vi.fn(async () => false),
@@ -137,6 +142,53 @@ describe('d home page', () => {
         subjectOptions: ['Math', 'Science'],
       }),
     );
+  });
+
+  it('flags an org admin (by role grant) so the builder shows org-wide completion totals', async () => {
+    getUserRolesMock.mockResolvedValueOnce({
+      data: [{ role_key: 'admin' }],
+      error: null,
+    } as never);
+    buildDashboardHomeInfographicMetricsMock.mockResolvedValueOnce({
+      activeRole: 'tutors',
+      isStaffView: false,
+      browseHref: '/iconic-academy/s',
+      calendarHref: '/iconic-academy/class-schedule',
+      notificationsHref: '/iconic-academy/notifications',
+      upcomingSessionsPage: {
+        thisWeek: { items: [], total: 0, pageSize: 6, totalPages: 1 },
+        nextWeek: { items: [], total: 0, pageSize: 6, totalPages: 1 },
+      },
+      metricsByRole: {
+        parents: {
+          upcomingSessionsThisWeek: 0,
+          completedClassesThisMonth: 0,
+          activeSubjectsCount: 0,
+          activeSubjectsLabel: 'No active subjects yet',
+        },
+        students: {
+          upcomingSessionsThisWeek: 0,
+          completedClassesThisMonth: 0,
+          activeSubjectsCount: 0,
+          activeSubjectsLabel: 'No active subjects yet',
+        },
+        tutors: {
+          upcomingSessionsThisWeek: 0,
+          completedClassesThisMonth: 0,
+          activeSubjectsCount: 0,
+          activeSubjectsLabel: 'No active subjects yet',
+        },
+      },
+    });
+
+    const element = await HomePageContent({ orgSlug: 'iconic-academy' });
+    render(element as React.ReactElement);
+
+    await waitFor(() => {
+      expect(buildDashboardHomeInfographicMetricsMock).toHaveBeenCalledWith(
+        expect.objectContaining({ isOrgAdminView: true }),
+      );
+    });
   });
 
   it('keeps guardian home metrics when account has multiple personas', async () => {

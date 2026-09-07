@@ -8,6 +8,7 @@ import {
 } from '@iconicedu/ui-web/components/messages/message-base';
 import { buildFileDownloadHref } from '@iconicedu/ui-web/components/messages/file-download.utils';
 import { MessageTextContent } from '@iconicedu/ui-web/components/messages/message-text-content';
+import { getFeedMessageBubbleClassName } from '../feed-message-bubble.styles';
 
 interface FileMessageProps extends Omit<MessageBaseProps, 'message' | 'children'> {
   message: FileMessageType;
@@ -39,7 +40,9 @@ export const FileMessage = memo(function FileMessage(props: FileMessageProps) {
       {!isFeedTheme && message.content?.text && (
         <MessageTextContent text={message.content.text} className="mb-2" />
       )}
-      <div className="max-w-sm overflow-hidden rounded-xl border border-border bg-card">
+      <div
+        className={`${isFeedTheme ? 'w-full' : 'max-w-sm'} overflow-hidden rounded-xl border border-border bg-card`}
+      >
         {attachments.map((attachment, index) => (
           <div
             key={`${attachment.storagePath ?? attachment.name}-${index}`}
@@ -84,7 +87,7 @@ export const FileMessage = memo(function FileMessage(props: FileMessageProps) {
       {isFeedTheme && message.content?.text && (
         <MessageTextContent
           text={message.content.text}
-          className="mt-3 rounded-[10px] border border-border/70 bg-background px-4 py-3"
+          className={`mt-2 ${getFeedMessageBubbleClassName(baseProps.currentUserId === message.core.sender.ids.id)}`}
         />
       )}
     </MessageBase>

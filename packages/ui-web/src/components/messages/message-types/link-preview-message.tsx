@@ -7,6 +7,7 @@ import {
   type MessageBaseProps,
 } from '@iconicedu/ui-web/components/messages/message-base';
 import { MessageTextContent } from '@iconicedu/ui-web/components/messages/message-text-content';
+import { getFeedMessageBubbleClassName } from '../feed-message-bubble.styles';
 import { LinkPreviewCard } from '@iconicedu/ui-web/components/messages/link-preview-card';
 import { confirmExternalMessageLink } from '@iconicedu/ui-web/components/messages/message-link.utils';
 
@@ -48,11 +49,13 @@ export const LinkPreviewMessage = memo(function LinkPreviewMessage(
           imageUrl={message.link.imageUrl}
           siteName={message.link.siteName}
           favicon={message.link.favicon}
-          className="block max-w-md overflow-hidden rounded-xl border border-border bg-card transition-colors hover:bg-accent"
+          className={`block ${isFeedTheme ? 'w-full' : 'max-w-md'} overflow-hidden rounded-xl border border-border bg-card transition-colors hover:bg-accent`}
         />
       </a>
       {isFeedTheme && caption && (
-        <div className="mt-3 rounded-[10px] border border-border/70 bg-background px-4 py-3 text-sm leading-relaxed text-foreground">
+        <div
+          className={`mt-2 ${getFeedMessageBubbleClassName(baseProps.currentUserId === message.core.sender.ids.id)}`}
+        >
           <MessageTextContent text={caption} mentions={message.content?.mentions} />
         </div>
       )}
