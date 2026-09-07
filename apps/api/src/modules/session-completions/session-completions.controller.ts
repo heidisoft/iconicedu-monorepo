@@ -39,6 +39,14 @@ export class SessionCompletionsController {
     });
   }
 
+  @Get('org-summary')
+  @UseGuards(AuthGuard)
+  orgSummary(@Req() req: AuthenticatedRequest, @Query('orgId') orgId: string) {
+    return this.sessionCompletionsService.getOrgCompletionSummary(req.user.id, {
+      orgId,
+    });
+  }
+
   @Get('channel-states')
   @UseGuards(AuthGuard)
   listChannelStates(

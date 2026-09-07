@@ -373,6 +373,108 @@ describe('SessionCompletionsService', () => {
     });
   });
 
+  describe('getOrgCompletionSummary', () => {
+    function makeOrgSummarySupabase(input: {
+      completionRows?: Array<{
+        schedule_id: string;
+        occurrence_key: string;
+        status: string;
+      }>;
+      roleRow?: { role_key: string } | null;
+      primaryRoleRow?: { id: string } | null;
+    }) {
+      const accountChain = makeChain({ data: { id: ACCOUNT_ID, org_id: ORG_ID } });
+      const roleChain = makeChain({
+        data: input.roleRow === undefined ? { role_key: 'staff' } : input.roleRow,
+      });
+      const primaryRoleChain = makeChain({
+        data: input.primaryRoleRow === undefined ? null : input.primaryRoleRow,
+      });
+      const completionsChain = makeChain({ data: input.completionRows ?? [] });
+
+      let accountCalls = 0;
+      const from = jest.fn((table: string) => {
+        if (table === 'accounts') {
+          accountCalls += 1;
+          // 1st: resolveAccount. 2nd: assertAdminAccess primary_role check.
+          return accountCalls === 1 ? accountChain : primaryRoleChain;
+        }
+        if (table === 'user_roles') return roleChain;
+        if (table === 'class_session_completions') return completionsChain;
+        throw new Error(`Unexpected table: ${table}`);
+      });
+
+      createSupabaseServiceClientMock.mockReturnValue({ from } as never);
+      return { from, completionsChain };
+    }
+
+    it('collapses cross-party rows to occurrences and nets pending against completed', async () => {
+      const { completionsChain } = makeOrgSummarySupabase({
+        completionRows: [
+          // Occurrence A: both parties confirmed -> counts once as completed.
+          {
+            schedule_id: SCHEDULE_ID,
+            occurrence_key: '2030-03-06T10:00:00.000Z',
+            status: 'confirmed',
+          },
+          {
+            schedule_id: SCHEDULE_ID,
+            occurrence_key: '2030-03-06T10:00:00.000Z',
+            status: 'auto_confirmed',
+          },
+          // Occurrence B: one party confirmed, the other still pending -> completed, not pending.
+          {
+            schedule_id: SCHEDULE_ID,
+            occurrence_key: '2030-03-13T10:00:00.000Z',
+            status: 'confirmed',
+          },
+          {
+            schedule_id: SCHEDULE_ID,
+            occurrence_key: '2030-03-13T10:00:00.000Z',
+            status: 'pending',
+          },
+          // Occurrence C: only pending rows -> pending.
+          {
+            schedule_id: '00000000-0000-4000-8000-0000000000aa',
+            occurrence_key: '2030-03-20T10:00:00.000Z',
+            status: 'pending',
+          },
+        ],
+      });
+      const service = new SessionCompletionsService();
+
+      const result = await service.getOrgCompletionSummary(AUTH_USER_ID, {
+        orgId: ORG_ID,
+      });
+
+      expect(completionsChain.in).toHaveBeenCalledWith('status', [
+        'confirmed',
+        'auto_confirmed',
+        'pending',
+      ]);
+      expect(result).toEqual({ completed: 2, pending: 1 });
+    });
+
+    it('rejects a non-admin caller', async () => {
+      makeOrgSummarySupabase({ roleRow: null, primaryRoleRow: null });
+      const service = new SessionCompletionsService();
+
+      await expect(
+        service.getOrgCompletionSummary(AUTH_USER_ID, { orgId: ORG_ID }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('rejects an invalid orgId before querying', async () => {
+      const { from } = makeOrgSummarySupabase({});
+      const service = new SessionCompletionsService();
+
+      await expect(
+        service.getOrgCompletionSummary(AUTH_USER_ID, { orgId: 'not-a-uuid' }),
+      ).rejects.toThrow(BadRequestException);
+      expect(from).not.toHaveBeenCalled();
+    });
+  });
+
   describe('confirm', () => {
     it('marks the originating notification(s) as read, single and batched alike', async () => {
       const { activityFeedItemsUpdateChain } = makeSupabase({
