@@ -326,6 +326,7 @@ export function ActivityCompletionCheck({
             activity={activity}
             colors={colors}
             onRatingSubmit={onRatingSubmit}
+            autoDismiss={false}
           />
         ) : null}
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
