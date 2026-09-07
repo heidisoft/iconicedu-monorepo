@@ -148,6 +148,7 @@ export function LearningSpacesDashboard({ orgSlug }: LearningSpacesDashboardProp
       </div>
 
       <AdminFilterBar
+        layout="toolbar"
         search={search}
         onSearchChange={setSearch}
         filterGroups={[

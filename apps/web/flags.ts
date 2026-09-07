@@ -165,7 +165,7 @@ export const enableAdminSessionAttendanceAnalytics = flag<
 >({
   key: 'admin-session-attendance-analytics',
   description:
-    'Enables monthly attendance analytics, people breakdowns, and advanced filters in admin.',
+    'Enables monthly completed-session analytics, confirmer breakdowns, and advanced filters in admin.',
   options: [
     { label: 'Off', value: false },
     { label: 'On', value: true },

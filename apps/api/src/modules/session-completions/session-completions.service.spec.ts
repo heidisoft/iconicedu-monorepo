@@ -40,6 +40,7 @@ describe('SessionCompletionsService', () => {
       in: jest.fn(() => chain),
       is: jest.fn(() => chain),
       limit: jest.fn(() => chain),
+      order: jest.fn(() => chain),
       maybeSingle: jest.fn(async () => result),
       returns: jest.fn(async () => result),
     };
@@ -142,6 +143,78 @@ describe('SessionCompletionsService', () => {
       ...overrides,
     };
   }
+
+  describe('listForAdmin', () => {
+    it('groups participant confirmations into one completed occurrence', async () => {
+      const accountChain = makeChain({ data: { id: ACCOUNT_ID, org_id: ORG_ID } });
+      const roleChain = makeChain({ data: { role_key: 'admin' } });
+      const completionChain = makeChain({
+        data: [
+          baseCompletionRow({
+            profile_id: PROFILE_ID,
+            role: 'educator',
+            status: 'confirmed',
+            rating: 5,
+            student_name: 'Jamie Lee',
+            resolved_at: '2030-03-06T11:05:00.000Z',
+            updated_at: '2030-03-06T11:05:00.000Z',
+          }),
+          baseCompletionRow({
+            id: '00000000-0000-4000-8000-000000000008',
+            profile_id: OTHER_PROFILE_ID,
+            role: 'guardian',
+            status: 'auto_confirmed',
+            student_name: 'Jamie Lee',
+            resolved_at: '2030-03-06T11:03:00.000Z',
+            updated_at: '2030-03-06T11:03:00.000Z',
+          }),
+        ],
+      });
+      const profilesChain = makeChain({
+        data: [
+          {
+            id: PROFILE_ID,
+            display_name: 'Taylor Reed',
+            first_name: null,
+            last_name: null,
+          },
+          {
+            id: OTHER_PROFILE_ID,
+            display_name: 'Morgan Lee',
+            first_name: null,
+            last_name: null,
+          },
+        ],
+      });
+      const participantsChain = makeChain({
+        data: [{ schedule_id: SCHEDULE_ID, display_name: 'Jamie Lee' }],
+      });
+      const from = jest.fn((table: string) => {
+        if (table === 'accounts') return accountChain;
+        if (table === 'user_roles') return roleChain;
+        if (table === 'class_session_completions') return completionChain;
+        if (table === 'profiles') return profilesChain;
+        if (table === 'class_schedule_participants') return participantsChain;
+        throw new Error(`Unexpected table: ${table}`);
+      });
+      createSupabaseServiceClientMock.mockReturnValue({ from } as never);
+
+      const result = await new SessionCompletionsService().listForAdmin(AUTH_USER_ID, {
+        orgId: ORG_ID,
+      });
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        completionMethod: 'mixed',
+        studentNames: ['Jamie Lee'],
+        averageRating: 5,
+        confirmedBy: [
+          { displayName: 'Taylor Reed', role: 'educator' },
+          { displayName: 'Morgan Lee', role: 'guardian' },
+        ],
+      });
+    });
+  });
 
   describe('listForProfile', () => {
     it('returns a bounded cursor page from the consolidated source', async () => {

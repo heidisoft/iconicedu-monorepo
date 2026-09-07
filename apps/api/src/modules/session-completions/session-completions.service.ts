@@ -8,6 +8,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type {
+  AdminSessionCompletionActorVM,
+  AdminSessionCompletionVM,
   ChannelSessionCompletionVM,
   ClassSessionCompletionRow,
   ConfirmSessionCompletionInput,
@@ -663,6 +665,43 @@ export class SessionCompletionsService {
     return targetProfile;
   }
 
+  private async assertAdminAccess(
+    supabase: SupabaseServiceClient,
+    account: AccountRow,
+    orgId: string,
+  ) {
+    const [roleResponse, accountResponse] = await Promise.all([
+      supabase
+        .from('user_roles')
+        .select('role_key')
+        .eq('org_id', orgId)
+        .eq('account_id', account.id)
+        .in('role_key', ['owner', 'admin', 'staff'])
+        .is('deleted_at', null)
+        .limit(1)
+        .maybeSingle<{ role_key: string }>(),
+      supabase
+        .from('accounts')
+        .select('id')
+        .eq('id', account.id)
+        .eq('org_id', orgId)
+        .in('primary_role', ['owner', 'admin', 'staff'])
+        .is('deleted_at', null)
+        .limit(1)
+        .maybeSingle<{ id: string }>(),
+    ]);
+
+    if (roleResponse.error) {
+      throw new InternalServerErrorException(roleResponse.error.message);
+    }
+    if (accountResponse.error) {
+      throw new InternalServerErrorException(accountResponse.error.message);
+    }
+    if (!roleResponse.data && !accountResponse.data) {
+      throw new ForbiddenException('Forbidden');
+    }
+  }
+
   private async publishDisputeNotifications(input: {
     supabase: SupabaseServiceClient;
     row: ClassSessionCompletionRow;
@@ -757,5 +796,126 @@ export class SessionCompletionsService {
     } catch {
       throw new BadRequestException('Invalid cursor');
     }
+  }
+
+  async listForAdmin(
+    authUserId: string,
+    params: { orgId: string },
+  ): Promise<AdminSessionCompletionVM[]> {
+    if (!params?.orgId || !isUuid(params.orgId)) {
+      throw new BadRequestException('Invalid orgId');
+    }
+
+    const supabase = createSupabaseServiceClient();
+    const account = await this.resolveAccount(supabase, authUserId, params.orgId);
+    await this.assertAdminAccess(supabase, account, params.orgId);
+
+    const { data, error } = await supabase
+      .from('class_session_completions')
+      .select('*')
+      .eq('org_id', params.orgId)
+      .in('status', ['confirmed', 'auto_confirmed'])
+      .is('deleted_at', null)
+      .order('session_end_at', { ascending: false })
+      .returns<ClassSessionCompletionRow[]>();
+
+    if (error) throw new InternalServerErrorException(error.message);
+    const completionRows = data ?? [];
+    const profileIds = [...new Set(completionRows.map((row) => row.profile_id))];
+    const scheduleIds = [...new Set(completionRows.map((row) => row.schedule_id))];
+    const [profileResponse, participantResponse] = await Promise.all([
+      profileIds.length
+        ? supabase
+            .from('profiles')
+            .select('id, display_name, first_name, last_name')
+            .eq('org_id', params.orgId)
+            .in('id', profileIds)
+            .is('deleted_at', null)
+            .returns<
+              Array<{
+                id: string;
+                display_name: string | null;
+                first_name: string | null;
+                last_name: string | null;
+              }>
+            >()
+        : Promise.resolve({ data: [], error: null }),
+      scheduleIds.length
+        ? supabase
+            .from('class_schedule_participants')
+            .select('schedule_id, display_name')
+            .eq('org_id', params.orgId)
+            .in('schedule_id', scheduleIds)
+            .eq('role', 'child')
+            .is('deleted_at', null)
+            .returns<Array<{ schedule_id: string; display_name: string | null }>>()
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+
+    if (profileResponse.error) {
+      throw new InternalServerErrorException(profileResponse.error.message);
+    }
+    if (participantResponse.error) {
+      throw new InternalServerErrorException(participantResponse.error.message);
+    }
+    const names = new Map(
+      (profileResponse.data ?? []).map((profile) => [
+        profile.id,
+        profile.display_name?.trim() ||
+          [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim() ||
+          'Unknown user',
+      ]),
+    );
+    const studentNamesByScheduleId = new Map<string, string[]>();
+    (participantResponse.data ?? []).forEach((participant) => {
+      const displayName = participant.display_name?.trim();
+      if (!displayName) return;
+      const values = studentNamesByScheduleId.get(participant.schedule_id) ?? [];
+      if (!values.includes(displayName)) values.push(displayName);
+      studentNamesByScheduleId.set(participant.schedule_id, values);
+    });
+
+    const grouped = new Map<string, ClassSessionCompletionRow[]>();
+    completionRows.forEach((row) => {
+      const key = `${row.schedule_id}|${row.occurrence_key}`;
+      const bucket = grouped.get(key) ?? [];
+      bucket.push(row);
+      grouped.set(key, bucket);
+    });
+
+    return [...grouped.entries()].map(([id, rows]) => {
+      const first = rows[0]!;
+      const actors: AdminSessionCompletionActorVM[] = rows.map((row) => ({
+        profileId: row.profile_id,
+        displayName: names.get(row.profile_id) ?? 'Unknown user',
+        role: row.role,
+        status: row.status as AdminSessionCompletionActorVM['status'],
+        completedAt: row.resolved_at ?? row.confirmed_at ?? row.updated_at,
+      }));
+      const methods = new Set(actors.map((actor) => actor.status));
+      const ratings = rows
+        .map((row) => row.rating)
+        .filter((rating): rating is number => typeof rating === 'number');
+
+      return {
+        id,
+        orgId: first.org_id,
+        scheduleId: first.schedule_id,
+        occurrenceKey: first.occurrence_key,
+        sessionEndAt: first.session_end_at,
+        sessionTitle: first.session_title ?? null,
+        studentNames: studentNamesByScheduleId.get(first.schedule_id) ?? [],
+        channelId: first.channel_id ?? null,
+        learningSpaceId: first.learning_space_id ?? null,
+        completedAt: actors
+          .map((actor) => actor.completedAt)
+          .sort((left, right) => right.localeCompare(left))[0]!,
+        completionMethod: methods.size > 1 ? 'mixed' : (actors[0]?.status ?? 'confirmed'),
+        confirmedBy: actors,
+        averageRating: ratings.length
+          ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length
+          : null,
+      };
+    });
   }
 }

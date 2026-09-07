@@ -83,6 +83,7 @@ export function FamiliesDashboard({ orgSlug }: FamiliesDashboardProps) {
       </div>
 
       <AdminFilterBar
+        layout="toolbar"
         search={search}
         onSearchChange={setSearch}
         filterGroups={[

@@ -1,40 +1,30 @@
 'use client';
 
 import * as React from 'react';
-import { CalendarCheck2, ChartNoAxesCombined, CircleX, UsersRound } from 'lucide-react';
-
-import type { LiveSessionAttendanceListItemVM } from '@iconicedu/shared-types';
+import { CalendarCheck2, GraduationCap, Star, UsersRound } from 'lucide-react';
+import type { AdminSessionCompletionVM } from '@iconicedu/shared-types';
 import { Card, CardContent, CardHeader, CardTitle } from '@iconicedu/ui-web';
 import { AdminFilterBar } from '@iconicedu/web/components/admin/admin-filter-bar';
-import { LiveSessionAttendanceTable } from '@iconicedu/web/app/(app)/[orgSlug]/admin/attendance/sessions/live-session-attendance-table';
+import { CompletedSessionsTable } from '@iconicedu/web/app/(app)/[orgSlug]/admin/attendance/sessions/completed-sessions-table';
 import {
-  buildMonthlyAttendanceTrend,
-  buildPersonBreakdown,
-  filterAttendanceRows,
-  formatAttendanceMonth,
-  getAttendanceMonthKey,
-  summarizeAttendance,
+  buildConfirmerBreakdown,
+  buildMonthlyCompletionTrend,
+  filterCompletions,
+  formatCompletionMonth,
+  getCompletionMonthKey,
+  summarizeCompletions,
 } from '@iconicedu/web/app/(app)/[orgSlug]/admin/attendance/sessions/session-attendance-analytics';
 
-type Props = {
-  orgSlug: string;
-  rows: LiveSessionAttendanceListItemVM[];
-};
-
-const ALL_FILTERS = {
+const DEFAULT_FILTERS = {
   search: '',
   month: 'all',
   teacherId: 'all',
   parentId: 'all',
-  status: 'ended',
-  scope: 'all',
+  studentName: 'all',
+  method: 'all',
 };
 
-function percentage(value: number | null) {
-  return value === null ? '—' : `${Math.round(value * 100)}%`;
-}
-
-function MetricCard({
+function Metric({
   label,
   value,
   detail,
@@ -46,89 +36,91 @@ function MetricCard({
   icon: React.ComponentType<{ className?: string }>;
 }) {
   return (
-    <Card>
-      <CardContent className="flex items-start justify-between p-5">
-        <div>
-          <p className="text-sm font-medium text-muted-foreground">{label}</p>
-          <p className="mt-2 text-3xl font-semibold tracking-tight">{value}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
-        </div>
-        <div className="rounded-lg bg-primary/10 p-2.5 text-primary">
-          <Icon className="h-5 w-5" />
-        </div>
-      </CardContent>
-    </Card>
+    <div className="flex min-w-0 items-start justify-between gap-4 p-5 sm:p-6">
+      <div>
+        <p className="text-sm font-medium text-muted-foreground">{label}</p>
+        <p className="mt-2 text-3xl font-semibold tracking-tight">{value}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
+      </div>
+      <div className="rounded-lg bg-primary/10 p-2.5 text-primary">
+        <Icon className="h-5 w-5" />
+      </div>
+    </div>
   );
 }
 
-function MonthlyTrend({ rows }: { rows: LiveSessionAttendanceListItemVM[] }) {
-  const points = buildMonthlyAttendanceTrend(rows);
-  const maxSessions = Math.max(1, ...points.map((point) => point.sessions));
-
+function Trend({ rows }: { rows: AdminSessionCompletionVM[] }) {
+  const points = buildMonthlyCompletionTrend(rows);
+  const maximum = Math.max(1, ...points.map((point) => point.sessions));
   return (
-    <Card className="lg:col-span-2">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base">Monthly change over time</CardTitle>
-        <p className="text-sm text-muted-foreground">
-          Completed sessions and attendance rate for the last 12 active months.
-        </p>
-      </CardHeader>
-      <CardContent>
-        {points.length === 0 ? (
-          <div className="flex h-56 items-center justify-center text-sm text-muted-foreground">
-            No completed sessions match these filters.
-          </div>
-        ) : (
-          <div
-            className="overflow-x-auto"
-            role="img"
-            aria-label="Monthly completed sessions and attendance rate"
-          >
-            <div className="flex h-60 min-w-[520px] items-end gap-3 border-b px-2 pt-8">
-              {points.map((point) => (
-                <div
-                  key={point.key}
-                  className="group flex h-full min-w-12 flex-1 flex-col justify-end"
-                >
-                  <div className="mb-2 text-center text-xs font-medium text-muted-foreground">
-                    {percentage(point.attendanceRate)}
-                  </div>
-                  <div
-                    className="mx-auto w-full max-w-14 rounded-t-md bg-primary/80 transition-colors group-hover:bg-primary"
-                    style={{
-                      height: `${Math.max(8, (point.sessions / maxSessions) * 145)}px`,
-                    }}
-                    title={`${point.label}: ${point.sessions} completed sessions, ${percentage(point.attendanceRate)} attendance`}
-                  />
-                  <div className="mt-2 truncate text-center text-[11px] text-muted-foreground">
-                    {point.label.replace(/ \d{4}$/, '')}
-                  </div>
+    <div className="border-t px-5 py-6 sm:px-6">
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <h3 className="font-semibold">Monthly completed lessons</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Change over time for the last 12 active months
+          </p>
+        </div>
+        <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
+          {points.length} active {points.length === 1 ? 'month' : 'months'}
+        </span>
+      </div>
+      {points.length === 0 ? (
+        <div className="flex h-56 items-center justify-center text-sm text-muted-foreground">
+          No completed sessions match these filters.
+        </div>
+      ) : (
+        <div
+          className="overflow-x-auto"
+          role="img"
+          aria-label="Monthly completed sessions"
+        >
+          <div className="flex h-60 min-w-[520px] items-end gap-3 border-b px-2 pt-8">
+            {points.map((point) => (
+              <div
+                key={point.key}
+                className="group flex h-full min-w-12 flex-1 flex-col justify-end"
+              >
+                <div className="mb-2 text-center text-xs font-medium text-muted-foreground">
+                  {point.sessions}
                 </div>
-              ))}
-            </div>
-            <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
-              <span>Bar height: completed sessions</span>
-              <span>Label: attendance rate</span>
-            </div>
+                <div
+                  className="mx-auto w-full max-w-14 rounded-t-md bg-primary/80 group-hover:bg-primary"
+                  style={{
+                    height: `${Math.max(8, (point.sessions / maximum) * 145)}px`,
+                  }}
+                  title={`${point.label}: ${point.sessions} completed sessions`}
+                />
+                <div className="mt-2 truncate text-center text-[11px] text-muted-foreground">
+                  {point.label.replace(/ \d{4}$/, '')}
+                </div>
+              </div>
+            ))}
           </div>
-        )}
-      </CardContent>
-    </Card>
+          <div className="mt-3 flex gap-4 text-xs text-muted-foreground">
+            <span>
+              {points.reduce((sum, point) => sum + point.teacher, 0)} teacher-confirmed
+            </span>
+            <span>
+              {points.reduce((sum, point) => sum + point.parent, 0)} parent-confirmed
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
-function PersonBreakdown({
+function Breakdown({
   title,
-  emptyLabel,
   rows,
-  kind,
+  role,
 }: {
   title: string;
-  emptyLabel: string;
-  rows: LiveSessionAttendanceListItemVM[];
-  kind: 'teacher' | 'parent';
+  rows: AdminSessionCompletionVM[];
+  role: 'educator' | 'guardian';
 }) {
-  const people = buildPersonBreakdown(rows, kind).slice(0, 5);
+  const people = buildConfirmerBreakdown(rows, role).slice(0, 5);
   const maximum = Math.max(1, ...people.map((person) => person.sessions));
   return (
     <Card>
@@ -137,7 +129,9 @@ function PersonBreakdown({
       </CardHeader>
       <CardContent className="space-y-4">
         {people.length === 0 ? (
-          <p className="py-16 text-center text-sm text-muted-foreground">{emptyLabel}</p>
+          <p className="py-16 text-center text-sm text-muted-foreground">
+            No confirmations recorded.
+          </p>
         ) : (
           people.map((person) => (
             <div key={person.id}>
@@ -159,157 +153,145 @@ function PersonBreakdown({
   );
 }
 
-export function SessionAttendanceDashboard({ orgSlug, rows }: Props) {
-  const [filters, setFilters] = React.useState(ALL_FILTERS);
-  const update = (key: keyof typeof ALL_FILTERS) => (value: string) =>
+export function SessionAttendanceDashboard({
+  rows,
+}: {
+  rows: AdminSessionCompletionVM[];
+}) {
+  const [filters, setFilters] = React.useState(DEFAULT_FILTERS);
+  const update = (key: keyof typeof DEFAULT_FILTERS) => (value: string) =>
     setFilters((current) => ({ ...current, [key]: value }));
-  const filteredRows = React.useMemo(
-    () => filterAttendanceRows(rows, filters),
-    [filters, rows],
-  );
-  const summary = summarizeAttendance(filteredRows);
-
-  const months = [...new Set(rows.map((row) => getAttendanceMonthKey(row.startedAt)))]
+  const filtered = React.useMemo(() => filterCompletions(rows, filters), [filters, rows]);
+  const summary = summarizeCompletions(filtered);
+  const months = [...new Set(rows.map((row) => getCompletionMonthKey(row.sessionEndAt)))]
     .filter(Boolean)
     .sort()
     .reverse();
-  const teachers = new Map(
-    rows.flatMap((row) =>
-      row.startedBy
-        ? [[row.startedBy.ids.id, row.startedBy.profile.displayName] as const]
-        : [],
-    ),
+  const people = (role: 'educator' | 'guardian') =>
+    new Map(
+      rows.flatMap((row) =>
+        row.confirmedBy
+          .filter((actor) => actor.role === role)
+          .map((actor) => [actor.profileId, actor.displayName] as const),
+      ),
+    );
+  const students = [...new Set(rows.flatMap((row) => row.studentNames))].sort((a, b) =>
+    a.localeCompare(b),
   );
-  const parents = new Map(
-    rows.flatMap((row) =>
-      (row.participants ?? [])
-        .filter((profile) => profile.kind === 'guardian')
-        .map((profile) => [profile.ids.id, profile.profile.displayName] as const),
-    ),
-  );
-
+  const options = (values: Map<string, string>, label: string) => [
+    { value: 'all', label },
+    ...[...values]
+      .sort((a, b) => a[1].localeCompare(b[1]))
+      .map(([value, name]) => ({ value, label: name })),
+  ];
   return (
     <div className="space-y-6">
-      <AdminFilterBar
-        search={filters.search}
-        onSearchChange={update('search')}
-        searchPlaceholder="Class, teacher, or parent"
-        filterGroups={[
-          {
-            label: 'Month',
-            value: filters.month,
-            onChange: update('month'),
-            options: [
-              { value: 'all', label: 'All months' },
-              ...months.map((month) => ({
-                value: month,
-                label: formatAttendanceMonth(month),
-              })),
-            ],
-          },
-          {
-            label: 'Teacher',
-            value: filters.teacherId,
-            onChange: update('teacherId'),
-            options: [
-              { value: 'all', label: 'All teachers' },
-              ...[...teachers]
-                .sort((a, b) => a[1].localeCompare(b[1]))
-                .map(([value, label]) => ({ value, label })),
-            ],
-          },
-          {
-            label: 'Parent',
-            value: filters.parentId,
-            onChange: update('parentId'),
-            options: [
-              { value: 'all', label: 'All parents' },
-              ...[...parents]
-                .sort((a, b) => a[1].localeCompare(b[1]))
-                .map(([value, label]) => ({ value, label })),
-            ],
-          },
-          {
-            label: 'Status',
-            value: filters.status,
-            onChange: update('status'),
-            options: [
-              { value: 'all', label: 'All statuses' },
-              { value: 'ended', label: 'Completed' },
-              { value: 'live', label: 'Live' },
-              { value: 'failed', label: 'Failed' },
-              { value: 'starting', label: 'Starting' },
-            ],
-          },
-          {
-            label: 'Type',
-            value: filters.scope,
-            onChange: update('scope'),
-            options: [
-              { value: 'all', label: 'All types' },
-              { value: 'scheduled', label: 'Scheduled' },
-              { value: 'ad-hoc', label: 'Ad hoc' },
-            ],
-          },
-        ]}
-      />
-
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          label="Completed sessions"
-          value={summary.completedSessions}
-          detail="Sessions ended in this view"
-          icon={CalendarCheck2}
-        />
-        <MetricCard
-          label="Attendance rate"
-          value={percentage(summary.attendanceRate)}
-          detail="Attendees out of expected"
-          icon={UsersRound}
-        />
-        <MetricCard
-          label="Full attendance"
-          value={percentage(summary.fullAttendanceRate)}
-          detail="Met the attendance policy"
-          icon={ChartNoAxesCombined}
-        />
-        <MetricCard
-          label="No-shows"
-          value={summary.noShows}
-          detail="Expected participants absent"
-          icon={CircleX}
-        />
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-4">
-        <MonthlyTrend rows={filteredRows} />
-        <PersonBreakdown
-          title="Completed by teacher"
-          emptyLabel="No teacher data available."
-          rows={filteredRows}
-          kind="teacher"
-        />
-        <PersonBreakdown
-          title="Completed by parent"
-          emptyLabel="No parent attendance recorded."
-          rows={filteredRows}
-          kind="parent"
-        />
-      </div>
-
-      <section aria-labelledby="session-records-heading" className="space-y-3">
-        <div className="flex items-end justify-between gap-4">
+      <Card className="overflow-hidden">
+        <CardHeader className="flex flex-col gap-4 p-5 sm:p-6 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h2 id="session-records-heading" className="text-lg font-semibold">
-              Session records
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              {filteredRows.length} matching{' '}
-              {filteredRows.length === 1 ? 'session' : 'sessions'}
+            <CardTitle className="text-xl">Completed lesson performance</CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Monthly completion activity across teachers, parents, and students.
             </p>
           </div>
+          <AdminFilterBar
+            layout="toolbar"
+            embedded
+            filterTitle="Filter completed lessons"
+            filterDescription="Narrow the overview and session records together."
+            search={filters.search}
+            onSearchChange={update('search')}
+            searchPlaceholder="Search completed lessons"
+            filterGroups={[
+              {
+                label: 'Month',
+                value: filters.month,
+                onChange: update('month'),
+                options: [
+                  { value: 'all', label: 'All months' },
+                  ...months.map((value) => ({
+                    value,
+                    label: formatCompletionMonth(value),
+                  })),
+                ],
+              },
+              {
+                label: 'Teacher',
+                value: filters.teacherId,
+                onChange: update('teacherId'),
+                options: options(people('educator'), 'All teachers'),
+              },
+              {
+                label: 'Parent',
+                value: filters.parentId,
+                onChange: update('parentId'),
+                options: options(people('guardian'), 'All parents'),
+              },
+              {
+                label: 'Student',
+                value: filters.studentName,
+                onChange: update('studentName'),
+                options: [
+                  { value: 'all', label: 'All students' },
+                  ...students.map((name) => ({ value: name, label: name })),
+                ],
+              },
+              {
+                label: 'Method',
+                value: filters.method,
+                onChange: update('method'),
+                options: [
+                  { value: 'all', label: 'All methods' },
+                  { value: 'confirmed', label: 'Confirmed' },
+                  { value: 'auto_confirmed', label: 'Auto-confirmed' },
+                  { value: 'mixed', label: 'Mixed' },
+                ],
+              },
+            ]}
+          />
+        </CardHeader>
+        <div className="grid divide-y border-t sm:grid-cols-2 sm:divide-x sm:divide-y-0 xl:grid-cols-4">
+          <Metric
+            label="Completed lessons"
+            value={summary.completedSessions}
+            detail="Unique schedule occurrences"
+            icon={CalendarCheck2}
+          />
+          <Metric
+            label="Teacher confirmed"
+            value={summary.teacherConfirmed}
+            detail="Completed by an educator"
+            icon={GraduationCap}
+          />
+          <Metric
+            label="Parent confirmed"
+            value={summary.parentConfirmed}
+            detail="Completed by a guardian"
+            icon={UsersRound}
+          />
+          <Metric
+            label="Average rating"
+            value={summary.averageRating == null ? '—' : summary.averageRating.toFixed(1)}
+            detail="Across rated sessions"
+            icon={Star}
+          />
         </div>
-        <LiveSessionAttendanceTable orgSlug={orgSlug} rows={filteredRows} />
+        <Trend rows={filtered} />
+      </Card>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Breakdown title="Completed by teacher" rows={filtered} role="educator" />
+        <Breakdown title="Completed by parent" rows={filtered} role="guardian" />
+      </div>
+      <section className="space-y-3" aria-labelledby="completed-records-heading">
+        <div>
+          <h2 id="completed-records-heading" className="text-lg font-semibold">
+            Completed session records
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            {filtered.length} matching {filtered.length === 1 ? 'session' : 'sessions'}
+          </p>
+        </div>
+        <CompletedSessionsTable rows={filtered} />
       </section>
     </div>
   );

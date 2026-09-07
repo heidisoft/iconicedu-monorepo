@@ -1,4 +1,5 @@
 import type {
+  AdminSessionCompletionVM,
   ChannelSessionCompletionVM,
   ConnectionVM,
   SessionCompletionVM,
@@ -17,6 +18,16 @@ export function listSessionCompletions(
 ) {
   return createApiClient(supabase).get<ConnectionVM<SessionCompletionVM>>(
     '/session-completions',
+    input,
+  );
+}
+
+export function listAdminSessionCompletions(
+  supabase: SupabaseClient,
+  input: { orgId: string },
+) {
+  return createApiClient(supabase).get<AdminSessionCompletionVM[]>(
+    '/session-completions/admin',
     input,
   );
 }

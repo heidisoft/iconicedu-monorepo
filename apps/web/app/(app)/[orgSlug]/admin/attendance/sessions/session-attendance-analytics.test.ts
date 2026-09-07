@@ -1,114 +1,90 @@
 import { describe, expect, it } from 'vitest';
-
-import type { LiveSessionAttendanceListItemVM } from '@iconicedu/shared-types';
+import type { AdminSessionCompletionVM } from '@iconicedu/shared-types';
 import {
-  buildMonthlyAttendanceTrend,
-  buildPersonBreakdown,
-  filterAttendanceRows,
-  summarizeAttendance,
+  buildConfirmerBreakdown,
+  buildMonthlyCompletionTrend,
+  filterCompletions,
+  summarizeCompletions,
 } from '@iconicedu/web/app/(app)/[orgSlug]/admin/attendance/sessions/session-attendance-analytics';
 
-const teacher = {
-  ids: { id: 'teacher-1', orgId: 'org-1', accountId: 'account-1' },
-  kind: 'educator' as const,
-  profile: {
-    displayName: 'Taylor Reed',
-    avatar: { source: 'generated' as const, seed: null, url: null },
-  },
-};
-
-const parent = {
-  ids: { id: 'parent-1', orgId: 'org-1', accountId: 'account-2' },
-  kind: 'guardian' as const,
-  profile: {
-    displayName: 'Morgan Lee',
-    avatar: { source: 'generated' as const, seed: null, url: null },
-  },
-};
-
-function row(overrides: Partial<LiveSessionAttendanceListItemVM> = {}) {
+function completion(
+  overrides: Partial<AdminSessionCompletionVM> = {},
+): AdminSessionCompletionVM {
   return {
-    ids: { id: 'session-1', orgId: 'org-1', channelId: 'channel-1' },
-    provider: 'daily',
-    status: 'ended',
-    scope: 'scheduled',
-    channelTopic: 'Algebra',
-    channelPurpose: 'learning-space',
-    learningSpaceTitle: 'Algebra tutoring',
-    startedAt: '2026-03-10T14:00:00.000Z',
-    endedAt: '2026-03-10T15:00:00.000Z',
-    joinPath: '/join',
-    startedBy: teacher,
-    participants: [parent],
-    metrics: {
-      participantCount: 4,
-      expectedParticipantCount: 4,
-      attendeeCount: 3,
-      fullAttendanceCount: 2,
-      partialAttendanceCount: 1,
-      noShowCount: 1,
-    },
+    id: 'schedule-1|2026-03-10T14:00:00.000Z',
+    orgId: 'org-1',
+    scheduleId: 'schedule-1',
+    occurrenceKey: '2026-03-10T14:00:00.000Z',
+    sessionEndAt: '2026-03-10T15:00:00.000Z',
+    sessionTitle: 'Algebra tutoring',
+    studentNames: ['Jamie Lee'],
+    channelId: 'channel-1',
+    learningSpaceId: 'space-1',
+    completedAt: '2026-03-10T15:05:00.000Z',
+    completionMethod: 'confirmed',
+    averageRating: 4,
+    confirmedBy: [
+      {
+        profileId: 'teacher-1',
+        displayName: 'Taylor Reed',
+        role: 'educator',
+        status: 'confirmed',
+        completedAt: '2026-03-10T15:05:00.000Z',
+      },
+      {
+        profileId: 'parent-1',
+        displayName: 'Morgan Lee',
+        role: 'guardian',
+        status: 'confirmed',
+        completedAt: '2026-03-10T15:03:00.000Z',
+      },
+    ],
     ...overrides,
-  } as LiveSessionAttendanceListItemVM;
+  };
 }
 
-describe('session attendance analytics', () => {
-  it('summarizes completed sessions and ignores non-ended rows', () => {
-    const summary = summarizeAttendance([
-      row(),
-      row({
-        ids: { id: 'session-2', orgId: 'org-1', channelId: 'channel-1' },
-        status: 'live',
-      }),
-    ]);
-
-    expect(summary).toEqual({
+describe('completed session analytics', () => {
+  it('summarizes unique completed occurrences by confirmer role', () => {
+    expect(summarizeCompletions([completion()])).toEqual({
       completedSessions: 1,
-      attendanceRate: 0.75,
-      fullAttendanceRate: 0.5,
-      noShows: 1,
+      teacherConfirmed: 1,
+      parentConfirmed: 1,
+      averageRating: 4,
     });
   });
 
-  it('filters by month, teacher, parent, status, scope, and search', () => {
-    const rows = [
-      row(),
-      row({
-        ids: { id: 'session-2', orgId: 'org-1', channelId: 'channel-2' },
-        startedAt: '2026-02-10T14:00:00.000Z',
-        channelTopic: 'Reading',
-      }),
-    ];
-    const result = filterAttendanceRows(rows, {
-      search: 'morgan',
-      month: '2026-03',
-      teacherId: 'teacher-1',
-      parentId: 'parent-1',
-      status: 'ended',
-      scope: 'scheduled',
-    });
-
-    expect(result.map((item) => item.ids.id)).toEqual(['session-1']);
+  it('filters by month, teacher, parent, method, and search', () => {
+    const result = filterCompletions(
+      [
+        completion(),
+        completion({ id: 'other', sessionEndAt: '2026-02-01T10:00:00.000Z' }),
+      ],
+      {
+        search: 'Jamie',
+        month: '2026-03',
+        teacherId: 'teacher-1',
+        parentId: 'parent-1',
+        studentName: 'Jamie Lee',
+        method: 'confirmed',
+      },
+    );
+    expect(result.map((row) => row.id)).toEqual(['schedule-1|2026-03-10T14:00:00.000Z']);
   });
 
-  it('builds chronological monthly and people breakdowns', () => {
+  it('builds chronological monthly and confirmer breakdowns', () => {
     const rows = [
-      row(),
-      row({
-        ids: { id: 'session-2', orgId: 'org-1', channelId: 'channel-2' },
-        startedAt: '2026-02-10T14:00:00.000Z',
-      }),
+      completion(),
+      completion({ id: 'other', sessionEndAt: '2026-02-01T10:00:00.000Z' }),
     ];
-
-    expect(buildMonthlyAttendanceTrend(rows).map((point) => point.key)).toEqual([
+    expect(buildMonthlyCompletionTrend(rows).map((point) => point.key)).toEqual([
       '2026-02',
       '2026-03',
     ]);
-    expect(buildPersonBreakdown(rows, 'teacher')[0]).toMatchObject({
+    expect(buildConfirmerBreakdown(rows, 'educator')[0]).toMatchObject({
       name: 'Taylor Reed',
       sessions: 2,
     });
-    expect(buildPersonBreakdown(rows, 'parent')[0]).toMatchObject({
+    expect(buildConfirmerBreakdown(rows, 'guardian')[0]).toMatchObject({
       name: 'Morgan Lee',
       sessions: 2,
     });

@@ -42,3 +42,28 @@ export interface ChannelSessionCompletionVM {
   scheduleId: UUID;
   occurrenceKey: ISODateTime;
 }
+
+export interface AdminSessionCompletionActorVM {
+  profileId: UUID;
+  displayName: string;
+  role: ParticipantRoleVM;
+  status: Extract<ClassSessionCompletionStatus, 'confirmed' | 'auto_confirmed'>;
+  completedAt: ISODateTime;
+}
+
+/** One completed schedule occurrence, grouped across all participant confirmations. */
+export interface AdminSessionCompletionVM {
+  id: string;
+  orgId: UUID;
+  scheduleId: UUID;
+  occurrenceKey: ISODateTime;
+  sessionEndAt: ISODateTime;
+  sessionTitle?: string | null;
+  studentNames: string[];
+  channelId?: UUID | null;
+  learningSpaceId?: UUID | null;
+  completedAt: ISODateTime;
+  completionMethod: 'confirmed' | 'auto_confirmed' | 'mixed';
+  confirmedBy: AdminSessionCompletionActorVM[];
+  averageRating?: number | null;
+}

@@ -11,12 +11,6 @@ import {
   Button,
   ChevronLeft,
   ChevronRight,
-  Search,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   Table,
   TableBody,
   TableCell,
@@ -24,12 +18,13 @@ import {
   TableHeader,
   TableRow,
 } from '@iconicedu/ui-web';
+import { AdminFilterBar } from '@iconicedu/web/components/admin/admin-filter-bar';
 
 type ActivityFeedAuditDashboardProps = {
   audit: AdminActivityFeedAuditVM;
 };
 
-const PAGE_SIZES = [10, 25, 50];
+const PAGE_SIZES = [25, 10, 50];
 const ALL_VERBS = 'all';
 
 function formatDateTime(value: string) {
@@ -103,7 +98,7 @@ export function ActivityFeedAuditDashboard({ audit }: ActivityFeedAuditDashboard
   const [search, setSearch] = React.useState('');
   const [verb, setVerb] = React.useState(ALL_VERBS);
   const [pageIndex, setPageIndex] = React.useState(1);
-  const [pageSize, setPageSize] = React.useState(PAGE_SIZES[1]);
+  const [pageSize, setPageSize] = React.useState(PAGE_SIZES[0]);
 
   React.useEffect(() => {
     setPageIndex(1);
@@ -209,49 +204,41 @@ export function ActivityFeedAuditDashboard({ audit }: ActivityFeedAuditDashboard
         </Table>
       </div>
 
-      <div className="rounded-xl border bg-card px-4 py-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 h-9 w-80 rounded-lg border bg-background px-3 focus-within:ring-2 focus-within:ring-ring shrink-0">
-            <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-            <input
-              className="flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none"
-              placeholder="Search verb, user, channel, job, or delivery"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          <Select value={verb} onValueChange={setVerb}>
-            <SelectTrigger className="w-full sm:w-72">
-              <SelectValue placeholder="Verb" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL_VERBS}>All verbs</SelectItem>
-              {audit.verbSummaries.map((summary) => (
-                <SelectItem key={summary.verb} value={summary.verb}>
-                  {summary.verb}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
-            value={String(pageSize)}
-            onValueChange={(value) => setPageSize(Number(value))}
-          >
-            <SelectTrigger className="w-full sm:w-32">
-              <SelectValue placeholder="Rows" />
-            </SelectTrigger>
-            <SelectContent>
-              {PAGE_SIZES.map((size) => (
-                <SelectItem key={size} value={String(size)}>
-                  {size} rows
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <p className="ml-auto text-sm text-muted-foreground">
-            Generated {formatDateTime(audit.generatedAt)}
-          </p>
-        </div>
+      <div className="space-y-2">
+        <AdminFilterBar
+          layout="toolbar"
+          filterTitle="Filter activity"
+          filterDescription="Narrow generated activity records and choose the page size."
+          search={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Search verb, user, channel, job, or delivery"
+          filterGroups={[
+            {
+              label: 'Verb',
+              value: verb,
+              onChange: setVerb,
+              options: [
+                { value: ALL_VERBS, label: 'All verbs' },
+                ...audit.verbSummaries.map((summary) => ({
+                  value: summary.verb,
+                  label: summary.verb,
+                })),
+              ],
+            },
+            {
+              label: 'Rows',
+              value: String(pageSize),
+              onChange: (value) => setPageSize(Number(value)),
+              options: PAGE_SIZES.map((size) => ({
+                value: String(size),
+                label: `${size} rows`,
+              })),
+            },
+          ]}
+        />
+        <p className="px-1 text-right text-xs text-muted-foreground">
+          Generated {formatDateTime(audit.generatedAt)}
+        </p>
       </div>
 
       <div className="rounded-xl border bg-card overflow-hidden">

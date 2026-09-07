@@ -121,4 +121,10 @@ export class SessionCompletionsController {
       sessionCompletionId: id,
     });
   }
+
+  @Get('admin')
+  @UseGuards(AuthGuard)
+  listForAdmin(@Req() req: AuthenticatedRequest, @Query('orgId') orgId: string) {
+    return this.sessionCompletionsService.listForAdmin(req.user.id, { orgId });
+  }
 }

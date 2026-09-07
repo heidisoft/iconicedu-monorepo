@@ -607,6 +607,7 @@ export function ChannelsDashboard({ orgSlug }: ChannelsDashboardProps) {
       </div>
 
       <AdminFilterBar
+        layout="toolbar"
         search={search}
         onSearchChange={setSearch}
         filterGroups={[

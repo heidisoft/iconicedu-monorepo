@@ -566,6 +566,7 @@ export function UsersTable({ orgSlug }: UsersTableProps) {
 
       {/* Filter bar */}
       <AdminFilterBar
+        layout="toolbar"
         search={search}
         onSearchChange={setSearch}
         filterGroups={[

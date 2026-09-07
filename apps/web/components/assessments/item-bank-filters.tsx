@@ -5,10 +5,6 @@ import { useEffect, useRef, useState, useTransition } from 'react';
 import type { AssessmentSubjectVM } from '@iconicedu/shared-types';
 import {
   Button,
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
   Label,
   Popover,
   PopoverContent,
@@ -47,27 +43,8 @@ const GRADES = Array.from({ length: 12 }, (_, i) => ({
   label: `Grade ${i + 1}`,
 }));
 
-const BP = { sm: 640, md: 768, lg: 1024, xl: 1280 } as const;
-
 function parseParam(v: string | null): string[] {
   return v ? v.split(',').filter(Boolean) : [];
-}
-
-// ─── useWindowWidth ───────────────────────────────────────────────────────────
-
-function useWindowWidth() {
-  const [width, setWidth] = useState(() =>
-    typeof window !== 'undefined' ? window.innerWidth : BP.xl,
-  );
-  useEffect(() => {
-    function onResize() {
-      setWidth(window.innerWidth);
-    }
-    onResize();
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-  return width;
 }
 
 // ─── MultiSelect ──────────────────────────────────────────────────────────────
@@ -218,18 +195,7 @@ export function ItemBankFilters({ subjects }: Props) {
   const searchParams = useSearchParams();
   const [, startTransition] = useTransition();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const width = useWindowWidth();
-
   const hasSubjects = subjects.length > 0;
-  const show = {
-    type: width >= BP.sm,
-    grade: width >= BP.md,
-    difficulty: width >= BP.lg,
-    subject: width >= BP.xl && hasSubjects,
-  };
-  const anyHidden =
-    !show.type || !show.grade || !show.difficulty || (hasSubjects && !show.subject);
 
   const urlSearch = searchParams.get('search') ?? '';
   const current = {
@@ -239,11 +205,12 @@ export function ItemBankFilters({ subjects }: Props) {
     difficulties: parseParam(searchParams.get('difficulties')),
   };
 
-  const activeHiddenCount =
-    (!show.type ? current.types.length : 0) +
-    (!show.grade ? current.grades.length : 0) +
-    (!show.difficulty ? current.difficulties.length : 0) +
-    (!show.subject ? current.subjectIds.length : 0);
+  const activeFilterCount = [
+    current.types,
+    current.grades,
+    current.difficulties,
+    current.subjectIds,
+  ].filter((values) => values.length > 0).length;
 
   const [searchValue, setSearchValue] = useState(urlSearch);
   useEffect(() => {
@@ -275,155 +242,92 @@ export function ItemBankFilters({ subjects }: Props) {
     label: s.icon ? `${s.icon} ${s.name}` : s.name,
   }));
 
-  return (
-    <>
-      <div className="rounded-xl border bg-card px-4 py-3">
-        <div className="flex items-center gap-3">
-          {/* Search — always visible */}
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="hidden sm:block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Search
-            </span>
-            <div className="flex items-center gap-2 h-9 w-44 sm:w-56 rounded-lg border bg-background px-3 focus-within:ring-2 focus-within:ring-ring">
-              <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-              <input
-                className="flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none"
-                placeholder="Search…"
-                value={searchValue}
-                onChange={(e) => handleSearchChange(e.target.value)}
-              />
-            </div>
-          </div>
+  function clearFilters() {
+    const params = new URLSearchParams(searchParams.toString());
+    ['types', 'grades', 'difficulties', 'subjectIds'].forEach((key) =>
+      params.delete(key),
+    );
+    params.delete('page');
+    startTransition(() => router.replace(`${pathname}?${params.toString()}`));
+  }
 
-          {show.type && (
+  return (
+    <div className="flex w-full flex-col gap-2 rounded-xl border bg-card p-3 sm:flex-row sm:items-center sm:justify-end">
+      <label className="flex h-9 min-w-0 items-center gap-2 rounded-lg border bg-background px-3 focus-within:ring-2 focus-within:ring-ring sm:w-64">
+        <span className="sr-only">Search</span>
+        <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        <input
+          className="min-w-0 flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none"
+          placeholder="Search questions"
+          value={searchValue}
+          onChange={(event) => handleSearchChange(event.target.value)}
+        />
+      </label>
+
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button variant="outline" size="sm" className="justify-center gap-2">
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            Filters
+            {activeFilterCount > 0 && (
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground">
+                {activeFilterCount}
+              </span>
+            )}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="end" className="w-[min(42rem,calc(100vw-2rem))] p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="font-semibold">Filter question bank</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Combine filters to narrow the current results.
+              </p>
+            </div>
+            {activeFilterCount > 0 && (
+              <Button variant="ghost" size="sm" onClick={clearFilters}>
+                Clear all
+              </Button>
+            )}
+          </div>
+          <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2">
             <MultiSelect
               label="Type"
               allLabel="All types"
               options={ITEM_TYPES}
               selected={current.types}
-              onChange={(v) => updateMulti('types', v)}
+              onChange={(values) => updateMulti('types', values)}
+              inline
             />
-          )}
-          {show.grade && (
             <MultiSelect
               label="Grade"
-              allLabel="All"
+              allLabel="All grades"
               options={GRADES}
               selected={current.grades}
-              onChange={(v) => updateMulti('grades', v)}
+              onChange={(values) => updateMulti('grades', values)}
+              inline
             />
-          )}
-          {show.difficulty && (
             <MultiSelect
               label="Difficulty"
-              allLabel="All"
+              allLabel="All difficulties"
               options={DIFFICULTIES}
               selected={current.difficulties}
-              onChange={(v) => updateMulti('difficulties', v)}
+              onChange={(values) => updateMulti('difficulties', values)}
+              inline
             />
-          )}
-          {show.subject && (
-            <MultiSelect
-              label="Subject"
-              allLabel="All"
-              options={subjectOptions}
-              selected={current.subjectIds}
-              onChange={(v) => updateMulti('subjectIds', v)}
-            />
-          )}
-
-          {/* More filters — always rendered; invisible when nothing is hidden */}
-          <div className="ml-auto shrink-0">
-            <Button
-              variant="outline"
-              size="sm"
-              className={`gap-2 transition-opacity ${anyHidden ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-              onClick={() => setMobileOpen(true)}
-            >
-              <SlidersHorizontal className="h-3.5 w-3.5" />
-              More filters
-              {activeHiddenCount > 0 && (
-                <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
-                  {activeHiddenCount}
-                </span>
-              )}
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* More filters dialog — only hidden filters */}
-      <Dialog open={mobileOpen} onOpenChange={setMobileOpen}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>More filters</DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col gap-5 py-2">
-            {!show.type && (
-              <MultiSelect
-                label="Type"
-                allLabel="All types"
-                options={ITEM_TYPES}
-                selected={current.types}
-                onChange={(v) => updateMulti('types', v)}
-                inline
-              />
-            )}
-            {!show.grade && (
-              <MultiSelect
-                label="Grade"
-                allLabel="All"
-                options={GRADES}
-                selected={current.grades}
-                onChange={(v) => updateMulti('grades', v)}
-                inline
-              />
-            )}
-            {!show.difficulty && (
-              <MultiSelect
-                label="Difficulty"
-                allLabel="All"
-                options={DIFFICULTIES}
-                selected={current.difficulties}
-                onChange={(v) => updateMulti('difficulties', v)}
-                inline
-              />
-            )}
-            {!show.subject && hasSubjects && (
+            {hasSubjects && (
               <MultiSelect
                 label="Subject"
-                allLabel="All"
+                allLabel="All subjects"
                 options={subjectOptions}
                 selected={current.subjectIds}
-                onChange={(v) => updateMulti('subjectIds', v)}
+                onChange={(values) => updateMulti('subjectIds', values)}
                 inline
               />
             )}
           </div>
-          {activeHiddenCount > 0 && (
-            <div className="border-t pt-3">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full text-muted-foreground"
-                onClick={() => {
-                  const params = new URLSearchParams(searchParams.toString());
-                  if (!show.type) params.delete('types');
-                  if (!show.grade) params.delete('grades');
-                  if (!show.difficulty) params.delete('difficulties');
-                  if (!show.subject) params.delete('subjectIds');
-                  startTransition(() =>
-                    router.replace(`${pathname}?${params.toString()}`),
-                  );
-                  setMobileOpen(false);
-                }}
-              >
-                Clear these filters
-              </Button>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-    </>
+        </PopoverContent>
+      </Popover>
+    </div>
   );
 }
