@@ -146,15 +146,14 @@ describe('completed session analytics', () => {
     expect(isCompletionMonthKey('all')).toBe(false);
   });
 
-  it('builds a month-filter href, leaving the current month implicit', () => {
-    const now = new Date('2026-09-07T12:00:00.000Z');
+  it('builds a month-filter href, leaving the three-month window implicit', () => {
     const base = '/i/admin/attendance/sessions';
-    expect(buildMonthFilterHref(base, '', '2026-07', now)).toBe(`${base}?month=2026-07`);
-    expect(buildMonthFilterHref(base, 'month=2026-07', 'all', now)).toBe(
-      `${base}?month=all`,
+    expect(buildMonthFilterHref(base, '', '2026-07')).toBe(`${base}?month=2026-07`);
+    expect(buildMonthFilterHref(base, 'month=2026-07', 'all')).toBe(base);
+    // Selecting a single month keeps it explicit in the URL.
+    expect(buildMonthFilterHref(base, 'month=2026-07', '2026-09')).toBe(
+      `${base}?month=2026-09`,
     );
-    // Selecting the current month clears the param rather than pinning it.
-    expect(buildMonthFilterHref(base, 'month=2026-07', '2026-09', now)).toBe(base);
   });
 
   it('builds chronological monthly and confirmer breakdowns', () => {
@@ -175,4 +174,54 @@ describe('completed session analytics', () => {
       sessions: 2,
     });
   });
+});
+
+it('counts pending and automatic confirmations in each person’s total but only manual confirmations in the numerator', () => {
+  const row = completion();
+  const participants = row.confirmedBy.map((actor) => ({
+    ...actor,
+    role: actor.role as 'educator' | 'guardian',
+  }));
+  const rows = [
+    completion({ participants }),
+    completion({
+      id: 'pending',
+      confirmedBy: [],
+      participants: participants.map((actor) => ({ ...actor, status: 'pending' })),
+    }),
+    completion({
+      id: 'automatic',
+      confirmedBy: row.confirmedBy.map((actor) => ({
+        ...actor,
+        status: 'auto_confirmed',
+      })),
+      participants: participants.map((actor) => ({ ...actor, status: 'auto_confirmed' })),
+    }),
+  ];
+  for (const role of ['educator', 'guardian'] as const) {
+    expect(buildConfirmerBreakdown(rows, role)[0]).toMatchObject({
+      sessions: 1,
+      total: 3,
+      percentage: 33,
+    });
+  }
+  expect(summarizeCompletions(rows)).toMatchObject({
+    completedSessions: 3,
+    teacherConfirmed: 1,
+    parentConfirmed: 1,
+  });
+  expect(filterCompletions(rows, { ...ALL, teacherId: 'teacher-1' })).toHaveLength(3);
+  expect(buildConfirmerBreakdown([], 'educator')).toEqual([]);
+});
+
+it('includes people with no confirmations and deduplicates people within an occurrence', () => {
+  const person = {
+    profileId: 'tutor',
+    displayName: 'Tutor',
+    role: 'educator' as const,
+    status: 'pending' as const,
+  };
+  expect(
+    buildConfirmerBreakdown([completion({ participants: [person, person] })], 'educator'),
+  ).toEqual([{ id: 'tutor', name: 'Tutor', sessions: 0, total: 1, percentage: 0 }]);
 });

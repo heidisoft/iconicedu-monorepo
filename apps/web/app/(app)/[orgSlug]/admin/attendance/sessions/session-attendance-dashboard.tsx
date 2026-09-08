@@ -13,6 +13,7 @@ import {
   buildMonthlyCompletionTrend,
   filterCompletions,
   formatCompletionMonth,
+  getCompletionParticipants,
   summarizeCompletions,
 } from '@iconicedu/web/app/(app)/[orgSlug]/admin/attendance/sessions/session-attendance-analytics';
 
@@ -54,7 +55,7 @@ function Trend({ rows }: { rows: AdminSessionCompletionVM[] }) {
         <div>
           <h2 className="text-sm font-semibold">Monthly completed lessons</h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Change over time for the last 12 active months
+            Completed sessions within the past three months
           </p>
         </div>
         <span className="text-xs text-muted-foreground">
@@ -116,8 +117,7 @@ function Breakdown({
   rows: AdminSessionCompletionVM[];
   role: 'educator' | 'guardian';
 }) {
-  const people = buildConfirmerBreakdown(rows, role).slice(0, 5);
-  const maximum = Math.max(1, ...people.map((person) => person.sessions));
+  const people = buildConfirmerBreakdown(rows, role);
   return (
     <div className="overflow-hidden rounded-xl border bg-card">
       <div className="border-b px-6 py-4">
@@ -126,19 +126,21 @@ function Breakdown({
       <div className="space-y-4 px-6 py-5">
         {people.length === 0 ? (
           <p className="py-12 text-center text-sm text-muted-foreground">
-            No confirmations recorded.
+            No matching tutors or parents.
           </p>
         ) : (
           people.map((person) => (
             <div key={person.id}>
               <div className="mb-1.5 flex items-center justify-between gap-3 text-sm">
                 <span className="truncate font-medium">{person.name}</span>
-                <span className="shrink-0 text-muted-foreground">{person.sessions}</span>
+                <span className="shrink-0 text-muted-foreground">
+                  {person.sessions} / {person.total} confirmed · {person.percentage}%
+                </span>
               </div>
               <div className="h-1.5 overflow-hidden rounded-full bg-muted">
                 <div
                   className="h-full rounded-full bg-primary"
-                  style={{ width: `${(person.sessions / maximum) * 100}%` }}
+                  style={{ width: `${person.percentage}%` }}
                 />
               </div>
             </div>
@@ -233,7 +235,7 @@ export function SessionAttendanceDashboard({
   const people = (role: 'educator' | 'guardian') =>
     new Map(
       rows.flatMap((row) =>
-        row.confirmedBy
+        getCompletionParticipants(row)
           .filter((actor) => actor.role === role)
           .map((actor) => [actor.profileId, actor.displayName] as const),
       ),
@@ -265,7 +267,7 @@ export function SessionAttendanceDashboard({
   ];
   const selectedPeriodLabel =
     selectedMonth === ALL_COMPLETION_MONTHS
-      ? 'All recorded months'
+      ? 'Past 3 months'
       : formatCompletionMonth(selectedMonth);
 
   return (
@@ -284,13 +286,13 @@ export function SessionAttendanceDashboard({
         />
         <Metric
           label="Teacher confirmed"
-          value={summary.teacherConfirmed}
-          detail="Completed by an educator"
+          value={`${summary.completedSessions ? Math.round((summary.teacherConfirmed / summary.completedSessions) * 100) : 0}%`}
+          detail={`${summary.teacherConfirmed} / ${summary.completedSessions} sessions manually confirmed`}
         />
         <Metric
           label="Parent confirmed"
-          value={summary.parentConfirmed}
-          detail="Completed by a guardian"
+          value={`${summary.completedSessions ? Math.round((summary.parentConfirmed / summary.completedSessions) * 100) : 0}%`}
+          detail={`${summary.parentConfirmed} / ${summary.completedSessions} sessions manually confirmed`}
         />
         <Metric
           label="Average rating"
@@ -313,7 +315,7 @@ export function SessionAttendanceDashboard({
               value: selectedMonth,
               onChange: handleMonthChange,
               options: [
-                { value: ALL_COMPLETION_MONTHS, label: 'All months' },
+                { value: ALL_COMPLETION_MONTHS, label: 'Past 3 months' },
                 ...monthOptions.map((value) => ({
                   value,
                   label: formatCompletionMonth(value),
