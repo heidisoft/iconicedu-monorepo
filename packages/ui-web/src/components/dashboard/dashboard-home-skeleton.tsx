@@ -77,22 +77,22 @@ function QuickActionCardSkeleton({ inverted = false }: { inverted?: boolean }) {
   return (
     <div
       className={`rounded-2xl p-5 ${
-        inverted ? 'bg-primary' : 'border border-border bg-background/70'
+        inverted ? 'bg-action' : 'border border-border bg-background/70'
       }`}
     >
       <div className="flex items-start gap-3">
         <Skeleton
-          className={`size-5 rounded-sm ${inverted ? 'bg-primary-foreground/30' : ''}`}
+          className={`size-5 rounded-sm ${inverted ? 'bg-action-foreground/30' : ''}`}
         />
         <div className="min-w-0 flex-1 space-y-2">
           <Skeleton
-            className={`h-5 w-24 rounded-md ${inverted ? 'bg-primary-foreground/30' : ''}`}
+            className={`h-5 w-24 rounded-md ${inverted ? 'bg-action-foreground/30' : ''}`}
           />
           <Skeleton
-            className={`h-4 w-28 rounded-md ${inverted ? 'bg-primary-foreground/20' : ''}`}
+            className={`h-4 w-28 rounded-md ${inverted ? 'bg-action-foreground/20' : ''}`}
           />
           <Skeleton
-            className={`h-4 w-24 rounded-md ${inverted ? 'bg-primary-foreground/20' : ''}`}
+            className={`h-4 w-24 rounded-md ${inverted ? 'bg-action-foreground/20' : ''}`}
           />
         </div>
       </div>

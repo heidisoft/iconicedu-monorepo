@@ -120,6 +120,11 @@ export function ActivityCompletionCheck({
   const [rescheduleRequested, setRescheduleRequested] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [localResolvedAt, setLocalResolvedAt] = useState<string | null>(null);
+  // True only when THIS session's confirm resolved a still-pending row. When the
+  // row was already complete (auto-confirmed by the system, or confirmed
+  // elsewhere), the "confirmed" view shows a plain "marked as completed" message
+  // rather than the "Great! How was the session?" prompt that assumes a fresh act.
+  const [freshlyConfirmed, setFreshlyConfirmed] = useState(false);
   const effectiveResolvedAt = localResolvedAt ?? metadata.resolvedAt;
   const [isUndoWindowOpen, setIsUndoWindowOpen] = useState(
     () => resolveUndoWindowOpen(effectiveResolvedAt) && !metadata.hasRating,
@@ -176,15 +181,25 @@ export function ActivityCompletionCheck({
     setStep('submitting_confirm');
     setError(null);
     try {
-      await confirmSessionCompletion({
+      const result = await confirmSessionCompletion({
         orgId: metadata.orgId,
         sessionCompletionId: metadata.sessionCompletionId!,
       });
-      setLocalResolvedAt(new Date().toISOString());
+      if (result.alreadyResolved) {
+        // Server says the session was already complete (auto-confirmed, or
+        // confirmed elsewhere) — show the completed state without the fresh
+        // "How was the session?" header or the Undo window.
+        setFreshlyConfirmed(false);
+      } else {
+        setFreshlyConfirmed(true);
+        setLocalResolvedAt(new Date().toISOString());
+      }
       setStep('confirmed');
       onCompletionSubmit?.('confirmed');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to submit');
+      setError(
+        err instanceof Error ? err.message : 'Something went wrong. Please try again.',
+      );
       setStep('prompt');
     }
   }, [canSubmit, metadata, onCompletionSubmit]);
@@ -205,7 +220,9 @@ export function ActivityCompletionCheck({
       setStep('disputed');
       onCompletionSubmit?.('disputed');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to submit');
+      setError(
+        err instanceof Error ? err.message : 'Something went wrong. Please try again.',
+      );
       setStep('dispute_form');
     }
   }, [
@@ -304,7 +321,9 @@ export function ActivityCompletionCheck({
           <View style={styles.confirmedHeader}>
             <CheckCircle2 size={16} color={colors.teal} />
             <Text style={[styles.confirmedLabel, { color: colors.teal }]}>
-              Great! How was the session?
+              {freshlyConfirmed
+                ? 'Great! How was the session?'
+                : 'This session has been marked as completed.'}
             </Text>
           </View>
           {isUndoWindowOpen ? (

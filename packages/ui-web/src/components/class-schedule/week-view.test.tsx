@@ -141,16 +141,16 @@ describe('WeekView', () => {
       vi.setSystemTime(instant);
       renderWeek('America/New_York');
 
-      expect(screen.getByText('27').className).toContain('bg-primary');
-      expect(screen.getByText('28').className).not.toContain('bg-primary');
+      expect(screen.getByText('27').className).toContain('bg-action');
+      expect(screen.getByText('28').className).not.toContain('bg-action');
     });
 
     it('marks the viewer date as today when the viewer is ahead of the instant', () => {
       vi.setSystemTime(instant);
       renderWeek('Asia/Colombo');
 
-      expect(screen.getByText('28').className).toContain('bg-primary');
-      expect(screen.getByText('27').className).not.toContain('bg-primary');
+      expect(screen.getByText('28').className).toContain('bg-action');
+      expect(screen.getByText('27').className).not.toContain('bg-action');
     });
 
     it('positions the current-time line at the viewer wall-clock time', () => {

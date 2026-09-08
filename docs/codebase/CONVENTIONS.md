@@ -19,6 +19,13 @@
 - Most relevant enforced rules (from `eslint.config.mjs`): TypeScript parser with ES2020/module source type, React + React Hooks plugins active, `ignores` excludes `node_modules`, `dist`, `coverage`, `.next`, generated Next files.
 - Run commands: `pnpm lint`, `pnpm lint:affected`, `pnpm lint:fix`, `pnpm format`, `pnpm format:check`.
 
+#### Web theme colors
+
+- Use the shared `Button` for standard actions. Custom filled action links and buttons use `bg-action`, `text-action-foreground`, and `hover:bg-action/85`, including dashboard and marketing calls to action.
+- Highlight live-session date pills and the current calendar date with `bg-action` and `text-action-foreground`. Nested date labels inherit the foreground so unavailable states remain readable.
+- Keep `primary` tokens for positive status indicators, live badges, and supporting accents. The action and primary palettes each have light and dark values in `packages/ui-web/src/styles/global.css`.
+- `flag-exempt: theme-token consistency maintenance` applies when correcting existing control colors without changing available actions or their behavior.
+
 ### 3) Import and Module Conventions
 
 - Path aliases (not relative-only): `@iconicedu/web/*`, `@iconicedu/api/*`, `@iconicedu/mobile/*`, `@iconicedu/ui-web/*`, `@iconicedu/ui-native/*`, `@iconicedu/shared-types(/*)`, `@iconicedu/utils(/*)` defined in `tsconfig.base.json`; mobile additionally uses `@/*` → `./src/*`.

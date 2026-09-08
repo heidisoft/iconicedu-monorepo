@@ -555,7 +555,9 @@ describe('ActivityItem', () => {
     expect(screen.getByText('1 of 2 confirmed')).toBeTruthy();
 
     fireEvent.press(screen.getByLabelText('Math Foundations — resolved'));
-    expect(screen.getByText('Great! How was the session?')).toBeTruthy();
+    // Already-confirmed on load (not a fresh in-session confirm) → the plain
+    // "marked as completed" message rather than the fresh-confirm feedback prompt.
+    expect(screen.getByText('This session has been marked as completed.')).toBeTruthy();
     expect(screen.getByText('Rate your session')).toBeTruthy();
 
     fireEvent.press(screen.getByLabelText('Math Foundations — needs confirmation'));

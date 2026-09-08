@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -18,6 +19,39 @@ import { AuthGuard } from '@iconicedu/api/modules/auth/auth.guard';
 import { SessionCompletionsService } from '@iconicedu/api/modules/session-completions/session-completions.service';
 import type { AuthenticatedRequest } from '@iconicedu/api/lib/http/authenticated-request';
 
+/**
+ * Normalises the optional `completedSince` / `completedUntil` query pair at the
+ * API boundary. Both are forwarded straight into PostgREST `session_end_at`
+ * predicates, so a malformed value would otherwise surface as an internal
+ * database error instead of a client-safe 400. Rejects non-timestamps and
+ * inverted ranges, and canonicalises accepted values to ISO 8601 UTC so the
+ * downstream half-open `[since, until)` window is always well-formed.
+ */
+function parseCompletedRange(
+  completedSince: string | undefined,
+  completedUntil: string | undefined,
+): { completedSince: string | null; completedUntil: string | null } {
+  const toEpochMs = (value: string | undefined, field: string): number | null => {
+    if (value === undefined) return null;
+    const ms = Date.parse(value);
+    if (!Number.isFinite(ms)) {
+      throw new BadRequestException(`${field} must be an ISO 8601 timestamp`);
+    }
+    return ms;
+  };
+
+  const sinceMs = toEpochMs(completedSince, 'completedSince');
+  const untilMs = toEpochMs(completedUntil, 'completedUntil');
+  if (sinceMs !== null && untilMs !== null && sinceMs >= untilMs) {
+    throw new BadRequestException('completedSince must be earlier than completedUntil');
+  }
+
+  return {
+    completedSince: sinceMs === null ? null : new Date(sinceMs).toISOString(),
+    completedUntil: untilMs === null ? null : new Date(untilMs).toISOString(),
+  };
+}
+
 @Controller('session-completions')
 export class SessionCompletionsController {
   constructor(private readonly sessionCompletionsService: SessionCompletionsService) {}
@@ -34,8 +68,7 @@ export class SessionCompletionsController {
     return this.sessionCompletionsService.getCompletionSummaryForProfile(req.user.id, {
       orgId,
       profileId,
-      completedSince: completedSince ?? null,
-      completedUntil: completedUntil ?? null,
+      ...parseCompletedRange(completedSince, completedUntil),
     });
   }
 
@@ -49,8 +82,7 @@ export class SessionCompletionsController {
   ) {
     return this.sessionCompletionsService.getOrgCompletionSummary(req.user.id, {
       orgId,
-      completedSince: completedSince ?? null,
-      completedUntil: completedUntil ?? null,
+      ...parseCompletedRange(completedSince, completedUntil),
     });
   }
 
@@ -139,7 +171,15 @@ export class SessionCompletionsController {
 
   @Get('admin')
   @UseGuards(AuthGuard)
-  listForAdmin(@Req() req: AuthenticatedRequest, @Query('orgId') orgId: string) {
-    return this.sessionCompletionsService.listForAdmin(req.user.id, { orgId });
+  listForAdmin(
+    @Req() req: AuthenticatedRequest,
+    @Query('orgId') orgId: string,
+    @Query('completedSince') completedSince?: string,
+    @Query('completedUntil') completedUntil?: string,
+  ) {
+    return this.sessionCompletionsService.listForAdmin(req.user.id, {
+      orgId,
+      ...parseCompletedRange(completedSince, completedUntil),
+    });
   }
 }

@@ -146,6 +146,11 @@ export function ActivityCompletionCheck({
   const [rescheduleRequested, setRescheduleRequested] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [localResolvedAt, setLocalResolvedAt] = useState<string | null>(null);
+  // True only when THIS session's confirm action resolved a still-pending row.
+  // When the row was already complete (auto-confirmed by the system, or confirmed
+  // elsewhere), the "confirmed" view shows a plain "marked as completed" message
+  // instead of the "Great! How was the session?" prompt that assumes a fresh act.
+  const [freshlyConfirmed, setFreshlyConfirmed] = useState(false);
   const effectiveResolvedAt = localResolvedAt ?? metadata.resolvedAt;
   const [isUndoWindowOpen, setIsUndoWindowOpen] = useState(
     () => resolveUndoWindowOpen(effectiveResolvedAt) && !metadata.hasRating,
@@ -215,13 +220,26 @@ export function ActivityCompletionCheck({
         const payload = (await response.json().catch(() => null)) as {
           error?: string;
         } | null;
-        throw new Error(payload?.error ?? 'Failed to submit');
+        throw new Error(payload?.error ?? 'Something went wrong. Please try again.');
       }
-      setLocalResolvedAt(new Date().toISOString());
+      const payload = (await response.json().catch(() => null)) as {
+        alreadyResolved?: boolean;
+      } | null;
+      if (payload?.alreadyResolved) {
+        // Server says the session was already complete (auto-confirmed, or
+        // confirmed elsewhere) — show the completed state without the fresh
+        // "How was the session?" header or the Undo window.
+        setFreshlyConfirmed(false);
+      } else {
+        setFreshlyConfirmed(true);
+        setLocalResolvedAt(new Date().toISOString());
+      }
       setStep('confirmed');
       onVoteSubmit?.('confirmed');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to submit');
+      setError(
+        err instanceof Error ? err.message : 'Something went wrong. Please try again.',
+      );
       setStep('prompt');
     }
   }, [canSubmit, metadata, onVoteSubmit]);
@@ -248,13 +266,15 @@ export function ActivityCompletionCheck({
         const payload = (await response.json().catch(() => null)) as {
           error?: string;
         } | null;
-        throw new Error(payload?.error ?? 'Failed to submit');
+        throw new Error(payload?.error ?? 'Something went wrong. Please try again.');
       }
       setLocalResolvedAt(new Date().toISOString());
       setStep('disputed');
       onVoteSubmit?.('disputed');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to submit');
+      setError(
+        err instanceof Error ? err.message : 'Something went wrong. Please try again.',
+      );
       setStep('dispute_form');
     }
   }, [
@@ -360,7 +380,9 @@ export function ActivityCompletionCheck({
           <div className="flex items-center gap-1.5">
             <CheckCircle2 className="size-4 text-success" />
             <p className="text-sm font-semibold text-success">
-              Great! How was the session?
+              {freshlyConfirmed
+                ? 'Great! How was the session?'
+                : 'This session has been marked as completed.'}
             </p>
           </div>
           {isUndoWindowOpen ? (

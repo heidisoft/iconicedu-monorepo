@@ -29,10 +29,16 @@ export function getOrgSessionCompletionSummary(input: {
 }
 
 export function confirmSessionCompletion(input: ConfirmSessionCompletionInput) {
-  return apiPost<{ success: true; feedbackEnabled: true }>(
-    `/session-completions/${input.sessionCompletionId}/confirm`,
-    { orgId: input.orgId },
-  );
+  return apiPost<{
+    success: true;
+    feedbackEnabled: boolean;
+    // Present when the session was already complete (auto-confirmed by the
+    // system, or confirmed from another device) — the call is a no-op success.
+    alreadyResolved?: boolean;
+    status?: 'confirmed' | 'auto_confirmed';
+  }>(`/session-completions/${input.sessionCompletionId}/confirm`, {
+    orgId: input.orgId,
+  });
 }
 
 export function disputeSessionCompletion(input: DisputeSessionCompletionInput) {

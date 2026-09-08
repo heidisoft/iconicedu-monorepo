@@ -9,10 +9,75 @@ export type CompletionFilters = {
   method: string;
 };
 
+// Sentinel month-filter value meaning "every recorded month" — widens the admin
+// read to an unbounded query. Anything else is a `YYYY-MM` (UTC) key.
+export const ALL_COMPLETION_MONTHS = 'all';
+
+const COMPLETION_MONTH_KEY_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
+
 export function getCompletionMonthKey(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+export function isCompletionMonthKey(value: string) {
+  return COMPLETION_MONTH_KEY_PATTERN.test(value);
+}
+
+/** UTC `YYYY-MM` for the month that `reference` falls in. */
+export function getCurrentCompletionMonthKey(reference: Date = new Date()) {
+  return `${reference.getUTCFullYear()}-${String(reference.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+/**
+ * The `count` most recent month keys (current first), used to populate the month
+ * filter without first loading every completion to discover which months have
+ * data.
+ */
+export function buildRecentCompletionMonthKeys(count = 12, reference: Date = new Date()) {
+  const keys: string[] = [];
+  for (let offset = 0; offset < count; offset += 1) {
+    const date = new Date(
+      Date.UTC(reference.getUTCFullYear(), reference.getUTCMonth() - offset, 1),
+    );
+    keys.push(getCurrentCompletionMonthKey(date));
+  }
+  return keys;
+}
+
+/**
+ * `[since, until)` ISO bounds on `session_end_at` for a month key, or null for
+ * `ALL_COMPLETION_MONTHS` / an unparseable key (caller then reads unbounded).
+ */
+export function completionMonthKeyToUtcRange(key: string) {
+  if (!isCompletionMonthKey(key)) return null;
+  const [year, month] = key.split('-').map(Number);
+  return {
+    since: new Date(Date.UTC(year, month - 1, 1)).toISOString(),
+    until: new Date(Date.UTC(year, month, 1)).toISOString(),
+  };
+}
+
+/**
+ * URL for the completed-sessions page with `month` set to `monthValue`. The
+ * current month is the page default, so it is left implicit (no query param)
+ * rather than pinned — keeps the canonical URL clean and shareable.
+ */
+export function buildMonthFilterHref(
+  pathname: string,
+  currentSearch: string,
+  monthValue: string,
+  now: Date = new Date(),
+) {
+  const params = new URLSearchParams(currentSearch);
+  if (monthValue === getCurrentCompletionMonthKey(now)) {
+    params.delete('month');
+  } else {
+    params.set('month', monthValue);
+  }
+  const query = params.toString();
+  return query ? `${pathname}?${query}` : pathname;
 }
 
 export function formatCompletionMonth(key: string) {

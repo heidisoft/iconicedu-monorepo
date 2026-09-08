@@ -344,8 +344,23 @@ export class SessionCompletionsService {
   async confirm(authUserId: string, body: ConfirmSessionCompletionInput) {
     const row = await this.loadOwnedRow(authUserId, body.orgId, body.sessionCompletionId);
     if (row.status !== 'pending') {
-      throw new BadRequestException(
-        `Cannot confirm a session completion in status '${row.status}'`,
+      // The session is no longer awaiting this person's response. Confirming an
+      // already-complete session is idempotent — it was auto-confirmed by the
+      // system, or confirmed from another device/tab. Report success (with a
+      // flag) so a client showing a stale prompt can switch to the completed
+      // state instead of surfacing a confusing error.
+      if (row.status === 'confirmed' || row.status === 'auto_confirmed') {
+        return {
+          success: true,
+          alreadyResolved: true,
+          status: row.status,
+          feedbackEnabled: true,
+        };
+      }
+      // row.status === 'disputed'
+      throw new ConflictException(
+        "This session was already reported as having a problem, so it can't be " +
+          'marked complete. Ask an admin if that needs to change.',
       );
     }
 
@@ -368,6 +383,33 @@ export class SessionCompletionsService {
 
     if (error) throw new InternalServerErrorException(error.message);
     if (!updated) {
+      // Lost a race: another device resolved this row between our read and our
+      // write. Re-read to see who won — confirming on top of a confirm is an
+      // idempotent success, but a dispute must still surface as a conflict rather
+      // than a fake "completed" state that would show completion/rating UI.
+      const { data: current, error: rereadError } = await supabase
+        .from('class_session_completions')
+        .select('status')
+        .eq('id', row.id)
+        .eq('org_id', body.orgId)
+        .is('deleted_at', null)
+        .maybeSingle<{ status: string }>();
+
+      if (rereadError) throw new InternalServerErrorException(rereadError.message);
+      if (current?.status === 'confirmed' || current?.status === 'auto_confirmed') {
+        return {
+          success: true,
+          alreadyResolved: true,
+          status: current.status,
+          feedbackEnabled: true,
+        };
+      }
+      if (current?.status === 'disputed') {
+        throw new ConflictException(
+          "This session was already reported as having a problem, so it can't be " +
+            'marked complete. Ask an admin if that needs to change.',
+        );
+      }
       throw new ConflictException('Session completion was already resolved');
     }
 
@@ -386,8 +428,11 @@ export class SessionCompletionsService {
 
     const row = await this.loadOwnedRow(authUserId, body.orgId, body.sessionCompletionId);
     if (row.status !== 'pending') {
-      throw new BadRequestException(
-        `Cannot dispute a session completion in status '${row.status}'`,
+      throw new ConflictException(
+        row.status === 'disputed'
+          ? "You've already reported a problem with this session."
+          : "This session has already been marked complete, so a problem can't be " +
+              'reported for it here. Ask an admin if you need to change that.',
       );
     }
 
@@ -413,7 +458,10 @@ export class SessionCompletionsService {
 
     if (error) throw new InternalServerErrorException(error.message);
     if (!updated) {
-      throw new ConflictException('Session completion was already resolved');
+      throw new ConflictException(
+        'This session was just updated from another device — refresh to see its ' +
+          'current status.',
+      );
     }
 
     this.logger.log(
@@ -872,7 +920,11 @@ export class SessionCompletionsService {
 
   async listForAdmin(
     authUserId: string,
-    params: { orgId: string },
+    params: {
+      orgId: string;
+      completedSince?: string | null;
+      completedUntil?: string | null;
+    },
   ): Promise<AdminSessionCompletionVM[]> {
     if (!params?.orgId || !isUuid(params.orgId)) {
       throw new BadRequestException('Invalid orgId');
@@ -882,12 +934,23 @@ export class SessionCompletionsService {
     const account = await this.resolveAccount(supabase, authUserId, params.orgId);
     await this.assertAdminAccess(supabase, account, params.orgId);
 
-    const { data, error } = await supabase
+    // The admin page defaults to a single month and only widens the window when
+    // the month filter changes, so bound the read to `session_end_at` rather than
+    // loading every completion the org has ever recorded.
+    let query = supabase
       .from('class_session_completions')
       .select('*')
       .eq('org_id', params.orgId)
       .in('status', ['confirmed', 'auto_confirmed'])
-      .is('deleted_at', null)
+      .is('deleted_at', null);
+    if (params.completedSince) {
+      query = query.gte('session_end_at', params.completedSince);
+    }
+    if (params.completedUntil) {
+      query = query.lt('session_end_at', params.completedUntil);
+    }
+
+    const { data, error } = await query
       .order('session_end_at', { ascending: false })
       .returns<ClassSessionCompletionRow[]>();
 

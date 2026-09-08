@@ -39,6 +39,8 @@ describe('SessionCompletionsService', () => {
       eq: jest.fn(() => chain),
       in: jest.fn(() => chain),
       is: jest.fn(() => chain),
+      gte: jest.fn(() => chain),
+      lt: jest.fn(() => chain),
       limit: jest.fn(() => chain),
       order: jest.fn(() => chain),
       maybeSingle: jest.fn(async () => result),
@@ -75,6 +77,9 @@ describe('SessionCompletionsService', () => {
     profileRow?: Record<string, unknown> | null;
     familyLinkRow?: Record<string, unknown> | null;
     updatedRow?: { id: string } | null;
+    // When set, the SECOND `class_session_completions` select (confirm's
+    // post-lost-race re-read) resolves to this instead of `completionRow`.
+    rereadRow?: Record<string, unknown> | null;
     rpcRows?: Array<Record<string, unknown>>;
     activityFeedItems?: Array<{ id: string; metadata: unknown }>;
   }) {
@@ -82,6 +87,9 @@ describe('SessionCompletionsService', () => {
       data: input.accountRow ?? { id: ACCOUNT_ID, org_id: ORG_ID },
     });
     const completionChain = makeChain({ data: input.completionRow });
+    const completionRereadChain = makeChain({
+      data: input.rereadRow === undefined ? input.completionRow : input.rereadRow,
+    });
     const profileChain = makeChain({
       data: input.profileRow ?? {
         id: PROFILE_ID,
@@ -99,10 +107,18 @@ describe('SessionCompletionsService', () => {
     });
     const activityFeedItemsUpdateChain = makeMarkReadUpdateChain();
 
+    let completionSelectCalls = 0;
     const from = jest.fn((table: string) => {
       if (table === 'accounts') return accountChain;
       if (table === 'class_session_completions') {
-        return { select: jest.fn(() => completionChain), update: updateChain.update };
+        return {
+          select: jest.fn(() => {
+            completionSelectCalls += 1;
+            // 1st select: loadOwnedRow. 2nd: confirm's lost-race re-read.
+            return completionSelectCalls === 1 ? completionChain : completionRereadChain;
+          }),
+          update: updateChain.update,
+        };
       }
       if (table === 'profiles') return profileChain;
       if (table === 'family_links') return familyLinkChain;
@@ -213,6 +229,50 @@ describe('SessionCompletionsService', () => {
           { displayName: 'Morgan Lee', role: 'guardian' },
         ],
       });
+    });
+
+    it('bounds the read to the requested session_end_at window', async () => {
+      const completionChain = makeChain({ data: [] });
+      const from = jest.fn((table: string) => {
+        if (table === 'accounts')
+          return makeChain({ data: { id: ACCOUNT_ID, org_id: ORG_ID } });
+        if (table === 'user_roles') return makeChain({ data: { role_key: 'admin' } });
+        if (table === 'class_session_completions') return completionChain;
+        throw new Error(`Unexpected table: ${table}`);
+      });
+      createSupabaseServiceClientMock.mockReturnValue({ from } as never);
+
+      await new SessionCompletionsService().listForAdmin(AUTH_USER_ID, {
+        orgId: ORG_ID,
+        completedSince: '2026-09-01T00:00:00.000Z',
+        completedUntil: '2026-10-01T00:00:00.000Z',
+      });
+
+      expect(completionChain.gte).toHaveBeenCalledWith(
+        'session_end_at',
+        '2026-09-01T00:00:00.000Z',
+      );
+      expect(completionChain.lt).toHaveBeenCalledWith(
+        'session_end_at',
+        '2026-10-01T00:00:00.000Z',
+      );
+    });
+
+    it('omits the window bounds when no range is given', async () => {
+      const completionChain = makeChain({ data: [] });
+      const from = jest.fn((table: string) => {
+        if (table === 'accounts')
+          return makeChain({ data: { id: ACCOUNT_ID, org_id: ORG_ID } });
+        if (table === 'user_roles') return makeChain({ data: { role_key: 'admin' } });
+        if (table === 'class_session_completions') return completionChain;
+        throw new Error(`Unexpected table: ${table}`);
+      });
+      createSupabaseServiceClientMock.mockReturnValue({ from } as never);
+
+      await new SessionCompletionsService().listForAdmin(AUTH_USER_ID, { orgId: ORG_ID });
+
+      expect(completionChain.gte).not.toHaveBeenCalled();
+      expect(completionChain.lt).not.toHaveBeenCalled();
     });
   });
 
@@ -593,6 +653,26 @@ describe('SessionCompletionsService', () => {
       expect(result).toEqual({ success: true, feedbackEnabled: true });
     });
 
+    it.each(['confirmed', 'auto_confirmed'] as const)(
+      'treats confirming an already-%s row as an idempotent success',
+      async (status) => {
+        makeSupabase({ completionRow: baseCompletionRow({ status }) });
+        const service = new SessionCompletionsService();
+
+        const result = await service.confirm(AUTH_USER_ID, {
+          orgId: ORG_ID,
+          sessionCompletionId: COMPLETION_ID,
+        });
+
+        expect(result).toEqual({
+          success: true,
+          alreadyResolved: true,
+          status,
+          feedbackEnabled: true,
+        });
+      },
+    );
+
     it('rejects confirming an already-disputed row', async () => {
       makeSupabase({ completionRow: baseCompletionRow({ status: 'disputed' }) });
       const service = new SessionCompletionsService();
@@ -602,13 +682,54 @@ describe('SessionCompletionsService', () => {
           orgId: ORG_ID,
           sessionCompletionId: COMPLETION_ID,
         }),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(ConflictException);
     });
 
-    it('rejects a stale confirm when another request resolves the row first', async () => {
+    it.each(['confirmed', 'auto_confirmed'] as const)(
+      'treats a lost confirm race as an idempotent success when the winner %s',
+      async (status) => {
+        makeSupabase({
+          completionRow: baseCompletionRow({ status: 'pending' }),
+          updatedRow: null,
+          rereadRow: baseCompletionRow({ status }),
+        });
+        const service = new SessionCompletionsService();
+
+        const result = await service.confirm(AUTH_USER_ID, {
+          orgId: ORG_ID,
+          sessionCompletionId: COMPLETION_ID,
+        });
+
+        expect(result).toEqual({
+          success: true,
+          alreadyResolved: true,
+          status,
+          feedbackEnabled: true,
+        });
+      },
+    );
+
+    it('rejects a lost confirm race when the winner disputed', async () => {
       makeSupabase({
         completionRow: baseCompletionRow({ status: 'pending' }),
         updatedRow: null,
+        rereadRow: baseCompletionRow({ status: 'disputed' }),
+      });
+      const service = new SessionCompletionsService();
+
+      await expect(
+        service.confirm(AUTH_USER_ID, {
+          orgId: ORG_ID,
+          sessionCompletionId: COMPLETION_ID,
+        }),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('reports a plain conflict when a lost confirm race re-reads as still pending', async () => {
+      makeSupabase({
+        completionRow: baseCompletionRow({ status: 'pending' }),
+        updatedRow: null,
+        rereadRow: baseCompletionRow({ status: 'pending' }),
       });
       const service = new SessionCompletionsService();
 
@@ -659,18 +780,21 @@ describe('SessionCompletionsService', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('rejects disputing an already-confirmed row', async () => {
-      makeSupabase({ completionRow: baseCompletionRow({ status: 'confirmed' }) });
-      const service = new SessionCompletionsService();
+    it.each(['confirmed', 'auto_confirmed', 'disputed'] as const)(
+      'rejects disputing an already-%s row with a Conflict',
+      async (status) => {
+        makeSupabase({ completionRow: baseCompletionRow({ status }) });
+        const service = new SessionCompletionsService();
 
-      await expect(
-        service.dispute(AUTH_USER_ID, {
-          orgId: ORG_ID,
-          sessionCompletionId: COMPLETION_ID,
-          disputeCategory: 'technical_issue',
-        }),
-      ).rejects.toThrow(BadRequestException);
-    });
+        await expect(
+          service.dispute(AUTH_USER_ID, {
+            orgId: ORG_ID,
+            sessionCompletionId: COMPLETION_ID,
+            disputeCategory: 'technical_issue',
+          }),
+        ).rejects.toThrow(ConflictException);
+      },
+    );
 
     it('publishes a dispute-reported notification to staff on success', async () => {
       const { from } = makeSupabase({
