@@ -116,7 +116,7 @@ export function filterCompletions(
     // `confirmedBy` still reports who actually confirmed it.
     if (
       filters.parentId !== 'all' &&
-      !row.guardians.some((guardian) => guardian.profileId === filters.parentId)
+      !(row.guardians ?? []).some((guardian) => guardian.profileId === filters.parentId)
     )
       return false;
     if (filters.studentName !== 'all' && !row.studentNames.includes(filters.studentName))
@@ -127,7 +127,7 @@ export function filterCompletions(
       row.sessionTitle,
       row.learningSpaceTitle,
       ...row.studentNames,
-      ...row.guardians.map((guardian) => guardian.displayName),
+      ...(row.guardians ?? []).map((guardian) => guardian.displayName),
       ...row.confirmedBy.map((actor) => actor.displayName),
     ].some((value) => value?.toLocaleLowerCase().includes(search));
   });

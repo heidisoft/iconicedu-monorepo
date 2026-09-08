@@ -242,7 +242,7 @@ export function SessionAttendanceDashboard({
   // never tapped "confirm" is still selectable.
   const parents = new Map(
     rows.flatMap((row) =>
-      row.guardians.map(
+      (row.guardians ?? []).map(
         (guardian) => [guardian.profileId, guardian.displayName] as const,
       ),
     ),
