@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import type {
   AdminSessionCompletionActorVM,
+  AdminSessionCompletionGuardianVM,
   AdminSessionCompletionVM,
   ChannelSessionCompletionVM,
   ClassSessionCompletionRow,
@@ -958,40 +959,68 @@ export class SessionCompletionsService {
     const completionRows = data ?? [];
     const profileIds = [...new Set(completionRows.map((row) => row.profile_id))];
     const scheduleIds = [...new Set(completionRows.map((row) => row.schedule_id))];
-    const [profileResponse, participantResponse] = await Promise.all([
-      profileIds.length
-        ? supabase
-            .from('profiles')
-            .select('id, display_name, first_name, last_name')
-            .eq('org_id', params.orgId)
-            .in('id', profileIds)
-            .is('deleted_at', null)
-            .returns<
-              Array<{
-                id: string;
-                display_name: string | null;
-                first_name: string | null;
-                last_name: string | null;
-              }>
-            >()
-        : Promise.resolve({ data: [], error: null }),
-      scheduleIds.length
-        ? supabase
-            .from('class_schedule_participants')
-            .select('schedule_id, display_name')
-            .eq('org_id', params.orgId)
-            .in('schedule_id', scheduleIds)
-            .eq('role', 'child')
-            .is('deleted_at', null)
-            .returns<Array<{ schedule_id: string; display_name: string | null }>>()
-        : Promise.resolve({ data: [], error: null }),
-    ]);
+    const learningSpaceIds = [
+      ...new Set(
+        completionRows
+          .map((row) => row.learning_space_id)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const [profileResponse, participantResponse, learningSpaceResponse] =
+      await Promise.all([
+        profileIds.length
+          ? supabase
+              .from('profiles')
+              .select('id, display_name, first_name, last_name')
+              .eq('org_id', params.orgId)
+              .in('id', profileIds)
+              .is('deleted_at', null)
+              .returns<
+                Array<{
+                  id: string;
+                  display_name: string | null;
+                  first_name: string | null;
+                  last_name: string | null;
+                }>
+              >()
+          : Promise.resolve({ data: [], error: null }),
+        // Pull both the students (for `studentNames`) and the guardians (for the
+        // admin "Parent" filter) attached to each schedule in one read.
+        scheduleIds.length
+          ? supabase
+              .from('class_schedule_participants')
+              .select('schedule_id, profile_id, role, display_name')
+              .eq('org_id', params.orgId)
+              .in('schedule_id', scheduleIds)
+              .in('role', ['child', 'guardian'])
+              .is('deleted_at', null)
+              .returns<
+                Array<{
+                  schedule_id: string;
+                  profile_id: string;
+                  role: string;
+                  display_name: string | null;
+                }>
+              >()
+          : Promise.resolve({ data: [], error: null }),
+        learningSpaceIds.length
+          ? supabase
+              .from('learning_spaces')
+              .select('id, title')
+              .eq('org_id', params.orgId)
+              .in('id', learningSpaceIds)
+              .returns<Array<{ id: string; title: string | null }>>()
+          : Promise.resolve({ data: [], error: null }),
+      ]);
 
     if (profileResponse.error) {
       throw new InternalServerErrorException(profileResponse.error.message);
     }
     if (participantResponse.error) {
       throw new InternalServerErrorException(participantResponse.error.message);
+    }
+    if (learningSpaceResponse.error) {
+      throw new InternalServerErrorException(learningSpaceResponse.error.message);
     }
     const names = new Map(
       (profileResponse.data ?? []).map((profile) => [
@@ -1001,14 +1030,144 @@ export class SessionCompletionsService {
           'Unknown user',
       ]),
     );
+    const learningSpaceTitles = new Map(
+      (learningSpaceResponse.data ?? []).map((space) => [
+        space.id,
+        space.title?.trim() || null,
+      ]),
+    );
     const studentNamesByScheduleId = new Map<string, string[]>();
+    const guardiansByScheduleId = new Map<string, AdminSessionCompletionGuardianVM[]>();
+    const childProfileIdsByScheduleId = new Map<string, string[]>();
+    const addGuardian = (
+      scheduleId: string,
+      guardian: AdminSessionCompletionGuardianVM,
+    ) => {
+      const values = guardiansByScheduleId.get(scheduleId) ?? [];
+      if (!values.some((existing) => existing.profileId === guardian.profileId)) {
+        values.push(guardian);
+      }
+      guardiansByScheduleId.set(scheduleId, values);
+    };
     (participantResponse.data ?? []).forEach((participant) => {
       const displayName = participant.display_name?.trim();
+      if (participant.role === 'guardian') {
+        addGuardian(participant.schedule_id, {
+          profileId: participant.profile_id,
+          displayName: displayName || 'Parent',
+        });
+        return;
+      }
+      const childIds = childProfileIdsByScheduleId.get(participant.schedule_id) ?? [];
+      if (!childIds.includes(participant.profile_id))
+        childIds.push(participant.profile_id);
+      childProfileIdsByScheduleId.set(participant.schedule_id, childIds);
       if (!displayName) return;
       const values = studentNamesByScheduleId.get(participant.schedule_id) ?? [];
       if (!values.includes(displayName)) values.push(displayName);
       studentNamesByScheduleId.set(participant.schedule_id, values);
     });
+
+    // Guardians are often not explicit schedule participants — the completion
+    // prompt itself reaches them through `family_links` off the child. Mirror
+    // that resolution here so the admin "Parent" filter can surface a parent for
+    // every session their kid sat in, even ones only the teacher confirmed.
+    const childProfileIds = [
+      ...new Set([...childProfileIdsByScheduleId.values()].flat()),
+    ];
+    if (childProfileIds.length) {
+      const { data: childProfiles, error: childProfilesError } = await supabase
+        .from('profiles')
+        .select('id, account_id, kind')
+        .eq('org_id', params.orgId)
+        .in('id', childProfileIds)
+        .is('deleted_at', null)
+        .returns<Array<{ id: string; account_id: string; kind: string | null }>>();
+      if (childProfilesError) {
+        throw new InternalServerErrorException(childProfilesError.message);
+      }
+      const childAccountIdByProfileId = new Map(
+        (childProfiles ?? [])
+          .filter((profile) => profile.kind === 'child')
+          .map((profile) => [profile.id, profile.account_id]),
+      );
+      const childAccountIds = [...new Set(childAccountIdByProfileId.values())];
+
+      if (childAccountIds.length) {
+        const { data: familyLinks, error: familyLinksError } = await supabase
+          .from('family_links')
+          .select('guardian_account_id, child_account_id')
+          .eq('org_id', params.orgId)
+          .in('child_account_id', childAccountIds)
+          .is('deleted_at', null)
+          .returns<Array<{ guardian_account_id: string; child_account_id: string }>>();
+        if (familyLinksError) {
+          throw new InternalServerErrorException(familyLinksError.message);
+        }
+        const guardianAccountIds = [
+          ...new Set((familyLinks ?? []).map((link) => link.guardian_account_id)),
+        ];
+
+        if (guardianAccountIds.length) {
+          const { data: guardianProfiles, error: guardianProfilesError } = await supabase
+            .from('profiles')
+            .select('id, account_id, display_name, first_name, last_name')
+            .eq('org_id', params.orgId)
+            .in('account_id', guardianAccountIds)
+            .is('deleted_at', null)
+            .returns<
+              Array<{
+                id: string;
+                account_id: string;
+                display_name: string | null;
+                first_name: string | null;
+                last_name: string | null;
+              }>
+            >();
+          if (guardianProfilesError) {
+            throw new InternalServerErrorException(guardianProfilesError.message);
+          }
+          const guardianByAccountId = new Map(
+            (guardianProfiles ?? []).map((profile) => [
+              profile.account_id,
+              {
+                profileId: profile.id,
+                displayName:
+                  profile.display_name?.trim() ||
+                  [profile.first_name, profile.last_name]
+                    .filter(Boolean)
+                    .join(' ')
+                    .trim() ||
+                  'Parent',
+              },
+            ]),
+          );
+          const guardiansByChildAccountId = new Map<
+            string,
+            AdminSessionCompletionGuardianVM[]
+          >();
+          (familyLinks ?? []).forEach((link) => {
+            const guardian = guardianByAccountId.get(link.guardian_account_id);
+            if (!guardian) return;
+            const values = guardiansByChildAccountId.get(link.child_account_id) ?? [];
+            if (!values.some((existing) => existing.profileId === guardian.profileId)) {
+              values.push(guardian);
+            }
+            guardiansByChildAccountId.set(link.child_account_id, values);
+          });
+
+          childProfileIdsByScheduleId.forEach((profileIdsForSchedule, scheduleId) => {
+            profileIdsForSchedule.forEach((childProfileId) => {
+              const childAccountId = childAccountIdByProfileId.get(childProfileId);
+              if (!childAccountId) return;
+              (guardiansByChildAccountId.get(childAccountId) ?? []).forEach((guardian) =>
+                addGuardian(scheduleId, guardian),
+              );
+            });
+          });
+        }
+      }
+    }
 
     const grouped = new Map<string, ClassSessionCompletionRow[]>();
     completionRows.forEach((row) => {
@@ -1032,6 +1191,22 @@ export class SessionCompletionsService {
         .map((row) => row.rating)
         .filter((rating): rating is number => typeof rating === 'number');
 
+      // Union the roster/family-link guardians with any guardian who actually
+      // confirmed — the confirmer may not appear in either source.
+      const guardians: AdminSessionCompletionGuardianVM[] = [
+        ...(guardiansByScheduleId.get(first.schedule_id) ?? []),
+      ];
+      actors
+        .filter((actor) => actor.role === 'guardian')
+        .forEach((actor) => {
+          if (!guardians.some((guardian) => guardian.profileId === actor.profileId)) {
+            guardians.push({
+              profileId: actor.profileId,
+              displayName: actor.displayName,
+            });
+          }
+        });
+
       return {
         id,
         orgId: first.org_id,
@@ -1042,11 +1217,15 @@ export class SessionCompletionsService {
         studentNames: studentNamesByScheduleId.get(first.schedule_id) ?? [],
         channelId: first.channel_id ?? null,
         learningSpaceId: first.learning_space_id ?? null,
+        learningSpaceTitle: first.learning_space_id
+          ? (learningSpaceTitles.get(first.learning_space_id) ?? null)
+          : null,
         completedAt: actors
           .map((actor) => actor.completedAt)
           .sort((left, right) => right.localeCompare(left))[0]!,
         completionMethod: methods.size > 1 ? 'mixed' : (actors[0]?.status ?? 'confirmed'),
         confirmedBy: actors,
+        guardians,
         averageRating: ratings.length
           ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length
           : null,

@@ -51,6 +51,17 @@ export interface AdminSessionCompletionActorVM {
   completedAt: ISODateTime;
 }
 
+/**
+ * A guardian attached to the session's schedule — the parent whose child sits in
+ * the occurrence, whether or not that parent personally confirmed it. Powers the
+ * admin "Parent" filter: picking a parent shows every completed session for their
+ * kid, with `confirmedBy` reporting who actually confirmed.
+ */
+export interface AdminSessionCompletionGuardianVM {
+  profileId: UUID;
+  displayName: string;
+}
+
 /** One completed schedule occurrence, grouped across all participant confirmations. */
 export interface AdminSessionCompletionVM {
   id: string;
@@ -62,8 +73,10 @@ export interface AdminSessionCompletionVM {
   studentNames: string[];
   channelId?: UUID | null;
   learningSpaceId?: UUID | null;
+  learningSpaceTitle?: string | null;
   completedAt: ISODateTime;
   completionMethod: 'confirmed' | 'auto_confirmed' | 'mixed';
   confirmedBy: AdminSessionCompletionActorVM[];
+  guardians: AdminSessionCompletionGuardianVM[];
   averageRating?: number | null;
 }

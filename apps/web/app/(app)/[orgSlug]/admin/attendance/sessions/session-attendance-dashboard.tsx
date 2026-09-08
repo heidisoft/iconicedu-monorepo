@@ -18,6 +18,7 @@ import {
 
 const DEFAULT_FILTERS = {
   search: '',
+  classroomId: 'all',
   teacherId: 'all',
   parentId: 'all',
   studentName: 'all',
@@ -237,6 +238,22 @@ export function SessionAttendanceDashboard({
           .map((actor) => [actor.profileId, actor.displayName] as const),
       ),
     );
+  // Parents come from the schedule roster, not just confirmers, so a parent who
+  // never tapped "confirm" is still selectable.
+  const parents = new Map(
+    rows.flatMap((row) =>
+      (row.guardians ?? []).map(
+        (guardian) => [guardian.profileId, guardian.displayName] as const,
+      ),
+    ),
+  );
+  const classrooms = new Map(
+    rows.flatMap((row) =>
+      row.learningSpaceId
+        ? [[row.learningSpaceId, row.learningSpaceTitle ?? 'Untitled classroom'] as const]
+        : [],
+    ),
+  );
   const students = [...new Set(rows.flatMap((row) => row.studentNames))].sort((a, b) =>
     a.localeCompare(b),
   );
@@ -253,7 +270,7 @@ export function SessionAttendanceDashboard({
 
   return (
     <div
-      className="flex flex-1 flex-col gap-4 transition-opacity aria-busy:opacity-60"
+      className="flex min-w-0 flex-1 flex-col gap-4 transition-opacity aria-busy:opacity-60"
       aria-busy={isMonthPending}
     >
       <span aria-live="polite" className="sr-only">
@@ -304,6 +321,12 @@ export function SessionAttendanceDashboard({
               ],
             },
             {
+              label: 'Classroom',
+              value: filters.classroomId,
+              onChange: update('classroomId'),
+              options: options(classrooms, 'All classrooms'),
+            },
+            {
               label: 'Teacher',
               value: filters.teacherId,
               onChange: update('teacherId'),
@@ -313,7 +336,7 @@ export function SessionAttendanceDashboard({
               label: 'Parent',
               value: filters.parentId,
               onChange: update('parentId'),
-              options: options(people('guardian'), 'All parents'),
+              options: options(parents, 'All parents'),
             },
             {
               label: 'Student',

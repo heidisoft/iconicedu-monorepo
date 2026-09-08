@@ -25,9 +25,11 @@ function completion(
     studentNames: ['Jamie Lee'],
     channelId: 'channel-1',
     learningSpaceId: 'space-1',
+    learningSpaceTitle: 'Room A',
     completedAt: '2026-03-10T15:05:00.000Z',
     completionMethod: 'confirmed',
     averageRating: 4,
+    guardians: [{ profileId: 'parent-1', displayName: 'Morgan Lee' }],
     confirmedBy: [
       {
         profileId: 'teacher-1',
@@ -48,6 +50,17 @@ function completion(
   };
 }
 
+// Every filter set to its "no-op" value, so a test can override just one.
+const ALL = {
+  search: '',
+  month: 'all',
+  classroomId: 'all',
+  teacherId: 'all',
+  parentId: 'all',
+  studentName: 'all',
+  method: 'all',
+};
+
 describe('completed session analytics', () => {
   it('summarizes unique completed occurrences by confirmer role', () => {
     expect(summarizeCompletions([completion()])).toEqual({
@@ -58,7 +71,7 @@ describe('completed session analytics', () => {
     });
   });
 
-  it('filters by month, teacher, parent, method, and search', () => {
+  it('filters by month, classroom, teacher, parent, method, and search', () => {
     const result = filterCompletions(
       [
         completion(),
@@ -67,6 +80,7 @@ describe('completed session analytics', () => {
       {
         search: 'Jamie',
         month: '2026-03',
+        classroomId: 'space-1',
         teacherId: 'teacher-1',
         parentId: 'parent-1',
         studentName: 'Jamie Lee',
@@ -74,6 +88,40 @@ describe('completed session analytics', () => {
       },
     );
     expect(result.map((row) => row.id)).toEqual(['schedule-1|2026-03-10T14:00:00.000Z']);
+  });
+
+  it('drops rows outside the selected classroom', () => {
+    const result = filterCompletions(
+      [completion(), completion({ id: 'other', learningSpaceId: 'space-2' })],
+      { ...ALL, classroomId: 'space-1' },
+    );
+    expect(result.map((row) => row.id)).toEqual(['schedule-1|2026-03-10T14:00:00.000Z']);
+  });
+
+  it('scopes the parent filter to the schedule roster, not the confirmer', () => {
+    // Session the parent is a guardian on, but only the teacher confirmed.
+    const teacherOnly = completion({
+      id: 'teacher-only',
+      confirmedBy: [
+        {
+          profileId: 'teacher-1',
+          displayName: 'Taylor Reed',
+          role: 'educator',
+          status: 'confirmed',
+          completedAt: '2026-03-10T15:05:00.000Z',
+        },
+      ],
+    });
+    // Different kid, different parent — must not match.
+    const otherFamily = completion({
+      id: 'other-family',
+      guardians: [{ profileId: 'parent-2', displayName: 'Alex Kim' }],
+    });
+    const result = filterCompletions([teacherOnly, otherFamily], {
+      ...ALL,
+      parentId: 'parent-1',
+    });
+    expect(result.map((row) => row.id)).toEqual(['teacher-only']);
   });
 
   it('derives the current UTC month key and a descending recent-month window', () => {

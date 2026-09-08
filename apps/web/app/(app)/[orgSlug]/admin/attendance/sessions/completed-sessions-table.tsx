@@ -12,7 +12,7 @@ import { formatAttendanceDateTime } from '@iconicedu/web/app/(app)/[orgSlug]/adm
 
 export function CompletedSessionsTable({ rows }: { rows: AdminSessionCompletionVM[] }) {
   return (
-    <div className="overflow-hidden rounded-xl border bg-card">
+    <div className="w-full min-w-0 overflow-hidden rounded-xl border bg-card">
       <Table>
         <TableHeader>
           <TableRow>
@@ -40,7 +40,11 @@ export function CompletedSessionsTable({ rows }: { rows: AdminSessionCompletionV
               <TableCell>{formatAttendanceDateTime(row.sessionEndAt)}</TableCell>
               <TableCell>{row.studentNames.join(', ') || '—'}</TableCell>
               <TableCell>
-                {row.confirmedBy.map((actor) => actor.displayName).join(', ')}
+                {row.confirmedBy.length === 0
+                  ? '—'
+                  : row.confirmedBy
+                      .map((actor) => `${actor.displayName} (${actor.role})`)
+                      .join(', ')}
               </TableCell>
               <TableCell>
                 <Badge variant="secondary" className="capitalize">

@@ -203,7 +203,23 @@ describe('SessionCompletionsService', () => {
         ],
       });
       const participantsChain = makeChain({
-        data: [{ schedule_id: SCHEDULE_ID, display_name: 'Jamie Lee' }],
+        data: [
+          {
+            schedule_id: SCHEDULE_ID,
+            profile_id: PROFILE_ID,
+            role: 'child',
+            display_name: 'Jamie Lee',
+          },
+          {
+            schedule_id: SCHEDULE_ID,
+            profile_id: OTHER_PROFILE_ID,
+            role: 'guardian',
+            display_name: 'Morgan Lee',
+          },
+        ],
+      });
+      const learningSpacesChain = makeChain({
+        data: [{ id: 'space-1', title: 'Room A' }],
       });
       const from = jest.fn((table: string) => {
         if (table === 'accounts') return accountChain;
@@ -211,6 +227,7 @@ describe('SessionCompletionsService', () => {
         if (table === 'class_session_completions') return completionChain;
         if (table === 'profiles') return profilesChain;
         if (table === 'class_schedule_participants') return participantsChain;
+        if (table === 'learning_spaces') return learningSpacesChain;
         throw new Error(`Unexpected table: ${table}`);
       });
       createSupabaseServiceClientMock.mockReturnValue({ from } as never);
@@ -223,12 +240,116 @@ describe('SessionCompletionsService', () => {
       expect(result[0]).toMatchObject({
         completionMethod: 'mixed',
         studentNames: ['Jamie Lee'],
+        learningSpaceTitle: 'Room A',
         averageRating: 5,
         confirmedBy: [
           { displayName: 'Taylor Reed', role: 'educator' },
           { displayName: 'Morgan Lee', role: 'guardian' },
         ],
+        guardians: [{ profileId: OTHER_PROFILE_ID, displayName: 'Morgan Lee' }],
       });
+    });
+
+    it('resolves guardians through family_links when they are not schedule participants', async () => {
+      const GUARDIAN_PROFILE_ID = '00000000-0000-4000-8000-0000000000a1';
+      const GUARDIAN_ACCOUNT_ID = '00000000-0000-4000-8000-0000000000a2';
+      const CHILD_ACCOUNT_ID = '00000000-0000-4000-8000-0000000000a3';
+
+      const completionChain = makeChain({
+        data: [
+          baseCompletionRow({
+            profile_id: PROFILE_ID,
+            role: 'educator',
+            status: 'confirmed',
+            student_name: 'Jamie Lee',
+            resolved_at: '2030-03-06T11:05:00.000Z',
+            updated_at: '2030-03-06T11:05:00.000Z',
+          }),
+        ],
+      });
+      // Only a child on the roster — no guardian participant row.
+      const participantsChain = makeChain({
+        data: [
+          {
+            schedule_id: SCHEDULE_ID,
+            profile_id: PROFILE_ID,
+            role: 'child',
+            display_name: 'Jamie Lee',
+          },
+        ],
+      });
+      // `profiles` is queried three times (confirmers, child, guardians); branch
+      // on the requested column list.
+      const profilesFrom = () => {
+        const chain: Record<string, jest.Mock> = {
+          eq: jest.fn(() => chain),
+          in: jest.fn(() => chain),
+          is: jest.fn(() => chain),
+          select: jest.fn((columns: string) => {
+            if (columns.includes('kind') && !columns.includes('display_name')) {
+              chain.returns = jest.fn(async () => ({
+                data: [{ id: PROFILE_ID, account_id: CHILD_ACCOUNT_ID, kind: 'child' }],
+              }));
+            } else if (columns.includes('account_id')) {
+              chain.returns = jest.fn(async () => ({
+                data: [
+                  {
+                    id: GUARDIAN_PROFILE_ID,
+                    account_id: GUARDIAN_ACCOUNT_ID,
+                    display_name: 'Robin Ash',
+                    first_name: null,
+                    last_name: null,
+                  },
+                ],
+              }));
+            } else {
+              chain.returns = jest.fn(async () => ({
+                data: [
+                  {
+                    id: PROFILE_ID,
+                    display_name: 'Taylor Reed',
+                    first_name: null,
+                    last_name: null,
+                  },
+                ],
+              }));
+            }
+            return chain;
+          }),
+          returns: jest.fn(async () => ({ data: [] })),
+        };
+        return chain;
+      };
+      const from = jest.fn((table: string) => {
+        if (table === 'accounts')
+          return makeChain({ data: { id: ACCOUNT_ID, org_id: ORG_ID } });
+        if (table === 'user_roles') return makeChain({ data: { role_key: 'admin' } });
+        if (table === 'class_session_completions') return completionChain;
+        if (table === 'class_schedule_participants') return participantsChain;
+        if (table === 'learning_spaces')
+          return makeChain({ data: [{ id: 'space-1', title: 'Room A' }] });
+        if (table === 'profiles') return profilesFrom();
+        if (table === 'family_links')
+          return makeChain({
+            data: [
+              {
+                guardian_account_id: GUARDIAN_ACCOUNT_ID,
+                child_account_id: CHILD_ACCOUNT_ID,
+              },
+            ],
+          });
+        throw new Error(`Unexpected table: ${table}`);
+      });
+      createSupabaseServiceClientMock.mockReturnValue({ from } as never);
+
+      const result = await new SessionCompletionsService().listForAdmin(AUTH_USER_ID, {
+        orgId: ORG_ID,
+      });
+
+      expect(result).toHaveLength(1);
+      expect(result[0]?.guardians).toEqual([
+        { profileId: GUARDIAN_PROFILE_ID, displayName: 'Robin Ash' },
+      ]);
     });
 
     it('bounds the read to the requested session_end_at window', async () => {
