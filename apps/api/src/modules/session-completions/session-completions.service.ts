@@ -383,9 +383,34 @@ export class SessionCompletionsService {
 
     if (error) throw new InternalServerErrorException(error.message);
     if (!updated) {
-      // Lost a race with another device that resolved it first — still a success
-      // from the user's point of view.
-      return { success: true, alreadyResolved: true, feedbackEnabled: true };
+      // Lost a race: another device resolved this row between our read and our
+      // write. Re-read to see who won — confirming on top of a confirm is an
+      // idempotent success, but a dispute must still surface as a conflict rather
+      // than a fake "completed" state that would show completion/rating UI.
+      const { data: current, error: rereadError } = await supabase
+        .from('class_session_completions')
+        .select('status')
+        .eq('id', row.id)
+        .eq('org_id', body.orgId)
+        .is('deleted_at', null)
+        .maybeSingle<{ status: string }>();
+
+      if (rereadError) throw new InternalServerErrorException(rereadError.message);
+      if (current?.status === 'confirmed' || current?.status === 'auto_confirmed') {
+        return {
+          success: true,
+          alreadyResolved: true,
+          status: current.status,
+          feedbackEnabled: true,
+        };
+      }
+      if (current?.status === 'disputed') {
+        throw new ConflictException(
+          "This session was already reported as having a problem, so it can't be " +
+            'marked complete. Ask an admin if that needs to change.',
+        );
+      }
+      throw new ConflictException('Session completion was already resolved');
     }
 
     this.logger.log(

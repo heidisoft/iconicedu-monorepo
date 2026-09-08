@@ -77,6 +77,9 @@ describe('SessionCompletionsService', () => {
     profileRow?: Record<string, unknown> | null;
     familyLinkRow?: Record<string, unknown> | null;
     updatedRow?: { id: string } | null;
+    // When set, the SECOND `class_session_completions` select (confirm's
+    // post-lost-race re-read) resolves to this instead of `completionRow`.
+    rereadRow?: Record<string, unknown> | null;
     rpcRows?: Array<Record<string, unknown>>;
     activityFeedItems?: Array<{ id: string; metadata: unknown }>;
   }) {
@@ -84,6 +87,9 @@ describe('SessionCompletionsService', () => {
       data: input.accountRow ?? { id: ACCOUNT_ID, org_id: ORG_ID },
     });
     const completionChain = makeChain({ data: input.completionRow });
+    const completionRereadChain = makeChain({
+      data: input.rereadRow === undefined ? input.completionRow : input.rereadRow,
+    });
     const profileChain = makeChain({
       data: input.profileRow ?? {
         id: PROFILE_ID,
@@ -101,10 +107,18 @@ describe('SessionCompletionsService', () => {
     });
     const activityFeedItemsUpdateChain = makeMarkReadUpdateChain();
 
+    let completionSelectCalls = 0;
     const from = jest.fn((table: string) => {
       if (table === 'accounts') return accountChain;
       if (table === 'class_session_completions') {
-        return { select: jest.fn(() => completionChain), update: updateChain.update };
+        return {
+          select: jest.fn(() => {
+            completionSelectCalls += 1;
+            // 1st select: loadOwnedRow. 2nd: confirm's lost-race re-read.
+            return completionSelectCalls === 1 ? completionChain : completionRereadChain;
+          }),
+          update: updateChain.update,
+        };
       }
       if (table === 'profiles') return profileChain;
       if (table === 'family_links') return familyLinkChain;
@@ -671,23 +685,60 @@ describe('SessionCompletionsService', () => {
       ).rejects.toThrow(ConflictException);
     });
 
-    it('treats a lost confirm race as an idempotent success', async () => {
+    it.each(['confirmed', 'auto_confirmed'] as const)(
+      'treats a lost confirm race as an idempotent success when the winner %s',
+      async (status) => {
+        makeSupabase({
+          completionRow: baseCompletionRow({ status: 'pending' }),
+          updatedRow: null,
+          rereadRow: baseCompletionRow({ status }),
+        });
+        const service = new SessionCompletionsService();
+
+        const result = await service.confirm(AUTH_USER_ID, {
+          orgId: ORG_ID,
+          sessionCompletionId: COMPLETION_ID,
+        });
+
+        expect(result).toEqual({
+          success: true,
+          alreadyResolved: true,
+          status,
+          feedbackEnabled: true,
+        });
+      },
+    );
+
+    it('rejects a lost confirm race when the winner disputed', async () => {
       makeSupabase({
         completionRow: baseCompletionRow({ status: 'pending' }),
         updatedRow: null,
+        rereadRow: baseCompletionRow({ status: 'disputed' }),
       });
       const service = new SessionCompletionsService();
 
-      const result = await service.confirm(AUTH_USER_ID, {
-        orgId: ORG_ID,
-        sessionCompletionId: COMPLETION_ID,
-      });
+      await expect(
+        service.confirm(AUTH_USER_ID, {
+          orgId: ORG_ID,
+          sessionCompletionId: COMPLETION_ID,
+        }),
+      ).rejects.toThrow(ConflictException);
+    });
 
-      expect(result).toEqual({
-        success: true,
-        alreadyResolved: true,
-        feedbackEnabled: true,
+    it('reports a plain conflict when a lost confirm race re-reads as still pending', async () => {
+      makeSupabase({
+        completionRow: baseCompletionRow({ status: 'pending' }),
+        updatedRow: null,
+        rereadRow: baseCompletionRow({ status: 'pending' }),
       });
+      const service = new SessionCompletionsService();
+
+      await expect(
+        service.confirm(AUTH_USER_ID, {
+          orgId: ORG_ID,
+          sessionCompletionId: COMPLETION_ID,
+        }),
+      ).rejects.toThrow(ConflictException);
     });
 
     it('rejects when the requesting account does not own the profile and has no family link', async () => {
