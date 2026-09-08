@@ -10,6 +10,7 @@ import {
 import type {
   AdminSessionCompletionActorVM,
   AdminSessionCompletionGuardianVM,
+  AdminSessionCompletionParticipantVM,
   AdminSessionCompletionVM,
   ChannelSessionCompletionVM,
   ClassSessionCompletionRow,
@@ -935,28 +936,53 @@ export class SessionCompletionsService {
     const account = await this.resolveAccount(supabase, authUserId, params.orgId);
     await this.assertAdminAccess(supabase, account, params.orgId);
 
-    // The admin page defaults to a single month and only widens the window when
-    // the month filter changes, so bound the read to `session_end_at` rather than
-    // loading every completion the org has ever recorded.
-    let query = supabase
-      .from('class_session_completions')
-      .select('*')
-      .eq('org_id', params.orgId)
-      .in('status', ['confirmed', 'auto_confirmed'])
-      .is('deleted_at', null);
-    if (params.completedSince) {
-      query = query.gte('session_end_at', params.completedSince);
+    // Clamp every admin read to the rolling three-month reporting window,
+    // including callers that omit bounds or request an older month.
+    const now = new Date();
+    const earliest = new Date(now);
+    earliest.setUTCDate(1);
+    earliest.setUTCMonth(earliest.getUTCMonth() - 3);
+    const lastDay = new Date(
+      Date.UTC(earliest.getUTCFullYear(), earliest.getUTCMonth() + 1, 0),
+    ).getUTCDate();
+    earliest.setUTCDate(Math.min(now.getUTCDate(), lastDay));
+    const requestedSince = params.completedSince
+      ? Date.parse(params.completedSince)
+      : earliest.getTime();
+    const requestedUntil = params.completedUntil
+      ? Date.parse(params.completedUntil)
+      : now.getTime();
+    if (
+      !Number.isFinite(requestedSince) ||
+      !Number.isFinite(requestedUntil) ||
+      requestedSince >= requestedUntil
+    ) {
+      throw new BadRequestException('Invalid completion date range');
     }
-    if (params.completedUntil) {
-      query = query.lt('session_end_at', params.completedUntil);
+    const since = Math.max(earliest.getTime(), requestedSince);
+    const until = Math.min(now.getTime(), requestedUntil);
+    if (since >= until) return [];
+
+    // Read all recipient states so pending people contribute to the denominator.
+    // Page through the rows to avoid truncating totals at the Data API row limit.
+    const completionRows: ClassSessionCompletionRow[] = [];
+    const pageSize = 500;
+    for (let offset = 0; ; offset += pageSize) {
+      const { data, error } = await supabase
+        .from('class_session_completions')
+        .select('*')
+        .eq('org_id', params.orgId)
+        .is('deleted_at', null)
+        .gte('session_end_at', new Date(since).toISOString())
+        .lt('session_end_at', new Date(until).toISOString())
+        .order('session_end_at', { ascending: false })
+        .order('id', { ascending: true })
+        .range(offset, offset + pageSize - 1)
+        .returns<ClassSessionCompletionRow[]>();
+      if (error) throw new InternalServerErrorException(error.message);
+      completionRows.push(...(data ?? []));
+      if ((data?.length ?? 0) < pageSize) break;
     }
-
-    const { data, error } = await query
-      .order('session_end_at', { ascending: false })
-      .returns<ClassSessionCompletionRow[]>();
-
-    if (error) throw new InternalServerErrorException(error.message);
-    const completionRows = data ?? [];
     const profileIds = [...new Set(completionRows.map((row) => row.profile_id))];
     const scheduleIds = [...new Set(completionRows.map((row) => row.schedule_id))];
     const learningSpaceIds = [
@@ -984,15 +1010,14 @@ export class SessionCompletionsService {
                 }>
               >()
           : Promise.resolve({ data: [], error: null }),
-        // Pull both the students (for `studentNames`) and the guardians (for the
-        // admin "Parent" filter) attached to each schedule in one read.
+        // Include tutors who have not confirmed, as well as students and parents.
         scheduleIds.length
           ? supabase
               .from('class_schedule_participants')
               .select('schedule_id, profile_id, role, display_name')
               .eq('org_id', params.orgId)
               .in('schedule_id', scheduleIds)
-              .in('role', ['child', 'guardian'])
+              .in('role', ['child', 'guardian', 'educator'])
               .is('deleted_at', null)
               .returns<
                 Array<{
@@ -1038,6 +1063,7 @@ export class SessionCompletionsService {
     );
     const studentNamesByScheduleId = new Map<string, string[]>();
     const guardiansByScheduleId = new Map<string, AdminSessionCompletionGuardianVM[]>();
+    const educatorsByScheduleId = new Map<string, AdminSessionCompletionGuardianVM[]>();
     const childProfileIdsByScheduleId = new Map<string, string[]>();
     const addGuardian = (
       scheduleId: string,
@@ -1051,6 +1077,15 @@ export class SessionCompletionsService {
     };
     (participantResponse.data ?? []).forEach((participant) => {
       const displayName = participant.display_name?.trim();
+      if (participant.role === 'educator') {
+        const educators = educatorsByScheduleId.get(participant.schedule_id) ?? [];
+        educators.push({
+          profileId: participant.profile_id,
+          displayName: displayName || 'Tutor',
+        });
+        educatorsByScheduleId.set(participant.schedule_id, educators);
+        return;
+      }
       if (participant.role === 'guardian') {
         addGuardian(participant.schedule_id, {
           profileId: participant.profile_id,
@@ -1177,59 +1212,98 @@ export class SessionCompletionsService {
       grouped.set(key, bucket);
     });
 
-    return [...grouped.entries()].map(([id, rows]) => {
-      const first = rows[0]!;
-      const actors: AdminSessionCompletionActorVM[] = rows.map((row) => ({
-        profileId: row.profile_id,
-        displayName: names.get(row.profile_id) ?? 'Unknown user',
-        role: row.role,
-        status: row.status as AdminSessionCompletionActorVM['status'],
-        completedAt: row.resolved_at ?? row.confirmed_at ?? row.updated_at,
-      }));
-      const methods = new Set(actors.map((actor) => actor.status));
-      const ratings = rows
-        .map((row) => row.rating)
-        .filter((rating): rating is number => typeof rating === 'number');
+    return [...grouped.entries()]
+      .filter(([, rows]) =>
+        rows.some((row) => row.status === 'confirmed' || row.status === 'auto_confirmed'),
+      )
+      .map(([id, rows]) => {
+        const first = rows[0]!;
+        const actors: AdminSessionCompletionActorVM[] = rows
+          .filter((row) => row.status === 'confirmed' || row.status === 'auto_confirmed')
+          .map((row) => ({
+            profileId: row.profile_id,
+            displayName: names.get(row.profile_id) ?? 'Unknown user',
+            role: row.role,
+            status: row.status as AdminSessionCompletionActorVM['status'],
+            completedAt: row.resolved_at ?? row.confirmed_at ?? row.updated_at,
+          }));
+        const methods = new Set(actors.map((actor) => actor.status));
+        const ratings = rows
+          .map((row) => row.rating)
+          .filter((rating): rating is number => typeof rating === 'number');
 
-      // Union the roster/family-link guardians with any guardian who actually
-      // confirmed — the confirmer may not appear in either source.
-      const guardians: AdminSessionCompletionGuardianVM[] = [
-        ...(guardiansByScheduleId.get(first.schedule_id) ?? []),
-      ];
-      actors
-        .filter((actor) => actor.role === 'guardian')
-        .forEach((actor) => {
-          if (!guardians.some((guardian) => guardian.profileId === actor.profileId)) {
-            guardians.push({
-              profileId: actor.profileId,
-              displayName: actor.displayName,
-            });
-          }
+        // Include every guardian recipient, even if absent from the current
+        // roster/family links or still awaiting confirmation.
+        const guardians: AdminSessionCompletionGuardianVM[] = [
+          ...(guardiansByScheduleId.get(first.schedule_id) ?? []),
+        ];
+        rows
+          .filter((row) => row.role === 'guardian')
+          .forEach((row) => {
+            if (!guardians.some((guardian) => guardian.profileId === row.profile_id)) {
+              guardians.push({
+                profileId: row.profile_id,
+                displayName: names.get(row.profile_id) ?? 'Parent',
+              });
+            }
+          });
+
+        const participants = new Map<string, AdminSessionCompletionParticipantVM>();
+        const addParticipant = (
+          person: AdminSessionCompletionGuardianVM,
+          role: 'educator' | 'guardian',
+        ) => {
+          participants.set(`${role}|${person.profileId}`, {
+            ...person,
+            role,
+            status: 'pending',
+            rating: null,
+          });
+        };
+        (educatorsByScheduleId.get(first.schedule_id) ?? []).forEach((person) =>
+          addParticipant(person, 'educator'),
+        );
+        guardians.forEach((person) => addParticipant(person, 'guardian'));
+        rows.forEach((row) => {
+          if (row.role !== 'educator' && row.role !== 'guardian') return;
+          const key = `${row.role}|${row.profile_id}`;
+          participants.set(key, {
+            profileId: row.profile_id,
+            displayName:
+              names.get(row.profile_id) ??
+              participants.get(key)?.displayName ??
+              'Unknown user',
+            role: row.role,
+            status: row.status,
+            rating: row.rating ?? null,
+          });
         });
 
-      return {
-        id,
-        orgId: first.org_id,
-        scheduleId: first.schedule_id,
-        occurrenceKey: first.occurrence_key,
-        sessionEndAt: first.session_end_at,
-        sessionTitle: first.session_title ?? null,
-        studentNames: studentNamesByScheduleId.get(first.schedule_id) ?? [],
-        channelId: first.channel_id ?? null,
-        learningSpaceId: first.learning_space_id ?? null,
-        learningSpaceTitle: first.learning_space_id
-          ? (learningSpaceTitles.get(first.learning_space_id) ?? null)
-          : null,
-        completedAt: actors
-          .map((actor) => actor.completedAt)
-          .sort((left, right) => right.localeCompare(left))[0]!,
-        completionMethod: methods.size > 1 ? 'mixed' : (actors[0]?.status ?? 'confirmed'),
-        confirmedBy: actors,
-        guardians,
-        averageRating: ratings.length
-          ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length
-          : null,
-      };
-    });
+        return {
+          id,
+          orgId: first.org_id,
+          scheduleId: first.schedule_id,
+          occurrenceKey: first.occurrence_key,
+          sessionEndAt: first.session_end_at,
+          sessionTitle: first.session_title ?? null,
+          studentNames: studentNamesByScheduleId.get(first.schedule_id) ?? [],
+          channelId: first.channel_id ?? null,
+          learningSpaceId: first.learning_space_id ?? null,
+          learningSpaceTitle: first.learning_space_id
+            ? (learningSpaceTitles.get(first.learning_space_id) ?? null)
+            : null,
+          completedAt: actors
+            .map((actor) => actor.completedAt)
+            .sort((left, right) => right.localeCompare(left))[0]!,
+          completionMethod:
+            methods.size > 1 ? 'mixed' : (actors[0]?.status ?? 'confirmed'),
+          confirmedBy: actors,
+          guardians,
+          participants: [...participants.values()],
+          averageRating: ratings.length
+            ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length
+            : null,
+        };
+      });
   }
 }

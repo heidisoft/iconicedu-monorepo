@@ -62,6 +62,15 @@ export interface AdminSessionCompletionGuardianVM {
   displayName: string;
 }
 
+/** A tutor or parent, including people who have not manually confirmed. */
+export interface AdminSessionCompletionParticipantVM {
+  profileId: UUID;
+  displayName: string;
+  role: 'educator' | 'guardian';
+  status: ClassSessionCompletionStatus;
+  rating?: number | null;
+}
+
 /** One completed schedule occurrence, grouped across all participant confirmations. */
 export interface AdminSessionCompletionVM {
   id: string;
@@ -78,5 +87,7 @@ export interface AdminSessionCompletionVM {
   completionMethod: 'confirmed' | 'auto_confirmed' | 'mixed';
   confirmedBy: AdminSessionCompletionActorVM[];
   guardians: AdminSessionCompletionGuardianVM[];
+  /** Optional while older API deployments are being replaced. */
+  participants?: AdminSessionCompletionParticipantVM[];
   averageRating?: number | null;
 }

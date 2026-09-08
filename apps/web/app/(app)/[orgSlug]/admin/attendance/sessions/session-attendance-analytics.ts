@@ -1,4 +1,7 @@
-import type { AdminSessionCompletionVM } from '@iconicedu/shared-types';
+import type {
+  AdminSessionCompletionParticipantVM,
+  AdminSessionCompletionVM,
+} from '@iconicedu/shared-types';
 
 export type CompletionFilters = {
   search: string;
@@ -10,8 +13,7 @@ export type CompletionFilters = {
   method: string;
 };
 
-// Sentinel month-filter value meaning "every recorded month" — widens the admin
-// read to an unbounded query. Anything else is a `YYYY-MM` (UTC) key.
+// Sentinel for the full rolling three-month window enforced by the API.
 export const ALL_COMPLETION_MONTHS = 'all';
 
 const COMPLETION_MONTH_KEY_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -36,7 +38,7 @@ export function getCurrentCompletionMonthKey(reference: Date = new Date()) {
  * filter without first loading every completion to discover which months have
  * data.
  */
-export function buildRecentCompletionMonthKeys(count = 12, reference: Date = new Date()) {
+export function buildRecentCompletionMonthKeys(count = 4, reference: Date = new Date()) {
   const keys: string[] = [];
   for (let offset = 0; offset < count; offset += 1) {
     const date = new Date(
@@ -49,7 +51,7 @@ export function buildRecentCompletionMonthKeys(count = 12, reference: Date = new
 
 /**
  * `[since, until)` ISO bounds on `session_end_at` for a month key, or null for
- * `ALL_COMPLETION_MONTHS` / an unparseable key (caller then reads unbounded).
+ * `ALL_COMPLETION_MONTHS` / an unparseable key (API uses its three-month window).
  */
 export function completionMonthKeyToUtcRange(key: string) {
   if (!isCompletionMonthKey(key)) return null;
@@ -60,19 +62,14 @@ export function completionMonthKeyToUtcRange(key: string) {
   };
 }
 
-/**
- * URL for the completed-sessions page with `month` set to `monthValue`. The
- * current month is the page default, so it is left implicit (no query param)
- * rather than pinned — keeps the canonical URL clean and shareable.
- */
+/** Keep the default three-month window implicit in shared URLs. */
 export function buildMonthFilterHref(
   pathname: string,
   currentSearch: string,
   monthValue: string,
-  now: Date = new Date(),
 ) {
   const params = new URLSearchParams(currentSearch);
-  if (monthValue === getCurrentCompletionMonthKey(now)) {
+  if (monthValue === ALL_COMPLETION_MONTHS) {
     params.delete('month');
   } else {
     params.set('month', monthValue);
@@ -106,7 +103,7 @@ export function filterCompletions(
       return false;
     if (
       filters.teacherId !== 'all' &&
-      !row.confirmedBy.some(
+      !getCompletionParticipants(row).some(
         (actor) => actor.role === 'educator' && actor.profileId === filters.teacherId,
       )
     )
@@ -128,7 +125,7 @@ export function filterCompletions(
       row.learningSpaceTitle,
       ...row.studentNames,
       ...(row.guardians ?? []).map((guardian) => guardian.displayName),
-      ...row.confirmedBy.map((actor) => actor.displayName),
+      ...getCompletionParticipants(row).map((actor) => actor.displayName),
     ].some((value) => value?.toLocaleLowerCase().includes(search));
   });
 }
@@ -138,10 +135,14 @@ export function summarizeCompletions(rows: AdminSessionCompletionVM[]) {
   return {
     completedSessions: rows.length,
     teacherConfirmed: rows.filter((row) =>
-      row.confirmedBy.some((actor) => actor.role === 'educator'),
+      row.confirmedBy.some(
+        (actor) => actor.role === 'educator' && actor.status === 'confirmed',
+      ),
     ).length,
     parentConfirmed: rows.filter((row) =>
-      row.confirmedBy.some((actor) => actor.role === 'guardian'),
+      row.confirmedBy.some(
+        (actor) => actor.role === 'guardian' && actor.status === 'confirmed',
+      ),
     ).length,
     averageRating: rated.length
       ? rated.reduce((sum, row) => sum + (row.averageRating ?? 0), 0) / rated.length
@@ -159,8 +160,18 @@ export function buildMonthlyCompletionTrend(rows: AdminSessionCompletionVM[]) {
     if (!key) return;
     const bucket = buckets.get(key) ?? { sessions: 0, teacher: 0, parent: 0 };
     bucket.sessions += 1;
-    if (row.confirmedBy.some((actor) => actor.role === 'educator')) bucket.teacher += 1;
-    if (row.confirmedBy.some((actor) => actor.role === 'guardian')) bucket.parent += 1;
+    if (
+      row.confirmedBy.some(
+        (actor) => actor.role === 'educator' && actor.status === 'confirmed',
+      )
+    )
+      bucket.teacher += 1;
+    if (
+      row.confirmedBy.some(
+        (actor) => actor.role === 'guardian' && actor.status === 'confirmed',
+      )
+    )
+      bucket.parent += 1;
     buckets.set(key, bucket);
   });
   return [...buckets.entries()]
@@ -169,26 +180,62 @@ export function buildMonthlyCompletionTrend(rows: AdminSessionCompletionVM[]) {
     .map(([key, values]) => ({ key, label: formatCompletionMonth(key), ...values }));
 }
 
+/** Compatibility fallback for a web deployment preceding the API update. */
+export function getCompletionParticipants(
+  row: AdminSessionCompletionVM,
+): AdminSessionCompletionParticipantVM[] {
+  if (row.participants) return row.participants;
+  const people = new Map<string, AdminSessionCompletionParticipantVM>();
+  (row.guardians ?? []).forEach((person) => {
+    people.set(`guardian|${person.profileId}`, {
+      ...person,
+      role: 'guardian',
+      status: 'pending',
+      rating: null,
+    });
+  });
+  row.confirmedBy.forEach((actor) => {
+    if (actor.role !== 'educator' && actor.role !== 'guardian') return;
+    people.set(`${actor.role}|${actor.profileId}`, {
+      ...actor,
+      role: actor.role,
+      rating: null,
+    });
+  });
+  return [...people.values()];
+}
+
 export function buildConfirmerBreakdown(
   rows: AdminSessionCompletionVM[],
   role: 'educator' | 'guardian',
 ) {
-  const people = new Map<string, { name: string; sessions: number }>();
+  const people = new Map<string, { name: string; sessions: number; total: number }>();
   rows.forEach((row) => {
     new Map(
-      row.confirmedBy
+      getCompletionParticipants(row)
         .filter((actor) => actor.role === role)
         .map((actor) => [actor.profileId, actor]),
     ).forEach((actor) => {
       const value = people.get(actor.profileId) ?? {
         name: actor.displayName,
         sessions: 0,
+        total: 0,
       };
-      value.sessions += 1;
+      value.total += 1;
+      if (actor.status === 'confirmed') value.sessions += 1;
       people.set(actor.profileId, value);
     });
   });
   return [...people.entries()]
-    .map(([id, value]) => ({ id, ...value }))
-    .sort((a, b) => b.sessions - a.sessions || a.name.localeCompare(b.name));
+    .map(([id, value]) => ({
+      id,
+      ...value,
+      percentage: Math.round((value.sessions / value.total) * 100),
+    }))
+    .sort(
+      (a, b) =>
+        b.percentage - a.percentage ||
+        b.sessions - a.sessions ||
+        a.name.localeCompare(b.name),
+    );
 }

@@ -31,6 +31,26 @@ Current class-session timing behavior:
 - Pending completion rows expire three days after the effective session end and
   are then auto-confirmed by `run_class_session_completion_expiry_sweep()`.
 
+The admin completed-sessions report (`/i/admin/attendance/sessions`) includes
+occurrences with at least one confirmed or auto-confirmed recipient, limited by
+session end time to the rolling past three calendar months in UTC. Month filters
+can narrow that interval; they cannot load older data or future sessions.
+The API enforces the interval even with analytics disabled.
+
+The teacher and parent breakdowns show manual confirmations / that person's total
+completed occurrences in the filtered results, as a percentage. People with zero
+confirmations remain visible. Automatic confirmations, pending responses, and
+disputes contribute to the denominator but not the manual-confirmation numerator.
+The table shows only tutors and parents, with their response status and individual
+rating below their name; staff and child confirmations are not listed there.
+Recipient records are supplemented with the current schedule roster and family
+links when a tutor or parent has no response record.
+
+The existing `admin-session-attendance-analytics` flag still controls the dashboard.
+`flag-exempt: maintenance of existing attendance reporting date limits, confirmation
+accuracy, and table presentation` covers the shared table and API corrections.
+Deploy the API before the web app to include pending tutors and individual ratings.
+
 Reminder reconciliation and dispatch are split on purpose:
 
 ```mermaid

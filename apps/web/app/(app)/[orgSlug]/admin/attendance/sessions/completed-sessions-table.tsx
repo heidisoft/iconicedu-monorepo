@@ -1,6 +1,7 @@
+import { Check, Clock, CircleAlert } from 'lucide-react';
+import { getCompletionParticipants } from './session-attendance-analytics';
 import type { AdminSessionCompletionVM } from '@iconicedu/shared-types';
 import {
-  Badge,
   Table,
   TableBody,
   TableCell,
@@ -20,14 +21,12 @@ export function CompletedSessionsTable({ rows }: { rows: AdminSessionCompletionV
             <TableHead>Ended</TableHead>
             <TableHead>Students</TableHead>
             <TableHead>Confirmed by</TableHead>
-            <TableHead>Method</TableHead>
-            <TableHead>Rating</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {rows.length === 0 && (
             <TableRow>
-              <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+              <TableCell colSpan={4} className="h-32 text-center text-muted-foreground">
                 No completed sessions match the selected filters.
               </TableCell>
             </TableRow>
@@ -40,19 +39,46 @@ export function CompletedSessionsTable({ rows }: { rows: AdminSessionCompletionV
               <TableCell>{formatAttendanceDateTime(row.sessionEndAt)}</TableCell>
               <TableCell>{row.studentNames.join(', ') || '—'}</TableCell>
               <TableCell>
-                {row.confirmedBy.length === 0
-                  ? '—'
-                  : row.confirmedBy
-                      .map((actor) => `${actor.displayName} (${actor.role})`)
-                      .join(', ')}
-              </TableCell>
-              <TableCell>
-                <Badge variant="secondary" className="capitalize">
-                  {row.completionMethod.replace('_', ' ')}
-                </Badge>
-              </TableCell>
-              <TableCell>
-                {row.averageRating == null ? '—' : `${row.averageRating.toFixed(1)} / 5`}
+                <ul className="space-y-2">
+                  {getCompletionParticipants(row).map((person) => {
+                    const confirmed = person.status === 'confirmed';
+                    const disputed = person.status === 'disputed';
+                    const Icon = confirmed ? Check : disputed ? CircleAlert : Clock;
+                    const status = confirmed
+                      ? 'Confirmed'
+                      : disputed
+                        ? 'Disputed'
+                        : person.status === 'auto_confirmed'
+                          ? 'Auto-confirmed; awaiting personal confirmation'
+                          : 'Pending';
+                    return (
+                      <li
+                        key={`${person.role}|${person.profileId}`}
+                        className="flex items-start gap-2"
+                      >
+                        <Icon
+                          aria-hidden="true"
+                          className={`mt-0.5 size-4 shrink-0 ${confirmed ? 'text-primary' : 'text-muted-foreground'}`}
+                        />
+                        <div>
+                          <p>
+                            {person.displayName}{' '}
+                            <span className="text-xs text-muted-foreground">
+                              ({person.role === 'educator' ? 'Tutor' : 'Parent'}) ·{' '}
+                              {status}
+                            </span>
+                          </p>
+                          {person.rating != null && (
+                            <p className="text-xs text-muted-foreground">
+                              Rating: {person.rating.toFixed(1)} / 5
+                            </p>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {getCompletionParticipants(row).length === 0 && '—'}
               </TableCell>
             </TableRow>
           ))}

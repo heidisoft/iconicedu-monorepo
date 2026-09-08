@@ -40,6 +40,7 @@ describe('SessionCompletionsService', () => {
       in: jest.fn(() => chain),
       is: jest.fn(() => chain),
       gte: jest.fn(() => chain),
+      range: jest.fn(() => chain),
       lt: jest.fn(() => chain),
       limit: jest.fn(() => chain),
       order: jest.fn(() => chain),
@@ -161,6 +162,10 @@ describe('SessionCompletionsService', () => {
   }
 
   describe('listForAdmin', () => {
+    beforeEach(() =>
+      jest.useFakeTimers().setSystemTime(new Date('2026-09-07T12:00:00.000Z')),
+    );
+    afterEach(() => jest.useRealTimers());
     it('groups participant confirmations into one completed occurrence', async () => {
       const accountChain = makeChain({ data: { id: ACCOUNT_ID, org_id: ORG_ID } });
       const roleChain = makeChain({ data: { role_key: 'admin' } });
@@ -375,11 +380,11 @@ describe('SessionCompletionsService', () => {
       );
       expect(completionChain.lt).toHaveBeenCalledWith(
         'session_end_at',
-        '2026-10-01T00:00:00.000Z',
+        '2026-09-07T12:00:00.000Z',
       );
     });
 
-    it('omits the window bounds when no range is given', async () => {
+    it('defaults to the rolling three-month window when no range is given', async () => {
       const completionChain = makeChain({ data: [] });
       const from = jest.fn((table: string) => {
         if (table === 'accounts')
@@ -392,8 +397,186 @@ describe('SessionCompletionsService', () => {
 
       await new SessionCompletionsService().listForAdmin(AUTH_USER_ID, { orgId: ORG_ID });
 
-      expect(completionChain.gte).not.toHaveBeenCalled();
-      expect(completionChain.lt).not.toHaveBeenCalled();
+      expect(completionChain.gte).toHaveBeenCalledWith(
+        'session_end_at',
+        '2026-06-07T12:00:00.000Z',
+      );
+      expect(completionChain.lt).toHaveBeenCalledWith(
+        'session_end_at',
+        '2026-09-07T12:00:00.000Z',
+      );
+    });
+  });
+
+  describe('admin confirmation reporting', () => {
+    beforeEach(() =>
+      jest.useFakeTimers().setSystemTime(new Date('2026-05-31T12:00:00.000Z')),
+    );
+    afterEach(() => jest.useRealTimers());
+
+    function setup(rows: ReturnType<typeof baseCompletionRow>[]) {
+      const completions = makeChain({ data: rows });
+      const from = jest.fn((table: string) => {
+        if (table === 'accounts')
+          return makeChain({ data: { id: ACCOUNT_ID, org_id: ORG_ID } });
+        if (table === 'user_roles') return makeChain({ data: { role_key: 'admin' } });
+        if (table === 'class_session_completions') return completions;
+        if (table === 'profiles') return makeChain({ data: [] });
+        if (table === 'learning_spaces') return makeChain({ data: [] });
+        if (table === 'class_schedule_participants')
+          return makeChain({
+            data: [
+              {
+                schedule_id: SCHEDULE_ID,
+                profile_id: PROFILE_ID,
+                role: 'educator',
+                display_name: 'Tutor One',
+              },
+              {
+                schedule_id: SCHEDULE_ID,
+                profile_id: OTHER_PROFILE_ID,
+                role: 'guardian',
+                display_name: 'Parent One',
+              },
+              {
+                schedule_id: SCHEDULE_ID,
+                profile_id: 'other-tutor',
+                role: 'educator',
+                display_name: 'Tutor Two',
+              },
+            ],
+          });
+        throw new Error(`Unexpected table: ${table}`);
+      });
+      createSupabaseServiceClientMock.mockReturnValue({ from } as never);
+      return { completions, from };
+    }
+
+    it('retains pending recipients and roster tutors but excludes staff and child confirmations from participants', async () => {
+      setup([
+        baseCompletionRow({
+          role: 'educator',
+          status: 'confirmed',
+          rating: 5,
+          updated_at: '2026-05-30T12:00:00Z',
+        }),
+        baseCompletionRow({
+          profile_id: OTHER_PROFILE_ID,
+          role: 'guardian',
+          status: 'pending',
+        }),
+        baseCompletionRow({
+          profile_id: 'staff',
+          role: 'staff',
+          status: 'confirmed',
+          updated_at: '2026-05-30T12:00:00Z',
+        }),
+        baseCompletionRow({
+          profile_id: 'child',
+          role: 'child',
+          status: 'confirmed',
+          updated_at: '2026-05-30T12:00:00Z',
+        }),
+        baseCompletionRow({
+          schedule_id: 'unconfirmed-session',
+          role: 'educator',
+          status: 'pending',
+        }),
+      ]);
+      const rows = await new SessionCompletionsService().listForAdmin(AUTH_USER_ID, {
+        orgId: ORG_ID,
+      });
+      expect(rows).toHaveLength(1);
+      expect(rows[0].participants).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            profileId: PROFILE_ID,
+            status: 'confirmed',
+            rating: 5,
+          }),
+          expect.objectContaining({
+            profileId: OTHER_PROFILE_ID,
+            status: 'pending',
+            rating: null,
+          }),
+          expect.objectContaining({ profileId: 'other-tutor', status: 'pending' }),
+        ]),
+      );
+      expect(rows[0].participants).toHaveLength(3);
+      expect(rows[0].confirmedBy).not.toEqual(
+        expect.arrayContaining([expect.objectContaining({ status: 'pending' })]),
+      );
+    });
+
+    it('clamps month-end subtraction and caller-supplied dates', async () => {
+      const { completions } = setup([]);
+      await new SessionCompletionsService().listForAdmin(AUTH_USER_ID, {
+        orgId: ORG_ID,
+        completedSince: '2020-01-01',
+        completedUntil: '2030-01-01',
+      });
+      expect(completions.gte).toHaveBeenCalledWith(
+        'session_end_at',
+        '2026-02-28T12:00:00.000Z',
+      );
+      expect(completions.lt).toHaveBeenCalledWith(
+        'session_end_at',
+        '2026-05-31T12:00:00.000Z',
+      );
+    });
+
+    it('returns no rows for a month entirely outside the allowed window', async () => {
+      const { completions } = setup([]);
+      expect(
+        await new SessionCompletionsService().listForAdmin(AUTH_USER_ID, {
+          orgId: ORG_ID,
+          completedSince: '2020-01-01',
+          completedUntil: '2020-02-01',
+        }),
+      ).toEqual([]);
+      expect(completions.select).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      { completedSince: 'invalid' },
+      { completedUntil: 'invalid' },
+      { completedSince: '2026-05-01', completedUntil: '2026-04-01' },
+    ])('rejects invalid dates: %j', async (range) => {
+      setup([]);
+      await expect(
+        new SessionCompletionsService().listForAdmin(AUTH_USER_ID, {
+          orgId: ORG_ID,
+          ...range,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('reads beyond the first database page without splitting occurrence recipients', async () => {
+      const confirmed = baseCompletionRow({
+        role: 'educator',
+        status: 'confirmed',
+        updated_at: '2026-05-30T12:00:00Z',
+      });
+      const { completions } = setup([]);
+      completions.returns
+        .mockResolvedValueOnce({ data: Array.from({ length: 500 }, () => confirmed) })
+        .mockResolvedValueOnce({
+          data: [
+            baseCompletionRow({
+              profile_id: OTHER_PROFILE_ID,
+              role: 'guardian',
+              status: 'pending',
+            }),
+          ],
+        });
+      const rows = await new SessionCompletionsService().listForAdmin(AUTH_USER_ID, {
+        orgId: ORG_ID,
+      });
+      expect(completions.range).toHaveBeenNthCalledWith(2, 500, 999);
+      expect(rows).toHaveLength(1);
+      expect(rows[0].participants).toContainEqual(
+        expect.objectContaining({ profileId: OTHER_PROFILE_ID, status: 'pending' }),
+      );
     });
   });
 
