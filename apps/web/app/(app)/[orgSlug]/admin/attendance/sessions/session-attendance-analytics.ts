@@ -3,6 +3,7 @@ import type { AdminSessionCompletionVM } from '@iconicedu/shared-types';
 export type CompletionFilters = {
   search: string;
   month: string;
+  classroomId: string;
   teacherId: string;
   parentId: string;
   studentName: string;
@@ -101,6 +102,8 @@ export function filterCompletions(
       getCompletionMonthKey(row.sessionEndAt) !== filters.month
     )
       return false;
+    if (filters.classroomId !== 'all' && row.learningSpaceId !== filters.classroomId)
+      return false;
     if (
       filters.teacherId !== 'all' &&
       !row.confirmedBy.some(
@@ -108,11 +111,12 @@ export function filterCompletions(
       )
     )
       return false;
+    // The parent filter is scoped by the child in the room, not by who tapped
+    // confirm: picking a parent shows every completed session for their kid, and
+    // `confirmedBy` still reports who actually confirmed it.
     if (
       filters.parentId !== 'all' &&
-      !row.confirmedBy.some(
-        (actor) => actor.role === 'guardian' && actor.profileId === filters.parentId,
-      )
+      !row.guardians.some((guardian) => guardian.profileId === filters.parentId)
     )
       return false;
     if (filters.studentName !== 'all' && !row.studentNames.includes(filters.studentName))
@@ -121,7 +125,9 @@ export function filterCompletions(
     if (!search) return true;
     return [
       row.sessionTitle,
+      row.learningSpaceTitle,
       ...row.studentNames,
+      ...row.guardians.map((guardian) => guardian.displayName),
       ...row.confirmedBy.map((actor) => actor.displayName),
     ].some((value) => value?.toLocaleLowerCase().includes(search));
   });

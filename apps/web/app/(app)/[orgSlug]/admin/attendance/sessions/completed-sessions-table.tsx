@@ -17,6 +17,7 @@ export function CompletedSessionsTable({ rows }: { rows: AdminSessionCompletionV
         <TableHeader>
           <TableRow>
             <TableHead>Session</TableHead>
+            <TableHead>Classroom</TableHead>
             <TableHead>Ended</TableHead>
             <TableHead>Students</TableHead>
             <TableHead>Confirmed by</TableHead>
@@ -27,7 +28,7 @@ export function CompletedSessionsTable({ rows }: { rows: AdminSessionCompletionV
         <TableBody>
           {rows.length === 0 && (
             <TableRow>
-              <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+              <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
                 No completed sessions match the selected filters.
               </TableCell>
             </TableRow>
@@ -37,10 +38,15 @@ export function CompletedSessionsTable({ rows }: { rows: AdminSessionCompletionV
               <TableCell className="font-medium">
                 {row.sessionTitle ?? 'Scheduled session'}
               </TableCell>
+              <TableCell>{row.learningSpaceTitle ?? '—'}</TableCell>
               <TableCell>{formatAttendanceDateTime(row.sessionEndAt)}</TableCell>
               <TableCell>{row.studentNames.join(', ') || '—'}</TableCell>
               <TableCell>
-                {row.confirmedBy.map((actor) => actor.displayName).join(', ')}
+                {row.confirmedBy.length === 0
+                  ? '—'
+                  : row.confirmedBy
+                      .map((actor) => `${actor.displayName} (${actor.role})`)
+                      .join(', ')}
               </TableCell>
               <TableCell>
                 <Badge variant="secondary" className="capitalize">
