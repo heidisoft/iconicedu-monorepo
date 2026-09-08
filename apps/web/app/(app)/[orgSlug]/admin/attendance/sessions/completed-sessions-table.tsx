@@ -12,7 +12,7 @@ import { formatAttendanceDateTime } from '@iconicedu/web/app/(app)/[orgSlug]/adm
 
 export function CompletedSessionsTable({ rows }: { rows: AdminSessionCompletionVM[] }) {
   return (
-    <div className="overflow-hidden rounded-xl border bg-card">
+    <div className="w-full min-w-0 overflow-hidden rounded-xl border bg-card">
       <Table>
         <TableHeader>
           <TableRow>

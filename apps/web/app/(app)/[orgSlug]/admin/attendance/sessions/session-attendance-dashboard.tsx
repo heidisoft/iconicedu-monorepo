@@ -270,7 +270,7 @@ export function SessionAttendanceDashboard({
 
   return (
     <div
-      className="flex flex-1 flex-col gap-4 transition-opacity aria-busy:opacity-60"
+      className="flex min-w-0 flex-1 flex-col gap-4 transition-opacity aria-busy:opacity-60"
       aria-busy={isMonthPending}
     >
       <span aria-live="polite" className="sr-only">
