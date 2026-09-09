@@ -275,7 +275,7 @@ describe('CompletionCheckDispatcherService', () => {
     const service = new CompletionCheckDispatcherService();
     const dispatch = jest
       .spyOn(service, 'dispatchCompletionCheck')
-      .mockResolvedValue(['activity-1']);
+      .mockResolvedValue({ status: 'sent', activityEventIds: ['activity-1'] });
 
     const result = await service.reconcileRecentCompletionChecks({
       supabase: supabase as never,
@@ -337,7 +337,7 @@ describe('CompletionCheckDispatcherService', () => {
       payload: basePayload,
     });
 
-    expect(result).toEqual([]);
+    expect(result).toEqual({ status: 'skipped', reason: 'occurrence_canceled' });
     expect(publishActivityEventMock).not.toHaveBeenCalled();
   });
 
@@ -355,7 +355,7 @@ describe('CompletionCheckDispatcherService', () => {
       payload: basePayload,
     });
 
-    expect(result).toEqual([]);
+    expect(result).toEqual({ status: 'skipped', reason: 'occurrence_canceled' });
     expect(publishActivityEventMock).not.toHaveBeenCalled();
   });
 
@@ -442,7 +442,7 @@ describe('CompletionCheckDispatcherService', () => {
         payload: basePayload,
       });
 
-      expect(result).toEqual([]);
+      expect(result).toEqual({ status: 'deferred', runAt: '2030-03-09T11:10:00.000Z' });
       expect(getClassSessionCompletionsCallCount()).toBe(0);
       expect(publishActivityEventMock).not.toHaveBeenCalled();
     },
@@ -461,7 +461,8 @@ describe('CompletionCheckDispatcherService', () => {
       payload: basePayload,
     });
 
-    expect(result).toHaveLength(3);
+    expect(result).toMatchObject({ status: 'sent', activityEventIds: expect.any(Array) });
+    if (result.status === 'sent') expect(result.activityEventIds).toHaveLength(3);
     expect(publishActivityEventMock).toHaveBeenCalledTimes(3);
     expect(publishActivityEventMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -472,5 +473,35 @@ describe('CompletionCheckDispatcherService', () => {
         }),
       }),
     );
+  });
+  it('publishes one individual teacher check for each of three consecutive classes', async () => {
+    const service = new CompletionCheckDispatcherService();
+    for (const hour of [10, 11, 12]) {
+      const { supabase } = makeSupabase({ upsertedId: `completion-${hour}` });
+      await service.dispatchCompletionCheck({
+        supabase: supabase as never,
+        systemProfileId: 'system-1',
+        job: {
+          id: `job-${hour}`,
+          org_id: 'org-1',
+          source_schedule_id: `schedule-${hour}`,
+        } as never,
+        payload: {
+          ...basePayload,
+          scheduleId: `schedule-${hour}`,
+          occurrenceStart: `2030-03-06T${hour}:00:00.000Z`,
+          members: [basePayload.members[1]],
+        },
+      });
+    }
+    expect(publishActivityEventMock).toHaveBeenCalledTimes(3);
+    const calls = publishActivityEventMock.mock.calls.map(([input]) => input);
+    expect(new Set(calls.map((input) => input.dedupeKey)).size).toBe(3);
+    for (const input of calls)
+      expect(input).toMatchObject({
+        eventType: 'session.completion_check.sent',
+        throwOnError: true,
+        audienceRules: [{ kind: 'users_only', userIds: ['teacher-1'] }],
+      });
   });
 });

@@ -91,7 +91,7 @@ describe('ReminderReconcileService', () => {
     jest.clearAllMocks();
   });
 
-  it('reconciles the 12-hour and 30-minute reminder jobs for the next session', async () => {
+  it('enqueues completion checks alongside pending pre-class reminders', async () => {
     const scheduleChain = makeMaybeSingleChain({
       data: buildScheduleRow(),
       error: null,
@@ -119,7 +119,8 @@ describe('ReminderReconcileService', () => {
       .mockImplementationOnce(() => succeededChain)
       .mockImplementationOnce(() => activeChain)
       .mockImplementationOnce(() => existingTwelveHourDedupeChain)
-      .mockImplementationOnce(() => existingThirtyMinuteDedupeChain);
+      .mockImplementationOnce(() => existingThirtyMinuteDedupeChain)
+      .mockImplementation(() => makeMaybeSingleChain({ data: null, error: null }));
     const reminderJobsUpdate = jest.fn((payload: Record<string, unknown>) => {
       updateChain.update(payload);
       return updateChain;
@@ -156,9 +157,10 @@ describe('ReminderReconcileService', () => {
       dedupeKey: 'session.reminder:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z:720',
       dedupeKeys: [
         'session.reminder:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z:720',
-        'session.reminder:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z:30',
+        'session.reminder:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z:15',
+        'session.completion_check:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z',
       ],
-      insertedCount: 2,
+      insertedCount: 3,
       keptCount: 0,
       canceledCount: 0,
     });
@@ -166,8 +168,8 @@ describe('ReminderReconcileService', () => {
       expect.objectContaining({
         status: 'pending',
         dedupe_key:
-          'session.reminder:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z:30',
-        run_at: '2030-03-06T09:30:00.000Z',
+          'session.reminder:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z:15',
+        run_at: '2030-03-06T09:45:00.000Z',
       }),
     );
     expect(reminderJobsUpdate).toHaveBeenCalledWith(
@@ -178,11 +180,17 @@ describe('ReminderReconcileService', () => {
         run_at: '2030-03-05T18:00:00.000Z',
       }),
     );
+    expect(insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        job_type: 'session.completion_check',
+        run_at: '2030-03-06T11:10:00.000Z',
+      }),
+    );
     expect(updateChain.eq).toHaveBeenCalledWith('id', 'existing-reminder-job-1');
     expect(updateChain.eq).toHaveBeenCalledWith('org_id', 'org-1');
   });
 
-  it('schedules the 30-minute reminder immediately when the class is five minutes away', async () => {
+  it('schedules the 15-minute reminder immediately when the class is two minutes away', async () => {
     const scheduleChain = makeMaybeSingleChain({
       data: {
         ...buildScheduleRow(),
@@ -207,7 +215,7 @@ describe('ReminderReconcileService', () => {
       .fn()
       .mockImplementationOnce(() => succeededChain)
       .mockImplementationOnce(() => activeChain)
-      .mockImplementationOnce(() => existingDedupeChain);
+      .mockImplementation(() => existingDedupeChain);
 
     createSupabaseServiceClientMock.mockReturnValue({
       from: jest.fn((table: string) => {
@@ -231,16 +239,17 @@ describe('ReminderReconcileService', () => {
       await new ReminderReconcileService().reconcileNextReminderJobForSchedule({
         orgId: 'org-1',
         scheduleId: 'schedule-1',
-        now: new Date('2030-03-06T10:00:00.000Z'),
+        now: new Date('2030-03-06T10:03:00.000Z'),
       });
 
     expect(result).toEqual({
       action: 'inserted',
-      dedupeKey: 'session.reminder:org-1:space-1:channel-1:2030-03-06T10:05:00.000Z:30',
+      dedupeKey: 'session.reminder:org-1:space-1:channel-1:2030-03-06T10:05:00.000Z:15',
       dedupeKeys: [
-        'session.reminder:org-1:space-1:channel-1:2030-03-06T10:05:00.000Z:30',
+        'session.reminder:org-1:space-1:channel-1:2030-03-06T10:05:00.000Z:15',
+        'session.completion_check:org-1:space-1:channel-1:2030-03-06T10:05:00.000Z',
       ],
-      insertedCount: 1,
+      insertedCount: 2,
       keptCount: 0,
       canceledCount: 0,
     });
@@ -248,11 +257,11 @@ describe('ReminderReconcileService', () => {
       expect.objectContaining({
         status: 'pending',
         dedupe_key:
-          'session.reminder:org-1:space-1:channel-1:2030-03-06T10:05:00.000Z:30',
-        run_at: '2030-03-06T10:00:00.000Z',
+          'session.reminder:org-1:space-1:channel-1:2030-03-06T10:05:00.000Z:15',
+        run_at: '2030-03-06T10:03:00.000Z',
         payload: expect.objectContaining({
-          reminderOffsetMinutes: 30,
-          summary: 'Class starts in 30 minutes',
+          reminderOffsetMinutes: 15,
+          summary: 'Class starts in 15 minutes',
         }),
       }),
     );
@@ -277,7 +286,7 @@ describe('ReminderReconcileService', () => {
         {
           id: 'old-reminder-job-1',
           dedupe_key:
-            'session.reminder:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z:5',
+            'session.reminder:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z:15',
         },
       ],
       error: null,
@@ -299,7 +308,8 @@ describe('ReminderReconcileService', () => {
       .mockImplementationOnce(() => succeededChain)
       .mockImplementationOnce(() => activeChain)
       .mockImplementationOnce(() => existingTwelveHourDedupeChain)
-      .mockImplementationOnce(() => existingThirtyMinuteDedupeChain);
+      .mockImplementationOnce(() => existingThirtyMinuteDedupeChain)
+      .mockImplementation(() => makeMaybeSingleChain({ data: null, error: null }));
     const reminderJobsUpdate = jest.fn((payload: Record<string, unknown>) => {
       updateChain.update(payload);
       return updateChain;
@@ -336,9 +346,10 @@ describe('ReminderReconcileService', () => {
       dedupeKey: 'session.reminder:org-1:space-1:channel-1:2030-03-06T11:00:00.000Z:720',
       dedupeKeys: [
         'session.reminder:org-1:space-1:channel-1:2030-03-06T11:00:00.000Z:720',
-        'session.reminder:org-1:space-1:channel-1:2030-03-06T11:00:00.000Z:30',
+        'session.reminder:org-1:space-1:channel-1:2030-03-06T11:00:00.000Z:15',
+        'session.completion_check:org-1:space-1:channel-1:2030-03-06T11:00:00.000Z',
       ],
-      insertedCount: 2,
+      insertedCount: 3,
       keptCount: 0,
       canceledCount: 1,
     });
@@ -350,7 +361,7 @@ describe('ReminderReconcileService', () => {
       }),
     );
     expect(updateChain.eq).toHaveBeenCalledWith('id', 'old-reminder-job-1');
-    expect(insert).toHaveBeenCalledTimes(2);
+    expect(insert).toHaveBeenCalledTimes(3);
     expect(insert).toHaveBeenCalledWith(
       expect.objectContaining({
         dedupe_key:
@@ -361,8 +372,8 @@ describe('ReminderReconcileService', () => {
     expect(insert).toHaveBeenCalledWith(
       expect.objectContaining({
         dedupe_key:
-          'session.reminder:org-1:space-1:channel-1:2030-03-06T11:00:00.000Z:30',
-        run_at: '2030-03-06T10:30:00.000Z',
+          'session.reminder:org-1:space-1:channel-1:2030-03-06T11:00:00.000Z:15',
+        run_at: '2030-03-06T10:45:00.000Z',
       }),
     );
   });
@@ -392,7 +403,7 @@ describe('ReminderReconcileService', () => {
       .fn()
       .mockImplementationOnce(() => succeededChain)
       .mockImplementationOnce(() => activeChain)
-      .mockImplementationOnce(() => existingDedupeChain);
+      .mockImplementation(() => existingDedupeChain);
 
     createSupabaseServiceClientMock.mockReturnValue({
       from: jest.fn((table: string) => {
@@ -506,4 +517,79 @@ describe('ReminderReconcileService', () => {
       expect(updateChain.is).toHaveBeenCalledWith('deleted_at', null);
     },
   );
+  it('materializes recurring completion checks without waiting for the first occurrence to dispatch', async () => {
+    const scheduleChain = makeMaybeSingleChain({
+      data: {
+        ...buildScheduleRow(),
+        recurrence: {
+          id: 'recurrence-1',
+          org_id: 'org-1',
+          frequency: 'daily',
+          interval: 1,
+          count: 3,
+          until: null,
+          timezone: 'UTC',
+          byday: [],
+          exceptions: [],
+          overrides: [],
+        },
+      },
+      error: null,
+    });
+    const emptyJobs = makeReturnsChain({ data: [], error: null });
+    const missingJob = makeMaybeSingleChain({ data: null, error: null });
+    const insert = jest.fn(async () => ({ error: null }));
+    const select = jest
+      .fn()
+      .mockReturnValueOnce(emptyJobs)
+      .mockReturnValueOnce(emptyJobs)
+      .mockReturnValue(missingJob);
+    createSupabaseServiceClientMock.mockReturnValue({
+      from: (table: string) => {
+        if (table === 'class_schedules') return { select: () => scheduleChain };
+        if (table === 'learning_spaces')
+          return {
+            select: () =>
+              makeMaybeSingleChain({ data: { status: 'active' }, error: null }),
+          };
+        return { select, insert };
+      },
+    } as never);
+    await new ReminderReconcileService().reconcileNextReminderJobForSchedule({
+      orgId: 'org-1',
+      scheduleId: 'schedule-1',
+      now: new Date('2030-03-05T16:00:00.000Z'),
+    });
+    const checks = insert.mock.calls
+      .map(([row]) => row as { job_type: string; run_at: string })
+      .filter((row) => row.job_type === 'session.completion_check');
+    expect(checks.map((row) => row.run_at)).toEqual([
+      '2030-03-06T11:10:00.000Z',
+      '2030-03-07T11:10:00.000Z',
+      '2030-03-08T11:10:00.000Z',
+    ]);
+  });
+
+  it('repairs stale schedule reconciliation via a bounded database pass', async () => {
+    const rpc = jest.fn(async () => ({ data: 3, error: null }));
+    const supabase = { rpc } as never;
+
+    const result = await new ReminderReconcileService().repairStaleScheduleReconciliation(
+      { supabase, limit: 25 },
+    );
+
+    expect(rpc).toHaveBeenCalledWith('enqueue_stale_schedule_reconciliation', {
+      p_limit: 25,
+    });
+    expect(result).toEqual({ requeued: 3 });
+  });
+
+  it('surfaces a database error from the repair pass', async () => {
+    const rpc = jest.fn(async () => ({ data: null, error: { message: 'boom' } }));
+    await expect(
+      new ReminderReconcileService().repairStaleScheduleReconciliation({
+        supabase: { rpc } as never,
+      }),
+    ).rejects.toThrow('boom');
+  });
 });

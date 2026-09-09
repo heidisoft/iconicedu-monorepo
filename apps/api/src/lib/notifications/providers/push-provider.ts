@@ -5,6 +5,7 @@ type PushNotificationPayload = {
   recipientProfileId: string;
   prefKey: string;
   title: string;
+  priority?: 'high';
   summary?: string | null;
   activityFeedItemId?: string | null;
   threadId?: string | null;
@@ -34,6 +35,7 @@ export type SendPushResult = {
 type ExpoPushMessage = {
   to: string;
   title: string;
+  priority?: 'high';
   body?: string;
   badge?: number;
   channelId?: string;
@@ -275,6 +277,7 @@ export async function sendPushNotification(payload: PushNotificationPayload) {
   const messages: ExpoPushMessage[] = tokens.map(({ token }) => ({
     to: token,
     title: payload.title,
+    ...(payload.priority ? { priority: payload.priority } : {}),
     body: payload.summary ? payload.summary : (preview ?? undefined),
     ...(badgeCount !== undefined ? { badge: badgeCount } : {}),
     // Required for Android 8+ to route the notification to the correct channel.

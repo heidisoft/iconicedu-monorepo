@@ -42,3 +42,4 @@ export * from './vm/assessment-test';
 export * from './vm/assessment-delivery';
 export * from './vm/assessment-session';
 export * from './vm/assessment-result';
+export * from './payloads/admin-tools';

@@ -20,7 +20,7 @@ import {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const DEFAULT_MAX_ATTEMPTS = 8;
-const SESSION_REMINDER_OFFSETS_MINUTES = [720, 30] as const;
+const SESSION_REMINDER_OFFSETS_MINUTES = [720, 15] as const;
 const SESSION_COMPLETION_CHECK_OFFSET_MINUTES = 10;
 const REMINDER_DELIVERY_WINDOW_START_HOUR = 9;
 const REMINDER_DELIVERY_WINDOW_END_HOUR = 18;
@@ -53,6 +53,7 @@ function clampToReminderDeliveryWindow(runAt: Date, timezone: string): Date {
 }
 // Wide enough to find the next occurrence without over-expanding
 const RECONCILE_HORIZON_DAYS = 365;
+const COMPLETION_HORIZON_DAYS = 30;
 
 // ─── Local types (mirrors reminders.service.ts — not exported from there) ───
 
@@ -290,11 +291,7 @@ export class ReminderReconcileService {
 
     const succeededDedupeKeys = new Set((succeededRows ?? []).map((r) => r.dedupe_key));
 
-    const nextJobs = this.computeExpectedJobsForNextOccurrence(
-      schedule,
-      succeededDedupeKeys,
-      now,
-    );
+    const nextJobs = this.computeExpectedJobs(schedule, succeededDedupeKeys, now);
     const nextDedupeKeys = new Set(nextJobs.map((job) => job.dedupeKey));
 
     // Check current active jobs
@@ -536,9 +533,35 @@ export class ReminderReconcileService {
     return { canceledCount, reconciledCount, scheduleCount: scheduleIds.length };
   }
 
-  // ─── Chain computation ───────────────────────────────────────────────────────
+  /**
+   * Periodic safety net for the dedicated schedule-reconciliation worker.
+   *
+   * Schedule writes enqueue a deduped `reminder.reconcile` job via DB triggers,
+   * and each run materializes a rolling completion window. A schedule left
+   * unedited for weeks can still drift out of that window, and a lost trigger
+   * event would leave jobs missing entirely. This asks the database for a bounded
+   * set of eligible schedules in that state and re-enqueues their reconcile job
+   * onto this worker's own queue — it never claims or dispatches directly.
+   */
+  async repairStaleScheduleReconciliation(input: {
+    supabase?: SupabaseServiceClient;
+    limit?: number;
+  }): Promise<{ requeued: number }> {
+    const supabase = input.supabase ?? this.getSupabase();
+    const { data, error } = await supabase.rpc('enqueue_stale_schedule_reconciliation', {
+      p_limit: input.limit ?? 25,
+    });
 
-  private computeExpectedJobsForNextOccurrence(
+    if (error) {
+      throw new InternalServerErrorException(error.message);
+    }
+
+    return { requeued: typeof data === 'number' ? data : Number(data ?? 0) };
+  }
+
+  // ─── Job computation ───────────────────────────────────────────────────────
+
+  private computeExpectedJobs(
     schedule: ClassScheduleVM,
     succeededDedupeKeys: Set<string>,
     now: Date,
@@ -547,7 +570,7 @@ export class ReminderReconcileService {
       return [];
     }
 
-    const rangeStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const rangeStart = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
     const rangeEnd = new Date(
       now.getTime() + RECONCILE_HORIZON_DAYS * 24 * 60 * 60 * 1000,
     );
@@ -558,6 +581,10 @@ export class ReminderReconcileService {
       )
       .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
 
+    const jobs: NextJobDescriptor[] = [];
+    const completionHorizon =
+      now.getTime() + COMPLETION_HORIZON_DAYS * 24 * 60 * 60 * 1000;
+    let hasReminderOccurrence = false;
     for (const occ of occurrences) {
       if (occ.source.kind !== 'class_session' || !occ.source.channelId) continue;
 
@@ -575,6 +602,7 @@ export class ReminderReconcileService {
 
       const reminderJobs: NextJobDescriptor[] = [];
       for (const [index, offsetMinutes] of SESSION_REMINDER_OFFSETS_MINUTES.entries()) {
+        if (hasReminderOccurrence) break;
         let runAt = new Date(occurrenceStart.getTime() - offsetMinutes * 60 * 1000);
         if (offsetMinutes === 720) {
           runAt = clampToReminderDeliveryWindow(runAt, occ.timezone ?? 'UTC');
@@ -611,10 +639,13 @@ export class ReminderReconcileService {
       }
 
       if (reminderJobs.length) {
-        return reminderJobs;
+        jobs.push(...reminderJobs);
+        hasReminderOccurrence = true;
       }
 
-      // Completion check job (replaces feedback request)
+      // Enqueue completion independently, even while pre-class reminders are pending.
+      // Materialize a rolling window so one failed occurrence cannot block the next.
+      if (occurrenceStart.getTime() > completionHorizon) continue;
       let completionCheckRunAt = new Date(
         feedbackBase.getTime() + SESSION_COMPLETION_CHECK_OFFSET_MINUTES * 60 * 1000,
       );
@@ -634,22 +665,20 @@ export class ReminderReconcileService {
         });
 
         if (!succeededDedupeKeys.has(dedupeKey)) {
-          return [
-            {
-              jobType: 'session.completion_check',
-              offsetMinutes: null,
-              occurrenceStart: occurrenceStartIso,
-              occurrenceEnd: occ.endAt,
-              runAt: completionCheckRunAt,
-              dedupeKey,
-              occurrence: occ,
-            },
-          ];
+          jobs.push({
+            jobType: 'session.completion_check',
+            offsetMinutes: null,
+            occurrenceStart: occurrenceStartIso,
+            occurrenceEnd: occ.endAt,
+            runAt: completionCheckRunAt,
+            dedupeKey,
+            occurrence: occ,
+          });
         }
       }
     }
 
-    return [];
+    return jobs;
   }
 
   private buildJobRow(

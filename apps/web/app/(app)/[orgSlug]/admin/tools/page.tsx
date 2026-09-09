@@ -11,7 +11,7 @@ import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 
 export const metadata: Metadata = {
   title: 'Admin · Tools',
-  description: 'Manually trigger edge functions and background workers for testing.',
+  description: 'Run and inspect background jobs for this organization.',
 };
 
 export default async function AdminToolsPage({
@@ -31,7 +31,7 @@ export default async function AdminToolsPage({
     <AdminPageShell title="Tools">
       <AdminPageHeading
         title="Developer Tools"
-        description="Manually trigger edge functions and background workers for testing."
+        description="Run and inspect background jobs for this organization."
       />
       <EdgeFunctionsDashboard orgId={org.id} />
     </AdminPageShell>

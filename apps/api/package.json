@@ -56,6 +56,10 @@
       "^@iconicedu/shared-types/(.*)$": "<rootDir>/../../packages/shared-types/src/$1",
       "^@iconicedu/shared-types$": "<rootDir>/../../packages/shared-types/src",
       "^@iconicedu/utils$": "<rootDir>/../../packages/utils/src"
+    },
+    "transform": {
+      "^.+\\.controller\\.ts$": "<rootDir>/test/controller-transformer.cjs",
+      "^.+\\.[jt]sx?$": "babel-jest"
     }
   },
   "devDependencies": {

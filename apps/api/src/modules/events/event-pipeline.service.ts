@@ -46,16 +46,35 @@ export class EventPipelineService {
     limit?: number;
     leaseSeconds?: number;
     jobKinds?: EventPipelineJobKind[];
+    pushOnly?: boolean;
+    reconcileOnly?: boolean;
+    orgId?: string;
   }) {
     const supabase = this.getSupabase();
     const runId = randomUUID();
     const startedAt = Date.now();
-    const claimResponse = await supabase.rpc('claim_due_event_pipeline_jobs', {
-      p_limit: input.limit ?? DEFAULT_JOB_LIMIT,
-      p_lease_owner: input.leaseOwner,
-      p_lease_seconds: input.leaseSeconds ?? DEFAULT_LEASE_SECONDS,
-      p_job_kinds: input.jobKinds?.length ? input.jobKinds : null,
-    });
+    const claimResponse = await supabase.rpc(
+      input.pushOnly
+        ? input.orgId
+          ? 'claim_due_org_push_notification_jobs'
+          : 'claim_due_push_notification_jobs'
+        : input.reconcileOnly
+          ? input.orgId
+            ? 'claim_due_org_schedule_reconciliation_jobs'
+            : 'claim_due_schedule_reconciliation_jobs'
+          : input.orgId
+            ? 'claim_due_org_event_pipeline_jobs'
+            : 'claim_due_event_pipeline_jobs',
+      {
+        ...(input.orgId ? { p_org_id: input.orgId } : {}),
+        p_limit: input.limit ?? DEFAULT_JOB_LIMIT,
+        p_lease_owner: input.leaseOwner,
+        p_lease_seconds: input.leaseSeconds ?? DEFAULT_LEASE_SECONDS,
+        ...(input.pushOnly || input.reconcileOnly
+          ? {}
+          : { p_job_kinds: input.jobKinds?.length ? input.jobKinds : null }),
+      },
+    );
 
     if (claimResponse.error) {
       throw new Error(claimResponse.error.message);
@@ -84,6 +103,21 @@ export class EventPipelineService {
       }
     }
 
+    // Periodic repair pass: re-enqueue reconciliation for eligible schedules whose
+    // reminder/completion jobs are missing or whose rolling window has drifted.
+    // Manual org-scoped runs skip global maintenance, matching the other workers.
+    let reconciliationRepair: { requeued: number } | undefined;
+    if (input.reconcileOnly && !input.orgId) {
+      try {
+        reconciliationRepair =
+          await this.reminderReconcileService.repairStaleScheduleReconciliation({
+            supabase,
+          });
+      } catch {
+        reconciliationRepair = { requeued: 0 };
+      }
+    }
+
     return {
       runId,
       claimed: jobs.length,
@@ -91,6 +125,7 @@ export class EventPipelineService {
       suppressed,
       failed,
       deadLettered,
+      ...(reconciliationRepair ? { reconciliationRepair } : {}),
       durationMs: Date.now() - startedAt,
     };
   }
@@ -164,6 +199,7 @@ export class EventPipelineService {
     if (job.job_kind === 'reminder.dispatch') {
       const result = await this.remindersService.dispatchDueReminderJobs({
         leaseOwner: `event-pipeline:${job.id}`,
+        orgId: job.org_id,
         limit:
           typeof job.payload?.limit === 'number'
             ? Math.max(1, Math.floor(job.payload.limit))

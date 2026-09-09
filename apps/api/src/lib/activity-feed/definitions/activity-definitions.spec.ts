@@ -295,7 +295,7 @@ describe('API activity definitions context rendering', () => {
 
     expect(feedbackDefinition?.tabKey).toBe('classes');
     expect(feedbackDefinition?.notification).toMatchObject({
-      defaultChannels: ['push', 'email'],
+      defaultChannels: ['email'],
       timing: 'standard',
     });
     expect(feedback.leading).toMatchObject({

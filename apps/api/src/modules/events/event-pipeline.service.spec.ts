@@ -208,4 +208,107 @@ describe('EventPipelineService', () => {
       expect.objectContaining({ claimed: 1, failed: 1, deadLettered: 1 }),
     );
   });
+  it.each([
+    [false, 'claim_due_org_event_pipeline_jobs'],
+    [true, 'claim_due_org_push_notification_jobs'],
+  ])(
+    'scopes manual event dispatch (pushOnly=%s) to the authorized organization',
+    async (pushOnly, claimRpc) => {
+      const rpc = jest.fn(async () => ({ data: [], error: null }));
+      createSupabaseServiceClientMock.mockReturnValue({ rpc } as never);
+      const service = new EventPipelineService(
+        activityWorkerService as never,
+        notificationService as never,
+        reminderReconcileService as never,
+        remindersService as never,
+      );
+      await service.dispatchDueJobs({
+        orgId: 'org-1',
+        pushOnly,
+        leaseOwner: 'admin-test',
+      });
+      expect(rpc).toHaveBeenCalledTimes(1);
+      expect(rpc).toHaveBeenCalledWith(
+        claimRpc,
+        expect.objectContaining({ p_org_id: 'org-1' }),
+      );
+    },
+  );
+
+  it('gives push delivery its own queue claim and worker budget', async () => {
+    const rpc = jest.fn(async () => ({ data: [], error: null }));
+    createSupabaseServiceClientMock.mockReturnValue({ rpc } as never);
+    const service = new EventPipelineService(
+      activityWorkerService as never,
+      notificationService as never,
+      reminderReconcileService as never,
+      remindersService as never,
+    );
+    await service.dispatchDueJobs({
+      leaseOwner: 'push-worker',
+      pushOnly: true,
+      limit: 25,
+    });
+    expect(rpc).toHaveBeenCalledWith('claim_due_push_notification_jobs', {
+      p_limit: 25,
+      p_lease_owner: 'push-worker',
+      p_lease_seconds: 120,
+    });
+  });
+
+  it('gives schedule reconciliation its own queue claim and repair pass', async () => {
+    const rpc = jest.fn(async () => ({ data: [], error: null }));
+    createSupabaseServiceClientMock.mockReturnValue({ rpc } as never);
+    const repairStaleScheduleReconciliation = jest
+      .fn()
+      .mockResolvedValue({ requeued: 4 });
+    const service = new EventPipelineService(
+      activityWorkerService as never,
+      notificationService as never,
+      { ...reminderReconcileService, repairStaleScheduleReconciliation } as never,
+      remindersService as never,
+    );
+
+    const result = await service.dispatchDueJobs({
+      leaseOwner: 'schedule-reconciliation-worker',
+      reconcileOnly: true,
+      limit: 50,
+    });
+
+    expect(rpc).toHaveBeenCalledWith('claim_due_schedule_reconciliation_jobs', {
+      p_limit: 50,
+      p_lease_owner: 'schedule-reconciliation-worker',
+      p_lease_seconds: 120,
+    });
+    expect(repairStaleScheduleReconciliation).toHaveBeenCalledWith({
+      supabase: expect.anything(),
+    });
+    expect(result).toEqual(
+      expect.objectContaining({ reconciliationRepair: { requeued: 4 } }),
+    );
+  });
+
+  it('scopes a manual reconciliation run to the org and skips the repair pass', async () => {
+    const rpc = jest.fn(async () => ({ data: [], error: null }));
+    createSupabaseServiceClientMock.mockReturnValue({ rpc } as never);
+    const repairStaleScheduleReconciliation = jest.fn();
+    const service = new EventPipelineService(
+      activityWorkerService as never,
+      notificationService as never,
+      { ...reminderReconcileService, repairStaleScheduleReconciliation } as never,
+      remindersService as never,
+    );
+
+    await service.dispatchDueJobs({
+      orgId: 'org-1',
+      reconcileOnly: true,
+      leaseOwner: 'admin-test',
+    });
+
+    expect(rpc).toHaveBeenCalledWith(
+      'claim_due_org_schedule_reconciliation_jobs',
+      expect.objectContaining({ p_org_id: 'org-1' }),
+    );
+    expect(repairStaleScheduleReconciliation).not.toHaveBeenCalled();
+  });
 });

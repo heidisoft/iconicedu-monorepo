@@ -1150,6 +1150,30 @@ jobs:
               if not exists (select 1 from cron.job where jobname = 'edge-function-reminders-dispatch') then
                 raise exception 'missing edge-function-reminders-dispatch cron job';
               end if;
+              if not exists (
+                select 1 from cron.job
+                where jobname = 'edge-function-session-completions-dispatch'
+                  and active and schedule = '* * * * *'
+                  and strpos(command, rtrim('${BRANCH_API_URL}', '/') || '/functions/v1/session-completions-dispatch') > 0
+              ) then
+                raise exception 'missing or misconfigured edge-function-session-completions-dispatch cron job';
+              end if;
+              if not exists (
+                select 1 from cron.job
+                where jobname = 'edge-function-push-notifications-dispatch'
+                  and active and schedule = '* * * * *'
+                  and strpos(command, rtrim('${BRANCH_API_URL}', '/') || '/functions/v1/push-notifications-dispatch') > 0
+              ) then
+                raise exception 'missing or misconfigured edge-function-push-notifications-dispatch cron job';
+              end if;
+              if not exists (
+                select 1 from cron.job
+                where jobname = 'edge-function-schedule-reconciliation-dispatch'
+                  and active and schedule = '* * * * *'
+                  and strpos(command, rtrim('${BRANCH_API_URL}', '/') || '/functions/v1/schedule-reconciliation-dispatch') > 0
+              ) then
+                raise exception 'missing or misconfigured edge-function-schedule-reconciliation-dispatch cron job';
+              end if;
               if not exists (select 1 from cron.job where jobname = 'edge-function-channel-read-state-repair') then
                 raise exception 'missing edge-function-channel-read-state-repair cron job';
               end if;
@@ -1818,6 +1842,30 @@ jobs:
               end if;
               if not exists (select 1 from cron.job where jobname = 'edge-function-reminders-dispatch') then
                 raise exception 'missing edge-function-reminders-dispatch cron job';
+              end if;
+              if not exists (
+                select 1 from cron.job
+                where jobname = 'edge-function-session-completions-dispatch'
+                  and active and schedule = '* * * * *'
+                  and strpos(command, rtrim('${SUPABASE_URL}', '/') || '/functions/v1/session-completions-dispatch') > 0
+              ) then
+                raise exception 'missing or misconfigured edge-function-session-completions-dispatch cron job';
+              end if;
+              if not exists (
+                select 1 from cron.job
+                where jobname = 'edge-function-push-notifications-dispatch'
+                  and active and schedule = '* * * * *'
+                  and strpos(command, rtrim('${SUPABASE_URL}', '/') || '/functions/v1/push-notifications-dispatch') > 0
+              ) then
+                raise exception 'missing or misconfigured edge-function-push-notifications-dispatch cron job';
+              end if;
+              if not exists (
+                select 1 from cron.job
+                where jobname = 'edge-function-schedule-reconciliation-dispatch'
+                  and active and schedule = '* * * * *'
+                  and strpos(command, rtrim('${SUPABASE_URL}', '/') || '/functions/v1/schedule-reconciliation-dispatch') > 0
+              ) then
+                raise exception 'missing or misconfigured edge-function-schedule-reconciliation-dispatch cron job';
               end if;
               if not exists (select 1 from cron.job where jobname = 'edge-function-channel-read-state-repair') then
                 raise exception 'missing edge-function-channel-read-state-repair cron job';

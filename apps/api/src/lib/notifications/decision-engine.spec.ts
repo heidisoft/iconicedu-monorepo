@@ -84,6 +84,44 @@ describe('buildNotificationDecision', () => {
     resolveEffectivePreferenceMock.mockClear();
   });
 
+  it.each([
+    'session.feedback_request.sent',
+    'session.completion_check.sent',
+    'session.completion_check.batch.sent',
+  ])('blocks push for %s even when saved preferences enable it', async (eventType) => {
+    const { client } = createSupabaseMock({});
+    const event = {
+      id: 'event-1',
+      org_id: 'org-1',
+      event_type: eventType,
+      occurred_at: '2026-04-21T11:59:30.000Z',
+      payload: {},
+      scope: { kind: 'learning_space', learningSpaceId: 'space-1' },
+    };
+    const pushOnly = await buildNotificationDecision({
+      supabase: client as never,
+      event: event as never,
+      recipientProfileId: 'profile-1',
+    });
+    expect(pushOnly.deliveryChannels).toEqual([]);
+    expect(pushOnly.shouldWriteInbox).toBe(true);
+
+    resolveEffectivePreferenceMock.mockResolvedValueOnce({
+      source: 'global_preference',
+      muted: false,
+      channels: ['push', 'email'],
+      scopeKind: 'learning_space',
+      scopeId: 'space-1',
+    });
+    const withEmail = await buildNotificationDecision({
+      supabase: client as never,
+      event: event as never,
+      recipientProfileId: 'profile-1',
+    });
+    expect(withEmail.deliveryChannels).toEqual(['email']);
+    expect(withEmail.shouldWriteInbox).toBe(true);
+  });
+
   it('suppresses external delivery when the source event requests silent notifications', async () => {
     const { client } = createSupabaseMock({
       channelLastReadAt: null,

@@ -169,7 +169,7 @@ export class NotificationService {
         const response = await input.supabase.rpc('enqueue_event_pipeline_job', {
           p_org_id: event.org_id,
           p_job_kind: 'notification.deliver',
-          p_dedupe_key: `notification.deliver:${event.id}:${recipientProfileId}:${channel}:${attemptBucket}`,
+          p_dedupe_key: `notification.deliver:${event.id}:${recipientProfileId}:${channel}`,
           p_payload: {
             activityEventId: event.id,
             recipientProfileId,
@@ -284,6 +284,10 @@ export class NotificationService {
         recipientProfileId,
         prefKey,
         title,
+        ...(eventResponse.data.event_type === 'session.reminder.sent' &&
+        eventResponse.data.payload?.reminderOffsetMinutes === 15
+          ? { priority: 'high' as const }
+          : {}),
         summary,
         activityFeedItemId,
         threadId: typeof payload.threadId === 'string' ? payload.threadId : null,

@@ -928,7 +928,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     tabKey: 'classes',
     importance: 'normal',
     notification: {
-      defaultChannels: ['push', 'email'],
+      defaultChannels: ['email'],
       timing: 'standard',
     },
     resolveRecipients: DEFAULT_RECIPIENTS,
@@ -940,7 +940,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     importance: 'normal',
     notification: {
       prefKey: 'session.completion_check.sent',
-      defaultChannels: ['push', 'email'],
+      defaultChannels: ['email'],
       timing: 'standard',
     },
     resolveRecipients: DEFAULT_RECIPIENTS,
@@ -991,7 +991,7 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     importance: 'normal',
     notification: {
       prefKey: 'session.completion_check.sent',
-      defaultChannels: ['push', 'email'],
+      defaultChannels: ['email'],
       timing: 'standard',
     },
     resolveRecipients: DEFAULT_RECIPIENTS,

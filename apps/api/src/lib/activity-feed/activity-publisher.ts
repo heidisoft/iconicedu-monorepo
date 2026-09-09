@@ -25,6 +25,8 @@ type PublishActivityEventInput<TPayload extends object = Record<string, unknown>
   payload: TPayload;
   dedupeKey?: string | null;
   refreshOnDedupe?: boolean;
+  // Durable workers must retry publication/projection failures before succeeding.
+  throwOnError?: boolean;
   createdBy?: string | null;
 };
 
@@ -189,7 +191,8 @@ export async function publishActivityEvent<TPayload extends object>(
               event: existingResponse.data,
               createdBy: input.createdBy ?? input.actorProfileId ?? null,
             });
-          } catch {
+          } catch (error) {
+            if (input.throwOnError) throw error;
             // Keep the event durable even if projection enqueue fails.
           }
         }
@@ -206,13 +209,15 @@ export async function publishActivityEvent<TPayload extends object>(
         event: insertResponse.data,
         createdBy: input.createdBy ?? input.actorProfileId ?? null,
       });
-    } catch {
+    } catch (error) {
+      if (input.throwOnError) throw error;
       // Keep the event durable even if projection enqueue fails.
     }
 
     return insertResponse.data;
   } catch (error) {
     logActivityPublishFailure('publish_failed', input, error);
+    if (input.throwOnError) throw error;
     return null;
   }
 }

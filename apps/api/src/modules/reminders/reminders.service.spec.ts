@@ -23,7 +23,13 @@ describe('RemindersService', () => {
     reconcileAllSchedulesForLearningSpace: jest.fn(async () => ({ action: 'noop' })),
   };
   const completionCheckDispatcher = {
-    dispatchCompletionCheck: jest.fn(async () => ['activity-event-1']),
+    dispatchCompletionCheck: jest.fn(
+      async (_input: {
+        job: { id: string };
+      }): Promise<
+        import('./completion-check-dispatcher.service').CompletionCheckDispatchResult
+      > => ({ status: 'sent', activityEventIds: ['activity-event-1'] }),
+    ),
     reconcileRecentCompletionChecks: jest.fn(async () => ({
       checked: 0,
       reconciled: 0,
@@ -39,6 +45,9 @@ describe('RemindersService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    completionCheckDispatcher.dispatchCompletionCheck
+      .mockReset()
+      .mockResolvedValue({ status: 'sent', activityEventIds: ['activity-event-1'] });
     jest.useFakeTimers().setSystemTime(new Date('2030-03-01T00:00:00.000Z'));
     process.env.SUPABASE_URL = 'https://prod-ref.supabase.co';
     loggerLogSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation();
@@ -220,6 +229,32 @@ describe('RemindersService', () => {
     );
   }
 
+  it.each([
+    ['dispatchDueReminderJobs', 'claim_due_org_reminder_jobs'],
+    ['dispatchDueCompletionCheckJobs', 'claim_due_org_completion_check_jobs'],
+  ] as const)(
+    'scopes %s to one organization without global maintenance',
+    async (method, claimRpc) => {
+      const rpc = jest.fn(async () => ({ data: [], error: null }));
+      const from = jest.fn();
+      createSupabaseServiceClientMock.mockReturnValue({ rpc, from } as never);
+      const result = await makeService()[method]({
+        orgId: 'org-1',
+        leaseOwner: 'admin-test',
+      });
+      expect(rpc).toHaveBeenCalledTimes(1);
+      expect(rpc).toHaveBeenCalledWith(
+        claimRpc,
+        expect.objectContaining({ p_org_id: 'org-1' }),
+      );
+      expect(from).not.toHaveBeenCalled();
+      expect(
+        completionCheckDispatcher.reconcileRecentCompletionChecks,
+      ).not.toHaveBeenCalled();
+      expect(result).toMatchObject({ claimed: 0, maintenanceSkipped: true });
+    },
+  );
+
   it('compiles two class reminders and one completion check for a learning space', async () => {
     const { supabase, reminderJobsTable } = makeCompileSupabase();
     createSupabaseServiceClientMock.mockReturnValue(supabase as never);
@@ -243,14 +278,14 @@ describe('RemindersService', () => {
       .sort((a, b) => a.run_at.localeCompare(b.run_at));
     expect(reminderRows.map((row) => row.run_at)).toEqual([
       '2030-03-05T18:00:00.000Z',
-      '2030-03-06T09:30:00.000Z',
+      '2030-03-06T09:45:00.000Z',
     ]);
     expect(reminderRows.map((row) => row.payload.summary)).toEqual([
       'Class starts in 12 hours',
-      'Class starts in 30 minutes',
+      'Class starts in 15 minutes',
     ]);
     expect(reminderRows[0]?.dedupe_key).toContain(':720');
-    expect(reminderRows[1]?.dedupe_key).toContain(':30');
+    expect(reminderRows[1]?.dedupe_key).toContain(':15');
     const completionCheckRow = compiledRows.find(
       (row) => row.job_type === 'session.completion_check',
     );
@@ -319,7 +354,7 @@ describe('RemindersService', () => {
         },
         {
           dedupe_key:
-            'session.reminder:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z:5',
+            'session.reminder:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z:15',
           status: 'succeeded',
         },
         {
@@ -510,15 +545,15 @@ describe('RemindersService', () => {
       timezone: 'America/New_York',
       payload: {
         title: 'Algebra',
-        summary: 'Class starts in 30 minutes',
-        reminderOffsetMinutes: 30,
+        summary: 'Class starts in 15 minutes',
+        reminderOffsetMinutes: 15,
         timezone: 'America/New_York',
         channelId: 'channel-1',
         learningSpaceId: 'space-1',
         scheduleId: 'schedule-1',
         occurrenceStart: '2030-03-06T10:00:00.000Z',
       },
-      dedupe_key: 'session.reminder:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z:30',
+      dedupe_key: 'session.reminder:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z:15',
       attempt_count: 0,
       max_attempts: 8,
     };
@@ -634,5 +669,125 @@ describe('RemindersService', () => {
       'run_class_session_completion_expiry_sweep',
     );
     expect(supabase.from).not.toHaveBeenCalledWith('class_schedules');
+  });
+  function makeCompletionDispatchSupabase() {
+    const updates: Array<{ id?: string; values: Record<string, unknown> }> = [];
+    const jobs = [1, 2, 3].map((index) => ({
+      id: `completion-job-${index}`,
+      org_id: 'org-1',
+      job_type: 'session.completion_check',
+      source_schedule_id: `schedule-${index}`,
+      payload: {},
+      attempt_count: 0,
+      max_attempts: 8,
+    }));
+    const rpc = jest.fn(async (name: string) => ({
+      data: name === 'claim_due_completion_check_jobs' ? jobs : [],
+      error: null,
+    }));
+    const supabase = {
+      rpc,
+      from: jest.fn((table: string) => {
+        if (table === 'reminder_jobs')
+          return {
+            update: (values: Record<string, unknown>) => {
+              const update = { values, id: undefined as string | undefined };
+              updates.push(update);
+              const chain = {
+                eq: (key: string, value: string) => {
+                  if (key === 'id') update.id = value;
+                  return chain;
+                },
+              };
+              return chain;
+            },
+          };
+        if (table === 'profiles')
+          return { select: () => makeChain({ data: { id: 'system-1' }, error: null }) };
+        if (table === 'reminder_dispatch_logs')
+          return { insert: jest.fn(async () => ({ error: null })) };
+        throw new Error(`Unexpected table ${table}`);
+      }),
+    };
+    createSupabaseServiceClientMock.mockReturnValue(supabase as never);
+    return { supabase, updates };
+  }
+
+  it('dispatches three completion jobs independently and only succeeds after publishing', async () => {
+    const { supabase, updates } = makeCompletionDispatchSupabase();
+    completionCheckDispatcher.dispatchCompletionCheck.mockImplementation(
+      async ({ job }: { job: { id: string } }) => {
+        expect(
+          updates.some(
+            (update) => update.id === job.id && update.values.status === 'succeeded',
+          ),
+        ).toBe(false);
+        return { status: 'sent', activityEventIds: [`event-${job.id}`] };
+      },
+    );
+    const result = await makeService().dispatchDueCompletionCheckJobs({
+      leaseOwner: 'completion-worker',
+    });
+    expect(result).toMatchObject({ claimed: 3, succeeded: 3, failed: 0 });
+    expect(completionCheckDispatcher.dispatchCompletionCheck).toHaveBeenCalledTimes(3);
+    expect(supabase.rpc).toHaveBeenCalledWith(
+      'claim_due_completion_check_jobs',
+      expect.any(Object),
+    );
+    expect(supabase.rpc).not.toHaveBeenCalledWith(
+      'claim_due_reminder_jobs',
+      expect.anything(),
+    );
+  });
+
+  it('keeps a moved session pending and continues the other completion jobs', async () => {
+    const { updates } = makeCompletionDispatchSupabase();
+    completionCheckDispatcher.dispatchCompletionCheck.mockResolvedValueOnce({
+      status: 'deferred',
+      runAt: '2030-03-02T13:10:00.000Z',
+    });
+    const result = await makeService().dispatchDueCompletionCheckJobs({
+      leaseOwner: 'completion-worker',
+    });
+    expect(result).toMatchObject({ claimed: 3, succeeded: 2, skipped: 1 });
+    expect(updates).toContainEqual(
+      expect.objectContaining({
+        id: 'completion-job-1',
+        values: expect.objectContaining({
+          status: 'pending',
+          run_at: '2030-03-02T13:10:00.000Z',
+          completion_reconciled_at: null,
+        }),
+      }),
+    );
+    expect(
+      updates.some(
+        (update) =>
+          update.id === 'completion-job-1' && update.values.status === 'succeeded',
+      ),
+    ).toBe(false);
+  });
+
+  it('retries a publication failure without blocking the other two classes', async () => {
+    const { updates } = makeCompletionDispatchSupabase();
+    completionCheckDispatcher.dispatchCompletionCheck.mockRejectedValueOnce(
+      new Error('publication temporarily unavailable'),
+    );
+    const result = await makeService().dispatchDueCompletionCheckJobs({
+      leaseOwner: 'completion-worker',
+    });
+    expect(result).toMatchObject({ claimed: 3, succeeded: 2, failed: 1 });
+    expect(updates).toContainEqual(
+      expect.objectContaining({
+        id: 'completion-job-1',
+        values: expect.objectContaining({ status: 'failed', attempt_count: 1 }),
+      }),
+    );
+    expect(
+      updates.some(
+        (update) =>
+          update.id === 'completion-job-1' && update.values.status === 'succeeded',
+      ),
+    ).toBe(false);
   });
 });

@@ -2,6 +2,7 @@ import { Body, Controller, Headers, Post, UnauthorizedException } from '@nestjs/
 import type { EventPipelineJobKind } from '@iconicedu/shared-types';
 
 import { EventPipelineService } from '@iconicedu/api/modules/events/event-pipeline.service';
+import { parseDispatchRemindersDto } from '@iconicedu/api/modules/reminders/dto/dispatch-reminders.dto';
 
 function resolveExpectedEventsDispatchToken() {
   return process.env.INTERNAL_EVENTS_TOKEN?.trim() || '';
@@ -17,6 +18,40 @@ function isAuthorizedBearer(
 @Controller()
 export class EventsController {
   constructor(private readonly eventPipelineService: EventPipelineService) {}
+
+  @Post('internal/push-notifications/dispatch')
+  async dispatchPushNotifications(
+    @Headers('authorization') authorization: string | undefined,
+    @Body() body: unknown,
+  ) {
+    const token = resolveExpectedEventsDispatchToken();
+    if (!token || authorization !== `Bearer ${token}`) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+    const dto = parseDispatchRemindersDto(body);
+    return this.eventPipelineService.dispatchDueJobs({
+      ...dto,
+      leaseOwner: dto.leaseOwner ?? 'internal-push-dispatch-api',
+      pushOnly: true,
+    });
+  }
+
+  @Post('internal/schedule-reconciliation/dispatch')
+  async dispatchScheduleReconciliation(
+    @Headers('authorization') authorization: string | undefined,
+    @Body() body: unknown,
+  ) {
+    const token = resolveExpectedEventsDispatchToken();
+    if (!token || authorization !== `Bearer ${token}`) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+    const dto = parseDispatchRemindersDto(body);
+    return this.eventPipelineService.dispatchDueJobs({
+      ...dto,
+      leaseOwner: dto.leaseOwner ?? 'internal-schedule-reconciliation-dispatch-api',
+      reconcileOnly: true,
+    });
+  }
 
   @Post('internal/events/dispatch')
   async dispatchEventPipeline(
