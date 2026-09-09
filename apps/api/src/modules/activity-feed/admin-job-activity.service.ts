@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import {
   ADMIN_JOB_ACTIVITY_KINDS,
   type AdminJobActivityGroupVM,
@@ -146,6 +146,8 @@ function isJobActivityKind(value: string): value is AdminJobActivityKind {
 
 @Injectable()
 export class AdminJobActivityService {
+  private readonly logger = new Logger(AdminJobActivityService.name);
+
   async fetchJobActivity(
     authUserId: string,
     orgId: string,
@@ -179,16 +181,44 @@ export class AdminJobActivityService {
     orgId: string,
     limit: number,
   ): Promise<AdminJobActivityGroupVM> {
-    const { data, error } = await supabase
-      .from(config.table)
-      .select('*')
-      .eq('org_id', orgId)
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false })
-      .limit(limit)
-      .returns<JobRow[]>();
+    const emptyGroup = (
+      unavailableReason: string | null = null,
+    ): AdminJobActivityGroupVM => ({
+      kind: config.kind,
+      title: config.title,
+      description: config.description,
+      workerName: config.workerName,
+      sampledCount: 0,
+      statusCounts: [],
+      latestProcessedAt: null,
+      records: [],
+      unavailable: unavailableReason !== null,
+      unavailableReason,
+    });
 
-    if (error) throw new InternalServerErrorException(error.message);
+    let data: JobRow[] | null = null;
+    try {
+      const result = await supabase
+        .from(config.table)
+        .select('*')
+        .eq('org_id', orgId)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false })
+        .limit(limit)
+        .returns<JobRow[]>();
+
+      if (result.error) {
+        this.logger.warn(
+          `job-activity: ${config.table} unavailable (${result.error.message})`,
+        );
+        return emptyGroup(result.error.message);
+      }
+      data = result.data;
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : 'query failed';
+      this.logger.warn(`job-activity: ${config.table} query threw (${message})`);
+      return emptyGroup(message);
+    }
 
     const records = (data ?? []).map((row) => config.mapRow(row));
 
@@ -220,6 +250,8 @@ export class AdminJobActivityService {
       statusCounts,
       latestProcessedAt,
       records,
+      unavailable: false,
+      unavailableReason: null,
     };
   }
 }

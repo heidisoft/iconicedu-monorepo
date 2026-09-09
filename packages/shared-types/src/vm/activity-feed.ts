@@ -351,6 +351,13 @@ export interface AdminJobActivityGroupVM {
   latestProcessedAt: string | null;
   /** Most recent records first, capped at the requested limit (default 50). */
   records: AdminJobActivityRecordVM[];
+  /**
+   * Set when this queue could not be read (table missing from the Data API,
+   * timeout, permission). Other groups in the response are still valid.
+   */
+  unavailable: boolean;
+  /** Short reason when `unavailable` is true. */
+  unavailableReason: string | null;
 }
 
 export interface AdminJobActivityOverviewVM {

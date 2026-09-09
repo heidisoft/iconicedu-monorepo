@@ -30,6 +30,18 @@ function makeListQuery<T>(rows: T[]) {
   return query;
 }
 
+function makeErrorQuery(message: string) {
+  const query = {
+    select: jest.fn(() => query),
+    eq: jest.fn(() => query),
+    is: jest.fn(() => query),
+    order: jest.fn(() => query),
+    limit: jest.fn(() => query),
+    returns: jest.fn(async () => ({ data: null, error: { message } })),
+  };
+  return query;
+}
+
 function mockClient(handlers: Record<string, () => unknown>) {
   const from = jest.fn((table: string) => {
     const handler = handlers[table];
@@ -170,5 +182,37 @@ describe('AdminJobActivityService', () => {
     });
 
     expect(overview.groups).toEqual([]);
+  });
+
+  it('marks a queue unavailable instead of failing the whole response', async () => {
+    mockClient({
+      accounts: ADMIN_ACCOUNT,
+      user_roles: ADMIN_ROLES,
+      activity_source_jobs: () => makeListQuery([]),
+      event_pipeline_jobs: () => makeListQuery([]),
+      notification_dispatch_jobs: () => makeListQuery([]),
+      reminder_jobs: () => makeListQuery([]),
+      reminder_reconcile_jobs: () =>
+        makeErrorQuery(
+          "Could not find the table 'public.reminder_reconcile_jobs' in the schema cache",
+        ),
+      class_session_completions: () => makeListQuery([]),
+    });
+
+    const service = new AdminJobActivityService();
+    const overview = await service.fetchJobActivity('auth-1', 'org-1');
+
+    expect(overview.groups).toHaveLength(6);
+    const reconcile = overview.groups.find(
+      (group) => group.kind === 'reminder-reconcile',
+    );
+    expect(reconcile?.unavailable).toBe(true);
+    expect(reconcile?.unavailableReason).toContain('schema cache');
+    expect(reconcile?.records).toEqual([]);
+
+    const activitySource = overview.groups.find(
+      (group) => group.kind === 'activity-source',
+    );
+    expect(activitySource?.unavailable).toBe(false);
   });
 });
