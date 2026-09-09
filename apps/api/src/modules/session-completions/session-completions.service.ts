@@ -244,47 +244,23 @@ export class SessionCompletionsService {
     const account = await this.resolveAccount(supabase, authUserId, params.orgId);
     await this.assertAdminAccess(supabase, account, params.orgId);
 
-    const { data, error } = await supabase
-      .from('class_session_completions')
-      .select('schedule_id, occurrence_key, status, session_end_at')
-      .eq('org_id', params.orgId)
-      .in('status', ['confirmed', 'auto_confirmed', 'pending'])
-      .is('deleted_at', null)
-      .returns<
-        Array<{
-          schedule_id: string;
-          occurrence_key: string;
-          status: string;
-          session_end_at: string;
-        }>
-      >();
+    // Aggregated in Postgres (get_org_session_completion_summary): the org-wide,
+    // all-time pending set is unbounded, so folding raw rows in Node here used
+    // to scan the whole table and trip statement_timeout on large orgs.
+    const response = await supabase.rpc('get_org_session_completion_summary', {
+      p_org_id: params.orgId,
+      p_since: params.completedSince ?? null,
+      p_until: params.completedUntil ?? null,
+    });
 
-    if (error) throw new InternalServerErrorException(error.message);
-
-    const since = params.completedSince ? Date.parse(params.completedSince) : null;
-    const until = params.completedUntil ? Date.parse(params.completedUntil) : null;
-    const confirmedOccurrences = new Set<string>();
-    const completedInWindow = new Set<string>();
-    const pendingOccurrences = new Set<string>();
-    for (const row of data ?? []) {
-      const key = `${row.schedule_id}|${row.occurrence_key}`;
-      if (row.status === 'pending') {
-        pendingOccurrences.add(key);
-        continue;
-      }
-      confirmedOccurrences.add(key);
-      const endMs = Date.parse(row.session_end_at);
-      if ((since === null || endMs >= since) && (until === null || endMs < until)) {
-        completedInWindow.add(key);
-      }
-    }
-    // A session with any confirmation is resolved — even if a co-participant's
-    // row is still pending, or the confirmation predates the window.
-    for (const key of confirmedOccurrences) {
-      pendingOccurrences.delete(key);
+    if (response.error) {
+      throw new InternalServerErrorException(response.error.message);
     }
 
-    return { completed: completedInWindow.size, pending: pendingOccurrences.size };
+    const row = (
+      (response.data ?? []) as Array<{ completed: number; pending: number }>
+    )[0];
+    return { completed: row?.completed ?? 0, pending: row?.pending ?? 0 };
   }
 
   /**
