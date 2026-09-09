@@ -4,6 +4,7 @@ import type {
   DisputeSessionCompletionInput,
   RateSessionCompletionInput,
   SessionCompletionVM,
+  SkipSessionCompletionRatingInput,
   UndoSessionCompletionInput,
 } from '@iconicedu/shared-types';
 import { apiGet, apiPost } from '@/lib/api/http-client';
@@ -67,6 +68,16 @@ export function rateSessionCompletion(input: RateSessionCompletionInput) {
 export function undoSessionCompletion(input: UndoSessionCompletionInput) {
   return apiPost<{ success: true }>(
     `/session-completions/${input.sessionCompletionId}/undo`,
+    {
+      orgId: input.orgId,
+    },
+  );
+}
+
+// Viewer confirmed the session but closed the rating prompt without scoring it.
+export function skipSessionCompletionRating(input: SkipSessionCompletionRatingInput) {
+  return apiPost<{ success: true; alreadyResolved?: boolean }>(
+    `/session-completions/${input.sessionCompletionId}/skip-rating`,
     {
       orgId: input.orgId,
     },

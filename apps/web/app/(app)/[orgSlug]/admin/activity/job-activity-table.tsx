@@ -52,7 +52,7 @@ export function JobActivityTable({ records }: JobActivityTableProps) {
         filterDescription="Search recent records or narrow to a single status."
         search={search}
         onSearchChange={setSearch}
-        searchPlaceholder="Search label, detail, status, or error"
+        searchPlaceholder="Search class, message, recipient, status, or error"
         filterGroups={[
           {
             label: 'Status',
@@ -67,10 +67,11 @@ export function JobActivityTable({ records }: JobActivityTableProps) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Job</TableHead>
+              <TableHead>Activity</TableHead>
+              <TableHead>For</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Attempts</TableHead>
-              <TableHead>Run at</TableHead>
+              <TableHead>Session time</TableHead>
               <TableHead>Processed</TableHead>
               <TableHead>Created</TableHead>
             </TableRow>
@@ -81,8 +82,13 @@ export function JobActivityTable({ records }: JobActivityTableProps) {
                 <TableCell>
                   <div className="min-w-0 max-w-md">
                     <p className="truncate text-sm font-medium">{record.label}</p>
-                    {record.detail ? (
+                    {record.message ? (
                       <p className="truncate text-xs text-muted-foreground">
+                        “{record.message}”
+                      </p>
+                    ) : null}
+                    {record.detail ? (
+                      <p className="truncate text-[11px] text-muted-foreground/70">
                         {record.detail}
                       </p>
                     ) : null}
@@ -94,15 +100,42 @@ export function JobActivityTable({ records }: JobActivityTableProps) {
                   </div>
                 </TableCell>
                 <TableCell>
-                  <Badge variant={jobActivityStatusVariant(record.status)}>
-                    {record.status}
-                  </Badge>
+                  <div className="flex max-w-[16rem] flex-wrap gap-1">
+                    {record.participants.length ? (
+                      record.participants.map((participant) => (
+                        <Badge
+                          key={participant}
+                          variant="outline"
+                          className="font-normal"
+                        >
+                          {participant}
+                        </Badge>
+                      ))
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex flex-col items-start gap-1">
+                    <Badge variant={jobActivityStatusVariant(record.status)}>
+                      {record.status}
+                    </Badge>
+                    {record.priority ? (
+                      <Badge
+                        variant={record.priority === 'high' ? 'destructive' : 'secondary'}
+                        className="font-normal"
+                      >
+                        {record.priority}
+                      </Badge>
+                    ) : null}
+                  </div>
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
                   {formatJobActivityAttempts(record)}
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
-                  {formatJobActivityDateTime(record.runAt)}
+                  {formatJobActivityDateTime(record.occurrenceAt)}
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
                   {formatJobActivityDateTime(record.dispatchedAt)}
@@ -115,7 +148,7 @@ export function JobActivityTable({ records }: JobActivityTableProps) {
             {!visibleRecords.length ? (
               <TableRow>
                 <TableCell
-                  colSpan={6}
+                  colSpan={7}
                   className="py-10 text-center text-sm text-muted-foreground"
                 >
                   No job records match the current filters.
