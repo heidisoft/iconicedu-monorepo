@@ -550,7 +550,7 @@ jobs:
 
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.117.0
 
       # 1. Create Supabase preview branch (idempotent — skips if already exists)
       - name: Create Supabase branch
@@ -1348,7 +1348,7 @@ jobs:
 
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.117.0
 
       - name: Resolve production platform values
         env:
@@ -1910,7 +1910,7 @@ jobs:
 
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.117.0
 
       # ── 1. Delete Supabase preview branch ──────────────────────
       - name: Delete Supabase branch
