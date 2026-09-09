@@ -9,7 +9,22 @@ import {
   TableHeader,
   TableRow,
 } from '@iconicedu/ui-web';
-import { formatAttendanceDateTime } from '@iconicedu/web/app/(app)/[orgSlug]/admin/attendance/sessions/live-session-attendance.utils';
+import {
+  formatAttendanceDateTime,
+  formatAttendanceDuration,
+} from '@iconicedu/web/app/(app)/[orgSlug]/admin/attendance/sessions/live-session-attendance.utils';
+
+// Scheduled length of the occurrence: end minus its start (occurrenceKey). Returns
+// null when either bound is unparseable or non-positive — some backfilled rows
+// carry no distinct end time, so end === start.
+function getSessionDurationSeconds(row: AdminSessionCompletionVM) {
+  const start = new Date(row.occurrenceKey).getTime();
+  const end = new Date(row.sessionEndAt).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+    return null;
+  }
+  return (end - start) / 1000;
+}
 
 export function CompletedSessionsTable({ rows }: { rows: AdminSessionCompletionVM[] }) {
   return (
@@ -19,6 +34,7 @@ export function CompletedSessionsTable({ rows }: { rows: AdminSessionCompletionV
           <TableRow>
             <TableHead>Session</TableHead>
             <TableHead>Ended</TableHead>
+            <TableHead>Duration</TableHead>
             <TableHead>Students</TableHead>
             <TableHead>Confirmed by</TableHead>
           </TableRow>
@@ -26,7 +42,7 @@ export function CompletedSessionsTable({ rows }: { rows: AdminSessionCompletionV
         <TableBody>
           {rows.length === 0 && (
             <TableRow>
-              <TableCell colSpan={4} className="h-32 text-center text-muted-foreground">
+              <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
                 No completed sessions match the selected filters.
               </TableCell>
             </TableRow>
@@ -37,6 +53,9 @@ export function CompletedSessionsTable({ rows }: { rows: AdminSessionCompletionV
                 {row.sessionTitle ?? 'Scheduled session'}
               </TableCell>
               <TableCell>{formatAttendanceDateTime(row.sessionEndAt)}</TableCell>
+              <TableCell>
+                {formatAttendanceDuration(getSessionDurationSeconds(row))}
+              </TableCell>
               <TableCell>{row.studentNames.join(', ') || '—'}</TableCell>
               <TableCell>
                 <ul className="space-y-2">
