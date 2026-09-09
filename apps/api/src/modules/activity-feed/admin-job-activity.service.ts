@@ -17,9 +17,11 @@ const MAX_SAMPLE_LIMIT = 200;
 
 type JobRow = Record<string, unknown>;
 
+/** Context shared across row mappers (e.g. resolved recipient names). */
+type MapContext = { profileNames: Map<string, string> };
+
 type JobActivityConfig = {
   kind: AdminJobActivityKind;
-  /** Queue table. */
   table: 'event_pipeline_jobs' | 'reminder_jobs';
   /** Discriminator column and value that isolate this job kind within the table. */
   column: 'job_kind' | 'job_type';
@@ -27,7 +29,7 @@ type JobActivityConfig = {
   title: string;
   description: string;
   workerName: string;
-  mapRow: (row: JobRow) => AdminJobActivityRecordVM;
+  mapRow: (row: JobRow, ctx: MapContext) => AdminJobActivityRecordVM;
 };
 
 function toText(value: unknown): string | null {
@@ -38,12 +40,22 @@ function toCount(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
 function baseRecord(row: JobRow): AdminJobActivityRecordVM {
   return {
     id: String(row.id),
     status: toText(row.status) ?? 'unknown',
     label: 'Job',
-    detail: null,
+    message: null,
+    participants: [],
+    occurrenceAt: null,
+    priority: null,
+    detail: toText(row.dedupe_key),
     attemptCount: toCount(row.attempt_count),
     maxAttempts: toCount(row.max_attempts),
     lastError: toText(row.last_error),
@@ -54,22 +66,71 @@ function baseRecord(row: JobRow): AdminJobActivityRecordVM {
   };
 }
 
-function pipelineRow(row: JobRow): AdminJobActivityRecordVM {
-  return {
-    ...baseRecord(row),
-    label: toText(row.source_kind) ?? toText(row.job_kind) ?? 'pipeline job',
-    detail: toText(row.dedupe_key),
-  };
+function memberNames(payload: Record<string, unknown>): string[] {
+  const members = Array.isArray(payload.members) ? payload.members : [];
+  return members
+    .map((entry) => {
+      const member = asRecord(entry);
+      const name = toText(member.displayName);
+      if (!name) return null;
+      const role = toText(member.role);
+      return role ? `${name} · ${role}` : name;
+    })
+    .filter((name): name is string => name !== null);
 }
 
+/** reminder_jobs rows (session.reminder / session.completion_check). */
 function reminderRow(row: JobRow): AdminJobActivityRecordVM {
+  const payload = asRecord(row.payload);
+  const offset = payload.reminderOffsetMinutes;
   return {
     ...baseRecord(row),
     label:
-      [toText(row.target_kind), toText(row.occurrence_start_at)]
-        .filter(Boolean)
-        .join(' · ') || 'reminder job',
-    detail: toText(row.dedupe_key),
+      toText(payload.title) ??
+      toText(payload.description) ??
+      toText(row.target_kind) ??
+      'reminder job',
+    message: toText(payload.summary),
+    participants: memberNames(payload),
+    occurrenceAt:
+      toText(row.occurrence_start_at) ??
+      toText(payload.occurrenceStart) ??
+      toText(payload.startAt),
+    priority: offset === 15 ? 'high' : null,
+  };
+}
+
+/** event_pipeline_jobs rows, dispatched by job_kind. */
+function pipelineRow(row: JobRow, ctx: MapContext): AdminJobActivityRecordVM {
+  const base = baseRecord(row);
+  const payload = asRecord(row.payload);
+  const jobKind = toText(row.job_kind);
+
+  if (jobKind === 'notification.deliver') {
+    const channel = toText(payload.deliveryChannel) ?? 'push';
+    const recipientId = toText(payload.recipientProfileId);
+    const recipient = recipientId ? (ctx.profileNames.get(recipientId) ?? null) : null;
+    const queuePriority = toCount(row.priority);
+    return {
+      ...base,
+      label: recipient ? `${channel} to ${recipient}` : `${channel} notification`,
+      participants: recipient ? [recipient] : [],
+      priority: queuePriority !== null && queuePriority <= 80 ? 'immediate' : 'delayed',
+    };
+  }
+
+  if (jobKind === 'reminder.reconcile') {
+    return {
+      ...base,
+      label: 'Schedule reconciliation',
+      detail: toText(payload.scheduleId) ?? base.detail,
+    };
+  }
+
+  return {
+    ...base,
+    label:
+      toText(payload.eventKind) ?? toText(row.source_kind) ?? jobKind ?? 'pipeline job',
   };
 }
 
@@ -152,6 +213,12 @@ function isJobActivityKind(value: string): value is AdminJobActivityKind {
   return (ADMIN_JOB_ACTIVITY_KINDS as readonly string[]).includes(value);
 }
 
+type LoadedGroup = {
+  config: JobActivityConfig;
+  rows: JobRow[] | null;
+  unavailableReason: string | null;
+};
+
 @Injectable()
 export class AdminJobActivityService {
   private readonly logger = new Logger(AdminJobActivityService.name);
@@ -176,35 +243,22 @@ export class AdminJobActivityService {
     }
 
     const supabase = createSupabaseServiceClient();
-    const groups = await Promise.all(
-      configs.map((config) => this.loadGroup(supabase, config, orgId, limit)),
+    const loaded = await Promise.all(
+      configs.map((config) => this.loadGroupRows(supabase, config, orgId, limit)),
     );
+
+    const profileNames = await this.resolveRecipientNames(supabase, orgId, loaded);
+    const groups = loaded.map((entry) => this.buildGroup(entry, { profileNames }));
 
     return { generatedAt: new Date().toISOString(), groups };
   }
 
-  private async loadGroup(
+  private async loadGroupRows(
     supabase: SupabaseServiceClient,
     config: JobActivityConfig,
     orgId: string,
     limit: number,
-  ): Promise<AdminJobActivityGroupVM> {
-    const emptyGroup = (
-      unavailableReason: string | null = null,
-    ): AdminJobActivityGroupVM => ({
-      kind: config.kind,
-      title: config.title,
-      description: config.description,
-      workerName: config.workerName,
-      sampledCount: 0,
-      statusCounts: [],
-      latestProcessedAt: null,
-      records: [],
-      unavailable: unavailableReason !== null,
-      unavailableReason,
-    });
-
-    let data: JobRow[] | null = null;
+  ): Promise<LoadedGroup> {
     try {
       const result = await supabase
         .from(config.table)
@@ -220,18 +274,87 @@ export class AdminJobActivityService {
         this.logger.warn(
           `job-activity: ${config.table}/${config.value} unavailable (${result.error.message})`,
         );
-        return emptyGroup(result.error.message);
+        return { config, rows: null, unavailableReason: result.error.message };
       }
-      data = result.data;
+      return { config, rows: result.data ?? [], unavailableReason: null };
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : 'query failed';
       this.logger.warn(
         `job-activity: ${config.table}/${config.value} query threw (${message})`,
       );
-      return emptyGroup(message);
+      return { config, rows: null, unavailableReason: message };
+    }
+  }
+
+  private async resolveRecipientNames(
+    supabase: SupabaseServiceClient,
+    orgId: string,
+    loaded: LoadedGroup[],
+  ): Promise<Map<string, string>> {
+    const ids = new Set<string>();
+    for (const entry of loaded) {
+      if (entry.config.value !== 'notification.deliver' || !entry.rows) continue;
+      for (const row of entry.rows) {
+        const recipientId = toText(asRecord(row.payload).recipientProfileId);
+        if (recipientId) ids.add(recipientId);
+      }
+    }
+    if (!ids.size) return new Map();
+
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, display_name, first_name, last_name')
+        .eq('org_id', orgId)
+        .in('id', Array.from(ids))
+        .returns<
+          Array<{
+            id: string;
+            display_name: string | null;
+            first_name: string | null;
+            last_name: string | null;
+          }>
+        >();
+      if (error) throw new Error(error.message);
+      return new Map(
+        (data ?? []).map((profile) => {
+          const fallback =
+            [profile.first_name, profile.last_name]
+              .map((part) => part?.trim())
+              .filter(Boolean)
+              .join(' ') || 'Unknown user';
+          return [profile.id, toText(profile.display_name) ?? fallback];
+        }),
+      );
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : 'lookup failed';
+      this.logger.warn(`job-activity: recipient name lookup failed (${message})`);
+      return new Map();
+    }
+  }
+
+  private buildGroup(entry: LoadedGroup, ctx: MapContext): AdminJobActivityGroupVM {
+    const { config } = entry;
+    const shell = {
+      kind: config.kind,
+      title: config.title,
+      description: config.description,
+      workerName: config.workerName,
+    };
+
+    if (!entry.rows) {
+      return {
+        ...shell,
+        sampledCount: 0,
+        statusCounts: [],
+        latestProcessedAt: null,
+        records: [],
+        unavailable: true,
+        unavailableReason: entry.unavailableReason,
+      };
     }
 
-    const records = (data ?? []).map((row) => config.mapRow(row));
+    const records = entry.rows.map((row) => config.mapRow(row, ctx));
 
     const statusCountMap = new Map<string, number>();
     let latestProcessedAt: string | null = null;
@@ -253,10 +376,7 @@ export class AdminJobActivityService {
       );
 
     return {
-      kind: config.kind,
-      title: config.title,
-      description: config.description,
-      workerName: config.workerName,
+      ...shell,
       sampledCount: records.length,
       statusCounts,
       latestProcessedAt,

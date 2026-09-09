@@ -15,6 +15,10 @@ function record(overrides: Partial<AdminJobActivityRecordVM>): AdminJobActivityR
     id: 'job-1',
     status: 'succeeded',
     label: 'message',
+    message: null,
+    participants: [],
+    occurrenceAt: null,
+    priority: null,
     detail: 'dedupe-1',
     attemptCount: 1,
     maxAttempts: 8,
@@ -151,5 +155,23 @@ describe('filterJobActivityRecords', () => {
         (r) => r.id,
       ),
     ).toEqual(['a']);
+  });
+
+  it('matches search against the message text and participants', () => {
+    const enriched = [
+      record({ id: 'x', message: 'Class starts in 30 minutes', participants: [] }),
+      record({ id: 'y', participants: ['Scott S · child', 'Denise R · educator'] }),
+    ];
+
+    expect(
+      filterJobActivityRecords(enriched, { search: '30 minutes', status: 'all' }).map(
+        (r) => r.id,
+      ),
+    ).toEqual(['x']);
+    expect(
+      filterJobActivityRecords(enriched, { search: 'denise', status: 'all' }).map(
+        (r) => r.id,
+      ),
+    ).toEqual(['y']);
   });
 });

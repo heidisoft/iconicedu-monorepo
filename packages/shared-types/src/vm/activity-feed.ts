@@ -325,9 +325,17 @@ export type AdminJobActivityKind = (typeof ADMIN_JOB_ACTIVITY_KINDS)[number];
 export interface AdminJobActivityRecordVM {
   id: string;
   status: string;
-  /** Short human label for what the job is about (job kind, channel, title…). */
+  /** Human label for what the job is about — class name, "Push to Jane", etc. */
   label: string;
-  /** Secondary line: dedupe key, target, schedule id, etc. */
+  /** The message text that was sent, when the job carries one. */
+  message: string | null;
+  /** Who the job is for/about — "Denise R · educator", "Scott S · child". */
+  participants: string[];
+  /** The class/occurrence time the job relates to. */
+  occurrenceAt: string | null;
+  /** Delivery priority when known — "high", "immediate", "delayed". */
+  priority: string | null;
+  /** Dedupe key / correlation id, for support lookups. */
   detail: string | null;
   attemptCount: number | null;
   maxAttempts: number | null;

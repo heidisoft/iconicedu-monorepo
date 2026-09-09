@@ -198,8 +198,15 @@ export function filterJobActivityRecords(
 
     if (!normalizedSearch) return true;
 
-    return [record.label, record.detail, record.status, record.lastError, record.id].some(
-      (field) => field?.toLowerCase().includes(normalizedSearch),
-    );
+    return [
+      record.label,
+      record.message,
+      record.detail,
+      record.status,
+      record.priority,
+      record.lastError,
+      record.id,
+      ...record.participants,
+    ].some((field) => field?.toLowerCase().includes(normalizedSearch));
   });
 }

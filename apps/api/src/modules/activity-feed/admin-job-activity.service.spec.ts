@@ -30,6 +30,7 @@ function makeFilteredQuery<T extends Record<string, unknown>>(rows: T[]) {
       filters.push([column, value]);
       return query;
     }),
+    in: jest.fn(() => query),
     is: jest.fn(() => query),
     order: jest.fn(() => query),
     limit: jest.fn(() => query),
@@ -103,6 +104,8 @@ const PIPELINE_ROWS = [
     job_kind: 'notification.deliver',
     status: 'succeeded',
     dedupe_key: 'push-1',
+    priority: 80,
+    payload: { deliveryChannel: 'push', recipientProfileId: 'profile-9' },
     attempt_count: 1,
     max_attempts: 8,
     created_at: '2026-09-09T12:00:00.000Z',
@@ -118,12 +121,26 @@ const REMINDER_ROWS = [
     target_kind: 'channel',
     occurrence_start_at: '2026-09-10T09:00:00.000Z',
     dedupe_key: 'reminder-1',
+    payload: {
+      title: 'ELA with Ms Denise',
+      summary: 'Class starts in 30 minutes',
+      reminderOffsetMinutes: 30,
+      members: [
+        { displayName: 'Scott S', role: 'child' },
+        { displayName: 'Denise R', role: 'educator' },
+      ],
+    },
     attempt_count: 0,
     max_attempts: 8,
     created_at: '2026-09-09T08:00:00.000Z',
     updated_at: '2026-09-09T08:00:00.000Z',
   },
 ];
+
+const PROFILES = () =>
+  makeFilteredQuery([
+    { id: 'profile-9', display_name: 'Jamie P', first_name: null, last_name: null },
+  ]);
 
 describe('AdminJobActivityService', () => {
   beforeEach(() => {
@@ -149,6 +166,7 @@ describe('AdminJobActivityService', () => {
       user_roles: ADMIN_ROLES,
       event_pipeline_jobs: () => makeFilteredQuery(PIPELINE_ROWS),
       reminder_jobs: () => makeFilteredQuery(REMINDER_ROWS),
+      profiles: PROFILES,
     });
 
     const service = new AdminJobActivityService();
@@ -188,13 +206,22 @@ describe('AdminJobActivityService', () => {
       (group) => group.kind === 'notification-deliver',
     );
     expect(deliver?.sampledCount).toBe(1);
-    expect(deliver?.records[0]?.id).toBe('d1');
+    expect(deliver?.records[0]).toMatchObject({
+      id: 'd1',
+      label: 'push to Jamie P',
+      participants: ['Jamie P'],
+      priority: 'immediate',
+    });
 
     const reminder = overview.groups.find((group) => group.kind === 'session-reminder');
     expect(reminder?.sampledCount).toBe(1);
     expect(reminder?.records[0]).toMatchObject({
       id: 'r1',
-      label: 'channel · 2026-09-10T09:00:00.000Z',
+      label: 'ELA with Ms Denise',
+      message: 'Class starts in 30 minutes',
+      participants: ['Scott S · child', 'Denise R · educator'],
+      occurrenceAt: '2026-09-10T09:00:00.000Z',
+      priority: null,
       detail: 'reminder-1',
     });
 
@@ -207,6 +234,7 @@ describe('AdminJobActivityService', () => {
       accounts: ADMIN_ACCOUNT,
       user_roles: ADMIN_ROLES,
       event_pipeline_jobs: () => makeFilteredQuery(PIPELINE_ROWS),
+      profiles: PROFILES,
     });
 
     const service = new AdminJobActivityService();
@@ -216,7 +244,7 @@ describe('AdminJobActivityService', () => {
 
     expect(overview.groups).toHaveLength(1);
     expect(overview.groups[0]?.kind).toBe('notification-deliver');
-    expect(overview.groups[0]?.records[0]?.id).toBe('d1');
+    expect(overview.groups[0]?.records[0]?.label).toBe('push to Jamie P');
     expect(from).not.toHaveBeenCalledWith('reminder_jobs');
   });
 
