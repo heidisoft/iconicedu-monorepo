@@ -50,22 +50,45 @@ describe('buildAdminMenuSections', () => {
     );
   });
 
-  it('includes activity feed and push notification delivery under activity', () => {
+  it('lists the job activity overview and one link per background job', () => {
     const sections = buildAdminMenuSections('/iconic-academy');
     const activitySection = sections.find((section) => section.title === 'Activity');
 
     expect(activitySection?.links).toEqual(
       expect.arrayContaining([
+        { title: 'Overview', url: '/iconic-academy/admin/activity' },
         {
-          title: 'Activity feed',
-          url: '/iconic-academy/admin/activity/feed',
+          title: 'Activity source jobs',
+          url: '/iconic-academy/admin/activity/activity-source',
         },
         {
-          title: 'Push notifications',
-          url: '/iconic-academy/admin/activity/notifications',
+          title: 'Event pipeline',
+          url: '/iconic-academy/admin/activity/event-pipeline',
+        },
+        {
+          title: 'Notification dispatch',
+          url: '/iconic-academy/admin/activity/notification-dispatch',
+        },
+        { title: 'Reminders', url: '/iconic-academy/admin/activity/reminder' },
+        {
+          title: 'Schedule reconciliation',
+          url: '/iconic-academy/admin/activity/reminder-reconcile',
+        },
+        {
+          title: 'Session completions',
+          url: '/iconic-academy/admin/activity/session-completion',
         },
       ]),
     );
+  });
+
+  it('no longer links the removed activity feed and push notification pages', () => {
+    const urls = buildAdminMenuSections('/iconic-academy')
+      .flatMap((section) => section.links)
+      .map((link) => link.url);
+
+    expect(urls).not.toContain('/iconic-academy/admin/activity/feed');
+    expect(urls).not.toContain('/iconic-academy/admin/activity/notifications');
   });
 
   it('does not include reports', () => {
@@ -84,8 +107,13 @@ describe('buildAdminMenuSections', () => {
 
   it('only links to implemented admin pages', () => {
     const implementedAdminPaths = new Set([
-      '/admin/activity/feed',
-      '/admin/activity/notifications',
+      '/admin/activity',
+      '/admin/activity/activity-source',
+      '/admin/activity/event-pipeline',
+      '/admin/activity/notification-dispatch',
+      '/admin/activity/reminder',
+      '/admin/activity/reminder-reconcile',
+      '/admin/activity/session-completion',
       '/admin/attendance/sessions',
       '/admin/channels',
       '/admin/classrooms',
