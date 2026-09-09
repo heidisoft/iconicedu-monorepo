@@ -16,6 +16,81 @@ import type { SupabaseServiceClient } from '@iconicedu/api/lib/supabase/service'
 
 const DEFAULT_MAX_ATTEMPTS = 8;
 
+// DM and classroom messages wake the device with `priority: 'high'`, but only for
+// the FIRST unread message in the conversation and only when the recipient is not
+// active. Once they already have unread messages here, later pushes stay at
+// normal priority until they catch up.
+const MESSAGE_HIGH_PRIORITY_EVENT_TYPES = new Set([
+  'message.posted',
+  'message.thread_reply.posted',
+]);
+const MESSAGE_HIGH_PRIORITY_ROUTE_KINDS = new Set(['dm', 'space']);
+
+async function resolveFirstUnreadMessagePushPriority(input: {
+  supabase: SupabaseServiceClient;
+  event: ActivityEventRow;
+  decision: Awaited<ReturnType<typeof buildNotificationDecision>>;
+  channelRouteKind: string | undefined;
+}): Promise<'high' | undefined> {
+  if (!MESSAGE_HIGH_PRIORITY_EVENT_TYPES.has(input.event.event_type)) {
+    return undefined;
+  }
+  // `immediate` is the decision engine's "recipient is not active" outcome —
+  // fresh presence or a recent read downgrades delivery to `delayed`/`digest`.
+  if (input.decision.deliveryTiming !== 'immediate') {
+    return undefined;
+  }
+  if (
+    !input.channelRouteKind ||
+    !MESSAGE_HIGH_PRIORITY_ROUTE_KINDS.has(input.channelRouteKind)
+  ) {
+    return undefined;
+  }
+
+  const channelId =
+    'channelId' in input.decision && typeof input.decision.channelId === 'string'
+      ? input.decision.channelId
+      : null;
+  if (!channelId) {
+    return undefined;
+  }
+
+  const threadId =
+    'threadId' in input.decision && typeof input.decision.threadId === 'string'
+      ? input.decision.threadId
+      : null;
+  const lastReadAt = threadId
+    ? ((input.decision as { threadLastReadAt?: string | null }).threadLastReadAt ?? null)
+    : ((input.decision as { channelLastReadAt?: string | null }).channelLastReadAt ??
+      null);
+
+  // First unread == no earlier still-unread message from anyone else in this
+  // conversation. `limit(1)` short-circuits as soon as one exists. A failed lookup
+  // must not block the notification itself, so fall back to normal priority.
+  try {
+    let query = input.supabase
+      .from('messages')
+      .select('id')
+      .eq('org_id', input.event.org_id)
+      .eq('channel_id', channelId)
+      .neq('sender_profile_id', input.decision.recipientProfileId)
+      .lt('created_at', input.event.occurred_at)
+      .is('deleted_at', null);
+    query = threadId ? query.eq('thread_id', threadId) : query.is('thread_id', null);
+    if (lastReadAt) {
+      query = query.gt('created_at', lastReadAt);
+    }
+
+    const { data, error } = await query.limit(1).maybeSingle<{ id: string }>();
+    if (error) {
+      return undefined;
+    }
+    return data ? undefined : 'high';
+  } catch {
+    return undefined;
+  }
+}
+
 function buildAttemptBucket(input: { timing: string; runAt: string }) {
   const runDate = new Date(input.runAt);
   const rounded = new Date(runDate);
@@ -279,15 +354,33 @@ export class NotificationService {
           ? (payload.rawEventPayload as Record<string, unknown>)
           : {};
 
+      const channelRouteKind =
+        typeof rawEventPayload.channelRouteKind === 'string'
+          ? rawEventPayload.channelRouteKind
+          : undefined;
+
+      const isHighPriorityReminder =
+        eventResponse.data.event_type === 'session.reminder.sent' &&
+        eventResponse.data.payload?.reminderOffsetMinutes === 15;
+      const messagePushPriority = isHighPriorityReminder
+        ? undefined
+        : await resolveFirstUnreadMessagePushPriority({
+            supabase: input.supabase,
+            event: eventResponse.data,
+            decision: latestDecision,
+            channelRouteKind,
+          });
+      const priority =
+        isHighPriorityReminder || messagePushPriority === 'high'
+          ? ('high' as const)
+          : undefined;
+
       return sendPushNotification({
         orgId: input.job.org_id,
         recipientProfileId,
         prefKey,
         title,
-        ...(eventResponse.data.event_type === 'session.reminder.sent' &&
-        eventResponse.data.payload?.reminderOffsetMinutes === 15
-          ? { priority: 'high' as const }
-          : {}),
+        ...(priority ? { priority } : {}),
         summary,
         activityFeedItemId,
         threadId: typeof payload.threadId === 'string' ? payload.threadId : null,

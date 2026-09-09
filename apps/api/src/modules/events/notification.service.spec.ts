@@ -61,6 +61,7 @@ function makeSupabase(
     guardian_account_id: string;
     child_account_id: string;
   }> = [],
+  options: { priorUnreadMessage?: { id: string } | null } = {},
 ) {
   const rpc = jest.fn(async () => ({ data: { id: 'job-1' }, error: null }));
   const supabase = {
@@ -73,6 +74,10 @@ function makeSupabase(
           filters.set(column, value);
           return query;
         }),
+        neq: jest.fn(() => query),
+        lt: jest.fn(() => query),
+        gt: jest.fn(() => query),
+        limit: jest.fn(() => query),
         in: jest.fn((column: string, value: unknown) => {
           filters.set(column, value);
           return query;
@@ -81,6 +86,9 @@ function makeSupabase(
         maybeSingle: jest.fn(async () => {
           if (table === 'activity_events') {
             return { data: event, error: null };
+          }
+          if (table === 'messages') {
+            return { data: options.priorUnreadMessage ?? null, error: null };
           }
           return { data: null, error: null };
         }),
@@ -151,6 +159,108 @@ describe('NotificationService reminder push priority', () => {
     const sent = jest.mocked(sendPushNotification).mock.calls[0]?.[0];
     if (priority) expect(sent).toHaveProperty('priority', 'high');
     else expect(sent).not.toHaveProperty('priority');
+  });
+});
+
+describe('NotificationService first-unread message push priority', () => {
+  const baseDecision = {
+    eventId: 'event-1',
+    recipientProfileId: 'profile-1',
+    prefKey: 'message.posted',
+    shouldWriteInbox: true,
+    deliveryChannels: ['push'] as const,
+    deliveryTiming: 'immediate',
+    runAt: '2026-05-05T12:00:00.000Z',
+    reasonCodes: [] as string[],
+    policy: {
+      prefKey: 'message.posted',
+      critical: false,
+      presenceAware: true,
+      digestEligible: false,
+      defaultDelaySeconds: 0,
+    },
+    scopeKind: null,
+    scopeId: null,
+    channelId: 'channel-1',
+    threadId: null as string | null,
+    recipientAccountId: 'account-1',
+    channelLastReadAt: null as string | null,
+    threadLastReadAt: null as string | null,
+  };
+
+  async function run(overrides: {
+    decision?: Partial<typeof baseDecision>;
+    eventType?: string;
+    routeKind?: string;
+    priorUnread?: { id: string } | null;
+    threadIdOnPayload?: string;
+  }) {
+    jest.mocked(sendPushNotification).mockClear();
+    jest
+      .mocked(buildNotificationDecision)
+      .mockResolvedValueOnce({ ...baseDecision, ...overrides.decision } as never);
+    const { supabase } = makeSupabase(
+      { ...makeEvent(), event_type: overrides.eventType ?? 'message.posted' },
+      [],
+      [],
+      { priorUnreadMessage: overrides.priorUnread ?? null },
+    );
+    await new NotificationService().deliver({
+      supabase: supabase as never,
+      job: {
+        id: 'job-1',
+        org_id: 'org-1',
+        payload: {
+          activityEventId: 'event-1',
+          recipientProfileId: 'profile-1',
+          deliveryChannel: 'push',
+          prefKey: 'message.posted',
+          threadId: overrides.threadIdOnPayload ?? null,
+          rawEventPayload: { channelRouteKind: overrides.routeKind },
+        },
+      } as never,
+    });
+    return jest.mocked(sendPushNotification).mock.calls[0]?.[0];
+  }
+
+  it('sends high priority for the first unread DM message when the recipient is not active', async () => {
+    expect(await run({ routeKind: 'dm' })).toHaveProperty('priority', 'high');
+  });
+
+  it('sends high priority for the first unread classroom message', async () => {
+    expect(await run({ routeKind: 'space' })).toHaveProperty('priority', 'high');
+  });
+
+  it('stays at normal priority once the conversation already has unread messages', async () => {
+    expect(
+      await run({ routeKind: 'dm', priorUnread: { id: 'message-earlier' } }),
+    ).not.toHaveProperty('priority');
+  });
+
+  it('stays at normal priority when the recipient is active (delivery delayed)', async () => {
+    expect(
+      await run({ routeKind: 'dm', decision: { deliveryTiming: 'delayed' } }),
+    ).not.toHaveProperty('priority');
+  });
+
+  it('does not apply to generic channels', async () => {
+    expect(await run({ routeKind: 'channel' })).not.toHaveProperty('priority');
+  });
+
+  it('does not apply when the channel route is unknown', async () => {
+    const out = await run({ routeKind: undefined, decision: {} });
+    expect(out).not.toHaveProperty('priority');
+  });
+
+  it('scopes first-unread to the thread for thread replies', async () => {
+    expect(
+      await run({
+        eventType: 'message.thread_reply.posted',
+        routeKind: 'space',
+        threadIdOnPayload: 'thread-1',
+        decision: { threadId: 'thread-1', prefKey: 'message.thread_reply.posted' },
+      }),
+    ).toHaveProperty('priority', 'high');
   });
 });
 
