@@ -195,6 +195,10 @@ export async function buildNotificationDecision(input: {
   const reasonCodes: NotificationDecisionReason[] = [];
   const policy = getNotificationPolicyConfig(input.event.event_type);
   const eventPayload = asRecord(input.event.payload) as EventPayload;
+  // Conversation identity is resolved from the event alone, so it is available on
+  // every return path (message-push priority in the delivery step needs it).
+  const channelId = resolveChannelIdFromScope(input.event);
+  const threadId = resolveThreadIdFromPayload(input.event);
   if (eventPayload.suppressNotifications === true) {
     return {
       eventId: input.event.id,
@@ -208,6 +212,11 @@ export async function buildNotificationDecision(input: {
       policy,
       scopeKind: null,
       scopeId: null,
+      channelId,
+      threadId,
+      recipientAccountId: null as string | null,
+      channelLastReadAt: null as string | null,
+      threadLastReadAt: null as string | null,
     };
   }
   const preference = await resolveEffectivePreference({
@@ -238,6 +247,11 @@ export async function buildNotificationDecision(input: {
       policy,
       scopeKind: preference.scopeKind,
       scopeId: preference.scopeId,
+      channelId,
+      threadId,
+      recipientAccountId: null as string | null,
+      channelLastReadAt: null as string | null,
+      threadLastReadAt: null as string | null,
     };
   }
 
@@ -251,9 +265,6 @@ export async function buildNotificationDecision(input: {
   if (profileResponse.error) {
     throw new Error(profileResponse.error.message);
   }
-
-  const channelId = resolveChannelIdFromScope(input.event);
-  const threadId = resolveThreadIdFromPayload(input.event);
 
   const [presenceResponse, readStateResponse, threadReadStateResponse] =
     await Promise.all([
@@ -317,5 +328,10 @@ export async function buildNotificationDecision(input: {
     ...decision,
     scopeKind: preference.scopeKind,
     scopeId: preference.scopeId,
+    channelId,
+    threadId,
+    recipientAccountId: profileResponse.data?.account_id ?? null,
+    channelLastReadAt: readStateResponse.data?.last_read_at ?? null,
+    threadLastReadAt: threadReadStateResponse.data?.last_read_at ?? null,
   };
 }
