@@ -10,6 +10,7 @@ import type { SupabaseServiceClient } from '@iconicedu/api/lib/supabase/service'
 import {
   getNotificationDefaultChannels,
   getNotificationPolicyConfig,
+  isPushDeliveryDisabled,
 } from '@iconicedu/api/lib/notifications/policy-config';
 import { resolveEffectivePreference } from '@iconicedu/api/lib/notifications/resolve-effective-preference';
 
@@ -219,7 +220,12 @@ export async function buildNotificationDecision(input: {
 
   reasonCodes.push(preference.source as NotificationDecisionReason);
 
-  if (preference.muted || preference.channels.length === 0) {
+  // Product policy also applies to stored preferences and already queued deliveries.
+  const deliveryChannels = isPushDeliveryDisabled(input.event.event_type)
+    ? preference.channels.filter((channel) => channel !== 'push')
+    : preference.channels;
+
+  if (preference.muted || deliveryChannels.length === 0) {
     return {
       eventId: input.event.id,
       recipientProfileId: input.recipientProfileId,
@@ -295,7 +301,7 @@ export async function buildNotificationDecision(input: {
   const decision = buildDeliveryPlan({
     event: input.event,
     recipientProfileId: input.recipientProfileId,
-    channels: preference.channels,
+    channels: deliveryChannels,
     reasonCodes,
     context: {
       liveStatus: presenceResponse.data?.live_status ?? null,

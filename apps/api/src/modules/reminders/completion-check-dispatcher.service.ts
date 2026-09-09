@@ -7,6 +7,11 @@ import { publishActivityEvent } from '@iconicedu/api/lib/activity-feed/activity-
 // they receive a single batched completion-check event instead of N individual ones.
 const GUARDIAN_BATCH_WINDOW_MINUTES = 30;
 
+export type CompletionCheckDispatchResult =
+  | { status: 'sent'; activityEventIds: string[] }
+  | { status: 'skipped'; reason: 'occurrence_canceled' | 'publication_suppressed' }
+  | { status: 'deferred'; runAt: string };
+
 type ReminderJobPayload = {
   title: string;
   summary?: string | null;
@@ -132,12 +137,33 @@ export class CompletionCheckDispatcherService {
         if (!job.updated_by) {
           throw new Error(`Completion-check job ${job.id} has no system profile`);
         }
-        await this.dispatchCompletionCheck({
+        const result = await this.dispatchCompletionCheck({
           supabase: input.supabase,
           job,
           payload: (job.payload ?? {}) as ReminderJobPayload,
           systemProfileId: job.updated_by,
         });
+        // A moved session still needs a future dispatch; it has not been repaired.
+        if (result.status === 'deferred') {
+          const response = await input.supabase
+            .from('reminder_jobs')
+            .update({
+              status: 'pending',
+              run_at: result.runAt,
+              next_attempt_at: null,
+              dispatched_at: null,
+              lease_owner: null,
+              lease_until: null,
+              last_error: null,
+              updated_at: new Date().toISOString(),
+              updated_by: job.updated_by,
+            })
+            .eq('id', job.id)
+            .eq('org_id', job.org_id)
+            .eq('status', 'succeeded');
+          if (response.error) throw new Error(response.error.message);
+          continue;
+        }
 
         const reconciledAt = new Date().toISOString();
         const response = await input.supabase
@@ -173,14 +199,14 @@ export class CompletionCheckDispatcherService {
    * Dispatches per-participant completion-check activity events, batching guardians
    * that have multiple sessions ending in the same time window.
    *
-   * Returns the list of activity event IDs that were published.
+   * Returns published IDs or an explicit skipped/deferred outcome for the worker.
    */
   async dispatchCompletionCheck(input: {
     supabase: SupabaseServiceClient;
     job: ReminderJobRow;
     payload: ReminderJobPayload;
     systemProfileId: string;
-  }): Promise<string[]> {
+  }): Promise<CompletionCheckDispatchResult> {
     const { supabase, job, payload, systemProfileId } = input;
 
     const scheduleId = payload.scheduleId ?? job.source_schedule_id;
@@ -188,10 +214,9 @@ export class CompletionCheckDispatcherService {
     const endAt = payload.endAt ?? null;
 
     if (!scheduleId || !occurrenceStart) {
-      this.logger.warn(
-        `completion_check: missing scheduleId or occurrenceStart for job ${job.id}`,
+      throw new Error(
+        `Missing scheduleId or occurrenceStart for completion job ${job.id}`,
       );
-      return [];
     }
 
     // Re-resolve current cancel/reschedule state right before dispatching — closes a
@@ -215,17 +240,23 @@ export class CompletionCheckDispatcherService {
       this.logger.log(
         `completion_check: ${scheduleId}/${occurrenceStart} was cancelled, skipping dispatch`,
       );
-      return [];
+      return { status: 'skipped', reason: 'occurrence_canceled' };
     }
 
-    if (new Date(effectiveOccurrence.sessionEndAt).getTime() > Date.now()) {
+    const runAt = new Date(
+      new Date(effectiveOccurrence.sessionEndAt).getTime() + 10 * 60 * 1000,
+    );
+    if (Number.isNaN(runAt.getTime()))
+      throw new Error('Invalid completion session end time');
+    if (runAt.getTime() > Date.now()) {
       this.logger.log(
-        `completion_check: ${scheduleId}/${occurrenceStart} now ends in the future, skipping dispatch`,
+        `completion_check: ${scheduleId}/${occurrenceStart} is not due, deferring until ${runAt.toISOString()}`,
       );
-      return [];
+      return { status: 'deferred', runAt: runAt.toISOString() };
     }
 
     const members = payload.members ?? [];
+    if (!members.length) throw new Error(`Completion job ${job.id} has no recipients`);
     const activityEventIds: string[] = [];
 
     // Partition members by role
@@ -281,6 +312,7 @@ export class CompletionCheckDispatcherService {
         },
         dedupeKey: `session.completion_check:${job.org_id}:${scheduleId}:${occurrenceStart}:${member.profileId}`,
         refreshOnDedupe: false,
+        throwOnError: true,
         createdBy: systemProfileId,
       });
 
@@ -305,7 +337,9 @@ export class CompletionCheckDispatcherService {
       activityEventIds.push(...batchedIds);
     }
 
-    return activityEventIds;
+    return activityEventIds.length
+      ? { status: 'sent', activityEventIds }
+      : { status: 'skipped', reason: 'publication_suppressed' };
   }
 
   private async dispatchGuardianCompletionCheck(input: {
@@ -410,6 +444,7 @@ export class CompletionCheckDispatcherService {
         },
         dedupeKey: `session.completion_check:${orgId}:${currentScheduleId}:${currentOccurrenceStart}:${guardianProfileId}`,
         refreshOnDedupe: false,
+        throwOnError: true,
         createdBy: systemProfileId,
       });
 
@@ -523,6 +558,7 @@ export class CompletionCheckDispatcherService {
       },
       dedupeKey: batchDedupeKey,
       refreshOnDedupe: true,
+      throwOnError: true,
       createdBy: systemProfileId,
     });
 

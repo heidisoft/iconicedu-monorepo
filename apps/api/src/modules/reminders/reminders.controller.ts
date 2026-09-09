@@ -57,6 +57,23 @@ export class RemindersController {
     });
   }
 
+  @Post('internal/session-completions/dispatch')
+  async dispatchCompletionChecks(
+    @Headers('authorization') authorization: string | undefined,
+    @Body() body: unknown,
+  ) {
+    const expectedToken = resolveExpectedToken();
+    if (!expectedToken || authorization !== `Bearer ${expectedToken}`) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+    const dto = parseDispatchRemindersDto(body);
+    return this.remindersService.dispatchDueCompletionCheckJobs({
+      leaseOwner: dto.leaseOwner ?? 'internal-completion-checks-api',
+      limit: dto.limit,
+      leaseSeconds: dto.leaseSeconds,
+    });
+  }
+
   @Post('reminders/learning-space/compile')
   @UseGuards(AuthGuard)
   compileLearningSpace(@Req() req: AuthenticatedRequest, @Body() body: unknown) {

@@ -10,5 +10,6 @@ import { NotificationService } from '@iconicedu/api/modules/events/notification.
   imports: [ActivityWorkerModule, RemindersModule],
   controllers: [EventsController],
   providers: [EventPipelineService, NotificationService],
+  exports: [EventPipelineService],
 })
 export class EventsModule {}

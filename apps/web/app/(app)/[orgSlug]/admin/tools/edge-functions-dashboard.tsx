@@ -1,14 +1,11 @@
 'use client';
 
 import * as React from 'react';
+import type { AdminToolKind } from '@iconicedu/shared-types';
+import { dispatchAdminTool } from '@iconicedu/web/lib/api/admin-tools';
+import { createSupabaseBrowserClient } from '@iconicedu/web/lib/supabase/client';
 
 import { Badge, Button, Input, Label, Loader2, toast } from '@iconicedu/ui-web';
-
-type FunctionKind =
-  | 'events-dispatch'
-  | 'reminders-dispatch'
-  | 'channel-read-state-repair'
-  | 'reminder-jobs-reset';
 
 type RunStatus = 'idle' | 'running' | 'success' | 'error';
 
@@ -20,7 +17,7 @@ type FunctionResult = {
 };
 
 type FunctionConfig = {
-  kind: FunctionKind;
+  kind: AdminToolKind;
   title: string;
   description: string;
   hasDispatchParams: boolean;
@@ -30,32 +27,56 @@ type FunctionConfig = {
 
 const FUNCTIONS: FunctionConfig[] = [
   {
-    kind: 'events-dispatch',
-    title: 'Unified Events Dispatch',
+    kind: 'schedule-reconciliation-dispatch',
+    title: 'Schedule Reconciliation',
     description:
-      'Claims event_pipeline_jobs for activity generation, projection, notification delivery, and reminder reconciliation.',
+      'Creates and updates pre-class reminder and completion-check jobs from class schedules. Runs independently of Events Dispatch.',
+    hasDispatchParams: true,
+    hasLeaseParams: true,
+  },
+  {
+    kind: 'events-dispatch',
+    title: 'Events Dispatch',
+    description:
+      'Processes activity events and prepares notifications. Use Push Notifications to deliver queued pushes.',
     hasDispatchParams: true,
     hasLeaseParams: true,
   },
   {
     kind: 'reminders-dispatch',
     title: 'Reminders Dispatch',
-    description: 'Claims due reminder_jobs and publishes reminder activity_events.',
+    description:
+      'Sends due pre-class reminders. Session completion checks run separately.',
+    hasDispatchParams: true,
+    hasLeaseParams: true,
+  },
+  {
+    kind: 'session-completions-dispatch',
+    title: 'Session Completion Checks',
+    description:
+      'Processes checks due ten minutes after each class ends. Each teacher receives a separate check per class.',
+    hasDispatchParams: true,
+    hasLeaseParams: true,
+  },
+  {
+    kind: 'push-notifications-dispatch',
+    title: 'Push Notifications',
+    description:
+      'Delivers queued push notifications, including pre-class reminders, with its own job limit and retries.',
     hasDispatchParams: true,
     hasLeaseParams: true,
   },
   {
     kind: 'channel-read-state-repair',
     title: 'Channel Read State Repair',
-    description:
-      'Recomputes unread counts for all channels across all orgs. Runs daily at 3 AM UTC — use this to force a repair.',
+    description: 'Recomputes unread counts for channels in this organization.',
     hasDispatchParams: false,
   },
   {
     kind: 'reminder-jobs-reset',
     title: 'Reminder Jobs — Reset & Reconcile',
     description:
-      'Cancels all active (pending/leased/failed) reminder_jobs for this org, then runs the reconciler for every schedule to repopulate fresh jobs. Use after data migrations or when the job table is in a bad state.',
+      'Deletes all non-successful reminder and completion-check jobs for this organization, then rebuilds upcoming jobs. Successful jobs are kept.',
     hasDispatchParams: false,
     destructive: true,
   },
@@ -86,26 +107,15 @@ function FunctionCard({ orgId, config }: FunctionCardProps) {
     setResult({ status: 'running' });
 
     try {
-      const response = await fetch('/api/admin/tools/dispatch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orgId,
-          kind: config.kind,
-          ...(config.hasDispatchParams && limit ? { limit: Number(limit) } : {}),
-          ...(config.hasLeaseParams && leaseSeconds
-            ? { leaseSeconds: Number(leaseSeconds) }
-            : {}),
-          ...(config.hasLeaseParams && leaseOwner ? { leaseOwner } : {}),
-        }),
+      const json = await dispatchAdminTool(createSupabaseBrowserClient(), {
+        orgId,
+        kind: config.kind,
+        ...(config.hasDispatchParams && limit ? { limit: Number(limit) } : {}),
+        ...(config.hasLeaseParams && leaseSeconds
+          ? { leaseSeconds: Number(leaseSeconds) }
+          : {}),
+        ...(config.hasLeaseParams && leaseOwner ? { leaseOwner } : {}),
       });
-
-      const json = (await response.json()) as {
-        success: boolean;
-        status?: number;
-        data?: unknown;
-        message?: string;
-      };
 
       if (json.success) {
         setResult({
@@ -174,7 +184,7 @@ function FunctionCard({ orgId, config }: FunctionCardProps) {
                     value={leaseSeconds}
                     onChange={(e) => setLeaseSeconds(e.target.value)}
                     className="w-32"
-                    min={1}
+                    min={30}
                     max={600}
                     disabled={isRunning}
                   />
@@ -206,7 +216,7 @@ function FunctionCard({ orgId, config }: FunctionCardProps) {
             disabled={isRunning}
           >
             {isRunning && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
-            {config.destructive ? 'Reset & reconcile' : 'Run cron job'}
+            {config.destructive ? 'Reset & reconcile' : 'Run now'}
           </Button>
           {result.ranAt && (
             <span className="text-muted-foreground text-xs">
@@ -236,9 +246,9 @@ export function EdgeFunctionsDashboard({ orgId }: EdgeFunctionsDashboardProps) {
   return (
     <div className="flex flex-col gap-4">
       <p className="text-muted-foreground text-sm">
-        Run the same work kicked off by the Supabase cron edge functions. The API-backed
-        jobs call their internal dispatch endpoints with cron-style payloads; the repair
-        job runs the same unread-count repair RPC used by its edge function.
+        Run background jobs for this organization. Completion checks and push
+        notifications run independently of pre-class reminders. These actions process due
+        jobs; they do not change the cron schedule.
       </p>
       <div className="grid gap-4 sm:grid-cols-2">
         {FUNCTIONS.map((config) => (

@@ -35,7 +35,7 @@ const DEFAULT_LEASE_SECONDS = 120;
 const DEFAULT_MAX_ATTEMPTS = 8;
 const RETRY_BASE_MS = 15_000;
 const RETRY_MAX_MS = 10 * 60_000;
-const SESSION_REMINDER_OFFSETS_MINUTES = [720, 30] as const;
+const SESSION_REMINDER_OFFSETS_MINUTES = [720, 15] as const;
 const SESSION_COMPLETION_CHECK_OFFSET_MINUTES = 10;
 const REMINDER_DELIVERY_WINDOW_START_HOUR = 9;
 const REMINDER_DELIVERY_WINDOW_END_HOUR = 18;
@@ -603,19 +603,51 @@ export class RemindersService {
   }
 
   async dispatchDueReminderJobs(input: {
+    orgId?: string;
     leaseOwner: string;
     limit?: number;
     leaseSeconds?: number;
   }) {
+    return this.dispatchDueJobs(input, 'session.reminder');
+  }
+
+  async dispatchDueCompletionCheckJobs(input: {
+    orgId?: string;
+    leaseOwner: string;
+    limit?: number;
+    leaseSeconds?: number;
+  }) {
+    return this.dispatchDueJobs(input, 'session.completion_check');
+  }
+
+  private async dispatchDueJobs(
+    input: {
+      orgId?: string;
+      leaseOwner: string;
+      limit?: number;
+      leaseSeconds?: number;
+    },
+    jobType: 'session.reminder' | 'session.completion_check',
+  ) {
     const supabase = this.getSupabase();
     const runId = randomUUID();
     const startedAt = Date.now();
 
-    const claimResponse = await supabase.rpc('claim_due_reminder_jobs', {
-      p_limit: input.limit ?? DEFAULT_JOB_LIMIT,
-      p_lease_owner: input.leaseOwner,
-      p_lease_seconds: input.leaseSeconds ?? DEFAULT_LEASE_SECONDS,
-    });
+    const claimResponse = await supabase.rpc(
+      jobType === 'session.completion_check'
+        ? input.orgId
+          ? 'claim_due_org_completion_check_jobs'
+          : 'claim_due_completion_check_jobs'
+        : input.orgId
+          ? 'claim_due_org_reminder_jobs'
+          : 'claim_due_reminder_jobs',
+      {
+        ...(input.orgId ? { p_org_id: input.orgId } : {}),
+        p_limit: input.limit ?? DEFAULT_JOB_LIMIT,
+        p_lease_owner: input.leaseOwner,
+        p_lease_seconds: input.leaseSeconds ?? DEFAULT_LEASE_SECONDS,
+      },
+    );
 
     if (claimResponse.error) {
       throw new Error(claimResponse.error.message);
@@ -705,20 +737,35 @@ export class RemindersService {
       }
     }
 
-    try {
-      const reconciliation =
-        await this.completionCheckDispatcher.reconcileRecentCompletionChecks({
-          supabase,
-        });
-      this.analytics.capture('api completion checks reconciled', reconciliation);
-    } catch (reconciliationError) {
-      this.logger.warn(
-        `completion-check reconciliation scan failed: ${
-          reconciliationError instanceof Error
-            ? reconciliationError.message
-            : String(reconciliationError)
-        }`,
-      );
+    // Global maintenance remains the responsibility of the cron workers.
+    if (input.orgId)
+      return {
+        runId,
+        claimed: claimed.length,
+        succeeded,
+        failed,
+        skipped,
+        deadLettered,
+        durationMs: Date.now() - startedAt,
+        maintenanceSkipped: true,
+      };
+
+    if (jobType === 'session.completion_check') {
+      try {
+        const reconciliation =
+          await this.completionCheckDispatcher.reconcileRecentCompletionChecks({
+            supabase,
+          });
+        this.analytics.capture('api completion checks reconciled', reconciliation);
+      } catch (reconciliationError) {
+        this.logger.warn(
+          `completion-check reconciliation scan failed: ${
+            reconciliationError instanceof Error
+              ? reconciliationError.message
+              : String(reconciliationError)
+          }`,
+        );
+      }
     }
 
     const staleCleanup = await this.runStaleActivityCleanup(supabase);
@@ -726,6 +773,7 @@ export class RemindersService {
 
     this.analytics.capture('api reminders dispatch completed', {
       runId,
+      jobType,
       claimed: claimed.length,
       succeeded,
       skipped,
@@ -1536,34 +1584,47 @@ export class RemindersService {
       return 'skipped';
     }
 
-    const updateResponse = await supabase
-      .from('reminder_jobs')
-      .update({
-        status: 'succeeded',
-        dispatched_at: now,
-        lease_owner: null,
-        lease_until: null,
-        updated_at: now,
-        updated_by: systemProfileId,
-        last_error: null,
-      })
-      .eq('id', job.id)
-      .eq('org_id', job.org_id);
-
-    if (updateResponse.error) {
-      throw new Error(updateResponse.error.message);
-    }
-
     let activityEventId: string | null = null;
 
     if (job.job_type === 'session.completion_check') {
-      const dispatchedIds = await this.completionCheckDispatcher.dispatchCompletionCheck({
+      const result = await this.completionCheckDispatcher.dispatchCompletionCheck({
         supabase,
         job,
         payload,
         systemProfileId,
       });
-      activityEventId = dispatchedIds[0] ?? null;
+      if (result.status !== 'sent') {
+        const deferred = result.status === 'deferred';
+        const response = await supabase
+          .from('reminder_jobs')
+          .update({
+            status: deferred ? 'pending' : 'canceled',
+            ...(result.status === 'deferred' ? { run_at: result.runAt } : {}),
+            lease_owner: null,
+            lease_until: null,
+            next_attempt_at: null,
+            dispatched_at: null,
+            completion_reconciled_at: null,
+            last_error: null,
+            updated_at: now,
+            updated_by: systemProfileId,
+          })
+          .eq('id', job.id)
+          .eq('org_id', job.org_id);
+        if (response.error) throw new Error(response.error.message);
+        await this.logDispatch({
+          supabase,
+          orgId: job.org_id,
+          jobId: job.id,
+          result: 'idempotent_hit',
+          details:
+            result.status === 'deferred'
+              ? { deferred_reason: 'session_end_moved', run_at: result.runAt }
+              : { skipped_reason: result.reason },
+        });
+        return 'skipped';
+      }
+      activityEventId = result.activityEventIds[0] ?? null;
     } else {
       const activityEvent = await publishActivityEvent({
         supabase,
@@ -1597,6 +1658,28 @@ export class RemindersService {
         createdBy: systemProfileId,
       });
       activityEventId = activityEvent?.id ?? null;
+    }
+
+    const updateResponse = await supabase
+      .from('reminder_jobs')
+      .update({
+        status: 'succeeded',
+        dispatched_at: now,
+        next_attempt_at: null,
+        ...(job.job_type === 'session.completion_check'
+          ? { completion_reconciled_at: now }
+          : {}),
+        lease_owner: null,
+        lease_until: null,
+        updated_at: now,
+        updated_by: systemProfileId,
+        last_error: null,
+      })
+      .eq('id', job.id)
+      .eq('org_id', job.org_id);
+
+    if (updateResponse.error) {
+      throw new Error(updateResponse.error.message);
     }
 
     await this.logDispatch({

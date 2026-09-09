@@ -20,10 +20,14 @@ and notifications — including cancellations and reschedules.
 ## Overview
 
 Schedule writes never synchronously compile reminders or generate activity events.
-Instead, DB triggers enqueue durable jobs into `event_pipeline_jobs`. The unified
-event dispatcher (running every minute) claims and processes those jobs
-asynchronously. This means primary schedule CRUD always completes even if the
-reminder or notification pipeline is degraded.
+Instead, DB triggers enqueue durable jobs into `event_pipeline_jobs`. Two
+per-minute workers claim and process those jobs asynchronously: the dedicated
+`schedule-reconciliation-dispatch` worker claims `reminder.reconcile` jobs through
+`claim_due_schedule_reconciliation_jobs`, and the general `events-dispatch` worker
+claims everything else (it explicitly excludes `reminder.reconcile`). This means
+primary schedule CRUD always completes even if the reminder or notification
+pipeline is degraded, and an Events backlog can no longer delay creating reminder
+or completion-check jobs.
 
 ---
 
@@ -62,14 +66,16 @@ DB trigger on class_schedules | recurrence | exceptions | overrides
     ↓ (always)                              ↓ (exceptions/overrides only)
 event_pipeline_jobs                        event_outbox
 job_kind='reminder.reconcile'              kind='session_cancel' | 'session_reschedule'
-    ↓ events-dispatch cron (1 min)             ↓ events-dispatch cron (1 min)
+    ↓ schedule-reconciliation-dispatch (1m)    ↓ events-dispatch cron (1 min)
 ReminderReconcileService                   ActivityGenerationService
 → upsert / cancel reminder_jobs            → activity_events
-    ↓ reminders-dispatch cron (1 min)          ↓ event projection
-dispatchDueReminderJobs                    activity_feed_items
-→ activity_events                          + notification.prepare / deliver jobs
-  (session.reminder.sent                       ↓
-   session.feedback_request.sent)          push notifications to participants
+  (session.reminder + session.completion_check)  ↓ event projection
+    ↓ reminders-dispatch /                 activity_feed_items
+      session-completions-dispatch (1m)    + notification.prepare / deliver jobs
+dispatchDueReminderJobs                        ↓
+→ activity_events                          push notifications to participants
+  (session.reminder.sent
+   session.completion_check.sent)
     ↓ event projection
 activity_feed_items + push notifications
 ```
@@ -82,6 +88,11 @@ activity_feed_items + push notifications
 
 **Method:** `reconcileNextReminderJobForSchedule({ orgId, scheduleId, now })`
 
+Claimed by the dedicated `schedule-reconciliation-dispatch` worker through
+`claim_due_schedule_reconciliation_jobs`
+(`EventPipelineService.dispatchDueJobs({ reconcileOnly: true })`). The general
+`events-dispatch` worker no longer claims these jobs.
+
 ### Logic
 
 1. Load full schedule: recurrence rules, exceptions, overrides, participants,
@@ -90,22 +101,20 @@ activity_feed_items + push notifications
    learning space archived) → cancel all active `reminder_jobs` → return
    `'canceled_only'`.
 3. Expand all occurrences across a 365-day horizon (`RECONCILE_HORIZON_DAYS`).
-4. For each non-cancelled occurrence compute candidate jobs:
-   - `session.reminder` at **−12 hours** and **−30 min** before session start
-   - `session.feedback_request` at **+15 min** after session end (falls back to
-     +15 min after start if end time is invalid)
+4. Compute candidate jobs:
+   - `session.reminder` at **−12 hours** and **−5 min** before session start, for
+     the next eligible occurrence only.
+   - `session.completion_check` at **+10 min** after session end, independently
+     for every eligible occurrence in the next 30 days (three-day lookback). These
+     do not wait for reminder delivery or an earlier occurrence's dispatch.
 5. Skip occurrences whose jobs already have a `succeeded` dedupe key.
-6. Return the first pending candidate as the "next job in chain".
-7. Compare against the currently active `reminder_jobs` row for this schedule:
-   - **Matches** → return `'kept'` (no write)
-   - **Different** → cancel old, insert new → return `'inserted'`
-   - **No future jobs** → cancel any stale active jobs → return `'noop'`
+6. Cancel active jobs no longer in the expected set; upsert the rest.
 
 ### Dedupe Keys
 
 ```
 session.reminder:<orgId>:<learningSpaceId>:<channelId>:<occurrenceStart>:<offsetMinutes>
-session.feedback_request:<orgId>:<learningSpaceId>:<channelId>:<occurrenceStart>
+session.completion_check:<orgId>:<learningSpaceId>:<channelId>:<occurrenceStart>
 ```
 
 ---
@@ -124,13 +133,23 @@ session.feedback_request:<orgId>:<learningSpaceId>:<channelId>:<occurrenceStart>
 
 **File:** `apps/api/src/modules/schedules/schedules.service.ts`
 
+The dedicated reconciliation worker owns the durable cleanup above, but it runs
+on its own cron tick. To close the sub-minute window where a due
+`session.reminder` job could fire before reconciliation cancels it, the reminder
+claim RPCs (`claim_due_reminder_jobs` / `claim_due_org_reminder_jobs`) skip any
+job whose schedule is `cancelled`/`completed`/`rescheduled` or gone, whose
+learning space is archived, whose one-off start moved in place, or whose
+recurring occurrence now has a cancelling exception or a start-moving override.
+Completion-check claims are unchanged — that worker re-resolves cancel/reschedule
+state itself at dispatch and can defer a moved session.
+
 ---
 
 ## Key Constants
 
 | Constant                           | Value                     | Meaning                                            |
 | ---------------------------------- | ------------------------- | -------------------------------------------------- |
-| `SESSION_REMINDER_OFFSETS_MINUTES` | `[720, 30]`               | Minutes before session start to fire reminders     |
+| `SESSION_REMINDER_OFFSETS_MINUTES` | `[720, 15]`               | Minutes before session start to fire reminders     |
 | `SESSION_FEEDBACK_OFFSET_MINUTES`  | `15`                      | Minutes after session end to fire feedback request |
 | `RECONCILE_HORIZON_DAYS`           | `365`                     | Look-ahead window for recurring event expansion    |
 | `reminder.reconcile` job priority  | `40`                      | Higher priority than `activity.generate` (50)      |
@@ -161,7 +180,10 @@ and notification delivery payloads are written.
 | `apps/api/src/modules/reminders/reminder-reconcile.service.ts`         | Reconciliation logic                             |
 | `apps/api/src/modules/reminders/reminders.service.ts`                  | Dispatch due reminder jobs                       |
 | `apps/api/src/modules/schedules/schedules.service.ts`                  | Schedule CRUD (trigger source)                   |
-| `apps/api/src/modules/events/event-pipeline.service.ts`                | Job claim & dispatch loop                        |
+| `apps/api/src/modules/events/event-pipeline.service.ts`                | Job claim & dispatch loop (`reconcileOnly` path) |
+| `apps/api/src/modules/events/events.controller.ts`                     | `/internal/schedule-reconciliation/dispatch`     |
+| `supabase/functions/schedule-reconciliation-dispatch/index.ts`         | Dedicated reconciliation Edge Function bridge    |
+| `supabase/migrations/*_independent_schedule_reconciliation_worker.sql` | Dedicated claim RPCs, repair pass, cron          |
 | `supabase/migrations/*_reminder_reconcile_jobs.sql`                    | Trigger definitions                              |
 | `supabase/migrations/*_unified_event_pipeline.sql`                     | `event_pipeline_jobs` schema & enqueue functions |
 | `supabase/migrations/*_schedule_recurrence_update_activity_outbox.sql` | Exception/override outbox triggers               |

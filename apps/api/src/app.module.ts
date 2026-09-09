@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AdminToolsModule } from '@iconicedu/api/modules/admin-tools/admin-tools.module';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { PrismaModule } from '@iconicedu/api/prisma/prisma.module';
@@ -37,6 +38,7 @@ import { RequestLoggingInterceptor } from '@iconicedu/api/observability/request-
     PrismaModule,
     AnalyticsModule,
     AuthModule,
+    AdminToolsModule,
     UsersModule,
     ChannelsModule,
     ClassesModule,

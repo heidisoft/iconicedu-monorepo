@@ -7,6 +7,16 @@ import { getActivityEventDefinition } from '@iconicedu/api/lib/activity-feed/def
 
 const FALLBACK_DEFAULT_CHANNELS: NotificationDeliveryChannel[] = ['push', 'email'];
 
+const PUSH_DISABLED_EVENT_TYPES = new Set([
+  'session.feedback_request.sent',
+  'session.completion_check.sent',
+  'session.completion_check.batch.sent',
+]);
+
+export function isPushDeliveryDisabled(eventType: string): boolean {
+  return PUSH_DISABLED_EVENT_TYPES.has(eventType);
+}
+
 function resolveDefaultDelaySeconds(input: {
   timing?: 'immediate' | 'standard' | 'digest';
   critical: boolean;

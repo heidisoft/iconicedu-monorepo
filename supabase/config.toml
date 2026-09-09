@@ -381,6 +381,15 @@ verify_jwt = false
 [functions.events-dispatch]
 verify_jwt = false
 
+[functions.session-completions-dispatch]
+verify_jwt = false
+
+[functions.push-notifications-dispatch]
+verify_jwt = false
+
+[functions.schedule-reconciliation-dispatch]
+verify_jwt = false
+
 [functions.channel-read-state-repair]
 verify_jwt = false
 

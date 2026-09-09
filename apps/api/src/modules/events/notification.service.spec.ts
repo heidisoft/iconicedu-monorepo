@@ -1,4 +1,6 @@
 import { NotificationService } from '@iconicedu/api/modules/events/notification.service';
+import { sendPushNotification } from '@iconicedu/api/lib/notifications/providers/push-provider';
+import { buildNotificationDecision } from '@iconicedu/api/lib/notifications/decision-engine';
 
 jest.mock('@iconicedu/api/lib/notifications/decision-engine', () => ({
   buildNotificationDecision: jest.fn(async ({ event }) => {
@@ -116,6 +118,88 @@ function makeSupabase(
   };
   return { supabase, rpc };
 }
+
+describe('NotificationService reminder push priority', () => {
+  it.each([
+    ['session.reminder.sent', 15, 'high'],
+    ['session.reminder.sent', 720, undefined],
+    ['session.reminder.sent', 5, undefined],
+    ['session.reminder.sent', undefined, undefined],
+    ['message.posted', 15, undefined],
+  ])('uses priority %s / offset %s -> %s', async (eventType, offset, priority) => {
+    jest.mocked(sendPushNotification).mockClear();
+    const { supabase } = makeSupabase({
+      ...makeEvent({ reminderOffsetMinutes: offset }),
+      event_type: eventType,
+    });
+    await new NotificationService().deliver({
+      supabase: supabase as never,
+      job: {
+        id: 'job-1',
+        org_id: 'org-1',
+        payload: {
+          activityEventId: 'event-1',
+          recipientProfileId: 'profile-1',
+          deliveryChannel: 'push',
+          prefKey: eventType,
+          // Delivery uses the latest source event, even if queued metadata is stale.
+          rawEventPayload: { reminderOffsetMinutes: 30 },
+        },
+      } as never,
+    });
+    expect(sendPushNotification).toHaveBeenCalledTimes(1);
+    const sent = jest.mocked(sendPushNotification).mock.calls[0]?.[0];
+    if (priority) expect(sent).toHaveProperty('priority', 'high');
+    else expect(sent).not.toHaveProperty('priority');
+  });
+});
+
+describe('NotificationService completion push policy', () => {
+  it.each([
+    'session.feedback_request.sent',
+    'session.completion_check.sent',
+    'session.completion_check.batch.sent',
+  ])('does not enqueue or send queued pushes for %s', async (eventType) => {
+    jest.mocked(sendPushNotification).mockClear();
+    const realDecision = jest.requireActual<
+      typeof import('@iconicedu/api/lib/notifications/decision-engine')
+    >('@iconicedu/api/lib/notifications/decision-engine').buildNotificationDecision;
+    jest
+      .mocked(buildNotificationDecision)
+      .mockImplementationOnce(realDecision)
+      .mockImplementationOnce(realDecision);
+    const { supabase, rpc } = makeSupabase({ ...makeEvent(), event_type: eventType });
+    const service = new NotificationService();
+    await service.prepareForActivityEvent({
+      supabase: supabase as never,
+      eventId: 'event-1',
+      recipientProfileIds: ['profile-1'],
+    });
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith(
+      'enqueue_event_pipeline_job',
+      expect.objectContaining({
+        p_payload: expect.objectContaining({ deliveryChannel: 'email' }),
+      }),
+    );
+    await expect(
+      service.deliver({
+        supabase: supabase as never,
+        job: {
+          id: 'queued-before-policy-change',
+          org_id: 'org-1',
+          payload: {
+            activityEventId: 'event-1',
+            recipientProfileId: 'profile-1',
+            deliveryChannel: 'push',
+            prefKey: eventType,
+          },
+        } as never,
+      }),
+    ).resolves.toMatchObject({ suppressed: true, reason: 'no_longer_eligible' });
+    expect(sendPushNotification).not.toHaveBeenCalled();
+  });
+});
 
 describe('NotificationService silent source events', () => {
   it('does not enqueue delivery jobs for silent activity events', async () => {
@@ -256,5 +340,29 @@ describe('NotificationService silent source events', () => {
         viewerStudentNames: ['Priya'],
       },
     });
+  });
+  it('enqueues separate push jobs for three class reminders with stable retry identities', async () => {
+    const service = new NotificationService();
+    const keys = new Set<string>();
+    for (const index of [1, 2, 3]) {
+      const event = {
+        ...makeEvent(),
+        id: `event-${index}`,
+        event_type: 'session.reminder.sent',
+      };
+      const { supabase, rpc } = makeSupabase(event);
+      for (const attempt of [1, 2]) {
+        await service.prepareForActivityEvent({
+          supabase: supabase as never,
+          eventId: event.id,
+          recipientProfileIds: ['teacher-1'],
+        });
+        expect(rpc.mock.calls[attempt - 1]?.[1]?.p_dedupe_key).toBe(
+          `notification.deliver:event-${index}:teacher-1:push`,
+        );
+      }
+      keys.add(rpc.mock.calls[0]![1].p_dedupe_key);
+    }
+    expect(keys.size).toBe(3);
   });
 });

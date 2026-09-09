@@ -85,4 +85,35 @@ describe('publishActivityEvent', () => {
       }),
     );
   });
+  it.each(['insert', 'projection'] as const)(
+    'propagates %s failures for durable completion workers',
+    async (failure) => {
+      const orgQuery = makeQuery({ data: { slug: 'test-org' }, error: null });
+      const eventQuery = makeQuery(
+        failure === 'insert'
+          ? { data: null, error: { message: 'database unavailable' } }
+          : {
+              data: { id: 'event-strict', org_id: `org-strict-${failure}` },
+              error: null,
+            },
+      );
+      const supabase = {
+        from: jest.fn().mockReturnValueOnce(orgQuery).mockReturnValueOnce(eventQuery),
+        rpc: jest.fn(async () => ({ error: { message: 'projection unavailable' } })),
+      };
+      await expect(
+        publishActivityEvent({
+          supabase: supabase as never,
+          orgId: `org-strict-${failure}`,
+          eventType: 'session.completion_check.sent',
+          sourceKind: 'system',
+          scope: { kind: 'global' },
+          payload: {},
+          throwOnError: true,
+        }),
+      ).rejects.toThrow(
+        failure === 'insert' ? 'database unavailable' : 'projection unavailable',
+      );
+    },
+  );
 });

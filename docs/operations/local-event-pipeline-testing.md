@@ -24,8 +24,9 @@ Reminder schedule changes use the same job table:
 ```text
 class schedule table change
   -> event_pipeline_jobs reminder.reconcile
+  -> schedule-reconciliation-dispatch (dedicated worker)
   -> reminder_jobs
-  -> reminders-dispatch
+  -> reminders-dispatch / session-completions-dispatch
   -> activity_events / activity_feed_items / notification jobs
 ```
 
@@ -92,6 +93,17 @@ curl -sS -X POST "$API_URL/internal/reminders/dispatch" \
   -H "content-type: application/json" \
   -d '{"limit":100,"leaseOwner":"local-manual-reminders"}'
 ```
+
+Dispatch completion checks separately with `POST /internal/session-completions/dispatch`
+and `INTERNAL_REMINDERS_TOKEN`. Checks remain due ten minutes after the effective
+class end, even if a job's `run_at` is manually moved earlier.
+
+The web admin tools at `/<orgSlug>/admin/tools` provide separate **Session Completion
+Checks** and **Push Notifications** actions. Manual runs are restricted to the
+selected organization. Run completion checks, then events dispatch to project their
+in-app items and prepare eligible email delivery. Completion and feedback requests
+do not send pushes; use pre-class reminders to test push notifications. The cards show each run's
+counters and report partial failures. See [Reminders Cron Ops](reminders.md#admin-tools).
 
 Run the unified dispatcher a few times because each phase enqueues the next phase
 after the current claim:
@@ -276,7 +288,16 @@ curl -sS -X POST "$API_URL/internal/events/dispatch" \
   -H "authorization: Bearer $INTERNAL_EVENTS_TOKEN" \
   -H "content-type: application/json" \
   -d '{"limit":100,"leaseOwner":"local-notification-deliver","jobKinds":["notification.deliver"]}'
+
+curl -sS -X POST "$API_URL/internal/push-notifications/dispatch" \
+  -H "authorization: Bearer $INTERNAL_EVENTS_TOKEN" \
+  -H "content-type: application/json" \
+  -d '{"limit":100,"leaseOwner":"local-push-deliver"}'
 ```
+
+The general event worker delivers non-push channels; the push worker exclusively
+claims push deliveries. Run the push worker after any subsequent event batches
+when testing delivery end to end.
 
 Expected locally:
 
@@ -344,16 +365,20 @@ order by created_at desc
 limit 10;
 ```
 
-Run reconcile:
+Run reconcile through the dedicated worker (the general `events-dispatch` worker no
+longer claims `reminder.reconcile`):
 
 ```bash
-curl -sS -X POST "$API_URL/internal/events/dispatch" \
+curl -sS -X POST "$API_URL/internal/schedule-reconciliation/dispatch" \
   -H "authorization: Bearer $INTERNAL_EVENTS_TOKEN" \
   -H "content-type: application/json" \
-  -d '{"limit":100,"leaseOwner":"local-reminder-reconcile","jobKinds":["reminder.reconcile"]}'
+  -d '{"limit":100,"leaseOwner":"local-reminder-reconcile"}'
 ```
 
-Verify only the next active reminder job is kept for that schedule:
+The response includes a `reconciliationRepair.requeued` counter from the bounded
+`enqueue_stale_schedule_reconciliation` repair pass that follows each run.
+
+Verify upcoming reminders and independent completion checks for that schedule:
 
 ```sql
 select
@@ -374,8 +399,9 @@ order by run_at asc;
 
 Expected:
 
-- One active `reminder_jobs` row for the schedule, unless the schedule has no
-  future reminder occurrence.
+- Pre-class reminders for the next eligible occurrence.
+- Independent completion checks for eligible occurrences in the next 30 days,
+  including a three-day lookback for recently ended classes.
 - The `reminder.reconcile` pipeline job ends as `succeeded`.
 
 ## Test 4: Reminder Dispatch To Activity And Notifications
@@ -397,6 +423,7 @@ where id = (
   from public.reminder_jobs
   where deleted_at is null
     and status in ('pending', 'failed')
+    and job_type = 'session.reminder'
   order by run_at asc
   limit 1
 )
@@ -444,7 +471,7 @@ Verify reminder activity:
 ```sql
 select id, event_type, source_kind, source_id, dedupe_key, projection_status, created_at
 from public.activity_events
-where event_type in ('session.reminder.sent', 'session.feedback_request.sent')
+where event_type in ('session.reminder.sent', 'session.completion_check.sent')
 order by created_at desc
 limit 20;
 
@@ -453,7 +480,7 @@ from public.activity_feed_items
 where source_event_id in (
   select id
   from public.activity_events
-  where event_type in ('session.reminder.sent', 'session.feedback_request.sent')
+  where event_type in ('session.reminder.sent', 'session.completion_check.sent')
 )
 order by created_at desc
 limit 20;
@@ -526,6 +553,9 @@ Supabase Edge Function bridge itself:
 ```bash
 supabase functions serve events-dispatch --env-file supabase/.env.local
 supabase functions serve reminders-dispatch --env-file supabase/.env.local
+supabase functions serve session-completions-dispatch --env-file supabase/.env.local
+supabase functions serve push-notifications-dispatch --env-file supabase/.env.local
+supabase functions serve schedule-reconciliation-dispatch --env-file supabase/.env.local
 ```
 
 The edge env file needs:
