@@ -32,7 +32,13 @@ export function JobActivityOverview({ overview, basePath }: JobActivityOverviewP
               <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
             </div>
 
-            <JobActivityStatusBar statusCounts={group.statusCounts} compact />
+            {group.unavailable ? (
+              <p className="text-xs text-warning">
+                Couldn&apos;t load recent records for this queue.
+              </p>
+            ) : (
+              <JobActivityStatusBar statusCounts={group.statusCounts} compact />
+            )}
 
             <div className="mt-auto flex items-center justify-between text-xs text-muted-foreground">
               <span>{group.sampledCount} sampled</span>

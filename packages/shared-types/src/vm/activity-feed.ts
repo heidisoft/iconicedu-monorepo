@@ -304,16 +304,20 @@ export interface AdminActivityFeedAuditVM {
 }
 
 /**
- * Background job queues surfaced on the admin activity pages. Each value doubles
+ * Background job kinds surfaced on the admin activity pages. Each value doubles
  * as the URL slug for its dedicated page (`/admin/activity/<kind>`).
+ *
+ * The first five are `event_pipeline_jobs` rows filtered by `job_kind`; the last
+ * two are `reminder_jobs` rows filtered by `job_type`.
  */
 export const ADMIN_JOB_ACTIVITY_KINDS = [
-  'activity-source',
-  'event-pipeline',
-  'notification-dispatch',
-  'reminder',
+  'activity-generate',
+  'activity-project',
+  'notification-prepare',
+  'notification-deliver',
   'reminder-reconcile',
-  'session-completion',
+  'session-reminder',
+  'session-completion-check',
 ] as const;
 
 export type AdminJobActivityKind = (typeof ADMIN_JOB_ACTIVITY_KINDS)[number];
@@ -351,6 +355,13 @@ export interface AdminJobActivityGroupVM {
   latestProcessedAt: string | null;
   /** Most recent records first, capped at the requested limit (default 50). */
   records: AdminJobActivityRecordVM[];
+  /**
+   * Set when this queue could not be read (table missing from the Data API,
+   * timeout, permission). Other groups in the response are still valid.
+   */
+  unavailable: boolean;
+  /** Short reason when `unavailable` is true. */
+  unavailableReason: string | null;
 }
 
 export interface AdminJobActivityOverviewVM {

@@ -12,6 +12,16 @@ type JobActivityDetailProps = {
 export function JobActivityDetail({ group }: JobActivityDetailProps) {
   return (
     <div className="flex flex-1 flex-col gap-4">
+      {group.unavailable ? (
+        <div className="rounded-xl border border-warning/40 bg-warning/10 px-5 py-4 text-sm text-warning">
+          <p className="font-medium">This queue could not be read.</p>
+          <p className="mt-1 text-xs">
+            {group.unavailableReason ??
+              'The table is not reachable through the Data API in this environment.'}
+          </p>
+        </div>
+      ) : null}
+
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="rounded-xl border bg-card px-5 pt-4 pb-5">
           <p className="text-sm text-muted-foreground">Sampled records</p>

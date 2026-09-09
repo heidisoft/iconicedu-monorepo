@@ -739,12 +739,7 @@ describe('SessionCompletionsService', () => {
 
   describe('getOrgCompletionSummary', () => {
     function makeOrgSummarySupabase(input: {
-      completionRows?: Array<{
-        schedule_id: string;
-        occurrence_key: string;
-        status: string;
-        session_end_at?: string;
-      }>;
+      summaryRows?: Array<{ completed: number; pending: number }>;
       roleRow?: { role_key: string } | null;
       primaryRoleRow?: { id: string } | null;
     }) {
@@ -755,7 +750,6 @@ describe('SessionCompletionsService', () => {
       const primaryRoleChain = makeChain({
         data: input.primaryRoleRow === undefined ? null : input.primaryRoleRow,
       });
-      const completionsChain = makeChain({ data: input.completionRows ?? [] });
 
       let accountCalls = 0;
       const from = jest.fn((table: string) => {
@@ -765,51 +759,21 @@ describe('SessionCompletionsService', () => {
           return accountCalls === 1 ? accountChain : primaryRoleChain;
         }
         if (table === 'user_roles') return roleChain;
-        if (table === 'class_session_completions') return completionsChain;
         throw new Error(`Unexpected table: ${table}`);
       });
 
-      createSupabaseServiceClientMock.mockReturnValue({ from } as never);
-      return { from, completionsChain };
+      const rpc = jest.fn(async () => ({
+        data: input.summaryRows ?? [],
+        error: null,
+      }));
+
+      createSupabaseServiceClientMock.mockReturnValue({ from, rpc } as never);
+      return { from, rpc };
     }
 
-    it('collapses cross-party rows to occurrences and nets pending against completed', async () => {
-      const { completionsChain } = makeOrgSummarySupabase({
-        completionRows: [
-          // Occurrence A: both parties confirmed -> counts once as completed.
-          {
-            schedule_id: SCHEDULE_ID,
-            occurrence_key: '2030-03-06T10:00:00.000Z',
-            status: 'confirmed',
-            session_end_at: '2030-03-06T11:00:00.000Z',
-          },
-          {
-            schedule_id: SCHEDULE_ID,
-            occurrence_key: '2030-03-06T10:00:00.000Z',
-            status: 'auto_confirmed',
-            session_end_at: '2030-03-06T11:00:00.000Z',
-          },
-          // Occurrence B: one party confirmed, the other still pending -> completed, not pending.
-          {
-            schedule_id: SCHEDULE_ID,
-            occurrence_key: '2030-03-13T10:00:00.000Z',
-            status: 'confirmed',
-            session_end_at: '2030-03-13T11:00:00.000Z',
-          },
-          {
-            schedule_id: SCHEDULE_ID,
-            occurrence_key: '2030-03-13T10:00:00.000Z',
-            status: 'pending',
-            session_end_at: '2030-03-13T11:00:00.000Z',
-          },
-          // Occurrence C: only pending rows -> pending.
-          {
-            schedule_id: '00000000-0000-4000-8000-0000000000aa',
-            occurrence_key: '2030-03-20T10:00:00.000Z',
-            status: 'pending',
-            session_end_at: '2030-03-20T11:00:00.000Z',
-          },
-        ],
+    it('delegates to the org summary function and returns its counts', async () => {
+      const { rpc } = makeOrgSummarySupabase({
+        summaryRows: [{ completed: 2, pending: 1 }],
       });
       const service = new SessionCompletionsService();
 
@@ -817,46 +781,17 @@ describe('SessionCompletionsService', () => {
         orgId: ORG_ID,
       });
 
-      expect(completionsChain.in).toHaveBeenCalledWith('status', [
-        'confirmed',
-        'auto_confirmed',
-        'pending',
-      ]);
+      expect(rpc).toHaveBeenCalledWith('get_org_session_completion_summary', {
+        p_org_id: ORG_ID,
+        p_since: null,
+        p_until: null,
+      });
       expect(result).toEqual({ completed: 2, pending: 1 });
     });
 
-    it('bounds completed to the session_end_at window but leaves pending unbounded', async () => {
-      makeOrgSummarySupabase({
-        completionRows: [
-          // In-window confirmed occurrence.
-          {
-            schedule_id: SCHEDULE_ID,
-            occurrence_key: '2030-03-10T10:00:00.000Z',
-            status: 'confirmed',
-            session_end_at: '2030-03-10T11:00:00.000Z',
-          },
-          // Confirmed but ended before the window -> not completed this month,
-          // and still excluded from pending because it is resolved.
-          {
-            schedule_id: SCHEDULE_ID,
-            occurrence_key: '2030-02-25T10:00:00.000Z',
-            status: 'confirmed',
-            session_end_at: '2030-02-25T11:00:00.000Z',
-          },
-          {
-            schedule_id: SCHEDULE_ID,
-            occurrence_key: '2030-02-25T10:00:00.000Z',
-            status: 'pending',
-            session_end_at: '2030-02-25T11:00:00.000Z',
-          },
-          // Genuinely unresolved occurrence, regardless of month.
-          {
-            schedule_id: '00000000-0000-4000-8000-0000000000bb',
-            occurrence_key: '2030-01-05T10:00:00.000Z',
-            status: 'pending',
-            session_end_at: '2030-01-05T11:00:00.000Z',
-          },
-        ],
+    it('passes the completed-window bounds through to the function', async () => {
+      const { rpc } = makeOrgSummarySupabase({
+        summaryRows: [{ completed: 1, pending: 4 }],
       });
       const service = new SessionCompletionsService();
 
@@ -866,7 +801,23 @@ describe('SessionCompletionsService', () => {
         completedUntil: '2030-04-01T00:00:00.000Z',
       });
 
-      expect(result).toEqual({ completed: 1, pending: 1 });
+      expect(rpc).toHaveBeenCalledWith('get_org_session_completion_summary', {
+        p_org_id: ORG_ID,
+        p_since: '2030-03-01T00:00:00.000Z',
+        p_until: '2030-04-01T00:00:00.000Z',
+      });
+      expect(result).toEqual({ completed: 1, pending: 4 });
+    });
+
+    it('defaults to zero counts when the function returns no row', async () => {
+      makeOrgSummarySupabase({ summaryRows: [] });
+      const service = new SessionCompletionsService();
+
+      const result = await service.getOrgCompletionSummary(AUTH_USER_ID, {
+        orgId: ORG_ID,
+      });
+
+      expect(result).toEqual({ completed: 0, pending: 0 });
     });
 
     it('rejects a non-admin caller', async () => {
@@ -879,13 +830,14 @@ describe('SessionCompletionsService', () => {
     });
 
     it('rejects an invalid orgId before querying', async () => {
-      const { from } = makeOrgSummarySupabase({});
+      const { from, rpc } = makeOrgSummarySupabase({});
       const service = new SessionCompletionsService();
 
       await expect(
         service.getOrgCompletionSummary(AUTH_USER_ID, { orgId: 'not-a-uuid' }),
       ).rejects.toThrow(BadRequestException);
       expect(from).not.toHaveBeenCalled();
+      expect(rpc).not.toHaveBeenCalled();
     });
   });
 

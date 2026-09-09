@@ -10,22 +10,32 @@ export function buildAdminMenuSections(
   const activityLinks = [
     { title: 'Overview', url: `${basePath}/admin/activity` },
     {
-      title: 'Activity source jobs',
-      url: `${basePath}/admin/activity/activity-source`,
+      title: 'Activity generate',
+      url: `${basePath}/admin/activity/activity-generate`,
     },
-    { title: 'Event pipeline', url: `${basePath}/admin/activity/event-pipeline` },
     {
-      title: 'Notification dispatch',
-      url: `${basePath}/admin/activity/notification-dispatch`,
+      title: 'Activity project',
+      url: `${basePath}/admin/activity/activity-project`,
     },
-    { title: 'Reminders', url: `${basePath}/admin/activity/reminder` },
+    {
+      title: 'Notification prepare',
+      url: `${basePath}/admin/activity/notification-prepare`,
+    },
+    {
+      title: 'Notification deliver',
+      url: `${basePath}/admin/activity/notification-deliver`,
+    },
     {
       title: 'Schedule reconciliation',
       url: `${basePath}/admin/activity/reminder-reconcile`,
     },
     {
-      title: 'Session completions',
-      url: `${basePath}/admin/activity/session-completion`,
+      title: 'Session reminders',
+      url: `${basePath}/admin/activity/session-reminder`,
+    },
+    {
+      title: 'Session completion checks',
+      url: `${basePath}/admin/activity/session-completion-check`,
     },
   ];
 

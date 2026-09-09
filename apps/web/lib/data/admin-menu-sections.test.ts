@@ -58,25 +58,32 @@ describe('buildAdminMenuSections', () => {
       expect.arrayContaining([
         { title: 'Overview', url: '/iconic-academy/admin/activity' },
         {
-          title: 'Activity source jobs',
-          url: '/iconic-academy/admin/activity/activity-source',
+          title: 'Activity generate',
+          url: '/iconic-academy/admin/activity/activity-generate',
         },
         {
-          title: 'Event pipeline',
-          url: '/iconic-academy/admin/activity/event-pipeline',
+          title: 'Activity project',
+          url: '/iconic-academy/admin/activity/activity-project',
         },
         {
-          title: 'Notification dispatch',
-          url: '/iconic-academy/admin/activity/notification-dispatch',
+          title: 'Notification prepare',
+          url: '/iconic-academy/admin/activity/notification-prepare',
         },
-        { title: 'Reminders', url: '/iconic-academy/admin/activity/reminder' },
+        {
+          title: 'Notification deliver',
+          url: '/iconic-academy/admin/activity/notification-deliver',
+        },
         {
           title: 'Schedule reconciliation',
           url: '/iconic-academy/admin/activity/reminder-reconcile',
         },
         {
-          title: 'Session completions',
-          url: '/iconic-academy/admin/activity/session-completion',
+          title: 'Session reminders',
+          url: '/iconic-academy/admin/activity/session-reminder',
+        },
+        {
+          title: 'Session completion checks',
+          url: '/iconic-academy/admin/activity/session-completion-check',
         },
       ]),
     );
@@ -108,12 +115,13 @@ describe('buildAdminMenuSections', () => {
   it('only links to implemented admin pages', () => {
     const implementedAdminPaths = new Set([
       '/admin/activity',
-      '/admin/activity/activity-source',
-      '/admin/activity/event-pipeline',
-      '/admin/activity/notification-dispatch',
-      '/admin/activity/reminder',
+      '/admin/activity/activity-generate',
+      '/admin/activity/activity-project',
+      '/admin/activity/notification-prepare',
+      '/admin/activity/notification-deliver',
       '/admin/activity/reminder-reconcile',
-      '/admin/activity/session-completion',
+      '/admin/activity/session-reminder',
+      '/admin/activity/session-completion-check',
       '/admin/attendance/sessions',
       '/admin/channels',
       '/admin/classrooms',

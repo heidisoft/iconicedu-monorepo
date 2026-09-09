@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import {
   ADMIN_JOB_ACTIVITY_KINDS,
   type AdminJobActivityGroupVM,
@@ -19,7 +19,11 @@ type JobRow = Record<string, unknown>;
 
 type JobActivityConfig = {
   kind: AdminJobActivityKind;
-  table: string;
+  /** Queue table. */
+  table: 'event_pipeline_jobs' | 'reminder_jobs';
+  /** Discriminator column and value that isolate this job kind within the table. */
+  column: 'job_kind' | 'job_type';
+  value: string;
   title: string;
   description: string;
   workerName: string;
@@ -50,93 +54,97 @@ function baseRecord(row: JobRow): AdminJobActivityRecordVM {
   };
 }
 
+function pipelineRow(row: JobRow): AdminJobActivityRecordVM {
+  return {
+    ...baseRecord(row),
+    label: toText(row.source_kind) ?? toText(row.job_kind) ?? 'pipeline job',
+    detail: toText(row.dedupe_key),
+  };
+}
+
+function reminderRow(row: JobRow): AdminJobActivityRecordVM {
+  return {
+    ...baseRecord(row),
+    label:
+      [toText(row.target_kind), toText(row.occurrence_start_at)]
+        .filter(Boolean)
+        .join(' · ') || 'reminder job',
+    detail: toText(row.dedupe_key),
+  };
+}
+
 const JOB_ACTIVITY_CONFIGS: JobActivityConfig[] = [
   {
-    kind: 'activity-source',
-    table: 'activity_source_jobs',
-    title: 'Activity source jobs',
-    description:
-      'Raw message, reaction, and schedule-change events waiting to be turned into activity.',
-    workerName: 'events-dispatch',
-    mapRow: (row) => ({
-      ...baseRecord(row),
-      label: toText(row.job_kind) ?? 'activity source',
-      detail: toText(row.dedupe_key),
-    }),
-  },
-  {
-    kind: 'event-pipeline',
+    kind: 'activity-generate',
     table: 'event_pipeline_jobs',
-    title: 'Event pipeline',
-    description:
-      'Fan-out steps that generate activity items and prepare notifications from each event.',
+    column: 'job_kind',
+    value: 'activity.generate',
+    title: 'Activity generate',
+    description: 'Turns raw message, reaction, and schedule events into activity items.',
     workerName: 'events-dispatch',
-    mapRow: (row) => ({
-      ...baseRecord(row),
-      label: toText(row.job_kind) ?? 'pipeline step',
-      detail: toText(row.source_kind) ?? toText(row.dedupe_key),
-    }),
+    mapRow: pipelineRow,
   },
   {
-    kind: 'notification-dispatch',
-    table: 'notification_dispatch_jobs',
-    title: 'Notification dispatch',
-    description: 'Queued push, email, and SMS notifications and their delivery attempts.',
+    kind: 'activity-project',
+    table: 'event_pipeline_jobs',
+    column: 'job_kind',
+    value: 'activity.project',
+    title: 'Activity project',
+    description: 'Projects generated activity items into each recipient inbox.',
+    workerName: 'events-dispatch',
+    mapRow: pipelineRow,
+  },
+  {
+    kind: 'notification-prepare',
+    table: 'event_pipeline_jobs',
+    column: 'job_kind',
+    value: 'notification.prepare',
+    title: 'Notification prepare',
+    description: 'Decides which push and email notifications each activity item needs.',
+    workerName: 'events-dispatch',
+    mapRow: pipelineRow,
+  },
+  {
+    kind: 'notification-deliver',
+    table: 'event_pipeline_jobs',
+    column: 'job_kind',
+    value: 'notification.deliver',
+    title: 'Notification deliver',
+    description: 'Delivers queued push and email notifications, with retries.',
     workerName: 'push-notifications-dispatch',
-    mapRow: (row) => ({
-      ...baseRecord(row),
-      label:
-        [toText(row.delivery_channel), toText(row.pref_key)]
-          .filter(Boolean)
-          .join(' · ') || 'notification',
-      detail:
-        [toText(row.delivery_timing), toText(row.attempt_bucket)]
-          .filter(Boolean)
-          .join(' · ') || null,
-    }),
-  },
-  {
-    kind: 'reminder',
-    table: 'reminder_jobs',
-    title: 'Reminders',
-    description: 'Pre-class reminders and other scheduled reminder messages.',
-    workerName: 'reminders-dispatch',
-    mapRow: (row) => ({
-      ...baseRecord(row),
-      label: toText(row.job_type) ?? 'reminder',
-      detail: toText(row.target_kind),
-    }),
+    mapRow: pipelineRow,
   },
   {
     kind: 'reminder-reconcile',
-    table: 'reminder_reconcile_jobs',
+    table: 'event_pipeline_jobs',
+    column: 'job_kind',
+    value: 'reminder.reconcile',
     title: 'Schedule reconciliation',
     description:
-      'Rebuilds reminder and completion-check jobs whenever a class schedule changes.',
+      'Rebuilds pre-class reminder and completion-check jobs whenever a class schedule changes.',
     workerName: 'schedule-reconciliation-dispatch',
-    mapRow: (row) => ({
-      ...baseRecord(row),
-      label: 'schedule.reconcile',
-      detail: toText(row.schedule_id),
-    }),
+    mapRow: pipelineRow,
   },
   {
-    kind: 'session-completion',
-    table: 'class_session_completions',
-    title: 'Session completions',
+    kind: 'session-reminder',
+    table: 'reminder_jobs',
+    column: 'job_type',
+    value: 'session.reminder',
+    title: 'Session reminders',
+    description: 'Pre-class reminder messages sent ahead of each session.',
+    workerName: 'reminders-dispatch',
+    mapRow: reminderRow,
+  },
+  {
+    kind: 'session-completion-check',
+    table: 'reminder_jobs',
+    column: 'job_type',
+    value: 'session.completion_check',
+    title: 'Session completion checks',
     description:
       'Post-class completion checks sent to each participant after a class ends.',
     workerName: 'session-completions-dispatch',
-    mapRow: (row) => ({
-      ...baseRecord(row),
-      label: toText(row.session_title) ?? 'Session completion',
-      detail: toText(row.role),
-      attemptCount: null,
-      maxAttempts: null,
-      lastError: null,
-      runAt: toText(row.session_end_at),
-      dispatchedAt: toText(row.notified_at),
-    }),
+    mapRow: reminderRow,
   },
 ];
 
@@ -146,6 +154,8 @@ function isJobActivityKind(value: string): value is AdminJobActivityKind {
 
 @Injectable()
 export class AdminJobActivityService {
+  private readonly logger = new Logger(AdminJobActivityService.name);
+
   async fetchJobActivity(
     authUserId: string,
     orgId: string,
@@ -179,16 +189,47 @@ export class AdminJobActivityService {
     orgId: string,
     limit: number,
   ): Promise<AdminJobActivityGroupVM> {
-    const { data, error } = await supabase
-      .from(config.table)
-      .select('*')
-      .eq('org_id', orgId)
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false })
-      .limit(limit)
-      .returns<JobRow[]>();
+    const emptyGroup = (
+      unavailableReason: string | null = null,
+    ): AdminJobActivityGroupVM => ({
+      kind: config.kind,
+      title: config.title,
+      description: config.description,
+      workerName: config.workerName,
+      sampledCount: 0,
+      statusCounts: [],
+      latestProcessedAt: null,
+      records: [],
+      unavailable: unavailableReason !== null,
+      unavailableReason,
+    });
 
-    if (error) throw new InternalServerErrorException(error.message);
+    let data: JobRow[] | null = null;
+    try {
+      const result = await supabase
+        .from(config.table)
+        .select('*')
+        .eq('org_id', orgId)
+        .eq(config.column, config.value)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false })
+        .limit(limit)
+        .returns<JobRow[]>();
+
+      if (result.error) {
+        this.logger.warn(
+          `job-activity: ${config.table}/${config.value} unavailable (${result.error.message})`,
+        );
+        return emptyGroup(result.error.message);
+      }
+      data = result.data;
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : 'query failed';
+      this.logger.warn(
+        `job-activity: ${config.table}/${config.value} query threw (${message})`,
+      );
+      return emptyGroup(message);
+    }
 
     const records = (data ?? []).map((row) => config.mapRow(row));
 
@@ -220,6 +261,8 @@ export class AdminJobActivityService {
       statusCounts,
       latestProcessedAt,
       records,
+      unavailable: false,
+      unavailableReason: null,
     };
   }
 }
