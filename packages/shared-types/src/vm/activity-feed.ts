@@ -304,16 +304,20 @@ export interface AdminActivityFeedAuditVM {
 }
 
 /**
- * Background job queues surfaced on the admin activity pages. Each value doubles
+ * Background job kinds surfaced on the admin activity pages. Each value doubles
  * as the URL slug for its dedicated page (`/admin/activity/<kind>`).
+ *
+ * The first five are `event_pipeline_jobs` rows filtered by `job_kind`; the last
+ * two are `reminder_jobs` rows filtered by `job_type`.
  */
 export const ADMIN_JOB_ACTIVITY_KINDS = [
-  'activity-source',
-  'event-pipeline',
-  'notification-dispatch',
-  'reminder',
+  'activity-generate',
+  'activity-project',
+  'notification-prepare',
+  'notification-deliver',
   'reminder-reconcile',
-  'session-completion',
+  'session-reminder',
+  'session-completion-check',
 ] as const;
 
 export type AdminJobActivityKind = (typeof ADMIN_JOB_ACTIVITY_KINDS)[number];
