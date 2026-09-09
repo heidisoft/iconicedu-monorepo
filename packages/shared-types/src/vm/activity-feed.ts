@@ -302,3 +302,58 @@ export interface AdminActivityFeedAuditVM {
   verbSummaries: AdminActivityFeedVerbSummaryVM[];
   items: AdminActivityFeedItemVM[];
 }
+
+/**
+ * Background job queues surfaced on the admin activity pages. Each value doubles
+ * as the URL slug for its dedicated page (`/admin/activity/<kind>`).
+ */
+export const ADMIN_JOB_ACTIVITY_KINDS = [
+  'activity-source',
+  'event-pipeline',
+  'notification-dispatch',
+  'reminder',
+  'reminder-reconcile',
+  'session-completion',
+] as const;
+
+export type AdminJobActivityKind = (typeof ADMIN_JOB_ACTIVITY_KINDS)[number];
+
+export interface AdminJobActivityRecordVM {
+  id: string;
+  status: string;
+  /** Short human label for what the job is about (job kind, channel, title…). */
+  label: string;
+  /** Secondary line: dedupe key, target, schedule id, etc. */
+  detail: string | null;
+  attemptCount: number | null;
+  maxAttempts: number | null;
+  lastError: string | null;
+  runAt: string | null;
+  dispatchedAt: string | null;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
+export interface AdminJobActivityStatusCountVM {
+  status: string;
+  count: number;
+}
+
+export interface AdminJobActivityGroupVM {
+  kind: AdminJobActivityKind;
+  title: string;
+  description: string;
+  /** Edge function that leases and processes this queue. */
+  workerName: string;
+  /** Number of records in the returned sample (at most the requested limit). */
+  sampledCount: number;
+  statusCounts: AdminJobActivityStatusCountVM[];
+  latestProcessedAt: string | null;
+  /** Most recent records first, capped at the requested limit (default 50). */
+  records: AdminJobActivityRecordVM[];
+}
+
+export interface AdminJobActivityOverviewVM {
+  generatedAt: string;
+  groups: AdminJobActivityGroupVM[];
+}

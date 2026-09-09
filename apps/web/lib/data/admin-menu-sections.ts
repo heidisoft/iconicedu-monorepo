@@ -8,10 +8,24 @@ export function buildAdminMenuSections(
   } = {},
 ): AdminMenuSectionVM[] {
   const activityLinks = [
-    { title: 'Activity feed', url: `${basePath}/admin/activity/feed` },
+    { title: 'Overview', url: `${basePath}/admin/activity` },
     {
-      title: 'Push notifications',
-      url: `${basePath}/admin/activity/notifications`,
+      title: 'Activity source jobs',
+      url: `${basePath}/admin/activity/activity-source`,
+    },
+    { title: 'Event pipeline', url: `${basePath}/admin/activity/event-pipeline` },
+    {
+      title: 'Notification dispatch',
+      url: `${basePath}/admin/activity/notification-dispatch`,
+    },
+    { title: 'Reminders', url: `${basePath}/admin/activity/reminder` },
+    {
+      title: 'Schedule reconciliation',
+      url: `${basePath}/admin/activity/reminder-reconcile`,
+    },
+    {
+      title: 'Session completions',
+      url: `${basePath}/admin/activity/session-completion`,
     },
   ];
 

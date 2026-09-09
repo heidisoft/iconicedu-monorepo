@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@iconicedu/api/modules/auth/auth.guard';
 import { ActivityFeedQueryService } from '@iconicedu/api/modules/activity-feed/activity-feed-query.service';
+import { AdminJobActivityService } from '@iconicedu/api/modules/activity-feed/admin-job-activity.service';
 import {
   extractBearerToken,
   type AuthenticatedRequest,
@@ -8,7 +9,10 @@ import {
 
 @Controller('activity-feed')
 export class ActivityFeedController {
-  constructor(private readonly activityFeedQueryService: ActivityFeedQueryService) {}
+  constructor(
+    private readonly activityFeedQueryService: ActivityFeedQueryService,
+    private readonly adminJobActivityService: AdminJobActivityService,
+  ) {}
 
   @Get()
   @UseGuards(AuthGuard)
@@ -41,6 +45,22 @@ export class ActivityFeedController {
     extractBearerToken(req.headers.authorization);
     const parsedLimit = limit ? Number(limit) : undefined;
     return this.activityFeedQueryService.fetchAdminActivityFeedAudit(req.user.id, orgId, {
+      limit: Number.isFinite(parsedLimit) ? parsedLimit : undefined,
+    });
+  }
+
+  @Get('admin/job-activity')
+  @UseGuards(AuthGuard)
+  getAdminJobActivity(
+    @Req() req: AuthenticatedRequest,
+    @Query('orgId') orgId: string,
+    @Query('kind') kind?: string,
+    @Query('limit') limit?: string,
+  ) {
+    extractBearerToken(req.headers.authorization);
+    const parsedLimit = limit ? Number(limit) : undefined;
+    return this.adminJobActivityService.fetchJobActivity(req.user.id, orgId, {
+      kind: kind || undefined,
       limit: Number.isFinite(parsedLimit) ? parsedLimit : undefined,
     });
   }
