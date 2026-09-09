@@ -51,9 +51,11 @@ describe('CompletedSessionsTable', () => {
     expect(screen.getAllByRole('columnheader').map((cell) => cell.textContent)).toEqual([
       'Session',
       'Ended',
+      'Duration',
       'Students',
       'Confirmed by',
     ]);
+    expect(screen.getByText('1h 0m')).toBeInTheDocument();
     const people = screen.getAllByRole('listitem');
     expect(within(people[0]).getByText('(Tutor) · Confirmed')).toBeInTheDocument();
     expect(within(people[0]).getByText('Rating: 5.0 / 5')).toBeInTheDocument();
@@ -93,6 +95,6 @@ describe('CompletedSessionsTable', () => {
 
   it('spans the four columns for an empty result', () => {
     render(<CompletedSessionsTable rows={[]} />);
-    expect(screen.getByRole('cell')).toHaveAttribute('colspan', '4');
+    expect(screen.getByRole('cell')).toHaveAttribute('colspan', '5');
   });
 });
