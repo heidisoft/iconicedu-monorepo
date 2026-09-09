@@ -223,6 +223,15 @@ describe('buildDashboardHomeInfographicMetrics', () => {
           status: 'confirmed',
           rating: 5,
         },
+        {
+          // Confirmed but the viewer closed the tile without rating (skip-rating
+          // stamps ratedAt, leaves rating null) — resolved, so not actionable.
+          ...baseCompletion,
+          id: 'completion-skipped',
+          status: 'confirmed',
+          rating: null,
+          ratedAt: '2026-03-12T17:00:00.000Z',
+        },
         { ...baseCompletion, id: 'completion-disputed', status: 'disputed' },
       ],
       // Aggregate totals come from the dedicated /summary endpoint, not the

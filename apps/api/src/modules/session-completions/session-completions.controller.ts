@@ -13,6 +13,7 @@ import type {
   ConfirmSessionCompletionInput,
   DisputeSessionCompletionInput,
   RateSessionCompletionInput,
+  SkipSessionCompletionRatingInput,
   UndoSessionCompletionInput,
 } from '@iconicedu/shared-types';
 import { AuthGuard } from '@iconicedu/api/modules/auth/auth.guard';
@@ -151,6 +152,19 @@ export class SessionCompletionsController {
     @Body() body: RateSessionCompletionInput,
   ) {
     return this.sessionCompletionsService.rate(req.user.id, {
+      ...body,
+      sessionCompletionId: id,
+    });
+  }
+
+  @Post(':id/skip-rating')
+  @UseGuards(AuthGuard)
+  skipRating(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() body: SkipSessionCompletionRatingInput,
+  ) {
+    return this.sessionCompletionsService.skipRating(req.user.id, {
       ...body,
       sessionCompletionId: id,
     });

@@ -1,6 +1,6 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { Clock3 } from 'lucide-react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Clock3, X } from 'lucide-react-native';
 import type {
   ActivityFeedLeafItemVM,
   SessionCompletionVM,
@@ -85,6 +85,8 @@ type Props = {
   colors: AppColors;
   onCompletionSubmit?: (status: 'confirmed' | 'disputed') => void;
   onRatingSubmit?: () => void;
+  /** When provided, renders a close (×) control that removes this tile from the stack. */
+  onDismiss?: () => void;
 };
 
 // Single outer card — date chip + title/badge + meta row, then the shared
@@ -100,11 +102,17 @@ export function SessionCompletedTile({
   colors,
   onCompletionSubmit,
   onRatingSubmit,
+  onDismiss,
 }: Props) {
   const { dayName, dayNum } = formatDateChip(completion.sessionEndAt);
   const time = formatTime(completion.sessionEndAt);
   const title = completion.sessionTitle?.trim() || 'Session';
   const showStudentName = Boolean(completion.studentName);
+  // The close (×) control only appears once the session is confirmed — either it
+  // arrived that way, or the viewer just confirmed it in this session.
+  const [isConfirmed, setIsConfirmed] = React.useState(
+    completion.status === 'confirmed' || completion.status === 'auto_confirmed',
+  );
 
   return (
     <View
@@ -127,6 +135,17 @@ export function SessionCompletedTile({
             <View style={[styles.badge, { backgroundColor: colors.tealBg }]}>
               <Text style={[styles.badgeText, { color: colors.teal }]}>Completed</Text>
             </View>
+            {onDismiss && isConfirmed ? (
+              <TouchableOpacity
+                onPress={onDismiss}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Dismiss this session"
+                style={styles.dismissButton}
+              >
+                <X size={14} color={colors.textFaint} />
+              </TouchableOpacity>
+            ) : null}
           </View>
 
           <View style={styles.metaRow}>
@@ -153,7 +172,10 @@ export function SessionCompletedTile({
         activity={toActivity(completion)}
         colors={colors}
         embedded
-        onCompletionSubmit={onCompletionSubmit}
+        onCompletionSubmit={(status) => {
+          if (status === 'confirmed') setIsConfirmed(true);
+          onCompletionSubmit?.(status);
+        }}
         onRatingSubmit={onRatingSubmit}
       />
     </View>
@@ -201,6 +223,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     flexShrink: 1,
+  },
+  dismissButton: {
+    marginLeft: 'auto',
+    padding: 2,
   },
   badge: {
     borderRadius: 6,

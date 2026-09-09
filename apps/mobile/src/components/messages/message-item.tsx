@@ -63,6 +63,7 @@ import {
   TrendingUp,
   Check,
   EyeOff,
+  X,
 } from 'lucide-react-native';
 import { AudioPlayer, createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import type { AudioStatus } from 'expo-audio';
@@ -83,6 +84,32 @@ const CHANNEL_FILES_BUCKET = 'channel-files';
 
 export function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+// Full "date · time" for a scheduled session, rendered in the session's own
+// timezone when it carries one (otherwise the device timezone). Using the
+// timezone explicitly keeps the displayed date/time correct instead of silently
+// shifting it to wherever the device happens to be.
+export function formatSessionDateTime(iso: string, timezone?: string | null): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  const zone = timezone?.trim();
+  const options: Intl.DateTimeFormatOptions = {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  };
+  try {
+    return new Intl.DateTimeFormat('en-US', {
+      ...options,
+      ...(zone ? { timeZone: zone } : {}),
+    }).format(date);
+  } catch {
+    return new Intl.DateTimeFormat('en-US', options).format(date);
+  }
 }
 
 function formatDate(iso: string): string {
@@ -1416,6 +1443,18 @@ function SessionCompleteBar({
   colors: AppColors;
   s: S;
 }) {
+  const { session } = message;
+  const [confirmed, setConfirmed] = useState(Boolean(session.completedAt));
+  const [dismissed, setDismissed] = useState(false);
+
+  if (dismissed) return null;
+
+  const timezone =
+    'timezone' in session && typeof session.timezone === 'string'
+      ? session.timezone
+      : null;
+  const sessionWhen = formatSessionDateTime(session.startAt, timezone);
+
   return (
     <View style={s.sessionCompleteRow}>
       <View style={[s.sessionCompleteLine, { backgroundColor: colors.border }]} />
@@ -1432,12 +1471,60 @@ function SessionCompleteBar({
           style={[s.sessionCompleteTitle, { color: colors.textMuted }]}
           numberOfLines={2}
         >
-          {message.session.title}
+          {session.title}
         </Text>
-        {!!message.session.endAt && (
-          <Text style={{ fontSize: 11, color: colors.textFaint }}>
-            {formatTime(message.session.endAt)}
-          </Text>
+        {!!sessionWhen && (
+          <Text style={{ fontSize: 11, color: colors.textFaint }}>{sessionWhen}</Text>
+        )}
+        {confirmed ? (
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+              marginTop: 2,
+            }}
+          >
+            <Text style={{ fontSize: 11, fontWeight: '600', color: colors.teal }}>
+              Marked complete
+            </Text>
+            <TouchableOpacity
+              onPress={() => setDismissed(true)}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Dismiss completed session"
+              style={{
+                width: 22,
+                height: 22,
+                borderRadius: 11,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderWidth: StyleSheet.hairlineWidth,
+                borderColor: colors.border,
+                backgroundColor: colors.card,
+              }}
+            >
+              <X size={13} color={colors.textMuted} />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity
+            onPress={() => setConfirmed(true)}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Mark session complete"
+            style={{
+              marginTop: 2,
+              paddingHorizontal: 10,
+              paddingVertical: 4,
+              borderRadius: 999,
+              backgroundColor: colors.tealBg,
+            }}
+          >
+            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.teal }}>
+              Mark complete
+            </Text>
+          </TouchableOpacity>
         )}
       </View>
       <View style={[s.sessionCompleteLine, { backgroundColor: colors.border }]} />

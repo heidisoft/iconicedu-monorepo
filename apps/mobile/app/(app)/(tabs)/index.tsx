@@ -572,6 +572,25 @@ function makeStyles(C: AppColors) {
       flex: 1,
       gap: 6,
     },
+    // Placeholder for the "Recently completed" carousel card during a refresh —
+    // mirrors SessionCompletedTile's bordered card so the section doesn't jump.
+    completedSkeletonCard: {
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: C.border,
+      backgroundColor: C.inputBg,
+      padding: 16,
+      gap: 16,
+    },
+    completedSkeletonHeader: {
+      flexDirection: 'row',
+      gap: 10,
+      alignItems: 'center',
+    },
+    completedSkeletonBody: {
+      flex: 1,
+      gap: 8,
+    },
     emptyWrap: {
       alignItems: 'center',
       justifyContent: 'center',
@@ -763,6 +782,7 @@ export default function HomeScreen() {
     sessions: completedSessions,
     summary: sessionCompletionSummary,
     isOrgAdminView: isCompletionOrgView,
+    isPending: completedSessionsLoading,
     refetch: refetchCompletedSessions,
   } = useCompletedSessions(sessionCompletionCarouselEnabled);
   // Staff/admins get the org-wide summary tile even when the carousel rollout
@@ -932,6 +952,14 @@ export default function HomeScreen() {
     upcomingSessionsThisWeek: topMetrics.upcomingSessionsThisWeek,
     nextWeekSessions,
   });
+  // On pull-to-refresh the completed query keeps its stale rows, so the carousel
+  // would otherwise sit there showing old cards. Swap in a skeleton while the
+  // refresh is in flight (only when there was something to refresh — no phantom
+  // section for people who have no recently completed sessions).
+  const showRecentlyCompletedSkeleton =
+    sessionCompletionCarouselEnabled &&
+    (refreshing || completedSessionsLoading) &&
+    completedSessions.length > 0;
   const showTodaySection = sessionsLoading || refreshing || todaySessions.length > 0;
   const showThisWeekSection =
     sessionsLoading || refreshing || thisWeekSessions.length > 0;
@@ -1340,7 +1368,26 @@ export default function HomeScreen() {
         </View>
 
         {sessionCompletionCarouselEnabled ? (
-          <SessionCompletedCarousel sessions={completedSessions} colors={colors} />
+          showRecentlyCompletedSkeleton ? (
+            <View style={{ gap: 10 }}>
+              <View style={s.activityHeader}>
+                <Text style={s.sectionLabel}>Recently completed</Text>
+                <PulseBox width={22} height={20} radius={999} />
+              </View>
+              <View style={s.completedSkeletonCard}>
+                <View style={s.completedSkeletonHeader}>
+                  <PulseBox width={46} height={44} radius={10} />
+                  <View style={s.completedSkeletonBody}>
+                    <PulseBox width={150} height={13} radius={4} />
+                    <PulseBox width={110} height={11} radius={4} />
+                  </View>
+                </View>
+                <PulseBox width={220} height={36} radius={10} />
+              </View>
+            </View>
+          ) : (
+            <SessionCompletedCarousel sessions={completedSessions} colors={colors} />
+          )
         ) : null}
 
         {/* Upcoming sessions */}

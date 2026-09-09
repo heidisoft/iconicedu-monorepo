@@ -1,6 +1,7 @@
 'use client';
 
-import { Clock3 } from 'lucide-react';
+import { useState } from 'react';
+import { Clock3, X } from 'lucide-react';
 import { Badge } from '@iconicedu/ui-web/ui/badge';
 import { ActivityCompletionCheck } from '@iconicedu/ui-web/components/notification/activity-completion-check';
 import {
@@ -73,6 +74,8 @@ type SessionCompletedTileProps = {
   completion: SessionCompletionVM;
   onVoteSubmit?: (status: 'confirmed' | 'disputed') => void;
   onRatingSubmit?: () => void;
+  /** When provided, renders a close (×) control that removes this tile from the stack. */
+  onDismiss?: () => void;
 };
 
 // Same shell shape as SessionCard (messages-session-card.tsx) — date chip, title +
@@ -83,10 +86,16 @@ export function SessionCompletedTile({
   completion,
   onVoteSubmit,
   onRatingSubmit,
+  onDismiss,
 }: SessionCompletedTileProps) {
   const { dayName, dayNum } = formatDateChip(completion.sessionEndAt);
   const time = formatTime(completion.sessionEndAt);
   const title = completion.sessionTitle?.trim() || 'Session';
+  // The close (×) control only appears once the session is confirmed — either it
+  // arrived that way, or the viewer just confirmed it in this session.
+  const [isConfirmed, setIsConfirmed] = useState(
+    completion.status === 'confirmed' || completion.status === 'auto_confirmed',
+  );
 
   return (
     <div className="flex w-full flex-col gap-4 rounded-xl border border-border/50 bg-muted/40 px-4 py-3">
@@ -102,6 +111,16 @@ export function SessionCompletedTile({
             <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
               Completed
             </Badge>
+            {onDismiss && isConfirmed ? (
+              <button
+                type="button"
+                onClick={onDismiss}
+                aria-label="Dismiss this session"
+                className="-my-1 -mr-1 ml-auto rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <X className="size-3.5" />
+              </button>
+            ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
             <Clock3 className="size-3" />
@@ -125,7 +144,10 @@ export function SessionCompletedTile({
       <ActivityCompletionCheck
         activity={toActivity(completion)}
         embedded
-        onVoteSubmit={onVoteSubmit}
+        onVoteSubmit={(status) => {
+          if (status === 'confirmed') setIsConfirmed(true);
+          onVoteSubmit?.(status);
+        }}
         onRatingSubmit={onRatingSubmit}
       />
     </div>

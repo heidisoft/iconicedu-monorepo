@@ -55,6 +55,7 @@ describe('SessionCompletionsService', () => {
       update: jest.fn(() => chain),
       eq: jest.fn(() => chain),
       in: jest.fn(() => chain),
+      is: jest.fn(() => chain),
       select: jest.fn(() => chain),
       maybeSingle: jest.fn(async () => ({ data: updated, error: null })),
     };
@@ -1275,6 +1276,81 @@ describe('SessionCompletionsService', () => {
       });
 
       expect(result).toEqual({ success: true });
+    });
+  });
+
+  describe('skipRating', () => {
+    it('rejects skipping a still-pending row', async () => {
+      makeSupabase({ completionRow: baseCompletionRow({ status: 'pending' }) });
+      const service = new SessionCompletionsService();
+
+      await expect(
+        service.skipRating(AUTH_USER_ID, {
+          orgId: ORG_ID,
+          sessionCompletionId: COMPLETION_ID,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('stamps rated_at with no rating on a confirmed row', async () => {
+      const { updateChain } = makeSupabase({
+        completionRow: baseCompletionRow({
+          status: 'confirmed',
+          rating: null,
+          rated_at: null,
+          learning_space_id: null,
+        }),
+      });
+      const service = new SessionCompletionsService();
+
+      const result = await service.skipRating(AUTH_USER_ID, {
+        orgId: ORG_ID,
+        sessionCompletionId: COMPLETION_ID,
+      });
+
+      expect(result).toEqual({ success: true });
+      const patch = updateChain.update.mock.calls[0][0] as Record<string, unknown>;
+      expect(patch.rated_at).toEqual(expect.any(String));
+      expect(patch).not.toHaveProperty('rating');
+    });
+
+    it('is a no-op success when the row was already rated', async () => {
+      const { updateChain } = makeSupabase({
+        completionRow: baseCompletionRow({
+          status: 'confirmed',
+          rating: 5,
+          rated_at: '2030-03-06T12:00:00.000Z',
+        }),
+      });
+      const service = new SessionCompletionsService();
+
+      const result = await service.skipRating(AUTH_USER_ID, {
+        orgId: ORG_ID,
+        sessionCompletionId: COMPLETION_ID,
+      });
+
+      expect(result).toEqual({ success: true, alreadyResolved: true });
+      expect(updateChain.update).not.toHaveBeenCalled();
+    });
+
+    it('is a no-op success when a rating landed first (lost race)', async () => {
+      makeSupabase({
+        completionRow: baseCompletionRow({
+          status: 'confirmed',
+          rating: null,
+          rated_at: null,
+          learning_space_id: null,
+        }),
+        updatedRow: null,
+      });
+      const service = new SessionCompletionsService();
+
+      const result = await service.skipRating(AUTH_USER_ID, {
+        orgId: ORG_ID,
+        sessionCompletionId: COMPLETION_ID,
+      });
+
+      expect(result).toEqual({ success: true, alreadyResolved: true });
     });
   });
 });

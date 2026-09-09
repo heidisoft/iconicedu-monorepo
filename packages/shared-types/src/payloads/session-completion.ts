@@ -34,3 +34,12 @@ export type UndoSessionCompletionInput = {
   orgId: UUID;
   sessionCompletionId: UUID;
 };
+
+// The viewer confirmed the session but is intentionally NOT leaving a rating
+// ("not voted"). Stamps `rated_at` with `rating` left null, so the completed-
+// sessions carousel stops surfacing it and it does not come back on re-fetch.
+// Only valid on a confirmed/auto_confirmed row that has no rating yet.
+export type SkipSessionCompletionRatingInput = {
+  orgId: UUID;
+  sessionCompletionId: UUID;
+};

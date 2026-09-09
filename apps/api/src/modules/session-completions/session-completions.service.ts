@@ -19,6 +19,7 @@ import type {
   DisputeSessionCompletionInput,
   RateSessionCompletionInput,
   SessionCompletionVM,
+  SkipSessionCompletionRatingInput,
   UndoSessionCompletionInput,
 } from '@iconicedu/shared-types';
 import {
@@ -578,6 +579,55 @@ export class SessionCompletionsService {
     }
 
     this.logger.log(`session completion rated id=${row.id} rating=${body.rating}`);
+    await this.markRelatedActivityFeedItemsRead(supabase, body.orgId, row);
+    return { success: true };
+  }
+
+  /**
+   * The viewer confirmed the session but is closing the rating prompt without
+   * scoring it ("not voted"). Stamps `rated_at` with `rating` left null so the
+   * homepage carousel and the completed-sessions list stop surfacing it — the
+   * session still counts as completed, it just has no feedback and won't come
+   * back on the next fetch.
+   */
+  async skipRating(authUserId: string, body: SkipSessionCompletionRatingInput) {
+    const row = await this.loadOwnedRow(authUserId, body.orgId, body.sessionCompletionId);
+    if (row.status !== 'confirmed' && row.status !== 'auto_confirmed') {
+      throw new BadRequestException(
+        `Cannot skip rating for a session completion in status '${row.status}'`,
+      );
+    }
+    // Already resolved (a real rating, or a previous skip) — nothing to do.
+    if (row.rating != null || row.rated_at != null) {
+      return { success: true, alreadyResolved: true };
+    }
+
+    const supabase = createSupabaseServiceClient();
+    const now = new Date().toISOString();
+    const { data: updated, error } = await supabase
+      .from('class_session_completions')
+      .update({
+        rated_at: now,
+        updated_at: now,
+        updated_by: row.profile_id,
+      })
+      .eq('id', row.id)
+      .eq('org_id', body.orgId)
+      .in('status', ['confirmed', 'auto_confirmed'])
+      .is('rated_at', null)
+      .select('id')
+      .maybeSingle<{ id: string }>();
+
+    if (error) throw new InternalServerErrorException(error.message);
+    if (!updated) {
+      // Lost a race with a real rating or a concurrent skip — the outcome the
+      // caller wanted (no longer awaiting a vote) already holds.
+      return { success: true, alreadyResolved: true };
+    }
+
+    this.logger.log(
+      `session completion rating skipped id=${row.id} profileId=${row.profile_id}`,
+    );
     await this.markRelatedActivityFeedItemsRead(supabase, body.orgId, row);
     return { success: true };
   }

@@ -105,7 +105,10 @@ export function useCompletedSessions(enabled = true): {
       (completion) =>
         completion.status === 'pending' ||
         ((completion.status === 'confirmed' || completion.status === 'auto_confirmed') &&
-          completion.rating == null),
+          completion.rating == null &&
+          // `ratedAt` set with no `rating` = the viewer confirmed but chose not
+          // to vote (skip-rating) — resolved, so keep it out of the carousel.
+          completion.ratedAt == null),
     ),
     summary: summarizeSessionCompletions(allSessions),
     isOrgAdminView,
