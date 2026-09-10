@@ -34,7 +34,7 @@ export default function GetStartedAuthClient({
   const [statusMessage, setStatusMessage] = React.useState<string | null>(null);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
-  const handleEmailLogin = async (email: string) => {
+  const handleEmailLogin = async (email: string, captchaToken: string | null) => {
     setErrorMessage(null);
     setStatusMessage(null);
 
@@ -42,6 +42,7 @@ export default function GetStartedAuthClient({
       email,
       options: {
         shouldCreateUser: shouldCreateUserForIntent('get-started'),
+        captchaToken: captchaToken ?? undefined,
       },
     });
 

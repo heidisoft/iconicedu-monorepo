@@ -21,6 +21,7 @@ import type { AppColors } from '@/lib/theme';
 import { useAnalytics } from '@/providers/analytics-provider';
 import { useAuth } from '@/providers/auth-provider';
 import { useTheme } from '@/providers/theme-provider';
+import { useTurnstile } from '@/hooks/use-turnstile';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -147,6 +148,7 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { signUpWithOtp, sessionExpiryMessage, clearSessionExpiryMessage } = useAuth();
+  const turnstile = useTurnstile();
   const router = useRouter();
   const { colors } = useTheme();
   const analytics = useAnalytics();
@@ -195,12 +197,20 @@ export default function LoginScreen() {
       return;
     }
 
+    if (turnstile.required && !turnstile.token) {
+      setError('Please complete the verification challenge to continue.');
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
       clearSessionExpiryMessage();
       analytics.capture(AnalyticsEvent.LOGIN_OTP_REQUESTED, { method: 'email' });
-      const { error: signInError } = await signUpWithOtp(email.trim());
+      const { error: signInError } = await signUpWithOtp(
+        email.trim(),
+        turnstile.token ?? undefined,
+      );
 
       if (signInError) {
         analytics.capture(AnalyticsEvent.LOGIN_ERROR, {
@@ -221,12 +231,14 @@ export default function LoginScreen() {
       setError(message);
     } finally {
       setLoading(false);
+      // Turnstile tokens are single-use — refresh for any retry.
+      turnstile.reset();
     }
-  }, [analytics, clearSessionExpiryMessage, email, router, signUpWithOtp]);
+  }, [analytics, clearSessionExpiryMessage, email, router, signUpWithOtp, turnstile]);
 
   const isValidEmail = EMAIL_RE.test(email.trim());
   const showEmailError = emailDirty && email.trim().length > 0 && !isValidEmail;
-  const isDisabled = !isValidEmail || loading;
+  const isDisabled = !isValidEmail || loading || (turnstile.required && !turnstile.token);
 
   return (
     <View style={s.safe}>
@@ -300,6 +312,8 @@ export default function LoginScreen() {
                 <Text style={s.errorTxt}>{sessionExpiryMessage}</Text>
               ) : null}
             </View>
+
+            {turnstile.widget}
 
             <TouchableOpacity
               style={[s.cta, isDisabled ? s.ctaDim : undefined]}

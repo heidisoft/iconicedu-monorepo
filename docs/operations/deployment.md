@@ -47,11 +47,12 @@ The Next.js web app is designed to deploy on [Vercel](https://vercel.com). It us
 
 ### Environment variables (Vercel dashboard)
 
-| Variable                               | Source                        |
-| -------------------------------------- | ----------------------------- |
-| `API_URL` / `NEXT_PUBLIC_API_URL`      | Railway API origin            |
-| `NEXT_PUBLIC_SUPABASE_URL`             | Supabase project API settings |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase project API settings |
+| Variable                               | Source                                                                   |
+| -------------------------------------- | ------------------------------------------------------------------------ |
+| `API_URL` / `NEXT_PUBLIC_API_URL`      | Railway API origin                                                       |
+| `NEXT_PUBLIC_SUPABASE_URL`             | Supabase project API settings                                            |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase project API settings                                            |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY`       | Cloudflare Turnstile widget (optional; see [turnstile.md](turnstile.md)) |
 
 ### Deploying
 
@@ -161,7 +162,8 @@ Mobile env vars (`EXPO_PUBLIC_*`) are set in `apps/mobile/eas.json` under the `e
     "production": {
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://your-project.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "your-publishable-key"
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "your-publishable-key",
+        "EXPO_PUBLIC_TURNSTILE_SITE_KEY": "your-turnstile-site-key"
       }
     }
   }
@@ -364,17 +366,19 @@ Confirm the production project's current backup and point-in-time recovery confi
 
 ## Environment Variables Reference
 
-| Variable                               | Web                     | Mobile | API | Notes                               |
-| -------------------------------------- | ----------------------- | ------ | --- | ----------------------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`             | ✅                      | —      | —   | Public, browser-safe                |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | ✅                      | —      | —   | Public, browser-safe                |
-| `SUPABASE_SERVICE_ROLE_KEY`            | —                       | —      | ✅  | API-only privileged credential      |
-| `EXPO_PUBLIC_SUPABASE_URL`             | —                       | ✅     | —   | Inlined at build time               |
-| `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | —                       | ✅     | —   | Inlined at build time               |
-| `DATABASE_URL`                         | —                       | —      | ✅  | Pooled Postgres URL                 |
-| `DIRECT_URL`                           | —                       | —      | ✅  | Non-pooled schema tooling URL       |
-| `SUPABASE_URL`                         | —                       | —      | ✅  |                                     |
-| `SUPABASE_JWT_SECRET`                  | —                       | —      | ✅  | From Supabase JWT settings          |
-| `INTERNAL_EVENTS_TOKEN`                | ✅ (server/admin tools) | —      | ✅  | Match Supabase Edge Function secret |
-| `INTERNAL_REMINDERS_TOKEN`             | ✅ (server/admin tools) | —      | ✅  | Match Supabase Edge Function secret |
-| `EXPO_ACCESS_TOKEN`                    | —                       | —      | ✅  | Expo push provider token            |
+| Variable                               | Web                     | Mobile | API | Notes                                                                                                   |
+| -------------------------------------- | ----------------------- | ------ | --- | ------------------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`             | ✅                      | —      | —   | Public, browser-safe                                                                                    |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | ✅                      | —      | —   | Public, browser-safe                                                                                    |
+| `SUPABASE_SERVICE_ROLE_KEY`            | —                       | —      | ✅  | API-only privileged credential                                                                          |
+| `EXPO_PUBLIC_SUPABASE_URL`             | —                       | ✅     | —   | Inlined at build time                                                                                   |
+| `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | —                       | ✅     | —   | Inlined at build time                                                                                   |
+| `DATABASE_URL`                         | —                       | —      | ✅  | Pooled Postgres URL                                                                                     |
+| `DIRECT_URL`                           | —                       | —      | ✅  | Non-pooled schema tooling URL                                                                           |
+| `SUPABASE_URL`                         | —                       | —      | ✅  |                                                                                                         |
+| `SUPABASE_JWT_SECRET`                  | —                       | —      | ✅  | From Supabase JWT settings                                                                              |
+| `INTERNAL_EVENTS_TOKEN`                | ✅ (server/admin tools) | —      | ✅  | Match Supabase Edge Function secret                                                                     |
+| `INTERNAL_REMINDERS_TOKEN`             | ✅ (server/admin tools) | —      | ✅  | Match Supabase Edge Function secret                                                                     |
+| `EXPO_ACCESS_TOKEN`                    | —                       | —      | ✅  | Expo push provider token                                                                                |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY`       | ✅                      | —      | —   | Public Cloudflare Turnstile site key; optional — no widget when unset. See [turnstile.md](turnstile.md) |
+| `EXPO_PUBLIC_TURNSTILE_SITE_KEY`       | —                       | ✅     | —   | Same key for mobile; inlined at build/OTA time. See [turnstile.md](turnstile.md)                        |

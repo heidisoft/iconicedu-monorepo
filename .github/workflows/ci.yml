@@ -1000,6 +1000,7 @@ jobs:
             --arg api_url "${{ steps.railway.outputs.railway_api_url }}" \
             --arg events_token "${{ secrets.INTERNAL_EVENTS_TOKEN }}" \
             --arg reminders_token "${{ secrets.INTERNAL_REMINDERS_TOKEN }}" \
+            --arg turnstile_site_key "${{ secrets.EXPO_PUBLIC_TURNSTILE_SITE_KEY }}" \
             '[
               {key:"API_URL", value:$api_url},
               {key:"NEXT_PUBLIC_API_URL", value:$api_url},
@@ -1007,7 +1008,11 @@ jobs:
               {key:"NEXT_PUBLIC_APP_ENV", value:"preview"},
               {key:"INTERNAL_EVENTS_TOKEN", value:$events_token},
               {key:"INTERNAL_REMINDERS_TOKEN", value:$reminders_token}
-            ] | map(. + {target:["preview"], gitBranch:$branch, type:"encrypted"})')
+            ]
+            + (if ($turnstile_site_key | length) > 0 then [
+              {key:"NEXT_PUBLIC_TURNSTILE_SITE_KEY", value:$turnstile_site_key}
+            ] else [] end)
+            | map(. + {target:["preview"], gitBranch:$branch, type:"encrypted"})')
 
           RESPONSE_FILE=$(mktemp)
           VERCEL_ENV_CONFIGURED=true

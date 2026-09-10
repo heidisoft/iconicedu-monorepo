@@ -12,6 +12,7 @@ describe('web env config', () => {
     ).toEqual({
       supabaseUrl: 'https://example.supabase.co',
       supabasePublishableKey: 'publishable-key',
+      turnstileSiteKey: null,
     });
   });
 
@@ -24,6 +25,7 @@ describe('web env config', () => {
     ).toEqual({
       supabaseUrl: 'https://example.supabase.co',
       supabasePublishableKey: 'publishable-key',
+      turnstileSiteKey: null,
     });
   });
 
@@ -36,7 +38,26 @@ describe('web env config', () => {
     ).toEqual({
       supabaseUrl: 'https://example.supabase.co',
       supabasePublishableKey: 'anon-key',
+      turnstileSiteKey: null,
     });
+  });
+
+  it('reads and trims the optional Turnstile site key', () => {
+    expect(
+      getPublicWebEnv({
+        NEXT_PUBLIC_SUPABASE_URL: 'https://example.supabase.co',
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'publishable-key',
+        NEXT_PUBLIC_TURNSTILE_SITE_KEY: '  1x00000000000000000000AA  ',
+      }).turnstileSiteKey,
+    ).toBe('1x00000000000000000000AA');
+
+    expect(
+      getPublicWebEnv({
+        NEXT_PUBLIC_SUPABASE_URL: 'https://example.supabase.co',
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'publishable-key',
+        NEXT_PUBLIC_TURNSTILE_SITE_KEY: '   ',
+      }).turnstileSiteKey,
+    ).toBeNull();
   });
 
   it('throws on missing or invalid public env', () => {
@@ -65,6 +86,7 @@ describe('web env config', () => {
       supabaseUrl: 'https://example.supabase.co',
       supabasePublishableKey: 'publishable-key',
       supabaseServiceRoleKey: 'service-role-key',
+      turnstileSiteKey: null,
     });
 
     expect(() =>
