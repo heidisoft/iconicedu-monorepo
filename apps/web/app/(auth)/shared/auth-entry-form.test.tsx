@@ -1,9 +1,38 @@
 // @vitest-environment jsdom
 import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { AuthEntryForm } from './auth-entry-form';
+
+// Mocked Turnstile widget: `configured` mirrors a set site key; `emit` is wired
+// to the live `onTokenChange` so tests can push a token / expiry on demand.
+const turnstileState = vi.hoisted(() => ({
+  configured: false,
+  emit: null as null | ((token: string | null) => void),
+}));
+
+vi.mock('./turnstile-field', async () => {
+  const react = await import('react');
+  return {
+    isTurnstileConfigured: () => turnstileState.configured,
+    TurnstileField: react.forwardRef(function MockTurnstileField(
+      { onTokenChange }: { onTokenChange: (token: string | null) => void },
+      ref: react.Ref<{ reset: () => void }>,
+    ) {
+      react.useImperativeHandle(ref, () => ({ reset: () => onTokenChange(null) }), [
+        onTokenChange,
+      ]);
+      react.useEffect(() => {
+        turnstileState.emit = onTokenChange;
+        return () => {
+          turnstileState.emit = null;
+        };
+      }, [onTokenChange]);
+      return null;
+    }),
+  };
+});
 
 const BASE_PROPS = {
   title: 'Sign in',
@@ -11,6 +40,11 @@ const BASE_PROPS = {
   introText: 'Use your email.',
   trustLine: 'Secure login.',
 };
+
+afterEach(() => {
+  turnstileState.configured = false;
+  turnstileState.emit = null;
+});
 
 describe('AuthEntryForm', () => {
   it('hides social login buttons and separator when both social providers are disabled', () => {
@@ -90,7 +124,40 @@ describe('AuthEntryForm', () => {
     fireEvent.click(submitButton);
 
     await waitFor(() => {
-      expect(onEmailLogin).toHaveBeenCalledWith('parent@example.com');
+      expect(onEmailLogin).toHaveBeenCalledWith('parent@example.com', null);
+    });
+  });
+
+  it('blocks submission until Turnstile yields a token, then forwards it', async () => {
+    turnstileState.configured = true;
+
+    const onEmailLogin = vi.fn();
+    render(
+      <AuthEntryForm
+        {...BASE_PROPS}
+        onEmailLogin={onEmailLogin}
+        enableGoogleSignIn={false}
+        enableAppleSignIn={false}
+      />,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText('Email'), {
+      target: { value: 'parent@example.com' },
+    });
+
+    const submitButton = screen.getByRole('button', { name: 'Send code' });
+    // Valid email but no captcha token yet -> still blocked.
+    expect(submitButton).toBeDisabled();
+    expect(screen.getByText('Verifying your browser…')).toBeInTheDocument();
+
+    // Widget solves and delivers a token.
+    act(() => turnstileState.emit?.('tk-live'));
+
+    await waitFor(() => expect(submitButton).toBeEnabled());
+    fireEvent.click(submitButton);
+
+    await waitFor(() => {
+      expect(onEmailLogin).toHaveBeenCalledWith('parent@example.com', 'tk-live');
     });
   });
 });

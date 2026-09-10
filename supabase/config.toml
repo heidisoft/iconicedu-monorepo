@@ -195,11 +195,16 @@ token_verifications = 30
 # Number of Web3 logins that can be made in a 5 minute interval per IP address.
 web3 = 30
 
-# Configure one of the supported captcha providers: `hcaptcha`, `turnstile`.
+# Attack Protection — Cloudflare Turnstile CAPTCHA on the OTP / signup / resend
+# endpoints. Left disabled by default: enabling it forces every client (web +
+# mobile) to send a captchaToken. To turn it on locally, uncomment the block and
+# set SUPABASE_AUTH_CAPTCHA_SECRET (Cloudflare's always-pass dummy secret
+# `1x0000000000000000000000000000000AA` for local/CI), then set the matching
+# site key in apps/web/.env.local and apps/mobile/.env. See docs/operations/turnstile.md.
 # [auth.captcha]
 # enabled = true
-# provider = "hcaptcha"
-# secret = ""
+# provider = "turnstile"
+# secret = "env(SUPABASE_AUTH_CAPTCHA_SECRET)"
 
 [auth.email]
 # Allow/disallow new user signups via email to your project.

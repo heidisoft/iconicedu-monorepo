@@ -56,7 +56,7 @@ export default function OrgLoginClient({
       'web_incomplete_onboarding_reauth=; path=/; max-age=0; SameSite=Lax;';
   }, []);
 
-  const handleEmailLogin = async (email: string) => {
+  const handleEmailLogin = async (email: string, captchaToken: string | null) => {
     setErrorMessage(null);
     setStatusMessage(null);
 
@@ -101,6 +101,7 @@ export default function OrgLoginClient({
       email,
       options: {
         shouldCreateUser: shouldCreateUserForIntent('login'),
+        captchaToken: captchaToken ?? undefined,
       },
     });
 

@@ -193,6 +193,7 @@ jobs:
           WEB_URL: ${{ steps.app-urls.outputs.web_url }}
           POSTHOG_KEY: ${{ secrets.POSTHOG_KEY }}
           POSTHOG_HOST: ${{ vars.POSTHOG_HOST || 'https://t.iconicedu.lk' }}
+          TURNSTILE_SITE_KEY: ${{ secrets.EXPO_PUBLIC_TURNSTILE_SITE_KEY }}
         run: |
           set -euo pipefail
 
@@ -226,6 +227,12 @@ jobs:
 
           if [[ -n "${POSTHOG_KEY}" ]]; then
             upsert_eas_env "EXPO_PUBLIC_POSTHOG_KEY" "${POSTHOG_KEY}" "sensitive"
+          fi
+
+          # Cloudflare Turnstile site key is public (shipped in the bundle); optional
+          # until Supabase Attack Protection is enabled. See docs/operations/turnstile.md.
+          if [[ -n "${TURNSTILE_SITE_KEY}" ]]; then
+            upsert_eas_env "EXPO_PUBLIC_TURNSTILE_SITE_KEY" "${TURNSTILE_SITE_KEY}" "plaintext"
           fi
 
       - name: Publish EAS Update (production)

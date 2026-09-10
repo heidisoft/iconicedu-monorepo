@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/providers/auth-provider';
 import { useTheme } from '@/providers/theme-provider';
 import { useAnalytics } from '@/providers/analytics-provider';
+import { useTurnstile } from '@/hooks/use-turnstile';
 import { AnalyticsEvent } from '@iconicedu/utils';
 import { fetchOnboardingStatus } from '@/lib/api/queries';
 import type { AppColors } from '@/lib/theme';
@@ -78,6 +79,7 @@ export default function OtpScreen() {
   const [error, setError] = useState<string | null>(null);
   const isVerifyingRef = React.useRef(false);
   const { verifySignupOtp, signUpWithOtp, setOnboardingCompletionStatus } = useAuth();
+  const turnstile = useTurnstile();
   const router = useRouter();
   const { colors } = useTheme();
   const analytics = useAnalytics();
@@ -145,11 +147,20 @@ export default function OtpScreen() {
 
   const handleResend = useCallback(async () => {
     if (!email) return;
+    if (turnstile.required && !turnstile.token) {
+      setError('Please complete the verification challenge to continue.');
+      return;
+    }
     setError(null);
     analytics.capture(AnalyticsEvent.OTP_RESENT);
-    const { error: resendError } = await signUpWithOtp(email);
+    const { error: resendError } = await signUpWithOtp(
+      email,
+      turnstile.token ?? undefined,
+    );
+    // Turnstile tokens are single-use — refresh before the next resend.
+    turnstile.reset();
     if (resendError) setError(resendError);
-  }, [email, signUpWithOtp, analytics]);
+  }, [email, signUpWithOtp, analytics, turnstile]);
 
   return (
     <SafeAreaView style={s.safe}>
@@ -203,6 +214,8 @@ export default function OtpScreen() {
           >
             <Text style={s.ctaTxt}>{loading ? 'Verifying…' : 'Verify code'}</Text>
           </TouchableOpacity>
+
+          {turnstile.widget}
 
           {/* Resend */}
           <View style={s.resendRow}>

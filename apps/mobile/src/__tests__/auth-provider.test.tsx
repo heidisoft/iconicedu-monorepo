@@ -156,6 +156,22 @@ describe('AuthProvider', () => {
     });
   });
 
+  it('forwards the Turnstile captcha token to supabase', async () => {
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    await act(async () => {
+      await result.current.signUpWithOtp('iconicedudev+test@gmail.com', 'cf-token');
+    });
+
+    expect(mockSignInWithOtp).toHaveBeenCalledWith({
+      email: 'iconicedudev+test@gmail.com',
+      options: { shouldCreateUser: true, captchaToken: 'cf-token' },
+    });
+  });
+
   it('verifyOtp calls supabase', async () => {
     const { result } = renderHook(() => useAuth(), { wrapper });
     await waitFor(() => {

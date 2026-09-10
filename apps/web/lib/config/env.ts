@@ -29,6 +29,13 @@ function getServiceRoleKey(source: EnvSource): string {
   return requireEnvValue(source.SUPABASE_SERVICE_ROLE_KEY, 'SUPABASE_SERVICE_ROLE_KEY');
 }
 
+function getTurnstileSiteKey(source: EnvSource): string | null {
+  // NEXT_PUBLIC_TURNSTILE_SITE_KEY — Cloudflare Turnstile public site key.
+  // Optional: when unset the auth forms render no widget and send no
+  // captchaToken, which is correct while Supabase Attack Protection is disabled.
+  return source.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() || null;
+}
+
 function getPublishableKey(source: EnvSource): string {
   // NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY — Vercel+Supabase connector name.
   // NEXT_PUBLIC_SUPABASE_ANON_KEY — fallback for local dev / manual setup.
@@ -51,10 +58,12 @@ export function getPublicWebEnv(source?: EnvSource) {
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:
       process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    NEXT_PUBLIC_TURNSTILE_SITE_KEY: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
   };
   return {
     supabaseUrl: getPublicSupabaseUrl(s),
     supabasePublishableKey: getPublishableKey(s),
+    turnstileSiteKey: getTurnstileSiteKey(s),
   };
 }
 
@@ -63,4 +72,16 @@ export function getServiceWebEnv(source: EnvSource = process.env) {
     ...getPublicWebEnv(source),
     supabaseServiceRoleKey: getServiceRoleKey(source),
   };
+}
+
+/**
+ * Cloudflare Turnstile site key, or null when unconfigured. Standalone (does not
+ * require the Supabase env) so auth UI can read it without pulling in the whole
+ * public env — literal process.env access keeps Next.js inlining intact.
+ */
+export function getPublicTurnstileSiteKey(source?: EnvSource): string | null {
+  const s = source ?? {
+    NEXT_PUBLIC_TURNSTILE_SITE_KEY: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
+  };
+  return getTurnstileSiteKey(s);
 }

@@ -347,6 +347,7 @@ jobs:
             --arg posthog_host "${{ vars.POSTHOG_HOST || 'https://t.iconicedu.lk' }}" \
             --arg api_url "${{ steps.app-urls.outputs.api_url }}" \
             --arg web_url "${{ steps.app-urls.outputs.web_url }}" \
+            --arg turnstile_site_key "${{ secrets.EXPO_PUBLIC_TURNSTILE_SITE_KEY }}" \
             '.build[$profile].env = ((.build[$profile].env // {}) + {
               EXPO_PUBLIC_SUPABASE_URL: $supabase_url,
               EXPO_PUBLIC_SUPABASE_ANON_KEY: $anon_key,
@@ -357,6 +358,8 @@ jobs:
               EXPO_PUBLIC_API_URL: $api_url
             } else {} end) + (if ($web_url | length) > 0 then {
               EXPO_PUBLIC_WEB_URL: $web_url
+            } else {} end) + (if ($turnstile_site_key | length) > 0 then {
+              EXPO_PUBLIC_TURNSTILE_SITE_KEY: $turnstile_site_key
             } else {} end))' \
             eas.json > "$tmp_eas_json"
           mv "$tmp_eas_json" eas.json

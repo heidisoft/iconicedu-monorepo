@@ -28,6 +28,11 @@ import {
   shouldCreateUserForIntent,
   type AuthIntent,
 } from '../shared/code-entry-utils';
+import {
+  TurnstileField,
+  type TurnstileFieldHandle,
+  isTurnstileConfigured,
+} from '../shared/turnstile-field';
 
 const RESEND_COOLDOWN_SECONDS = 30;
 
@@ -64,6 +69,9 @@ export default function CodeEntryClient() {
   const [isVerifying, setIsVerifying] = React.useState(false);
   const [isResending, setIsResending] = React.useState(false);
   const [resendCooldown, setResendCooldown] = React.useState(RESEND_COOLDOWN_SECONDS);
+  const [captchaToken, setCaptchaToken] = React.useState<string | null>(null);
+  const turnstileRef = React.useRef<TurnstileFieldHandle>(null);
+  const awaitingCaptcha = isTurnstileConfigured() && !captchaToken;
 
   React.useEffect(() => {
     if (resendCooldown <= 0) {
@@ -128,7 +136,7 @@ export default function CodeEntryClient() {
   };
 
   const handleResend = async () => {
-    if (!email || resendCooldown > 0) {
+    if (!email || resendCooldown > 0 || awaitingCaptcha) {
       return;
     }
 
@@ -140,8 +148,12 @@ export default function CodeEntryClient() {
       email,
       options: {
         shouldCreateUser: shouldCreateUserForIntent(intent),
+        captchaToken: captchaToken ?? undefined,
       },
     });
+
+    // Turnstile tokens are single-use — refresh before the next resend.
+    turnstileRef.current?.reset();
 
     if (error) {
       setErrorMessage(error.message);
@@ -223,12 +235,17 @@ export default function CodeEntryClient() {
                 {errorMessage ?? statusMessage}
               </div>
             ) : null}
+            <TurnstileField
+              ref={turnstileRef}
+              onTokenChange={setCaptchaToken}
+              className="flex justify-center"
+            />
             <FieldDescription className="text-center">
               Didn&apos;t receive the code?{' '}
               <button
                 type="button"
                 onClick={handleResend}
-                disabled={resendCooldown > 0 || isResending}
+                disabled={resendCooldown > 0 || isResending || awaitingCaptcha}
                 className="font-medium text-foreground underline decoration-current underline-offset-4 disabled:pointer-events-none disabled:opacity-60"
               >
                 {isResending

@@ -15,6 +15,12 @@ import { Input } from '@iconicedu/ui-web/ui/input';
 import { SiteLogoFull } from '@iconicedu/ui-web/components/branding/site-logo-full';
 import { Loader2 } from 'lucide-react';
 
+import {
+  TurnstileField,
+  type TurnstileFieldHandle,
+  isTurnstileConfigured,
+} from './turnstile-field';
+
 type OAuthProvider = 'apple' | 'google';
 type OAuthActionVerb = 'login' | 'sign-up';
 
@@ -25,7 +31,7 @@ type AuthEntryFormProps = React.ComponentProps<'div'> & {
   subtitle: string;
   introText: string;
   trustLine: string;
-  onEmailLogin?: (email: string) => Promise<void> | void;
+  onEmailLogin?: (email: string, captchaToken: string | null) => Promise<void> | void;
   onEmailChange?: (email: string) => void;
   onOAuthLogin?: (provider: OAuthProvider) => Promise<void> | void;
   statusMessage?: string | null;
@@ -117,12 +123,16 @@ export function AuthEntryForm({
   const [isEmailSubmitting, setIsEmailSubmitting] = React.useState(false);
   const [oauthSubmittingProvider, setOauthSubmittingProvider] =
     React.useState<OAuthProvider | null>(null);
+  const [captchaToken, setCaptchaToken] = React.useState<string | null>(null);
+  const turnstileRef = React.useRef<TurnstileFieldHandle>(null);
+  const turnstileRequired = isTurnstileConfigured();
 
   const trimmedEmail = email.trim();
   const isValidEmail = EMAIL_RE.test(trimmedEmail);
   const showEmailError = emailDirty && trimmedEmail.length > 0 && !isValidEmail;
   const isSubmitting = isEmailSubmitting || oauthSubmittingProvider !== null;
-  const isEmailSubmitDisabled = isSubmitting || !isValidEmail;
+  const awaitingCaptcha = turnstileRequired && !captchaToken;
+  const isEmailSubmitDisabled = isSubmitting || !isValidEmail || awaitingCaptcha;
   const showOAuthOptions = enableGoogleSignIn || enableAppleSignIn;
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -131,14 +141,16 @@ export function AuthEntryForm({
       return;
     }
     setEmailDirty(true);
-    if (!isValidEmail) {
+    if (!isValidEmail || awaitingCaptcha) {
       return;
     }
     setIsEmailSubmitting(true);
     try {
-      await onEmailLogin(trimmedEmail);
+      await onEmailLogin(trimmedEmail, captchaToken);
     } finally {
       setIsEmailSubmitting(false);
+      // Turnstile tokens are single-use — refresh for any retry / resend.
+      turnstileRef.current?.reset();
     }
   };
 
@@ -226,6 +238,11 @@ export function AuthEntryForm({
             ) : null}
           </Field>
           <Field>
+            <TurnstileField
+              ref={turnstileRef}
+              onTokenChange={setCaptchaToken}
+              className="flex justify-center"
+            />
             <Button
               type="submit"
               variant="secondary"
@@ -241,6 +258,11 @@ export function AuthEntryForm({
                 submitLabel
               )}
             </Button>
+            {awaitingCaptcha && !isSubmitting ? (
+              <FieldDescription className="text-center">
+                Verifying your browser…
+              </FieldDescription>
+            ) : null}
           </Field>
           {showOAuthOptions ? (
             <>
