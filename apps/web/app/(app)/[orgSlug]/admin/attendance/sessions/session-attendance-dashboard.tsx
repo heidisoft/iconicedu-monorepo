@@ -240,9 +240,9 @@ export function SessionAttendanceDashboard({
     () => filterCompletions(rows, { ...filters, month: selectedMonth }),
     [filters, rows, selectedMonth],
   );
-  // The metrics/trend/breakdown/recent blocks report on *completed* lessons only
-  // and stay scoped to the month filter — the participant/classroom/method/search
-  // filters below only narrow the sessions table, not these summary blocks.
+  // The trend/recent blocks report on *completed* lessons only and stay scoped
+  // to the month filter — the participant/classroom/method/search filters below
+  // only narrow the sessions table, not these summary blocks.
   const completedRows = React.useMemo(
     () =>
       rows.filter(
@@ -251,7 +251,9 @@ export function SessionAttendanceDashboard({
       ),
     [rows],
   );
-  const summary = summarizeCompletions(completedRows);
+  // The top metric tiles count every session in the month, not just completed
+  // ones, so pending/disputed sessions are reflected here too.
+  const summary = summarizeCompletions(rows);
   const classrooms = new Map(
     rows.flatMap((row) =>
       row.learningSpaceId
@@ -289,9 +291,9 @@ export function SessionAttendanceDashboard({
       </span>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Metric
-          label="Completed lessons"
+          label="Sessions"
           value={summary.completedSessions}
-          detail="Unique schedule occurrences"
+          detail="Unique schedule occurrences this month"
         />
         <Metric
           label="Teacher confirmed"
