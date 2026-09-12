@@ -570,6 +570,74 @@ describe('ReminderReconcileService', () => {
     ]);
   });
 
+  it("still generates a completion check for a recurring schedule's own base occurrence when it is far outside the reconcile lookback window", async () => {
+    // The bug this guards against: converting an existing one-off session into
+    // a recurring class copies its original start_at verbatim onto the new
+    // schedule. That base occurrence is very often already older than the
+    // reconcile window (`now - 3 days`) by the time the edit is saved — here,
+    // 10 days old — so it must still be retained rather than silently dropped.
+    const scheduleChain = makeMaybeSingleChain({
+      data: {
+        ...buildScheduleRow(),
+        start_at: '2030-03-06T10:00:00.000Z',
+        end_at: '2030-03-06T11:00:00.000Z',
+        recurrence: {
+          id: 'recurrence-1',
+          org_id: 'org-1',
+          frequency: 'weekly',
+          interval: 1,
+          count: 1,
+          until: null,
+          timezone: 'UTC',
+          byday: [],
+          exceptions: [],
+          overrides: [],
+        },
+      },
+      error: null,
+    });
+    const emptyJobs = makeReturnsChain({ data: [], error: null });
+    const missingJob = makeMaybeSingleChain({ data: null, error: null });
+    const insert = jest.fn(async () => ({ error: null }));
+    const select = jest
+      .fn()
+      .mockReturnValueOnce(emptyJobs)
+      .mockReturnValueOnce(emptyJobs)
+      .mockReturnValue(missingJob);
+    createSupabaseServiceClientMock.mockReturnValue({
+      from: (table: string) => {
+        if (table === 'class_schedules') return { select: () => scheduleChain };
+        if (table === 'learning_spaces')
+          return {
+            select: () =>
+              makeMaybeSingleChain({ data: { status: 'active' }, error: null }),
+          };
+        return { select, insert };
+      },
+    } as never);
+
+    // "now" is 10 days after the schedule's own start_at — well outside the
+    // reconcile service's `now - 3 days` lookback.
+    await new ReminderReconcileService().reconcileNextReminderJobForSchedule({
+      orgId: 'org-1',
+      scheduleId: 'schedule-1',
+      now: new Date('2030-03-16T12:00:00.000Z'),
+    });
+
+    const checks = insert.mock.calls
+      .map(
+        ([row]) =>
+          row as { job_type: string; occurrence_start_at: string; run_at: string },
+      )
+      .filter((row) => row.job_type === 'session.completion_check');
+
+    expect(checks).toHaveLength(1);
+    expect(checks[0]?.occurrence_start_at).toBe('2030-03-06T10:00:00.000Z');
+    // Overdue by 10 days, so it's clamped to fire immediately rather than at
+    // its natural (long-past) run_at.
+    expect(checks[0]?.run_at).toBe('2030-03-16T12:00:00.000Z');
+  });
+
   it('repairs stale schedule reconciliation via a bounded database pass', async () => {
     const rpc = jest.fn(async () => ({ data: 3, error: null }));
     const supabase = { rpc } as never;
