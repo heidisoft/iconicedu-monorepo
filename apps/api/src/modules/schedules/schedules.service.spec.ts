@@ -699,12 +699,14 @@ describe('SchedulesService authorization', () => {
       ],
       schedules: [
         {
+          id: null,
           startAt: '2030-03-06T10:00:00.000Z',
           endAt: '2030-03-06T11:00:00.000Z',
           timezone: 'America/New_York',
           recurrence: null,
         },
       ],
+      removedScheduleIds: [],
     });
 
     expect(publishActivityEventMock).toHaveBeenCalledWith(
@@ -754,7 +756,9 @@ describe('SchedulesService authorization', () => {
         },
       ],
       cascadeSchedules: [{ id: 'schedule-old' }],
-      cascadeRecurrences: [{ id: 'recurrence-old' }],
+      cascadeRecurrences: [
+        { id: 'recurrence-old', schedule_id: 'schedule-old', until: null },
+      ],
     });
     createSupabaseServiceClientMock
       .mockReturnValueOnce(
@@ -778,6 +782,7 @@ describe('SchedulesService authorization', () => {
       participants: [],
       schedules: [
         {
+          id: 'schedule-old',
           startAt: '2030-03-06T10:00:00.000Z',
           endAt: '2030-03-06T11:00:00.000Z',
           timezone: 'America/New_York',
@@ -803,6 +808,7 @@ describe('SchedulesService authorization', () => {
           },
         },
       ],
+      removedScheduleIds: [],
     });
 
     expect(publishActivityEventMock).toHaveBeenCalledTimes(1);
@@ -920,6 +926,277 @@ describe('SchedulesService authorization', () => {
       },
     ]);
   });
+
+  it('updates a matched schedule in place instead of deleting and recreating it', async () => {
+    createSupabaseSessionClientMock.mockReturnValue({
+      auth: {
+        getUser: jest.fn(async () => ({
+          data: { user: { id: 'auth-user-1' } },
+          error: null,
+        })),
+      },
+    } as never);
+
+    const operations: Array<{ table: string; action: string; payload?: unknown }> = [];
+    const mainClient = makeReplaceSchedulesClient({
+      previousSchedules: [{ id: 'schedule-old' }],
+      cascadeSchedules: [],
+      operations,
+    });
+    createSupabaseServiceClientMock
+      .mockReturnValueOnce(
+        makeSingleResult({
+          id: 'account-1',
+          active_profile_id: 'profile-staff',
+        }) as never,
+      )
+      .mockReturnValueOnce(makeSingleResult([{ role_key: 'staff' }]) as never)
+      .mockReturnValueOnce(mainClient as never);
+
+    const service = new SchedulesService();
+    const result = await service.replaceSchedulesForLearningSpace('token-1', {
+      orgId: 'org-1',
+      learningSpaceId: 'space-1',
+      channelId: 'channel-1',
+      createdBy: 'profile-staff',
+      title: 'Algebra I',
+      description: null,
+      themeKey: null,
+      participants: [],
+      schedules: [
+        {
+          id: 'schedule-old',
+          startAt: '2030-03-06T10:00:00.000Z',
+          endAt: '2030-03-06T12:00:00.000Z',
+          timezone: 'America/New_York',
+          recurrence: null,
+        },
+      ],
+      removedScheduleIds: [],
+    });
+
+    expect(result.scheduleIds).toEqual(['schedule-old']);
+    expect(
+      operations.some((op) => op.table === 'class_schedules' && op.action === 'delete'),
+    ).toBe(false);
+    expect(operations).toContainEqual(
+      expect.objectContaining({
+        table: 'class_schedules',
+        action: 'update',
+        payload: expect.objectContaining({
+          start_at: '2030-03-06T10:00:00.000Z',
+          end_at: '2030-03-06T12:00:00.000Z',
+        }),
+      }),
+    );
+  });
+
+  it('converts a one-off schedule to recurring in place, preserving the schedule id', async () => {
+    createSupabaseSessionClientMock.mockReturnValue({
+      auth: {
+        getUser: jest.fn(async () => ({
+          data: { user: { id: 'auth-user-1' } },
+          error: null,
+        })),
+      },
+    } as never);
+
+    const operations: Array<{ table: string; action: string; payload?: unknown }> = [];
+    const mainClient = makeReplaceSchedulesClient({
+      previousSchedules: [{ id: 'schedule-oneoff' }],
+      cascadeSchedules: [],
+      cascadeRecurrences: [],
+      operations,
+    });
+    createSupabaseServiceClientMock
+      .mockReturnValueOnce(
+        makeSingleResult({
+          id: 'account-1',
+          active_profile_id: 'profile-staff',
+        }) as never,
+      )
+      .mockReturnValueOnce(makeSingleResult([{ role_key: 'staff' }]) as never)
+      .mockReturnValueOnce(mainClient as never);
+
+    const service = new SchedulesService();
+    const result = await service.replaceSchedulesForLearningSpace('token-1', {
+      orgId: 'org-1',
+      learningSpaceId: 'space-1',
+      channelId: 'channel-1',
+      createdBy: 'profile-staff',
+      title: 'Math with Ms.Shenaly',
+      description: null,
+      themeKey: null,
+      participants: [],
+      schedules: [
+        {
+          id: 'schedule-oneoff',
+          startAt: '2030-03-06T10:00:00.000Z',
+          endAt: '2030-03-06T11:00:00.000Z',
+          timezone: 'America/New_York',
+          recurrence: {
+            frequency: 'weekly',
+            interval: 1,
+            count: null,
+            until: null,
+            timezone: 'America/New_York',
+            rawRrule: null,
+            bysecond: null,
+            byminute: null,
+            byhour: null,
+            byday: ['WE'],
+            bymonthday: null,
+            byyearday: null,
+            byweekno: null,
+            bymonth: null,
+            bysetpos: null,
+            wkst: null,
+            exceptions: [],
+            overrides: [],
+          },
+        },
+      ],
+      removedScheduleIds: [],
+    });
+
+    // The core regression: the recurring series attaches to the SAME schedule
+    // id instead of minting a new one and orphaning the old one as "cancelled".
+    expect(result.scheduleIds).toEqual(['schedule-oneoff']);
+    expect(
+      operations.some((op) => op.table === 'class_schedules' && op.action === 'delete'),
+    ).toBe(false);
+    expect(operations).toContainEqual(
+      expect.objectContaining({
+        table: 'class_schedule_recurrence',
+        action: 'insert',
+        payload: expect.objectContaining({ schedule_id: 'schedule-oneoff' }),
+      }),
+    );
+  });
+
+  it('removes only schedules no longer referenced, leaving matched ones untouched', async () => {
+    createSupabaseSessionClientMock.mockReturnValue({
+      auth: {
+        getUser: jest.fn(async () => ({
+          data: { user: { id: 'auth-user-1' } },
+          error: null,
+        })),
+      },
+    } as never);
+
+    const operations: Array<{ table: string; action: string; payload?: unknown }> = [];
+    const inCalls: Array<{ table: string; column: string; values: unknown[] }> = [];
+    const mainClient = makeReplaceSchedulesClient({
+      previousSchedules: [{ id: 'schedule-keep' }, { id: 'schedule-drop' }],
+      cascadeSchedules: [],
+      sessionCompletionRows: [],
+      operations,
+      inCalls,
+    });
+    createSupabaseServiceClientMock
+      .mockReturnValueOnce(
+        makeSingleResult({
+          id: 'account-1',
+          active_profile_id: 'profile-staff',
+        }) as never,
+      )
+      .mockReturnValueOnce(makeSingleResult([{ role_key: 'staff' }]) as never)
+      .mockReturnValueOnce(mainClient as never);
+
+    const service = new SchedulesService();
+    await service.replaceSchedulesForLearningSpace('token-1', {
+      orgId: 'org-1',
+      learningSpaceId: 'space-1',
+      channelId: 'channel-1',
+      createdBy: 'profile-staff',
+      title: 'Algebra I',
+      description: null,
+      themeKey: null,
+      participants: [],
+      schedules: [
+        {
+          id: 'schedule-keep',
+          startAt: '2030-03-06T10:00:00.000Z',
+          endAt: '2030-03-06T11:00:00.000Z',
+          timezone: 'America/New_York',
+          recurrence: null,
+        },
+      ],
+      removedScheduleIds: [],
+    });
+
+    const hardDeleteCall = inCalls.find(
+      (call) => call.table === 'class_schedules' && call.column === 'id',
+    );
+    expect(hardDeleteCall?.values).toEqual(['schedule-drop']);
+
+    const reminderCancelCall = inCalls.find(
+      (call) => call.table === 'reminder_jobs' && call.column === 'source_schedule_id',
+    );
+    expect(reminderCancelCall?.values).toEqual(['schedule-drop']);
+
+    // schedule-keep gets a legitimate in-place update, but never a soft-delete.
+    expect(
+      operations.some(
+        (op) =>
+          op.table === 'class_schedules' &&
+          op.action === 'update' &&
+          (op.payload as { status?: string })?.status === 'cancelled',
+      ),
+    ).toBe(false);
+  });
+
+  it('reconciles reminders for the whole learning space once after all writes commit', async () => {
+    createSupabaseSessionClientMock.mockReturnValue({
+      auth: {
+        getUser: jest.fn(async () => ({
+          data: { user: { id: 'auth-user-1' } },
+          error: null,
+        })),
+      },
+    } as never);
+
+    const mainClient = makeReplaceSchedulesClient({
+      previousSchedules: [],
+      cascadeSchedules: [],
+    });
+    createSupabaseServiceClientMock
+      .mockReturnValueOnce(
+        makeSingleResult({
+          id: 'account-1',
+          active_profile_id: 'profile-staff',
+        }) as never,
+      )
+      .mockReturnValueOnce(makeSingleResult([{ role_key: 'staff' }]) as never)
+      .mockReturnValueOnce(mainClient as never);
+
+    const reconcileAllSchedulesForLearningSpace = jest.fn(async () => ({
+      reconciledCount: 0,
+      canceledCount: 0,
+    }));
+    const service = new SchedulesService({
+      reconcileAllSchedulesForLearningSpace,
+    } as never);
+
+    await service.replaceSchedulesForLearningSpace('token-1', {
+      orgId: 'org-1',
+      learningSpaceId: 'space-1',
+      channelId: 'channel-1',
+      createdBy: 'profile-staff',
+      title: 'Algebra I',
+      description: null,
+      themeKey: null,
+      participants: [],
+      schedules: [],
+      removedScheduleIds: [],
+    });
+
+    expect(reconcileAllSchedulesForLearningSpace).toHaveBeenCalledTimes(1);
+    expect(reconcileAllSchedulesForLearningSpace).toHaveBeenCalledWith(
+      'org-1',
+      'space-1',
+    );
+  });
 });
 
 function makeReplaceSchedulesClient(input: {
@@ -928,6 +1205,7 @@ function makeReplaceSchedulesClient(input: {
   cascadeRecurrences?: unknown[];
   sessionCompletionRows?: unknown[];
   operations?: Array<{ table: string; action: string; payload?: unknown }>;
+  inCalls?: Array<{ table: string; column: string; values: unknown[] }>;
 }) {
   let classSchedulesSelectCount = 0;
   return {
@@ -939,13 +1217,19 @@ function makeReplaceSchedulesClient(input: {
         }),
         eq: jest.fn(() => query),
         is: jest.fn(() => query),
-        in: jest.fn(() => query),
+        in: jest.fn((column: string, values: unknown[]) => {
+          input.inCalls?.push({ table, column, values });
+          return query;
+        }),
         not: jest.fn(() => query),
         delete: jest.fn(() => {
           input.operations?.push({ table, action: 'delete' });
           return query;
         }),
-        insert: jest.fn(() => Promise.resolve({ data: null, error: null })),
+        insert: jest.fn((payload: unknown) => {
+          input.operations?.push({ table, action: 'insert', payload });
+          return Promise.resolve({ data: null, error: null });
+        }),
         update: jest.fn((payload: unknown) => {
           input.operations?.push({ table, action: 'update', payload });
           return query;

@@ -9,7 +9,7 @@ import { createApiClient } from '@iconicedu/web/lib/api/http-client';
 import {
   type CanonicalLearningSpaceSchedule,
   buildCanonicalLearningSpaceSchedulesFromExisting,
-  buildCanonicalLearningSpaceSchedulesFromPayload,
+  buildCanonicalLearningSpaceScheduleFromPayload,
   buildLearningSpaceScheduleHashBundleFromCanonical,
   buildLearningSpaceSchedulesHashKeyFromExisting,
   buildLearningSpaceSchedulesHashKeyFromPayload,
@@ -80,6 +80,9 @@ type ExistingScheduleCompareInput = {
 };
 
 type NormalizedIncomingSchedule = {
+  /** Position in the original incoming `nextSchedules` array — lets callers align
+   * pairing results back onto the raw payload without relying on object identity. */
+  index: number;
   startAt: string;
   endAt: string;
   timezone: string | null;
@@ -106,6 +109,25 @@ export type LearningSpaceScheduleDiffPlan = {
     previous: NormalizedExistingSchedule;
     next: NormalizedIncomingSchedule;
   }>;
+  /**
+   * Index-aligned with the incoming `nextSchedules` array (matched or unchanged
+   * pairs included, not just `rescheduled`): the matched previous schedule's real
+   * `class_schedules.id`, or null when a schedule has no previous match at all.
+   * Lets the API update matched schedules in place instead of deleting and
+   * recreating every row on every edit.
+   */
+  previousIdByNextIndex: Array<string | null>;
+  /** `class_schedules.id`s with no match in the incoming list — the only schedules
+   * that should actually be removed, instead of implicitly deleting everything. */
+  removedScheduleIds: string[];
+  /**
+   * True when a matched pair's recurrence presence (had a recurrence row before vs.
+   * has one now) differs, even if the hash comparison finds them identical. Catches
+   * the case where a one-off session's synthesized default recurrence happens to be
+   * byte-identical to an explicit weekly recurrence on the same weekday/time, which
+   * would otherwise make the edit look like a no-op and never persist.
+   */
+  recurrencePresenceChanged: boolean;
 };
 
 type SchedulePairingReason =
@@ -141,6 +163,17 @@ function buildStructuralSignature(
     durationMinutes: durationMinutesBetween(schedule.startAt, schedule.endAt),
   });
 }
+
+// Pass 2 of pairSchedulesForCompare has no structural constraint at all — with
+// this bound removed, exactly one leftover "removed" schedule and one leftover
+// "added" schedule in the same edit get force-paired no matter how unrelated
+// they are (e.g. a genuinely new Tuesday class paired with an unrelated
+// Saturday class being deleted, just because they're each other's only
+// candidate). That pairing now drives an in-place DB update, so a bad match
+// would wrongly carry the deleted schedule's id — and its completion history —
+// onto the new one. Generous enough to still catch legitimate edits (a
+// rescheduled weekday can land up to a week away), but bounded.
+const MAX_FALLBACK_PAIRING_DISTANCE_MS = 14 * 24 * 60 * 60 * 1000;
 
 function toTimeOrZero(value: string) {
   const parsed = new Date(value).getTime();
@@ -256,13 +289,22 @@ function buildExistingScheduleCompareInputs(input: {
 function normalizeIncomingSchedulesForCompare(
   schedules: LearningSpaceSchedulePayload[] | null | undefined,
 ): NormalizedIncomingSchedule[] {
-  return buildCanonicalLearningSpaceSchedulesFromPayload(schedules).map((canonical) => ({
-    ...buildLearningSpaceScheduleHashBundleFromCanonical(canonical),
-    startAt: canonical.startAt,
-    endAt: canonical.endAt,
-    timezone: canonical.timezone,
-    canonical,
-  }));
+  // Deliberately NOT using the plural buildCanonicalLearningSpaceSchedulesFromPayload
+  // helper here — it sorts its output, which would silently detach `index` from
+  // the schedule's actual position in the original array (the position that
+  // buildScheduleRowsForApi's output, which previousIdByNextIndex must align
+  // with, preserves).
+  return (schedules ?? []).map((schedule, index) => {
+    const canonical = buildCanonicalLearningSpaceScheduleFromPayload(schedule);
+    return {
+      ...buildLearningSpaceScheduleHashBundleFromCanonical(canonical),
+      index,
+      startAt: canonical.startAt,
+      endAt: canonical.endAt,
+      timezone: canonical.timezone,
+      canonical,
+    };
+  });
 }
 
 function pairSchedulesForCompare(
@@ -330,6 +372,16 @@ function pairSchedulesForCompare(
     }
 
     const best = selectNearest(selectedCandidates, nextItem);
+    const distanceMs = Math.abs(
+      toTimeOrZero(best.item.startAt) - toTimeOrZero(nextItem.startAt),
+    );
+    if (distanceMs > MAX_FALLBACK_PAIRING_DISTANCE_MS) {
+      // Too far apart to plausibly be the same schedule — leave both unpaired
+      // (a genuine removal and a genuine addition) rather than force a match.
+      nextIndex += 1;
+      continue;
+    }
+
     const matched = remainingPrevious.splice(best.index, 1)[0];
     if (matched) {
       pairs.push({
@@ -408,22 +460,37 @@ export function buildLearningSpaceScheduleDiffPlan(input: {
     added: [],
     removed: [],
     rescheduled: [],
+    previousIdByNextIndex: new Array(next.length).fill(null),
+    removedScheduleIds: [],
+    recurrencePresenceChanged: false,
   };
 
   const pairing = pairSchedulesForCompare(previous, next);
+  const recurrencesByScheduleId = input.recurrencesByScheduleId ?? new Map();
 
   for (const pair of pairing.pairs) {
     const previousSchedule = pair.previous;
     const nextSchedule = pair.next;
+    plan.previousIdByNextIndex[nextSchedule.index] = previousSchedule.id;
+
     if (!schedulesMatch(previousSchedule, nextSchedule)) {
       plan.rescheduled.push({
         previous: previousSchedule,
         next: nextSchedule,
       });
     }
+
+    const previousHasRecurrence = recurrencesByScheduleId.has(previousSchedule.id);
+    const nextHasRecurrence = Boolean(input.nextSchedules?.[nextSchedule.index]?.rule);
+    if (previousHasRecurrence !== nextHasRecurrence) {
+      plan.recurrencePresenceChanged = true;
+    }
   }
 
   plan.removed.push(...pairing.unpairedPrevious);
+  plan.removedScheduleIds.push(
+    ...pairing.unpairedPrevious.map((schedule) => schedule.id),
+  );
   plan.added.push(...pairing.unpairedNext);
 
   return plan;
@@ -660,11 +727,17 @@ export async function updateLearningSpaceFromPayload(
     previousScheduleCount: previousScheduleCompareInputs.length,
     nextScheduleCount: (payload.schedules ?? []).length,
   });
-  const hasSemanticScheduleChanges = hasScheduleHashChanges;
+  // OR in `recurrencePresenceChanged`: a one-off session's synthesized default
+  // recurrence can be byte-identical to an explicit weekly recurrence on the same
+  // weekday/time, making the hash comparison alone miss that recurrence was just
+  // turned on/off — that must still count as a real change.
+  const hasSemanticScheduleChanges =
+    hasScheduleHashChanges || scheduleDiffPlan.recurrencePresenceChanged;
   debugScheduleDiff('change-decision', {
     hasScheduleChanges: hasSemanticScheduleChanges,
     hasSemanticScheduleChanges,
     hasScheduleHashChanges,
+    recurrencePresenceChanged: scheduleDiffPlan.recurrencePresenceChanged,
     addedCount: scheduleDiffPlan.added.length,
     removedCount: scheduleDiffPlan.removed.length,
     rescheduledCount: scheduleDiffPlan.rescheduled.length,
@@ -733,6 +806,8 @@ export async function updateLearningSpaceFromPayload(
       themeKey: payload.settings?.themeKey ?? null,
       participants: payload.participants,
       schedules: payload.schedules ?? [],
+      previousIdByNextIndex: scheduleDiffPlan.previousIdByNextIndex,
+      removedScheduleIds: scheduleDiffPlan.removedScheduleIds,
     });
   }
 
@@ -952,6 +1027,13 @@ type ReplaceSchedulesPayload = {
   themeKey?: string | null;
   participants: LearningSpaceParticipantPayload[];
   schedules: LearningSpaceCreatePayload['schedules'];
+  /** Index-aligned with `schedules`: the real `class_schedules.id` to update in
+   * place, or null/absent for a genuinely new schedule. Omitted entirely for a
+   * fresh learning-space creation, where every schedule is new. */
+  previousIdByNextIndex?: Array<string | null>;
+  /** Existing schedule ids with no match in `schedules` — sent explicitly so
+   * removal is an instruction, not an implicit "anything not resent gets deleted." */
+  removedScheduleIds?: string[];
 };
 
 export async function replaceLearningSpaceSchedules(
@@ -959,6 +1041,12 @@ export async function replaceLearningSpaceSchedules(
   payload: ReplaceSchedulesPayload,
 ) {
   const api = createApiClient(supabase);
+  const scheduleRows = buildScheduleRowsForApi(payload.schedules ?? []).map(
+    (row, index) => ({
+      ...row,
+      id: payload.previousIdByNextIndex?.[index] ?? null,
+    }),
+  );
   await api.post('/schedules/learning-space/replace', {
     orgId: payload.orgId,
     learningSpaceId: payload.learningSpaceId,
@@ -976,6 +1064,7 @@ export async function replaceLearningSpaceSchedules(
         avatarUrl: p.avatarUrl ?? null,
         themeKey: p.themeKey ?? null,
       })),
-    schedules: buildScheduleRowsForApi(payload.schedules ?? []),
+    schedules: scheduleRows,
+    removedScheduleIds: payload.removedScheduleIds ?? [],
   });
 }

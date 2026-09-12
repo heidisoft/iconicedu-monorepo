@@ -105,4 +105,90 @@ describe('replaceLearningSpaceSchedules', () => {
       }),
     );
   });
+
+  it('attaches the matched previous schedule id and forwards removedScheduleIds', async () => {
+    const mockSupabase = {
+      auth: {
+        getSession: vi.fn(async () => ({
+          data: { session: { access_token: 'token-1' } },
+        })),
+      },
+    };
+
+    await replaceLearningSpaceSchedules(mockSupabase as never, {
+      orgId: 'org-1',
+      learningSpaceId: 'space-1',
+      channelId: 'channel-1',
+      createdBy: 'profile-1',
+      createdAt: '2026-03-01T00:00:00.000Z',
+      title: 'Algebra',
+      description: 'Updated schedule',
+      themeKey: 'teal',
+      participants: [],
+      schedules: [
+        {
+          startDate: '2026-03-10T14:00:00.000Z',
+          timezone: 'UTC',
+          rule: {
+            frequency: 'weekly',
+            byWeekday: ['TU'],
+            weekdayTimes: [{ day: 'TU', time: '14:00' }],
+          },
+          exceptions: [],
+          overrides: [],
+        },
+        {
+          startDate: '2026-03-12T09:00:00.000Z',
+          timezone: 'UTC',
+          rule: null,
+          exceptions: [],
+          overrides: [],
+        },
+      ],
+      previousIdByNextIndex: ['schedule-existing', null],
+      removedScheduleIds: ['schedule-gone'],
+    });
+
+    const [, body] = apiPostMock.mock.calls[0] as [string, { schedules: unknown[] }];
+    expect(body.schedules).toEqual([
+      expect.objectContaining({ id: 'schedule-existing' }),
+      expect.objectContaining({ id: null }),
+    ]);
+    expect(body).toMatchObject({ removedScheduleIds: ['schedule-gone'] });
+  });
+
+  it('omits schedule ids and sends no removals for a fresh learning space with no previous schedules', async () => {
+    const mockSupabase = {
+      auth: {
+        getSession: vi.fn(async () => ({
+          data: { session: { access_token: 'token-1' } },
+        })),
+      },
+    };
+
+    await replaceLearningSpaceSchedules(mockSupabase as never, {
+      orgId: 'org-1',
+      learningSpaceId: 'space-1',
+      channelId: 'channel-1',
+      createdBy: 'profile-1',
+      createdAt: '2026-03-01T00:00:00.000Z',
+      title: 'Algebra',
+      description: null,
+      themeKey: null,
+      participants: [],
+      schedules: [
+        {
+          startDate: '2026-03-10T14:00:00.000Z',
+          timezone: 'UTC',
+          rule: null,
+          exceptions: [],
+          overrides: [],
+        },
+      ],
+    });
+
+    const [, body] = apiPostMock.mock.calls[0] as [string, { schedules: unknown[] }];
+    expect(body.schedules).toEqual([expect.objectContaining({ id: null })]);
+    expect(body).toMatchObject({ removedScheduleIds: [] });
+  });
 });

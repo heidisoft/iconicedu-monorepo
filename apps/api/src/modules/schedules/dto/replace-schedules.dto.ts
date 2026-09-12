@@ -1,5 +1,12 @@
 import { BadRequestException } from '@nestjs/common';
 
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isUuid(value: string) {
+  return UUID_PATTERN.test(value);
+}
+
 export type RecurrenceExceptionInput = {
   occurrenceKey: string;
   reason: string | null;
@@ -36,6 +43,8 @@ export type RecurrenceRowInput = {
 };
 
 export type ScheduleRowInput = {
+  /** Existing `class_schedules.id` to update in place, or null for a new schedule. */
+  id: string | null;
   startAt: string;
   endAt: string;
   timezone: string;
@@ -60,6 +69,9 @@ export type ReplaceSchedulesDto = {
   themeKey: string | null;
   participants: ParticipantRowInput[];
   schedules: ScheduleRowInput[];
+  /** Existing schedule ids with no match in `schedules` — explicit removal
+   * instructions, unioned in the service with any id simply left off the list. */
+  removedScheduleIds: string[];
 };
 
 function asRequiredString(body: Record<string, unknown>, key: string): string {
@@ -207,12 +219,26 @@ function parseRecurrence(item: unknown): RecurrenceRowInput | null {
   };
 }
 
+function parseScheduleId(
+  body: Record<string, unknown>,
+  key: string,
+  context: string,
+): string | null {
+  const value = body[key];
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'string' || !isUuid(value)) {
+    throw new BadRequestException(`${context}.${key} must be a valid UUID`);
+  }
+  return value;
+}
+
 function parseScheduleRow(item: unknown, index: number): ScheduleRowInput {
   if (!item || typeof item !== 'object' || Array.isArray(item)) {
     throw new BadRequestException(`schedules[${index}] is invalid`);
   }
   const s = item as Record<string, unknown>;
   return {
+    id: parseScheduleId(s, 'id', `schedules[${index}]`),
     startAt: asRequiredString(s, 'startAt'),
     endAt: asRequiredString(s, 'endAt'),
     timezone: asRequiredString(s, 'timezone'),
@@ -220,11 +246,36 @@ function parseScheduleRow(item: unknown, index: number): ScheduleRowInput {
   };
 }
 
+function parseRemovedScheduleIds(body: Record<string, unknown>): string[] {
+  const value = body['removedScheduleIds'];
+  if (value === null || value === undefined) return [];
+  if (!Array.isArray(value)) {
+    throw new BadRequestException('removedScheduleIds must be an array');
+  }
+  return value.map((entry, index) => {
+    if (typeof entry !== 'string' || !isUuid(entry)) {
+      throw new BadRequestException(`removedScheduleIds[${index}] must be a valid UUID`);
+    }
+    return entry;
+  });
+}
+
 export function parseReplaceSchedulesDto(input: unknown): ReplaceSchedulesDto {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw new BadRequestException('Invalid request body');
   }
   const body = input as Record<string, unknown>;
+  const schedules = asRequiredArray(body, 'schedules', parseScheduleRow);
+
+  const seenIds = new Set<string>();
+  for (const schedule of schedules) {
+    if (!schedule.id) continue;
+    if (seenIds.has(schedule.id)) {
+      throw new BadRequestException(`Duplicate schedule id: ${schedule.id}`);
+    }
+    seenIds.add(schedule.id);
+  }
+
   return {
     orgId: asRequiredString(body, 'orgId'),
     learningSpaceId: asRequiredString(body, 'learningSpaceId'),
@@ -234,6 +285,7 @@ export function parseReplaceSchedulesDto(input: unknown): ReplaceSchedulesDto {
     description: asOptionalString(body, 'description'),
     themeKey: asOptionalString(body, 'themeKey'),
     participants: asRequiredArray(body, 'participants', parseParticipant),
-    schedules: asRequiredArray(body, 'schedules', parseScheduleRow),
+    schedules,
+    removedScheduleIds: parseRemovedScheduleIds(body),
   };
 }

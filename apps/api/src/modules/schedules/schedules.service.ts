@@ -16,6 +16,7 @@ import { ReminderReconcileService } from '@iconicedu/api/modules/reminders/remin
 import type {
   CancelSessionDto,
   DeleteSchedulesDto,
+  RecurrenceRowInput,
   ReplaceSchedulesDto,
   RescheduleSessionDto,
   ScheduleRowInput,
@@ -37,21 +38,6 @@ const CLASS_SCHEDULE_SELECT = `
     overrides:class_schedule_recurrence_overrides(id, occurrence_key, patch)
   )
 `;
-
-type ExistingScheduleCompareRow = {
-  id: string;
-  start_at: string;
-  end_at: string;
-  timezone: string | null;
-  recurrence: Array<{
-    frequency: string | null;
-    interval: number | null;
-    count: number | null;
-    until: string | null;
-    timezone: string | null;
-    byday: string[] | null;
-  }> | null;
-};
 
 type InsertedScheduleActivityInput = {
   scheduleId: string;
@@ -132,27 +118,90 @@ export class SchedulesService {
     const actor = await this.requireOrgActor(accessToken, dto.orgId);
     const supabase = createSupabaseServiceClient();
     const now = new Date().toISOString();
-    const previousSchedules = await this.loadExistingSchedulesForActivityComparison(
+    const actorProfileId = actor.profileId ?? dto.createdBy;
+
+    const existing = await this.loadExistingSchedulesForSync(
       supabase,
       dto.orgId,
       dto.learningSpaceId,
     );
+    const existingIds = new Set(existing.scheduleIds);
 
-    // Delete existing schedules for the learning space
-    await this.cascadeDeleteSchedulesForLearningSpace(
-      supabase,
-      dto.orgId,
-      dto.learningSpaceId,
-      actor.profileId ?? dto.createdBy ?? null,
+    // Partition the incoming list: a schedule carrying an `id` that matches a
+    // currently-existing row is updated in place; everything else is a fresh
+    // insert. A client-supplied id is never trusted on its own — it only ever
+    // takes effect if it matches a row we just loaded for this exact org +
+    // learning space, so a stale/foreign/cross-tenant id degrades safely into
+    // "treat as insert" rather than updating the wrong row.
+    const seenExistingIds = new Set<string>();
+    const toUpdate: Array<{ existingScheduleId: string; schedule: ScheduleRowInput }> =
+      [];
+    const toInsert: ScheduleRowInput[] = [];
+    for (const schedule of dto.schedules) {
+      if (
+        schedule.id &&
+        existingIds.has(schedule.id) &&
+        !seenExistingIds.has(schedule.id)
+      ) {
+        seenExistingIds.add(schedule.id);
+        toUpdate.push({ existingScheduleId: schedule.id, schedule });
+      } else {
+        toInsert.push(schedule);
+      }
+    }
+
+    // Anything existing that wasn't matched by an incoming `id` is being removed.
+    // `dto.removedScheduleIds` is unioned in as defense-in-depth (it's normally
+    // already implied by "not referenced above") — an id `toUpdate` claimed always
+    // wins over a stale removal instruction for the same id.
+    const toRemoveIds = existing.scheduleIds
+      .filter((id) => !seenExistingIds.has(id))
+      .concat(dto.removedScheduleIds.filter((id) => existingIds.has(id)));
+    const uniqueToRemoveIds = [...new Set(toRemoveIds)].filter(
+      (id) => !seenExistingIds.has(id),
     );
 
-    if (!dto.schedules.length) {
-      return { scheduleIds: [] };
+    // Remove first: cancel-before-hard-delete ordering for the FK on reminder_jobs
+    // (see cascadeDeleteSchedules) needs the removed set settled before we touch
+    // anything else, and keeps this step self-contained/easy to reason about.
+    if (uniqueToRemoveIds.length) {
+      await this.cascadeDeleteSchedules(
+        supabase,
+        dto.orgId,
+        uniqueToRemoveIds,
+        actorProfileId,
+      );
     }
 
     const scheduleIds: string[] = [];
+    const insertedForActivity: InsertedScheduleActivityInput[] = [];
+    const updatedForActivity: Array<{
+      scheduleId: string;
+      schedule: ScheduleRowInput;
+      previousUntil: string | null;
+    }> = [];
 
-    for (const schedule of dto.schedules) {
+    for (const { existingScheduleId, schedule } of toUpdate) {
+      scheduleIds.push(existingScheduleId);
+      const previousUntil =
+        existing.recurrenceUntilByScheduleId.get(existingScheduleId) ?? null;
+      await this.updateScheduleInPlace(
+        supabase,
+        dto,
+        existingScheduleId,
+        existing.recurrenceIdByScheduleId.get(existingScheduleId) ?? null,
+        schedule,
+        actorProfileId,
+        now,
+      );
+      updatedForActivity.push({
+        scheduleId: existingScheduleId,
+        schedule,
+        previousUntil,
+      });
+    }
+
+    for (const schedule of toInsert) {
       const scheduleId = randomUUID();
       scheduleIds.push(scheduleId);
 
@@ -182,7 +231,6 @@ export class SchedulesService {
         throw new InternalServerErrorException(scheduleError.message);
       }
 
-      // Participants
       await this.insertScheduleParticipants(
         supabase,
         dto.orgId,
@@ -192,7 +240,6 @@ export class SchedulesService {
         now,
       );
 
-      // Recurrence
       if (schedule.recurrence) {
         await this.insertScheduleRecurrence(
           supabase,
@@ -203,17 +250,27 @@ export class SchedulesService {
           now,
         );
       }
+
+      insertedForActivity.push({ scheduleId, schedule });
     }
 
-    await this.publishScheduleReplacementActivities({
+    await this.publishScheduleSyncActivities({
       supabase,
       dto,
-      previousSchedules,
-      insertedSchedules: scheduleIds.map((scheduleId, index) => ({
-        scheduleId,
-        schedule: dto.schedules[index]!,
-      })),
+      inserted: insertedForActivity,
+      updated: updatedForActivity,
     });
+
+    // Reconcile reminders once, after all writes commit — reads the current
+    // schedule set from the DB, cancels orphaned jobs for removed schedules, and
+    // idempotently (re)builds jobs for every remaining one, including untouched
+    // schedules (a cheap no-op for those). Closes the gap where this bulk-edit
+    // flow previously never generated reminder/completion-check jobs synchronously
+    // at all, relying solely on an async DB-trigger reconciliation pass.
+    await this.reminderReconcileService?.reconcileAllSchedulesForLearningSpace(
+      dto.orgId,
+      dto.learningSpaceId,
+    );
 
     return { scheduleIds };
   }
@@ -772,6 +829,8 @@ export class SchedulesService {
     return new Date(occurrenceStart + (baseEnd - baseStart)).toISOString();
   }
 
+  /** Thin wrapper preserving "delete every schedule in this learning space"
+   * semantics for callers that want it (e.g. archiving/deleting a classroom). */
   private async cascadeDeleteSchedulesForLearningSpace(
     supabase: SupabaseServiceClient,
     orgId: string,
@@ -790,7 +849,20 @@ export class SchedulesService {
       throw new InternalServerErrorException(fetchError.message);
     }
 
-    const scheduleIds = (existingSchedules ?? []).map((r) => r.id);
+    await this.cascadeDeleteSchedules(
+      supabase,
+      orgId,
+      (existingSchedules ?? []).map((r) => r.id),
+      actorProfileId,
+    );
+  }
+
+  private async cascadeDeleteSchedules(
+    supabase: SupabaseServiceClient,
+    orgId: string,
+    scheduleIds: string[],
+    actorProfileId: string | null,
+  ) {
     if (!scheduleIds.length) return;
     const now = new Date().toISOString();
 
@@ -902,100 +974,88 @@ export class SchedulesService {
     }
   }
 
-  private async loadExistingSchedulesForActivityComparison(
+  /**
+   * The ground truth the in-place sync needs to partition an incoming schedule
+   * list into update/insert/remove: which schedule ids currently exist for this
+   * learning space, and — for ones that carry an active recurrence — its row id
+   * (to update in place) and current `until` (to detect a newly-added end date
+   * for activity publishing, same as the old signature-matching heuristic did).
+   */
+  private async loadExistingSchedulesForSync(
     supabase: SupabaseServiceClient,
     orgId: string,
     learningSpaceId: string,
   ) {
-    const { data, error } = await supabase
+    const { data: scheduleRows, error: scheduleError } = await supabase
       .from('class_schedules')
-      .select(
-        `
-          id, start_at, end_at, timezone,
-          recurrence:class_schedule_recurrence(
-            frequency, interval, count, until, timezone, byday
-          )
-        `,
-      )
+      .select('id')
       .eq('org_id', orgId)
       .eq('source_learning_space_id', learningSpaceId)
       .eq('source_kind', 'class_session')
       .is('deleted_at', null)
-      .returns<ExistingScheduleCompareRow[]>();
+      .returns<Array<{ id: string }>>();
 
-    if (error) {
-      throw new InternalServerErrorException(error.message);
+    if (scheduleError) {
+      throw new InternalServerErrorException(scheduleError.message);
     }
 
-    return data ?? [];
-  }
+    const scheduleIds = (scheduleRows ?? []).map((row) => row.id);
+    const recurrenceIdByScheduleId = new Map<string, string>();
+    const recurrenceUntilByScheduleId = new Map<string, string | null>();
 
-  private buildScheduleActivitySignature(
-    schedule:
-      | ScheduleRowInput
-      | Pick<
-          ExistingScheduleCompareRow,
-          'start_at' | 'end_at' | 'timezone' | 'recurrence'
-        >,
-  ) {
-    const isInput = 'startAt' in schedule;
-    const recurrence = isInput ? schedule.recurrence : (schedule.recurrence?.[0] ?? null);
-    return JSON.stringify({
-      startAt: isInput ? schedule.startAt : schedule.start_at,
-      endAt: isInput ? schedule.endAt : schedule.end_at,
-      timezone: isInput ? schedule.timezone : (schedule.timezone ?? null),
-      recurrence: recurrence
-        ? {
-            frequency: recurrence.frequency,
-            interval: recurrence.interval ?? null,
-            timezone: recurrence.timezone ?? null,
-            byday: [...(recurrence.byday ?? [])].sort(),
-          }
-        : null,
-    });
-  }
+    if (scheduleIds.length) {
+      const { data: recurrenceRows, error: recurrenceError } = await supabase
+        .from('class_schedule_recurrence')
+        .select('id, schedule_id, until')
+        .eq('org_id', orgId)
+        .in('schedule_id', scheduleIds)
+        .is('deleted_at', null)
+        .returns<Array<{ id: string; schedule_id: string; until: string | null }>>();
 
-  private getScheduleRecurrenceUntil(
-    schedule: ScheduleRowInput | ExistingScheduleCompareRow,
-  ) {
-    if ('startAt' in schedule) {
-      return schedule.recurrence?.until ?? null;
+      if (recurrenceError) {
+        throw new InternalServerErrorException(recurrenceError.message);
+      }
+
+      for (const row of recurrenceRows ?? []) {
+        recurrenceIdByScheduleId.set(row.schedule_id, row.id);
+        recurrenceUntilByScheduleId.set(row.schedule_id, row.until ?? null);
+      }
     }
-    return schedule.recurrence?.[0]?.until ?? null;
+
+    return { scheduleIds, recurrenceIdByScheduleId, recurrenceUntilByScheduleId };
   }
 
-  private async publishScheduleReplacementActivities(input: {
+  private async publishScheduleSyncActivities(input: {
     supabase: SupabaseServiceClient;
     dto: ReplaceSchedulesDto;
-    previousSchedules: ExistingScheduleCompareRow[];
-    insertedSchedules: InsertedScheduleActivityInput[];
+    inserted: InsertedScheduleActivityInput[];
+    updated: Array<{
+      scheduleId: string;
+      schedule: ScheduleRowInput;
+      previousUntil: string | null;
+    }>;
   }) {
-    const previousBySignature = new Map<string, ExistingScheduleCompareRow[]>();
-    for (const previous of input.previousSchedules) {
-      const signature = this.buildScheduleActivitySignature(previous);
-      previousBySignature.set(signature, [
-        ...(previousBySignature.get(signature) ?? []),
-        previous,
-      ]);
+    for (const insertedSchedule of input.inserted) {
+      await this.publishScheduleActivity(
+        input.supabase,
+        input.dto,
+        insertedSchedule,
+        'created',
+      );
     }
 
-    for (const inserted of input.insertedSchedules) {
-      const signature = this.buildScheduleActivitySignature(inserted.schedule);
-      const matchedPrevious = previousBySignature.get(signature)?.shift() ?? null;
-      if (!matchedPrevious) {
+    for (const updatedSchedule of input.updated) {
+      const nextUntil = updatedSchedule.schedule.recurrence?.until ?? null;
+      if (
+        nextUntil &&
+        (!updatedSchedule.previousUntil || nextUntil !== updatedSchedule.previousUntil)
+      ) {
         await this.publishScheduleActivity(
           input.supabase,
           input.dto,
-          inserted,
-          'created',
+          { scheduleId: updatedSchedule.scheduleId, schedule: updatedSchedule.schedule },
+          'ended',
         );
-        continue;
-      }
-
-      const previousUntil = this.getScheduleRecurrenceUntil(matchedPrevious);
-      const nextUntil = this.getScheduleRecurrenceUntil(inserted.schedule);
-      if (nextUntil && (!previousUntil || nextUntil !== previousUntil)) {
-        await this.publishScheduleActivity(input.supabase, input.dto, inserted, 'ended');
       }
     }
   }
@@ -1118,6 +1178,100 @@ export class SchedulesService {
       throw new InternalServerErrorException(recurrenceError.message);
     }
 
+    await this.replaceRecurrenceExceptionsAndOverrides(
+      supabase,
+      orgId,
+      recurrenceId,
+      recurrence,
+      createdBy,
+      now,
+    );
+  }
+
+  /**
+   * Updates an existing `class_schedule_recurrence` row in place (preserving its
+   * id) instead of the insert-only path used for brand-new schedules — this is
+   * what lets a recurring schedule that already has confirmations/reminder-job
+   * history keep that history when its recurrence rule changes.
+   */
+  private async updateScheduleRecurrence(
+    supabase: SupabaseServiceClient,
+    orgId: string,
+    recurrenceId: string,
+    schedule: ScheduleRowInput,
+    updatedBy: string,
+    now: string,
+  ) {
+    const recurrence = schedule.recurrence!;
+
+    const { error: recurrenceError } = await supabase
+      .from('class_schedule_recurrence')
+      .update({
+        frequency: recurrence.frequency,
+        interval: recurrence.interval ?? null,
+        count: recurrence.count ?? null,
+        until: recurrence.until ?? null,
+        timezone: recurrence.timezone ?? null,
+        raw_rrule: recurrence.rawRrule ?? null,
+        bysecond: recurrence.bysecond ?? null,
+        byminute: recurrence.byminute ?? null,
+        byhour: recurrence.byhour ?? null,
+        byday: recurrence.byday ?? null,
+        bymonthday: recurrence.bymonthday ?? null,
+        byyearday: recurrence.byyearday ?? null,
+        byweekno: recurrence.byweekno ?? null,
+        bymonth: recurrence.bymonth ?? null,
+        bysetpos: recurrence.bysetpos ?? null,
+        wkst: recurrence.wkst ?? null,
+        updated_at: now,
+        updated_by: updatedBy,
+      })
+      .eq('id', recurrenceId)
+      .eq('org_id', orgId);
+
+    if (recurrenceError) {
+      throw new InternalServerErrorException(recurrenceError.message);
+    }
+
+    await this.replaceRecurrenceExceptionsAndOverrides(
+      supabase,
+      orgId,
+      recurrenceId,
+      recurrence,
+      updatedBy,
+      now,
+    );
+  }
+
+  /** Shared by insert and update: replaces every exception/override row for a
+   * recurrence id with the incoming set. Safe to delete-then-reinsert since
+   * nothing outside these two tables references exception/override row ids. */
+  private async replaceRecurrenceExceptionsAndOverrides(
+    supabase: SupabaseServiceClient,
+    orgId: string,
+    recurrenceId: string,
+    recurrence: RecurrenceRowInput,
+    actorProfileId: string,
+    now: string,
+  ) {
+    const { error: deleteExceptionsError } = await supabase
+      .from('class_schedule_recurrence_exceptions')
+      .delete()
+      .eq('org_id', orgId)
+      .eq('recurrence_id', recurrenceId);
+    if (deleteExceptionsError) {
+      throw new InternalServerErrorException(deleteExceptionsError.message);
+    }
+
+    const { error: deleteOverridesError } = await supabase
+      .from('class_schedule_recurrence_overrides')
+      .delete()
+      .eq('org_id', orgId)
+      .eq('recurrence_id', recurrenceId);
+    if (deleteOverridesError) {
+      throw new InternalServerErrorException(deleteOverridesError.message);
+    }
+
     if (recurrence.exceptions.length) {
       const exceptionRows = recurrence.exceptions.map((e) => ({
         id: randomUUID(),
@@ -1126,9 +1280,9 @@ export class SchedulesService {
         occurrence_key: e.occurrenceKey,
         reason: e.reason ?? null,
         created_at: now,
-        created_by: createdBy,
+        created_by: actorProfileId,
         updated_at: now,
-        updated_by: createdBy,
+        updated_by: actorProfileId,
       }));
 
       const { error } = await supabase
@@ -1145,15 +1299,102 @@ export class SchedulesService {
         occurrence_key: o.occurrenceKey,
         patch: o.patch,
         created_at: now,
-        created_by: createdBy,
+        created_by: actorProfileId,
         updated_at: now,
-        updated_by: createdBy,
+        updated_by: actorProfileId,
       }));
 
       const { error } = await supabase
         .from('class_schedule_recurrence_overrides')
         .insert(overrideRows);
       if (error) throw new InternalServerErrorException(error.message);
+    }
+  }
+
+  /**
+   * Updates a matched schedule in place instead of deleting and recreating it —
+   * the core of the fix: `class_schedules.id` (and therefore anything keyed off
+   * it, like `class_session_completions`) survives edits, including converting a
+   * one-off session into a recurring one.
+   */
+  private async updateScheduleInPlace(
+    supabase: SupabaseServiceClient,
+    dto: ReplaceSchedulesDto,
+    existingScheduleId: string,
+    existingRecurrenceId: string | null,
+    schedule: ScheduleRowInput,
+    actorProfileId: string,
+    now: string,
+  ) {
+    const { error: updateError } = await supabase
+      .from('class_schedules')
+      .update({
+        title: dto.title,
+        description: dto.description,
+        theme_key: dto.themeKey ?? null,
+        start_at: schedule.startAt,
+        end_at: schedule.endAt,
+        timezone: schedule.timezone,
+        updated_at: now,
+        updated_by: actorProfileId,
+      })
+      .eq('id', existingScheduleId)
+      .eq('org_id', dto.orgId);
+
+    if (updateError) {
+      throw new InternalServerErrorException(updateError.message);
+    }
+
+    // Participants: nothing outside this table references a participant row's
+    // own id, so delete+reinsert scoped to just this schedule is safe and simple.
+    const { error: deleteParticipantsError } = await supabase
+      .from('class_schedule_participants')
+      .delete()
+      .eq('org_id', dto.orgId)
+      .eq('schedule_id', existingScheduleId);
+    if (deleteParticipantsError) {
+      throw new InternalServerErrorException(deleteParticipantsError.message);
+    }
+    await this.insertScheduleParticipants(
+      supabase,
+      dto.orgId,
+      existingScheduleId,
+      dto.participants,
+      actorProfileId,
+      now,
+    );
+
+    if (schedule.recurrence) {
+      if (existingRecurrenceId) {
+        await this.updateScheduleRecurrence(
+          supabase,
+          dto.orgId,
+          existingRecurrenceId,
+          schedule,
+          actorProfileId,
+          now,
+        );
+      } else {
+        await this.insertScheduleRecurrence(
+          supabase,
+          dto.orgId,
+          existingScheduleId,
+          schedule,
+          actorProfileId,
+          now,
+        );
+      }
+    } else if (existingRecurrenceId) {
+      // Recurrence just got turned off — exceptions/overrides cascade-delete
+      // with it (ON DELETE CASCADE from class_schedule_recurrence).
+      const { error: deleteRecurrenceError } = await supabase
+        .from('class_schedule_recurrence')
+        .delete()
+        .eq('org_id', dto.orgId)
+        .eq('id', existingRecurrenceId);
+      if (deleteRecurrenceError) {
+        throw new InternalServerErrorException(deleteRecurrenceError.message);
+      }
     }
   }
 

@@ -42,4 +42,90 @@ describe('parseReplaceSchedulesDto', () => {
       }),
     ).toThrow(BadRequestException);
   });
+
+  const VALID_UUID = '00000000-0000-4000-8000-000000000001';
+  const OTHER_UUID = '00000000-0000-4000-8000-000000000002';
+
+  it('accepts an optional schedule id and defaults removedScheduleIds to empty', () => {
+    const dto = parseReplaceSchedulesDto({
+      ...basePayload,
+      participants: [],
+      schedules: [
+        {
+          id: VALID_UUID,
+          startAt: '2026-09-01T00:00:00.000Z',
+          endAt: '2026-09-01T01:00:00.000Z',
+          timezone: 'UTC',
+        },
+        {
+          startAt: '2026-09-02T00:00:00.000Z',
+          endAt: '2026-09-02T01:00:00.000Z',
+          timezone: 'UTC',
+        },
+      ],
+    });
+
+    expect(dto.schedules.map((schedule) => schedule.id)).toEqual([VALID_UUID, null]);
+    expect(dto.removedScheduleIds).toEqual([]);
+  });
+
+  it('accepts explicit removedScheduleIds', () => {
+    const dto = parseReplaceSchedulesDto({
+      ...basePayload,
+      participants: [],
+      removedScheduleIds: [VALID_UUID, OTHER_UUID],
+    });
+
+    expect(dto.removedScheduleIds).toEqual([VALID_UUID, OTHER_UUID]);
+  });
+
+  it('rejects a malformed schedule id', () => {
+    expect(() =>
+      parseReplaceSchedulesDto({
+        ...basePayload,
+        participants: [],
+        schedules: [
+          {
+            id: 'not-a-uuid',
+            startAt: '2026-09-01T00:00:00.000Z',
+            endAt: '2026-09-01T01:00:00.000Z',
+            timezone: 'UTC',
+          },
+        ],
+      }),
+    ).toThrow(BadRequestException);
+  });
+
+  it('rejects a malformed removedScheduleIds entry', () => {
+    expect(() =>
+      parseReplaceSchedulesDto({
+        ...basePayload,
+        participants: [],
+        removedScheduleIds: ['not-a-uuid'],
+      }),
+    ).toThrow(BadRequestException);
+  });
+
+  it('rejects duplicate schedule ids', () => {
+    expect(() =>
+      parseReplaceSchedulesDto({
+        ...basePayload,
+        participants: [],
+        schedules: [
+          {
+            id: VALID_UUID,
+            startAt: '2026-09-01T00:00:00.000Z',
+            endAt: '2026-09-01T01:00:00.000Z',
+            timezone: 'UTC',
+          },
+          {
+            id: VALID_UUID,
+            startAt: '2026-09-02T00:00:00.000Z',
+            endAt: '2026-09-02T01:00:00.000Z',
+            timezone: 'UTC',
+          },
+        ],
+      }),
+    ).toThrow(BadRequestException);
+  });
 });

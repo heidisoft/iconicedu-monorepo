@@ -27,6 +27,10 @@ import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session
 import { getRequestContext } from '@iconicedu/api/observability/request-context';
 import { ReminderReconcileService } from '@iconicedu/api/modules/reminders/reminder-reconcile.service';
 import { CompletionCheckDispatcherService } from '@iconicedu/api/modules/reminders/completion-check-dispatcher.service';
+import {
+  expandRecurringEvents,
+  normalizeBaseScheduleId,
+} from '@iconicedu/api/modules/reminders/schedule-expansion.util';
 import { publishActivityEvent } from '@iconicedu/api/lib/activity-feed/activity-publisher';
 
 const REMINDER_HORIZON_DAYS = 30;
@@ -192,16 +196,6 @@ type ClassScheduleRow = {
     | null;
 };
 
-type ExpandedClassSchedule = ClassScheduleVM & {
-  uiState?: {
-    kind?: 'default' | 'exception' | 'override';
-    disabled?: boolean;
-    reason?: string | null;
-    originalStartAt?: string;
-    originalEndAt?: string;
-  };
-};
-
 type StaleActivityCleanupResult = {
   notifications_marked_read?: number | null;
   completion_votes_marked_completed?: number | null;
@@ -274,7 +268,7 @@ export class RemindersService {
     const rangeEnd = new Date(
       now.getTime() + REMINDER_HORIZON_DAYS * 24 * 60 * 60 * 1000,
     );
-    const occurrences = this.expandRecurringEvents(relevant, rangeStart, rangeEnd).filter(
+    const occurrences = expandRecurringEvents(relevant, rangeStart, rangeEnd).filter(
       (schedule) =>
         schedule.status !== 'cancelled' && !isClassScheduleAfterArchiveCutoff(schedule),
     );
@@ -296,7 +290,7 @@ export class RemindersService {
       const feedbackBaseTime = Number.isNaN(occurrenceEnd.getTime())
         ? occurrenceStart
         : occurrenceEnd;
-      const normalizedScheduleId = this.normalizeBaseScheduleId(occurrence.ids.id);
+      const normalizedScheduleId = normalizeBaseScheduleId(occurrence.ids.id);
       const payload: ReminderJobPayload = {
         title: occurrence.title,
         summary: occurrence.description ?? null,
@@ -1084,12 +1078,6 @@ export class RemindersService {
     return ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'].includes(value);
   }
 
-  private normalizeBaseScheduleId(scheduleId: string) {
-    const marker = '__';
-    const index = scheduleId.indexOf(marker);
-    return index === -1 ? scheduleId : scheduleId.slice(0, index);
-  }
-
   private isJobRunAfterArchiveCutoff(schedule: ClassScheduleVM, runAt: Date) {
     if (schedule.source.kind !== 'class_session') return false;
     const archivedAt = schedule.source.archivedAt;
@@ -1127,323 +1115,6 @@ export class RemindersService {
   }) {
     const learningSpaceId = input.learningSpaceId ?? 'unknown-space';
     return `session.completion_check:${input.orgId}:${learningSpaceId}:${input.channelId}:${input.occurrenceStart}`;
-  }
-
-  private getScheduleTimezone(event: Pick<ClassScheduleVM, 'timezone' | 'recurrence'>) {
-    return event.timezone ?? event.recurrence?.rule.timezone ?? 'UTC';
-  }
-
-  private startOfDay(date: Date) {
-    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  }
-
-  private addDays(date: Date, days: number) {
-    const next = new Date(date);
-    next.setDate(next.getDate() + days);
-    return next;
-  }
-
-  private toDateKey(value: Date) {
-    return value.toISOString().slice(0, 10);
-  }
-
-  private parseDateKey(value: string) {
-    const [yearText, monthText, dayText] = value.split('-');
-    const year = Number.parseInt(yearText ?? '1970', 10);
-    const month = Number.parseInt(monthText ?? '1', 10);
-    const day = Number.parseInt(dayText ?? '1', 10);
-    return new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0));
-  }
-
-  private getDateDiffInDays(left: string, right: string) {
-    return Math.round(
-      (this.parseDateKey(left).getTime() - this.parseDateKey(right).getTime()) /
-        (24 * 60 * 60 * 1000),
-    );
-  }
-
-  private getWeekdayTokenFromDateKey(value: string): WeekdayVM {
-    const weekday = this.parseDateKey(value).getUTCDay();
-    return ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][weekday] as WeekdayVM;
-  }
-
-  private getScheduleLocalDayKey(
-    isoDateTime: string,
-    event: Pick<ClassScheduleVM, 'timezone' | 'recurrence'>,
-  ) {
-    return (
-      getLocalDate(isoDateTime, this.getScheduleTimezone(event)) ??
-      isoDateTime.slice(0, 10)
-    );
-  }
-
-  private isWithinRange(date: Date, rangeStart: Date, rangeEnd: Date) {
-    const day = this.startOfDay(date).getTime();
-    return day >= rangeStart.getTime() && day <= rangeEnd.getTime();
-  }
-
-  private getMinDate(dates: Date[]) {
-    return dates.reduce((min, current) => (current < min ? current : min), dates[0]!);
-  }
-
-  private getMaxDate(dates: Date[]) {
-    return dates.reduce((max, current) => (current > max ? current : max), dates[0]!);
-  }
-
-  private getDisplaySchedulePriority(schedule: ExpandedClassSchedule) {
-    if (schedule.uiState?.kind === 'exception') return 3;
-    if (schedule.uiState?.kind === 'override') return 2;
-    return 1;
-  }
-
-  private getDisplayScheduleOccurrenceIdentity(schedule: ExpandedClassSchedule) {
-    const baseId = this.normalizeBaseScheduleId(schedule.ids.id);
-    const originalStartAt = schedule.uiState?.originalStartAt;
-    if (originalStartAt) {
-      return `${baseId}|${originalStartAt}`;
-    }
-    const separatorIndex = schedule.ids.id.indexOf('__');
-    if (separatorIndex !== -1) {
-      const [, occurrenceKey = schedule.startAt] = schedule.ids.id.split('__');
-      return `${baseId}|${occurrenceKey}`;
-    }
-    return `${baseId}|${schedule.startAt}`;
-  }
-
-  private dedupeExpandedEvents(schedules: ExpandedClassSchedule[]) {
-    const deduped = new Map<string, ExpandedClassSchedule>();
-    schedules.forEach((schedule) => {
-      const key = this.getDisplayScheduleOccurrenceIdentity(schedule);
-      const existing = deduped.get(key);
-      if (
-        !existing ||
-        this.getDisplaySchedulePriority(schedule) >
-          this.getDisplaySchedulePriority(existing)
-      ) {
-        deduped.set(key, schedule);
-      }
-    });
-    return Array.from(deduped.values());
-  }
-
-  private expandRecurringEvents(
-    events: ClassScheduleVM[],
-    rangeStart: Date,
-    rangeEnd: Date,
-  ) {
-    const expanded: ExpandedClassSchedule[] = [];
-    const rangeStartDay = this.startOfDay(rangeStart);
-    const rangeEndDay = this.startOfDay(rangeEnd);
-
-    events.forEach((event) => {
-      if (!event.recurrence) {
-        const eventDate = this.startOfDay(new Date(event.startAt));
-        if (this.isWithinRange(eventDate, rangeStartDay, rangeEndDay)) {
-          const isCancelled = event.status === 'cancelled';
-          expanded.push({
-            ...event,
-            meetingLink: isCancelled ? null : event.meetingLink,
-            uiState: isCancelled
-              ? {
-                  kind: 'exception',
-                  disabled: true,
-                  reason: event.description ?? null,
-                  originalStartAt: event.startAt,
-                  originalEndAt: event.endAt,
-                }
-              : { kind: 'default' },
-          });
-        }
-        return;
-      }
-
-      const recurrence = event.recurrence;
-      const rule = recurrence.rule;
-      const interval = rule.interval ?? 1;
-      const scheduleTimezone = this.getScheduleTimezone(event);
-      const baseStart = new Date(event.startAt);
-      const baseLocalDate =
-        getLocalDate(event.startAt, scheduleTimezone) ?? event.startAt.slice(0, 10);
-      const baseLocalTime = getLocalTime(event.startAt, scheduleTimezone) ?? '00:00';
-      const durationMs = new Date(event.endAt).getTime() - baseStart.getTime();
-      const exceptions = new Set(
-        recurrence.exceptions?.map((exception) => exception.occurrenceKey) ?? [],
-      );
-      const exceptionsByDay = new Set(
-        recurrence.exceptions?.map((exception) =>
-          this.getScheduleLocalDayKey(exception.occurrenceKey, event),
-        ) ?? [],
-      );
-      const overrides = new Map(
-        recurrence.overrides?.map((override) => [
-          override.occurrenceKey,
-          override.patch,
-        ]) ?? [],
-      );
-      const overridesByDay = new Map(
-        recurrence.overrides?.map((override) => [
-          this.getScheduleLocalDayKey(override.occurrenceKey, event),
-          override.patch,
-        ]) ?? [],
-      );
-      const byWeekday = rule.byWeekday?.length
-        ? rule.byWeekday
-        : [this.getWeekdayTokenFromDateKey(baseLocalDate)];
-      const overrideOriginalDates =
-        recurrence.overrides?.map((override) =>
-          this.getScheduleLocalDayKey(override.occurrenceKey, event),
-        ) ?? [];
-      const overridePatchedDates =
-        recurrence.overrides
-          ?.map((override) =>
-            override.patch.startAt
-              ? this.getScheduleLocalDayKey(override.patch.startAt, event)
-              : null,
-          )
-          .filter((date): date is string => Boolean(date)) ?? [];
-      const exceptionDates =
-        recurrence.exceptions?.map((exception) =>
-          this.getScheduleLocalDayKey(exception.occurrenceKey, event),
-        ) ?? [];
-      const rangeStartLocalDate =
-        getLocalDate(rangeStart.toISOString(), scheduleTimezone) ??
-        this.toDateKey(rangeStartDay);
-      const rangeEndLocalDate =
-        getLocalDate(rangeEnd.toISOString(), scheduleTimezone) ??
-        this.toDateKey(rangeEndDay);
-      const iterationStart = this.getMinDate(
-        [
-          this.parseDateKey(baseLocalDate),
-          this.parseDateKey(rangeStartLocalDate),
-          ...overrideOriginalDates,
-          ...exceptionDates,
-        ].map((value) => (typeof value === 'string' ? this.parseDateKey(value) : value)),
-      );
-      const iterationEnd = this.getMaxDate(
-        [
-          this.parseDateKey(rangeEndLocalDate),
-          ...overrideOriginalDates,
-          ...overridePatchedDates,
-          ...exceptionDates,
-        ].map((value) => (typeof value === 'string' ? this.parseDateKey(value) : value)),
-      );
-
-      recurrence.exceptions?.forEach((exception) => {
-        const originalStart = new Date(exception.occurrenceKey);
-        const occurrenceDayKey = this.getScheduleLocalDayKey(
-          exception.occurrenceKey,
-          event,
-        );
-        if (
-          overrides.has(exception.occurrenceKey) ||
-          overridesByDay.has(occurrenceDayKey)
-        )
-          return;
-        const originalEnd = new Date(originalStart.getTime() + durationMs);
-        expanded.push({
-          ...event,
-          ids: {
-            ...event.ids,
-            id: `${event.ids.id}__${exception.occurrenceKey}__exception`,
-          },
-          startAt: originalStart.toISOString(),
-          endAt: originalEnd.toISOString(),
-          status: 'cancelled',
-          meetingLink: null,
-          recurrence: undefined,
-          description: exception.reason ?? event.description ?? null,
-          uiState: {
-            kind: 'exception',
-            disabled: true,
-            reason: exception.reason ?? null,
-            originalStartAt: originalStart.toISOString(),
-            originalEndAt: originalEnd.toISOString(),
-          },
-        });
-      });
-
-      let occurrenceCount = 0;
-      const until = rule.until
-        ? (getLocalDate(rule.until, scheduleTimezone) ?? rule.until.slice(0, 10))
-        : null;
-
-      for (
-        let current = iterationStart;
-        current <= iterationEnd;
-        current = this.addDays(current, 1)
-      ) {
-        const currentLocalDate = this.toDateKey(current);
-        if (currentLocalDate < baseLocalDate) continue;
-        if (until && currentLocalDate > until) break;
-
-        const diffDays = this.getDateDiffInDays(currentLocalDate, baseLocalDate);
-        let matches = false;
-        if (rule.frequency === 'daily') {
-          matches = diffDays % interval === 0;
-        } else if (rule.frequency === 'weekly') {
-          const weeksDiff = Math.floor(diffDays / 7);
-          matches =
-            weeksDiff % interval === 0 &&
-            byWeekday.includes(this.getWeekdayTokenFromDateKey(currentLocalDate));
-        }
-
-        const occurrenceKey =
-          toUtcFromLocal(currentLocalDate, baseLocalTime, scheduleTimezone) ??
-          (() => {
-            const occurrenceStart = new Date(current);
-            occurrenceStart.setHours(
-              baseStart.getHours(),
-              baseStart.getMinutes(),
-              baseStart.getSeconds(),
-              baseStart.getMilliseconds(),
-            );
-            return occurrenceStart.toISOString();
-          })();
-        const occurrenceStart = new Date(occurrenceKey);
-        const occurrenceDayKey = currentLocalDate;
-        const override =
-          overrides.get(occurrenceKey) ?? overridesByDay.get(occurrenceDayKey);
-        const hasOverride = Boolean(override);
-
-        if (!matches && !hasOverride) continue;
-        if (
-          (exceptions.has(occurrenceKey) || exceptionsByDay.has(occurrenceDayKey)) &&
-          !hasOverride
-        )
-          continue;
-        if (rule.count && occurrenceCount >= rule.count) break;
-
-        const occurrenceEnd = new Date(occurrenceStart.getTime() + durationMs);
-        expanded.push({
-          ...event,
-          ...override,
-          ids: { ...event.ids, id: `${event.ids.id}__${occurrenceKey}` },
-          startAt: override?.startAt ?? occurrenceStart.toISOString(),
-          endAt: override?.endAt ?? occurrenceEnd.toISOString(),
-          status: override?.status ?? (hasOverride ? 'rescheduled' : event.status),
-          recurrence: event.recurrence,
-          uiState: hasOverride
-            ? {
-                kind: 'override',
-                reason:
-                  typeof override?.description === 'string'
-                    ? override.description
-                    : typeof (override as { reason?: unknown } | undefined)?.reason ===
-                        'string'
-                      ? ((override as { reason?: string }).reason ?? null)
-                      : null,
-                originalStartAt: occurrenceStart.toISOString(),
-                originalEndAt: occurrenceEnd.toISOString(),
-              }
-            : { kind: 'default' },
-        });
-        occurrenceCount += 1;
-      }
-    });
-
-    return this.dedupeExpandedEvents(expanded).filter((schedule) =>
-      this.isWithinRange(new Date(schedule.startAt), rangeStartDay, rangeEndDay),
-    );
   }
 
   private resolveRetryDelayMs(attemptCount: number) {

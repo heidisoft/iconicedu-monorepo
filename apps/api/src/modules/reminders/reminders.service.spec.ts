@@ -299,6 +299,54 @@ describe('RemindersService', () => {
     );
   });
 
+  it("still compiles a completion check for a recurring schedule's own base occurrence when it is far outside the compile window", async () => {
+    // Mirrors the reconcile-service regression test: converting an existing
+    // one-off session to recurring copies its original start_at verbatim, so
+    // the base occurrence is very often already outside the `now - 24h` .. `now
+    // + 30d` compile window by the time the edit is saved. It must still be
+    // retained rather than silently dropped — only the pre-class reminders
+    // (which are naturally skipped once their own run_at is in the past) don't
+    // fire for it.
+    const { supabase, reminderJobsTable } = makeCompileSupabase({
+      scheduleRows: [
+        buildScheduleRow({
+          start_at: '2030-01-15T10:00:00.000Z',
+          end_at: '2030-01-15T11:00:00.000Z',
+          recurrence: {
+            id: 'recurrence-1',
+            org_id: 'org-1',
+            frequency: 'weekly',
+            interval: 1,
+            count: 1,
+            until: null,
+            timezone: 'UTC',
+            byday: [],
+            exceptions: [],
+            overrides: [],
+          },
+        }),
+      ],
+    });
+    createSupabaseServiceClientMock.mockReturnValue(supabase as never);
+
+    const service = makeService();
+    const result = await service.compileLearningSpaceReminderJobs('token-1', {
+      orgId: 'org-1',
+      learningSpaceId: 'space-1',
+    });
+
+    expect(result).toEqual({ compiledCount: 1, canceledCount: 0 });
+    const compiledRows = reminderJobsTable.upsert.mock.calls[0]?.[0] as Array<{
+      job_type: string;
+      occurrence_start_at: string;
+      run_at: string;
+    }>;
+    expect(compiledRows).toHaveLength(1);
+    expect(compiledRows[0]?.job_type).toBe('session.completion_check');
+    expect(compiledRows[0]?.occurrence_start_at).toBe('2030-01-15T10:00:00.000Z');
+    expect(compiledRows[0]?.run_at).toBe('2030-01-15T11:10:00.000Z');
+  });
+
   it('throws Forbidden when the token user has no account in the org', async () => {
     const { supabase } = makeCompileSupabase({ account: null });
     createSupabaseServiceClientMock.mockReturnValue(supabase as never);
