@@ -9,6 +9,7 @@ vi.mock('@iconicedu/web/flags', () => ({
 }));
 vi.mock('@iconicedu/web/lib/api/session-completions', () => ({
   listAdminSessionCompletions: vi.fn(async () => []),
+  listOrgRosterForAdmin: vi.fn(async () => []),
 }));
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(async () => ({})),

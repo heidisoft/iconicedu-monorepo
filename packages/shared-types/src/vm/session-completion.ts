@@ -62,6 +62,17 @@ export interface AdminSessionCompletionGuardianVM {
   displayName: string;
 }
 
+/**
+ * A profile in the org matching a given `kind` ('educator' or 'guardian'),
+ * independent of any specific schedule or completion. Powers the admin
+ * "Filter by participant" teacher/parent dropdowns, so every teacher/parent in
+ * the org is selectable, not just ones with a completion in the loaded window.
+ */
+export interface AdminOrgProfileOptionVM {
+  profileId: UUID;
+  displayName: string;
+}
+
 /** A tutor or parent, including people who have not manually confirmed. */
 export interface AdminSessionCompletionParticipantVM {
   profileId: UUID;
@@ -71,7 +82,9 @@ export interface AdminSessionCompletionParticipantVM {
   rating?: number | null;
 }
 
-/** One completed schedule occurrence, grouped across all participant confirmations. */
+/** One schedule occurrence within the admin reporting window, whether completed,
+ * still pending confirmation, or under dispute — grouped across all participant
+ * confirmations. */
 export interface AdminSessionCompletionVM {
   id: string;
   orgId: UUID;
@@ -84,7 +97,7 @@ export interface AdminSessionCompletionVM {
   learningSpaceId?: UUID | null;
   learningSpaceTitle?: string | null;
   completedAt: ISODateTime;
-  completionMethod: 'confirmed' | 'auto_confirmed' | 'mixed';
+  completionMethod: 'confirmed' | 'auto_confirmed' | 'mixed' | 'pending' | 'disputed';
   confirmedBy: AdminSessionCompletionActorVM[];
   guardians: AdminSessionCompletionGuardianVM[];
   /** Optional while older API deployments are being replaced. */

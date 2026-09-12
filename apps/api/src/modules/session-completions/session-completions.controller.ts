@@ -193,6 +193,19 @@ export class SessionCompletionsController {
     return this.sessionCompletionsService.adminConfirm(req.user.id, body);
   }
 
+  @Get('admin/roster')
+  @UseGuards(AuthGuard)
+  listOrgRosterForAdmin(
+    @Req() req: AuthenticatedRequest,
+    @Query('orgId') orgId: string,
+    @Query('kind') kind: 'educator' | 'guardian',
+  ) {
+    return this.sessionCompletionsService.listOrgRosterForAdmin(req.user.id, {
+      orgId,
+      kind,
+    });
+  }
+
   @Get('admin')
   @UseGuards(AuthGuard)
   listForAdmin(

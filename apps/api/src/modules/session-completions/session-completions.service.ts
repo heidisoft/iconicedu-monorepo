@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import type {
   AdminConfirmSessionCompletionInput,
+  AdminOrgProfileOptionVM,
   AdminSessionCompletionActorVM,
   AdminSessionCompletionGuardianVM,
   AdminSessionCompletionParticipantVM,
@@ -1045,6 +1046,54 @@ export class SessionCompletionsService {
     return { success: true, confirmedCount: updated?.length ?? 0 };
   }
 
+  /**
+   * Every org profile of the given kind, for the admin "Filter by participant"
+   * teacher/parent dropdowns — sourced from the users roster directly rather than
+   * derived from whichever completions happen to be loaded, so a teacher/parent
+   * with zero completions in the current window is still selectable.
+   */
+  async listOrgRosterForAdmin(
+    authUserId: string,
+    params: { orgId: string; kind: 'educator' | 'guardian' },
+  ): Promise<AdminOrgProfileOptionVM[]> {
+    if (!params?.orgId || !isUuid(params.orgId)) {
+      throw new BadRequestException('Invalid orgId');
+    }
+    if (params.kind !== 'educator' && params.kind !== 'guardian') {
+      throw new BadRequestException('Invalid kind');
+    }
+
+    const supabase = createSupabaseServiceClient();
+    const account = await this.resolveAccount(supabase, authUserId, params.orgId);
+    await this.assertAdminAccess(supabase, account, params.orgId);
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, display_name, first_name, last_name')
+      .eq('org_id', params.orgId)
+      .eq('kind', params.kind)
+      .is('deleted_at', null)
+      .returns<
+        Array<{
+          id: string;
+          display_name: string | null;
+          first_name: string | null;
+          last_name: string | null;
+        }>
+      >();
+    if (error) throw new InternalServerErrorException(error.message);
+
+    return (data ?? [])
+      .map((profile) => ({
+        profileId: profile.id,
+        displayName:
+          profile.display_name?.trim() ||
+          [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim() ||
+          (params.kind === 'educator' ? 'Tutor' : 'Parent'),
+      }))
+      .sort((a, b) => a.displayName.localeCompare(b.displayName));
+  }
+
   async listForAdmin(
     authUserId: string,
     params: {
@@ -1337,98 +1386,106 @@ export class SessionCompletionsService {
       grouped.set(key, bucket);
     });
 
-    return [...grouped.entries()]
-      .filter(([, rows]) =>
-        rows.some((row) => row.status === 'confirmed' || row.status === 'auto_confirmed'),
-      )
-      .map(([id, rows]) => {
-        const first = rows[0]!;
-        const actors: AdminSessionCompletionActorVM[] = rows
-          .filter((row) => row.status === 'confirmed' || row.status === 'auto_confirmed')
-          .map((row) => ({
-            profileId: row.profile_id,
-            displayName: names.get(row.profile_id) ?? 'Unknown user',
-            role: row.role,
-            status: row.status as AdminSessionCompletionActorVM['status'],
-            completedAt: row.resolved_at ?? row.confirmed_at ?? row.updated_at,
-          }));
-        const methods = new Set(actors.map((actor) => actor.status));
-        const ratings = rows
-          .map((row) => row.rating)
-          .filter((rating): rating is number => typeof rating === 'number');
+    return [...grouped.entries()].map(([id, rows]) => {
+      const first = rows[0]!;
+      // Every recipient row, whether or not it has confirmed — occurrences still
+      // awaiting confirmation or under dispute are shown, not just completed ones.
+      const confirmedActors: AdminSessionCompletionActorVM[] = rows
+        .filter((row) => row.status === 'confirmed' || row.status === 'auto_confirmed')
+        .map((row) => ({
+          profileId: row.profile_id,
+          displayName: names.get(row.profile_id) ?? 'Unknown user',
+          role: row.role,
+          status: row.status as AdminSessionCompletionActorVM['status'],
+          completedAt: row.resolved_at ?? row.confirmed_at ?? row.updated_at,
+        }));
+      const methods = new Set(confirmedActors.map((actor) => actor.status));
+      const hasDispute = rows.some((row) => row.status === 'disputed');
+      const completionMethod: AdminSessionCompletionVM['completionMethod'] =
+        confirmedActors.length === 0
+          ? hasDispute
+            ? 'disputed'
+            : 'pending'
+          : methods.size > 1
+            ? 'mixed'
+            : confirmedActors[0]!.status;
+      const ratings = rows
+        .map((row) => row.rating)
+        .filter((rating): rating is number => typeof rating === 'number');
 
-        // Include every guardian recipient, even if absent from the current
-        // roster/family links or still awaiting confirmation.
-        const guardians: AdminSessionCompletionGuardianVM[] = [
-          ...(guardiansByScheduleId.get(first.schedule_id) ?? []),
-        ];
-        rows
-          .filter((row) => row.role === 'guardian')
-          .forEach((row) => {
-            if (!guardians.some((guardian) => guardian.profileId === row.profile_id)) {
-              guardians.push({
-                profileId: row.profile_id,
-                displayName: names.get(row.profile_id) ?? 'Parent',
-              });
-            }
-          });
-
-        const participants = new Map<string, AdminSessionCompletionParticipantVM>();
-        const addParticipant = (
-          person: AdminSessionCompletionGuardianVM,
-          role: 'educator' | 'guardian',
-        ) => {
-          participants.set(`${role}|${person.profileId}`, {
-            ...person,
-            role,
-            status: 'pending',
-            rating: null,
-          });
-        };
-        (educatorsByScheduleId.get(first.schedule_id) ?? []).forEach((person) =>
-          addParticipant(person, 'educator'),
-        );
-        guardians.forEach((person) => addParticipant(person, 'guardian'));
-        rows.forEach((row) => {
-          if (row.role !== 'educator' && row.role !== 'guardian') return;
-          const key = `${row.role}|${row.profile_id}`;
-          participants.set(key, {
-            profileId: row.profile_id,
-            displayName:
-              names.get(row.profile_id) ??
-              participants.get(key)?.displayName ??
-              'Unknown user',
-            role: row.role,
-            status: row.status,
-            rating: row.rating ?? null,
-          });
+      // Include every guardian recipient, even if absent from the current
+      // roster/family links or still awaiting confirmation.
+      const guardians: AdminSessionCompletionGuardianVM[] = [
+        ...(guardiansByScheduleId.get(first.schedule_id) ?? []),
+      ];
+      rows
+        .filter((row) => row.role === 'guardian')
+        .forEach((row) => {
+          if (!guardians.some((guardian) => guardian.profileId === row.profile_id)) {
+            guardians.push({
+              profileId: row.profile_id,
+              displayName: names.get(row.profile_id) ?? 'Parent',
+            });
+          }
         });
 
-        return {
-          id,
-          orgId: first.org_id,
-          scheduleId: first.schedule_id,
-          occurrenceKey: first.occurrence_key,
-          sessionEndAt: first.session_end_at,
-          sessionTitle: first.session_title ?? null,
-          studentNames: studentNamesByScheduleId.get(first.schedule_id) ?? [],
-          channelId: first.channel_id ?? null,
-          learningSpaceId: first.learning_space_id ?? null,
-          learningSpaceTitle: first.learning_space_id
-            ? (learningSpaceTitles.get(first.learning_space_id) ?? null)
-            : null,
-          completedAt: actors
-            .map((actor) => actor.completedAt)
-            .sort((left, right) => right.localeCompare(left))[0]!,
-          completionMethod:
-            methods.size > 1 ? 'mixed' : (actors[0]?.status ?? 'confirmed'),
-          confirmedBy: actors,
-          guardians,
-          participants: [...participants.values()],
-          averageRating: ratings.length
-            ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length
-            : null,
-        };
+      const participants = new Map<string, AdminSessionCompletionParticipantVM>();
+      const addParticipant = (
+        person: AdminSessionCompletionGuardianVM,
+        role: 'educator' | 'guardian',
+      ) => {
+        participants.set(`${role}|${person.profileId}`, {
+          ...person,
+          role,
+          status: 'pending',
+          rating: null,
+        });
+      };
+      (educatorsByScheduleId.get(first.schedule_id) ?? []).forEach((person) =>
+        addParticipant(person, 'educator'),
+      );
+      guardians.forEach((person) => addParticipant(person, 'guardian'));
+      rows.forEach((row) => {
+        if (row.role !== 'educator' && row.role !== 'guardian') return;
+        const key = `${row.role}|${row.profile_id}`;
+        participants.set(key, {
+          profileId: row.profile_id,
+          displayName:
+            names.get(row.profile_id) ??
+            participants.get(key)?.displayName ??
+            'Unknown user',
+          role: row.role,
+          status: row.status,
+          rating: row.rating ?? null,
+        });
       });
+
+      return {
+        id,
+        orgId: first.org_id,
+        scheduleId: first.schedule_id,
+        occurrenceKey: first.occurrence_key,
+        sessionEndAt: first.session_end_at,
+        sessionTitle: first.session_title ?? null,
+        studentNames: studentNamesByScheduleId.get(first.schedule_id) ?? [],
+        channelId: first.channel_id ?? null,
+        learningSpaceId: first.learning_space_id ?? null,
+        learningSpaceTitle: first.learning_space_id
+          ? (learningSpaceTitles.get(first.learning_space_id) ?? null)
+          : null,
+        completedAt: confirmedActors.length
+          ? confirmedActors
+              .map((actor) => actor.completedAt)
+              .sort((left, right) => right.localeCompare(left))[0]!
+          : (first.resolved_at ?? first.updated_at ?? first.session_end_at),
+        completionMethod,
+        confirmedBy: confirmedActors,
+        guardians,
+        participants: [...participants.values()],
+        averageRating: ratings.length
+          ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length
+          : null,
+      };
+    });
   }
 }

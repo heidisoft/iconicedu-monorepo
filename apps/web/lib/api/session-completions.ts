@@ -1,5 +1,6 @@
 import type {
   AdminConfirmSessionCompletionInput,
+  AdminOrgProfileOptionVM,
   AdminSessionCompletionVM,
   ChannelSessionCompletionVM,
   ConnectionVM,
@@ -29,6 +30,16 @@ export function listAdminSessionCompletions(
 ) {
   return createApiClient(supabase).get<AdminSessionCompletionVM[]>(
     '/session-completions/admin',
+    input,
+  );
+}
+
+export function listOrgRosterForAdmin(
+  supabase: SupabaseClient,
+  input: { orgId: string; kind: 'educator' | 'guardian' },
+) {
+  return createApiClient(supabase).get<AdminOrgProfileOptionVM[]>(
+    '/session-completions/admin/roster',
     input,
   );
 }

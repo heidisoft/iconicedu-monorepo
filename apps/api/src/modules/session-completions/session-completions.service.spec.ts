@@ -488,8 +488,14 @@ describe('SessionCompletionsService', () => {
       const rows = await new SessionCompletionsService().listForAdmin(AUTH_USER_ID, {
         orgId: ORG_ID,
       });
-      expect(rows).toHaveLength(1);
-      expect(rows[0].participants).toEqual(
+      // Both occurrences are returned — the still-pending one is shown too, not
+      // just the one with a confirmed recipient.
+      expect(rows).toHaveLength(2);
+      const confirmedOccurrence = rows.find((row) => row.scheduleId === SCHEDULE_ID)!;
+      const pendingOccurrence = rows.find(
+        (row) => row.scheduleId === 'unconfirmed-session',
+      )!;
+      expect(confirmedOccurrence.participants).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
             profileId: PROFILE_ID,
@@ -504,10 +510,12 @@ describe('SessionCompletionsService', () => {
           expect.objectContaining({ profileId: 'other-tutor', status: 'pending' }),
         ]),
       );
-      expect(rows[0].participants).toHaveLength(3);
-      expect(rows[0].confirmedBy).not.toEqual(
+      expect(confirmedOccurrence.participants).toHaveLength(3);
+      expect(confirmedOccurrence.confirmedBy).not.toEqual(
         expect.arrayContaining([expect.objectContaining({ status: 'pending' })]),
       );
+      expect(pendingOccurrence.completionMethod).toBe('pending');
+      expect(pendingOccurrence.confirmedBy).toHaveLength(0);
     });
 
     it('clamps month-end subtraction and caller-supplied dates', async () => {

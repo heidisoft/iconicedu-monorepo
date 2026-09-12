@@ -14,7 +14,10 @@ import {
 } from '@iconicedu/web/app/(app)/[orgSlug]/admin/attendance/sessions/session-attendance-analytics';
 import { enableAdminSessionAttendanceAnalytics } from '@iconicedu/web/flags';
 import { requireAdminOrgContext } from '@iconicedu/web/lib/admin/require-admin-org-context';
-import { listAdminSessionCompletions } from '@iconicedu/web/lib/api/session-completions';
+import {
+  listAdminSessionCompletions,
+  listOrgRosterForAdmin,
+} from '@iconicedu/web/lib/api/session-completions';
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 
@@ -59,6 +62,12 @@ export default async function AdminCompletedSessionsPage({
     completedSince: range?.since,
     completedUntil: range?.until,
   });
+  const [teachers, parents] = analyticsEnabled
+    ? await Promise.all([
+        listOrgRosterForAdmin(supabase, { orgId: org.id, kind: 'educator' }),
+        listOrgRosterForAdmin(supabase, { orgId: org.id, kind: 'guardian' }),
+      ])
+    : [[], []];
 
   return (
     <AdminPageShell title="Completed sessions">
@@ -71,6 +80,8 @@ export default async function AdminCompletedSessionsPage({
           rows={rows}
           selectedMonth={selectedMonth}
           monthOptions={monthOptions}
+          teachers={teachers}
+          parents={parents}
         />
       ) : (
         <CompletedSessionsTable rows={rows} />
