@@ -55,3 +55,14 @@ export type AdminConfirmSessionCompletionInput = {
   scheduleId: UUID;
   occurrenceKey: string;
 };
+
+// Same natural-key addressing as AdminConfirmSessionCompletionInput, for removing a
+// wrong/erroneous entry rather than resolving a real one. When profileId is omitted,
+// every participant row for the occurrence is deleted (the whole occurrence was
+// wrong); when present, only that one person's submission is deleted.
+export type AdminDeleteSessionCompletionInput = {
+  orgId: UUID;
+  scheduleId: UUID;
+  occurrenceKey: string;
+  profileId?: UUID;
+};

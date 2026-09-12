@@ -1,5 +1,6 @@
 import type {
   AdminConfirmSessionCompletionInput,
+  AdminDeleteSessionCompletionInput,
   AdminOrgProfileOptionVM,
   AdminSessionCompletionVM,
   ChannelSessionCompletionVM,
@@ -50,6 +51,16 @@ export function confirmSessionCompletionAsAdmin(
 ) {
   return createApiClient(supabase).post<{ success: boolean; confirmedCount: number }>(
     '/session-completions/admin/confirm-occurrence',
+    input,
+  );
+}
+
+export function deleteSessionCompletionAsAdmin(
+  supabase: SupabaseClient,
+  input: AdminDeleteSessionCompletionInput,
+) {
+  return createApiClient(supabase).post<{ success: boolean; deletedCount: number }>(
+    '/session-completions/admin/delete-submission',
     input,
   );
 }
