@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import type {
   AdminConfirmSessionCompletionInput,
+  AdminCreateSessionCompletionInput,
   AdminDeleteSessionCompletionInput,
   ConfirmSessionCompletionInput,
   DisputeSessionCompletionInput,
@@ -201,6 +202,15 @@ export class SessionCompletionsController {
     @Body() body: AdminDeleteSessionCompletionInput,
   ) {
     return this.sessionCompletionsService.adminDeleteSubmission(req.user.id, body);
+  }
+
+  @Post('admin/create-manual')
+  @UseGuards(AuthGuard)
+  adminCreateManual(
+    @Req() req: AuthenticatedRequest,
+    @Body() body: AdminCreateSessionCompletionInput,
+  ) {
+    return this.sessionCompletionsService.adminCreateManualCompletion(req.user.id, body);
   }
 
   @Get('admin/roster')

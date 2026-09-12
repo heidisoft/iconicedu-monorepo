@@ -66,3 +66,16 @@ export type AdminDeleteSessionCompletionInput = {
   occurrenceKey: string;
   profileId?: UUID;
 };
+
+// Manually backfills a full 'pending' participant set (one row per
+// educator/guardian/child on the schedule's own roster) for an occurrence that
+// never got a completion-check trail at all — e.g. the dispatcher never ran for
+// it. Every row starts 'pending', exactly like a normal live-dispatched
+// session, so the real participants can confirm/dispute it themselves rather
+// than the admin asserting an outcome on their behalf.
+export type AdminCreateSessionCompletionInput = {
+  orgId: UUID;
+  scheduleId: UUID;
+  occurrenceKey: string;
+  sessionEndAt: string;
+};
