@@ -2,7 +2,10 @@
 
 import * as React from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import type { AdminSessionCompletionVM } from '@iconicedu/shared-types';
+import type {
+  AdminOrgProfileOptionVM,
+  AdminSessionCompletionVM,
+} from '@iconicedu/shared-types';
 import { Badge } from '@iconicedu/ui-web';
 import {
   AdminFilterBar,
@@ -16,7 +19,6 @@ import {
   buildMonthlyCompletionTrend,
   filterCompletions,
   formatCompletionMonth,
-  getCompletionParticipants,
   summarizeCompletions,
 } from '@iconicedu/web/app/(app)/[orgSlug]/admin/attendance/sessions/session-attendance-analytics';
 
@@ -202,10 +204,14 @@ export function SessionAttendanceDashboard({
   rows,
   selectedMonth,
   monthOptions,
+  teachers,
+  parents,
 }: {
   rows: AdminSessionCompletionVM[];
   selectedMonth: string;
   monthOptions: string[];
+  teachers: AdminOrgProfileOptionVM[];
+  parents: AdminOrgProfileOptionVM[];
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -234,24 +240,18 @@ export function SessionAttendanceDashboard({
     () => filterCompletions(rows, { ...filters, month: selectedMonth }),
     [filters, rows, selectedMonth],
   );
-  const summary = summarizeCompletions(filtered);
-  const people = (role: 'educator' | 'guardian') =>
-    new Map(
-      rows.flatMap((row) =>
-        getCompletionParticipants(row)
-          .filter((actor) => actor.role === role)
-          .map((actor) => [actor.profileId, actor.displayName] as const),
+  // The metrics/trend/breakdown/recent blocks report on *completed* lessons only
+  // and stay scoped to the month filter — the participant/classroom/method/search
+  // filters below only narrow the sessions table, not these summary blocks.
+  const completedRows = React.useMemo(
+    () =>
+      rows.filter(
+        (row) =>
+          row.completionMethod !== 'pending' && row.completionMethod !== 'disputed',
       ),
-    );
-  // Parents come from the schedule roster, not just confirmers, so a parent who
-  // never tapped "confirm" is still selectable.
-  const parents = new Map(
-    rows.flatMap((row) =>
-      (row.guardians ?? []).map(
-        (guardian) => [guardian.profileId, guardian.displayName] as const,
-      ),
-    ),
+    [rows],
   );
+  const summary = summarizeCompletions(completedRows);
   const classrooms = new Map(
     rows.flatMap((row) =>
       row.learningSpaceId
@@ -267,6 +267,12 @@ export function SessionAttendanceDashboard({
     ...[...values]
       .sort((a, b) => a[1].localeCompare(b[1]))
       .map(([value, name]) => ({ value, label: name })),
+  ];
+  const profileOptions = (values: AdminOrgProfileOptionVM[], label: string) => [
+    { value: 'all', label },
+    ...[...values]
+      .sort((a, b) => a.displayName.localeCompare(b.displayName))
+      .map((profile) => ({ value: profile.profileId, label: profile.displayName })),
   ];
   const selectedPeriodLabel =
     selectedMonth === ALL_COMPLETION_MONTHS
@@ -340,6 +346,8 @@ export function SessionAttendanceDashboard({
                 { value: 'confirmed', label: 'Confirmed' },
                 { value: 'auto_confirmed', label: 'Auto-confirmed' },
                 { value: 'mixed', label: 'Mixed' },
+                { value: 'pending', label: 'Pending' },
+                { value: 'disputed', label: 'Disputed' },
               ],
             },
           ]}
@@ -351,13 +359,13 @@ export function SessionAttendanceDashboard({
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(20rem,0.65fr)]">
-        <Trend rows={filtered} />
-        <RecentCompletions rows={filtered} />
+        <Trend rows={completedRows} />
+        <RecentCompletions rows={completedRows} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Breakdown title="Completed by teacher" rows={filtered} role="educator" />
-        <Breakdown title="Completed by parent" rows={filtered} role="guardian" />
+        <Breakdown title="Completed by teacher" rows={completedRows} role="educator" />
+        <Breakdown title="Completed by parent" rows={completedRows} role="guardian" />
       </div>
 
       <div className="flex flex-wrap items-center gap-4 rounded-xl border bg-card px-4 py-3">
@@ -369,7 +377,7 @@ export function SessionAttendanceDashboard({
             label: 'Teacher',
             value: filters.teacherId,
             onChange: update('teacherId'),
-            options: options(people('educator'), 'All teachers'),
+            options: profileOptions(teachers, 'All teachers'),
           }}
         />
         <FilterDropdown
@@ -377,7 +385,7 @@ export function SessionAttendanceDashboard({
             label: 'Parent',
             value: filters.parentId,
             onChange: update('parentId'),
-            options: options(parents, 'All parents'),
+            options: profileOptions(parents, 'All parents'),
           }}
         />
         <FilterDropdown
