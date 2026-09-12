@@ -364,8 +364,12 @@ export function SessionAttendanceDashboard({
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Breakdown title="Completed by teacher" rows={completedRows} role="educator" />
-        <Breakdown title="Completed by parent" rows={completedRows} role="guardian" />
+        {/* Unlike the metrics/trend/recent blocks, these read every session in the
+            completions table for the month — including still-pending and disputed
+            ones — so every teacher/parent with a session shows up, with their
+            confirmed/total ratio counting every session they're part of. */}
+        <Breakdown title="Completed by teacher" rows={rows} role="educator" />
+        <Breakdown title="Completed by parent" rows={rows} role="guardian" />
       </div>
 
       <div className="flex flex-wrap items-center gap-4 rounded-xl border bg-card px-4 py-3">
