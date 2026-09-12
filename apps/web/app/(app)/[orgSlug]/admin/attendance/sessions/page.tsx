@@ -18,6 +18,7 @@ import {
   listAdminSessionCompletions,
   listOrgRosterForAdmin,
 } from '@iconicedu/web/lib/api/session-completions';
+import { listSchedules } from '@iconicedu/web/lib/api/schedules';
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 
@@ -68,6 +69,7 @@ export default async function AdminCompletedSessionsPage({
         listOrgRosterForAdmin(supabase, { orgId: org.id, kind: 'guardian' }),
       ])
     : [[], []];
+  const schedules = await listSchedules(supabase, { orgId: org.id });
 
   return (
     <AdminPageShell title="Completed sessions">
@@ -82,9 +84,11 @@ export default async function AdminCompletedSessionsPage({
           monthOptions={monthOptions}
           teachers={teachers}
           parents={parents}
+          schedules={schedules}
+          orgId={org.id}
         />
       ) : (
-        <CompletedSessionsTable rows={rows} />
+        <CompletedSessionsTable rows={rows} schedules={schedules} orgId={org.id} />
       )}
     </AdminPageShell>
   );

@@ -1,5 +1,6 @@
 import type {
   AdminConfirmSessionCompletionInput,
+  AdminCreateSessionCompletionInput,
   AdminDeleteSessionCompletionInput,
   AdminOrgProfileOptionVM,
   AdminSessionCompletionVM,
@@ -63,6 +64,17 @@ export function deleteSessionCompletionAsAdmin(
     '/session-completions/admin/delete-submission',
     input,
   );
+}
+
+export function createSessionCompletionAsAdmin(
+  supabase: SupabaseClient,
+  input: AdminCreateSessionCompletionInput,
+) {
+  return createApiClient(supabase).post<{
+    success: boolean;
+    createdCount: number;
+    skippedCount: number;
+  }>('/session-completions/admin/create-manual', input);
 }
 
 export function getSessionCompletionSummary(

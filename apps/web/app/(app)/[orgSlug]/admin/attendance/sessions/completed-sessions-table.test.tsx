@@ -47,7 +47,7 @@ const row: AdminSessionCompletionVM = {
 
 describe('CompletedSessionsTable', () => {
   it('shows confirmation states and each person’s rating in the confirmation cell', () => {
-    render(<CompletedSessionsTable rows={[row]} />);
+    render(<CompletedSessionsTable rows={[row]} schedules={[]} orgId="org" />);
     expect(screen.getAllByRole('columnheader').map((cell) => cell.textContent)).toEqual([
       'Session',
       'Ended',
@@ -90,6 +90,8 @@ describe('CompletedSessionsTable', () => {
             })),
           },
         ]}
+        schedules={[]}
+        orgId="org"
       />,
     );
     expect(screen.queryByText(/Hidden/)).not.toBeInTheDocument();
@@ -99,7 +101,7 @@ describe('CompletedSessionsTable', () => {
   });
 
   it('spans the six columns for an empty result', () => {
-    render(<CompletedSessionsTable rows={[]} />);
+    render(<CompletedSessionsTable rows={[]} schedules={[]} orgId="org" />);
     expect(screen.getByRole('cell')).toHaveAttribute('colspan', '6');
   });
 });

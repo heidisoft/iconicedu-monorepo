@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import type {
   AdminConfirmSessionCompletionInput,
+  AdminCreateSessionCompletionInput,
   AdminDeleteSessionCompletionInput,
   AdminOrgProfileOptionVM,
   AdminSessionCompletionActorVM,
@@ -1114,6 +1115,132 @@ export class SessionCompletionsService {
     );
 
     return { success: true, deletedCount: deleted.length };
+  }
+
+  /**
+   * Manually creates a full 'pending' participant set for an occurrence with no
+   * completion-check trail at all (e.g. the dispatcher never ran for it) —
+   * mirrors exactly what the live dispatcher itself creates
+   * (upsertSessionCompletion): one row per educator/guardian/child on the
+   * schedule's own roster, so the real participants confirm/dispute it
+   * themselves rather than the admin asserting an outcome on their behalf.
+   * created_by/updated_by record the admin who added it — the live dispatcher
+   * never sets created_by, so this is what distinguishes a manually-added
+   * record from a system-created one.
+   */
+  async adminCreateManualCompletion(
+    authUserId: string,
+    body: AdminCreateSessionCompletionInput,
+  ): Promise<{ success: true; createdCount: number; skippedCount: number }> {
+    if (!body?.orgId || !isUuid(body.orgId)) {
+      throw new BadRequestException('Invalid orgId');
+    }
+    if (!body?.scheduleId || !isUuid(body.scheduleId)) {
+      throw new BadRequestException('Invalid scheduleId');
+    }
+    if (!body?.occurrenceKey || !Number.isFinite(Date.parse(body.occurrenceKey))) {
+      throw new BadRequestException('Invalid occurrenceKey');
+    }
+    if (!body?.sessionEndAt || !Number.isFinite(Date.parse(body.sessionEndAt))) {
+      throw new BadRequestException('Invalid sessionEndAt');
+    }
+    if (Date.parse(body.sessionEndAt) <= Date.parse(body.occurrenceKey)) {
+      throw new BadRequestException('sessionEndAt must be after occurrenceKey');
+    }
+
+    const supabase = createSupabaseServiceClient();
+    const account = await this.resolveAccount(supabase, authUserId, body.orgId);
+    await this.assertAdminAccess(supabase, account, body.orgId);
+
+    const { data: schedule, error: scheduleError } = await supabase
+      .from('class_schedules')
+      .select('id, title, source_channel_id, source_learning_space_id')
+      .eq('org_id', body.orgId)
+      .eq('id', body.scheduleId)
+      .is('deleted_at', null)
+      .maybeSingle<{
+        id: string;
+        title: string | null;
+        source_channel_id: string | null;
+        source_learning_space_id: string | null;
+      }>();
+    if (scheduleError) throw new InternalServerErrorException(scheduleError.message);
+    if (!schedule) throw new NotFoundException('Schedule not found');
+
+    const { data: participants, error: participantsError } = await supabase
+      .from('class_schedule_participants')
+      .select('profile_id, role')
+      .eq('org_id', body.orgId)
+      .eq('schedule_id', body.scheduleId)
+      .in('role', ['educator', 'guardian', 'child'])
+      .is('deleted_at', null)
+      .returns<Array<{ profile_id: string; role: string }>>();
+    if (participantsError) {
+      throw new InternalServerErrorException(participantsError.message);
+    }
+    if (!participants?.length) {
+      throw new BadRequestException(
+        'This classroom has no tutor/parent/student roster to notify',
+      );
+    }
+
+    const { data: staffProfile, error: staffProfileError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('account_id', account.id)
+      .eq('org_id', body.orgId)
+      .is('deleted_at', null)
+      .limit(1)
+      .maybeSingle<{ id: string }>();
+    if (staffProfileError) {
+      throw new InternalServerErrorException(staffProfileError.message);
+    }
+    const staffId = staffProfile?.id ?? account.id;
+
+    const now = new Date().toISOString();
+    const expiresAt = new Date(
+      Date.parse(body.sessionEndAt) + 3 * 24 * 60 * 60 * 1000,
+    ).toISOString();
+
+    const rows = participants.map((participant) => ({
+      org_id: body.orgId,
+      schedule_id: body.scheduleId,
+      occurrence_key: body.occurrenceKey,
+      profile_id: participant.profile_id,
+      role: participant.role,
+      status: 'pending' as const,
+      channel_id: schedule.source_channel_id,
+      learning_space_id: schedule.source_learning_space_id,
+      session_title: schedule.title,
+      session_end_at: body.sessionEndAt,
+      notified_at: now,
+      expires_at: expiresAt,
+      created_at: now,
+      created_by: staffId,
+      updated_at: now,
+      updated_by: staffId,
+    }));
+
+    const { data: inserted, error: insertError } = await supabase
+      .from('class_session_completions')
+      .upsert(rows, {
+        onConflict: 'org_id,schedule_id,occurrence_key,profile_id',
+        ignoreDuplicates: true,
+      })
+      .select('id');
+    if (insertError) throw new InternalServerErrorException(insertError.message);
+
+    const createdCount = inserted?.length ?? 0;
+    this.logger.log(
+      `session completion admin-created scheduleId=${body.scheduleId} ` +
+        `occurrenceKey=${body.occurrenceKey} count=${createdCount}`,
+    );
+
+    return {
+      success: true,
+      createdCount,
+      skippedCount: rows.length - createdCount,
+    };
   }
 
   /**

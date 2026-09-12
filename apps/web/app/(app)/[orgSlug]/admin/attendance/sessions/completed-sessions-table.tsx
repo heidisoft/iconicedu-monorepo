@@ -9,8 +9,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  Plus,
   Trash2,
 } from 'lucide-react';
+import { toUtcFromLocal } from '@iconicedu/utils';
 import { getCompletionParticipants } from './session-attendance-analytics';
 import type {
   AdminSessionCompletionParticipantVM,
@@ -26,6 +28,20 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  Input,
+  Label,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Table,
   TableBody,
   TableCell,
@@ -38,6 +54,7 @@ import {
   formatAttendanceDateTime,
   formatAttendanceDuration,
 } from '@iconicedu/web/app/(app)/[orgSlug]/admin/attendance/sessions/live-session-attendance.utils';
+import type { ScheduleOptionRow } from '@iconicedu/web/lib/api/schedules';
 
 const PAGE_SIZE = 10;
 
@@ -53,7 +70,188 @@ function getSessionDurationSeconds(row: AdminSessionCompletionVM) {
   return (end - start) / 1000;
 }
 
-export function CompletedSessionsTable({ rows }: { rows: AdminSessionCompletionVM[] }) {
+// Lets an admin backfill a session that has no completion-check trail at all
+// (e.g. the dispatcher never ran for it) — creates a full 'pending' row per
+// tutor/parent/student on the chosen classroom's own roster, same as a normal
+// live-dispatched session, so the real participants confirm/dispute it
+// themselves rather than the admin asserting an outcome on their behalf.
+function CreateSessionDialog({
+  orgId,
+  schedules,
+}: {
+  orgId: string;
+  schedules: ScheduleOptionRow[];
+}) {
+  const router = useRouter();
+  const [open, setOpen] = React.useState(false);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [scheduleId, setScheduleId] = React.useState('');
+  const formRef = React.useRef<HTMLFormElement | null>(null);
+
+  const activeSchedules = schedules.filter((schedule) => schedule.status !== 'cancelled');
+
+  const handleOpenChange = (next: boolean) => {
+    if (isSubmitting) return;
+    setOpen(next);
+    if (!next) {
+      formRef.current?.reset();
+      setScheduleId('');
+    }
+  };
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const date = String(formData.get('date') ?? '');
+    const startTime = String(formData.get('startTime') ?? '');
+    const endTime = String(formData.get('endTime') ?? '');
+    const schedule = schedules.find((candidate) => candidate.id === scheduleId);
+
+    if (!schedule) {
+      toast.error('Choose a classroom');
+      return;
+    }
+
+    const timezone = schedule.timezone ?? 'UTC';
+    const occurrenceKey = toUtcFromLocal(date, startTime, timezone);
+    const sessionEndAt = toUtcFromLocal(date, endTime, timezone);
+    if (!occurrenceKey || !sessionEndAt) {
+      toast.error('Enter a valid date, start time, and end time');
+      return;
+    }
+    if (Date.parse(sessionEndAt) <= Date.parse(occurrenceKey)) {
+      toast.error('End time must be after the start time');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const response = await fetch('/api/admin/session-completions/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orgId,
+          scheduleId: schedule.id,
+          occurrenceKey,
+          sessionEndAt,
+        }),
+      });
+      const result = await response.json();
+      if (!result?.success) {
+        throw new Error(result?.message ?? 'Unable to create session.');
+      }
+      if (!result.createdCount) {
+        toast.error('That session already has records for every participant.');
+      } else {
+        toast.success(
+          result.skippedCount
+            ? `Created ${result.createdCount} record(s); ${result.skippedCount} already existed`
+            : `Created ${result.createdCount} record(s), awaiting confirmation`,
+        );
+        handleOpenChange(false);
+        router.refresh();
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to create session.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline" type="button">
+          <Plus className="mr-1.5 size-3.5" />
+          Add session
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="space-y-4 sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Add a session manually</DialogTitle>
+          <DialogDescription>
+            Use this when a session happened but never got a completion record — e.g. the
+            automatic check never ran for it. Creates a pending record for every tutor,
+            parent, and student on the classroom&apos;s roster so they can confirm it
+            themselves.
+          </DialogDescription>
+        </DialogHeader>
+        <form
+          ref={formRef}
+          onSubmit={(event) => void handleSubmit(event)}
+          className="space-y-4"
+        >
+          <div className="space-y-1">
+            <Label htmlFor="create-session-classroom">Classroom</Label>
+            <Select
+              value={scheduleId}
+              onValueChange={setScheduleId}
+              disabled={isSubmitting}
+            >
+              <SelectTrigger id="create-session-classroom" className="w-full">
+                <SelectValue placeholder="Select a classroom" />
+              </SelectTrigger>
+              <SelectContent>
+                {activeSchedules.map((schedule) => (
+                  <SelectItem key={schedule.id} value={schedule.id}>
+                    {schedule.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="create-session-date">Session date</Label>
+            <Input
+              id="create-session-date"
+              name="date"
+              type="date"
+              required
+              disabled={isSubmitting}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="create-session-start">Start time</Label>
+              <Input
+                id="create-session-start"
+                name="startTime"
+                type="time"
+                required
+                disabled={isSubmitting}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="create-session-end">End time</Label>
+              <Input
+                id="create-session-end"
+                name="endTime"
+                type="time"
+                required
+                disabled={isSubmitting}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="submit" disabled={isSubmitting || !scheduleId}>
+              {isSubmitting ? 'Creating…' : 'Create session'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export function CompletedSessionsTable({
+  rows,
+  schedules,
+  orgId,
+}: {
+  rows: AdminSessionCompletionVM[];
+  schedules: ScheduleOptionRow[];
+  orgId: string;
+}) {
   const router = useRouter();
   const [page, setPage] = React.useState(1);
   const [confirmingId, setConfirmingId] = React.useState<string | null>(null);
@@ -141,6 +339,9 @@ export function CompletedSessionsTable({ rows }: { rows: AdminSessionCompletionV
 
   return (
     <div className="w-full min-w-0 overflow-hidden rounded-xl border bg-card">
+      <div className="flex items-center justify-end border-b px-4 py-3">
+        <CreateSessionDialog orgId={orgId} schedules={schedules} />
+      </div>
       <Table>
         <TableHeader>
           <TableRow>

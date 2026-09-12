@@ -12,6 +12,7 @@ import {
   FilterDropdown,
 } from '@iconicedu/web/components/admin/admin-filter-bar';
 import { CompletedSessionsTable } from '@iconicedu/web/app/(app)/[orgSlug]/admin/attendance/sessions/completed-sessions-table';
+import type { ScheduleOptionRow } from '@iconicedu/web/lib/api/schedules';
 import {
   ALL_COMPLETION_MONTHS,
   buildConfirmerBreakdown,
@@ -206,12 +207,16 @@ export function SessionAttendanceDashboard({
   monthOptions,
   teachers,
   parents,
+  schedules,
+  orgId,
 }: {
   rows: AdminSessionCompletionVM[];
   selectedMonth: string;
   monthOptions: string[];
   teachers: AdminOrgProfileOptionVM[];
   parents: AdminOrgProfileOptionVM[];
+  schedules: ScheduleOptionRow[];
+  orgId: string;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -407,7 +412,7 @@ export function SessionAttendanceDashboard({
         />
       </div>
 
-      <CompletedSessionsTable rows={filtered} />
+      <CompletedSessionsTable rows={filtered} schedules={schedules} orgId={orgId} />
     </div>
   );
 }
