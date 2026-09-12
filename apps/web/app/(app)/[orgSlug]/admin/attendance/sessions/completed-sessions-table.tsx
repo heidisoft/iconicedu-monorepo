@@ -1,7 +1,11 @@
-import { Check, Clock, CircleAlert } from 'lucide-react';
+'use client';
+
+import * as React from 'react';
+import { Check, Clock, CircleAlert, ChevronLeft, ChevronRight } from 'lucide-react';
 import { getCompletionParticipants } from './session-attendance-analytics';
 import type { AdminSessionCompletionVM } from '@iconicedu/shared-types';
 import {
+  Button,
   Table,
   TableBody,
   TableCell,
@@ -13,6 +17,8 @@ import {
   formatAttendanceDateTime,
   formatAttendanceDuration,
 } from '@iconicedu/web/app/(app)/[orgSlug]/admin/attendance/sessions/live-session-attendance.utils';
+
+const PAGE_SIZE = 10;
 
 // Scheduled length of the occurrence: end minus its start (occurrenceKey). Returns
 // null when either bound is unparseable or non-positive — some backfilled rows
@@ -27,6 +33,19 @@ function getSessionDurationSeconds(row: AdminSessionCompletionVM) {
 }
 
 export function CompletedSessionsTable({ rows }: { rows: AdminSessionCompletionVM[] }) {
+  const [page, setPage] = React.useState(1);
+
+  // Filters upstream replace `rows` with a new array, so reset back to page 1
+  // whenever the underlying result set changes rather than stranding the user
+  // on a page that may no longer exist.
+  React.useEffect(() => {
+    setPage(1);
+  }, [rows]);
+
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageRows = rows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
   return (
     <div className="w-full min-w-0 overflow-hidden rounded-xl border bg-card">
       <Table>
@@ -47,7 +66,7 @@ export function CompletedSessionsTable({ rows }: { rows: AdminSessionCompletionV
               </TableCell>
             </TableRow>
           )}
-          {rows.map((row) => (
+          {pageRows.map((row) => (
             <TableRow key={row.id}>
               <TableCell className="font-medium">
                 {row.sessionTitle ?? 'Scheduled session'}
@@ -103,6 +122,39 @@ export function CompletedSessionsTable({ rows }: { rows: AdminSessionCompletionV
           ))}
         </TableBody>
       </Table>
+      {rows.length > 0 && (
+        <div className="flex items-center justify-between gap-3 border-t px-4 py-3">
+          <p className="text-xs text-muted-foreground">
+            Showing {(currentPage - 1) * PAGE_SIZE + 1}–
+            {Math.min(currentPage * PAGE_SIZE, rows.length)} of {rows.length}
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1"
+              disabled={currentPage <= 1}
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+              Previous
+            </Button>
+            <span className="text-xs text-muted-foreground">
+              Page {currentPage} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1"
+              disabled={currentPage >= totalPages}
+              onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+            >
+              Next
+              <ChevronRight className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

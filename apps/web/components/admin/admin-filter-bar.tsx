@@ -67,7 +67,7 @@ function useWindowWidth() {
 
 // ─── FilterDropdown (inline) ──────────────────────────────────────────────────
 
-function FilterDropdown({
+export function FilterDropdown({
   group,
   fullWidth = false,
 }: {

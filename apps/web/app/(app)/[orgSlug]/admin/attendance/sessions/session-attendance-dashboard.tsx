@@ -4,7 +4,10 @@ import * as React from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import type { AdminSessionCompletionVM } from '@iconicedu/shared-types';
 import { Badge } from '@iconicedu/ui-web';
-import { AdminFilterBar } from '@iconicedu/web/components/admin/admin-filter-bar';
+import {
+  AdminFilterBar,
+  FilterDropdown,
+} from '@iconicedu/web/components/admin/admin-filter-bar';
 import { CompletedSessionsTable } from '@iconicedu/web/app/(app)/[orgSlug]/admin/attendance/sessions/completed-sessions-table';
 import {
   ALL_COMPLETION_MONTHS,
@@ -329,27 +332,6 @@ export function SessionAttendanceDashboard({
               options: options(classrooms, 'All classrooms'),
             },
             {
-              label: 'Teacher',
-              value: filters.teacherId,
-              onChange: update('teacherId'),
-              options: options(people('educator'), 'All teachers'),
-            },
-            {
-              label: 'Parent',
-              value: filters.parentId,
-              onChange: update('parentId'),
-              options: options(parents, 'All parents'),
-            },
-            {
-              label: 'Student',
-              value: filters.studentName,
-              onChange: update('studentName'),
-              options: [
-                { value: 'all', label: 'All students' },
-                ...students.map((name) => ({ value: name, label: name })),
-              ],
-            },
-            {
               label: 'Method',
               value: filters.method,
               onChange: update('method'),
@@ -376,6 +358,39 @@ export function SessionAttendanceDashboard({
       <div className="grid gap-4 lg:grid-cols-2">
         <Breakdown title="Completed by teacher" rows={filtered} role="educator" />
         <Breakdown title="Completed by parent" rows={filtered} role="guardian" />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-4 rounded-xl border bg-card px-4 py-3">
+        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Filter by participant
+        </span>
+        <FilterDropdown
+          group={{
+            label: 'Teacher',
+            value: filters.teacherId,
+            onChange: update('teacherId'),
+            options: options(people('educator'), 'All teachers'),
+          }}
+        />
+        <FilterDropdown
+          group={{
+            label: 'Parent',
+            value: filters.parentId,
+            onChange: update('parentId'),
+            options: options(parents, 'All parents'),
+          }}
+        />
+        <FilterDropdown
+          group={{
+            label: 'Student',
+            value: filters.studentName,
+            onChange: update('studentName'),
+            options: [
+              { value: 'all', label: 'All students' },
+              ...students.map((name) => ({ value: name, label: name })),
+            ],
+          }}
+        />
       </div>
 
       <CompletedSessionsTable rows={filtered} />
