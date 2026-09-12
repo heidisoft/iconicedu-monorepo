@@ -1,4 +1,5 @@
 import type {
+  AdminConfirmSessionCompletionInput,
   AdminSessionCompletionVM,
   ChannelSessionCompletionVM,
   ConnectionVM,
@@ -28,6 +29,16 @@ export function listAdminSessionCompletions(
 ) {
   return createApiClient(supabase).get<AdminSessionCompletionVM[]>(
     '/session-completions/admin',
+    input,
+  );
+}
+
+export function confirmSessionCompletionAsAdmin(
+  supabase: SupabaseClient,
+  input: AdminConfirmSessionCompletionInput,
+) {
+  return createApiClient(supabase).post<{ success: boolean; confirmedCount: number }>(
+    '/session-completions/admin/confirm-occurrence',
     input,
   );
 }

@@ -54,6 +54,7 @@ describe('CompletedSessionsTable', () => {
       'Duration',
       'Students',
       'Confirmed by',
+      'Actions',
     ]);
     expect(screen.getByText('1h 0m')).toBeInTheDocument();
     const people = screen.getAllByRole('listitem');
@@ -67,6 +68,9 @@ describe('CompletedSessionsTable', () => {
     expect(within(people[2]).getByText('Rating: 4.0 / 5')).toBeInTheDocument();
     expect(within(people[3]).getByText('(Parent) · Disputed')).toBeInTheDocument();
     expect(screen.queryByText('4.5 / 5')).not.toBeInTheDocument();
+    // A disputed participant blocks the staff "Confirm" action for the occurrence.
+    expect(screen.getByText('Dispute reported')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Confirm' })).not.toBeInTheDocument();
   });
 
   it('excludes staff and children from the compatibility fallback', () => {
@@ -91,10 +95,11 @@ describe('CompletedSessionsTable', () => {
     expect(screen.queryByText(/Hidden/)).not.toBeInTheDocument();
     expect(screen.getByText(/Waiting Parent/)).toBeInTheDocument();
     expect(screen.getByText('(Parent) · Pending')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Confirm' })).toBeInTheDocument();
   });
 
-  it('spans the four columns for an empty result', () => {
+  it('spans the six columns for an empty result', () => {
     render(<CompletedSessionsTable rows={[]} />);
-    expect(screen.getByRole('cell')).toHaveAttribute('colspan', '5');
+    expect(screen.getByRole('cell')).toHaveAttribute('colspan', '6');
   });
 });

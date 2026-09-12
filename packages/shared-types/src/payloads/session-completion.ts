@@ -43,3 +43,15 @@ export type SkipSessionCompletionRatingInput = {
   orgId: UUID;
   sessionCompletionId: UUID;
 };
+
+// Natural-key addressed (not sessionCompletionId) because an admin acts on the
+// whole occurrence at once — every participant row for it — rather than a
+// single person's row, and the admin completed-sessions list only ever exposes
+// the schedule/occurrence pair, not individual row ids. Confirming settles
+// every still-open (pending/auto_confirmed) row for the occurrence, which is
+// also what stops the confirm prompt from resurfacing for the teacher/parent.
+export type AdminConfirmSessionCompletionInput = {
+  orgId: UUID;
+  scheduleId: UUID;
+  occurrenceKey: string;
+};
