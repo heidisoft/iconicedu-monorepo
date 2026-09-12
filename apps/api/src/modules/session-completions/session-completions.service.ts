@@ -8,6 +8,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type {
+  AdminConfirmSessionCompletionInput,
   AdminSessionCompletionActorVM,
   AdminSessionCompletionGuardianVM,
   AdminSessionCompletionParticipantVM,
@@ -944,6 +945,104 @@ export class SessionCompletionsService {
     } catch {
       throw new BadRequestException('Invalid cursor');
     }
+  }
+
+  /**
+   * Staff override for a whole occurrence: settles every still-open (pending or
+   * auto_confirmed) participant row at once, rather than the single owned row
+   * `confirm()` handles. Unlike `confirm()`, the caller need not be a party to
+   * the session — authorization is admin-role-based (`assertAdminAccess`), the
+   * same gate `listForAdmin` uses. Flipping status away from 'pending' is what
+   * stops the teacher/parent prompt from resurfacing: their own `confirm()` call
+   * (or the mobile prompt driving it) treats a non-pending row as already
+   * resolved, and the completion-check reminder job only ever targets pending
+   * rows.
+   */
+  async adminConfirm(authUserId: string, body: AdminConfirmSessionCompletionInput) {
+    if (!body?.orgId || !isUuid(body.orgId)) {
+      throw new BadRequestException('Invalid orgId');
+    }
+    if (!body?.scheduleId || !isUuid(body.scheduleId)) {
+      throw new BadRequestException('Invalid scheduleId');
+    }
+    if (!body?.occurrenceKey || !Number.isFinite(Date.parse(body.occurrenceKey))) {
+      throw new BadRequestException('Invalid occurrenceKey');
+    }
+
+    const supabase = createSupabaseServiceClient();
+    const account = await this.resolveAccount(supabase, authUserId, body.orgId);
+    await this.assertAdminAccess(supabase, account, body.orgId);
+
+    const { data: rows, error } = await supabase
+      .from('class_session_completions')
+      .select('*')
+      .eq('org_id', body.orgId)
+      .eq('schedule_id', body.scheduleId)
+      .eq('occurrence_key', body.occurrenceKey)
+      .is('deleted_at', null)
+      .returns<ClassSessionCompletionRow[]>();
+
+    if (error) throw new InternalServerErrorException(error.message);
+    if (!rows?.length) throw new NotFoundException('Session completion not found');
+
+    if (rows.some((row) => row.status === 'disputed')) {
+      throw new ConflictException(
+        "This session has an open dispute, so it can't be confirmed here. " +
+          'Resolve the dispute first.',
+      );
+    }
+
+    const openRows = rows.filter(
+      (row) => row.status === 'pending' || row.status === 'auto_confirmed',
+    );
+    if (!openRows.length) {
+      return { success: true, alreadyResolved: true, confirmedCount: 0 };
+    }
+
+    const { data: staffProfile, error: staffProfileError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('account_id', account.id)
+      .eq('org_id', body.orgId)
+      .is('deleted_at', null)
+      .limit(1)
+      .maybeSingle<{ id: string }>();
+    if (staffProfileError)
+      throw new InternalServerErrorException(staffProfileError.message);
+
+    const now = new Date().toISOString();
+    const { data: updated, error: updateError } = await supabase
+      .from('class_session_completions')
+      .update({
+        status: 'confirmed',
+        confirmed_at: now,
+        resolved_at: now,
+        updated_at: now,
+        updated_by: staffProfile?.id ?? account.id,
+      })
+      .in(
+        'id',
+        openRows.map((row) => row.id),
+      )
+      .eq('org_id', body.orgId)
+      .in('status', ['pending', 'auto_confirmed'])
+      .select('id')
+      .returns<Array<{ id: string }>>();
+
+    if (updateError) throw new InternalServerErrorException(updateError.message);
+
+    this.logger.log(
+      `session completion admin-confirmed scheduleId=${body.scheduleId} ` +
+        `occurrenceKey=${body.occurrenceKey} count=${updated?.length ?? 0}`,
+    );
+
+    await Promise.all(
+      openRows.map((row) =>
+        this.markRelatedActivityFeedItemsRead(supabase, body.orgId, row),
+      ),
+    );
+
+    return { success: true, confirmedCount: updated?.length ?? 0 };
   }
 
   async listForAdmin(

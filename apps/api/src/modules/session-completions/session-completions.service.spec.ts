@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  NotFoundException,
 } from '@nestjs/common';
 import { SessionCompletionsService } from '@iconicedu/api/modules/session-completions/session-completions.service';
 import { publishActivityEvent } from '@iconicedu/api/lib/activity-feed/activity-publisher';
@@ -578,6 +579,168 @@ describe('SessionCompletionsService', () => {
       expect(rows[0].participants).toContainEqual(
         expect.objectContaining({ profileId: OTHER_PROFILE_ID, status: 'pending' }),
       );
+    });
+  });
+
+  describe('adminConfirm', () => {
+    const OCCURRENCE_KEY = '2030-03-06T10:00:00.000Z';
+    const OTHER_COMPLETION_ID = '00000000-0000-4000-8000-00000000000a';
+
+    function setup(input: {
+      rows: ReturnType<typeof baseCompletionRow>[];
+      roleRow?: { role_key: string } | null;
+      primaryRoleRow?: { id: string } | null;
+      staffProfileRow?: { id: string } | null;
+    }) {
+      let accountCalls = 0;
+      const accountChain = makeChain({ data: { id: ACCOUNT_ID, org_id: ORG_ID } });
+      const primaryRoleChain = makeChain({
+        data:
+          input.primaryRoleRow === undefined ? { id: ACCOUNT_ID } : input.primaryRoleRow,
+      });
+      const roleChain = makeChain({
+        data: input.roleRow === undefined ? { role_key: 'admin' } : input.roleRow,
+      });
+      const selectChain = makeChain({ data: input.rows });
+      const updateChain: Record<string, jest.Mock> = {
+        update: jest.fn(() => updateChain),
+        in: jest.fn(() => updateChain),
+        eq: jest.fn(() => updateChain),
+        select: jest.fn(() => updateChain),
+        returns: jest.fn(async () => ({
+          data: input.rows
+            .filter((row) => row.status === 'pending' || row.status === 'auto_confirmed')
+            .map((row) => ({ id: row.id as string })),
+          error: null,
+        })),
+      };
+      const profileChain = makeChain({
+        data:
+          input.staffProfileRow === undefined
+            ? { id: PROFILE_ID }
+            : input.staffProfileRow,
+      });
+      const activityFeedSelectChain = makeChain({ data: [] });
+      const activityFeedUpdateChain: Record<string, jest.Mock> = {
+        update: jest.fn(() => activityFeedUpdateChain),
+        eq: jest.fn(() => activityFeedUpdateChain),
+        in: jest.fn(() => activityFeedUpdateChain),
+      };
+
+      const from = jest.fn((table: string) => {
+        if (table === 'accounts') {
+          accountCalls += 1;
+          // 1st: resolveAccount. 2nd: assertAdminAccess primary_role check.
+          return accountCalls === 1 ? accountChain : primaryRoleChain;
+        }
+        if (table === 'user_roles') return roleChain;
+        if (table === 'class_session_completions') {
+          return {
+            select: jest.fn(() => selectChain),
+            update: updateChain.update,
+          };
+        }
+        if (table === 'profiles') return profileChain;
+        if (table === 'activity_feed_items') {
+          return {
+            select: jest.fn(() => activityFeedSelectChain),
+            update: activityFeedUpdateChain.update,
+          };
+        }
+        throw new Error(`Unexpected table: ${table}`);
+      });
+      createSupabaseServiceClientMock.mockReturnValue({ from } as never);
+      return { from, selectChain, updateChain };
+    }
+
+    it('confirms every pending/auto_confirmed row and stamps the staff profile as updated_by', async () => {
+      const rows = [
+        baseCompletionRow({ id: COMPLETION_ID, role: 'educator', status: 'pending' }),
+        baseCompletionRow({
+          id: OTHER_COMPLETION_ID,
+          role: 'guardian',
+          status: 'auto_confirmed',
+        }),
+      ];
+      const { updateChain } = setup({ rows });
+
+      const result = await new SessionCompletionsService().adminConfirm(AUTH_USER_ID, {
+        orgId: ORG_ID,
+        scheduleId: SCHEDULE_ID,
+        occurrenceKey: OCCURRENCE_KEY,
+      });
+
+      expect(result).toEqual({ success: true, confirmedCount: 2 });
+      expect(updateChain.update).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'confirmed', updated_by: PROFILE_ID }),
+      );
+      expect(updateChain.in).toHaveBeenCalledWith('id', [
+        COMPLETION_ID,
+        OTHER_COMPLETION_ID,
+      ]);
+    });
+
+    it('is a no-op success once every row is already confirmed', async () => {
+      const rows = [baseCompletionRow({ status: 'confirmed' })];
+      setup({ rows });
+
+      const result = await new SessionCompletionsService().adminConfirm(AUTH_USER_ID, {
+        orgId: ORG_ID,
+        scheduleId: SCHEDULE_ID,
+        occurrenceKey: OCCURRENCE_KEY,
+      });
+
+      expect(result).toEqual({ success: true, alreadyResolved: true, confirmedCount: 0 });
+    });
+
+    it('rejects when any participant row is disputed', async () => {
+      const rows = [baseCompletionRow({ status: 'disputed' })];
+      setup({ rows });
+
+      await expect(
+        new SessionCompletionsService().adminConfirm(AUTH_USER_ID, {
+          orgId: ORG_ID,
+          scheduleId: SCHEDULE_ID,
+          occurrenceKey: OCCURRENCE_KEY,
+        }),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('rejects a non-admin caller', async () => {
+      setup({ rows: [], roleRow: null, primaryRoleRow: null });
+
+      await expect(
+        new SessionCompletionsService().adminConfirm(AUTH_USER_ID, {
+          orgId: ORG_ID,
+          scheduleId: SCHEDULE_ID,
+          occurrenceKey: OCCURRENCE_KEY,
+        }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('rejects when the occurrence has no completion rows', async () => {
+      setup({ rows: [] });
+
+      await expect(
+        new SessionCompletionsService().adminConfirm(AUTH_USER_ID, {
+          orgId: ORG_ID,
+          scheduleId: SCHEDULE_ID,
+          occurrenceKey: OCCURRENCE_KEY,
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('rejects an invalid scheduleId before querying', async () => {
+      const { from } = setup({ rows: [] });
+
+      await expect(
+        new SessionCompletionsService().adminConfirm(AUTH_USER_ID, {
+          orgId: ORG_ID,
+          scheduleId: 'not-a-uuid',
+          occurrenceKey: OCCURRENCE_KEY,
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(from).not.toHaveBeenCalled();
     });
   });
 

@@ -10,6 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type {
+  AdminConfirmSessionCompletionInput,
   ConfirmSessionCompletionInput,
   DisputeSessionCompletionInput,
   RateSessionCompletionInput,
@@ -181,6 +182,15 @@ export class SessionCompletionsController {
       ...body,
       sessionCompletionId: id,
     });
+  }
+
+  @Post('admin/confirm-occurrence')
+  @UseGuards(AuthGuard)
+  adminConfirm(
+    @Req() req: AuthenticatedRequest,
+    @Body() body: AdminConfirmSessionCompletionInput,
+  ) {
+    return this.sessionCompletionsService.adminConfirm(req.user.id, body);
   }
 
   @Get('admin')
