@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import type {
   AdminConfirmSessionCompletionInput,
+  AdminDeleteSessionCompletionInput,
   AdminOrgProfileOptionVM,
   AdminSessionCompletionActorVM,
   AdminSessionCompletionGuardianVM,
@@ -1044,6 +1045,75 @@ export class SessionCompletionsService {
     );
 
     return { success: true, confirmedCount: updated?.length ?? 0 };
+  }
+
+  /**
+   * Soft-deletes a wrong/erroneous admin submission — either one participant's
+   * row (profileId given) or every row for the occurrence (profileId omitted),
+   * for cleaning up a bad entry rather than resolving a real one.
+   */
+  async adminDeleteSubmission(
+    authUserId: string,
+    body: AdminDeleteSessionCompletionInput,
+  ): Promise<{ success: true; deletedCount: number }> {
+    if (!body?.orgId || !isUuid(body.orgId)) {
+      throw new BadRequestException('Invalid orgId');
+    }
+    if (!body?.scheduleId || !isUuid(body.scheduleId)) {
+      throw new BadRequestException('Invalid scheduleId');
+    }
+    if (!body?.occurrenceKey || !Number.isFinite(Date.parse(body.occurrenceKey))) {
+      throw new BadRequestException('Invalid occurrenceKey');
+    }
+    if (body.profileId && !isUuid(body.profileId)) {
+      throw new BadRequestException('Invalid profileId');
+    }
+
+    const supabase = createSupabaseServiceClient();
+    const account = await this.resolveAccount(supabase, authUserId, body.orgId);
+    await this.assertAdminAccess(supabase, account, body.orgId);
+
+    const { data: staffProfile, error: staffProfileError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('account_id', account.id)
+      .eq('org_id', body.orgId)
+      .is('deleted_at', null)
+      .limit(1)
+      .maybeSingle<{ id: string }>();
+    if (staffProfileError) {
+      throw new InternalServerErrorException(staffProfileError.message);
+    }
+
+    const now = new Date().toISOString();
+    const deletedBy = staffProfile?.id ?? account.id;
+    const baseQuery = supabase
+      .from('class_session_completions')
+      .update({
+        deleted_at: now,
+        deleted_by: deletedBy,
+        updated_at: now,
+        updated_by: deletedBy,
+      })
+      .eq('org_id', body.orgId)
+      .eq('schedule_id', body.scheduleId)
+      .eq('occurrence_key', body.occurrenceKey)
+      .is('deleted_at', null);
+    const query = body.profileId ? baseQuery.eq('profile_id', body.profileId) : baseQuery;
+
+    const { data: deleted, error } = await query
+      .select('id')
+      .returns<Array<{ id: string }>>();
+    if (error) throw new InternalServerErrorException(error.message);
+    if (!deleted?.length) throw new NotFoundException('Session completion not found');
+
+    this.logger.log(
+      `session completion admin-deleted scheduleId=${body.scheduleId} ` +
+        `occurrenceKey=${body.occurrenceKey} profileId=${body.profileId ?? 'all'} ` +
+        `count=${deleted.length}`,
+    );
+
+    return { success: true, deletedCount: deleted.length };
   }
 
   /**

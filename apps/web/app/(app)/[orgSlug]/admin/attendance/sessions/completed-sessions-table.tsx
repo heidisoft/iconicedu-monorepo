@@ -9,10 +9,22 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  Trash2,
 } from 'lucide-react';
 import { getCompletionParticipants } from './session-attendance-analytics';
-import type { AdminSessionCompletionVM } from '@iconicedu/shared-types';
+import type {
+  AdminSessionCompletionParticipantVM,
+  AdminSessionCompletionVM,
+} from '@iconicedu/shared-types';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
   Button,
   Table,
   TableBody,
@@ -82,6 +94,47 @@ export function CompletedSessionsTable({ rows }: { rows: AdminSessionCompletionV
     }
   };
 
+  // Removes a wrong entry rather than resolving a real one: either one
+  // participant's submission (person given) or the whole occurrence's rows
+  // (person omitted), for cleaning up bad data (e.g. an erroneous backfill).
+  const [pendingDelete, setPendingDelete] = React.useState<{
+    row: AdminSessionCompletionVM;
+    person: AdminSessionCompletionParticipantVM | null;
+  } | null>(null);
+  const [deletingKey, setDeletingKey] = React.useState<string | null>(null);
+
+  const handleDeleteSubmission = async () => {
+    if (!pendingDelete || deletingKey) return;
+    const { row, person } = pendingDelete;
+    const key = `${row.id}|${person?.profileId ?? 'all'}`;
+    setDeletingKey(key);
+    try {
+      const response = await fetch('/api/admin/session-completions/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orgId: row.orgId,
+          scheduleId: row.scheduleId,
+          occurrenceKey: row.occurrenceKey,
+          profileId: person?.profileId,
+        }),
+      });
+      const result = await response.json();
+      if (!result?.success) {
+        throw new Error(result?.message ?? 'Unable to delete submission.');
+      }
+      toast.success(person ? 'Submission deleted' : 'Session entry deleted');
+      setPendingDelete(null);
+      router.refresh();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : 'Unable to delete submission.',
+      );
+    } finally {
+      setDeletingKey(null);
+    }
+  };
+
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const pageRows = rows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
@@ -147,7 +200,7 @@ export function CompletedSessionsTable({ rows }: { rows: AdminSessionCompletionV
                             aria-hidden="true"
                             className={`mt-0.5 size-4 shrink-0 ${confirmed ? 'text-primary' : 'text-muted-foreground'}`}
                           />
-                          <div>
+                          <div className="min-w-0 flex-1">
                             <p>
                               {person.displayName}{' '}
                               <span className="text-xs text-muted-foreground">
@@ -161,6 +214,16 @@ export function CompletedSessionsTable({ rows }: { rows: AdminSessionCompletionV
                               </p>
                             )}
                           </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 shrink-0 p-0 text-muted-foreground hover:text-destructive"
+                            aria-label={`Delete ${person.displayName}'s submission`}
+                            title="Delete this submission"
+                            onClick={() => setPendingDelete({ row, person })}
+                          >
+                            <Trash2 className="size-3.5" />
+                          </Button>
                         </li>
                       );
                     })}
@@ -168,26 +231,38 @@ export function CompletedSessionsTable({ rows }: { rows: AdminSessionCompletionV
                   {participants.length === 0 && '—'}
                 </TableCell>
                 <TableCell>
-                  {hasDispute ? (
-                    <span className="text-xs text-muted-foreground">
-                      Dispute reported
-                    </span>
-                  ) : needsConfirmation ? (
+                  <div className="flex items-center gap-2">
+                    {hasDispute ? (
+                      <span className="text-xs text-muted-foreground">
+                        Dispute reported
+                      </span>
+                    ) : needsConfirmation ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={confirmingId === row.id}
+                        onClick={() => void handleStaffConfirm(row)}
+                      >
+                        {confirmingId === row.id ? (
+                          <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                        ) : (
+                          'Confirm'
+                        )}
+                      </Button>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Confirmed</span>
+                    )}
                     <Button
                       variant="outline"
                       size="sm"
-                      disabled={confirmingId === row.id}
-                      onClick={() => void handleStaffConfirm(row)}
+                      className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                      aria-label="Delete this session entry"
+                      title="Delete this session entry (wrong submission)"
+                      onClick={() => setPendingDelete({ row, person: null })}
                     >
-                      {confirmingId === row.id ? (
-                        <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                      ) : (
-                        'Confirm'
-                      )}
+                      <Trash2 className="size-4" />
                     </Button>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">Confirmed</span>
-                  )}
+                  </div>
                 </TableCell>
               </TableRow>
             );
@@ -227,6 +302,38 @@ export function CompletedSessionsTable({ rows }: { rows: AdminSessionCompletionV
           </div>
         </div>
       )}
+
+      <AlertDialog
+        open={Boolean(pendingDelete)}
+        onOpenChange={(open) => {
+          if (!open && !deletingKey) setPendingDelete(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pendingDelete?.person
+                ? `Delete ${pendingDelete.person.displayName}'s submission?`
+                : 'Delete this session entry?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDelete?.person
+                ? "This permanently removes this person's confirmation/rating for this session. Use this only to clean up a wrong or erroneous entry."
+                : 'This permanently removes every submission for this session occurrence. Use this only to clean up a wrong or erroneous entry.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={Boolean(deletingKey)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={Boolean(deletingKey)}
+              onClick={() => void handleDeleteSubmission()}
+            >
+              {deletingKey ? 'Deleting…' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
