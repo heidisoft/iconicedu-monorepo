@@ -46,9 +46,10 @@
 --   * confirmed_at / resolved_at are set to the session's own end_at, NEVER
 --     now(), so the backfilled row does not masquerade as "just resolved"
 --     and flood the 3-day carousel/inbox window.
---   * Unbounded by month or org, unlike the September-specific migrations —
---     this gap can affect any recurring schedule's anchor occurrence,
---     regardless of when the schedule was created.
+--   * Bounded to September 2026 (session_end_at), matching the scope actually
+--     requested — the underlying gap isn't month-specific (it can affect any
+--     recurring schedule's anchor occurrence regardless of when the schedule
+--     was created), but this backfill only touches September.
 
 insert into public.class_session_completions (
   org_id, schedule_id, occurrence_key, profile_id, role,
@@ -85,6 +86,8 @@ where cs.deleted_at is null
   and cs.source_kind = 'class_session'
   and cs.status <> 'cancelled'
   and cs.end_at < now()
+  and cs.end_at >= (timestamp '2026-09-01 00:00:00' at time zone coalesce(cs.timezone, 'UTC'))
+  and cs.end_at <  (timestamp '2026-10-01 00:00:00' at time zone coalesce(cs.timezone, 'UTC'))
   and not exists (
     select 1
       from public.class_schedule_recurrence_exceptions cse

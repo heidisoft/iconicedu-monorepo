@@ -17,12 +17,14 @@
 -- itself, which still carries occurrence_start_at, the full recipient list
 -- (payload.members), title, channel/learning-space, and end time.
 --
--- 20260907090000_backfill_september_session_completions.sql and
--- 20260912000000_backfill_recurring_anchor_session_completions.sql already
--- reconstruct rows from reminder_jobs / class_schedules for narrower slices of
--- this same gap (September only; recurring anchors only). This migration is
--- the general case: every succeeded completion-check job, any month, whether
--- or not its schedule still exists.
+-- 20260907090000_backfill_september_session_completions.sql already
+-- reconstructs rows from reminder_jobs for September, but only per-occurrence
+-- (skips an occurrence entirely if any participant already has a row) and
+-- only for recurring schedules via a separate reminder_jobs reconstruction
+-- path. This migration re-covers September per-participant instead, so a
+-- partially-covered occurrence (e.g. only the teacher already has a row) gets
+-- its remaining participants filled in too. Scoped to September only, to
+-- match the scope actually requested and applied.
 --
 -- Trustworthiness of `status = 'succeeded'`: dispatchCompletionCheck
 -- (apps/api/src/modules/reminders/completion-check-dispatcher.service.ts)
@@ -34,22 +36,16 @@
 -- completion-check went out" — the same trust basis the September migration
 -- already relies on for its own reminder_jobs reconstruction.
 --
--- Verified counts before writing this (production, read-only queries): 489
--- succeeded completion-check jobs total; only 43 already have a matching
--- completion row (38 of those from jobs dispatched >= 2026-09-05, under the
--- current eager-upsert dispatcher; 5 from the September backfill migrations).
--- 441 of the 447 missing are from before 2026-09-05.
---
 -- Scope: class_session_completions.schedule_id is a NOT NULL foreign key to
 -- class_schedules(id) with no cascade, so a row can only be inserted for a
--- schedule that still exists. Of the 447 missing occurrences, 351 belong to a
--- schedule that was hard-deleted (the pre-09681b58 delete-and-recreate edit
--- pattern) and CANNOT be backfilled without either relaxing that constraint or
--- fabricating a placeholder schedule row — deliberately left alone here rather
--- than making that schema/data-integrity call unilaterally. This migration
--- only inserts for the 96 occurrences (308 participant-rows) whose schedule is
--- still present, joining class_schedules to let the foreign key do the
--- filtering rather than duplicating its existence check by hand.
+-- schedule that still exists. Some September occurrences belong to a schedule
+-- that was hard-deleted (the pre-09681b58 delete-and-recreate edit pattern)
+-- and CANNOT be backfilled without either relaxing that constraint or
+-- fabricating a placeholder schedule row — deliberately left alone here
+-- rather than making that schema/data-integrity call unilaterally. This
+-- migration only inserts for occurrences whose schedule is still present,
+-- joining class_schedules to let the foreign key do the filtering rather than
+-- duplicating its existence check by hand.
 --
 -- Per-participant, not per-occurrence: unlike the September migration's
 -- Path 2, this does not skip an occurrence just because SOME participant
@@ -114,4 +110,6 @@ where rj.deleted_at is null
   and rj.occurrence_start_at < now()
   and resolved_schedule.effective_schedule_id is not null
   and member->>'profileId' is not null
+  and session_end.at >= (timestamp '2026-09-01 00:00:00' at time zone coalesce(rj.timezone, 'UTC'))
+  and session_end.at <  (timestamp '2026-10-01 00:00:00' at time zone coalesce(rj.timezone, 'UTC'))
 on conflict (org_id, schedule_id, occurrence_key, profile_id) do nothing;
