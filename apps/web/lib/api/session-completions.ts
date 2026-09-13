@@ -4,6 +4,7 @@ import type {
   AdminDeleteSessionCompletionInput,
   AdminOrgProfileOptionVM,
   AdminSessionCompletionVM,
+  AdminUndoSessionCompletionInput,
   ChannelSessionCompletionVM,
   ConnectionVM,
   SessionCompletionVM,
@@ -52,6 +53,16 @@ export function confirmSessionCompletionAsAdmin(
 ) {
   return createApiClient(supabase).post<{ success: boolean; confirmedCount: number }>(
     '/session-completions/admin/confirm-occurrence',
+    input,
+  );
+}
+
+export function undoSessionCompletionAsAdmin(
+  supabase: SupabaseClient,
+  input: AdminUndoSessionCompletionInput,
+) {
+  return createApiClient(supabase).post<{ success: boolean; undoneCount: number }>(
+    '/session-completions/admin/undo-occurrence',
     input,
   );
 }

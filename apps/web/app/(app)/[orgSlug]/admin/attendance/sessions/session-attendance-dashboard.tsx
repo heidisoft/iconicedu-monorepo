@@ -2,16 +2,30 @@
 
 import * as React from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { Loader2 } from 'lucide-react';
+import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 import type {
   AdminOrgProfileOptionVM,
   AdminSessionCompletionVM,
 } from '@iconicedu/shared-types';
-import { Badge } from '@iconicedu/ui-web';
+import {
+  type ChartConfig,
+  ChartContainer,
+  ChartLegend,
+  ChartLegendContent,
+  ChartTooltip,
+  ChartTooltipContent,
+} from '@iconicedu/ui-web';
 import {
   AdminFilterBar,
   FilterDropdown,
 } from '@iconicedu/web/components/admin/admin-filter-bar';
 import { CompletedSessionsTable } from '@iconicedu/web/app/(app)/[orgSlug]/admin/attendance/sessions/completed-sessions-table';
+import {
+  OverviewSkeleton,
+  TableSkeleton,
+  TrendSkeleton,
+} from '@iconicedu/web/app/(app)/[orgSlug]/admin/attendance/sessions/session-attendance-skeletons';
 import type { ScheduleOptionRow } from '@iconicedu/web/lib/api/schedules';
 import {
   ALL_COMPLETION_MONTHS,
@@ -31,6 +45,14 @@ const DEFAULT_FILTERS = {
   studentName: 'all',
   method: 'all',
 };
+
+type Filters = typeof DEFAULT_FILTERS;
+
+const TREND_CHART_CONFIG = {
+  sessions: { label: 'Sessions', color: 'var(--chart-1)' },
+  teacher: { label: 'Teacher confirmed', color: 'var(--chart-2)' },
+  parent: { label: 'Parent confirmed', color: 'var(--chart-5)' },
+} satisfies ChartConfig;
 
 function Metric({
   label,
@@ -52,16 +74,35 @@ function Metric({
   );
 }
 
-function Trend({ rows }: { rows: AdminSessionCompletionVM[] }) {
-  const points = buildMonthlyCompletionTrend(rows);
-  const maximum = Math.max(1, ...points.map((point) => point.sessions));
+// Always plots the last three months, independent of every filter on the page
+// (month, classroom, participant, method, search) — `trendRowsPromise` is a
+// dedicated fetch the server never scopes to the selected month.
+function TrendSection({
+  trendRowsPromise,
+}: {
+  trendRowsPromise: Promise<AdminSessionCompletionVM[]>;
+}) {
+  const trendRows = React.use(trendRowsPromise);
+  const completedRows = React.useMemo(
+    () =>
+      trendRows.filter(
+        (row) =>
+          row.completionMethod !== 'pending' && row.completionMethod !== 'disputed',
+      ),
+    [trendRows],
+  );
+  const points = React.useMemo(
+    () => buildMonthlyCompletionTrend(completedRows),
+    [completedRows],
+  );
+
   return (
     <div className="overflow-hidden rounded-xl border bg-card">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b px-6 py-4">
         <div>
           <h2 className="text-sm font-semibold">Monthly completed lessons</h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Completed sessions within the past three months
+            Completed sessions over the last 3 months — independent of the filters below
           </p>
         </div>
         <span className="text-xs text-muted-foreground">
@@ -69,45 +110,72 @@ function Trend({ rows }: { rows: AdminSessionCompletionVM[] }) {
         </span>
       </div>
       {points.length === 0 ? (
-        <div className="flex h-56 items-center justify-center text-sm text-muted-foreground">
-          No completed sessions match these filters.
+        <div className="flex h-72 items-center justify-center text-sm text-muted-foreground">
+          No completed sessions in the last 3 months.
         </div>
       ) : (
-        <div
-          className="overflow-x-auto px-6 py-5"
-          role="img"
-          aria-label="Monthly completed sessions"
-        >
-          <div className="flex h-56 min-w-[520px] items-end gap-3 border-b px-2 pt-6">
-            {points.map((point) => (
-              <div
-                key={point.key}
-                className="group flex h-full min-w-12 flex-1 flex-col justify-end"
-              >
-                <div className="mb-2 text-center text-xs font-medium text-muted-foreground">
-                  {point.sessions}
-                </div>
-                <div
-                  className="mx-auto w-full max-w-14 rounded-t-sm bg-primary/75 transition-colors group-hover:bg-primary"
-                  style={{
-                    height: `${Math.max(8, (point.sessions / maximum) * 145)}px`,
-                  }}
-                  title={`${point.label}: ${point.sessions} completed sessions`}
-                />
-                <div className="mt-2 truncate text-center text-[11px] text-muted-foreground">
-                  {point.label.replace(/ \d{4}$/, '')}
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="mt-4 flex flex-wrap gap-4 text-xs text-muted-foreground">
-            <span>
-              {points.reduce((sum, point) => sum + point.teacher, 0)} teacher-confirmed
-            </span>
-            <span>
-              {points.reduce((sum, point) => sum + point.parent, 0)} parent-confirmed
-            </span>
-          </div>
+        <div className="p-6" role="img" aria-label="Monthly completed sessions">
+          <ChartContainer config={TREND_CHART_CONFIG} className="aspect-auto h-72 w-full">
+            <AreaChart data={points} margin={{ left: 12, right: 12 }}>
+              <defs>
+                <linearGradient id="fillSessions" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="var(--color-sessions)" stopOpacity={0.4} />
+                  <stop
+                    offset="95%"
+                    stopColor="var(--color-sessions)"
+                    stopOpacity={0.05}
+                  />
+                </linearGradient>
+                <linearGradient id="fillTeacher" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="var(--color-teacher)" stopOpacity={0.5} />
+                  <stop
+                    offset="95%"
+                    stopColor="var(--color-teacher)"
+                    stopOpacity={0.05}
+                  />
+                </linearGradient>
+                <linearGradient id="fillParent" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="var(--color-parent)" stopOpacity={0.5} />
+                  <stop offset="95%" stopColor="var(--color-parent)" stopOpacity={0.05} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid vertical={false} />
+              <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
+              <YAxis
+                allowDecimals={false}
+                tickLine={false}
+                axisLine={false}
+                tickMargin={8}
+                width={28}
+              />
+              <ChartTooltip
+                cursor={false}
+                content={<ChartTooltipContent indicator="dot" />}
+              />
+              <Area
+                dataKey="sessions"
+                type="monotone"
+                fill="url(#fillSessions)"
+                stroke="var(--color-sessions)"
+                strokeWidth={2}
+              />
+              <Area
+                dataKey="teacher"
+                type="monotone"
+                fill="url(#fillTeacher)"
+                stroke="var(--color-teacher)"
+                strokeWidth={2}
+              />
+              <Area
+                dataKey="parent"
+                type="monotone"
+                fill="url(#fillParent)"
+                stroke="var(--color-parent)"
+                strokeWidth={2}
+              />
+              <ChartLegend content={<ChartLegendContent />} />
+            </AreaChart>
+          </ChartContainer>
         </div>
       )}
     </div>
@@ -118,10 +186,12 @@ function Breakdown({
   title,
   rows,
   role,
+  hoursLabel,
 }: {
   title: string;
   rows: AdminSessionCompletionVM[];
   role: 'educator' | 'guardian';
+  hoursLabel: string;
 }) {
   const people = buildConfirmerBreakdown(rows, role);
   return (
@@ -149,49 +219,8 @@ function Breakdown({
                   style={{ width: `${person.percentage}%` }}
                 />
               </div>
-            </div>
-          ))
-        )}
-      </div>
-    </div>
-  );
-}
-
-function RecentCompletions({ rows }: { rows: AdminSessionCompletionVM[] }) {
-  const recent = [...rows]
-    .sort(
-      (a, b) => new Date(b.sessionEndAt).getTime() - new Date(a.sessionEndAt).getTime(),
-    )
-    .slice(0, 5);
-
-  return (
-    <div className="overflow-hidden rounded-xl border bg-card">
-      <div className="border-b px-6 py-4">
-        <h2 className="text-sm font-semibold">Recent completed lessons</h2>
-      </div>
-      <div className="space-y-3 p-4">
-        {recent.length === 0 ? (
-          <p className="py-16 text-center text-sm text-muted-foreground">
-            No completed sessions match these filters.
-          </p>
-        ) : (
-          recent.map((row) => (
-            <div key={row.id} className="rounded-lg border bg-muted/25 px-4 py-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold">
-                    {row.sessionTitle ?? 'Scheduled session'}
-                  </p>
-                  <p className="mt-1 truncate text-xs text-muted-foreground">
-                    {row.studentNames.join(', ') || 'No student listed'}
-                  </p>
-                </div>
-                <Badge variant="secondary" className="shrink-0 capitalize">
-                  {row.completionMethod.replace('_', ' ')}
-                </Badge>
-              </div>
-              <p className="mt-2 text-xs text-muted-foreground">
-                {new Date(row.sessionEndAt).toLocaleString('en-US', { timeZone: 'UTC' })}
+              <p className="mt-1 text-xs text-muted-foreground">
+                {person.hours.toFixed(1)}h {hoursLabel}
               </p>
             </div>
           ))
@@ -201,60 +230,36 @@ function RecentCompletions({ rows }: { rows: AdminSessionCompletionVM[] }) {
   );
 }
 
-export function SessionAttendanceDashboard({
-  rows,
+// Metrics, the top filter bar, and both breakdown widgets all read from the same
+// `rowsPromise` (scoped to the selected month) plus the org teacher/parent roster
+// used to populate the "Filter by participant" dropdowns.
+function OverviewSection({
+  rowsPromise,
+  rosterPromise,
+  filters,
+  update,
   selectedMonth,
   monthOptions,
-  teachers,
-  parents,
-  schedules,
-  orgId,
+  handleMonthChange,
+  selectedPeriodLabel,
 }: {
-  rows: AdminSessionCompletionVM[];
+  rowsPromise: Promise<AdminSessionCompletionVM[]>;
+  rosterPromise: Promise<[AdminOrgProfileOptionVM[], AdminOrgProfileOptionVM[]]>;
+  filters: Filters;
+  update: (key: keyof Filters) => (value: string) => void;
   selectedMonth: string;
   monthOptions: string[];
-  teachers: AdminOrgProfileOptionVM[];
-  parents: AdminOrgProfileOptionVM[];
-  schedules: ScheduleOptionRow[];
-  orgId: string;
+  handleMonthChange: (value: string) => void;
+  selectedPeriodLabel: string;
 }) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const [isMonthPending, startMonthTransition] = React.useTransition();
-  const [filters, setFilters] = React.useState(DEFAULT_FILTERS);
-  const update = (key: keyof typeof DEFAULT_FILTERS) => (value: string) =>
-    setFilters((current) => ({ ...current, [key]: value }));
+  const rows = React.use(rowsPromise);
+  const [teachers, parents] = React.use(rosterPromise);
 
-  // Changing the month navigates so the server can load that month's rows; the
-  // other filters stay in-memory over whatever month is currently loaded.
-  const handleMonthChange = React.useCallback(
-    (value: string) => {
-      if (value === selectedMonth) return;
-      const href = buildMonthFilterHref(pathname, searchParams.toString(), value);
-      startMonthTransition(() => {
-        router.replace(href, { scroll: false });
-      });
-    },
-    [pathname, router, searchParams, selectedMonth],
-  );
-
-  // The server already scoped `rows` to `selectedMonth`; threading it through
-  // keeps the period label and trend honest, and is a no-op for "all months".
+  // Threading `selectedMonth` through keeps the period label and count honest —
+  // it's a no-op for "all months" since the server already scoped `rows`.
   const filtered = React.useMemo(
     () => filterCompletions(rows, { ...filters, month: selectedMonth }),
     [filters, rows, selectedMonth],
-  );
-  // The trend/recent blocks report on *completed* lessons only and stay scoped
-  // to the month filter — the participant/classroom/method/search filters below
-  // only narrow the sessions table, not these summary blocks.
-  const completedRows = React.useMemo(
-    () =>
-      rows.filter(
-        (row) =>
-          row.completionMethod !== 'pending' && row.completionMethod !== 'disputed',
-      ),
-    [rows],
   );
   // The top metric tiles count every session in the month, not just completed
   // ones, so pending/disputed sessions are reflected here too.
@@ -281,19 +286,9 @@ export function SessionAttendanceDashboard({
       .sort((a, b) => a.displayName.localeCompare(b.displayName))
       .map((profile) => ({ value: profile.profileId, label: profile.displayName })),
   ];
-  const selectedPeriodLabel =
-    selectedMonth === ALL_COMPLETION_MONTHS
-      ? 'Past 3 months'
-      : formatCompletionMonth(selectedMonth);
 
   return (
-    <div
-      className="flex min-w-0 flex-1 flex-col gap-4 transition-opacity aria-busy:opacity-60"
-      aria-busy={isMonthPending}
-    >
-      <span aria-live="polite" className="sr-only">
-        {isMonthPending ? `Loading ${selectedPeriodLabel}` : ''}
-      </span>
+    <>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Metric
           label="Sessions"
@@ -365,18 +360,23 @@ export function SessionAttendanceDashboard({
         </p>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(20rem,0.65fr)]">
-        <Trend rows={completedRows} />
-        <RecentCompletions rows={completedRows} />
-      </div>
-
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* Unlike the metrics/trend/recent blocks, these read every session in the
+        {/* Unlike the metrics/trend blocks, these read every session in the
             completions table for the month — including still-pending and disputed
             ones — so every teacher/parent with a session shows up, with their
-            confirmed/total ratio counting every session they're part of. */}
-        <Breakdown title="Completed by teacher" rows={rows} role="educator" />
-        <Breakdown title="Completed by parent" rows={rows} role="guardian" />
+            confirmed/total ratio and hours counting every session they're part of. */}
+        <Breakdown
+          title="Completed by teacher"
+          rows={rows}
+          role="educator"
+          hoursLabel="completed"
+        />
+        <Breakdown
+          title="Completed by parent"
+          rows={rows}
+          role="guardian"
+          hoursLabel="taken"
+        />
       </div>
 
       <div className="flex flex-wrap items-center gap-4 rounded-xl border bg-card px-4 py-3">
@@ -411,8 +411,125 @@ export function SessionAttendanceDashboard({
           }}
         />
       </div>
+    </>
+  );
+}
 
-      <CompletedSessionsTable rows={filtered} schedules={schedules} orgId={orgId} />
+// The session list only needs `rows` + `schedules` (for the "Add session"
+// dialog) — kept in its own Suspense boundary so a slow schedules fetch never
+// blocks the metrics/filters/breakdowns above from painting, and vice versa.
+function TableSection({
+  rowsPromise,
+  schedulesPromise,
+  filters,
+  selectedMonth,
+  orgId,
+}: {
+  rowsPromise: Promise<AdminSessionCompletionVM[]>;
+  schedulesPromise: Promise<ScheduleOptionRow[]>;
+  filters: Filters;
+  selectedMonth: string;
+  orgId: string;
+}) {
+  const rows = React.use(rowsPromise);
+  const schedules = React.use(schedulesPromise);
+  const filtered = React.useMemo(
+    () => filterCompletions(rows, { ...filters, month: selectedMonth }),
+    [filters, rows, selectedMonth],
+  );
+
+  return <CompletedSessionsTable rows={filtered} schedules={schedules} orgId={orgId} />;
+}
+
+export function SessionAttendanceDashboard({
+  rowsPromise,
+  trendRowsPromise,
+  rosterPromise,
+  schedulesPromise,
+  selectedMonth,
+  monthOptions,
+  orgId,
+}: {
+  rowsPromise: Promise<AdminSessionCompletionVM[]>;
+  trendRowsPromise: Promise<AdminSessionCompletionVM[]>;
+  rosterPromise: Promise<[AdminOrgProfileOptionVM[], AdminOrgProfileOptionVM[]]>;
+  schedulesPromise: Promise<ScheduleOptionRow[]>;
+  selectedMonth: string;
+  monthOptions: string[];
+  orgId: string;
+}) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [isMonthPending, startMonthTransition] = React.useTransition();
+  const [filters, setFilters] = React.useState<Filters>(DEFAULT_FILTERS);
+  const update = (key: keyof Filters) => (value: string) =>
+    setFilters((current) => ({ ...current, [key]: value }));
+
+  // Changing the month navigates so the server can load that month's rows; the
+  // other filters stay in-memory over whatever month is currently loaded. Doing
+  // this inside a transition keeps every section's last-rendered content visible
+  // (dimmed via aria-busy) instead of reverting to its Suspense fallback.
+  const handleMonthChange = React.useCallback(
+    (value: string) => {
+      if (value === selectedMonth) return;
+      const href = buildMonthFilterHref(pathname, searchParams.toString(), value);
+      startMonthTransition(() => {
+        router.replace(href, { scroll: false });
+      });
+    },
+    [pathname, router, searchParams, selectedMonth],
+  );
+
+  const selectedPeriodLabel =
+    selectedMonth === ALL_COMPLETION_MONTHS
+      ? 'Past 3 months'
+      : formatCompletionMonth(selectedMonth);
+
+  return (
+    <div
+      className="flex min-w-0 flex-1 flex-col gap-4 transition-opacity aria-busy:opacity-60"
+      aria-busy={isMonthPending}
+    >
+      <span aria-live="polite" className="sr-only">
+        {isMonthPending ? `Loading ${selectedPeriodLabel}` : ''}
+      </span>
+      {isMonthPending && (
+        <div
+          className="flex items-center gap-1.5 text-xs text-muted-foreground"
+          aria-hidden="true"
+        >
+          <Loader2 className="size-3.5 animate-spin" />
+          Loading {selectedPeriodLabel}…
+        </div>
+      )}
+
+      <React.Suspense fallback={<TrendSkeleton />}>
+        <TrendSection trendRowsPromise={trendRowsPromise} />
+      </React.Suspense>
+
+      <React.Suspense fallback={<OverviewSkeleton />}>
+        <OverviewSection
+          rowsPromise={rowsPromise}
+          rosterPromise={rosterPromise}
+          filters={filters}
+          update={update}
+          selectedMonth={selectedMonth}
+          monthOptions={monthOptions}
+          handleMonthChange={handleMonthChange}
+          selectedPeriodLabel={selectedPeriodLabel}
+        />
+      </React.Suspense>
+
+      <React.Suspense fallback={<TableSkeleton />}>
+        <TableSection
+          rowsPromise={rowsPromise}
+          schedulesPromise={schedulesPromise}
+          filters={filters}
+          selectedMonth={selectedMonth}
+          orgId={orgId}
+        />
+      </React.Suspense>
     </div>
   );
 }

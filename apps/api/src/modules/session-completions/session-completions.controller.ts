@@ -13,6 +13,7 @@ import type {
   AdminConfirmSessionCompletionInput,
   AdminCreateSessionCompletionInput,
   AdminDeleteSessionCompletionInput,
+  AdminUndoSessionCompletionInput,
   ConfirmSessionCompletionInput,
   DisputeSessionCompletionInput,
   RateSessionCompletionInput,
@@ -193,6 +194,15 @@ export class SessionCompletionsController {
     @Body() body: AdminConfirmSessionCompletionInput,
   ) {
     return this.sessionCompletionsService.adminConfirm(req.user.id, body);
+  }
+
+  @Post('admin/undo-occurrence')
+  @UseGuards(AuthGuard)
+  adminUndoConfirm(
+    @Req() req: AuthenticatedRequest,
+    @Body() body: AdminUndoSessionCompletionInput,
+  ) {
+    return this.sessionCompletionsService.adminUndoConfirm(req.user.id, body);
   }
 
   @Post('admin/delete-submission')

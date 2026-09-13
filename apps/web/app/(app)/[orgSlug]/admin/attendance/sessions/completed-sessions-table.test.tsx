@@ -73,6 +73,44 @@ describe('CompletedSessionsTable', () => {
     expect(screen.queryByRole('button', { name: 'Confirm' })).not.toBeInTheDocument();
   });
 
+  it('shows who confirmed on a participant’s behalf when staff overrode it', () => {
+    render(
+      <CompletedSessionsTable
+        rows={[
+          {
+            ...row,
+            participants: [
+              {
+                profileId: 'tutor',
+                displayName: 'Tutor One',
+                role: 'educator',
+                status: 'confirmed',
+                confirmedByStaff: {
+                  profileId: 'staff-1',
+                  displayName: 'Admin Ada',
+                  confirmedAt: '2026-09-01T13:15:00Z',
+                },
+              },
+              {
+                profileId: 'parent',
+                displayName: 'Parent One',
+                role: 'guardian',
+                status: 'confirmed',
+              },
+            ],
+          },
+        ]}
+        schedules={[]}
+        orgId="org"
+      />,
+    );
+    const people = screen.getAllByRole('listitem');
+    expect(
+      within(people[0]).getByText(/Confirmed by staff: Admin Ada/),
+    ).toBeInTheDocument();
+    expect(within(people[1]).queryByText(/Confirmed by staff/)).not.toBeInTheDocument();
+  });
+
   it('excludes staff and children from the compatibility fallback', () => {
     render(
       <CompletedSessionsTable

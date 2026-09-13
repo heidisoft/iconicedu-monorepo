@@ -234,7 +234,14 @@ function CreateSessionDialog({
           </div>
           <DialogFooter>
             <Button type="submit" disabled={isSubmitting || !scheduleId}>
-              {isSubmitting ? 'Creating…' : 'Create session'}
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-1.5 size-4 animate-spin" aria-hidden="true" />
+                  Creating…
+                </>
+              ) : (
+                'Create session'
+              )}
             </Button>
           </DialogFooter>
         </form>
@@ -263,9 +270,33 @@ export function CompletedSessionsTable({
     setPage(1);
   }, [rows]);
 
+  // Mirrors UNDO_WINDOW_MS in the API's SessionCompletionsService — the server
+  // is the real enforcement point, this just stops offering an action that
+  // would fail once the window has definitely closed.
+  const UNDO_WINDOW_MS = 60_000;
+
+  const handleUndoStaffConfirm = async (row: AdminSessionCompletionVM) => {
+    const response = await fetch('/api/admin/session-completions/undo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        orgId: row.orgId,
+        scheduleId: row.scheduleId,
+        occurrenceKey: row.occurrenceKey,
+      }),
+    });
+    const result = await response.json();
+    if (!result?.success) {
+      throw new Error(result?.message ?? 'Unable to undo confirmation.');
+    }
+    router.refresh();
+  };
+
   // Once staff confirms, every participant row for the occurrence flips to
   // 'confirmed' server-side, so this stops offering the action and the
-  // teacher/parent's own confirm prompt stops resurfacing for it too.
+  // teacher/parent's own confirm prompt stops resurfacing for it too. A brief
+  // "Undo" action on the success toast lets an admin reverse a mis-click before
+  // that state settles elsewhere (participant ratings, notifications, etc).
   const handleStaffConfirm = async (row: AdminSessionCompletionVM) => {
     if (confirmingId) return;
     setConfirmingId(row.id);
@@ -283,8 +314,20 @@ export function CompletedSessionsTable({
       if (!result?.success) {
         throw new Error(result?.message ?? 'Unable to confirm session.');
       }
-      toast.success('Session confirmed');
       router.refresh();
+      toast.success('Session confirmed', {
+        duration: UNDO_WINDOW_MS,
+        action: {
+          label: 'Undo',
+          onClick: () =>
+            toast.promise(handleUndoStaffConfirm(row), {
+              loading: 'Undoing confirmation…',
+              success: 'Confirmation undone',
+              error: (error) =>
+                error instanceof Error ? error.message : 'Unable to undo confirmation.',
+            }),
+        },
+      });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Unable to confirm session.');
     } finally {
@@ -414,6 +457,15 @@ export function CompletedSessionsTable({
                                 Rating: {person.rating.toFixed(1)} / 5
                               </p>
                             )}
+                            {confirmed && person.confirmedByStaff && (
+                              <p className="text-xs text-muted-foreground">
+                                Confirmed by staff: {person.confirmedByStaff.displayName}{' '}
+                                ·{' '}
+                                {formatAttendanceDateTime(
+                                  person.confirmedByStaff.confirmedAt,
+                                )}
+                              </p>
+                            )}
                           </div>
                           <Button
                             variant="ghost"
@@ -530,7 +582,14 @@ export function CompletedSessionsTable({
               disabled={Boolean(deletingKey)}
               onClick={() => void handleDeleteSubmission()}
             >
-              {deletingKey ? 'Deleting…' : 'Delete'}
+              {deletingKey ? (
+                <>
+                  <Loader2 className="mr-1.5 size-4 animate-spin" aria-hidden="true" />
+                  Deleting…
+                </>
+              ) : (
+                'Delete'
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
