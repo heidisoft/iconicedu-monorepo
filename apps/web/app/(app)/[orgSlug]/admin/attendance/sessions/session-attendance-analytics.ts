@@ -130,6 +130,16 @@ export function filterCompletions(
   });
 }
 
+// Scheduled length of the occurrence: end minus its start (occurrenceKey). Returns
+// 0 when either bound is unparseable or non-positive — some backfilled rows carry
+// no distinct end time, so end === start.
+export function getCompletionDurationHours(row: AdminSessionCompletionVM) {
+  const start = new Date(row.occurrenceKey).getTime();
+  const end = new Date(row.sessionEndAt).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return 0;
+  return (end - start) / (1000 * 60 * 60);
+}
+
 export function summarizeCompletions(rows: AdminSessionCompletionVM[]) {
   const rated = rows.filter((row) => typeof row.averageRating === 'number');
   return {
@@ -209,7 +219,10 @@ export function buildConfirmerBreakdown(
   rows: AdminSessionCompletionVM[],
   role: 'educator' | 'guardian',
 ) {
-  const people = new Map<string, { name: string; sessions: number; total: number }>();
+  const people = new Map<
+    string,
+    { name: string; sessions: number; total: number; hours: number }
+  >();
   rows.forEach((row) => {
     new Map(
       getCompletionParticipants(row)
@@ -220,9 +233,13 @@ export function buildConfirmerBreakdown(
         name: actor.displayName,
         sessions: 0,
         total: 0,
+        hours: 0,
       };
       value.total += 1;
-      if (actor.status === 'confirmed') value.sessions += 1;
+      if (actor.status === 'confirmed') {
+        value.sessions += 1;
+        value.hours += getCompletionDurationHours(row);
+      }
       people.set(actor.profileId, value);
     });
   });

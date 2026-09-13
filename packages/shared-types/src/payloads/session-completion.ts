@@ -56,6 +56,17 @@ export type AdminConfirmSessionCompletionInput = {
   occurrenceKey: string;
 };
 
+// Reverts a staff `adminConfirm` back to 'pending' for the occurrence, mirroring the
+// short undo window the participant-facing UndoSessionCompletionInput offers — same
+// idea, scoped to the admin bulk action instead of one person's own row. Only rows
+// this same staff member's adminConfirm call touched (updated_by) and still within
+// the undo window are reverted; see UNDO_WINDOW_MS in session-completions.service.ts.
+export type AdminUndoSessionCompletionInput = {
+  orgId: UUID;
+  scheduleId: UUID;
+  occurrenceKey: string;
+};
+
 // Same natural-key addressing as AdminConfirmSessionCompletionInput, for removing a
 // wrong/erroneous entry rather than resolving a real one. When profileId is omitted,
 // every participant row for the occurrence is deleted (the whole occurrence was

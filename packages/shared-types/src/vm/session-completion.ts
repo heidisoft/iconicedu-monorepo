@@ -80,6 +80,17 @@ export interface AdminSessionCompletionParticipantVM {
   role: 'educator' | 'guardian';
   status: ClassSessionCompletionStatus;
   rating?: number | null;
+  /**
+   * Set when this person's 'confirmed' status came from a staff override
+   * (admin confirm-occurrence) rather than the person confirming it themselves —
+   * i.e. the row's `updated_by` differs from its `profile_id`. Absent for a
+   * self-confirmed or auto-confirmed row.
+   */
+  confirmedByStaff?: {
+    profileId: UUID;
+    displayName: string;
+    confirmedAt: ISODateTime;
+  } | null;
 }
 
 /** One schedule occurrence within the admin reporting window, whether completed,

@@ -7,6 +7,7 @@ import {
   buildRecentCompletionMonthKeys,
   completionMonthKeyToUtcRange,
   filterCompletions,
+  getCompletionDurationHours,
   getCurrentCompletionMonthKey,
   isCompletionMonthKey,
   summarizeCompletions,
@@ -168,10 +169,12 @@ describe('completed session analytics', () => {
     expect(buildConfirmerBreakdown(rows, 'educator')[0]).toMatchObject({
       name: 'Taylor Reed',
       sessions: 2,
+      hours: 1,
     });
     expect(buildConfirmerBreakdown(rows, 'guardian')[0]).toMatchObject({
       name: 'Morgan Lee',
       sessions: 2,
+      hours: 1,
     });
   });
 });
@@ -223,5 +226,37 @@ it('includes people with no confirmations and deduplicates people within an occu
   };
   expect(
     buildConfirmerBreakdown([completion({ participants: [person, person] })], 'educator'),
-  ).toEqual([{ id: 'tutor', name: 'Tutor', sessions: 0, total: 1, percentage: 0 }]);
+  ).toEqual([
+    { id: 'tutor', name: 'Tutor', sessions: 0, total: 1, hours: 0, percentage: 0 },
+  ]);
+});
+
+describe('getCompletionDurationHours', () => {
+  it('divides the occurrence-to-end span into hours', () => {
+    expect(getCompletionDurationHours(completion())).toBe(1);
+    expect(
+      getCompletionDurationHours(
+        completion({
+          occurrenceKey: '2026-03-10T14:00:00.000Z',
+          sessionEndAt: '2026-03-10T14:30:00.000Z',
+        }),
+      ),
+    ).toBe(0.5);
+  });
+
+  it('returns 0 for a non-positive or unparseable span', () => {
+    expect(
+      getCompletionDurationHours(
+        completion({ occurrenceKey: '2026-03-10T14:00:00.000Z', sessionEndAt: 'nope' }),
+      ),
+    ).toBe(0);
+    expect(
+      getCompletionDurationHours(
+        completion({
+          occurrenceKey: '2026-03-10T14:00:00.000Z',
+          sessionEndAt: '2026-03-10T14:00:00.000Z',
+        }),
+      ),
+    ).toBe(0);
+  });
 });

@@ -16,6 +16,7 @@ import type {
   AdminSessionCompletionGuardianVM,
   AdminSessionCompletionParticipantVM,
   AdminSessionCompletionVM,
+  AdminUndoSessionCompletionInput,
   ChannelSessionCompletionVM,
   ClassSessionCompletionRow,
   ConfirmSessionCompletionInput,
@@ -1053,6 +1054,94 @@ export class SessionCompletionsService {
   }
 
   /**
+   * Reverts an `adminConfirm` bulk override back to 'pending', mirroring the
+   * participant-facing `undo()`'s short window (UNDO_WINDOW_MS) and its "no
+   * undo once rated" rule. Scoped to rows THIS staff member's adminConfirm call
+   * touched (`updated_by` matches their own profile, and `updated_by !==
+   * profile_id` so a participant's own self-confirm is never undone here) —
+   * another staff member's confirm, or a participant's own confirm, is left
+   * alone even if it happened on the same occurrence.
+   */
+  async adminUndoConfirm(authUserId: string, body: AdminUndoSessionCompletionInput) {
+    if (!body?.orgId || !isUuid(body.orgId)) {
+      throw new BadRequestException('Invalid orgId');
+    }
+    if (!body?.scheduleId || !isUuid(body.scheduleId)) {
+      throw new BadRequestException('Invalid scheduleId');
+    }
+    if (!body?.occurrenceKey || !Number.isFinite(Date.parse(body.occurrenceKey))) {
+      throw new BadRequestException('Invalid occurrenceKey');
+    }
+
+    const supabase = createSupabaseServiceClient();
+    const account = await this.resolveAccount(supabase, authUserId, body.orgId);
+    await this.assertAdminAccess(supabase, account, body.orgId);
+
+    const { data: staffProfile, error: staffProfileError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('account_id', account.id)
+      .eq('org_id', body.orgId)
+      .is('deleted_at', null)
+      .limit(1)
+      .maybeSingle<{ id: string }>();
+    if (staffProfileError)
+      throw new InternalServerErrorException(staffProfileError.message);
+    const staffId = staffProfile?.id ?? account.id;
+
+    const { data: rows, error } = await supabase
+      .from('class_session_completions')
+      .select('*')
+      .eq('org_id', body.orgId)
+      .eq('schedule_id', body.scheduleId)
+      .eq('occurrence_key', body.occurrenceKey)
+      .is('deleted_at', null)
+      .returns<ClassSessionCompletionRow[]>();
+
+    if (error) throw new InternalServerErrorException(error.message);
+    if (!rows?.length) throw new NotFoundException('Session completion not found');
+
+    const undoableRows = rows.filter((row) => {
+      if (row.status !== 'confirmed') return false;
+      if (row.updated_by !== staffId || row.profile_id === staffId) return false;
+      if (row.rating !== null && row.rating !== undefined) return false;
+      const resolvedAtMs = row.resolved_at ? new Date(row.resolved_at).getTime() : NaN;
+      return Number.isFinite(resolvedAtMs) && Date.now() - resolvedAtMs <= UNDO_WINDOW_MS;
+    });
+    if (!undoableRows.length) {
+      throw new BadRequestException('Undo window has expired');
+    }
+
+    const now = new Date().toISOString();
+    const { data: updated, error: updateError } = await supabase
+      .from('class_session_completions')
+      .update({
+        status: 'pending',
+        confirmed_at: null,
+        resolved_at: null,
+        updated_at: now,
+        updated_by: staffId,
+      })
+      .in(
+        'id',
+        undoableRows.map((row) => row.id),
+      )
+      .eq('org_id', body.orgId)
+      .eq('status', 'confirmed')
+      .select('id')
+      .returns<Array<{ id: string }>>();
+
+    if (updateError) throw new InternalServerErrorException(updateError.message);
+
+    this.logger.log(
+      `session completion admin-confirm undone scheduleId=${body.scheduleId} ` +
+        `occurrenceKey=${body.occurrenceKey} count=${updated?.length ?? 0}`,
+    );
+
+    return { success: true, undoneCount: updated?.length ?? 0 };
+  }
+
+  /**
    * Soft-deletes a wrong/erroneous admin submission — either one participant's
    * row (profileId given) or every row for the occurrence (profileId omitted),
    * for cleaning up a bad entry rather than resolving a real one.
@@ -1358,7 +1447,16 @@ export class SessionCompletionsService {
       completionRows.push(...(data ?? []));
       if ((data?.length ?? 0) < pageSize) break;
     }
-    const profileIds = [...new Set(completionRows.map((row) => row.profile_id))];
+    // Includes `updated_by` so a staff override's own name resolves too — a
+    // confirmed row whose updated_by differs from its own profile_id was
+    // confirmed by that staff member on the participant's behalf.
+    const profileIds = [
+      ...new Set(
+        completionRows.flatMap((row) =>
+          [row.profile_id, row.updated_by].filter((id): id is string => Boolean(id)),
+        ),
+      ),
+    ];
     const scheduleIds = [...new Set(completionRows.map((row) => row.schedule_id))];
     const learningSpaceIds = [
       ...new Set(
@@ -1649,6 +1747,19 @@ export class SessionCompletionsService {
       rows.forEach((row) => {
         if (row.role !== 'educator' && row.role !== 'guardian') return;
         const key = `${row.role}|${row.profile_id}`;
+        // A 'confirmed' row whose updated_by differs from its own profile_id was
+        // settled by a staff override (adminConfirm), not by the person
+        // themselves — surface who did it and when for the admin session list.
+        const confirmedByStaff =
+          row.status === 'confirmed' &&
+          row.updated_by &&
+          row.updated_by !== row.profile_id
+            ? {
+                profileId: row.updated_by,
+                displayName: names.get(row.updated_by) ?? 'Staff',
+                confirmedAt: row.resolved_at ?? row.confirmed_at ?? row.updated_at,
+              }
+            : null;
         participants.set(key, {
           profileId: row.profile_id,
           displayName:
@@ -1658,6 +1769,7 @@ export class SessionCompletionsService {
           role: row.role,
           status: row.status,
           rating: row.rating ?? null,
+          confirmedByStaff,
         });
       });
 

@@ -454,6 +454,85 @@ describe('SessionCompletionsService', () => {
       return { completions, from };
     }
 
+    it('flags a confirmed participant whose updated_by differs from their own profile as staff-confirmed', async () => {
+      const { completions, from } = setup([
+        baseCompletionRow({
+          role: 'educator',
+          status: 'confirmed',
+          updated_by: 'staff-override-1',
+          resolved_at: '2026-05-30T12:05:00Z',
+          updated_at: '2026-05-30T12:05:00Z',
+        }),
+        baseCompletionRow({
+          profile_id: OTHER_PROFILE_ID,
+          role: 'guardian',
+          status: 'confirmed',
+          updated_by: OTHER_PROFILE_ID,
+          resolved_at: '2026-05-30T12:00:00Z',
+          updated_at: '2026-05-30T12:00:00Z',
+        }),
+      ]);
+      from.mockImplementation((table: string) => {
+        if (table === 'profiles') {
+          return makeChain({
+            data: [
+              {
+                id: PROFILE_ID,
+                display_name: 'Tutor One',
+                first_name: null,
+                last_name: null,
+              },
+              {
+                id: OTHER_PROFILE_ID,
+                display_name: 'Parent One',
+                first_name: null,
+                last_name: null,
+              },
+              {
+                id: 'staff-override-1',
+                display_name: 'Admin Ada',
+                first_name: null,
+                last_name: null,
+              },
+            ],
+          });
+        }
+        if (table === 'accounts')
+          return makeChain({ data: { id: ACCOUNT_ID, org_id: ORG_ID } });
+        if (table === 'user_roles') return makeChain({ data: { role_key: 'admin' } });
+        if (table === 'class_session_completions') return completions;
+        if (table === 'learning_spaces') return makeChain({ data: [] });
+        if (table === 'class_schedule_participants') return makeChain({ data: [] });
+        throw new Error(`Unexpected table: ${table}`);
+      });
+
+      const rows = await new SessionCompletionsService().listForAdmin(AUTH_USER_ID, {
+        orgId: ORG_ID,
+      });
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.participants).toContainEqual(
+        expect.objectContaining({
+          profileId: PROFILE_ID,
+          role: 'educator',
+          status: 'confirmed',
+          confirmedByStaff: {
+            profileId: 'staff-override-1',
+            displayName: 'Admin Ada',
+            confirmedAt: '2026-05-30T12:05:00Z',
+          },
+        }),
+      );
+      expect(rows[0]?.participants).toContainEqual(
+        expect.objectContaining({
+          profileId: OTHER_PROFILE_ID,
+          role: 'guardian',
+          status: 'confirmed',
+          confirmedByStaff: null,
+        }),
+      );
+    });
+
     it('retains pending recipients and roster tutors but excludes staff and child confirmations from participants', async () => {
       setup([
         baseCompletionRow({
@@ -743,6 +822,192 @@ describe('SessionCompletionsService', () => {
 
       await expect(
         new SessionCompletionsService().adminConfirm(AUTH_USER_ID, {
+          orgId: ORG_ID,
+          scheduleId: 'not-a-uuid',
+          occurrenceKey: OCCURRENCE_KEY,
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(from).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('adminUndoConfirm', () => {
+    const OCCURRENCE_KEY = '2030-03-06T10:00:00.000Z';
+
+    beforeEach(() =>
+      jest.useFakeTimers().setSystemTime(new Date('2026-05-31T12:01:00.000Z')),
+    );
+    afterEach(() => jest.useRealTimers());
+
+    function setup(input: {
+      rows: ReturnType<typeof baseCompletionRow>[];
+      roleRow?: { role_key: string } | null;
+      primaryRoleRow?: { id: string } | null;
+      staffProfileRow?: { id: string } | null;
+    }) {
+      let accountCalls = 0;
+      const accountChain = makeChain({ data: { id: ACCOUNT_ID, org_id: ORG_ID } });
+      const primaryRoleChain = makeChain({
+        data:
+          input.primaryRoleRow === undefined ? { id: ACCOUNT_ID } : input.primaryRoleRow,
+      });
+      const roleChain = makeChain({
+        data: input.roleRow === undefined ? { role_key: 'admin' } : input.roleRow,
+      });
+      const selectChain = makeChain({ data: input.rows });
+      // Mirrors the service's own undo-eligibility filter, simulating that only
+      // matching rows are actually updated by the (mocked) database.
+      const staffId =
+        (input.staffProfileRow === undefined ? PROFILE_ID : input.staffProfileRow?.id) ??
+        ACCOUNT_ID;
+      const undoableIds = input.rows
+        .filter((row) => {
+          if (row.status !== 'confirmed') return false;
+          if (row.updated_by !== staffId || row.profile_id === staffId) return false;
+          if (row.rating !== null && row.rating !== undefined) return false;
+          const resolvedAtMs = row.resolved_at
+            ? new Date(row.resolved_at as string).getTime()
+            : NaN;
+          return Number.isFinite(resolvedAtMs) && Date.now() - resolvedAtMs <= 60_000;
+        })
+        .map((row) => row.id as string);
+      const updateChain: Record<string, jest.Mock> = {
+        update: jest.fn(() => updateChain),
+        in: jest.fn(() => updateChain),
+        eq: jest.fn(() => updateChain),
+        select: jest.fn(() => updateChain),
+        returns: jest.fn(async () => ({
+          data: undoableIds.map((id) => ({ id })),
+          error: null,
+        })),
+      };
+      const profileChain = makeChain({
+        data:
+          input.staffProfileRow === undefined
+            ? { id: PROFILE_ID }
+            : input.staffProfileRow,
+      });
+
+      const from = jest.fn((table: string) => {
+        if (table === 'accounts') {
+          accountCalls += 1;
+          return accountCalls === 1 ? accountChain : primaryRoleChain;
+        }
+        if (table === 'user_roles') return roleChain;
+        if (table === 'profiles') return profileChain;
+        if (table === 'class_session_completions') {
+          return {
+            select: jest.fn(() => selectChain),
+            update: updateChain.update,
+          };
+        }
+        throw new Error(`Unexpected table: ${table}`);
+      });
+      createSupabaseServiceClientMock.mockReturnValue({ from } as never);
+      return { from, selectChain, updateChain };
+    }
+
+    it('reverts a staff-confirmed row within the undo window back to pending', async () => {
+      const rows = [
+        baseCompletionRow({
+          id: COMPLETION_ID,
+          profile_id: OTHER_PROFILE_ID,
+          role: 'educator',
+          status: 'confirmed',
+          updated_by: PROFILE_ID,
+          resolved_at: '2026-05-31T12:00:30.000Z',
+        }),
+      ];
+      const { updateChain } = setup({ rows });
+
+      const result = await new SessionCompletionsService().adminUndoConfirm(
+        AUTH_USER_ID,
+        {
+          orgId: ORG_ID,
+          scheduleId: SCHEDULE_ID,
+          occurrenceKey: OCCURRENCE_KEY,
+        },
+      );
+
+      expect(result).toEqual({ success: true, undoneCount: 1 });
+      expect(updateChain.update).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'pending', updated_by: PROFILE_ID }),
+      );
+      expect(updateChain.in).toHaveBeenCalledWith('id', [COMPLETION_ID]);
+    });
+
+    it('rejects once the undo window has expired', async () => {
+      const rows = [
+        baseCompletionRow({
+          profile_id: OTHER_PROFILE_ID,
+          role: 'educator',
+          status: 'confirmed',
+          updated_by: PROFILE_ID,
+          resolved_at: '2026-05-31T11:00:00.000Z',
+        }),
+      ];
+      setup({ rows });
+
+      await expect(
+        new SessionCompletionsService().adminUndoConfirm(AUTH_USER_ID, {
+          orgId: ORG_ID,
+          scheduleId: SCHEDULE_ID,
+          occurrenceKey: OCCURRENCE_KEY,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('never undoes a participant’s own self-confirm or another staff member’s override', async () => {
+      const rows = [
+        baseCompletionRow({
+          id: COMPLETION_ID,
+          profile_id: OTHER_PROFILE_ID,
+          role: 'educator',
+          status: 'confirmed',
+          updated_by: OTHER_PROFILE_ID,
+          resolved_at: '2026-05-31T12:00:30.000Z',
+        }),
+      ];
+      setup({ rows });
+
+      await expect(
+        new SessionCompletionsService().adminUndoConfirm(AUTH_USER_ID, {
+          orgId: ORG_ID,
+          scheduleId: SCHEDULE_ID,
+          occurrenceKey: OCCURRENCE_KEY,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects a non-admin caller', async () => {
+      setup({ rows: [], roleRow: null, primaryRoleRow: null });
+
+      await expect(
+        new SessionCompletionsService().adminUndoConfirm(AUTH_USER_ID, {
+          orgId: ORG_ID,
+          scheduleId: SCHEDULE_ID,
+          occurrenceKey: OCCURRENCE_KEY,
+        }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('rejects when the occurrence has no completion rows', async () => {
+      setup({ rows: [] });
+
+      await expect(
+        new SessionCompletionsService().adminUndoConfirm(AUTH_USER_ID, {
+          orgId: ORG_ID,
+          scheduleId: SCHEDULE_ID,
+          occurrenceKey: OCCURRENCE_KEY,
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('rejects an invalid scheduleId before querying', async () => {
+      const { from } = setup({ rows: [] });
+
+      await expect(
+        new SessionCompletionsService().adminUndoConfirm(AUTH_USER_ID, {
           orgId: ORG_ID,
           scheduleId: 'not-a-uuid',
           occurrenceKey: OCCURRENCE_KEY,

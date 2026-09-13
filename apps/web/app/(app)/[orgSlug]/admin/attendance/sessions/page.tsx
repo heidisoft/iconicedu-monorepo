@@ -57,19 +57,40 @@ export default async function AdminCompletedSessionsPage({
     analyticsEnabled && month && monthOptions.includes(month)
       ? month
       : ALL_COMPLETION_MONTHS;
+
+  if (!analyticsEnabled) {
+    const rows = await listAdminSessionCompletions(supabase, { orgId: org.id });
+    const schedules = await listSchedules(supabase, { orgId: org.id });
+    return (
+      <AdminPageShell title="Completed sessions">
+        <AdminPageHeading
+          title="Completed sessions"
+          description="Review session confirmations from the past three months."
+        />
+        <CompletedSessionsTable rows={rows} schedules={schedules} orgId={org.id} />
+      </AdminPageShell>
+    );
+  }
+
   const range = completionMonthKeyToUtcRange(selectedMonth);
-  const rows = await listAdminSessionCompletions(supabase, {
+  // Each promise is kicked off here (not awaited) and handed straight to the
+  // client dashboard, which unwraps it per-section with `use()` inside its own
+  // Suspense boundary — a slow query for one section (e.g. the roster) never
+  // blocks the others from painting. The trend chart deliberately reads its own
+  // unscoped fetch instead of `rowsPromise`, so it always covers the full
+  // rolling three-month window regardless of the month/participant/method
+  // filters applied to the rest of the page.
+  const rowsPromise = listAdminSessionCompletions(supabase, {
     orgId: org.id,
     completedSince: range?.since,
     completedUntil: range?.until,
   });
-  const [teachers, parents] = analyticsEnabled
-    ? await Promise.all([
-        listOrgRosterForAdmin(supabase, { orgId: org.id, kind: 'educator' }),
-        listOrgRosterForAdmin(supabase, { orgId: org.id, kind: 'guardian' }),
-      ])
-    : [[], []];
-  const schedules = await listSchedules(supabase, { orgId: org.id });
+  const trendRowsPromise = listAdminSessionCompletions(supabase, { orgId: org.id });
+  const rosterPromise = Promise.all([
+    listOrgRosterForAdmin(supabase, { orgId: org.id, kind: 'educator' }),
+    listOrgRosterForAdmin(supabase, { orgId: org.id, kind: 'guardian' }),
+  ]);
+  const schedulesPromise = listSchedules(supabase, { orgId: org.id });
 
   return (
     <AdminPageShell title="Completed sessions">
@@ -77,19 +98,15 @@ export default async function AdminCompletedSessionsPage({
         title="Completed sessions"
         description="Review session confirmations from the past three months."
       />
-      {analyticsEnabled ? (
-        <SessionAttendanceDashboard
-          rows={rows}
-          selectedMonth={selectedMonth}
-          monthOptions={monthOptions}
-          teachers={teachers}
-          parents={parents}
-          schedules={schedules}
-          orgId={org.id}
-        />
-      ) : (
-        <CompletedSessionsTable rows={rows} schedules={schedules} orgId={org.id} />
-      )}
+      <SessionAttendanceDashboard
+        rowsPromise={rowsPromise}
+        trendRowsPromise={trendRowsPromise}
+        rosterPromise={rosterPromise}
+        schedulesPromise={schedulesPromise}
+        selectedMonth={selectedMonth}
+        monthOptions={monthOptions}
+        orgId={org.id}
+      />
     </AdminPageShell>
   );
 }
