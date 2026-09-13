@@ -163,8 +163,8 @@ export class SessionCompletionsService {
    * exact COUNTs over the whole table instead:
    *   - `completed`: confirmed / auto_confirmed rows, optionally bounded to a
    *     session-end window (the tile shows "this month").
-   *   - `pending`: all rows still awaiting the viewer's action (unbounded — a
-   *     pending row auto-expires via `expires_at` anyway).
+   *   - `pending`: rows still awaiting the viewer's action, bounded to the same
+   *     window as `completed` — both numbers describe the same month.
    */
   async getCompletionSummaryForProfile(
     authUserId: string,
@@ -195,16 +195,19 @@ export class SessionCompletionsService {
         .is('deleted_at', null);
 
     let completedQuery = scopedCount().in('status', ['confirmed', 'auto_confirmed']);
+    let pendingQuery = scopedCount().eq('status', 'pending');
     if (params.completedSince) {
       completedQuery = completedQuery.gte('session_end_at', params.completedSince);
+      pendingQuery = pendingQuery.gte('session_end_at', params.completedSince);
     }
     if (params.completedUntil) {
       completedQuery = completedQuery.lt('session_end_at', params.completedUntil);
+      pendingQuery = pendingQuery.lt('session_end_at', params.completedUntil);
     }
 
     const [completedResult, pendingResult] = await Promise.all([
       completedQuery,
-      scopedCount().eq('status', 'pending'),
+      pendingQuery,
     ]);
 
     if (completedResult.error) {
@@ -230,8 +233,9 @@ export class SessionCompletionsService {
    *   - `completed`: occurrences with a confirmed / auto_confirmed row whose
    *     `session_end_at` falls in the optional window (the tile shows "this
    *     month", same as the per-role tile it replaces).
-   *   - `pending`: occurrences still awaiting someone's action that have no
-   *     confirmation at all (unbounded — a stale pending row auto-expires).
+   *   - `pending`: occurrences with a pending row (and no confirmation) whose
+   *     `session_end_at` falls in the same window as `completed`, so the two
+   *     numbers describe the same month.
    */
   async getOrgCompletionSummary(
     authUserId: string,
@@ -249,9 +253,9 @@ export class SessionCompletionsService {
     const account = await this.resolveAccount(supabase, authUserId, params.orgId);
     await this.assertAdminAccess(supabase, account, params.orgId);
 
-    // Aggregated in Postgres (get_org_session_completion_summary): the org-wide,
-    // all-time pending set is unbounded, so folding raw rows in Node here used
-    // to scan the whole table and trip statement_timeout on large orgs.
+    // Aggregated in Postgres (get_org_session_completion_summary): the org-wide
+    // completion set is unbounded, so folding raw rows in Node here used to
+    // scan the whole table and trip statement_timeout on large orgs.
     const response = await supabase.rpc('get_org_session_completion_summary', {
       p_org_id: params.orgId,
       p_since: params.completedSince ?? null,
