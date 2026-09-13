@@ -24,7 +24,6 @@ import type {
   DeleteSchedulesDto,
   RecurrenceExceptionInput,
   RecurrenceOverrideInput,
-  RecurrenceRowInput,
   ReplaceSchedulesDto,
   RescheduleSessionDto,
   ScheduleRowInput,
@@ -76,8 +75,6 @@ type ScheduleOverrideLookupRow = {
   updated_at: string | null;
   created_at: string | null;
 };
-
-const RRULE_BYDAY_TOKENS = new Set(['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU']);
 
 type RecurrenceExceptionRow = { occurrence_key: string; reason: string | null };
 type RecurrenceOverrideRow = {
