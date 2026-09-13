@@ -14,6 +14,7 @@ import { EventLiveIndicator } from '@iconicedu/ui-web/components/class-schedule/
 import type {
   CancelSessionActionInput,
   EditSessionActionInput,
+  EditSessionOutcome,
 } from '@iconicedu/ui-web/components/class-schedule/session-action-types';
 
 interface EventCardProps {
@@ -21,6 +22,7 @@ interface EventCardProps {
   compact?: boolean;
   canCancelSession?: boolean;
   canEditSession?: boolean;
+  canUseSeriesRescheduleScopes?: boolean;
   onCancelSession?: (
     event: DisplayClassScheduleVM,
     input: CancelSessionActionInput,
@@ -28,7 +30,7 @@ interface EventCardProps {
   onEditSession?: (
     event: DisplayClassScheduleVM,
     input: EditSessionActionInput,
-  ) => Promise<void>;
+  ) => Promise<EditSessionOutcome | void>;
 }
 
 export function EventCard({
@@ -36,6 +38,7 @@ export function EventCard({
   compact = false,
   canCancelSession = false,
   canEditSession = false,
+  canUseSeriesRescheduleScopes = false,
   onCancelSession,
   onEditSession,
 }: EventCardProps) {
@@ -117,6 +120,7 @@ export function EventCard({
       onOpenChange={setOpen}
       canCancelSession={canCancelSession}
       canEditSession={canEditSession}
+      canUseSeriesRescheduleScopes={canUseSeriesRescheduleScopes}
       onCancelSession={onCancelSession}
       onEditSession={onEditSession}
     >

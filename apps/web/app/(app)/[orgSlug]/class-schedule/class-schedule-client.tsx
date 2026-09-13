@@ -7,12 +7,14 @@ import type { ClassScheduleViewVM, ClassScheduleVM } from '@iconicedu/shared-typ
 import type {
   CancelSessionActionInput,
   EditSessionActionInput,
+  EditSessionOutcome,
 } from '@iconicedu/ui-web/components/class-schedule/session-action-types';
 import { ScheduleDisplayTimeZoneProvider } from '@iconicedu/ui-web/components/shared/schedule-display-timezone-context';
 import type { DisplayClassScheduleVM } from '@iconicedu/ui-web/lib/class-schedule-utils';
 import { toScheduleDisplayDate } from '@iconicedu/ui-web/lib/schedule-display-timezone';
 import { cancelClassScheduleSessionAction } from '@iconicedu/web/app/actions/cancel-class-schedule-session';
 import { updateClassScheduleSessionAction } from '@iconicedu/web/app/actions/update-class-schedule-session';
+import { splitClassScheduleSessionAction } from '@iconicedu/web/app/actions/split-class-schedule-session';
 import {
   applyCancelledSessionToSchedules,
   applyUpdatedSessionToSchedules,
@@ -25,6 +27,10 @@ type ClassScheduleClientProps = {
   orgSlug: string;
   canCancelSessions: boolean;
   canEditSessions: boolean;
+  /** enable-class-schedule-series-reschedule flag — gates the "This and
+   * following events"/"All events" quick-edit scopes. `canEditSessions`
+   * alone still allows today's per-occurrence edit regardless of this flag. */
+  canUseSeriesRescheduleScopes: boolean;
   timezone?: string | null;
 };
 
@@ -33,6 +39,7 @@ export function ClassScheduleClient({
   orgSlug,
   canCancelSessions,
   canEditSessions,
+  canUseSeriesRescheduleScopes,
   timezone,
 }: ClassScheduleClientProps) {
   const router = useRouter();
@@ -98,8 +105,32 @@ export function ClassScheduleClient({
   const handleEditSession = async (
     event: DisplayClassScheduleVM,
     input: EditSessionActionInput,
-  ) => {
+  ): Promise<EditSessionOutcome | void> => {
     try {
+      if (input.scope === 'thisAndFollowing') {
+        const splitResult = await splitClassScheduleSessionAction({
+          orgSlug,
+          scheduleId: getBaseScheduleId(event.ids.id),
+          occurrenceKey: getEventOccurrenceKey(event),
+          date: input.date,
+          startTime: input.startTime,
+          endTime: input.endTime,
+          timezone: input.timezone,
+          reason: input.reason,
+          confirmDropFutureOverrides: input.confirmDropFutureOverrides,
+        });
+
+        if ('requiresConfirmation' in splitResult) {
+          return splitResult;
+        }
+
+        // The series was split into two schedule ids — refetch rather than
+        // patch scheduleEvents in place.
+        toast.success('Session updated. Future sessions moved to the new day.');
+        startTransition(() => router.refresh());
+        return;
+      }
+
       const result = await updateClassScheduleSessionAction({
         orgSlug,
         scheduleId: getBaseScheduleId(event.ids.id),
@@ -109,7 +140,20 @@ export function ClassScheduleClient({
         endTime: input.endTime,
         timezone: input.timezone,
         reason: input.reason,
+        scope: input.scope === 'all' ? 'all' : 'occurrence',
+        confirmDropFutureOverrides: input.confirmDropFutureOverrides,
       });
+
+      if ('requiresConfirmation' in result) {
+        return result;
+      }
+
+      if (input.scope === 'all') {
+        // The whole recurrence rule changed — refetch rather than patch.
+        toast.success('Series updated.');
+        startTransition(() => router.refresh());
+        return;
+      }
 
       setScheduleEvents((currentEvents) =>
         applyUpdatedSessionToSchedules(currentEvents, result),
@@ -136,6 +180,7 @@ export function ClassScheduleClient({
           events={scheduleEvents}
           canCancelSessions={canCancelSessions}
           canEditSessions={canEditSessions}
+          canUseSeriesRescheduleScopes={canUseSeriesRescheduleScopes}
           editFullScheduleHref={canEditSessions ? `/${orgSlug}/admin/classrooms` : null}
           onCancelSession={handleCancelSession}
           onEditSession={handleEditSession}

@@ -6,6 +6,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
+import { getLocalDate, getLocalTime, toUtcFromLocal } from '@iconicedu/utils';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
 import { publishActivityEvent } from '@iconicedu/api/lib/activity-feed/activity-publisher';
 import {
@@ -13,13 +14,21 @@ import {
   type SupabaseServiceClient,
 } from '@iconicedu/api/lib/supabase/service';
 import { ReminderReconcileService } from '@iconicedu/api/modules/reminders/reminder-reconcile.service';
+import {
+  addDays,
+  parseDateKey,
+  toDateKey,
+} from '@iconicedu/api/modules/reminders/schedule-expansion.util';
 import type {
   CancelSessionDto,
   DeleteSchedulesDto,
+  RecurrenceExceptionInput,
+  RecurrenceOverrideInput,
   RecurrenceRowInput,
   ReplaceSchedulesDto,
   RescheduleSessionDto,
   ScheduleRowInput,
+  SplitRecurringSessionDto,
 } from '@iconicedu/api/modules/schedules/dto';
 
 const CLASS_SCHEDULE_SELECT = `
@@ -66,6 +75,27 @@ type ScheduleOverrideLookupRow = {
   patch: Record<string, unknown> | null;
   updated_at: string | null;
   created_at: string | null;
+};
+
+const RRULE_BYDAY_TOKENS = new Set(['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU']);
+
+type RecurrenceExceptionRow = { occurrence_key: string; reason: string | null };
+type RecurrenceOverrideRow = {
+  occurrence_key: string;
+  patch: Record<string, unknown> | null;
+};
+
+/** Detail shape needed for both the "whole series" reschedule and the
+ * "this and following" split — enough to validate the recurrence is a simple
+ * weekly/single-weekday rule and to partition its exceptions/overrides. */
+type RecurrenceSplitLookupRow = {
+  id: string;
+  frequency: string;
+  timezone: string | null;
+  until: string | null;
+  byday: string[] | null;
+  exceptions: RecurrenceExceptionRow[] | null;
+  overrides: RecurrenceOverrideRow[] | null;
 };
 
 @Injectable()
@@ -397,7 +427,14 @@ export class SchedulesService {
   async rescheduleScheduleSession(
     accessToken: string,
     dto: RescheduleSessionDto,
-  ): Promise<{ success: true; mode: 'single' | 'recurring' }> {
+  ): Promise<
+    | { success: true; mode: 'single' | 'recurring' }
+    | {
+        requiresConfirmation: true;
+        futureOverrideCount: number;
+        futureExceptionCount: number;
+      }
+  > {
     const actor = await this.requireOrgActor(accessToken, dto.orgId);
     const supabase = createSupabaseServiceClient();
     const now = new Date().toISOString();
@@ -456,6 +493,17 @@ export class SchedulesService {
       await this.reconcileRemindersForSchedule(dto.orgId, dto.scheduleId);
 
       return { success: true, mode: 'single' };
+    }
+
+    if (dto.scope === 'all') {
+      return this.rescheduleEntireRecurringSeries(
+        supabase,
+        dto,
+        recurrenceRow.id,
+        actor.profileId,
+        now,
+        activityContext,
+      );
     }
 
     const occurrenceKey = dto.occurrenceKey;
@@ -558,6 +606,174 @@ export class SchedulesService {
     await this.reconcileRemindersForSchedule(dto.orgId, dto.scheduleId);
 
     return { success: true, mode: 'recurring' };
+  }
+
+  /**
+   * "This and following events": truncates the existing recurring series as of
+   * the edited occurrence's local calendar day and creates a brand-new series
+   * carrying the new day/time/weekday forward. The old `class_schedules.id` is
+   * never touched — `class_session_completions` rows already attached to it
+   * stay correctly attributed to history. v1 only supports splitting into a
+   * single new weekday (the existing rule must already be weekly/single-weekday
+   * too); anything more complex should go through the full classroom editor.
+   */
+  async splitRecurringSeries(
+    accessToken: string,
+    dto: SplitRecurringSessionDto,
+  ): Promise<
+    | { success: true; oldScheduleId: string; newScheduleId: string }
+    | {
+        requiresConfirmation: true;
+        futureOverrideCount: number;
+        futureExceptionCount: number;
+      }
+  > {
+    const actor = await this.requireOrgActor(accessToken, dto.orgId);
+    const supabase = createSupabaseServiceClient();
+    const now = new Date().toISOString();
+
+    if (!dto.byWeekday || dto.byWeekday.length !== 1) {
+      throw new BadRequestException('byWeekday must contain exactly one weekday');
+    }
+
+    const activityContext = await this.loadRescheduleActivityContext(
+      supabase,
+      dto.orgId,
+      dto.scheduleId,
+    );
+    if (!activityContext) {
+      throw new BadRequestException('Schedule not found');
+    }
+
+    const recurrenceDetail = await this.loadRecurrenceSplitDetail(
+      supabase,
+      dto.orgId,
+      dto.scheduleId,
+    );
+    if (!recurrenceDetail) {
+      throw new BadRequestException('This schedule is not recurring');
+    }
+    this.assertSimpleWeeklyRecurrence(recurrenceDetail);
+
+    const scheduleTimezone =
+      activityContext.timezone ?? recurrenceDetail.timezone ?? 'UTC';
+
+    const exceptions = recurrenceDetail.exceptions ?? [];
+    if (exceptions.some((e) => e.occurrence_key === dto.occurrenceKey)) {
+      throw new BadRequestException('Cannot split a series on a cancelled occurrence');
+    }
+
+    // Always the OLD schedule's timezone — occurrenceKey was generated against
+    // it, and reinterpreting it in a new target timezone (if one is being set as
+    // part of this same edit) could shift the split boundary by a day.
+    const splitLocalDate =
+      getLocalDate(dto.occurrenceKey, scheduleTimezone) ?? dto.occurrenceKey.slice(0, 10);
+    const nowLocalDate = getLocalDate(now, scheduleTimezone) ?? now.slice(0, 10);
+    if (splitLocalDate < nowLocalDate) {
+      // The UI is expected to prevent splitting on a past occurrence entirely;
+      // this is a warn-only backstop since server/client clock and timezone
+      // resolution can legitimately disagree by a day at the boundary.
+      // eslint-disable-next-line no-console
+      console.warn(
+        `splitRecurringSeries: split date ${splitLocalDate} is in the past for schedule ${dto.scheduleId}`,
+      );
+    }
+
+    if (recurrenceDetail.until) {
+      const untilLocalDate =
+        getLocalDate(recurrenceDetail.until, scheduleTimezone) ??
+        recurrenceDetail.until.slice(0, 10);
+      if (splitLocalDate > untilLocalDate) {
+        throw new BadRequestException(
+          'This occurrence is past the series end date and can no longer be split — the series may have just been ended by another edit.',
+        );
+      }
+    }
+
+    const cutoffLocalDate = toDateKey(addDays(parseDateKey(splitLocalDate), -1));
+    const oldUntil =
+      toUtcFromLocal(cutoffLocalDate, '23:59', scheduleTimezone) ??
+      new Date(`${cutoffLocalDate}T23:59:00Z`).toISOString();
+
+    const isBeforeSplit = (occurrenceKey: string) => {
+      const localDate =
+        getLocalDate(occurrenceKey, scheduleTimezone) ?? occurrenceKey.slice(0, 10);
+      return localDate < splitLocalDate;
+    };
+    const overrides = recurrenceDetail.overrides ?? [];
+    const keptExceptions = exceptions.filter((e) => isBeforeSplit(e.occurrence_key));
+    const keptOverrides = overrides.filter((o) => isBeforeSplit(o.occurrence_key));
+    const droppedExceptionCount = exceptions.length - keptExceptions.length;
+    const droppedOverrideCount = overrides.length - keptOverrides.length;
+
+    // Splitting always drops the exceptions/overrides on/after the split
+    // point (they belonged to occurrences the old pattern produced, which
+    // stop existing once the series forks) — that's destructive in the same
+    // way a weekday change under 'all' scope is, so it gets the same
+    // confirm-before-dropping treatment.
+    if (
+      (droppedExceptionCount > 0 || droppedOverrideCount > 0) &&
+      !dto.confirmDropFutureOverrides
+    ) {
+      return {
+        requiresConfirmation: true,
+        futureOverrideCount: droppedOverrideCount,
+        futureExceptionCount: droppedExceptionCount,
+      };
+    }
+
+    const { data: newScheduleId, error: rpcError } = await supabase.rpc(
+      'split_class_schedule_recurrence',
+      {
+        p_org_id: dto.orgId,
+        p_schedule_id: dto.scheduleId,
+        p_old_until: oldUntil,
+        p_kept_exceptions: keptExceptions.map((e) => ({
+          occurrenceKey: e.occurrence_key,
+          reason: e.reason,
+        })),
+        p_kept_overrides: keptOverrides.map((o) => ({
+          occurrenceKey: o.occurrence_key,
+          patch: o.patch,
+        })),
+        p_new_start_at: dto.newStartAt,
+        p_new_end_at: dto.newEndAt,
+        p_new_timezone: dto.timezone ?? scheduleTimezone,
+        p_new_byday: dto.byWeekday,
+        p_actor_profile_id: actor.profileId,
+        p_now: now,
+      },
+    );
+
+    if (rpcError) {
+      throw new InternalServerErrorException(rpcError.message);
+    }
+
+    const resolvedNewScheduleId = newScheduleId as string;
+
+    await this.publishScheduleSplitActivities({
+      supabase,
+      orgId: dto.orgId,
+      actorProfileId: actor.profileId,
+      context: activityContext,
+      oldUntil,
+      newScheduleId: resolvedNewScheduleId,
+      newStartAt: dto.newStartAt,
+      newEndAt: dto.newEndAt,
+      reason: dto.reason,
+    });
+
+    // Reconcile is per-scheduleId (see reconcileRemindersForSchedule's own
+    // doc), so both the truncated old series and the new one need their own
+    // call — reconciling one does nothing for the other.
+    await this.reconcileRemindersForSchedule(dto.orgId, dto.scheduleId);
+    await this.reconcileRemindersForSchedule(dto.orgId, resolvedNewScheduleId);
+
+    return {
+      success: true,
+      oldScheduleId: dto.scheduleId,
+      newScheduleId: resolvedNewScheduleId,
+    };
   }
 
   // ─── Private helpers ─────────────────────────────────────────────────────────
@@ -797,6 +1013,252 @@ export class SchedulesService {
       },
       dedupeKey: input.dedupeKey,
       refreshOnDedupe: true,
+      createdBy: input.actorProfileId,
+    });
+  }
+
+  private async loadRecurrenceSplitDetail(
+    supabase: SupabaseServiceClient,
+    orgId: string,
+    scheduleId: string,
+  ): Promise<RecurrenceSplitLookupRow | null> {
+    const { data, error } = await supabase
+      .from('class_schedule_recurrence')
+      .select(
+        `
+          id, frequency, timezone, until, byday,
+          exceptions:class_schedule_recurrence_exceptions(occurrence_key, reason),
+          overrides:class_schedule_recurrence_overrides(occurrence_key, patch)
+        `,
+      )
+      .eq('org_id', orgId)
+      .eq('schedule_id', scheduleId)
+      .is('deleted_at', null)
+      .maybeSingle<RecurrenceSplitLookupRow>();
+
+    if (error) {
+      throw new InternalServerErrorException(error.message);
+    }
+    return data ?? null;
+  }
+
+  /** v1 of the quick-edit "This and following"/"All events" scopes only
+   * supports the simple weekly + single-weekday shape that `expandRecurringEvents`
+   * actually implements (monthly/yearly/multi-weekday DB columns exist but
+   * aren't consumed by expansion) — anything else must go through the full
+   * classroom editor, which accepts arbitrary RecurrenceRowInput shapes. */
+  private assertSimpleWeeklyRecurrence(recurrence: RecurrenceSplitLookupRow) {
+    if (recurrence.frequency !== 'weekly' || (recurrence.byday ?? []).length !== 1) {
+      throw new BadRequestException(
+        'This quick edit only supports a simple weekly, single-weekday recurrence — use the full classroom editor for this schedule.',
+      );
+    }
+  }
+
+  /**
+   * "All events": rewrites the recurrence rule in place on the existing
+   * schedule/recurrence row (no new schedule id). If the weekday is changing,
+   * any future exceptions/overrides no longer match the new pattern's day and
+   * must be dropped — since that's destructive, the caller has to explicitly
+   * confirm via `dto.confirmDropFutureOverrides` once told how many would be
+   * affected.
+   */
+  private async rescheduleEntireRecurringSeries(
+    supabase: SupabaseServiceClient,
+    dto: RescheduleSessionDto,
+    recurrenceId: string,
+    actorProfileId: string,
+    now: string,
+    activityContext: RescheduleActivityContext | null,
+  ): Promise<
+    | { success: true; mode: 'recurring' }
+    | {
+        requiresConfirmation: true;
+        futureOverrideCount: number;
+        futureExceptionCount: number;
+      }
+  > {
+    const recurrenceDetail = await this.loadRecurrenceSplitDetail(
+      supabase,
+      dto.orgId,
+      dto.scheduleId,
+    );
+    if (!recurrenceDetail) {
+      throw new BadRequestException('This schedule is not recurring');
+    }
+    this.assertSimpleWeeklyRecurrence(recurrenceDetail);
+    // Defensive: `parseRescheduleSessionDto` already enforces this shape for
+    // HTTP callers, but this method is also called directly (e.g. from
+    // tests, or any future in-process caller), so don't rely solely on the
+    // controller-layer parser having run.
+    if (!dto.byWeekday || dto.byWeekday.length !== 1) {
+      throw new BadRequestException("scope 'all' requires exactly one byWeekday entry");
+    }
+
+    const newByWeekday = dto.byWeekday[0]!;
+    const weekdayChanged = (recurrenceDetail.byday ?? [])[0] !== newByWeekday;
+    const resolvedTimezone =
+      dto.timezone ?? recurrenceDetail.timezone ?? activityContext?.timezone ?? 'UTC';
+    const todayLocalDate = getLocalDate(now, resolvedTimezone) ?? now.slice(0, 10);
+
+    const isFuture = (occurrenceKey: string) => {
+      const localDate =
+        getLocalDate(occurrenceKey, resolvedTimezone) ?? occurrenceKey.slice(0, 10);
+      return localDate >= todayLocalDate;
+    };
+
+    const exceptions = recurrenceDetail.exceptions ?? [];
+    const overrides = recurrenceDetail.overrides ?? [];
+    const futureExceptions = exceptions.filter((e) => isFuture(e.occurrence_key));
+    const futureOverrides = overrides.filter((o) => isFuture(o.occurrence_key));
+
+    if (
+      weekdayChanged &&
+      (futureExceptions.length > 0 || futureOverrides.length > 0) &&
+      !dto.confirmDropFutureOverrides
+    ) {
+      return {
+        requiresConfirmation: true,
+        futureOverrideCount: futureOverrides.length,
+        futureExceptionCount: futureExceptions.length,
+      };
+    }
+
+    const keptExceptions = weekdayChanged
+      ? exceptions.filter((e) => !isFuture(e.occurrence_key))
+      : exceptions;
+    const keptOverrides = weekdayChanged
+      ? overrides.filter((o) => !isFuture(o.occurrence_key))
+      : overrides;
+
+    // Preserve the schedule's own calendar DATE — only its time-of-day
+    // changes here. `expandRecurringEvents` treats `start_at`'s local date as
+    // a hard floor (no occurrence before it is ever generated), so writing
+    // dto.startAt's date verbatim would silently erase every occurrence
+    // (including already-happened ones the kept exceptions/overrides above
+    // still need to render correctly) between the old date and the new one.
+    // The weekday itself comes entirely from `byday`, not from this date.
+    const preservedLocalDate =
+      getLocalDate(activityContext?.startAt ?? now, resolvedTimezone) ?? now.slice(0, 10);
+    const newStartLocalTime = getLocalTime(dto.startAt, resolvedTimezone) ?? '00:00';
+    const newEndLocalTime = getLocalTime(dto.endAt, resolvedTimezone) ?? '00:00';
+    const newStartAt =
+      toUtcFromLocal(preservedLocalDate, newStartLocalTime, resolvedTimezone) ??
+      dto.startAt;
+    const newEndAt =
+      toUtcFromLocal(preservedLocalDate, newEndLocalTime, resolvedTimezone) ?? dto.endAt;
+
+    // Wrapped in a transaction: this touches four tables (schedule,
+    // recurrence, exceptions, overrides) — an unwrapped sequence here would
+    // risk both a lost-update race (another edit's exception/override landing
+    // between this read and the wholesale replace) and a partial-failure
+    // window where the schedule's time and the recurrence's weekday disagree.
+    const { error: rpcError } = await supabase.rpc(
+      'update_class_schedule_recurrence_rule',
+      {
+        p_org_id: dto.orgId,
+        p_schedule_id: dto.scheduleId,
+        p_recurrence_id: recurrenceId,
+        p_new_start_at: newStartAt,
+        p_new_end_at: newEndAt,
+        p_new_timezone: resolvedTimezone,
+        p_new_byday: dto.byWeekday,
+        p_kept_exceptions: keptExceptions.map((e) => ({
+          occurrenceKey: e.occurrence_key,
+          reason: e.reason,
+        })),
+        p_kept_overrides: keptOverrides.map((o) => ({
+          occurrenceKey: o.occurrence_key,
+          patch: o.patch,
+        })),
+        p_actor_profile_id: actorProfileId,
+        p_now: now,
+      },
+    );
+    if (rpcError) {
+      throw new InternalServerErrorException(rpcError.message);
+    }
+
+    await this.publishSessionRescheduledActivity({
+      supabase,
+      orgId: dto.orgId,
+      actorProfileId,
+      context: activityContext,
+      oldStartAt: activityContext?.startAt ?? null,
+      oldEndAt: activityContext?.endAt ?? null,
+      newStartAt,
+      newEndAt,
+      reason: dto.reason,
+      suppressNotifications: dto.suppressNotifications,
+      dedupeKey: `class.session.rescheduled:${dto.orgId}:${dto.scheduleId}:all:${now}`,
+    });
+    await this.reconcileRemindersForSchedule(dto.orgId, dto.scheduleId);
+
+    return { success: true, mode: 'recurring' };
+  }
+
+  private async publishScheduleSplitActivities(input: {
+    supabase: SupabaseServiceClient;
+    orgId: string;
+    actorProfileId: string | null;
+    context: RescheduleActivityContext;
+    oldUntil: string;
+    newScheduleId: string;
+    newStartAt: string;
+    newEndAt: string;
+    reason: string | null;
+  }) {
+    if (!input.context.learningSpaceId || !input.context.channelId) {
+      return;
+    }
+
+    const basePayload = {
+      learningSpaceId: input.context.learningSpaceId,
+      channelId: input.context.channelId,
+      title: input.context.title,
+      learningSpaceTitle: input.context.title,
+      channelRouteKind: 'space',
+      members: input.context.members,
+      reason: input.reason,
+    };
+
+    await publishActivityEvent({
+      supabase: input.supabase,
+      orgId: input.orgId,
+      eventType: 'class.schedule.ended',
+      sourceKind: input.actorProfileId ? 'profile' : 'system',
+      actorProfileId: input.actorProfileId,
+      scope: { kind: 'learning_space', learningSpaceId: input.context.learningSpaceId },
+      objectRef: { kind: 'schedule', id: input.context.scheduleId },
+      targetRef: { kind: 'learning_space', id: input.context.learningSpaceId },
+      audienceRules: [{ kind: 'all_in_scope' }],
+      payload: {
+        ...basePayload,
+        scheduleId: input.context.scheduleId,
+        until: input.oldUntil,
+        recurrenceUntil: input.oldUntil,
+      },
+      dedupeKey: `class.schedule.ended:${input.orgId}:${input.context.scheduleId}:${input.oldUntil}`,
+      createdBy: input.actorProfileId,
+    });
+
+    await publishActivityEvent({
+      supabase: input.supabase,
+      orgId: input.orgId,
+      eventType: 'class.schedule.created',
+      sourceKind: input.actorProfileId ? 'profile' : 'system',
+      actorProfileId: input.actorProfileId,
+      scope: { kind: 'learning_space', learningSpaceId: input.context.learningSpaceId },
+      objectRef: { kind: 'schedule', id: input.newScheduleId },
+      targetRef: { kind: 'learning_space', id: input.context.learningSpaceId },
+      audienceRules: [{ kind: 'all_in_scope' }],
+      payload: {
+        ...basePayload,
+        scheduleId: input.newScheduleId,
+        startAt: input.newStartAt,
+        endAt: input.newEndAt,
+      },
+      dedupeKey: `class.schedule.created:${input.orgId}:${input.newScheduleId}`,
       createdBy: input.actorProfileId,
     });
   }
@@ -1182,7 +1644,8 @@ export class SchedulesService {
       supabase,
       orgId,
       recurrenceId,
-      recurrence,
+      recurrence.exceptions,
+      recurrence.overrides,
       createdBy,
       now,
     );
@@ -1237,7 +1700,8 @@ export class SchedulesService {
       supabase,
       orgId,
       recurrenceId,
-      recurrence,
+      recurrence.exceptions,
+      recurrence.overrides,
       updatedBy,
       now,
     );
@@ -1250,7 +1714,8 @@ export class SchedulesService {
     supabase: SupabaseServiceClient,
     orgId: string,
     recurrenceId: string,
-    recurrence: RecurrenceRowInput,
+    exceptions: RecurrenceExceptionInput[],
+    overrides: RecurrenceOverrideInput[],
     actorProfileId: string,
     now: string,
   ) {
@@ -1272,8 +1737,8 @@ export class SchedulesService {
       throw new InternalServerErrorException(deleteOverridesError.message);
     }
 
-    if (recurrence.exceptions.length) {
-      const exceptionRows = recurrence.exceptions.map((e) => ({
+    if (exceptions.length) {
+      const exceptionRows = exceptions.map((e) => ({
         id: randomUUID(),
         org_id: orgId,
         recurrence_id: recurrenceId,
@@ -1291,8 +1756,8 @@ export class SchedulesService {
       if (error) throw new InternalServerErrorException(error.message);
     }
 
-    if (recurrence.overrides.length) {
-      const overrideRows = recurrence.overrides.map((o) => ({
+    if (overrides.length) {
+      const overrideRows = overrides.map((o) => ({
         id: randomUUID(),
         org_id: orgId,
         recurrence_id: recurrenceId,

@@ -33,6 +33,7 @@ import { formatScheduleDisplayValue } from '@iconicedu/ui-web/lib/schedule-displ
 import type {
   CancelSessionActionInput,
   EditSessionActionInput,
+  EditSessionOutcome,
 } from '@iconicedu/ui-web/components/class-schedule/session-action-types';
 
 interface DayViewProps {
@@ -46,6 +47,7 @@ interface DayViewProps {
   onMonthChange?: (date: Date) => void;
   canCancelSessions?: boolean;
   canEditSessions?: boolean;
+  canUseSeriesRescheduleScopes?: boolean;
   onCancelSession?: (
     event: DisplayClassScheduleVM,
     input: CancelSessionActionInput,
@@ -53,7 +55,7 @@ interface DayViewProps {
   onEditSession?: (
     event: DisplayClassScheduleVM,
     input: EditSessionActionInput,
-  ) => Promise<void>;
+  ) => Promise<EditSessionOutcome | void>;
 }
 
 export function DayView({
@@ -67,6 +69,7 @@ export function DayView({
   onMonthChange,
   canCancelSessions = false,
   canEditSessions = false,
+  canUseSeriesRescheduleScopes = false,
   onCancelSession,
   onEditSession,
 }: DayViewProps) {
@@ -197,6 +200,7 @@ export function DayView({
                         compact={isCompact}
                         canCancelSession={canCancelSessions}
                         canEditSession={canEditSessions}
+                        canUseSeriesRescheduleScopes={canUseSeriesRescheduleScopes}
                         onCancelSession={onCancelSession}
                         onEditSession={onEditSession}
                       />
@@ -242,6 +246,9 @@ export function DayView({
                                 event={hidden}
                                 canCancelSession={canCancelSessions}
                                 canEditSession={canEditSessions}
+                                canUseSeriesRescheduleScopes={
+                                  canUseSeriesRescheduleScopes
+                                }
                                 onCancelSession={onCancelSession}
                                 onEditSession={onEditSession}
                               />

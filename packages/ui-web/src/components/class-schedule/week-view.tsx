@@ -22,6 +22,7 @@ import { useScheduleDisplayTimeZone } from '@iconicedu/ui-web/components/shared/
 import type {
   CancelSessionActionInput,
   EditSessionActionInput,
+  EditSessionOutcome,
 } from '@iconicedu/ui-web/components/class-schedule/session-action-types';
 
 interface WeekViewProps {
@@ -31,6 +32,7 @@ interface WeekViewProps {
   onSwitchToDay?: () => void;
   canCancelSessions?: boolean;
   canEditSessions?: boolean;
+  canUseSeriesRescheduleScopes?: boolean;
   onCancelSession?: (
     event: DisplayClassScheduleVM,
     input: CancelSessionActionInput,
@@ -38,7 +40,7 @@ interface WeekViewProps {
   onEditSession?: (
     event: DisplayClassScheduleVM,
     input: EditSessionActionInput,
-  ) => Promise<void>;
+  ) => Promise<EditSessionOutcome | void>;
 }
 
 export function WeekView({
@@ -48,6 +50,7 @@ export function WeekView({
   onSwitchToDay,
   canCancelSessions = false,
   canEditSessions = false,
+  canUseSeriesRescheduleScopes = false,
   onCancelSession,
   onEditSession,
 }: WeekViewProps) {
@@ -243,6 +246,7 @@ export function WeekView({
                             compact={isCompact}
                             canCancelSession={canCancelSessions}
                             canEditSession={canEditSessions}
+                            canUseSeriesRescheduleScopes={canUseSeriesRescheduleScopes}
                             onCancelSession={onCancelSession}
                             onEditSession={onEditSession}
                           />
@@ -288,6 +292,9 @@ export function WeekView({
                                     event={hidden}
                                     canCancelSession={canCancelSessions}
                                     canEditSession={canEditSessions}
+                                    canUseSeriesRescheduleScopes={
+                                      canUseSeriesRescheduleScopes
+                                    }
                                     onCancelSession={onCancelSession}
                                     onEditSession={onEditSession}
                                   />

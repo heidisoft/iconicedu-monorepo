@@ -224,6 +224,21 @@ export function toOccurrenceKey(isoDate: string, time: string) {
   return date.toISOString();
 }
 
+const WEEKDAY_TOKENS: WeekdayVM[] = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+
+/** Derives the RRULE weekday token (MO/TU/.../SU) a plain `YYYY-MM-DD` date
+ * key falls on, independent of any timezone (the date key is already the
+ * intended local calendar date). Used by the class-schedule "This and
+ * following"/"All events" quick-edit actions to turn the date an admin picks
+ * into the new recurrence's `byWeekday`. */
+export function weekdayTokenFromLocalDate(dateKey: string): WeekdayVM {
+  const [year, month, day] = dateKey.split('-').map((value) => Number(value));
+  const weekdayIndex = new Date(
+    Date.UTC(year ?? 1970, (month ?? 1) - 1, day ?? 1, 12),
+  ).getUTCDay();
+  return WEEKDAY_TOKENS[weekdayIndex]!;
+}
+
 export function toOccurrenceKeyInTimezone(
   isoDate: string,
   time: string,
