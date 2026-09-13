@@ -191,7 +191,7 @@ function RecentCompletions({ rows }: { rows: AdminSessionCompletionVM[] }) {
                 </Badge>
               </div>
               <p className="mt-2 text-xs text-muted-foreground">
-                {new Date(row.sessionEndAt).toLocaleString()}
+                {new Date(row.sessionEndAt).toLocaleString('en-US', { timeZone: 'UTC' })}
               </p>
             </div>
           ))

@@ -82,7 +82,7 @@ export function formatJobActivityDateTime(value: string | null): string {
   if (!value) return '—';
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return '—';
-  return parsed.toLocaleString();
+  return parsed.toLocaleString('en-US', { timeZone: 'UTC' });
 }
 
 export function formatJobActivityAttempts(
@@ -172,8 +172,12 @@ export function buildJobActivityVolume(
       key: date.toISOString(),
       label:
         granularity === 'hour'
-          ? date.toLocaleTimeString([], { hour: 'numeric' })
-          : date.toLocaleDateString([], { month: 'short', day: 'numeric' }),
+          ? date.toLocaleTimeString('en-US', { hour: 'numeric', timeZone: 'UTC' })
+          : date.toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              timeZone: 'UTC',
+            }),
       count: counts.get(cursor) ?? 0,
     });
   }

@@ -51,9 +51,7 @@ export interface AdminFilterBarProps {
 const BP = { sm: 640, md: 768, lg: 1024 } as const;
 
 function useWindowWidth() {
-  const [width, setWidth] = React.useState(() =>
-    typeof window !== 'undefined' ? window.innerWidth : BP.lg,
-  );
+  const [width, setWidth] = React.useState<number>(BP.lg);
   React.useEffect(() => {
     function onResize() {
       setWidth(window.innerWidth);
