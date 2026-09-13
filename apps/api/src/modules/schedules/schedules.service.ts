@@ -709,6 +709,20 @@ export class SchedulesService {
       toUtcFromLocal(cutoffLocalDate, '23:59', scheduleTimezone) ??
       new Date(`${cutoffLocalDate}T23:59:00Z`).toISOString();
 
+    // The new series' anchor is free-form user input (whatever date the admin
+    // picked in the dialog) — if it lands before the split point, the new
+    // series would start generating occurrences while the old series is
+    // still active through the day before the split, overlapping and
+    // duplicating sessions/reminders in that window.
+    const newSeriesTimezone = dto.timezone ?? scheduleTimezone;
+    const newAnchorLocalDate =
+      getLocalDate(dto.newStartAt, newSeriesTimezone) ?? dto.newStartAt.slice(0, 10);
+    if (newAnchorLocalDate < splitLocalDate) {
+      throw new BadRequestException(
+        'The new day/time must fall on or after the occurrence being split — pick a date that is not earlier than the selected occurrence.',
+      );
+    }
+
     const isBeforeSplit = (occurrenceKey: string) => {
       const localDate =
         getLocalDate(occurrenceKey, scheduleTimezone) ?? occurrenceKey.slice(0, 10);
@@ -754,7 +768,7 @@ export class SchedulesService {
         })),
         p_new_start_at: dto.newStartAt,
         p_new_end_at: dto.newEndAt,
-        p_new_timezone: dto.timezone ?? scheduleTimezone,
+        p_new_timezone: newSeriesTimezone,
         p_new_byday: dto.byWeekday,
         p_actor_profile_id: actor.profileId,
         p_now: now,

@@ -43,6 +43,9 @@ declare
   v_original_until timestamptz;
   v_new_schedule_id uuid := gen_random_uuid();
   v_new_recurrence_id uuid := gen_random_uuid();
+  v_new_timezone text;
+  v_new_hour int;
+  v_new_minute int;
 begin
   select * into v_old_schedule
     from public.class_schedules
@@ -67,6 +70,14 @@ begin
   end if;
 
   v_original_until := v_old_recurrence.until;
+  v_new_timezone := coalesce(p_new_timezone, v_old_recurrence.timezone, v_old_schedule.timezone);
+  -- byhour/byminute must track the NEW start time, not copy the old
+  -- recurrence's verbatim — the full classroom editor (learning-space-detail.ts,
+  -- buildWeekdayTimesFromRecurrence) reconstructs its displayed/edited time
+  -- from these columns, so a stale value here would silently revert this
+  -- quick edit's time change the next time someone saves the full editor.
+  v_new_hour := extract(hour from (p_new_start_at at time zone v_new_timezone))::int;
+  v_new_minute := extract(minute from (p_new_start_at at time zone v_new_timezone))::int;
 
   -- Truncate the old series.
   update public.class_schedule_recurrence
@@ -121,7 +132,7 @@ begin
   ) values (
     v_new_schedule_id, p_org_id, v_old_schedule.title, v_old_schedule.description,
     v_old_schedule.location, v_old_schedule.meeting_link,
-    p_new_start_at, p_new_end_at, coalesce(p_new_timezone, v_old_schedule.timezone),
+    p_new_start_at, p_new_end_at, v_new_timezone,
     'scheduled', v_old_schedule.visibility, v_old_schedule.theme_key,
     v_old_schedule.source_kind, v_old_schedule.source_learning_space_id,
     v_old_schedule.source_channel_id, v_old_schedule.source_session_id,
@@ -138,8 +149,8 @@ begin
   ) values (
     v_new_recurrence_id, p_org_id, v_new_schedule_id, v_old_recurrence.frequency,
     v_old_recurrence.interval, v_old_recurrence.count, v_original_until,
-    coalesce(p_new_timezone, v_old_recurrence.timezone),
-    null, v_old_recurrence.bysecond, v_old_recurrence.byminute, v_old_recurrence.byhour,
+    v_new_timezone,
+    null, v_old_recurrence.bysecond, array[v_new_minute], array[v_new_hour],
     p_new_byday, v_old_recurrence.bymonthday, v_old_recurrence.byyearday,
     v_old_recurrence.byweekno, v_old_recurrence.bymonth, v_old_recurrence.bysetpos,
     v_old_recurrence.wkst,
@@ -196,6 +207,9 @@ language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  v_new_hour int;
+  v_new_minute int;
 begin
   perform 1 from public.class_schedules
    where id = p_schedule_id and org_id = p_org_id and deleted_at is null
@@ -212,6 +226,14 @@ begin
     raise exception 'recurrence % not found for schedule %', p_recurrence_id, p_schedule_id;
   end if;
 
+  -- byhour/byminute must track the NEW start time — the full classroom
+  -- editor reconstructs its displayed/edited time from these columns
+  -- (learning-space-detail.ts, buildWeekdayTimesFromRecurrence), so leaving
+  -- them stale would silently revert this quick edit's time change the next
+  -- time someone saves the full editor.
+  v_new_hour := extract(hour from (p_new_start_at at time zone p_new_timezone))::int;
+  v_new_minute := extract(minute from (p_new_start_at at time zone p_new_timezone))::int;
+
   update public.class_schedules
      set start_at = p_new_start_at,
          end_at = p_new_end_at,
@@ -223,6 +245,8 @@ begin
   update public.class_schedule_recurrence
      set byday = p_new_byday,
          timezone = p_new_timezone,
+         byhour = array[v_new_hour],
+         byminute = array[v_new_minute],
          updated_at = p_now,
          updated_by = p_actor_profile_id
    where id = p_recurrence_id;

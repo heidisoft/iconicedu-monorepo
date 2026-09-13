@@ -1293,8 +1293,8 @@ describe('SchedulesService authorization', () => {
         orgId: 'org-1',
         scheduleId: 'schedule-1',
         occurrenceKey: '2026-09-23T09:10:00.000Z',
-        newStartAt: '2026-09-22T14:00:00.000Z',
-        newEndAt: '2026-09-22T15:00:00.000Z',
+        newStartAt: '2026-09-29T14:00:00.000Z',
+        newEndAt: '2026-09-29T15:00:00.000Z',
         timezone: null,
         byWeekday: ['TU'],
         reason: 'Parent requested a permanent change',
@@ -1331,8 +1331,8 @@ describe('SchedulesService authorization', () => {
               suppressNotifications: false,
             },
           ],
-          p_new_start_at: '2026-09-22T14:00:00.000Z',
-          p_new_end_at: '2026-09-22T15:00:00.000Z',
+          p_new_start_at: '2026-09-29T14:00:00.000Z',
+          p_new_end_at: '2026-09-29T15:00:00.000Z',
           p_new_timezone: 'UTC',
           p_new_byday: ['TU'],
           p_actor_profile_id: 'profile-staff',
@@ -1384,8 +1384,8 @@ describe('SchedulesService authorization', () => {
           orgId: 'org-1',
           scheduleId: 'schedule-1',
           occurrenceKey: '2026-09-23T09:10:00.000Z',
-          newStartAt: '2026-09-22T14:00:00.000Z',
-          newEndAt: '2026-09-22T15:00:00.000Z',
+          newStartAt: '2026-09-29T14:00:00.000Z',
+          newEndAt: '2026-09-29T15:00:00.000Z',
           timezone: null,
           byWeekday: ['TU'],
           reason: null,
@@ -1417,8 +1417,8 @@ describe('SchedulesService authorization', () => {
         orgId: 'org-1',
         scheduleId: 'schedule-1',
         occurrenceKey: '2026-09-23T09:10:00.000Z',
-        newStartAt: '2026-09-22T14:00:00.000Z',
-        newEndAt: '2026-09-22T15:00:00.000Z',
+        newStartAt: '2026-09-29T14:00:00.000Z',
+        newEndAt: '2026-09-29T15:00:00.000Z',
         timezone: null,
         byWeekday: ['TU'],
         reason: null,
@@ -1456,8 +1456,8 @@ describe('SchedulesService authorization', () => {
           orgId: 'org-1',
           scheduleId: 'schedule-1',
           occurrenceKey: '2026-09-23T09:10:00.000Z',
-          newStartAt: '2026-09-22T14:00:00.000Z',
-          newEndAt: '2026-09-22T15:00:00.000Z',
+          newStartAt: '2026-09-29T14:00:00.000Z',
+          newEndAt: '2026-09-29T15:00:00.000Z',
           timezone: null,
           byWeekday: ['TU'],
           reason: null,
@@ -1490,8 +1490,8 @@ describe('SchedulesService authorization', () => {
           orgId: 'org-1',
           scheduleId: 'schedule-1',
           occurrenceKey: '2026-09-23T09:10:00.000Z',
-          newStartAt: '2026-09-22T14:00:00.000Z',
-          newEndAt: '2026-09-22T15:00:00.000Z',
+          newStartAt: '2026-09-29T14:00:00.000Z',
+          newEndAt: '2026-09-29T15:00:00.000Z',
           timezone: null,
           byWeekday: ['TU'],
           reason: null,
@@ -1520,6 +1520,44 @@ describe('SchedulesService authorization', () => {
 
       const service = new SchedulesService();
 
+      await expect(
+        service.splitRecurringSeries('token-1', {
+          orgId: 'org-1',
+          scheduleId: 'schedule-1',
+          occurrenceKey: '2026-09-23T09:10:00.000Z',
+          newStartAt: '2026-09-29T14:00:00.000Z',
+          newEndAt: '2026-09-29T15:00:00.000Z',
+          timezone: null,
+          byWeekday: ['TU'],
+          reason: null,
+          suppressNotifications: false,
+          confirmDropFutureOverrides: false,
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(rpcMock).not.toHaveBeenCalled();
+    });
+
+    it('rejects a new anchor date that falls before the occurrence being split', async () => {
+      mockActor();
+      const recurrenceRow = {
+        id: 'recurrence-1',
+        frequency: 'weekly',
+        timezone: 'UTC',
+        until: null,
+        byday: ['WE'],
+        exceptions: [],
+        overrides: [],
+      };
+      const rpcMock = jest.fn();
+      const mainClient = makeSplitClient({ scheduleRow, recurrenceRow, rpcMock });
+      createSupabaseServiceClientMock.mockReturnValueOnce(mainClient as never);
+
+      const service = new SchedulesService();
+
+      // Splitting at the 2026-09-23 (Wed) occurrence, but picking a Tuesday
+      // that falls a day earlier (2026-09-22) would let the new series start
+      // generating occurrences before the old series' retained prefix ends —
+      // exactly the overlap the split is supposed to avoid.
       await expect(
         service.splitRecurringSeries('token-1', {
           orgId: 'org-1',
@@ -1557,8 +1595,8 @@ describe('SchedulesService authorization', () => {
         orgId: 'org-1',
         scheduleId: 'schedule-1',
         occurrenceKey: '2026-09-23T09:10:00.000Z',
-        newStartAt: '2026-09-22T14:00:00.000Z',
-        newEndAt: '2026-09-22T15:00:00.000Z',
+        newStartAt: '2026-09-29T14:00:00.000Z',
+        newEndAt: '2026-09-29T15:00:00.000Z',
         timezone: null,
         byWeekday: ['TU'],
         reason: null,
@@ -1607,8 +1645,8 @@ describe('SchedulesService authorization', () => {
           orgId: 'org-1',
           scheduleId: 'schedule-1',
           occurrenceKey: '2026-09-23T09:10:00.000Z',
-          newStartAt: '2026-09-22T14:00:00.000Z',
-          newEndAt: '2026-09-22T15:00:00.000Z',
+          newStartAt: '2026-09-29T14:00:00.000Z',
+          newEndAt: '2026-09-29T15:00:00.000Z',
           timezone: null,
           byWeekday: ['TU'],
           reason: null,
