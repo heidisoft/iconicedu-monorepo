@@ -61,6 +61,10 @@ function createServiceSupabaseStub(input?: {
     accountId: string;
     kind?: string;
   }>;
+  /** `user_roles` rows, by account id. */
+  roleKeysByAccountId?: Record<string, string[]>;
+  /** `accounts.primary_role`, by account id. */
+  primaryRoleByAccountId?: Record<string, string>;
 }) {
   let liveSessionRow: Record<string, unknown> | null =
     input?.activeLiveSessionRow ?? null;
@@ -70,6 +74,8 @@ function createServiceSupabaseStub(input?: {
   const memberProfileIds = new Set(input?.memberProfileIds ?? ['profile-1']);
   const familyLinks = input?.familyLinks ?? [];
   const childProfiles = input?.childProfiles ?? [];
+  const roleKeysByAccountId = input?.roleKeysByAccountId ?? {};
+  const primaryRoleByAccountId = input?.primaryRoleByAccountId ?? {};
   const availableProfiles = [
     { id: 'profile-1', accountId: 'account-1', kind: 'educator' },
     ...childProfiles,
@@ -249,6 +255,80 @@ function createServiceSupabaseStub(input?: {
               .map((profile) => ({ id: profile.id })),
             error: null,
           }),
+        };
+      }
+
+      if (table === 'user_roles') {
+        const filters: { accountId?: string; roleKeys?: string[] } = {};
+        return {
+          select() {
+            return this;
+          },
+          eq(column: string, value: string) {
+            if (column === 'account_id') {
+              filters.accountId = value;
+            }
+            return this;
+          },
+          in(column: string, values: string[]) {
+            if (column === 'role_key') {
+              filters.roleKeys = values;
+            }
+            return this;
+          },
+          is() {
+            return this;
+          },
+          limit() {
+            return this;
+          },
+          returns: async () => {
+            const held = roleKeysByAccountId[filters.accountId ?? ''] ?? [];
+            const matches = held.filter(
+              (roleKey) => !filters.roleKeys || filters.roleKeys.includes(roleKey),
+            );
+            return {
+              data: matches.map((roleKey) => ({ id: `role-${roleKey}` })),
+              error: null,
+            };
+          },
+        };
+      }
+
+      if (table === 'accounts') {
+        const filters: { accountId?: string; primaryRoles?: string[] } = {};
+        return {
+          select() {
+            return this;
+          },
+          eq(column: string, value: string) {
+            if (column === 'id') {
+              filters.accountId = value;
+            }
+            return this;
+          },
+          in(column: string, values: string[]) {
+            if (column === 'primary_role') {
+              filters.primaryRoles = values;
+            }
+            return this;
+          },
+          is() {
+            return this;
+          },
+          limit() {
+            return this;
+          },
+          returns: async () => {
+            const primaryRole = primaryRoleByAccountId[filters.accountId ?? ''];
+            const matches =
+              primaryRole &&
+              (!filters.primaryRoles || filters.primaryRoles.includes(primaryRole));
+            return {
+              data: matches ? [{ id: filters.accountId }] : [],
+              error: null,
+            };
+          },
         };
       }
 
@@ -679,6 +759,103 @@ describe('createOrJoinLiveSession', () => {
     ).rejects.toThrow('Unauthorized');
   });
 
+  it('lets a staff profile join a classroom session without a channel_members row', async () => {
+    const serviceSupabase = createServiceSupabaseStub({
+      memberProfileIds: ['profile-other-1'],
+    });
+
+    const result = await createOrJoinLiveSession({
+      serviceSupabase: serviceSupabase as never,
+      actor: {
+        ...DEFAULT_ACTOR,
+        account: { id: 'account-staff-1', org_id: 'org-1' },
+        profile: {
+          id: 'profile-staff-1',
+          account_id: 'account-staff-1',
+          kind: 'staff',
+          display_name: 'Sam Staff',
+        } as unknown as ProfileRow,
+      },
+      channelId: 'channel-1',
+      orgSlug: 'iconic-academy',
+    });
+
+    expect(result).toMatchObject({ sessionId: 'live-session-1', created: true });
+  });
+
+  it.each([
+    ['admin', { roleKeysByAccountId: { 'account-admin-1': ['admin'] } }],
+    ['owner', { primaryRoleByAccountId: { 'account-admin-1': 'owner' } }],
+  ])(
+    'lets an org %s join a classroom session without a channel_members row',
+    async (_role, roleStub) => {
+      const serviceSupabase = createServiceSupabaseStub({
+        memberProfileIds: ['profile-other-1'],
+        ...roleStub,
+      });
+
+      const result = await createOrJoinLiveSession({
+        serviceSupabase: serviceSupabase as never,
+        actor: {
+          ...DEFAULT_ACTOR,
+          account: { id: 'account-admin-1', org_id: 'org-1' },
+          profile: {
+            id: 'profile-admin-1',
+            account_id: 'account-admin-1',
+            kind: 'educator',
+            display_name: 'Alex Admin',
+          } as unknown as ProfileRow,
+        },
+        channelId: 'channel-1',
+        orgSlug: 'iconic-academy',
+      });
+
+      expect(result).toMatchObject({ sessionId: 'live-session-1', created: true });
+    },
+  );
+
+  it('does not extend the supervision branch beyond classroom channels', async () => {
+    const serviceSupabase = createServiceSupabaseStub({
+      memberProfileIds: ['profile-other-1'],
+      channel: { purpose: 'direct', primary_entity_kind: null, primary_entity_id: null },
+    });
+
+    await expect(
+      createOrJoinLiveSession({
+        serviceSupabase: serviceSupabase as never,
+        actor: {
+          ...DEFAULT_ACTOR,
+          account: { id: 'account-staff-1', org_id: 'org-1' },
+          profile: {
+            id: 'profile-staff-1',
+            account_id: 'account-staff-1',
+            kind: 'staff',
+            display_name: 'Sam Staff',
+          } as unknown as ProfileRow,
+        },
+        channelId: 'channel-1',
+        orgSlug: 'iconic-academy',
+      }),
+    ).rejects.toThrow('Unauthorized');
+  });
+
+  it('still denies a non-member with no supervisory role', async () => {
+    const serviceSupabase = createServiceSupabaseStub({
+      memberProfileIds: ['profile-other-1'],
+      roleKeysByAccountId: { 'account-1': ['educator'] },
+      primaryRoleByAccountId: { 'account-1': 'educator' },
+    });
+
+    await expect(
+      createOrJoinLiveSession({
+        serviceSupabase: serviceSupabase as never,
+        actor: DEFAULT_ACTOR,
+        channelId: 'channel-1',
+        orgSlug: 'iconic-academy',
+      }),
+    ).rejects.toThrow('Unauthorized');
+  });
+
   it('uses schedule-derived learningSpaceId and scheduleId when channel metadata is missing', async () => {
     vi.mocked(resolveChannelLiveSessionScope).mockResolvedValueOnce({
       scopeKey: 'occurrence:2026-03-02T10:00:00.000Z',
@@ -838,6 +1015,63 @@ describe('resolveLiveSessionJoinAccess', () => {
           display_name: 'Jamie Educator',
           first_name: 'Jamie',
           last_name: 'Educator',
+        } as never,
+      }),
+    ).rejects.toThrow('Unauthorized');
+  });
+
+  it('re-grants room access to a supervising staff profile', async () => {
+    const serviceSupabase = createServiceSupabaseStub({
+      activeLiveSessionRow: {
+        id: 'live-session-1',
+        org_id: 'org-1',
+        channel_id: 'channel-1',
+        provider: 'daily',
+        status: 'live',
+        provider_metadata: {},
+      },
+      memberProfileIds: ['profile-member-1'],
+    });
+
+    const result = await resolveLiveSessionJoinAccess({
+      serviceSupabase: serviceSupabase as never,
+      liveSessionId: 'live-session-1',
+      profile: {
+        id: 'profile-staff-1',
+        org_id: 'org-1',
+        account_id: 'account-staff-1',
+        kind: 'staff',
+        display_name: 'Sam Staff',
+      } as never,
+    });
+
+    expect(result.session.id).toBe('live-session-1');
+  });
+
+  it('denies room access to a staff profile when the channel is not a classroom', async () => {
+    const serviceSupabase = createServiceSupabaseStub({
+      activeLiveSessionRow: {
+        id: 'live-session-1',
+        org_id: 'org-1',
+        channel_id: 'channel-1',
+        provider: 'daily',
+        status: 'live',
+        provider_metadata: {},
+      },
+      memberProfileIds: ['profile-member-1'],
+      channel: { purpose: 'direct', primary_entity_kind: null, primary_entity_id: null },
+    });
+
+    await expect(
+      resolveLiveSessionJoinAccess({
+        serviceSupabase: serviceSupabase as never,
+        liveSessionId: 'live-session-1',
+        profile: {
+          id: 'profile-staff-1',
+          org_id: 'org-1',
+          account_id: 'account-staff-1',
+          kind: 'staff',
+          display_name: 'Sam Staff',
         } as never,
       }),
     ).rejects.toThrow('Unauthorized');
