@@ -83,12 +83,13 @@ begin
      and org_id = p_org_id;
 
   insert into public.class_schedule_recurrence_exceptions (
-    id, org_id, recurrence_id, occurrence_key, reason,
+    id, org_id, recurrence_id, occurrence_key, reason, suppress_notifications,
     created_at, created_by, updated_at, updated_by
   )
   select
     gen_random_uuid(), p_org_id, v_old_recurrence.id,
     (e->>'occurrenceKey')::timestamptz, e->>'reason',
+    coalesce((e->>'suppressNotifications')::boolean, false),
     p_now, p_actor_profile_id, p_now, p_actor_profile_id
   from jsonb_array_elements(coalesce(p_kept_exceptions, '[]'::jsonb)) as e;
 
@@ -97,12 +98,13 @@ begin
      and org_id = p_org_id;
 
   insert into public.class_schedule_recurrence_overrides (
-    id, org_id, recurrence_id, occurrence_key, patch,
+    id, org_id, recurrence_id, occurrence_key, patch, suppress_notifications,
     created_at, created_by, updated_at, updated_by
   )
   select
     gen_random_uuid(), p_org_id, v_old_recurrence.id,
     (o->>'occurrenceKey')::timestamptz, o->'patch',
+    coalesce((o->>'suppressNotifications')::boolean, false),
     p_now, p_actor_profile_id, p_now, p_actor_profile_id
   from jsonb_array_elements(coalesce(p_kept_overrides, '[]'::jsonb)) as o;
 
@@ -229,12 +231,13 @@ begin
    where recurrence_id = p_recurrence_id and org_id = p_org_id;
 
   insert into public.class_schedule_recurrence_exceptions (
-    id, org_id, recurrence_id, occurrence_key, reason,
+    id, org_id, recurrence_id, occurrence_key, reason, suppress_notifications,
     created_at, created_by, updated_at, updated_by
   )
   select
     gen_random_uuid(), p_org_id, p_recurrence_id,
     (e->>'occurrenceKey')::timestamptz, e->>'reason',
+    coalesce((e->>'suppressNotifications')::boolean, false),
     p_now, p_actor_profile_id, p_now, p_actor_profile_id
   from jsonb_array_elements(coalesce(p_kept_exceptions, '[]'::jsonb)) as e;
 
@@ -242,12 +245,13 @@ begin
    where recurrence_id = p_recurrence_id and org_id = p_org_id;
 
   insert into public.class_schedule_recurrence_overrides (
-    id, org_id, recurrence_id, occurrence_key, patch,
+    id, org_id, recurrence_id, occurrence_key, patch, suppress_notifications,
     created_at, created_by, updated_at, updated_by
   )
   select
     gen_random_uuid(), p_org_id, p_recurrence_id,
     (o->>'occurrenceKey')::timestamptz, o->'patch',
+    coalesce((o->>'suppressNotifications')::boolean, false),
     p_now, p_actor_profile_id, p_now, p_actor_profile_id
   from jsonb_array_elements(coalesce(p_kept_overrides, '[]'::jsonb)) as o;
 end;

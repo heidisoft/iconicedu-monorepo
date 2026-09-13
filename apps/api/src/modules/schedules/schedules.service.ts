@@ -76,10 +76,15 @@ type ScheduleOverrideLookupRow = {
   created_at: string | null;
 };
 
-type RecurrenceExceptionRow = { occurrence_key: string; reason: string | null };
+type RecurrenceExceptionRow = {
+  occurrence_key: string;
+  reason: string | null;
+  suppress_notifications: boolean | null;
+};
 type RecurrenceOverrideRow = {
   occurrence_key: string;
   patch: Record<string, unknown> | null;
+  suppress_notifications: boolean | null;
 };
 
 /** Detail shape needed for both the "whole series" reschedule and the
@@ -90,6 +95,7 @@ type RecurrenceSplitLookupRow = {
   frequency: string;
   timezone: string | null;
   until: string | null;
+  count: number | null;
   byday: string[] | null;
   exceptions: RecurrenceExceptionRow[] | null;
   overrides: RecurrenceOverrideRow[] | null;
@@ -651,6 +657,17 @@ export class SchedulesService {
       throw new BadRequestException('This schedule is not recurring');
     }
     this.assertSimpleWeeklyRecurrence(recurrenceDetail);
+    if (recurrenceDetail.count != null) {
+      // The split copies the old recurrence's `count` verbatim onto the new
+      // series (it has no way to know how many occurrences the old series
+      // already consumed before the split point), which would let a
+      // count-limited series run for longer than originally intended. Until
+      // that's computed correctly, route count-limited recurrences to the
+      // full classroom editor instead of silently over-running.
+      throw new BadRequestException(
+        'This quick edit does not support recurrences limited by an occurrence count — use the full classroom editor for this schedule.',
+      );
+    }
 
     const scheduleTimezone =
       activityContext.timezone ?? recurrenceDetail.timezone ?? 'UTC';
@@ -728,10 +745,12 @@ export class SchedulesService {
         p_kept_exceptions: keptExceptions.map((e) => ({
           occurrenceKey: e.occurrence_key,
           reason: e.reason,
+          suppressNotifications: e.suppress_notifications ?? false,
         })),
         p_kept_overrides: keptOverrides.map((o) => ({
           occurrenceKey: o.occurrence_key,
           patch: o.patch,
+          suppressNotifications: o.suppress_notifications ?? false,
         })),
         p_new_start_at: dto.newStartAt,
         p_new_end_at: dto.newEndAt,
@@ -748,23 +767,37 @@ export class SchedulesService {
 
     const resolvedNewScheduleId = newScheduleId as string;
 
-    await this.publishScheduleSplitActivities({
-      supabase,
-      orgId: dto.orgId,
-      actorProfileId: actor.profileId,
-      context: activityContext,
-      oldUntil,
-      newScheduleId: resolvedNewScheduleId,
-      newStartAt: dto.newStartAt,
-      newEndAt: dto.newEndAt,
-      reason: dto.reason,
-    });
+    // The split already committed above — a failure past this point must not
+    // turn an already-applied split into an error response (a naive retry
+    // would then hit the "past the series end date" rejection since the old
+    // series is already truncated). The DB-trigger-driven async reconcile
+    // queue is the fallback if the reconcile calls below are skipped.
+    try {
+      await this.publishScheduleSplitActivities({
+        supabase,
+        orgId: dto.orgId,
+        actorProfileId: actor.profileId,
+        context: activityContext,
+        oldUntil,
+        newScheduleId: resolvedNewScheduleId,
+        newStartAt: dto.newStartAt,
+        newEndAt: dto.newEndAt,
+        reason: dto.reason,
+        suppressNotifications: dto.suppressNotifications,
+      });
 
-    // Reconcile is per-scheduleId (see reconcileRemindersForSchedule's own
-    // doc), so both the truncated old series and the new one need their own
-    // call — reconciling one does nothing for the other.
-    await this.reconcileRemindersForSchedule(dto.orgId, dto.scheduleId);
-    await this.reconcileRemindersForSchedule(dto.orgId, resolvedNewScheduleId);
+      // Reconcile is per-scheduleId (see reconcileRemindersForSchedule's own
+      // doc), so both the truncated old series and the new one need their own
+      // call — reconciling one does nothing for the other.
+      await this.reconcileRemindersForSchedule(dto.orgId, dto.scheduleId);
+      await this.reconcileRemindersForSchedule(dto.orgId, resolvedNewScheduleId);
+    } catch (postCommitError) {
+      // eslint-disable-next-line no-console
+      console.error(
+        `splitRecurringSeries: post-commit activity/reconcile failed for ${dto.scheduleId} -> ${resolvedNewScheduleId}`,
+        postCommitError,
+      );
+    }
 
     return {
       success: true,
@@ -1023,9 +1056,9 @@ export class SchedulesService {
       .from('class_schedule_recurrence')
       .select(
         `
-          id, frequency, timezone, until, byday,
-          exceptions:class_schedule_recurrence_exceptions(occurrence_key, reason),
-          overrides:class_schedule_recurrence_overrides(occurrence_key, patch)
+          id, frequency, timezone, until, count, byday,
+          exceptions:class_schedule_recurrence_exceptions(occurrence_key, reason, suppress_notifications),
+          overrides:class_schedule_recurrence_overrides(occurrence_key, patch, suppress_notifications)
         `,
       )
       .eq('org_id', orgId)
@@ -1094,13 +1127,19 @@ export class SchedulesService {
 
     const newByWeekday = dto.byWeekday[0]!;
     const weekdayChanged = (recurrenceDetail.byday ?? [])[0] !== newByWeekday;
-    const resolvedTimezone =
-      dto.timezone ?? recurrenceDetail.timezone ?? activityContext?.timezone ?? 'UTC';
-    const todayLocalDate = getLocalDate(now, resolvedTimezone) ?? now.slice(0, 10);
+    // Always the OLD schedule's timezone for interpreting EXISTING timestamps
+    // (occurrence keys, start_at) — same rule as splitRecurringSeries. If this
+    // edit also changes timezone, reinterpreting old timestamps in the new
+    // zone could shift date-boundary comparisons by a day near midnight.
+    const oldTimezone = recurrenceDetail.timezone ?? activityContext?.timezone ?? 'UTC';
+    // The timezone the series operates under going forward — used only for
+    // the NEW start/end time-of-day and for what gets written to the DB.
+    const newTimezone = dto.timezone ?? oldTimezone;
+    const todayLocalDate = getLocalDate(now, oldTimezone) ?? now.slice(0, 10);
 
     const isFuture = (occurrenceKey: string) => {
       const localDate =
-        getLocalDate(occurrenceKey, resolvedTimezone) ?? occurrenceKey.slice(0, 10);
+        getLocalDate(occurrenceKey, oldTimezone) ?? occurrenceKey.slice(0, 10);
       return localDate >= todayLocalDate;
     };
 
@@ -1136,14 +1175,13 @@ export class SchedulesService {
     // still need to render correctly) between the old date and the new one.
     // The weekday itself comes entirely from `byday`, not from this date.
     const preservedLocalDate =
-      getLocalDate(activityContext?.startAt ?? now, resolvedTimezone) ?? now.slice(0, 10);
-    const newStartLocalTime = getLocalTime(dto.startAt, resolvedTimezone) ?? '00:00';
-    const newEndLocalTime = getLocalTime(dto.endAt, resolvedTimezone) ?? '00:00';
+      getLocalDate(activityContext?.startAt ?? now, oldTimezone) ?? now.slice(0, 10);
+    const newStartLocalTime = getLocalTime(dto.startAt, newTimezone) ?? '00:00';
+    const newEndLocalTime = getLocalTime(dto.endAt, newTimezone) ?? '00:00';
     const newStartAt =
-      toUtcFromLocal(preservedLocalDate, newStartLocalTime, resolvedTimezone) ??
-      dto.startAt;
+      toUtcFromLocal(preservedLocalDate, newStartLocalTime, newTimezone) ?? dto.startAt;
     const newEndAt =
-      toUtcFromLocal(preservedLocalDate, newEndLocalTime, resolvedTimezone) ?? dto.endAt;
+      toUtcFromLocal(preservedLocalDate, newEndLocalTime, newTimezone) ?? dto.endAt;
 
     // Wrapped in a transaction: this touches four tables (schedule,
     // recurrence, exceptions, overrides) — an unwrapped sequence here would
@@ -1158,15 +1196,17 @@ export class SchedulesService {
         p_recurrence_id: recurrenceId,
         p_new_start_at: newStartAt,
         p_new_end_at: newEndAt,
-        p_new_timezone: resolvedTimezone,
+        p_new_timezone: newTimezone,
         p_new_byday: dto.byWeekday,
         p_kept_exceptions: keptExceptions.map((e) => ({
           occurrenceKey: e.occurrence_key,
           reason: e.reason,
+          suppressNotifications: e.suppress_notifications ?? false,
         })),
         p_kept_overrides: keptOverrides.map((o) => ({
           occurrenceKey: o.occurrence_key,
           patch: o.patch,
+          suppressNotifications: o.suppress_notifications ?? false,
         })),
         p_actor_profile_id: actorProfileId,
         p_now: now,
@@ -1176,20 +1216,32 @@ export class SchedulesService {
       throw new InternalServerErrorException(rpcError.message);
     }
 
-    await this.publishSessionRescheduledActivity({
-      supabase,
-      orgId: dto.orgId,
-      actorProfileId,
-      context: activityContext,
-      oldStartAt: activityContext?.startAt ?? null,
-      oldEndAt: activityContext?.endAt ?? null,
-      newStartAt,
-      newEndAt,
-      reason: dto.reason,
-      suppressNotifications: dto.suppressNotifications,
-      dedupeKey: `class.session.rescheduled:${dto.orgId}:${dto.scheduleId}:all:${now}`,
-    });
-    await this.reconcileRemindersForSchedule(dto.orgId, dto.scheduleId);
+    // The rule change already committed above — a failure past this point
+    // (activity publish, reminder reconcile) must not turn an already-applied
+    // edit into an error response. The DB-trigger-driven async reconcile
+    // queue is the belt-and-suspenders fallback if either of these is skipped.
+    try {
+      await this.publishSessionRescheduledActivity({
+        supabase,
+        orgId: dto.orgId,
+        actorProfileId,
+        context: activityContext,
+        oldStartAt: activityContext?.startAt ?? null,
+        oldEndAt: activityContext?.endAt ?? null,
+        newStartAt,
+        newEndAt,
+        reason: dto.reason,
+        suppressNotifications: dto.suppressNotifications,
+        dedupeKey: `class.session.rescheduled:${dto.orgId}:${dto.scheduleId}:all:${now}`,
+      });
+      await this.reconcileRemindersForSchedule(dto.orgId, dto.scheduleId);
+    } catch (postCommitError) {
+      // eslint-disable-next-line no-console
+      console.error(
+        `rescheduleEntireRecurringSeries: post-commit activity/reconcile failed for schedule ${dto.scheduleId}`,
+        postCommitError,
+      );
+    }
 
     return { success: true, mode: 'recurring' };
   }
@@ -1204,6 +1256,7 @@ export class SchedulesService {
     newStartAt: string;
     newEndAt: string;
     reason: string | null;
+    suppressNotifications: boolean;
   }) {
     if (!input.context.learningSpaceId || !input.context.channelId) {
       return;
@@ -1212,6 +1265,7 @@ export class SchedulesService {
     const basePayload = {
       learningSpaceId: input.context.learningSpaceId,
       channelId: input.context.channelId,
+      suppressNotifications: input.suppressNotifications,
       title: input.context.title,
       learningSpaceTitle: input.context.title,
       channelRouteKind: 'space',
