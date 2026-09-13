@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
 import { publishActivityEvent } from '@iconicedu/api/lib/activity-feed/activity-publisher';
@@ -1196,6 +1196,725 @@ describe('SchedulesService authorization', () => {
       'org-1',
       'space-1',
     );
+  });
+
+  describe('splitRecurringSeries ("This and following events")', () => {
+    function mockActor() {
+      createSupabaseSessionClientMock.mockReturnValue({
+        auth: {
+          getUser: jest.fn(async () => ({
+            data: { user: { id: 'auth-user-1' } },
+            error: null,
+          })),
+        },
+      } as never);
+      createSupabaseServiceClientMock
+        .mockReturnValueOnce(
+          makeSingleResult({
+            id: 'account-1',
+            active_profile_id: 'profile-staff',
+          }) as never,
+        )
+        .mockReturnValueOnce(makeSingleResult([{ role_key: 'staff' }]) as never);
+    }
+
+    function makeSplitClient(input: {
+      scheduleRow: Record<string, unknown> | null;
+      recurrenceRow: Record<string, unknown> | null;
+      rpcMock: jest.Mock;
+    }) {
+      return {
+        from: jest.fn((table: string) => {
+          const query = {
+            select: jest.fn(() => query),
+            eq: jest.fn(() => query),
+            is: jest.fn(() => query),
+            maybeSingle: jest.fn(async () => {
+              if (table === 'class_schedules') {
+                return { data: input.scheduleRow, error: null };
+              }
+              if (table === 'class_schedule_recurrence') {
+                return { data: input.recurrenceRow, error: null };
+              }
+              return { data: null, error: null };
+            }),
+          };
+          return query;
+        }),
+        rpc: input.rpcMock,
+      };
+    }
+
+    const scheduleRow = {
+      id: 'schedule-1',
+      title: 'Algebra I',
+      start_at: '2026-09-02T09:10:00.000Z',
+      end_at: '2026-09-02T10:10:00.000Z',
+      timezone: 'UTC',
+      source_learning_space_id: 'space-1',
+      source_channel_id: 'channel-1',
+      participants: [],
+    };
+
+    it('splits the series: truncates the old rule and creates a new one from the split point', async () => {
+      mockActor();
+      const recurrenceRow = {
+        id: 'recurrence-1',
+        frequency: 'weekly',
+        timezone: 'UTC',
+        until: null,
+        byday: ['WE'],
+        exceptions: [
+          { occurrence_key: '2026-09-02T09:10:00.000Z', reason: null },
+          { occurrence_key: '2026-09-30T09:10:00.000Z', reason: null },
+        ],
+        overrides: [
+          {
+            occurrence_key: '2026-09-16T09:10:00.000Z',
+            patch: {
+              startAt: '2026-09-16T10:00:00.000Z',
+              endAt: '2026-09-16T11:00:00.000Z',
+            },
+          },
+        ],
+      };
+      const rpcMock = jest.fn(async () => ({ data: 'new-schedule-1', error: null }));
+      const mainClient = makeSplitClient({ scheduleRow, recurrenceRow, rpcMock });
+      createSupabaseServiceClientMock.mockReturnValueOnce(mainClient as never);
+
+      const reconcileNextReminderJobForSchedule = jest.fn(async () => ({
+        action: 'inserted',
+      }));
+      const service = new SchedulesService({
+        reconcileNextReminderJobForSchedule,
+      } as never);
+
+      const result = await service.splitRecurringSeries('token-1', {
+        orgId: 'org-1',
+        scheduleId: 'schedule-1',
+        occurrenceKey: '2026-09-23T09:10:00.000Z',
+        newStartAt: '2026-09-29T14:00:00.000Z',
+        newEndAt: '2026-09-29T15:00:00.000Z',
+        timezone: null,
+        byWeekday: ['TU'],
+        reason: 'Parent requested a permanent change',
+        suppressNotifications: false,
+        confirmDropFutureOverrides: true,
+      });
+
+      expect(result).toEqual({
+        success: true,
+        oldScheduleId: 'schedule-1',
+        newScheduleId: 'new-schedule-1',
+      });
+
+      expect(rpcMock).toHaveBeenCalledWith(
+        'split_class_schedule_recurrence',
+        expect.objectContaining({
+          p_org_id: 'org-1',
+          p_schedule_id: 'schedule-1',
+          p_old_until: '2026-09-22T23:59:00.000Z',
+          p_kept_exceptions: [
+            {
+              occurrenceKey: '2026-09-02T09:10:00.000Z',
+              reason: null,
+              suppressNotifications: false,
+            },
+          ],
+          p_kept_overrides: [
+            {
+              occurrenceKey: '2026-09-16T09:10:00.000Z',
+              patch: {
+                startAt: '2026-09-16T10:00:00.000Z',
+                endAt: '2026-09-16T11:00:00.000Z',
+              },
+              suppressNotifications: false,
+            },
+          ],
+          p_new_start_at: '2026-09-29T14:00:00.000Z',
+          p_new_end_at: '2026-09-29T15:00:00.000Z',
+          p_new_timezone: 'UTC',
+          p_new_byday: ['TU'],
+          p_actor_profile_id: 'profile-staff',
+        }),
+      );
+
+      // Reconciling is per-scheduleId — both the truncated old series and the
+      // brand-new one need their own call, or the other silently goes stale.
+      expect(reconcileNextReminderJobForSchedule).toHaveBeenCalledTimes(2);
+      expect(reconcileNextReminderJobForSchedule).toHaveBeenCalledWith({
+        orgId: 'org-1',
+        scheduleId: 'schedule-1',
+      });
+      expect(reconcileNextReminderJobForSchedule).toHaveBeenCalledWith({
+        orgId: 'org-1',
+        scheduleId: 'new-schedule-1',
+      });
+
+      expect(publishActivityEventMock).toHaveBeenCalledWith(
+        expect.objectContaining({ eventType: 'class.schedule.ended' }),
+      );
+      expect(publishActivityEventMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: 'class.schedule.created',
+          objectRef: { kind: 'schedule', id: 'new-schedule-1' },
+        }),
+      );
+    });
+
+    it('rejects splitting on an occurrence that is already cancelled', async () => {
+      mockActor();
+      const recurrenceRow = {
+        id: 'recurrence-1',
+        frequency: 'weekly',
+        timezone: 'UTC',
+        until: null,
+        byday: ['WE'],
+        exceptions: [{ occurrence_key: '2026-09-23T09:10:00.000Z', reason: 'Cancelled' }],
+        overrides: [],
+      };
+      const rpcMock = jest.fn();
+      const mainClient = makeSplitClient({ scheduleRow, recurrenceRow, rpcMock });
+      createSupabaseServiceClientMock.mockReturnValueOnce(mainClient as never);
+
+      const service = new SchedulesService();
+
+      await expect(
+        service.splitRecurringSeries('token-1', {
+          orgId: 'org-1',
+          scheduleId: 'schedule-1',
+          occurrenceKey: '2026-09-23T09:10:00.000Z',
+          newStartAt: '2026-09-29T14:00:00.000Z',
+          newEndAt: '2026-09-29T15:00:00.000Z',
+          timezone: null,
+          byWeekday: ['TU'],
+          reason: null,
+          suppressNotifications: false,
+          confirmDropFutureOverrides: false,
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(rpcMock).not.toHaveBeenCalled();
+    });
+
+    it('requires confirmation before dropping future exceptions/overrides on split', async () => {
+      mockActor();
+      const recurrenceRow = {
+        id: 'recurrence-1',
+        frequency: 'weekly',
+        timezone: 'UTC',
+        until: null,
+        byday: ['WE'],
+        exceptions: [{ occurrence_key: '2026-09-30T09:10:00.000Z', reason: null }],
+        overrides: [],
+      };
+      const rpcMock = jest.fn();
+      const mainClient = makeSplitClient({ scheduleRow, recurrenceRow, rpcMock });
+      createSupabaseServiceClientMock.mockReturnValueOnce(mainClient as never);
+
+      const service = new SchedulesService();
+
+      const result = await service.splitRecurringSeries('token-1', {
+        orgId: 'org-1',
+        scheduleId: 'schedule-1',
+        occurrenceKey: '2026-09-23T09:10:00.000Z',
+        newStartAt: '2026-09-29T14:00:00.000Z',
+        newEndAt: '2026-09-29T15:00:00.000Z',
+        timezone: null,
+        byWeekday: ['TU'],
+        reason: null,
+        suppressNotifications: false,
+        confirmDropFutureOverrides: false,
+      });
+
+      expect(result).toEqual({
+        requiresConfirmation: true,
+        futureOverrideCount: 0,
+        futureExceptionCount: 1,
+      });
+      expect(rpcMock).not.toHaveBeenCalled();
+    });
+
+    it('rejects splitting an occurrence past the series end date', async () => {
+      mockActor();
+      const recurrenceRow = {
+        id: 'recurrence-1',
+        frequency: 'weekly',
+        timezone: 'UTC',
+        until: '2026-09-16T09:10:00.000Z',
+        byday: ['WE'],
+        exceptions: [],
+        overrides: [],
+      };
+      const rpcMock = jest.fn();
+      const mainClient = makeSplitClient({ scheduleRow, recurrenceRow, rpcMock });
+      createSupabaseServiceClientMock.mockReturnValueOnce(mainClient as never);
+
+      const service = new SchedulesService();
+
+      await expect(
+        service.splitRecurringSeries('token-1', {
+          orgId: 'org-1',
+          scheduleId: 'schedule-1',
+          occurrenceKey: '2026-09-23T09:10:00.000Z',
+          newStartAt: '2026-09-29T14:00:00.000Z',
+          newEndAt: '2026-09-29T15:00:00.000Z',
+          timezone: null,
+          byWeekday: ['TU'],
+          reason: null,
+          suppressNotifications: false,
+          confirmDropFutureOverrides: false,
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(rpcMock).not.toHaveBeenCalled();
+    });
+
+    it('rejects splitting a recurrence that is not simple weekly/single-weekday', async () => {
+      mockActor();
+      const recurrenceRow = {
+        id: 'recurrence-1',
+        frequency: 'weekly',
+        timezone: 'UTC',
+        until: null,
+        byday: ['MO', 'WE'],
+        exceptions: [],
+        overrides: [],
+      };
+      const rpcMock = jest.fn();
+      const mainClient = makeSplitClient({ scheduleRow, recurrenceRow, rpcMock });
+      createSupabaseServiceClientMock.mockReturnValueOnce(mainClient as never);
+
+      const service = new SchedulesService();
+
+      await expect(
+        service.splitRecurringSeries('token-1', {
+          orgId: 'org-1',
+          scheduleId: 'schedule-1',
+          occurrenceKey: '2026-09-23T09:10:00.000Z',
+          newStartAt: '2026-09-29T14:00:00.000Z',
+          newEndAt: '2026-09-29T15:00:00.000Z',
+          timezone: null,
+          byWeekday: ['TU'],
+          reason: null,
+          suppressNotifications: false,
+          confirmDropFutureOverrides: false,
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(rpcMock).not.toHaveBeenCalled();
+    });
+
+    it('rejects splitting a recurrence limited by an occurrence count', async () => {
+      mockActor();
+      const recurrenceRow = {
+        id: 'recurrence-1',
+        frequency: 'weekly',
+        timezone: 'UTC',
+        until: null,
+        count: 10,
+        byday: ['WE'],
+        exceptions: [],
+        overrides: [],
+      };
+      const rpcMock = jest.fn();
+      const mainClient = makeSplitClient({ scheduleRow, recurrenceRow, rpcMock });
+      createSupabaseServiceClientMock.mockReturnValueOnce(mainClient as never);
+
+      const service = new SchedulesService();
+
+      await expect(
+        service.splitRecurringSeries('token-1', {
+          orgId: 'org-1',
+          scheduleId: 'schedule-1',
+          occurrenceKey: '2026-09-23T09:10:00.000Z',
+          newStartAt: '2026-09-29T14:00:00.000Z',
+          newEndAt: '2026-09-29T15:00:00.000Z',
+          timezone: null,
+          byWeekday: ['TU'],
+          reason: null,
+          suppressNotifications: false,
+          confirmDropFutureOverrides: false,
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(rpcMock).not.toHaveBeenCalled();
+    });
+
+    it('rejects a new anchor date that falls before the occurrence being split', async () => {
+      mockActor();
+      const recurrenceRow = {
+        id: 'recurrence-1',
+        frequency: 'weekly',
+        timezone: 'UTC',
+        until: null,
+        byday: ['WE'],
+        exceptions: [],
+        overrides: [],
+      };
+      const rpcMock = jest.fn();
+      const mainClient = makeSplitClient({ scheduleRow, recurrenceRow, rpcMock });
+      createSupabaseServiceClientMock.mockReturnValueOnce(mainClient as never);
+
+      const service = new SchedulesService();
+
+      // Splitting at the 2026-09-23 (Wed) occurrence, but picking a Tuesday
+      // that falls a day earlier (2026-09-22) would let the new series start
+      // generating occurrences before the old series' retained prefix ends —
+      // exactly the overlap the split is supposed to avoid.
+      await expect(
+        service.splitRecurringSeries('token-1', {
+          orgId: 'org-1',
+          scheduleId: 'schedule-1',
+          occurrenceKey: '2026-09-23T09:10:00.000Z',
+          newStartAt: '2026-09-22T14:00:00.000Z',
+          newEndAt: '2026-09-22T15:00:00.000Z',
+          timezone: null,
+          byWeekday: ['TU'],
+          reason: null,
+          suppressNotifications: false,
+          confirmDropFutureOverrides: false,
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(rpcMock).not.toHaveBeenCalled();
+    });
+
+    it('forwards suppressNotifications to the split activity payloads', async () => {
+      mockActor();
+      const recurrenceRow = {
+        id: 'recurrence-1',
+        frequency: 'weekly',
+        timezone: 'UTC',
+        until: null,
+        byday: ['WE'],
+        exceptions: [],
+        overrides: [],
+      };
+      const rpcMock = jest.fn(async () => ({ data: 'new-schedule-1', error: null }));
+      const mainClient = makeSplitClient({ scheduleRow, recurrenceRow, rpcMock });
+      createSupabaseServiceClientMock.mockReturnValueOnce(mainClient as never);
+
+      const service = new SchedulesService();
+      await service.splitRecurringSeries('token-1', {
+        orgId: 'org-1',
+        scheduleId: 'schedule-1',
+        occurrenceKey: '2026-09-23T09:10:00.000Z',
+        newStartAt: '2026-09-29T14:00:00.000Z',
+        newEndAt: '2026-09-29T15:00:00.000Z',
+        timezone: null,
+        byWeekday: ['TU'],
+        reason: null,
+        suppressNotifications: true,
+        confirmDropFutureOverrides: false,
+      });
+
+      expect(publishActivityEventMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: 'class.schedule.ended',
+          payload: expect.objectContaining({ suppressNotifications: true }),
+        }),
+      );
+      expect(publishActivityEventMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: 'class.schedule.created',
+          payload: expect.objectContaining({ suppressNotifications: true }),
+        }),
+      );
+    });
+
+    it('does not fail the request when the post-commit reconcile call throws', async () => {
+      mockActor();
+      const recurrenceRow = {
+        id: 'recurrence-1',
+        frequency: 'weekly',
+        timezone: 'UTC',
+        until: null,
+        byday: ['WE'],
+        exceptions: [],
+        overrides: [],
+      };
+      const rpcMock = jest.fn(async () => ({ data: 'new-schedule-1', error: null }));
+      const mainClient = makeSplitClient({ scheduleRow, recurrenceRow, rpcMock });
+      createSupabaseServiceClientMock.mockReturnValueOnce(mainClient as never);
+
+      const reconcileNextReminderJobForSchedule = jest.fn(async () => {
+        throw new Error('transient reconcile failure');
+      });
+      const service = new SchedulesService({
+        reconcileNextReminderJobForSchedule,
+      } as never);
+
+      await expect(
+        service.splitRecurringSeries('token-1', {
+          orgId: 'org-1',
+          scheduleId: 'schedule-1',
+          occurrenceKey: '2026-09-23T09:10:00.000Z',
+          newStartAt: '2026-09-29T14:00:00.000Z',
+          newEndAt: '2026-09-29T15:00:00.000Z',
+          timezone: null,
+          byWeekday: ['TU'],
+          reason: null,
+          suppressNotifications: false,
+          confirmDropFutureOverrides: false,
+        }),
+      ).resolves.toEqual({
+        success: true,
+        oldScheduleId: 'schedule-1',
+        newScheduleId: 'new-schedule-1',
+      });
+    });
+  });
+
+  describe("rescheduleScheduleSession scope: 'all'", () => {
+    const scheduleRow = {
+      id: 'schedule-1',
+      title: 'Algebra I',
+      start_at: '2026-09-02T09:10:00.000Z',
+      end_at: '2026-09-02T10:10:00.000Z',
+      timezone: 'UTC',
+      source_learning_space_id: 'space-1',
+      source_channel_id: 'channel-1',
+      participants: [],
+    };
+
+    function mockActor() {
+      createSupabaseSessionClientMock.mockReturnValue({
+        auth: {
+          getUser: jest.fn(async () => ({
+            data: { user: { id: 'auth-user-1' } },
+            error: null,
+          })),
+        },
+      } as never);
+      createSupabaseServiceClientMock
+        .mockReturnValueOnce(
+          makeSingleResult({
+            id: 'account-1',
+            active_profile_id: 'profile-staff',
+          }) as never,
+        )
+        .mockReturnValueOnce(makeSingleResult([{ role_key: 'staff' }]) as never);
+    }
+
+    function makeAllScopeClient(input: {
+      recurrenceRow: Record<string, unknown>;
+      operations: Array<{ table: string; action: string; payload?: unknown }>;
+      rpcMock?: jest.Mock;
+    }) {
+      return {
+        from: jest.fn((table: string) => {
+          const query = {
+            select: jest.fn(() => query),
+            eq: jest.fn(() => query),
+            is: jest.fn(() => query),
+            delete: jest.fn(() => {
+              input.operations.push({ table, action: 'delete' });
+              return query;
+            }),
+            insert: jest.fn((payload: unknown) => {
+              input.operations.push({ table, action: 'insert', payload });
+              return Promise.resolve({ data: null, error: null });
+            }),
+            update: jest.fn((payload: unknown) => {
+              input.operations.push({ table, action: 'update', payload });
+              return query;
+            }),
+            maybeSingle: jest.fn(async () => {
+              if (table === 'class_schedules') return { data: scheduleRow, error: null };
+              if (table === 'class_schedule_recurrence') {
+                return { data: input.recurrenceRow, error: null };
+              }
+              return { data: null, error: null };
+            }),
+          };
+          return query;
+        }),
+        rpc: input.rpcMock ?? jest.fn(async () => ({ data: null, error: null })),
+      };
+    }
+
+    it('requires confirmation before dropping future overrides when the weekday changes', async () => {
+      mockActor();
+      const operations: Array<{ table: string; action: string; payload?: unknown }> = [];
+      const mainClient = makeAllScopeClient({
+        recurrenceRow: {
+          id: 'recurrence-1',
+          frequency: 'weekly',
+          timezone: 'UTC',
+          until: null,
+          byday: ['WE'],
+          exceptions: [],
+          overrides: [{ occurrence_key: '2030-04-01T09:10:00.000Z', patch: {} }],
+        },
+        operations,
+      });
+      createSupabaseServiceClientMock.mockReturnValueOnce(mainClient as never);
+
+      const service = new SchedulesService();
+      const result = await service.rescheduleScheduleSession('token-1', {
+        orgId: 'org-1',
+        scheduleId: 'schedule-1',
+        occurrenceKey: null,
+        startAt: '2030-04-02T14:00:00.000Z',
+        endAt: '2030-04-02T15:00:00.000Z',
+        timezone: 'UTC',
+        reason: null,
+        suppressNotifications: false,
+        scope: 'all',
+        byWeekday: ['TU'],
+        confirmDropFutureOverrides: false,
+      });
+
+      expect(result).toEqual({
+        requiresConfirmation: true,
+        futureOverrideCount: 1,
+        futureExceptionCount: 0,
+      });
+      expect(
+        operations.some((op) => op.table === 'class_schedules' && op.action === 'update'),
+      ).toBe(false);
+    });
+
+    it('applies the whole-series rule change once confirmed, dropping only future overrides, via the atomic RPC', async () => {
+      mockActor();
+      const operations: Array<{ table: string; action: string; payload?: unknown }> = [];
+      const rpcMock = jest.fn(async () => ({ data: null, error: null }));
+      const mainClient = makeAllScopeClient({
+        recurrenceRow: {
+          id: 'recurrence-1',
+          frequency: 'weekly',
+          timezone: 'UTC',
+          until: null,
+          byday: ['WE'],
+          exceptions: [],
+          overrides: [
+            {
+              occurrence_key: '2020-01-01T09:10:00.000Z',
+              patch: { reason: 'past, kept' },
+            },
+            {
+              occurrence_key: '2030-04-01T09:10:00.000Z',
+              patch: { reason: 'future, dropped' },
+            },
+          ],
+        },
+        operations,
+        rpcMock,
+      });
+      createSupabaseServiceClientMock.mockReturnValueOnce(mainClient as never);
+
+      const reconcileNextReminderJobForSchedule = jest.fn(async () => ({
+        action: 'inserted',
+      }));
+      const service = new SchedulesService({
+        reconcileNextReminderJobForSchedule,
+      } as never);
+
+      const result = await service.rescheduleScheduleSession('token-1', {
+        orgId: 'org-1',
+        scheduleId: 'schedule-1',
+        occurrenceKey: null,
+        startAt: '2030-04-02T14:00:00.000Z',
+        endAt: '2030-04-02T15:00:00.000Z',
+        timezone: 'UTC',
+        reason: null,
+        suppressNotifications: false,
+        scope: 'all',
+        byWeekday: ['TU'],
+        confirmDropFutureOverrides: true,
+      });
+
+      expect(result).toEqual({ success: true, mode: 'recurring' });
+      // All four table writes happen inside one RPC call, not as separate
+      // unwrapped statements — the schedule/recurrence/exceptions/overrides
+      // fix (see rescheduleEntireRecurringSeries) must never drift back to
+      // one-write-per-table.
+      expect(
+        operations.some(
+          (op) =>
+            (op.table === 'class_schedules' ||
+              op.table === 'class_schedule_recurrence' ||
+              op.table === 'class_schedule_recurrence_overrides') &&
+            op.action !== 'select',
+        ),
+      ).toBe(false);
+      expect(rpcMock).toHaveBeenCalledWith(
+        'update_class_schedule_recurrence_rule',
+        expect.objectContaining({
+          p_org_id: 'org-1',
+          p_schedule_id: 'schedule-1',
+          p_recurrence_id: 'recurrence-1',
+          // The schedule's own calendar DATE (2026-09-02) is preserved —
+          // only the time-of-day changes — so expandRecurringEvents's
+          // start_at-as-floor logic never hides prior occurrences.
+          p_new_start_at: '2026-09-02T14:00:00.000Z',
+          p_new_end_at: '2026-09-02T15:00:00.000Z',
+          p_new_byday: ['TU'],
+          p_kept_exceptions: [],
+          p_kept_overrides: [
+            {
+              occurrenceKey: '2020-01-01T09:10:00.000Z',
+              patch: { reason: 'past, kept' },
+              suppressNotifications: false,
+            },
+          ],
+          p_actor_profile_id: 'profile-staff',
+        }),
+      );
+      expect(reconcileNextReminderJobForSchedule).toHaveBeenCalledWith({
+        orgId: 'org-1',
+        scheduleId: 'schedule-1',
+      });
+    });
+
+    it("interprets the schedule's existing start_at in the OLD timezone, not a simultaneously-changed new one", async () => {
+      mockActor();
+      const operations: Array<{ table: string; action: string; payload?: unknown }> = [];
+      // scheduleRow.start_at is 09:10 UTC — shifting by Honolulu's fixed -10:00
+      // offset crosses into the previous local day, so getting this wrong
+      // (using the new timezone to read an old, UTC-anchored timestamp) is
+      // observable as an off-by-one-day p_new_start_at/p_new_end_at below.
+      const rpcMock = jest.fn(async () => ({ data: null, error: null }));
+      const mainClient = makeAllScopeClient({
+        recurrenceRow: {
+          id: 'recurrence-1',
+          frequency: 'weekly',
+          timezone: 'UTC',
+          until: null,
+          byday: ['WE'],
+          exceptions: [],
+          overrides: [],
+        },
+        operations,
+        rpcMock,
+      });
+      createSupabaseServiceClientMock.mockReturnValueOnce(mainClient as never);
+
+      const service = new SchedulesService();
+      const result = await service.rescheduleScheduleSession('token-1', {
+        orgId: 'org-1',
+        scheduleId: 'schedule-1',
+        occurrenceKey: null,
+        startAt: '2026-09-02T22:00:00.000Z',
+        endAt: '2026-09-02T23:00:00.000Z',
+        timezone: 'Pacific/Honolulu',
+        reason: null,
+        suppressNotifications: false,
+        scope: 'all',
+        byWeekday: ['WE'],
+        confirmDropFutureOverrides: false,
+      });
+
+      expect(result).toEqual({ success: true, mode: 'recurring' });
+      expect(rpcMock).toHaveBeenCalledWith(
+        'update_class_schedule_recurrence_rule',
+        expect.objectContaining({
+          // Correct: calendar date stays 2026-09-02 (from the old UTC
+          // schedule), only the time-of-day and timezone change. A version
+          // that reinterpreted start_at using Honolulu (new tz) first would
+          // compute 2026-09-01 instead — one day off.
+          p_new_start_at: '2026-09-02T22:00:00.000Z',
+          p_new_end_at: '2026-09-02T23:00:00.000Z',
+          p_new_timezone: 'Pacific/Honolulu',
+        }),
+      );
+    });
   });
 });
 

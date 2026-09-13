@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@iconicedu/ui-web/ui/select';
+import { RadioGroup, RadioGroupItem } from '@iconicedu/ui-web/ui/radio-group';
 import { Textarea } from '@iconicedu/ui-web/ui/textarea';
 import {
   Dialog,
@@ -27,6 +28,8 @@ import type { DisplayClassScheduleVM } from '@iconicedu/ui-web/lib/class-schedul
 import type {
   CancelSessionActionInput,
   EditSessionActionInput,
+  EditSessionOutcome,
+  EditSessionScope,
 } from '@iconicedu/ui-web/components/class-schedule/session-action-types';
 
 interface EventActionsProps {
@@ -34,6 +37,10 @@ interface EventActionsProps {
   onClose: () => void;
   canCancelSession?: boolean;
   canEditSession?: boolean;
+  /** enable-class-schedule-series-reschedule flag — gates the "This and
+   * following events"/"All events" quick-edit scopes; "This event" (today's
+   * per-occurrence edit) is unaffected by this flag. */
+  canUseSeriesRescheduleScopes?: boolean;
   onCancelSession?: (
     event: DisplayClassScheduleVM,
     input: CancelSessionActionInput,
@@ -41,7 +48,7 @@ interface EventActionsProps {
   onEditSession?: (
     event: DisplayClassScheduleVM,
     input: EditSessionActionInput,
-  ) => Promise<void>;
+  ) => Promise<EditSessionOutcome | void>;
 }
 
 function addOneHour(time: string) {
@@ -64,11 +71,28 @@ function buildEditDefaults(event: DisplayClassScheduleVM, timezone: string) {
   };
 }
 
+/** Whether this recurring event's rule is the simple weekly/single-weekday
+ * shape the "This and following"/"All events" quick-edit scopes support.
+ * Must match `assertSimpleWeeklyRecurrence` on the API exactly (requires
+ * exactly one `byWeekday` entry, not zero-or-one) — a looser client check
+ * would show the option only to have the server reject it on submit. */
+function isSimpleWeeklyRecurrence(event: DisplayClassScheduleVM) {
+  const rule = event.recurrence?.rule;
+  if (!rule || rule.frequency !== 'weekly') return false;
+  return rule.byWeekday?.length === 1;
+}
+
+function isTodayOrLaterLocalDate(occurrenceLocalDate: string, timezone: string) {
+  const todayLocalDate = getLocalDate(new Date().toISOString(), timezone) ?? '';
+  return occurrenceLocalDate >= todayLocalDate;
+}
+
 export function EventActions({
   event,
   onClose,
   canCancelSession = false,
   canEditSession = false,
+  canUseSeriesRescheduleScopes = false,
   onCancelSession,
   onEditSession,
 }: EventActionsProps) {
@@ -84,6 +108,11 @@ export function EventActions({
   const [editEndTime, setEditEndTime] = useState('');
   const [editTimezone, setEditTimezone] = useState(scheduleTimezone);
   const [editReason, setEditReason] = useState('');
+  const [editScope, setEditScope] = useState<EditSessionScope>('occurrence');
+  const [pendingConfirmation, setPendingConfirmation] = useState<{
+    futureOverrideCount: number;
+    futureExceptionCount: number;
+  } | null>(null);
   const [isEditingSession, setIsEditingSession] = useState(false);
   const scheduleTabLink =
     event.source.kind === 'class_session' && event.source.channelId
@@ -117,6 +146,23 @@ export function EventActions({
     showSessionActionButtons && canEditSession && Boolean(fullScheduleEditLink);
   const isEditTimeRangeValid =
     Boolean(editStartTime) && Boolean(editEndTime) && editStartTime < editEndTime;
+  // "This and following"/"All events" only make sense for a simple weekly,
+  // single-weekday recurrence on a not-yet-past occurrence — anything more
+  // complex (multi-weekday, monthly/yearly) or already-elapsed still only
+  // offers "This event" (today's per-occurrence override behavior).
+  const canOfferSeriesScopes =
+    canUseSeriesRescheduleScopes &&
+    isRecurringSession &&
+    isSimpleWeeklyRecurrence(event) &&
+    isTodayOrLaterLocalDate(
+      getLocalDate(event.startAt, scheduleTimezone) ?? event.startAt.slice(0, 10),
+      scheduleTimezone,
+    );
+  // Once a series-wide scope is picked, the date field the admin edits stops
+  // meaning "move just this date" and starts meaning "the new pattern's day
+  // of week comes from this date" — timezone becomes editable too, since
+  // these scopes rewrite the series rather than override one occurrence.
+  const lockTimezoneToSchedule = isRecurringSession && editScope === 'occurrence';
 
   const resetCancelForm = () => {
     setCancelReason('');
@@ -129,6 +175,8 @@ export function EventActions({
     setEditEndTime(defaults.endTime);
     setEditTimezone(defaults.timezone);
     setEditReason(defaults.reason);
+    setEditScope('occurrence');
+    setPendingConfirmation(null);
     setEditDialogOpen(true);
   };
 
@@ -139,6 +187,8 @@ export function EventActions({
     setEditEndTime(defaults.endTime);
     setEditTimezone(defaults.timezone);
     setEditReason(defaults.reason);
+    setEditScope('occurrence');
+    setPendingConfirmation(null);
   };
 
   const handleConfirmCancel = async () => {
@@ -159,7 +209,7 @@ export function EventActions({
     }
   };
 
-  const handleConfirmEdit = async () => {
+  const handleConfirmEdit = async (confirmDropFutureOverrides = false) => {
     if (
       !onEditSession ||
       !editDate ||
@@ -172,13 +222,22 @@ export function EventActions({
 
     setIsEditingSession(true);
     try {
-      await onEditSession(event, {
+      const outcome = await onEditSession(event, {
         date: editDate,
         startTime: editStartTime,
         endTime: editEndTime,
-        timezone: isRecurringSession ? scheduleTimezone : editTimezone,
+        timezone: lockTimezoneToSchedule ? scheduleTimezone : editTimezone,
         reason: editReason,
+        scope: editScope,
+        confirmDropFutureOverrides,
       });
+      if (outcome?.requiresConfirmation) {
+        setPendingConfirmation({
+          futureOverrideCount: outcome.futureOverrideCount,
+          futureExceptionCount: outcome.futureExceptionCount,
+        });
+        return;
+      }
       setEditDialogOpen(false);
       resetEditForm();
       onClose();
@@ -349,21 +408,80 @@ export function EventActions({
       >
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Edit this session</DialogTitle>
+            <DialogTitle>
+              {editScope === 'occurrence'
+                ? 'Edit this session'
+                : editScope === 'thisAndFollowing'
+                  ? 'Edit this and following sessions'
+                  : 'Edit all sessions in this series'}
+            </DialogTitle>
             <DialogDescription>
-              Update the session timing. Recurring sessions reuse the classroom schedule
-              override model for one-off changes.
+              {editScope === 'occurrence'
+                ? 'Update the session timing. Recurring sessions reuse the classroom schedule override model for one-off changes.'
+                : "The date you pick below sets the new day of week; every occurrence keeps that day and time. Sessions before the split date aren't affected."}
             </DialogDescription>
           </DialogHeader>
+          {canOfferSeriesScopes ? (
+            <RadioGroup
+              value={editScope}
+              onValueChange={(value) => {
+                setEditScope(value as EditSessionScope);
+                setPendingConfirmation(null);
+              }}
+              className="gap-2"
+            >
+              <div className="flex items-center gap-2">
+                <RadioGroupItem
+                  value="occurrence"
+                  id={`edit-session-scope-occurrence-${event.ids.id}`}
+                  disabled={isEditingSession}
+                />
+                <Label
+                  htmlFor={`edit-session-scope-occurrence-${event.ids.id}`}
+                  className="cursor-pointer font-normal"
+                >
+                  This event
+                </Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <RadioGroupItem
+                  value="thisAndFollowing"
+                  id={`edit-session-scope-following-${event.ids.id}`}
+                  disabled={isEditingSession}
+                />
+                <Label
+                  htmlFor={`edit-session-scope-following-${event.ids.id}`}
+                  className="cursor-pointer font-normal"
+                >
+                  This and following events
+                </Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <RadioGroupItem
+                  value="all"
+                  id={`edit-session-scope-all-${event.ids.id}`}
+                  disabled={isEditingSession}
+                />
+                <Label
+                  htmlFor={`edit-session-scope-all-${event.ids.id}`}
+                  className="cursor-pointer font-normal"
+                >
+                  All events
+                </Label>
+              </div>
+            </RadioGroup>
+          ) : null}
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor={`edit-session-date-${event.ids.id}`}>Date</Label>
+              <Label htmlFor={`edit-session-date-${event.ids.id}`}>
+                {editScope === 'occurrence' ? 'Date' : 'New day (from date)'}
+              </Label>
               <Input
                 id={`edit-session-date-${event.ids.id}`}
                 type="date"
                 value={editDate}
                 onChange={(dialogEvent) => setEditDate(dialogEvent.target.value)}
-                disabled={isEditingSession}
+                disabled={isEditingSession || Boolean(pendingConfirmation)}
               />
             </div>
             <div className="space-y-2">
@@ -371,7 +489,11 @@ export function EventActions({
               <Select
                 value={editTimezone}
                 onValueChange={setEditTimezone}
-                disabled={isEditingSession || isRecurringSession}
+                disabled={
+                  isEditingSession ||
+                  lockTimezoneToSchedule ||
+                  Boolean(pendingConfirmation)
+                }
               >
                 <SelectTrigger id={`edit-session-timezone-${event.ids.id}`}>
                   <SelectValue placeholder="Select timezone" />
@@ -384,7 +506,7 @@ export function EventActions({
                   ))}
                 </SelectContent>
               </Select>
-              {isRecurringSession ? (
+              {lockTimezoneToSchedule ? (
                 <p className="text-xs text-muted-foreground">
                   One-off recurring edits keep the classroom schedule timezone.
                 </p>
@@ -427,7 +549,7 @@ export function EventActions({
                     setEditEndTime(addOneHour(newStart));
                   }
                 }}
-                disabled={isEditingSession}
+                disabled={isEditingSession || Boolean(pendingConfirmation)}
               />
             </div>
             <div className="space-y-2">
@@ -437,7 +559,7 @@ export function EventActions({
                 type="time"
                 value={editEndTime}
                 onChange={(dialogEvent) => setEditEndTime(dialogEvent.target.value)}
-                disabled={isEditingSession}
+                disabled={isEditingSession || Boolean(pendingConfirmation)}
               />
               {!isEditTimeRangeValid ? (
                 <p className="text-xs text-destructive">
@@ -459,29 +581,67 @@ export function EventActions({
               disabled={isEditingSession}
             />
           </div>
+          {pendingConfirmation ? (
+            <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+              This will drop {pendingConfirmation.futureOverrideCount} upcoming one-off
+              change
+              {pendingConfirmation.futureOverrideCount === 1 ? '' : 's'} and{' '}
+              {pendingConfirmation.futureExceptionCount} upcoming cancellation
+              {pendingConfirmation.futureExceptionCount === 1 ? '' : 's'} on the old day —
+              they no longer apply once the series moves. Date, time, and timezone are
+              locked while this is showing; use Back to change them.
+            </div>
+          ) : null}
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setEditDialogOpen(false);
-                resetEditForm();
-              }}
-              disabled={isEditingSession}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleConfirmEdit}
-              disabled={
-                isEditingSession ||
-                !editDate ||
-                !editStartTime ||
-                !editEndTime ||
-                !isEditTimeRangeValid
-              }
-            >
-              {isEditingSession ? 'Saving...' : 'Save changes'}
-            </Button>
+            {pendingConfirmation ? (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => setPendingConfirmation(null)}
+                  disabled={isEditingSession}
+                >
+                  Back
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => handleConfirmEdit(true)}
+                  disabled={
+                    isEditingSession ||
+                    !editDate ||
+                    !editStartTime ||
+                    !editEndTime ||
+                    !isEditTimeRangeValid
+                  }
+                >
+                  {isEditingSession ? 'Saving...' : 'Drop overrides & save'}
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setEditDialogOpen(false);
+                    resetEditForm();
+                  }}
+                  disabled={isEditingSession}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => handleConfirmEdit(false)}
+                  disabled={
+                    isEditingSession ||
+                    !editDate ||
+                    !editStartTime ||
+                    !editEndTime ||
+                    !isEditTimeRangeValid
+                  }
+                >
+                  {isEditingSession ? 'Saving...' : 'Save changes'}
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

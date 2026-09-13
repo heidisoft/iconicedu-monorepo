@@ -10,6 +10,7 @@ const getProfileByAccountIdMock = vi.fn();
 const getLearningSpaceDetailMock = vi.fn();
 const apiPostMock = vi.fn();
 const revalidatePathMock = vi.fn();
+const enableClassScheduleSeriesRescheduleRunMock = vi.fn();
 
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
   createSupabaseServerClient: (...args: unknown[]) =>
@@ -51,6 +52,12 @@ vi.mock('@iconicedu/web/lib/api/http-client', () => ({
 
 vi.mock('next/cache', () => ({
   revalidatePath: (...args: unknown[]) => revalidatePathMock(...args),
+}));
+
+vi.mock('@iconicedu/web/flags', () => ({
+  enableClassScheduleSeriesReschedule: {
+    run: (...args: unknown[]) => enableClassScheduleSeriesRescheduleRunMock(...args),
+  },
 }));
 
 import { updateClassScheduleSessionAction } from './update-class-schedule-session';
@@ -179,6 +186,7 @@ describe('updateClassScheduleSessionAction', () => {
     getLearningSpaceDetailMock.mockReset();
     apiPostMock.mockReset();
     revalidatePathMock.mockReset();
+    enableClassScheduleSeriesRescheduleRunMock.mockReset();
 
     createSupabaseServerClientMock.mockResolvedValue(createServerSupabase());
     createSupabaseServiceClientMock.mockReturnValue(createServiceSupabase());
@@ -190,6 +198,9 @@ describe('updateClassScheduleSessionAction', () => {
       data: { id: 'profile-1' },
     });
     apiPostMock.mockResolvedValue({ success: true, mode: 'recurring' });
+    // ON by default in this suite so the existing scope:'all' tests exercise
+    // real behavior; the dedicated OFF test below overrides this per-case.
+    enableClassScheduleSeriesRescheduleRunMock.mockResolvedValue(true);
   });
 
   it('delegates recurring reschedules to the API without rewriting exceptions', async () => {
@@ -332,5 +343,119 @@ describe('updateClassScheduleSessionAction', () => {
         suppressNotifications: true,
       }),
     );
+  });
+
+  it("scope 'all' derives byWeekday from the chosen date and rewrites the whole series", async () => {
+    getLearningSpaceDetailMock.mockResolvedValue(
+      createLearningSpaceDetail({
+        rule: { frequency: 'weekly', timezone: 'America/New_York' },
+      }),
+    );
+
+    const result = await updateClassScheduleSessionAction({
+      orgSlug: 'iconic-academy',
+      scheduleId: 'schedule-1',
+      occurrenceKey: '2026-03-21T14:00:00.000Z',
+      date: '2026-03-24', // a Tuesday
+      startTime: '14:00',
+      endTime: '15:00',
+      timezone: 'America/New_York',
+      reason: null,
+      scope: 'all',
+    });
+
+    expect(apiPostMock).toHaveBeenCalledWith(
+      '/schedules/session/reschedule',
+      expect.objectContaining({
+        orgId: 'org-1',
+        scheduleId: 'schedule-1',
+        scope: 'all',
+        byWeekday: ['TU'],
+        confirmDropFutureOverrides: false,
+      }),
+    );
+    expect(result).toEqual({
+      scheduleId: 'schedule-1',
+      occurrenceKey: '2026-03-21T14:00:00.000Z',
+      mode: 'recurring',
+      status: 'scheduled',
+      startAt: toOccurrenceKeyInTimezone('2026-03-24', '14:00', 'America/New_York'),
+      endAt: toOccurrenceKeyInTimezone('2026-03-24', '15:00', 'America/New_York'),
+      timezone: 'America/New_York',
+      reason: null,
+    });
+  });
+
+  it("scope 'all' surfaces a confirmation requirement instead of applying the change", async () => {
+    getLearningSpaceDetailMock.mockResolvedValue(
+      createLearningSpaceDetail({
+        rule: { frequency: 'weekly', timezone: 'America/New_York' },
+      }),
+    );
+    apiPostMock.mockResolvedValue({
+      requiresConfirmation: true,
+      futureOverrideCount: 2,
+      futureExceptionCount: 1,
+    });
+
+    const result = await updateClassScheduleSessionAction({
+      orgSlug: 'iconic-academy',
+      scheduleId: 'schedule-1',
+      occurrenceKey: '2026-03-21T14:00:00.000Z',
+      date: '2026-03-24',
+      startTime: '14:00',
+      endTime: '15:00',
+      timezone: 'America/New_York',
+      scope: 'all',
+    });
+
+    expect(result).toEqual({
+      requiresConfirmation: true,
+      futureOverrideCount: 2,
+      futureExceptionCount: 1,
+    });
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it("scope 'all' rejects a non-recurring schedule", async () => {
+    getLearningSpaceDetailMock.mockResolvedValue(
+      createLearningSpaceDetail({ rule: undefined }),
+    );
+
+    await expect(
+      updateClassScheduleSessionAction({
+        orgSlug: 'iconic-academy',
+        scheduleId: 'schedule-1',
+        occurrenceKey: '2026-03-21T14:00:00.000Z',
+        date: '2026-03-24',
+        startTime: '14:00',
+        endTime: '15:00',
+        timezone: 'America/New_York',
+        scope: 'all',
+      }),
+    ).rejects.toThrow('Only recurring sessions support editing the whole series.');
+  });
+
+  it("scope 'all' rejects the request when enable-class-schedule-series-reschedule is off", async () => {
+    enableClassScheduleSeriesRescheduleRunMock.mockResolvedValue(false);
+    getLearningSpaceDetailMock.mockResolvedValue(
+      createLearningSpaceDetail({
+        rule: { frequency: 'weekly', timezone: 'America/New_York' },
+      }),
+    );
+
+    await expect(
+      updateClassScheduleSessionAction({
+        orgSlug: 'iconic-academy',
+        scheduleId: 'schedule-1',
+        occurrenceKey: '2026-03-21T14:00:00.000Z',
+        date: '2026-03-24',
+        startTime: '14:00',
+        endTime: '15:00',
+        timezone: 'America/New_York',
+        scope: 'all',
+      }),
+    ).rejects.toThrow('This feature is not available yet.');
+    expect(apiPostMock).not.toHaveBeenCalled();
   });
 });

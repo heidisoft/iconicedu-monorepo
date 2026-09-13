@@ -8,6 +8,7 @@ import { DayView } from '@iconicedu/ui-web/components/class-schedule/day-view';
 import type {
   CancelSessionActionInput,
   EditSessionActionInput,
+  EditSessionOutcome,
 } from '@iconicedu/ui-web/components/class-schedule/session-action-types';
 import { useScheduleDisplayTimeZone } from '@iconicedu/ui-web/components/shared/schedule-display-timezone-context';
 import {
@@ -28,6 +29,9 @@ interface ClassScheduleContainerProps {
   childrenCount?: number;
   canCancelSessions?: boolean;
   canEditSessions?: boolean;
+  /** enable-class-schedule-series-reschedule flag — gates the "This and
+   * following events"/"All events" quick-edit scopes on recurring sessions. */
+  canUseSeriesRescheduleScopes?: boolean;
   editFullScheduleHref?: string | null;
   onCancelSession?: (
     event: DisplayClassScheduleVM,
@@ -36,7 +40,7 @@ interface ClassScheduleContainerProps {
   onEditSession?: (
     event: DisplayClassScheduleVM,
     input: EditSessionActionInput,
-  ) => Promise<void>;
+  ) => Promise<EditSessionOutcome | void>;
 }
 
 export function ClassScheduleContainer({
@@ -48,6 +52,7 @@ export function ClassScheduleContainer({
   childrenCount,
   canCancelSessions = false,
   canEditSessions = false,
+  canUseSeriesRescheduleScopes = false,
   editFullScheduleHref,
   onCancelSession,
   onEditSession,
@@ -120,6 +125,7 @@ export function ClassScheduleContainer({
           onSwitchToDay={() => onViewChange('day')}
           canCancelSessions={canCancelSessions}
           canEditSessions={canEditSessions}
+          canUseSeriesRescheduleScopes={canUseSeriesRescheduleScopes}
           onCancelSession={onCancelSession}
           onEditSession={onEditSession}
         />
@@ -135,6 +141,7 @@ export function ClassScheduleContainer({
           onMonthChange={setClassScheduleMonthAnchor}
           canCancelSessions={canCancelSessions}
           canEditSessions={canEditSessions}
+          canUseSeriesRescheduleScopes={canUseSeriesRescheduleScopes}
           onCancelSession={onCancelSession}
           onEditSession={onEditSession}
         />

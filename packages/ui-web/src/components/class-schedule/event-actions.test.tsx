@@ -157,12 +157,125 @@ describe('EventActions', () => {
           endTime: '12:30',
           timezone: 'America/New_York',
           reason: 'Family requested a change',
+          scope: 'occurrence',
+          confirmDropFutureOverrides: false,
         },
       );
     });
     await waitFor(() => {
       expect(onClose).toHaveBeenCalled();
     });
+  });
+
+  it('offers "This and following"/"All events" scopes for a simple weekly recurring future occurrence', async () => {
+    const onEditSession = vi.fn(async () => undefined);
+    const onClose = vi.fn();
+
+    render(
+      <EventActions
+        event={buildEvent({
+          ids: { id: 'schedule-1__2030-04-03T15:00:00.000Z', orgId: 'org-1' },
+          startAt: '2030-04-03T15:00:00.000Z',
+          endAt: '2030-04-03T16:00:00.000Z',
+          timezone: 'UTC',
+          recurrence: {
+            ids: { id: 'recurrence-1', orgId: 'org-1' },
+            rule: { frequency: 'weekly', byWeekday: ['WE'] },
+          },
+        })}
+        onClose={onClose}
+        canEditSession
+        canUseSeriesRescheduleScopes
+        onEditSession={onEditSession}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit this session' }));
+    const dialog = screen.getByRole('dialog');
+
+    expect(within(dialog).getByLabelText('This event')).toBeInTheDocument();
+    expect(
+      within(dialog).getByLabelText('This and following events'),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('All events')).toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByLabelText('This and following events'));
+    fireEvent.change(within(dialog).getByLabelText('New day (from date)'), {
+      target: { value: '2030-04-09' },
+    });
+    fireEvent.change(within(dialog).getByLabelText('Start time'), {
+      target: { value: '14:00' },
+    });
+    fireEvent.change(within(dialog).getByLabelText('End time'), {
+      target: { value: '15:00' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() => {
+      expect(onEditSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ids: expect.objectContaining({ id: 'schedule-1__2030-04-03T15:00:00.000Z' }),
+        }),
+        expect.objectContaining({
+          date: '2030-04-09',
+          startTime: '14:00',
+          endTime: '15:00',
+          scope: 'thisAndFollowing',
+          confirmDropFutureOverrides: false,
+        }),
+      );
+    });
+  });
+
+  it('hides series-wide scopes for an otherwise-eligible recurring event when the flag is off', async () => {
+    render(
+      <EventActions
+        event={buildEvent({
+          ids: { id: 'schedule-1__2030-04-03T15:00:00.000Z', orgId: 'org-1' },
+          startAt: '2030-04-03T15:00:00.000Z',
+          endAt: '2030-04-03T16:00:00.000Z',
+          timezone: 'UTC',
+          recurrence: {
+            ids: { id: 'recurrence-1', orgId: 'org-1' },
+            rule: { frequency: 'weekly', byWeekday: ['WE'] },
+          },
+        })}
+        onClose={vi.fn()}
+        canEditSession
+        // canUseSeriesRescheduleScopes omitted — defaults to false, matching
+        // the enable-class-schedule-series-reschedule flag's defaultValue.
+        onEditSession={vi.fn(async () => undefined)}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit this session' }));
+    const dialog = screen.getByRole('dialog');
+
+    expect(within(dialog).queryByLabelText('This event')).not.toBeInTheDocument();
+    expect(
+      within(dialog).queryByLabelText('This and following events'),
+    ).not.toBeInTheDocument();
+    expect(within(dialog).queryByLabelText('All events')).not.toBeInTheDocument();
+    expect(within(dialog).getByLabelText('Date')).toBeInTheDocument();
+  });
+
+  it('does not offer series-wide scopes for a non-recurring session', async () => {
+    render(
+      <EventActions
+        event={buildEvent()}
+        onClose={vi.fn()}
+        canEditSession
+        onEditSession={vi.fn(async () => undefined)}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit this session' }));
+    const dialog = screen.getByRole('dialog');
+
+    expect(within(dialog).queryByLabelText('This event')).not.toBeInTheDocument();
+    expect(
+      within(dialog).queryByLabelText('This and following events'),
+    ).not.toBeInTheDocument();
   });
 
   it('hides the cancel session action for already cancelled events', () => {

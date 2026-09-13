@@ -8,11 +8,13 @@ import { getLearningSpaceDetail } from '@iconicedu/web/lib/admin/learning-space-
 import {
   normalizeScheduleFormDate,
   toOccurrenceKeyInTimezone,
+  weekdayTokenFromLocalDate,
 } from '@iconicedu/web/lib/admin/learning-space-schedule-hash';
 import { createApiClient } from '@iconicedu/web/lib/api/http-client';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 import { getLocalDate } from '@iconicedu/utils';
+import { enableClassScheduleSeriesReschedule } from '@iconicedu/web/flags';
 
 export type UpdateClassScheduleSessionActionInput = {
   orgSlug: string;
@@ -24,6 +26,13 @@ export type UpdateClassScheduleSessionActionInput = {
   timezone: string;
   reason?: string | null;
   suppressNotifications?: boolean;
+  /** `'all'` rewrites the whole recurring series' day/time in place — the new
+   * weekday is derived from `date`. Omit or `'occurrence'` for today's
+   * per-occurrence override behavior. */
+  scope?: 'occurrence' | 'all';
+  /** `scope: 'all'` only — confirms dropping future overrides/cancellations
+   * that no longer apply once the weekday changes. */
+  confirmDropFutureOverrides?: boolean;
 };
 
 export type UpdateClassScheduleSessionActionResult = {
@@ -37,6 +46,14 @@ export type UpdateClassScheduleSessionActionResult = {
   reason: string | null;
 };
 
+export type UpdateClassScheduleSessionActionOutcome =
+  | UpdateClassScheduleSessionActionResult
+  | {
+      requiresConfirmation: true;
+      futureOverrideCount: number;
+      futureExceptionCount: number;
+    };
+
 function normalizeReason(reason?: string | null) {
   const trimmed = reason?.trim();
   return trimmed ? trimmed : null;
@@ -48,7 +65,7 @@ function isValidTimeRange(startTime: string, endTime: string) {
 
 export async function updateClassScheduleSessionAction(
   input: UpdateClassScheduleSessionActionInput,
-): Promise<UpdateClassScheduleSessionActionResult> {
+): Promise<UpdateClassScheduleSessionActionOutcome> {
   if (!input.date || !input.startTime || !input.endTime || !input.timezone) {
     throw new Error('Missing required session fields.');
   }
@@ -153,6 +170,66 @@ export async function updateClassScheduleSessionAction(
       revalidatePath(`/${input.orgSlug}/s/${scheduleRow.source_channel_id}`);
     }
   };
+
+  if (input.scope === 'all') {
+    const seriesRescheduleEnabled = await enableClassScheduleSeriesReschedule.run({
+      identify: { profileId: actorProfile.id },
+    });
+    if (!seriesRescheduleEnabled) {
+      throw new Error('This feature is not available yet.');
+    }
+    if (!isRecurringSchedule) {
+      throw new Error('Only recurring sessions support editing the whole series.');
+    }
+
+    const startAt = toOccurrenceKeyInTimezone(
+      input.date,
+      input.startTime,
+      input.timezone,
+    );
+    const endAt = toOccurrenceKeyInTimezone(input.date, input.endTime, input.timezone);
+
+    const response = await api.post<{
+      success?: true;
+      mode?: 'recurring';
+      requiresConfirmation?: true;
+      futureOverrideCount?: number;
+      futureExceptionCount?: number;
+    }>('/schedules/session/reschedule', {
+      orgId: org.id,
+      scheduleId: input.scheduleId,
+      occurrenceKey: input.occurrenceKey ?? null,
+      startAt,
+      endAt,
+      timezone: input.timezone,
+      reason: normalizedReason,
+      suppressNotifications: input.suppressNotifications === true,
+      scope: 'all',
+      byWeekday: [weekdayTokenFromLocalDate(input.date)],
+      confirmDropFutureOverrides: input.confirmDropFutureOverrides === true,
+    });
+
+    if (response.requiresConfirmation) {
+      return {
+        requiresConfirmation: true,
+        futureOverrideCount: response.futureOverrideCount ?? 0,
+        futureExceptionCount: response.futureExceptionCount ?? 0,
+      };
+    }
+
+    revalidateScheduleViews();
+
+    return {
+      scheduleId: input.scheduleId,
+      occurrenceKey: input.occurrenceKey,
+      mode: 'recurring',
+      status: 'scheduled',
+      startAt,
+      endAt,
+      timezone: input.timezone,
+      reason: normalizedReason,
+    };
+  }
 
   if (!isRecurringSchedule) {
     const startDate = normalizeScheduleFormDate(input.date, input.timezone);

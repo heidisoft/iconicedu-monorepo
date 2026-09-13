@@ -9,6 +9,7 @@ import { EventActions } from '@iconicedu/ui-web/components/class-schedule/event-
 import type {
   CancelSessionActionInput,
   EditSessionActionInput,
+  EditSessionOutcome,
 } from '@iconicedu/ui-web/components/class-schedule/session-action-types';
 import { ResponsiveDialog } from '@iconicedu/ui-web/components/shared/responsive-dialog';
 import type { DisplayClassScheduleVM } from '@iconicedu/ui-web/lib/class-schedule-utils';
@@ -20,6 +21,7 @@ interface EventDialogProps {
   children: React.ReactNode;
   canCancelSession?: boolean;
   canEditSession?: boolean;
+  canUseSeriesRescheduleScopes?: boolean;
   onCancelSession?: (
     event: DisplayClassScheduleVM,
     input: CancelSessionActionInput,
@@ -27,7 +29,7 @@ interface EventDialogProps {
   onEditSession?: (
     event: DisplayClassScheduleVM,
     input: EditSessionActionInput,
-  ) => Promise<void>;
+  ) => Promise<EditSessionOutcome | void>;
 }
 
 export function EventDialog({
@@ -37,6 +39,7 @@ export function EventDialog({
   children,
   canCancelSession = false,
   canEditSession = false,
+  canUseSeriesRescheduleScopes = false,
   onCancelSession,
   onEditSession,
 }: EventDialogProps) {
@@ -53,6 +56,7 @@ export function EventDialog({
             onClose={() => onOpenChange(false)}
             canCancelSession={canCancelSession}
             canEditSession={canEditSession}
+            canUseSeriesRescheduleScopes={canUseSeriesRescheduleScopes}
             onCancelSession={onCancelSession}
             onEditSession={onEditSession}
           />

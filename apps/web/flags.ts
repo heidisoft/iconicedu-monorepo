@@ -106,6 +106,26 @@ export const enableMobileAppleSignIn = flag<boolean, { profileId?: string | null
   },
 });
 
+export const enableClassScheduleSeriesReschedule = flag<
+  boolean,
+  { profileId?: string | null }
+>({
+  key: 'enable-class-schedule-series-reschedule',
+  description:
+    'Shows the "This and following events"/"All events" quick-edit scopes on recurring class sessions and allows the corresponding split/whole-series reschedule server actions.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: 'enable-class-schedule-series-reschedule',
+      profileId: entities?.profileId,
+    });
+  },
+});
+
 export const enableMarketingSitePages = flag<boolean, { profileId?: string | null }>({
   key: 'enable-marketing-site-pages',
   description:
@@ -183,6 +203,7 @@ export const webFlags = {
   enableAdminSessionAttendanceAnalytics,
   enableAssessments,
   enableChannelCommunications,
+  enableClassScheduleSeriesReschedule,
   enableMarketingSitePages,
   enableMessageTypeComposer,
   enableSessionCompletionCarousel,

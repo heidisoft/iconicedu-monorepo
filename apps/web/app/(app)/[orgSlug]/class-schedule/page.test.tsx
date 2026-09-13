@@ -11,6 +11,13 @@ const buildClassSchedulesByOrgMock = vi.fn();
 const getDashboardAccountContextMock = vi.fn();
 const getDashboardProfileContextMock = vi.fn();
 const classScheduleClientMock = vi.fn(() => null);
+const enableClassScheduleSeriesRescheduleRunMock = vi.fn();
+
+vi.mock('@iconicedu/web/flags', () => ({
+  enableClassScheduleSeriesReschedule: {
+    run: (...args: unknown[]) => enableClassScheduleSeriesRescheduleRunMock(...args),
+  },
+}));
 
 vi.mock('@iconicedu/web/lib/schedules/builders/class-schedule.builder', () => ({
   buildClassSchedulesByOrg: (...args: unknown[]) => buildClassSchedulesByOrgMock(...args),
@@ -63,11 +70,13 @@ describe('class schedule page viewer scoping', () => {
     getDashboardAccountContextMock.mockReset();
     getDashboardProfileContextMock.mockReset();
     classScheduleClientMock.mockReset();
+    enableClassScheduleSeriesRescheduleRunMock.mockReset();
 
     getDashboardAccountContextMock.mockResolvedValue({
       supabase: {},
       account: { id: 'account-1', org_id: 'org-1', primary_role: 'guardian' },
     });
+    enableClassScheduleSeriesRescheduleRunMock.mockResolvedValue(false);
   });
 
   it('passes only child schedules when viewing as a child profile', async () => {
@@ -241,5 +250,40 @@ describe('class schedule page viewer scoping', () => {
         orgSlug: 'iconic-academy',
       }),
     );
+  });
+
+  it('passes the enable-class-schedule-series-reschedule flag value through', async () => {
+    buildClassSchedulesByOrgMock.mockResolvedValue([]);
+    getDashboardProfileContextMock.mockResolvedValue({
+      currentUserProfile: {
+        kind: 'guardian',
+        ids: { id: 'guardian-1', orgId: 'org-1', accountId: 'account-guardian-1' },
+        prefs: { timezone: 'America/New_York' },
+        children: { items: [] },
+      },
+    });
+
+    enableClassScheduleSeriesRescheduleRunMock.mockResolvedValue(false);
+    let element = await ClassSchedulePage({
+      params: Promise.resolve({ orgSlug: 'iconic-academy' }),
+    });
+    render(element as React.ReactElement);
+    await waitFor(() => {
+      expect(classScheduleClientMock).toHaveBeenCalledWith(
+        expect.objectContaining({ canUseSeriesRescheduleScopes: false }),
+      );
+    });
+
+    classScheduleClientMock.mockClear();
+    enableClassScheduleSeriesRescheduleRunMock.mockResolvedValue(true);
+    element = await ClassSchedulePage({
+      params: Promise.resolve({ orgSlug: 'iconic-academy' }),
+    });
+    render(element as React.ReactElement);
+    await waitFor(() => {
+      expect(classScheduleClientMock).toHaveBeenCalledWith(
+        expect.objectContaining({ canUseSeriesRescheduleScopes: true }),
+      );
+    });
   });
 });
