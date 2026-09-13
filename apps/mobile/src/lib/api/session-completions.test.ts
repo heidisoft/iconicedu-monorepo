@@ -2,6 +2,7 @@ import {
   confirmSessionCompletion,
   disputeSessionCompletion,
   getOrgSessionCompletionSummary,
+  getSessionCompletionSummary,
   listSessionCompletions,
   rateSessionCompletion,
 } from './session-completions';
@@ -36,6 +37,22 @@ describe('session completion API client', () => {
 
     expect(apiGet).toHaveBeenCalledWith('/session-completions/org-summary', {
       orgId: 'org-1',
+      completedSince: '2026-09-01T00:00:00.000Z',
+      completedUntil: '2026-10-01T00:00:00.000Z',
+    });
+  });
+
+  it('requests the per-profile summary with a completed-session window', () => {
+    getSessionCompletionSummary({
+      orgId: 'org-1',
+      profileId: 'profile-1',
+      completedSince: '2026-09-01T00:00:00.000Z',
+      completedUntil: '2026-10-01T00:00:00.000Z',
+    });
+
+    expect(apiGet).toHaveBeenCalledWith('/session-completions/summary', {
+      orgId: 'org-1',
+      profileId: 'profile-1',
       completedSince: '2026-09-01T00:00:00.000Z',
       completedUntil: '2026-10-01T00:00:00.000Z',
     });

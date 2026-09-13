@@ -2,20 +2,12 @@ import { useQuery } from '@tanstack/react-query';
 import type { SessionCompletionVM } from '@iconicedu/shared-types';
 import {
   getOrgSessionCompletionSummary,
+  getSessionCompletionSummary,
   listSessionCompletions,
 } from '@/lib/api/session-completions';
 import { queryKeys } from '@/lib/api/query-keys';
 import { useAccount } from '@/hooks/use-account';
 import { useProfile } from '@/hooks/use-profile';
-
-export function summarizeSessionCompletions(sessions: SessionCompletionVM[]) {
-  return {
-    completed: sessions.filter(
-      (session) => session.status === 'confirmed' || session.status === 'auto_confirmed',
-    ).length,
-    pending: sessions.filter((session) => session.status === 'pending').length,
-  };
-}
 
 // An org admin is a role grant (owner/admin/staff) or a staff/system profile
 // kind — either one sees org-wide "Sessions completed" totals, matching web.
@@ -79,6 +71,24 @@ export function useCompletedSessions(enabled = true): {
     retry: 1,
   });
 
+  // The carousel needs the raw list (pending + freshly-resolved rows), but
+  // that list is capped and time-windowed — it must never be aggregated into
+  // the "Sessions completed" tile. That tile reads its own exact, month-scoped
+  // count, matching web's home-infographic-metrics.
+  const summaryQuery = useQuery({
+    queryKey: queryKeys.sessionCompletionSummary(orgId, profileId, month.monthKey),
+    queryFn: () =>
+      getSessionCompletionSummary({
+        orgId,
+        profileId,
+        completedSince: month.start,
+        completedUntil: month.end,
+      }),
+    enabled: Boolean(orgId && profileId && !isOrgAdminView),
+    staleTime: 60_000,
+    retry: 1,
+  });
+
   const query = useQuery({
     queryKey: queryKeys.sessionCompletions(orgId, profileId),
     queryFn: () => listSessionCompletions({ orgId, profileId, limit: 50 }),
@@ -110,10 +120,10 @@ export function useCompletedSessions(enabled = true): {
           // to vote (skip-rating) — resolved, so keep it out of the carousel.
           completion.ratedAt == null),
     ),
-    summary: summarizeSessionCompletions(allSessions),
+    summary: summaryQuery.data ?? { completed: 0, pending: 0 },
     isOrgAdminView,
-    isPending: query.isPending,
-    isError: query.isError,
-    refetch: query.refetch,
+    isPending: query.isPending || summaryQuery.isPending,
+    isError: query.isError || summaryQuery.isError,
+    refetch: () => Promise.all([query.refetch(), summaryQuery.refetch()]),
   };
 }

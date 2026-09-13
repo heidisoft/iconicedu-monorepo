@@ -29,6 +29,18 @@ export function getOrgSessionCompletionSummary(input: {
   );
 }
 
+export function getSessionCompletionSummary(input: {
+  orgId: string;
+  profileId: string;
+  completedSince?: string;
+  completedUntil?: string;
+}) {
+  return apiGet<{ completed: number; pending: number }>(
+    '/session-completions/summary',
+    input,
+  );
+}
+
 export function confirmSessionCompletion(input: ConfirmSessionCompletionInput) {
   return apiPost<{
     success: true;
