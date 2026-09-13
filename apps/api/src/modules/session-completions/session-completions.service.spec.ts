@@ -837,6 +837,7 @@ describe('SessionCompletionsService', () => {
       const familyLinkChain = makeChain({ data: input.familyLinkRow ?? null });
 
       let completionsSelectCalls = 0;
+      const completionChains: Array<Record<string, unknown>> = [];
       const from = jest.fn((table: string) => {
         if (table === 'accounts') return accountChain;
         if (table === 'profiles') return profileChain;
@@ -846,9 +847,11 @@ describe('SessionCompletionsService', () => {
             // 1st select() builds the "completed" count query, 2nd the "pending" one.
             select: jest.fn(() => {
               completionsSelectCalls += 1;
-              return makeCountChain(
+              const chain = makeCountChain(
                 completionsSelectCalls === 1 ? input.completedCount : input.pendingCount,
               );
+              completionChains.push(chain);
+              return chain;
             }),
           };
         }
@@ -856,7 +859,7 @@ describe('SessionCompletionsService', () => {
       });
 
       createSupabaseServiceClientMock.mockReturnValue({ from } as never);
-      return { from };
+      return { from, completionChains };
     }
 
     it('returns exact confirmed and pending counts, not a page slice', async () => {
@@ -871,6 +874,39 @@ describe('SessionCompletionsService', () => {
       });
 
       expect(result).toEqual({ completed: 137, pending: 4 });
+    });
+
+    it('bounds the pending count to the same session_end_at window as completed', async () => {
+      const { completionChains } = makeSummarySupabase({
+        completedCount: 1,
+        pendingCount: 1,
+      });
+      const service = new SessionCompletionsService();
+
+      await service.getCompletionSummaryForProfile(AUTH_USER_ID, {
+        orgId: ORG_ID,
+        profileId: PROFILE_ID,
+        completedSince: '2026-03-01T00:00:00.000Z',
+        completedUntil: '2026-04-01T00:00:00.000Z',
+      });
+
+      const [completedChain, pendingChain] = completionChains;
+      expect(completedChain.gte).toHaveBeenCalledWith(
+        'session_end_at',
+        '2026-03-01T00:00:00.000Z',
+      );
+      expect(completedChain.lt).toHaveBeenCalledWith(
+        'session_end_at',
+        '2026-04-01T00:00:00.000Z',
+      );
+      expect(pendingChain.gte).toHaveBeenCalledWith(
+        'session_end_at',
+        '2026-03-01T00:00:00.000Z',
+      );
+      expect(pendingChain.lt).toHaveBeenCalledWith(
+        'session_end_at',
+        '2026-04-01T00:00:00.000Z',
+      );
     });
 
     it('rejects an invalid profileId before querying', async () => {
