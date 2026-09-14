@@ -39,6 +39,7 @@ export * from '@iconicedu/ui-web/providers/theme-provider';
 export * from '@iconicedu/ui-web/ui/badge';
 export * from '@iconicedu/ui-web/ui/alert-dialog';
 export * from '@iconicedu/ui-web/ui/skeleton';
+export * from '@iconicedu/ui-web/ui/chart';
 export * from '@iconicedu/ui-web/ui/card';
 export * from '@iconicedu/ui-web/components/dashboard-header';
 export * from '@iconicedu/ui-web/components/participant-selector';

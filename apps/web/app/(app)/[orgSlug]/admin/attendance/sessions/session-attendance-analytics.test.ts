@@ -3,8 +3,8 @@ import type { AdminSessionCompletionVM } from '@iconicedu/shared-types';
 import {
   buildConfirmerBreakdown,
   buildMonthFilterHref,
-  buildMonthlyCompletionTrend,
   buildRecentCompletionMonthKeys,
+  buildWeeklySessionTrend,
   completionMonthKeyToUtcRange,
   filterCompletions,
   getCompletionDurationHours,
@@ -157,15 +157,11 @@ describe('completed session analytics', () => {
     );
   });
 
-  it('builds chronological monthly and confirmer breakdowns', () => {
+  it('builds confirmer breakdowns', () => {
     const rows = [
       completion(),
       completion({ id: 'other', sessionEndAt: '2026-02-01T10:00:00.000Z' }),
     ];
-    expect(buildMonthlyCompletionTrend(rows).map((point) => point.key)).toEqual([
-      '2026-02',
-      '2026-03',
-    ]);
     expect(buildConfirmerBreakdown(rows, 'educator')[0]).toMatchObject({
       name: 'Taylor Reed',
       sessions: 2,
@@ -176,6 +172,49 @@ describe('completed session analytics', () => {
       sessions: 2,
       hours: 1,
     });
+  });
+});
+
+describe('buildWeeklySessionTrend', () => {
+  const reference = new Date('2026-03-16T12:00:00.000Z'); // a Monday
+
+  it('zero-fills every week in the window and buckets by session date', () => {
+    const points = buildWeeklySessionTrend([completion()], reference, 3);
+    expect(points.map((point) => point.key)).toEqual([
+      '2026-03-02',
+      '2026-03-09',
+      '2026-03-16',
+    ]);
+    // completion()'s sessionEndAt (2026-03-10) falls in the week of 2026-03-09.
+    expect(points).toEqual([
+      { key: '2026-03-02', label: 'Mar 2', sessions: 0, confirmed: 0, conflicts: 0 },
+      { key: '2026-03-09', label: 'Mar 9', sessions: 1, confirmed: 1, conflicts: 0 },
+      { key: '2026-03-16', label: 'Mar 16', sessions: 0, confirmed: 0, conflicts: 0 },
+    ]);
+  });
+
+  it('counts pending/disputed toward sessions but not confirmed, and disputed toward conflicts', () => {
+    // Within the single plotted week (the week containing `reference` itself).
+    const sessionEndAt = '2026-03-17T10:00:00.000Z';
+    const rows = [
+      completion({ id: 'pending', sessionEndAt, completionMethod: 'pending' }),
+      completion({ id: 'disputed', sessionEndAt, completionMethod: 'disputed' }),
+      completion({ id: 'confirmed', sessionEndAt, completionMethod: 'confirmed' }),
+      completion({ id: 'auto', sessionEndAt, completionMethod: 'auto_confirmed' }),
+    ];
+    const week = buildWeeklySessionTrend(rows, reference, 1)[0];
+    expect(week).toMatchObject({ sessions: 4, confirmed: 2, conflicts: 1 });
+  });
+
+  it('ignores rows outside the plotted window', () => {
+    const points = buildWeeklySessionTrend(
+      [completion({ sessionEndAt: '2020-01-01T00:00:00.000Z' })],
+      reference,
+      1,
+    );
+    expect(points).toEqual([
+      { key: '2026-03-16', label: 'Mar 16', sessions: 0, confirmed: 0, conflicts: 0 },
+    ]);
   });
 });
 
