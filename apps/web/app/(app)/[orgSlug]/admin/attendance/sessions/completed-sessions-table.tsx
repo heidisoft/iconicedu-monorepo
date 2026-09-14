@@ -70,6 +70,41 @@ function getSessionDurationSeconds(row: AdminSessionCompletionVM) {
   return (end - start) / 1000;
 }
 
+// Every student across the given classrooms, deduplicated by profile —
+// picking one first narrows the classroom list to just their classes, rather
+// than making the admin hunt for the right classroom by name.
+export function listScheduleStudentOptions(schedules: ScheduleOptionRow[]) {
+  const byProfileId = new Map<string, string>();
+  schedules.forEach((schedule) => {
+    (schedule.participants ?? [])
+      .filter((participant) => participant.role === 'child')
+      .forEach((participant) => {
+        byProfileId.set(
+          participant.profile_id,
+          participant.display_name?.trim() || 'Unnamed student',
+        );
+      });
+  });
+  return [...byProfileId.entries()]
+    .map(([profileId, displayName]) => ({ profileId, displayName }))
+    .sort((a, b) => a.displayName.localeCompare(b.displayName));
+}
+
+// Classrooms the given student is a participant on; empty until a student is
+// chosen, rather than falling back to showing every classroom.
+export function filterSchedulesByStudent(
+  schedules: ScheduleOptionRow[],
+  studentProfileId: string,
+) {
+  if (!studentProfileId) return [];
+  return schedules.filter((schedule) =>
+    (schedule.participants ?? []).some(
+      (participant) =>
+        participant.role === 'child' && participant.profile_id === studentProfileId,
+    ),
+  );
+}
+
 // Lets an admin backfill a session that has no completion-check trail at all
 // (e.g. the dispatcher never ran for it) — creates a full 'pending' row per
 // tutor/parent/student on the chosen classroom's own roster, same as a normal
@@ -85,16 +120,31 @@ function CreateSessionDialog({
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [studentProfileId, setStudentProfileId] = React.useState('');
   const [scheduleId, setScheduleId] = React.useState('');
   const formRef = React.useRef<HTMLFormElement | null>(null);
 
   const activeSchedules = schedules.filter((schedule) => schedule.status !== 'cancelled');
+  const students = React.useMemo(
+    () => listScheduleStudentOptions(activeSchedules),
+    [activeSchedules],
+  );
+  const classroomOptions = React.useMemo(
+    () => filterSchedulesByStudent(activeSchedules, studentProfileId),
+    [activeSchedules, studentProfileId],
+  );
+
+  const handleStudentChange = (value: string) => {
+    setStudentProfileId(value);
+    setScheduleId('');
+  };
 
   const handleOpenChange = (next: boolean) => {
     if (isSubmitting) return;
     setOpen(next);
     if (!next) {
       formRef.current?.reset();
+      setStudentProfileId('');
       setScheduleId('');
     }
   };
@@ -182,17 +232,40 @@ function CreateSessionDialog({
           className="space-y-4"
         >
           <div className="space-y-1">
+            <Label htmlFor="create-session-student">Student</Label>
+            <Select
+              value={studentProfileId}
+              onValueChange={handleStudentChange}
+              disabled={isSubmitting}
+            >
+              <SelectTrigger id="create-session-student" className="w-full">
+                <SelectValue placeholder="Select a student" />
+              </SelectTrigger>
+              <SelectContent>
+                {students.map((student) => (
+                  <SelectItem key={student.profileId} value={student.profileId}>
+                    {student.displayName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
             <Label htmlFor="create-session-classroom">Classroom</Label>
             <Select
               value={scheduleId}
               onValueChange={setScheduleId}
-              disabled={isSubmitting}
+              disabled={isSubmitting || !studentProfileId}
             >
               <SelectTrigger id="create-session-classroom" className="w-full">
-                <SelectValue placeholder="Select a classroom" />
+                <SelectValue
+                  placeholder={
+                    studentProfileId ? 'Select a classroom' : 'Choose a student first'
+                  }
+                />
               </SelectTrigger>
               <SelectContent>
-                {activeSchedules.map((schedule) => (
+                {classroomOptions.map((schedule) => (
                   <SelectItem key={schedule.id} value={schedule.id}>
                     {schedule.title}
                   </SelectItem>

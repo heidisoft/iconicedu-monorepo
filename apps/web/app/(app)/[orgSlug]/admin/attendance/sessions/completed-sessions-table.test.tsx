@@ -1,7 +1,12 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { AdminSessionCompletionVM } from '@iconicedu/shared-types';
-import { CompletedSessionsTable } from './completed-sessions-table';
+import type { ScheduleOptionRow } from '@iconicedu/web/lib/api/schedules';
+import {
+  CompletedSessionsTable,
+  filterSchedulesByStudent,
+  listScheduleStudentOptions,
+} from './completed-sessions-table';
 
 const row: AdminSessionCompletionVM = {
   id: 'one',
@@ -141,5 +146,90 @@ describe('CompletedSessionsTable', () => {
   it('spans the six columns for an empty result', () => {
     render(<CompletedSessionsTable rows={[]} schedules={[]} orgId="org" />);
     expect(screen.getByRole('cell')).toHaveAttribute('colspan', '6');
+  });
+});
+
+describe('listScheduleStudentOptions', () => {
+  const schedules: ScheduleOptionRow[] = [
+    {
+      id: 'algebra',
+      title: 'Algebra',
+      status: 'active',
+      timezone: 'UTC',
+      participants: [
+        { profile_id: 'jamie', role: 'child', display_name: 'Jamie Lee' },
+        { profile_id: 'tutor', role: 'educator', display_name: 'Tutor One' },
+      ],
+    },
+    {
+      id: 'reading',
+      title: 'Reading',
+      status: 'active',
+      timezone: 'UTC',
+      participants: [
+        { profile_id: 'alex', role: 'child', display_name: 'Alex Kim' },
+        { profile_id: 'jamie', role: 'child', display_name: 'Jamie Lee' },
+      ],
+    },
+  ];
+
+  it('deduplicates students across classrooms and sorts by name', () => {
+    expect(listScheduleStudentOptions(schedules)).toEqual([
+      { profileId: 'alex', displayName: 'Alex Kim' },
+      { profileId: 'jamie', displayName: 'Jamie Lee' },
+    ]);
+  });
+
+  it('excludes non-child participants and falls back for a blank name', () => {
+    const withBlankName: ScheduleOptionRow[] = [
+      {
+        id: 'algebra',
+        title: 'Algebra',
+        status: 'active',
+        timezone: 'UTC',
+        participants: [
+          { profile_id: 'guardian-1', role: 'guardian', display_name: 'Parent One' },
+          { profile_id: 'child-1', role: 'child', display_name: '  ' },
+        ],
+      },
+    ];
+    expect(listScheduleStudentOptions(withBlankName)).toEqual([
+      { profileId: 'child-1', displayName: 'Unnamed student' },
+    ]);
+  });
+
+  it('handles schedules with no participants', () => {
+    expect(
+      listScheduleStudentOptions([{ ...schedules[0], participants: undefined }]),
+    ).toEqual([]);
+  });
+});
+
+describe('filterSchedulesByStudent', () => {
+  const schedules: ScheduleOptionRow[] = [
+    {
+      id: 'algebra',
+      title: 'Algebra',
+      status: 'active',
+      timezone: 'UTC',
+      participants: [{ profile_id: 'jamie', role: 'child', display_name: 'Jamie Lee' }],
+    },
+    {
+      id: 'reading',
+      title: 'Reading',
+      status: 'active',
+      timezone: 'UTC',
+      participants: [{ profile_id: 'alex', role: 'child', display_name: 'Alex Kim' }],
+    },
+  ];
+
+  it('returns nothing until a student is chosen', () => {
+    expect(filterSchedulesByStudent(schedules, '')).toEqual([]);
+  });
+
+  it('narrows to only the classrooms the chosen student is on', () => {
+    expect(filterSchedulesByStudent(schedules, 'jamie').map((s) => s.id)).toEqual([
+      'algebra',
+    ]);
   });
 });
