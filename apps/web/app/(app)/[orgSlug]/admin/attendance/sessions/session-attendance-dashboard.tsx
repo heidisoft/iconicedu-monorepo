@@ -74,6 +74,15 @@ function Metric({
   );
 }
 
+function TrendStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div>
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="mt-1 text-2xl font-semibold leading-none tracking-tight">{value}</p>
+    </div>
+  );
+}
+
 // Always plots the last three months, independent of every filter on the page
 // (month, classroom, participant, method, search) — `trendRowsPromise` is a
 // dedicated fetch the server never scopes to the selected month.
@@ -95,26 +104,41 @@ function TrendSection({
     () => buildMonthlyCompletionTrend(completedRows),
     [completedRows],
   );
+  // These summary counts cover the same unscoped 3-month window as the chart —
+  // independent of the month/participant/method filters applied elsewhere on
+  // the page, unlike the top metric tiles.
+  const summary = React.useMemo(() => summarizeCompletions(trendRows), [trendRows]);
+  const totalConflicts = React.useMemo(
+    () => trendRows.filter((row) => row.completionMethod === 'disputed').length,
+    [trendRows],
+  );
 
   return (
     <div className="overflow-hidden rounded-xl border bg-card">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b px-6 py-4">
         <div>
-          <h2 className="text-sm font-semibold">Monthly completed lessons</h2>
+          <h2 className="text-sm font-semibold">Monthly Session Overview</h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Completed sessions over the last 3 months — independent of the filters below
+            Sessions over the last 3 months — independent of the filters below
           </p>
         </div>
         <span className="text-xs text-muted-foreground">
           {points.length} active {points.length === 1 ? 'month' : 'months'}
         </span>
       </div>
+      <div className="grid grid-cols-2 gap-4 border-b px-6 py-4 sm:grid-cols-5">
+        <TrendStat label="Total sessions" value={summary.completedSessions} />
+        <TrendStat label="Confirmed by teacher" value={summary.teacherConfirmed} />
+        <TrendStat label="Confirmed by parent" value={summary.parentConfirmed} />
+        <TrendStat label="Total confirmed" value={completedRows.length} />
+        <TrendStat label="Total conflicts" value={totalConflicts} />
+      </div>
       {points.length === 0 ? (
         <div className="flex h-72 items-center justify-center text-sm text-muted-foreground">
           No completed sessions in the last 3 months.
         </div>
       ) : (
-        <div className="p-6" role="img" aria-label="Monthly completed sessions">
+        <div className="p-6" role="img" aria-label="Monthly session overview">
           <ChartContainer config={TREND_CHART_CONFIG} className="aspect-auto h-72 w-full">
             <AreaChart data={points} margin={{ left: 12, right: 12 }}>
               <defs>
