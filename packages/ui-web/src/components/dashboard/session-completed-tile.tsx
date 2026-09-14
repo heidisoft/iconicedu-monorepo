@@ -5,6 +5,7 @@ import { Clock3, X } from 'lucide-react';
 import { Badge } from '@iconicedu/ui-web/ui/badge';
 import { ActivityCompletionCheck } from '@iconicedu/ui-web/components/notification/activity-completion-check';
 import {
+  formatScheduleDisplayValue,
   formatScheduleDisplayTimeWithZone,
   resolveScheduleDisplayTimeZone,
 } from '@iconicedu/ui-web/lib/schedule-display-timezone';
@@ -47,12 +48,14 @@ function toActivity(completion: SessionCompletionVM): ActivityFeedLeafItemVM {
   };
 }
 
+// Routed through the shared schedule-display-timezone resolver (rather than
+// bare `toLocaleDateString`) so the day chip always agrees with `formatTime`'s
+// timezone below.
 function formatDateChip(iso: string) {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return { dayName: '', dayNum: '' };
+  const timezone = resolveScheduleDisplayTimeZone();
   return {
-    dayName: date.toLocaleDateString(undefined, { weekday: 'short' }),
-    dayNum: date.toLocaleDateString(undefined, { day: 'numeric' }),
+    dayName: formatScheduleDisplayValue(iso, timezone, { weekday: 'short' }) ?? '',
+    dayNum: formatScheduleDisplayValue(iso, timezone, { day: 'numeric' }) ?? '',
   };
 }
 
@@ -88,8 +91,11 @@ export function SessionCompletedTile({
   onRatingSubmit,
   onDismiss,
 }: SessionCompletedTileProps) {
-  const { dayName, dayNum } = formatDateChip(completion.sessionEndAt);
-  const time = formatTime(completion.sessionEndAt);
+  // Tile shows when the session started (matches SessionCard elsewhere), not
+  // when it ended — `sessionEndAt` here would misdate sessions that cross
+  // midnight local time.
+  const { dayName, dayNum } = formatDateChip(completion.occurrenceKey);
+  const time = formatTime(completion.occurrenceKey);
   const title = completion.sessionTitle?.trim() || 'Session';
   // The close (×) control only appears once the session is confirmed — either it
   // arrived that way, or the viewer just confirmed it in this session.

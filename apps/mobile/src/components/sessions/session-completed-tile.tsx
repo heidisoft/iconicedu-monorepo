@@ -104,8 +104,11 @@ export function SessionCompletedTile({
   onRatingSubmit,
   onDismiss,
 }: Props) {
-  const { dayName, dayNum } = formatDateChip(completion.sessionEndAt);
-  const time = formatTime(completion.sessionEndAt);
+  // Tile shows when the session started (matches SessionCard elsewhere), not
+  // when it ended — `sessionEndAt` here would misdate sessions that cross
+  // midnight local time.
+  const { dayName, dayNum } = formatDateChip(completion.occurrenceKey);
+  const time = formatTime(completion.occurrenceKey);
   const title = completion.sessionTitle?.trim() || 'Session';
   const showStudentName = Boolean(completion.studentName);
   // The close (×) control only appears once the session is confirmed — either it
