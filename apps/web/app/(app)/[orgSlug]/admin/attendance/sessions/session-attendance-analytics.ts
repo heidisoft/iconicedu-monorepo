@@ -160,34 +160,70 @@ export function summarizeCompletions(rows: AdminSessionCompletionVM[]) {
   };
 }
 
-export function buildMonthlyCompletionTrend(rows: AdminSessionCompletionVM[]) {
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** UTC Monday-start of the week containing `value`, or null if unparseable. */
+function getWeekStartUtc(value: string | Date): Date | null {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  const utcMidnightMs = Date.UTC(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate(),
+  );
+  const dayOfWeek = new Date(utcMidnightMs).getUTCDay(); // 0 (Sun) .. 6 (Sat)
+  const daysSinceMonday = (dayOfWeek + 6) % 7;
+  return new Date(utcMidnightMs - daysSinceMonday * 24 * 60 * 60 * 1000);
+}
+
+/**
+ * Weekly buckets (UTC, Monday-start) of session-date activity covering the
+ * rolling 3-month window, oldest first and zero-filled — every week in range
+ * appears even with no activity, so the chart's x-axis stays continuous. Each
+ * row is grouped by the week containing its `sessionEndAt`; rows outside the
+ * `weekCount`-week window (e.g. a stale fetch) are ignored rather than
+ * extending it.
+ */
+export function buildWeeklySessionTrend(
+  rows: AdminSessionCompletionVM[],
+  reference: Date = new Date(),
+  weekCount = 13,
+) {
+  const currentWeekStart = getWeekStartUtc(reference)!;
+  const order: string[] = [];
   const buckets = new Map<
     string,
-    { sessions: number; teacher: number; parent: number }
+    { sessions: number; confirmed: number; conflicts: number }
   >();
+  for (let i = weekCount - 1; i >= 0; i -= 1) {
+    const key = new Date(currentWeekStart.getTime() - i * WEEK_MS)
+      .toISOString()
+      .slice(0, 10);
+    order.push(key);
+    buckets.set(key, { sessions: 0, confirmed: 0, conflicts: 0 });
+  }
+
   rows.forEach((row) => {
-    const key = getCompletionMonthKey(row.sessionEndAt);
-    if (!key) return;
-    const bucket = buckets.get(key) ?? { sessions: 0, teacher: 0, parent: 0 };
+    const weekStart = getWeekStartUtc(row.sessionEndAt);
+    if (!weekStart) return;
+    const bucket = buckets.get(weekStart.toISOString().slice(0, 10));
+    if (!bucket) return;
     bucket.sessions += 1;
-    if (
-      row.confirmedBy.some(
-        (actor) => actor.role === 'educator' && actor.status === 'confirmed',
-      )
-    )
-      bucket.teacher += 1;
-    if (
-      row.confirmedBy.some(
-        (actor) => actor.role === 'guardian' && actor.status === 'confirmed',
-      )
-    )
-      bucket.parent += 1;
-    buckets.set(key, bucket);
+    if (row.completionMethod !== 'pending' && row.completionMethod !== 'disputed') {
+      bucket.confirmed += 1;
+    }
+    if (row.completionMethod === 'disputed') bucket.conflicts += 1;
   });
-  return [...buckets.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .slice(-12)
-    .map(([key, values]) => ({ key, label: formatCompletionMonth(key), ...values }));
+
+  return order.map((key) => ({
+    key,
+    label: new Intl.DateTimeFormat('en-US', {
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'UTC',
+    }).format(new Date(key)),
+    ...buckets.get(key)!,
+  }));
 }
 
 /** Compatibility fallback for a web deployment preceding the API update. */

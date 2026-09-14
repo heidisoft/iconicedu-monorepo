@@ -14,13 +14,8 @@ export function TrendSkeleton() {
         <Skeleton className="h-4 w-44" />
         <Skeleton className="mt-2 h-3 w-64" />
       </div>
-      <div className="grid grid-cols-2 gap-4 px-6 py-4 sm:grid-cols-5">
-        {Array.from({ length: 5 }).map((_, index) => (
-          <div key={index} className="space-y-1.5">
-            <Skeleton className="h-3 w-20" />
-            <Skeleton className="h-6 w-10" />
-          </div>
-        ))}
+      <div className="p-6">
+        <Skeleton className="h-72 w-full rounded-lg" />
       </div>
     </div>
   );
