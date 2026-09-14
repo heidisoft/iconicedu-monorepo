@@ -3,19 +3,10 @@
 import * as React from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 import type {
   AdminOrgProfileOptionVM,
   AdminSessionCompletionVM,
 } from '@iconicedu/shared-types';
-import {
-  type ChartConfig,
-  ChartContainer,
-  ChartLegend,
-  ChartLegendContent,
-  ChartTooltip,
-  ChartTooltipContent,
-} from '@iconicedu/ui-web';
 import {
   AdminFilterBar,
   FilterDropdown,
@@ -31,7 +22,6 @@ import {
   ALL_COMPLETION_MONTHS,
   buildConfirmerBreakdown,
   buildMonthFilterHref,
-  buildMonthlyCompletionTrend,
   filterCompletions,
   formatCompletionMonth,
   summarizeCompletions,
@@ -47,12 +37,6 @@ const DEFAULT_FILTERS = {
 };
 
 type Filters = typeof DEFAULT_FILTERS;
-
-const TREND_CHART_CONFIG = {
-  sessions: { label: 'Sessions', color: 'var(--chart-1)' },
-  teacher: { label: 'Teacher confirmed', color: 'var(--chart-2)' },
-  parent: { label: 'Parent confirmed', color: 'var(--chart-5)' },
-} satisfies ChartConfig;
 
 function Metric({
   label,
@@ -83,9 +67,9 @@ function TrendStat({ label, value }: { label: string; value: number }) {
   );
 }
 
-// Always plots the last three months, independent of every filter on the page
-// (month, classroom, participant, method, search) — `trendRowsPromise` is a
-// dedicated fetch the server never scopes to the selected month.
+// Always summarizes the last three months, independent of every filter on the
+// page (month, classroom, participant, method, search) — `trendRowsPromise` is
+// a dedicated fetch the server never scopes to the selected month.
 function TrendSection({
   trendRowsPromise,
 }: {
@@ -100,13 +84,8 @@ function TrendSection({
       ),
     [trendRows],
   );
-  const points = React.useMemo(
-    () => buildMonthlyCompletionTrend(completedRows),
-    [completedRows],
-  );
-  // These summary counts cover the same unscoped 3-month window as the chart —
-  // independent of the month/participant/method filters applied elsewhere on
-  // the page, unlike the top metric tiles.
+  // These summary counts cover the same unscoped 3-month window — independent
+  // of the month/participant/method filters applied elsewhere on the page.
   const summary = React.useMemo(() => summarizeCompletions(trendRows), [trendRows]);
   const totalConflicts = React.useMemo(
     () => trendRows.filter((row) => row.completionMethod === 'disputed').length,
@@ -115,93 +94,19 @@ function TrendSection({
 
   return (
     <div className="overflow-hidden rounded-xl border bg-card">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b px-6 py-4">
-        <div>
-          <h2 className="text-sm font-semibold">Monthly Session Overview</h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Sessions over the last 3 months — independent of the filters below
-          </p>
-        </div>
-        <span className="text-xs text-muted-foreground">
-          {points.length} active {points.length === 1 ? 'month' : 'months'}
-        </span>
+      <div className="border-b px-6 py-4">
+        <h2 className="text-sm font-semibold">Monthly Session Overview</h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Sessions over the last 3 months — independent of the filters below
+        </p>
       </div>
-      <div className="grid grid-cols-2 gap-4 border-b px-6 py-4 sm:grid-cols-5">
+      <div className="grid grid-cols-2 gap-4 px-6 py-4 sm:grid-cols-5">
         <TrendStat label="Total sessions" value={summary.completedSessions} />
         <TrendStat label="Confirmed by teacher" value={summary.teacherConfirmed} />
         <TrendStat label="Confirmed by parent" value={summary.parentConfirmed} />
         <TrendStat label="Total confirmed" value={completedRows.length} />
         <TrendStat label="Total conflicts" value={totalConflicts} />
       </div>
-      {points.length === 0 ? (
-        <div className="flex h-72 items-center justify-center text-sm text-muted-foreground">
-          No completed sessions in the last 3 months.
-        </div>
-      ) : (
-        <div className="p-6" role="img" aria-label="Monthly session overview">
-          <ChartContainer config={TREND_CHART_CONFIG} className="aspect-auto h-72 w-full">
-            <AreaChart data={points} margin={{ left: 12, right: 12 }}>
-              <defs>
-                <linearGradient id="fillSessions" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="var(--color-sessions)" stopOpacity={0.4} />
-                  <stop
-                    offset="95%"
-                    stopColor="var(--color-sessions)"
-                    stopOpacity={0.05}
-                  />
-                </linearGradient>
-                <linearGradient id="fillTeacher" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="var(--color-teacher)" stopOpacity={0.5} />
-                  <stop
-                    offset="95%"
-                    stopColor="var(--color-teacher)"
-                    stopOpacity={0.05}
-                  />
-                </linearGradient>
-                <linearGradient id="fillParent" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="var(--color-parent)" stopOpacity={0.5} />
-                  <stop offset="95%" stopColor="var(--color-parent)" stopOpacity={0.05} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid vertical={false} />
-              <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
-              <YAxis
-                allowDecimals={false}
-                tickLine={false}
-                axisLine={false}
-                tickMargin={8}
-                width={28}
-              />
-              <ChartTooltip
-                cursor={false}
-                content={<ChartTooltipContent indicator="dot" />}
-              />
-              <Area
-                dataKey="sessions"
-                type="monotone"
-                fill="url(#fillSessions)"
-                stroke="var(--color-sessions)"
-                strokeWidth={2}
-              />
-              <Area
-                dataKey="teacher"
-                type="monotone"
-                fill="url(#fillTeacher)"
-                stroke="var(--color-teacher)"
-                strokeWidth={2}
-              />
-              <Area
-                dataKey="parent"
-                type="monotone"
-                fill="url(#fillParent)"
-                stroke="var(--color-parent)"
-                strokeWidth={2}
-              />
-              <ChartLegend content={<ChartLegendContent />} />
-            </AreaChart>
-          </ChartContainer>
-        </div>
-      )}
     </div>
   );
 }
