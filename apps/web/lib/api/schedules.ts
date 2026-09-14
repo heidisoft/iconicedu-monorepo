@@ -4,11 +4,18 @@ import { createApiClient } from '@iconicedu/web/lib/api/http-client';
 // GET /schedules returns the raw class_schedules row shape (snake_case, plus
 // nested participants/recurrence) — this narrows to just what a classroom
 // picker needs rather than importing the full row type.
+export type ScheduleParticipantOption = {
+  profile_id: string;
+  role: string;
+  display_name: string | null;
+};
+
 export type ScheduleOptionRow = {
   id: string;
   title: string;
   status: string;
   timezone: string | null;
+  participants?: ScheduleParticipantOption[];
 };
 
 export function listSchedules(
