@@ -51,8 +51,10 @@ import {
   toast,
 } from '@iconicedu/ui-web';
 import {
+  formatAttendanceDate,
   formatAttendanceDateTime,
   formatAttendanceDuration,
+  formatAttendanceTimeOfDay,
 } from '@iconicedu/web/app/(app)/[orgSlug]/admin/attendance/sessions/live-session-attendance.utils';
 import type { ScheduleOptionRow } from '@iconicedu/web/lib/api/schedules';
 
@@ -462,8 +464,7 @@ export function CompletedSessionsTable({
         <TableHeader>
           <TableRow>
             <TableHead>Session</TableHead>
-            <TableHead>Ended</TableHead>
-            <TableHead>Duration</TableHead>
+            <TableHead>Session time</TableHead>
             <TableHead>Students</TableHead>
             <TableHead>Confirmed by</TableHead>
             <TableHead>Actions</TableHead>
@@ -472,7 +473,7 @@ export function CompletedSessionsTable({
         <TableBody>
           {rows.length === 0 && (
             <TableRow>
-              <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+              <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
                 No completed sessions match the selected filters.
               </TableCell>
             </TableRow>
@@ -490,9 +491,13 @@ export function CompletedSessionsTable({
                 <TableCell className="font-medium">
                   {row.sessionTitle ?? 'Scheduled session'}
                 </TableCell>
-                <TableCell>{formatAttendanceDateTime(row.sessionEndAt)}</TableCell>
                 <TableCell>
-                  {formatAttendanceDuration(getSessionDurationSeconds(row))}
+                  <p>{formatAttendanceDate(row.occurrenceKey)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {formatAttendanceTimeOfDay(row.occurrenceKey)} –{' '}
+                    {formatAttendanceTimeOfDay(row.sessionEndAt)} (
+                    {formatAttendanceDuration(getSessionDurationSeconds(row))})
+                  </p>
                 </TableCell>
                 <TableCell>{row.studentNames.join(', ') || '—'}</TableCell>
                 <TableCell>

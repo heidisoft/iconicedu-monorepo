@@ -14,6 +14,29 @@ export function formatAttendanceDateTime(value: string | null | undefined) {
   }).format(new Date(value));
 }
 
+export function formatAttendanceDate(value: string | null | undefined) {
+  if (!value) {
+    return '—';
+  }
+
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(new Date(value));
+}
+
+export function formatAttendanceTimeOfDay(value: string | null | undefined) {
+  if (!value) {
+    return '—';
+  }
+
+  return new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(new Date(value));
+}
+
 export function formatAttendanceDuration(seconds: number | null | undefined) {
   if (typeof seconds !== 'number' || !Number.isFinite(seconds)) {
     return '—';
