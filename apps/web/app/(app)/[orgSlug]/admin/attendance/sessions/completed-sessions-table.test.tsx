@@ -56,10 +56,11 @@ describe('CompletedSessionsTable', () => {
     expect(screen.getAllByRole('columnheader').map((cell) => cell.textContent)).toEqual([
       'Session',
       'Session time',
-      'Students',
       'Confirmed by',
       'Actions',
     ]);
+    // Session combines the title with its student names underneath.
+    expect(screen.getByText('Student')).toBeInTheDocument();
     // Session time combines the date with a start–end (duration) range —
     // the times themselves render in the local timezone, so only assert the
     // timezone-independent duration.
@@ -145,9 +146,9 @@ describe('CompletedSessionsTable', () => {
     expect(screen.getByRole('button', { name: 'Confirm' })).toBeInTheDocument();
   });
 
-  it('spans the five columns for an empty result', () => {
+  it('spans the four columns for an empty result', () => {
     render(<CompletedSessionsTable rows={[]} schedules={[]} orgId="org" />);
-    expect(screen.getByRole('cell')).toHaveAttribute('colspan', '5');
+    expect(screen.getByRole('cell')).toHaveAttribute('colspan', '4');
   });
 });
 

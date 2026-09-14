@@ -465,7 +465,6 @@ export function CompletedSessionsTable({
           <TableRow>
             <TableHead>Session</TableHead>
             <TableHead>Session time</TableHead>
-            <TableHead>Students</TableHead>
             <TableHead>Confirmed by</TableHead>
             <TableHead>Actions</TableHead>
           </TableRow>
@@ -473,7 +472,7 @@ export function CompletedSessionsTable({
         <TableBody>
           {rows.length === 0 && (
             <TableRow>
-              <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
+              <TableCell colSpan={4} className="h-32 text-center text-muted-foreground">
                 No completed sessions match the selected filters.
               </TableCell>
             </TableRow>
@@ -489,7 +488,10 @@ export function CompletedSessionsTable({
             return (
               <TableRow key={row.id}>
                 <TableCell className="font-medium">
-                  {row.sessionTitle ?? 'Scheduled session'}
+                  <p>{row.sessionTitle ?? 'Scheduled session'}</p>
+                  <p className="text-xs font-normal text-muted-foreground">
+                    {row.studentNames.join(', ') || '—'}
+                  </p>
                 </TableCell>
                 <TableCell>
                   <p>{formatAttendanceDate(row.occurrenceKey)}</p>
@@ -499,7 +501,6 @@ export function CompletedSessionsTable({
                     {formatAttendanceDuration(getSessionDurationSeconds(row))})
                   </p>
                 </TableCell>
-                <TableCell>{row.studentNames.join(', ') || '—'}</TableCell>
                 <TableCell>
                   <ul className="space-y-2">
                     {participants.map((person) => {
