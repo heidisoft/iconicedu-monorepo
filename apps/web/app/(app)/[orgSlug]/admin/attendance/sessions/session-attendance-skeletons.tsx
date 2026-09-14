@@ -1,8 +1,8 @@
 import { Skeleton } from '@iconicedu/ui-web';
 
-// One fallback per independently-streamed section of the dashboard (trend chart,
-// metrics/filters/breakdowns, and the session table), so a slow query for one
-// section never blocks the others from painting.
+// One fallback per independently-streamed section of the dashboard (monthly
+// session overview, metrics/filters/breakdowns, and the session table), so a
+// slow query for one section never blocks the others from painting.
 
 export function TrendSkeleton() {
   return (
@@ -10,15 +10,17 @@ export function TrendSkeleton() {
       className="overflow-hidden rounded-xl border bg-card"
       data-testid="attendance-trend-skeleton"
     >
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b px-6 py-4">
-        <div className="space-y-2">
-          <Skeleton className="h-4 w-44" />
-          <Skeleton className="h-3 w-64" />
-        </div>
-        <Skeleton className="h-3 w-20" />
+      <div className="border-b px-6 py-4">
+        <Skeleton className="h-4 w-44" />
+        <Skeleton className="mt-2 h-3 w-64" />
       </div>
-      <div className="p-6">
-        <Skeleton className="h-72 w-full rounded-lg" />
+      <div className="grid grid-cols-2 gap-4 px-6 py-4 sm:grid-cols-5">
+        {Array.from({ length: 5 }).map((_, index) => (
+          <div key={index} className="space-y-1.5">
+            <Skeleton className="h-3 w-20" />
+            <Skeleton className="h-6 w-10" />
+          </div>
+        ))}
       </div>
     </div>
   );
