@@ -55,13 +55,15 @@ describe('CompletedSessionsTable', () => {
     render(<CompletedSessionsTable rows={[row]} schedules={[]} orgId="org" />);
     expect(screen.getAllByRole('columnheader').map((cell) => cell.textContent)).toEqual([
       'Session',
-      'Ended',
-      'Duration',
+      'Session time',
       'Students',
       'Confirmed by',
       'Actions',
     ]);
-    expect(screen.getByText('1h 0m')).toBeInTheDocument();
+    // Session time combines the date with a start–end (duration) range —
+    // the times themselves render in the local timezone, so only assert the
+    // timezone-independent duration.
+    expect(screen.getByText(/\(1h 0m\)/)).toBeInTheDocument();
     const people = screen.getAllByRole('listitem');
     expect(within(people[0]).getByText('(Tutor) · Confirmed')).toBeInTheDocument();
     expect(within(people[0]).getByText('Rating: 5.0 / 5')).toBeInTheDocument();
@@ -143,9 +145,9 @@ describe('CompletedSessionsTable', () => {
     expect(screen.getByRole('button', { name: 'Confirm' })).toBeInTheDocument();
   });
 
-  it('spans the six columns for an empty result', () => {
+  it('spans the five columns for an empty result', () => {
     render(<CompletedSessionsTable rows={[]} schedules={[]} orgId="org" />);
-    expect(screen.getByRole('cell')).toHaveAttribute('colspan', '6');
+    expect(screen.getByRole('cell')).toHaveAttribute('colspan', '5');
   });
 });
 
