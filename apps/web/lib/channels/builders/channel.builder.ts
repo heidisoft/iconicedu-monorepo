@@ -255,7 +255,7 @@ async function buildChannelFromRow(
   });
 }
 
-async function loadParticipantsByChannel(
+export async function loadParticipantsByChannel(
   supabase: SupabaseClient,
   orgId: string,
   membersByChannel: Map<string, ChannelMemberRow[]>,

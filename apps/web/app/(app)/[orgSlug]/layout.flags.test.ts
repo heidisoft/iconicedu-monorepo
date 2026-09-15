@@ -7,6 +7,7 @@ const {
   cookiesMock,
   buildOrgBySlugMock,
   getOrCreateAccountMock,
+  getAccountByIdMock,
   buildSidebarBaseDataMock,
   loadSidebarContextMock,
   resolveEffectiveProfileForAccountInOrgMock,
@@ -25,6 +26,7 @@ const {
   cookiesMock: vi.fn(),
   buildOrgBySlugMock: vi.fn(),
   getOrCreateAccountMock: vi.fn(),
+  getAccountByIdMock: vi.fn(),
   buildSidebarBaseDataMock: vi.fn(),
   loadSidebarContextMock: vi.fn(),
   resolveEffectiveProfileForAccountInOrgMock: vi.fn(),
@@ -65,6 +67,10 @@ vi.mock('@iconicedu/web/lib/org/builders/org.builder', () => ({
 
 vi.mock('@iconicedu/web/lib/accounts/getOrCreateAccount', () => ({
   getOrCreateAccount: (...args: unknown[]) => getOrCreateAccountMock(...args),
+}));
+
+vi.mock('@iconicedu/web/lib/accounts/queries/accounts.query', () => ({
+  getAccountById: (...args: unknown[]) => getAccountByIdMock(...args),
 }));
 
 vi.mock('@iconicedu/web/lib/sidebar/buildSidebarBaseData', () => ({
@@ -126,6 +132,7 @@ describe('org layout persona flags', () => {
     cookiesMock.mockReset();
     buildOrgBySlugMock.mockReset();
     getOrCreateAccountMock.mockReset();
+    getAccountByIdMock.mockReset();
     buildSidebarBaseDataMock.mockReset();
     loadSidebarContextMock.mockReset();
     resolveEffectiveProfileForAccountInOrgMock.mockReset();
@@ -149,8 +156,17 @@ describe('org layout persona flags', () => {
         id: 'account-1',
         org_id: 'org-1',
         role_status: 'active',
+        auth_user_id: 'auth-1',
       },
       invite: null,
+    });
+    getAccountByIdMock.mockResolvedValue({
+      data: {
+        id: 'account-1',
+        org_id: 'org-1',
+        role_status: 'active',
+        auth_user_id: 'auth-1',
+      },
     });
     shouldRedirectToAuthResumeMock.mockReturnValue(false);
     resolveEffectiveProfileForAccountInOrgMock.mockResolvedValue({

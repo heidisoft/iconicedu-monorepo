@@ -100,3 +100,21 @@ export async function getChannelReadStatesByAccountId(
     .is('thread_id', null)
     .returns<ChannelReadStateRow[]>();
 }
+
+export async function getChannelReadStatesByAccountIds(
+  supabase: SupabaseClient,
+  orgId: string,
+  accountIds: string[],
+) {
+  if (!accountIds.length) {
+    return { data: [] as ChannelReadStateRow[] };
+  }
+
+  return supabase
+    .from('channel_read_state')
+    .select(CHANNEL_READ_STATE_SELECT)
+    .eq('org_id', orgId)
+    .in('account_id', accountIds)
+    .is('thread_id', null)
+    .returns<ChannelReadStateRow[]>();
+}

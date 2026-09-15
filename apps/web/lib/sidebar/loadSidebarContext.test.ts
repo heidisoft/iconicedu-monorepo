@@ -4,7 +4,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { loadSidebarContext } from '@iconicedu/web/lib/sidebar/loadSidebarContext';
 
 const buildSidebarUser = vi.fn();
-const buildDirectMessageChannelsWithMessages = vi.fn();
+const buildChannelsSidebarProjection = vi.fn();
+const getChannelReadStatesByAccountIds = vi.fn();
+const getThreadReadStatesByAccountIds = vi.fn();
 const getAccountsByAuthUserId = vi.fn();
 const getOrgsByIds = vi.fn();
 
@@ -12,9 +14,19 @@ vi.mock('@iconicedu/web/lib/sidebar/user/buildSidebarUser', () => ({
   buildSidebarUser: (...args: unknown[]) => buildSidebarUser(...args),
 }));
 
-vi.mock('@iconicedu/web/lib/channels/builders/channel.builder', () => ({
-  buildDirectMessageChannelsWithMessages: (...args: unknown[]) =>
-    buildDirectMessageChannelsWithMessages(...args),
+vi.mock('@iconicedu/web/lib/channels/builders/channel-sidebar.builder', () => ({
+  buildChannelsSidebarProjection: (...args: unknown[]) =>
+    buildChannelsSidebarProjection(...args),
+}));
+
+vi.mock('@iconicedu/web/lib/channels/queries/channels.query', () => ({
+  getChannelReadStatesByAccountIds: (...args: unknown[]) =>
+    getChannelReadStatesByAccountIds(...args),
+}));
+
+vi.mock('@iconicedu/web/lib/messages/queries/messages.query', () => ({
+  getThreadReadStatesByAccountIds: (...args: unknown[]) =>
+    getThreadReadStatesByAccountIds(...args),
 }));
 
 vi.mock('@iconicedu/web/lib/onboarding/determineOnboardingStep', () => ({
@@ -46,6 +58,7 @@ vi.mock('@iconicedu/web/lib/org/queries/org.query', () => ({
 const makeChannel = (id: string, participantIds: string[]) =>
   ({
     ids: { id, orgId: 'org-1' },
+    basics: { kind: 'dm' },
     collections: {
       participants: participantIds.map((participantId) => ({
         ids: { id: participantId, orgId: 'org-1', accountId: `account-${participantId}` },
@@ -54,22 +67,27 @@ const makeChannel = (id: string, participantIds: string[]) =>
           avatar: { url: null, source: 'seed' },
         },
       })),
+      readState: { channelId: id, unreadCount: 0 },
     },
   }) as any;
 
 describe('loadSidebarContext', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    buildDirectMessageChannelsWithMessages.mockReset();
+    buildChannelsSidebarProjection.mockReset();
+    getChannelReadStatesByAccountIds.mockReset();
+    getThreadReadStatesByAccountIds.mockReset();
     buildSidebarUser.mockReset();
     getAccountsByAuthUserId.mockReset();
     getOrgsByIds.mockReset();
     getAccountsByAuthUserId.mockResolvedValue({ data: [] });
     getOrgsByIds.mockResolvedValue({ data: [] });
+    buildChannelsSidebarProjection.mockResolvedValue([]);
+    getChannelReadStatesByAccountIds.mockResolvedValue({ data: [] });
+    getThreadReadStatesByAccountIds.mockResolvedValue({ data: [] });
   });
 
   it('filters direct messages for guardians to only include their channels', async () => {
-    buildDirectMessageChannelsWithMessages.mockResolvedValueOnce([]);
     buildSidebarUser.mockResolvedValueOnce({
       accountVM: { ids: { id: 'account-1', orgId: 'org-1' } },
       profileVM: {
@@ -112,9 +130,12 @@ describe('loadSidebarContext', () => {
   });
 
   it('includes child direct messages for guardians', async () => {
-    buildDirectMessageChannelsWithMessages.mockResolvedValueOnce([
-      makeChannel('dm-child', ['profile-child', 'profile-other']),
+    buildChannelsSidebarProjection.mockResolvedValueOnce([
+      makeChannel('dm-child', ['child', 'other']),
     ]);
+    getChannelReadStatesByAccountIds.mockResolvedValueOnce({
+      data: [{ channel_id: 'dm-child', account_id: 'account-child', unread_count: 3 }],
+    });
     buildSidebarUser.mockResolvedValueOnce({
       accountVM: { ids: { id: 'account-1', orgId: 'org-1' } },
       profileVM: {
@@ -154,14 +175,22 @@ describe('loadSidebarContext', () => {
       baseSidebarData,
     });
 
-    expect(buildDirectMessageChannelsWithMessages).toHaveBeenCalledWith(
-      supabase,
-      'org-1',
-      { accountId: 'account-child' },
-    );
+    expect(buildChannelsSidebarProjection).toHaveBeenCalledWith(supabase, 'org-1', {
+      accountId: 'account-1',
+    });
+    expect(getChannelReadStatesByAccountIds).toHaveBeenCalledWith(supabase, 'org-1', [
+      'account-child',
+    ]);
+    expect(getThreadReadStatesByAccountIds).toHaveBeenCalledWith(supabase, 'org-1', [
+      'account-child',
+    ]);
     expect(
       result.sidebarData.collections.directMessages.map((channel: any) => channel.ids.id),
     ).toEqual(expect.arrayContaining(['dm-guardian', 'dm-child']));
+    const childChannel = result.sidebarData.collections.directMessages.find(
+      (channel: any) => channel.ids.id === 'dm-child',
+    );
+    expect(childChannel.collections.readState.unreadCount).toBe(3);
   });
 
   it('adds organization switcher items from all auth-user accounts', async () => {
