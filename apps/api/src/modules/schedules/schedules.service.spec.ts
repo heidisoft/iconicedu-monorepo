@@ -150,6 +150,21 @@ describe('SchedulesService authorization', () => {
             return query;
           }),
           maybeSingle: jest.fn(async () => {
+            if (table === 'class_schedules') {
+              return {
+                data: {
+                  id: 'schedule-1',
+                  title: 'Algebra I',
+                  start_at: '2026-03-21T14:00:00.000Z',
+                  end_at: '2026-03-21T15:00:00.000Z',
+                  timezone: 'America/New_York',
+                  source_learning_space_id: 'space-1',
+                  source_channel_id: 'channel-1',
+                  participants: [],
+                },
+                error: null,
+              };
+            }
             if (table === 'class_schedule_recurrence') {
               return { data: { id: 'recurrence-1' }, error: null };
             }
@@ -1198,6 +1213,224 @@ describe('SchedulesService authorization', () => {
     );
   });
 
+  it('rejects rescheduling a session in an archived classroom', async () => {
+    createSupabaseSessionClientMock.mockReturnValue({
+      auth: {
+        getUser: jest.fn(async () => ({
+          data: { user: { id: 'auth-user-1' } },
+          error: null,
+        })),
+      },
+    } as never);
+
+    const mainClient = {
+      from: jest.fn((table: string) => {
+        const query = {
+          select: jest.fn(() => query),
+          eq: jest.fn(() => query),
+          is: jest.fn(() => query),
+          maybeSingle: jest.fn(async () => {
+            if (table === 'class_schedules') {
+              return {
+                data: {
+                  id: 'schedule-1',
+                  title: 'Algebra I',
+                  start_at: '2026-03-21T14:00:00.000Z',
+                  end_at: '2026-03-21T15:00:00.000Z',
+                  timezone: 'America/New_York',
+                  source_learning_space_id: 'space-1',
+                  source_channel_id: 'channel-1',
+                  participants: [],
+                },
+                error: null,
+              };
+            }
+            if (table === 'learning_spaces') {
+              return { data: { status: 'archived', archived_at: null }, error: null };
+            }
+            return { data: null, error: null };
+          }),
+        };
+        return query;
+      }),
+    };
+    createSupabaseServiceClientMock
+      .mockReturnValueOnce(
+        makeSingleResult({
+          id: 'account-1',
+          active_profile_id: 'profile-staff',
+        }) as never,
+      )
+      .mockReturnValueOnce(makeSingleResult([{ role_key: 'staff' }]) as never)
+      .mockReturnValueOnce(mainClient as never);
+
+    const service = new SchedulesService();
+
+    await expect(
+      service.rescheduleScheduleSession('token-1', {
+        orgId: 'org-1',
+        scheduleId: 'schedule-1',
+        occurrenceKey: null,
+        startAt: '2026-03-22T15:30:00.000Z',
+        endAt: '2026-03-22T16:45:00.000Z',
+        timezone: 'America/New_York',
+        reason: null,
+        suppressNotifications: false,
+      }),
+    ).rejects.toThrow('Archived classrooms cannot be changed.');
+  });
+
+  describe('getSessionEditContext', () => {
+    const scheduleRow = {
+      id: 'schedule-1',
+      title: 'Algebra I',
+      start_at: '2026-03-21T14:00:00.000Z',
+      end_at: '2026-03-21T15:00:00.000Z',
+      timezone: 'America/New_York',
+      source_learning_space_id: 'space-1',
+      source_channel_id: 'channel-1',
+      participants: [],
+    };
+
+    function mockActorAndContextClient(learningSpaceRow: Record<string, unknown> | null) {
+      createSupabaseSessionClientMock.mockReturnValue({
+        auth: {
+          getUser: jest.fn(async () => ({
+            data: { user: { id: 'auth-user-1' } },
+            error: null,
+          })),
+        },
+      } as never);
+
+      const mainClient = {
+        from: jest.fn((table: string) => {
+          const query = {
+            select: jest.fn(() => query),
+            eq: jest.fn(() => query),
+            is: jest.fn(() => query),
+            maybeSingle: jest.fn(async () => {
+              if (table === 'class_schedules') {
+                return { data: scheduleRow, error: null };
+              }
+              if (table === 'learning_spaces') {
+                return { data: learningSpaceRow, error: null };
+              }
+              return { data: null, error: null };
+            }),
+          };
+          return query;
+        }),
+      };
+      createSupabaseServiceClientMock
+        .mockReturnValueOnce(
+          makeSingleResult({
+            id: 'account-1',
+            active_profile_id: 'profile-staff',
+          }) as never,
+        )
+        .mockReturnValueOnce(makeSingleResult([{ role_key: 'staff' }]) as never)
+        .mockReturnValueOnce(mainClient as never);
+    }
+
+    it('returns the schedule bootstrap context for an active classroom', async () => {
+      mockActorAndContextClient({ status: 'active', archived_at: null });
+
+      const service = new SchedulesService();
+      await expect(
+        service.getSessionEditContext('token-1', {
+          orgId: 'org-1',
+          scheduleId: 'schedule-1',
+        }),
+      ).resolves.toEqual({
+        scheduleId: 'schedule-1',
+        title: 'Algebra I',
+        startAt: '2026-03-21T14:00:00.000Z',
+        endAt: '2026-03-21T15:00:00.000Z',
+        timezone: 'America/New_York',
+        sourceLearningSpaceId: 'space-1',
+        sourceChannelId: 'channel-1',
+      });
+    });
+
+    it('rejects when the schedule does not exist', async () => {
+      createSupabaseSessionClientMock.mockReturnValue({
+        auth: {
+          getUser: jest.fn(async () => ({
+            data: { user: { id: 'auth-user-1' } },
+            error: null,
+          })),
+        },
+      } as never);
+      const mainClient = {
+        from: jest.fn(() => {
+          const query = {
+            select: jest.fn(() => query),
+            eq: jest.fn(() => query),
+            is: jest.fn(() => query),
+            maybeSingle: jest.fn(async () => ({ data: null, error: null })),
+          };
+          return query;
+        }),
+      };
+      createSupabaseServiceClientMock
+        .mockReturnValueOnce(
+          makeSingleResult({
+            id: 'account-1',
+            active_profile_id: 'profile-staff',
+          }) as never,
+        )
+        .mockReturnValueOnce(makeSingleResult([{ role_key: 'staff' }]) as never)
+        .mockReturnValueOnce(mainClient as never);
+
+      const service = new SchedulesService();
+      await expect(
+        service.getSessionEditContext('token-1', {
+          orgId: 'org-1',
+          scheduleId: 'missing-schedule',
+        }),
+      ).rejects.toThrow('Schedule not found');
+    });
+
+    it('rejects when the source learning space is archived', async () => {
+      mockActorAndContextClient({ status: 'archived', archived_at: null });
+
+      const service = new SchedulesService();
+      await expect(
+        service.getSessionEditContext('token-1', {
+          orgId: 'org-1',
+          scheduleId: 'schedule-1',
+        }),
+      ).rejects.toThrow('Archived classrooms cannot be changed.');
+    });
+
+    it('rejects non-staff/owner/admin roles', async () => {
+      createSupabaseSessionClientMock.mockReturnValue({
+        auth: {
+          getUser: jest.fn(async () => ({
+            data: { user: { id: 'auth-user-1' } },
+            error: null,
+          })),
+        },
+      } as never);
+      createSupabaseServiceClientMock
+        .mockReturnValueOnce(
+          makeSingleResult({
+            id: 'account-1',
+            active_profile_id: 'profile-guardian',
+          }) as never,
+        )
+        .mockReturnValueOnce(makeSingleResult([{ role_key: 'guardian' }]) as never);
+
+      const service = new SchedulesService();
+      await expect(
+        service.getSessionEditContext('token-1', {
+          orgId: 'org-1',
+          scheduleId: 'schedule-1',
+        }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
   describe('splitRecurringSeries ("This and following events")', () => {
     function mockActor() {
       createSupabaseSessionClientMock.mockReturnValue({
@@ -1658,6 +1891,65 @@ describe('SchedulesService authorization', () => {
         oldScheduleId: 'schedule-1',
         newScheduleId: 'new-schedule-1',
       });
+    });
+
+    it('rejects splitting a session in an archived classroom', async () => {
+      mockActor();
+      const recurrenceRow = {
+        id: 'recurrence-1',
+        frequency: 'weekly',
+        timezone: 'UTC',
+        until: null,
+        byday: ['WE'],
+        exceptions: [],
+        overrides: [],
+      };
+      const rpcMock = jest.fn();
+      const mainClient = {
+        from: jest.fn((table: string) => {
+          const query = {
+            select: jest.fn(() => query),
+            eq: jest.fn(() => query),
+            is: jest.fn(() => query),
+            maybeSingle: jest.fn(async () => {
+              if (table === 'class_schedules') {
+                return { data: scheduleRow, error: null };
+              }
+              if (table === 'class_schedule_recurrence') {
+                return { data: recurrenceRow, error: null };
+              }
+              if (table === 'learning_spaces') {
+                return {
+                  data: { status: 'archived', archived_at: '2026-01-01T00:00:00.000Z' },
+                  error: null,
+                };
+              }
+              return { data: null, error: null };
+            }),
+          };
+          return query;
+        }),
+        rpc: rpcMock,
+      };
+      createSupabaseServiceClientMock.mockReturnValueOnce(mainClient as never);
+
+      const service = new SchedulesService();
+
+      await expect(
+        service.splitRecurringSeries('token-1', {
+          orgId: 'org-1',
+          scheduleId: 'schedule-1',
+          occurrenceKey: '2026-09-23T09:10:00.000Z',
+          newStartAt: '2026-09-29T14:00:00.000Z',
+          newEndAt: '2026-09-29T15:00:00.000Z',
+          timezone: null,
+          byWeekday: ['TU'],
+          reason: null,
+          suppressNotifications: false,
+          confirmDropFutureOverrides: false,
+        }),
+      ).rejects.toThrow('Archived classrooms cannot be changed.');
+      expect(rpcMock).not.toHaveBeenCalled();
     });
   });
 
