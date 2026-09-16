@@ -1,3 +1,4 @@
+import { buildReminderPushCollapseId } from '@iconicedu/api/lib/notifications/push-collapse';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 
 type PushNotificationPayload = {
@@ -39,6 +40,7 @@ type ExpoPushMessage = {
   body?: string;
   badge?: number;
   channelId?: string;
+  collapseId?: string;
   data?: Record<string, unknown>;
   sound: 'default';
 };
@@ -215,6 +217,20 @@ function resolvePreviewFromMetadata(
   return undefined;
 }
 
+// Only reminder notifications carry a reminder dedupe key, so only they
+// collapse. Conversational pushes deliberately keep stacking in the tray.
+function resolveCollapseIdFromMetadata(metadata: Record<string, unknown> | undefined) {
+  const root = asRecord(metadata);
+  const rawEventPayload = asRecord(root.rawEventPayload);
+  const dedupeKey = rawEventPayload.reminderDedupeKey ?? root.reminderDedupeKey;
+
+  if (typeof dedupeKey !== 'string') {
+    return undefined;
+  }
+
+  return buildReminderPushCollapseId(dedupeKey);
+}
+
 export async function sendPushNotification(payload: PushNotificationPayload) {
   const supabase = createSupabaseServiceClient();
 
@@ -272,6 +288,7 @@ export async function sendPushNotification(payload: PushNotificationPayload) {
   const senderName = resolveSenderNameFromMetadata(payload.metadata);
   const senderAvatarUrl = resolveSenderAvatarUrlFromMetadata(payload.metadata);
   const preview = resolvePreviewFromMetadata(payload.metadata, payload.summary);
+  const collapseId = resolveCollapseIdFromMetadata(payload.metadata);
 
   // 2. Build Expo push messages
   const messages: ExpoPushMessage[] = tokens.map(({ token }) => ({
@@ -283,6 +300,9 @@ export async function sendPushNotification(payload: PushNotificationPayload) {
     // Required for Android 8+ to route the notification to the correct channel.
     // Must match the channel created by ensureAndroidChannel() in use-push-registration.ts.
     channelId: 'default',
+    // Present only for reminders: replaces an earlier copy of the same reminder
+    // in the tray rather than stacking another one beside it.
+    ...(collapseId ? { collapseId } : {}),
     data: {
       prefKey: payload.prefKey,
       orgId: payload.orgId,
