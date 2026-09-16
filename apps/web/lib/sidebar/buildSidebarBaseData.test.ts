@@ -4,6 +4,7 @@ import { buildSidebarBaseData } from './buildSidebarBaseData';
 
 const buildLearningSpacesSidebarProjection = vi.fn();
 const buildChannelsSidebarProjection = vi.fn();
+const getLatestMessagesByChannelId = vi.fn();
 
 vi.mock('../spaces/builders/learning-space.builder', () => ({
   buildLearningSpacesSidebarProjection: (...args: unknown[]) =>
@@ -13,13 +14,23 @@ vi.mock('../spaces/builders/learning-space.builder', () => ({
 vi.mock('../channels/builders/channel-sidebar.builder', () => ({
   buildChannelsSidebarProjection: (...args: unknown[]) =>
     buildChannelsSidebarProjection(...args),
+  getLatestMessagesByChannelId: (...args: unknown[]) =>
+    getLatestMessagesByChannelId(...args),
+  withLatestMessagePreview: (channel: unknown) => channel,
 }));
 
 describe('buildSidebarBaseData', () => {
   it('builds classes and direct messages with account-scoped read state', async () => {
     buildLearningSpacesSidebarProjection.mockResolvedValue([
-      { ids: { id: 'space-1', orgId: 'org-1' } },
+      {
+        ids: { id: 'space-1', orgId: 'org-1' },
+        channels: {
+          primaryChannel: { ids: { id: 'space-channel-1', orgId: 'org-1' } },
+          relatedChannels: [],
+        },
+      },
     ]);
+    getLatestMessagesByChannelId.mockResolvedValue(new Map());
     buildChannelsSidebarProjection.mockResolvedValue([
       {
         ids: { id: 'dm-1', orgId: 'org-1' },

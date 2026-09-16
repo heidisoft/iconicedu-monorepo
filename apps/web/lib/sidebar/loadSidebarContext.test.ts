@@ -5,6 +5,7 @@ import { loadSidebarContext } from '@iconicedu/web/lib/sidebar/loadSidebarContex
 
 const buildSidebarUser = vi.fn();
 const buildChannelsSidebarProjection = vi.fn();
+const getLatestMessagesByChannelId = vi.fn();
 const getChannelReadStatesByAccountIds = vi.fn();
 const getThreadReadStatesByAccountIds = vi.fn();
 const getAccountsByAuthUserId = vi.fn();
@@ -17,6 +18,9 @@ vi.mock('@iconicedu/web/lib/sidebar/user/buildSidebarUser', () => ({
 vi.mock('@iconicedu/web/lib/channels/builders/channel-sidebar.builder', () => ({
   buildChannelsSidebarProjection: (...args: unknown[]) =>
     buildChannelsSidebarProjection(...args),
+  getLatestMessagesByChannelId: (...args: unknown[]) =>
+    getLatestMessagesByChannelId(...args),
+  withLatestMessagePreview: (channel: unknown) => channel,
 }));
 
 vi.mock('@iconicedu/web/lib/channels/queries/channels.query', () => ({
@@ -75,6 +79,7 @@ describe('loadSidebarContext', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     buildChannelsSidebarProjection.mockReset();
+    getLatestMessagesByChannelId.mockReset();
     getChannelReadStatesByAccountIds.mockReset();
     getThreadReadStatesByAccountIds.mockReset();
     buildSidebarUser.mockReset();
@@ -83,6 +88,7 @@ describe('loadSidebarContext', () => {
     getAccountsByAuthUserId.mockResolvedValue({ data: [] });
     getOrgsByIds.mockResolvedValue({ data: [] });
     buildChannelsSidebarProjection.mockResolvedValue([]);
+    getLatestMessagesByChannelId.mockResolvedValue(new Map());
     getChannelReadStatesByAccountIds.mockResolvedValue({ data: [] });
     getThreadReadStatesByAccountIds.mockResolvedValue({ data: [] });
   });

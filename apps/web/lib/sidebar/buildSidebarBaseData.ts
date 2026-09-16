@@ -1,8 +1,16 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { ChannelVM, SidebarLeftDataVM } from '@iconicedu/shared-types';
+import type {
+  ChannelVM,
+  LearningSpaceVM,
+  SidebarLeftDataVM,
+} from '@iconicedu/shared-types';
 
 import { buildLearningSpacesSidebarProjection } from '../spaces/builders/learning-space.builder';
-import { buildChannelsSidebarProjection } from '../channels/builders/channel-sidebar.builder';
+import {
+  buildChannelsSidebarProjection,
+  getLatestMessagesByChannelId,
+  withLatestMessagePreview,
+} from '../channels/builders/channel-sidebar.builder';
 import { syncClassRequestUnreadCount } from './class-request-unread';
 
 type SidebarBaseData = Omit<SidebarLeftDataVM, 'user'>;
@@ -50,6 +58,31 @@ export async function buildSidebarBaseData(
         new Date(left.lifecycle.createdAt).getTime(),
     )[0];
 
+  // `nav-direct-messages.tsx` sorts DMs by latest-activity and falls back to the
+  // latest sender's name, and `sidebar-unread.ts` uses the latest message's sender to
+  // infer "unread" before a read-state row exists — both need a real latest message,
+  // not the empty placeholder every other sidebar consumer is fine with. Fetch it only
+  // for the channels actually exposed below (never the full org channel set above).
+  const learningSpaceChannels = activeLearningSpaces.flatMap((space) => [
+    space.channels.primaryChannel,
+    ...(space.channels.relatedChannels ?? []),
+  ]);
+  const latestMessagesByChannelId = await getLatestMessagesByChannelId(supabase, orgId, [
+    ...directMessages,
+    ...learningSpaceChannels,
+    ...alertChannels,
+    ...classRequestChannels,
+  ]);
+  const withPreview = (channel: ChannelVM) =>
+    withLatestMessagePreview(channel, latestMessagesByChannelId);
+  const withSpacePreview = (space: LearningSpaceVM): LearningSpaceVM => ({
+    ...space,
+    channels: {
+      primaryChannel: withPreview(space.channels.primaryChannel),
+      relatedChannels: space.channels.relatedChannels?.map(withPreview),
+    },
+  });
+
   const supportChannelId =
     allChannels.find((channel) => channel.basics.purpose === 'support')?.ids.id ?? null;
 
@@ -94,10 +127,10 @@ export async function buildSidebarBaseData(
       navSecondary,
     },
     collections: {
-      learningSpaces: activeLearningSpaces,
-      directMessages,
-      classRequestChannels,
-      alertChannels,
+      learningSpaces: activeLearningSpaces.map(withSpacePreview),
+      directMessages: directMessages.map(withPreview),
+      classRequestChannels: classRequestChannels.map(withPreview),
+      alertChannels: alertChannels.map(withPreview),
     },
   });
 }

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { ChannelVM } from '@iconicedu/shared-types';
+import type { ChannelVM, MessageVM } from '@iconicedu/shared-types';
 import { groupBy } from '@iconicedu/utils';
 
 import {
@@ -16,6 +16,7 @@ import {
 } from '@iconicedu/web/lib/channels/queries/channels.query';
 import { getThreadReadStatesByAccountId } from '@iconicedu/web/lib/messages/queries/messages.query';
 import { loadParticipantsByChannel } from '@iconicedu/web/lib/channels/builders/channel.builder';
+import { buildChannelMessages } from '@iconicedu/web/lib/messages/builders/channel-messages.builder';
 
 type SidebarProjectionOptions = {
   accountId?: string | null;
@@ -103,4 +104,51 @@ export async function buildChannelsSidebarProjection(
         : { ...createDefaultChannelReadState(row.id), threadUnreadCount },
     });
   });
+}
+
+// Sidebar consumers leave `collections.messages` empty (see above) for good reason on
+// the full org channel set, but a handful of UI behaviors genuinely need the latest
+// message: `nav-direct-messages.tsx` sorts DMs by recent activity and falls back to
+// the latest sender's name, and `sidebar-unread.ts` uses the latest message's sender
+// to infer "unread" for a channel that has no persisted read-state row yet (a brand
+// new channel). Fetch a single bounded (`LIMIT 1`) latest message per channel — only
+// for the caller-supplied, already viewer-scoped channel list (DMs, learning-space
+// channels, alerts, class requests), never the full org channel set — so this stays a
+// small, fixed-per-viewer cost rather than reintroducing the org-wide fan-out this
+// module exists to remove.
+export async function getLatestMessagesByChannelId(
+  supabase: SupabaseClient,
+  orgId: string,
+  channels: ChannelVM[],
+): Promise<Map<string, MessageVM[]>> {
+  const uniqueChannelIds = Array.from(new Set(channels.map((channel) => channel.ids.id)));
+
+  const entries = await Promise.all(
+    uniqueChannelIds.map(async (channelId) => {
+      const messages = await buildChannelMessages(supabase, orgId, channelId, {
+        limit: 1,
+      });
+      return [channelId, messages] as const;
+    }),
+  );
+
+  return new Map(entries);
+}
+
+export function withLatestMessagePreview(
+  channel: ChannelVM,
+  latestMessagesByChannelId: Map<string, MessageVM[]>,
+): ChannelVM {
+  const messages = latestMessagesByChannelId.get(channel.ids.id);
+  if (!messages?.length) {
+    return channel;
+  }
+
+  return {
+    ...channel,
+    collections: {
+      ...channel.collections,
+      messages: { items: messages, total: messages.length },
+    },
+  };
 }

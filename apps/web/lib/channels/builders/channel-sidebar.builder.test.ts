@@ -1,7 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { buildChannelsSidebarProjection } from '@iconicedu/web/lib/channels/builders/channel-sidebar.builder';
+import {
+  buildChannelsSidebarProjection,
+  getLatestMessagesByChannelId,
+  withLatestMessagePreview,
+} from '@iconicedu/web/lib/channels/builders/channel-sidebar.builder';
 
 const getChannelsByOrg = vi.fn();
 const getChannelParticipantsByChannelIds = vi.fn();
@@ -9,6 +13,7 @@ const getChannelCapabilitiesByChannelIds = vi.fn();
 const getChannelReadStatesByAccountId = vi.fn();
 const getThreadReadStatesByAccountId = vi.fn();
 const getProfilesByIds = vi.fn();
+const buildChannelMessages = vi.fn();
 
 vi.mock('@iconicedu/web/lib/channels/queries/channels.query', () => ({
   getChannelsByOrg: (...args: unknown[]) => getChannelsByOrg(...args),
@@ -27,6 +32,10 @@ vi.mock('@iconicedu/web/lib/messages/queries/messages.query', () => ({
 
 vi.mock('@iconicedu/web/lib/profile/queries/profiles.query', () => ({
   getProfilesByIds: (...args: unknown[]) => getProfilesByIds(...args),
+}));
+
+vi.mock('@iconicedu/web/lib/messages/builders/channel-messages.builder', () => ({
+  buildChannelMessages: (...args: unknown[]) => buildChannelMessages(...args),
 }));
 
 vi.mock('@iconicedu/web/lib/profile/builders/user-profile.builder', () => ({
@@ -106,5 +115,65 @@ describe('buildChannelsSidebarProjection', () => {
 
     expect(results).toEqual([]);
     expect(getChannelParticipantsByChannelIds).not.toHaveBeenCalled();
+  });
+});
+
+describe('getLatestMessagesByChannelId', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const makeChannel = (id: string) => ({ ids: { id, orgId: 'org-1' } }) as any;
+
+  it('fetches a bounded (limit 1) latest message once per unique channel id', async () => {
+    buildChannelMessages.mockImplementation(
+      async (_supabase: any, _orgId: string, channelId: string) =>
+        channelId === 'channel-1' ? [{ ids: { id: 'message-1' } }] : [],
+    );
+
+    const result = await getLatestMessagesByChannelId({} as any, 'org-1', [
+      makeChannel('channel-1'),
+      makeChannel('channel-2'),
+      makeChannel('channel-1'), // same channel appearing twice (e.g. alert + DM overlap)
+    ]);
+
+    expect(buildChannelMessages).toHaveBeenCalledTimes(2);
+    expect(buildChannelMessages).toHaveBeenCalledWith({}, 'org-1', 'channel-1', {
+      limit: 1,
+    });
+    expect(result.get('channel-1')).toEqual([{ ids: { id: 'message-1' } }]);
+    expect(result.get('channel-2')).toEqual([]);
+  });
+});
+
+describe('withLatestMessagePreview', () => {
+  it('attaches the latest message when one exists for the channel', () => {
+    const channel = {
+      ids: { id: 'channel-1' },
+      collections: { messages: { items: [], total: 0 }, participants: [] },
+    } as any;
+    const latestMessagesByChannelId = new Map([
+      ['channel-1', [{ ids: { id: 'message-1' } }]],
+    ]);
+
+    const result = withLatestMessagePreview(channel, latestMessagesByChannelId as any);
+
+    expect(result.collections.messages).toEqual({
+      items: [{ ids: { id: 'message-1' } }],
+      total: 1,
+    });
+    // Untouched fields are preserved.
+    expect(result.collections.participants).toBe(channel.collections.participants);
+  });
+
+  it('returns the same channel unchanged when there is no latest message', () => {
+    const channel = {
+      ids: { id: 'channel-1' },
+      collections: { messages: { items: [], total: 0 }, participants: [] },
+    } as any;
+
+    const result = withLatestMessagePreview(channel, new Map());
+
+    expect(result).toBe(channel);
   });
 });

@@ -23,7 +23,11 @@ import {
   upsertUserOnboardingStatus,
 } from '@iconicedu/web/lib/onboarding/queries/status.query';
 import { mapUserOnboardingStatusRowToVM } from '@iconicedu/web/lib/onboarding/mappers';
-import { buildChannelsSidebarProjection } from '@iconicedu/web/lib/channels/builders/channel-sidebar.builder';
+import {
+  buildChannelsSidebarProjection,
+  getLatestMessagesByChannelId,
+  withLatestMessagePreview,
+} from '@iconicedu/web/lib/channels/builders/channel-sidebar.builder';
 import { getChannelReadStatesByAccountIds } from '@iconicedu/web/lib/channels/queries/channels.query';
 import { getThreadReadStatesByAccountIds } from '@iconicedu/web/lib/messages/queries/messages.query';
 import { getOrgsByIds } from '@iconicedu/web/lib/org/queries/org.query';
@@ -255,18 +259,31 @@ async function resolveGuardianDirectMessages(
     );
   });
 
-  const childScopedChannels = childDirectMessageChannels.map((channel) => ({
-    ...channel,
-    collections: {
-      ...channel.collections,
-      readState: {
-        channelId: channel.ids.id,
-        ...channel.collections.readState,
-        unreadCount: childUnreadByChannel.get(channel.ids.id) ?? 0,
-        threadUnreadCount: childThreadUnreadByChannel.get(channel.ids.id) ?? 0,
+  // These channels came from a fresh `buildChannelsSidebarProjection` call above, so
+  // (like every other channel out of that projection) they still carry the empty
+  // message placeholder — attach a real latest message for the same reason
+  // `buildSidebarBaseData` does for the guardian's own DMs.
+  const childLatestMessagesByChannelId = await getLatestMessagesByChannelId(
+    supabase,
+    input.account.org_id,
+    childDirectMessageChannels,
+  );
+
+  const childScopedChannels = childDirectMessageChannels.map((channel) => {
+    const withPreview = withLatestMessagePreview(channel, childLatestMessagesByChannelId);
+    return {
+      ...withPreview,
+      collections: {
+        ...withPreview.collections,
+        readState: {
+          channelId: channel.ids.id,
+          ...withPreview.collections.readState,
+          unreadCount: childUnreadByChannel.get(channel.ids.id) ?? 0,
+          threadUnreadCount: childThreadUnreadByChannel.get(channel.ids.id) ?? 0,
+        },
       },
-    },
-  }));
+    };
+  });
 
   const merged = new Map<string, (typeof guardianChannels)[number]>();
   [...guardianChannels, ...childScopedChannels].forEach((channel) => {
