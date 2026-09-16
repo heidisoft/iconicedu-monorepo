@@ -213,6 +213,83 @@ export async function buildLearningSpacesByOrg(
   return results.filter((space): space is LearningSpaceVM => Boolean(space));
 }
 
+// Sidebar-only variant of `buildLearningSpacesByOrg`: instead of resolving each
+// learning space's channels via `buildChannelById` (one query set per channel, plus a
+// full thread/message/media/file rebuild each caller already paid for once via
+// `buildChannelsSidebarProjection`), it looks channels up from a shared map built by
+// the caller. It also batches participant profile hydration across every space in one
+// call instead of once per space. No schedule series is resolved (sidebar rendering
+// doesn't need it, matching `buildLearningSpacesByOrg`'s existing `undefined` default).
+export async function buildLearningSpacesSidebarProjection(
+  supabase: SupabaseClient,
+  orgId: string,
+  channelsById: Map<string, ChannelVM>,
+): Promise<LearningSpaceVM[]> {
+  const { data: learningSpaces } = await getLearningSpacesByOrg(supabase, orgId);
+  if (!learningSpaces?.length) {
+    return [];
+  }
+
+  const learningSpaceIds = learningSpaces.map((space) => space.id);
+
+  const [channelRelations, participantRelations] = await Promise.all([
+    getLearningSpaceChannelsByLearningSpaceIds(supabase, orgId, learningSpaceIds),
+    getLearningSpaceParticipantsByLearningSpaceIds(supabase, orgId, learningSpaceIds),
+  ]);
+
+  const channelRowsBySpace = groupBy(
+    channelRelations.data ?? [],
+    (row) => row.learning_space_id,
+  );
+  const participantRowsBySpace = groupBy(
+    participantRelations.data ?? [],
+    (row) => row.learning_space_id,
+  );
+
+  const allParticipantProfileIds = Array.from(
+    new Set((participantRelations.data ?? []).map((row) => row.profile_id)),
+  );
+  const profilesById = await buildUserProfilesByIds(
+    supabase,
+    orgId,
+    allParticipantProfileIds,
+  );
+
+  const results = learningSpaces.map((space) => {
+    const channelRows = channelRowsBySpace.get(space.id) ?? [];
+    const channels = channelRows
+      .map((row) => channelsById.get(row.channel_id))
+      .filter((channel): channel is ChannelVM => Boolean(channel));
+
+    const primaryRow = channelRows.find((row) => row.is_primary);
+    const primaryChannel =
+      channels.find((channel) => channel.ids.id === primaryRow?.channel_id) ??
+      channels[0] ??
+      null;
+    if (!primaryChannel) {
+      return null;
+    }
+
+    const relatedChannels = channels.filter(
+      (channel) => channel.ids.id !== primaryChannel.ids.id,
+    );
+    const participants = (participantRowsBySpace.get(space.id) ?? [])
+      .map((row) => profilesById.get(row.profile_id))
+      .filter((profile): profile is NonNullable<typeof profile> => Boolean(profile));
+
+    return mapLearningSpaceRowToVM(space, {
+      channels: {
+        primaryChannel,
+        relatedChannels: relatedChannels.length ? relatedChannels : undefined,
+      },
+      participants,
+      scheduleSeries: null,
+    });
+  });
+
+  return results.filter((space): space is LearningSpaceVM => Boolean(space));
+}
+
 export async function buildLearningSpaceByChannelId(
   supabase: SupabaseClient,
   orgId: string,

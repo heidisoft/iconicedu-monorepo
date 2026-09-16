@@ -23,7 +23,13 @@ import {
   upsertUserOnboardingStatus,
 } from '@iconicedu/web/lib/onboarding/queries/status.query';
 import { mapUserOnboardingStatusRowToVM } from '@iconicedu/web/lib/onboarding/mappers';
-import { buildDirectMessageChannelsWithMessages } from '@iconicedu/web/lib/channels/builders/channel.builder';
+import {
+  buildChannelsSidebarProjection,
+  getLatestMessagesByChannelId,
+  withLatestMessagePreview,
+} from '@iconicedu/web/lib/channels/builders/channel-sidebar.builder';
+import { getChannelReadStatesByAccountIds } from '@iconicedu/web/lib/channels/queries/channels.query';
+import { getThreadReadStatesByAccountIds } from '@iconicedu/web/lib/messages/queries/messages.query';
 import { getOrgsByIds } from '@iconicedu/web/lib/org/queries/org.query';
 import { reportWebObservedError } from '@iconicedu/web/lib/analytics/report-error';
 
@@ -186,6 +192,11 @@ async function resolveSidebarOrganizations(
   );
 }
 
+// Finds DM channels a guardian's linked children participate in, and the unread
+// counts for each, without rebuilding every org DM channel's full message/thread/
+// media/file graph once per child (the previous behavior). One bounded channel
+// projection plus two batched `.in('account_id', childAccountIds)` read-state queries
+// cover any number of children.
 async function resolveGuardianDirectMessages(
   supabase: SupabaseClient,
   input: {
@@ -203,22 +214,79 @@ async function resolveGuardianDirectMessages(
 
   const childAccountIds = (profileVM.children?.items ?? [])
     .map((child) => child.ids.accountId)
-    .filter(Boolean);
+    .filter((accountId): accountId is string => Boolean(accountId));
 
   if (!childAccountIds.length) {
     return guardianChannels;
   }
 
-  const childChannelLists = await Promise.all(
-    childAccountIds.map((accountId) =>
-      buildDirectMessageChannelsWithMessages(supabase, input.account.org_id, {
-        accountId,
+  const [allChannels, childChannelReadStatesResponse, childThreadReadStatesResponse] =
+    await Promise.all([
+      buildChannelsSidebarProjection(supabase, input.account.org_id, {
+        accountId: input.account.id,
       }),
-    ),
+      getChannelReadStatesByAccountIds(supabase, input.account.org_id, childAccountIds),
+      getThreadReadStatesByAccountIds(supabase, input.account.org_id, childAccountIds),
+    ]);
+
+  const childDirectMessageChannels = allChannels.filter(
+    (channel) =>
+      (channel.basics.kind === 'dm' || channel.basics.kind === 'group_dm') &&
+      childAccountIds.some((accountId) =>
+        channel.collections.participants.some(
+          (participant) => participant.ids.accountId === accountId,
+        ),
+      ),
   );
 
+  const childUnreadByChannel = new Map<string, number>();
+  (childChannelReadStatesResponse.data ?? []).forEach((row) => {
+    const current = childUnreadByChannel.get(row.channel_id) ?? 0;
+    childUnreadByChannel.set(
+      row.channel_id,
+      Math.max(current, Math.max(0, row.unread_count ?? 0)),
+    );
+  });
+  const childThreadUnreadByChannel = new Map<string, number>();
+  (childThreadReadStatesResponse.data ?? []).forEach((row) => {
+    if (!row.channel_id) {
+      return;
+    }
+    const current = childThreadUnreadByChannel.get(row.channel_id) ?? 0;
+    childThreadUnreadByChannel.set(
+      row.channel_id,
+      current + Math.max(0, row.unread_count ?? 0),
+    );
+  });
+
+  // These channels came from a fresh `buildChannelsSidebarProjection` call above, so
+  // (like every other channel out of that projection) they still carry the empty
+  // message placeholder — attach a real latest message for the same reason
+  // `buildSidebarBaseData` does for the guardian's own DMs.
+  const childLatestMessagesByChannelId = await getLatestMessagesByChannelId(
+    supabase,
+    input.account.org_id,
+    childDirectMessageChannels,
+  );
+
+  const childScopedChannels = childDirectMessageChannels.map((channel) => {
+    const withPreview = withLatestMessagePreview(channel, childLatestMessagesByChannelId);
+    return {
+      ...withPreview,
+      collections: {
+        ...withPreview.collections,
+        readState: {
+          channelId: channel.ids.id,
+          ...withPreview.collections.readState,
+          unreadCount: childUnreadByChannel.get(channel.ids.id) ?? 0,
+          threadUnreadCount: childThreadUnreadByChannel.get(channel.ids.id) ?? 0,
+        },
+      },
+    };
+  });
+
   const merged = new Map<string, (typeof guardianChannels)[number]>();
-  [...guardianChannels, ...childChannelLists.flat()].forEach((channel) => {
+  [...guardianChannels, ...childScopedChannels].forEach((channel) => {
     const existing = merged.get(channel.ids.id);
     if (!existing) {
       merged.set(channel.ids.id, channel);

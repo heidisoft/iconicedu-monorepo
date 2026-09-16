@@ -225,6 +225,25 @@ export async function getThreadReadStatesByAccountId(
     .returns<ChannelReadStateRow[]>();
 }
 
+export async function getThreadReadStatesByAccountIds(
+  supabase: SupabaseClient,
+  orgId: string,
+  accountIds: string[],
+) {
+  if (!accountIds.length) {
+    return { data: [] as ChannelReadStateRow[] };
+  }
+
+  return supabase
+    .from('channel_read_state')
+    .select(CHANNEL_READ_STATE_SELECT)
+    .eq('org_id', orgId)
+    .in('account_id', accountIds)
+    .not('thread_id', 'is', null)
+    .is('deleted_at', null)
+    .returns<ChannelReadStateRow[]>();
+}
+
 export async function getMessageReactionsByMessageIds(
   supabase: SupabaseClient,
   orgId: string,
