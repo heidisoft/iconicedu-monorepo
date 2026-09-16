@@ -56,14 +56,6 @@
       "threads"
     ],
     "apps/web/app/actions/remove-family-member.ts": ["accounts", "family_links"],
-    "apps/web/app/actions/split-class-schedule-session.ts": [
-      "class_schedules",
-      "learning_spaces"
-    ],
-    "apps/web/app/actions/update-class-schedule-session.ts": [
-      "class_schedules",
-      "learning_spaces"
-    ],
     "apps/web/app/api/activity-feed/read/route.ts": ["activity_feed_items"],
     "apps/web/app/api/admin/activity/events/failed/route.ts": ["activity_events"],
     "apps/web/app/api/admin/activity/suppression/route.ts": [

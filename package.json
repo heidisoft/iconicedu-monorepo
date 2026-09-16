@@ -77,7 +77,7 @@
     "guard:supabase-access-control": "node scripts/check-supabase-access-control.mjs",
     "guard:auth-signout-scopes": "node scripts/check-auth-signout-scopes.mjs",
     "guard:frontend-table-access": "node scripts/check-frontend-table-access.mjs",
-    "guard:frontend-table-access:update": "node scripts/check-frontend-table-access.mjs --write-baseline",
+    "guard:frontend-table-access:update": "node scripts/check-frontend-table-access.mjs --write-baseline && prettier --write scripts/frontend-table-access-baseline.json",
     "test:guard:activity-feed-writes": "node --test scripts/check-activity-feed-writes.test.mjs",
     "test:guard:feature-flags": "node --test scripts/check-feature-flag-gating.test.mjs",
     "test:guard:supabase-access-control": "node --test scripts/check-supabase-access-control.test.mjs",

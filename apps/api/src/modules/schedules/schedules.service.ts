@@ -34,6 +34,7 @@ import type {
   SplitRecurringSessionDto,
 } from '@iconicedu/api/modules/schedules/dto';
 import type {
+  ClassScheduleSessionContextVM,
   ClassScheduleVM,
   LearningSpaceEditContextVM,
 } from '@iconicedu/shared-types';
@@ -151,6 +152,42 @@ export class SchedulesService {
     return input.scheduleIds
       ? buildClassSchedulesByIds(supabase, input.orgId, input.scheduleIds)
       : buildClassSchedulesByOrg(supabase, input.orgId);
+  }
+
+  /** Bootstrap for the reschedule / split quick-edit flows. Replaces the
+   * service-role `class_schedules` + `learning_spaces` reads apps/web used to do
+   * itself: rejects missing schedules and archived classrooms server-side, so the
+   * web action only proceeds for editable sessions. The mutations re-check both
+   * (see `assertLearningSpaceEditable`), so this is a fast-fail, not the gate. */
+  async getSessionEditContext(
+    accessToken: string,
+    input: { orgId: string; scheduleId: string },
+  ): Promise<ClassScheduleSessionContextVM> {
+    await this.requireOrgActor(accessToken, input.orgId);
+    const supabase = createSupabaseServiceClient();
+    const activityContext = await this.loadRescheduleActivityContext(
+      supabase,
+      input.orgId,
+      input.scheduleId,
+    );
+    if (!activityContext) {
+      throw new BadRequestException('Schedule not found');
+    }
+    await this.assertLearningSpaceEditable(
+      supabase,
+      input.orgId,
+      activityContext.learningSpaceId,
+    );
+
+    return {
+      scheduleId: activityContext.scheduleId,
+      title: activityContext.title,
+      startAt: activityContext.startAt,
+      endAt: activityContext.endAt,
+      timezone: activityContext.timezone,
+      sourceLearningSpaceId: activityContext.learningSpaceId,
+      sourceChannelId: activityContext.channelId,
+    };
   }
 
   /** Snapshot of a learning space's own participants/schedules/recurrences/
@@ -547,6 +584,7 @@ export class SchedulesService {
     const actor = await this.requireOrgActor(accessToken, dto.orgId);
     const supabase = createSupabaseServiceClient();
     const now = new Date().toISOString();
+    await this.assertScheduleEditable(supabase, dto.orgId, dto.scheduleId);
 
     // Check if it has recurrence
     const { data: recurrenceRow, error: recurrenceError } = await supabase
@@ -660,6 +698,14 @@ export class SchedulesService {
       supabase,
       dto.orgId,
       dto.scheduleId,
+    );
+    if (!activityContext) {
+      throw new BadRequestException('Schedule not found');
+    }
+    await this.assertLearningSpaceEditable(
+      supabase,
+      dto.orgId,
+      activityContext.learningSpaceId,
     );
 
     const { data: recurrenceRow, error: recurrenceError } = await supabase
@@ -862,6 +908,11 @@ export class SchedulesService {
     if (!activityContext) {
       throw new BadRequestException('Schedule not found');
     }
+    await this.assertLearningSpaceEditable(
+      supabase,
+      dto.orgId,
+      activityContext.learningSpaceId,
+    );
 
     const recurrenceDetail = await this.loadRecurrenceSplitDetail(
       supabase,
@@ -2141,6 +2192,57 @@ export class SchedulesService {
         throw new InternalServerErrorException(deleteRecurrenceError.message);
       }
     }
+  }
+
+  /** Archived classrooms are read-only (docs/operations/class-archive-lifecycle.md).
+   * Enforced on every session mutation (cancel / reschedule / split) so no caller
+   * can bypass it — apps/web used to be the only place this was checked. */
+  private async assertLearningSpaceEditable(
+    supabase: SupabaseServiceClient,
+    orgId: string,
+    learningSpaceId: string | null,
+  ): Promise<void> {
+    if (!learningSpaceId) return;
+
+    const { data, error } = await supabase
+      .from('learning_spaces')
+      .select('status, archived_at')
+      .eq('id', learningSpaceId)
+      .eq('org_id', orgId)
+      .is('deleted_at', null)
+      .maybeSingle<{ status: string | null; archived_at: string | null }>();
+
+    if (error) {
+      throw new InternalServerErrorException(error.message);
+    }
+    if (data?.archived_at || data?.status === 'archived') {
+      throw new BadRequestException('Archived classrooms cannot be changed.');
+    }
+  }
+
+  /** Cancel does not otherwise load the schedule row, so resolve its learning
+   * space here. A missing schedule is left to the existing cancel logic. */
+  private async assertScheduleEditable(
+    supabase: SupabaseServiceClient,
+    orgId: string,
+    scheduleId: string,
+  ): Promise<void> {
+    const { data, error } = await supabase
+      .from('class_schedules')
+      .select('source_learning_space_id')
+      .eq('id', scheduleId)
+      .eq('org_id', orgId)
+      .is('deleted_at', null)
+      .maybeSingle<{ source_learning_space_id: string | null }>();
+
+    if (error) {
+      throw new InternalServerErrorException(error.message);
+    }
+    await this.assertLearningSpaceEditable(
+      supabase,
+      orgId,
+      data?.source_learning_space_id ?? null,
+    );
   }
 
   private async attachLearningSpaceArchiveMetadata(

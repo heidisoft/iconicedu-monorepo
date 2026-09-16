@@ -83,6 +83,27 @@ export class SchedulesController {
     );
   }
 
+  /** Bootstrap for the single-session quick-edit flows (reschedule / split).
+   * Rejects missing schedules and archived classrooms server-side. */
+  @Get('schedules/session/context')
+  @UseGuards(AuthGuard)
+  getSessionEditContext(
+    @Req() req: AuthenticatedRequest,
+    @Query('orgId') orgId: string,
+    @Query('scheduleId') scheduleId: string,
+  ) {
+    if (!orgId || typeof orgId !== 'string') {
+      throw new BadRequestException('orgId is required');
+    }
+    if (!scheduleId || typeof scheduleId !== 'string') {
+      throw new BadRequestException('scheduleId is required');
+    }
+    return this.schedulesService.getSessionEditContext(
+      extractBearerToken(req.headers.authorization),
+      { orgId, scheduleId },
+    );
+  }
+
   @Get('schedules/learning-space/context')
   @UseGuards(AuthGuard)
   getLearningSpaceEditContext(
