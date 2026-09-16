@@ -42,6 +42,29 @@ export class SchedulesController {
     });
   }
 
+  @Get('schedules/calendar')
+  @UseGuards(AuthGuard)
+  listForCalendar(
+    @Req() req: AuthenticatedRequest,
+    @Query('orgId') orgId: string,
+    @Query('channelId') channelId?: string,
+    @Query('scheduleIds') scheduleIds?: string,
+  ) {
+    if (!orgId || typeof orgId !== 'string') {
+      throw new BadRequestException('orgId is required');
+    }
+    return this.schedulesService.listForCalendar(
+      extractBearerToken(req.headers.authorization),
+      {
+        orgId,
+        channelId,
+        scheduleIds: scheduleIds
+          ? scheduleIds.split(',').filter((id) => id.length > 0)
+          : undefined,
+      },
+    );
+  }
+
   @Post('schedules/exceptions')
   @UseGuards(AuthGuard)
   createException(
