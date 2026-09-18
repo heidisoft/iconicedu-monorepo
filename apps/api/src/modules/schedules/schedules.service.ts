@@ -29,6 +29,7 @@ import type {
   ScheduleRowInput,
   SplitRecurringSessionDto,
 } from '@iconicedu/api/modules/schedules/dto';
+import type { LearningSpaceEditContextVM } from '@iconicedu/shared-types';
 
 const CLASS_SCHEDULE_SELECT = `
   id, org_id, title, description, location, meeting_link,
@@ -121,6 +122,191 @@ export class SchedulesService {
     const { data, error } = await query;
     if (error) throw new InternalServerErrorException(error.message);
     return this.attachLearningSpaceArchiveMetadata(input.orgId, data ?? []);
+  }
+
+  /** Snapshot of a learning space's own participants/schedules/recurrences/
+   * channel settings, for the admin classroom editor to diff an incoming
+   * save against. Replaces what apps/web used to fetch directly via a
+   * service-role client — recurrence/exception/override reads are scoped to
+   * this learning space's own schedules, not the whole org. */
+  async getLearningSpaceEditContext(
+    accessToken: string,
+    input: { orgId: string; learningSpaceId: string; channelId: string },
+  ): Promise<LearningSpaceEditContextVM> {
+    await this.requireOrgActor(accessToken, input.orgId);
+    const supabase = createSupabaseServiceClient();
+
+    const [participantsResult, schedulesResult, channelResult] = await Promise.all([
+      supabase
+        .from('learning_space_participants')
+        .select('profile_id')
+        .eq('org_id', input.orgId)
+        .eq('learning_space_id', input.learningSpaceId)
+        .is('deleted_at', null)
+        .returns<Array<{ profile_id: string }>>(),
+      supabase
+        .from('class_schedules')
+        .select('id, title, start_at, end_at, timezone')
+        .eq('org_id', input.orgId)
+        .eq('source_learning_space_id', input.learningSpaceId)
+        .is('deleted_at', null)
+        .returns<
+          Array<{
+            id: string;
+            title: string;
+            start_at: string;
+            end_at: string;
+            timezone: string | null;
+          }>
+        >(),
+      supabase
+        .from('channels')
+        .select(
+          'topic, description, icon_key, ui_theme_key, ui_defaults, live_session_config',
+        )
+        .eq('org_id', input.orgId)
+        .eq('id', input.channelId)
+        .is('deleted_at', null)
+        .maybeSingle<{
+          topic: string | null;
+          description: string | null;
+          icon_key: string | null;
+          ui_theme_key: string | null;
+          ui_defaults: unknown;
+          live_session_config: unknown;
+        }>(),
+    ]);
+
+    if (participantsResult.error) {
+      throw new InternalServerErrorException(participantsResult.error.message);
+    }
+    if (schedulesResult.error) {
+      throw new InternalServerErrorException(schedulesResult.error.message);
+    }
+    if (channelResult.error) {
+      throw new InternalServerErrorException(channelResult.error.message);
+    }
+
+    const schedules = schedulesResult.data ?? [];
+    const scheduleIds = schedules.map((schedule) => schedule.id);
+
+    let recurrenceRows: Array<{
+      id: string;
+      schedule_id: string;
+      frequency: string;
+      interval: number | null;
+      count: number | null;
+      until: string | null;
+      timezone: string | null;
+      bysecond: number[] | null;
+      byminute: number[] | null;
+      byhour: number[] | null;
+      byday: string[] | null;
+      bymonthday: number[] | null;
+      byyearday: number[] | null;
+      byweekno: number[] | null;
+      bymonth: number[] | null;
+      bysetpos: number[] | null;
+      wkst: string | null;
+    }> = [];
+    if (scheduleIds.length) {
+      const { data, error } = await supabase
+        .from('class_schedule_recurrence')
+        .select(
+          'id, schedule_id, frequency, interval, count, until, timezone, bysecond, byminute, byhour, byday, bymonthday, byyearday, byweekno, bymonth, bysetpos, wkst',
+        )
+        .eq('org_id', input.orgId)
+        .in('schedule_id', scheduleIds)
+        .is('deleted_at', null);
+      if (error) throw new InternalServerErrorException(error.message);
+      recurrenceRows = data ?? [];
+    }
+
+    const recurrenceIds = recurrenceRows.map((row) => row.id);
+    let exceptionRows: Array<{
+      recurrence_id: string;
+      occurrence_key: string;
+      reason: string | null;
+    }> = [];
+    let overrideRows: Array<{
+      recurrence_id: string;
+      occurrence_key: string;
+      patch: Record<string, unknown> | null;
+    }> = [];
+    if (recurrenceIds.length) {
+      const [exceptionsResult, overridesResult] = await Promise.all([
+        supabase
+          .from('class_schedule_recurrence_exceptions')
+          .select('recurrence_id, occurrence_key, reason')
+          .eq('org_id', input.orgId)
+          .in('recurrence_id', recurrenceIds),
+        supabase
+          .from('class_schedule_recurrence_overrides')
+          .select('recurrence_id, occurrence_key, patch')
+          .eq('org_id', input.orgId)
+          .in('recurrence_id', recurrenceIds),
+      ]);
+      if (exceptionsResult.error) {
+        throw new InternalServerErrorException(exceptionsResult.error.message);
+      }
+      if (overridesResult.error) {
+        throw new InternalServerErrorException(overridesResult.error.message);
+      }
+      exceptionRows = exceptionsResult.data ?? [];
+      overrideRows = overridesResult.data ?? [];
+    }
+
+    const channel = channelResult.data;
+
+    return {
+      participantProfileIds: (participantsResult.data ?? []).map((row) => row.profile_id),
+      schedules: schedules.map((schedule) => ({
+        id: schedule.id,
+        title: schedule.title,
+        startAt: schedule.start_at,
+        endAt: schedule.end_at,
+        timezone: schedule.timezone,
+      })),
+      recurrences: recurrenceRows.map((row) => ({
+        id: row.id,
+        scheduleId: row.schedule_id,
+        frequency: row.frequency,
+        interval: row.interval,
+        count: row.count,
+        until: row.until,
+        timezone: row.timezone,
+        bySecond: row.bysecond,
+        byMinute: row.byminute,
+        byHour: row.byhour,
+        byDay: row.byday,
+        byMonthDay: row.bymonthday,
+        byYearDay: row.byyearday,
+        byWeekNo: row.byweekno,
+        byMonth: row.bymonth,
+        bySetPos: row.bysetpos,
+        wkst: row.wkst,
+      })),
+      exceptions: exceptionRows.map((row) => ({
+        recurrenceId: row.recurrence_id,
+        occurrenceKey: row.occurrence_key,
+        reason: row.reason,
+      })),
+      overrides: overrideRows.map((row) => ({
+        recurrenceId: row.recurrence_id,
+        occurrenceKey: row.occurrence_key,
+        patch: row.patch,
+      })),
+      channel: channel
+        ? {
+            topic: channel.topic,
+            description: channel.description,
+            iconKey: channel.icon_key,
+            themeKey: channel.ui_theme_key,
+            uiDefaults: channel.ui_defaults,
+            liveSessionConfig: channel.live_session_config,
+          }
+        : null,
+    };
   }
 
   async createException(

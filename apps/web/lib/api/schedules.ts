@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { LearningSpaceEditContextVM } from '@iconicedu/shared-types';
 import { createApiClient } from '@iconicedu/web/lib/api/http-client';
 
 // GET /schedules returns the raw class_schedules row shape (snake_case, plus
@@ -23,4 +24,14 @@ export function listSchedules(
   input: { orgId: string; channelId?: string },
 ) {
   return createApiClient(supabase).get<ScheduleOptionRow[]>('/schedules', input);
+}
+
+export function getLearningSpaceEditContext(
+  supabase: SupabaseClient,
+  input: { orgId: string; learningSpaceId: string; channelId: string },
+) {
+  return createApiClient(supabase).get<LearningSpaceEditContextVM>(
+    '/schedules/learning-space/context',
+    input,
+  );
 }
