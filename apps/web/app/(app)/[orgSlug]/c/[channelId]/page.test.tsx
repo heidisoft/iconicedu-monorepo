@@ -17,6 +17,7 @@ vi.mock('@iconicedu/web/app/(app)/[orgSlug]/messages/messages-shell-client', () 
 }));
 
 vi.mock('@iconicedu/web/app/actions/messages', () => ({
+  editTextMessageAction: vi.fn(),
   sendFileMessageAction: vi.fn(),
   sendFilesMessageAction: vi.fn(),
   sendTextMessageAction: vi.fn(),

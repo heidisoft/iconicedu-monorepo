@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { DashboardHeader } from '@iconicedu/ui-web';
 import { LearningSpaceShell } from '@iconicedu/web/app/(app)/[orgSlug]/s/[channelId]/learning-space-shell';
 import {
+  editTextMessageAction,
   sendFileMessageAction,
   sendFilesMessageAction,
   sendTextMessageAction,
@@ -77,6 +78,7 @@ export default async function Page({
         sendTextMessage={sendTextMessageAction}
         sendFileMessage={sendFileMessageAction}
         sendFilesMessage={sendFilesMessageAction}
+        editTextMessage={editTextMessageAction}
         toggleReaction={toggleMessageReactionAction}
         toggleSavedMessage={toggleSavedMessageAction}
         deleteMessage={deleteMessageAction}

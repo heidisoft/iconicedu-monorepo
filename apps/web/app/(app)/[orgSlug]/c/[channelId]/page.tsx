@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { DashboardHeader } from '@iconicedu/ui-web';
 import {
+  editTextMessageAction,
   sendFileMessageAction,
   sendFilesMessageAction,
   sendTextMessageAction,
@@ -69,6 +70,7 @@ export default async function Page({
         sendTextMessage={sendTextMessageAction}
         sendFileMessage={sendFileMessageAction}
         sendFilesMessage={sendFilesMessageAction}
+        editTextMessage={editTextMessageAction}
         toggleReaction={toggleMessageReactionAction}
         toggleSavedMessage={toggleSavedMessageAction}
         deleteMessage={deleteMessageAction}

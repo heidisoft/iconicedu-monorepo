@@ -1,6 +1,7 @@
 'use server';
 
 import type {
+  MessageEditTextInput,
   MessageMentionVM,
   MessageSendFileInput,
   MessageSendFilesInput,
@@ -9,6 +10,7 @@ import type {
   MessageToggleReactionInput,
   MessageVM,
 } from '@iconicedu/shared-types';
+import { MESSAGE_EDIT_WINDOW_MINUTES } from '@iconicedu/shared-types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
@@ -132,6 +134,23 @@ async function insertMessageRowWithRlsFallback(input: {
   }
 
   return serviceInsert;
+}
+
+async function findExistingMessageByClientId(
+  supabase: SupabaseClient,
+  input: { orgId: string; channelId: string; clientMessageId: string },
+): Promise<{ id: string } | null> {
+  const response = await supabase
+    .from('messages')
+    .select('id')
+    .eq('id', input.clientMessageId)
+    .eq('org_id', input.orgId)
+    .eq('channel_id', input.channelId)
+    .maybeSingle<{ id: string }>();
+  if (response.error) {
+    throw new Error(response.error.message);
+  }
+  return response.data ?? null;
 }
 
 function sanitizeMentions(
@@ -601,6 +620,29 @@ export async function sendTextMessageWithSupabase(
   if (input.senderProfileId !== currentProfileId) {
     throw new Error('Invalid sender');
   }
+
+  if (input.clientMessageId) {
+    const existingMessage = await findExistingMessageByClientId(supabase, {
+      orgId: accountOrgId,
+      channelId: input.channelId,
+      clientMessageId: input.clientMessageId,
+    });
+    if (existingMessage) {
+      const existingVM = await buildMessageById(
+        supabase,
+        accountOrgId,
+        existingMessage.id,
+        {
+          accountId: actor.account.id,
+          profileId: currentProfileId,
+        },
+      );
+      if (existingVM) {
+        return existingVM;
+      }
+    }
+  }
+
   let sanitizedMentions: MessageMentionVM[] = [];
   if (input.mentions?.length) {
     const channelMembersResponse = await supabase
@@ -684,6 +726,7 @@ export async function sendTextMessageWithSupabase(
     now,
   });
   const messageInsertValues = {
+    ...(input.clientMessageId ? { id: input.clientMessageId } : {}),
     org_id: accountOrgId,
     channel_id: input.channelId,
     sender_profile_id: currentProfileId,
@@ -915,9 +958,32 @@ export async function sendFileMessageWithSupabase(
     throw new Error('Invalid file storage path');
   }
 
-  const now = new Date().toISOString();
   const currentProfileId = actor.profile.id;
   const serviceSupabase = deps.serviceSupabase;
+
+  if (input.clientMessageId) {
+    const existingMessage = await findExistingMessageByClientId(supabase, {
+      orgId: input.orgId,
+      channelId: input.channelId,
+      clientMessageId: input.clientMessageId,
+    });
+    if (existingMessage) {
+      const existingVM = await buildMessageById(
+        supabase,
+        input.orgId,
+        existingMessage.id,
+        {
+          accountId: actor.account.id,
+          profileId: currentProfileId,
+        },
+      );
+      if (existingVM) {
+        return existingVM;
+      }
+    }
+  }
+
+  const now = new Date().toISOString();
   const activityContext = await resolveActivityChannelContext({
     supabase,
     orgId: input.orgId,
@@ -983,6 +1049,7 @@ export async function sendFileMessageWithSupabase(
     supabase,
     serviceSupabase,
     values: {
+      ...(input.clientMessageId ? { id: input.clientMessageId } : {}),
       org_id: input.orgId,
       channel_id: input.channelId,
       sender_profile_id: currentProfileId,
@@ -1250,8 +1317,31 @@ export async function sendFilesMessageWithSupabase(
     throw new Error('Mixed file and image uploads must be sent separately');
   }
 
-  const now = new Date().toISOString();
   const serviceSupabase = deps.serviceSupabase;
+
+  if (input.clientMessageId) {
+    const existingMessage = await findExistingMessageByClientId(supabase, {
+      orgId: input.orgId,
+      channelId: input.channelId,
+      clientMessageId: input.clientMessageId,
+    });
+    if (existingMessage) {
+      const existingVM = await buildMessageById(
+        supabase,
+        input.orgId,
+        existingMessage.id,
+        {
+          accountId: actor.account.id,
+          profileId: currentProfileId,
+        },
+      );
+      if (existingVM) {
+        return existingVM;
+      }
+    }
+  }
+
+  const now = new Date().toISOString();
   const activityContext = await resolveActivityChannelContext({
     supabase,
     orgId: input.orgId,
@@ -1310,6 +1400,7 @@ export async function sendFilesMessageWithSupabase(
     supabase,
     serviceSupabase,
     values: {
+      ...(input.clientMessageId ? { id: input.clientMessageId } : {}),
       org_id: input.orgId,
       channel_id: input.channelId,
       sender_profile_id: currentProfileId,
@@ -1759,4 +1850,117 @@ export async function toggleSavedMessageAction(
   if (unsaveResponse.error) {
     throw new Error(unsaveResponse.error.message);
   }
+}
+
+export async function editTextMessageAction(
+  input: MessageEditTextInput,
+): Promise<MessageVM> {
+  const supabase = await createSupabaseServerClient();
+  const authUser = await requireAuthedUser(supabase);
+  const actor = await resolveEffectiveMessageActor({
+    supabase,
+    authUserId: authUser.id,
+    orgId: input.orgId,
+  });
+
+  const content = input.content.trim();
+  if (!content) {
+    throw new Error('Message text is required');
+  }
+
+  const messageResponse = await supabase
+    .from('messages')
+    .select('id, org_id, channel_id, sender_profile_id, type, created_at, deleted_at')
+    .eq('id', input.messageId)
+    .maybeSingle<{
+      id: string;
+      org_id: string;
+      channel_id: string;
+      sender_profile_id: string;
+      type: string;
+      created_at: string;
+      deleted_at: string | null;
+    }>();
+
+  if (!messageResponse.data || messageResponse.data.org_id !== input.orgId) {
+    throw new Error('Message not found');
+  }
+  if (messageResponse.data.deleted_at) {
+    throw new Error('Message has been deleted');
+  }
+  if (messageResponse.data.type !== 'text') {
+    throw new Error('Only text messages can be edited');
+  }
+  if (messageResponse.data.sender_profile_id !== actor.profile.id) {
+    throw new Error('Unauthorized: You can only edit your own messages');
+  }
+
+  const editWindowMs = MESSAGE_EDIT_WINDOW_MINUTES * 60 * 1000;
+  if (Date.now() - new Date(messageResponse.data.created_at).getTime() > editWindowMs) {
+    throw new Error('The edit window for this message has passed');
+  }
+
+  let sanitizedMentions: MessageMentionVM[] = [];
+  if (input.mentions?.length) {
+    const channelMembersResponse = await supabase
+      .from('channel_members')
+      .select('profile_id')
+      .eq('org_id', input.orgId)
+      .eq('channel_id', messageResponse.data.channel_id)
+      .is('deleted_at', null)
+      .returns<Array<{ profile_id: string }>>();
+
+    if (channelMembersResponse.error) {
+      throw new Error(channelMembersResponse.error.message);
+    }
+
+    sanitizedMentions = sanitizeMentions(
+      content,
+      input.mentions,
+      new Set((channelMembersResponse.data ?? []).map((member) => member.profile_id)),
+      actor.profile.id,
+    );
+  }
+
+  const now = new Date().toISOString();
+  const payloadUpdate = await supabase
+    .from('message_text')
+    .update({
+      payload: {
+        text: content,
+        ...(sanitizedMentions.length ? { mentions: sanitizedMentions } : {}),
+      },
+      updated_at: now,
+      updated_by: actor.profile.id,
+    })
+    .eq('message_id', input.messageId)
+    .eq('org_id', input.orgId);
+
+  if (payloadUpdate.error) {
+    throw new Error(payloadUpdate.error.message);
+  }
+
+  const messageUpdate = await supabase
+    .from('messages')
+    .update({
+      is_edited: true,
+      edited_at: now,
+    })
+    .eq('id', input.messageId)
+    .eq('org_id', input.orgId)
+    .eq('sender_profile_id', actor.profile.id)
+    .is('deleted_at', null);
+
+  if (messageUpdate.error) {
+    throw new Error(messageUpdate.error.message);
+  }
+
+  const updatedVM = await buildMessageById(supabase, input.orgId, input.messageId, {
+    accountId: actor.account.id,
+    profileId: actor.profile.id,
+  });
+  if (!updatedVM) {
+    throw new Error('Unable to load updated message');
+  }
+  return updatedVM;
 }

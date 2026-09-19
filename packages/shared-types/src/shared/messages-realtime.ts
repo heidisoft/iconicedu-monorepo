@@ -60,6 +60,12 @@ export type MessageSendTextInput = {
   } | null;
   threadParentId?: string | null;
   threadId?: string | null;
+  /**
+   * Client-generated UUID used as the message's row id. Retrying a send with
+   * the same value is idempotent: the server returns the already-created
+   * message instead of inserting a duplicate.
+   */
+  clientMessageId?: string;
 };
 
 export type MessageSendFileInput = {
@@ -75,6 +81,7 @@ export type MessageSendFileInput = {
   durationSeconds?: number;
   threadParentId?: string | null;
   threadId?: string | null;
+  clientMessageId?: string;
 };
 
 export type MessageSendFilesInput = {
@@ -91,6 +98,7 @@ export type MessageSendFilesInput = {
   content?: string;
   threadParentId?: string | null;
   threadId?: string | null;
+  clientMessageId?: string;
 };
 
 export type MessageToggleReactionInput = {
@@ -116,10 +124,21 @@ export type MessageToggleSavedInput = {
   isSaved: boolean;
 };
 
+export type MessageEditTextInput = {
+  orgId: string;
+  messageId: string;
+  content: string;
+  mentions?: MessageMentionVM[];
+};
+
 export interface MessageWriteClient {
   sendTextMessage: (input: MessageSendTextInput) => Promise<MessageVM>;
+  editTextMessage: (input: MessageEditTextInput) => Promise<MessageVM>;
   toggleReaction: (input: MessageToggleReactionInput) => Promise<void>;
   toggleSavedMessage: (input: MessageToggleSavedInput) => Promise<void>;
   deleteMessage: (input: MessageDeleteInput) => Promise<void>;
   toggleHiddenMessage: (input: MessageToggleHiddenInput) => Promise<void>;
 }
+
+/** Minutes after sending during which a sender may still edit a text message. */
+export const MESSAGE_EDIT_WINDOW_MINUTES = 15;

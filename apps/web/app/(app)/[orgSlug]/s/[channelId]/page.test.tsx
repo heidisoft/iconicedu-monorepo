@@ -17,6 +17,7 @@ vi.mock('@iconicedu/web/app/(app)/[orgSlug]/s/[channelId]/learning-space-shell',
 }));
 
 vi.mock('@iconicedu/web/app/actions/messages', () => ({
+  editTextMessageAction: vi.fn(),
   sendFileMessageAction: vi.fn(),
   sendFilesMessageAction: vi.fn(),
   sendTextMessageAction: vi.fn(),

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   deleteMessageAction,
+  editTextMessageAction,
   sendFileMessageAction,
   sendFilesMessageAction,
   sendTextMessageAction,
@@ -17,6 +18,9 @@ const apiPost = vi.fn();
 const apiDelete = vi.fn();
 const resolveActiveProfileForAccountInOrg = vi.fn();
 const buildThreadById = vi.fn(async () => ({ ids: { id: 'thread-1', orgId: 'org-1' } }));
+const buildMessageById = vi.fn(async () => ({
+  ids: { id: 'message-1', orgId: 'org-1' },
+}));
 
 function createChannelLookupChain(
   data: {
@@ -94,6 +98,9 @@ vi.mock('../../lib/api/http-client', () => ({
 
 vi.mock('@iconicedu/web/lib/messages/builders/thread.builder', () => ({
   buildThreadById: (...args: unknown[]) => buildThreadById(...args),
+}));
+vi.mock('@iconicedu/web/lib/messages/builders/message.builder', () => ({
+  buildMessageById: (...args: unknown[]) => buildMessageById(...args),
 }));
 vi.mock('@iconicedu/web/lib/messages/link-preview', () => ({
   extractFirstUrl: vi.fn(
@@ -3380,5 +3387,178 @@ describe('toggleSavedMessageAction', () => {
     expect(unsaveChain.eq).toHaveBeenCalledWith('message_id', 'message-1');
     expect(unsaveChain.eq).toHaveBeenCalledWith('profile_id', 'profile-1');
     expect(unsaveChain.is).toHaveBeenCalledWith('deleted_at', null);
+  });
+});
+
+describe('editTextMessageAction', () => {
+  function mockMessageRow(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'message-1',
+      org_id: 'org-1',
+      channel_id: 'chan-1',
+      sender_profile_id: 'profile-1',
+      type: 'text',
+      created_at: new Date().toISOString(),
+      deleted_at: null,
+      ...overrides,
+    };
+  }
+
+  function setUpSupabase(messageRow: Record<string, unknown> | null) {
+    const supabase = {
+      auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
+      from: vi.fn(),
+    };
+
+    const messageSelectChain: any = {};
+    messageSelectChain.eq = vi.fn(() => messageSelectChain);
+    messageSelectChain.maybeSingle = vi.fn(async () => ({ data: messageRow }));
+
+    const messageTextUpdateChain: any = {};
+    messageTextUpdateChain.eq = vi.fn(() => messageTextUpdateChain);
+    messageTextUpdateChain.then = (resolve: any, reject?: any) =>
+      Promise.resolve({ error: null }).then(resolve, reject);
+    const updateMessageText = vi.fn(() => messageTextUpdateChain);
+
+    const messagesUpdateChain: any = {};
+    messagesUpdateChain.eq = vi.fn(() => messagesUpdateChain);
+    messagesUpdateChain.is = vi.fn(async () => ({ error: null }));
+    const updateMessage = vi.fn(() => messagesUpdateChain);
+
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'messages') {
+        return { select: () => messageSelectChain, update: updateMessage };
+      }
+      if (table === 'message_text') {
+        return { update: updateMessageText };
+      }
+      return {};
+    });
+
+    return { supabase, updateMessageText, updateMessage };
+  }
+
+  beforeEach(() => {
+    buildMessageById.mockReset();
+    buildMessageById.mockResolvedValue({ ids: { id: 'message-1', orgId: 'org-1' } });
+  });
+
+  it('updates the payload, marks the message edited, and returns the rebuilt VM', async () => {
+    const { supabase, updateMessageText, updateMessage } =
+      setUpSupabase(mockMessageRow());
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
+
+    const result = await editTextMessageAction({
+      orgId: 'org-1',
+      messageId: 'message-1',
+      content: 'updated text',
+    });
+
+    expect(updateMessageText).toHaveBeenCalledWith(
+      expect.objectContaining({ payload: { text: 'updated text' } }),
+    );
+    expect(updateMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ is_edited: true }),
+    );
+    expect(buildMessageById).toHaveBeenCalledWith(supabase, 'org-1', 'message-1', {
+      accountId: 'account-1',
+      profileId: 'profile-1',
+    });
+    expect(result).toEqual({ ids: { id: 'message-1', orgId: 'org-1' } });
+  });
+
+  it('rejects editing a message the actor does not own', async () => {
+    const { supabase } = setUpSupabase(
+      mockMessageRow({ sender_profile_id: 'someone-else' }),
+    );
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
+
+    await expect(
+      editTextMessageAction({
+        orgId: 'org-1',
+        messageId: 'message-1',
+        content: 'nope',
+      }),
+    ).rejects.toThrow('Unauthorized: You can only edit your own messages');
+  });
+
+  it('rejects editing outside the edit window', async () => {
+    const { supabase } = setUpSupabase(
+      mockMessageRow({ created_at: new Date(Date.now() - 20 * 60 * 1000).toISOString() }),
+    );
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
+
+    await expect(
+      editTextMessageAction({
+        orgId: 'org-1',
+        messageId: 'message-1',
+        content: 'too late',
+      }),
+    ).rejects.toThrow('The edit window for this message has passed');
+  });
+
+  it('rejects editing a non-text message', async () => {
+    const { supabase } = setUpSupabase(mockMessageRow({ type: 'image' }));
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
+
+    await expect(
+      editTextMessageAction({
+        orgId: 'org-1',
+        messageId: 'message-1',
+        content: 'nope',
+      }),
+    ).rejects.toThrow('Only text messages can be edited');
+  });
+
+  it('rejects editing a deleted message', async () => {
+    const { supabase } = setUpSupabase(
+      mockMessageRow({ deleted_at: new Date().toISOString() }),
+    );
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
+
+    await expect(
+      editTextMessageAction({
+        orgId: 'org-1',
+        messageId: 'message-1',
+        content: 'nope',
+      }),
+    ).rejects.toThrow('Message has been deleted');
+  });
+
+  it('rejects when the message does not belong to the given org', async () => {
+    const { supabase } = setUpSupabase(mockMessageRow({ org_id: 'other-org' }));
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
+
+    await expect(
+      editTextMessageAction({
+        orgId: 'org-1',
+        messageId: 'message-1',
+        content: 'nope',
+      }),
+    ).rejects.toThrow('Message not found');
   });
 });

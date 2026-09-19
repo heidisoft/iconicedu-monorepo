@@ -4,12 +4,14 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Query,
   Post,
   Req,
   UseGuards,
 } from '@nestjs/common';
 import type {
+  MessageEditTextInput,
   MessageSendFileInput,
   MessageSendFilesInput,
   MessageSendTextInput,
@@ -90,6 +92,17 @@ export class MessagesController {
   sendFiles(@Req() req: AuthenticatedRequest, @Body() body: MessageSendFilesInput) {
     const accessToken = extractBearerToken(req.headers.authorization);
     return this.messagesService.sendFilesMessage(req.user.id, accessToken, body);
+  }
+
+  @Patch(':id/text')
+  @UseGuards(AuthGuard)
+  editText(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() body: MessageEditTextInput,
+  ) {
+    const accessToken = extractBearerToken(req.headers.authorization);
+    return this.messagesService.editTextMessage(req.user.id, accessToken, id, body);
   }
 
   @Delete(':id')

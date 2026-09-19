@@ -12,6 +12,7 @@ import type {
   AudienceRuleVM,
   FeedScopeVM,
   MessageVM,
+  MessageEditTextInput,
   MessageMentionVM,
   MessageSendFileInput,
   MessageSendFilesInput,
@@ -19,6 +20,7 @@ import type {
   ReactionVM,
   ThreadVM,
 } from '@iconicedu/shared-types';
+import { MESSAGE_EDIT_WINDOW_MINUTES } from '@iconicedu/shared-types';
 import { buildSenderProfile, mapRowToMessageVM } from '@iconicedu/utils';
 import {
   resolveActivityChannelContext,
@@ -998,6 +1000,23 @@ export class MessagesService {
     return { accountId: account.id, profile: senderProfile };
   }
 
+  private async findExistingMessageByClientId(input: {
+    serviceSupabase: ReturnType<typeof createSupabaseServiceClient>;
+    orgId: string;
+    channelId: string;
+    clientMessageId: string;
+  }): Promise<{ id: string } | null> {
+    const { data, error } = await input.serviceSupabase
+      .from('messages')
+      .select('id')
+      .eq('id', input.clientMessageId)
+      .eq('org_id', input.orgId)
+      .eq('channel_id', input.channelId)
+      .maybeSingle<{ id: string }>();
+    if (error) throw new InternalServerErrorException(error.message);
+    return data ?? null;
+  }
+
   private async resolveThreadContext(input: {
     accessToken: string;
     orgId: string;
@@ -1323,6 +1342,19 @@ export class MessagesService {
         senderProfileId: input.senderProfileId,
       });
       const serviceSupabase = createSupabaseServiceClient();
+
+      if (input.clientMessageId) {
+        const existing = await this.findExistingMessageByClientId({
+          serviceSupabase,
+          orgId: input.orgId,
+          channelId: input.channelId,
+          clientMessageId: input.clientMessageId,
+        });
+        if (existing) {
+          return { id: existing.id };
+        }
+      }
+
       let sanitizedMentions: MessageMentionVM[] = [];
       if (input.mentions?.length) {
         const channelMembersResponse = await serviceSupabase
@@ -1420,6 +1452,7 @@ export class MessagesService {
       const messageInsert = await serviceSupabase
         .from('messages')
         .insert({
+          ...(input.clientMessageId ? { id: input.clientMessageId } : {}),
           org_id: input.orgId,
           channel_id: input.channelId,
           sender_profile_id: actor.profile.id,
@@ -1539,6 +1572,107 @@ export class MessagesService {
     }
   }
 
+  async editTextMessage(
+    authUserId: string,
+    accessToken: string,
+    messageId: string,
+    input: MessageEditTextInput,
+  ) {
+    const content = input.content.trim();
+    if (!content) throw new BadRequestException('Message text is required');
+    if (!input.orgId) throw new BadRequestException('orgId is required');
+
+    const serviceSupabase = createSupabaseServiceClient();
+    const { data: message, error: messageError } = await serviceSupabase
+      .from('messages')
+      .select('id, org_id, channel_id, sender_profile_id, type, created_at, deleted_at')
+      .eq('id', messageId)
+      .maybeSingle<{
+        id: string;
+        org_id: string;
+        channel_id: string;
+        sender_profile_id: string;
+        type: string;
+        created_at: string;
+        deleted_at: string | null;
+      }>();
+    if (messageError) throw new InternalServerErrorException(messageError.message);
+    if (!message || message.org_id !== input.orgId) {
+      throw new NotFoundException('Message not found');
+    }
+    if (message.deleted_at) {
+      throw new BadRequestException('Message has been deleted');
+    }
+    if (message.type !== 'text') {
+      throw new BadRequestException('Only text messages can be edited');
+    }
+
+    const actor = await this.resolveWritableProfile({
+      authUserId,
+      accessToken,
+      orgId: input.orgId,
+      senderProfileId: message.sender_profile_id,
+    });
+
+    const editWindowMs = MESSAGE_EDIT_WINDOW_MINUTES * 60 * 1000;
+    if (Date.now() - new Date(message.created_at).getTime() > editWindowMs) {
+      throw new ForbiddenException('The edit window for this message has passed');
+    }
+
+    let sanitizedMentions: MessageMentionVM[] = [];
+    if (input.mentions?.length) {
+      const channelMembersResponse = await serviceSupabase
+        .from('channel_members')
+        .select('profile_id')
+        .eq('org_id', input.orgId)
+        .eq('channel_id', message.channel_id)
+        .is('deleted_at', null)
+        .returns<Array<{ profile_id: string }>>();
+      if (channelMembersResponse.error) {
+        throw new InternalServerErrorException(channelMembersResponse.error.message);
+      }
+      sanitizedMentions = sanitizeMentions(
+        content,
+        input.mentions,
+        new Set((channelMembersResponse.data ?? []).map((member) => member.profile_id)),
+        actor.profile.id,
+      );
+    }
+
+    const now = new Date().toISOString();
+    const payloadUpdate = await serviceSupabase
+      .from('message_text')
+      .update({
+        payload: {
+          text: content,
+          ...(sanitizedMentions.length ? { mentions: sanitizedMentions } : {}),
+        },
+        updated_at: now,
+        updated_by: actor.profile.id,
+      })
+      .eq('message_id', messageId)
+      .eq('org_id', input.orgId);
+    if (payloadUpdate.error) {
+      throw new InternalServerErrorException(payloadUpdate.error.message);
+    }
+
+    const messageUpdate = await serviceSupabase
+      .from('messages')
+      .update({
+        is_edited: true,
+        edited_at: now,
+        updated_at: now,
+        updated_by: actor.profile.id,
+      })
+      .eq('id', messageId)
+      .eq('org_id', input.orgId);
+    if (messageUpdate.error) {
+      throw new InternalServerErrorException(messageUpdate.error.message);
+    }
+
+    return { id: messageId };
+  }
+
   async sendFileMessage(
     authUserId: string,
     accessToken: string,
@@ -1567,6 +1701,19 @@ export class MessagesService {
       ) {
         throw new BadRequestException('Invalid file storage path');
       }
+
+      if (input.clientMessageId) {
+        const existing = await this.findExistingMessageByClientId({
+          serviceSupabase,
+          orgId: input.orgId,
+          channelId: input.channelId,
+          clientMessageId: input.clientMessageId,
+        });
+        if (existing) {
+          return { id: existing.id };
+        }
+      }
+
       const now = new Date().toISOString();
       const activityContext = await resolveActivityChannelContext({
         supabase: serviceSupabase,
@@ -1642,6 +1789,7 @@ export class MessagesService {
       const messageInsert = await serviceSupabase
         .from('messages')
         .insert({
+          ...(input.clientMessageId ? { id: input.clientMessageId } : {}),
           org_id: input.orgId,
           channel_id: input.channelId,
           sender_profile_id: actor.profile.id,
@@ -1814,6 +1962,19 @@ export class MessagesService {
           throw new BadRequestException('Invalid file storage path');
         }
       }
+
+      if (input.clientMessageId) {
+        const existing = await this.findExistingMessageByClientId({
+          serviceSupabase,
+          orgId: input.orgId,
+          channelId: input.channelId,
+          clientMessageId: input.clientMessageId,
+        });
+        if (existing) {
+          return { id: existing.id };
+        }
+      }
+
       const now = new Date().toISOString();
       const activityContext = await resolveActivityChannelContext({
         supabase: serviceSupabase,
@@ -1897,6 +2058,7 @@ export class MessagesService {
       const messageInsert = await serviceSupabase
         .from('messages')
         .insert({
+          ...(input.clientMessageId ? { id: input.clientMessageId } : {}),
           org_id: input.orgId,
           channel_id: input.channelId,
           sender_profile_id: actor.profile.id,
