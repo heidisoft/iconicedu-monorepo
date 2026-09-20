@@ -94,6 +94,9 @@ interface MessageListProps {
   onToggleSaved?: (messageId: string) => void;
   onToggleHidden?: (messageId: string) => void;
   onDelete?: (messageId: string) => void;
+  onRetrySend?: (messageId: string) => void;
+  onEditFailedSend?: (messageId: string) => void;
+  onDiscardFailedSend?: (messageId: string) => void;
   getMessageActionState?: (messageId: string) => MessageActionState | undefined;
   currentUserId?: string;
   currentUserProfile?: UserProfileVM | null;
@@ -214,6 +217,9 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
       onToggleSaved,
       onToggleHidden,
       onDelete,
+      onRetrySend,
+      onEditFailedSend,
+      onDiscardFailedSend,
       getMessageActionState,
       currentUserId,
       currentUserProfile,
@@ -882,6 +888,9 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
             onToggleSaved={onToggleSaved}
             onToggleHidden={onToggleHidden}
             onDelete={onDelete}
+            onRetrySend={onRetrySend}
+            onEditFailedSend={onEditFailedSend}
+            onDiscardFailedSend={onDiscardFailedSend}
             actionState={getMessageActionState?.(message.ids.id)}
             currentUserId={currentUserId}
             currentUserCanDeleteAnyMessages={currentUserCanDeleteAnyMessages}
@@ -1425,6 +1434,9 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                         onToggleSaved={onToggleSaved}
                         onToggleHidden={onToggleHidden}
                         onDelete={onDelete}
+                        onRetrySend={onRetrySend}
+                        onEditFailedSend={onEditFailedSend}
+                        onDiscardFailedSend={onDiscardFailedSend}
                         actionState={getMessageActionState?.(message.ids.id)}
                         currentUserId={currentUserId}
                         currentUserCanDeleteAnyMessages={currentUserCanDeleteAnyMessages}

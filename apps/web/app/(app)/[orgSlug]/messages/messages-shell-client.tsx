@@ -143,6 +143,9 @@ type MessagesShellClientProps = {
   currentUserProfile?: UserProfileVM | null;
   readOnly?: boolean;
   showCreateMessageTypeButton?: boolean;
+  enableMessageDrafts?: boolean;
+  enableMessageEdit?: boolean;
+  enableMessageSendReliability?: boolean;
   panelRegistry?: Partial<
     MessagesRightPanelRegistry<ComponentType<{ intent: MessagesRightPanelIntent }>>
   >;
@@ -176,6 +179,9 @@ export function MessagesShellClient({
   currentUserProfile,
   readOnly = false,
   showCreateMessageTypeButton = true,
+  enableMessageDrafts = false,
+  enableMessageEdit = false,
+  enableMessageSendReliability = false,
   panelRegistry,
   sendTextMessage,
   sendFileMessage,
@@ -523,6 +529,9 @@ export function MessagesShellClient({
         currentUserProfile={currentUserProfile}
         readOnly={readOnly}
         showCreateMessageTypeButton={showCreateMessageTypeButton}
+        enableMessageDrafts={enableMessageDrafts}
+        enableMessageEdit={enableMessageEdit}
+        enableMessageSendReliability={enableMessageSendReliability}
         panelRegistry={panelRegistry}
         realtimeClient={realtimeClient}
         messageWriteClient={messageWriteClient}

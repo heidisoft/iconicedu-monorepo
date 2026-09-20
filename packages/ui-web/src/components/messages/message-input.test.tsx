@@ -1,14 +1,18 @@
-import { describe, expect, it, vi } from 'vitest';
+/* @vitest-environment jsdom */
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { UserProfileVM } from '@iconicedu/shared-types';
 
 import { MESSAGE_INPUT_FILE_ACCEPT } from './message-input.attachments';
-import { buildAssignmentDraftFromContent } from './message-input';
+import { buildAssignmentDraftFromContent, MessageInput } from './message-input';
 import {
   getMentionCandidates,
   getMentionPopupPosition,
   getMentionState,
   matchesMentionQuery,
 } from './message-input.utils';
+import { readMessageDraft } from './message-draft-store';
 
 function createParticipant(
   overrides: Partial<UserProfileVM> & { ids?: Partial<UserProfileVM['ids']> } = {},
@@ -351,6 +355,142 @@ describe('message-input mention helpers', () => {
       description: '',
       message: '',
       subject: '',
+    });
+  });
+});
+
+const draftScope = {
+  accountId: 'account-1',
+  profileId: 'user-1',
+  orgId: 'org-1',
+  channelId: 'channel-1',
+  threadId: null,
+};
+
+describe('MessageInput drafts and send reliability', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  afterEach(() => {
+    window.localStorage.clear();
+    vi.restoreAllMocks();
+  });
+
+  it('never touches localStorage when enableMessageDrafts is off', async () => {
+    const user = userEvent.setup();
+    render(
+      <MessageInput
+        onSend={vi.fn()}
+        draftScope={draftScope}
+        enableMessageDrafts={false}
+      />,
+    );
+
+    await user.type(screen.getByPlaceholderText('Write a message...'), 'unsaved text');
+
+    expect(readMessageDraft(draftScope)).toBeNull();
+    expect(screen.queryByText('Draft saved')).not.toBeInTheDocument();
+  });
+
+  it('autosaves the composer text as a draft after the debounce window', async () => {
+    const user = userEvent.setup();
+    render(<MessageInput onSend={vi.fn()} draftScope={draftScope} enableMessageDrafts />);
+
+    await user.type(
+      screen.getByPlaceholderText('Write a message...'),
+      'Hi there, quick question',
+    );
+
+    await waitFor(
+      () => {
+        expect(readMessageDraft(draftScope)?.content).toBe('Hi there, quick question');
+      },
+      { timeout: 2000 },
+    );
+    await screen.findByText('Draft saved');
+  });
+
+  it('restores a saved draft into the composer on mount', async () => {
+    window.localStorage.setItem(
+      'message-draft:account-1:user-1:org-1:channel-1:main',
+      JSON.stringify({
+        version: 1,
+        ...draftScope,
+        content: 'Restored draft text',
+        updatedAt: new Date().toISOString(),
+      }),
+    );
+
+    render(<MessageInput onSend={vi.fn()} draftScope={draftScope} enableMessageDrafts />);
+
+    expect(await screen.findByDisplayValue('Restored draft text')).toBeInTheDocument();
+    expect(await screen.findByText('Draft restored')).toBeInTheDocument();
+  });
+
+  it('clears the draft after a successful send', async () => {
+    const user = userEvent.setup();
+    const onSend = vi.fn().mockResolvedValue(undefined);
+    render(<MessageInput onSend={onSend} draftScope={draftScope} enableMessageDrafts />);
+
+    const textarea = screen.getByPlaceholderText('Write a message...');
+    await user.type(textarea, 'Message to send');
+    await waitFor(() => {
+      expect(readMessageDraft(draftScope)).not.toBeNull();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+
+    await waitFor(() => {
+      expect(onSend).toHaveBeenCalled();
+    });
+    expect(readMessageDraft(draftScope)).toBeNull();
+  });
+
+  it('keeps the draft when the send fails, so nothing typed is lost', async () => {
+    const user = userEvent.setup();
+    const onSend = vi.fn().mockRejectedValue(new Error('network error'));
+    render(<MessageInput onSend={onSend} draftScope={draftScope} enableMessageDrafts />);
+
+    const textarea = screen.getByPlaceholderText('Write a message...');
+    await user.type(textarea, 'Will fail to send');
+    await waitFor(() => {
+      expect(readMessageDraft(draftScope)).not.toBeNull();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+
+    await waitFor(() => {
+      expect(onSend).toHaveBeenCalled();
+    });
+    // Composer content (and therefore the draft) survives a failed send.
+    expect(readMessageDraft(draftScope)?.content).toBe('Will fail to send');
+    expect(screen.getByDisplayValue('Will fail to send')).toBeInTheDocument();
+  });
+
+  it('generates a clientMessageId and passes it to onSend when reliability is enabled', async () => {
+    const user = userEvent.setup();
+    const onSend = vi.fn().mockResolvedValue(undefined);
+    render(<MessageInput onSend={onSend} enableMessageSendReliability />);
+
+    await user.type(screen.getByPlaceholderText('Write a message...'), 'Reliable send');
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+
+    await waitFor(() => {
+      expect(onSend).toHaveBeenCalledWith('Reliable send', [], null, expect.any(String));
+    });
+  });
+
+  it('does not pass a clientMessageId when reliability is disabled (default)', async () => {
+    const user = userEvent.setup();
+    const onSend = vi.fn().mockResolvedValue(undefined);
+    render(<MessageInput onSend={onSend} />);
+
+    await user.type(screen.getByPlaceholderText('Write a message...'), 'Plain send');
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+
+    await waitFor(() => {
+      expect(onSend).toHaveBeenCalledWith('Plain send', [], null, undefined);
     });
   });
 });

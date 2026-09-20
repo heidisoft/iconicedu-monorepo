@@ -84,6 +84,9 @@ import {
 } from './message-input-link-preview.utils';
 import { LinkPreviewCard } from './link-preview-card';
 import { getComposerSubmitLabel } from './message-loading-state.utils';
+import { useMessageDraft } from './use-message-draft';
+import type { MessageDraftScope } from './message-draft-store';
+import { generateClientMessageId } from './client-message-id';
 
 const TYPING_STOP_DELAY_MS = 3000;
 const TYPING_KEEPALIVE_THROTTLE_MS = 1200;
@@ -99,10 +102,17 @@ interface MessageInputProps {
       dueAt: string;
       subject?: string;
     } | null,
+    /**
+     * Client-generated id for idempotent retries. Only populated when
+     * `enableMessageSendReliability` is on — see MESSAGE_SEND_RELIABILITY
+     * notes near `handleSend` below.
+     */
+    clientMessageId?: string,
   ) => void;
   onAttachFiles?: (
     attachments: Array<{ file: File; durationSeconds?: number }>,
     content?: string,
+    clientMessageId?: string,
   ) => Promise<void> | void;
   placeholder?: string;
   sticky?: boolean;
@@ -118,6 +128,12 @@ interface MessageInputProps {
     value: string;
     nonce: number;
   } | null;
+  /** Gates draft autosave/restore. When false (default) this component never touches localStorage. */
+  enableMessageDrafts?: boolean;
+  /** Identity + location used to scope a draft. Null/incomplete disables drafts even if the flag is on. */
+  draftScope?: MessageDraftScope | null;
+  /** Gates clientMessageId-based idempotent retry of failed sends. */
+  enableMessageSendReliability?: boolean;
 }
 
 type PendingAttachment = {
@@ -234,8 +250,25 @@ export function MessageInput({
   onInputKeyDown,
   showCreateMessageTypeButton = true,
   prefillRequest = null,
+  enableMessageDrafts = false,
+  draftScope = null,
+  enableMessageSendReliability = false,
 }: MessageInputProps) {
   const [content, setContent] = React.useState('');
+  const pendingAttachmentsClientMessageIdRef = React.useRef<{
+    key: string;
+    id: string;
+  } | null>(null);
+  const resolvedDraftScope = enableMessageDrafts ? draftScope : null;
+  const {
+    restoredDraft,
+    notifyContentChange,
+    clearDraft,
+    status: draftStatus,
+  } = useMessageDraft({
+    enabled: enableMessageDrafts,
+    scope: resolvedDraftScope,
+  });
   const [isSendingText, setIsSendingText] = React.useState(false);
   const [isAttachingFile, setIsAttachingFile] = React.useState(false);
   const [pendingAttachments, setPendingAttachments] = React.useState<PendingAttachment[]>(
@@ -549,8 +582,10 @@ export function MessageInput({
     setActiveMentionIndex(0);
     clearTypingTimeout();
     notifyTypingStop();
+    clearDraft();
+    pendingAttachmentsClientMessageIdRef.current = null;
     textareaRef.current?.focus();
-  }, [clearPendingAttachments, clearTypingTimeout, notifyTypingStop]);
+  }, [clearDraft, clearPendingAttachments, clearTypingTimeout, notifyTypingStop]);
 
   const handleSend = React.useCallback(() => {
     if (readOnly || isBusy || hasActiveRecording) {
@@ -562,9 +597,26 @@ export function MessageInput({
     }
 
     if (pendingAttachments.length > 0 && onAttachFiles) {
+      // Reuse the same clientMessageId across repeated Send clicks for the
+      // same pending attachment batch so a retry after a failed send is
+      // idempotent on the server; a new/changed batch gets a fresh id.
+      const attachmentBatchKey = pendingAttachments.map((a) => a.id).join('|');
+      let attachmentClientMessageId: string | undefined;
+      if (enableMessageSendReliability) {
+        const cached = pendingAttachmentsClientMessageIdRef.current;
+        attachmentClientMessageId =
+          cached && cached.key === attachmentBatchKey
+            ? cached.id
+            : generateClientMessageId();
+        pendingAttachmentsClientMessageIdRef.current = {
+          key: attachmentBatchKey,
+          id: attachmentClientMessageId,
+        };
+      }
       const sendAttachment = async () => {
         try {
           setIsAttachingFile(true);
+          setAttachmentError(null);
           await onAttachFiles(
             await Promise.all(
               pendingAttachments.map(async (pendingAttachment) => ({
@@ -579,8 +631,18 @@ export function MessageInput({
               })),
             ),
             trimmedContent || undefined,
+            attachmentClientMessageId,
           );
           resetComposer();
+        } catch {
+          // Keep the attachments + content in the composer so nothing is
+          // lost; the user can inspect/retry (Send reuses the same
+          // clientMessageId above) or remove attachments to start over.
+          setAttachmentError(
+            enableMessageSendReliability
+              ? 'Could not send. Your files are still attached — tap Send to retry.'
+              : 'Could not send attachment(s). Please try again.',
+          );
         } finally {
           setIsAttachingFile(false);
         }
@@ -595,11 +657,19 @@ export function MessageInput({
         participants,
         currentUserId,
       );
+      const clientMessageId = enableMessageSendReliability
+        ? generateClientMessageId()
+        : undefined;
       const sendText = async () => {
         try {
           setIsSendingText(true);
-          await Promise.resolve(onSend(trimmedContent, mentions, null));
+          await Promise.resolve(onSend(trimmedContent, mentions, null, clientMessageId));
           resetComposer();
+        } catch {
+          // Leave the composer content intact on failure so the draft (if
+          // enabled) survives and the user doesn't lose what they typed.
+          // The failed send itself is surfaced as a "Not sent" state on the
+          // message bubble (see messages-container's failed-send handling).
         } finally {
           setIsSendingText(false);
         }
@@ -609,6 +679,7 @@ export function MessageInput({
   }, [
     content,
     currentUserId,
+    enableMessageSendReliability,
     hasActiveRecording,
     isBusy,
     onAttachFiles,
@@ -749,6 +820,27 @@ export function MessageInput({
       textarea.setSelectionRange(nextCaret, nextCaret);
     }, 0);
   }, [handleTyping, prefillRequest]);
+
+  // Restore a saved draft once it's found (mount, or when the scope changes —
+  // e.g. switching channels/threads). Never clobbers a starter-action prefill
+  // or text the user has already started typing in this mount.
+  const hasRestoredDraftRef = React.useRef(false);
+  React.useEffect(() => {
+    hasRestoredDraftRef.current = false;
+  }, [draftScope?.channelId, draftScope?.threadId]);
+  React.useEffect(() => {
+    if (!restoredDraft || hasRestoredDraftRef.current) {
+      return;
+    }
+    hasRestoredDraftRef.current = true;
+    setContent((current) => (current ? current : restoredDraft.content));
+  }, [restoredDraft]);
+
+  // Debounce-autosave the composer text as a draft. No-ops entirely when
+  // drafts are disabled or the scope is unresolved (see useMessageDraft).
+  React.useEffect(() => {
+    notifyContentChange(content);
+  }, [content, notifyContentChange]);
 
   React.useEffect(() => {
     return () => {
@@ -1369,6 +1461,11 @@ export function MessageInput({
           {isDragOver ? (
             <div className="border-b border-border px-3 py-2 text-xs font-medium text-primary">
               Drop file or image to attach
+            </div>
+          ) : null}
+          {enableMessageDrafts && draftStatus !== 'idle' ? (
+            <div role="status" className="px-3 pt-2 text-[11px] text-muted-foreground/80">
+              {draftStatus === 'restored' ? 'Draft restored' : 'Draft saved'}
             </div>
           ) : null}
           <Textarea

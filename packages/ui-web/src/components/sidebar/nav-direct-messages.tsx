@@ -38,11 +38,14 @@ export function NavDirectMessages({
   currentUserId,
   activeChannelId,
   dashboardBasePath = '/',
+  draftChannelIds,
 }: {
   dms: ChannelVM[];
   currentUserId: string;
   activeChannelId?: string | null;
   dashboardBasePath?: string;
+  /** Channel ids with a saved, non-expired draft — shows a small "Draft" label. */
+  draftChannelIds?: Set<string>;
 }) {
   const { isMobile } = useSidebar();
   const totalUnreadCount = React.useMemo(
@@ -201,10 +204,19 @@ export function NavDirectMessages({
                       </div>
                     )}
                   </div>
-                  {unreadCount > 0 && (
-                    <Badge className="ml-auto h-5 px-1.5 text-[10px] group-data-[collapsible=icon]:hidden">
-                      {unreadCount}
-                    </Badge>
+                  {(unreadCount > 0 || draftChannelIds?.has(item.ids.id)) && (
+                    <span className="ml-auto flex items-center gap-1.5">
+                      {draftChannelIds?.has(item.ids.id) ? (
+                        <span className="text-[10px] font-medium text-muted-foreground group-data-[collapsible=icon]:hidden">
+                          Draft
+                        </span>
+                      ) : null}
+                      {unreadCount > 0 && (
+                        <Badge className="h-5 px-1.5 text-[10px] group-data-[collapsible=icon]:hidden">
+                          {unreadCount}
+                        </Badge>
+                      )}
+                    </span>
                   )}
                 </a>
               </SidebarMenuButton>
