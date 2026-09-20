@@ -49,5 +49,25 @@ export function getLocalMobileFeatureFlagFallback(key: MobileFeatureFlagKey): bo
     );
   }
 
+  if (key === mobileFeatureFlagKeys.enableMessageDrafts) {
+    return parseBooleanFeatureFlag(process.env.EXPO_PUBLIC_ENABLE_MESSAGE_DRAFTS);
+  }
+
+  if (key === mobileFeatureFlagKeys.enableMessageEdit) {
+    return parseBooleanFeatureFlag(process.env.EXPO_PUBLIC_ENABLE_MESSAGE_EDIT);
+  }
+
+  if (key === mobileFeatureFlagKeys.enableMobileMessageComposerParity) {
+    return parseBooleanFeatureFlag(
+      process.env.EXPO_PUBLIC_ENABLE_MOBILE_MESSAGE_COMPOSER_PARITY,
+    );
+  }
+
+  if (key === mobileFeatureFlagKeys.enableMessageSendReliability) {
+    return parseBooleanFeatureFlag(
+      process.env.EXPO_PUBLIC_ENABLE_MESSAGE_SEND_RELIABILITY,
+    );
+  }
+
   return false;
 }

@@ -1705,6 +1705,12 @@ function makeStyles(colors: AppColors) {
       color: colors.text,
     },
     textContentOwn: { color: colors.text },
+    editedIndicator: {
+      fontSize: 11,
+      color: colors.textFaint,
+      marginTop: 2,
+    },
+    editedIndicatorOwn: { color: colors.textFaint },
     emojiOnlyTextContent: {
       fontSize: 36,
       lineHeight: 42,
@@ -2810,17 +2816,28 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     const mentions = (message as { content?: { mentions?: MessageMentionVM[] } }).content
       ?.mentions;
     const emojiOnly = isEmojiOnlyText(text);
+    const isEdited = type === 'text' && message.state?.isEdited === true;
     return (
-      <FormattedText
-        text={text}
-        mentions={mentions}
-        style={[
-          s.textContent,
-          emojiOnly && s.emojiOnlyTextContent,
-          ownInChannel && s.textContentOwn,
-        ]}
-        isOwn={ownInChannel}
-      />
+      <>
+        <FormattedText
+          text={text}
+          mentions={mentions}
+          style={[
+            s.textContent,
+            emojiOnly && s.emojiOnlyTextContent,
+            ownInChannel && s.textContentOwn,
+          ]}
+          isOwn={ownInChannel}
+        />
+        {isEdited && (
+          <Text
+            style={[s.editedIndicator, ownInChannel && s.editedIndicatorOwn]}
+            accessibilityLabel="Edited"
+          >
+            (edited)
+          </Text>
+        )}
+      </>
     );
   };
 

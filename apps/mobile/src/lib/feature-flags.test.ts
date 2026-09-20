@@ -100,6 +100,59 @@ describe('mobile feature flags', () => {
     expect(parseBooleanFeatureFlag('')).toBe(false);
   });
 
+  it('keeps the four messaging P0 flags off by default', () => {
+    delete process.env.EXPO_PUBLIC_ENABLE_MESSAGE_DRAFTS;
+    delete process.env.EXPO_PUBLIC_ENABLE_MESSAGE_EDIT;
+    delete process.env.EXPO_PUBLIC_ENABLE_MOBILE_MESSAGE_COMPOSER_PARITY;
+    delete process.env.EXPO_PUBLIC_ENABLE_MESSAGE_SEND_RELIABILITY;
+
+    expect(
+      getLocalMobileFeatureFlagFallback(mobileFeatureFlagKeys.enableMessageDrafts),
+    ).toBe(false);
+    expect(
+      getLocalMobileFeatureFlagFallback(mobileFeatureFlagKeys.enableMessageEdit),
+    ).toBe(false);
+    expect(
+      getLocalMobileFeatureFlagFallback(
+        mobileFeatureFlagKeys.enableMobileMessageComposerParity,
+      ),
+    ).toBe(false);
+    expect(
+      getLocalMobileFeatureFlagFallback(
+        mobileFeatureFlagKeys.enableMessageSendReliability,
+      ),
+    ).toBe(false);
+  });
+
+  it('enables the four messaging P0 flags from their Expo public env flags', () => {
+    process.env.EXPO_PUBLIC_ENABLE_MESSAGE_DRAFTS = 'true';
+    process.env.EXPO_PUBLIC_ENABLE_MESSAGE_EDIT = 'true';
+    process.env.EXPO_PUBLIC_ENABLE_MOBILE_MESSAGE_COMPOSER_PARITY = 'true';
+    process.env.EXPO_PUBLIC_ENABLE_MESSAGE_SEND_RELIABILITY = 'true';
+
+    expect(
+      getLocalMobileFeatureFlagFallback(mobileFeatureFlagKeys.enableMessageDrafts),
+    ).toBe(true);
+    expect(
+      getLocalMobileFeatureFlagFallback(mobileFeatureFlagKeys.enableMessageEdit),
+    ).toBe(true);
+    expect(
+      getLocalMobileFeatureFlagFallback(
+        mobileFeatureFlagKeys.enableMobileMessageComposerParity,
+      ),
+    ).toBe(true);
+    expect(
+      getLocalMobileFeatureFlagFallback(
+        mobileFeatureFlagKeys.enableMessageSendReliability,
+      ),
+    ).toBe(true);
+
+    delete process.env.EXPO_PUBLIC_ENABLE_MESSAGE_DRAFTS;
+    delete process.env.EXPO_PUBLIC_ENABLE_MESSAGE_EDIT;
+    delete process.env.EXPO_PUBLIC_ENABLE_MOBILE_MESSAGE_COMPOSER_PARITY;
+    delete process.env.EXPO_PUBLIC_ENABLE_MESSAGE_SEND_RELIABILITY;
+  });
+
   it('keeps the session completion carousel off unless explicitly enabled', () => {
     delete process.env.EXPO_PUBLIC_ENABLE_SESSION_COMPLETION_CAROUSEL;
     expect(

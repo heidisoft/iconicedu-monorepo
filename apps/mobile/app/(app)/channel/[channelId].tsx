@@ -13,7 +13,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { MessageVM, UserProfileVM } from '@iconicedu/shared-types';
+import type { MessageMentionVM, MessageVM, UserProfileVM } from '@iconicedu/shared-types';
 import { useAccount } from '@/hooks/use-account';
 import { useProfile } from '@/hooks/use-profile';
 import { useMessages } from '@/hooks/use-messages';
@@ -22,10 +22,12 @@ import {
   sendTextMessage,
   sendFileMessage,
   sendFilesMessage,
+  editTextMessage,
   uploadChannelFile,
   buildMessageStoragePath,
   deleteMessage,
   fetchChannelMetaByChannelId,
+  fetchChannelMembers,
   fetchChannelReadState,
   ensureDirectMessageChannelForProfiles,
   queryKeys,
@@ -34,7 +36,10 @@ import type { AttachmentPayload } from '@/components/messages/attachment-sheet';
 import type { PendingUpload } from '@/components/messages/pending-message-row';
 import { useTheme } from '@/providers/theme-provider';
 import { resolveMobileMessageUiTheme } from '@/components/messages/themes/registry';
-import { MessageInput } from '@/components/messages/message-input';
+import {
+  MessageInput,
+  type EditingMessageContext,
+} from '@/components/messages/message-input';
 import { TypingIndicator } from '@/components/messages/typing-indicator';
 import { ConversationHeader } from '@/components/messages/conversation-header';
 import { MessageActionsSheet } from '@/components/messages/message-actions-sheet';
@@ -47,6 +52,7 @@ import { reportMobileObservedError } from '@/lib/analytics/report-error';
 import { useMarkRead } from '@/hooks/use-mark-read';
 import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
 import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
+import { getMentionCandidates } from '@/lib/messages/message-mentions';
 import { usePushNudge } from '@/hooks/use-push-nudge';
 import { PushNudgeSheet } from '@/components/notifications/push-nudge-sheet';
 import { usePushConsent } from '@/providers/push-consent-provider';
@@ -65,6 +71,16 @@ export default function ChannelConversationScreen() {
   const { colors } = useTheme();
   const enableMobileDirectMessageStart = useMobileFeatureFlag(
     mobileFeatureFlagKeys.enableMobileDirectMessageStart,
+  );
+  const enableMessageDrafts = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.enableMessageDrafts,
+  );
+  const enableMessageEdit = useMobileFeatureFlag(mobileFeatureFlagKeys.enableMessageEdit);
+  const enableMobileMessageComposerParity = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.enableMobileMessageComposerParity,
+  );
+  const enableMessageSendReliability = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.enableMessageSendReliability,
   );
 
   const orgId = account?.org_id ?? '';
@@ -104,6 +120,20 @@ export default function ChannelConversationScreen() {
     : (channelMeta?.icon_key ?? null);
   const resolvedThemeKey = channelMeta?.themeKey ?? null;
   const resolvedMessageUiThemeKey = channelMeta?.messageUiThemeKey ?? 'feed';
+
+  // Channel members — only needed for @mention autocomplete, so skip the
+  // request entirely unless mention authoring is enabled.
+  const { data: channelMembers } = useQuery({
+    queryKey: ['channelMembers', orgId, channelId, profileId] as const,
+    queryFn: () => fetchChannelMembers(orgId, channelId ?? '', profileId),
+    enabled: enableMobileMessageComposerParity && !!orgId && !!channelId && !!profileId,
+    staleTime: 60_000,
+  });
+  const mentionCandidates = useMemo(
+    () => getMentionCandidates(channelMembers ?? [], profileId),
+    [channelMembers, profileId],
+  );
+
   const {
     data: messages,
     isLoading,
@@ -195,6 +225,71 @@ export default function ChannelConversationScreen() {
     setThreadReplyTarget(msg);
   }, []);
 
+  // ── Edit sent text messages ──
+  const [editingMessage, setEditingMessage] = useState<EditingMessageContext | null>(
+    null,
+  );
+
+  const handleEditMessage = useCallback((message: MessageVM) => {
+    const content = (message as { content?: { text?: string } }).content?.text ?? '';
+    const mentions = (message as { content?: { mentions?: MessageMentionVM[] } }).content
+      ?.mentions;
+    setEditingMessage({ messageId: message.ids.id, content, mentions });
+  }, []);
+
+  const handleCancelEdit = useCallback(() => setEditingMessage(null), []);
+
+  const handleSaveEdit = useCallback(
+    async (input: {
+      messageId: string;
+      content: string;
+      mentions?: MessageMentionVM[];
+    }) => {
+      const key = queryKeys.messages(channelId ?? '', profileId);
+      const previous = queryClient.getQueryData<MessageVM[]>(key);
+
+      // Optimistic update so the edited text + "(edited)" indicator show
+      // immediately; rolled back below on error.
+      queryClient.setQueryData<MessageVM[]>(key, (current) =>
+        current?.map((message) =>
+          message.ids.id === input.messageId
+            ? ({
+                ...message,
+                content: { text: input.content, mentions: input.mentions },
+                state: {
+                  ...message.state,
+                  isEdited: true,
+                  editedAt: new Date().toISOString(),
+                },
+              } as MessageVM)
+            : message,
+        ),
+      );
+
+      try {
+        await editTextMessage(input.messageId, orgId, input.content, input.mentions);
+        void queryClient.invalidateQueries({ queryKey: key });
+        return true;
+      } catch (error) {
+        queryClient.setQueryData(key, previous);
+        reportMobileObservedError({
+          error,
+          source: 'mobile.messages.channel.edit_text',
+          message: 'Failed to edit channel message',
+          context: { channelId, orgId, profileId, messageId: input.messageId },
+        });
+        Alert.alert(
+          'Unable to save edit',
+          error instanceof Error
+            ? error.message
+            : 'Something went wrong. Please try again.',
+        );
+        return false;
+      }
+    },
+    [channelId, orgId, profileId, queryClient],
+  );
+
   // ── Pending uploads (WhatsApp-style optimistic UI) ──
   // Each pending item is shown in the message list immediately while the upload runs.
   // The realtime subscription invalidates the query once the DB row is created, replacing
@@ -226,25 +321,98 @@ export default function ChannelConversationScreen() {
   }, [activeTab, handlePushNotificationMoment]);
 
   // ── Send message ──
+  // meta.clientMessageId is only set when enableMessageSendReliability is on
+  // (see MessageInput) — when present we track this send as a "Not sent" row
+  // in pendingUploads instead of firing a one-shot Alert on failure, and
+  // rethrow so MessageInput keeps the draft around for a retry.
   const handleSend = useCallback(
-    async (text: string) => {
+    async (
+      text: string,
+      meta?: { mentions?: MessageMentionVM[]; clientMessageId?: string },
+    ) => {
       if (!channelId || !profileId || !orgId) return;
-      try {
-        if (threadReplyTarget) {
-          const threadId = threadReplyTarget.social?.thread?.ids.id;
+      const mentions = meta?.mentions;
+      const clientMessageId = meta?.clientMessageId;
+      const threadParentId = threadReplyTarget?.ids.id;
+      const threadId = threadReplyTarget?.social?.thread?.ids.id;
+
+      if (enableMessageSendReliability && clientMessageId) {
+        setPendingUploads((prev) => [
+          ...prev,
+          {
+            id: clientMessageId,
+            type: 'text',
+            attachments: [],
+            senderName,
+            createdAt: new Date().toISOString(),
+            caption: text,
+            clientMessageId,
+            mentions,
+            threadParentId,
+            threadId,
+          },
+        ]);
+        try {
           await sendTextMessage(
             channelId,
             profileId,
             orgId,
             text,
-            threadReplyTarget.ids.id,
+            threadParentId,
             threadId,
+            {
+              clientMessageId,
+              mentions,
+            },
+          );
+          setPendingUploads((prev) => prev.filter((p) => p.id !== clientMessageId));
+          if (threadReplyTarget) {
+            setThreadReplyTarget(null);
+            void refetch();
+          }
+        } catch (error) {
+          reportMobileObservedError({
+            error,
+            source: 'mobile.messages.channel.send_text',
+            message: 'Failed to send channel message',
+            context: { channelId, orgId, profileId },
+          });
+          setPendingUploads((prev) =>
+            prev.map((p) => (p.id === clientMessageId ? { ...p, failed: true } : p)),
+          );
+          // Rethrow so the composer keeps the draft — the "Not sent" pending
+          // row above is the error affordance now, not a one-shot Alert.
+          throw error;
+        }
+        void handlePushNotificationMoment();
+        return;
+      }
+
+      // Legacy path (send-reliability flag off) — unchanged pre-existing behavior.
+      try {
+        if (threadReplyTarget) {
+          await sendTextMessage(
+            channelId,
+            profileId,
+            orgId,
+            text,
+            threadParentId,
+            threadId,
+            mentions?.length ? { mentions } : undefined,
           );
           setThreadReplyTarget(null);
           // Thread reply count lives in the threads table — refetch to update the pill.
           void refetch();
         } else {
-          await sendTextMessage(channelId, profileId, orgId, text);
+          await sendTextMessage(
+            channelId,
+            profileId,
+            orgId,
+            text,
+            undefined,
+            undefined,
+            mentions?.length ? { mentions } : undefined,
+          );
           // Realtime subscription handles cache invalidation for non-thread messages.
         }
       } catch (error) {
@@ -268,15 +436,61 @@ export default function ChannelConversationScreen() {
       channelId,
       profileId,
       orgId,
+      senderName,
       threadReplyTarget,
       refetch,
       handlePushNotificationMoment,
+      enableMessageSendReliability,
     ],
+  );
+
+  // ── Retry a failed text send (reuses the same clientMessageId — idempotent) ──
+  const handleRetryTextSend = useCallback(
+    async (pendingId: string) => {
+      const pending = pendingUploads.find((p) => p.id === pendingId);
+      if (!pending || pending.type !== 'text' || !channelId || !profileId || !orgId)
+        return;
+
+      setPendingUploads((prev) =>
+        prev.map((p) => (p.id === pendingId ? { ...p, failed: false } : p)),
+      );
+
+      try {
+        await sendTextMessage(
+          channelId,
+          profileId,
+          orgId,
+          pending.caption ?? '',
+          pending.threadParentId,
+          pending.threadId,
+          { clientMessageId: pending.clientMessageId, mentions: pending.mentions },
+        );
+        setPendingUploads((prev) => prev.filter((p) => p.id !== pendingId));
+        if (pending.threadParentId) {
+          void refetch();
+        }
+      } catch (error) {
+        reportMobileObservedError({
+          error,
+          source: 'mobile.messages.channel.retry_text',
+          message: 'Failed to retry channel message send',
+          context: { channelId, orgId, profileId, pendingId },
+        });
+        setPendingUploads((prev) =>
+          prev.map((p) => (p.id === pendingId ? { ...p, failed: true } : p)),
+        );
+      }
+    },
+    [pendingUploads, channelId, profileId, orgId, refetch],
   );
 
   // ── Send attachment (WhatsApp-style: show locally first, upload in background) ──
   const handleSendAttachment = useCallback(
-    async (attachments: AttachmentPayload[], caption?: string) => {
+    async (
+      attachments: AttachmentPayload[],
+      caption?: string,
+      clientMessageId?: string,
+    ) => {
       if (!channelId || !profileId || !orgId || !attachments.length) return;
 
       const type: PendingUpload['type'] =
@@ -287,6 +501,10 @@ export default function ChannelConversationScreen() {
             : 'file';
 
       const pendingId = `pending-${Date.now()}`;
+      // clientMessageId is only set (by MessageInput) when send-reliability
+      // is on — stored on the pending row and reused verbatim on retry so a
+      // retry after a partial failure (upload ok, message insert failed)
+      // can't create a duplicate message.
 
       // 1. Add local preview immediately — user sees it right away (like WhatsApp)
       setPendingUploads((prev) => [
@@ -298,6 +516,7 @@ export default function ChannelConversationScreen() {
           senderName,
           createdAt: new Date().toISOString(),
           caption,
+          clientMessageId,
         },
       ]);
 
@@ -318,6 +537,9 @@ export default function ChannelConversationScreen() {
             orgId,
             { ...a, storagePath },
             caption,
+            undefined,
+            undefined,
+            clientMessageId,
           );
         } else {
           const uploaded = await Promise.all(
@@ -334,9 +556,27 @@ export default function ChannelConversationScreen() {
             }),
           );
           if (uploaded.length === 1) {
-            await sendFileMessage(channelId, profileId, orgId, uploaded[0], caption);
+            await sendFileMessage(
+              channelId,
+              profileId,
+              orgId,
+              uploaded[0],
+              caption,
+              undefined,
+              undefined,
+              clientMessageId,
+            );
           } else {
-            await sendFilesMessage(channelId, profileId, orgId, uploaded, caption);
+            await sendFilesMessage(
+              channelId,
+              profileId,
+              orgId,
+              uploaded,
+              caption,
+              undefined,
+              undefined,
+              clientMessageId,
+            );
           }
         }
 
@@ -382,11 +622,15 @@ export default function ChannelConversationScreen() {
     [orgId, profileId, removeMessage, restoreMessage],
   );
 
-  // ── Retry a failed upload ──
+  // ── Retry a failed upload (or a failed text send — see handleRetryTextSend) ──
   const handleRetryUpload = useCallback(
     async (pendingId: string) => {
       const pending = pendingUploads.find((p) => p.id === pendingId);
       if (!pending?.failed) return;
+      if (pending.type === 'text') {
+        await handleRetryTextSend(pendingId);
+        return;
+      }
 
       // Reset to uploading state so the spinner shows again
       setPendingUploads((prev) =>
@@ -394,7 +638,11 @@ export default function ChannelConversationScreen() {
       );
 
       try {
-        const { caption } = pending;
+        // Reuse the SAME clientMessageId from the original attempt (when
+        // send-reliability generated one) — the server's idempotency check
+        // then returns the already-created message instead of a duplicate
+        // if the earlier attempt actually succeeded server-side.
+        const { caption, clientMessageId } = pending;
         if (pending.type === 'audio') {
           const a = pending.attachments[0];
           const storagePath = buildMessageStoragePath(
@@ -411,6 +659,9 @@ export default function ChannelConversationScreen() {
             orgId,
             { ...a, storagePath },
             caption,
+            undefined,
+            undefined,
+            clientMessageId,
           );
         } else {
           const uploaded = await Promise.all(
@@ -427,9 +678,27 @@ export default function ChannelConversationScreen() {
             }),
           );
           if (uploaded.length === 1) {
-            await sendFileMessage(channelId!, profileId, orgId, uploaded[0], caption);
+            await sendFileMessage(
+              channelId!,
+              profileId,
+              orgId,
+              uploaded[0],
+              caption,
+              undefined,
+              undefined,
+              clientMessageId,
+            );
           } else {
-            await sendFilesMessage(channelId!, profileId, orgId, uploaded, caption);
+            await sendFilesMessage(
+              channelId!,
+              profileId,
+              orgId,
+              uploaded,
+              caption,
+              undefined,
+              undefined,
+              clientMessageId,
+            );
           }
         }
         setPendingUploads((prev) => prev.filter((p) => p.id !== pendingId));
@@ -452,7 +721,7 @@ export default function ChannelConversationScreen() {
         );
       }
     },
-    [pendingUploads, channelId, profileId, orgId],
+    [pendingUploads, channelId, profileId, orgId, handleRetryTextSend],
   );
 
   // ── Reaction toggle ──
@@ -624,6 +893,19 @@ export default function ChannelConversationScreen() {
             replyTo={threadReplyTarget}
             onCancelReply={() => setThreadReplyTarget(null)}
             uploading={pendingUploads.some((p) => !p.failed)}
+            enableDrafts={enableMessageDrafts}
+            draftScope={
+              orgId && profileId && accountId && channelId
+                ? { accountId, profileId, orgId, channelId }
+                : undefined
+            }
+            editingMessage={editingMessage}
+            onSaveEdit={handleSaveEdit}
+            onCancelEdit={handleCancelEdit}
+            enableMentions={enableMobileMessageComposerParity}
+            mentionCandidates={mentionCandidates}
+            enableFormatting={enableMobileMessageComposerParity}
+            enableSendReliability={enableMessageSendReliability}
           />
         </KeyboardAvoidingView>
       )}
@@ -671,6 +953,8 @@ export default function ChannelConversationScreen() {
         onReact={handleReactionToggle}
         onThread={handleThreadOpen}
         onDelete={handleDelete}
+        enableEdit={enableMessageEdit}
+        onEdit={handleEditMessage}
       />
 
       {/* Push notification nudge */}

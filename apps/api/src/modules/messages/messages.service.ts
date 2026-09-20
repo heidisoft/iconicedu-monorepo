@@ -31,7 +31,7 @@ import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
 
 const BASE_MESSAGE_SELECT = `
-  id, org_id, channel_id, sender_profile_id, visibility_type, visibility_user_ids, type, created_at, updated_at, thread_parent_id,
+  id, org_id, channel_id, sender_profile_id, visibility_type, visibility_user_ids, type, created_at, updated_at, thread_parent_id, is_edited, edited_at,
   sender:profiles!sender_profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed, kind, timezone, ui_theme_key)
 `;
 
