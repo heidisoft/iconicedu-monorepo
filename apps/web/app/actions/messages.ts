@@ -134,6 +134,79 @@ async function insertMessageRowWithRlsFallback(input: {
   return serviceInsert;
 }
 
+async function resolveReplyReference(
+  supabase: SupabaseClient,
+  input: { orgId: string; channelId: string; replyToMessageId: string },
+): Promise<{
+  messageId: string;
+  senderId: string;
+  senderName: string;
+  snippet: string;
+  type: string;
+} | null> {
+  const messageResponse = await supabase
+    .from('messages')
+    .select('id, sender_profile_id, type, deleted_at')
+    .eq('org_id', input.orgId)
+    .eq('channel_id', input.channelId)
+    .eq('id', input.replyToMessageId)
+    .maybeSingle<{
+      id: string;
+      sender_profile_id: string;
+      type: string;
+      deleted_at: string | null;
+    }>();
+  if (messageResponse.error) {
+    throw new Error(messageResponse.error.message);
+  }
+  const target = messageResponse.data;
+  if (!target || target.deleted_at) return null;
+
+  const [payloadResponse, profileResponse] = await Promise.all([
+    supabase
+      .from('message_text')
+      .select('payload')
+      .eq('message_id', target.id)
+      .maybeSingle<{ payload: Record<string, unknown> | null }>(),
+    supabase
+      .from('profiles')
+      .select('display_name, first_name, last_name')
+      .eq('id', target.sender_profile_id)
+      .is('deleted_at', null)
+      .maybeSingle<{
+        display_name: string | null;
+        first_name: string | null;
+        last_name: string | null;
+      }>(),
+  ]);
+  if (payloadResponse.error) {
+    throw new Error(payloadResponse.error.message);
+  }
+  if (profileResponse.error) {
+    throw new Error(profileResponse.error.message);
+  }
+
+  const snippet =
+    typeof payloadResponse.data?.payload?.text === 'string'
+      ? payloadResponse.data.payload.text
+      : target.type;
+  const senderName =
+    profileResponse.data?.display_name?.trim() ||
+    [profileResponse.data?.first_name, profileResponse.data?.last_name]
+      .filter(Boolean)
+      .join(' ')
+      .trim() ||
+    'Unknown';
+
+  return {
+    messageId: target.id,
+    senderId: target.sender_profile_id,
+    senderName,
+    snippet: snippet.slice(0, 140),
+    type: target.type,
+  };
+}
+
 function sanitizeMentions(
   content: string,
   mentions: MessageMentionVM[] | undefined,
@@ -623,6 +696,14 @@ export async function sendTextMessageWithSupabase(
     );
   }
 
+  const replyReference = input.replyToMessageId
+    ? await resolveReplyReference(supabase, {
+        orgId: accountOrgId,
+        channelId: input.channelId,
+        replyToMessageId: input.replyToMessageId,
+      })
+    : null;
+
   const now = new Date().toISOString();
   const activityContext = await resolveActivityChannelContext({
     supabase,
@@ -696,6 +777,7 @@ export async function sendTextMessageWithSupabase(
     visibility_user_ids: supportVisibility.visibility_user_ids ?? null,
     thread_id: threadId,
     thread_parent_id: input.threadParentId ?? null,
+    reply_to_message_id: replyReference?.messageId ?? null,
     created_at: now,
     created_by: currentProfileId,
     updated_at: now,
@@ -750,6 +832,7 @@ export async function sendTextMessageWithSupabase(
           : {
               text: input.content,
               ...(sanitizedMentions.length ? { mentions: sanitizedMentions } : {}),
+              ...(replyReference ? { replyTo: replyReference } : {}),
             },
       created_at: now,
       created_by: currentProfileId,
@@ -827,6 +910,7 @@ export async function sendTextMessageWithSupabase(
         : {
             text: input.content,
             ...(sanitizedMentions.length ? { mentions: sanitizedMentions } : {}),
+            ...(replyReference ? { replyTo: replyReference } : {}),
           },
     reactions: [],
     thread: thread ?? undefined,

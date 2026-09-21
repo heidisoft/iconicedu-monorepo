@@ -1,4 +1,5 @@
 import type {
+  MessageReplyReferenceVM,
   MessageVM,
   RawMessageRow,
   RawSenderProfile,
@@ -56,6 +57,10 @@ export function mapRowToMessageVM(
     row.org_id,
   );
   const previewText = String(c.text ?? '');
+  const replyTo =
+    c.replyTo && typeof c.replyTo === 'object'
+      ? (c.replyTo as MessageReplyReferenceVM)
+      : undefined;
 
   const base = {
     ids: { id: row.id, orgId: row.org_id },
@@ -71,7 +76,7 @@ export function mapRowToMessageVM(
             }
           : { type: 'all' as const },
     },
-    social: { reactions, ...(thread ? { thread } : {}) },
+    social: { reactions, ...(thread ? { thread } : {}), ...(replyTo ? { replyTo } : {}) },
   };
 
   switch (row.type) {

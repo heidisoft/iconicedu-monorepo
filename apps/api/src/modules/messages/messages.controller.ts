@@ -92,6 +92,12 @@ export class MessagesController {
     return this.messagesService.sendFilesMessage(req.user.id, accessToken, body);
   }
 
+  @Get('link-preview')
+  @UseGuards(AuthGuard)
+  fetchLinkPreview(@Query('url') url: string) {
+    return this.messagesService.fetchLinkPreview(url);
+  }
+
   @Delete(':id')
   @UseGuards(AuthGuard)
   remove(

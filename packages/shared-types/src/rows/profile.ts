@@ -147,15 +147,22 @@ export interface NotificationPreferenceRow extends Partial<AuditRow> {
   muted?: boolean | null;
 }
 
-export interface NotificationPreferenceScopeRow extends Partial<AuditRow> {
+/**
+ * Shape of the JSON returned by `GET /notification-preferences/scopes`
+ * (apps/api's NotificationPreferencesService#listScopes already converts the
+ * underlying snake_case DB row to camelCase before responding).
+ */
+export interface NotificationPreferenceScopeRow {
   id: UUID;
-  org_id: UUID;
-  profile_id: UUID;
-  scope_kind: 'channel' | 'learning_space';
-  scope_id: UUID;
-  pref_key: string;
+  orgId: UUID;
+  profileId: UUID;
+  scopeKind: 'channel' | 'learning_space';
+  scopeId: UUID;
+  prefKey: string;
   channels: string[];
   muted?: boolean | null;
+  mode?: 'normal' | 'mentions_only' | 'muted_until' | 'muted_until_enabled';
+  mutedUntil?: ISODateTime | null;
 }
 
 export interface FamilyLinkRow extends Partial<AuditRow> {

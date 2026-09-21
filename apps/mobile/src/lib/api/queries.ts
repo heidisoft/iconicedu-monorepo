@@ -21,7 +21,9 @@ export {
   fetchDirectMessages,
   fetchFamilyLinks,
   fetchIsChannelMember,
+  fetchConversationNotificationMode,
   fetchNotificationPreferences,
+  setConversationNotificationMode,
   fetchProfilesByAccountIds,
   fetchSupervisedDirectMessages,
   findDirectMessageChannelForProfiles,
@@ -32,8 +34,10 @@ export {
   deleteMessage,
   fetchChannelMessages,
   fetchChannelReadState,
+  fetchLinkPreview,
   fetchThreadMessages,
   markChannelReadState,
+  markChannelUnread,
   markChannelsReadByIds,
   markThreadReadState,
   sendFileMessage,
@@ -42,7 +46,8 @@ export {
   toggleReaction,
   uploadChannelFile,
 } from './messages/queries';
-export type { FileAttachmentInput } from './messages/queries';
+export type { FileAttachmentInput, LinkPreviewMetadata } from './messages/queries';
+export type { ConversationNotificationMode } from './channel/queries';
 export {
   fetchLearningSpaceChannels,
   fetchLearningSpaces,

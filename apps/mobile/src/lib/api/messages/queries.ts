@@ -75,7 +75,17 @@ export async function fetchChannelReadState(channelId: string, accountId: string
     lastReadMessageId: string | null;
     lastReadAt: string | null;
     unreadCount: number;
+    isManuallyUnread?: boolean;
   } | null>(`/channels/${channelId}/read-state`, { accountId });
+}
+
+export async function markChannelUnread(input: {
+  orgId: string;
+  accountId: string;
+  profileId: string;
+  channelId: string;
+}): Promise<void> {
+  await apiPost(`/channels/${input.channelId}/mark-unread`, input);
 }
 
 export async function markChannelReadState(input: {
@@ -272,4 +282,17 @@ export async function sendFilesMessage(
   } satisfies MessageSendFilesInput);
 
   return { id: result.id };
+}
+
+export type LinkPreviewMetadata = {
+  url: string;
+  title: string;
+  description?: string;
+  imageUrl?: string;
+  siteName?: string;
+  favicon?: string;
+};
+
+export async function fetchLinkPreview(url: string): Promise<LinkPreviewMetadata> {
+  return apiGet<LinkPreviewMetadata>('/messages/link-preview', { url });
 }
