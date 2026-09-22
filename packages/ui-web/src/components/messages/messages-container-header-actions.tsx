@@ -4,12 +4,15 @@ import { memo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import {
   Bookmark,
+  CalendarClock,
   Flag,
   Info,
   LifeBuoy,
   Loader2,
   LogOut,
   MoreHorizontal,
+  Pin,
+  Search,
   Video,
 } from 'lucide-react';
 import { Button } from '@iconicedu/ui-web/ui/button';
@@ -125,8 +128,16 @@ export function resolveHeaderJoinHref(input: {
 
 export const MessagesContainerHeaderActions = memo(
   function MessagesContainerHeaderActions() {
-    const { toggle, isActive, channel, currentUserId, joinLiveSession } =
-      useMessagesState();
+    const {
+      toggle,
+      isActive,
+      channel,
+      currentUserId,
+      joinLiveSession,
+      enableMessagePinning,
+      enableMessageSearch,
+      enableScheduledSend,
+    } = useMessagesState();
     const [isJoinPending, setIsJoinPending] = useState(false);
     const otherParticipant =
       channel.basics.kind === 'dm'
@@ -217,6 +228,30 @@ export const MessagesContainerHeaderActions = memo(
               />
             );
           })}
+          {enableMessageSearch ? (
+            <ActionButton
+              icon={Search}
+              label="Search messages"
+              active={isActive('search')}
+              onClick={() => toggle({ key: 'search' })}
+            />
+          ) : null}
+          {enableMessagePinning ? (
+            <ActionButton
+              icon={Pin}
+              label="Pinned messages"
+              active={isActive('pinned')}
+              onClick={() => toggle({ key: 'pinned' })}
+            />
+          ) : null}
+          {enableScheduledSend ? (
+            <ActionButton
+              icon={CalendarClock}
+              label="Scheduled messages"
+              active={isActive('scheduled')}
+              onClick={() => toggle({ key: 'scheduled' })}
+            />
+          ) : null}
           {joinAction.visible ? (
             <Button size="sm" disabled={isJoinPending} onClick={() => void handleJoin()}>
               {isJoinPending ? (

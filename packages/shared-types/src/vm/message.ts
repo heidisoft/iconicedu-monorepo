@@ -87,7 +87,10 @@ export type MessagesRightPanelIntent =
   | { key: 'channel_info' }
   | { key: 'saved' }
   | { key: 'profile'; userId: UUID }
-  | { key: 'thread'; threadId: UUID };
+  | { key: 'thread'; threadId: UUID }
+  | { key: 'pinned' }
+  | { key: 'search' }
+  | { key: 'scheduled' };
 
 export type MessagesRightPanelIntentKey = MessagesRightPanelIntent['key'];
 

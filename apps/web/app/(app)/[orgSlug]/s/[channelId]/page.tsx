@@ -19,7 +19,12 @@ import {
   getDashboardAccountContext,
   getDashboardProfileContext,
 } from '@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth';
-import { enableMessageTypeComposer } from '@iconicedu/web/flags';
+import {
+  enableMessagePinning,
+  enableMessageSearch,
+  enableMessageTypeComposer,
+  enableScheduledSend,
+} from '@iconicedu/web/flags';
 
 const INITIAL_MESSAGES_PAGE_SIZE = 40;
 
@@ -54,9 +59,11 @@ export default async function Page({
   if (!channel) {
     notFound();
   }
-  const showCreateMessageTypeButton = await enableMessageTypeComposer.run({
-    identify: { profileId: profileResponse.data?.id ?? null },
-  });
+  const identify = { profileId: profileResponse.data?.id ?? null };
+  const showCreateMessageTypeButton = await enableMessageTypeComposer.run({ identify });
+  const showMessagePinning = await enableMessagePinning.run({ identify });
+  const showMessageSearch = await enableMessageSearch.run({ identify });
+  const showScheduledSend = await enableScheduledSend.run({ identify });
   const isStaffReadOnly = isStaffObserverReadOnlyChannel(
     channel,
     account.id,
@@ -74,6 +81,9 @@ export default async function Page({
         currentUserProfile={currentUserProfile}
         readOnly={isStaffReadOnly}
         showCreateMessageTypeButton={showCreateMessageTypeButton}
+        enableMessagePinning={showMessagePinning}
+        enableMessageSearch={showMessageSearch}
+        enableScheduledSend={showScheduledSend}
         sendTextMessage={sendTextMessageAction}
         sendFileMessage={sendFileMessageAction}
         sendFilesMessage={sendFilesMessageAction}

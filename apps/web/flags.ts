@@ -199,13 +199,64 @@ export const enableAdminSessionAttendanceAnalytics = flag<
   },
 });
 
+export const enableMessagePinning = flag<boolean, { profileId?: string | null }>({
+  key: platformFeatureFlagKeys.enableMessagePinning,
+  description: 'Allows staff and educators to pin messages within a channel.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: platformFeatureFlagKeys.enableMessagePinning,
+      profileId: entities?.profileId,
+    });
+  },
+});
+
+export const enableMessageSearch = flag<boolean, { profileId?: string | null }>({
+  key: platformFeatureFlagKeys.enableMessageSearch,
+  description: 'Shows the in-channel message search entry point.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: platformFeatureFlagKeys.enableMessageSearch,
+      profileId: entities?.profileId,
+    });
+  },
+});
+
+export const enableScheduledSend = flag<boolean, { profileId?: string | null }>({
+  key: platformFeatureFlagKeys.enableScheduledSend,
+  description: 'Allows composing messages to send at a future scheduled time.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: platformFeatureFlagKeys.enableScheduledSend,
+      profileId: entities?.profileId,
+    });
+  },
+});
+
 export const webFlags = {
   enableAdminSessionAttendanceAnalytics,
   enableAssessments,
   enableChannelCommunications,
   enableClassScheduleSeriesReschedule,
   enableMarketingSitePages,
+  enableMessagePinning,
+  enableMessageSearch,
   enableMessageTypeComposer,
+  enableScheduledSend,
   enableSessionCompletionCarousel,
   enableMobileAppleSignIn,
   enableMobileDirectMessageStart,

@@ -59,6 +59,10 @@ export interface MessageBaseProps {
   messageUiThemeKey?: MessageUiThemeKeyVM;
   feedGroupPosition?: 'single' | 'first' | 'middle' | 'last';
   showActionControls?: boolean;
+  canPinMessages?: boolean;
+  isPinned?: boolean;
+  isPinning?: boolean;
+  onTogglePinned?: () => void;
 }
 
 export const MessageBase = memo(function MessageBase({
@@ -80,6 +84,10 @@ export const MessageBase = memo(function MessageBase({
   messageUiThemeKey = 'classic',
   feedGroupPosition,
   showActionControls = true,
+  canPinMessages = false,
+  isPinned = false,
+  isPinning = false,
+  onTogglePinned,
 }: MessageBaseProps) {
   const [isThreadActionPending, setIsThreadActionPending] = useState(false);
   const [isQuickActionsActive, setIsQuickActionsActive] = useState(false);
@@ -198,6 +206,10 @@ export const MessageBase = memo(function MessageBase({
     onToggleHidden,
     onDelete,
     feed: isFeedTheme,
+    canPinMessages,
+    isPinned,
+    isPinning,
+    onTogglePinned,
   };
   const actionsMenu = <MessageManagementMenu {...managementProps} />;
   const quickActionControls = shouldShowQuickActionControls ? (

@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@iconicedu/ui-web/ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@iconicedu/ui-web/ui/popover';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -60,6 +61,7 @@ import {
   Plus,
   BookOpen,
   ClipboardCheck,
+  Clock,
   type LucideIcon,
 } from 'lucide-react';
 import {
@@ -84,6 +86,13 @@ import {
 } from './message-input-link-preview.utils';
 import { LinkPreviewCard } from './link-preview-card';
 import { getComposerSubmitLabel } from './message-loading-state.utils';
+import {
+  buildScheduleSendAt,
+  getDefaultScheduleDraft,
+  isScheduleDraftInFuture,
+  resolveBrowserTimezone,
+  type ScheduleDraft,
+} from './message-schedule-send.utils';
 
 const TYPING_STOP_DELAY_MS = 3000;
 const TYPING_KEEPALIVE_THROTTLE_MS = 1200;
@@ -118,6 +127,13 @@ interface MessageInputProps {
     value: string;
     nonce: number;
   } | null;
+  enableScheduledSend?: boolean;
+  onScheduleSend?: (input: {
+    content: string;
+    mentions?: MessageMentionVM[];
+    sendAt: string;
+    timezone: string;
+  }) => Promise<void> | void;
 }
 
 type PendingAttachment = {
@@ -234,9 +250,17 @@ export function MessageInput({
   onInputKeyDown,
   showCreateMessageTypeButton = true,
   prefillRequest = null,
+  enableScheduledSend = false,
+  onScheduleSend,
 }: MessageInputProps) {
   const [content, setContent] = React.useState('');
   const [isSendingText, setIsSendingText] = React.useState(false);
+  const [isScheduleOpen, setIsScheduleOpen] = React.useState(false);
+  const [isScheduling, setIsScheduling] = React.useState(false);
+  const [scheduleDraft, setScheduleDraft] = React.useState<ScheduleDraft>(() =>
+    getDefaultScheduleDraft(),
+  );
+  const [scheduleError, setScheduleError] = React.useState<string | null>(null);
   const [isAttachingFile, setIsAttachingFile] = React.useState(false);
   const [pendingAttachments, setPendingAttachments] = React.useState<PendingAttachment[]>(
     [],
@@ -617,6 +641,65 @@ export function MessageInput({
     participants,
     readOnly,
     resetComposer,
+  ]);
+
+  const handleScheduleSubmit = React.useCallback(() => {
+    if (readOnly || isBusy || hasActiveRecording || !onScheduleSend) {
+      return;
+    }
+    const trimmedContent = content.trim();
+    if (!trimmedContent) {
+      setScheduleError('Write a message before scheduling it.');
+      return;
+    }
+    const sendAt = buildScheduleSendAt(scheduleDraft);
+    if (!sendAt) {
+      setScheduleError('Choose a date and time to schedule this message.');
+      return;
+    }
+    if (!isScheduleDraftInFuture(scheduleDraft)) {
+      setScheduleError('Pick a time in the future.');
+      return;
+    }
+
+    const mentions = extractMentionsFromMessageText(
+      trimmedContent,
+      participants,
+      currentUserId,
+    );
+    const scheduleMessage = async () => {
+      try {
+        setIsScheduling(true);
+        setScheduleError(null);
+        await Promise.resolve(
+          onScheduleSend({
+            content: trimmedContent,
+            mentions,
+            sendAt,
+            timezone: resolveBrowserTimezone(),
+          }),
+        );
+        setIsScheduleOpen(false);
+        resetComposer();
+      } catch (error) {
+        setScheduleError(
+          error instanceof Error ? error.message : 'Unable to schedule message.',
+        );
+      } finally {
+        setIsScheduling(false);
+      }
+    };
+    void scheduleMessage();
+  }, [
+    content,
+    currentUserId,
+    hasActiveRecording,
+    isBusy,
+    onScheduleSend,
+    participants,
+    readOnly,
+    resetComposer,
+    scheduleDraft,
   ]);
 
   const openAssignmentComposer = React.useCallback(
@@ -1593,30 +1676,130 @@ export function MessageInput({
                 ) : null}
               </div>
             </TooltipProvider>
-            <Button
-              type="button"
-              size="sm"
-              onClick={handleSend}
-              disabled={
-                readOnly ||
-                isBusy ||
-                hasActiveRecording ||
-                (!content.trim() && pendingAttachments.length === 0)
-              }
-              className="h-8 gap-1.5"
-            >
-              {isBusy ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  {getComposerSubmitLabel({ isSendingText, isAttachingFile })}
-                </>
-              ) : (
-                <>
-                  <Send className="h-3.5 w-3.5" />
-                  Send
-                </>
-              )}
-            </Button>
+            <div className="flex items-center gap-1.5">
+              {enableScheduledSend && onScheduleSend ? (
+                <Popover
+                  open={isScheduleOpen}
+                  onOpenChange={(open) => {
+                    setIsScheduleOpen(open);
+                    if (open) {
+                      setScheduleError(null);
+                      setScheduleDraft(getDefaultScheduleDraft());
+                    }
+                  }}
+                >
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                          aria-label="Schedule send"
+                          title="Schedule send"
+                          disabled={
+                            readOnly ||
+                            isBusy ||
+                            hasActiveRecording ||
+                            !content.trim() ||
+                            pendingAttachments.length > 0
+                          }
+                        >
+                          <Clock className="h-4 w-4" />
+                        </Button>
+                      </PopoverTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent>Schedule send</TooltipContent>
+                  </Tooltip>
+                  <PopoverContent align="end" className="w-72">
+                    <div className="space-y-3">
+                      <div className="text-sm font-medium text-foreground">
+                        Schedule this message
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <Label htmlFor="schedule-send-date" className="text-xs">
+                            Date
+                          </Label>
+                          <Input
+                            id="schedule-send-date"
+                            type="date"
+                            value={scheduleDraft.date}
+                            onChange={(event) =>
+                              setScheduleDraft((current) => ({
+                                ...current,
+                                date: event.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="schedule-send-time" className="text-xs">
+                            Time
+                          </Label>
+                          <Input
+                            id="schedule-send-time"
+                            type="time"
+                            value={scheduleDraft.time}
+                            onChange={(event) =>
+                              setScheduleDraft((current) => ({
+                                ...current,
+                                time: event.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Sends in your local timezone ({resolveBrowserTimezone()}).
+                      </p>
+                      {scheduleError ? (
+                        <p className="text-xs text-destructive">{scheduleError}</p>
+                      ) : null}
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="w-full gap-1.5"
+                        onClick={handleScheduleSubmit}
+                        disabled={isScheduling}
+                      >
+                        {isScheduling ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Clock className="h-3.5 w-3.5" />
+                        )}
+                        Schedule message
+                      </Button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              ) : null}
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleSend}
+                disabled={
+                  readOnly ||
+                  isBusy ||
+                  hasActiveRecording ||
+                  (!content.trim() && pendingAttachments.length === 0)
+                }
+                className="h-8 gap-1.5"
+              >
+                {isBusy ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    {getComposerSubmitLabel({ isSendingText, isAttachingFile })}
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-3.5 w-3.5" />
+                    Send
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </div>
       </div>
