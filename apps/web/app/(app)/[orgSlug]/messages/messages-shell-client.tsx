@@ -142,6 +142,8 @@ type MessagesShellClientProps = {
   currentUserProfile?: UserProfileVM | null;
   readOnly?: boolean;
   showCreateMessageTypeButton?: boolean;
+  showAiRefine?: boolean;
+  showAiSuggestedReplies?: boolean;
   panelRegistry?: Partial<
     MessagesRightPanelRegistry<ComponentType<{ intent: MessagesRightPanelIntent }>>
   >;
@@ -174,6 +176,8 @@ export function MessagesShellClient({
   currentUserProfile,
   readOnly = false,
   showCreateMessageTypeButton = true,
+  showAiRefine = false,
+  showAiSuggestedReplies = false,
   panelRegistry,
   sendTextMessage,
   sendFileMessage,
@@ -518,6 +522,8 @@ export function MessagesShellClient({
         currentUserProfile={currentUserProfile}
         readOnly={readOnly}
         showCreateMessageTypeButton={showCreateMessageTypeButton}
+        showAiRefine={showAiRefine}
+        showAiSuggestedReplies={showAiSuggestedReplies}
         panelRegistry={panelRegistry}
         realtimeClient={realtimeClient}
         messageWriteClient={messageWriteClient}

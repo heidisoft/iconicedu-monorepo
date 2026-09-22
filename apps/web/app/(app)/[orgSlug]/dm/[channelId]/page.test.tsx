@@ -12,6 +12,8 @@ const buildChannelByIdMock = vi.fn();
 const buildChannelByDmKeyMock = vi.fn();
 const resolveOrgDashboardPathMock = vi.fn(async () => '/iconic-academy');
 const enableMessageTypeComposerRunMock = vi.fn(async () => true);
+const enableAiRefineRunMock = vi.fn(async () => true);
+const enableAiSuggestedRepliesRunMock = vi.fn(async () => true);
 
 vi.mock('next/navigation', () => ({
   notFound: () => {
@@ -75,6 +77,12 @@ vi.mock('@iconicedu/web/flags', () => ({
   enableMessageTypeComposer: {
     run: (...args: unknown[]) => enableMessageTypeComposerRunMock(...args),
   },
+  enableAiRefine: {
+    run: (...args: unknown[]) => enableAiRefineRunMock(...args),
+  },
+  enableAiSuggestedReplies: {
+    run: (...args: unknown[]) => enableAiSuggestedRepliesRunMock(...args),
+  },
 }));
 
 describe('d/dm/[channelId] page', () => {
@@ -101,6 +109,8 @@ describe('d/dm/[channelId] page', () => {
           currentUserProfile: { ids: { id: 'profile-1', orgId: 'org-1' } },
           readOnly: false,
           showCreateMessageTypeButton: true,
+          showAiRefine: true,
+          showAiSuggestedReplies: true,
         }),
       );
     });

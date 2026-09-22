@@ -179,6 +179,40 @@ export const enableSessionCompletionCarousel = flag<
   },
 });
 
+export const enableAiRefine = flag<boolean, { profileId?: string | null }>({
+  key: platformFeatureFlagKeys.enableAiRefine,
+  description:
+    'Shows the "Refine with AI" composer affordance that rewrites a draft via the Anthropic API before sending.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: platformFeatureFlagKeys.enableAiRefine,
+      profileId: entities?.profileId,
+    });
+  },
+});
+
+export const enableAiSuggestedReplies = flag<boolean, { profileId?: string | null }>({
+  key: platformFeatureFlagKeys.enableAiSuggestedReplies,
+  description:
+    'Shows AI-generated suggested reply chips above the composer; suggestions are never auto-sent.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: platformFeatureFlagKeys.enableAiSuggestedReplies,
+      profileId: entities?.profileId,
+    });
+  },
+});
+
 export const enableAdminSessionAttendanceAnalytics = flag<
   boolean,
   { profileId?: string | null }
@@ -201,6 +235,8 @@ export const enableAdminSessionAttendanceAnalytics = flag<
 
 export const webFlags = {
   enableAdminSessionAttendanceAnalytics,
+  enableAiRefine,
+  enableAiSuggestedReplies,
   enableAssessments,
   enableChannelCommunications,
   enableClassScheduleSeriesReschedule,

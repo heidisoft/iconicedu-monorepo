@@ -102,6 +102,8 @@ export interface MessagesContainerProps {
   currentUserProfile?: UserProfileVM | null;
   readOnly?: boolean;
   showCreateMessageTypeButton?: boolean;
+  showAiRefine?: boolean;
+  showAiSuggestedReplies?: boolean;
   realtimeClient?: MessagesRealtimeClient | null;
   messageWriteClient?: MessageWriteClient | null;
   uploadFileMessage?: (input: {
@@ -390,6 +392,8 @@ export function MessagesContainer({
   currentUserProfile,
   readOnly = false,
   showCreateMessageTypeButton = true,
+  showAiRefine = false,
+  showAiSuggestedReplies = false,
   realtimeClient,
   messageWriteClient,
   uploadFileMessage,
@@ -1992,7 +1996,10 @@ export function MessagesContainer({
               placeholder={getMessageInputPlaceholder(channel, resolvedCurrentUserId)}
               participants={participants}
               currentUserId={resolvedCurrentUserId}
+              channelId={channel.ids.id}
               showCreateMessageTypeButton={showCreateMessageTypeButton}
+              showAiRefine={showAiRefine}
+              showAiSuggestedReplies={showAiSuggestedReplies}
               prefillRequest={composerPrefillRequest}
               onTypingStart={handleTypingStart}
               onTypingStop={handleTypingStop}
