@@ -5,6 +5,7 @@ import { resolveAppUrl } from '@iconicedu/web/lib/config/app-url';
 
 const apiPost = vi.fn();
 const requireEffectiveActorContext = vi.fn();
+const enableAiRefineRun = vi.fn();
 const APP_URL = resolveAppUrl();
 
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
@@ -20,6 +21,10 @@ vi.mock('@iconicedu/web/lib/family-view/actor-context', () => ({
     requireEffectiveActorContext(...args),
 }));
 
+vi.mock('@iconicedu/web/flags', () => ({
+  enableAiRefine: { run: (...args: unknown[]) => enableAiRefineRun(...args) },
+}));
+
 describe('POST /api/ai-assist/refine', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -27,7 +32,26 @@ describe('POST /api/ai-assist/refine', () => {
       account: { id: 'account-1', org_id: 'org-1' },
       profile: { id: 'profile-1' },
     });
+    enableAiRefineRun.mockResolvedValue(true);
     apiPost.mockResolvedValue({ refinedText: 'Hi there!', factsPreserved: true });
+  });
+
+  it('returns 403 when the flag is disabled', async () => {
+    enableAiRefineRun.mockResolvedValue(false);
+
+    const response = await POST(
+      new Request(`${APP_URL}/api/ai-assist/refine`, {
+        method: 'POST',
+        body: JSON.stringify({
+          channelId: 'channel-1',
+          content: 'hi there',
+          instruction: 'proofread',
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    expect(apiPost).not.toHaveBeenCalled();
   });
 
   it('returns 400 when content is missing', async () => {

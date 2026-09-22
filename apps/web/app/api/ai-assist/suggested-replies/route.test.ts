@@ -5,6 +5,7 @@ import { resolveAppUrl } from '@iconicedu/web/lib/config/app-url';
 
 const apiPost = vi.fn();
 const requireEffectiveActorContext = vi.fn();
+const enableAiSuggestedRepliesRun = vi.fn();
 const APP_URL = resolveAppUrl();
 
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
@@ -20,6 +21,12 @@ vi.mock('@iconicedu/web/lib/family-view/actor-context', () => ({
     requireEffectiveActorContext(...args),
 }));
 
+vi.mock('@iconicedu/web/flags', () => ({
+  enableAiSuggestedReplies: {
+    run: (...args: unknown[]) => enableAiSuggestedRepliesRun(...args),
+  },
+}));
+
 describe('POST /api/ai-assist/suggested-replies', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -27,7 +34,22 @@ describe('POST /api/ai-assist/suggested-replies', () => {
       account: { id: 'account-1', org_id: 'org-1' },
       profile: { id: 'profile-1' },
     });
+    enableAiSuggestedRepliesRun.mockResolvedValue(true);
     apiPost.mockResolvedValue({ suggestions: ['Sounds good!', 'Thanks!'] });
+  });
+
+  it('returns 403 when the flag is disabled', async () => {
+    enableAiSuggestedRepliesRun.mockResolvedValue(false);
+
+    const response = await POST(
+      new Request(`${APP_URL}/api/ai-assist/suggested-replies`, {
+        method: 'POST',
+        body: JSON.stringify({ channelId: 'channel-1' }),
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    expect(apiPost).not.toHaveBeenCalled();
   });
 
   it('returns 400 when channelId is missing', async () => {

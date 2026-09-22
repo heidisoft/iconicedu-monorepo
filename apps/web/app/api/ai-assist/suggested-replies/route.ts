@@ -4,6 +4,7 @@ import type { AiSuggestedRepliesResult } from '@iconicedu/shared-types';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { requireEffectiveActorContext } from '@iconicedu/web/lib/family-view/actor-context';
 import { createApiClient } from '@iconicedu/web/lib/api/http-client';
+import { enableAiSuggestedReplies } from '@iconicedu/web/flags';
 
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as { channelId?: string } | null;
@@ -33,6 +34,16 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { success: false, message: 'Account not found' },
       { status: 404 },
+    );
+  }
+
+  const isEnabled = await enableAiSuggestedReplies.run({
+    identify: { profileId: actor.profile.id },
+  });
+  if (!isEnabled) {
+    return NextResponse.json(
+      { success: false, message: 'AI assist is not available' },
+      { status: 403 },
     );
   }
 
