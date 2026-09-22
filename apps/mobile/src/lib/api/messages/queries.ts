@@ -1,11 +1,12 @@
 import { File as ExpoFile } from 'expo-file-system';
 import type {
+  MessageMentionVM,
   MessageSendFileInput,
   MessageSendFilesInput,
   MessageSendTextInput,
   MessageVM,
 } from '@iconicedu/shared-types';
-import { apiDelete, apiGet, apiPost } from '@/lib/api/http-client';
+import { apiDelete, apiGet, apiPost, apiPut } from '@/lib/api/http-client';
 import { supabase } from '@/lib/supabase/client';
 
 export async function fetchChannelMessages(
@@ -272,4 +273,115 @@ export async function sendFilesMessage(
   } satisfies MessageSendFilesInput);
 
   return { id: result.id };
+}
+
+// ─── Pinning (issue #264 P2) ────────────────────────────────────────────────
+
+export async function fetchPinnedMessages(input: {
+  orgId: string;
+  channelId: string;
+  profileId: string;
+  accountId: string;
+}) {
+  return apiGet<Array<{ message: MessageVM; pinnedBy: unknown; pinnedAt: string }>>(
+    '/message-pins',
+    input,
+  );
+}
+
+export async function toggleMessagePin(input: {
+  orgId: string;
+  channelId: string;
+  messageId: string;
+  isPinned: boolean;
+  profileId: string;
+}): Promise<void> {
+  await apiPost('/message-pins', input);
+}
+
+// ─── Search (issue #264 P2) ─────────────────────────────────────────────────
+
+export type MessageSearchResult = {
+  message: MessageVM;
+  matchRanges: Array<{ start: number; end: number }>;
+};
+
+export async function searchChannelMessages(input: {
+  orgId: string;
+  channelId: string;
+  query: string;
+  profileId: string;
+  accountId: string;
+  senderProfileId?: string;
+  createdAfter?: string;
+  createdBefore?: string;
+  limit?: number;
+}): Promise<MessageSearchResult[]> {
+  return apiGet<MessageSearchResult[]>('/message-search', input);
+}
+
+// ─── Scheduled send (issue #264 P2) ─────────────────────────────────────────
+
+export type ScheduledMessage = {
+  ids: { id: string; orgId: string };
+  channelId: string;
+  senderProfileId: string;
+  content: string;
+  mentions?: MessageMentionVM[];
+  threadParentId?: string | null;
+  threadId?: string | null;
+  sendAt: string;
+  timezone?: string | null;
+  status: 'pending' | 'sent' | 'canceled' | 'failed';
+  dispatchedMessageId?: string | null;
+  lastError?: string | null;
+};
+
+export async function fetchScheduledMessages(input: {
+  orgId: string;
+  senderProfileId: string;
+}): Promise<ScheduledMessage[]> {
+  return apiGet<ScheduledMessage[]>('/scheduled-messages', input);
+}
+
+export async function scheduleMessage(input: {
+  orgId: string;
+  channelId: string;
+  senderProfileId: string;
+  content: string;
+  mentions?: MessageMentionVM[];
+  threadParentId?: string | null;
+  threadId?: string | null;
+  sendAt: string;
+  timezone?: string | null;
+}): Promise<ScheduledMessage> {
+  return apiPost<ScheduledMessage>('/scheduled-messages', input);
+}
+
+export async function updateScheduledMessage(input: {
+  orgId: string;
+  id: string;
+  content?: string;
+  mentions?: MessageMentionVM[];
+  sendAt?: string;
+  timezone?: string | null;
+}): Promise<ScheduledMessage> {
+  const { id, ...body } = input;
+  return apiPut<ScheduledMessage>(`/scheduled-messages/${id}`, body);
+}
+
+export async function cancelScheduledMessage(input: {
+  orgId: string;
+  id: string;
+}): Promise<void> {
+  await apiDelete(`/scheduled-messages/${input.id}?orgId=${input.orgId}`);
+}
+
+export async function sendScheduledMessageNow(input: {
+  orgId: string;
+  id: string;
+}): Promise<ScheduledMessage> {
+  return apiPost<ScheduledMessage>(`/scheduled-messages/${input.id}/send-now`, {
+    orgId: input.orgId,
+  });
 }

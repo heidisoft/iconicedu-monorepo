@@ -123,3 +123,58 @@ export interface MessageWriteClient {
   deleteMessage: (input: MessageDeleteInput) => Promise<void>;
   toggleHiddenMessage: (input: MessageToggleHiddenInput) => Promise<void>;
 }
+
+// ─── Pinning (issue #264 P2) ────────────────────────────────────────────────
+
+export type MessageTogglePinInput = {
+  orgId: string;
+  channelId: string;
+  messageId: string;
+  isPinned: boolean;
+};
+
+export type ListPinnedMessagesInput = {
+  orgId: string;
+  channelId: string;
+};
+
+// ─── Search (issue #264 P2) ─────────────────────────────────────────────────
+
+export type MessageSearchInput = {
+  orgId: string;
+  channelId: string;
+  query: string;
+  senderProfileId?: string;
+  createdAfter?: string;
+  createdBefore?: string;
+  limit?: number;
+  cursor?: string | null;
+};
+
+// ─── Scheduled send (issue #264 P2) ─────────────────────────────────────────
+
+export type ScheduledMessageCreateInput = {
+  orgId: string;
+  channelId: string;
+  senderProfileId: string;
+  content: string;
+  mentions?: MessageMentionVM[];
+  threadParentId?: string | null;
+  threadId?: string | null;
+  sendAt: string;
+  timezone?: string | null;
+};
+
+export type ScheduledMessageUpdateInput = {
+  orgId: string;
+  id: string;
+  content?: string;
+  mentions?: MessageMentionVM[];
+  sendAt?: string;
+  timezone?: string | null;
+};
+
+export type ScheduledMessageIdInput = {
+  orgId: string;
+  id: string;
+};

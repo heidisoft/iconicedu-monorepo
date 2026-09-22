@@ -379,3 +379,47 @@ export type MessageVM =
   | LinkPreviewMessageVM
   | AudioRecordingMessageVM
   | LiveSessionStartedMessageVM;
+
+// ─── Pinning (issue #264 P2) ────────────────────────────────────────────────
+
+export interface PinnedMessageVM {
+  message: MessageVM;
+  pinnedBy: UserProfileVM;
+  pinnedAt: ISODateTime;
+}
+
+// ─── Search (issue #264 P2) ─────────────────────────────────────────────────
+// Scoped to text messages within a single channel for this pass — see PR
+// notes for why attachment-caption search across the other message payload
+// tables is a deliberate follow-up rather than part of this cut.
+
+export interface MessageSearchFiltersVM {
+  senderProfileId?: UUID;
+  createdAfter?: ISODateTime;
+  createdBefore?: ISODateTime;
+}
+
+export interface MessageSearchResultVM {
+  message: MessageVM;
+  /** Case-insensitive substring ranges of the query match within the message's text, for client-side highlighting. */
+  matchRanges: Array<{ start: number; end: number }>;
+}
+
+// ─── Scheduled send (issue #264 P2) ─────────────────────────────────────────
+
+export type ScheduledMessageStatusVM = 'pending' | 'sent' | 'canceled' | 'failed';
+
+export interface ScheduledMessageVM {
+  ids: IdsBaseVM;
+  channelId: UUID;
+  senderProfileId: UUID;
+  content: string;
+  mentions?: MessageMentionVM[];
+  threadParentId?: UUID | null;
+  threadId?: UUID | null;
+  sendAt: ISODateTime;
+  timezone?: IANATimezone | null;
+  status: ScheduledMessageStatusVM;
+  dispatchedMessageId?: UUID | null;
+  lastError?: string | null;
+}
