@@ -111,4 +111,40 @@ describe('mobile feature flags', () => {
       getLocalMobileFeatureFlagFallback(mobileFeatureFlagKeys.sessionCompletionCarousel),
     ).toBe(true);
   });
+
+  it('keeps message pinning, search, and scheduled send off by default', () => {
+    delete process.env.EXPO_PUBLIC_ENABLE_MESSAGE_PINNING;
+    delete process.env.EXPO_PUBLIC_ENABLE_MESSAGE_SEARCH;
+    delete process.env.EXPO_PUBLIC_ENABLE_SCHEDULED_SEND;
+
+    expect(
+      getLocalMobileFeatureFlagFallback(mobileFeatureFlagKeys.enableMessagePinning),
+    ).toBe(false);
+    expect(
+      getLocalMobileFeatureFlagFallback(mobileFeatureFlagKeys.enableMessageSearch),
+    ).toBe(false);
+    expect(
+      getLocalMobileFeatureFlagFallback(mobileFeatureFlagKeys.enableScheduledSend),
+    ).toBe(false);
+  });
+
+  it('enables message pinning, search, and scheduled send from Expo public env flags', () => {
+    process.env.EXPO_PUBLIC_ENABLE_MESSAGE_PINNING = 'true';
+    process.env.EXPO_PUBLIC_ENABLE_MESSAGE_SEARCH = 'true';
+    process.env.EXPO_PUBLIC_ENABLE_SCHEDULED_SEND = 'true';
+
+    expect(
+      getLocalMobileFeatureFlagFallback(mobileFeatureFlagKeys.enableMessagePinning),
+    ).toBe(true);
+    expect(
+      getLocalMobileFeatureFlagFallback(mobileFeatureFlagKeys.enableMessageSearch),
+    ).toBe(true);
+    expect(
+      getLocalMobileFeatureFlagFallback(mobileFeatureFlagKeys.enableScheduledSend),
+    ).toBe(true);
+
+    delete process.env.EXPO_PUBLIC_ENABLE_MESSAGE_PINNING;
+    delete process.env.EXPO_PUBLIC_ENABLE_MESSAGE_SEARCH;
+    delete process.env.EXPO_PUBLIC_ENABLE_SCHEDULED_SEND;
+  });
 });

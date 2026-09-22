@@ -64,6 +64,7 @@ import {
   Check,
   EyeOff,
   X,
+  Pin,
 } from 'lucide-react-native';
 import { AudioPlayer, createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import type { AudioStatus } from 'expo-audio';
@@ -905,6 +906,16 @@ const visibilityBadgeStyles = StyleSheet.create({
     paddingVertical: 4,
   },
 });
+
+// ─── Pinned indicator (issue #264 P2) ─────────────────────────────────────
+
+export function PinnedIndicator({ colors }: { colors: AppColors }) {
+  return (
+    <View testID="message-pinned-indicator" style={{ marginHorizontal: 2 }}>
+      <Pin size={11} color={colors.teal} fill={colors.teal} />
+    </View>
+  );
+}
 
 // ─── Inline thread reply (compact) ────────────────────────────────────────────
 
@@ -2064,6 +2075,10 @@ export type MessageItemProps = {
   showActionControls?: boolean;
   onSendAnnotation?: (attachment: AttachmentPayload) => void;
   messageUiThemeKey?: 'classic' | 'feed';
+  /** Gated by `enableMessagePinning` — shows a small pin indicator next to the sender/time. */
+  isPinned?: boolean;
+  /** True while this message is the active search-result navigation target — briefly tints the row. */
+  isHighlighted?: boolean;
 };
 
 export const MessageItem: React.FC<MessageItemProps> = ({
@@ -2083,6 +2098,8 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   showActionControls = true,
   onSendAnnotation,
   messageUiThemeKey = 'classic',
+  isPinned = false,
+  isHighlighted = false,
 }) => {
   const { markThreadRead } = useMarkRead({
     orgId: message.ids.orgId,
@@ -2832,7 +2849,12 @@ export const MessageItem: React.FC<MessageItemProps> = ({
       <Pressable
         onLongPress={() => onLongPress?.(message)}
         delayLongPress={350}
-        style={[s.row, ownInChannel && s.rowOwn, isGroupStart && s.rowGroupStart]}
+        style={[
+          s.row,
+          ownInChannel && s.rowOwn,
+          isGroupStart && s.rowGroupStart,
+          isHighlighted && { backgroundColor: colors.tealBg, borderRadius: 12 },
+        ]}
       >
         <View style={s.avatarSlot}>
           {isGroupStart && (
@@ -2876,6 +2898,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                 <VisibilityBadge message={message} colors={colors} />
               )}
               {!ownInChannel && <Text style={s.msgTime}>{time}</Text>}
+              {isPinned && <PinnedIndicator colors={colors} />}
             </View>
           )}
           {type === 'lesson-assignment' && (
@@ -3005,7 +3028,12 @@ export const MessageItem: React.FC<MessageItemProps> = ({
       <Pressable
         onLongPress={() => onLongPress?.(message)}
         delayLongPress={350}
-        style={[s.row, ownInChannel && s.rowOwn, isGroupStart && s.rowGroupStart]}
+        style={[
+          s.row,
+          ownInChannel && s.rowOwn,
+          isGroupStart && s.rowGroupStart,
+          isHighlighted && { backgroundColor: colors.tealBg, borderRadius: 12 },
+        ]}
       >
         {/* Avatar slot */}
         <View style={s.avatarSlot}>
@@ -3053,6 +3081,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                 <VisibilityBadge message={message} colors={colors} />
               )}
               {!ownInChannel && <Text style={s.msgTime}>{time}</Text>}
+              {isPinned && <PinnedIndicator colors={colors} />}
             </View>
           )}
           {/* Dedicated layouts for rich message types; text/cards use bubble */}
