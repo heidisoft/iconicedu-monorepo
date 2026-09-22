@@ -237,7 +237,7 @@ async function fetchLinkPreviewMetadata(url: string) {
   }
 }
 
-function sanitizeMentions(
+export function sanitizeMentions(
   content: string,
   mentions: MessageMentionVM[] | undefined,
   allowedProfileIds: Set<string>,
@@ -948,7 +948,7 @@ export class MessagesService {
     return result;
   }
 
-  private async resolveWritableProfile(input: {
+  async resolveWritableProfile(input: {
     authUserId: string;
     accessToken: string;
     orgId: string;
@@ -1243,6 +1243,51 @@ export class MessagesService {
 
     return [...typedRows]
       .reverse()
+      .map((row) =>
+        mapRowToMessageVM(
+          row,
+          payloadMap.get(row.id) ?? null,
+          reactionMap.get(row.id) ?? [],
+          threadsMap.get(row.id),
+        ),
+      );
+  }
+
+  /** Fetches specific messages by id (not paginated by channel), still visibility-filtered. Used by pinning and search. */
+  async getMessagesByIds(input: {
+    accessToken: string;
+    orgId: string;
+    messageIds: string[];
+    profileId: string;
+    accountId: string;
+  }): Promise<MessageVM[]> {
+    if (!input.messageIds.length) return [];
+    const supabase = createSupabaseSessionClient(input.accessToken);
+    const { data, error } = await supabase
+      .from('messages')
+      .select(BASE_MESSAGE_SELECT)
+      .eq('org_id', input.orgId)
+      .in('id', input.messageIds)
+      .is('deleted_at', null);
+    if (error) throw new InternalServerErrorException(error.message);
+
+    const typedRows = filterVisibleMessageRows(
+      (data ?? []) as unknown as RawMessageRow[],
+      input.profileId,
+    );
+    if (!typedRows.length) return [];
+
+    const messageIds = typedRows.map((row) => row.id);
+    const [payloadMap, reactionMap, threadsMap] = await Promise.all([
+      this.loadPayloads(input.accessToken, typedRows),
+      this.loadReactions(input.accessToken, messageIds, input.accountId),
+      this.loadThreads(input.accessToken, messageIds, input.accountId),
+    ]);
+
+    const rowsById = new Map(typedRows.map((row) => [row.id, row]));
+    return input.messageIds
+      .map((id) => rowsById.get(id))
+      .filter((row): row is RawMessageRow => Boolean(row))
       .map((row) =>
         mapRowToMessageVM(
           row,

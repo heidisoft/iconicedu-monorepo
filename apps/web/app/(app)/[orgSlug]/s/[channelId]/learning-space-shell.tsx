@@ -20,6 +20,9 @@ export function LearningSpaceShell({
   currentUserProfile,
   readOnly = false,
   showCreateMessageTypeButton = true,
+  enableMessagePinning = false,
+  enableMessageSearch = false,
+  enableScheduledSend = false,
   sendTextMessage,
   sendFileMessage,
   sendFilesMessage,
@@ -35,6 +38,9 @@ export function LearningSpaceShell({
   currentUserProfile?: UserProfileVM | null;
   readOnly?: boolean;
   showCreateMessageTypeButton?: boolean;
+  enableMessagePinning?: boolean;
+  enableMessageSearch?: boolean;
+  enableScheduledSend?: boolean;
   sendTextMessage: (input: MessageSendTextInput) => Promise<MessageVM>;
   sendFileMessage: (input: MessageSendFileInput) => Promise<MessageVM>;
   sendFilesMessage: (input: MessageSendFilesInput) => Promise<MessageVM>;
@@ -63,6 +69,9 @@ export function LearningSpaceShell({
       currentUserProfile={currentUserProfile}
       readOnly={readOnly}
       showCreateMessageTypeButton={showCreateMessageTypeButton}
+      enableMessagePinning={enableMessagePinning}
+      enableMessageSearch={enableMessageSearch}
+      enableScheduledSend={enableScheduledSend}
       panelRegistry={{
         channel_info: (props) => (
           <LearningSpaceInfoPanel {...props} learningSpace={learningSpace} />

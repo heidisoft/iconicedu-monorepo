@@ -50,6 +50,10 @@ import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
 import { usePushNudge } from '@/hooks/use-push-nudge';
 import { PushNudgeSheet } from '@/components/notifications/push-nudge-sheet';
 import { usePushConsent } from '@/providers/push-consent-provider';
+import { useMessageP2Features } from '@/hooks/use-message-p2-features';
+import { PinnedMessagesSheet } from '@/components/messages/pinned-messages-sheet';
+import { MessageSearchSheet } from '@/components/messages/message-search-sheet';
+import { ScheduledMessagesSheet } from '@/components/messages/scheduled-messages-sheet';
 
 type ChannelTab = 'messages' | 'sessions';
 
@@ -146,6 +150,12 @@ export default function ChannelConversationScreen() {
     accountId,
     channelId: channelId ?? '',
     profileKind,
+  });
+  const p2 = useMessageP2Features({
+    orgId,
+    channelId: channelId ?? '',
+    profileId,
+    accountId,
   });
   const refreshConversation = useCallback(async () => {
     await Promise.all([
@@ -613,6 +623,9 @@ export default function ChannelConversationScreen() {
             emptyTitle={emptyStateCopy.title}
             emptyDescription={emptyStateCopy.description}
             emptyIcon={emptyStateCopy.icon}
+            pinnedMessageIds={p2.pinnedMessageIds}
+            highlightMessageId={p2.highlightMessageId}
+            onScrollToMessageResult={p2.handleScrollToMessageResult}
           />
           <TypingIndicator typingUsers={typingUsers} />
           <MessageInput
@@ -624,6 +637,8 @@ export default function ChannelConversationScreen() {
             replyTo={threadReplyTarget}
             onCancelReply={() => setThreadReplyTarget(null)}
             uploading={pendingUploads.some((p) => !p.failed)}
+            enableScheduledSend={p2.enableScheduledSend}
+            onScheduleSend={p2.scheduleSend}
           />
         </KeyboardAvoidingView>
       )}
@@ -645,6 +660,54 @@ export default function ChannelConversationScreen() {
           setInfoVisible(false);
           setProfileUser(user);
         }}
+        enablePinning={p2.enablePinning}
+        onOpenPinned={() => {
+          setInfoVisible(false);
+          p2.openPinnedSheet();
+        }}
+        enableSearch={p2.enableSearch}
+        onOpenSearch={() => {
+          setInfoVisible(false);
+          p2.openSearch();
+        }}
+        enableScheduledSend={p2.enableScheduledSend}
+        onOpenScheduled={() => {
+          setInfoVisible(false);
+          p2.openScheduledSheet();
+        }}
+      />
+
+      {/* Pinned messages */}
+      <PinnedMessagesSheet
+        visible={p2.pinnedSheetVisible}
+        orgId={orgId}
+        channelId={channelId ?? ''}
+        profileId={profileId}
+        accountId={accountId}
+        onClose={p2.closePinnedSheet}
+        onJumpToMessage={p2.jumpToMessage}
+      />
+
+      {/* Search within messages */}
+      <MessageSearchSheet
+        visible={p2.searchVisible}
+        orgId={orgId}
+        channelId={channelId ?? ''}
+        profileId={profileId}
+        accountId={accountId}
+        onClose={p2.closeSearch}
+        onResultPress={(messageId) => {
+          p2.closeSearch();
+          p2.jumpToMessage(messageId);
+        }}
+      />
+
+      {/* Scheduled messages */}
+      <ScheduledMessagesSheet
+        visible={p2.scheduledSheetVisible}
+        orgId={orgId}
+        senderProfileId={profileId}
+        onClose={p2.closeScheduledSheet}
       />
 
       {/* Profile sheet */}
@@ -671,6 +734,9 @@ export default function ChannelConversationScreen() {
         onReact={handleReactionToggle}
         onThread={handleThreadOpen}
         onDelete={handleDelete}
+        enablePinning={p2.enablePinning}
+        isPinned={actionsMessage ? p2.pinnedMessageIds.has(actionsMessage.ids.id) : false}
+        onTogglePin={p2.handleTogglePin}
       />
 
       {/* Push notification nudge */}

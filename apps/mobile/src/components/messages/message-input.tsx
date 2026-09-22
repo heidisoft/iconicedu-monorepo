@@ -11,6 +11,7 @@ import {
   ScrollView,
   Keyboard,
   Platform,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AudioPlayer, createAudioPlayer } from 'expo-audio';
@@ -21,7 +22,18 @@ import type { AppColors } from '@/lib/theme';
 import type { MessageVM } from '@iconicedu/shared-types';
 import { EmojiPicker } from './emoji-picker';
 import { AttachmentSheet, type AttachmentPayload } from './attachment-sheet';
-import { ThumbsUp, Plus, ArrowUp, X, FileText, Play, Pause } from 'lucide-react-native';
+import { ScheduleDateTimePicker } from './schedule-date-time-picker';
+import { getDeviceTimezone } from '@/lib/messages/schedule-send';
+import {
+  ThumbsUp,
+  Plus,
+  ArrowUp,
+  X,
+  FileText,
+  Play,
+  Pause,
+  Clock,
+} from 'lucide-react-native';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -76,6 +88,14 @@ type MessageInputProps = {
   replyTo?: MessageVM | null;
   /** Called when the user dismisses the reply preview with ✕. */
   onCancelReply?: () => void;
+  /** Gated by `enableScheduledSend`. When set, long-pressing send offers "Schedule send". */
+  enableScheduledSend?: boolean;
+  /** Called with the composed text + picked absolute send time when the user confirms scheduling. */
+  onScheduleSend?: (input: {
+    content: string;
+    sendAt: string;
+    timezone: string | null;
+  }) => Promise<void> | void;
 };
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
@@ -298,6 +318,19 @@ function makeStyles(C: AppColors, bottomInset: number, keyboardVisible: boolean)
       alignItems: 'center',
       justifyContent: 'center',
     },
+    scheduleBadge: {
+      position: 'absolute',
+      bottom: -2,
+      right: -2,
+      width: 16,
+      height: 16,
+      borderRadius: 8,
+      backgroundColor: C.card,
+      borderWidth: 1,
+      borderColor: C.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
   });
 }
 
@@ -313,6 +346,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   onTypingStop,
   replyTo,
   onCancelReply,
+  enableScheduledSend = false,
+  onScheduleSend,
 }) => {
   const [text, setText] = useState('');
   const [inputKey, setInputKey] = useState(0);
@@ -321,6 +356,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
   const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
   const [pendingAttachments, setPendingAttachments] = useState<AttachmentPayload[]>([]);
+  const [schedulePickerVisible, setSchedulePickerVisible] = useState(false);
+  const [scheduling, setScheduling] = useState(false);
   const [loadedImageUris, setLoadedImageUris] = useState<Set<string>>(new Set());
   const [audioPlaying, setAudioPlaying] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
@@ -475,6 +512,49 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     resetIOSInput,
     runSendProgress,
   ]);
+
+  const handleSendLongPress = useCallback(() => {
+    if (!enableScheduledSend || !onScheduleSend) return;
+    if (!text.trim() || pendingAttachments.length > 0) return;
+    Alert.alert('Send message', undefined, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Schedule send', onPress: () => setSchedulePickerVisible(true) },
+      { text: 'Send now', onPress: () => void handleSend() },
+    ]);
+    // handleSend is stable via useCallback below; referenced here intentionally.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enableScheduledSend, onScheduleSend, text, pendingAttachments]);
+
+  const handleConfirmSchedule = useCallback(
+    async (date: Date) => {
+      if (!onScheduleSend) return;
+      const content = text.trim();
+      if (!content) {
+        setSchedulePickerVisible(false);
+        return;
+      }
+      setScheduling(true);
+      try {
+        await onScheduleSend({
+          content,
+          sendAt: date.toISOString(),
+          timezone: getDeviceTimezone(),
+        });
+        setSchedulePickerVisible(false);
+        setText('');
+        resetIOSInput();
+        onTypingStop?.();
+      } catch (error) {
+        Alert.alert(
+          'Unable to schedule message',
+          error instanceof Error ? error.message : 'Please try again.',
+        );
+      } finally {
+        setScheduling(false);
+      }
+    },
+    [onScheduleSend, text, resetIOSInput, onTypingStop],
+  );
 
   const handleChangeText = useCallback(
     (t: string) => {
@@ -678,10 +758,23 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             onPress={() => {
               void handleSend();
             }}
+            onLongPress={
+              enableScheduledSend && onScheduleSend ? handleSendLongPress : undefined
+            }
             activeOpacity={0.8}
             accessibilityLabel="Send message"
+            accessibilityHint={
+              enableScheduledSend && onScheduleSend
+                ? 'Long-press for more send options, including scheduling'
+                : undefined
+            }
           >
             <ArrowUp size={20} color={colors.tealFg} />
+            {enableScheduledSend && onScheduleSend && (
+              <View style={s.scheduleBadge}>
+                <Clock size={9} color={colors.teal} />
+              </View>
+            )}
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
@@ -710,6 +803,22 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         }}
         disabled={disabled}
       />
+
+      {enableScheduledSend && onScheduleSend && (
+        <ScheduleDateTimePicker
+          visible={schedulePickerVisible}
+          minimumDate={new Date()}
+          onCancel={() => setSchedulePickerVisible(false)}
+          onConfirm={(date) => {
+            void handleConfirmSchedule(date);
+          }}
+        />
+      )}
+      {scheduling && (
+        <View style={s.progressBarWrap}>
+          <ActivityIndicator size="small" color={colors.teal} />
+        </View>
+      )}
     </>
   );
 };

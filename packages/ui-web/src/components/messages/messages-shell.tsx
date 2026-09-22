@@ -15,6 +15,9 @@ import { MessagesRightSidebarRegion } from './messages-right-sidebar-region';
 import { ChannelInfoPanel } from './panels/channel-info-panel';
 import { ProfilePanel } from './panels/profile-panel';
 import { SavedPanel } from './panels/saved-panel';
+import { PinnedPanel } from './panels/pinned-panel';
+import { MessageSearchPanel } from './panels/message-search-panel';
+import { ScheduledPanel } from './panels/scheduled-panel';
 import type {
   MessagesRightPanelRegistry,
   MessagesRightPanelIntent,
@@ -49,6 +52,9 @@ export const MessagesShell = memo(function MessagesShell(props: MessagesShellPro
       saved: SavedPanel,
       profile: ProfilePanel,
       thread: () => null,
+      pinned: PinnedPanel,
+      search: MessageSearchPanel,
+      scheduled: ScheduledPanel,
     };
     return { ...defaultRegistry, ...(props.panelRegistry ?? {}) };
   }, [props.panelRegistry]);
@@ -59,6 +65,13 @@ export const MessagesShell = memo(function MessagesShell(props: MessagesShellPro
       currentUserId={props.currentUserId}
       isReadOnly={props.readOnly}
       showCreateMessageTypeButton={props.showCreateMessageTypeButton}
+      canManageChannel={
+        props.currentUserProfile?.kind === 'staff' ||
+        props.currentUserProfile?.kind === 'educator'
+      }
+      enableMessagePinning={props.enableMessagePinning}
+      enableMessageSearch={props.enableMessageSearch}
+      enableScheduledSend={props.enableScheduledSend}
     >
       <MessagesShellLayout {...props} registry={rightPanelRegistry} />
     </MessagesStateProvider>

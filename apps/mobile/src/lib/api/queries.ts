@@ -29,20 +29,32 @@ export {
 } from './channel/queries';
 export {
   buildMessageStoragePath,
+  cancelScheduledMessage,
   deleteMessage,
   fetchChannelMessages,
   fetchChannelReadState,
+  fetchPinnedMessages,
+  fetchScheduledMessages,
   fetchThreadMessages,
   markChannelReadState,
   markChannelsReadByIds,
   markThreadReadState,
+  scheduleMessage,
+  searchChannelMessages,
   sendFileMessage,
   sendFilesMessage,
+  sendScheduledMessageNow,
   sendTextMessage,
+  toggleMessagePin,
   toggleReaction,
+  updateScheduledMessage,
   uploadChannelFile,
 } from './messages/queries';
-export type { FileAttachmentInput } from './messages/queries';
+export type {
+  FileAttachmentInput,
+  MessageSearchResult,
+  ScheduledMessage,
+} from './messages/queries';
 export {
   fetchLearningSpaceChannels,
   fetchLearningSpaces,

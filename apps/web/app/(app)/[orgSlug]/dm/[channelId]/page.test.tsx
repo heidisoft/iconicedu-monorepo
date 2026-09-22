@@ -75,6 +75,9 @@ vi.mock('@iconicedu/web/flags', () => ({
   enableMessageTypeComposer: {
     run: (...args: unknown[]) => enableMessageTypeComposerRunMock(...args),
   },
+  enableMessagePinning: { run: async () => false },
+  enableMessageSearch: { run: async () => false },
+  enableScheduledSend: { run: async () => false },
 }));
 
 describe('d/dm/[channelId] page', () => {

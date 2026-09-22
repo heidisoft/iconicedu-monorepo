@@ -1,6 +1,7 @@
 'use client';
 
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { reportObservedError } from '@iconicedu/utils';
 import type { MessageListRef } from '@iconicedu/ui-web/components/messages/message-list';
 import { resolveWebMessageUiTheme } from '@iconicedu/ui-web/components/messages/themes/registry';
@@ -102,6 +103,9 @@ export interface MessagesContainerProps {
   currentUserProfile?: UserProfileVM | null;
   readOnly?: boolean;
   showCreateMessageTypeButton?: boolean;
+  enableMessagePinning?: boolean;
+  enableMessageSearch?: boolean;
+  enableScheduledSend?: boolean;
   realtimeClient?: MessagesRealtimeClient | null;
   messageWriteClient?: MessageWriteClient | null;
   uploadFileMessage?: (input: {
@@ -390,6 +394,8 @@ export function MessagesContainer({
   currentUserProfile,
   readOnly = false,
   showCreateMessageTypeButton = true,
+  enableMessagePinning = false,
+  enableScheduledSend = false,
   realtimeClient,
   messageWriteClient,
   uploadFileMessage,
@@ -444,6 +450,8 @@ export function MessagesContainer({
   const [savingMessageIds, setSavingMessageIds] = useState<Record<string, true>>({});
   const [hidingMessageIds, setHidingMessageIds] = useState<Record<string, true>>({});
   const [deletingMessageIds, setDeletingMessageIds] = useState<Record<string, true>>({});
+  const [pinnedMessageIds, setPinnedMessageIds] = useState<Set<string>>(new Set());
+  const [pinningMessageIds, setPinningMessageIds] = useState<Record<string, true>>({});
   const [reactionPickerMessageIds, setReactionPickerMessageIds] = useState<
     Record<string, true>
   >({});
@@ -1167,6 +1175,105 @@ export function MessagesContainer({
     ],
   );
 
+  useEffect(() => {
+    if (!enableMessagePinning) {
+      setPinnedMessageIds(new Set());
+      return;
+    }
+    let isCancelled = false;
+    const loadPins = async () => {
+      try {
+        const params = new URLSearchParams({ channelId: channel.ids.id });
+        const response = await runWithNetworkActivity(() =>
+          window.fetch(`/api/messages/pins?${params.toString()}`),
+        );
+        if (!response.ok) {
+          return;
+        }
+        const payload = (await response.json()) as {
+          success?: boolean;
+          data?: Array<{ message: MessageVM }>;
+        };
+        if (!isCancelled && payload.success) {
+          setPinnedMessageIds(
+            new Set((payload.data ?? []).map((pin) => pin.message.ids.id)),
+          );
+        }
+      } catch {
+        // Best effort — pin state simply stays unknown for this session.
+      }
+    };
+    void loadPins();
+    return () => {
+      isCancelled = true;
+    };
+  }, [channel.ids.id, enableMessagePinning, runWithNetworkActivity]);
+
+  const handleTogglePinned = useCallback(
+    (messageId: string) => {
+      if (readOnly) return;
+      const wasPinned = pinnedMessageIds.has(messageId);
+      setPendingMessageAction(setPinningMessageIds, messageId, true);
+      setPinnedMessageIds((current) => {
+        const next = new Set(current);
+        if (wasPinned) {
+          next.delete(messageId);
+        } else {
+          next.add(messageId);
+        }
+        return next;
+      });
+
+      const persistPin = async () => {
+        try {
+          const response = await runWithNetworkActivity(() =>
+            window.fetch('/api/messages/pins', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                channelId: channel.ids.id,
+                messageId,
+                isPinned: !wasPinned,
+              }),
+            }),
+          );
+          const payload = (await response.json().catch(() => null)) as {
+            success?: boolean;
+            message?: string;
+          } | null;
+          if (!response.ok || !payload?.success) {
+            throw new Error(payload?.message ?? 'Unable to update pinned message');
+          }
+        } catch (error) {
+          // Roll back the optimistic update and surface the error (e.g. the
+          // 25-active-pins cap, or a 403 for members who cannot manage the channel).
+          setPinnedMessageIds((current) => {
+            const next = new Set(current);
+            if (wasPinned) {
+              next.add(messageId);
+            } else {
+              next.delete(messageId);
+            }
+            return next;
+          });
+          toast.error(
+            error instanceof Error ? error.message : 'Unable to update pinned message',
+          );
+        } finally {
+          setPendingMessageAction(setPinningMessageIds, messageId, false);
+        }
+      };
+      void persistPin();
+    },
+    [
+      channel.ids.id,
+      pinnedMessageIds,
+      readOnly,
+      runWithNetworkActivity,
+      setPendingMessageAction,
+    ],
+  );
+
   const handleDeleteMessage = useCallback(
     async (messageId: string) => {
       if (readOnly && currentUserProfile?.kind !== 'staff') return;
@@ -1873,6 +1980,12 @@ export function MessagesContainer({
       currentUserId,
       currentUserProfile: resolvedCurrentUserProfile,
       currentUserCanDeleteAnyMessages: currentUserProfile?.kind === 'staff',
+      currentUserCanPinMessages:
+        enableMessagePinning &&
+        (currentUserProfile?.kind === 'staff' || currentUserProfile?.kind === 'educator'),
+      pinnedMessageIds,
+      pinningMessageIds: new Set(Object.keys(pinningMessageIds)),
+      onTogglePinned: handleTogglePinned,
       isReadOnly: readOnly,
       onSendThreadReply: handleSendThreadReply,
       lastReadMessageId,
@@ -1906,6 +2019,10 @@ export function MessagesContainer({
     handleLoadOlderMessages,
     markChannelRead,
     setComposerPrefillRequest,
+    enableMessagePinning,
+    pinnedMessageIds,
+    pinningMessageIds,
+    handleTogglePinned,
   ]);
 
   const renderActiveTabContent = () => {
@@ -1996,6 +2113,33 @@ export function MessagesContainer({
               prefillRequest={composerPrefillRequest}
               onTypingStart={handleTypingStart}
               onTypingStop={handleTypingStop}
+              enableScheduledSend={enableScheduledSend}
+              onScheduleSend={
+                enableScheduledSend
+                  ? async ({ content, mentions, sendAt, timezone }) => {
+                      const response = await runWithNetworkActivity(() =>
+                        window.fetch('/api/messages/scheduled', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            channelId: channel.ids.id,
+                            content,
+                            mentions,
+                            sendAt,
+                            timezone,
+                          }),
+                        }),
+                      );
+                      const payload = (await response.json().catch(() => null)) as {
+                        success?: boolean;
+                        message?: string;
+                      } | null;
+                      if (!response.ok || !payload?.success) {
+                        throw new Error(payload?.message ?? 'Unable to schedule message');
+                      }
+                    }
+                  : undefined
+              }
             />
           )}
         </>

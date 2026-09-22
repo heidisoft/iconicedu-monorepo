@@ -49,5 +49,17 @@ export function getLocalMobileFeatureFlagFallback(key: MobileFeatureFlagKey): bo
     );
   }
 
+  if (key === mobileFeatureFlagKeys.enableMessagePinning) {
+    return parseBooleanFeatureFlag(process.env.EXPO_PUBLIC_ENABLE_MESSAGE_PINNING);
+  }
+
+  if (key === mobileFeatureFlagKeys.enableMessageSearch) {
+    return parseBooleanFeatureFlag(process.env.EXPO_PUBLIC_ENABLE_MESSAGE_SEARCH);
+  }
+
+  if (key === mobileFeatureFlagKeys.enableScheduledSend) {
+    return parseBooleanFeatureFlag(process.env.EXPO_PUBLIC_ENABLE_SCHEDULED_SEND);
+  }
+
   return false;
 }

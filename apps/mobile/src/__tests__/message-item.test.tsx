@@ -405,6 +405,43 @@ describe('MessageItem', () => {
     expect(screen.getByLabelText('Visible to specific users')).toBeTruthy();
   });
 
+  it('shows the pinned indicator when isPinned is true (issue #264 P2)', () => {
+    render(
+      <MessageItem
+        message={baseMessage}
+        isOwn={false}
+        isGroupStart
+        colors={colors}
+        isPinned
+      />,
+    );
+
+    expect(screen.getByTestId('message-pinned-indicator')).toBeTruthy();
+  });
+
+  it('hides the pinned indicator when isPinned is false or omitted', () => {
+    render(
+      <MessageItem message={baseMessage} isOwn={false} isGroupStart colors={colors} />,
+    );
+
+    expect(screen.queryByTestId('message-pinned-indicator')).toBeNull();
+  });
+
+  it('tints the row background when isHighlighted is true (search jump-to-message)', () => {
+    render(
+      <MessageItem
+        message={baseMessage}
+        isOwn={false}
+        isGroupStart
+        colors={colors}
+        isHighlighted
+      />,
+    );
+
+    const row = screen.getByText('Hello world');
+    expect(row).toBeTruthy();
+  });
+
   it('opens PDF attachments in the in-app PDF viewer instead of the generic browser flow', () => {
     render(
       <MessageItem message={pdfFileMessage} isOwn={false} isGroupStart colors={colors} />,
