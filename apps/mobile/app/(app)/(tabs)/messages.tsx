@@ -490,6 +490,14 @@ function makeStyles(C: AppColors) {
       paddingHorizontal: 6,
     },
     badgeTxt: { color: '#ffffff', fontSize: 12, fontWeight: '700' },
+    // Shown when the user explicitly marked a conversation unread but there are
+    // no actual unread messages to count.
+    badgeDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: C.teal,
+    },
 
     emptyWrap: {
       flex: 1,
@@ -767,7 +775,10 @@ function ChannelRow({
   const sender = item.last_message_sender;
   const time = formatListTime(item.last_message_at ?? item.updated_at);
   const unread = (item.unread_count ?? 0) + (item.thread_unread_count ?? 0);
-  const hasUnread = unread > 0;
+  // An explicit "mark unread" keeps the row in its unread treatment even when
+  // there is nothing left to count.
+  const isManuallyUnread = item.is_manually_unread === true;
+  const hasUnread = unread > 0 || isManuallyUnread;
   const isClassroom = !isDm && Boolean(item.is_learning_space);
   const studentProfiles = !isDm ? (item.student_profiles ?? []) : [];
   const participantProfiles = !isDm ? (item.participant_profiles ?? []) : [];
@@ -903,9 +914,13 @@ function ChannelRow({
               {time}
             </Text>
             {hasUnread ? (
-              <View style={s.badge}>
-                <Text style={s.badgeTxt}>{unread > 99 ? '99+' : unread}</Text>
-              </View>
+              unread > 0 ? (
+                <View style={s.badge}>
+                  <Text style={s.badgeTxt}>{unread > 99 ? '99+' : unread}</Text>
+                </View>
+              ) : (
+                <View testID="channel-row-manual-unread-dot" style={s.badgeDot} />
+              )
             ) : (
               <View />
             )}
@@ -1153,7 +1168,11 @@ export default function MessagesScreen() {
     () =>
       data
         .filter((item): item is ChannelListItem => !('_type' in item))
-        .filter((item) => (item.unread_count ?? 0) + (item.thread_unread_count ?? 0) > 0)
+        .filter(
+          (item) =>
+            (item.unread_count ?? 0) + (item.thread_unread_count ?? 0) > 0 ||
+            item.is_manually_unread === true,
+        )
         .map((item) => item.id),
     [data],
   );

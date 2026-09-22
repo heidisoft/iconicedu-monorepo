@@ -28,6 +28,7 @@ import {
   fetchChannelMetaByChannelId,
   fetchChannelReadState,
   ensureDirectMessageChannelForProfiles,
+  markChannelUnread,
   queryKeys,
 } from '@/lib/api/queries';
 import type { AttachmentPayload } from '@/components/messages/attachment-sheet';
@@ -45,6 +46,7 @@ import { resolveChannelTopicIconKey } from '@/lib/learning-space-icons';
 import { buildMobileChannelEmptyStateCopy } from '@/lib/message-empty-state';
 import { reportMobileObservedError } from '@/lib/analytics/report-error';
 import { useMarkRead } from '@/hooks/use-mark-read';
+import { applyOptimisticChannelManualUnread } from '@/lib/messages/apply-optimistic-channel-read-state';
 import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
 import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
 import { usePushNudge } from '@/hooks/use-push-nudge';
@@ -65,6 +67,12 @@ export default function ChannelConversationScreen() {
   const { colors } = useTheme();
   const enableMobileDirectMessageStart = useMobileFeatureFlag(
     mobileFeatureFlagKeys.enableMobileDirectMessageStart,
+  );
+  const enableMessageReplyReference = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.enableMessageReplyReference,
+  );
+  const enableMessageMarkUnread = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.enableMessageMarkUnread,
   );
 
   const orgId = account?.org_id ?? '';
@@ -147,6 +155,9 @@ export default function ChannelConversationScreen() {
     channelId: channelId ?? '',
     profileKind,
   });
+  const isChannelUnread =
+    (channelReadState?.unreadCount ?? 0) > 0 ||
+    channelReadState?.isManuallyUnread === true;
   const refreshConversation = useCallback(async () => {
     await Promise.all([
       refetch(),
@@ -190,10 +201,38 @@ export default function ChannelConversationScreen() {
 
   // ── Thread reply target — drives the reply preview above the input ──
   const [threadReplyTarget, setThreadReplyTarget] = useState<MessageVM | null>(null);
+  // ── Quote reply target — distinct from "reply in thread"; drives its own preview ──
+  const [quoteReplyTarget, setQuoteReplyTarget] = useState<MessageVM | null>(null);
 
   const handleThreadOpen = useCallback((msg: MessageVM) => {
+    setQuoteReplyTarget(null);
     setThreadReplyTarget(msg);
   }, []);
+
+  const handleQuoteReply = useCallback((msg: MessageVM) => {
+    setThreadReplyTarget(null);
+    setQuoteReplyTarget(msg);
+  }, []);
+
+  const handleMarkUnread = useCallback(
+    async (_msg: MessageVM) => {
+      if (!channelId || !orgId || !accountId || !profileId) return;
+      try {
+        await markChannelUnread({ orgId, accountId, profileId, channelId });
+        applyOptimisticChannelManualUnread({
+          queryClient,
+          orgId,
+          profileId,
+          accountId,
+          channelId,
+          profileKind,
+        });
+      } catch {
+        Alert.alert('Unable to mark unread', 'Please try again.');
+      }
+    },
+    [channelId, orgId, accountId, profileId, profileKind, queryClient],
+  );
 
   // ── Pending uploads (WhatsApp-style optimistic UI) ──
   // Each pending item is shown in the message list immediately while the upload runs.
@@ -243,6 +282,18 @@ export default function ChannelConversationScreen() {
           setThreadReplyTarget(null);
           // Thread reply count lives in the threads table — refetch to update the pill.
           void refetch();
+        } else if (quoteReplyTarget) {
+          await sendTextMessage(
+            channelId,
+            profileId,
+            orgId,
+            text,
+            undefined,
+            undefined,
+            quoteReplyTarget.ids.id,
+          );
+          setQuoteReplyTarget(null);
+          // Realtime subscription handles cache invalidation for non-thread messages.
         } else {
           await sendTextMessage(channelId, profileId, orgId, text);
           // Realtime subscription handles cache invalidation for non-thread messages.
@@ -269,6 +320,7 @@ export default function ChannelConversationScreen() {
       profileId,
       orgId,
       threadReplyTarget,
+      quoteReplyTarget,
       refetch,
       handlePushNotificationMoment,
     ],
@@ -623,6 +675,8 @@ export default function ChannelConversationScreen() {
             onTypingStop={broadcastTypingStop}
             replyTo={threadReplyTarget}
             onCancelReply={() => setThreadReplyTarget(null)}
+            quoteReplyTo={quoteReplyTarget}
+            onCancelQuoteReply={() => setQuoteReplyTarget(null)}
             uploading={pendingUploads.some((p) => !p.failed)}
           />
         </KeyboardAvoidingView>
@@ -671,6 +725,9 @@ export default function ChannelConversationScreen() {
         onReact={handleReactionToggle}
         onThread={handleThreadOpen}
         onDelete={handleDelete}
+        onQuoteReply={enableMessageReplyReference ? handleQuoteReply : undefined}
+        onMarkUnread={enableMessageMarkUnread ? handleMarkUnread : undefined}
+        isChannelUnread={isChannelUnread}
       />
 
       {/* Push notification nudge */}

@@ -1,4 +1,5 @@
 import {
+  findFirstMessageLink,
   isTrustedExternalLink,
   splitMessageTextByLinks,
 } from '@/lib/messages/link-opening';
@@ -27,5 +28,24 @@ describe('message link opening helpers', () => {
       isTrustedExternalLink('https://play.google.com/store/apps/details?id=app'),
     ).toBe(true);
     expect(isTrustedExternalLink('https://example.com')).toBe(false);
+  });
+
+  it('finds the first URL in a composer draft for link preview detection', () => {
+    expect(findFirstMessageLink('Check out https://example.com/a and more')).toBe(
+      'https://example.com/a',
+    );
+    expect(findFirstMessageLink('www.example.com is neat')).toBe(
+      'https://www.example.com',
+    );
+  });
+
+  it('returns null when the draft has no URL', () => {
+    expect(findFirstMessageLink('just some plain text')).toBeNull();
+  });
+
+  it('returns only the first URL when multiple are present', () => {
+    expect(findFirstMessageLink('https://first.com then https://second.com')).toBe(
+      'https://first.com',
+    );
   });
 });

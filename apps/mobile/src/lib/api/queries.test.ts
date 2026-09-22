@@ -383,6 +383,30 @@ describe('sendTextMessage', () => {
 
     expect(mockApiPost).not.toHaveBeenCalled();
   });
+
+  it('passes replyToMessageId through for quote replies', async () => {
+    mockApiPost.mockResolvedValue({ id: 'message-2' });
+
+    await sendTextMessage(
+      'channel-1',
+      'profile-1',
+      'org-1',
+      'Sounds good',
+      undefined,
+      undefined,
+      'original-message-1',
+    );
+
+    expect(mockApiPost).toHaveBeenCalledWith('/messages/text', {
+      orgId: 'org-1',
+      channelId: 'channel-1',
+      senderProfileId: 'profile-1',
+      content: 'Sounds good',
+      threadParentId: undefined,
+      threadId: undefined,
+      replyToMessageId: 'original-message-1',
+    });
+  });
 });
 
 describe('sendFileMessage', () => {

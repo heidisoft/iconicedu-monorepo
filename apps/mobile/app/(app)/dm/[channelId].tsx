@@ -26,6 +26,7 @@ import {
   fetchChannelReadState,
   fetchDirectMessageChannelMetaByChannelId,
   ensureDirectMessageChannelForProfiles,
+  markChannelUnread,
   queryKeys,
 } from '@/lib/api/queries';
 import { useTheme } from '@/providers/theme-provider';
@@ -45,6 +46,7 @@ import { buildMobileChannelEmptyStateCopy } from '@/lib/message-empty-state';
 import type { AttachmentPayload } from '@/components/messages/attachment-sheet';
 import type { PendingUpload } from '@/components/messages/pending-message-row';
 import { useMarkRead } from '@/hooks/use-mark-read';
+import { applyOptimisticChannelManualUnread } from '@/lib/messages/apply-optimistic-channel-read-state';
 import type { ChannelListItem, DmParticipant } from '@/lib/api/types';
 import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
 import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
@@ -91,6 +93,12 @@ export default function DmConversationScreen() {
   const { colors } = useTheme();
   const enableMobileDirectMessageStart = useMobileFeatureFlag(
     mobileFeatureFlagKeys.enableMobileDirectMessageStart,
+  );
+  const enableMessageReplyReference = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.enableMessageReplyReference,
+  );
+  const enableMessageMarkUnread = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.enableMessageMarkUnread,
   );
   const ThemedMessageList = resolveMobileMessageUiTheme('classic').MessageList;
 
@@ -218,6 +226,9 @@ export default function DmConversationScreen() {
     channelId: channelId ?? '',
     profileKind: (profileRecord?.kind as string | null | undefined) ?? null,
   });
+  const isChannelUnread =
+    (channelReadState?.unreadCount ?? 0) > 0 ||
+    channelReadState?.isManuallyUnread === true;
 
   const refreshConversation = useCallback(async () => {
     await Promise.all([
@@ -302,10 +313,38 @@ export default function DmConversationScreen() {
 
   // ── Thread reply target — drives the reply preview above the input ──
   const [threadReplyTarget, setThreadReplyTarget] = useState<MessageVM | null>(null);
+  // ── Quote reply target — distinct from "reply in thread"; drives its own preview ──
+  const [quoteReplyTarget, setQuoteReplyTarget] = useState<MessageVM | null>(null);
 
   const handleThreadOpen = useCallback((msg: MessageVM) => {
+    setQuoteReplyTarget(null);
     setThreadReplyTarget(msg);
   }, []);
+
+  const handleQuoteReply = useCallback((msg: MessageVM) => {
+    setThreadReplyTarget(null);
+    setQuoteReplyTarget(msg);
+  }, []);
+
+  const handleMarkUnread = useCallback(
+    async (_msg: MessageVM) => {
+      if (!channelId || !orgId || !accountId || !profileId) return;
+      try {
+        await markChannelUnread({ orgId, accountId, profileId, channelId });
+        applyOptimisticChannelManualUnread({
+          queryClient,
+          orgId,
+          profileId,
+          accountId,
+          channelId,
+          profileKind: (profileRecord?.kind as string | null | undefined) ?? null,
+        });
+      } catch {
+        Alert.alert('Unable to mark unread', 'Please try again.');
+      }
+    },
+    [channelId, orgId, accountId, profileId, profileRecord, queryClient],
+  );
 
   // ── Push notification nudge ──
   const {
@@ -353,6 +392,17 @@ export default function DmConversationScreen() {
           setThreadReplyTarget(null);
           // Refresh so the parent message's thread stats (reply count) update
           void refetch();
+        } else if (quoteReplyTarget) {
+          await sendTextMessage(
+            channelId,
+            profileId,
+            orgId,
+            text,
+            undefined,
+            undefined,
+            quoteReplyTarget.ids.id,
+          );
+          setQuoteReplyTarget(null);
         } else {
           await sendTextMessage(channelId, profileId, orgId, text);
         }
@@ -379,6 +429,7 @@ export default function DmConversationScreen() {
       profileId,
       orgId,
       threadReplyTarget,
+      quoteReplyTarget,
       refetch,
       handlePushNotificationMoment,
     ],
@@ -679,6 +730,8 @@ export default function DmConversationScreen() {
             onTypingStop={broadcastTypingStop}
             replyTo={threadReplyTarget}
             onCancelReply={() => setThreadReplyTarget(null)}
+            quoteReplyTo={quoteReplyTarget}
+            onCancelQuoteReply={() => setQuoteReplyTarget(null)}
           />
         )}
       </KeyboardAvoidingView>
@@ -725,6 +778,9 @@ export default function DmConversationScreen() {
         onReact={handleReactionToggle}
         onThread={handleThreadOpen}
         onDelete={handleDelete}
+        onQuoteReply={enableMessageReplyReference ? handleQuoteReply : undefined}
+        onMarkUnread={enableMessageMarkUnread ? handleMarkUnread : undefined}
+        isChannelUnread={isChannelUnread}
       />
 
       {/* Push notification nudge */}

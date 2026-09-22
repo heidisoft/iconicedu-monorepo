@@ -38,9 +38,14 @@ import type { AppColors } from '@/lib/theme';
 import type { PresenceDisplayStatus } from '@/hooks/use-online-profile-ids';
 import { reportMobileObservedError } from '@/lib/analytics/report-error';
 import { openMessageLink, splitMessageTextByLinks } from '@/lib/messages/link-opening';
+import {
+  parseMessageLines,
+  messageTextHasListLines,
+} from '@/lib/messages/list-formatting';
 import { fetchThreadMessages } from '@/lib/api/queries';
 import { useMarkRead } from '@/hooks/use-mark-read';
 import { EmojiPicker } from './emoji-picker';
+import { ReplyReferenceBlock } from './reply-reference-block';
 import {
   SmilePlus,
   CornerUpLeft,
@@ -350,6 +355,92 @@ function buildFmtSegments(text: string, mentions?: MessageMentionVM[]): FmtSegme
   return segs;
 }
 
+function renderFmtSegments(segs: FmtSegment[], colors: AppColors): React.ReactNode {
+  const mentionBg = colors.tealBg;
+  const mentionColor = colors.teal;
+  return segs.map((seg, i) => {
+    if (seg.kind === 'bold')
+      return (
+        <Text key={i} style={{ fontWeight: '700' }}>
+          {splitMessageTextByLinks(seg.value).map((part, partIndex) =>
+            part.kind === 'link' ? (
+              <Text
+                key={partIndex}
+                accessibilityRole="link"
+                style={{ color: colors.teal, textDecorationLine: 'underline' }}
+                onPress={() => openMessageLink(part.url)}
+              >
+                {part.value}
+              </Text>
+            ) : (
+              <Text key={partIndex}>{part.value}</Text>
+            ),
+          )}
+        </Text>
+      );
+    if (seg.kind === 'italic')
+      return (
+        <Text key={i} style={{ fontStyle: 'italic' }}>
+          {splitMessageTextByLinks(seg.value).map((part, partIndex) =>
+            part.kind === 'link' ? (
+              <Text
+                key={partIndex}
+                accessibilityRole="link"
+                style={{ color: colors.teal, textDecorationLine: 'underline' }}
+                onPress={() => openMessageLink(part.url)}
+              >
+                {part.value}
+              </Text>
+            ) : (
+              <Text key={partIndex}>{part.value}</Text>
+            ),
+          )}
+        </Text>
+      );
+    if (seg.kind === 'mention')
+      return (
+        <Text
+          key={i}
+          style={{
+            backgroundColor: mentionBg,
+            color: mentionColor,
+            fontWeight: '600',
+          }}
+        >
+          {` ${seg.value} `}
+        </Text>
+      );
+    return splitMessageTextByLinks(seg.value).map((part, partIndex) =>
+      part.kind === 'link' ? (
+        <Text
+          key={`${i}-${partIndex}`}
+          accessibilityRole="link"
+          style={{ color: colors.teal, textDecorationLine: 'underline' }}
+          onPress={() => openMessageLink(part.url)}
+        >
+          {part.value}
+        </Text>
+      ) : (
+        <Text key={`${i}-${partIndex}`}>{part.value}</Text>
+      ),
+    );
+  });
+}
+
+/** Mentions carry absolute [start,end) offsets into the full text — narrow them
+ * to a single line's [lineStart,lineEnd) range when rendering list lines. */
+function mentionsForLineRange(
+  mentions: MessageMentionVM[] | undefined,
+  lineStart: number,
+  lineEnd: number,
+): MessageMentionVM[] | undefined {
+  if (!mentions?.length) return undefined;
+  const inRange = mentions
+    .filter((m) => m.start >= lineStart && m.end <= lineEnd)
+    .map((m) => ({ ...m, start: m.start - lineStart, end: m.end - lineStart }));
+  return inRange.length ? inRange : undefined;
+}
+
 function FormattedText({
   text,
   mentions,
@@ -362,81 +453,74 @@ function FormattedText({
   isOwn?: boolean;
 }) {
   const { colors } = useTheme();
-  const segs = buildFmtSegments(text, mentions);
-  const mentionBg = colors.tealBg;
-  const mentionColor = colors.teal;
+
+  if (!messageTextHasListLines(text)) {
+    const segs = buildFmtSegments(text, mentions);
+    return (
+      <Text testID="message-text-content" style={style}>
+        {renderFmtSegments(segs, colors)}
+      </Text>
+    );
+  }
+
+  // Block render: one row per line so bullet/numbered lines get their own
+  // marker + indentation. Non-list lines within the same message still render
+  // as plain inline text.
+  const lines = parseMessageLines(text);
+  const rawLines = text.split('\n');
+  let cursor = 0;
   return (
-    <Text testID="message-text-content" style={style}>
-      {segs.map((seg, i) => {
-        if (seg.kind === 'bold')
+    <View testID="message-text-content" style={listStyles.block}>
+      {lines.map((line, i) => {
+        const rawLine = rawLines[i] ?? '';
+        const lineStart = cursor;
+        // Advance cursor past this raw line (+1 for the '\n' that separated it).
+        cursor += rawLine.length + 1;
+
+        // Mention offsets are relative to the full raw text. For plain lines
+        // `line.content` IS the raw line, so remapping is straightforward. List
+        // lines have their marker stripped from `content`, so remapping mention
+        // offsets onto them is an edge case we intentionally skip (mentions
+        // can't be authored alongside list formatting on this branch anyway).
+        const lineMentions =
+          line.kind === 'plain'
+            ? mentionsForLineRange(mentions, lineStart, lineStart + rawLine.length)
+            : undefined;
+        const segs = buildFmtSegments(line.content, lineMentions);
+
+        if (line.kind === 'plain') {
+          if (!line.content) {
+            return <View key={i} style={listStyles.blankLine} />;
+          }
           return (
-            <Text key={i} style={{ fontWeight: '700' }}>
-              {splitMessageTextByLinks(seg.value).map((part, partIndex) =>
-                part.kind === 'link' ? (
-                  <Text
-                    key={partIndex}
-                    accessibilityRole="link"
-                    style={{ color: colors.teal, textDecorationLine: 'underline' }}
-                    onPress={() => openMessageLink(part.url)}
-                  >
-                    {part.value}
-                  </Text>
-                ) : (
-                  <Text key={partIndex}>{part.value}</Text>
-                ),
-              )}
+            <Text key={i} style={style}>
+              {renderFmtSegments(segs, colors)}
             </Text>
           );
-        if (seg.kind === 'italic')
-          return (
-            <Text key={i} style={{ fontStyle: 'italic' }}>
-              {splitMessageTextByLinks(seg.value).map((part, partIndex) =>
-                part.kind === 'link' ? (
-                  <Text
-                    key={partIndex}
-                    accessibilityRole="link"
-                    style={{ color: colors.teal, textDecorationLine: 'underline' }}
-                    onPress={() => openMessageLink(part.url)}
-                  >
-                    {part.value}
-                  </Text>
-                ) : (
-                  <Text key={partIndex}>{part.value}</Text>
-                ),
-              )}
+        }
+
+        return (
+          <View key={i} style={listStyles.listRow}>
+            <Text style={[style, listStyles.listMarker]}>
+              {line.kind === 'bullet' ? '•' : `${line.number}.`}
             </Text>
-          );
-        if (seg.kind === 'mention')
-          return (
-            <Text
-              key={i}
-              style={{
-                backgroundColor: mentionBg,
-                color: mentionColor,
-                fontWeight: '600',
-              }}
-            >
-              {` ${seg.value} `}
+            <Text style={[style, listStyles.listRowText]}>
+              {renderFmtSegments(segs, colors)}
             </Text>
-          );
-        return splitMessageTextByLinks(seg.value).map((part, partIndex) =>
-          part.kind === 'link' ? (
-            <Text
-              key={`${i}-${partIndex}`}
-              accessibilityRole="link"
-              style={{ color: colors.teal, textDecorationLine: 'underline' }}
-              onPress={() => openMessageLink(part.url)}
-            >
-              {part.value}
-            </Text>
-          ) : (
-            <Text key={`${i}-${partIndex}`}>{part.value}</Text>
-          ),
+          </View>
         );
       })}
-    </Text>
+    </View>
   );
 }
+
+const listStyles = StyleSheet.create({
+  block: { gap: 2 },
+  blankLine: { height: 8 },
+  listRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
+  listMarker: { minWidth: 16 },
+  listRowText: { flex: 1 },
+});
 
 // ─── Social bar: reactions + thread pill in one row ──────────────────────────
 
@@ -2064,6 +2148,10 @@ export type MessageItemProps = {
   showActionControls?: boolean;
   onSendAnnotation?: (attachment: AttachmentPayload) => void;
   messageUiThemeKey?: 'classic' | 'feed';
+  /** Called when the user taps the quoted "reply to" block on a message. */
+  onReplyReferencePress?: (messageId: string) => void;
+  /** Briefly highlights this message's bubble — used after scrolling to it via a reply tap. */
+  isHighlighted?: boolean;
 };
 
 export const MessageItem: React.FC<MessageItemProps> = ({
@@ -2083,6 +2171,8 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   showActionControls = true,
   onSendAnnotation,
   messageUiThemeKey = 'classic',
+  onReplyReferencePress,
+  isHighlighted = false,
 }) => {
   const { markThreadRead } = useMarkRead({
     orgId: message.ids.orgId,
@@ -3005,7 +3095,12 @@ export const MessageItem: React.FC<MessageItemProps> = ({
       <Pressable
         onLongPress={() => onLongPress?.(message)}
         delayLongPress={350}
-        style={[s.row, ownInChannel && s.rowOwn, isGroupStart && s.rowGroupStart]}
+        style={[
+          s.row,
+          ownInChannel && s.rowOwn,
+          isGroupStart && s.rowGroupStart,
+          isHighlighted && { backgroundColor: colors.tealBg },
+        ]}
       >
         {/* Avatar slot */}
         <View style={s.avatarSlot}>
@@ -3054,6 +3149,14 @@ export const MessageItem: React.FC<MessageItemProps> = ({
               )}
               {!ownInChannel && <Text style={s.msgTime}>{time}</Text>}
             </View>
+          )}
+          {/* Quoted reference to the message this one replies to, when present */}
+          {!!message.social?.replyTo && (
+            <ReplyReferenceBlock
+              replyTo={message.social.replyTo}
+              colors={colors}
+              onPress={onReplyReferencePress}
+            />
           )}
           {/* Dedicated layouts for rich message types; text/cards use bubble */}
           {type === 'image' ? (

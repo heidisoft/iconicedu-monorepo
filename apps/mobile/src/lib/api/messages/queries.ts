@@ -145,6 +145,7 @@ export async function sendTextMessage(
   text: string,
   threadParentId?: string,
   threadId?: string,
+  replyToMessageId?: string | null,
 ) {
   const content = text.trim();
   if (!content) throw new Error('Message text is required');
@@ -155,6 +156,7 @@ export async function sendTextMessage(
     content,
     threadParentId,
     threadId,
+    replyToMessageId: replyToMessageId ?? undefined,
   } satisfies MessageSendTextInput);
 }
 
