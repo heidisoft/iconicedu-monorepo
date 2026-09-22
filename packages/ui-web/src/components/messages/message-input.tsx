@@ -1,8 +1,15 @@
 'use client';
 
 import * as React from 'react';
-import type { MessageMentionVM, UserProfileVM } from '@iconicedu/shared-types';
+import { toast } from 'sonner';
+import type {
+  AiRefineDraftResult,
+  AiRefineInstruction,
+  MessageMentionVM,
+  UserProfileVM,
+} from '@iconicedu/shared-types';
 import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
+import { Badge } from '@iconicedu/ui-web/ui/badge';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import {
   Dialog,
@@ -60,6 +67,7 @@ import {
   Plus,
   BookOpen,
   ClipboardCheck,
+  Sparkles,
   type LucideIcon,
 } from 'lucide-react';
 import {
@@ -88,6 +96,61 @@ import { getComposerSubmitLabel } from './message-loading-state.utils';
 const TYPING_STOP_DELAY_MS = 3000;
 const TYPING_KEEPALIVE_THROTTLE_MS = 1200;
 
+// The "Refine with AI" trigger only appears once the draft has enough content to be
+// worth rewriting. 15 characters sits in the middle of the 10-20 char range considered
+// for this threshold — short enough to catch a typical one-line message, long enough to
+// avoid popping up while the user has barely started typing.
+const AI_REFINE_MIN_CONTENT_LENGTH = 15;
+
+// Mirrors the API's MAX_CUSTOM_INSTRUCTION_LENGTH (apps/api ai-assist module). That
+// constant isn't exported for client use, so it's duplicated here as a client-side cap;
+// the server independently enforces its own limit regardless of what's sent.
+const AI_REFINE_MAX_CUSTOM_INSTRUCTION_LENGTH = 500;
+
+type AiRefineDialogStep = 'translate' | 'custom' | 'loading' | 'preview';
+
+const AI_REFINE_INSTRUCTIONS: Array<{
+  value: AiRefineInstruction;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: 'proofread',
+    label: 'Proofread',
+    description: 'Fix grammar, spelling, and punctuation.',
+  },
+  {
+    value: 'clearer',
+    label: 'Make clearer',
+    description: 'Simplify wording for easier reading.',
+  },
+  {
+    value: 'shorter',
+    label: 'Make shorter',
+    description: 'Tighten the message to the essentials.',
+  },
+  {
+    value: 'warmer',
+    label: 'Warmer tone',
+    description: 'Add a friendlier, warmer tone.',
+  },
+  {
+    value: 'professional',
+    label: 'More professional',
+    description: 'Polish the tone for a professional audience.',
+  },
+  {
+    value: 'translate',
+    label: 'Translate',
+    description: 'Translate this draft into another language.',
+  },
+  {
+    value: 'custom',
+    label: 'Custom instruction',
+    description: 'Describe exactly how you want it rewritten.',
+  },
+];
+
 interface MessageInputProps {
   onSend: (
     content: string,
@@ -114,6 +177,12 @@ interface MessageInputProps {
   onFocus?: () => void;
   onInputKeyDown?: () => void;
   showCreateMessageTypeButton?: boolean;
+  /** The channel this composer is writing into — required to invoke either AI-assist call. */
+  channelId?: string;
+  /** Shows the "Refine with AI" composer affordance (issue #264, Experimental). Default false. */
+  showAiRefine?: boolean;
+  /** Shows the AI-generated suggested-reply chips above the composer (issue #264, Experimental). Default false. */
+  showAiSuggestedReplies?: boolean;
   prefillRequest?: {
     value: string;
     nonce: number;
@@ -233,6 +302,9 @@ export function MessageInput({
   onFocus,
   onInputKeyDown,
   showCreateMessageTypeButton = true,
+  channelId,
+  showAiRefine = false,
+  showAiSuggestedReplies = false,
   prefillRequest = null,
 }: MessageInputProps) {
   const [content, setContent] = React.useState('');
@@ -258,6 +330,23 @@ export function MessageInput({
   const [assignmentDraft, setAssignmentDraft] = React.useState<AssignmentComposerDraft>(
     buildAssignmentDraftFromContent('homework', ''),
   );
+  const [isAiRefineMenuOpen, setIsAiRefineMenuOpen] = React.useState(false);
+  const [isAiRefineDialogOpen, setIsAiRefineDialogOpen] = React.useState(false);
+  const [isAiRefineLoading, setIsAiRefineLoading] = React.useState(false);
+  const [aiRefineStep, setAiRefineStep] = React.useState<AiRefineDialogStep>('loading');
+  const [aiRefineInstruction, setAiRefineInstruction] =
+    React.useState<AiRefineInstruction | null>(null);
+  const [aiRefineTargetLanguage, setAiRefineTargetLanguage] = React.useState('');
+  const [aiRefineCustomInstruction, setAiRefineCustomInstruction] = React.useState('');
+  const [aiRefineSelection, setAiRefineSelection] = React.useState<{
+    start: number;
+    end: number;
+  } | null>(null);
+  const [aiRefineResult, setAiRefineResult] = React.useState<AiRefineDraftResult | null>(
+    null,
+  );
+  const [suggestedReplies, setSuggestedReplies] = React.useState<string[] | null>(null);
+  const [isSuggestedRepliesLoading, setIsSuggestedRepliesLoading] = React.useState(false);
   const [mentionPopupPosition, setMentionPopupPosition] =
     React.useState<MentionPopupPosition | null>(null);
   const [activeMentionIndex, setActiveMentionIndex] = React.useState(0);
@@ -1051,6 +1140,180 @@ export function MessageInput({
     recorder.stop();
   }, [resetRecordingState, stopRecordingStream]);
 
+  const captureTextareaSelection = React.useCallback(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return null;
+    const start = textarea.selectionStart ?? 0;
+    const end = textarea.selectionEnd ?? 0;
+    return start !== end ? { start, end } : null;
+  }, []);
+
+  const runAiRefine = React.useCallback(
+    async (
+      instruction: AiRefineInstruction,
+      extra?: { customInstruction?: string; targetLanguage?: string },
+    ) => {
+      setAiRefineInstruction(instruction);
+      setIsAiRefineDialogOpen(true);
+      setAiRefineStep('loading');
+      setIsAiRefineLoading(true);
+      try {
+        const response = await fetch('/api/ai-assist/refine', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            channelId,
+            content,
+            selectionStart: aiRefineSelection?.start,
+            selectionEnd: aiRefineSelection?.end,
+            instruction,
+            customInstruction: extra?.customInstruction,
+            targetLanguage: extra?.targetLanguage,
+          }),
+        });
+        const payload = (await response.json().catch(() => null)) as
+          | ({ success: true } & AiRefineDraftResult)
+          | { success: false; message: string }
+          | null;
+        if (!payload?.success) {
+          setIsAiRefineDialogOpen(false);
+          toast.error(payload?.message ?? 'Unable to refine draft');
+          return;
+        }
+        setAiRefineResult({
+          refinedText: payload.refinedText,
+          factsPreserved: payload.factsPreserved,
+          flaggedNotes: payload.flaggedNotes,
+        });
+        setAiRefineStep('preview');
+      } catch {
+        setIsAiRefineDialogOpen(false);
+        toast.error('Unable to refine draft');
+      } finally {
+        setIsAiRefineLoading(false);
+      }
+    },
+    [channelId, content, aiRefineSelection],
+  );
+
+  const handleSelectAiRefineInstruction = React.useCallback(
+    (instruction: AiRefineInstruction) => {
+      setIsAiRefineMenuOpen(false);
+      if (instruction === 'translate') {
+        setAiRefineInstruction('translate');
+        setAiRefineTargetLanguage('');
+        setAiRefineStep('translate');
+        setIsAiRefineDialogOpen(true);
+        return;
+      }
+      if (instruction === 'custom') {
+        setAiRefineInstruction('custom');
+        setAiRefineCustomInstruction('');
+        setAiRefineStep('custom');
+        setIsAiRefineDialogOpen(true);
+        return;
+      }
+      void runAiRefine(instruction);
+    },
+    [runAiRefine],
+  );
+
+  const handleConfirmAiTranslate = React.useCallback(() => {
+    const targetLanguage = aiRefineTargetLanguage.trim();
+    if (!targetLanguage) return;
+    void runAiRefine('translate', { targetLanguage });
+  }, [aiRefineTargetLanguage, runAiRefine]);
+
+  const handleConfirmAiCustom = React.useCallback(() => {
+    const customInstruction = aiRefineCustomInstruction.trim();
+    if (!customInstruction) return;
+    void runAiRefine('custom', { customInstruction });
+  }, [aiRefineCustomInstruction, runAiRefine]);
+
+  const handleAiRefineTryAgain = React.useCallback(() => {
+    if (!aiRefineInstruction) return;
+    const extra =
+      aiRefineInstruction === 'translate'
+        ? { targetLanguage: aiRefineTargetLanguage.trim() }
+        : aiRefineInstruction === 'custom'
+          ? { customInstruction: aiRefineCustomInstruction.trim() }
+          : undefined;
+    void runAiRefine(aiRefineInstruction, extra);
+  }, [
+    aiRefineInstruction,
+    aiRefineTargetLanguage,
+    aiRefineCustomInstruction,
+    runAiRefine,
+  ]);
+
+  const handleAiRefineReplace = React.useCallback(() => {
+    if (!aiRefineResult) return;
+    const previousContent = content;
+    const nextContent = aiRefineSelection
+      ? content.slice(0, aiRefineSelection.start) +
+        aiRefineResult.refinedText +
+        content.slice(aiRefineSelection.end)
+      : aiRefineResult.refinedText;
+    setContent(nextContent);
+    handleTyping(nextContent);
+    setIsAiRefineDialogOpen(false);
+    toast.success('Draft updated with the AI-refined text.', {
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          setContent(previousContent);
+          handleTyping(previousContent);
+        },
+      },
+    });
+  }, [aiRefineResult, aiRefineSelection, content, handleTyping]);
+
+  const handleAiRefineKeepOriginal = React.useCallback(() => {
+    setIsAiRefineDialogOpen(false);
+  }, []);
+
+  const handleFetchSuggestedReplies = React.useCallback(async () => {
+    if (isSuggestedRepliesLoading) return;
+    setIsSuggestedRepliesLoading(true);
+    try {
+      const response = await fetch('/api/ai-assist/suggested-replies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channelId }),
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | { success: true; suggestions: string[] }
+        | { success: false; message: string }
+        | null;
+      if (!payload?.success) {
+        toast.error(payload?.message ?? 'Unable to load suggested replies');
+        return;
+      }
+      setSuggestedReplies(payload.suggestions);
+    } catch {
+      toast.error('Unable to load suggested replies');
+    } finally {
+      setIsSuggestedRepliesLoading(false);
+    }
+  }, [channelId, isSuggestedRepliesLoading]);
+
+  const handleSelectSuggestedReply = React.useCallback(
+    (suggestion: string) => {
+      if (readOnly) return;
+      setContent(suggestion);
+      handleTyping(suggestion);
+      setSuggestedReplies(null);
+      window.setTimeout(() => {
+        const textarea = textareaRef.current;
+        if (!textarea) return;
+        textarea.focus();
+        const nextCaret = suggestion.length;
+        textarea.setSelectionRange(nextCaret, nextCaret);
+      }, 0);
+    },
+    [handleTyping, readOnly],
+  );
+
   return (
     <div
       className={
@@ -1060,6 +1323,38 @@ export function MessageInput({
       }
     >
       <div className="mx-auto w-full max-w-[960px]">
+        {showAiSuggestedReplies &&
+        (isSuggestedRepliesLoading || suggestedReplies !== null) ? (
+          <div className="mb-2 rounded-xl border border-border bg-muted/20 p-3">
+            <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              <Sparkles className="h-3.5 w-3.5" />
+              AI suggestions
+            </div>
+            {isSuggestedRepliesLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Finding suggestions...
+              </div>
+            ) : suggestedReplies && suggestedReplies.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {suggestedReplies.map((suggestion, index) => (
+                  <Button
+                    key={`${index}-${suggestion.slice(0, 16)}`}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-auto max-w-full whitespace-normal text-left"
+                    onClick={() => handleSelectSuggestedReply(suggestion)}
+                  >
+                    {suggestion}
+                  </Button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">No suggestions right now.</p>
+            )}
+          </div>
+        ) : null}
         <div
           ref={wrapperRef}
           className={cn(
@@ -1538,6 +1833,84 @@ export function MessageInput({
                       : 'Record voice message'}
                   </TooltipContent>
                 </Tooltip>
+                {showAiSuggestedReplies ? (
+                  <>
+                    <div className="mx-1 h-4 w-px bg-border" />
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                          aria-label="Suggested replies"
+                          title="Suggested replies"
+                          disabled={isSuggestedRepliesLoading}
+                          onClick={() => void handleFetchSuggestedReplies()}
+                        >
+                          {isSuggestedRepliesLoading ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Sparkles className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Suggested replies</TooltipContent>
+                    </Tooltip>
+                  </>
+                ) : null}
+                {showAiRefine && content.trim().length >= AI_REFINE_MIN_CONTENT_LENGTH ? (
+                  <>
+                    <div className="mx-1 h-4 w-px bg-border" />
+                    <DropdownMenu
+                      open={isAiRefineMenuOpen}
+                      onOpenChange={(open) => {
+                        if (open) {
+                          setAiRefineSelection(captureTextareaSelection());
+                        }
+                        setIsAiRefineMenuOpen(open);
+                      }}
+                    >
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 gap-1 px-2 text-muted-foreground hover:text-foreground"
+                          aria-label="Refine with AI"
+                          title="Refine with AI"
+                          disabled={isAiRefineLoading}
+                        >
+                          {isAiRefineLoading ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Sparkles className="h-3.5 w-3.5" />
+                          )}
+                          <Badge variant="secondary" className="h-4 px-1 text-[10px]">
+                            AI
+                          </Badge>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-64">
+                        <DropdownMenuLabel>Refine with AI</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        {AI_REFINE_INSTRUCTIONS.map((item) => (
+                          <DropdownMenuItem
+                            key={item.value}
+                            onSelect={() => handleSelectAiRefineInstruction(item.value)}
+                          >
+                            <div className="flex min-w-0 flex-col">
+                              <span className="truncate font-medium">{item.label}</span>
+                              <span className="truncate text-xs text-muted-foreground">
+                                {item.description}
+                              </span>
+                            </div>
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </>
+                ) : null}
                 {showCreateMessageTypeButton ? (
                   <>
                     <div className="mx-1 h-4 w-px bg-border" />
@@ -1748,6 +2121,168 @@ export function MessageInput({
               </Button>
             </DialogFooter>
           </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={isAiRefineDialogOpen}
+        onOpenChange={(open) => {
+          setIsAiRefineDialogOpen(open);
+          if (!open) {
+            setAiRefineResult(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[32rem]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4" />
+              Refine with AI
+              <Badge variant="secondary" className="h-4 px-1 text-[10px]">
+                AI
+              </Badge>
+            </DialogTitle>
+            <DialogDescription>
+              {aiRefineStep === 'translate'
+                ? 'Choose a target language to translate this draft.'
+                : aiRefineStep === 'custom'
+                  ? 'Describe how you want this draft rewritten.'
+                  : 'Review the AI-refined text before it replaces anything in your draft.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          {aiRefineStep === 'translate' ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="ai-refine-target-language">Target language</Label>
+                <Input
+                  id="ai-refine-target-language"
+                  value={aiRefineTargetLanguage}
+                  onChange={(event) => setAiRefineTargetLanguage(event.target.value)}
+                  placeholder="e.g. Spanish"
+                  autoFocus
+                />
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsAiRefineDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleConfirmAiTranslate}
+                  disabled={!aiRefineTargetLanguage.trim()}
+                >
+                  Refine
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : null}
+
+          {aiRefineStep === 'custom' ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="ai-refine-custom-instruction">Instruction</Label>
+                <Textarea
+                  id="ai-refine-custom-instruction"
+                  rows={3}
+                  value={aiRefineCustomInstruction}
+                  onChange={(event) =>
+                    setAiRefineCustomInstruction(
+                      event.target.value.slice(
+                        0,
+                        AI_REFINE_MAX_CUSTOM_INSTRUCTION_LENGTH,
+                      ),
+                    )
+                  }
+                  placeholder="e.g. Make it sound more encouraging for a 3rd grader"
+                  autoFocus
+                />
+                <p className="text-right text-xs text-muted-foreground">
+                  {aiRefineCustomInstruction.length}/
+                  {AI_REFINE_MAX_CUSTOM_INSTRUCTION_LENGTH}
+                </p>
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsAiRefineDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleConfirmAiCustom}
+                  disabled={!aiRefineCustomInstruction.trim()}
+                >
+                  Refine
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : null}
+
+          {aiRefineStep === 'loading' ? (
+            <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Refining your draft...
+            </div>
+          ) : null}
+
+          {aiRefineStep === 'preview' && aiRefineResult ? (
+            <div className="space-y-3">
+              {aiRefineResult.factsPreserved === false ? (
+                <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs text-warning">
+                  <p className="font-medium">This may have changed:</p>
+                  <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                    {(aiRefineResult.flaggedNotes ?? []).map((note, index) => (
+                      <li key={index}>{note}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground">Original</p>
+                <p className="whitespace-pre-wrap rounded-lg bg-muted/40 p-2 text-sm text-muted-foreground">
+                  {aiRefineSelection
+                    ? content.slice(aiRefineSelection.start, aiRefineSelection.end)
+                    : content}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                  <Sparkles className="h-3 w-3" />
+                  AI-refined
+                </p>
+                <p className="whitespace-pre-wrap rounded-lg border border-primary/30 bg-primary/5 p-2 text-sm text-foreground">
+                  {aiRefineResult.refinedText}
+                </p>
+              </div>
+              <DialogFooter className="flex-wrap gap-2 sm:justify-between">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleAiRefineKeepOriginal}
+                >
+                  Keep original
+                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleAiRefineTryAgain}
+                  >
+                    Try again
+                  </Button>
+                  <Button type="button" onClick={handleAiRefineReplace}>
+                    Replace
+                  </Button>
+                </div>
+              </DialogFooter>
+            </div>
+          ) : null}
         </DialogContent>
       </Dialog>
     </div>

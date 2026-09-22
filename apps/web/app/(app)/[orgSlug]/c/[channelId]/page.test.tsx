@@ -7,6 +7,8 @@ import Page from '@iconicedu/web/app/(app)/[orgSlug]/c/[channelId]/page';
 const messagesShellMock = vi.fn(() => null);
 const buildChannelByIdMock = vi.fn();
 const enableMessageTypeComposerRunMock = vi.fn(async () => true);
+const enableAiRefineRunMock = vi.fn(async () => true);
+const enableAiSuggestedRepliesRunMock = vi.fn(async () => true);
 
 vi.mock('@iconicedu/ui-web', () => ({
   DashboardHeader: () => null,
@@ -45,6 +47,12 @@ vi.mock('@iconicedu/web/flags', () => ({
   enableMessageTypeComposer: {
     run: (...args: unknown[]) => enableMessageTypeComposerRunMock(...args),
   },
+  enableAiRefine: {
+    run: (...args: unknown[]) => enableAiRefineRunMock(...args),
+  },
+  enableAiSuggestedReplies: {
+    run: (...args: unknown[]) => enableAiSuggestedRepliesRunMock(...args),
+  },
 }));
 
 describe('d/c/[channelId] page', () => {
@@ -66,6 +74,8 @@ describe('d/c/[channelId] page', () => {
           currentUserProfile: { ids: { id: 'profile-1', orgId: 'org-1' } },
           readOnly: false,
           showCreateMessageTypeButton: true,
+          showAiRefine: true,
+          showAiSuggestedReplies: true,
         }),
       );
     });
