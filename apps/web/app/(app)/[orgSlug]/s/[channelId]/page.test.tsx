@@ -7,6 +7,7 @@ import Page from '@iconicedu/web/app/(app)/[orgSlug]/s/[channelId]/page';
 const learningSpaceShellMock = vi.fn(() => null);
 const buildChannelByIdMock = vi.fn();
 const enableMessageTypeComposerRunMock = vi.fn(async () => true);
+const enableP1MessagingFlagRunMock = vi.fn(async () => false);
 
 vi.mock('@iconicedu/ui-web', () => ({
   DashboardHeader: () => null,
@@ -48,6 +49,18 @@ vi.mock('@iconicedu/web/lib/spaces/builders/learning-space.builder', () => ({
 vi.mock('@iconicedu/web/flags', () => ({
   enableMessageTypeComposer: {
     run: (...args: unknown[]) => enableMessageTypeComposerRunMock(...args),
+  },
+  enableMessageMarkUnread: {
+    run: (...args: unknown[]) => enableP1MessagingFlagRunMock(...args),
+  },
+  enableMessageReplyReference: {
+    run: (...args: unknown[]) => enableP1MessagingFlagRunMock(...args),
+  },
+  enableNotificationConversationControls: {
+    run: (...args: unknown[]) => enableP1MessagingFlagRunMock(...args),
+  },
+  enableMessageListFormatting: {
+    run: (...args: unknown[]) => enableP1MessagingFlagRunMock(...args),
   },
 }));
 

@@ -19,10 +19,17 @@ function getLearningSpaceChannels(space: LearningSpaceVM): ChannelVM[] {
 }
 
 function getChannelUnreadCount(channel: ChannelVM): number {
-  return (
+  const persistedUnreadCount =
     Math.max(0, channel.collections.readState?.unreadCount ?? 0) +
-    Math.max(0, channel.collections.readState?.threadUnreadCount ?? 0)
-  );
+    Math.max(0, channel.collections.readState?.threadUnreadCount ?? 0);
+
+  // A channel the user explicitly marked unread should show the same unread treatment
+  // (bold/dot/badge) as one with real unread messages, even if the persisted count is 0.
+  if (persistedUnreadCount === 0 && channel.collections.readState?.isManuallyUnread) {
+    return 1;
+  }
+
+  return persistedUnreadCount;
 }
 
 export function getDirectMessageItemUnreadCount(

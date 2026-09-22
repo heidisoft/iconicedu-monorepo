@@ -199,6 +199,76 @@ export const enableAdminSessionAttendanceAnalytics = flag<
   },
 });
 
+export const enableMessageMarkUnread = flag<boolean, { profileId?: string | null }>({
+  key: platformFeatureFlagKeys.enableMessageMarkUnread,
+  description: 'Shows the "Mark unread" message action and enables the mark-unread API.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: platformFeatureFlagKeys.enableMessageMarkUnread,
+      profileId: entities?.profileId,
+    });
+  },
+});
+
+export const enableMessageReplyReference = flag<boolean, { profileId?: string | null }>({
+  key: platformFeatureFlagKeys.enableMessageReplyReference,
+  description:
+    'Enables quoting a specific message as an inline reply reference from the composer.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: platformFeatureFlagKeys.enableMessageReplyReference,
+      profileId: entities?.profileId,
+    });
+  },
+});
+
+export const enableNotificationConversationControls = flag<
+  boolean,
+  { profileId?: string | null }
+>({
+  key: platformFeatureFlagKeys.enableNotificationConversationControls,
+  description:
+    'Shows per-conversation notification mode controls (normal/mentions-only/mute) in channel info.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: platformFeatureFlagKeys.enableNotificationConversationControls,
+      profileId: entities?.profileId,
+    });
+  },
+});
+
+export const enableMessageListFormatting = flag<boolean, { profileId?: string | null }>({
+  key: platformFeatureFlagKeys.enableMessageListFormatting,
+  description:
+    'Enables bullet/numbered list composer toolbar buttons and rendering of list-formatted messages.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: platformFeatureFlagKeys.enableMessageListFormatting,
+      profileId: entities?.profileId,
+    });
+  },
+});
+
 export const webFlags = {
   enableAdminSessionAttendanceAnalytics,
   enableAssessments,
@@ -206,6 +276,10 @@ export const webFlags = {
   enableClassScheduleSeriesReschedule,
   enableMarketingSitePages,
   enableMessageTypeComposer,
+  enableMessageMarkUnread,
+  enableMessageReplyReference,
+  enableNotificationConversationControls,
+  enableMessageListFormatting,
   enableSessionCompletionCarousel,
   enableMobileAppleSignIn,
   enableMobileDirectMessageStart,

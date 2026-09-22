@@ -142,6 +142,10 @@ type MessagesShellClientProps = {
   currentUserProfile?: UserProfileVM | null;
   readOnly?: boolean;
   showCreateMessageTypeButton?: boolean;
+  enableMessageMarkUnread?: boolean;
+  enableMessageReplyReference?: boolean;
+  enableNotificationConversationControls?: boolean;
+  enableMessageListFormatting?: boolean;
   panelRegistry?: Partial<
     MessagesRightPanelRegistry<ComponentType<{ intent: MessagesRightPanelIntent }>>
   >;
@@ -174,6 +178,10 @@ export function MessagesShellClient({
   currentUserProfile,
   readOnly = false,
   showCreateMessageTypeButton = true,
+  enableMessageMarkUnread = false,
+  enableMessageReplyReference = false,
+  enableNotificationConversationControls = false,
+  enableMessageListFormatting = false,
   panelRegistry,
   sendTextMessage,
   sendFileMessage,
@@ -518,6 +526,10 @@ export function MessagesShellClient({
         currentUserProfile={currentUserProfile}
         readOnly={readOnly}
         showCreateMessageTypeButton={showCreateMessageTypeButton}
+        enableMessageMarkUnread={enableMessageMarkUnread}
+        enableMessageReplyReference={enableMessageReplyReference}
+        enableNotificationConversationControls={enableNotificationConversationControls}
+        enableMessageListFormatting={enableMessageListFormatting}
         panelRegistry={panelRegistry}
         realtimeClient={realtimeClient}
         messageWriteClient={messageWriteClient}
