@@ -948,7 +948,7 @@ export class MessagesService {
     return result;
   }
 
-  private async resolveWritableProfile(input: {
+  async resolveWritableProfile(input: {
     authUserId: string;
     accessToken: string;
     orgId: string;

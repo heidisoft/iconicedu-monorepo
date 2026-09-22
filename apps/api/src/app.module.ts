@@ -8,6 +8,7 @@ import { UsersModule } from '@iconicedu/api/modules/users/users.module';
 import { ChannelsModule } from '@iconicedu/api/modules/channels/channels.module';
 import { ClassesModule } from '@iconicedu/api/modules/classes/classes.module';
 import { MessagesModule } from '@iconicedu/api/modules/messages/messages.module';
+import { AiAssistModule } from '@iconicedu/api/modules/ai-assist/ai-assist.module';
 import { RemindersModule } from '@iconicedu/api/modules/reminders/reminders.module';
 import { AnalyticsModule } from '@iconicedu/api/analytics/analytics.module';
 import { ActivityFeedModule } from '@iconicedu/api/modules/activity-feed/activity-feed.module';
@@ -43,6 +44,7 @@ import { RequestLoggingInterceptor } from '@iconicedu/api/observability/request-
     ChannelsModule,
     ClassesModule,
     MessagesModule,
+    AiAssistModule,
     ActivityFeedModule,
     SessionCompletionsModule,
     RemindersModule,
