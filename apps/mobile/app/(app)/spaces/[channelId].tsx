@@ -628,6 +628,9 @@ export default function SpaceDetailScreen() {
             replyTo={threadReplyTarget}
             onCancelReply={() => setThreadReplyTarget(null)}
             uploading={pendingUploads.some((upload) => !upload.failed)}
+            orgId={orgId}
+            channelId={channelId}
+            profileId={profileId}
           />
         </KeyboardAvoidingView>
       ) : (

@@ -624,6 +624,9 @@ export default function ChannelConversationScreen() {
             replyTo={threadReplyTarget}
             onCancelReply={() => setThreadReplyTarget(null)}
             uploading={pendingUploads.some((p) => !p.failed)}
+            orgId={orgId}
+            channelId={channelId}
+            profileId={profileId}
           />
         </KeyboardAvoidingView>
       )}

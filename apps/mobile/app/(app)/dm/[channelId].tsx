@@ -679,6 +679,9 @@ export default function DmConversationScreen() {
             onTypingStop={broadcastTypingStop}
             replyTo={threadReplyTarget}
             onCancelReply={() => setThreadReplyTarget(null)}
+            orgId={orgId}
+            channelId={channelId}
+            profileId={profileId}
           />
         )}
       </KeyboardAvoidingView>
