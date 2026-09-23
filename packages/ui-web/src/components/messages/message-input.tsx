@@ -259,6 +259,10 @@ export function MessageInput({
     key: string;
     id: string;
   } | null>(null);
+  const pendingTextClientMessageIdRef = React.useRef<{
+    key: string;
+    id: string;
+  } | null>(null);
   const resolvedDraftScope = enableMessageDrafts ? draftScope : null;
   const {
     restoredDraft,
@@ -584,6 +588,7 @@ export function MessageInput({
     notifyTypingStop();
     clearDraft();
     pendingAttachmentsClientMessageIdRef.current = null;
+    pendingTextClientMessageIdRef.current = null;
     textareaRef.current?.focus();
   }, [clearDraft, clearPendingAttachments, clearTypingTimeout, notifyTypingStop]);
 
@@ -657,9 +662,19 @@ export function MessageInput({
         participants,
         currentUserId,
       );
-      const clientMessageId = enableMessageSendReliability
-        ? generateClientMessageId()
-        : undefined;
+      // Reuse the same clientMessageId across repeated Send clicks for the
+      // same draft text so a retry after an ambiguous failure is idempotent
+      // on the server; changed content gets a fresh id.
+      let clientMessageId: string | undefined;
+      if (enableMessageSendReliability) {
+        const cached = pendingTextClientMessageIdRef.current;
+        clientMessageId =
+          cached && cached.key === trimmedContent ? cached.id : generateClientMessageId();
+        pendingTextClientMessageIdRef.current = {
+          key: trimmedContent,
+          id: clientMessageId,
+        };
+      }
       const sendText = async () => {
         try {
           setIsSendingText(true);
@@ -670,6 +685,7 @@ export function MessageInput({
           // enabled) survives and the user doesn't lose what they typed.
           // The failed send itself is surfaced as a "Not sent" state on the
           // message bubble (see messages-container's failed-send handling).
+          // Send reuses the same clientMessageId above on retry.
         } finally {
           setIsSendingText(false);
         }

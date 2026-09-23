@@ -493,4 +493,44 @@ describe('MessageInput drafts and send reliability', () => {
       expect(onSend).toHaveBeenCalledWith('Plain send', [], null, undefined);
     });
   });
+
+  it('reuses the same clientMessageId when retrying the same failed text send', async () => {
+    const user = userEvent.setup();
+    const onSend = vi.fn().mockRejectedValue(new Error('network blip'));
+    render(<MessageInput onSend={onSend} enableMessageSendReliability />);
+
+    await user.type(screen.getByPlaceholderText('Write a message...'), 'Retry me');
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    await waitFor(() => expect(onSend).toHaveBeenCalledTimes(1));
+
+    // Composer content survived the failure — press Send again without
+    // editing it, simulating a retry after an ambiguous failure.
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    await waitFor(() => expect(onSend).toHaveBeenCalledTimes(2));
+
+    const firstId = onSend.mock.calls[0]![3];
+    const secondId = onSend.mock.calls[1]![3];
+    expect(firstId).toEqual(expect.any(String));
+    expect(secondId).toBe(firstId);
+  });
+
+  it('generates a fresh clientMessageId once the retried content changes', async () => {
+    const user = userEvent.setup();
+    const onSend = vi.fn().mockRejectedValueOnce(new Error('network blip'));
+    onSend.mockResolvedValueOnce(undefined);
+    render(<MessageInput onSend={onSend} enableMessageSendReliability />);
+
+    const textarea = screen.getByPlaceholderText('Write a message...');
+    await user.type(textarea, 'Original');
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    await waitFor(() => expect(onSend).toHaveBeenCalledTimes(1));
+
+    await user.type(textarea, ' edited');
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    await waitFor(() => expect(onSend).toHaveBeenCalledTimes(2));
+
+    const firstId = onSend.mock.calls[0]![3];
+    const secondId = onSend.mock.calls[1]![3];
+    expect(secondId).not.toBe(firstId);
+  });
 });
