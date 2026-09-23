@@ -19,7 +19,12 @@ type Step =
   | 'disputed'
   | 'already_responded';
 
-type DisputeCategory = 'teacher_absent' | 'student_absent' | 'technical_issue' | 'other';
+type DisputeCategory =
+  | 'teacher_absent'
+  | 'student_absent'
+  | 'technical_issue'
+  | 'did_not_happen'
+  | 'other';
 type CompletionStatus = 'pending' | 'confirmed' | 'disputed' | 'auto_confirmed';
 
 // Same window ActivityFeedbackRequest already uses for its "Edit rating" button —
@@ -37,6 +42,7 @@ const DISPUTE_CATEGORIES: { key: DisputeCategory; label: string }[] = [
   { key: 'teacher_absent', label: 'Teacher absent' },
   { key: 'student_absent', label: 'Student absent' },
   { key: 'technical_issue', label: 'Technical issue' },
+  { key: 'did_not_happen', label: 'Session did not happen' },
   { key: 'other', label: 'Other' },
 ];
 

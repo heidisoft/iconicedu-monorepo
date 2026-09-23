@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import {
+  AlertTriangle,
   Check,
   Clock,
   CircleAlert,
@@ -17,6 +18,7 @@ import { getCompletionParticipants } from './session-attendance-analytics';
 import type {
   AdminSessionCompletionParticipantVM,
   AdminSessionCompletionVM,
+  ClassSessionCompletionDisputeCategory,
 } from '@iconicedu/shared-types';
 import {
   AlertDialog,
@@ -48,6 +50,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  Textarea,
   toast,
 } from '@iconicedu/ui-web';
 import {
@@ -59,6 +62,17 @@ import {
 import type { ScheduleOptionRow } from '@iconicedu/web/lib/api/schedules';
 
 const PAGE_SIZE = 10;
+
+const DISPUTE_CATEGORIES: {
+  key: ClassSessionCompletionDisputeCategory;
+  label: string;
+}[] = [
+  { key: 'did_not_happen', label: 'Session did not happen' },
+  { key: 'teacher_absent', label: 'Teacher absent' },
+  { key: 'student_absent', label: 'Student absent' },
+  { key: 'technical_issue', label: 'Technical issue' },
+  { key: 'other', label: 'Other' },
+];
 
 // Scheduled length of the occurrence: end minus its start (occurrenceKey). Returns
 // null when either bound is unparseable or non-positive — some backfilled rows
@@ -325,6 +339,130 @@ function CreateSessionDialog({
   );
 }
 
+// Lets staff report that a session had a problem (most commonly, neither the
+// tutor nor the student showed up) directly from the admin table, instead of
+// waiting for a participant to flag their own row. Settles every still-open
+// row for the occurrence at once, same as staff confirm — the session simply
+// won't need a participant confirm/dispute anymore once staff has acted on it.
+function DisputeSessionDialog({
+  row,
+  onSubmitted,
+}: {
+  row: AdminSessionCompletionVM;
+  onSubmitted: () => void;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [category, setCategory] =
+    React.useState<ClassSessionCompletionDisputeCategory>('did_not_happen');
+  const [reason, setReason] = React.useState('');
+
+  const handleOpenChange = (next: boolean) => {
+    if (isSubmitting) return;
+    setOpen(next);
+    if (!next) {
+      setCategory('did_not_happen');
+      setReason('');
+    }
+  };
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsSubmitting(true);
+    try {
+      const response = await fetch('/api/admin/session-completions/dispute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orgId: row.orgId,
+          scheduleId: row.scheduleId,
+          occurrenceKey: row.occurrenceKey,
+          disputeCategory: category,
+          disputeReason: reason.trim() || undefined,
+        }),
+      });
+      const result = await response.json();
+      if (!result?.success) {
+        throw new Error(result?.message ?? 'Unable to report session.');
+      }
+      toast.success('Session reported');
+      handleOpenChange(false);
+      onSubmitted();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to report session.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" type="button">
+          <AlertTriangle className="mr-1.5 size-3.5" />
+          Report a problem
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="space-y-4 sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Report a problem with this session</DialogTitle>
+          <DialogDescription>
+            Use this when a session has a problem nobody has flagged yet — e.g. neither
+            the tutor nor the student showed up. This settles every open submission for
+            the session as disputed.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={(event) => void handleSubmit(event)} className="space-y-4">
+          <div className="space-y-1">
+            <Label htmlFor="dispute-session-category">Reason</Label>
+            <Select
+              value={category}
+              onValueChange={(value) =>
+                setCategory(value as ClassSessionCompletionDisputeCategory)
+              }
+              disabled={isSubmitting}
+            >
+              <SelectTrigger id="dispute-session-category" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {DISPUTE_CATEGORIES.map((option) => (
+                  <SelectItem key={option.key} value={option.key}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="dispute-session-reason">Notes (optional)</Label>
+            <Textarea
+              id="dispute-session-reason"
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+              disabled={isSubmitting}
+              maxLength={500}
+              placeholder="Any extra context for this report…"
+            />
+          </div>
+          <DialogFooter>
+            <Button type="submit" disabled={isSubmitting} variant="destructive">
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-1.5 size-4 animate-spin" aria-hidden="true" />
+                  Reporting…
+                </>
+              ) : (
+                'Report session'
+              )}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function CompletedSessionsTable({
   rows,
   schedules,
@@ -563,24 +701,30 @@ export function CompletedSessionsTable({
                   {participants.length === 0 && '—'}
                 </TableCell>
                 <TableCell>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     {hasDispute ? (
                       <span className="text-xs text-muted-foreground">
                         Dispute reported
                       </span>
                     ) : needsConfirmation ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={confirmingId === row.id}
-                        onClick={() => void handleStaffConfirm(row)}
-                      >
-                        {confirmingId === row.id ? (
-                          <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                        ) : (
-                          'Confirm'
-                        )}
-                      </Button>
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={confirmingId === row.id}
+                          onClick={() => void handleStaffConfirm(row)}
+                        >
+                          {confirmingId === row.id ? (
+                            <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                          ) : (
+                            'Confirm'
+                          )}
+                        </Button>
+                        <DisputeSessionDialog
+                          row={row}
+                          onSubmitted={() => router.refresh()}
+                        />
+                      </>
                     ) : (
                       <span className="text-xs text-muted-foreground">Confirmed</span>
                     )}
