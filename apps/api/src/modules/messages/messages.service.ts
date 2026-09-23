@@ -1665,9 +1665,15 @@ export class MessagesService {
         updated_by: actor.profile.id,
       })
       .eq('id', messageId)
-      .eq('org_id', input.orgId);
+      .eq('org_id', input.orgId)
+      .select('id');
     if (messageUpdate.error) {
       throw new InternalServerErrorException(messageUpdate.error.message);
+    }
+    if (!messageUpdate.data?.length) {
+      throw new InternalServerErrorException(
+        'Edit saved but the edited indicator failed to update — the message row was not found on the is_edited update',
+      );
     }
 
     return { id: messageId };

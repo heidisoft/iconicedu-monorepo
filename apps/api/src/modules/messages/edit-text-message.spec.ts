@@ -4,6 +4,7 @@ import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session
 import {
   BadRequestException,
   ForbiddenException,
+  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 
@@ -55,6 +56,8 @@ function setUpServiceClient(input: {
   messageRow: ReturnType<typeof baseMessageRow> | null;
   accountId?: string;
   senderAccountId?: string;
+  /** Simulates the is_edited UPDATE matching zero rows (defaults to a single matching row). */
+  messagesUpdateMatchedRows?: Array<{ id: string }>;
 }) {
   const accountId = input.accountId ?? 'account-1';
   const senderAccountId = input.senderAccountId ?? accountId;
@@ -80,7 +83,10 @@ function setUpServiceClient(input: {
   });
   const familyLinksChain = makeChain({ data: null, error: null });
   const messageTextUpdateChain = makeChain({ data: null, error: null });
-  const messagesUpdateChain = makeChain({ data: null, error: null });
+  const messagesUpdateChain = makeChain({
+    data: input.messagesUpdateMatchedRows ?? [{ id: MESSAGE_ID }],
+    error: null,
+  });
 
   let messagesCallCount = 0;
   const from = jest.fn((table: string) => {
@@ -127,6 +133,21 @@ describe('MessagesService.editTextMessage', () => {
     expect(messagesUpdateChain.update).toHaveBeenCalledWith(
       expect.objectContaining({ is_edited: true }),
     );
+  });
+
+  it('fails loudly instead of silently when the is_edited update matches no row', async () => {
+    setUpServiceClient({
+      messageRow: baseMessageRow(),
+      messagesUpdateMatchedRows: [],
+    });
+
+    await expect(
+      service.editTextMessage(AUTH_USER_ID, 'token', MESSAGE_ID, {
+        orgId: ORG_ID,
+        messageId: MESSAGE_ID,
+        content: 'updated text',
+      }),
+    ).rejects.toBeInstanceOf(InternalServerErrorException);
   });
 
   it('rejects editing a message outside the edit window', async () => {
