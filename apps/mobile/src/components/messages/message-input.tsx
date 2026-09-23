@@ -491,8 +491,14 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   // ── Automatic drafts ──────────────────────────────────────────────────────
   const draft = useMessageDraft(draftScope ?? null, enableDrafts && !!draftScope);
 
-  // Restore a saved draft once, as long as the composer is otherwise empty
-  // (never clobber an active reply-in-progress or an edit-in-progress).
+  // Restore a saved draft once it's actually found, as long as the composer
+  // is otherwise empty (never clobber an active reply-in-progress or an
+  // edit-in-progress). Only latches once `restoredDraft` is non-null — the
+  // hook resolves `isRestored=true` with a null draft as soon as it fast-path
+  // exits (e.g. before orgId/profileId/draftScope are ready), and latching
+  // on that premature resolution would permanently block the real restore
+  // that follows once the scope actually resolves. Mirrors the web composer's
+  // equivalent effect.
   const draftRestoreAppliedRef = useRef(false);
   useEffect(() => {
     if (
@@ -500,14 +506,13 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       !draft.isRestored ||
       draftRestoreAppliedRef.current ||
       isEditing ||
-      text.length > 0
+      text.length > 0 ||
+      !draft.restoredDraft?.content
     ) {
       return;
     }
     draftRestoreAppliedRef.current = true;
-    if (draft.restoredDraft?.content) {
-      setText(draft.restoredDraft.content);
-    }
+    setText(draft.restoredDraft.content);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enableDrafts, draft.isRestored, draft.restoredDraft, isEditing]);
 
@@ -789,12 +794,22 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         mentions: mentions?.length ? mentions : undefined,
       });
       if (ok) {
+        setText('');
+        resetIOSInput();
         onCancelEdit?.();
       }
     } finally {
       setSavingEdit(false);
     }
-  }, [editingMessage, onSaveEdit, onCancelEdit, text, enableMentions, mentionCandidates]);
+  }, [
+    editingMessage,
+    onSaveEdit,
+    onCancelEdit,
+    text,
+    enableMentions,
+    mentionCandidates,
+    resetIOSInput,
+  ]);
 
   const handleCancelEdit = useCallback(() => {
     setText('');
