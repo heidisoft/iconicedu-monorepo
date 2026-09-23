@@ -10,7 +10,6 @@ import type {
   MessageToggleReactionInput,
   MessageVM,
 } from '@iconicedu/shared-types';
-import { MESSAGE_EDIT_WINDOW_MINUTES } from '@iconicedu/shared-types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
@@ -1868,92 +1867,15 @@ export async function editTextMessageAction(
     throw new Error('Message text is required');
   }
 
-  const messageResponse = await supabase
-    .from('messages')
-    .select('id, org_id, channel_id, sender_profile_id, type, created_at, deleted_at')
-    .eq('id', input.messageId)
-    .maybeSingle<{
-      id: string;
-      org_id: string;
-      channel_id: string;
-      sender_profile_id: string;
-      type: string;
-      created_at: string;
-      deleted_at: string | null;
-    }>();
-
-  if (!messageResponse.data || messageResponse.data.org_id !== input.orgId) {
-    throw new Error('Message not found');
-  }
-  if (messageResponse.data.deleted_at) {
-    throw new Error('Message has been deleted');
-  }
-  if (messageResponse.data.type !== 'text') {
-    throw new Error('Only text messages can be edited');
-  }
-  if (messageResponse.data.sender_profile_id !== actor.profile.id) {
-    throw new Error('Unauthorized: You can only edit your own messages');
-  }
-
-  const editWindowMs = MESSAGE_EDIT_WINDOW_MINUTES * 60 * 1000;
-  if (Date.now() - new Date(messageResponse.data.created_at).getTime() > editWindowMs) {
-    throw new Error('The edit window for this message has passed');
-  }
-
-  let sanitizedMentions: MessageMentionVM[] = [];
-  if (input.mentions?.length) {
-    const channelMembersResponse = await supabase
-      .from('channel_members')
-      .select('profile_id')
-      .eq('org_id', input.orgId)
-      .eq('channel_id', messageResponse.data.channel_id)
-      .is('deleted_at', null)
-      .returns<Array<{ profile_id: string }>>();
-
-    if (channelMembersResponse.error) {
-      throw new Error(channelMembersResponse.error.message);
-    }
-
-    sanitizedMentions = sanitizeMentions(
-      content,
-      input.mentions,
-      new Set((channelMembersResponse.data ?? []).map((member) => member.profile_id)),
-      actor.profile.id,
-    );
-  }
-
-  const now = new Date().toISOString();
-  const payloadUpdate = await supabase
-    .from('message_text')
-    .update({
-      payload: {
-        text: content,
-        ...(sanitizedMentions.length ? { mentions: sanitizedMentions } : {}),
-      },
-      updated_at: now,
-      updated_by: actor.profile.id,
-    })
-    .eq('message_id', input.messageId)
-    .eq('org_id', input.orgId);
-
-  if (payloadUpdate.error) {
-    throw new Error(payloadUpdate.error.message);
-  }
-
-  const messageUpdate = await supabase
-    .from('messages')
-    .update({
-      is_edited: true,
-      edited_at: now,
-    })
-    .eq('id', input.messageId)
-    .eq('org_id', input.orgId)
-    .eq('sender_profile_id', actor.profile.id)
-    .is('deleted_at', null);
-
-  if (messageUpdate.error) {
-    throw new Error(messageUpdate.error.message);
-  }
+  // Routed through the API (not a direct Supabase write) because ownership here
+  // must account for family-link-authorized guardian edits on a child's message,
+  // which apps/api's resolveWritableProfile already handles — the RLS policy on
+  // message_text only recognizes literal auth-user profile ownership.
+  const api = createApiClient(supabase);
+  await api.patch(`/messages/${input.messageId}/text`, {
+    ...input,
+    content,
+  });
 
   const updatedVM = await buildMessageById(supabase, input.orgId, input.messageId, {
     accountId: actor.account.id,
