@@ -29,6 +29,10 @@ import {
 import { filterVisibleMessageRows } from '@iconicedu/api/lib/messages/message-visibility';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
+import {
+  apiFeatureFlagKeys,
+  evaluateApiBooleanFlag,
+} from '@iconicedu/api/lib/flags/posthog-openfeature';
 
 const BASE_MESSAGE_SELECT = `
   id, org_id, channel_id, sender_profile_id, visibility_type, visibility_user_ids, type, created_at, updated_at, thread_parent_id, is_edited, edited_at,
@@ -1613,6 +1617,17 @@ export class MessagesService {
       orgId: input.orgId,
       senderProfileId: message.sender_profile_id,
     });
+
+    // The client-visible flag only hides the Edit menu entry — enforce it
+    // here too so a client can't invoke the mutation directly during a dark
+    // rollout (flag off) by calling the endpoint without going through UI.
+    const editEnabled = await evaluateApiBooleanFlag({
+      flagKey: apiFeatureFlagKeys.enableMessageEdit,
+      distinctId: actor.profile.id,
+    });
+    if (!editEnabled) {
+      throw new ForbiddenException('Message editing is not available');
+    }
 
     const editWindowMs = MESSAGE_EDIT_WINDOW_MINUTES * 60 * 1000;
     if (Date.now() - new Date(message.created_at).getTime() > editWindowMs) {
