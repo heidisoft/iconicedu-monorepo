@@ -1,4 +1,4 @@
-import type { ClassScheduleVM } from '@iconicedu/shared-types';
+import type { ClassScheduleVM, SessionCompletionVM } from '@iconicedu/shared-types';
 import type { ClassSession } from '@/components/sessions/session-card';
 
 import {
@@ -45,6 +45,25 @@ function makeSchedule(input: {
       themeKey: null,
     })),
     recurrence: undefined,
+  };
+}
+
+function makeCompletion(input: {
+  scheduleId: string;
+  occurrenceKey: string;
+  status: SessionCompletionVM['status'];
+}): SessionCompletionVM {
+  return {
+    id: `${input.scheduleId}-completion`,
+    orgId: 'org-1',
+    scheduleId: input.scheduleId,
+    occurrenceKey: input.occurrenceKey,
+    profileId: 'child-1',
+    role: 'child',
+    status: input.status,
+    rescheduleRequested: false,
+    sessionEndAt: input.occurrenceKey,
+    expiresAt: input.occurrenceKey,
   };
 }
 
@@ -123,6 +142,52 @@ describe('buildHomeMetricSummary', () => {
       thirdMetricValue: 2,
       thirdMetricLabel: 'Math, Science',
     });
+  });
+
+  it('excludes an elapsed session from Completed Classes once it is known disputed', () => {
+    const schedules = [
+      makeSchedule({
+        id: 'completed',
+        learningSpaceId: 'space-science',
+        startAt: '2026-03-05T14:00:00Z',
+        endAt: '2026-03-05T15:00:00Z',
+        participants: [
+          { id: 'child-1', role: 'child' },
+          { id: 'teacher-1', role: 'educator' },
+        ],
+      }),
+    ];
+
+    // Without completion data, elapsed time alone marks it complete (matches
+    // "builds child metrics with active subjects" above).
+    expect(
+      buildHomeMetricSummary({
+        schedules,
+        learningSpaces: LEARNING_SPACES,
+        profileKind: 'child',
+        profileId: 'child-1',
+        now: BASE_NOW,
+      }).completedClassesThisMonth,
+    ).toBe(1);
+
+    // Nobody actually showed up — a disputed completion row must override the
+    // elapsed-time guess, even though the session's end time has passed.
+    expect(
+      buildHomeMetricSummary({
+        schedules,
+        completedSessions: [
+          makeCompletion({
+            scheduleId: 'completed',
+            occurrenceKey: '2026-03-05T14:00:00Z',
+            status: 'disputed',
+          }),
+        ],
+        learningSpaces: LEARNING_SPACES,
+        profileKind: 'child',
+        profileId: 'child-1',
+        now: BASE_NOW,
+      }).completedClassesThisMonth,
+    ).toBe(0);
   });
 
   it('excludes cancelled upcoming sessions from the weekly homepage metric', () => {
