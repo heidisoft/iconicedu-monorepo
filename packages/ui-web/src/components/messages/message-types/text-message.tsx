@@ -145,6 +145,13 @@ export const TextMessage = memo(function TextMessage(props: TextMessageProps) {
               <Loader2 className="h-3 w-3 animate-spin" />
               Saving edit...
             </span>
+          ) : message.state?.isEdited ? (
+            <span
+              className="mt-0.5 text-[11px] text-muted-foreground"
+              aria-label="Edited"
+            >
+              (edited)
+            </span>
           ) : null}
           {editError ? (
             <p className="mt-0.5 text-[11px] text-destructive">{editError}</p>

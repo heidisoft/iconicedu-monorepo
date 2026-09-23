@@ -199,4 +199,35 @@ describe('TextMessage edit flow', () => {
     expect(screen.getByText('Hello world')).toBeInTheDocument();
     expect(editTextMessage).not.toHaveBeenCalled();
   });
+
+  it('shows an "(edited)" indicator when the message has been edited', () => {
+    useOptionalMessagesState.mockReturnValue({
+      currentUserId: 'profile-1',
+      enableMessageEdit: true,
+      channel: { collections: { participants: [] } },
+      editTextMessage: vi.fn(),
+    });
+
+    render(
+      <TextMessage
+        message={makeMessage({ state: { isEdited: true } })}
+        {...baseBaseProps}
+      />,
+    );
+
+    expect(screen.getByLabelText('Edited')).toHaveTextContent('(edited)');
+  });
+
+  it('does not show an "(edited)" indicator for an unedited message', () => {
+    useOptionalMessagesState.mockReturnValue({
+      currentUserId: 'profile-1',
+      enableMessageEdit: true,
+      channel: { collections: { participants: [] } },
+      editTextMessage: vi.fn(),
+    });
+
+    render(<TextMessage message={makeMessage()} {...baseBaseProps} />);
+
+    expect(screen.queryByLabelText('Edited')).not.toBeInTheDocument();
+  });
 });
