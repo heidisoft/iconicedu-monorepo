@@ -697,10 +697,23 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       resetIOSInput();
       onTypingStop?.();
       await clearPendingAudio();
-      await runSendProgress(
-        () =>
-          onSendAttachment?.(attachments, caption, clientMessageId) ?? Promise.resolve(),
-      );
+      try {
+        await runSendProgress(
+          () =>
+            onSendAttachment?.(attachments, caption, clientMessageId) ??
+            Promise.resolve(),
+        );
+        // Only clear the draft once the attachment send is confirmed — the
+        // caption text was autosaved the same way plain text is, so leaving
+        // it uncleared would restore an already-sent caption next time this
+        // conversation is opened and risk prompting an accidental resend.
+        if (enableDrafts) {
+          await draft.clearDraft();
+        }
+      } catch {
+        // Failure — leave any persisted draft caption in place, matching the
+        // text-send failure path below.
+      }
       return;
     }
     const trimmed = text.trim();
