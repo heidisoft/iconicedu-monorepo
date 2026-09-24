@@ -1138,6 +1138,11 @@ function FeedContentCard({
               color={colors.text}
               mentionColor={colors.teal}
             />
+            {message.core.type === 'text' && message.state?.isEdited === true && (
+              <Text style={styles.editedIndicator} accessibilityLabel="Edited">
+                (edited)
+              </Text>
+            )}
           </View>
         </View>
       )}
@@ -1526,6 +1531,11 @@ function FeedComment({
               color={colors.text}
               mentionColor={colors.teal}
             />
+            {message.core.type === 'text' && message.state?.isEdited === true && (
+              <Text style={styles.editedIndicator} accessibilityLabel="Edited">
+                (edited)
+              </Text>
+            )}
           </View>
         </View>
         <FeedActions
@@ -2021,6 +2031,12 @@ const makeStyles = (C: FeedColors) =>
       color: C.muted,
       fontSize: FONT.meta,
       lineHeight: FONT.metaLine,
+    },
+    editedIndicator: {
+      color: C.muted,
+      fontSize: FONT.meta,
+      lineHeight: FONT.metaLine,
+      marginTop: 2,
     },
     roleRow: {
       flexDirection: 'row',

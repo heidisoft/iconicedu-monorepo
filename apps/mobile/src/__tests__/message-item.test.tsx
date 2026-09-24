@@ -194,6 +194,37 @@ describe('MessageItem', () => {
     expect(screen.getByText('Hello world')).toBeTruthy();
   });
 
+  it('does not render an edited indicator for an unedited message', () => {
+    render(
+      <MessageItem message={baseMessage} isOwn={false} isGroupStart colors={colors} />,
+    );
+    expect(screen.queryByText('(edited)')).toBeNull();
+  });
+
+  it('renders an "(edited)" indicator when the message state marks it edited', () => {
+    const editedMessage: MessageVM = {
+      ...baseMessage,
+      state: { isEdited: true, editedAt: '2025-01-15T10:40:00Z' },
+    } as unknown as MessageVM;
+
+    render(
+      <MessageItem message={editedMessage} isOwn={false} isGroupStart colors={colors} />,
+    );
+    expect(screen.getByText('(edited)')).toBeTruthy();
+  });
+
+  it('does not render an edited indicator on a non-text message even if state.isEdited is set', () => {
+    const editedFile: MessageVM = {
+      ...pdfFileMessage,
+      state: { isEdited: true },
+    } as unknown as MessageVM;
+
+    render(
+      <MessageItem message={editedFile} isOwn={false} isGroupStart colors={colors} />,
+    );
+    expect(screen.queryByText('(edited)')).toBeNull();
+  });
+
   it('gives long text messages a definite bubble width so they wrap on mobile', () => {
     const longMessage = {
       ...baseMessage,

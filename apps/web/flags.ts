@@ -269,6 +269,77 @@ export const enableMessageListFormatting = flag<boolean, { profileId?: string | 
   },
 });
 
+export const enableMessageDrafts = flag<boolean, { profileId?: string | null }>({
+  key: platformFeatureFlagKeys.enableMessageDrafts,
+  description:
+    'Autosaves and restores in-progress message drafts (main and thread composers) on web and mobile.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: platformFeatureFlagKeys.enableMessageDrafts,
+      profileId: entities?.profileId,
+    });
+  },
+});
+
+export const enableMessageEdit = flag<boolean, { profileId?: string | null }>({
+  key: platformFeatureFlagKeys.enableMessageEdit,
+  description:
+    'Lets a sender edit their own eligible text message within the edit window, on web and mobile.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: platformFeatureFlagKeys.enableMessageEdit,
+      profileId: entities?.profileId,
+    });
+  },
+});
+
+export const enableMobileMessageComposerParity = flag<
+  boolean,
+  { profileId?: string | null }
+>({
+  key: platformFeatureFlagKeys.enableMobileMessageComposerParity,
+  description:
+    'Enables authoring person mentions and bold/italic formatting from the mobile composer.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: platformFeatureFlagKeys.enableMobileMessageComposerParity,
+      profileId: entities?.profileId,
+    });
+  },
+});
+
+export const enableMessageSendReliability = flag<boolean, { profileId?: string | null }>({
+  key: platformFeatureFlagKeys.enableMessageSendReliability,
+  description:
+    'Enables idempotent send retries and attachment upload recovery for failed sends on web and mobile.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: platformFeatureFlagKeys.enableMessageSendReliability,
+      profileId: entities?.profileId,
+    });
+  },
+});
+
 export const webFlags = {
   enableAdminSessionAttendanceAnalytics,
   enableAssessments,
@@ -284,6 +355,10 @@ export const webFlags = {
   enableMobileAppleSignIn,
   enableMobileDirectMessageStart,
   enableMobileGoogleSignIn,
+  enableMessageDrafts,
+  enableMessageEdit,
+  enableMobileMessageComposerParity,
+  enableMessageSendReliability,
 } as const;
 
 export type WebFlagKey = keyof typeof webFlags;

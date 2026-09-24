@@ -47,6 +47,7 @@ vi.mock('./context/messages-state-provider', () => ({
     setCreateTextMessage: vi.fn(),
     setSendTextMessage: vi.fn(),
     setSendFileMessage: vi.fn(),
+    setEditTextMessage: vi.fn(),
     setJoinLiveSession: vi.fn(),
     setGetMessageActionState: vi.fn(),
     setThreadHandlers: vi.fn(),

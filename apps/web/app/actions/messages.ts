@@ -1,6 +1,7 @@
 'use server';
 
 import type {
+  MessageEditTextInput,
   MessageMentionVM,
   MessageSendFileInput,
   MessageSendFilesInput,
@@ -205,6 +206,23 @@ async function resolveReplyReference(
     snippet: snippet.slice(0, 140),
     type: target.type,
   };
+}
+
+async function findExistingMessageByClientId(
+  supabase: SupabaseClient,
+  input: { orgId: string; channelId: string; clientMessageId: string },
+): Promise<{ id: string } | null> {
+  const response = await supabase
+    .from('messages')
+    .select('id')
+    .eq('id', input.clientMessageId)
+    .eq('org_id', input.orgId)
+    .eq('channel_id', input.channelId)
+    .maybeSingle<{ id: string }>();
+  if (response.error) {
+    throw new Error(response.error.message);
+  }
+  return response.data ?? null;
 }
 
 function sanitizeMentions(
@@ -674,6 +692,29 @@ export async function sendTextMessageWithSupabase(
   if (input.senderProfileId !== currentProfileId) {
     throw new Error('Invalid sender');
   }
+
+  if (input.clientMessageId) {
+    const existingMessage = await findExistingMessageByClientId(supabase, {
+      orgId: accountOrgId,
+      channelId: input.channelId,
+      clientMessageId: input.clientMessageId,
+    });
+    if (existingMessage) {
+      const existingVM = await buildMessageById(
+        supabase,
+        accountOrgId,
+        existingMessage.id,
+        {
+          accountId: actor.account.id,
+          profileId: currentProfileId,
+        },
+      );
+      if (existingVM) {
+        return existingVM;
+      }
+    }
+  }
+
   let sanitizedMentions: MessageMentionVM[] = [];
   if (input.mentions?.length) {
     const channelMembersResponse = await supabase
@@ -765,6 +806,7 @@ export async function sendTextMessageWithSupabase(
     now,
   });
   const messageInsertValues = {
+    ...(input.clientMessageId ? { id: input.clientMessageId } : {}),
     org_id: accountOrgId,
     channel_id: input.channelId,
     sender_profile_id: currentProfileId,
@@ -999,9 +1041,32 @@ export async function sendFileMessageWithSupabase(
     throw new Error('Invalid file storage path');
   }
 
-  const now = new Date().toISOString();
   const currentProfileId = actor.profile.id;
   const serviceSupabase = deps.serviceSupabase;
+
+  if (input.clientMessageId) {
+    const existingMessage = await findExistingMessageByClientId(supabase, {
+      orgId: input.orgId,
+      channelId: input.channelId,
+      clientMessageId: input.clientMessageId,
+    });
+    if (existingMessage) {
+      const existingVM = await buildMessageById(
+        supabase,
+        input.orgId,
+        existingMessage.id,
+        {
+          accountId: actor.account.id,
+          profileId: currentProfileId,
+        },
+      );
+      if (existingVM) {
+        return existingVM;
+      }
+    }
+  }
+
+  const now = new Date().toISOString();
   const activityContext = await resolveActivityChannelContext({
     supabase,
     orgId: input.orgId,
@@ -1067,6 +1132,7 @@ export async function sendFileMessageWithSupabase(
     supabase,
     serviceSupabase,
     values: {
+      ...(input.clientMessageId ? { id: input.clientMessageId } : {}),
       org_id: input.orgId,
       channel_id: input.channelId,
       sender_profile_id: currentProfileId,
@@ -1334,8 +1400,31 @@ export async function sendFilesMessageWithSupabase(
     throw new Error('Mixed file and image uploads must be sent separately');
   }
 
-  const now = new Date().toISOString();
   const serviceSupabase = deps.serviceSupabase;
+
+  if (input.clientMessageId) {
+    const existingMessage = await findExistingMessageByClientId(supabase, {
+      orgId: input.orgId,
+      channelId: input.channelId,
+      clientMessageId: input.clientMessageId,
+    });
+    if (existingMessage) {
+      const existingVM = await buildMessageById(
+        supabase,
+        input.orgId,
+        existingMessage.id,
+        {
+          accountId: actor.account.id,
+          profileId: currentProfileId,
+        },
+      );
+      if (existingVM) {
+        return existingVM;
+      }
+    }
+  }
+
+  const now = new Date().toISOString();
   const activityContext = await resolveActivityChannelContext({
     supabase,
     orgId: input.orgId,
@@ -1394,6 +1483,7 @@ export async function sendFilesMessageWithSupabase(
     supabase,
     serviceSupabase,
     values: {
+      ...(input.clientMessageId ? { id: input.clientMessageId } : {}),
       org_id: input.orgId,
       channel_id: input.channelId,
       sender_profile_id: currentProfileId,
@@ -1843,4 +1933,40 @@ export async function toggleSavedMessageAction(
   if (unsaveResponse.error) {
     throw new Error(unsaveResponse.error.message);
   }
+}
+
+export async function editTextMessageAction(
+  input: MessageEditTextInput,
+): Promise<MessageVM> {
+  const supabase = await createSupabaseServerClient();
+  const authUser = await requireAuthedUser(supabase);
+  const actor = await resolveEffectiveMessageActor({
+    supabase,
+    authUserId: authUser.id,
+    orgId: input.orgId,
+  });
+
+  const content = input.content.trim();
+  if (!content) {
+    throw new Error('Message text is required');
+  }
+
+  // Routed through the API (not a direct Supabase write) because ownership here
+  // must account for family-link-authorized guardian edits on a child's message,
+  // which apps/api's resolveWritableProfile already handles — the RLS policy on
+  // message_text only recognizes literal auth-user profile ownership.
+  const api = createApiClient(supabase);
+  await api.patch(`/messages/${input.messageId}/text`, {
+    ...input,
+    content,
+  });
+
+  const updatedVM = await buildMessageById(supabase, input.orgId, input.messageId, {
+    accountId: actor.account.id,
+    profileId: actor.profile.id,
+  });
+  if (!updatedVM) {
+    throw new Error('Unable to load updated message');
+  }
+  return updatedVM;
 }

@@ -12,6 +12,7 @@ import {
   Loader2,
   MoreHorizontal,
   MoreVertical,
+  Pencil,
   Trash2,
 } from 'lucide-react';
 import type { MessageVM, UUID } from '@iconicedu/shared-types';
@@ -45,6 +46,8 @@ type MessageManagementMenuProps = {
   onToggleSaved?: () => void;
   onToggleHidden?: () => void;
   onDelete?: () => void;
+  /** Present only when the caller has already determined this message is edit-eligible. */
+  onEdit?: () => void;
   feed?: boolean;
   children?: ReactElement;
 };
@@ -59,6 +62,7 @@ export function MessageManagementMenu({
   onToggleSaved,
   onToggleHidden,
   onDelete,
+  onEdit,
   feed,
   children,
 }: MessageManagementMenuProps) {
@@ -71,13 +75,13 @@ export function MessageManagementMenu({
     'relative flex cursor-default select-none items-center rounded-sm px-2 py-2 text-sm outline-none data-[highlighted]:bg-accent data-[disabled]:pointer-events-none data-[disabled]:opacity-50';
 
   const messagesState = useOptionalMessagesState();
-  const readState = messagesState?.channel.collections.readState;
+  const readState = messagesState?.channel?.collections.readState;
   const channelAlreadyShowsUnread =
     Boolean(readState?.isManuallyUnread) || (readState?.unreadCount ?? 0) > 0;
   const canReplyToMessage = Boolean(messagesState?.enableMessageReplyReference);
   const canMarkChannelUnread =
     Boolean(messagesState?.enableMessageMarkUnread) && !channelAlreadyShowsUnread;
-  const channelId = messagesState?.channel.ids.id;
+  const channelId = messagesState?.channel?.ids?.id;
 
   const handleReply = useCallback(() => {
     messagesState?.startReplyTo(message);
@@ -156,6 +160,12 @@ export function MessageManagementMenu({
       {(isOwn || canDeleteAnyMessages) && (
         <>
           <Separator className="-mx-1 my-1 h-px bg-border" />
+          {isOwn && onEdit && (
+            <Item className={itemClass} disabled={isReadOnly} onSelect={onEdit}>
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit message
+            </Item>
+          )}
           {isOwn && (
             <Item
               className={itemClass}

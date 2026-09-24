@@ -32,6 +32,7 @@ export {
 export {
   buildMessageStoragePath,
   deleteMessage,
+  editTextMessage,
   fetchChannelMessages,
   fetchChannelReadState,
   fetchLinkPreview,
@@ -46,7 +47,11 @@ export {
   toggleReaction,
   uploadChannelFile,
 } from './messages/queries';
-export type { FileAttachmentInput, LinkPreviewMetadata } from './messages/queries';
+export type {
+  FileAttachmentInput,
+  LinkPreviewMetadata,
+  SendTextMessageOptions,
+} from './messages/queries';
 export type { ConversationNotificationMode } from './channel/queries';
 export {
   fetchLearningSpaceChannels,

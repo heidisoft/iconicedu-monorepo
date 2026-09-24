@@ -1,5 +1,7 @@
 import type {
   MessageReplyReferenceVM,
+  MessageMentionVM,
+  MessageStateVM,
   MessageVM,
   RawMessageRow,
   RawSenderProfile,
@@ -61,6 +63,13 @@ export function mapRowToMessageVM(
     c.replyTo && typeof c.replyTo === 'object'
       ? (c.replyTo as MessageReplyReferenceVM)
       : undefined;
+  const mentions = Array.isArray(c.mentions)
+    ? (c.mentions as MessageMentionVM[])
+    : undefined;
+
+  const state: MessageStateVM | undefined = row.is_edited
+    ? { isEdited: true, ...(row.edited_at ? { editedAt: row.edited_at } : {}) }
+    : undefined;
 
   const base = {
     ids: { id: row.id, orgId: row.org_id },
@@ -77,11 +86,15 @@ export function mapRowToMessageVM(
           : { type: 'all' as const },
     },
     social: { reactions, ...(thread ? { thread } : {}), ...(replyTo ? { replyTo } : {}) },
+    ...(state ? { state } : {}),
   };
 
   switch (row.type) {
     case 'text':
-      return { ...base, content: { text: previewText } } as MessageVM;
+      return {
+        ...base,
+        content: { text: previewText, ...(mentions ? { mentions } : {}) },
+      } as MessageVM;
     case 'lesson-assignment':
       return { ...base, content: { text: previewText }, assignment: c } as MessageVM;
     case 'homework-submission':

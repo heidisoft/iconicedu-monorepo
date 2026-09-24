@@ -51,6 +51,8 @@ export type RawMessageRow = Pick<
   | 'created_at'
   | 'updated_at'
   | 'thread_parent_id'
+  | 'is_edited'
+  | 'edited_at'
 > & {
   visibility_type?: 'all' | 'specific-users' | null;
   visibility_user_ids?: UUID[] | null;

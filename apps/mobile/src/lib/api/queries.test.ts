@@ -8,6 +8,7 @@ import {
   fetchSpaceSchedulesByChannelId,
   fetchActivityFeed,
   fetchSupervisedDirectMessages,
+  editTextMessage,
   sendFileMessage,
   sendFilesMessage,
   sendTextMessage,
@@ -37,12 +38,14 @@ const mockApiPost = jest.fn();
 const mockApiGet = jest.fn();
 const mockApiDelete = jest.fn();
 const mockApiPut = jest.fn();
+const mockApiPatch = jest.fn();
 
 jest.mock('@/lib/api/http-client', () => ({
   apiPost: (...args: unknown[]) => mockApiPost(...args),
   apiGet: (...args: unknown[]) => mockApiGet(...args),
   apiDelete: (...args: unknown[]) => mockApiDelete(...args),
   apiPut: (...args: unknown[]) => mockApiPut(...args),
+  apiPatch: (...args: unknown[]) => mockApiPatch(...args),
 }));
 
 // Build a chainable Supabase query mock that resolves at .order()
@@ -406,6 +409,76 @@ describe('sendTextMessage', () => {
       threadId: undefined,
       replyToMessageId: 'original-message-1',
     });
+  });
+
+  it('includes clientMessageId and mentions in the body when provided', async () => {
+    mockApiPost.mockResolvedValue({ id: 'message-1' });
+    const mentions = [
+      { profileId: 'profile-2', displayName: 'Jordan Lee', start: 3, end: 14 },
+    ];
+
+    await sendTextMessage(
+      'channel-1',
+      'profile-1',
+      'org-1',
+      'Hi @Jordan Lee',
+      undefined,
+      undefined,
+      { clientMessageId: 'client-abc', mentions },
+    );
+
+    expect(mockApiPost).toHaveBeenCalledWith('/messages/text', {
+      orgId: 'org-1',
+      channelId: 'channel-1',
+      senderProfileId: 'profile-1',
+      content: 'Hi @Jordan Lee',
+      threadParentId: undefined,
+      threadId: undefined,
+      clientMessageId: 'client-abc',
+      mentions,
+    });
+  });
+});
+
+describe('editTextMessage', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('PATCHes /messages/:id/text with orgId, messageId, and content', async () => {
+    mockApiPatch.mockResolvedValue({ id: 'message-1' });
+
+    const result = await editTextMessage('message-1', 'org-1', '  Edited text  ');
+
+    expect(mockApiPatch).toHaveBeenCalledWith('/messages/message-1/text', {
+      orgId: 'org-1',
+      messageId: 'message-1',
+      content: 'Edited text',
+    });
+    expect(result).toEqual({ id: 'message-1' });
+  });
+
+  it('includes mentions when provided', async () => {
+    mockApiPatch.mockResolvedValue({ id: 'message-1' });
+    const mentions = [
+      { profileId: 'profile-2', displayName: 'Jordan Lee', start: 0, end: 11 },
+    ];
+
+    await editTextMessage('message-1', 'org-1', '@Jordan Lee hi', mentions);
+
+    expect(mockApiPatch).toHaveBeenCalledWith('/messages/message-1/text', {
+      orgId: 'org-1',
+      messageId: 'message-1',
+      content: '@Jordan Lee hi',
+      mentions,
+    });
+  });
+
+  it('rejects blank content before calling the API', async () => {
+    await expect(editTextMessage('message-1', 'org-1', '   ')).rejects.toThrow(
+      'Message text is required',
+    );
+    expect(mockApiPatch).not.toHaveBeenCalled();
   });
 });
 

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { DashboardHeader } from '@iconicedu/ui-web';
 import {
+  editTextMessageAction,
   sendFileMessageAction,
   sendFilesMessageAction,
   sendTextMessageAction,
@@ -23,6 +24,9 @@ import {
   enableMessageReplyReference,
   enableNotificationConversationControls,
   enableMessageListFormatting,
+  enableMessageDrafts,
+  enableMessageEdit,
+  enableMessageSendReliability,
 } from '@iconicedu/web/flags';
 
 const INITIAL_MESSAGES_PAGE_SIZE = 40;
@@ -62,11 +66,17 @@ export default async function Page({
     replyReferenceEnabled,
     notificationConversationControlsEnabled,
     listFormattingEnabled,
+    messageDraftsEnabled,
+    messageEditEnabled,
+    messageSendReliabilityEnabled,
   ] = await Promise.all([
     enableMessageMarkUnread.run({ identify }),
     enableMessageReplyReference.run({ identify }),
     enableNotificationConversationControls.run({ identify }),
     enableMessageListFormatting.run({ identify }),
+    enableMessageDrafts.run({ identify }),
+    enableMessageEdit.run({ identify }),
+    enableMessageSendReliability.run({ identify }),
   ]);
   const isStaffReadOnly = isStaffObserverReadOnlyChannel(
     channel,
@@ -88,9 +98,13 @@ export default async function Page({
         enableMessageReplyReference={replyReferenceEnabled}
         enableNotificationConversationControls={notificationConversationControlsEnabled}
         enableMessageListFormatting={listFormattingEnabled}
+        enableMessageDrafts={messageDraftsEnabled}
+        enableMessageEdit={messageEditEnabled}
+        enableMessageSendReliability={messageSendReliabilityEnabled}
         sendTextMessage={sendTextMessageAction}
         sendFileMessage={sendFileMessageAction}
         sendFilesMessage={sendFilesMessageAction}
+        editTextMessage={editTextMessageAction}
         toggleReaction={toggleMessageReactionAction}
         toggleSavedMessage={toggleSavedMessageAction}
         deleteMessage={deleteMessageAction}

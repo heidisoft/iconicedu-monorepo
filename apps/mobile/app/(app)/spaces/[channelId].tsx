@@ -21,6 +21,7 @@ import {
   sendTextMessage,
   sendFileMessage,
   sendFilesMessage,
+  editTextMessage,
   uploadChannelFile,
   buildMessageStoragePath,
   ensureDirectMessageChannelForProfiles,
@@ -32,7 +33,10 @@ import {
 } from '@/lib/api/queries';
 import { useTheme } from '@/providers/theme-provider';
 import { resolveMobileMessageUiTheme } from '@/components/messages/themes/registry';
-import { MessageInput } from '@/components/messages/message-input';
+import {
+  MessageInput,
+  type EditingMessageContext,
+} from '@/components/messages/message-input';
 import { TypingIndicator } from '@/components/messages/typing-indicator';
 import { ConversationHeader } from '@/components/messages/conversation-header';
 import { MessageActionsSheet } from '@/components/messages/message-actions-sheet';
@@ -42,7 +46,7 @@ import { SpaceSessionsTab } from '@/components/messages/space-sessions-tab';
 import type { AttachmentPayload } from '@/components/messages/attachment-sheet';
 import { buildMobileChannelEmptyStateCopy } from '@/lib/message-empty-state';
 import { reportMobileObservedError } from '@/lib/analytics/report-error';
-import type { MessageVM, UserProfileVM } from '@iconicedu/shared-types';
+import type { MessageMentionVM, MessageVM, UserProfileVM } from '@iconicedu/shared-types';
 import { useMarkRead } from '@/hooks/use-mark-read';
 import { applyOptimisticChannelManualUnread } from '@/lib/messages/apply-optimistic-channel-read-state';
 import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
@@ -89,6 +93,7 @@ export default function SpaceDetailScreen() {
   const enableMessageMarkUnread = useMobileFeatureFlag(
     mobileFeatureFlagKeys.enableMessageMarkUnread,
   );
+  const enableMessageEdit = useMobileFeatureFlag(mobileFeatureFlagKeys.enableMessageEdit);
 
   const orgId = account?.org_id ?? '';
   const accountId =
@@ -316,6 +321,71 @@ export default function SpaceDetailScreen() {
       }
     },
     [orgId, profileId, removeMessage, restoreMessage],
+  );
+
+  // ── Edit sent text messages ──
+  const [editingMessage, setEditingMessage] = useState<EditingMessageContext | null>(
+    null,
+  );
+
+  const handleEditMessage = useCallback((message: MessageVM) => {
+    const content = (message as { content?: { text?: string } }).content?.text ?? '';
+    const mentions = (message as { content?: { mentions?: MessageMentionVM[] } }).content
+      ?.mentions;
+    setEditingMessage({ messageId: message.ids.id, content, mentions });
+  }, []);
+
+  const handleCancelEdit = useCallback(() => setEditingMessage(null), []);
+
+  const handleSaveEdit = useCallback(
+    async (input: {
+      messageId: string;
+      content: string;
+      mentions?: MessageMentionVM[];
+    }) => {
+      const key = queryKeys.messages(channelId ?? '', profileId);
+      const previous = queryClient.getQueryData<MessageVM[]>(key);
+
+      // Optimistic update so the edited text + "(edited)" indicator show
+      // immediately; rolled back below on error.
+      queryClient.setQueryData<MessageVM[]>(key, (current) =>
+        current?.map((message) =>
+          message.ids.id === input.messageId
+            ? ({
+                ...message,
+                content: { text: input.content, mentions: input.mentions },
+                state: {
+                  ...message.state,
+                  isEdited: true,
+                  editedAt: new Date().toISOString(),
+                },
+              } as MessageVM)
+            : message,
+        ),
+      );
+
+      try {
+        await editTextMessage(input.messageId, orgId, input.content, input.mentions);
+        void queryClient.invalidateQueries({ queryKey: key });
+        return true;
+      } catch (error) {
+        queryClient.setQueryData(key, previous);
+        reportMobileObservedError({
+          error,
+          source: 'mobile.messages.spaces.edit_text',
+          message: 'Failed to edit space message',
+          context: { channelId, orgId, profileId, messageId: input.messageId },
+        });
+        Alert.alert(
+          'Unable to save edit',
+          error instanceof Error
+            ? error.message
+            : 'Something went wrong. Please try again.',
+        );
+        return false;
+      }
+    },
+    [channelId, orgId, profileId, queryClient],
   );
 
   const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
@@ -681,6 +751,9 @@ export default function SpaceDetailScreen() {
             quoteReplyTo={quoteReplyTarget}
             onCancelQuoteReply={() => setQuoteReplyTarget(null)}
             uploading={pendingUploads.some((upload) => !upload.failed)}
+            editingMessage={editingMessage}
+            onSaveEdit={handleSaveEdit}
+            onCancelEdit={handleCancelEdit}
           />
         </KeyboardAvoidingView>
       ) : (
@@ -741,6 +814,8 @@ export default function SpaceDetailScreen() {
         onQuoteReply={enableMessageReplyReference ? handleQuoteReply : undefined}
         onMarkUnread={enableMessageMarkUnread ? handleMarkUnread : undefined}
         isChannelUnread={isChannelUnread}
+        enableEdit={enableMessageEdit}
+        onEdit={handleEditMessage}
       />
 
       {/* Push notification nudge */}

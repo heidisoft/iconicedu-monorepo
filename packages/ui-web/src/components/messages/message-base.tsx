@@ -55,6 +55,11 @@ export interface MessageBaseProps {
   onToggleSaved?: () => void;
   onToggleHidden?: () => void;
   onDelete?: () => void;
+  onRetrySend?: () => void;
+  onEditFailedSend?: () => void;
+  onDiscardFailedSend?: () => void;
+  /** Present only when the caller has already determined this message is edit-eligible. */
+  onEdit?: () => void;
   currentUserId?: UUID;
   canDeleteAnyMessages?: boolean;
   actionState?: MessageActionState;
@@ -76,6 +81,10 @@ export const MessageBase = memo(function MessageBase({
   onToggleSaved,
   onToggleHidden,
   onDelete,
+  onRetrySend,
+  onEditFailedSend,
+  onDiscardFailedSend,
+  onEdit,
   currentUserId,
   canDeleteAnyMessages = false,
   actionState,
@@ -130,6 +139,7 @@ export const MessageBase = memo(function MessageBase({
       feedGroupPosition === 'last');
   const hasReactions = message.social.reactions.length > 0;
   const hasThread = !isThreadReply && Boolean(message.social.thread);
+  const sendFailed = Boolean(actionState?.sendFailed);
   const shouldShowQuickActionControls = showActionControls && !shouldHideQuickActions;
   const shouldShowActionsRow = hasReactions || hasThread;
   const shouldPinQuickActions = isQuickActionsActive || isEmojiPickerOpen;
@@ -211,6 +221,7 @@ export const MessageBase = memo(function MessageBase({
     onToggleSaved,
     onToggleHidden,
     onDelete,
+    onEdit,
     feed: isFeedTheme,
   };
   const actionsMenu = <MessageManagementMenu {...managementProps} />;
@@ -686,6 +697,48 @@ export const MessageBase = memo(function MessageBase({
 
           {inlineThreadContent ? (
             <div className={isFeedTheme ? 'mt-2' : 'mt-3'}>{inlineThreadContent}</div>
+          ) : null}
+
+          {sendFailed ? (
+            <div
+              className={cn(
+                'mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs',
+                isFeedTheme
+                  ? 'justify-start'
+                  : isOwnMessage
+                    ? 'justify-end'
+                    : 'justify-start',
+              )}
+            >
+              <span className="font-medium text-destructive">Not sent</span>
+              {onRetrySend ? (
+                <button
+                  type="button"
+                  onClick={onRetrySend}
+                  className="font-medium text-primary hover:underline"
+                >
+                  Retry
+                </button>
+              ) : null}
+              {onEditFailedSend ? (
+                <button
+                  type="button"
+                  onClick={onEditFailedSend}
+                  className="font-medium text-muted-foreground hover:underline"
+                >
+                  Edit
+                </button>
+              ) : null}
+              {onDiscardFailedSend ? (
+                <button
+                  type="button"
+                  onClick={onDiscardFailedSend}
+                  className="font-medium text-muted-foreground hover:underline"
+                >
+                  Discard
+                </button>
+              ) : null}
+            </div>
           ) : null}
         </div>
       </div>

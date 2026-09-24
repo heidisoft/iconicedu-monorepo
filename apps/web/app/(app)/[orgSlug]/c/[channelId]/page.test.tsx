@@ -11,6 +11,9 @@ const enableMessageMarkUnreadRunMock = vi.fn(async () => false);
 const enableMessageReplyReferenceRunMock = vi.fn(async () => true);
 const enableNotificationConversationControlsRunMock = vi.fn(async () => false);
 const enableMessageListFormattingRunMock = vi.fn(async () => true);
+const enableMessageDraftsRunMock = vi.fn(async () => false);
+const enableMessageEditRunMock = vi.fn(async () => false);
+const enableMessageSendReliabilityRunMock = vi.fn(async () => false);
 
 vi.mock('@iconicedu/ui-web', () => ({
   DashboardHeader: () => null,
@@ -21,6 +24,7 @@ vi.mock('@iconicedu/web/app/(app)/[orgSlug]/messages/messages-shell-client', () 
 }));
 
 vi.mock('@iconicedu/web/app/actions/messages', () => ({
+  editTextMessageAction: vi.fn(),
   sendFileMessageAction: vi.fn(),
   sendFilesMessageAction: vi.fn(),
   sendTextMessageAction: vi.fn(),
@@ -60,6 +64,15 @@ vi.mock('@iconicedu/web/flags', () => ({
   },
   enableMessageListFormatting: {
     run: (...args: unknown[]) => enableMessageListFormattingRunMock(...args),
+  },
+  enableMessageDrafts: {
+    run: (...args: unknown[]) => enableMessageDraftsRunMock(...args),
+  },
+  enableMessageEdit: {
+    run: (...args: unknown[]) => enableMessageEditRunMock(...args),
+  },
+  enableMessageSendReliability: {
+    run: (...args: unknown[]) => enableMessageSendReliabilityRunMock(...args),
   },
 }));
 

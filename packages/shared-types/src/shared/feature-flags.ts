@@ -9,6 +9,10 @@ export const platformFeatureFlagKeys = {
   enableMobileLinkPreviews: 'enable-mobile-link-previews',
   enableNotificationConversationControls: 'enable-notification-conversation-controls',
   enableMessageListFormatting: 'enable-message-list-formatting',
+  enableMessageDrafts: 'enable-message-drafts',
+  enableMessageEdit: 'enable-message-edit',
+  enableMobileMessageComposerParity: 'enable-mobile-message-composer-parity',
+  enableMessageSendReliability: 'enable-message-send-reliability',
 } as const;
 
 export type PlatformFeatureFlagKey =

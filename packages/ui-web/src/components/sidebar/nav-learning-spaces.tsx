@@ -53,6 +53,7 @@ export function NavLearningSpaces({
   currentUser,
   dashboardBasePath = '/',
   classRequestAction,
+  draftChannelIds,
 }: {
   learningSpaces: LearningSpaceVM[];
   title: string;
@@ -63,6 +64,8 @@ export function NavLearningSpaces({
   isMobile: boolean;
   currentUser?: { accountId?: string; profileId?: string };
   dashboardBasePath?: string;
+  /** Channel ids with a saved, non-expired draft — shows a small "Draft" label. */
+  draftChannelIds?: Set<string>;
   classRequestAction?: {
     orgSlug: string;
     fallbackHref: string;
@@ -175,10 +178,19 @@ export function NavLearningSpaces({
                             {space.basics.subject ?? 'General'}
                           </div>
                         </div>
-                        {unreadCount > 0 ? (
-                          <Badge className="ml-auto h-5 px-1.5 text-[10px]">
-                            {unreadCount}
-                          </Badge>
+                        {unreadCount > 0 || draftChannelIds?.has(channel.ids.id) ? (
+                          <span className="ml-auto flex items-center gap-1.5">
+                            {draftChannelIds?.has(channel.ids.id) ? (
+                              <span className="text-[10px] font-medium text-muted-foreground">
+                                Draft
+                              </span>
+                            ) : null}
+                            {unreadCount > 0 ? (
+                              <Badge className="h-5 px-1.5 text-[10px]">
+                                {unreadCount}
+                              </Badge>
+                            ) : null}
+                          </span>
                         ) : null}
                       </a>
                     </SidebarMenuButton>
