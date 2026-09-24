@@ -1346,6 +1346,8 @@ export class ChannelsService {
     const sessionSupabase = createSupabaseSessionClient(accessToken);
     const serviceSupabase = createSupabaseServiceClient();
 
+    let resolvedAccountId: string | null = null;
+
     const membershipLookup = await sessionSupabase
       .from('channel_members')
       .select('id')
@@ -1407,12 +1409,28 @@ export class ChannelsService {
       if (svcMemberErr) throw new InternalServerErrorException(svcMemberErr.message);
       if (!serviceMembership)
         throw new ForbiddenException('Not a member of this channel');
+
+      resolvedAccountId = childProfile.account_id;
+    }
+
+    if (!resolvedAccountId) {
+      const { data: profileRow, error: profileLookupErr } = await serviceSupabase
+        .from('profiles')
+        .select('account_id')
+        .eq('id', input.profileId)
+        .eq('org_id', input.orgId)
+        .is('deleted_at', null)
+        .maybeSingle<{ account_id: string }>();
+      if (profileLookupErr)
+        throw new InternalServerErrorException(profileLookupErr.message);
+      if (!profileRow) throw new ForbiddenException('Not a member of this channel');
+      resolvedAccountId = profileRow.account_id;
     }
 
     const { error } = await serviceSupabase.rpc('mark_channel_unread', {
       p_org_id: input.orgId,
       p_channel_id: input.channelId,
-      p_account_id: input.accountId,
+      p_account_id: resolvedAccountId,
       p_actor_profile_id: input.profileId,
     });
     if (error) throw new InternalServerErrorException(error.message);

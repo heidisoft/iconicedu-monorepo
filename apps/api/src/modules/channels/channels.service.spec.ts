@@ -1,4 +1,4 @@
-import { InternalServerErrorException } from '@nestjs/common';
+import { ForbiddenException, InternalServerErrorException } from '@nestjs/common';
 import { ChannelsService } from './channels.service';
 import { ThreadsService } from '@iconicedu/api/modules/threads/threads.service';
 import { evaluateApiBooleanFlag } from '@iconicedu/api/lib/flags/posthog-openfeature';
@@ -552,6 +552,95 @@ describe('ChannelsService.markRead', () => {
       const result = await svc.markRead('token', BASE_INPUT);
 
       expect(result).toEqual({ unreadCount: 0 });
+      expect(mockRpc).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe('ChannelsService.markUnread', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    const methods = ['from', 'select', 'eq', 'in', 'is', 'order', 'limit'];
+    for (const m of methods) {
+      (mockSessionClient as Record<string, jest.Mock>)[m].mockReturnValue(
+        mockSessionClient,
+      );
+      (mockServiceClient as Record<string, jest.Mock>)[m].mockReturnValue(
+        mockServiceClient,
+      );
+    }
+    mockServiceClient.rpc.mockReturnValue(mockServiceClient);
+  });
+
+  describe('direct member (own profile, session can see membership)', () => {
+    it('derives the account id from the authenticated profile, ignoring a mismatched client-supplied accountId', async () => {
+      mockMaybeSingle
+        .mockResolvedValueOnce({ data: { id: 'member-1' }, error: null }) // membership
+        .mockResolvedValueOnce({ data: { account_id: 'real-acct-1' }, error: null }); // profile lookup
+
+      mockRpc.mockResolvedValueOnce({ data: null, error: null });
+
+      const svc = makeService();
+      const result = await svc.markUnread('token', {
+        ...BASE_INPUT,
+        accountId: 'attacker-supplied-acct-id',
+      });
+
+      expect(result).toEqual({ success: true });
+      expect(mockRpc).toHaveBeenCalledWith(
+        'mark_channel_unread',
+        expect.objectContaining({
+          p_account_id: 'real-acct-1',
+          p_actor_profile_id: BASE_INPUT.profileId,
+        }),
+      );
+    });
+  });
+
+  describe('guardian acting as child (session RLS blocks membership)', () => {
+    beforeEach(() => {
+      mockAuthGetUser.mockResolvedValue({
+        data: { user: { id: 'guardian-auth-uid' } },
+        error: null,
+      });
+    });
+
+    it('resolves the child account id via family_links, ignoring a mismatched client-supplied accountId', async () => {
+      mockMaybeSingle
+        .mockResolvedValueOnce({ data: null, error: null }) // session membership → null (RLS)
+        .mockResolvedValueOnce({ data: { id: 'guardian-acct-1' }, error: null }) // guardian account
+        .mockResolvedValueOnce({ data: { account_id: 'child-acct-1' }, error: null }) // child profile
+        .mockResolvedValueOnce({ data: { id: 'family-link-1' }, error: null }) // family_links
+        .mockResolvedValueOnce({ data: { id: 'svc-member-1' }, error: null }); // service membership
+
+      mockRpc.mockResolvedValueOnce({ data: null, error: null });
+
+      const svc = makeService();
+      await svc.markUnread('guardian-token', {
+        ...BASE_INPUT,
+        accountId: 'attacker-supplied-acct-id',
+      });
+
+      expect(mockRpc).toHaveBeenCalledWith(
+        'mark_channel_unread',
+        expect.objectContaining({
+          p_account_id: 'child-acct-1',
+          p_actor_profile_id: 'child-profile-1',
+        }),
+      );
+    });
+  });
+
+  describe('error handling', () => {
+    it('throws ForbiddenException when the profile has no resolvable account', async () => {
+      mockMaybeSingle
+        .mockResolvedValueOnce({ data: { id: 'member-1' }, error: null }) // membership
+        .mockResolvedValueOnce({ data: null, error: null }); // profile lookup → not found
+
+      const svc = makeService();
+      await expect(svc.markUnread('token', BASE_INPUT)).rejects.toThrow(
+        ForbiddenException,
+      );
       expect(mockRpc).not.toHaveBeenCalled();
     });
   });

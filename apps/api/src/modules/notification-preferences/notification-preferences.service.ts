@@ -298,32 +298,59 @@ export class NotificationPreferencesService {
     }
 
     const { serviceSupabase } = await this.requireOrgActor(accessToken, body.orgId);
-    const existingResponse = await serviceSupabase
-      .from('notification_preference_scopes')
-      .select('pref_key, channels')
-      .eq('org_id', body.orgId)
-      .eq('profile_id', body.profileId)
-      .eq('scope_kind', body.scopeKind)
-      .eq('scope_id', body.scopeId)
-      .in('pref_key', CONVERSATION_MESSAGE_PREF_KEYS)
-      .is('deleted_at', null);
-    if (existingResponse.error) {
-      throw new InternalServerErrorException(existingResponse.error.message);
+    const [existingScopedResponse, existingGlobalResponse] = await Promise.all([
+      serviceSupabase
+        .from('notification_preference_scopes')
+        .select('pref_key, channels')
+        .eq('org_id', body.orgId)
+        .eq('profile_id', body.profileId)
+        .eq('scope_kind', body.scopeKind)
+        .eq('scope_id', body.scopeId)
+        .in('pref_key', CONVERSATION_MESSAGE_PREF_KEYS)
+        .is('deleted_at', null),
+      serviceSupabase
+        .from('notification_preferences')
+        .select('pref_key, channels')
+        .eq('org_id', body.orgId)
+        .eq('profile_id', body.profileId)
+        .in('pref_key', CONVERSATION_MESSAGE_PREF_KEYS)
+        .is('deleted_at', null),
+    ]);
+    if (existingScopedResponse.error) {
+      throw new InternalServerErrorException(existingScopedResponse.error.message);
+    }
+    if (existingGlobalResponse.error) {
+      throw new InternalServerErrorException(existingGlobalResponse.error.message);
     }
     const existingChannelsByPrefKey = new Map(
-      (existingResponse.data ?? []).map((row) => [
+      (existingScopedResponse.data ?? []).map((row) => [
         row.pref_key as string,
         (row.channels as string[] | null) ?? [],
       ]),
     );
+    const globalChannelsByPrefKey = new Map(
+      (existingGlobalResponse.data ?? []).map((row) => [
+        row.pref_key as string,
+        (row.channels as string[] | null) ?? [],
+      ]),
+    );
+    const signupDefaultChannelsByPrefKey = new Map(
+      this.signupDefaultPreferences.map((pref) => [pref.prefKey, [...pref.channels]]),
+    );
 
+    // A scope with no row yet must inherit the profile's effective channels
+    // (its own global preference, else the signup default) rather than a
+    // hard-coded ['push'] — otherwise choosing any mode here silently drops
+    // channels (e.g. email) the user already has enabled globally.
     await Promise.all(
       CONVERSATION_MESSAGE_PREF_KEYS.map((prefKey) =>
         this.upsertScope(accessToken, {
           orgId: body.orgId,
           profileId: body.profileId,
           prefKey,
-          channels: existingChannelsByPrefKey.get(prefKey) ?? ['push'],
+          channels: existingChannelsByPrefKey.get(prefKey) ??
+            globalChannelsByPrefKey.get(prefKey) ??
+            signupDefaultChannelsByPrefKey.get(prefKey) ?? ['push'],
           mode: body.mode,
           mutedUntil: body.mutedUntil,
           scopeKind: body.scopeKind,

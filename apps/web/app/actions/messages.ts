@@ -137,7 +137,12 @@ async function insertMessageRowWithRlsFallback(input: {
 
 async function resolveReplyReference(
   supabase: SupabaseClient,
-  input: { orgId: string; channelId: string; replyToMessageId: string },
+  input: {
+    orgId: string;
+    channelId: string;
+    replyToMessageId: string;
+    currentProfileId: string;
+  },
 ): Promise<{
   messageId: string;
   senderId: string;
@@ -147,7 +152,9 @@ async function resolveReplyReference(
 } | null> {
   const messageResponse = await supabase
     .from('messages')
-    .select('id, sender_profile_id, type, deleted_at')
+    .select(
+      'id, sender_profile_id, type, deleted_at, visibility_type, visibility_user_ids',
+    )
     .eq('org_id', input.orgId)
     .eq('channel_id', input.channelId)
     .eq('id', input.replyToMessageId)
@@ -156,12 +163,24 @@ async function resolveReplyReference(
       sender_profile_id: string;
       type: string;
       deleted_at: string | null;
+      visibility_type: string | null;
+      visibility_user_ids: string[] | null;
     }>();
   if (messageResponse.error) {
     throw new Error(messageResponse.error.message);
   }
   const target = messageResponse.data;
+  // A missing/deleted reply target degrades gracefully to "no reference"
+  // rather than failing the whole send. A target the caller isn't in the
+  // visibility audience for (e.g. another user's hidden support message)
+  // degrades the same way instead of leaking its contents into the reply.
   if (!target || target.deleted_at) return null;
+  if (
+    target.visibility_type === 'specific-users' &&
+    !(target.visibility_user_ids ?? []).includes(input.currentProfileId)
+  ) {
+    return null;
+  }
 
   const [payloadResponse, profileResponse] = await Promise.all([
     supabase
@@ -742,6 +761,7 @@ export async function sendTextMessageWithSupabase(
         orgId: accountOrgId,
         channelId: input.channelId,
         replyToMessageId: input.replyToMessageId,
+        currentProfileId,
       })
     : null;
 
