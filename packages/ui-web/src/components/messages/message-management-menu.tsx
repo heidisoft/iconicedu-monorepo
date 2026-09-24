@@ -10,6 +10,7 @@ import {
   Loader2,
   MoreHorizontal,
   MoreVertical,
+  Pencil,
   Trash2,
 } from 'lucide-react';
 import type { MessageVM, UUID } from '@iconicedu/shared-types';
@@ -42,6 +43,8 @@ type MessageManagementMenuProps = {
   onToggleSaved?: () => void;
   onToggleHidden?: () => void;
   onDelete?: () => void;
+  /** Present only when the caller has already determined this message is edit-eligible. */
+  onEdit?: () => void;
   feed?: boolean;
   children?: ReactElement;
 };
@@ -56,6 +59,7 @@ export function MessageManagementMenu({
   onToggleSaved,
   onToggleHidden,
   onDelete,
+  onEdit,
   feed,
   children,
 }: MessageManagementMenuProps) {
@@ -96,6 +100,12 @@ export function MessageManagementMenu({
       {(isOwn || canDeleteAnyMessages) && (
         <>
           <Separator className="-mx-1 my-1 h-px bg-border" />
+          {isOwn && onEdit && (
+            <Item className={itemClass} disabled={isReadOnly} onSelect={onEdit}>
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit message
+            </Item>
+          )}
           {isOwn && (
             <Item
               className={itemClass}

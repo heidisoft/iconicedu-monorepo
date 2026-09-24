@@ -18,10 +18,35 @@ import type { AudioStatus } from 'expo-audio';
 import { useTheme } from '@/providers/theme-provider';
 import { RoleNameIndicator } from '@/components/profile/role-name-indicator';
 import type { AppColors } from '@/lib/theme';
-import type { MessageVM } from '@iconicedu/shared-types';
+import type { MessageMentionVM, MessageVM } from '@iconicedu/shared-types';
 import { EmojiPicker } from './emoji-picker';
 import { AttachmentSheet, type AttachmentPayload } from './attachment-sheet';
-import { ThumbsUp, Plus, ArrowUp, X, FileText, Play, Pause } from 'lucide-react-native';
+import {
+  ThumbsUp,
+  Plus,
+  ArrowUp,
+  X,
+  FileText,
+  Play,
+  Pause,
+  Bold,
+  Italic,
+  Check,
+} from 'lucide-react-native';
+import { useMessageDraft, type MessageDraftScope } from '@/hooks/use-message-draft';
+import { generateClientMessageId } from '@/lib/messages/client-message-id';
+import {
+  applyInlineFormat,
+  type TextSelection,
+} from '@/lib/messages/message-input-formatting';
+import {
+  disambiguateMentionCandidateLabels,
+  extractMentionsFromMessageText,
+  getMentionState,
+  insertMention,
+  rankMentionCandidates,
+  type MentionCandidate,
+} from '@/lib/messages/message-mentions';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -58,12 +83,27 @@ const MAX_INPUT_HEIGHT = 120;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+/** Extra data attached to a send when mentions/send-reliability are enabled. */
+export type MessageSendMeta = {
+  mentions?: MessageMentionVM[];
+  /** Present when enableSendReliability is on — reuse it verbatim on retry. */
+  clientMessageId?: string;
+};
+
+/** Message currently being edited — drives the composer's edit mode. */
+export type EditingMessageContext = {
+  messageId: string;
+  content: string;
+  mentions?: MessageMentionVM[];
+};
+
 type MessageInputProps = {
-  onSend: (text: string) => void | Promise<void>;
+  onSend: (text: string, meta?: MessageSendMeta) => void | Promise<void>;
   /** Called with picked/recorded attachments and optional caption — caller handles upload + send. */
   onSendAttachment?: (
     attachments: AttachmentPayload[],
     caption?: string,
+    clientMessageId?: string,
   ) => Promise<void>;
   placeholder?: string;
   disabled?: boolean;
@@ -76,6 +116,34 @@ type MessageInputProps = {
   replyTo?: MessageVM | null;
   /** Called when the user dismisses the reply preview with ✕. */
   onCancelReply?: () => void;
+
+  // ── Automatic drafts (issue #264 capability #1) — gate with enableMessageDrafts ──
+  enableDrafts?: boolean;
+  /** Identifies this composer for AsyncStorage draft scoping. Required when enableDrafts is true. */
+  draftScope?: MessageDraftScope;
+
+  // ── Edit sent text messages (capability #4) — gate with enableMessageEdit ──
+  /** Non-null puts the composer into edit mode, prefilled with this message's text. */
+  editingMessage?: EditingMessageContext | null;
+  /** Return true on a successful save; the composer exits edit mode only then. */
+  onSaveEdit?: (input: {
+    messageId: string;
+    content: string;
+    mentions?: MessageMentionVM[];
+  }) => Promise<boolean>;
+  onCancelEdit?: () => void;
+
+  // ── Classroom-aware mentions authoring (capability #5) — gate with enableMobileMessageComposerParity ──
+  enableMentions?: boolean;
+  /** Channel/DM participants eligible to be @mentioned (current user already excluded). */
+  mentionCandidates?: MentionCandidate[];
+
+  // ── Bold/italic formatting authoring (capability #6) — gate with enableMobileMessageComposerParity ──
+  enableFormatting?: boolean;
+
+  // ── Send-failure recovery (capability #2) — gate with enableMessageSendReliability ──
+  /** When true, onSend receives a fresh clientMessageId in `meta` on every attempt. */
+  enableSendReliability?: boolean;
 };
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
@@ -298,6 +366,79 @@ function makeStyles(C: AppColors, bottomInset: number, keyboardVisible: boolean)
       alignItems: 'center',
       justifyContent: 'center',
     },
+
+    // Edit mode: Save / Cancel buttons replace the send/emoji button
+    editCancelBtn: {
+      height: 40,
+      paddingHorizontal: 14,
+      borderRadius: 20,
+      backgroundColor: C.card,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: C.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    editCancelTxt: { fontSize: 14, fontWeight: '600', color: C.textMuted },
+    editSaveBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: C.teal,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    editBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 6,
+      backgroundColor: C.tealBg,
+    },
+    editBannerTxt: { fontSize: 12, fontWeight: '600', color: C.teal },
+
+    // Draft status hint ("Draft saved" / "Draft restored")
+    draftStatus: {
+      paddingHorizontal: 16,
+      paddingTop: 4,
+      backgroundColor: C.bg,
+    },
+    draftStatusTxt: { fontSize: 12, color: C.textFaint },
+
+    // Formatting toolbar (Bold / Italic)
+    formattingToolbar: {
+      flexDirection: 'row',
+      gap: 8,
+      paddingHorizontal: 12,
+      paddingTop: 6,
+      backgroundColor: C.bg,
+    },
+    formattingBtn: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: C.card,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: C.border,
+    },
+
+    // Mention suggestions list — sits directly above the input bar
+    mentionList: {
+      maxHeight: 200,
+      backgroundColor: C.card,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: C.border,
+    },
+    mentionItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      gap: 8,
+    },
+    mentionItemLabel: { fontSize: 15, color: C.text, fontWeight: '500' },
   });
 }
 
@@ -313,6 +454,15 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   onTypingStop,
   replyTo,
   onCancelReply,
+  enableDrafts = false,
+  draftScope,
+  editingMessage = null,
+  onSaveEdit,
+  onCancelEdit,
+  enableMentions = false,
+  mentionCandidates = [],
+  enableFormatting = false,
+  enableSendReliability = false,
 }) => {
   const [text, setText] = useState('');
   const [inputKey, setInputKey] = useState(0);
@@ -324,6 +474,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const [loadedImageUris, setLoadedImageUris] = useState<Set<string>>(new Set());
   const [audioPlaying, setAudioPlaying] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [selection, setSelection] = useState<TextSelection>({ start: 0, end: 0 });
+  const [savingEdit, setSavingEdit] = useState(false);
   const audioSoundRef = useRef<AudioPlayer | null>(null);
   const audioSubRef = useRef<{ remove(): void } | null>(null);
   const { colors } = useTheme();
@@ -332,6 +484,94 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const s = React.useMemo(
     () => makeStyles(colors, insets.bottom, keyboardVisible),
     [colors, insets.bottom, keyboardVisible],
+  );
+
+  const isEditing = !!editingMessage;
+
+  // ── Automatic drafts ──────────────────────────────────────────────────────
+  const draft = useMessageDraft(draftScope ?? null, enableDrafts && !!draftScope);
+
+  // Restore a saved draft once it's actually found, as long as the composer
+  // is otherwise empty (never clobber an active reply-in-progress or an
+  // edit-in-progress). Only latches once `restoredDraft` is non-null — the
+  // hook resolves `isRestored=true` with a null draft as soon as it fast-path
+  // exits (e.g. before orgId/profileId/draftScope are ready), and latching
+  // on that premature resolution would permanently block the real restore
+  // that follows once the scope actually resolves. Mirrors the web composer's
+  // equivalent effect.
+  const draftRestoreAppliedRef = useRef(false);
+  useEffect(() => {
+    if (
+      !enableDrafts ||
+      !draft.isRestored ||
+      draftRestoreAppliedRef.current ||
+      isEditing ||
+      text.length > 0 ||
+      !draft.restoredDraft?.content
+    ) {
+      return;
+    }
+    draftRestoreAppliedRef.current = true;
+    setText(draft.restoredDraft.content);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enableDrafts, draft.isRestored, draft.restoredDraft, isEditing]);
+
+  // Reset the "already restored" guard when the composer's scope changes
+  // (e.g. navigating to a different channel/thread).
+  useEffect(() => {
+    draftRestoreAppliedRef.current = false;
+  }, [draftScope?.channelId, draftScope?.threadId]);
+
+  // ── Edit mode ─────────────────────────────────────────────────────────────
+  // Seed the input with the message's current text whenever edit mode is entered.
+  useEffect(() => {
+    if (editingMessage) {
+      setText(editingMessage.content);
+      requestAnimationFrame(() => inputRef.current?.focus());
+    }
+  }, [editingMessage]);
+
+  // ── Mention autocomplete ──────────────────────────────────────────────────
+  const mentionState = enableMentions ? getMentionState(text, selection.start) : null;
+  const mentionSuggestions = React.useMemo(() => {
+    if (!mentionState) return [];
+    const ranked = rankMentionCandidates(mentionCandidates, mentionState.query);
+    return disambiguateMentionCandidateLabels(ranked).slice(0, 6);
+  }, [mentionState, mentionCandidates]);
+
+  const handleSelectMention = useCallback(
+    (candidate: { id: string; label: string; displayName: string }) => {
+      if (!mentionState) return;
+      const result = insertMention(
+        text,
+        { start: mentionState.start, end: mentionState.end },
+        candidate.displayName,
+      );
+      setText(result.nextValue);
+      setSelection({ start: result.caret, end: result.caret });
+      requestAnimationFrame(() => {
+        inputRef.current?.setNativeProps({
+          selection: { start: result.caret, end: result.caret },
+        });
+      });
+    },
+    [mentionState, text],
+  );
+
+  // ── Bold / italic formatting toolbar ─────────────────────────────────────
+  const applyFormatting = useCallback(
+    (wrapper: '**' | '*') => {
+      const result = applyInlineFormat(text, selection, wrapper);
+      setText(result.nextValue);
+      setSelection(result.selection);
+      requestAnimationFrame(() => {
+        inputRef.current?.setNativeProps({ selection: result.selection });
+      });
+      if (enableDrafts && !isEditing) {
+        draft.notifyContentChanged(result.nextValue);
+      }
+    },
+    [text, selection, enableDrafts, isEditing, draft],
   );
 
   // Auto-focus the input whenever a reply target is set
@@ -449,14 +689,31 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     if (pendingAttachments.length > 0) {
       const attachments = pendingAttachments;
       const caption = text.trim() || undefined;
+      const clientMessageId = enableSendReliability
+        ? generateClientMessageId()
+        : undefined;
       setPendingAttachments([]);
       setText('');
       resetIOSInput();
       onTypingStop?.();
       await clearPendingAudio();
-      await runSendProgress(
-        () => onSendAttachment?.(attachments, caption) ?? Promise.resolve(),
-      );
+      try {
+        await runSendProgress(
+          () =>
+            onSendAttachment?.(attachments, caption, clientMessageId) ??
+            Promise.resolve(),
+        );
+        // Only clear the draft once the attachment send is confirmed — the
+        // caption text was autosaved the same way plain text is, so leaving
+        // it uncleared would restore an already-sent caption next time this
+        // conversation is opened and risk prompting an accidental resend.
+        if (enableDrafts) {
+          await draft.clearDraft();
+        }
+      } catch {
+        // Failure — leave any persisted draft caption in place, matching the
+        // text-send failure path below.
+      }
       return;
     }
     const trimmed = text.trim();
@@ -464,7 +721,34 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     setText('');
     resetIOSInput();
     onTypingStop?.();
-    await runSendProgress(() => Promise.resolve(onSend(trimmed)));
+
+    const meta: MessageSendMeta = {};
+    if (enableMentions && mentionCandidates.length) {
+      const extracted = extractMentionsFromMessageText(trimmed, mentionCandidates);
+      if (extracted.length) meta.mentions = extracted;
+    }
+    if (enableSendReliability) {
+      meta.clientMessageId = generateClientMessageId();
+    }
+    const hasMeta = Object.keys(meta).length > 0;
+
+    try {
+      await runSendProgress(() =>
+        Promise.resolve(hasMeta ? onSend(trimmed, meta) : onSend(trimmed)),
+      );
+      // Only clear the draft once the send is confirmed. When send-reliability
+      // is enabled the caller rethrows on failure so we keep the draft; legacy
+      // callers swallow the error internally (and already show their own
+      // alert), so clearing here matches the pre-existing optimistic-clear UX.
+      if (enableDrafts) {
+        await draft.clearDraft();
+      }
+    } catch {
+      // Failure — leave any persisted draft in place so the user's text isn't
+      // lost. The parent screen (when send-reliability is on) is responsible
+      // for showing a "Not sent" retry affordance; this component only owns
+      // the composer's own text field, which is already optimistically clear.
+    }
   }, [
     text,
     pendingAttachments,
@@ -474,6 +758,11 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     clearPendingAudio,
     resetIOSInput,
     runSendProgress,
+    enableMentions,
+    mentionCandidates,
+    enableSendReliability,
+    enableDrafts,
+    draft,
   ]);
 
   const handleChangeText = useCallback(
@@ -484,8 +773,12 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       } else {
         onTypingStop?.();
       }
+      if (enableDrafts && !isEditing) {
+        draft.dismissStatus();
+        draft.notifyContentChanged(t);
+      }
     },
-    [onTypingChange, onTypingStop],
+    [onTypingChange, onTypingStop, enableDrafts, isEditing, draft],
   );
 
   const handleEmojiSelect = useCallback(
@@ -496,8 +789,49 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     [onSend, runSendProgress],
   );
 
+  const handleSaveEdit = useCallback(async () => {
+    if (!editingMessage || !onSaveEdit) return;
+    const trimmed = text.trim();
+    if (!trimmed) return;
+
+    const mentions =
+      enableMentions && mentionCandidates.length
+        ? extractMentionsFromMessageText(trimmed, mentionCandidates)
+        : undefined;
+
+    setSavingEdit(true);
+    try {
+      const ok = await onSaveEdit({
+        messageId: editingMessage.messageId,
+        content: trimmed,
+        mentions: mentions?.length ? mentions : undefined,
+      });
+      if (ok) {
+        setText('');
+        resetIOSInput();
+        onCancelEdit?.();
+      }
+    } finally {
+      setSavingEdit(false);
+    }
+  }, [
+    editingMessage,
+    onSaveEdit,
+    onCancelEdit,
+    text,
+    enableMentions,
+    mentionCandidates,
+    resetIOSInput,
+  ]);
+
+  const handleCancelEdit = useCallback(() => {
+    setText('');
+    onCancelEdit?.();
+  }, [onCancelEdit]);
+
   const canSend = (text.trim().length > 0 || pendingAttachments.length > 0) && !disabled;
   const resolvedPlaceholder = truncatePlaceholder(placeholder);
+  const canSaveEdit = text.trim().length > 0 && !savingEdit;
 
   return (
     <>
@@ -638,21 +972,80 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         </View>
       )}
 
+      {/* Edit mode banner */}
+      {isEditing && (
+        <View style={s.editBanner}>
+          <Text style={s.editBannerTxt}>Editing message</Text>
+        </View>
+      )}
+
+      {/* Draft status hint — only ever shown outside edit mode */}
+      {enableDrafts && !isEditing && draft.status !== 'idle' && (
+        <View style={s.draftStatus}>
+          <Text style={s.draftStatusTxt} accessibilityLabel={`Draft ${draft.status}`}>
+            {draft.status === 'restored' ? 'Draft restored' : 'Draft saved'}
+          </Text>
+        </View>
+      )}
+
+      {/* Bold / italic formatting toolbar */}
+      {enableFormatting && (
+        <View style={s.formattingToolbar}>
+          <TouchableOpacity
+            style={s.formattingBtn}
+            onPress={() => applyFormatting('**')}
+            activeOpacity={0.7}
+            accessibilityLabel="Bold"
+            accessibilityRole="button"
+          >
+            <Bold size={16} color={colors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={s.formattingBtn}
+            onPress={() => applyFormatting('*')}
+            activeOpacity={0.7}
+            accessibilityLabel="Italic"
+            accessibilityRole="button"
+          >
+            <Italic size={16} color={colors.text} />
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Mention autocomplete suggestions */}
+      {enableMentions && mentionState && mentionSuggestions.length > 0 && (
+        <ScrollView style={s.mentionList} keyboardShouldPersistTaps="handled">
+          {mentionSuggestions.map((candidate) => (
+            <TouchableOpacity
+              key={candidate.id}
+              style={s.mentionItem}
+              activeOpacity={0.7}
+              onPress={() => handleSelectMention(candidate)}
+              accessibilityLabel={`Mention ${candidate.label}`}
+            >
+              <Text style={s.mentionItemLabel}>{candidate.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
+
       <View style={s.bar}>
-        {/* + Attachment button — shows spinner while an upload is in flight */}
-        <TouchableOpacity
-          style={s.addBtn}
-          disabled={disabled || uploading}
-          activeOpacity={0.7}
-          onPress={() => setAttachmentSheetVisible(true)}
-          accessibilityLabel="Add attachment"
-        >
-          {uploading ? (
-            <ActivityIndicator size="small" color={colors.teal} />
-          ) : (
-            <Plus size={22} color={colors.textMuted} />
-          )}
-        </TouchableOpacity>
+        {/* + Attachment button — shows spinner while an upload is in flight; hidden while editing */}
+        {!isEditing && (
+          <TouchableOpacity
+            style={s.addBtn}
+            disabled={disabled || uploading}
+            activeOpacity={0.7}
+            onPress={() => setAttachmentSheetVisible(true)}
+            accessibilityLabel="Add attachment"
+          >
+            {uploading ? (
+              <ActivityIndicator size="small" color={colors.teal} />
+            ) : (
+              <Plus size={22} color={colors.textMuted} />
+            )}
+          </TouchableOpacity>
+        )}
 
         {/* Pill: text input only */}
         <View style={s.pill}>
@@ -662,6 +1055,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             style={s.input}
             value={text}
             onChangeText={handleChangeText}
+            onSelectionChange={(event) => setSelection(event.nativeEvent.selection)}
             placeholder={resolvedPlaceholder}
             placeholderTextColor={colors.textFaint}
             multiline
@@ -671,8 +1065,34 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           />
         </View>
 
-        {/* Right action button — send when typing, emoji picker when idle */}
-        {canSend ? (
+        {/* Right action area: Save/Cancel while editing; send/emoji otherwise */}
+        {isEditing ? (
+          <>
+            <TouchableOpacity
+              style={s.editCancelBtn}
+              onPress={handleCancelEdit}
+              activeOpacity={0.7}
+              accessibilityLabel="Cancel edit"
+            >
+              <Text style={s.editCancelTxt}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={s.editSaveBtn}
+              onPress={() => {
+                void handleSaveEdit();
+              }}
+              disabled={!canSaveEdit}
+              activeOpacity={0.8}
+              accessibilityLabel="Save edit"
+            >
+              {savingEdit ? (
+                <ActivityIndicator size="small" color={colors.tealFg} />
+              ) : (
+                <Check size={20} color={colors.tealFg} />
+              )}
+            </TouchableOpacity>
+          </>
+        ) : canSend ? (
           <TouchableOpacity
             style={s.sendBtn}
             onPress={() => {

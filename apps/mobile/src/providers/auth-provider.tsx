@@ -18,6 +18,7 @@ import {
   revokePushToken,
   clearUserNotificationState,
 } from '@/lib/notifications/push-token';
+import { clearAllMessageDrafts } from '@/hooks/use-message-draft';
 import { useAnalytics } from '@/providers/analytics-provider';
 import {
   AnalyticsEvent,
@@ -523,6 +524,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     await signOutCurrentSession();
     await clearUserNotificationState();
+    // Full sign-out ends the local session entirely, so it's safe (and the
+    // clean hook point — see issue #264) to clear every locally-drafted
+    // message on this device, not just the signed-out profile's.
+    await clearAllMessageDrafts();
     queryClient.clear();
     analytics.reset();
   }, [analytics, queryClient]);

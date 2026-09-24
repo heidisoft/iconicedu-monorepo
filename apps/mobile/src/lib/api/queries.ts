@@ -30,6 +30,7 @@ export {
 export {
   buildMessageStoragePath,
   deleteMessage,
+  editTextMessage,
   fetchChannelMessages,
   fetchChannelReadState,
   fetchThreadMessages,
@@ -42,7 +43,7 @@ export {
   toggleReaction,
   uploadChannelFile,
 } from './messages/queries';
-export type { FileAttachmentInput } from './messages/queries';
+export type { FileAttachmentInput, SendTextMessageOptions } from './messages/queries';
 export {
   fetchLearningSpaceChannels,
   fetchLearningSpaces,

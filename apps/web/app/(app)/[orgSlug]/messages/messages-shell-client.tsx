@@ -11,6 +11,7 @@ import {
 import { useRouter } from 'next/navigation';
 import type {
   ChannelVM,
+  MessageEditTextInput,
   MessageSendFileInput,
   MessageSendFilesInput,
   MessageSendTextInput,
@@ -142,6 +143,9 @@ type MessagesShellClientProps = {
   currentUserProfile?: UserProfileVM | null;
   readOnly?: boolean;
   showCreateMessageTypeButton?: boolean;
+  enableMessageDrafts?: boolean;
+  enableMessageEdit?: boolean;
+  enableMessageSendReliability?: boolean;
   panelRegistry?: Partial<
     MessagesRightPanelRegistry<ComponentType<{ intent: MessagesRightPanelIntent }>>
   >;
@@ -149,6 +153,7 @@ type MessagesShellClientProps = {
   sendTextMessage: (input: MessageSendTextInput) => Promise<MessageVM>;
   sendFileMessage: (input: MessageSendFileInput) => Promise<MessageVM>;
   sendFilesMessage: (input: MessageSendFilesInput) => Promise<MessageVM>;
+  editTextMessage: (input: MessageEditTextInput) => Promise<MessageVM>;
   toggleReaction: (input: {
     orgId: string;
     messageId: string;
@@ -174,10 +179,14 @@ export function MessagesShellClient({
   currentUserProfile,
   readOnly = false,
   showCreateMessageTypeButton = true,
+  enableMessageDrafts = false,
+  enableMessageEdit = false,
+  enableMessageSendReliability = false,
   panelRegistry,
   sendTextMessage,
   sendFileMessage,
   sendFilesMessage,
+  editTextMessage,
   toggleReaction,
   toggleSavedMessage,
   deleteMessage,
@@ -197,6 +206,7 @@ export function MessagesShellClient({
   const messageWriteClient = useMemo(
     () => ({
       sendTextMessage,
+      editTextMessage,
       toggleReaction,
       toggleSavedMessage,
       deleteMessage,
@@ -204,6 +214,7 @@ export function MessagesShellClient({
     }),
     [
       sendTextMessage,
+      editTextMessage,
       toggleReaction,
       toggleSavedMessage,
       deleteMessage,
@@ -518,6 +529,9 @@ export function MessagesShellClient({
         currentUserProfile={currentUserProfile}
         readOnly={readOnly}
         showCreateMessageTypeButton={showCreateMessageTypeButton}
+        enableMessageDrafts={enableMessageDrafts}
+        enableMessageEdit={enableMessageEdit}
+        enableMessageSendReliability={enableMessageSendReliability}
         panelRegistry={panelRegistry}
         realtimeClient={realtimeClient}
         messageWriteClient={messageWriteClient}

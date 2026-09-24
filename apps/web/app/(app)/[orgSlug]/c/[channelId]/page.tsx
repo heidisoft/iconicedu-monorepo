@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { DashboardHeader } from '@iconicedu/ui-web';
 import {
+  editTextMessageAction,
   sendFileMessageAction,
   sendFilesMessageAction,
   sendTextMessageAction,
@@ -17,7 +18,12 @@ import {
   getDashboardAccountContext,
   getDashboardProfileContext,
 } from '@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth';
-import { enableMessageTypeComposer } from '@iconicedu/web/flags';
+import {
+  enableMessageTypeComposer,
+  enableMessageDrafts,
+  enableMessageEdit,
+  enableMessageSendReliability,
+} from '@iconicedu/web/flags';
 
 const INITIAL_MESSAGES_PAGE_SIZE = 40;
 
@@ -50,6 +56,15 @@ export default async function Page({
   const showCreateMessageTypeButton = await enableMessageTypeComposer.run({
     identify: { profileId: profileResponse.data?.id ?? null },
   });
+  const messageDraftsEnabled = await enableMessageDrafts.run({
+    identify: { profileId: profileResponse.data?.id ?? null },
+  });
+  const messageEditEnabled = await enableMessageEdit.run({
+    identify: { profileId: profileResponse.data?.id ?? null },
+  });
+  const messageSendReliabilityEnabled = await enableMessageSendReliability.run({
+    identify: { profileId: profileResponse.data?.id ?? null },
+  });
   const isStaffReadOnly = isStaffObserverReadOnlyChannel(
     channel,
     account.id,
@@ -66,9 +81,13 @@ export default async function Page({
         currentUserProfile={currentUserProfile}
         readOnly={isStaffReadOnly}
         showCreateMessageTypeButton={showCreateMessageTypeButton}
+        enableMessageDrafts={messageDraftsEnabled}
+        enableMessageEdit={messageEditEnabled}
+        enableMessageSendReliability={messageSendReliabilityEnabled}
         sendTextMessage={sendTextMessageAction}
         sendFileMessage={sendFileMessageAction}
         sendFilesMessage={sendFilesMessageAction}
+        editTextMessage={editTextMessageAction}
         toggleReaction={toggleMessageReactionAction}
         toggleSavedMessage={toggleSavedMessageAction}
         deleteMessage={deleteMessageAction}

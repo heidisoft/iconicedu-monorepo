@@ -7,6 +7,9 @@ import Page from '@iconicedu/web/app/(app)/[orgSlug]/c/[channelId]/page';
 const messagesShellMock = vi.fn(() => null);
 const buildChannelByIdMock = vi.fn();
 const enableMessageTypeComposerRunMock = vi.fn(async () => true);
+const enableMessageDraftsRunMock = vi.fn(async () => false);
+const enableMessageEditRunMock = vi.fn(async () => false);
+const enableMessageSendReliabilityRunMock = vi.fn(async () => false);
 
 vi.mock('@iconicedu/ui-web', () => ({
   DashboardHeader: () => null,
@@ -17,6 +20,7 @@ vi.mock('@iconicedu/web/app/(app)/[orgSlug]/messages/messages-shell-client', () 
 }));
 
 vi.mock('@iconicedu/web/app/actions/messages', () => ({
+  editTextMessageAction: vi.fn(),
   sendFileMessageAction: vi.fn(),
   sendFilesMessageAction: vi.fn(),
   sendTextMessageAction: vi.fn(),
@@ -44,6 +48,15 @@ vi.mock('@iconicedu/web/lib/channels/builders/channel.builder', () => ({
 vi.mock('@iconicedu/web/flags', () => ({
   enableMessageTypeComposer: {
     run: (...args: unknown[]) => enableMessageTypeComposerRunMock(...args),
+  },
+  enableMessageDrafts: {
+    run: (...args: unknown[]) => enableMessageDraftsRunMock(...args),
+  },
+  enableMessageEdit: {
+    run: (...args: unknown[]) => enableMessageEditRunMock(...args),
+  },
+  enableMessageSendReliability: {
+    run: (...args: unknown[]) => enableMessageSendReliabilityRunMock(...args),
   },
 }));
 

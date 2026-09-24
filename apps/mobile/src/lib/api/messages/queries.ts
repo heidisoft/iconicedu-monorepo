@@ -1,11 +1,13 @@
 import { File as ExpoFile } from 'expo-file-system';
 import type {
+  MessageEditTextInput,
+  MessageMentionVM,
   MessageSendFileInput,
   MessageSendFilesInput,
   MessageSendTextInput,
   MessageVM,
 } from '@iconicedu/shared-types';
-import { apiDelete, apiGet, apiPost } from '@/lib/api/http-client';
+import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api/http-client';
 import { supabase } from '@/lib/supabase/client';
 
 export async function fetchChannelMessages(
@@ -128,6 +130,12 @@ export async function markThreadReadState(input: {
   return response.unreadCount ?? 0;
 }
 
+export type SendTextMessageOptions = {
+  /** Client-generated idempotency key — see MessageSendTextInput.clientMessageId. */
+  clientMessageId?: string;
+  mentions?: MessageMentionVM[];
+};
+
 export async function sendTextMessage(
   channelId: string,
   senderProfileId: string,
@@ -135,6 +143,7 @@ export async function sendTextMessage(
   text: string,
   threadParentId?: string,
   threadId?: string,
+  options?: SendTextMessageOptions,
 ) {
   const content = text.trim();
   if (!content) throw new Error('Message text is required');
@@ -145,7 +154,31 @@ export async function sendTextMessage(
     content,
     threadParentId,
     threadId,
+    ...(options?.clientMessageId ? { clientMessageId: options.clientMessageId } : {}),
+    ...(options?.mentions?.length ? { mentions: options.mentions } : {}),
   } satisfies MessageSendTextInput);
+}
+
+/**
+ * PATCH /messages/:id/text — sender-only, text-only, not-deleted, within
+ * MESSAGE_EDIT_WINDOW_MINUTES on the server. Throws with the server's error
+ * message (via http-client's parseResponse) on rejection, e.g. a stale edit
+ * attempt past the window.
+ */
+export async function editTextMessage(
+  messageId: string,
+  orgId: string,
+  content: string,
+  mentions?: MessageMentionVM[],
+): Promise<{ id: string }> {
+  const trimmed = content.trim();
+  if (!trimmed) throw new Error('Message text is required');
+  return apiPatch<{ id: string }>(`/messages/${messageId}/text`, {
+    orgId,
+    messageId,
+    content: trimmed,
+    ...(mentions?.length ? { mentions } : {}),
+  } satisfies MessageEditTextInput);
 }
 
 const CHANNEL_FILES_BUCKET = 'channel-files';
@@ -228,6 +261,7 @@ export async function sendFileMessage(
   content?: string,
   threadParentId?: string,
   threadId?: string,
+  clientMessageId?: string,
 ) {
   const result = await apiPost<{ id: string }>('/messages/file', {
     orgId,
@@ -241,6 +275,7 @@ export async function sendFileMessage(
     content,
     threadParentId: threadParentId ?? null,
     threadId: threadId ?? null,
+    ...(clientMessageId ? { clientMessageId } : {}),
   } satisfies MessageSendFileInput);
 
   return { id: result.id };
@@ -254,6 +289,7 @@ export async function sendFilesMessage(
   content?: string,
   threadParentId?: string,
   threadId?: string,
+  clientMessageId?: string,
 ) {
   if (!files.length) throw new Error('No files provided');
   const result = await apiPost<{ id: string }>('/messages/files', {
@@ -269,6 +305,7 @@ export async function sendFilesMessage(
     content,
     threadParentId: threadParentId ?? null,
     threadId: threadId ?? null,
+    ...(clientMessageId ? { clientMessageId } : {}),
   } satisfies MessageSendFilesInput);
 
   return { id: result.id };
