@@ -25,6 +25,14 @@ export function useMarkRead({
   const queryClient = useQueryClient();
   const lastMarkedChannelIdRef = useRef<string | null>(null);
 
+  // Marking a channel unread doesn't change the latest message id, so without
+  // this the "already marked read for this message id" guard below would
+  // silently swallow the next genuine read (e.g. leaving and reopening the
+  // channel) and the manual-unread flag would never clear server-side.
+  const resetChannelReadGuard = useCallback(() => {
+    lastMarkedChannelIdRef.current = null;
+  }, []);
+
   const markChannelRead = useCallback(
     async (lastReadMessageId: string) => {
       if (!channelId || !orgId || !accountId || !profileId || !lastReadMessageId) return;
@@ -122,5 +130,5 @@ export function useMarkRead({
     [accountId, profileId, queryClient],
   );
 
-  return { markChannelRead, markThreadRead };
+  return { markChannelRead, markThreadRead, resetChannelReadGuard };
 }

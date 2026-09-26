@@ -144,6 +144,22 @@ describe('useMarkRead', () => {
       expect(mockMarkChannelReadState).toHaveBeenCalledTimes(1);
     });
 
+    it('re-calls the API for the same lastReadMessageId after resetChannelReadGuard, so a manual mark-unread in between still clears on the next visit', async () => {
+      const { result } = renderHook(() => useMarkRead(DEFAULT_PARAMS));
+
+      await act(async () => {
+        await result.current.markChannelRead('msg-1');
+      });
+      act(() => {
+        result.current.resetChannelReadGuard();
+      });
+      await act(async () => {
+        await result.current.markChannelRead('msg-1');
+      });
+
+      expect(mockMarkChannelReadState).toHaveBeenCalledTimes(2);
+    });
+
     it('does nothing when channelId is empty', async () => {
       const { result } = renderHook(() =>
         useMarkRead({ ...DEFAULT_PARAMS, channelId: '' }),

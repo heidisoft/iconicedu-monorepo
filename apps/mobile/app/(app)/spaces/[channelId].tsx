@@ -148,7 +148,7 @@ export default function SpaceDetailScreen() {
     enabled: !!channelId && !!accountId,
     staleTime: 30_000,
   });
-  const { markChannelRead } = useMarkRead({
+  const { markChannelRead, resetChannelReadGuard } = useMarkRead({
     orgId,
     profileId,
     accountId,
@@ -292,11 +292,20 @@ export default function SpaceDetailScreen() {
           channelId,
           profileKind,
         });
+        resetChannelReadGuard();
       } catch {
         Alert.alert('Unable to mark unread', 'Please try again.');
       }
     },
-    [channelId, orgId, accountId, profileId, profileKind, queryClient],
+    [
+      channelId,
+      orgId,
+      accountId,
+      profileId,
+      profileKind,
+      queryClient,
+      resetChannelReadGuard,
+    ],
   );
 
   // ── Reaction toggle ──

@@ -248,7 +248,7 @@ export default function DmConversationScreen() {
     enabled: !!channelId && !!accountId,
     staleTime: 30_000,
   });
-  const { markChannelRead } = useMarkRead({
+  const { markChannelRead, resetChannelReadGuard } = useMarkRead({
     orgId,
     profileId,
     accountId,
@@ -368,11 +368,20 @@ export default function DmConversationScreen() {
           channelId,
           profileKind: (profileRecord?.kind as string | null | undefined) ?? null,
         });
+        resetChannelReadGuard();
       } catch {
         Alert.alert('Unable to mark unread', 'Please try again.');
       }
     },
-    [channelId, orgId, accountId, profileId, profileRecord, queryClient],
+    [
+      channelId,
+      orgId,
+      accountId,
+      profileId,
+      profileRecord,
+      queryClient,
+      resetChannelReadGuard,
+    ],
   );
 
   // ── Edit sent text messages ──
