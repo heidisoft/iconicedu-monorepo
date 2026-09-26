@@ -1,4 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import {
   View,
   Text,
@@ -78,9 +85,16 @@ function findUnreadStartMessageId(input: {
   lastReadAt?: string | null;
   unreadCount?: number;
   currentProfileId?: string;
+  manuallyUnreadFromMessageId?: string | null;
 }): string | null {
-  const { messages, lastReadMessageId, lastReadAt, unreadCount, currentProfileId } =
-    input;
+  const {
+    messages,
+    lastReadMessageId,
+    lastReadAt,
+    unreadCount,
+    currentProfileId,
+    manuallyUnreadFromMessageId,
+  } = input;
   const normalizedUnreadCount = Math.max(0, unreadCount ?? 0);
   if (messages.length === 0) return null;
 
@@ -93,6 +107,17 @@ function findUnreadStartMessageId(input: {
     }
     return null;
   };
+
+  // A manual "mark unread" carries an explicit anchor — the message the user
+  // selected — which takes priority over the read-position heuristics below.
+  // Those all walk forward from lastReadMessageId/lastReadAt, which manual
+  // unread never moves, so they'd otherwise find nothing to show.
+  if (manuallyUnreadFromMessageId) {
+    const anchorIndex = messages.findIndex(
+      (message) => message.ids.id === manuallyUnreadFromMessageId,
+    );
+    if (anchorIndex >= 0) return manuallyUnreadFromMessageId;
+  }
 
   if (lastReadMessageId) {
     const lastReadIndex = messages.findIndex(
@@ -125,6 +150,7 @@ export function findLatestUnreadIncomingMessageId(input: {
   lastReadAt?: string | null;
   unreadCount?: number;
   currentProfileId?: string;
+  manuallyUnreadFromMessageId?: string | null;
 }): string | null {
   const unreadStartMessageId = findUnreadStartMessageId(input);
   if (!unreadStartMessageId) {
@@ -434,6 +460,8 @@ export type MessageListProps = {
   lastReadMessageId?: string | null;
   lastReadAt?: string | null;
   unreadCount?: number;
+  /** Anchor set by an explicit "mark unread" — takes priority over the read-position heuristics. */
+  manuallyUnreadFromMessageId?: string | null;
   onSendAnnotation?: (attachment: import('./attachment-sheet').AttachmentPayload) => void;
   messageUiThemeKey?: 'classic' | 'feed';
   /** Gated by `enableMessagePinning` — ids of currently-pinned messages, for the pin indicator. */
@@ -447,6 +475,8 @@ export type MessageListProps = {
   highlightMessageId?: string | null;
   onScrollToMessageResult?: (found: boolean) => void;
 };
+
+const REPLY_HIGHLIGHT_DURATION_MS = 1600;
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -474,6 +504,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   lastReadMessageId,
   lastReadAt,
   unreadCount,
+  manuallyUnreadFromMessageId,
   onSendAnnotation,
   messageUiThemeKey = 'classic',
   pinnedMessageIds,
@@ -488,6 +519,8 @@ export const MessageList: React.FC<MessageListProps> = ({
   const contentHeightRef = useRef(0);
   const reactionStartContentHeightRef = useRef(0);
   const preserveOffsetAfterReactionRef = useRef(false);
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+  const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Build items newest-first so inverted FlatList renders newest at the bottom
   const unreadAnchorMessageId = useMemo(
@@ -498,8 +531,16 @@ export const MessageList: React.FC<MessageListProps> = ({
         lastReadAt,
         unreadCount,
         currentProfileId,
+        manuallyUnreadFromMessageId,
       }),
-    [messages, lastReadMessageId, lastReadAt, unreadCount, currentProfileId],
+    [
+      messages,
+      lastReadMessageId,
+      lastReadAt,
+      unreadCount,
+      currentProfileId,
+      manuallyUnreadFromMessageId,
+    ],
   );
   const listData = useMemo(
     () =>
@@ -519,8 +560,16 @@ export const MessageList: React.FC<MessageListProps> = ({
         lastReadAt,
         unreadCount,
         currentProfileId,
+        manuallyUnreadFromMessageId,
       }),
-    [messages, lastReadMessageId, lastReadAt, unreadCount, currentProfileId],
+    [
+      messages,
+      lastReadMessageId,
+      lastReadAt,
+      unreadCount,
+      currentProfileId,
+      manuallyUnreadFromMessageId,
+    ],
   );
 
   const maybeMarkUnreadAsViewed = useCallback(() => {
@@ -613,6 +662,40 @@ export const MessageList: React.FC<MessageListProps> = ({
     [onReactionToggle],
   );
 
+  // Tapping a "reply to" quote block scrolls to / highlights the original
+  // message when it's still loaded. When it isn't (paginated away, deleted,
+  // etc.) this is a silent no-op — no crash, no error state.
+  useEffect(() => {
+    return () => {
+      if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
+    };
+  }, []);
+
+  const handleReplyReferencePress = useCallback(
+    (messageId: string) => {
+      const index = listData.findIndex(
+        (entry) =>
+          !isDateSeparator(entry) &&
+          !isUnreadSeparator(entry) &&
+          entry.ids.id === messageId,
+      );
+      if (index < 0) return;
+
+      try {
+        flatListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
+      } catch {
+        // best-effort — an unmeasured index just won't animate-scroll
+      }
+
+      if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
+      setHighlightedMessageId(messageId);
+      highlightTimeoutRef.current = setTimeout(() => {
+        setHighlightedMessageId(null);
+      }, REPLY_HIGHLIGHT_DURATION_MS);
+    },
+    [listData],
+  );
+
   const renderItem = useCallback(
     ({ item, index }: { item: MessageListItem; index: number }) => {
       if (isDateSeparator(item)) {
@@ -666,7 +749,11 @@ export const MessageList: React.FC<MessageListProps> = ({
           onSendAnnotation={onSendAnnotation}
           messageUiThemeKey={messageUiThemeKey}
           isPinned={pinnedMessageIds?.has(item.ids.id) ?? false}
-          isHighlighted={!!highlightMessageId && item.ids.id === highlightMessageId}
+          onReplyReferencePress={handleReplyReferencePress}
+          isHighlighted={
+            (!!highlightMessageId && item.ids.id === highlightMessageId) ||
+            highlightedMessageId === item.ids.id
+          }
         />
       );
     },
@@ -685,6 +772,8 @@ export const MessageList: React.FC<MessageListProps> = ({
       messageUiThemeKey,
       pinnedMessageIds,
       highlightMessageId,
+      handleReplyReferencePress,
+      highlightedMessageId,
     ],
   );
 

@@ -784,7 +784,7 @@ export default function HomeScreen() {
     isOrgAdminView: isCompletionOrgView,
     isPending: completedSessionsLoading,
     refetch: refetchCompletedSessions,
-  } = useCompletedSessions(sessionCompletionCarouselEnabled);
+  } = useCompletedSessions();
   // Staff/admins get the org-wide summary tile even when the carousel rollout
   // flag is off for them.
   const showCompletionSummary = sessionCompletionCarouselEnabled || isCompletionOrgView;
@@ -865,6 +865,7 @@ export default function HomeScreen() {
     () =>
       buildHomeMetricSummary({
         schedules: orgSchedules,
+        completedSessions,
         learningSpaces: learningSpaces.map((space) => ({
           id: String((space as Record<string, unknown>).id),
           status: ((space as Record<string, unknown>).status as string | null) ?? null,
@@ -881,6 +882,7 @@ export default function HomeScreen() {
       }),
     [
       childProfiles,
+      completedSessions,
       learningSpaces,
       orgSchedules,
       primaryRole,

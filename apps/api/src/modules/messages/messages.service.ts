@@ -12,6 +12,7 @@ import type {
   AudienceRuleVM,
   FeedScopeVM,
   MessageVM,
+  MessageEditTextInput,
   MessageMentionVM,
   MessageSendFileInput,
   MessageSendFilesInput,
@@ -19,7 +20,14 @@ import type {
   ReactionVM,
   ThreadVM,
 } from '@iconicedu/shared-types';
-import { buildSenderProfile, mapRowToMessageVM } from '@iconicedu/utils';
+import { MESSAGE_EDIT_WINDOW_MINUTES } from '@iconicedu/shared-types';
+import {
+  buildSenderProfile,
+  mapRowToMessageVM,
+  extractFirstUrl,
+  fetchLinkPreviewMetadata,
+  isSafeLinkPreviewUrl,
+} from '@iconicedu/utils';
 import {
   resolveActivityChannelContext,
   resolveVisibilityAudienceFromMessageRow,
@@ -27,9 +35,13 @@ import {
 import { filterVisibleMessageRows } from '@iconicedu/api/lib/messages/message-visibility';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
+import {
+  apiFeatureFlagKeys,
+  evaluateApiBooleanFlag,
+} from '@iconicedu/api/lib/flags/posthog-openfeature';
 
 const BASE_MESSAGE_SELECT = `
-  id, org_id, channel_id, sender_profile_id, visibility_type, visibility_user_ids, type, created_at, updated_at, thread_parent_id,
+  id, org_id, channel_id, sender_profile_id, visibility_type, visibility_user_ids, type, created_at, updated_at, thread_parent_id, is_edited, edited_at,
   sender:profiles!sender_profile_id(id, display_name, first_name, last_name, avatar_url, avatar_seed, kind, timezone, ui_theme_key)
 `;
 
@@ -111,130 +123,6 @@ function buildWritableProfileDisplayName(profile: WritableProfileRow) {
     .trim();
 
   return fullName || 'Someone';
-}
-
-const URL_PATTERN = /(https?:\/\/[^\s]+)/i;
-const PRIVATE_HOST_PATTERN =
-  /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.)/i;
-
-function decodeHtml(value: string) {
-  return value
-    .replace(/&amp;/g, '&')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>');
-}
-
-function extractMetaContent(html: string, property: string) {
-  const patterns = [
-    new RegExp(
-      `<meta[^>]+property=["']${property}["'][^>]+content=["']([^"']+)["'][^>]*>`,
-      'i',
-    ),
-    new RegExp(
-      `<meta[^>]+content=["']([^"']+)["'][^>]+property=["']${property}["'][^>]*>`,
-      'i',
-    ),
-    new RegExp(
-      `<meta[^>]+name=["']${property}["'][^>]+content=["']([^"']+)["'][^>]*>`,
-      'i',
-    ),
-    new RegExp(
-      `<meta[^>]+content=["']([^"']+)["'][^>]+name=["']${property}["'][^>]*>`,
-      'i',
-    ),
-  ];
-
-  for (const pattern of patterns) {
-    const match = html.match(pattern);
-    if (match?.[1]) {
-      return decodeHtml(match[1].trim());
-    }
-  }
-
-  return undefined;
-}
-
-function extractTitle(html: string) {
-  const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-  return titleMatch?.[1] ? decodeHtml(titleMatch[1].trim()) : undefined;
-}
-
-function resolveRelativeUrl(baseUrl: string, candidate?: string) {
-  if (!candidate) return undefined;
-
-  try {
-    return new globalThis.URL(candidate, baseUrl).toString();
-  } catch {
-    return undefined;
-  }
-}
-
-function extractFirstUrl(text: string) {
-  return text.match(URL_PATTERN)?.[1] ?? null;
-}
-
-function isSafeLinkPreviewUrl(url: string): boolean {
-  try {
-    const parsed = new globalThis.URL(url);
-    if (!['http:', 'https:'].includes(parsed.protocol)) {
-      return false;
-    }
-    return !PRIVATE_HOST_PATTERN.test(parsed.hostname);
-  } catch {
-    return false;
-  }
-}
-
-async function fetchLinkPreviewMetadata(url: string) {
-  if (!isSafeLinkPreviewUrl(url)) {
-    throw new Error('Unsafe URL for link preview');
-  }
-
-  const normalizedUrl = new globalThis.URL(url).toString();
-  const fallbackHost = new globalThis.URL(normalizedUrl).hostname.replace(/^www\./, '');
-
-  try {
-    const response = await fetch(normalizedUrl, {
-      redirect: 'follow',
-      headers: {
-        'user-agent': 'ICONICEDULinkPreviewBot/1.0',
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch link preview: ${response.status}`);
-    }
-
-    const html = await response.text();
-    const ogTitle = extractMetaContent(html, 'og:title');
-    const ogDescription = extractMetaContent(html, 'og:description');
-    const ogImage = extractMetaContent(html, 'og:image');
-    const ogSiteName = extractMetaContent(html, 'og:site_name');
-    const metaDescription = extractMetaContent(html, 'description');
-    const title = ogTitle ?? extractTitle(html) ?? fallbackHost;
-    const faviconHref =
-      html.match(
-        /<link[^>]+rel=["'][^"']*icon[^"']*["'][^>]+href=["']([^"']+)["'][^>]*>/i,
-      )?.[1] ?? '/favicon.ico';
-
-    return {
-      url: normalizedUrl,
-      title,
-      description: ogDescription ?? metaDescription,
-      imageUrl: resolveRelativeUrl(normalizedUrl, ogImage),
-      siteName: ogSiteName ?? fallbackHost,
-      favicon: resolveRelativeUrl(normalizedUrl, faviconHref),
-    };
-  } catch {
-    return {
-      url: normalizedUrl,
-      title: fallbackHost,
-      siteName: fallbackHost,
-      favicon: resolveRelativeUrl(normalizedUrl, '/favicon.ico'),
-    };
-  }
 }
 
 export function sanitizeMentions(
@@ -998,6 +886,113 @@ export class MessagesService {
     return { accountId: account.id, profile: senderProfile };
   }
 
+  private async resolveReplyReference(input: {
+    serviceSupabase: ReturnType<typeof createSupabaseServiceClient>;
+    orgId: string;
+    channelId: string;
+    replyToMessageId: string;
+    currentProfileId: string;
+  }): Promise<{
+    messageId: string;
+    senderId: string;
+    senderName: string;
+    snippet: string;
+    type: string;
+  } | null> {
+    const messageResponse = await input.serviceSupabase
+      .from('messages')
+      .select(
+        'id, sender_profile_id, type, deleted_at, visibility_type, visibility_user_ids',
+      )
+      .eq('org_id', input.orgId)
+      .eq('channel_id', input.channelId)
+      .eq('id', input.replyToMessageId)
+      .maybeSingle<{
+        id: string;
+        sender_profile_id: string;
+        type: string;
+        deleted_at: string | null;
+        visibility_type: string | null;
+        visibility_user_ids: string[] | null;
+      }>();
+    if (messageResponse.error) {
+      throw new InternalServerErrorException(messageResponse.error.message);
+    }
+    const target = messageResponse.data;
+    // A missing/deleted reply target degrades gracefully to "no reference"
+    // rather than failing the whole send. A target the caller isn't in the
+    // visibility audience for (e.g. another user's hidden support message)
+    // degrades the same way instead of leaking its contents into the reply.
+    if (!target || target.deleted_at) return null;
+    if (
+      target.visibility_type === 'specific-users' &&
+      !(target.visibility_user_ids ?? []).includes(input.currentProfileId)
+    ) {
+      return null;
+    }
+
+    const [payloadResponse, profileResponse] = await Promise.all([
+      input.serviceSupabase
+        .from('message_text')
+        .select('payload')
+        .eq('message_id', target.id)
+        .maybeSingle<{ payload: Record<string, unknown> | null }>(),
+      input.serviceSupabase
+        .from('profiles')
+        .select('display_name, first_name, last_name')
+        .eq('id', target.sender_profile_id)
+        .is('deleted_at', null)
+        .maybeSingle<{
+          display_name: string | null;
+          first_name: string | null;
+          last_name: string | null;
+        }>(),
+    ]);
+    if (payloadResponse.error) {
+      throw new InternalServerErrorException(payloadResponse.error.message);
+    }
+    if (profileResponse.error) {
+      throw new InternalServerErrorException(profileResponse.error.message);
+    }
+
+    const snippet =
+      typeof payloadResponse.data?.payload?.text === 'string'
+        ? payloadResponse.data.payload.text
+        : target.type;
+    const senderName =
+      profileResponse.data?.display_name?.trim() ||
+      [profileResponse.data?.first_name, profileResponse.data?.last_name]
+        .filter(Boolean)
+        .join(' ')
+        .trim() ||
+      'Unknown';
+
+    return {
+      messageId: target.id,
+      senderId: target.sender_profile_id,
+      senderName,
+      snippet: snippet.slice(0, 140),
+      type: target.type,
+    };
+  }
+
+  private async findExistingMessageByClientId(input: {
+    serviceSupabase: ReturnType<typeof createSupabaseServiceClient>;
+    orgId: string;
+    channelId: string;
+    clientMessageId: string;
+  }): Promise<{ id: string } | null> {
+    const { data, error } = await input.serviceSupabase
+      .from('messages')
+      .select('id')
+      .eq('id', input.clientMessageId)
+      .eq('org_id', input.orgId)
+      .eq('channel_id', input.channelId)
+      .maybeSingle<{ id: string }>();
+    if (error) throw new InternalServerErrorException(error.message);
+    return data ?? null;
+  }
+
   private async resolveThreadContext(input: {
     accessToken: string;
     orgId: string;
@@ -1368,6 +1363,19 @@ export class MessagesService {
         senderProfileId: input.senderProfileId,
       });
       const serviceSupabase = createSupabaseServiceClient();
+
+      if (input.clientMessageId) {
+        const existing = await this.findExistingMessageByClientId({
+          serviceSupabase,
+          orgId: input.orgId,
+          channelId: input.channelId,
+          clientMessageId: input.clientMessageId,
+        });
+        if (existing) {
+          return { id: existing.id };
+        }
+      }
+
       let sanitizedMentions: MessageMentionVM[] = [];
       if (input.mentions?.length) {
         const channelMembersResponse = await serviceSupabase
@@ -1389,6 +1397,16 @@ export class MessagesService {
           actor.profile.id,
         );
       }
+
+      const replyReference = input.replyToMessageId
+        ? await this.resolveReplyReference({
+            serviceSupabase,
+            orgId: input.orgId,
+            channelId: input.channelId,
+            replyToMessageId: input.replyToMessageId,
+            currentProfileId: actor.profile.id,
+          })
+        : null;
 
       const now = new Date().toISOString();
       const activityContext = await resolveActivityChannelContext({
@@ -1465,6 +1483,7 @@ export class MessagesService {
       const messageInsert = await serviceSupabase
         .from('messages')
         .insert({
+          ...(input.clientMessageId ? { id: input.clientMessageId } : {}),
           org_id: input.orgId,
           channel_id: input.channelId,
           sender_profile_id: actor.profile.id,
@@ -1477,6 +1496,7 @@ export class MessagesService {
           visibility_user_ids: supportVisibility.visibility_user_ids ?? null,
           thread_id: threadId,
           thread_parent_id: input.threadParentId ?? null,
+          reply_to_message_id: replyReference?.messageId ?? null,
           created_at: now,
           created_by: actor.profile.id,
           updated_at: now,
@@ -1523,6 +1543,7 @@ export class MessagesService {
               ? {
                   ...(content ? { text: content } : {}),
                   ...(sanitizedMentions.length ? { mentions: sanitizedMentions } : {}),
+                  ...(replyReference ? { replyTo: replyReference } : {}),
                   url: previewMetadata.url,
                   title: previewMetadata.title,
                   description: previewMetadata.description,
@@ -1533,6 +1554,7 @@ export class MessagesService {
               : {
                   text: content,
                   ...(sanitizedMentions.length ? { mentions: sanitizedMentions } : {}),
+                  ...(replyReference ? { replyTo: replyReference } : {}),
                 },
           created_at: now,
           created_by: actor.profile.id,
@@ -1584,6 +1606,124 @@ export class MessagesService {
     }
   }
 
+  async editTextMessage(
+    authUserId: string,
+    accessToken: string,
+    messageId: string,
+    input: MessageEditTextInput,
+  ) {
+    const content = input.content.trim();
+    if (!content) throw new BadRequestException('Message text is required');
+    if (!input.orgId) throw new BadRequestException('orgId is required');
+
+    const serviceSupabase = createSupabaseServiceClient();
+    const { data: message, error: messageError } = await serviceSupabase
+      .from('messages')
+      .select('id, org_id, channel_id, sender_profile_id, type, created_at, deleted_at')
+      .eq('id', messageId)
+      .maybeSingle<{
+        id: string;
+        org_id: string;
+        channel_id: string;
+        sender_profile_id: string;
+        type: string;
+        created_at: string;
+        deleted_at: string | null;
+      }>();
+    if (messageError) throw new InternalServerErrorException(messageError.message);
+    if (!message || message.org_id !== input.orgId) {
+      throw new NotFoundException('Message not found');
+    }
+    if (message.deleted_at) {
+      throw new BadRequestException('Message has been deleted');
+    }
+    if (message.type !== 'text') {
+      throw new BadRequestException('Only text messages can be edited');
+    }
+
+    const actor = await this.resolveWritableProfile({
+      authUserId,
+      accessToken,
+      orgId: input.orgId,
+      senderProfileId: message.sender_profile_id,
+    });
+
+    // The client-visible flag only hides the Edit menu entry — enforce it
+    // here too so a client can't invoke the mutation directly during a dark
+    // rollout (flag off) by calling the endpoint without going through UI.
+    const editEnabled = await evaluateApiBooleanFlag({
+      flagKey: apiFeatureFlagKeys.enableMessageEdit,
+      distinctId: actor.profile.id,
+    });
+    if (!editEnabled) {
+      throw new ForbiddenException('Message editing is not available');
+    }
+
+    const editWindowMs = MESSAGE_EDIT_WINDOW_MINUTES * 60 * 1000;
+    if (Date.now() - new Date(message.created_at).getTime() > editWindowMs) {
+      throw new ForbiddenException('The edit window for this message has passed');
+    }
+
+    let sanitizedMentions: MessageMentionVM[] = [];
+    if (input.mentions?.length) {
+      const channelMembersResponse = await serviceSupabase
+        .from('channel_members')
+        .select('profile_id')
+        .eq('org_id', input.orgId)
+        .eq('channel_id', message.channel_id)
+        .is('deleted_at', null)
+        .returns<Array<{ profile_id: string }>>();
+      if (channelMembersResponse.error) {
+        throw new InternalServerErrorException(channelMembersResponse.error.message);
+      }
+      sanitizedMentions = sanitizeMentions(
+        content,
+        input.mentions,
+        new Set((channelMembersResponse.data ?? []).map((member) => member.profile_id)),
+        actor.profile.id,
+      );
+    }
+
+    const now = new Date().toISOString();
+    const payloadUpdate = await serviceSupabase
+      .from('message_text')
+      .update({
+        payload: {
+          text: content,
+          ...(sanitizedMentions.length ? { mentions: sanitizedMentions } : {}),
+        },
+        updated_at: now,
+        updated_by: actor.profile.id,
+      })
+      .eq('message_id', messageId)
+      .eq('org_id', input.orgId);
+    if (payloadUpdate.error) {
+      throw new InternalServerErrorException(payloadUpdate.error.message);
+    }
+
+    const messageUpdate = await serviceSupabase
+      .from('messages')
+      .update({
+        is_edited: true,
+        edited_at: now,
+        updated_at: now,
+        updated_by: actor.profile.id,
+      })
+      .eq('id', messageId)
+      .eq('org_id', input.orgId)
+      .select('id');
+    if (messageUpdate.error) {
+      throw new InternalServerErrorException(messageUpdate.error.message);
+    }
+    if (!messageUpdate.data?.length) {
+      throw new InternalServerErrorException(
+        'Edit saved but the edited indicator failed to update — the message row was not found on the is_edited update',
+      );
+    }
+
+    return { id: messageId };
+  }
+
   async sendFileMessage(
     authUserId: string,
     accessToken: string,
@@ -1612,6 +1752,19 @@ export class MessagesService {
       ) {
         throw new BadRequestException('Invalid file storage path');
       }
+
+      if (input.clientMessageId) {
+        const existing = await this.findExistingMessageByClientId({
+          serviceSupabase,
+          orgId: input.orgId,
+          channelId: input.channelId,
+          clientMessageId: input.clientMessageId,
+        });
+        if (existing) {
+          return { id: existing.id };
+        }
+      }
+
       const now = new Date().toISOString();
       const activityContext = await resolveActivityChannelContext({
         supabase: serviceSupabase,
@@ -1687,6 +1840,7 @@ export class MessagesService {
       const messageInsert = await serviceSupabase
         .from('messages')
         .insert({
+          ...(input.clientMessageId ? { id: input.clientMessageId } : {}),
           org_id: input.orgId,
           channel_id: input.channelId,
           sender_profile_id: actor.profile.id,
@@ -1859,6 +2013,19 @@ export class MessagesService {
           throw new BadRequestException('Invalid file storage path');
         }
       }
+
+      if (input.clientMessageId) {
+        const existing = await this.findExistingMessageByClientId({
+          serviceSupabase,
+          orgId: input.orgId,
+          channelId: input.channelId,
+          clientMessageId: input.clientMessageId,
+        });
+        if (existing) {
+          return { id: existing.id };
+        }
+      }
+
       const now = new Date().toISOString();
       const activityContext = await resolveActivityChannelContext({
         supabase: serviceSupabase,
@@ -1942,6 +2109,7 @@ export class MessagesService {
       const messageInsert = await serviceSupabase
         .from('messages')
         .insert({
+          ...(input.clientMessageId ? { id: input.clientMessageId } : {}),
           org_id: input.orgId,
           channel_id: input.channelId,
           sender_profile_id: actor.profile.id,
@@ -2100,5 +2268,15 @@ export class MessagesService {
 
     if (error) throw new InternalServerErrorException(error.message);
     return { success: true };
+  }
+
+  async fetchLinkPreview(url: string) {
+    if (!url?.trim()) {
+      throw new BadRequestException('url is required');
+    }
+    if (!isSafeLinkPreviewUrl(url)) {
+      throw new BadRequestException('url is not allowed');
+    }
+    return fetchLinkPreviewMetadata(url);
   }
 }

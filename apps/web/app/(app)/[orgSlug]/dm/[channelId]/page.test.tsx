@@ -12,6 +12,10 @@ const buildChannelByIdMock = vi.fn();
 const buildChannelByDmKeyMock = vi.fn();
 const resolveOrgDashboardPathMock = vi.fn(async () => '/iconic-academy');
 const enableMessageTypeComposerRunMock = vi.fn(async () => true);
+const enableP1MessagingFlagRunMock = vi.fn(async () => false);
+const enableMessageDraftsRunMock = vi.fn(async () => false);
+const enableMessageEditRunMock = vi.fn(async () => false);
+const enableMessageSendReliabilityRunMock = vi.fn(async () => false);
 
 vi.mock('next/navigation', () => ({
   notFound: () => {
@@ -33,6 +37,7 @@ vi.mock('@iconicedu/web/app/(app)/[orgSlug]/messages/messages-shell-client', () 
 }));
 
 vi.mock('@iconicedu/web/app/actions/messages', () => ({
+  editTextMessageAction: vi.fn(),
   sendFileMessageAction: vi.fn(),
   sendFilesMessageAction: vi.fn(),
   sendTextMessageAction: vi.fn(),
@@ -78,6 +83,27 @@ vi.mock('@iconicedu/web/flags', () => ({
   enableMessagePinning: { run: async () => false },
   enableMessageSearch: { run: async () => false },
   enableScheduledSend: { run: async () => false },
+  enableMessageMarkUnread: {
+    run: (...args: unknown[]) => enableP1MessagingFlagRunMock(...args),
+  },
+  enableMessageReplyReference: {
+    run: (...args: unknown[]) => enableP1MessagingFlagRunMock(...args),
+  },
+  enableNotificationConversationControls: {
+    run: (...args: unknown[]) => enableP1MessagingFlagRunMock(...args),
+  },
+  enableMessageListFormatting: {
+    run: (...args: unknown[]) => enableP1MessagingFlagRunMock(...args),
+  },
+  enableMessageDrafts: {
+    run: (...args: unknown[]) => enableMessageDraftsRunMock(...args),
+  },
+  enableMessageEdit: {
+    run: (...args: unknown[]) => enableMessageEditRunMock(...args),
+  },
+  enableMessageSendReliability: {
+    run: (...args: unknown[]) => enableMessageSendReliabilityRunMock(...args),
+  },
 }));
 
 describe('d/dm/[channelId] page', () => {

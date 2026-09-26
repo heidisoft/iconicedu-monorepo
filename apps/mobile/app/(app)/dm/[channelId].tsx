@@ -12,7 +12,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { MessageVM, UserProfileVM } from '@iconicedu/shared-types';
+import type { MessageMentionVM, MessageVM, UserProfileVM } from '@iconicedu/shared-types';
 import { useAccount } from '@/hooks/use-account';
 import { useProfile } from '@/hooks/use-profile';
 import { useMessages } from '@/hooks/use-messages';
@@ -20,12 +20,15 @@ import {
   sendTextMessage,
   sendFileMessage,
   sendFilesMessage,
+  editTextMessage,
   uploadChannelFile,
   buildMessageStoragePath,
   deleteMessage,
+  fetchChannelMembers,
   fetchChannelReadState,
   fetchDirectMessageChannelMetaByChannelId,
   ensureDirectMessageChannelForProfiles,
+  markChannelUnread,
   queryKeys,
 } from '@/lib/api/queries';
 import { useTheme } from '@/providers/theme-provider';
@@ -34,7 +37,10 @@ import {
   useProfilePresenceSummary,
 } from '@/hooks/use-online-profile-ids';
 import { resolveMobileMessageUiTheme } from '@/components/messages/themes/registry';
-import { MessageInput } from '@/components/messages/message-input';
+import {
+  MessageInput,
+  type EditingMessageContext,
+} from '@/components/messages/message-input';
 import { TypingIndicator } from '@/components/messages/typing-indicator';
 import { ConversationHeader } from '@/components/messages/conversation-header';
 import { MessageActionsSheet } from '@/components/messages/message-actions-sheet';
@@ -45,6 +51,7 @@ import { buildMobileChannelEmptyStateCopy } from '@/lib/message-empty-state';
 import type { AttachmentPayload } from '@/components/messages/attachment-sheet';
 import type { PendingUpload } from '@/components/messages/pending-message-row';
 import { useMarkRead } from '@/hooks/use-mark-read';
+import { applyOptimisticChannelManualUnread } from '@/lib/messages/apply-optimistic-channel-read-state';
 import type { ChannelListItem, DmParticipant } from '@/lib/api/types';
 import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
 import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
@@ -56,6 +63,7 @@ import { useMessageP2Features } from '@/hooks/use-message-p2-features';
 import { PinnedMessagesSheet } from '@/components/messages/pinned-messages-sheet';
 import { MessageSearchSheet } from '@/components/messages/message-search-sheet';
 import { ScheduledMessagesSheet } from '@/components/messages/scheduled-messages-sheet';
+import { getMentionCandidates } from '@/lib/messages/message-mentions';
 
 function participantName(participant: DmParticipant | null | undefined): string | null {
   if (!participant) return null;
@@ -96,6 +104,22 @@ export default function DmConversationScreen() {
   const enableMobileDirectMessageStart = useMobileFeatureFlag(
     mobileFeatureFlagKeys.enableMobileDirectMessageStart,
   );
+  const enableMessageReplyReference = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.enableMessageReplyReference,
+  );
+  const enableMessageMarkUnread = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.enableMessageMarkUnread,
+  );
+  const enableMessageDrafts = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.enableMessageDrafts,
+  );
+  const enableMessageEdit = useMobileFeatureFlag(mobileFeatureFlagKeys.enableMessageEdit);
+  const enableMobileMessageComposerParity = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.enableMobileMessageComposerParity,
+  );
+  const enableMessageSendReliability = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.enableMessageSendReliability,
+  );
   const ThemedMessageList = resolveMobileMessageUiTheme('classic').MessageList;
 
   const orgId = account?.org_id ?? '';
@@ -119,6 +143,19 @@ export default function DmConversationScreen() {
     enabled: !!channelId && !!orgId && !!profileId && !!accountId,
     staleTime: 5 * 60 * 1000,
   });
+  // DM participants — only needed for @mention autocomplete, so skip the
+  // request entirely unless mention authoring is enabled.
+  const { data: dmMembers } = useQuery({
+    queryKey: ['channelMembers', orgId, channelId, profileId] as const,
+    queryFn: () => fetchChannelMembers(orgId, channelId ?? '', profileId),
+    enabled: enableMobileMessageComposerParity && !!orgId && !!channelId && !!profileId,
+    staleTime: 60_000,
+  });
+  const mentionCandidates = React.useMemo(
+    () => getMentionCandidates(dmMembers ?? [], profileId),
+    [dmMembers, profileId],
+  );
+
   const dmPartner = getDmPartner(dmMeta);
   const resolvedTopic = participantName(dmPartner) ?? dmMeta?.topic ?? 'Direct Message';
   const resolvedAvatarSeed = dmPartner?.avatar_seed ?? dmPartner?.id ?? undefined;
@@ -221,13 +258,19 @@ export default function DmConversationScreen() {
     profileId,
     accountId,
   });
-  const { markChannelRead } = useMarkRead({
+  const { markChannelRead, resetChannelReadGuard } = useMarkRead({
     orgId,
     profileId,
     accountId,
     channelId: channelId ?? '',
     profileKind: (profileRecord?.kind as string | null | undefined) ?? null,
+    isFocused,
+    isManuallyUnread: channelReadState?.isManuallyUnread,
+    lastReadMessageId: channelReadState?.lastReadMessageId,
   });
+  const isChannelUnread =
+    (channelReadState?.unreadCount ?? 0) > 0 ||
+    channelReadState?.isManuallyUnread === true;
 
   const refreshConversation = useCallback(async () => {
     await Promise.all([
@@ -312,10 +355,117 @@ export default function DmConversationScreen() {
 
   // ── Thread reply target — drives the reply preview above the input ──
   const [threadReplyTarget, setThreadReplyTarget] = useState<MessageVM | null>(null);
+  // ── Quote reply target — distinct from "reply in thread"; drives its own preview ──
+  const [quoteReplyTarget, setQuoteReplyTarget] = useState<MessageVM | null>(null);
 
   const handleThreadOpen = useCallback((msg: MessageVM) => {
+    setQuoteReplyTarget(null);
     setThreadReplyTarget(msg);
   }, []);
+
+  const handleQuoteReply = useCallback((msg: MessageVM) => {
+    setThreadReplyTarget(null);
+    setQuoteReplyTarget(msg);
+  }, []);
+
+  const handleMarkUnread = useCallback(
+    async (msg: MessageVM) => {
+      if (!channelId || !orgId || !accountId || !profileId) return;
+      try {
+        await markChannelUnread({
+          orgId,
+          accountId,
+          profileId,
+          channelId,
+          fromMessageId: msg.ids.id,
+        });
+        applyOptimisticChannelManualUnread({
+          queryClient,
+          orgId,
+          profileId,
+          accountId,
+          channelId,
+          profileKind: (profileRecord?.kind as string | null | undefined) ?? null,
+          fromMessageId: msg.ids.id,
+        });
+        resetChannelReadGuard();
+      } catch {
+        Alert.alert('Unable to mark unread', 'Please try again.');
+      }
+    },
+    [
+      channelId,
+      orgId,
+      accountId,
+      profileId,
+      profileRecord,
+      queryClient,
+      resetChannelReadGuard,
+    ],
+  );
+
+  // ── Edit sent text messages ──
+  const [editingMessage, setEditingMessage] = useState<EditingMessageContext | null>(
+    null,
+  );
+
+  const handleEditMessage = useCallback((message: MessageVM) => {
+    const content = (message as { content?: { text?: string } }).content?.text ?? '';
+    const mentions = (message as { content?: { mentions?: MessageMentionVM[] } }).content
+      ?.mentions;
+    setEditingMessage({ messageId: message.ids.id, content, mentions });
+  }, []);
+
+  const handleCancelEdit = useCallback(() => setEditingMessage(null), []);
+
+  const handleSaveEdit = useCallback(
+    async (input: {
+      messageId: string;
+      content: string;
+      mentions?: MessageMentionVM[];
+    }) => {
+      const key = queryKeys.messages(channelId ?? '', profileId);
+      const previous = queryClient.getQueryData<MessageVM[]>(key);
+
+      queryClient.setQueryData<MessageVM[]>(key, (current) =>
+        current?.map((message) =>
+          message.ids.id === input.messageId
+            ? ({
+                ...message,
+                content: { text: input.content, mentions: input.mentions },
+                state: {
+                  ...message.state,
+                  isEdited: true,
+                  editedAt: new Date().toISOString(),
+                },
+              } as MessageVM)
+            : message,
+        ),
+      );
+
+      try {
+        await editTextMessage(input.messageId, orgId, input.content, input.mentions);
+        void queryClient.invalidateQueries({ queryKey: key });
+        return true;
+      } catch (error) {
+        queryClient.setQueryData(key, previous);
+        reportMobileObservedError({
+          error,
+          source: 'mobile.messages.dm.edit_text',
+          message: 'Failed to edit DM message',
+          context: { channelId, orgId, profileId, messageId: input.messageId },
+        });
+        Alert.alert(
+          'Unable to save edit',
+          error instanceof Error
+            ? error.message
+            : 'Something went wrong. Please try again.',
+        );
+        return false;
+      }
+    },
+    [channelId, orgId, profileId, queryClient],
+  );
 
   // ── Push notification nudge ──
   const {
@@ -346,25 +496,106 @@ export default function DmConversationScreen() {
 
   // ── Send message ──
   // When a thread reply target is active, route the message into that thread.
+  // meta.clientMessageId is only set when enableMessageSendReliability is on
+  // (see MessageInput) — when present we track this send as a "Not sent" row
+  // in pendingUploads instead of firing a one-shot Alert on failure, and
+  // rethrow so MessageInput keeps the draft around for a retry.
   const handleSend = useCallback(
-    async (text: string) => {
+    async (
+      text: string,
+      meta?: { mentions?: MessageMentionVM[]; clientMessageId?: string },
+    ) => {
       if (!channelId || !profileId || !orgId) return;
-      try {
-        if (threadReplyTarget) {
-          const threadId = threadReplyTarget.social?.thread?.ids.id;
+      const mentions = meta?.mentions;
+      const clientMessageId = meta?.clientMessageId;
+      const threadParentId = threadReplyTarget?.ids.id;
+      const threadId = threadReplyTarget?.social?.thread?.ids.id;
+
+      if (enableMessageSendReliability && clientMessageId) {
+        setPendingUploads((prev) => [
+          ...prev,
+          {
+            id: clientMessageId,
+            type: 'text',
+            attachments: [],
+            senderName,
+            createdAt: new Date().toISOString(),
+            caption: text,
+            clientMessageId,
+            mentions,
+            threadParentId,
+            threadId,
+          },
+        ]);
+        try {
           await sendTextMessage(
             channelId,
             profileId,
             orgId,
             text,
-            threadReplyTarget.ids.id,
+            threadParentId,
             threadId,
+            {
+              clientMessageId,
+              mentions,
+            },
+          );
+          setPendingUploads((prev) => prev.filter((p) => p.id !== clientMessageId));
+          if (threadReplyTarget) {
+            setThreadReplyTarget(null);
+            void refetch();
+          }
+        } catch (error) {
+          reportMobileObservedError({
+            error,
+            source: 'mobile.messages.dm.send_text',
+            message: 'Failed to send DM',
+            context: { channelId, orgId, profileId },
+          });
+          setPendingUploads((prev) =>
+            prev.map((p) => (p.id === clientMessageId ? { ...p, failed: true } : p)),
+          );
+          throw error;
+        }
+        void handlePushNotificationMoment();
+        return;
+      }
+
+      try {
+        if (threadReplyTarget) {
+          await sendTextMessage(
+            channelId,
+            profileId,
+            orgId,
+            text,
+            threadParentId,
+            threadId,
+            mentions?.length ? { mentions } : undefined,
           );
           setThreadReplyTarget(null);
           // Refresh so the parent message's thread stats (reply count) update
           void refetch();
+        } else if (quoteReplyTarget) {
+          await sendTextMessage(
+            channelId,
+            profileId,
+            orgId,
+            text,
+            undefined,
+            undefined,
+            quoteReplyTarget.ids.id,
+          );
+          setQuoteReplyTarget(null);
         } else {
-          await sendTextMessage(channelId, profileId, orgId, text);
+          await sendTextMessage(
+            channelId,
+            profileId,
+            orgId,
+            text,
+            undefined,
+            undefined,
+            mentions?.length ? { mentions } : undefined,
+          );
         }
       } catch (error) {
         reportMobileObservedError({
@@ -388,14 +619,61 @@ export default function DmConversationScreen() {
       channelId,
       profileId,
       orgId,
+      senderName,
       threadReplyTarget,
+      quoteReplyTarget,
       refetch,
       handlePushNotificationMoment,
+      enableMessageSendReliability,
     ],
   );
 
+  // ── Retry a failed text send (reuses the same clientMessageId — idempotent) ──
+  const handleRetryTextSend = useCallback(
+    async (pendingId: string) => {
+      const pending = pendingUploads.find((p) => p.id === pendingId);
+      if (!pending || pending.type !== 'text' || !channelId || !profileId || !orgId)
+        return;
+
+      setPendingUploads((prev) =>
+        prev.map((p) => (p.id === pendingId ? { ...p, failed: false } : p)),
+      );
+
+      try {
+        await sendTextMessage(
+          channelId,
+          profileId,
+          orgId,
+          pending.caption ?? '',
+          pending.threadParentId,
+          pending.threadId,
+          { clientMessageId: pending.clientMessageId, mentions: pending.mentions },
+        );
+        setPendingUploads((prev) => prev.filter((p) => p.id !== pendingId));
+        if (pending.threadParentId) {
+          void refetch();
+        }
+      } catch (error) {
+        reportMobileObservedError({
+          error,
+          source: 'mobile.messages.dm.retry_text',
+          message: 'Failed to retry DM send',
+          context: { channelId, orgId, profileId, pendingId },
+        });
+        setPendingUploads((prev) =>
+          prev.map((p) => (p.id === pendingId ? { ...p, failed: true } : p)),
+        );
+      }
+    },
+    [pendingUploads, channelId, profileId, orgId, refetch],
+  );
+
   const handleSendAttachment = useCallback(
-    async (attachments: AttachmentPayload[], caption?: string) => {
+    async (
+      attachments: AttachmentPayload[],
+      caption?: string,
+      clientMessageId?: string,
+    ) => {
       if (!channelId || !profileId || !orgId || !attachments.length) return;
 
       const type: PendingUpload['type'] =
@@ -406,6 +684,10 @@ export default function DmConversationScreen() {
             : 'file';
 
       const pendingId = `pending-${Date.now()}`;
+      // clientMessageId is only set (by MessageInput) when send-reliability
+      // is on — stored on the pending row and reused verbatim on retry so a
+      // retry after a partial failure (upload ok, message insert failed)
+      // can't create a duplicate message.
 
       setPendingUploads((prev) => [
         ...prev,
@@ -416,6 +698,7 @@ export default function DmConversationScreen() {
           senderName,
           createdAt: new Date().toISOString(),
           caption,
+          clientMessageId,
         },
       ]);
 
@@ -441,6 +724,9 @@ export default function DmConversationScreen() {
             orgId,
             { ...attachment, storagePath },
             caption,
+            undefined,
+            undefined,
+            clientMessageId,
           );
         } else {
           const uploaded = await Promise.all(
@@ -463,9 +749,27 @@ export default function DmConversationScreen() {
           );
 
           if (uploaded.length === 1) {
-            await sendFileMessage(channelId, profileId, orgId, uploaded[0], caption);
+            await sendFileMessage(
+              channelId,
+              profileId,
+              orgId,
+              uploaded[0],
+              caption,
+              undefined,
+              undefined,
+              clientMessageId,
+            );
           } else {
-            await sendFilesMessage(channelId, profileId, orgId, uploaded, caption);
+            await sendFilesMessage(
+              channelId,
+              profileId,
+              orgId,
+              uploaded,
+              caption,
+              undefined,
+              undefined,
+              clientMessageId,
+            );
           }
         }
 
@@ -485,6 +789,10 @@ export default function DmConversationScreen() {
     async (pendingId: string) => {
       const pending = pendingUploads.find((upload) => upload.id === pendingId);
       if (!pending || !channelId || !profileId || !orgId) return;
+      if (pending.type === 'text') {
+        await handleRetryTextSend(pendingId);
+        return;
+      }
 
       setPendingUploads((prev) =>
         prev.map((upload) =>
@@ -493,6 +801,11 @@ export default function DmConversationScreen() {
       );
 
       try {
+        // Reuse the SAME clientMessageId from the original attempt (when
+        // send-reliability generated one) — the server's idempotency check
+        // then returns the already-created message instead of a duplicate
+        // if the earlier attempt actually succeeded server-side.
+        const { clientMessageId } = pending;
         if (pending.type === 'audio') {
           const attachment = pending.attachments[0];
           const storagePath = buildMessageStoragePath(
@@ -514,6 +827,9 @@ export default function DmConversationScreen() {
             orgId,
             { ...attachment, storagePath },
             pending.caption,
+            undefined,
+            undefined,
+            clientMessageId,
           );
         } else {
           const uploaded = await Promise.all(
@@ -542,6 +858,9 @@ export default function DmConversationScreen() {
               orgId,
               uploaded[0],
               pending.caption,
+              undefined,
+              undefined,
+              clientMessageId,
             );
           } else {
             await sendFilesMessage(
@@ -550,6 +869,9 @@ export default function DmConversationScreen() {
               orgId,
               uploaded,
               pending.caption,
+              undefined,
+              undefined,
+              clientMessageId,
             );
           }
         }
@@ -563,7 +885,7 @@ export default function DmConversationScreen() {
         );
       }
     },
-    [pendingUploads, channelId, profileId, orgId],
+    [pendingUploads, channelId, profileId, orgId, handleRetryTextSend],
   );
 
   // ── Delete message ──
@@ -644,6 +966,9 @@ export default function DmConversationScreen() {
             lastReadMessageId={channelReadState?.lastReadMessageId ?? null}
             lastReadAt={channelReadState?.lastReadAt ?? null}
             unreadCount={channelReadState?.unreadCount ?? 0}
+            manuallyUnreadFromMessageId={
+              channelReadState?.manuallyUnreadFromMessageId ?? null
+            }
             onLoadMore={loadMore}
             loading={false}
             refreshing={isRefetching}
@@ -694,6 +1019,21 @@ export default function DmConversationScreen() {
             onCancelReply={() => setThreadReplyTarget(null)}
             enableScheduledSend={p2.enableScheduledSend}
             onScheduleSend={p2.scheduleSend}
+            quoteReplyTo={quoteReplyTarget}
+            onCancelQuoteReply={() => setQuoteReplyTarget(null)}
+            enableDrafts={enableMessageDrafts}
+            draftScope={
+              orgId && profileId && accountId && channelId
+                ? { accountId, profileId, orgId, channelId }
+                : undefined
+            }
+            editingMessage={editingMessage}
+            onSaveEdit={handleSaveEdit}
+            onCancelEdit={handleCancelEdit}
+            enableMentions={enableMobileMessageComposerParity}
+            mentionCandidates={mentionCandidates}
+            enableFormatting={enableMobileMessageComposerParity}
+            enableSendReliability={enableMessageSendReliability}
           />
         )}
       </KeyboardAvoidingView>
@@ -791,6 +1131,11 @@ export default function DmConversationScreen() {
         enablePinning={p2.enablePinning}
         isPinned={actionsMessage ? p2.pinnedMessageIds.has(actionsMessage.ids.id) : false}
         onTogglePin={p2.handleTogglePin}
+        onQuoteReply={enableMessageReplyReference ? handleQuoteReply : undefined}
+        onMarkUnread={enableMessageMarkUnread ? handleMarkUnread : undefined}
+        isChannelUnread={isChannelUnread}
+        enableEdit={enableMessageEdit}
+        onEdit={handleEditMessage}
       />
 
       {/* Push notification nudge */}

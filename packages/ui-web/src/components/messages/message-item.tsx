@@ -63,6 +63,9 @@ interface MessageItemProps {
   onToggleHidden?: (messageId: string) => void;
   onToggleImportant?: (messageId: string) => void;
   onDelete?: (messageId: string) => void;
+  onRetrySend?: (messageId: string) => void;
+  onEditFailedSend?: (messageId: string) => void;
+  onDiscardFailedSend?: (messageId: string) => void;
   actionState?: MessageActionState;
   messageUiThemeKey?: MessageUiThemeKeyVM;
   inlineThreadContent?: ReactNode;
@@ -87,6 +90,9 @@ export const MessageItem = memo(function MessageItem({
   onToggleHidden,
   onToggleImportant,
   onDelete,
+  onRetrySend,
+  onEditFailedSend,
+  onDiscardFailedSend,
   actionState,
   messageUiThemeKey = 'classic',
   inlineThreadContent,
@@ -125,6 +131,18 @@ export const MessageItem = memo(function MessageItem({
     onTogglePinned?.(message.ids.id);
   };
 
+  const handleRetrySend = () => {
+    onRetrySend?.(message.ids.id);
+  };
+
+  const handleEditFailedSend = () => {
+    onEditFailedSend?.(message.ids.id);
+  };
+
+  const handleDiscardFailedSend = () => {
+    onDiscardFailedSend?.(message.ids.id);
+  };
+
   const commonProps = {
     onOpenThread,
     isThreadReply,
@@ -135,6 +153,9 @@ export const MessageItem = memo(function MessageItem({
     onToggleHidden: handleToggleHidden,
     onToggleImportant: handleToggleImportant,
     onDelete: handleDelete,
+    onRetrySend: onRetrySend ? handleRetrySend : undefined,
+    onEditFailedSend: onEditFailedSend ? handleEditFailedSend : undefined,
+    onDiscardFailedSend: onDiscardFailedSend ? handleDiscardFailedSend : undefined,
     currentUserId,
     canDeleteAnyMessages: currentUserCanDeleteAnyMessages,
     actionState,

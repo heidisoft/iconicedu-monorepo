@@ -2,6 +2,7 @@ import React from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 import { renderHook, act, waitFor } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthProvider, useAuth } from '@/providers/auth-provider';
 import { AnalyticsEvent } from '@iconicedu/utils';
 
@@ -348,6 +349,25 @@ describe('AuthProvider', () => {
     });
 
     expect(mockSignOut).toHaveBeenCalledWith({ scope: 'local' });
+  });
+
+  it('signOut clears every locally-stored message draft on the device', async () => {
+    await AsyncStorage.setItem('message-draft:acc-1:prof-1:org-1:chan-1:main', '{}');
+    await AsyncStorage.setItem('unrelated-key', 'keep-me');
+
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    await act(async () => {
+      await result.current.signOut();
+    });
+
+    expect(
+      await AsyncStorage.getItem('message-draft:acc-1:prof-1:org-1:chan-1:main'),
+    ).toBeNull();
+    expect(await AsyncStorage.getItem('unrelated-key')).toBe('keep-me');
   });
 
   it('returns error from signInWithOtp on failure', async () => {

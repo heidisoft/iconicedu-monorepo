@@ -65,6 +65,16 @@ export async function apiPut<T>(path: string, body?: unknown): Promise<T> {
   return parseResponse<T>(response);
 }
 
+export async function apiPatch<T>(path: string, body?: unknown): Promise<T> {
+  const response = await fetch(`${resolveApiBaseUrl()}${path}`, {
+    method: 'PATCH',
+    headers: await getAuthHeaders(),
+    body: JSON.stringify(body ?? {}),
+  });
+
+  return parseResponse<T>(response);
+}
+
 export async function apiDelete<T>(path: string, body?: unknown): Promise<T> {
   const response = await fetch(`${resolveApiBaseUrl()}${path}`, {
     method: 'DELETE',

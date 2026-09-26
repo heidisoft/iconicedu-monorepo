@@ -10,7 +10,7 @@ import {
   Alert,
   Animated,
 } from 'react-native';
-import type { MessageVM } from '@iconicedu/shared-types';
+import { MESSAGE_EDIT_WINDOW_MINUTES, type MessageVM } from '@iconicedu/shared-types';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 import { EmojiPicker } from './emoji-picker';
@@ -24,7 +24,28 @@ import {
   SmilePlus,
   Pin,
   PinOff,
+  Quote,
+  Mail,
+  Pencil,
 } from 'lucide-react-native';
+
+/**
+ * Sender-only, text-only, not-deleted, within the server's edit window
+ * (see MESSAGE_EDIT_WINDOW_MINUTES). This is a UX convenience check only —
+ * the server is authoritative and re-validates on PATCH /messages/:id/text.
+ */
+export function isMessageEditEligible(
+  message: MessageVM,
+  isOwn: boolean,
+  now: number = Date.now(),
+): boolean {
+  if (!isOwn) return false;
+  if (message.core?.type !== 'text') return false;
+  const createdAtMs = Date.parse(message.core.createdAt);
+  if (Number.isNaN(createdAtMs)) return false;
+  const windowMs = MESSAGE_EDIT_WINDOW_MINUTES * 60 * 1000;
+  return now - createdAtMs <= windowMs;
+}
 
 // Facebook Messenger-style quick reactions
 const QUICK_REACTIONS = ['❤️', '😂', '😮', '😢', '😡', '👍'];
@@ -54,6 +75,15 @@ type MessageActionsSheetProps = {
   enablePinning?: boolean;
   isPinned?: boolean;
   onTogglePin?: (messageId: string, nextPinned: boolean) => Promise<void> | void;
+  /** When provided (feature-flag gated by the caller), shows a "Quote reply" row. */
+  onQuoteReply?: (message: MessageVM) => void;
+  /** When provided (feature-flag gated by the caller), shows a "Mark unread" row. */
+  onMarkUnread?: (message: MessageVM) => void;
+  /** Hides the "Mark unread" row when the channel is already showing as unread. */
+  isChannelUnread?: boolean;
+  /** Gated behind enableMessageEdit — hides the Edit row entirely when false/omitted. */
+  enableEdit?: boolean;
+  onEdit?: (message: MessageVM) => void;
 };
 
 // ─── Animated reaction bubble (Facebook Messenger style) ──────────────────────
@@ -194,6 +224,11 @@ export const MessageActionsSheet: React.FC<MessageActionsSheetProps> = ({
   enablePinning = false,
   isPinned = false,
   onTogglePin,
+  onQuoteReply,
+  onMarkUnread,
+  isChannelUnread = false,
+  enableEdit = false,
+  onEdit,
 }) => {
   const { colors } = useTheme();
   const s = React.useMemo(() => makeStyles(colors), [colors]);
@@ -228,6 +263,24 @@ export const MessageActionsSheet: React.FC<MessageActionsSheetProps> = ({
     onThread(message);
     onClose();
   }, [message, onThread, onClose]);
+
+  const handleQuoteReply = useCallback(() => {
+    if (!message) return;
+    onQuoteReply?.(message);
+    onClose();
+  }, [message, onQuoteReply, onClose]);
+
+  const handleMarkUnread = useCallback(() => {
+    if (!message) return;
+    onMarkUnread?.(message);
+    onClose();
+  }, [message, onMarkUnread, onClose]);
+
+  const handleEdit = useCallback(() => {
+    if (!message) return;
+    onEdit?.(message);
+    onClose();
+  }, [message, onEdit, onClose]);
 
   const handleSave = useCallback(() => {
     if (!message) return;
@@ -299,6 +352,8 @@ export const MessageActionsSheet: React.FC<MessageActionsSheetProps> = ({
   }, [message, onDelete, onClose]);
 
   const textContent = (message as { content?: { text?: string } })?.content?.text ?? '';
+  const canEdit =
+    !isReadOnly && enableEdit && !!message && isMessageEditEligible(message, isOwn);
 
   if (!message) return null;
 
@@ -341,6 +396,30 @@ export const MessageActionsSheet: React.FC<MessageActionsSheetProps> = ({
                 <TouchableOpacity style={s.actionItem} onPress={handleThread}>
                   <MessageCircle size={20} color={colors.text} />
                   <Text style={s.actionLabel}>Reply in thread</Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Quote reply — distinct from "Reply in thread"; feature-flag gated by the caller */}
+              {!isReadOnly && !!onQuoteReply && (
+                <TouchableOpacity style={s.actionItem} onPress={handleQuoteReply}>
+                  <Quote size={20} color={colors.text} />
+                  <Text style={s.actionLabel}>Quote reply</Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Mark unread — hidden for your own messages and once the channel is already unread; feature-flag gated by the caller */}
+              {!isReadOnly && !!onMarkUnread && !isOwn && !isChannelUnread && (
+                <TouchableOpacity style={s.actionItem} onPress={handleMarkUnread}>
+                  <Mail size={20} color={colors.text} />
+                  <Text style={s.actionLabel}>Mark unread</Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Edit — sender's own eligible text message only */}
+              {canEdit && (
+                <TouchableOpacity style={s.actionItem} onPress={handleEdit}>
+                  <Pencil size={20} color={colors.text} />
+                  <Text style={s.actionLabel}>Edit message</Text>
                 </TouchableOpacity>
               )}
 

@@ -78,6 +78,21 @@ export type AdminDeleteSessionCompletionInput = {
   profileId?: UUID;
 };
 
+// Same natural-key addressing as AdminConfirmSessionCompletionInput: staff report a
+// problem with the whole occurrence directly (e.g. neither party showed up and
+// nobody has flagged it yet), rather than waiting on a participant to dispute their
+// own row. Settles every still-open (pending/auto_confirmed) row for the occurrence,
+// mirroring adminConfirm's bulk-row shape but writing 'disputed' instead of
+// 'confirmed'.
+export type AdminDisputeSessionCompletionInput = {
+  orgId: UUID;
+  scheduleId: UUID;
+  occurrenceKey: string;
+  disputeCategory: ClassSessionCompletionDisputeCategory;
+  disputeReason?: string | null;
+  rescheduleRequested?: boolean;
+};
+
 // Manually backfills a full 'pending' participant set (one row per
 // educator/guardian/child on the schedule's own roster) for an occurrence that
 // never got a completion-check trail at all — e.g. the dispatcher never ran for

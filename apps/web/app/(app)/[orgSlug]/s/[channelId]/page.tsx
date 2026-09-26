@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { DashboardHeader } from '@iconicedu/ui-web';
 import { LearningSpaceShell } from '@iconicedu/web/app/(app)/[orgSlug]/s/[channelId]/learning-space-shell';
 import {
+  editTextMessageAction,
   sendFileMessageAction,
   sendFilesMessageAction,
   sendTextMessageAction,
@@ -24,6 +25,13 @@ import {
   enableMessageSearch,
   enableMessageTypeComposer,
   enableScheduledSend,
+  enableMessageMarkUnread,
+  enableMessageReplyReference,
+  enableNotificationConversationControls,
+  enableMessageListFormatting,
+  enableMessageDrafts,
+  enableMessageEdit,
+  enableMessageSendReliability,
 } from '@iconicedu/web/flags';
 
 const INITIAL_MESSAGES_PAGE_SIZE = 40;
@@ -60,10 +68,31 @@ export default async function Page({
     notFound();
   }
   const identify = { profileId: profileResponse.data?.id ?? null };
-  const showCreateMessageTypeButton = await enableMessageTypeComposer.run({ identify });
-  const showMessagePinning = await enableMessagePinning.run({ identify });
-  const showMessageSearch = await enableMessageSearch.run({ identify });
-  const showScheduledSend = await enableScheduledSend.run({ identify });
+  const [
+    showCreateMessageTypeButton,
+    showMessagePinning,
+    showMessageSearch,
+    showScheduledSend,
+    markUnreadEnabled,
+    replyReferenceEnabled,
+    notificationConversationControlsEnabled,
+    listFormattingEnabled,
+    messageDraftsEnabled,
+    messageEditEnabled,
+    messageSendReliabilityEnabled,
+  ] = await Promise.all([
+    enableMessageTypeComposer.run({ identify }),
+    enableMessagePinning.run({ identify }),
+    enableMessageSearch.run({ identify }),
+    enableScheduledSend.run({ identify }),
+    enableMessageMarkUnread.run({ identify }),
+    enableMessageReplyReference.run({ identify }),
+    enableNotificationConversationControls.run({ identify }),
+    enableMessageListFormatting.run({ identify }),
+    enableMessageDrafts.run({ identify }),
+    enableMessageEdit.run({ identify }),
+    enableMessageSendReliability.run({ identify }),
+  ]);
   const isStaffReadOnly = isStaffObserverReadOnlyChannel(
     channel,
     account.id,
@@ -84,9 +113,17 @@ export default async function Page({
         enableMessagePinning={showMessagePinning}
         enableMessageSearch={showMessageSearch}
         enableScheduledSend={showScheduledSend}
+        enableMessageMarkUnread={markUnreadEnabled}
+        enableMessageReplyReference={replyReferenceEnabled}
+        enableNotificationConversationControls={notificationConversationControlsEnabled}
+        enableMessageListFormatting={listFormattingEnabled}
+        enableMessageDrafts={messageDraftsEnabled}
+        enableMessageEdit={messageEditEnabled}
+        enableMessageSendReliability={messageSendReliabilityEnabled}
         sendTextMessage={sendTextMessageAction}
         sendFileMessage={sendFileMessageAction}
         sendFilesMessage={sendFilesMessageAction}
+        editTextMessage={editTextMessageAction}
         toggleReaction={toggleMessageReactionAction}
         toggleSavedMessage={toggleSavedMessageAction}
         deleteMessage={deleteMessageAction}

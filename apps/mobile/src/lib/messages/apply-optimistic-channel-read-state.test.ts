@@ -3,6 +3,7 @@ import type { MessageVM } from '@iconicedu/shared-types';
 import { queryKeys } from '@/lib/api/queries';
 import type { ChannelListItem } from '@/lib/api/types';
 import {
+  applyOptimisticChannelManualUnread,
   applyOptimisticChannelReadState,
   applyOptimisticThreadReadState,
 } from './apply-optimistic-channel-read-state';
@@ -347,5 +348,199 @@ describe('applyOptimisticChannelReadState', () => {
       queryKeys.directMessages('org-1', 'profile-1'),
     );
     expect(next).toBe(lists);
+  });
+
+  it('clears an explicit manual-unread flag when the channel is read', () => {
+    const queryClient = new QueryClient();
+    const lists = makeChannelList(0).map((item) => ({
+      ...item,
+      is_manually_unread: true,
+    }));
+    queryClient.setQueryData(queryKeys.directMessages('org-1', 'profile-1'), lists);
+
+    applyOptimisticChannelReadState({
+      queryClient,
+      orgId: 'org-1',
+      profileId: 'profile-1',
+      accountId: 'account-1',
+      channelId: 'channel-1',
+      lastReadMessageId: 'msg-1',
+    });
+
+    const next = queryClient.getQueryData<ChannelListItem[]>(
+      queryKeys.directMessages('org-1', 'profile-1'),
+    );
+    expect(next?.[0].is_manually_unread).toBe(false);
+
+    const readState = queryClient.getQueryData<{ isManuallyUnread?: boolean }>(
+      queryKeys.channelReadState('channel-1', 'account-1'),
+    );
+    expect(readState?.isManuallyUnread).toBe(false);
+  });
+
+  it('clears the manual-unread anchor when the channel is read', () => {
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(queryKeys.channelReadState('channel-1', 'account-1'), {
+      channelId: 'channel-1',
+      lastReadMessageId: 'msg-9',
+      lastReadAt: '2026-04-22T00:00:00.000Z',
+      unreadCount: 1,
+      isManuallyUnread: true,
+      manuallyUnreadFromMessageId: 'message-42',
+    });
+
+    applyOptimisticChannelReadState({
+      queryClient,
+      orgId: 'org-1',
+      profileId: 'profile-1',
+      accountId: 'account-1',
+      channelId: 'channel-1',
+      lastReadMessageId: 'msg-9',
+    });
+
+    const readState = queryClient.getQueryData<{
+      manuallyUnreadFromMessageId?: string | null;
+    }>(queryKeys.channelReadState('channel-1', 'account-1'));
+    expect(readState?.manuallyUnreadFromMessageId).toBeNull();
+  });
+});
+
+describe('applyOptimisticChannelManualUnread', () => {
+  const makeChannelList = (): ChannelListItem[] => [
+    {
+      id: 'channel-1',
+      org_id: 'org-1',
+      topic: 'Channel 1',
+      description: null,
+      kind: 'dm',
+      updated_at: '2026-04-22T00:00:00.000Z',
+      unread_count: 0,
+      thread_unread_count: 0,
+      last_message_text: 'hi',
+      last_message_at: '2026-04-22T00:00:00.000Z',
+      last_message_sender: null,
+    },
+    {
+      id: 'channel-2',
+      org_id: 'org-1',
+      topic: 'Channel 2',
+      description: null,
+      kind: 'dm',
+      updated_at: '2026-04-22T00:00:00.000Z',
+      unread_count: 0,
+      thread_unread_count: 0,
+      last_message_text: 'hi',
+      last_message_at: '2026-04-22T00:00:00.000Z',
+      last_message_sender: null,
+    },
+  ];
+
+  it('flags the row as manually unread across dm, learning space and supervised lists', () => {
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(
+      queryKeys.directMessages('org-1', 'profile-1'),
+      makeChannelList(),
+    );
+    queryClient.setQueryData(
+      ['learningSpaceChannels', 'org-1', 'profile-1', null],
+      makeChannelList(),
+    );
+    queryClient.setQueryData(
+      queryKeys.supervisedDirectMessages('org-1', 'account-1'),
+      makeChannelList(),
+    );
+
+    applyOptimisticChannelManualUnread({
+      queryClient,
+      orgId: 'org-1',
+      profileId: 'profile-1',
+      accountId: 'account-1',
+      channelId: 'channel-1',
+    });
+
+    const dms = queryClient.getQueryData<ChannelListItem[]>(
+      queryKeys.directMessages('org-1', 'profile-1'),
+    );
+    expect(dms?.[0].is_manually_unread).toBe(true);
+    // Other rows are untouched
+    expect(dms?.[1].is_manually_unread).toBeUndefined();
+
+    const spaces = queryClient.getQueryData<ChannelListItem[]>([
+      'learningSpaceChannels',
+      'org-1',
+      'profile-1',
+      null,
+    ]);
+    expect(spaces?.[0].is_manually_unread).toBe(true);
+
+    const supervised = queryClient.getQueryData<ChannelListItem[]>(
+      queryKeys.supervisedDirectMessages('org-1', 'account-1'),
+    );
+    expect(supervised?.[0].is_manually_unread).toBe(true);
+  });
+
+  it('marks the channel read-state cache as manually unread while keeping the unread count', () => {
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(queryKeys.channelReadState('channel-1', 'account-1'), {
+      channelId: 'channel-1',
+      lastReadMessageId: 'msg-9',
+      lastReadAt: '2026-04-22T00:00:00.000Z',
+      unreadCount: 3,
+    });
+
+    applyOptimisticChannelManualUnread({
+      queryClient,
+      orgId: 'org-1',
+      profileId: 'profile-1',
+      accountId: 'account-1',
+      channelId: 'channel-1',
+    });
+
+    const readState = queryClient.getQueryData<{
+      unreadCount: number;
+      isManuallyUnread?: boolean;
+      lastReadMessageId: string | null;
+    }>(queryKeys.channelReadState('channel-1', 'account-1'));
+    expect(readState?.isManuallyUnread).toBe(true);
+    expect(readState?.unreadCount).toBe(3);
+    expect(readState?.lastReadMessageId).toBe('msg-9');
+  });
+
+  it('stores the selected message as the manual-unread anchor', () => {
+    const queryClient = new QueryClient();
+
+    applyOptimisticChannelManualUnread({
+      queryClient,
+      orgId: 'org-1',
+      profileId: 'profile-1',
+      accountId: 'account-1',
+      channelId: 'channel-1',
+      fromMessageId: 'message-42',
+    });
+
+    const readState = queryClient.getQueryData<{
+      manuallyUnreadFromMessageId?: string | null;
+    }>(queryKeys.channelReadState('channel-1', 'account-1'));
+    expect(readState?.manuallyUnreadFromMessageId).toBe('message-42');
+  });
+
+  it('leaves list caches untouched when the channel is not in them', () => {
+    const queryClient = new QueryClient();
+    const lists = makeChannelList();
+    queryClient.setQueryData(queryKeys.directMessages('org-1', 'profile-1'), lists);
+
+    applyOptimisticChannelManualUnread({
+      queryClient,
+      orgId: 'org-1',
+      profileId: 'profile-1',
+      accountId: 'account-1',
+      channelId: 'channel-missing',
+    });
+
+    expect(
+      queryClient.getQueryData<ChannelListItem[]>(
+        queryKeys.directMessages('org-1', 'profile-1'),
+      ),
+    ).toBe(lists);
   });
 });

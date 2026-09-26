@@ -166,7 +166,7 @@ describe('buildDashboardHomeInfographicMetrics', () => {
     vi.clearAllMocks();
   });
 
-  it('keeps the completed-session query off when its rollout flag is disabled', async () => {
+  it('keeps the completed-session carousel/summary off when its rollout flag is disabled, but still reads completions for the Completed Classes fallback count', async () => {
     mockApi([], []);
 
     const result = await buildDashboardHomeInfographicMetrics({
@@ -183,10 +183,14 @@ describe('buildDashboardHomeInfographicMetrics', () => {
 
     expect(result.completedSessionsPending).toEqual([]);
     expect(result.sessionCompletionSummary).toBeNull();
-    expect(apiGetMock).not.toHaveBeenCalledWith(
-      '/session-completions',
-      expect.anything(),
-    );
+    // Still fetched (unflagged) so the "Completed Classes" elapsed-time fallback
+    // can tell a confirmed/disputed occurrence apart from a merely-elapsed one —
+    // see completionLookup/disputedLookup in buildActiveRoleMetrics.
+    expect(apiGetMock).toHaveBeenCalledWith('/session-completions', {
+      orgId: 'org-1',
+      profileId: 'child-1',
+      limit: 50,
+    });
     expect(apiGetMock).not.toHaveBeenCalledWith(
       '/session-completions/summary',
       expect.anything(),
@@ -400,6 +404,49 @@ describe('buildDashboardHomeInfographicMetrics', () => {
     );
     expect(result.metricsByRole.parents.upcomingSessionsThisWeek).toBe(0);
     expect(result.metricsByRole.tutors.upcomingSessionsThisWeek).toBe(0);
+  });
+
+  it('excludes an elapsed occurrence from Completed Classes once it is known disputed, but keeps guessing complete for occurrences with no completion record', async () => {
+    // schedule-1 recurs daily 03-10..03-20; before NOW (03-13) that's three
+    // elapsed occurrences (03-10, 03-11, 03-12), all still schedule-status
+    // 'scheduled' since the sweep never flips recurring schedules. Without any
+    // completion data, all three would be guessed complete purely from elapsed
+    // time (see the sibling "builds student metrics" test, which asserts 3).
+    // Here 03-10's occurrence has an actual disputed completion row — nobody
+    // showed up — so it must NOT count, even though its time has elapsed.
+    mockApi(
+      [buildRawSchedule()],
+      [{ id: 'space-1', status: 'active', subject: 'Math', title: null }],
+      [
+        {
+          id: 'completion-1',
+          orgId: 'org-1',
+          scheduleId: 'schedule-1',
+          occurrenceKey: '2026-03-10T15:00:00.000Z',
+          profileId: 'child-1',
+          role: 'child',
+          status: 'disputed',
+          disputeCategory: 'did_not_happen',
+          rating: null,
+          ratingComment: null,
+          sessionEndAt: '2026-03-10T16:00:00.000Z',
+          expiresAt: '2026-03-13T16:00:00.000Z',
+        },
+      ],
+    );
+
+    const result = await buildDashboardHomeInfographicMetrics({
+      supabase: {} as never,
+      orgId: 'org-1',
+      orgSlug: 'iconic-academy',
+      now: NOW,
+      currentUserProfile: {
+        kind: 'child',
+        ids: { id: 'child-1', orgId: 'org-1', accountId: 'account-c1' },
+      } as never,
+    });
+
+    expect(result.metricsByRole.students.completedClassesThisMonth).toBe(2);
   });
 
   it('builds tutor metrics from educator profile scope', async () => {

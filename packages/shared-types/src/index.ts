@@ -2,6 +2,7 @@ export * from './vm/message';
 export * from './vm/sidebar';
 export * from './shared/shared';
 export * from './shared/messages-realtime';
+export * from './shared/message-drafts';
 export * from './shared/availability';
 export * from './shared/working-hours';
 export * from './shared/subjects';

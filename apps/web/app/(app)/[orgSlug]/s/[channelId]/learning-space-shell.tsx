@@ -3,6 +3,7 @@
 import type {
   ChannelVM,
   LearningSpaceVM,
+  MessageEditTextInput,
   MessageSendFileInput,
   MessageSendFilesInput,
   MessageSendTextInput,
@@ -23,9 +24,17 @@ export function LearningSpaceShell({
   enableMessagePinning = false,
   enableMessageSearch = false,
   enableScheduledSend = false,
+  enableMessageMarkUnread = false,
+  enableMessageReplyReference = false,
+  enableNotificationConversationControls = false,
+  enableMessageListFormatting = false,
+  enableMessageDrafts = false,
+  enableMessageEdit = false,
+  enableMessageSendReliability = false,
   sendTextMessage,
   sendFileMessage,
   sendFilesMessage,
+  editTextMessage,
   toggleReaction,
   toggleSavedMessage,
   deleteMessage,
@@ -41,9 +50,17 @@ export function LearningSpaceShell({
   enableMessagePinning?: boolean;
   enableMessageSearch?: boolean;
   enableScheduledSend?: boolean;
+  enableMessageMarkUnread?: boolean;
+  enableMessageReplyReference?: boolean;
+  enableNotificationConversationControls?: boolean;
+  enableMessageListFormatting?: boolean;
+  enableMessageDrafts?: boolean;
+  enableMessageEdit?: boolean;
+  enableMessageSendReliability?: boolean;
   sendTextMessage: (input: MessageSendTextInput) => Promise<MessageVM>;
   sendFileMessage: (input: MessageSendFileInput) => Promise<MessageVM>;
   sendFilesMessage: (input: MessageSendFilesInput) => Promise<MessageVM>;
+  editTextMessage: (input: MessageEditTextInput) => Promise<MessageVM>;
   toggleReaction: (input: {
     orgId: string;
     messageId: string;
@@ -72,6 +89,13 @@ export function LearningSpaceShell({
       enableMessagePinning={enableMessagePinning}
       enableMessageSearch={enableMessageSearch}
       enableScheduledSend={enableScheduledSend}
+      enableMessageMarkUnread={enableMessageMarkUnread}
+      enableMessageReplyReference={enableMessageReplyReference}
+      enableNotificationConversationControls={enableNotificationConversationControls}
+      enableMessageListFormatting={enableMessageListFormatting}
+      enableMessageDrafts={enableMessageDrafts}
+      enableMessageEdit={enableMessageEdit}
+      enableMessageSendReliability={enableMessageSendReliability}
       panelRegistry={{
         channel_info: (props) => (
           <LearningSpaceInfoPanel {...props} learningSpace={learningSpace} />
@@ -80,6 +104,7 @@ export function LearningSpaceShell({
       sendTextMessage={sendTextMessage}
       sendFileMessage={sendFileMessage}
       sendFilesMessage={sendFilesMessage}
+      editTextMessage={editTextMessage}
       toggleReaction={toggleReaction}
       toggleSavedMessage={toggleSavedMessage}
       deleteMessage={deleteMessage}

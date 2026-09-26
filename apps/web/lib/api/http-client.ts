@@ -98,6 +98,16 @@ export function createApiClient(supabase: SupabaseClient) {
     return parseResponse<T>(response);
   }
 
+  async function patch<T>(path: string, body?: unknown): Promise<T> {
+    const response = await fetch(`${apiUrl}${path}`, {
+      method: 'PATCH',
+      headers: await getAuthHeaders(supabase),
+      body: JSON.stringify(body ?? {}),
+    });
+
+    return parseResponse<T>(response);
+  }
+
   async function del<T>(path: string, body?: unknown): Promise<T> {
     const response = await fetch(`${apiUrl}${path}`, {
       method: 'DELETE',
@@ -108,5 +118,5 @@ export function createApiClient(supabase: SupabaseClient) {
     return parseResponse<T>(response);
   }
 
-  return { get, post, put, delete: del };
+  return { get, post, put, patch, delete: del };
 }

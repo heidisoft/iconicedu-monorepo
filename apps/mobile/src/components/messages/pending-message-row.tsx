@@ -9,13 +9,19 @@ import {
 } from 'react-native';
 import { FileText, Mic, AlertCircle } from 'lucide-react-native';
 import type { AppColors } from '@/lib/theme';
+import type { MessageMentionVM } from '@iconicedu/shared-types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type PendingUpload = {
   id: string;
-  type: 'image' | 'file' | 'audio';
-  /** Full attachment payload — includes base64 for images so retry can re-upload. */
+  type: 'image' | 'file' | 'audio' | 'text';
+  /**
+   * Full attachment payload — includes base64 for images so retry can
+   * re-upload. Empty for a `type: 'text'` row (see `caption` instead), which
+   * represents a text message send that is in flight or failed
+   * (issue #264 send-failure recovery — gated by enableMessageSendReliability).
+   */
   attachments: Array<{
     uri: string;
     name: string;
@@ -28,6 +34,18 @@ export type PendingUpload = {
   createdAt: string;
   caption?: string;
   failed?: boolean;
+  /**
+   * Present for `type: 'text'` (and, when send-reliability is enabled, for
+   * attachment rows too) — the same clientMessageId sent with the original
+   * attempt. Retrying MUST reuse this id so the server's idempotency check
+   * returns the existing message instead of creating a duplicate.
+   */
+  clientMessageId?: string;
+  /** Mentions extracted from `caption` for a `type: 'text'` row's retry. */
+  mentions?: MessageMentionVM[];
+  /** Thread targeting for a `type: 'text'` row's retry, so it resends into the same thread. */
+  threadParentId?: string;
+  threadId?: string;
 };
 
 type PendingMessageRowProps = {
@@ -62,7 +80,7 @@ export function PendingMessageRow({ pending, colors, onRetry }: PendingMessageRo
           </View>
         )}
 
-        {type === 'image' ? (
+        {type === 'text' ? null : type === 'image' ? (
           attachments.length === 1 ? (
             /* ── Single image ─────────────────────────────────────────── */
             <View style={styles.singleImageWrap}>

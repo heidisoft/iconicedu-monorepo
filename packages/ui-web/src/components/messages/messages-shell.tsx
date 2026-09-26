@@ -72,6 +72,15 @@ export const MessagesShell = memo(function MessagesShell(props: MessagesShellPro
       enableMessagePinning={props.enableMessagePinning}
       enableMessageSearch={props.enableMessageSearch}
       enableScheduledSend={props.enableScheduledSend}
+      enableMessageMarkUnread={props.enableMessageMarkUnread}
+      enableMessageReplyReference={props.enableMessageReplyReference}
+      enableNotificationConversationControls={
+        props.enableNotificationConversationControls
+      }
+      enableMessageListFormatting={props.enableMessageListFormatting}
+      enableMessageDrafts={props.enableMessageDrafts}
+      enableMessageEdit={props.enableMessageEdit}
+      enableMessageSendReliability={props.enableMessageSendReliability}
     >
       <MessagesShellLayout {...props} registry={rightPanelRegistry} />
     </MessagesStateProvider>

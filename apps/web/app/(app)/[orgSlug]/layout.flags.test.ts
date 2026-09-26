@@ -15,6 +15,7 @@ const {
   mapOrgSubjectRowsToOptionsMock,
   buildAdminMenuSectionsMock,
   enableAssessmentsRunMock,
+  enableMessageDraftsRunMock,
   shouldRedirectToAuthResumeMock,
   resolveOrgDashboardPathMock,
   redirectMock,
@@ -34,6 +35,7 @@ const {
   mapOrgSubjectRowsToOptionsMock: vi.fn(),
   buildAdminMenuSectionsMock: vi.fn(),
   enableAssessmentsRunMock: vi.fn(),
+  enableMessageDraftsRunMock: vi.fn(),
   shouldRedirectToAuthResumeMock: vi.fn(),
   resolveOrgDashboardPathMock: vi.fn(),
   redirectMock: vi.fn(),
@@ -101,6 +103,9 @@ vi.mock('@iconicedu/web/flags', () => ({
   enableAssessments: {
     run: (...args: unknown[]) => enableAssessmentsRunMock(...args),
   },
+  enableMessageDrafts: {
+    run: (...args: unknown[]) => enableMessageDraftsRunMock(...args),
+  },
 }));
 
 vi.mock('@iconicedu/web/app/(app)/[orgSlug]/layout-auth-gate', () => ({
@@ -140,6 +145,7 @@ describe('org layout persona flags', () => {
     mapOrgSubjectRowsToOptionsMock.mockReset();
     buildAdminMenuSectionsMock.mockReset();
     enableAssessmentsRunMock.mockReset();
+    enableMessageDraftsRunMock.mockReset();
     shouldRedirectToAuthResumeMock.mockReset();
     resolveOrgDashboardPathMock.mockReset();
     redirectMock.mockReset();
@@ -191,6 +197,7 @@ describe('org layout persona flags', () => {
     mapOrgSubjectRowsToOptionsMock.mockReturnValue([]);
     buildAdminMenuSectionsMock.mockReturnValue([]);
     enableAssessmentsRunMock.mockResolvedValue(false);
+    enableMessageDraftsRunMock.mockResolvedValue(false);
     resolveOrgDashboardPathMock.mockResolvedValue('/iconic-academy');
   });
 

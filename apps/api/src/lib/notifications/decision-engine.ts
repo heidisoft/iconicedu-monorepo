@@ -234,7 +234,10 @@ export async function buildNotificationDecision(input: {
     ? preference.channels.filter((channel) => channel !== 'push')
     : preference.channels;
 
-  if (preference.muted || deliveryChannels.length === 0) {
+  const suppressedByMentionsOnly =
+    preference.mentionsOnly && !isMentionEvent(input.event);
+
+  if (preference.muted || suppressedByMentionsOnly || deliveryChannels.length === 0) {
     return {
       eventId: input.event.id,
       recipientProfileId: input.recipientProfileId,

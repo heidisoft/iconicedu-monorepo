@@ -61,5 +61,51 @@ export function getLocalMobileFeatureFlagFallback(key: MobileFeatureFlagKey): bo
     return parseBooleanFeatureFlag(process.env.EXPO_PUBLIC_ENABLE_SCHEDULED_SEND);
   }
 
+  if (key === mobileFeatureFlagKeys.enableMessageMarkUnread) {
+    return parseBooleanFeatureFlag(process.env.EXPO_PUBLIC_ENABLE_MESSAGE_MARK_UNREAD);
+  }
+
+  if (key === mobileFeatureFlagKeys.enableMessageReplyReference) {
+    return parseBooleanFeatureFlag(
+      process.env.EXPO_PUBLIC_ENABLE_MESSAGE_REPLY_REFERENCE,
+    );
+  }
+
+  if (key === mobileFeatureFlagKeys.enableMobileLinkPreviews) {
+    return parseBooleanFeatureFlag(process.env.EXPO_PUBLIC_ENABLE_MOBILE_LINK_PREVIEWS);
+  }
+
+  if (key === mobileFeatureFlagKeys.enableNotificationConversationControls) {
+    return parseBooleanFeatureFlag(
+      process.env.EXPO_PUBLIC_ENABLE_NOTIFICATION_CONVERSATION_CONTROLS,
+    );
+  }
+
+  if (key === mobileFeatureFlagKeys.enableMessageListFormatting) {
+    return parseBooleanFeatureFlag(
+      process.env.EXPO_PUBLIC_ENABLE_MESSAGE_LIST_FORMATTING,
+    );
+  }
+
+  if (key === mobileFeatureFlagKeys.enableMessageDrafts) {
+    return parseBooleanFeatureFlag(process.env.EXPO_PUBLIC_ENABLE_MESSAGE_DRAFTS);
+  }
+
+  if (key === mobileFeatureFlagKeys.enableMessageEdit) {
+    return parseBooleanFeatureFlag(process.env.EXPO_PUBLIC_ENABLE_MESSAGE_EDIT);
+  }
+
+  if (key === mobileFeatureFlagKeys.enableMobileMessageComposerParity) {
+    return parseBooleanFeatureFlag(
+      process.env.EXPO_PUBLIC_ENABLE_MOBILE_MESSAGE_COMPOSER_PARITY,
+    );
+  }
+
+  if (key === mobileFeatureFlagKeys.enableMessageSendReliability) {
+    return parseBooleanFeatureFlag(
+      process.env.EXPO_PUBLIC_ENABLE_MESSAGE_SEND_RELIABILITY,
+    );
+  }
+
   return false;
 }

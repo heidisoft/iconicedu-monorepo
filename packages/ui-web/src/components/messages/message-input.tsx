@@ -42,10 +42,13 @@ import {
   type MentionState,
 } from './message-input.utils';
 import { extractMentionsFromMessageText } from './message-mentions.utils';
-import { applyInlineFormat } from './message-input-formatting.utils';
+import { applyInlineFormat, applyListFormat } from './message-input-formatting.utils';
 import {
   Bold,
   Italic,
+  List,
+  ListOrdered,
+  CornerUpLeft,
   AtSign,
   Smile,
   Paperclip,
@@ -93,6 +96,9 @@ import {
   resolveBrowserTimezone,
   type ScheduleDraft,
 } from './message-schedule-send.utils';
+import { useMessageDraft } from './use-message-draft';
+import type { MessageDraftScope } from './message-draft-store';
+import { generateClientMessageId } from './client-message-id';
 
 const TYPING_STOP_DELAY_MS = 3000;
 const TYPING_KEEPALIVE_THROTTLE_MS = 1200;
@@ -108,10 +114,17 @@ interface MessageInputProps {
       dueAt: string;
       subject?: string;
     } | null,
+    /**
+     * Client-generated id for idempotent retries. Only populated when
+     * `enableMessageSendReliability` is on — see MESSAGE_SEND_RELIABILITY
+     * notes near `handleSend` below.
+     */
+    clientMessageId?: string,
   ) => void;
   onAttachFiles?: (
     attachments: Array<{ file: File; durationSeconds?: number }>,
     content?: string,
+    clientMessageId?: string,
   ) => Promise<void> | void;
   placeholder?: string;
   sticky?: boolean;
@@ -134,6 +147,16 @@ interface MessageInputProps {
     sendAt: string;
     timezone: string;
   }) => Promise<void> | void;
+  enableMessageReplyReference?: boolean;
+  enableMessageListFormatting?: boolean;
+  replyTarget?: { senderName: string; snippet: string } | null;
+  onClearReply?: () => void;
+  /** Gates draft autosave/restore. When false (default) this component never touches localStorage. */
+  enableMessageDrafts?: boolean;
+  /** Identity + location used to scope a draft. Null/incomplete disables drafts even if the flag is on. */
+  draftScope?: MessageDraftScope | null;
+  /** Gates clientMessageId-based idempotent retry of failed sends. */
+  enableMessageSendReliability?: boolean;
 }
 
 type PendingAttachment = {
@@ -252,8 +275,33 @@ export function MessageInput({
   prefillRequest = null,
   enableScheduledSend = false,
   onScheduleSend,
+  enableMessageReplyReference = false,
+  enableMessageListFormatting = false,
+  replyTarget = null,
+  onClearReply,
+  enableMessageDrafts = false,
+  draftScope = null,
+  enableMessageSendReliability = false,
 }: MessageInputProps) {
   const [content, setContent] = React.useState('');
+  const pendingAttachmentsClientMessageIdRef = React.useRef<{
+    key: string;
+    id: string;
+  } | null>(null);
+  const pendingTextClientMessageIdRef = React.useRef<{
+    key: string;
+    id: string;
+  } | null>(null);
+  const resolvedDraftScope = enableMessageDrafts ? draftScope : null;
+  const {
+    restoredDraft,
+    notifyContentChange,
+    clearDraft,
+    status: draftStatus,
+  } = useMessageDraft({
+    enabled: enableMessageDrafts,
+    scope: resolvedDraftScope,
+  });
   const [isSendingText, setIsSendingText] = React.useState(false);
   const [isScheduleOpen, setIsScheduleOpen] = React.useState(false);
   const [isScheduling, setIsScheduling] = React.useState(false);
@@ -538,6 +586,32 @@ export function MessageInput({
     [content, handleTyping, hasActiveRecording, isBusy, readOnly, syncMentionState],
   );
 
+  const applyListFormatAtSelection = React.useCallback(
+    (kind: 'bullet' | 'numbered') => {
+      const textarea = textareaRef.current;
+      if (!textarea || readOnly || isBusy || hasActiveRecording) {
+        return;
+      }
+
+      const result = applyListFormat(
+        content,
+        textarea.selectionStart,
+        textarea.selectionEnd,
+        kind,
+      );
+
+      setContent(result.nextValue);
+      handleTyping(result.nextValue);
+
+      window.setTimeout(() => {
+        textarea.focus();
+        textarea.setSelectionRange(result.selectionStart, result.selectionEnd);
+        syncMentionState(result.nextValue, result.selectionEnd);
+      }, 0);
+    },
+    [content, handleTyping, hasActiveRecording, isBusy, readOnly, syncMentionState],
+  );
+
   const handleMentionSelect = React.useCallback(
     (candidate: MentionCandidate) => {
       const textarea = textareaRef.current;
@@ -573,8 +647,11 @@ export function MessageInput({
     setActiveMentionIndex(0);
     clearTypingTimeout();
     notifyTypingStop();
+    clearDraft();
+    pendingAttachmentsClientMessageIdRef.current = null;
+    pendingTextClientMessageIdRef.current = null;
     textareaRef.current?.focus();
-  }, [clearPendingAttachments, clearTypingTimeout, notifyTypingStop]);
+  }, [clearDraft, clearPendingAttachments, clearTypingTimeout, notifyTypingStop]);
 
   const handleSend = React.useCallback(() => {
     if (readOnly || isBusy || hasActiveRecording) {
@@ -586,9 +663,26 @@ export function MessageInput({
     }
 
     if (pendingAttachments.length > 0 && onAttachFiles) {
+      // Reuse the same clientMessageId across repeated Send clicks for the
+      // same pending attachment batch so a retry after a failed send is
+      // idempotent on the server; a new/changed batch gets a fresh id.
+      const attachmentBatchKey = pendingAttachments.map((a) => a.id).join('|');
+      let attachmentClientMessageId: string | undefined;
+      if (enableMessageSendReliability) {
+        const cached = pendingAttachmentsClientMessageIdRef.current;
+        attachmentClientMessageId =
+          cached && cached.key === attachmentBatchKey
+            ? cached.id
+            : generateClientMessageId();
+        pendingAttachmentsClientMessageIdRef.current = {
+          key: attachmentBatchKey,
+          id: attachmentClientMessageId,
+        };
+      }
       const sendAttachment = async () => {
         try {
           setIsAttachingFile(true);
+          setAttachmentError(null);
           await onAttachFiles(
             await Promise.all(
               pendingAttachments.map(async (pendingAttachment) => ({
@@ -603,8 +697,18 @@ export function MessageInput({
               })),
             ),
             trimmedContent || undefined,
+            attachmentClientMessageId,
           );
           resetComposer();
+        } catch {
+          // Keep the attachments + content in the composer so nothing is
+          // lost; the user can inspect/retry (Send reuses the same
+          // clientMessageId above) or remove attachments to start over.
+          setAttachmentError(
+            enableMessageSendReliability
+              ? 'Could not send. Your files are still attached — tap Send to retry.'
+              : 'Could not send attachment(s). Please try again.',
+          );
         } finally {
           setIsAttachingFile(false);
         }
@@ -619,11 +723,30 @@ export function MessageInput({
         participants,
         currentUserId,
       );
+      // Reuse the same clientMessageId across repeated Send clicks for the
+      // same draft text so a retry after an ambiguous failure is idempotent
+      // on the server; changed content gets a fresh id.
+      let clientMessageId: string | undefined;
+      if (enableMessageSendReliability) {
+        const cached = pendingTextClientMessageIdRef.current;
+        clientMessageId =
+          cached && cached.key === trimmedContent ? cached.id : generateClientMessageId();
+        pendingTextClientMessageIdRef.current = {
+          key: trimmedContent,
+          id: clientMessageId,
+        };
+      }
       const sendText = async () => {
         try {
           setIsSendingText(true);
-          await Promise.resolve(onSend(trimmedContent, mentions, null));
+          await Promise.resolve(onSend(trimmedContent, mentions, null, clientMessageId));
           resetComposer();
+        } catch {
+          // Leave the composer content intact on failure so the draft (if
+          // enabled) survives and the user doesn't lose what they typed.
+          // The failed send itself is surfaced as a "Not sent" state on the
+          // message bubble (see messages-container's failed-send handling).
+          // Send reuses the same clientMessageId above on retry.
         } finally {
           setIsSendingText(false);
         }
@@ -633,6 +756,7 @@ export function MessageInput({
   }, [
     content,
     currentUserId,
+    enableMessageSendReliability,
     hasActiveRecording,
     isBusy,
     onAttachFiles,
@@ -832,6 +956,27 @@ export function MessageInput({
       textarea.setSelectionRange(nextCaret, nextCaret);
     }, 0);
   }, [handleTyping, prefillRequest]);
+
+  // Restore a saved draft once it's found (mount, or when the scope changes —
+  // e.g. switching channels/threads). Never clobbers a starter-action prefill
+  // or text the user has already started typing in this mount.
+  const hasRestoredDraftRef = React.useRef(false);
+  React.useEffect(() => {
+    hasRestoredDraftRef.current = false;
+  }, [draftScope?.channelId, draftScope?.threadId]);
+  React.useEffect(() => {
+    if (!restoredDraft || hasRestoredDraftRef.current) {
+      return;
+    }
+    hasRestoredDraftRef.current = true;
+    setContent((current) => (current ? current : restoredDraft.content));
+  }, [restoredDraft]);
+
+  // Debounce-autosave the composer text as a draft. No-ops entirely when
+  // drafts are disabled or the scope is unresolved (see useMessageDraft).
+  React.useEffect(() => {
+    notifyContentChange(content);
+  }, [content, notifyContentChange]);
 
   React.useEffect(() => {
     return () => {
@@ -1143,6 +1288,29 @@ export function MessageInput({
       }
     >
       <div className="mx-auto w-full max-w-[960px]">
+        {enableMessageReplyReference && replyTarget ? (
+          <div className="mb-1.5 flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs">
+            <CornerUpLeft
+              className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+              aria-hidden="true"
+            />
+            <span className="min-w-0 flex-1 truncate">
+              <span className="font-medium text-foreground">
+                Replying to {replyTarget.senderName}
+              </span>
+              <span className="text-muted-foreground"> — {replyTarget.snippet}</span>
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              aria-label="Cancel reply"
+              onClick={onClearReply}
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        ) : null}
         <div
           ref={wrapperRef}
           className={cn(
@@ -1454,6 +1622,11 @@ export function MessageInput({
               Drop file or image to attach
             </div>
           ) : null}
+          {enableMessageDrafts && draftStatus !== 'idle' ? (
+            <div role="status" className="px-3 pt-2 text-[11px] text-muted-foreground/80">
+              {draftStatus === 'restored' ? 'Draft restored' : 'Draft saved'}
+            </div>
+          ) : null}
           <Textarea
             ref={textareaRef}
             rows={1}
@@ -1546,6 +1719,20 @@ export function MessageInput({
                     onClick={btn.onClick}
                   />
                 ))}
+                {enableMessageListFormatting ? (
+                  <>
+                    <FormatButton
+                      icon={List}
+                      label="Bulleted list"
+                      onClick={() => applyListFormatAtSelection('bullet')}
+                    />
+                    <FormatButton
+                      icon={ListOrdered}
+                      label="Numbered list"
+                      onClick={() => applyListFormatAtSelection('numbered')}
+                    />
+                  </>
+                ) : null}
                 <div className="mx-1 h-4 w-px bg-border" />
                 <FormatButton
                   icon={AtSign}
