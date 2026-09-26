@@ -1,4 +1,4 @@
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { markChannelReadState, markThreadReadState, queryKeys } from '@/lib/api/queries';
 import {
@@ -13,6 +13,10 @@ type UseMarkReadParams = {
   accountId: string;
   channelId: string;
   profileKind?: string | null;
+  /** Screen focus state — pass to auto-clear a manual unread mark on refocus. */
+  isFocused?: boolean;
+  isManuallyUnread?: boolean;
+  lastReadMessageId?: string | null;
 };
 
 export function useMarkRead({
@@ -21,9 +25,20 @@ export function useMarkRead({
   accountId,
   channelId,
   profileKind,
+  isFocused,
+  isManuallyUnread,
+  lastReadMessageId,
 }: UseMarkReadParams) {
   const queryClient = useQueryClient();
   const lastMarkedChannelIdRef = useRef<string | null>(null);
+
+  // Marking a channel unread doesn't change the latest message id, so without
+  // this the "already marked read for this message id" guard below would
+  // silently swallow the next genuine read (e.g. leaving and reopening the
+  // channel) and the manual-unread flag would never clear server-side.
+  const resetChannelReadGuard = useCallback(() => {
+    lastMarkedChannelIdRef.current = null;
+  }, []);
 
   const markChannelRead = useCallback(
     async (lastReadMessageId: string) => {
@@ -54,6 +69,8 @@ export function useMarkRead({
           lastReadMessageId,
           lastReadAt: new Date().toISOString(),
           unreadCount,
+          isManuallyUnread: false,
+          manuallyUnreadFromMessageId: null,
         });
       } catch {
         void queryClient.invalidateQueries({
@@ -63,6 +80,37 @@ export function useMarkRead({
     },
     [orgId, profileId, accountId, channelId, profileKind, queryClient],
   );
+
+  // A channel manually marked unread has no genuinely new incoming message
+  // for the "unread viewed" scroll heuristic to notice, so that trigger
+  // never fires and the manual flag would otherwise stay set forever.
+  //
+  // Reopening the channel from the conversation list pushes a brand-new
+  // screen instance each time (pop/push, not a persisted mount), so a
+  // "blur-then-refocus on this instance" check never actually fires on a
+  // normal reopen — the very first render is already focused. So instead we
+  // track the last *observed* value of isManuallyUnread: if it's true and
+  // the previous observed value was NOT a live "false → true" flip while
+  // already focused (i.e. it was already true when we first saw a real
+  // value, however that happened), it predates this screen and we clear it.
+  // If it flips false → true while we're already focused, that's the user's
+  // own mark-unread action on this same live screen — leave it alone.
+  const previousManuallyUnreadRef = useRef<boolean | undefined>(undefined);
+  const wasFocusedRef = useRef(isFocused ?? false);
+  useEffect(() => {
+    const previousManuallyUnread = previousManuallyUnreadRef.current;
+    const wasFocused = wasFocusedRef.current;
+    previousManuallyUnreadRef.current = isManuallyUnread;
+    wasFocusedRef.current = isFocused ?? false;
+
+    if (!isFocused || !isManuallyUnread || !lastReadMessageId) return;
+
+    const justMarkedUnreadOnThisLiveScreen =
+      previousManuallyUnread === false && wasFocused === true;
+    if (!justMarkedUnreadOnThisLiveScreen) {
+      void markChannelRead(lastReadMessageId);
+    }
+  }, [isFocused, isManuallyUnread, lastReadMessageId, markChannelRead]);
 
   const markThreadRead = useCallback(
     async (input: {
@@ -122,5 +170,5 @@ export function useMarkRead({
     [accountId, profileId, queryClient],
   );
 
-  return { markChannelRead, markThreadRead };
+  return { markChannelRead, markThreadRead, resetChannelReadGuard };
 }

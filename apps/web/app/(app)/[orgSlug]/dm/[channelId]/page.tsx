@@ -26,6 +26,10 @@ import {
 } from '@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth';
 import {
   enableMessageTypeComposer,
+  enableMessageMarkUnread,
+  enableMessageReplyReference,
+  enableNotificationConversationControls,
+  enableMessageListFormatting,
   enableMessageDrafts,
   enableMessageEdit,
   enableMessageSendReliability,
@@ -82,15 +86,24 @@ export default async function Page({
   const showCreateMessageTypeButton = await enableMessageTypeComposer.run({
     identify: { profileId: profileResponse.data?.id ?? null },
   });
-  const messageDraftsEnabled = await enableMessageDrafts.run({
-    identify: { profileId: profileResponse.data?.id ?? null },
-  });
-  const messageEditEnabled = await enableMessageEdit.run({
-    identify: { profileId: profileResponse.data?.id ?? null },
-  });
-  const messageSendReliabilityEnabled = await enableMessageSendReliability.run({
-    identify: { profileId: profileResponse.data?.id ?? null },
-  });
+  const identify = { profileId: profileResponse.data?.id ?? null };
+  const [
+    markUnreadEnabled,
+    replyReferenceEnabled,
+    notificationConversationControlsEnabled,
+    listFormattingEnabled,
+    messageDraftsEnabled,
+    messageEditEnabled,
+    messageSendReliabilityEnabled,
+  ] = await Promise.all([
+    enableMessageMarkUnread.run({ identify }),
+    enableMessageReplyReference.run({ identify }),
+    enableNotificationConversationControls.run({ identify }),
+    enableMessageListFormatting.run({ identify }),
+    enableMessageDrafts.run({ identify }),
+    enableMessageEdit.run({ identify }),
+    enableMessageSendReliability.run({ identify }),
+  ]);
 
   const participantAccountIds = new Set(
     (channel.collections.participants ?? []).map(
@@ -127,6 +140,10 @@ export default async function Page({
         currentUserProfile={currentUserProfile}
         readOnly={isSupervisedReadOnly || isStaffReadOnly}
         showCreateMessageTypeButton={showCreateMessageTypeButton}
+        enableMessageMarkUnread={markUnreadEnabled}
+        enableMessageReplyReference={replyReferenceEnabled}
+        enableNotificationConversationControls={notificationConversationControlsEnabled}
+        enableMessageListFormatting={listFormattingEnabled}
         enableMessageDrafts={messageDraftsEnabled}
         enableMessageEdit={messageEditEnabled}
         enableMessageSendReliability={messageSendReliabilityEnabled}

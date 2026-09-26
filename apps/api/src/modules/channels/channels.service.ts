@@ -1,5 +1,9 @@
 import { randomUUID } from 'crypto';
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { PrismaService } from '@iconicedu/api/prisma/prisma.service';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
@@ -34,6 +38,7 @@ type ChannelListItem = {
   updated_at: string;
   unread_count: number;
   thread_unread_count: number;
+  is_manually_unread?: boolean;
   last_message_text: string | null;
   last_message_at: string | null;
   last_message_sender: string | null;
@@ -436,7 +441,7 @@ export class ChannelsService {
         .is('deleted_at', null),
       supabase
         .from('channel_read_state')
-        .select('channel_id, unread_count')
+        .select('channel_id, unread_count, manually_marked_unread')
         .eq('account_id', input.accountId)
         .in('channel_id', channelIds)
         .is('thread_id', null)
@@ -459,6 +464,12 @@ export class ChannelsService {
       (readStateRows ?? []).map((row) => [
         row.channel_id as string,
         row.unread_count ?? 0,
+      ]),
+    );
+    const manuallyUnreadByChannelId = new Map(
+      (readStateRows ?? []).map((row) => [
+        row.channel_id as string,
+        row.manually_marked_unread === true,
       ]),
     );
     const threadUnreadByChannelId = new Map<string, number>();
@@ -490,6 +501,7 @@ export class ChannelsService {
         updated_at: channel.updated_at,
         unread_count: Math.max(0, readStateByChannelId.get(channel.id) ?? 0),
         thread_unread_count: Math.max(0, threadUnreadByChannelId.get(channel.id) ?? 0),
+        is_manually_unread: manuallyUnreadByChannelId.get(channel.id) ?? false,
         last_message_text: last?.text ?? null,
         last_message_at: last?.at ?? null,
         last_message_sender: last?.sender ?? null,
@@ -578,7 +590,7 @@ export class ChannelsService {
       ] = await Promise.all([
         supabase
           .from('channel_read_state')
-          .select('channel_id, unread_count')
+          .select('channel_id, unread_count, manually_marked_unread')
           .eq('account_id', child.account_id as string)
           .in('channel_id', channelIds)
           .is('thread_id', null)
@@ -607,6 +619,12 @@ export class ChannelsService {
         (readStateRows ?? []).map((row) => [
           row.channel_id as string,
           row.unread_count ?? 0,
+        ]),
+      );
+      const manuallyUnreadByChannelId = new Map(
+        (readStateRows ?? []).map((row) => [
+          row.channel_id as string,
+          row.manually_marked_unread === true,
         ]),
       );
       const threadUnreadByChannelId = new Map<string, number>();
@@ -639,6 +657,7 @@ export class ChannelsService {
           updated_at: channel.updated_at,
           unread_count: Math.max(0, readStateByChannelId.get(channel.id) ?? 0),
           thread_unread_count: Math.max(0, threadUnreadByChannelId.get(channel.id) ?? 0),
+          is_manually_unread: manuallyUnreadByChannelId.get(channel.id) ?? false,
           last_message_text: null,
           last_message_at: null,
           last_message_sender: null,
@@ -1305,7 +1324,9 @@ export class ChannelsService {
     const supabase = createSupabaseSessionClient(accessToken);
     let query = supabase
       .from('channel_read_state')
-      .select('channel_id, thread_id, last_read_message_id, last_read_at, unread_count')
+      .select(
+        'channel_id, thread_id, last_read_message_id, last_read_at, unread_count, manually_marked_unread, manually_marked_unread_from_message_id',
+      )
       .eq('channel_id', input.channelId)
       .eq('account_id', input.accountId)
       .is('deleted_at', null);
@@ -1319,6 +1340,8 @@ export class ChannelsService {
       last_read_message_id: string | null;
       last_read_at: string | null;
       unread_count: number | null;
+      manually_marked_unread: boolean | null;
+      manually_marked_unread_from_message_id: string | null;
     }>();
     if (error) throw new InternalServerErrorException(error.message);
     if (!data) return null;
@@ -1328,7 +1351,128 @@ export class ChannelsService {
       lastReadMessageId: data.last_read_message_id ?? null,
       lastReadAt: data.last_read_at ?? null,
       unreadCount: data.unread_count ?? 0,
+      isManuallyUnread: data.manually_marked_unread ?? false,
+      manuallyUnreadFromMessageId: data.manually_marked_unread_from_message_id ?? null,
     };
+  }
+
+  async markUnread(
+    accessToken: string,
+    input: {
+      orgId: string;
+      accountId: string;
+      profileId: string;
+      channelId: string;
+      fromMessageId?: string | null;
+    },
+  ) {
+    const sessionSupabase = createSupabaseSessionClient(accessToken);
+    const serviceSupabase = createSupabaseServiceClient();
+
+    let resolvedAccountId: string | null = null;
+
+    const membershipLookup = await sessionSupabase
+      .from('channel_members')
+      .select('id')
+      .eq('org_id', input.orgId)
+      .eq('channel_id', input.channelId)
+      .eq('profile_id', input.profileId)
+      .is('deleted_at', null)
+      .maybeSingle<{ id: string }>();
+    if (membershipLookup.error) {
+      throw new InternalServerErrorException(membershipLookup.error.message);
+    }
+
+    if (!membershipLookup.data) {
+      const { data: authUser, error: authError } = await sessionSupabase.auth.getUser();
+      if (authError || !authUser?.user?.id) {
+        throw new ForbiddenException('Not a member of this channel');
+      }
+      const authUserId = authUser.user.id;
+
+      const { data: guardianAccount, error: guardianErr } = await serviceSupabase
+        .from('accounts')
+        .select('id')
+        .eq('auth_user_id', authUserId)
+        .eq('org_id', input.orgId)
+        .is('deleted_at', null)
+        .maybeSingle<{ id: string }>();
+      if (guardianErr) throw new InternalServerErrorException(guardianErr.message);
+      if (!guardianAccount) throw new ForbiddenException('Not a member of this channel');
+
+      const { data: childProfile, error: profileErr } = await serviceSupabase
+        .from('profiles')
+        .select('account_id')
+        .eq('id', input.profileId)
+        .eq('org_id', input.orgId)
+        .is('deleted_at', null)
+        .maybeSingle<{ account_id: string }>();
+      if (profileErr) throw new InternalServerErrorException(profileErr.message);
+      if (!childProfile) throw new ForbiddenException('Not a member of this channel');
+
+      const { data: familyLink, error: familyLinkErr } = await serviceSupabase
+        .from('family_links')
+        .select('id')
+        .eq('org_id', input.orgId)
+        .eq('guardian_account_id', guardianAccount.id)
+        .eq('child_account_id', childProfile.account_id)
+        .is('deleted_at', null)
+        .maybeSingle<{ id: string }>();
+      if (familyLinkErr) throw new InternalServerErrorException(familyLinkErr.message);
+      if (!familyLink) throw new ForbiddenException('Not a member of this channel');
+
+      const { data: serviceMembership, error: svcMemberErr } = await serviceSupabase
+        .from('channel_members')
+        .select('id')
+        .eq('org_id', input.orgId)
+        .eq('channel_id', input.channelId)
+        .eq('profile_id', input.profileId)
+        .is('deleted_at', null)
+        .maybeSingle<{ id: string }>();
+      if (svcMemberErr) throw new InternalServerErrorException(svcMemberErr.message);
+      if (!serviceMembership)
+        throw new ForbiddenException('Not a member of this channel');
+
+      resolvedAccountId = childProfile.account_id;
+    }
+
+    if (!resolvedAccountId) {
+      const { data: profileRow, error: profileLookupErr } = await serviceSupabase
+        .from('profiles')
+        .select('account_id')
+        .eq('id', input.profileId)
+        .eq('org_id', input.orgId)
+        .is('deleted_at', null)
+        .maybeSingle<{ account_id: string }>();
+      if (profileLookupErr)
+        throw new InternalServerErrorException(profileLookupErr.message);
+      if (!profileRow) throw new ForbiddenException('Not a member of this channel');
+      resolvedAccountId = profileRow.account_id;
+    }
+
+    let resolvedFromMessageId: string | null = null;
+    if (input.fromMessageId) {
+      const { data: anchorMessage, error: anchorErr } = await serviceSupabase
+        .from('messages')
+        .select('id')
+        .eq('id', input.fromMessageId)
+        .eq('org_id', input.orgId)
+        .eq('channel_id', input.channelId)
+        .is('deleted_at', null)
+        .maybeSingle<{ id: string }>();
+      if (anchorErr) throw new InternalServerErrorException(anchorErr.message);
+      resolvedFromMessageId = anchorMessage?.id ?? null;
+    }
+
+    const { error } = await serviceSupabase.rpc('mark_channel_unread', {
+      p_org_id: input.orgId,
+      p_channel_id: input.channelId,
+      p_account_id: resolvedAccountId,
+      p_actor_profile_id: input.profileId,
+      p_from_message_id: resolvedFromMessageId,
+    });
+    if (error) throw new InternalServerErrorException(error.message);
+    return { success: true };
   }
 
   async markReadState(

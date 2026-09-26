@@ -1,7 +1,21 @@
-import { InternalServerErrorException } from '@nestjs/common';
+import { ForbiddenException, InternalServerErrorException } from '@nestjs/common';
 import { ChannelsService } from './channels.service';
 import { ThreadsService } from '@iconicedu/api/modules/threads/threads.service';
 import { evaluateApiBooleanFlag } from '@iconicedu/api/lib/flags/posthog-openfeature';
+import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
+
+/** A thenable, chainable stand-in for a directly-awaited (no .maybeSingle()) query. */
+function makeThenableChain(result: { data: unknown; error: null }) {
+  const chain: Record<string, unknown> = {};
+  ['select', 'eq', 'in', 'is', 'not', 'order', 'limit'].forEach((method) => {
+    chain[method] = jest.fn(() => chain);
+  });
+  (chain as { then: (...args: unknown[]) => Promise<unknown> }).then = (
+    resolve,
+    reject,
+  ) => Promise.resolve(result).then(resolve as never, reject as never);
+  return chain;
+}
 
 // ─── Supabase client mocks ────────────────────────────────────────────────────
 
@@ -557,6 +571,135 @@ describe('ChannelsService.markRead', () => {
   });
 });
 
+describe('ChannelsService.markUnread', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    const methods = ['from', 'select', 'eq', 'in', 'is', 'order', 'limit'];
+    for (const m of methods) {
+      (mockSessionClient as Record<string, jest.Mock>)[m].mockReturnValue(
+        mockSessionClient,
+      );
+      (mockServiceClient as Record<string, jest.Mock>)[m].mockReturnValue(
+        mockServiceClient,
+      );
+    }
+    mockServiceClient.rpc.mockReturnValue(mockServiceClient);
+  });
+
+  describe('direct member (own profile, session can see membership)', () => {
+    it('derives the account id from the authenticated profile, ignoring a mismatched client-supplied accountId', async () => {
+      mockMaybeSingle
+        .mockResolvedValueOnce({ data: { id: 'member-1' }, error: null }) // membership
+        .mockResolvedValueOnce({ data: { account_id: 'real-acct-1' }, error: null }); // profile lookup
+
+      mockRpc.mockResolvedValueOnce({ data: null, error: null });
+
+      const svc = makeService();
+      const result = await svc.markUnread('token', {
+        ...BASE_INPUT,
+        accountId: 'attacker-supplied-acct-id',
+      });
+
+      expect(result).toEqual({ success: true });
+      expect(mockRpc).toHaveBeenCalledWith(
+        'mark_channel_unread',
+        expect.objectContaining({
+          p_account_id: 'real-acct-1',
+          p_actor_profile_id: BASE_INPUT.profileId,
+        }),
+      );
+    });
+
+    it('passes a fromMessageId through as the RPC anchor once verified to belong to this channel', async () => {
+      mockMaybeSingle
+        .mockResolvedValueOnce({ data: { id: 'member-1' }, error: null }) // membership
+        .mockResolvedValueOnce({ data: { account_id: 'real-acct-1' }, error: null }) // profile lookup
+        .mockResolvedValueOnce({ data: { id: 'message-1' }, error: null }); // anchor message lookup
+
+      mockRpc.mockResolvedValueOnce({ data: null, error: null });
+
+      const svc = makeService();
+      await svc.markUnread('token', {
+        ...BASE_INPUT,
+        fromMessageId: 'message-1',
+      });
+
+      expect(mockRpc).toHaveBeenCalledWith(
+        'mark_channel_unread',
+        expect.objectContaining({ p_from_message_id: 'message-1' }),
+      );
+    });
+
+    it('drops a fromMessageId that does not belong to this org/channel rather than trusting it', async () => {
+      mockMaybeSingle
+        .mockResolvedValueOnce({ data: { id: 'member-1' }, error: null }) // membership
+        .mockResolvedValueOnce({ data: { account_id: 'real-acct-1' }, error: null }) // profile lookup
+        .mockResolvedValueOnce({ data: null, error: null }); // anchor message lookup → not found
+
+      mockRpc.mockResolvedValueOnce({ data: null, error: null });
+
+      const svc = makeService();
+      await svc.markUnread('token', {
+        ...BASE_INPUT,
+        fromMessageId: 'message-from-another-channel',
+      });
+
+      expect(mockRpc).toHaveBeenCalledWith(
+        'mark_channel_unread',
+        expect.objectContaining({ p_from_message_id: null }),
+      );
+    });
+  });
+
+  describe('guardian acting as child (session RLS blocks membership)', () => {
+    beforeEach(() => {
+      mockAuthGetUser.mockResolvedValue({
+        data: { user: { id: 'guardian-auth-uid' } },
+        error: null,
+      });
+    });
+
+    it('resolves the child account id via family_links, ignoring a mismatched client-supplied accountId', async () => {
+      mockMaybeSingle
+        .mockResolvedValueOnce({ data: null, error: null }) // session membership → null (RLS)
+        .mockResolvedValueOnce({ data: { id: 'guardian-acct-1' }, error: null }) // guardian account
+        .mockResolvedValueOnce({ data: { account_id: 'child-acct-1' }, error: null }) // child profile
+        .mockResolvedValueOnce({ data: { id: 'family-link-1' }, error: null }) // family_links
+        .mockResolvedValueOnce({ data: { id: 'svc-member-1' }, error: null }); // service membership
+
+      mockRpc.mockResolvedValueOnce({ data: null, error: null });
+
+      const svc = makeService();
+      await svc.markUnread('guardian-token', {
+        ...BASE_INPUT,
+        accountId: 'attacker-supplied-acct-id',
+      });
+
+      expect(mockRpc).toHaveBeenCalledWith(
+        'mark_channel_unread',
+        expect.objectContaining({
+          p_account_id: 'child-acct-1',
+          p_actor_profile_id: 'child-profile-1',
+        }),
+      );
+    });
+  });
+
+  describe('error handling', () => {
+    it('throws ForbiddenException when the profile has no resolvable account', async () => {
+      mockMaybeSingle
+        .mockResolvedValueOnce({ data: { id: 'member-1' }, error: null }) // membership
+        .mockResolvedValueOnce({ data: null, error: null }); // profile lookup → not found
+
+      const svc = makeService();
+      await expect(svc.markUnread('token', BASE_INPUT)).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(mockRpc).not.toHaveBeenCalled();
+    });
+  });
+});
+
 describe('ChannelsService.markReadState', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -620,5 +763,82 @@ describe('ChannelsService.markReadState', () => {
         p_last_read_message_id: 'reply-1',
       }),
     );
+  });
+});
+
+describe('ChannelsService.getDirectMessages', () => {
+  it('returns is_manually_unread from channel_read_state, not just unread_count', async () => {
+    const membersChain = makeThenableChain({
+      data: [
+        {
+          channel_id: 'channel-1',
+          profile_id: 'other-profile',
+          profile: {
+            id: 'other-profile',
+            account_id: 'other-account',
+            display_name: 'Other Person',
+            first_name: null,
+            last_name: null,
+            avatar_url: null,
+            avatar_seed: null,
+            timezone: null,
+            city: null,
+            country_code: null,
+            country_name: null,
+            kind: 'guardian',
+            ui_theme_key: null,
+          },
+        },
+      ],
+      error: null,
+    });
+    const channelsChain = makeThenableChain({
+      data: [
+        {
+          id: 'channel-1',
+          org_id: 'org-1',
+          topic: 'Test DM',
+          description: null,
+          kind: 'dm',
+          updated_at: '2026-01-01T00:00:00.000Z',
+          ui_defaults: null,
+        },
+      ],
+      error: null,
+    });
+    const readStateChain = makeThenableChain({
+      data: [{ channel_id: 'channel-1', unread_count: 0, manually_marked_unread: true }],
+      error: null,
+    });
+    const threadReadStateChain = makeThenableChain({ data: [], error: null });
+
+    let readStateCallCount = 0;
+    const customClient = {
+      from: jest.fn((table: string) => {
+        if (table === 'channel_members') return membersChain;
+        if (table === 'channels') return channelsChain;
+        if (table === 'channel_read_state') {
+          readStateCallCount += 1;
+          return readStateCallCount === 1 ? readStateChain : threadReadStateChain;
+        }
+        throw new Error(`Unexpected table: ${table}`);
+      }),
+    };
+
+    (createSupabaseSessionClient as jest.Mock).mockReturnValueOnce(customClient);
+
+    const svc = makeService();
+    const result = await svc.getDirectMessages('token', {
+      orgId: 'org-1',
+      profileId: 'my-profile',
+      accountId: 'my-account',
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      id: 'channel-1',
+      unread_count: 0,
+      is_manually_unread: true,
+    });
   });
 });

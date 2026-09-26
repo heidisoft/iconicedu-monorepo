@@ -70,10 +70,19 @@ export interface NotificationPreferenceVM {
 
 export type NotificationScopeKindVM = 'channel' | 'learning_space';
 
+/** Richer per-conversation notification state; `muted` above is kept in sync for readers that only understand the boolean. */
+export type NotificationConversationModeVM =
+  | 'normal'
+  | 'mentions_only'
+  | 'muted_until'
+  | 'muted_until_enabled';
+
 export interface NotificationScopedPreferenceVM extends NotificationPreferenceVM {
   scopeKind: NotificationScopeKindVM;
   scopeId: UUID;
   prefKey: NotificationKey | string;
+  mode?: NotificationConversationModeVM;
+  mutedUntil?: ISODateTime | null;
 }
 
 export type NotificationKey =

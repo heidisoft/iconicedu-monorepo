@@ -49,6 +49,9 @@ import {
 } from '@/lib/api/queries';
 import { profileAvatarColors, profileAvatarBg } from '@/lib/profile-avatar-colors';
 import { BottomSheet } from '@iconicedu/ui-native';
+import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
+import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
+import { NotificationModeSection } from '@/components/messages/notification-mode-section';
 
 const CHANNEL_FILES_BUCKET = 'channel-files';
 
@@ -361,6 +364,23 @@ function parseChannelUiDefaults(value: unknown): ParsedMobileChannelUiDefaults {
 export function getVisibleChannelInfoTabs(input?: ParsedMobileChannelUiDefaults | null) {
   const disabledTabs = new Set(input?.disabledTabs ?? []);
   return TABS.filter((tab) => !disabledTabs.has(tab.key));
+}
+
+/** Learning spaces are scoped separately from plain channels/DMs. */
+export function resolveNotificationScopeKind(
+  kind: ChannelInfoSheetProps['kind'],
+): 'channel' | 'learning_space' {
+  return kind === 'space' ? 'learning_space' : 'channel';
+}
+
+/** The notification controls need the flag plus a full identity to query with. */
+export function resolveNotificationControlsVisibility(input: {
+  enabled: boolean;
+  channelId?: string | null;
+  orgId?: string | null;
+  profileId?: string | null;
+}): boolean {
+  return Boolean(input.enabled && input.channelId && input.orgId && input.profileId);
 }
 
 // ─── Tab icon renderer ─────────────────────────────────────────────────────────
@@ -1166,7 +1186,18 @@ export function ChannelInfoSheet({
     null,
   );
 
+  const enableNotificationConversationControls = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.enableNotificationConversationControls,
+  );
+
   const isDm = kind === 'dm';
+  const notificationScopeKind = resolveNotificationScopeKind(kind);
+  const showNotificationControls = resolveNotificationControlsVisibility({
+    enabled: enableNotificationConversationControls,
+    channelId,
+    orgId,
+    profileId: currentProfileId,
+  });
   const seed = avatarSeed ?? title;
   const heroAvatarColors = profileAvatarColors({ seed, themeKey: avatarThemeKey });
   const typeLabel = isDm ? 'Direct Message' : kind === 'space' ? 'Class' : 'Channel';
@@ -1507,6 +1538,16 @@ export function ChannelInfoSheet({
                   </>
                 )}
               </View>
+
+              {/* Per-conversation notification controls */}
+              {showNotificationControls && (
+                <NotificationModeSection
+                  orgId={orgId}
+                  profileId={currentProfileId}
+                  scopeKind={notificationScopeKind}
+                  scopeId={channelId!}
+                />
+              )}
             </ScrollView>
           ) : (
             /* ── Channel / Space: compact hero + fixed tabs + scrollable content ── */
@@ -1536,6 +1577,18 @@ export function ChannelInfoSheet({
                   </TouchableOpacity>
                 )}
               </View>
+
+              {/* Per-conversation notification controls */}
+              {showNotificationControls && (
+                <View style={{ paddingTop: 12 }}>
+                  <NotificationModeSection
+                    orgId={orgId}
+                    profileId={currentProfileId}
+                    scopeKind={notificationScopeKind}
+                    scopeId={channelId!}
+                  />
+                </View>
+              )}
 
               {/* Fixed tab bar */}
               {visibleTabs.length > 1 ? (
@@ -1663,4 +1716,6 @@ export function ChannelInfoSheet({
 export const __test__ = {
   getVisibleChannelInfoTabs,
   parseChannelUiDefaults,
+  resolveNotificationControlsVisibility,
+  resolveNotificationScopeKind,
 };

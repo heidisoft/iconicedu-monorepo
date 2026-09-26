@@ -20,6 +20,8 @@ export interface ChannelReadStateVM {
   lastReadAt?: ISODateTime;
   unreadCount: number;
   threadUnreadCount?: number;
+  /** True when the user explicitly marked this channel unread, as opposed to it having unread messages. */
+  isManuallyUnread?: boolean;
 }
 
 export interface ThreadReadStateVM {
@@ -144,9 +146,31 @@ export interface MessageMentionVM {
   end: number;
 }
 
+/** A compact, denormalized snapshot of the message being replied to, so it can render inline without an extra fetch. */
+export interface MessageReplyReferenceVM {
+  messageId: UUID;
+  senderId: UUID;
+  senderName: string;
+  snippet: string;
+  type: MessageTypeVM;
+  /** True when the referenced message is deleted, hidden, or otherwise no longer accessible to the viewer. */
+  isUnavailable?: boolean;
+}
+
 export interface MessageSocialVM {
   reactions: ReactionVM[];
   thread?: ThreadVM;
+  replyTo?: MessageReplyReferenceVM;
+}
+
+/** Fetched, cacheable metadata for a link preview card. */
+export interface LinkPreviewMetadataVM {
+  url: string;
+  title: string;
+  description?: string;
+  imageUrl?: string;
+  siteName?: string;
+  favicon?: string;
 }
 
 interface BaseMessageVM {
@@ -321,14 +345,7 @@ export interface HomeworkSubmissionMessageVM extends BaseMessageVM {
 export interface LinkPreviewMessageVM extends BaseMessageVM {
   core: MessageCoreVM & { type: 'link-preview' };
   content?: { text?: string; mentions?: MessageMentionVM[] };
-  link: {
-    url: string;
-    title: string;
-    description?: string;
-    imageUrl?: string;
-    siteName?: string;
-    favicon?: string;
-  };
+  link: LinkPreviewMetadataVM;
 }
 
 export interface AudioRecordingMessageVM extends BaseMessageVM {

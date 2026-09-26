@@ -42,3 +42,60 @@ describe('channel-info-sheet tab visibility', () => {
     expect(parsed.disabledTabs).toEqual(['saved', 'files']);
   });
 });
+
+describe('channel-info-sheet notification controls', () => {
+  it('stays hidden while the feature flag is off', () => {
+    expect(
+      __test__.resolveNotificationControlsVisibility({
+        enabled: false,
+        channelId: 'channel-1',
+        orgId: 'org-1',
+        profileId: 'profile-1',
+      }),
+    ).toBe(false);
+  });
+
+  it('shows once the flag is on and the identity is complete', () => {
+    expect(
+      __test__.resolveNotificationControlsVisibility({
+        enabled: true,
+        channelId: 'channel-1',
+        orgId: 'org-1',
+        profileId: 'profile-1',
+      }),
+    ).toBe(true);
+  });
+
+  it('stays hidden when the channel or identity is missing', () => {
+    expect(
+      __test__.resolveNotificationControlsVisibility({
+        enabled: true,
+        channelId: '',
+        orgId: 'org-1',
+        profileId: 'profile-1',
+      }),
+    ).toBe(false);
+    expect(
+      __test__.resolveNotificationControlsVisibility({
+        enabled: true,
+        channelId: 'channel-1',
+        orgId: '',
+        profileId: 'profile-1',
+      }),
+    ).toBe(false);
+    expect(
+      __test__.resolveNotificationControlsVisibility({
+        enabled: true,
+        channelId: 'channel-1',
+        orgId: 'org-1',
+        profileId: '',
+      }),
+    ).toBe(false);
+  });
+
+  it('maps learning spaces to the learning_space scope and everything else to channel', () => {
+    expect(__test__.resolveNotificationScopeKind('space')).toBe('learning_space');
+    expect(__test__.resolveNotificationScopeKind('channel')).toBe('channel');
+    expect(__test__.resolveNotificationScopeKind('dm')).toBe('channel');
+  });
+});

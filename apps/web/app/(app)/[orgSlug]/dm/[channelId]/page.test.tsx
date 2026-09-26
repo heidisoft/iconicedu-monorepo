@@ -12,6 +12,7 @@ const buildChannelByIdMock = vi.fn();
 const buildChannelByDmKeyMock = vi.fn();
 const resolveOrgDashboardPathMock = vi.fn(async () => '/iconic-academy');
 const enableMessageTypeComposerRunMock = vi.fn(async () => true);
+const enableP1MessagingFlagRunMock = vi.fn(async () => false);
 const enableMessageDraftsRunMock = vi.fn(async () => false);
 const enableMessageEditRunMock = vi.fn(async () => false);
 const enableMessageSendReliabilityRunMock = vi.fn(async () => false);
@@ -78,6 +79,18 @@ vi.mock('@iconicedu/web/lib/org/resolve-dashboard-path', () => ({
 vi.mock('@iconicedu/web/flags', () => ({
   enableMessageTypeComposer: {
     run: (...args: unknown[]) => enableMessageTypeComposerRunMock(...args),
+  },
+  enableMessageMarkUnread: {
+    run: (...args: unknown[]) => enableP1MessagingFlagRunMock(...args),
+  },
+  enableMessageReplyReference: {
+    run: (...args: unknown[]) => enableP1MessagingFlagRunMock(...args),
+  },
+  enableNotificationConversationControls: {
+    run: (...args: unknown[]) => enableP1MessagingFlagRunMock(...args),
+  },
+  enableMessageListFormatting: {
+    run: (...args: unknown[]) => enableP1MessagingFlagRunMock(...args),
   },
   enableMessageDrafts: {
     run: (...args: unknown[]) => enableMessageDraftsRunMock(...args),

@@ -21,7 +21,13 @@ import type {
   ThreadVM,
 } from '@iconicedu/shared-types';
 import { MESSAGE_EDIT_WINDOW_MINUTES } from '@iconicedu/shared-types';
-import { buildSenderProfile, mapRowToMessageVM } from '@iconicedu/utils';
+import {
+  buildSenderProfile,
+  mapRowToMessageVM,
+  extractFirstUrl,
+  fetchLinkPreviewMetadata,
+  isSafeLinkPreviewUrl,
+} from '@iconicedu/utils';
 import {
   resolveActivityChannelContext,
   resolveVisibilityAudienceFromMessageRow,
@@ -117,130 +123,6 @@ function buildWritableProfileDisplayName(profile: WritableProfileRow) {
     .trim();
 
   return fullName || 'Someone';
-}
-
-const URL_PATTERN = /(https?:\/\/[^\s]+)/i;
-const PRIVATE_HOST_PATTERN =
-  /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.)/i;
-
-function decodeHtml(value: string) {
-  return value
-    .replace(/&amp;/g, '&')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>');
-}
-
-function extractMetaContent(html: string, property: string) {
-  const patterns = [
-    new RegExp(
-      `<meta[^>]+property=["']${property}["'][^>]+content=["']([^"']+)["'][^>]*>`,
-      'i',
-    ),
-    new RegExp(
-      `<meta[^>]+content=["']([^"']+)["'][^>]+property=["']${property}["'][^>]*>`,
-      'i',
-    ),
-    new RegExp(
-      `<meta[^>]+name=["']${property}["'][^>]+content=["']([^"']+)["'][^>]*>`,
-      'i',
-    ),
-    new RegExp(
-      `<meta[^>]+content=["']([^"']+)["'][^>]+name=["']${property}["'][^>]*>`,
-      'i',
-    ),
-  ];
-
-  for (const pattern of patterns) {
-    const match = html.match(pattern);
-    if (match?.[1]) {
-      return decodeHtml(match[1].trim());
-    }
-  }
-
-  return undefined;
-}
-
-function extractTitle(html: string) {
-  const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-  return titleMatch?.[1] ? decodeHtml(titleMatch[1].trim()) : undefined;
-}
-
-function resolveRelativeUrl(baseUrl: string, candidate?: string) {
-  if (!candidate) return undefined;
-
-  try {
-    return new globalThis.URL(candidate, baseUrl).toString();
-  } catch {
-    return undefined;
-  }
-}
-
-function extractFirstUrl(text: string) {
-  return text.match(URL_PATTERN)?.[1] ?? null;
-}
-
-function isSafeLinkPreviewUrl(url: string): boolean {
-  try {
-    const parsed = new globalThis.URL(url);
-    if (!['http:', 'https:'].includes(parsed.protocol)) {
-      return false;
-    }
-    return !PRIVATE_HOST_PATTERN.test(parsed.hostname);
-  } catch {
-    return false;
-  }
-}
-
-async function fetchLinkPreviewMetadata(url: string) {
-  if (!isSafeLinkPreviewUrl(url)) {
-    throw new Error('Unsafe URL for link preview');
-  }
-
-  const normalizedUrl = new globalThis.URL(url).toString();
-  const fallbackHost = new globalThis.URL(normalizedUrl).hostname.replace(/^www\./, '');
-
-  try {
-    const response = await fetch(normalizedUrl, {
-      redirect: 'follow',
-      headers: {
-        'user-agent': 'ICONICEDULinkPreviewBot/1.0',
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch link preview: ${response.status}`);
-    }
-
-    const html = await response.text();
-    const ogTitle = extractMetaContent(html, 'og:title');
-    const ogDescription = extractMetaContent(html, 'og:description');
-    const ogImage = extractMetaContent(html, 'og:image');
-    const ogSiteName = extractMetaContent(html, 'og:site_name');
-    const metaDescription = extractMetaContent(html, 'description');
-    const title = ogTitle ?? extractTitle(html) ?? fallbackHost;
-    const faviconHref =
-      html.match(
-        /<link[^>]+rel=["'][^"']*icon[^"']*["'][^>]+href=["']([^"']+)["'][^>]*>/i,
-      )?.[1] ?? '/favicon.ico';
-
-    return {
-      url: normalizedUrl,
-      title,
-      description: ogDescription ?? metaDescription,
-      imageUrl: resolveRelativeUrl(normalizedUrl, ogImage),
-      siteName: ogSiteName ?? fallbackHost,
-      favicon: resolveRelativeUrl(normalizedUrl, faviconHref),
-    };
-  } catch {
-    return {
-      url: normalizedUrl,
-      title: fallbackHost,
-      siteName: fallbackHost,
-      favicon: resolveRelativeUrl(normalizedUrl, '/favicon.ico'),
-    };
-  }
 }
 
 function sanitizeMentions(
@@ -1004,6 +886,96 @@ export class MessagesService {
     return { accountId: account.id, profile: senderProfile };
   }
 
+  private async resolveReplyReference(input: {
+    serviceSupabase: ReturnType<typeof createSupabaseServiceClient>;
+    orgId: string;
+    channelId: string;
+    replyToMessageId: string;
+    currentProfileId: string;
+  }): Promise<{
+    messageId: string;
+    senderId: string;
+    senderName: string;
+    snippet: string;
+    type: string;
+  } | null> {
+    const messageResponse = await input.serviceSupabase
+      .from('messages')
+      .select(
+        'id, sender_profile_id, type, deleted_at, visibility_type, visibility_user_ids',
+      )
+      .eq('org_id', input.orgId)
+      .eq('channel_id', input.channelId)
+      .eq('id', input.replyToMessageId)
+      .maybeSingle<{
+        id: string;
+        sender_profile_id: string;
+        type: string;
+        deleted_at: string | null;
+        visibility_type: string | null;
+        visibility_user_ids: string[] | null;
+      }>();
+    if (messageResponse.error) {
+      throw new InternalServerErrorException(messageResponse.error.message);
+    }
+    const target = messageResponse.data;
+    // A missing/deleted reply target degrades gracefully to "no reference"
+    // rather than failing the whole send. A target the caller isn't in the
+    // visibility audience for (e.g. another user's hidden support message)
+    // degrades the same way instead of leaking its contents into the reply.
+    if (!target || target.deleted_at) return null;
+    if (
+      target.visibility_type === 'specific-users' &&
+      !(target.visibility_user_ids ?? []).includes(input.currentProfileId)
+    ) {
+      return null;
+    }
+
+    const [payloadResponse, profileResponse] = await Promise.all([
+      input.serviceSupabase
+        .from('message_text')
+        .select('payload')
+        .eq('message_id', target.id)
+        .maybeSingle<{ payload: Record<string, unknown> | null }>(),
+      input.serviceSupabase
+        .from('profiles')
+        .select('display_name, first_name, last_name')
+        .eq('id', target.sender_profile_id)
+        .is('deleted_at', null)
+        .maybeSingle<{
+          display_name: string | null;
+          first_name: string | null;
+          last_name: string | null;
+        }>(),
+    ]);
+    if (payloadResponse.error) {
+      throw new InternalServerErrorException(payloadResponse.error.message);
+    }
+    if (profileResponse.error) {
+      throw new InternalServerErrorException(profileResponse.error.message);
+    }
+
+    const snippet =
+      typeof payloadResponse.data?.payload?.text === 'string'
+        ? payloadResponse.data.payload.text
+        : target.type;
+    const senderName =
+      profileResponse.data?.display_name?.trim() ||
+      [profileResponse.data?.first_name, profileResponse.data?.last_name]
+        .filter(Boolean)
+        .join(' ')
+        .trim() ||
+      'Unknown';
+
+    return {
+      messageId: target.id,
+      senderId: target.sender_profile_id,
+      senderName,
+      snippet: snippet.slice(0, 140),
+      type: target.type,
+    };
+  }
+
   private async findExistingMessageByClientId(input: {
     serviceSupabase: ReturnType<typeof createSupabaseServiceClient>;
     orgId: string;
@@ -1381,6 +1353,16 @@ export class MessagesService {
         );
       }
 
+      const replyReference = input.replyToMessageId
+        ? await this.resolveReplyReference({
+            serviceSupabase,
+            orgId: input.orgId,
+            channelId: input.channelId,
+            replyToMessageId: input.replyToMessageId,
+            currentProfileId: actor.profile.id,
+          })
+        : null;
+
       const now = new Date().toISOString();
       const activityContext = await resolveActivityChannelContext({
         supabase: serviceSupabase,
@@ -1469,6 +1451,7 @@ export class MessagesService {
           visibility_user_ids: supportVisibility.visibility_user_ids ?? null,
           thread_id: threadId,
           thread_parent_id: input.threadParentId ?? null,
+          reply_to_message_id: replyReference?.messageId ?? null,
           created_at: now,
           created_by: actor.profile.id,
           updated_at: now,
@@ -1515,6 +1498,7 @@ export class MessagesService {
               ? {
                   ...(content ? { text: content } : {}),
                   ...(sanitizedMentions.length ? { mentions: sanitizedMentions } : {}),
+                  ...(replyReference ? { replyTo: replyReference } : {}),
                   url: previewMetadata.url,
                   title: previewMetadata.title,
                   description: previewMetadata.description,
@@ -1525,6 +1509,7 @@ export class MessagesService {
               : {
                   text: content,
                   ...(sanitizedMentions.length ? { mentions: sanitizedMentions } : {}),
+                  ...(replyReference ? { replyTo: replyReference } : {}),
                 },
           created_at: now,
           created_by: actor.profile.id,
@@ -2238,5 +2223,15 @@ export class MessagesService {
 
     if (error) throw new InternalServerErrorException(error.message);
     return { success: true };
+  }
+
+  async fetchLinkPreview(url: string) {
+    if (!url?.trim()) {
+      throw new BadRequestException('url is required');
+    }
+    if (!isSafeLinkPreviewUrl(url)) {
+      throw new BadRequestException('url is not allowed');
+    }
+    return fetchLinkPreviewMetadata(url);
   }
 }

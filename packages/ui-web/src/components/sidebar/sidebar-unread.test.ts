@@ -201,3 +201,65 @@ describe('class unread helpers', () => {
     expect(unread).toBe(0);
   });
 });
+
+describe('isManuallyUnread treatment', () => {
+  it('treats a manually-marked-unread direct message channel as unread even with a zero count', () => {
+    const unread = getDirectMessageItemUnreadCount(
+      {
+        collections: {
+          readState: { unreadCount: 0, isManuallyUnread: true },
+        },
+      } as unknown as ChannelVM,
+      'account-self',
+    );
+
+    expect(unread).toBeGreaterThan(0);
+  });
+
+  it('does not double-count when a manually-unread channel also has a real unread count', () => {
+    const unread = getDirectMessageItemUnreadCount(
+      {
+        collections: {
+          readState: { unreadCount: 4, isManuallyUnread: true },
+        },
+      } as unknown as ChannelVM,
+      'account-self',
+    );
+
+    expect(unread).toBe(4);
+  });
+
+  it('does not mark a channel unread when isManuallyUnread is false and there is no other unread signal', () => {
+    const unread = getDirectMessageItemUnreadCount(
+      {
+        collections: {
+          readState: {
+            unreadCount: 0,
+            isManuallyUnread: false,
+            lastReadAt: '2026-02-16T00:00:00.000Z',
+          },
+        },
+      } as unknown as ChannelVM,
+      'account-self',
+    );
+
+    expect(unread).toBe(0);
+  });
+
+  it('treats a manually-marked-unread learning space channel as unread', () => {
+    const unread = getLearningSpaceItemUnreadCountForUser(
+      {
+        channels: {
+          primaryChannel: {
+            collections: {
+              readState: { unreadCount: 0, isManuallyUnread: true },
+            },
+          },
+        },
+      } as unknown as LearningSpaceVM,
+      { accountId: 'account-1', profileId: 'profile-1' },
+    );
+
+    expect(unread).toBeGreaterThan(0);
+  });
+});

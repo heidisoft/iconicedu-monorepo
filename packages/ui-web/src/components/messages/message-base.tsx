@@ -39,6 +39,8 @@ import type { MessageActionState } from '@iconicedu/ui-web/components/messages/c
 import { getFeedMessageBubbleClassName } from './feed-message-bubble.styles';
 import { getFeedRoleIcon, getFeedRoleLabel } from './feed-message-role';
 import { MessageManagementMenu } from './message-management-menu';
+import { MessageReplyQuote } from './message-reply-quote';
+import { useOptionalMessagesState } from './context/messages-state-provider';
 
 export interface MessageBaseProps {
   message: MessageVM;
@@ -93,6 +95,18 @@ export const MessageBase = memo(function MessageBase({
   const [isThreadActionPending, setIsThreadActionPending] = useState(false);
   const [isQuickActionsActive, setIsQuickActionsActive] = useState(false);
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+
+  const messagesState = useOptionalMessagesState();
+  const replyTo = message.social.replyTo;
+  const showReplyQuote =
+    Boolean(replyTo) && Boolean(messagesState?.enableMessageReplyReference);
+  const isReplyTargetReachable = showReplyQuote
+    ? (messagesState?.messages ?? []).some((item) => item.ids.id === replyTo?.messageId)
+    : false;
+  const handleJumpToReplyOriginal = useCallback(() => {
+    if (!replyTo) return;
+    messagesState?.scrollToMessage?.(replyTo.messageId);
+  }, [messagesState, replyTo]);
 
   const senderName = getProfileDisplayName(message.core.sender.profile);
   const isOwnMessage = currentUserId === message.core.sender.ids.id;
@@ -620,6 +634,13 @@ export const MessageBase = memo(function MessageBase({
                   (isOwnMessage ? 'bg-chat-bubble-own' : 'bg-chat-bubble-other'),
               )}
             >
+              {showReplyQuote && replyTo ? (
+                <MessageReplyQuote
+                  replyTo={replyTo}
+                  isReachable={isReplyTargetReachable}
+                  onClick={isReplyTargetReachable ? handleJumpToReplyOriginal : undefined}
+                />
+              ) : null}
               {children}
             </div>
             {quickActionControls && !isFeedTheme ? (

@@ -49,6 +49,32 @@ export function getLocalMobileFeatureFlagFallback(key: MobileFeatureFlagKey): bo
     );
   }
 
+  if (key === mobileFeatureFlagKeys.enableMessageMarkUnread) {
+    return parseBooleanFeatureFlag(process.env.EXPO_PUBLIC_ENABLE_MESSAGE_MARK_UNREAD);
+  }
+
+  if (key === mobileFeatureFlagKeys.enableMessageReplyReference) {
+    return parseBooleanFeatureFlag(
+      process.env.EXPO_PUBLIC_ENABLE_MESSAGE_REPLY_REFERENCE,
+    );
+  }
+
+  if (key === mobileFeatureFlagKeys.enableMobileLinkPreviews) {
+    return parseBooleanFeatureFlag(process.env.EXPO_PUBLIC_ENABLE_MOBILE_LINK_PREVIEWS);
+  }
+
+  if (key === mobileFeatureFlagKeys.enableNotificationConversationControls) {
+    return parseBooleanFeatureFlag(
+      process.env.EXPO_PUBLIC_ENABLE_NOTIFICATION_CONVERSATION_CONTROLS,
+    );
+  }
+
+  if (key === mobileFeatureFlagKeys.enableMessageListFormatting) {
+    return parseBooleanFeatureFlag(
+      process.env.EXPO_PUBLIC_ENABLE_MESSAGE_LIST_FORMATTING,
+    );
+  }
+
   if (key === mobileFeatureFlagKeys.enableMessageDrafts) {
     return parseBooleanFeatureFlag(process.env.EXPO_PUBLIC_ENABLE_MESSAGE_DRAFTS);
   }

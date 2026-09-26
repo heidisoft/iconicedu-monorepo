@@ -213,4 +213,23 @@ export class ChannelsController {
       channelId,
     });
   }
+
+  @Post(':channelId/mark-unread')
+  @UseGuards(AuthGuard)
+  markUnread(
+    @Req() req: AuthenticatedRequest,
+    @Param('channelId') channelId: string,
+    @Body()
+    body: {
+      orgId: string;
+      accountId: string;
+      profileId: string;
+      fromMessageId?: string | null;
+    },
+  ) {
+    return this.channelsService.markUnread(
+      extractBearerToken(req.headers.authorization),
+      { ...body, channelId },
+    );
+  }
 }

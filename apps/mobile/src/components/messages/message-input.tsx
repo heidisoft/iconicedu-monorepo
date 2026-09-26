@@ -29,10 +29,18 @@ import {
   FileText,
   Play,
   Pause,
+  List,
+  ListOrdered,
+  ExternalLink,
   Bold,
   Italic,
   Check,
 } from 'lucide-react-native';
+import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
+import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
+import { fetchLinkPreview, type LinkPreviewMetadata } from '@/lib/api/queries';
+import { findFirstMessageLink } from '@/lib/messages/link-opening';
+import { applyListPrefixToSelection } from '@/lib/messages/list-formatting';
 import { useMessageDraft, type MessageDraftScope } from '@/hooks/use-message-draft';
 import { generateClientMessageId } from '@/lib/messages/client-message-id';
 import {
@@ -116,6 +124,10 @@ type MessageInputProps = {
   replyTo?: MessageVM | null;
   /** Called when the user dismisses the reply preview with ✕. */
   onCancelReply?: () => void;
+  /** When set, shows a compact "quote reply" preview banner above the input bar. */
+  quoteReplyTo?: MessageVM | null;
+  /** Called when the user dismisses the quote-reply preview with ✕. */
+  onCancelQuoteReply?: () => void;
 
   // ── Automatic drafts (issue #264 capability #1) — gate with enableMessageDrafts ──
   enableDrafts?: boolean;
@@ -169,6 +181,14 @@ function makeStyles(C: AppColors, bottomInset: number, keyboardVisible: boolean)
       backgroundColor: C.teal,
     },
     replyInfo: { flex: 1 },
+    replyKindLabel: {
+      fontSize: 11,
+      fontWeight: '700',
+      textTransform: 'uppercase',
+      letterSpacing: 0.4,
+      color: C.textFaint,
+      marginBottom: 2,
+    },
     replySender: {
       fontSize: 13,
       fontWeight: '600',
@@ -178,6 +198,53 @@ function makeStyles(C: AppColors, bottomInset: number, keyboardVisible: boolean)
     replyText: {
       fontSize: 13,
       color: C.textMuted,
+    },
+
+    // Link preview card — sits above the bar while composing, same slot pattern
+    // as the reply preview (dismiss-only: does not remove the URL from the text).
+    linkPreviewCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      backgroundColor: C.bg,
+      borderTopWidth: 1,
+      borderTopColor: C.border,
+    },
+    linkPreviewImg: {
+      width: 44,
+      height: 44,
+      borderRadius: 8,
+      backgroundColor: C.card,
+    },
+    linkPreviewBody: { flex: 1, minWidth: 0 },
+    linkPreviewTitle: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: C.text,
+    },
+    linkPreviewDesc: {
+      fontSize: 12,
+      color: C.textMuted,
+      marginTop: 1,
+    },
+    linkPreviewSite: {
+      fontSize: 11,
+      color: C.textFaint,
+      marginTop: 2,
+    },
+
+    // List-formatting toolbar buttons — small squares next to the "+" button
+    listFormatBtn: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: C.card,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: C.border,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
 
     // Attachment preview strip (sits above the bar, same pattern as reply preview)
@@ -454,6 +521,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   onTypingStop,
   replyTo,
   onCancelReply,
+  quoteReplyTo,
+  onCancelQuoteReply,
   enableDrafts = false,
   draftScope,
   editingMessage = null,
@@ -484,6 +553,112 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const s = React.useMemo(
     () => makeStyles(colors, insets.bottom, keyboardVisible),
     [colors, insets.bottom, keyboardVisible],
+  );
+
+  const enableMobileLinkPreviews = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.enableMobileLinkPreviews,
+  );
+  const enableMessageListFormatting = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.enableMessageListFormatting,
+  );
+
+  // ── Link preview (composer-time only — capability #11) ───────────────────
+  const [linkPreviewUrl, setLinkPreviewUrl] = useState<string | null>(null);
+  const [linkPreviewData, setLinkPreviewData] = useState<LinkPreviewMetadata | null>(
+    null,
+  );
+  const [linkPreviewLoading, setLinkPreviewLoading] = useState(false);
+  const [dismissedLinkPreviewUrl, setDismissedLinkPreviewUrl] = useState<string | null>(
+    null,
+  );
+  const linkPreviewDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const linkPreviewRequestIdRef = useRef(0);
+
+  useEffect(() => {
+    if (!enableMobileLinkPreviews) {
+      setLinkPreviewUrl(null);
+      setLinkPreviewData(null);
+      setLinkPreviewLoading(false);
+      return;
+    }
+
+    const detectedUrl = findFirstMessageLink(text);
+    if (!detectedUrl) {
+      setLinkPreviewUrl(null);
+      setLinkPreviewData(null);
+      setLinkPreviewLoading(false);
+      if (linkPreviewDebounceRef.current) clearTimeout(linkPreviewDebounceRef.current);
+      return;
+    }
+
+    if (detectedUrl === linkPreviewUrl) return;
+
+    setLinkPreviewUrl(detectedUrl);
+    setLinkPreviewData(null);
+
+    if (detectedUrl === dismissedLinkPreviewUrl) {
+      setLinkPreviewLoading(false);
+      return;
+    }
+
+    if (linkPreviewDebounceRef.current) clearTimeout(linkPreviewDebounceRef.current);
+    setLinkPreviewLoading(true);
+    const requestId = ++linkPreviewRequestIdRef.current;
+    linkPreviewDebounceRef.current = setTimeout(() => {
+      fetchLinkPreview(detectedUrl)
+        .then((data) => {
+          if (linkPreviewRequestIdRef.current !== requestId) return;
+          setLinkPreviewData(data);
+        })
+        .catch(() => {
+          // Routine failure (no metadata, blocked host, offline, etc.) — no card, no toast.
+          if (linkPreviewRequestIdRef.current !== requestId) return;
+          setLinkPreviewData(null);
+        })
+        .finally(() => {
+          if (linkPreviewRequestIdRef.current !== requestId) return;
+          setLinkPreviewLoading(false);
+        });
+    }, 400);
+  }, [text, enableMobileLinkPreviews, linkPreviewUrl, dismissedLinkPreviewUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (linkPreviewDebounceRef.current) clearTimeout(linkPreviewDebounceRef.current);
+    };
+  }, []);
+
+  const handleDismissLinkPreview = useCallback(() => {
+    if (linkPreviewUrl) setDismissedLinkPreviewUrl(linkPreviewUrl);
+    setLinkPreviewData(null);
+    setLinkPreviewLoading(false);
+  }, [linkPreviewUrl]);
+
+  const showLinkPreviewCard =
+    enableMobileLinkPreviews &&
+    !!linkPreviewUrl &&
+    linkPreviewUrl !== dismissedLinkPreviewUrl &&
+    (linkPreviewLoading || !!linkPreviewData);
+
+  // ── List formatting toolbar (bullet / numbered — capability #13) ─────────
+  const handleApplyListFormat = useCallback(
+    (kind: 'bullet' | 'numbered') => {
+      const { text: nextText, cursor } = applyListPrefixToSelection(
+        text,
+        selection.start,
+        selection.end,
+        kind,
+      );
+      setText(nextText);
+      onTypingChange?.();
+      requestAnimationFrame(() => {
+        inputRef.current?.setNativeProps?.({
+          selection: { start: cursor, end: cursor },
+        });
+      });
+      setSelection({ start: cursor, end: cursor });
+    },
+    [text, selection, onTypingChange],
   );
 
   const isEditing = !!editingMessage;
@@ -576,10 +751,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
   // Auto-focus the input whenever a reply target is set
   useEffect(() => {
-    if (replyTo) {
+    if (replyTo || quoteReplyTo) {
       inputRef.current?.focus();
     }
-  }, [replyTo]);
+  }, [replyTo, quoteReplyTo]);
 
   // Reset image loading state whenever the pending set changes
   useEffect(() => {
@@ -721,6 +896,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     setText('');
     resetIOSInput();
     onTypingStop?.();
+    setLinkPreviewUrl(null);
+    setLinkPreviewData(null);
+    setDismissedLinkPreviewUrl(null);
 
     const meta: MessageSendMeta = {};
     if (enableMentions && mentionCandidates.length) {
@@ -835,28 +1013,77 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
   return (
     <>
-      {/* Reply-in-thread preview banner */}
-      {replyTo && (
+      {/* Reply preview banner — either a thread reply or a quote reply (mutually exclusive) */}
+      {(quoteReplyTo ?? replyTo) && (
         <View style={s.replyPreview}>
           <View style={s.replyAccent} />
           <View style={s.replyInfo}>
+            <Text style={s.replyKindLabel}>
+              {quoteReplyTo ? 'Replying to' : 'Reply in thread'}
+            </Text>
             <RoleNameIndicator
-              name={replyTo.core.sender.profile.displayName}
-              role={replyTo.core.sender.kind}
+              name={(quoteReplyTo ?? replyTo)!.core.sender.profile.displayName}
+              role={(quoteReplyTo ?? replyTo)!.core.sender.kind}
               textStyle={s.replySender}
               numberOfLines={1}
               iconSize={12}
             />
             <Text style={s.replyText} numberOfLines={1}>
-              {getMessagePreviewText(replyTo)}
+              {getMessagePreviewText((quoteReplyTo ?? replyTo)!)}
             </Text>
           </View>
           <TouchableOpacity
-            onPress={onCancelReply}
+            onPress={quoteReplyTo ? onCancelQuoteReply : onCancelReply}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            accessibilityLabel="Cancel reply"
+            accessibilityLabel={quoteReplyTo ? 'Cancel quote reply' : 'Cancel reply'}
           >
             <X size={18} color={colors.textMuted} />
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Link preview card — composer-time only; dismiss hides the card without
+          removing the URL from the text (re-shown only if the text changes to a
+          different URL). */}
+      {showLinkPreviewCard && (
+        <View style={s.linkPreviewCard} testID="composer-link-preview-card">
+          {linkPreviewLoading ? (
+            <ActivityIndicator size="small" color={colors.teal} />
+          ) : (
+            <>
+              {!!linkPreviewData?.imageUrl && (
+                <RNImage
+                  source={{ uri: linkPreviewData.imageUrl }}
+                  style={s.linkPreviewImg}
+                  resizeMode="cover"
+                />
+              )}
+              {!linkPreviewData?.imageUrl && (
+                <ExternalLink size={18} color={colors.textMuted} />
+              )}
+              <View style={s.linkPreviewBody}>
+                <Text style={s.linkPreviewTitle} numberOfLines={1}>
+                  {linkPreviewData?.title || linkPreviewUrl}
+                </Text>
+                {!!linkPreviewData?.description && (
+                  <Text style={s.linkPreviewDesc} numberOfLines={2}>
+                    {linkPreviewData.description}
+                  </Text>
+                )}
+                {!!linkPreviewData?.siteName && (
+                  <Text style={s.linkPreviewSite} numberOfLines={1}>
+                    {linkPreviewData.siteName}
+                  </Text>
+                )}
+              </View>
+            </>
+          )}
+          <TouchableOpacity
+            onPress={handleDismissLinkPreview}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityLabel="Dismiss link preview"
+          >
+            <X size={16} color={colors.textMuted} />
           </TouchableOpacity>
         </View>
       )}
@@ -1045,6 +1272,30 @@ export const MessageInput: React.FC<MessageInputProps> = ({
               <Plus size={22} color={colors.textMuted} />
             )}
           </TouchableOpacity>
+        )}
+
+        {/* List formatting toolbar — bullet / numbered list authoring */}
+        {enableMessageListFormatting && (
+          <>
+            <TouchableOpacity
+              style={s.listFormatBtn}
+              disabled={disabled}
+              activeOpacity={0.7}
+              onPress={() => handleApplyListFormat('bullet')}
+              accessibilityLabel="Add bullet list"
+            >
+              <List size={16} color={colors.textMuted} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={s.listFormatBtn}
+              disabled={disabled}
+              activeOpacity={0.7}
+              onPress={() => handleApplyListFormat('numbered')}
+              accessibilityLabel="Add numbered list"
+            >
+              <ListOrdered size={16} color={colors.textMuted} />
+            </TouchableOpacity>
+          </>
         )}
 
         {/* Pill: text input only */}

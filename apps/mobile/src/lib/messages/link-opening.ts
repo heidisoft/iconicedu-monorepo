@@ -69,6 +69,19 @@ export function splitMessageTextByLinks(text: string): MessageTextPart[] {
   return parts.length ? parts : [{ kind: 'text', value: text }];
 }
 
+/**
+ * Returns the first URL found in the given text (normalized to an absolute
+ * https URL), or null if none is present. Reuses the same URL_PATTERN as
+ * splitMessageTextByLinks so composer-time detection stays consistent with
+ * how sent messages are rendered.
+ */
+export function findFirstMessageLink(text: string): string | null {
+  URL_PATTERN.lastIndex = 0;
+  const match = URL_PATTERN.exec(text);
+  if (!match) return null;
+  return normalizeUrl(stripTrailingPunctuation(match[0]));
+}
+
 export function openMessageLink(url: string): void {
   const normalizedUrl = normalizeUrl(url);
   if (isTrustedExternalLink(normalizedUrl)) {

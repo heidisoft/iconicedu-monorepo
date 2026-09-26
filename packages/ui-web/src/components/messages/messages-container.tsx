@@ -102,6 +102,10 @@ export interface MessagesContainerProps {
   currentUserProfile?: UserProfileVM | null;
   readOnly?: boolean;
   showCreateMessageTypeButton?: boolean;
+  enableMessageMarkUnread?: boolean;
+  enableMessageReplyReference?: boolean;
+  enableNotificationConversationControls?: boolean;
+  enableMessageListFormatting?: boolean;
   realtimeClient?: MessagesRealtimeClient | null;
   messageWriteClient?: MessageWriteClient | null;
   uploadFileMessage?: (input: {
@@ -396,6 +400,8 @@ export function MessagesContainer({
   currentUserProfile,
   readOnly = false,
   showCreateMessageTypeButton = true,
+  enableMessageReplyReference = false,
+  enableMessageListFormatting = false,
   realtimeClient,
   messageWriteClient,
   uploadFileMessage,
@@ -454,6 +460,8 @@ export function MessagesContainer({
     setScrollToMessage,
     messageFilter,
     toggleMessageFilter,
+    replyTarget,
+    clearReplyTo,
   } = useMessagesState();
   const channelMessages = useMemo(
     () => channel.collections.messages?.items ?? [],
@@ -931,6 +939,10 @@ export function MessagesContainer({
         });
         addMessage(optimisticMessage);
 
+        const replyToMessageId = enableMessageReplyReference
+          ? (replyTarget?.messageId ?? undefined)
+          : undefined;
+
         if (messageWriteClient && currentUserId) {
           try {
             const created = await runWithNetworkActivity(() =>
@@ -941,6 +953,7 @@ export function MessagesContainer({
                 content,
                 mentions,
                 homework,
+                replyToMessageId,
                 clientMessageId,
               }),
             );
@@ -952,6 +965,9 @@ export function MessagesContainer({
               deleteMessage(optimisticMessage.ids.id);
             } else {
               updateMessage(optimisticMessage.ids.id, created);
+            }
+            if (replyToMessageId) {
+              clearReplyTo();
             }
           } catch (error) {
             reportObservedError({
@@ -999,6 +1015,9 @@ export function MessagesContainer({
       readOnly,
       runWithNetworkActivity,
       updateMessage,
+      enableMessageReplyReference,
+      replyTarget,
+      clearReplyTo,
     ],
   );
 
@@ -2187,6 +2206,10 @@ export function MessagesContainer({
               prefillRequest={composerPrefillRequest}
               onTypingStart={handleTypingStart}
               onTypingStop={handleTypingStop}
+              enableMessageReplyReference={enableMessageReplyReference}
+              enableMessageListFormatting={enableMessageListFormatting}
+              replyTarget={enableMessageReplyReference ? replyTarget : null}
+              onClearReply={clearReplyTo}
               enableMessageDrafts={enableMessageDrafts}
               draftScope={draftScope}
               enableMessageSendReliability={enableMessageSendReliability}

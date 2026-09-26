@@ -9,6 +9,32 @@ type PreferenceRow = {
   muted?: boolean | null;
 };
 
+type ScopedPreferenceRow = PreferenceRow & {
+  mode?: string | null;
+  muted_until?: string | null;
+};
+
+/** Resolves a scoped preference row's mode/muted_until into an effective muted + mentions-only state. */
+function resolveScopedMuteState(row: ScopedPreferenceRow): {
+  muted: boolean;
+  mentionsOnly: boolean;
+} {
+  const mode = row.mode ?? (row.muted ? 'muted_until_enabled' : 'normal');
+  switch (mode) {
+    case 'muted_until_enabled':
+      return { muted: true, mentionsOnly: false };
+    case 'muted_until': {
+      const mutedUntilMs = row.muted_until ? Date.parse(row.muted_until) : Number.NaN;
+      const stillMuted = !Number.isNaN(mutedUntilMs) && mutedUntilMs > Date.now();
+      return { muted: stillMuted, mentionsOnly: false };
+    }
+    case 'mentions_only':
+      return { muted: false, mentionsOnly: true };
+    default:
+      return { muted: Boolean(row.muted), mentionsOnly: false };
+  }
+}
+
 function asRecord(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return {};
@@ -55,14 +81,14 @@ export async function resolveEffectivePreference(input: {
   const scopedPreferencePromise = scopedTarget
     ? input.supabase
         .from('notification_preference_scopes')
-        .select('channels, muted')
+        .select('channels, muted, mode, muted_until')
         .eq('org_id', input.event.org_id)
         .eq('profile_id', input.recipientProfileId)
         .eq('scope_kind', scopedTarget.scopeKind)
         .eq('scope_id', scopedTarget.scopeId)
         .eq('pref_key', prefKey)
         .is('deleted_at', null)
-        .maybeSingle<PreferenceRow>()
+        .maybeSingle<ScopedPreferenceRow>()
     : Promise.resolve({ data: null, error: null });
 
   const globalPreferencePromise = input.supabase
@@ -86,7 +112,7 @@ export async function resolveEffectivePreference(input: {
     throw new Error(globalResponse.error.message);
   }
 
-  const scoped = scopedResponse.data;
+  const scoped = scopedResponse.data as ScopedPreferenceRow | null;
   const global = globalResponse.data;
   const source = scoped
     ? 'scoped_preference'
@@ -94,7 +120,9 @@ export async function resolveEffectivePreference(input: {
       ? 'global_preference'
       : 'system_default';
   const effective = scoped ?? global;
-  const muted = Boolean(effective?.muted);
+  const { muted, mentionsOnly } = scoped
+    ? resolveScopedMuteState(scoped)
+    : { muted: Boolean(global?.muted), mentionsOnly: false };
   const channels = effective
     ? normalizeDeliveryChannels(effective.channels)
     : input.defaultChannels;
@@ -102,6 +130,7 @@ export async function resolveEffectivePreference(input: {
   return {
     source,
     muted,
+    mentionsOnly,
     channels,
     scopeKind: scopedTarget?.scopeKind ?? null,
     scopeId: scopedTarget?.scopeId ?? null,

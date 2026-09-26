@@ -70,12 +70,17 @@ import type { AttachmentPayload } from '@/components/messages/attachment-sheet';
 import { reportMobileObservedError } from '@/lib/analytics/report-error';
 import { openMessageLink, splitMessageTextByLinks } from '@/lib/messages/link-opening';
 import {
+  parseMessageLines,
+  messageTextHasListLines,
+} from '@/lib/messages/list-formatting';
+import {
   useOnlineProfileIds,
   type PresenceDisplayStatus,
 } from '@/hooks/use-online-profile-ids';
 import { fetchThreadMessages } from '@/lib/api/queries';
 import { useMarkRead } from '@/hooks/use-mark-read';
 import { supabase } from '@/lib/supabase/client';
+import { ReplyReferenceBlock } from '@/components/messages/reply-reference-block';
 
 const CHANNEL_FILES_BUCKET = 'channel-files';
 
@@ -147,9 +152,16 @@ function findUnreadStartMessageId(input: {
   lastReadAt?: string | null;
   unreadCount?: number;
   currentProfileId?: string;
+  manuallyUnreadFromMessageId?: string | null;
 }): string | null {
-  const { messages, lastReadMessageId, lastReadAt, unreadCount, currentProfileId } =
-    input;
+  const {
+    messages,
+    lastReadMessageId,
+    lastReadAt,
+    unreadCount,
+    currentProfileId,
+    manuallyUnreadFromMessageId,
+  } = input;
   const normalizedUnreadCount = Math.max(0, unreadCount ?? 0);
   if (messages.length === 0) return null;
 
@@ -162,6 +174,17 @@ function findUnreadStartMessageId(input: {
     }
     return null;
   };
+
+  // A manual "mark unread" carries an explicit anchor — the message the user
+  // selected — which takes priority over the read-position heuristics below.
+  // Those all walk forward from lastReadMessageId/lastReadAt, which manual
+  // unread never moves, so they'd otherwise find nothing to show.
+  if (manuallyUnreadFromMessageId) {
+    const anchorIndex = messages.findIndex(
+      (message) => message.ids.id === manuallyUnreadFromMessageId,
+    );
+    if (anchorIndex >= 0) return manuallyUnreadFromMessageId;
+  }
 
   if (lastReadMessageId) {
     const lastReadIndex = messages.findIndex(
@@ -344,20 +367,22 @@ function buildSegments(text: string, mentions?: MessageMentionVM[]) {
   return parts;
 }
 
-function FeedText({
+function FeedTextLine({
   text,
   mentions,
-  size = FONT.body,
-  lineHeight = FONT.bodyLine,
+  size,
+  lineHeight,
   color,
   mentionColor,
+  style,
 }: {
   text: string;
   mentions?: MessageMentionVM[];
-  size?: number;
-  lineHeight?: number;
+  size: number;
+  lineHeight: number;
   color: string;
   mentionColor: string;
+  style?: object;
 }) {
   const renderTextParts = (value: string, keyPrefix: string) =>
     splitMessageTextByLinks(value).map((part, index) =>
@@ -376,7 +401,7 @@ function FeedText({
     );
 
   return (
-    <Text style={[stylesLight.feedText, { color, fontSize: size, lineHeight }]}>
+    <Text style={[stylesLight.feedText, { color, fontSize: size, lineHeight }, style]}>
       {buildSegments(text, mentions).map((segment, index) =>
         segment.kind === 'mention' ? (
           <Text key={index} style={{ color: mentionColor, fontWeight: '700' }}>
@@ -387,6 +412,84 @@ function FeedText({
         ),
       )}
     </Text>
+  );
+}
+
+function FeedText({
+  text,
+  mentions,
+  size = FONT.body,
+  lineHeight = FONT.bodyLine,
+  color,
+  mentionColor,
+}: {
+  text: string;
+  mentions?: MessageMentionVM[];
+  size?: number;
+  lineHeight?: number;
+  color: string;
+  mentionColor: string;
+}) {
+  if (!messageTextHasListLines(text)) {
+    return (
+      <FeedTextLine
+        text={text}
+        mentions={mentions}
+        size={size}
+        lineHeight={lineHeight}
+        color={color}
+        mentionColor={mentionColor}
+      />
+    );
+  }
+
+  // Block render: bullet/numbered lines get a marker + indentation. Mentions
+  // aren't remapped onto list lines here (an edge case — mentions can't be
+  // authored alongside list formatting on this branch).
+  const lines = parseMessageLines(text);
+  return (
+    <View style={{ gap: 2 }}>
+      {lines.map((line, i) => {
+        if (line.kind === 'plain') {
+          if (!line.content) return <View key={i} style={{ height: 8 }} />;
+          return (
+            <FeedTextLine
+              key={i}
+              text={line.content}
+              mentions={mentions}
+              size={size}
+              lineHeight={lineHeight}
+              color={color}
+              mentionColor={mentionColor}
+            />
+          );
+        }
+        return (
+          <View
+            key={i}
+            style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}
+          >
+            <Text
+              style={[
+                stylesLight.feedText,
+                { color, fontSize: size, lineHeight, minWidth: 16 },
+              ]}
+            >
+              {line.kind === 'bullet' ? '•' : `${line.number}.`}
+            </Text>
+            <View style={{ flex: 1 }}>
+              <FeedTextLine
+                text={line.content}
+                size={size}
+                lineHeight={lineHeight}
+                color={color}
+                mentionColor={mentionColor}
+              />
+            </View>
+          </View>
+        );
+      })}
+    </View>
   );
 }
 
@@ -1009,10 +1112,12 @@ function FeedContentCard({
   message,
   compact = false,
   isOwn = false,
+  onReplyReferencePress,
 }: {
   message: MessageVM;
   compact?: boolean;
   isOwn?: boolean;
+  onReplyReferencePress?: (messageId: string) => void;
 }) {
   const { colors, isDark } = useTheme();
   const styles = isDark ? stylesDark : stylesLight;
@@ -1021,33 +1126,45 @@ function FeedContentCard({
     const link = (message as LinkPreviewMessageVM).link;
     text = link ? text.replace(link.url, '').trim() : text;
   }
-  if (!text) return null;
+  const replyTo = message.social?.replyTo;
+  if (!text && !replyTo) return null;
   const emojiOnly = isEmojiOnlyText(text);
   return (
-    <View
-      testID="feed-text-card"
-      style={[
-        styles.textCard,
-        isOwn ? styles.ownBubbleCard : styles.otherBubbleCard,
-        compact && styles.commentTextCard,
-      ]}
-    >
-      <View style={styles.captionTextWrap}>
-        <FeedText
-          text={text}
-          mentions={getMentions(message)}
-          size={emojiOnly ? FONT.emoji : undefined}
-          lineHeight={emojiOnly ? FONT.emojiLine : undefined}
-          color={colors.text}
-          mentionColor={colors.teal}
+    <>
+      {!!replyTo && (
+        <ReplyReferenceBlock
+          replyTo={replyTo}
+          colors={colors}
+          onPress={onReplyReferencePress}
         />
-        {message.core.type === 'text' && message.state?.isEdited === true && (
-          <Text style={styles.editedIndicator} accessibilityLabel="Edited">
-            (edited)
-          </Text>
-        )}
-      </View>
-    </View>
+      )}
+      {!!text && (
+        <View
+          testID="feed-text-card"
+          style={[
+            styles.textCard,
+            isOwn ? styles.ownBubbleCard : styles.otherBubbleCard,
+            compact && styles.commentTextCard,
+          ]}
+        >
+          <View style={styles.captionTextWrap}>
+            <FeedText
+              text={text}
+              mentions={getMentions(message)}
+              size={emojiOnly ? FONT.emoji : undefined}
+              lineHeight={emojiOnly ? FONT.emojiLine : undefined}
+              color={colors.text}
+              mentionColor={colors.teal}
+            />
+            {message.core.type === 'text' && message.state?.isEdited === true && (
+              <Text style={styles.editedIndicator} accessibilityLabel="Edited">
+                (edited)
+              </Text>
+            )}
+          </View>
+        </View>
+      )}
+    </>
   );
 }
 
@@ -1114,6 +1231,7 @@ function FeedMessageBlock({
   onLongPress,
   onSendAnnotation,
   isReadOnly,
+  onReplyReferencePress,
 }: {
   message: MessageVM;
   isLastInGroup: boolean;
@@ -1127,6 +1245,7 @@ function FeedMessageBlock({
   onLongPress?: (message: MessageVM) => void;
   onSendAnnotation?: (attachment: AttachmentPayload) => void;
   isReadOnly?: boolean;
+  onReplyReferencePress?: (messageId: string) => void;
 }) {
   const { colors, isDark } = useTheme();
   const styles = isDark ? stylesDark : stylesLight;
@@ -1273,6 +1392,7 @@ function FeedMessageBlock({
           <FeedContentCard
             message={message}
             isOwn={message.core.sender.ids.id === currentProfileId}
+            onReplyReferencePress={onReplyReferencePress}
           />
         ) : null}
         <FeedActions
@@ -1461,6 +1581,7 @@ function FeedPost({
   onLongPress,
   onSendAnnotation,
   isReadOnly,
+  onReplyReferencePress,
 }: {
   messages: MessageVM[];
   presenceByProfileId: Map<string, PresenceDisplayStatus>;
@@ -1474,6 +1595,7 @@ function FeedPost({
   onLongPress?: (message: MessageVM) => void;
   onSendAnnotation?: (attachment: AttachmentPayload) => void;
   isReadOnly?: boolean;
+  onReplyReferencePress?: (messageId: string) => void;
 }) {
   const { colors, isDark } = useTheme();
   const styles = isDark ? stylesDark : stylesLight;
@@ -1516,6 +1638,7 @@ function FeedPost({
             onLongPress={onLongPress}
             onSendAnnotation={onSendAnnotation}
             isReadOnly={isReadOnly}
+            onReplyReferencePress={onReplyReferencePress}
           />
         ))}
       </View>
@@ -1547,6 +1670,7 @@ export const FeedMessageList: React.FC<FeedMessageListProps> = ({
   lastReadMessageId,
   lastReadAt,
   unreadCount,
+  manuallyUnreadFromMessageId,
   onSendAnnotation,
 }) => {
   const { colors, isDark } = useTheme();
@@ -1584,8 +1708,16 @@ export const FeedMessageList: React.FC<FeedMessageListProps> = ({
         lastReadAt,
         unreadCount,
         currentProfileId,
+        manuallyUnreadFromMessageId,
       }),
-    [currentProfileId, lastReadAt, lastReadMessageId, sortedMessages, unreadCount],
+    [
+      currentProfileId,
+      lastReadAt,
+      lastReadMessageId,
+      sortedMessages,
+      unreadCount,
+      manuallyUnreadFromMessageId,
+    ],
   );
   const unreadStartMessageId = useMemo(
     () =>
@@ -1595,8 +1727,16 @@ export const FeedMessageList: React.FC<FeedMessageListProps> = ({
         lastReadAt,
         unreadCount,
         currentProfileId,
+        manuallyUnreadFromMessageId,
       }),
-    [currentProfileId, lastReadAt, lastReadMessageId, sortedMessages, unreadCount],
+    [
+      currentProfileId,
+      lastReadAt,
+      lastReadMessageId,
+      sortedMessages,
+      unreadCount,
+      manuallyUnreadFromMessageId,
+    ],
   );
   const unreadStartIndex = useMemo(
     () =>
@@ -1608,6 +1748,27 @@ export const FeedMessageList: React.FC<FeedMessageListProps> = ({
   const groupedMessages = useMemo(
     () => buildFeedMessageGroups(sortedMessages),
     [sortedMessages],
+  );
+  // Tapping a "reply to" quote block scrolls to the group containing the
+  // original message (feed groups several messages per post, so this is a
+  // best-effort scroll to the post rather than a per-message highlight).
+  const handleReplyReferencePress = useCallback(
+    (messageId: string) => {
+      const groupIndex = groupedMessages.findIndex((group) =>
+        group.messages.some((groupMessage) => groupMessage.ids.id === messageId),
+      );
+      if (groupIndex < 0) return;
+      try {
+        flatListRef.current?.scrollToIndex({
+          index: groupIndex,
+          animated: true,
+          viewPosition: 0.5,
+        });
+      } catch {
+        // best-effort — an unmeasured index just won't animate-scroll
+      }
+    },
+    [groupedMessages],
   );
   const unreadMessageIds = useMemo(() => {
     if (unreadStartIndex < 0) return new Set<string>();
@@ -1766,6 +1927,9 @@ export const FeedMessageList: React.FC<FeedMessageListProps> = ({
       }
       onScroll={handleScroll}
       scrollEventThrottle={120}
+      onScrollToIndexFailed={() => {
+        // Item not yet measured — degrade gracefully rather than throwing.
+      }}
       onLayout={() => {
         if (pendingScrollToLatestRef.current) {
           scrollToLatest(didInitialScrollRef.current);
@@ -1817,6 +1981,7 @@ export const FeedMessageList: React.FC<FeedMessageListProps> = ({
           onLongPress={onMessageLongPress}
           onSendAnnotation={onSendAnnotation}
           isReadOnly={isReadOnly}
+          onReplyReferencePress={handleReplyReferencePress}
         />
       )}
       ListFooterComponent={footerNode}

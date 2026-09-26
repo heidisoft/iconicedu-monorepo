@@ -1,4 +1,5 @@
 import type {
+  MessageReplyReferenceVM,
   MessageMentionVM,
   MessageStateVM,
   MessageVM,
@@ -58,6 +59,10 @@ export function mapRowToMessageVM(
     row.org_id,
   );
   const previewText = String(c.text ?? '');
+  const replyTo =
+    c.replyTo && typeof c.replyTo === 'object'
+      ? (c.replyTo as MessageReplyReferenceVM)
+      : undefined;
   const mentions = Array.isArray(c.mentions)
     ? (c.mentions as MessageMentionVM[])
     : undefined;
@@ -80,7 +85,7 @@ export function mapRowToMessageVM(
             }
           : { type: 'all' as const },
     },
-    social: { reactions, ...(thread ? { thread } : {}) },
+    social: { reactions, ...(thread ? { thread } : {}), ...(replyTo ? { replyTo } : {}) },
     ...(state ? { state } : {}),
   };
 

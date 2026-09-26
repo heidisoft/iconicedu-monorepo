@@ -22,6 +22,8 @@ import {
   EyeOff,
   Trash2,
   SmilePlus,
+  Quote,
+  Mail,
   Pencil,
 } from 'lucide-react-native';
 
@@ -58,6 +60,12 @@ type MessageActionsSheetProps = {
   onDelete: (messageId: string) => void;
   onSave?: (messageId: string, saved: boolean) => void;
   onHide?: (messageId: string) => void;
+  /** When provided (feature-flag gated by the caller), shows a "Quote reply" row. */
+  onQuoteReply?: (message: MessageVM) => void;
+  /** When provided (feature-flag gated by the caller), shows a "Mark unread" row. */
+  onMarkUnread?: (message: MessageVM) => void;
+  /** Hides the "Mark unread" row when the channel is already showing as unread. */
+  isChannelUnread?: boolean;
   /** Gated behind enableMessageEdit — hides the Edit row entirely when false/omitted. */
   enableEdit?: boolean;
   onEdit?: (message: MessageVM) => void;
@@ -198,6 +206,9 @@ export const MessageActionsSheet: React.FC<MessageActionsSheetProps> = ({
   onDelete,
   onSave,
   onHide,
+  onQuoteReply,
+  onMarkUnread,
+  isChannelUnread = false,
   enableEdit = false,
   onEdit,
 }) => {
@@ -228,6 +239,18 @@ export const MessageActionsSheet: React.FC<MessageActionsSheetProps> = ({
     onThread(message);
     onClose();
   }, [message, onThread, onClose]);
+
+  const handleQuoteReply = useCallback(() => {
+    if (!message) return;
+    onQuoteReply?.(message);
+    onClose();
+  }, [message, onQuoteReply, onClose]);
+
+  const handleMarkUnread = useCallback(() => {
+    if (!message) return;
+    onMarkUnread?.(message);
+    onClose();
+  }, [message, onMarkUnread, onClose]);
 
   const handleEdit = useCallback(() => {
     if (!message) return;
@@ -330,6 +353,22 @@ export const MessageActionsSheet: React.FC<MessageActionsSheetProps> = ({
                 <TouchableOpacity style={s.actionItem} onPress={handleThread}>
                   <MessageCircle size={20} color={colors.text} />
                   <Text style={s.actionLabel}>Reply in thread</Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Quote reply — distinct from "Reply in thread"; feature-flag gated by the caller */}
+              {!isReadOnly && !!onQuoteReply && (
+                <TouchableOpacity style={s.actionItem} onPress={handleQuoteReply}>
+                  <Quote size={20} color={colors.text} />
+                  <Text style={s.actionLabel}>Quote reply</Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Mark unread — hidden for your own messages and once the channel is already unread; feature-flag gated by the caller */}
+              {!isReadOnly && !!onMarkUnread && !isOwn && !isChannelUnread && (
+                <TouchableOpacity style={s.actionItem} onPress={handleMarkUnread}>
+                  <Mail size={20} color={colors.text} />
+                  <Text style={s.actionLabel}>Mark unread</Text>
                 </TouchableOpacity>
               )}
 
