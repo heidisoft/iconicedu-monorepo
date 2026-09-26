@@ -38,6 +38,7 @@ type ChannelListItem = {
   updated_at: string;
   unread_count: number;
   thread_unread_count: number;
+  is_manually_unread?: boolean;
   last_message_text: string | null;
   last_message_at: string | null;
   last_message_sender: string | null;
@@ -440,7 +441,7 @@ export class ChannelsService {
         .is('deleted_at', null),
       supabase
         .from('channel_read_state')
-        .select('channel_id, unread_count')
+        .select('channel_id, unread_count, manually_marked_unread')
         .eq('account_id', input.accountId)
         .in('channel_id', channelIds)
         .is('thread_id', null)
@@ -463,6 +464,12 @@ export class ChannelsService {
       (readStateRows ?? []).map((row) => [
         row.channel_id as string,
         row.unread_count ?? 0,
+      ]),
+    );
+    const manuallyUnreadByChannelId = new Map(
+      (readStateRows ?? []).map((row) => [
+        row.channel_id as string,
+        row.manually_marked_unread === true,
       ]),
     );
     const threadUnreadByChannelId = new Map<string, number>();
@@ -494,6 +501,7 @@ export class ChannelsService {
         updated_at: channel.updated_at,
         unread_count: Math.max(0, readStateByChannelId.get(channel.id) ?? 0),
         thread_unread_count: Math.max(0, threadUnreadByChannelId.get(channel.id) ?? 0),
+        is_manually_unread: manuallyUnreadByChannelId.get(channel.id) ?? false,
         last_message_text: last?.text ?? null,
         last_message_at: last?.at ?? null,
         last_message_sender: last?.sender ?? null,
@@ -582,7 +590,7 @@ export class ChannelsService {
       ] = await Promise.all([
         supabase
           .from('channel_read_state')
-          .select('channel_id, unread_count')
+          .select('channel_id, unread_count, manually_marked_unread')
           .eq('account_id', child.account_id as string)
           .in('channel_id', channelIds)
           .is('thread_id', null)
@@ -611,6 +619,12 @@ export class ChannelsService {
         (readStateRows ?? []).map((row) => [
           row.channel_id as string,
           row.unread_count ?? 0,
+        ]),
+      );
+      const manuallyUnreadByChannelId = new Map(
+        (readStateRows ?? []).map((row) => [
+          row.channel_id as string,
+          row.manually_marked_unread === true,
         ]),
       );
       const threadUnreadByChannelId = new Map<string, number>();
@@ -643,6 +657,7 @@ export class ChannelsService {
           updated_at: channel.updated_at,
           unread_count: Math.max(0, readStateByChannelId.get(channel.id) ?? 0),
           thread_unread_count: Math.max(0, threadUnreadByChannelId.get(channel.id) ?? 0),
+          is_manually_unread: manuallyUnreadByChannelId.get(channel.id) ?? false,
           last_message_text: null,
           last_message_at: null,
           last_message_sender: null,
