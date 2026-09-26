@@ -80,7 +80,9 @@ export function MessageManagementMenu({
     Boolean(readState?.isManuallyUnread) || (readState?.unreadCount ?? 0) > 0;
   const canReplyToMessage = Boolean(messagesState?.enableMessageReplyReference);
   const canMarkChannelUnread =
-    Boolean(messagesState?.enableMessageMarkUnread) && !channelAlreadyShowsUnread;
+    Boolean(messagesState?.enableMessageMarkUnread) &&
+    !isOwn &&
+    !channelAlreadyShowsUnread;
   const channelId = messagesState?.channel?.ids?.id;
 
   const handleReply = useCallback(() => {

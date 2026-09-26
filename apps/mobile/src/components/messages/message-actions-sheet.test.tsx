@@ -102,6 +102,24 @@ describe('MessageActionsSheet', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it('hides Mark unread for your own message, even when the channel is not already unread', () => {
+    render(
+      <MessageActionsSheet
+        visible
+        message={baseMessage}
+        isOwn
+        onClose={noop}
+        onReact={noop}
+        onThread={noop}
+        onDelete={noop}
+        onMarkUnread={jest.fn()}
+        isChannelUnread={false}
+      />,
+    );
+
+    expect(screen.queryByText('Mark unread')).toBeNull();
+  });
+
   it('hides Mark unread when the channel is already showing as unread', () => {
     render(
       <MessageActionsSheet

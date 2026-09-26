@@ -364,8 +364,8 @@ export const MessageActionsSheet: React.FC<MessageActionsSheetProps> = ({
                 </TouchableOpacity>
               )}
 
-              {/* Mark unread — hidden once the channel is already unread; feature-flag gated by the caller */}
-              {!isReadOnly && !!onMarkUnread && !isChannelUnread && (
+              {/* Mark unread — hidden for your own messages and once the channel is already unread; feature-flag gated by the caller */}
+              {!isReadOnly && !!onMarkUnread && !isOwn && !isChannelUnread && (
                 <TouchableOpacity style={s.actionItem} onPress={handleMarkUnread}>
                   <Mail size={20} color={colors.text} />
                   <Text style={s.actionLabel}>Mark unread</Text>

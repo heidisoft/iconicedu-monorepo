@@ -57,6 +57,7 @@ function renderMenu(options: {
   channel: ChannelVM;
   enableMessageReplyReference?: boolean;
   enableMessageMarkUnread?: boolean;
+  currentUserId?: string;
 }) {
   return render(
     <MessagesStateProvider
@@ -64,7 +65,10 @@ function renderMenu(options: {
       enableMessageReplyReference={options.enableMessageReplyReference}
       enableMessageMarkUnread={options.enableMessageMarkUnread}
     >
-      <MessageManagementMenu message={message} currentUserId="profile-2" />
+      <MessageManagementMenu
+        message={message}
+        currentUserId={options.currentUserId ?? 'profile-2'}
+      />
     </MessagesStateProvider>,
   );
 }
@@ -122,6 +126,18 @@ describe('MessageManagementMenu reply and mark-unread actions', () => {
     renderMenu({
       channel: makeChannel({ unreadCount: 3 }),
       enableMessageMarkUnread: true,
+    });
+    await openMenu(user);
+
+    expect(screen.queryByText('Mark unread')).not.toBeInTheDocument();
+  });
+
+  it('hides Mark unread for your own message, even when the channel is not already unread', async () => {
+    const user = userEvent.setup();
+    renderMenu({
+      channel: makeChannel({ unreadCount: 0 }),
+      enableMessageMarkUnread: true,
+      currentUserId: 'profile-1', // matches message's sender id
     });
     await openMenu(user);
 
