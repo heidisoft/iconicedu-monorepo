@@ -60,6 +60,8 @@ export type MessageSendTextInput = {
   } | null;
   threadParentId?: string | null;
   threadId?: string | null;
+  /** Id of the message this one is quoting, rendered as a compact reference above the composer and on the message. */
+  replyToMessageId?: string | null;
   /**
    * Client-generated UUID used as the message's row id. Retrying a send with
    * the same value is idempotent: the server returns the already-created
@@ -139,6 +141,32 @@ export interface MessageWriteClient {
   deleteMessage: (input: MessageDeleteInput) => Promise<void>;
   toggleHiddenMessage: (input: MessageToggleHiddenInput) => Promise<void>;
 }
+
+export type MessageMarkUnreadInput = {
+  orgId: string;
+  channelId: string;
+};
+
+export type MessageLinkPreviewFetchInput = {
+  orgId: string;
+  channelId: string;
+  url: string;
+};
+
+export type NotificationConversationMode =
+  | 'normal'
+  | 'mentions_only'
+  | 'muted_until'
+  | 'muted_until_enabled';
+
+export type NotificationConversationSettingInput = {
+  orgId: string;
+  scopeKind: 'channel' | 'learning_space';
+  scopeId: string;
+  mode: NotificationConversationMode;
+  /** Required when mode is 'muted_until'; ignored otherwise. */
+  mutedUntil?: string | null;
+};
 
 /** Minutes after sending during which a sender may still edit a text message. */
 export const MESSAGE_EDIT_WINDOW_MINUTES = 15;

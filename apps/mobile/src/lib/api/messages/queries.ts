@@ -77,7 +77,19 @@ export async function fetchChannelReadState(channelId: string, accountId: string
     lastReadMessageId: string | null;
     lastReadAt: string | null;
     unreadCount: number;
+    isManuallyUnread?: boolean;
+    manuallyUnreadFromMessageId?: string | null;
   } | null>(`/channels/${channelId}/read-state`, { accountId });
+}
+
+export async function markChannelUnread(input: {
+  orgId: string;
+  accountId: string;
+  profileId: string;
+  channelId: string;
+  fromMessageId?: string | null;
+}): Promise<void> {
+  await apiPost(`/channels/${input.channelId}/mark-unread`, input);
 }
 
 export async function markChannelReadState(input: {
@@ -134,6 +146,8 @@ export type SendTextMessageOptions = {
   /** Client-generated idempotency key — see MessageSendTextInput.clientMessageId. */
   clientMessageId?: string;
   mentions?: MessageMentionVM[];
+  /** Id of the message this one is quoting — see MessageSendTextInput.replyToMessageId. */
+  replyToMessageId?: string | null;
 };
 
 export async function sendTextMessage(
@@ -143,10 +157,15 @@ export async function sendTextMessage(
   text: string,
   threadParentId?: string,
   threadId?: string,
-  options?: SendTextMessageOptions,
+  /** A bare string is shorthand for `{ replyToMessageId: value }`. */
+  optionsOrReplyToMessageId?: string | SendTextMessageOptions,
 ) {
   const content = text.trim();
   if (!content) throw new Error('Message text is required');
+  const options: SendTextMessageOptions =
+    typeof optionsOrReplyToMessageId === 'string'
+      ? { replyToMessageId: optionsOrReplyToMessageId }
+      : (optionsOrReplyToMessageId ?? {});
   return apiPost('/messages/text', {
     orgId,
     channelId,
@@ -154,8 +173,9 @@ export async function sendTextMessage(
     content,
     threadParentId,
     threadId,
-    ...(options?.clientMessageId ? { clientMessageId: options.clientMessageId } : {}),
-    ...(options?.mentions?.length ? { mentions: options.mentions } : {}),
+    ...(options.replyToMessageId ? { replyToMessageId: options.replyToMessageId } : {}),
+    ...(options.clientMessageId ? { clientMessageId: options.clientMessageId } : {}),
+    ...(options.mentions?.length ? { mentions: options.mentions } : {}),
   } satisfies MessageSendTextInput);
 }
 
@@ -309,4 +329,17 @@ export async function sendFilesMessage(
   } satisfies MessageSendFilesInput);
 
   return { id: result.id };
+}
+
+export type LinkPreviewMetadata = {
+  url: string;
+  title: string;
+  description?: string;
+  imageUrl?: string;
+  siteName?: string;
+  favicon?: string;
+};
+
+export async function fetchLinkPreview(url: string): Promise<LinkPreviewMetadata> {
+  return apiGet<LinkPreviewMetadata>('/messages/link-preview', { url });
 }

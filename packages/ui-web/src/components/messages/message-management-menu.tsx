@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, type ReactElement } from 'react';
+import { useCallback, useState, type ReactElement } from 'react';
 import { ContextMenu } from 'radix-ui';
 import {
   Bookmark,
+  Circle,
   Copy,
+  CornerUpLeft,
   EyeOff,
   Forward,
   Loader2,
@@ -14,6 +16,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import type { MessageVM, UUID } from '@iconicedu/shared-types';
+import { useOptionalMessagesState } from './context/messages-state-provider';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import {
   DropdownMenu,
@@ -64,13 +67,72 @@ export function MessageManagementMenu({
   children,
 }: MessageManagementMenuProps) {
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [isMarkingUnread, setIsMarkingUnread] = useState(false);
   const isOwn = message.core.sender.ids.id === currentUserId;
   const Item = children ? ContextMenu.Item : DropdownMenuItem;
   const Separator = children ? ContextMenu.Separator : DropdownMenuSeparator;
   const itemClass =
     'relative flex cursor-default select-none items-center rounded-sm px-2 py-2 text-sm outline-none data-[highlighted]:bg-accent data-[disabled]:pointer-events-none data-[disabled]:opacity-50';
+
+  const messagesState = useOptionalMessagesState();
+  const readState = messagesState?.channel?.collections.readState;
+  const channelAlreadyShowsUnread =
+    Boolean(readState?.isManuallyUnread) || (readState?.unreadCount ?? 0) > 0;
+  const canReplyToMessage = Boolean(messagesState?.enableMessageReplyReference);
+  const canMarkChannelUnread =
+    Boolean(messagesState?.enableMessageMarkUnread) &&
+    !isOwn &&
+    !channelAlreadyShowsUnread;
+  const channelId = messagesState?.channel?.ids?.id;
+
+  const handleReply = useCallback(() => {
+    messagesState?.startReplyTo(message);
+  }, [messagesState, message]);
+
+  const handleMarkUnread = useCallback(() => {
+    if (!channelId) return;
+    const markUnread = async () => {
+      setIsMarkingUnread(true);
+      try {
+        await fetch('/api/messages/mark-unread', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ channelId, messageId: message.ids.id }),
+        });
+      } catch {
+        // Best effort — the sidebar reconciles with server read-state on next load.
+      } finally {
+        setIsMarkingUnread(false);
+      }
+    };
+    void markUnread();
+  }, [channelId, message.ids.id]);
+
   const content = (
     <>
+      {canReplyToMessage && (
+        <Item className={itemClass} disabled={isReadOnly} onSelect={handleReply}>
+          <CornerUpLeft className="mr-2 h-4 w-4" />
+          Reply
+        </Item>
+      )}
+      {canMarkChannelUnread && (
+        <Item
+          className={itemClass}
+          disabled={isMarkingUnread}
+          onSelect={handleMarkUnread}
+        >
+          {isMarkingUnread ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <Circle className="mr-2 h-4 w-4" />
+          )}
+          Mark unread
+        </Item>
+      )}
+      {(canReplyToMessage || canMarkChannelUnread) && (
+        <Separator className="-mx-1 my-1 h-px bg-border" />
+      )}
       {feed && (
         <Item
           className={itemClass}

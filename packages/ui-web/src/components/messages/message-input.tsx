@@ -41,10 +41,13 @@ import {
   type MentionState,
 } from './message-input.utils';
 import { extractMentionsFromMessageText } from './message-mentions.utils';
-import { applyInlineFormat } from './message-input-formatting.utils';
+import { applyInlineFormat, applyListFormat } from './message-input-formatting.utils';
 import {
   Bold,
   Italic,
+  List,
+  ListOrdered,
+  CornerUpLeft,
   AtSign,
   Smile,
   Paperclip,
@@ -128,6 +131,10 @@ interface MessageInputProps {
     value: string;
     nonce: number;
   } | null;
+  enableMessageReplyReference?: boolean;
+  enableMessageListFormatting?: boolean;
+  replyTarget?: { senderName: string; snippet: string } | null;
+  onClearReply?: () => void;
   /** Gates draft autosave/restore. When false (default) this component never touches localStorage. */
   enableMessageDrafts?: boolean;
   /** Identity + location used to scope a draft. Null/incomplete disables drafts even if the flag is on. */
@@ -250,6 +257,10 @@ export function MessageInput({
   onInputKeyDown,
   showCreateMessageTypeButton = true,
   prefillRequest = null,
+  enableMessageReplyReference = false,
+  enableMessageListFormatting = false,
+  replyTarget = null,
+  onClearReply,
   enableMessageDrafts = false,
   draftScope = null,
   enableMessageSendReliability = false,
@@ -537,6 +548,32 @@ export function MessageInput({
         textarea.selectionStart,
         textarea.selectionEnd,
         wrapper,
+      );
+
+      setContent(result.nextValue);
+      handleTyping(result.nextValue);
+
+      window.setTimeout(() => {
+        textarea.focus();
+        textarea.setSelectionRange(result.selectionStart, result.selectionEnd);
+        syncMentionState(result.nextValue, result.selectionEnd);
+      }, 0);
+    },
+    [content, handleTyping, hasActiveRecording, isBusy, readOnly, syncMentionState],
+  );
+
+  const applyListFormatAtSelection = React.useCallback(
+    (kind: 'bullet' | 'numbered') => {
+      const textarea = textareaRef.current;
+      if (!textarea || readOnly || isBusy || hasActiveRecording) {
+        return;
+      }
+
+      const result = applyListFormat(
+        content,
+        textarea.selectionStart,
+        textarea.selectionEnd,
+        kind,
       );
 
       setContent(result.nextValue);
@@ -1168,6 +1205,29 @@ export function MessageInput({
       }
     >
       <div className="mx-auto w-full max-w-[960px]">
+        {enableMessageReplyReference && replyTarget ? (
+          <div className="mb-1.5 flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs">
+            <CornerUpLeft
+              className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+              aria-hidden="true"
+            />
+            <span className="min-w-0 flex-1 truncate">
+              <span className="font-medium text-foreground">
+                Replying to {replyTarget.senderName}
+              </span>
+              <span className="text-muted-foreground"> — {replyTarget.snippet}</span>
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              aria-label="Cancel reply"
+              onClick={onClearReply}
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        ) : null}
         <div
           ref={wrapperRef}
           className={cn(
@@ -1576,6 +1636,20 @@ export function MessageInput({
                     onClick={btn.onClick}
                   />
                 ))}
+                {enableMessageListFormatting ? (
+                  <>
+                    <FormatButton
+                      icon={List}
+                      label="Bulleted list"
+                      onClick={() => applyListFormatAtSelection('bullet')}
+                    />
+                    <FormatButton
+                      icon={ListOrdered}
+                      label="Numbered list"
+                      onClick={() => applyListFormatAtSelection('numbered')}
+                    />
+                  </>
+                ) : null}
                 <div className="mx-1 h-4 w-px bg-border" />
                 <FormatButton
                   icon={AtSign}

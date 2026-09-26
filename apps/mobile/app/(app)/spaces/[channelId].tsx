@@ -28,6 +28,7 @@ import {
   fetchSpaceChannelMetaByChannelId,
   fetchChannelReadState,
   deleteMessage,
+  markChannelUnread,
   queryKeys,
 } from '@/lib/api/queries';
 import { useTheme } from '@/providers/theme-provider';
@@ -47,6 +48,7 @@ import { buildMobileChannelEmptyStateCopy } from '@/lib/message-empty-state';
 import { reportMobileObservedError } from '@/lib/analytics/report-error';
 import type { MessageMentionVM, MessageVM, UserProfileVM } from '@iconicedu/shared-types';
 import { useMarkRead } from '@/hooks/use-mark-read';
+import { applyOptimisticChannelManualUnread } from '@/lib/messages/apply-optimistic-channel-read-state';
 import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
 import { usePushNudge } from '@/hooks/use-push-nudge';
 import { PushNudgeSheet } from '@/components/notifications/push-nudge-sheet';
@@ -84,6 +86,12 @@ export default function SpaceDetailScreen() {
   const { colors } = useTheme();
   const enableMobileDirectMessageStart = useMobileFeatureFlag(
     mobileFeatureFlagKeys.enableMobileDirectMessageStart,
+  );
+  const enableMessageReplyReference = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.enableMessageReplyReference,
+  );
+  const enableMessageMarkUnread = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.enableMessageMarkUnread,
   );
   const enableMessageEdit = useMobileFeatureFlag(mobileFeatureFlagKeys.enableMessageEdit);
 
@@ -140,13 +148,19 @@ export default function SpaceDetailScreen() {
     enabled: !!channelId && !!accountId,
     staleTime: 30_000,
   });
-  const { markChannelRead } = useMarkRead({
+  const { markChannelRead, resetChannelReadGuard } = useMarkRead({
     orgId,
     profileId,
     accountId,
     channelId: channelId ?? '',
     profileKind,
+    isFocused,
+    isManuallyUnread: channelReadState?.isManuallyUnread,
+    lastReadMessageId: channelReadState?.lastReadMessageId,
   });
+  const isChannelUnread =
+    (channelReadState?.unreadCount ?? 0) > 0 ||
+    channelReadState?.isManuallyUnread === true;
   const refreshConversation = useCallback(async () => {
     await Promise.all([
       refetch(),
@@ -255,10 +269,54 @@ export default function SpaceDetailScreen() {
 
   // ── Thread reply target ──
   const [threadReplyTarget, setThreadReplyTarget] = useState<MessageVM | null>(null);
+  // ── Quote reply target — distinct from "reply in thread"; drives its own preview ──
+  const [quoteReplyTarget, setQuoteReplyTarget] = useState<MessageVM | null>(null);
 
   const handleThreadOpen = useCallback((msg: MessageVM) => {
+    setQuoteReplyTarget(null);
     setThreadReplyTarget(msg);
   }, []);
+
+  const handleQuoteReply = useCallback((msg: MessageVM) => {
+    setThreadReplyTarget(null);
+    setQuoteReplyTarget(msg);
+  }, []);
+
+  const handleMarkUnread = useCallback(
+    async (msg: MessageVM) => {
+      if (!channelId || !orgId || !accountId || !profileId) return;
+      try {
+        await markChannelUnread({
+          orgId,
+          accountId,
+          profileId,
+          channelId,
+          fromMessageId: msg.ids.id,
+        });
+        applyOptimisticChannelManualUnread({
+          queryClient,
+          orgId,
+          profileId,
+          accountId,
+          channelId,
+          profileKind,
+          fromMessageId: msg.ids.id,
+        });
+        resetChannelReadGuard();
+      } catch {
+        Alert.alert('Unable to mark unread', 'Please try again.');
+      }
+    },
+    [
+      channelId,
+      orgId,
+      accountId,
+      profileId,
+      profileKind,
+      queryClient,
+      resetChannelReadGuard,
+    ],
+  );
 
   // ── Reaction toggle ──
   const handleReactionToggle = useCallback(
@@ -391,6 +449,17 @@ export default function SpaceDetailScreen() {
           );
           setThreadReplyTarget(null);
           void refetch();
+        } else if (quoteReplyTarget) {
+          await sendTextMessage(
+            channelId,
+            profileId,
+            orgId,
+            text,
+            undefined,
+            undefined,
+            quoteReplyTarget.ids.id,
+          );
+          setQuoteReplyTarget(null);
         } else {
           await sendTextMessage(channelId, profileId, orgId, text);
         }
@@ -416,6 +485,7 @@ export default function SpaceDetailScreen() {
       profileId,
       orgId,
       threadReplyTarget,
+      quoteReplyTarget,
       refetch,
       handlePushNotificationMoment,
     ],
@@ -671,6 +741,9 @@ export default function SpaceDetailScreen() {
             lastReadMessageId={channelReadState?.lastReadMessageId ?? null}
             lastReadAt={channelReadState?.lastReadAt ?? null}
             unreadCount={channelReadState?.unreadCount ?? 0}
+            manuallyUnreadFromMessageId={
+              channelReadState?.manuallyUnreadFromMessageId ?? null
+            }
             onLoadMore={loadMore}
             loading={isLoading}
             refreshing={isRefetching}
@@ -697,6 +770,8 @@ export default function SpaceDetailScreen() {
             onTypingStop={broadcastTypingStop}
             replyTo={threadReplyTarget}
             onCancelReply={() => setThreadReplyTarget(null)}
+            quoteReplyTo={quoteReplyTarget}
+            onCancelQuoteReply={() => setQuoteReplyTarget(null)}
             uploading={pendingUploads.some((upload) => !upload.failed)}
             editingMessage={editingMessage}
             onSaveEdit={handleSaveEdit}
@@ -758,6 +833,9 @@ export default function SpaceDetailScreen() {
         onReact={handleReactionToggle}
         onThread={handleThreadOpen}
         onDelete={handleDelete}
+        onQuoteReply={enableMessageReplyReference ? handleQuoteReply : undefined}
+        onMarkUnread={enableMessageMarkUnread ? handleMarkUnread : undefined}
+        isChannelUnread={isChannelUnread}
         enableEdit={enableMessageEdit}
         onEdit={handleEditMessage}
       />

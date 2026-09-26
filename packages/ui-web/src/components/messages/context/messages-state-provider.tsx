@@ -5,6 +5,7 @@ import type {
   ChannelVM,
   ConnectionVM,
   MessageMentionVM,
+  MessageReplyReferenceVM,
   MessagesRightPanelIntent,
   MessagesRightPanelIntentKey,
   MessagesRightSidebarState,
@@ -13,6 +14,7 @@ import type {
   ThreadVM,
   UUID,
 } from '@iconicedu/shared-types';
+import { buildReplyReferenceFromMessage } from '../message-reply-reference.utils';
 
 type ThreadData = {
   thread: ThreadVM;
@@ -40,6 +42,13 @@ interface MessagesStateContextValue {
   messages: MessageVM[];
   messageFilter: MessageFilterKey | null;
   showCreateMessageTypeButton: boolean;
+  enableMessageMarkUnread: boolean;
+  enableMessageReplyReference: boolean;
+  enableNotificationConversationControls: boolean;
+  enableMessageListFormatting: boolean;
+  replyTarget: MessageReplyReferenceVM | null;
+  startReplyTo: (message: MessageVM) => void;
+  clearReplyTo: () => void;
   enableMessageDrafts: boolean;
   enableMessageEdit: boolean;
   enableMessageSendReliability: boolean;
@@ -154,6 +163,10 @@ export function MessagesStateProvider({
   currentUserId: initialCurrentUserId = '',
   isReadOnly = false,
   showCreateMessageTypeButton = true,
+  enableMessageMarkUnread = false,
+  enableMessageReplyReference = false,
+  enableNotificationConversationControls = false,
+  enableMessageListFormatting = false,
   enableMessageDrafts = false,
   enableMessageEdit = false,
   enableMessageSendReliability = false,
@@ -163,6 +176,10 @@ export function MessagesStateProvider({
   currentUserId?: string;
   isReadOnly?: boolean;
   showCreateMessageTypeButton?: boolean;
+  enableMessageMarkUnread?: boolean;
+  enableMessageReplyReference?: boolean;
+  enableNotificationConversationControls?: boolean;
+  enableMessageListFormatting?: boolean;
   enableMessageDrafts?: boolean;
   enableMessageEdit?: boolean;
   enableMessageSendReliability?: boolean;
@@ -201,6 +218,15 @@ export function MessagesStateProvider({
   const [scrollToMessage, setScrollToMessage] = useState<
     ((messageId: string) => void) | undefined
   >(undefined);
+  const [replyTarget, setReplyTarget] = useState<MessageReplyReferenceVM | null>(null);
+
+  const startReplyTo = useCallback((message: MessageVM) => {
+    setReplyTarget(buildReplyReferenceFromMessage(message));
+  }, []);
+
+  const clearReplyTo = useCallback(() => {
+    setReplyTarget(null);
+  }, []);
 
   const open = useCallback((intent: MessagesRightPanelIntent) => {
     setState({ isOpen: true, intent });
@@ -324,6 +350,13 @@ export function MessagesStateProvider({
       messages,
       messageFilter,
       showCreateMessageTypeButton,
+      enableMessageMarkUnread,
+      enableMessageReplyReference,
+      enableNotificationConversationControls,
+      enableMessageListFormatting,
+      replyTarget,
+      startReplyTo,
+      clearReplyTo,
       enableMessageDrafts,
       enableMessageEdit,
       enableMessageSendReliability,
@@ -368,6 +401,13 @@ export function MessagesStateProvider({
       messages,
       messageFilter,
       showCreateMessageTypeButton,
+      enableMessageMarkUnread,
+      enableMessageReplyReference,
+      enableNotificationConversationControls,
+      enableMessageListFormatting,
+      replyTarget,
+      startReplyTo,
+      clearReplyTo,
       enableMessageDrafts,
       enableMessageEdit,
       enableMessageSendReliability,

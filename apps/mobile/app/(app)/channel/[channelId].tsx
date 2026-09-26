@@ -30,6 +30,7 @@ import {
   fetchChannelMembers,
   fetchChannelReadState,
   ensureDirectMessageChannelForProfiles,
+  markChannelUnread,
   queryKeys,
 } from '@/lib/api/queries';
 import type { AttachmentPayload } from '@/components/messages/attachment-sheet';
@@ -50,6 +51,7 @@ import { resolveChannelTopicIconKey } from '@/lib/learning-space-icons';
 import { buildMobileChannelEmptyStateCopy } from '@/lib/message-empty-state';
 import { reportMobileObservedError } from '@/lib/analytics/report-error';
 import { useMarkRead } from '@/hooks/use-mark-read';
+import { applyOptimisticChannelManualUnread } from '@/lib/messages/apply-optimistic-channel-read-state';
 import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
 import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
 import { getMentionCandidates } from '@/lib/messages/message-mentions';
@@ -71,6 +73,12 @@ export default function ChannelConversationScreen() {
   const { colors } = useTheme();
   const enableMobileDirectMessageStart = useMobileFeatureFlag(
     mobileFeatureFlagKeys.enableMobileDirectMessageStart,
+  );
+  const enableMessageReplyReference = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.enableMessageReplyReference,
+  );
+  const enableMessageMarkUnread = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.enableMessageMarkUnread,
   );
   const enableMessageDrafts = useMobileFeatureFlag(
     mobileFeatureFlagKeys.enableMessageDrafts,
@@ -170,13 +178,19 @@ export default function ChannelConversationScreen() {
     enabled: !!channelId && !!accountId,
     staleTime: 30_000,
   });
-  const { markChannelRead } = useMarkRead({
+  const { markChannelRead, resetChannelReadGuard } = useMarkRead({
     orgId,
     profileId,
     accountId,
     channelId: channelId ?? '',
     profileKind,
+    isFocused,
+    isManuallyUnread: channelReadState?.isManuallyUnread,
+    lastReadMessageId: channelReadState?.lastReadMessageId,
   });
+  const isChannelUnread =
+    (channelReadState?.unreadCount ?? 0) > 0 ||
+    channelReadState?.isManuallyUnread === true;
   const refreshConversation = useCallback(async () => {
     await Promise.all([
       refetch(),
@@ -220,10 +234,54 @@ export default function ChannelConversationScreen() {
 
   // ── Thread reply target — drives the reply preview above the input ──
   const [threadReplyTarget, setThreadReplyTarget] = useState<MessageVM | null>(null);
+  // ── Quote reply target — distinct from "reply in thread"; drives its own preview ──
+  const [quoteReplyTarget, setQuoteReplyTarget] = useState<MessageVM | null>(null);
 
   const handleThreadOpen = useCallback((msg: MessageVM) => {
+    setQuoteReplyTarget(null);
     setThreadReplyTarget(msg);
   }, []);
+
+  const handleQuoteReply = useCallback((msg: MessageVM) => {
+    setThreadReplyTarget(null);
+    setQuoteReplyTarget(msg);
+  }, []);
+
+  const handleMarkUnread = useCallback(
+    async (msg: MessageVM) => {
+      if (!channelId || !orgId || !accountId || !profileId) return;
+      try {
+        await markChannelUnread({
+          orgId,
+          accountId,
+          profileId,
+          channelId,
+          fromMessageId: msg.ids.id,
+        });
+        applyOptimisticChannelManualUnread({
+          queryClient,
+          orgId,
+          profileId,
+          accountId,
+          channelId,
+          profileKind,
+          fromMessageId: msg.ids.id,
+        });
+        resetChannelReadGuard();
+      } catch {
+        Alert.alert('Unable to mark unread', 'Please try again.');
+      }
+    },
+    [
+      channelId,
+      orgId,
+      accountId,
+      profileId,
+      profileKind,
+      queryClient,
+      resetChannelReadGuard,
+    ],
+  );
 
   // ── Edit sent text messages ──
   const [editingMessage, setEditingMessage] = useState<EditingMessageContext | null>(
@@ -403,6 +461,18 @@ export default function ChannelConversationScreen() {
           setThreadReplyTarget(null);
           // Thread reply count lives in the threads table — refetch to update the pill.
           void refetch();
+        } else if (quoteReplyTarget) {
+          await sendTextMessage(
+            channelId,
+            profileId,
+            orgId,
+            text,
+            undefined,
+            undefined,
+            quoteReplyTarget.ids.id,
+          );
+          setQuoteReplyTarget(null);
+          // Realtime subscription handles cache invalidation for non-thread messages.
         } else {
           await sendTextMessage(
             channelId,
@@ -438,6 +508,7 @@ export default function ChannelConversationScreen() {
       orgId,
       senderName,
       threadReplyTarget,
+      quoteReplyTarget,
       refetch,
       handlePushNotificationMoment,
       enableMessageSendReliability,
@@ -863,6 +934,9 @@ export default function ChannelConversationScreen() {
             lastReadMessageId={channelReadState?.lastReadMessageId ?? null}
             lastReadAt={channelReadState?.lastReadAt ?? null}
             unreadCount={channelReadState?.unreadCount ?? 0}
+            manuallyUnreadFromMessageId={
+              channelReadState?.manuallyUnreadFromMessageId ?? null
+            }
             onLoadMore={loadMore}
             loading={isLoading}
             refreshing={isRefetching}
@@ -892,6 +966,8 @@ export default function ChannelConversationScreen() {
             onTypingStop={broadcastTypingStop}
             replyTo={threadReplyTarget}
             onCancelReply={() => setThreadReplyTarget(null)}
+            quoteReplyTo={quoteReplyTarget}
+            onCancelQuoteReply={() => setQuoteReplyTarget(null)}
             uploading={pendingUploads.some((p) => !p.failed)}
             enableDrafts={enableMessageDrafts}
             draftScope={
@@ -953,6 +1029,9 @@ export default function ChannelConversationScreen() {
         onReact={handleReactionToggle}
         onThread={handleThreadOpen}
         onDelete={handleDelete}
+        onQuoteReply={enableMessageReplyReference ? handleQuoteReply : undefined}
+        onMarkUnread={enableMessageMarkUnread ? handleMarkUnread : undefined}
+        isChannelUnread={isChannelUnread}
         enableEdit={enableMessageEdit}
         onEdit={handleEditMessage}
       />

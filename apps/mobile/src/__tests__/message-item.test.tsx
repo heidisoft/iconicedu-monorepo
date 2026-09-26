@@ -446,4 +446,141 @@ describe('MessageItem', () => {
     expect(screen.getByText('PDF viewer:Worksheet.pdf')).toBeTruthy();
     expect(mockOpenBrowserAsync).not.toHaveBeenCalled();
   });
+
+  describe('reply reference (quote reply)', () => {
+    const replyMessage = {
+      ...baseMessage,
+      ids: { id: 'msg-2', orgId: 'org-1' },
+      content: { text: 'Yes, that works for me' },
+      social: {
+        reactions: [],
+        replyTo: {
+          messageId: 'msg-1',
+          senderId: 'user-1',
+          senderName: 'John Doe',
+          snippet: 'Hello world',
+          type: 'text',
+        },
+      },
+    } as unknown as MessageVM;
+
+    it('renders the quoted original above the message body', () => {
+      render(
+        <MessageItem message={replyMessage} isOwn={false} isGroupStart colors={colors} />,
+      );
+
+      expect(screen.getByTestId('reply-reference-block')).toBeTruthy();
+      expect(screen.getByText('Hello world')).toBeTruthy();
+      expect(screen.getByText('Yes, that works for me')).toBeTruthy();
+    });
+
+    it('asks the list to scroll to the original when the quote is tapped', () => {
+      const onReplyReferencePress = jest.fn();
+      render(
+        <MessageItem
+          message={replyMessage}
+          isOwn={false}
+          isGroupStart
+          colors={colors}
+          onReplyReferencePress={onReplyReferencePress}
+        />,
+      );
+
+      fireEvent.press(screen.getByTestId('reply-reference-block'));
+      expect(onReplyReferencePress).toHaveBeenCalledWith('msg-1');
+    });
+
+    it('degrades gracefully when the original is unavailable', () => {
+      const onReplyReferencePress = jest.fn();
+      const unavailableReply = {
+        ...replyMessage,
+        social: {
+          reactions: [],
+          replyTo: {
+            ...(replyMessage.social as { replyTo: Record<string, unknown> }).replyTo,
+            isUnavailable: true,
+          },
+        },
+      } as unknown as MessageVM;
+
+      render(
+        <MessageItem
+          message={unavailableReply}
+          isOwn={false}
+          isGroupStart
+          colors={colors}
+          onReplyReferencePress={onReplyReferencePress}
+        />,
+      );
+
+      expect(screen.getByText('Original message unavailable')).toBeTruthy();
+      fireEvent.press(screen.getByTestId('reply-reference-block'));
+      expect(onReplyReferencePress).not.toHaveBeenCalled();
+    });
+
+    it('renders no quote block for messages that are not replies', () => {
+      render(
+        <MessageItem message={baseMessage} isOwn={false} isGroupStart colors={colors} />,
+      );
+      expect(screen.queryByTestId('reply-reference-block')).toBeNull();
+    });
+  });
+
+  describe('list formatting rendering', () => {
+    function makeTextMessage(text: string): MessageVM {
+      return {
+        ...baseMessage,
+        ids: { id: `msg-${text.length}`, orgId: 'org-1' },
+        content: { text },
+      } as unknown as MessageVM;
+    }
+
+    it('renders bullet lines with a bullet glyph and the marker stripped', () => {
+      render(
+        <MessageItem
+          message={makeTextMessage('Shopping:\n- milk\n- eggs')}
+          isOwn={false}
+          isGroupStart
+          colors={colors}
+        />,
+      );
+
+      expect(screen.getByText('Shopping:')).toBeTruthy();
+      expect(screen.getAllByText('•')).toHaveLength(2);
+      expect(screen.getByText('milk')).toBeTruthy();
+      expect(screen.getByText('eggs')).toBeTruthy();
+      // The raw "- " markers are not rendered as literal text
+      expect(screen.queryByText('- milk')).toBeNull();
+    });
+
+    it('renders numbered lines with their numbers', () => {
+      render(
+        <MessageItem
+          message={makeTextMessage('1. first\n2. second')}
+          isOwn={false}
+          isGroupStart
+          colors={colors}
+        />,
+      );
+
+      expect(screen.getByText('1.')).toBeTruthy();
+      expect(screen.getByText('2.')).toBeTruthy();
+      expect(screen.getByText('first')).toBeTruthy();
+      expect(screen.getByText('second')).toBeTruthy();
+    });
+
+    it('leaves plain text messages on the original single-text render path', () => {
+      render(
+        <MessageItem
+          message={makeTextMessage('no lists here')}
+          isOwn={false}
+          isGroupStart
+          colors={colors}
+        />,
+      );
+
+      expect(screen.getByTestId('message-text-content')).toBeTruthy();
+      expect(screen.queryByText('•')).toBeNull();
+    });
+  });
 });
