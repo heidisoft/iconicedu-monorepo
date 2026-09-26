@@ -202,6 +202,21 @@ describe('useMarkRead', () => {
   });
 
   describe('refocus while manually unread', () => {
+    it('marks read on a fresh mount that is already manually unread (reopening from the list pushes a brand-new screen instance, not a persisted one)', async () => {
+      renderHook(() =>
+        useMarkRead({
+          ...DEFAULT_PARAMS,
+          isFocused: true,
+          isManuallyUnread: true,
+          lastReadMessageId: 'msg-5',
+        }),
+      );
+
+      expect(mockMarkChannelReadState).toHaveBeenCalledWith(
+        expect.objectContaining({ lastReadMessageId: 'msg-5' }),
+      );
+    });
+
     it('marks read on a genuine focus transition when the channel is manually unread', async () => {
       const { rerender } = renderHook((props) => useMarkRead(props), {
         initialProps: {

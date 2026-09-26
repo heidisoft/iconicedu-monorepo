@@ -81,15 +81,31 @@ export function useMarkRead({
 
   // A channel manually marked unread has no genuinely new incoming message
   // for the "unread viewed" scroll heuristic to notice, so that trigger
-  // never fires and the manual flag would otherwise stay set forever. On a
-  // real focus transition (leaving and reopening the channel — not merely
-  // marking it unread while already focused), re-send the existing
-  // lastReadMessageId so the server clears the flag.
+  // never fires and the manual flag would otherwise stay set forever.
+  //
+  // Reopening the channel from the conversation list pushes a brand-new
+  // screen instance each time (pop/push, not a persisted mount), so a
+  // "blur-then-refocus on this instance" check never actually fires on a
+  // normal reopen — the very first render is already focused. So instead we
+  // track the last *observed* value of isManuallyUnread: if it's true and
+  // the previous observed value was NOT a live "false → true" flip while
+  // already focused (i.e. it was already true when we first saw a real
+  // value, however that happened), it predates this screen and we clear it.
+  // If it flips false → true while we're already focused, that's the user's
+  // own mark-unread action on this same live screen — leave it alone.
+  const previousManuallyUnreadRef = useRef<boolean | undefined>(undefined);
   const wasFocusedRef = useRef(isFocused ?? false);
   useEffect(() => {
+    const previousManuallyUnread = previousManuallyUnreadRef.current;
     const wasFocused = wasFocusedRef.current;
+    previousManuallyUnreadRef.current = isManuallyUnread;
     wasFocusedRef.current = isFocused ?? false;
-    if (isFocused && !wasFocused && isManuallyUnread && lastReadMessageId) {
+
+    if (!isFocused || !isManuallyUnread || !lastReadMessageId) return;
+
+    const justMarkedUnreadOnThisLiveScreen =
+      previousManuallyUnread === false && wasFocused === true;
+    if (!justMarkedUnreadOnThisLiveScreen) {
       void markChannelRead(lastReadMessageId);
     }
   }, [isFocused, isManuallyUnread, lastReadMessageId, markChannelRead]);
