@@ -254,6 +254,9 @@ export default function DmConversationScreen() {
     accountId,
     channelId: channelId ?? '',
     profileKind: (profileRecord?.kind as string | null | undefined) ?? null,
+    isFocused,
+    isManuallyUnread: channelReadState?.isManuallyUnread,
+    lastReadMessageId: channelReadState?.lastReadMessageId,
   });
   const isChannelUnread =
     (channelReadState?.unreadCount ?? 0) > 0 ||

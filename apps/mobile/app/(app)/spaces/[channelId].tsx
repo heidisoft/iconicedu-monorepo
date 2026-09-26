@@ -154,6 +154,9 @@ export default function SpaceDetailScreen() {
     accountId,
     channelId: channelId ?? '',
     profileKind,
+    isFocused,
+    isManuallyUnread: channelReadState?.isManuallyUnread,
+    lastReadMessageId: channelReadState?.lastReadMessageId,
   });
   const isChannelUnread =
     (channelReadState?.unreadCount ?? 0) > 0 ||
