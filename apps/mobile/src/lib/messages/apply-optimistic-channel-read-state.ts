@@ -9,6 +9,7 @@ type ChannelReadState = {
   lastReadAt: string | null;
   unreadCount: number;
   isManuallyUnread?: boolean;
+  manuallyUnreadFromMessageId?: string | null;
 } | null;
 
 function markChannelListRowManuallyUnread(
@@ -118,6 +119,7 @@ export function applyOptimisticChannelReadState(input: {
       lastReadAt,
       unreadCount: 0,
       isManuallyUnread: false,
+      manuallyUnreadFromMessageId: null,
     }),
   );
 
@@ -150,8 +152,17 @@ export function applyOptimisticChannelManualUnread(input: {
   accountId: string;
   channelId: string;
   profileKind?: string | null;
+  fromMessageId?: string | null;
 }) {
-  const { queryClient, orgId, profileId, accountId, channelId, profileKind } = input;
+  const {
+    queryClient,
+    orgId,
+    profileId,
+    accountId,
+    channelId,
+    profileKind,
+    fromMessageId,
+  } = input;
 
   queryClient.setQueryData<ChannelReadState>(
     queryKeys.channelReadState(channelId, accountId),
@@ -161,6 +172,7 @@ export function applyOptimisticChannelManualUnread(input: {
       lastReadAt: current?.lastReadAt ?? null,
       unreadCount: current?.unreadCount ?? 0,
       isManuallyUnread: true,
+      manuallyUnreadFromMessageId: fromMessageId ?? null,
     }),
   );
 

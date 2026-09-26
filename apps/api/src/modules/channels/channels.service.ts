@@ -1310,7 +1310,7 @@ export class ChannelsService {
     let query = supabase
       .from('channel_read_state')
       .select(
-        'channel_id, thread_id, last_read_message_id, last_read_at, unread_count, manually_marked_unread',
+        'channel_id, thread_id, last_read_message_id, last_read_at, unread_count, manually_marked_unread, manually_marked_unread_from_message_id',
       )
       .eq('channel_id', input.channelId)
       .eq('account_id', input.accountId)
@@ -1326,6 +1326,7 @@ export class ChannelsService {
       last_read_at: string | null;
       unread_count: number | null;
       manually_marked_unread: boolean | null;
+      manually_marked_unread_from_message_id: string | null;
     }>();
     if (error) throw new InternalServerErrorException(error.message);
     if (!data) return null;
@@ -1336,12 +1337,19 @@ export class ChannelsService {
       lastReadAt: data.last_read_at ?? null,
       unreadCount: data.unread_count ?? 0,
       isManuallyUnread: data.manually_marked_unread ?? false,
+      manuallyUnreadFromMessageId: data.manually_marked_unread_from_message_id ?? null,
     };
   }
 
   async markUnread(
     accessToken: string,
-    input: { orgId: string; accountId: string; profileId: string; channelId: string },
+    input: {
+      orgId: string;
+      accountId: string;
+      profileId: string;
+      channelId: string;
+      fromMessageId?: string | null;
+    },
   ) {
     const sessionSupabase = createSupabaseSessionClient(accessToken);
     const serviceSupabase = createSupabaseServiceClient();
@@ -1427,11 +1435,26 @@ export class ChannelsService {
       resolvedAccountId = profileRow.account_id;
     }
 
+    let resolvedFromMessageId: string | null = null;
+    if (input.fromMessageId) {
+      const { data: anchorMessage, error: anchorErr } = await serviceSupabase
+        .from('messages')
+        .select('id')
+        .eq('id', input.fromMessageId)
+        .eq('org_id', input.orgId)
+        .eq('channel_id', input.channelId)
+        .is('deleted_at', null)
+        .maybeSingle<{ id: string }>();
+      if (anchorErr) throw new InternalServerErrorException(anchorErr.message);
+      resolvedFromMessageId = anchorMessage?.id ?? null;
+    }
+
     const { error } = await serviceSupabase.rpc('mark_channel_unread', {
       p_org_id: input.orgId,
       p_channel_id: input.channelId,
       p_account_id: resolvedAccountId,
       p_actor_profile_id: input.profileId,
+      p_from_message_id: resolvedFromMessageId,
     });
     if (error) throw new InternalServerErrorException(error.message);
     return { success: true };

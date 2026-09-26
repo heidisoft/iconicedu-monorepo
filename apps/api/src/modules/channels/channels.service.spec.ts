@@ -595,6 +595,46 @@ describe('ChannelsService.markUnread', () => {
         }),
       );
     });
+
+    it('passes a fromMessageId through as the RPC anchor once verified to belong to this channel', async () => {
+      mockMaybeSingle
+        .mockResolvedValueOnce({ data: { id: 'member-1' }, error: null }) // membership
+        .mockResolvedValueOnce({ data: { account_id: 'real-acct-1' }, error: null }) // profile lookup
+        .mockResolvedValueOnce({ data: { id: 'message-1' }, error: null }); // anchor message lookup
+
+      mockRpc.mockResolvedValueOnce({ data: null, error: null });
+
+      const svc = makeService();
+      await svc.markUnread('token', {
+        ...BASE_INPUT,
+        fromMessageId: 'message-1',
+      });
+
+      expect(mockRpc).toHaveBeenCalledWith(
+        'mark_channel_unread',
+        expect.objectContaining({ p_from_message_id: 'message-1' }),
+      );
+    });
+
+    it('drops a fromMessageId that does not belong to this org/channel rather than trusting it', async () => {
+      mockMaybeSingle
+        .mockResolvedValueOnce({ data: { id: 'member-1' }, error: null }) // membership
+        .mockResolvedValueOnce({ data: { account_id: 'real-acct-1' }, error: null }) // profile lookup
+        .mockResolvedValueOnce({ data: null, error: null }); // anchor message lookup → not found
+
+      mockRpc.mockResolvedValueOnce({ data: null, error: null });
+
+      const svc = makeService();
+      await svc.markUnread('token', {
+        ...BASE_INPUT,
+        fromMessageId: 'message-from-another-channel',
+      });
+
+      expect(mockRpc).toHaveBeenCalledWith(
+        'mark_channel_unread',
+        expect.objectContaining({ p_from_message_id: null }),
+      );
+    });
   });
 
   describe('guardian acting as child (session RLS blocks membership)', () => {

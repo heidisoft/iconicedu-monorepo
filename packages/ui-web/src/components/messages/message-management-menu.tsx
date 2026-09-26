@@ -95,7 +95,7 @@ export function MessageManagementMenu({
         await fetch('/api/messages/mark-unread', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ channelId }),
+          body: JSON.stringify({ channelId, messageId: message.ids.id }),
         });
       } catch {
         // Best effort — the sidebar reconciles with server read-state on next load.
@@ -104,7 +104,7 @@ export function MessageManagementMenu({
       }
     };
     void markUnread();
-  }, [channelId]);
+  }, [channelId, message.ids.id]);
 
   const content = (
     <>

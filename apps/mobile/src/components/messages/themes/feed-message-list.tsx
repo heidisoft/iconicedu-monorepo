@@ -152,9 +152,16 @@ function findUnreadStartMessageId(input: {
   lastReadAt?: string | null;
   unreadCount?: number;
   currentProfileId?: string;
+  manuallyUnreadFromMessageId?: string | null;
 }): string | null {
-  const { messages, lastReadMessageId, lastReadAt, unreadCount, currentProfileId } =
-    input;
+  const {
+    messages,
+    lastReadMessageId,
+    lastReadAt,
+    unreadCount,
+    currentProfileId,
+    manuallyUnreadFromMessageId,
+  } = input;
   const normalizedUnreadCount = Math.max(0, unreadCount ?? 0);
   if (messages.length === 0) return null;
 
@@ -167,6 +174,17 @@ function findUnreadStartMessageId(input: {
     }
     return null;
   };
+
+  // A manual "mark unread" carries an explicit anchor — the message the user
+  // selected — which takes priority over the read-position heuristics below.
+  // Those all walk forward from lastReadMessageId/lastReadAt, which manual
+  // unread never moves, so they'd otherwise find nothing to show.
+  if (manuallyUnreadFromMessageId) {
+    const anchorIndex = messages.findIndex(
+      (message) => message.ids.id === manuallyUnreadFromMessageId,
+    );
+    if (anchorIndex >= 0) return manuallyUnreadFromMessageId;
+  }
 
   if (lastReadMessageId) {
     const lastReadIndex = messages.findIndex(
@@ -1652,6 +1670,7 @@ export const FeedMessageList: React.FC<FeedMessageListProps> = ({
   lastReadMessageId,
   lastReadAt,
   unreadCount,
+  manuallyUnreadFromMessageId,
   onSendAnnotation,
 }) => {
   const { colors, isDark } = useTheme();
@@ -1689,8 +1708,16 @@ export const FeedMessageList: React.FC<FeedMessageListProps> = ({
         lastReadAt,
         unreadCount,
         currentProfileId,
+        manuallyUnreadFromMessageId,
       }),
-    [currentProfileId, lastReadAt, lastReadMessageId, sortedMessages, unreadCount],
+    [
+      currentProfileId,
+      lastReadAt,
+      lastReadMessageId,
+      sortedMessages,
+      unreadCount,
+      manuallyUnreadFromMessageId,
+    ],
   );
   const unreadStartMessageId = useMemo(
     () =>
@@ -1700,8 +1727,16 @@ export const FeedMessageList: React.FC<FeedMessageListProps> = ({
         lastReadAt,
         unreadCount,
         currentProfileId,
+        manuallyUnreadFromMessageId,
       }),
-    [currentProfileId, lastReadAt, lastReadMessageId, sortedMessages, unreadCount],
+    [
+      currentProfileId,
+      lastReadAt,
+      lastReadMessageId,
+      sortedMessages,
+      unreadCount,
+      manuallyUnreadFromMessageId,
+    ],
   );
   const unreadStartIndex = useMemo(
     () =>

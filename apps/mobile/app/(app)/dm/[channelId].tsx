@@ -359,10 +359,16 @@ export default function DmConversationScreen() {
   }, []);
 
   const handleMarkUnread = useCallback(
-    async (_msg: MessageVM) => {
+    async (msg: MessageVM) => {
       if (!channelId || !orgId || !accountId || !profileId) return;
       try {
-        await markChannelUnread({ orgId, accountId, profileId, channelId });
+        await markChannelUnread({
+          orgId,
+          accountId,
+          profileId,
+          channelId,
+          fromMessageId: msg.ids.id,
+        });
         applyOptimisticChannelManualUnread({
           queryClient,
           orgId,
@@ -370,6 +376,7 @@ export default function DmConversationScreen() {
           accountId,
           channelId,
           profileKind: (profileRecord?.kind as string | null | undefined) ?? null,
+          fromMessageId: msg.ids.id,
         });
         resetChannelReadGuard();
       } catch {
@@ -949,6 +956,9 @@ export default function DmConversationScreen() {
             lastReadMessageId={channelReadState?.lastReadMessageId ?? null}
             lastReadAt={channelReadState?.lastReadAt ?? null}
             unreadCount={channelReadState?.unreadCount ?? 0}
+            manuallyUnreadFromMessageId={
+              channelReadState?.manuallyUnreadFromMessageId ?? null
+            }
             onLoadMore={loadMore}
             loading={false}
             refreshing={isRefetching}

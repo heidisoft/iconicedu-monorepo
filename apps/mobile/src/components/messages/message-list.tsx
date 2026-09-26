@@ -85,9 +85,16 @@ function findUnreadStartMessageId(input: {
   lastReadAt?: string | null;
   unreadCount?: number;
   currentProfileId?: string;
+  manuallyUnreadFromMessageId?: string | null;
 }): string | null {
-  const { messages, lastReadMessageId, lastReadAt, unreadCount, currentProfileId } =
-    input;
+  const {
+    messages,
+    lastReadMessageId,
+    lastReadAt,
+    unreadCount,
+    currentProfileId,
+    manuallyUnreadFromMessageId,
+  } = input;
   const normalizedUnreadCount = Math.max(0, unreadCount ?? 0);
   if (messages.length === 0) return null;
 
@@ -100,6 +107,17 @@ function findUnreadStartMessageId(input: {
     }
     return null;
   };
+
+  // A manual "mark unread" carries an explicit anchor — the message the user
+  // selected — which takes priority over the read-position heuristics below.
+  // Those all walk forward from lastReadMessageId/lastReadAt, which manual
+  // unread never moves, so they'd otherwise find nothing to show.
+  if (manuallyUnreadFromMessageId) {
+    const anchorIndex = messages.findIndex(
+      (message) => message.ids.id === manuallyUnreadFromMessageId,
+    );
+    if (anchorIndex >= 0) return manuallyUnreadFromMessageId;
+  }
 
   if (lastReadMessageId) {
     const lastReadIndex = messages.findIndex(
@@ -132,6 +150,7 @@ export function findLatestUnreadIncomingMessageId(input: {
   lastReadAt?: string | null;
   unreadCount?: number;
   currentProfileId?: string;
+  manuallyUnreadFromMessageId?: string | null;
 }): string | null {
   const unreadStartMessageId = findUnreadStartMessageId(input);
   if (!unreadStartMessageId) {
@@ -441,6 +460,8 @@ export type MessageListProps = {
   lastReadMessageId?: string | null;
   lastReadAt?: string | null;
   unreadCount?: number;
+  /** Anchor set by an explicit "mark unread" — takes priority over the read-position heuristics. */
+  manuallyUnreadFromMessageId?: string | null;
   onSendAnnotation?: (attachment: import('./attachment-sheet').AttachmentPayload) => void;
   messageUiThemeKey?: 'classic' | 'feed';
 };
@@ -473,6 +494,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   lastReadMessageId,
   lastReadAt,
   unreadCount,
+  manuallyUnreadFromMessageId,
   onSendAnnotation,
   messageUiThemeKey = 'classic',
 }) => {
@@ -496,8 +518,16 @@ export const MessageList: React.FC<MessageListProps> = ({
         lastReadAt,
         unreadCount,
         currentProfileId,
+        manuallyUnreadFromMessageId,
       }),
-    [messages, lastReadMessageId, lastReadAt, unreadCount, currentProfileId],
+    [
+      messages,
+      lastReadMessageId,
+      lastReadAt,
+      unreadCount,
+      currentProfileId,
+      manuallyUnreadFromMessageId,
+    ],
   );
   const listData = useMemo(
     () =>
@@ -517,8 +547,16 @@ export const MessageList: React.FC<MessageListProps> = ({
         lastReadAt,
         unreadCount,
         currentProfileId,
+        manuallyUnreadFromMessageId,
       }),
-    [messages, lastReadMessageId, lastReadAt, unreadCount, currentProfileId],
+    [
+      messages,
+      lastReadMessageId,
+      lastReadAt,
+      unreadCount,
+      currentProfileId,
+      manuallyUnreadFromMessageId,
+    ],
   );
 
   const maybeMarkUnreadAsViewed = useCallback(() => {

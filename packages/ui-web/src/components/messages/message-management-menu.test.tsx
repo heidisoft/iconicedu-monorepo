@@ -154,7 +154,7 @@ describe('MessageManagementMenu reply and mark-unread actions', () => {
         '/api/messages/mark-unread',
         expect.objectContaining({
           method: 'POST',
-          body: JSON.stringify({ channelId: 'channel-1' }),
+          body: JSON.stringify({ channelId: 'channel-1', messageId: 'message-1' }),
         }),
       );
     });

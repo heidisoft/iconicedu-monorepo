@@ -69,6 +69,8 @@ export function useMarkRead({
           lastReadMessageId,
           lastReadAt: new Date().toISOString(),
           unreadCount,
+          isManuallyUnread: false,
+          manuallyUnreadFromMessageId: null,
         });
       } catch {
         void queryClient.invalidateQueries({

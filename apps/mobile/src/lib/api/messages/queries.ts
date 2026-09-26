@@ -78,6 +78,7 @@ export async function fetchChannelReadState(channelId: string, accountId: string
     lastReadAt: string | null;
     unreadCount: number;
     isManuallyUnread?: boolean;
+    manuallyUnreadFromMessageId?: string | null;
   } | null>(`/channels/${channelId}/read-state`, { accountId });
 }
 
@@ -86,6 +87,7 @@ export async function markChannelUnread(input: {
   accountId: string;
   profileId: string;
   channelId: string;
+  fromMessageId?: string | null;
 }): Promise<void> {
   await apiPost(`/channels/${input.channelId}/mark-unread`, input);
 }

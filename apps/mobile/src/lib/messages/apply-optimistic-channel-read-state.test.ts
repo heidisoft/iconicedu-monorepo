@@ -377,6 +377,32 @@ describe('applyOptimisticChannelReadState', () => {
     );
     expect(readState?.isManuallyUnread).toBe(false);
   });
+
+  it('clears the manual-unread anchor when the channel is read', () => {
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(queryKeys.channelReadState('channel-1', 'account-1'), {
+      channelId: 'channel-1',
+      lastReadMessageId: 'msg-9',
+      lastReadAt: '2026-04-22T00:00:00.000Z',
+      unreadCount: 1,
+      isManuallyUnread: true,
+      manuallyUnreadFromMessageId: 'message-42',
+    });
+
+    applyOptimisticChannelReadState({
+      queryClient,
+      orgId: 'org-1',
+      profileId: 'profile-1',
+      accountId: 'account-1',
+      channelId: 'channel-1',
+      lastReadMessageId: 'msg-9',
+    });
+
+    const readState = queryClient.getQueryData<{
+      manuallyUnreadFromMessageId?: string | null;
+    }>(queryKeys.channelReadState('channel-1', 'account-1'));
+    expect(readState?.manuallyUnreadFromMessageId).toBeNull();
+  });
 });
 
 describe('applyOptimisticChannelManualUnread', () => {
@@ -478,6 +504,24 @@ describe('applyOptimisticChannelManualUnread', () => {
     expect(readState?.isManuallyUnread).toBe(true);
     expect(readState?.unreadCount).toBe(3);
     expect(readState?.lastReadMessageId).toBe('msg-9');
+  });
+
+  it('stores the selected message as the manual-unread anchor', () => {
+    const queryClient = new QueryClient();
+
+    applyOptimisticChannelManualUnread({
+      queryClient,
+      orgId: 'org-1',
+      profileId: 'profile-1',
+      accountId: 'account-1',
+      channelId: 'channel-1',
+      fromMessageId: 'message-42',
+    });
+
+    const readState = queryClient.getQueryData<{
+      manuallyUnreadFromMessageId?: string | null;
+    }>(queryKeys.channelReadState('channel-1', 'account-1'));
+    expect(readState?.manuallyUnreadFromMessageId).toBe('message-42');
   });
 
   it('leaves list caches untouched when the channel is not in them', () => {

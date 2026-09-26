@@ -219,7 +219,13 @@ export class ChannelsController {
   markUnread(
     @Req() req: AuthenticatedRequest,
     @Param('channelId') channelId: string,
-    @Body() body: { orgId: string; accountId: string; profileId: string },
+    @Body()
+    body: {
+      orgId: string;
+      accountId: string;
+      profileId: string;
+      fromMessageId?: string | null;
+    },
   ) {
     return this.channelsService.markUnread(
       extractBearerToken(req.headers.authorization),

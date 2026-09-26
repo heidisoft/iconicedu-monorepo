@@ -5,9 +5,13 @@ import { requireEffectiveActorContext } from '@iconicedu/web/lib/family-view/act
 import { createApiClient } from '@iconicedu/web/lib/api/http-client';
 
 export async function POST(request: Request) {
-  const body = (await request.json().catch(() => null)) as { channelId?: string } | null;
+  const body = (await request.json().catch(() => null)) as {
+    channelId?: string;
+    messageId?: string;
+  } | null;
 
   const channelId = body?.channelId?.trim();
+  const messageId = body?.messageId?.trim() || undefined;
   if (!channelId) {
     return NextResponse.json(
       { success: false, message: 'channelId is required' },
@@ -42,6 +46,7 @@ export async function POST(request: Request) {
       orgId: actor.account.org_id,
       accountId: actor.account.id,
       profileId: actor.profile.id,
+      fromMessageId: messageId,
     });
 
     return NextResponse.json({ success: true });
