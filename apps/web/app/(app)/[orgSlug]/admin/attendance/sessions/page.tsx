@@ -14,6 +14,7 @@ import {
 } from '@iconicedu/web/app/(app)/[orgSlug]/admin/attendance/sessions/session-attendance-analytics';
 import {
   enableAdminSessionAttendanceAnalytics,
+  enableSessionCompletionDisputeDetails,
   enableSessionCompletionVerifiedDuration,
 } from '@iconicedu/web/flags';
 import { requireAdminOrgContext } from '@iconicedu/web/lib/admin/require-admin-org-context';
@@ -57,6 +58,11 @@ export default async function AdminCompletedSessionsPage({
     (await enableSessionCompletionVerifiedDuration.run({
       identify: { profileId: adminContext.actorProfileId },
     }));
+  const disputeDetailsEnabled =
+    adminContext.ok &&
+    (await enableSessionCompletionDisputeDetails.run({
+      identify: { profileId: adminContext.actorProfileId },
+    }));
 
   // A rolling three-month interval can intersect four calendar months.
   // The API clamps both month requests and the default view to that interval.
@@ -80,6 +86,7 @@ export default async function AdminCompletedSessionsPage({
           schedules={schedules}
           orgId={org.id}
           allowVerifiedDurationOverride={verifiedDurationEnabled}
+          showDisputeDetails={disputeDetailsEnabled}
         />
       </AdminPageShell>
     );
@@ -120,6 +127,7 @@ export default async function AdminCompletedSessionsPage({
         monthOptions={monthOptions}
         orgId={org.id}
         allowVerifiedDurationOverride={verifiedDurationEnabled}
+        showDisputeDetails={disputeDetailsEnabled}
       />
     </AdminPageShell>
   );

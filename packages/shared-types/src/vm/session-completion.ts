@@ -91,6 +91,14 @@ export interface AdminSessionCompletionParticipantVM {
     displayName: string;
     confirmedAt: ISODateTime;
   } | null;
+  /** Set when this person's row is 'disputed' — the reason they (or staff, on
+   * their behalf) reported a problem with the session. */
+  disputeDetails?: {
+    category: ClassSessionCompletionDisputeCategory;
+    reason: string | null;
+    rescheduleRequested: boolean;
+    disputedAt: ISODateTime;
+  } | null;
 }
 
 /** One schedule occurrence within the admin reporting window, whether completed,

@@ -74,6 +74,10 @@ const DISPUTE_CATEGORIES: {
   { key: 'other', label: 'Other' },
 ];
 
+const DISPUTE_CATEGORY_LABELS = new Map(
+  DISPUTE_CATEGORIES.map((option) => [option.key, option.label]),
+);
+
 // Scheduled length of the occurrence: end minus its start (occurrenceKey). Returns
 // null when either bound is unparseable or non-positive — some backfilled rows
 // carry no distinct end time, so end === start.
@@ -607,12 +611,15 @@ export function CompletedSessionsTable({
   schedules,
   orgId,
   allowVerifiedDurationOverride = false,
+  showDisputeDetails = false,
 }: {
   rows: AdminSessionCompletionVM[];
   schedules: ScheduleOptionRow[];
   orgId: string;
   /** Gated by the enableSessionCompletionVerifiedDuration flag (see flags.ts). */
   allowVerifiedDurationOverride?: boolean;
+  /** Gated by the enableSessionCompletionDisputeDetails flag (see flags.ts). */
+  showDisputeDetails?: boolean;
 }) {
   const router = useRouter();
   const [page, setPage] = React.useState(1);
@@ -841,6 +848,18 @@ export function CompletedSessionsTable({
                                 {formatAttendanceDateTime(
                                   person.confirmedByStaff.confirmedAt,
                                 )}
+                              </p>
+                            )}
+                            {disputed && showDisputeDetails && person.disputeDetails && (
+                              <p className="text-xs text-muted-foreground">
+                                {DISPUTE_CATEGORY_LABELS.get(
+                                  person.disputeDetails.category,
+                                ) ?? person.disputeDetails.category}
+                                {person.disputeDetails.reason
+                                  ? `: ${person.disputeDetails.reason}`
+                                  : ''}
+                                {person.disputeDetails.rescheduleRequested &&
+                                  ' · Reschedule requested'}
                               </p>
                             )}
                           </div>

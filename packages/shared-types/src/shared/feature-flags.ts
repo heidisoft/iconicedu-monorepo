@@ -19,6 +19,7 @@ export const platformFeatureFlagKeys = {
   enableMobileMessageComposerParity: 'enable-mobile-message-composer-parity',
   enableMessageSendReliability: 'enable-message-send-reliability',
   enableSessionCompletionVerifiedDuration: 'enable-session-completion-verified-duration',
+  enableSessionCompletionDisputeDetails: 'enable-session-completion-dispute-details',
 } as const;
 
 export type PlatformFeatureFlagKey =

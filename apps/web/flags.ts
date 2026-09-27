@@ -442,6 +442,26 @@ export const enableSessionCompletionVerifiedDuration = flag<
   },
 });
 
+export const enableSessionCompletionDisputeDetails = flag<
+  boolean,
+  { profileId?: string | null }
+>({
+  key: platformFeatureFlagKeys.enableSessionCompletionDisputeDetails,
+  description:
+    'Shows the reported dispute category and reason under a disputed participant in the admin completed-sessions list.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: platformFeatureFlagKeys.enableSessionCompletionDisputeDetails,
+      profileId: entities?.profileId,
+    });
+  },
+});
+
 export const webFlags = {
   enableAdminSessionAttendanceAnalytics,
   enableAiRefine,
@@ -467,6 +487,7 @@ export const webFlags = {
   enableMobileMessageComposerParity,
   enableMessageSendReliability,
   enableSessionCompletionVerifiedDuration,
+  enableSessionCompletionDisputeDetails,
 } as const;
 
 export type WebFlagKey = keyof typeof webFlags;

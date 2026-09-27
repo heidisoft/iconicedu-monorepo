@@ -83,6 +83,52 @@ describe('CompletedSessionsTable', () => {
     expect(screen.queryByRole('button', { name: 'Confirm' })).not.toBeInTheDocument();
   });
 
+  const rowWithDisputeDetails: AdminSessionCompletionVM = {
+    ...row,
+    participants: [
+      ...row.participants!.slice(0, 3),
+      {
+        profileId: 'parent-three',
+        displayName: 'Parent Three',
+        role: 'guardian',
+        status: 'disputed',
+        disputeDetails: {
+          category: 'technical_issue',
+          reason: 'Not completed full 1h',
+          rescheduleRequested: true,
+          disputedAt: '2026-09-01T13:05:00Z',
+        },
+      },
+    ],
+  };
+
+  it('hides the dispute category and reason when the flag is off', () => {
+    render(
+      <CompletedSessionsTable
+        rows={[rowWithDisputeDetails]}
+        schedules={[]}
+        orgId="org"
+      />,
+    );
+    expect(
+      screen.queryByText(/Technical issue: Not completed full 1h/),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the reported dispute category and reason when the flag is on', () => {
+    render(
+      <CompletedSessionsTable
+        rows={[rowWithDisputeDetails]}
+        schedules={[]}
+        orgId="org"
+        showDisputeDetails
+      />,
+    );
+    expect(
+      screen.getByText('Technical issue: Not completed full 1h · Reschedule requested'),
+    ).toBeInTheDocument();
+  });
+
   it('lets staff resolve a dispute with a verified duration when the flag is on', () => {
     render(
       <CompletedSessionsTable
