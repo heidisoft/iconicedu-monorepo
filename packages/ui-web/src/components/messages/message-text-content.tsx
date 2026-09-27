@@ -8,19 +8,29 @@ import {
 } from './message-link.utils';
 import { buildMessageTextSegments } from './message-mentions.utils';
 import { isEmojiOnlyText } from './message-action-visibility.utils';
+import { useOptionalMessagesState } from './context/messages-state-provider';
+import {
+  splitTextIntoListBlocks,
+  sliceMentionsForRange,
+} from './message-list-blocks.utils';
 
 type MessageTextContentProps = {
   text: string;
   mentions?: MessageMentionVM[];
   className?: string;
+  /** Explicit override for tests; falls back to the enableMessageListFormatting flag. */
+  enableListFormatting?: boolean;
 };
 
 export const MessageTextContent = memo(function MessageTextContent({
   text,
   mentions,
   className,
+  enableListFormatting,
 }: MessageTextContentProps) {
-  const segments = buildMessageTextSegments(text, mentions);
+  const messagesState = useOptionalMessagesState();
+  const listFormattingEnabled =
+    enableListFormatting ?? messagesState?.enableMessageListFormatting ?? false;
   const isEmojiOnly = isEmojiOnlyText(text);
 
   const renderLinkedText = (value: string, keyPrefix: string) =>
@@ -97,28 +107,93 @@ export const MessageTextContent = memo(function MessageTextContent({
     });
   };
 
+  const renderInlineNodes = (
+    value: string,
+    mentionsForValue: MessageMentionVM[],
+    keyPrefix: string,
+  ) => {
+    const segments = buildMessageTextSegments(value, mentionsForValue);
+    return segments.map((segment, index) => {
+      if (segment.type === 'text') {
+        return (
+          <span key={`${keyPrefix}-text-${index}`}>
+            {renderFormattedText(segment.text)}
+          </span>
+        );
+      }
+
+      return (
+        <span
+          key={`${keyPrefix}-mention-${segment.mention.profileId}-${segment.mention.start}`}
+          className="mx-[1px] inline-flex items-center rounded-md bg-action-subtle px-1.5 py-0.5 font-medium text-action ring-1 ring-action/25"
+        >
+          @{segment.mention.displayName}
+        </span>
+      );
+    });
+  };
+
+  const blocks = listFormattingEnabled ? splitTextIntoListBlocks(text) : null;
+  const hasLists = blocks ? blocks.some((block) => block.kind !== 'text') : false;
+
+  if (!hasLists) {
+    return (
+      <p
+        className={cn(
+          'text-[15px] leading-5 whitespace-pre-wrap [overflow-wrap:anywhere] text-foreground',
+          isEmojiOnly && 'text-4xl leading-tight',
+          className,
+        )}
+      >
+        {renderInlineNodes(text, mentions ?? [], 'flat')}
+      </p>
+    );
+  }
+
   return (
-    <p
+    <div
       className={cn(
-        'text-[15px] leading-5 whitespace-pre-wrap [overflow-wrap:anywhere] text-foreground',
-        isEmojiOnly && 'text-4xl leading-tight',
+        'space-y-1 text-[15px] leading-5 text-foreground [overflow-wrap:anywhere]',
         className,
       )}
     >
-      {segments.map((segment, index) => {
-        if (segment.type === 'text') {
-          return <span key={`text-${index}`}>{renderFormattedText(segment.text)}</span>;
+      {blocks!.map((block, blockIndex) => {
+        if (block.kind === 'text') {
+          if (!block.text) {
+            return null;
+          }
+          return (
+            <p key={`block-${blockIndex}`} className="whitespace-pre-wrap">
+              {renderInlineNodes(
+                block.text,
+                sliceMentionsForRange(mentions, block.start, block.end),
+                `b${blockIndex}`,
+              )}
+            </p>
+          );
         }
 
+        const ListTag = block.kind === 'bullet-list' ? 'ul' : 'ol';
         return (
-          <span
-            key={`mention-${segment.mention.profileId}-${segment.mention.start}`}
-            className="mx-[1px] inline-flex items-center rounded-md bg-action-subtle px-1.5 py-0.5 font-medium text-action ring-1 ring-action/25"
+          <ListTag
+            key={`block-${blockIndex}`}
+            className={cn(
+              'space-y-0.5 pl-5',
+              block.kind === 'bullet-list' ? 'list-disc' : 'list-decimal',
+            )}
           >
-            @{segment.mention.displayName}
-          </span>
+            {block.items.map((item, itemIndex) => (
+              <li key={`block-${blockIndex}-item-${itemIndex}`}>
+                {renderInlineNodes(
+                  item.text,
+                  sliceMentionsForRange(mentions, item.start, item.end),
+                  `b${blockIndex}i${itemIndex}`,
+                )}
+              </li>
+            ))}
+          </ListTag>
         );
       })}
-    </p>
+    </div>
   );
 });

@@ -9,6 +9,13 @@ const buildChannelByIdMock = vi.fn();
 const enableMessageTypeComposerRunMock = vi.fn(async () => true);
 const enableAiRefineRunMock = vi.fn(async () => true);
 const enableAiSuggestedRepliesRunMock = vi.fn(async () => true);
+const enableMessageMarkUnreadRunMock = vi.fn(async () => false);
+const enableMessageReplyReferenceRunMock = vi.fn(async () => true);
+const enableNotificationConversationControlsRunMock = vi.fn(async () => false);
+const enableMessageListFormattingRunMock = vi.fn(async () => true);
+const enableMessageDraftsRunMock = vi.fn(async () => false);
+const enableMessageEditRunMock = vi.fn(async () => false);
+const enableMessageSendReliabilityRunMock = vi.fn(async () => false);
 
 vi.mock('@iconicedu/ui-web', () => ({
   DashboardHeader: () => null,
@@ -19,6 +26,7 @@ vi.mock('@iconicedu/web/app/(app)/[orgSlug]/messages/messages-shell-client', () 
 }));
 
 vi.mock('@iconicedu/web/app/actions/messages', () => ({
+  editTextMessageAction: vi.fn(),
   sendFileMessageAction: vi.fn(),
   sendFilesMessageAction: vi.fn(),
   sendTextMessageAction: vi.fn(),
@@ -53,6 +61,30 @@ vi.mock('@iconicedu/web/flags', () => ({
   enableAiSuggestedReplies: {
     run: (...args: unknown[]) => enableAiSuggestedRepliesRunMock(...args),
   },
+  enableMessagePinning: { run: async () => false },
+  enableMessageSearch: { run: async () => false },
+  enableScheduledSend: { run: async () => false },
+  enableMessageMarkUnread: {
+    run: (...args: unknown[]) => enableMessageMarkUnreadRunMock(...args),
+  },
+  enableMessageReplyReference: {
+    run: (...args: unknown[]) => enableMessageReplyReferenceRunMock(...args),
+  },
+  enableNotificationConversationControls: {
+    run: (...args: unknown[]) => enableNotificationConversationControlsRunMock(...args),
+  },
+  enableMessageListFormatting: {
+    run: (...args: unknown[]) => enableMessageListFormattingRunMock(...args),
+  },
+  enableMessageDrafts: {
+    run: (...args: unknown[]) => enableMessageDraftsRunMock(...args),
+  },
+  enableMessageEdit: {
+    run: (...args: unknown[]) => enableMessageEditRunMock(...args),
+  },
+  enableMessageSendReliability: {
+    run: (...args: unknown[]) => enableMessageSendReliabilityRunMock(...args),
+  },
 }));
 
 describe('d/c/[channelId] page', () => {
@@ -78,6 +110,35 @@ describe('d/c/[channelId] page', () => {
           showAiSuggestedReplies: true,
         }),
       );
+    });
+  });
+
+  it('threads the P1 messaging flags down to MessagesShellClient', async () => {
+    buildChannelByIdMock.mockResolvedValueOnce({
+      ids: { id: 'channel-1', orgId: 'org-1' },
+      collections: {
+        participants: [{ ids: { accountId: 'account-1' } }],
+      },
+    });
+
+    const element = await Page({
+      params: Promise.resolve({ orgSlug: 'iconic-academy', channelId: 'channel-1' }),
+    });
+    render(element as React.ReactElement);
+
+    await waitFor(() => {
+      expect(messagesShellMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          enableMessageMarkUnread: false,
+          enableMessageReplyReference: true,
+          enableNotificationConversationControls: false,
+          enableMessageListFormatting: true,
+        }),
+      );
+    });
+
+    expect(enableMessageMarkUnreadRunMock).toHaveBeenCalledWith({
+      identify: { profileId: 'profile-1' },
     });
   });
 

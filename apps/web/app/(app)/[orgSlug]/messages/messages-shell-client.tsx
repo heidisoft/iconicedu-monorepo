@@ -11,6 +11,7 @@ import {
 import { useRouter } from 'next/navigation';
 import type {
   ChannelVM,
+  MessageEditTextInput,
   MessageSendFileInput,
   MessageSendFilesInput,
   MessageSendTextInput,
@@ -144,6 +145,16 @@ type MessagesShellClientProps = {
   showCreateMessageTypeButton?: boolean;
   showAiRefine?: boolean;
   showAiSuggestedReplies?: boolean;
+  enableMessagePinning?: boolean;
+  enableMessageSearch?: boolean;
+  enableScheduledSend?: boolean;
+  enableMessageMarkUnread?: boolean;
+  enableMessageReplyReference?: boolean;
+  enableNotificationConversationControls?: boolean;
+  enableMessageListFormatting?: boolean;
+  enableMessageDrafts?: boolean;
+  enableMessageEdit?: boolean;
+  enableMessageSendReliability?: boolean;
   panelRegistry?: Partial<
     MessagesRightPanelRegistry<ComponentType<{ intent: MessagesRightPanelIntent }>>
   >;
@@ -151,6 +162,7 @@ type MessagesShellClientProps = {
   sendTextMessage: (input: MessageSendTextInput) => Promise<MessageVM>;
   sendFileMessage: (input: MessageSendFileInput) => Promise<MessageVM>;
   sendFilesMessage: (input: MessageSendFilesInput) => Promise<MessageVM>;
+  editTextMessage: (input: MessageEditTextInput) => Promise<MessageVM>;
   toggleReaction: (input: {
     orgId: string;
     messageId: string;
@@ -178,10 +190,21 @@ export function MessagesShellClient({
   showCreateMessageTypeButton = true,
   showAiRefine = false,
   showAiSuggestedReplies = false,
+  enableMessagePinning = false,
+  enableMessageSearch = false,
+  enableScheduledSend = false,
+  enableMessageMarkUnread = false,
+  enableMessageReplyReference = false,
+  enableNotificationConversationControls = false,
+  enableMessageListFormatting = false,
+  enableMessageDrafts = false,
+  enableMessageEdit = false,
+  enableMessageSendReliability = false,
   panelRegistry,
   sendTextMessage,
   sendFileMessage,
   sendFilesMessage,
+  editTextMessage,
   toggleReaction,
   toggleSavedMessage,
   deleteMessage,
@@ -201,6 +224,7 @@ export function MessagesShellClient({
   const messageWriteClient = useMemo(
     () => ({
       sendTextMessage,
+      editTextMessage,
       toggleReaction,
       toggleSavedMessage,
       deleteMessage,
@@ -208,6 +232,7 @@ export function MessagesShellClient({
     }),
     [
       sendTextMessage,
+      editTextMessage,
       toggleReaction,
       toggleSavedMessage,
       deleteMessage,
@@ -524,6 +549,16 @@ export function MessagesShellClient({
         showCreateMessageTypeButton={showCreateMessageTypeButton}
         showAiRefine={showAiRefine}
         showAiSuggestedReplies={showAiSuggestedReplies}
+        enableMessagePinning={enableMessagePinning}
+        enableMessageSearch={enableMessageSearch}
+        enableScheduledSend={enableScheduledSend}
+        enableMessageMarkUnread={enableMessageMarkUnread}
+        enableMessageReplyReference={enableMessageReplyReference}
+        enableNotificationConversationControls={enableNotificationConversationControls}
+        enableMessageListFormatting={enableMessageListFormatting}
+        enableMessageDrafts={enableMessageDrafts}
+        enableMessageEdit={enableMessageEdit}
+        enableMessageSendReliability={enableMessageSendReliability}
         panelRegistry={panelRegistry}
         realtimeClient={realtimeClient}
         messageWriteClient={messageWriteClient}

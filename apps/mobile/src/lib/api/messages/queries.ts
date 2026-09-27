@@ -4,12 +4,14 @@ import type {
   AiRefineDraftResult,
   AiSuggestedRepliesInput,
   AiSuggestedRepliesResult,
+  MessageEditTextInput,
+  MessageMentionVM,
   MessageSendFileInput,
   MessageSendFilesInput,
   MessageSendTextInput,
   MessageVM,
 } from '@iconicedu/shared-types';
-import { apiDelete, apiGet, apiPost } from '@/lib/api/http-client';
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from '@/lib/api/http-client';
 import { supabase } from '@/lib/supabase/client';
 
 export async function fetchChannelMessages(
@@ -79,7 +81,19 @@ export async function fetchChannelReadState(channelId: string, accountId: string
     lastReadMessageId: string | null;
     lastReadAt: string | null;
     unreadCount: number;
+    isManuallyUnread?: boolean;
+    manuallyUnreadFromMessageId?: string | null;
   } | null>(`/channels/${channelId}/read-state`, { accountId });
+}
+
+export async function markChannelUnread(input: {
+  orgId: string;
+  accountId: string;
+  profileId: string;
+  channelId: string;
+  fromMessageId?: string | null;
+}): Promise<void> {
+  await apiPost(`/channels/${input.channelId}/mark-unread`, input);
 }
 
 export async function markChannelReadState(input: {
@@ -144,6 +158,14 @@ export async function fetchSuggestedReplies(
   return apiPost('/ai-assist/suggested-replies', input);
 }
 
+export type SendTextMessageOptions = {
+  /** Client-generated idempotency key — see MessageSendTextInput.clientMessageId. */
+  clientMessageId?: string;
+  mentions?: MessageMentionVM[];
+  /** Id of the message this one is quoting — see MessageSendTextInput.replyToMessageId. */
+  replyToMessageId?: string | null;
+};
+
 export async function sendTextMessage(
   channelId: string,
   senderProfileId: string,
@@ -151,9 +173,15 @@ export async function sendTextMessage(
   text: string,
   threadParentId?: string,
   threadId?: string,
+  /** A bare string is shorthand for `{ replyToMessageId: value }`. */
+  optionsOrReplyToMessageId?: string | SendTextMessageOptions,
 ) {
   const content = text.trim();
   if (!content) throw new Error('Message text is required');
+  const options: SendTextMessageOptions =
+    typeof optionsOrReplyToMessageId === 'string'
+      ? { replyToMessageId: optionsOrReplyToMessageId }
+      : (optionsOrReplyToMessageId ?? {});
   return apiPost('/messages/text', {
     orgId,
     channelId,
@@ -161,7 +189,32 @@ export async function sendTextMessage(
     content,
     threadParentId,
     threadId,
+    ...(options.replyToMessageId ? { replyToMessageId: options.replyToMessageId } : {}),
+    ...(options.clientMessageId ? { clientMessageId: options.clientMessageId } : {}),
+    ...(options.mentions?.length ? { mentions: options.mentions } : {}),
   } satisfies MessageSendTextInput);
+}
+
+/**
+ * PATCH /messages/:id/text — sender-only, text-only, not-deleted, within
+ * MESSAGE_EDIT_WINDOW_MINUTES on the server. Throws with the server's error
+ * message (via http-client's parseResponse) on rejection, e.g. a stale edit
+ * attempt past the window.
+ */
+export async function editTextMessage(
+  messageId: string,
+  orgId: string,
+  content: string,
+  mentions?: MessageMentionVM[],
+): Promise<{ id: string }> {
+  const trimmed = content.trim();
+  if (!trimmed) throw new Error('Message text is required');
+  return apiPatch<{ id: string }>(`/messages/${messageId}/text`, {
+    orgId,
+    messageId,
+    content: trimmed,
+    ...(mentions?.length ? { mentions } : {}),
+  } satisfies MessageEditTextInput);
 }
 
 const CHANNEL_FILES_BUCKET = 'channel-files';
@@ -244,6 +297,7 @@ export async function sendFileMessage(
   content?: string,
   threadParentId?: string,
   threadId?: string,
+  clientMessageId?: string,
 ) {
   const result = await apiPost<{ id: string }>('/messages/file', {
     orgId,
@@ -257,6 +311,7 @@ export async function sendFileMessage(
     content,
     threadParentId: threadParentId ?? null,
     threadId: threadId ?? null,
+    ...(clientMessageId ? { clientMessageId } : {}),
   } satisfies MessageSendFileInput);
 
   return { id: result.id };
@@ -270,6 +325,7 @@ export async function sendFilesMessage(
   content?: string,
   threadParentId?: string,
   threadId?: string,
+  clientMessageId?: string,
 ) {
   if (!files.length) throw new Error('No files provided');
   const result = await apiPost<{ id: string }>('/messages/files', {
@@ -285,7 +341,132 @@ export async function sendFilesMessage(
     content,
     threadParentId: threadParentId ?? null,
     threadId: threadId ?? null,
+    ...(clientMessageId ? { clientMessageId } : {}),
   } satisfies MessageSendFilesInput);
 
   return { id: result.id };
+}
+
+// ─── Pinning (issue #264 P2) ────────────────────────────────────────────────
+
+export async function fetchPinnedMessages(input: {
+  orgId: string;
+  channelId: string;
+  profileId: string;
+  accountId: string;
+}) {
+  return apiGet<Array<{ message: MessageVM; pinnedBy: unknown; pinnedAt: string }>>(
+    '/message-pins',
+    input,
+  );
+}
+
+export async function toggleMessagePin(input: {
+  orgId: string;
+  channelId: string;
+  messageId: string;
+  isPinned: boolean;
+  profileId: string;
+}): Promise<void> {
+  await apiPost('/message-pins', input);
+}
+
+// ─── Search (issue #264 P2) ─────────────────────────────────────────────────
+
+export type MessageSearchResult = {
+  message: MessageVM;
+  matchRanges: Array<{ start: number; end: number }>;
+};
+
+export async function searchChannelMessages(input: {
+  orgId: string;
+  channelId: string;
+  query: string;
+  profileId: string;
+  accountId: string;
+  senderProfileId?: string;
+  createdAfter?: string;
+  createdBefore?: string;
+  limit?: number;
+}): Promise<MessageSearchResult[]> {
+  return apiGet<MessageSearchResult[]>('/message-search', input);
+}
+
+// ─── Scheduled send (issue #264 P2) ─────────────────────────────────────────
+
+export type ScheduledMessage = {
+  ids: { id: string; orgId: string };
+  channelId: string;
+  senderProfileId: string;
+  content: string;
+  mentions?: MessageMentionVM[];
+  threadParentId?: string | null;
+  threadId?: string | null;
+  sendAt: string;
+  timezone?: string | null;
+  status: 'pending' | 'sent' | 'canceled' | 'failed';
+  dispatchedMessageId?: string | null;
+  lastError?: string | null;
+};
+
+export async function fetchScheduledMessages(input: {
+  orgId: string;
+  senderProfileId: string;
+}): Promise<ScheduledMessage[]> {
+  return apiGet<ScheduledMessage[]>('/scheduled-messages', input);
+}
+
+export async function scheduleMessage(input: {
+  orgId: string;
+  channelId: string;
+  senderProfileId: string;
+  content: string;
+  mentions?: MessageMentionVM[];
+  threadParentId?: string | null;
+  threadId?: string | null;
+  sendAt: string;
+  timezone?: string | null;
+}): Promise<ScheduledMessage> {
+  return apiPost<ScheduledMessage>('/scheduled-messages', input);
+}
+
+export async function updateScheduledMessage(input: {
+  orgId: string;
+  id: string;
+  content?: string;
+  mentions?: MessageMentionVM[];
+  sendAt?: string;
+  timezone?: string | null;
+}): Promise<ScheduledMessage> {
+  const { id, ...body } = input;
+  return apiPut<ScheduledMessage>(`/scheduled-messages/${id}`, body);
+}
+
+export async function cancelScheduledMessage(input: {
+  orgId: string;
+  id: string;
+}): Promise<void> {
+  await apiDelete(`/scheduled-messages/${input.id}?orgId=${input.orgId}`);
+}
+
+export async function sendScheduledMessageNow(input: {
+  orgId: string;
+  id: string;
+}): Promise<ScheduledMessage> {
+  return apiPost<ScheduledMessage>(`/scheduled-messages/${input.id}/send-now`, {
+    orgId: input.orgId,
+  });
+}
+
+export type LinkPreviewMetadata = {
+  url: string;
+  title: string;
+  description?: string;
+  imageUrl?: string;
+  siteName?: string;
+  favicon?: string;
+};
+
+export async function fetchLinkPreview(url: string): Promise<LinkPreviewMetadata> {
+  return apiGet<LinkPreviewMetadata>('/messages/link-preview', { url });
 }

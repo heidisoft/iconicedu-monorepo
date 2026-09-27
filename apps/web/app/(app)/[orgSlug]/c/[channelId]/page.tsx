@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { DashboardHeader } from '@iconicedu/ui-web';
 import {
+  editTextMessageAction,
   sendFileMessageAction,
   sendFilesMessageAction,
   sendTextMessageAction,
@@ -20,7 +21,17 @@ import {
 import {
   enableAiRefine,
   enableAiSuggestedReplies,
+  enableMessagePinning,
+  enableMessageSearch,
   enableMessageTypeComposer,
+  enableScheduledSend,
+  enableMessageMarkUnread,
+  enableMessageReplyReference,
+  enableNotificationConversationControls,
+  enableMessageListFormatting,
+  enableMessageDrafts,
+  enableMessageEdit,
+  enableMessageSendReliability,
 } from '@iconicedu/web/flags';
 
 const INITIAL_MESSAGES_PAGE_SIZE = 40;
@@ -51,15 +62,36 @@ export default async function Page({
   if (!channel) {
     notFound();
   }
-  const showCreateMessageTypeButton = await enableMessageTypeComposer.run({
-    identify: { profileId: profileResponse.data?.id ?? null },
-  });
-  const showAiRefine = await enableAiRefine.run({
-    identify: { profileId: profileResponse.data?.id ?? null },
-  });
-  const showAiSuggestedReplies = await enableAiSuggestedReplies.run({
-    identify: { profileId: profileResponse.data?.id ?? null },
-  });
+  const identify = { profileId: profileResponse.data?.id ?? null };
+  const [
+    showCreateMessageTypeButton,
+    showAiRefine,
+    showAiSuggestedReplies,
+    showMessagePinning,
+    showMessageSearch,
+    showScheduledSend,
+    markUnreadEnabled,
+    replyReferenceEnabled,
+    notificationConversationControlsEnabled,
+    listFormattingEnabled,
+    messageDraftsEnabled,
+    messageEditEnabled,
+    messageSendReliabilityEnabled,
+  ] = await Promise.all([
+    enableMessageTypeComposer.run({ identify }),
+    enableAiRefine.run({ identify }),
+    enableAiSuggestedReplies.run({ identify }),
+    enableMessagePinning.run({ identify }),
+    enableMessageSearch.run({ identify }),
+    enableScheduledSend.run({ identify }),
+    enableMessageMarkUnread.run({ identify }),
+    enableMessageReplyReference.run({ identify }),
+    enableNotificationConversationControls.run({ identify }),
+    enableMessageListFormatting.run({ identify }),
+    enableMessageDrafts.run({ identify }),
+    enableMessageEdit.run({ identify }),
+    enableMessageSendReliability.run({ identify }),
+  ]);
   const isStaffReadOnly = isStaffObserverReadOnlyChannel(
     channel,
     account.id,
@@ -78,9 +110,20 @@ export default async function Page({
         showCreateMessageTypeButton={showCreateMessageTypeButton}
         showAiRefine={showAiRefine}
         showAiSuggestedReplies={showAiSuggestedReplies}
+        enableMessagePinning={showMessagePinning}
+        enableMessageSearch={showMessageSearch}
+        enableScheduledSend={showScheduledSend}
+        enableMessageMarkUnread={markUnreadEnabled}
+        enableMessageReplyReference={replyReferenceEnabled}
+        enableNotificationConversationControls={notificationConversationControlsEnabled}
+        enableMessageListFormatting={listFormattingEnabled}
+        enableMessageDrafts={messageDraftsEnabled}
+        enableMessageEdit={messageEditEnabled}
+        enableMessageSendReliability={messageSendReliabilityEnabled}
         sendTextMessage={sendTextMessageAction}
         sendFileMessage={sendFileMessageAction}
         sendFilesMessage={sendFilesMessageAction}
+        editTextMessage={editTextMessageAction}
         toggleReaction={toggleMessageReactionAction}
         toggleSavedMessage={toggleSavedMessageAction}
         deleteMessage={deleteMessageAction}

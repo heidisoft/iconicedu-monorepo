@@ -232,6 +232,33 @@ describe('NavDirectMessages', () => {
 
     expect(await screen.findByRole('tooltip')).toHaveTextContent('STAFF');
   });
+
+  it('shows a "Draft" label only for channels present in draftChannelIds', () => {
+    render(
+      <SidebarProvider>
+        <NavDirectMessages
+          dms={[makeDm('dm-1', 'account-self', 0), makeDm('dm-2', 'account-self', 0)]}
+          currentUserId="account-self"
+          draftChannelIds={new Set(['dm-1'])}
+        />
+      </SidebarProvider>,
+    );
+
+    expect(screen.getAllByText('Draft')).toHaveLength(1);
+  });
+
+  it('renders no "Draft" label when draftChannelIds is not provided', () => {
+    render(
+      <SidebarProvider>
+        <NavDirectMessages
+          dms={[makeDm('dm-1', 'account-self', 0)]}
+          currentUserId="account-self"
+        />
+      </SidebarProvider>,
+    );
+
+    expect(screen.queryByText('Draft')).not.toBeInTheDocument();
+  });
 });
 
 function makeDm(

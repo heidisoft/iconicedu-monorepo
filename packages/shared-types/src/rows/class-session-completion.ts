@@ -11,6 +11,7 @@ export type ClassSessionCompletionDisputeCategory =
   | 'teacher_absent'
   | 'student_absent'
   | 'technical_issue'
+  | 'did_not_happen'
   | 'other';
 
 export interface ClassSessionCompletionRow {

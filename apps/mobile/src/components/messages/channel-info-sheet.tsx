@@ -29,6 +29,9 @@ import {
   Share2,
   Video,
   X,
+  Pin,
+  Search,
+  CalendarClock,
 } from 'lucide-react-native';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
@@ -49,6 +52,9 @@ import {
 } from '@/lib/api/queries';
 import { profileAvatarColors, profileAvatarBg } from '@/lib/profile-avatar-colors';
 import { BottomSheet } from '@iconicedu/ui-native';
+import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
+import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
+import { NotificationModeSection } from '@/components/messages/notification-mode-section';
 
 const CHANNEL_FILES_BUCKET = 'channel-files';
 
@@ -323,6 +329,15 @@ export type ChannelInfoSheetProps = {
   onJoinPress?: () => void;
   onClose: () => void;
   onProfilePress?: (user: UserProfileVM) => void;
+  /** Gated by `enableMessagePinning` — shows a "Pinned messages" quick-action entry. */
+  enablePinning?: boolean;
+  onOpenPinned?: () => void;
+  /** Gated by `enableMessageSearch` — shows a "Search messages" quick-action entry. */
+  enableSearch?: boolean;
+  onOpenSearch?: () => void;
+  /** Gated by `enableScheduledSend` — shows a "Scheduled messages" quick-action entry. */
+  enableScheduledSend?: boolean;
+  onOpenScheduled?: () => void;
 };
 
 // ─── Tab definitions ───────────────────────────────────────────────────────────
@@ -363,7 +378,97 @@ export function getVisibleChannelInfoTabs(input?: ParsedMobileChannelUiDefaults 
   return TABS.filter((tab) => !disabledTabs.has(tab.key));
 }
 
+/** Learning spaces are scoped separately from plain channels/DMs. */
+export function resolveNotificationScopeKind(
+  kind: ChannelInfoSheetProps['kind'],
+): 'channel' | 'learning_space' {
+  return kind === 'space' ? 'learning_space' : 'channel';
+}
+
+/** The notification controls need the flag plus a full identity to query with. */
+export function resolveNotificationControlsVisibility(input: {
+  enabled: boolean;
+  channelId?: string | null;
+  orgId?: string | null;
+  profileId?: string | null;
+}): boolean {
+  return Boolean(input.enabled && input.channelId && input.orgId && input.profileId);
+}
+
 // ─── Tab icon renderer ─────────────────────────────────────────────────────────
+
+// ─── Quick actions: Pinned / Search / Scheduled (issue #264 P2) ───────────────
+
+function QuickActions({
+  enablePinning,
+  onOpenPinned,
+  enableSearch,
+  onOpenSearch,
+  enableScheduledSend,
+  onOpenScheduled,
+  colors,
+  s,
+}: {
+  enablePinning: boolean;
+  onOpenPinned?: () => void;
+  enableSearch: boolean;
+  onOpenSearch?: () => void;
+  enableScheduledSend: boolean;
+  onOpenScheduled?: () => void;
+  colors: AppColors;
+  s: ReturnType<typeof makeStyles>;
+}) {
+  const items: Array<{
+    key: string;
+    label: string;
+    icon: React.ReactNode;
+    onPress?: () => void;
+  }> = [];
+  if (enablePinning && onOpenPinned) {
+    items.push({
+      key: 'pinned',
+      label: 'Pinned',
+      icon: <Pin size={20} color={colors.text} />,
+      onPress: onOpenPinned,
+    });
+  }
+  if (enableSearch && onOpenSearch) {
+    items.push({
+      key: 'search',
+      label: 'Search',
+      icon: <Search size={20} color={colors.text} />,
+      onPress: onOpenSearch,
+    });
+  }
+  if (enableScheduledSend && onOpenScheduled) {
+    items.push({
+      key: 'scheduled',
+      label: 'Scheduled',
+      icon: <CalendarClock size={20} color={colors.text} />,
+      onPress: onOpenScheduled,
+    });
+  }
+
+  if (items.length === 0) return null;
+
+  return (
+    <View style={s.quickActionsRow}>
+      {items.map((item) => (
+        <TouchableOpacity
+          key={item.key}
+          style={s.quickActionBtn}
+          onPress={item.onPress}
+          activeOpacity={0.75}
+          accessibilityRole="button"
+          accessibilityLabel={item.label}
+        >
+          <View style={s.quickActionIconBox}>{item.icon}</View>
+          <Text style={s.quickActionLabel}>{item.label}</Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+}
 
 function TabIcon({ tabKey, color }: { tabKey: ChannelTab; color: string }) {
   const size = 16;
@@ -881,6 +986,37 @@ function makeStyles(C: AppColors) {
       backgroundColor: C.inputBg,
     },
 
+    // ── Quick actions (pin / search / scheduled — issue #264 P2) ──────────────
+    quickActionsRow: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      flexWrap: 'wrap',
+      gap: 10,
+      paddingHorizontal: 16,
+      paddingBottom: 16,
+    },
+    quickActionBtn: {
+      alignItems: 'center',
+      gap: 4,
+      width: 84,
+    },
+    quickActionIconBox: {
+      width: 48,
+      height: 48,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: C.inputBg,
+      borderWidth: hairline,
+      borderColor: C.border,
+    },
+    quickActionLabel: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: C.textMuted,
+      textAlign: 'center',
+    },
+
     // ── Info rows (DM only) ───────────────────────────────────────────────────
     section: {
       marginHorizontal: 16,
@@ -1143,6 +1279,12 @@ export function ChannelInfoSheet({
   onJoinPress,
   onClose,
   onProfilePress,
+  enablePinning = false,
+  onOpenPinned,
+  enableSearch = false,
+  onOpenSearch,
+  enableScheduledSend = false,
+  onOpenScheduled,
 }: ChannelInfoSheetProps) {
   const { colors } = useTheme();
   const router = useRouter();
@@ -1166,7 +1308,18 @@ export function ChannelInfoSheet({
     null,
   );
 
+  const enableNotificationConversationControls = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.enableNotificationConversationControls,
+  );
+
   const isDm = kind === 'dm';
+  const notificationScopeKind = resolveNotificationScopeKind(kind);
+  const showNotificationControls = resolveNotificationControlsVisibility({
+    enabled: enableNotificationConversationControls,
+    channelId,
+    orgId,
+    profileId: currentProfileId,
+  });
   const seed = avatarSeed ?? title;
   const heroAvatarColors = profileAvatarColors({ seed, themeKey: avatarThemeKey });
   const typeLabel = isDm ? 'Direct Message' : kind === 'space' ? 'Class' : 'Channel';
@@ -1477,6 +1630,17 @@ export function ChannelInfoSheet({
                 {!!subtitle && <Text style={s.heroSub}>{subtitle}</Text>}
               </View>
 
+              <QuickActions
+                enablePinning={enablePinning}
+                onOpenPinned={onOpenPinned}
+                enableSearch={enableSearch}
+                onOpenSearch={onOpenSearch}
+                enableScheduledSend={enableScheduledSend}
+                onOpenScheduled={onOpenScheduled}
+                colors={colors}
+                s={s}
+              />
+
               {/* Info rows */}
               <View style={s.section}>
                 <View style={s.row}>
@@ -1507,6 +1671,16 @@ export function ChannelInfoSheet({
                   </>
                 )}
               </View>
+
+              {/* Per-conversation notification controls */}
+              {showNotificationControls && (
+                <NotificationModeSection
+                  orgId={orgId}
+                  profileId={currentProfileId}
+                  scopeKind={notificationScopeKind}
+                  scopeId={channelId!}
+                />
+              )}
             </ScrollView>
           ) : (
             /* ── Channel / Space: compact hero + fixed tabs + scrollable content ── */
@@ -1536,6 +1710,29 @@ export function ChannelInfoSheet({
                   </TouchableOpacity>
                 )}
               </View>
+
+              <QuickActions
+                enablePinning={enablePinning}
+                onOpenPinned={onOpenPinned}
+                enableSearch={enableSearch}
+                onOpenSearch={onOpenSearch}
+                enableScheduledSend={enableScheduledSend}
+                onOpenScheduled={onOpenScheduled}
+                colors={colors}
+                s={s}
+              />
+
+              {/* Per-conversation notification controls */}
+              {showNotificationControls && (
+                <View style={{ paddingTop: 12 }}>
+                  <NotificationModeSection
+                    orgId={orgId}
+                    profileId={currentProfileId}
+                    scopeKind={notificationScopeKind}
+                    scopeId={channelId!}
+                  />
+                </View>
+              )}
 
               {/* Fixed tab bar */}
               {visibleTabs.length > 1 ? (
@@ -1663,4 +1860,6 @@ export function ChannelInfoSheet({
 export const __test__ = {
   getVisibleChannelInfoTabs,
   parseChannelUiDefaults,
+  resolveNotificationControlsVisibility,
+  resolveNotificationScopeKind,
 };

@@ -20,6 +20,8 @@ export interface ChannelReadStateVM {
   lastReadAt?: ISODateTime;
   unreadCount: number;
   threadUnreadCount?: number;
+  /** True when the user explicitly marked this channel unread, as opposed to it having unread messages. */
+  isManuallyUnread?: boolean;
 }
 
 export interface ThreadReadStateVM {
@@ -87,7 +89,10 @@ export type MessagesRightPanelIntent =
   | { key: 'channel_info' }
   | { key: 'saved' }
   | { key: 'profile'; userId: UUID }
-  | { key: 'thread'; threadId: UUID };
+  | { key: 'thread'; threadId: UUID }
+  | { key: 'pinned' }
+  | { key: 'search' }
+  | { key: 'scheduled' };
 
 export type MessagesRightPanelIntentKey = MessagesRightPanelIntent['key'];
 
@@ -144,9 +149,31 @@ export interface MessageMentionVM {
   end: number;
 }
 
+/** A compact, denormalized snapshot of the message being replied to, so it can render inline without an extra fetch. */
+export interface MessageReplyReferenceVM {
+  messageId: UUID;
+  senderId: UUID;
+  senderName: string;
+  snippet: string;
+  type: MessageTypeVM;
+  /** True when the referenced message is deleted, hidden, or otherwise no longer accessible to the viewer. */
+  isUnavailable?: boolean;
+}
+
 export interface MessageSocialVM {
   reactions: ReactionVM[];
   thread?: ThreadVM;
+  replyTo?: MessageReplyReferenceVM;
+}
+
+/** Fetched, cacheable metadata for a link preview card. */
+export interface LinkPreviewMetadataVM {
+  url: string;
+  title: string;
+  description?: string;
+  imageUrl?: string;
+  siteName?: string;
+  favicon?: string;
 }
 
 interface BaseMessageVM {
@@ -321,14 +348,7 @@ export interface HomeworkSubmissionMessageVM extends BaseMessageVM {
 export interface LinkPreviewMessageVM extends BaseMessageVM {
   core: MessageCoreVM & { type: 'link-preview' };
   content?: { text?: string; mentions?: MessageMentionVM[] };
-  link: {
-    url: string;
-    title: string;
-    description?: string;
-    imageUrl?: string;
-    siteName?: string;
-    favicon?: string;
-  };
+  link: LinkPreviewMetadataVM;
 }
 
 export interface AudioRecordingMessageVM extends BaseMessageVM {
@@ -379,3 +399,47 @@ export type MessageVM =
   | LinkPreviewMessageVM
   | AudioRecordingMessageVM
   | LiveSessionStartedMessageVM;
+
+// ─── Pinning (issue #264 P2) ────────────────────────────────────────────────
+
+export interface PinnedMessageVM {
+  message: MessageVM;
+  pinnedBy: UserProfileVM;
+  pinnedAt: ISODateTime;
+}
+
+// ─── Search (issue #264 P2) ─────────────────────────────────────────────────
+// Scoped to text messages within a single channel for this pass — see PR
+// notes for why attachment-caption search across the other message payload
+// tables is a deliberate follow-up rather than part of this cut.
+
+export interface MessageSearchFiltersVM {
+  senderProfileId?: UUID;
+  createdAfter?: ISODateTime;
+  createdBefore?: ISODateTime;
+}
+
+export interface MessageSearchResultVM {
+  message: MessageVM;
+  /** Case-insensitive substring ranges of the query match within the message's text, for client-side highlighting. */
+  matchRanges: Array<{ start: number; end: number }>;
+}
+
+// ─── Scheduled send (issue #264 P2) ─────────────────────────────────────────
+
+export type ScheduledMessageStatusVM = 'pending' | 'sent' | 'canceled' | 'failed';
+
+export interface ScheduledMessageVM {
+  ids: IdsBaseVM;
+  channelId: UUID;
+  senderProfileId: UUID;
+  content: string;
+  mentions?: MessageMentionVM[];
+  threadParentId?: UUID | null;
+  threadId?: UUID | null;
+  sendAt: ISODateTime;
+  timezone?: IANATimezone | null;
+  status: ScheduledMessageStatusVM;
+  dispatchedMessageId?: UUID | null;
+  lastError?: string | null;
+}

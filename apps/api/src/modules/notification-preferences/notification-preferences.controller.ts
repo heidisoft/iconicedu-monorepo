@@ -84,6 +84,8 @@ export class NotificationPreferencesController {
       prefKey: string;
       channels: string[];
       muted?: boolean | null;
+      mode?: 'normal' | 'mentions_only' | 'muted_until' | 'muted_until_enabled';
+      mutedUntil?: string | null;
       scopeKind: string;
       scopeId: string;
     },
@@ -108,6 +110,41 @@ export class NotificationPreferencesController {
     },
   ) {
     return this.notificationPreferencesService.deleteScope(
+      extractBearerToken(req.headers.authorization),
+      body,
+    );
+  }
+
+  @Get('conversation-mode')
+  @UseGuards(AuthGuard)
+  getConversationMode(
+    @Req() req: AuthenticatedRequest,
+    @Query('orgId') orgId: string,
+    @Query('profileId') profileId: string,
+    @Query('scopeKind') scopeKind: string,
+    @Query('scopeId') scopeId: string,
+  ) {
+    return this.notificationPreferencesService.getConversationMode(
+      extractBearerToken(req.headers.authorization),
+      { orgId, profileId, scopeKind, scopeId },
+    );
+  }
+
+  @Post('conversation-mode')
+  @UseGuards(AuthGuard)
+  setConversationMode(
+    @Req() req: AuthenticatedRequest,
+    @Body()
+    body: {
+      orgId: string;
+      profileId: string;
+      scopeKind: string;
+      scopeId: string;
+      mode: 'normal' | 'mentions_only' | 'muted_until' | 'muted_until_enabled';
+      mutedUntil?: string | null;
+    },
+  ) {
+    return this.notificationPreferencesService.setConversationMode(
       extractBearerToken(req.headers.authorization),
       body,
     );

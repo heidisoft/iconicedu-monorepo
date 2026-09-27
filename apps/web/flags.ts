@@ -233,6 +233,195 @@ export const enableAdminSessionAttendanceAnalytics = flag<
   },
 });
 
+export const enableMessagePinning = flag<boolean, { profileId?: string | null }>({
+  key: platformFeatureFlagKeys.enableMessagePinning,
+  description: 'Allows staff and educators to pin messages within a channel.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: platformFeatureFlagKeys.enableMessagePinning,
+      profileId: entities?.profileId,
+    });
+  },
+});
+
+export const enableMessageMarkUnread = flag<boolean, { profileId?: string | null }>({
+  key: platformFeatureFlagKeys.enableMessageMarkUnread,
+  description: 'Shows the "Mark unread" message action and enables the mark-unread API.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: platformFeatureFlagKeys.enableMessageMarkUnread,
+      profileId: entities?.profileId,
+    });
+  },
+});
+
+export const enableMessageSearch = flag<boolean, { profileId?: string | null }>({
+  key: platformFeatureFlagKeys.enableMessageSearch,
+  description: 'Shows the in-channel message search entry point.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: platformFeatureFlagKeys.enableMessageSearch,
+      profileId: entities?.profileId,
+    });
+  },
+});
+
+export const enableMessageReplyReference = flag<boolean, { profileId?: string | null }>({
+  key: platformFeatureFlagKeys.enableMessageReplyReference,
+  description:
+    'Enables quoting a specific message as an inline reply reference from the composer.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: platformFeatureFlagKeys.enableMessageReplyReference,
+      profileId: entities?.profileId,
+    });
+  },
+});
+
+export const enableScheduledSend = flag<boolean, { profileId?: string | null }>({
+  key: platformFeatureFlagKeys.enableScheduledSend,
+  description: 'Allows composing messages to send at a future scheduled time.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: platformFeatureFlagKeys.enableScheduledSend,
+      profileId: entities?.profileId,
+    });
+  },
+});
+
+export const enableNotificationConversationControls = flag<
+  boolean,
+  { profileId?: string | null }
+>({
+  key: platformFeatureFlagKeys.enableNotificationConversationControls,
+  description:
+    'Shows per-conversation notification mode controls (normal/mentions-only/mute) in channel info.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: platformFeatureFlagKeys.enableNotificationConversationControls,
+      profileId: entities?.profileId,
+    });
+  },
+});
+
+export const enableMessageListFormatting = flag<boolean, { profileId?: string | null }>({
+  key: platformFeatureFlagKeys.enableMessageListFormatting,
+  description:
+    'Enables bullet/numbered list composer toolbar buttons and rendering of list-formatted messages.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: platformFeatureFlagKeys.enableMessageListFormatting,
+      profileId: entities?.profileId,
+    });
+  },
+});
+
+export const enableMessageDrafts = flag<boolean, { profileId?: string | null }>({
+  key: platformFeatureFlagKeys.enableMessageDrafts,
+  description:
+    'Autosaves and restores in-progress message drafts (main and thread composers) on web and mobile.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: platformFeatureFlagKeys.enableMessageDrafts,
+      profileId: entities?.profileId,
+    });
+  },
+});
+
+export const enableMessageEdit = flag<boolean, { profileId?: string | null }>({
+  key: platformFeatureFlagKeys.enableMessageEdit,
+  description:
+    'Lets a sender edit their own eligible text message within the edit window, on web and mobile.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: platformFeatureFlagKeys.enableMessageEdit,
+      profileId: entities?.profileId,
+    });
+  },
+});
+
+export const enableMobileMessageComposerParity = flag<
+  boolean,
+  { profileId?: string | null }
+>({
+  key: platformFeatureFlagKeys.enableMobileMessageComposerParity,
+  description:
+    'Enables authoring person mentions and bold/italic formatting from the mobile composer.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: platformFeatureFlagKeys.enableMobileMessageComposerParity,
+      profileId: entities?.profileId,
+    });
+  },
+});
+
+export const enableMessageSendReliability = flag<boolean, { profileId?: string | null }>({
+  key: platformFeatureFlagKeys.enableMessageSendReliability,
+  description:
+    'Enables idempotent send retries and attachment upload recovery for failed sends on web and mobile.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: platformFeatureFlagKeys.enableMessageSendReliability,
+      profileId: entities?.profileId,
+    });
+  },
+});
+
 export const webFlags = {
   enableAdminSessionAttendanceAnalytics,
   enableAiRefine,
@@ -241,11 +430,22 @@ export const webFlags = {
   enableChannelCommunications,
   enableClassScheduleSeriesReschedule,
   enableMarketingSitePages,
+  enableMessagePinning,
+  enableMessageSearch,
   enableMessageTypeComposer,
+  enableScheduledSend,
+  enableMessageMarkUnread,
+  enableMessageReplyReference,
+  enableNotificationConversationControls,
+  enableMessageListFormatting,
   enableSessionCompletionCarousel,
   enableMobileAppleSignIn,
   enableMobileDirectMessageStart,
   enableMobileGoogleSignIn,
+  enableMessageDrafts,
+  enableMessageEdit,
+  enableMobileMessageComposerParity,
+  enableMessageSendReliability,
 } as const;
 
 export type WebFlagKey = keyof typeof webFlags;

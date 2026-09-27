@@ -8,6 +8,7 @@ import type {
   UserProfileVM,
 } from '@iconicedu/shared-types';
 import {
+  buildScheduleCompletionLookup,
   getResolvedScheduleDisplayMonthKey,
   getScheduleDisplayStartOfDay,
   getScheduleDisplayStartOfWeek,
@@ -17,6 +18,7 @@ import {
   splitSchedulesByTimeline,
   toMonthGroups,
   type ClassSession,
+  type ScheduleOccurrenceCompletion,
 } from '@iconicedu/ui-web/components/messages/tabs/messages-schedule-tab.utils';
 import { createApiClient } from '@iconicedu/web/lib/api/http-client';
 import {
@@ -444,9 +446,11 @@ async function buildActiveRoleMetrics(input: {
   orgSlug: string;
   pageSize: number;
   timezone?: string | null;
+  viewerProfileId?: string;
 }): Promise<{
   metrics: DashboardInfographicRoleMetrics;
   upcomingSessionsPage: DashboardUpcomingSessionsPage;
+  completionRows: SessionCompletionVM[];
 }> {
   if (!input.isStaffView && !input.scopedProfileIds.size) {
     return {
@@ -456,17 +460,48 @@ async function buildActiveRoleMetrics(input: {
         thisWeek: { items: [], total: 0, pageSize: input.pageSize, totalPages: 1 },
         nextWeek: { items: [], total: 0, pageSize: input.pageSize, totalPages: 1 },
       },
+      completionRows: [],
     };
   }
 
   const apiClient = createApiClient(input.supabase);
-  const [rawSchedules, rawSpaces] = await Promise.all([
+  // Fetched unconditionally (not gated behind the completion-carousel rollout
+  // flag) purely so the "Completed Classes" elapsed-time fallback below can
+  // tell an actually-confirmed session apart from one that's merely past its
+  // end time with attendance still unresolved — see completionLookup/
+  // disputedLookup. Capped the same way the carousel's own fetch is; a session
+  // outside the most recent 50 rows just falls back to the elapsed-time guess,
+  // same as before this fix.
+  const [rawSchedules, rawSpaces, completionRows] = await Promise.all([
     apiClient.get<Record<string, unknown>[]>('/schedules', { orgId: input.orgId }),
     apiClient.get<Record<string, unknown>[]>('/spaces', { orgId: input.orgId }),
+    !input.isStaffView && input.viewerProfileId
+      ? listSessionCompletions(input.supabase, {
+          orgId: input.orgId,
+          profileId: input.viewerProfileId,
+          limit: 50,
+        })
+          .then((page) => page.items)
+          .catch(() => [])
+      : Promise.resolve<SessionCompletionVM[]>([]),
   ]);
 
   const schedules = (rawSchedules ?? []).map(mapApiScheduleRow);
   const allSpaces = (rawSpaces ?? []).map(mapApiSpaceRow);
+  const toOccurrenceKeyList = (
+    rows: SessionCompletionVM[],
+  ): ScheduleOccurrenceCompletion[] =>
+    rows.map((row) => ({ scheduleId: row.scheduleId, occurrenceKey: row.occurrenceKey }));
+  const completionLookup = buildScheduleCompletionLookup(
+    toOccurrenceKeyList(
+      completionRows.filter(
+        (row) => row.status === 'confirmed' || row.status === 'auto_confirmed',
+      ),
+    ),
+  );
+  const disputedLookup = buildScheduleCompletionLookup(
+    toOccurrenceKeyList(completionRows.filter((row) => row.status === 'disputed')),
+  );
 
   const scopedSchedules = input.isStaffView
     ? schedules.filter((schedule) => schedule.source.kind === 'class_session')
@@ -484,6 +519,7 @@ async function buildActiveRoleMetrics(input: {
         thisWeek: { items: [], total: 0, pageSize: input.pageSize, totalPages: 1 },
         nextWeek: { items: [], total: 0, pageSize: input.pageSize, totalPages: 1 },
       },
+      completionRows,
     };
   }
 
@@ -515,6 +551,7 @@ async function buildActiveRoleMetrics(input: {
     [...timelineBuckets.past, ...timelineBuckets.upcoming],
     input.now,
     input.timezone,
+    { completionLookup, disputedLookup },
   );
   const currentMonthKey = getResolvedScheduleDisplayMonthKey(
     input.now,
@@ -592,6 +629,7 @@ async function buildActiveRoleMetrics(input: {
           : toActiveSubjectsLabel(activeSubjects),
     },
     upcomingSessionsPage,
+    completionRows,
   };
 }
 
@@ -616,6 +654,7 @@ export async function buildDashboardHomeInfographicMetrics(input: {
   // org-wide "Sessions completed" totals.
   const staffOrAdminView = isStaffView || Boolean(input.isOrgAdminView);
   const scopedProfileIds = resolveScopedProfileIds(input.currentUserProfile, activeRole);
+  const viewerProfileId = input.currentUserProfile?.ids.id;
 
   const activeRoleData = await buildActiveRoleMetrics({
     supabase: input.supabase,
@@ -627,8 +666,8 @@ export async function buildDashboardHomeInfographicMetrics(input: {
     orgSlug: input.orgSlug,
     pageSize,
     timezone: input.timezone ?? input.currentUserProfile?.prefs?.timezone ?? null,
+    viewerProfileId,
   });
-  const viewerProfileId = input.currentUserProfile?.ids.id;
   // Staff/admins see an org-wide summary (every classroom session, all time),
   // independent of the carousel rollout flag — it's an org KPI, not the
   // per-student confirmation feature. Everyone else sees their own carousel page
@@ -644,13 +683,12 @@ export async function buildDashboardHomeInfographicMetrics(input: {
     [now],
     input.timezone ?? input.currentUserProfile?.prefs?.timezone ?? null,
   );
+  // buildActiveRoleMetrics already fetched this same profile-scoped page (to
+  // build the "Completed Classes" fallback's completion/dispute lookups), so
+  // reuse it here rather than issuing the identical request twice.
   const [sessionCompletionsPage, sessionCompletionSummary] = await Promise.all([
-    profileCompletionQueriesEnabled && viewerProfileId
-      ? listSessionCompletions(input.supabase, {
-          orgId: input.orgId,
-          profileId: viewerProfileId,
-          limit: 50,
-        }).then((page) => page.items)
+    profileCompletionQueriesEnabled
+      ? Promise.resolve(activeRoleData.completionRows)
       : Promise.resolve<SessionCompletionVM[]>([]),
     orgCompletionSummaryEnabled
       ? // A permissions hiccup for an unusual profile must not take down the

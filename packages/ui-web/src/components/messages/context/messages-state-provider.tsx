@@ -5,6 +5,7 @@ import type {
   ChannelVM,
   ConnectionVM,
   MessageMentionVM,
+  MessageReplyReferenceVM,
   MessagesRightPanelIntent,
   MessagesRightPanelIntentKey,
   MessagesRightSidebarState,
@@ -13,6 +14,7 @@ import type {
   ThreadVM,
   UUID,
 } from '@iconicedu/shared-types';
+import { buildReplyReferenceFromMessage } from '../message-reply-reference.utils';
 
 type ThreadData = {
   thread: ThreadVM;
@@ -26,24 +28,42 @@ export type MessageActionState = {
   isDeleting?: boolean;
   isAddingReaction?: boolean;
   pendingReactionEmojis?: string[];
+  /** True when this (optimistic) message failed to send and is awaiting retry/discard. */
+  sendFailed?: boolean;
 };
 
 interface MessagesStateContextValue {
   channel: ChannelVM;
   isReadOnly: boolean;
   currentUserId: string;
+  /** Staff/educators can manage the channel (pin messages, etc.) — see MessagesShell wiring. */
+  canManageChannel: boolean;
+  enableMessagePinning: boolean;
+  enableMessageSearch: boolean;
+  enableScheduledSend: boolean;
   savedCount: number;
   homeworkCount: number;
   sessionSummaryCount: number;
   messages: MessageVM[];
   messageFilter: MessageFilterKey | null;
   showCreateMessageTypeButton: boolean;
+  enableMessageMarkUnread: boolean;
+  enableMessageReplyReference: boolean;
+  enableNotificationConversationControls: boolean;
+  enableMessageListFormatting: boolean;
+  replyTarget: MessageReplyReferenceVM | null;
+  startReplyTo: (message: MessageVM) => void;
+  clearReplyTo: () => void;
+  enableMessageDrafts: boolean;
+  enableMessageEdit: boolean;
+  enableMessageSendReliability: boolean;
   createTextMessage: (
     content: string,
     mentions?: MessageMentionVM[],
   ) => TextMessageVM | null;
   sendTextMessage: SendTextMessageHandler;
   sendFileMessage: SendFileMessageHandler;
+  editTextMessage: EditTextMessageHandler;
   joinLiveSession?: JoinLiveSessionHandler;
   threadHandlers: ThreadActionHandlers;
   state: MessagesRightSidebarState;
@@ -64,6 +84,7 @@ interface MessagesStateContextValue {
   ) => void;
   setSendTextMessage: (handler: SendTextMessageHandler) => void;
   setSendFileMessage: (handler: SendFileMessageHandler) => void;
+  setEditTextMessage: (handler: EditTextMessageHandler) => void;
   setJoinLiveSession: (handler: JoinLiveSessionHandler | undefined) => void;
   setThreadHandlers: (handlers: ThreadActionHandlers) => void;
   toggleMessageFilter: (key: MessageFilterKey) => void;
@@ -115,6 +136,12 @@ export type SendFileMessageHandler = (input: {
   threadParentId?: string | null;
 }) => Promise<MessageVM | null>;
 
+export type EditTextMessageHandler = (input: {
+  messageId: string;
+  content: string;
+  mentions?: MessageMentionVM[];
+}) => Promise<MessageVM | null>;
+
 export type JoinLiveSessionHandler = () => Promise<void>;
 
 export type MessageFilterKey = 'homework' | 'session-summary';
@@ -141,12 +168,34 @@ export function MessagesStateProvider({
   currentUserId: initialCurrentUserId = '',
   isReadOnly = false,
   showCreateMessageTypeButton = true,
+  canManageChannel = false,
+  enableMessagePinning = false,
+  enableMessageSearch = false,
+  enableScheduledSend = false,
+  enableMessageMarkUnread = false,
+  enableMessageReplyReference = false,
+  enableNotificationConversationControls = false,
+  enableMessageListFormatting = false,
+  enableMessageDrafts = false,
+  enableMessageEdit = false,
+  enableMessageSendReliability = false,
   children,
 }: {
   channel: ChannelVM;
   currentUserId?: string;
   isReadOnly?: boolean;
   showCreateMessageTypeButton?: boolean;
+  canManageChannel?: boolean;
+  enableMessagePinning?: boolean;
+  enableMessageSearch?: boolean;
+  enableScheduledSend?: boolean;
+  enableMessageMarkUnread?: boolean;
+  enableMessageReplyReference?: boolean;
+  enableNotificationConversationControls?: boolean;
+  enableMessageListFormatting?: boolean;
+  enableMessageDrafts?: boolean;
+  enableMessageEdit?: boolean;
+  enableMessageSendReliability?: boolean;
   children: React.ReactNode;
 }) {
   const [state, setState] = useState<MessagesRightSidebarState>({
@@ -168,6 +217,9 @@ export function MessagesStateProvider({
   const [sendFileMessage, setSendFileMessage] = useState<SendFileMessageHandler>(
     async () => null,
   );
+  const [editTextMessage, setEditTextMessage] = useState<EditTextMessageHandler>(
+    async () => null,
+  );
   const [joinLiveSession, setJoinLiveSession] = useState<
     JoinLiveSessionHandler | undefined
   >(undefined);
@@ -179,6 +231,15 @@ export function MessagesStateProvider({
   const [scrollToMessage, setScrollToMessage] = useState<
     ((messageId: string) => void) | undefined
   >(undefined);
+  const [replyTarget, setReplyTarget] = useState<MessageReplyReferenceVM | null>(null);
+
+  const startReplyTo = useCallback((message: MessageVM) => {
+    setReplyTarget(buildReplyReferenceFromMessage(message));
+  }, []);
+
+  const clearReplyTo = useCallback(() => {
+    setReplyTarget(null);
+  }, []);
 
   const open = useCallback((intent: MessagesRightPanelIntent) => {
     setState({ isOpen: true, intent });
@@ -269,6 +330,10 @@ export function MessagesStateProvider({
     setSendFileMessage(() => handler);
   }, []);
 
+  const setEditTextMessageFactory = useCallback((handler: EditTextMessageHandler) => {
+    setEditTextMessage(() => handler);
+  }, []);
+
   const setJoinLiveSessionFactory = useCallback(
     (handler: JoinLiveSessionHandler | undefined) => {
       setJoinLiveSession(() => handler);
@@ -292,15 +357,30 @@ export function MessagesStateProvider({
       channel,
       isReadOnly,
       currentUserId,
+      canManageChannel,
+      enableMessagePinning,
+      enableMessageSearch,
+      enableScheduledSend,
       savedCount,
       homeworkCount,
       sessionSummaryCount,
       messages,
       messageFilter,
       showCreateMessageTypeButton,
+      enableMessageMarkUnread,
+      enableMessageReplyReference,
+      enableNotificationConversationControls,
+      enableMessageListFormatting,
+      replyTarget,
+      startReplyTo,
+      clearReplyTo,
+      enableMessageDrafts,
+      enableMessageEdit,
+      enableMessageSendReliability,
       createTextMessage,
       sendTextMessage,
       sendFileMessage,
+      editTextMessage,
       joinLiveSession,
       threadHandlers,
       state,
@@ -316,6 +396,7 @@ export function MessagesStateProvider({
       setCreateTextMessage: setCreateTextMessageFactory,
       setSendTextMessage: setSendTextMessageFactory,
       setSendFileMessage: setSendFileMessageFactory,
+      setEditTextMessage: setEditTextMessageFactory,
       setJoinLiveSession: setJoinLiveSessionFactory,
       setThreadHandlers: setThreadHandlersFactory,
       toggleMessageFilter,
@@ -331,15 +412,30 @@ export function MessagesStateProvider({
       channel,
       isReadOnly,
       currentUserId,
+      canManageChannel,
+      enableMessagePinning,
+      enableMessageSearch,
+      enableScheduledSend,
       savedCount,
       homeworkCount,
       sessionSummaryCount,
       messages,
       messageFilter,
       showCreateMessageTypeButton,
+      enableMessageMarkUnread,
+      enableMessageReplyReference,
+      enableNotificationConversationControls,
+      enableMessageListFormatting,
+      replyTarget,
+      startReplyTo,
+      clearReplyTo,
+      enableMessageDrafts,
+      enableMessageEdit,
+      enableMessageSendReliability,
       createTextMessage,
       sendTextMessage,
       sendFileMessage,
+      editTextMessage,
       joinLiveSession,
       threadHandlers,
       state,
@@ -355,6 +451,7 @@ export function MessagesStateProvider({
       setCreateTextMessageFactory,
       setSendTextMessageFactory,
       setSendFileMessageFactory,
+      setEditTextMessageFactory,
       setJoinLiveSessionFactory,
       setThreadHandlersFactory,
       toggleMessageFilter,

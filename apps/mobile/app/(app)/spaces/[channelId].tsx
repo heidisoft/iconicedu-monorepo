@@ -21,17 +21,22 @@ import {
   sendTextMessage,
   sendFileMessage,
   sendFilesMessage,
+  editTextMessage,
   uploadChannelFile,
   buildMessageStoragePath,
   ensureDirectMessageChannelForProfiles,
   fetchSpaceChannelMetaByChannelId,
   fetchChannelReadState,
   deleteMessage,
+  markChannelUnread,
   queryKeys,
 } from '@/lib/api/queries';
 import { useTheme } from '@/providers/theme-provider';
 import { resolveMobileMessageUiTheme } from '@/components/messages/themes/registry';
-import { MessageInput } from '@/components/messages/message-input';
+import {
+  MessageInput,
+  type EditingMessageContext,
+} from '@/components/messages/message-input';
 import { TypingIndicator } from '@/components/messages/typing-indicator';
 import { ConversationHeader } from '@/components/messages/conversation-header';
 import { MessageActionsSheet } from '@/components/messages/message-actions-sheet';
@@ -41,13 +46,18 @@ import { SpaceSessionsTab } from '@/components/messages/space-sessions-tab';
 import type { AttachmentPayload } from '@/components/messages/attachment-sheet';
 import { buildMobileChannelEmptyStateCopy } from '@/lib/message-empty-state';
 import { reportMobileObservedError } from '@/lib/analytics/report-error';
-import type { MessageVM, UserProfileVM } from '@iconicedu/shared-types';
+import type { MessageMentionVM, MessageVM, UserProfileVM } from '@iconicedu/shared-types';
 import { useMarkRead } from '@/hooks/use-mark-read';
+import { applyOptimisticChannelManualUnread } from '@/lib/messages/apply-optimistic-channel-read-state';
 import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
 import { usePushNudge } from '@/hooks/use-push-nudge';
 import { PushNudgeSheet } from '@/components/notifications/push-nudge-sheet';
 import { usePushConsent } from '@/providers/push-consent-provider';
 import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
+import { useMessageP2Features } from '@/hooks/use-message-p2-features';
+import { PinnedMessagesSheet } from '@/components/messages/pinned-messages-sheet';
+import { MessageSearchSheet } from '@/components/messages/message-search-sheet';
+import { ScheduledMessagesSheet } from '@/components/messages/scheduled-messages-sheet';
 
 type PendingUpload = {
   id: string;
@@ -81,6 +91,13 @@ export default function SpaceDetailScreen() {
   const enableMobileDirectMessageStart = useMobileFeatureFlag(
     mobileFeatureFlagKeys.enableMobileDirectMessageStart,
   );
+  const enableMessageReplyReference = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.enableMessageReplyReference,
+  );
+  const enableMessageMarkUnread = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.enableMessageMarkUnread,
+  );
+  const enableMessageEdit = useMobileFeatureFlag(mobileFeatureFlagKeys.enableMessageEdit);
 
   const orgId = account?.org_id ?? '';
   const accountId =
@@ -135,13 +152,25 @@ export default function SpaceDetailScreen() {
     enabled: !!channelId && !!accountId,
     staleTime: 30_000,
   });
-  const { markChannelRead } = useMarkRead({
+  const { markChannelRead, resetChannelReadGuard } = useMarkRead({
     orgId,
     profileId,
     accountId,
     channelId: channelId ?? '',
     profileKind,
+    isFocused,
+    isManuallyUnread: channelReadState?.isManuallyUnread,
+    lastReadMessageId: channelReadState?.lastReadMessageId,
   });
+  const p2 = useMessageP2Features({
+    orgId,
+    channelId: channelId ?? '',
+    profileId,
+    accountId,
+  });
+  const isChannelUnread =
+    (channelReadState?.unreadCount ?? 0) > 0 ||
+    channelReadState?.isManuallyUnread === true;
   const refreshConversation = useCallback(async () => {
     await Promise.all([
       refetch(),
@@ -250,10 +279,54 @@ export default function SpaceDetailScreen() {
 
   // ── Thread reply target ──
   const [threadReplyTarget, setThreadReplyTarget] = useState<MessageVM | null>(null);
+  // ── Quote reply target — distinct from "reply in thread"; drives its own preview ──
+  const [quoteReplyTarget, setQuoteReplyTarget] = useState<MessageVM | null>(null);
 
   const handleThreadOpen = useCallback((msg: MessageVM) => {
+    setQuoteReplyTarget(null);
     setThreadReplyTarget(msg);
   }, []);
+
+  const handleQuoteReply = useCallback((msg: MessageVM) => {
+    setThreadReplyTarget(null);
+    setQuoteReplyTarget(msg);
+  }, []);
+
+  const handleMarkUnread = useCallback(
+    async (msg: MessageVM) => {
+      if (!channelId || !orgId || !accountId || !profileId) return;
+      try {
+        await markChannelUnread({
+          orgId,
+          accountId,
+          profileId,
+          channelId,
+          fromMessageId: msg.ids.id,
+        });
+        applyOptimisticChannelManualUnread({
+          queryClient,
+          orgId,
+          profileId,
+          accountId,
+          channelId,
+          profileKind,
+          fromMessageId: msg.ids.id,
+        });
+        resetChannelReadGuard();
+      } catch {
+        Alert.alert('Unable to mark unread', 'Please try again.');
+      }
+    },
+    [
+      channelId,
+      orgId,
+      accountId,
+      profileId,
+      profileKind,
+      queryClient,
+      resetChannelReadGuard,
+    ],
+  );
 
   // ── Reaction toggle ──
   const handleReactionToggle = useCallback(
@@ -277,6 +350,71 @@ export default function SpaceDetailScreen() {
       }
     },
     [orgId, profileId, removeMessage, restoreMessage],
+  );
+
+  // ── Edit sent text messages ──
+  const [editingMessage, setEditingMessage] = useState<EditingMessageContext | null>(
+    null,
+  );
+
+  const handleEditMessage = useCallback((message: MessageVM) => {
+    const content = (message as { content?: { text?: string } }).content?.text ?? '';
+    const mentions = (message as { content?: { mentions?: MessageMentionVM[] } }).content
+      ?.mentions;
+    setEditingMessage({ messageId: message.ids.id, content, mentions });
+  }, []);
+
+  const handleCancelEdit = useCallback(() => setEditingMessage(null), []);
+
+  const handleSaveEdit = useCallback(
+    async (input: {
+      messageId: string;
+      content: string;
+      mentions?: MessageMentionVM[];
+    }) => {
+      const key = queryKeys.messages(channelId ?? '', profileId);
+      const previous = queryClient.getQueryData<MessageVM[]>(key);
+
+      // Optimistic update so the edited text + "(edited)" indicator show
+      // immediately; rolled back below on error.
+      queryClient.setQueryData<MessageVM[]>(key, (current) =>
+        current?.map((message) =>
+          message.ids.id === input.messageId
+            ? ({
+                ...message,
+                content: { text: input.content, mentions: input.mentions },
+                state: {
+                  ...message.state,
+                  isEdited: true,
+                  editedAt: new Date().toISOString(),
+                },
+              } as MessageVM)
+            : message,
+        ),
+      );
+
+      try {
+        await editTextMessage(input.messageId, orgId, input.content, input.mentions);
+        void queryClient.invalidateQueries({ queryKey: key });
+        return true;
+      } catch (error) {
+        queryClient.setQueryData(key, previous);
+        reportMobileObservedError({
+          error,
+          source: 'mobile.messages.spaces.edit_text',
+          message: 'Failed to edit space message',
+          context: { channelId, orgId, profileId, messageId: input.messageId },
+        });
+        Alert.alert(
+          'Unable to save edit',
+          error instanceof Error
+            ? error.message
+            : 'Something went wrong. Please try again.',
+        );
+        return false;
+      }
+    },
+    [channelId, orgId, profileId, queryClient],
   );
 
   const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
@@ -321,6 +459,17 @@ export default function SpaceDetailScreen() {
           );
           setThreadReplyTarget(null);
           void refetch();
+        } else if (quoteReplyTarget) {
+          await sendTextMessage(
+            channelId,
+            profileId,
+            orgId,
+            text,
+            undefined,
+            undefined,
+            quoteReplyTarget.ids.id,
+          );
+          setQuoteReplyTarget(null);
         } else {
           await sendTextMessage(channelId, profileId, orgId, text);
         }
@@ -346,6 +495,7 @@ export default function SpaceDetailScreen() {
       profileId,
       orgId,
       threadReplyTarget,
+      quoteReplyTarget,
       refetch,
       handlePushNotificationMoment,
     ],
@@ -601,6 +751,9 @@ export default function SpaceDetailScreen() {
             lastReadMessageId={channelReadState?.lastReadMessageId ?? null}
             lastReadAt={channelReadState?.lastReadAt ?? null}
             unreadCount={channelReadState?.unreadCount ?? 0}
+            manuallyUnreadFromMessageId={
+              channelReadState?.manuallyUnreadFromMessageId ?? null
+            }
             onLoadMore={loadMore}
             loading={isLoading}
             refreshing={isRefetching}
@@ -617,6 +770,9 @@ export default function SpaceDetailScreen() {
             emptyTitle={emptyStateCopy.title}
             emptyDescription={emptyStateCopy.description}
             emptyIcon={emptyStateCopy.icon}
+            pinnedMessageIds={p2.pinnedMessageIds}
+            highlightMessageId={p2.highlightMessageId}
+            onScrollToMessageResult={p2.handleScrollToMessageResult}
           />
           <TypingIndicator typingUsers={typingUsers} />
           <MessageInput
@@ -627,10 +783,17 @@ export default function SpaceDetailScreen() {
             onTypingStop={broadcastTypingStop}
             replyTo={threadReplyTarget}
             onCancelReply={() => setThreadReplyTarget(null)}
+            quoteReplyTo={quoteReplyTarget}
+            onCancelQuoteReply={() => setQuoteReplyTarget(null)}
             uploading={pendingUploads.some((upload) => !upload.failed)}
             orgId={orgId}
             channelId={channelId}
             profileId={profileId}
+            enableScheduledSend={p2.enableScheduledSend}
+            onScheduleSend={p2.scheduleSend}
+            editingMessage={editingMessage}
+            onSaveEdit={handleSaveEdit}
+            onCancelEdit={handleCancelEdit}
           />
         </KeyboardAvoidingView>
       ) : (
@@ -662,6 +825,54 @@ export default function SpaceDetailScreen() {
           setInfoVisible(false);
           setProfileUser(user);
         }}
+        enablePinning={p2.enablePinning}
+        onOpenPinned={() => {
+          setInfoVisible(false);
+          p2.openPinnedSheet();
+        }}
+        enableSearch={p2.enableSearch}
+        onOpenSearch={() => {
+          setInfoVisible(false);
+          p2.openSearch();
+        }}
+        enableScheduledSend={p2.enableScheduledSend}
+        onOpenScheduled={() => {
+          setInfoVisible(false);
+          p2.openScheduledSheet();
+        }}
+      />
+
+      {/* Pinned messages */}
+      <PinnedMessagesSheet
+        visible={p2.pinnedSheetVisible}
+        orgId={orgId}
+        channelId={channelId ?? ''}
+        profileId={profileId}
+        accountId={accountId}
+        onClose={p2.closePinnedSheet}
+        onJumpToMessage={p2.jumpToMessage}
+      />
+
+      {/* Search within messages */}
+      <MessageSearchSheet
+        visible={p2.searchVisible}
+        orgId={orgId}
+        channelId={channelId ?? ''}
+        profileId={profileId}
+        accountId={accountId}
+        onClose={p2.closeSearch}
+        onResultPress={(messageId) => {
+          p2.closeSearch();
+          p2.jumpToMessage(messageId);
+        }}
+      />
+
+      {/* Scheduled messages */}
+      <ScheduledMessagesSheet
+        visible={p2.scheduledSheetVisible}
+        orgId={orgId}
+        senderProfileId={profileId}
+        onClose={p2.closeScheduledSheet}
       />
 
       {/* Profile sheet */}
@@ -688,6 +899,14 @@ export default function SpaceDetailScreen() {
         onReact={handleReactionToggle}
         onThread={handleThreadOpen}
         onDelete={handleDelete}
+        enablePinning={p2.enablePinning}
+        isPinned={actionsMessage ? p2.pinnedMessageIds.has(actionsMessage.ids.id) : false}
+        onTogglePin={p2.handleTogglePin}
+        onQuoteReply={enableMessageReplyReference ? handleQuoteReply : undefined}
+        onMarkUnread={enableMessageMarkUnread ? handleMarkUnread : undefined}
+        isChannelUnread={isChannelUnread}
+        enableEdit={enableMessageEdit}
+        onEdit={handleEditMessage}
       />
 
       {/* Push notification nudge */}

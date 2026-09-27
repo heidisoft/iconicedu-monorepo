@@ -161,9 +161,15 @@ export function mapMessageRowToVM(row: MessageRow, input: MessageMapperInput): M
     visibility: mapVisibility(row),
   };
 
+  const replyTo =
+    payload?.replyTo && typeof payload.replyTo === 'object'
+      ? (payload.replyTo as MessageSocialVM['replyTo'])
+      : undefined;
+
   const social: MessageSocialVM = {
     reactions: input.reactions ?? [],
     ...(input.thread ? { thread: input.thread } : {}),
+    ...(replyTo ? { replyTo } : {}),
   };
 
   const base = {

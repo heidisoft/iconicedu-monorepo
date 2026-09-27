@@ -63,6 +63,7 @@
       "expo-sharing",
       "expo-web-browser",
       "expo-audio",
+      "@react-native-community/datetimepicker",
       [
         "expo-notifications",
         {

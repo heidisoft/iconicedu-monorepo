@@ -1,6 +1,7 @@
 'use client';
 
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { reportObservedError } from '@iconicedu/utils';
 import type { MessageListRef } from '@iconicedu/ui-web/components/messages/message-list';
 import { resolveWebMessageUiTheme } from '@iconicedu/ui-web/components/messages/themes/registry';
@@ -104,6 +105,13 @@ export interface MessagesContainerProps {
   showCreateMessageTypeButton?: boolean;
   showAiRefine?: boolean;
   showAiSuggestedReplies?: boolean;
+  enableMessagePinning?: boolean;
+  enableMessageSearch?: boolean;
+  enableScheduledSend?: boolean;
+  enableMessageMarkUnread?: boolean;
+  enableMessageReplyReference?: boolean;
+  enableNotificationConversationControls?: boolean;
+  enableMessageListFormatting?: boolean;
   realtimeClient?: MessagesRealtimeClient | null;
   messageWriteClient?: MessageWriteClient | null;
   uploadFileMessage?: (input: {
@@ -113,6 +121,12 @@ export interface MessagesContainerProps {
     threadParentId?: string | null;
   }) => Promise<MessageVM[]>;
   joinLiveSession?: () => Promise<void>;
+  /** Gates draft autosave/restore for the main channel composer. Default off. */
+  enableMessageDrafts?: boolean;
+  /** Gates the "Edit message" action on the sender's own eligible text messages. Default off. */
+  enableMessageEdit?: boolean;
+  /** Gates clientMessageId-based idempotent retry of failed sends. Default off. */
+  enableMessageSendReliability?: boolean;
 }
 
 const isGuardianProfile = (profile: UserProfileVM): profile is GuardianProfileVM =>
@@ -394,13 +408,39 @@ export function MessagesContainer({
   showCreateMessageTypeButton = true,
   showAiRefine = false,
   showAiSuggestedReplies = false,
+  enableMessagePinning = false,
+  enableScheduledSend = false,
+  enableMessageReplyReference = false,
+  enableMessageListFormatting = false,
   realtimeClient,
   messageWriteClient,
   uploadFileMessage,
   joinLiveSession,
+  enableMessageDrafts = false,
+  enableMessageEdit = false,
+  enableMessageSendReliability = false,
 }: MessagesContainerProps) {
   const messageListRef = useRef<MessageListRef>(null);
   const messagesRef = useRef<MessageVM[]>([]);
+  const [failedSends, setFailedSends] = useState<
+    Record<
+      string,
+      {
+        content: string;
+        mentions?: MessageMentionVM[];
+        homework?: AssignmentSendInput;
+        clientMessageId: string;
+      }
+    >
+  >({});
+  const failedSendMessageIds = useMemo(
+    () =>
+      Object.keys(failedSends).reduce<Record<string, true>>((acc, id) => {
+        acc[id] = true;
+        return acc;
+      }, {}),
+    [failedSends],
+  );
   const lastPersistedReadMessageIdRef = useRef<UUID | null>(
     channel.collections.readState?.lastReadMessageId ?? null,
   );
@@ -423,12 +463,15 @@ export function MessagesContainer({
     setCreateTextMessage,
     setSendTextMessage,
     setSendFileMessage,
+    setEditTextMessage,
     setJoinLiveSession,
     setThreadHandlers,
     setGetMessageActionState,
     setScrollToMessage,
     messageFilter,
     toggleMessageFilter,
+    replyTarget,
+    clearReplyTo,
   } = useMessagesState();
   const channelMessages = useMemo(
     () => channel.collections.messages?.items ?? [],
@@ -448,6 +491,8 @@ export function MessagesContainer({
   const [savingMessageIds, setSavingMessageIds] = useState<Record<string, true>>({});
   const [hidingMessageIds, setHidingMessageIds] = useState<Record<string, true>>({});
   const [deletingMessageIds, setDeletingMessageIds] = useState<Record<string, true>>({});
+  const [pinnedMessageIds, setPinnedMessageIds] = useState<Set<string>>(new Set());
+  const [pinningMessageIds, setPinningMessageIds] = useState<Record<string, true>>({});
   const [reactionPickerMessageIds, setReactionPickerMessageIds] = useState<
     Record<string, true>
   >({});
@@ -524,10 +569,12 @@ export function MessagesContainer({
         deletingMessageIds,
         reactionPickerMessageIds,
         reactionEmojiKeys,
+        failedSendMessageIds: failedSendMessageIds,
       });
     },
     [
       deletingMessageIds,
+      failedSendMessageIds,
       hidingMessageIds,
       reactionEmojiKeys,
       reactionPickerMessageIds,
@@ -558,6 +605,26 @@ export function MessagesContainer({
   const senderProfile =
     resolvedCurrentUserProfile ?? guardian ?? educator ?? fallbackParticipant;
   const currentUserId = resolvedCurrentUserId;
+  const currentAccountId = resolvedCurrentUserProfile?.ids.accountId ?? '';
+  const draftScope = useMemo(
+    () =>
+      enableMessageDrafts && currentAccountId && currentUserId
+        ? {
+            accountId: currentAccountId,
+            profileId: currentUserId,
+            orgId: channel.ids.orgId,
+            channelId: channel.ids.id,
+            threadId: null,
+          }
+        : null,
+    [
+      enableMessageDrafts,
+      currentAccountId,
+      currentUserId,
+      channel.ids.orgId,
+      channel.ids.id,
+    ],
+  );
   const typingParticipants = useMemo(
     () =>
       participants.filter(
@@ -853,8 +920,22 @@ export function MessagesContainer({
     [updateMessage],
   );
 
+  const clearFailedSend = useCallback((messageId: string) => {
+    setFailedSends((prev) => {
+      if (!prev[messageId]) return prev;
+      const next = { ...prev };
+      delete next[messageId];
+      return next;
+    });
+  }, []);
+
   const handleSendMessage = useCallback(
-    (content: string, mentions?: MessageMentionVM[], homework?: AssignmentSendInput) => {
+    (
+      content: string,
+      mentions?: MessageMentionVM[],
+      homework?: AssignmentSendInput,
+      clientMessageId?: string,
+    ) => {
       if (readOnly) return;
       if (!senderProfile) return;
       if (messageFilter) {
@@ -870,6 +951,10 @@ export function MessagesContainer({
         });
         addMessage(optimisticMessage);
 
+        const replyToMessageId = enableMessageReplyReference
+          ? (replyTarget?.messageId ?? undefined)
+          : undefined;
+
         if (messageWriteClient && currentUserId) {
           try {
             const created = await runWithNetworkActivity(() =>
@@ -880,8 +965,11 @@ export function MessagesContainer({
                 content,
                 mentions,
                 homework,
+                replyToMessageId,
+                clientMessageId,
               }),
             );
+            clearFailedSend(optimisticMessage.ids.id);
             const exists = messagesRef.current.some(
               (message) => message.ids.id === created.ids.id,
             );
@@ -890,14 +978,34 @@ export function MessagesContainer({
             } else {
               updateMessage(optimisticMessage.ids.id, created);
             }
+            if (replyToMessageId) {
+              clearReplyTo();
+            }
           } catch (error) {
-            deleteMessage(optimisticMessage.ids.id);
             reportObservedError({
               error,
               source: 'web.messages.send_message',
               message: 'Failed to send message',
               context: { channelId: channel.ids.id },
             });
+            if (enableMessageSendReliability && clientMessageId) {
+              // Keep the optimistic message visible as "Not sent" instead of
+              // deleting it, so Retry/Edit/Discard has something to act on.
+              setFailedSends((prev) => ({
+                ...prev,
+                [optimisticMessage.ids.id]: {
+                  content,
+                  mentions,
+                  homework,
+                  clientMessageId,
+                },
+              }));
+            } else {
+              deleteMessage(optimisticMessage.ids.id);
+            }
+            // Propagate so MessageInput does NOT reset the composer (and, if
+            // drafts are enabled, does not clear the draft) on a failed send.
+            throw error;
           }
           return;
         }
@@ -906,7 +1014,9 @@ export function MessagesContainer({
     },
     [
       addMessage,
+      clearFailedSend,
       deleteMessage,
+      enableMessageSendReliability,
       senderProfile,
       messageFilter,
       toggleMessageFilter,
@@ -917,7 +1027,81 @@ export function MessagesContainer({
       readOnly,
       runWithNetworkActivity,
       updateMessage,
+      enableMessageReplyReference,
+      replyTarget,
+      clearReplyTo,
     ],
+  );
+
+  const handleRetryFailedSend = useCallback(
+    (messageId: string) => {
+      const failed = failedSends[messageId];
+      if (!failed || !messageWriteClient || !currentUserId) return;
+      const retry = async () => {
+        try {
+          const created = await runWithNetworkActivity(() =>
+            messageWriteClient.sendTextMessage({
+              orgId: channel.ids.orgId,
+              channelId: channel.ids.id,
+              senderProfileId: currentUserId,
+              content: failed.content,
+              mentions: failed.mentions,
+              homework: failed.homework,
+              clientMessageId: failed.clientMessageId,
+            }),
+          );
+          clearFailedSend(messageId);
+          const exists = messagesRef.current.some(
+            (message) =>
+              message.ids.id === created.ids.id && message.ids.id !== messageId,
+          );
+          if (exists) {
+            deleteMessage(messageId);
+          } else {
+            updateMessage(messageId, created);
+          }
+        } catch (error) {
+          reportObservedError({
+            error,
+            source: 'web.messages.retry_send_message',
+            message: 'Failed to retry sending message',
+            context: { channelId: channel.ids.id, messageId },
+          });
+          // Stays marked failed in `failedSends` so Retry remains available.
+        }
+      };
+      void retry();
+    },
+    [
+      channel.ids.id,
+      channel.ids.orgId,
+      clearFailedSend,
+      currentUserId,
+      deleteMessage,
+      failedSends,
+      messageWriteClient,
+      runWithNetworkActivity,
+      updateMessage,
+    ],
+  );
+
+  const handleDiscardFailedSend = useCallback(
+    (messageId: string) => {
+      clearFailedSend(messageId);
+      deleteMessage(messageId);
+    },
+    [clearFailedSend, deleteMessage],
+  );
+
+  const handleEditFailedSend = useCallback(
+    (messageId: string) => {
+      const failed = failedSends[messageId];
+      if (!failed) return;
+      setComposerPrefillRequest({ value: failed.content, nonce: Date.now() });
+      clearFailedSend(messageId);
+      deleteMessage(messageId);
+    },
+    [clearFailedSend, deleteMessage, failedSends],
   );
 
   const handleSendThreadReply = useCallback(
@@ -1165,6 +1349,105 @@ export function MessagesContainer({
       realtimeClient,
       messages,
       toggleHidden,
+      readOnly,
+      runWithNetworkActivity,
+      setPendingMessageAction,
+    ],
+  );
+
+  useEffect(() => {
+    if (!enableMessagePinning) {
+      setPinnedMessageIds(new Set());
+      return;
+    }
+    let isCancelled = false;
+    const loadPins = async () => {
+      try {
+        const params = new URLSearchParams({ channelId: channel.ids.id });
+        const response = await runWithNetworkActivity(() =>
+          window.fetch(`/api/messages/pins?${params.toString()}`),
+        );
+        if (!response.ok) {
+          return;
+        }
+        const payload = (await response.json()) as {
+          success?: boolean;
+          data?: Array<{ message: MessageVM }>;
+        };
+        if (!isCancelled && payload.success) {
+          setPinnedMessageIds(
+            new Set((payload.data ?? []).map((pin) => pin.message.ids.id)),
+          );
+        }
+      } catch {
+        // Best effort — pin state simply stays unknown for this session.
+      }
+    };
+    void loadPins();
+    return () => {
+      isCancelled = true;
+    };
+  }, [channel.ids.id, enableMessagePinning, runWithNetworkActivity]);
+
+  const handleTogglePinned = useCallback(
+    (messageId: string) => {
+      if (readOnly) return;
+      const wasPinned = pinnedMessageIds.has(messageId);
+      setPendingMessageAction(setPinningMessageIds, messageId, true);
+      setPinnedMessageIds((current) => {
+        const next = new Set(current);
+        if (wasPinned) {
+          next.delete(messageId);
+        } else {
+          next.add(messageId);
+        }
+        return next;
+      });
+
+      const persistPin = async () => {
+        try {
+          const response = await runWithNetworkActivity(() =>
+            window.fetch('/api/messages/pins', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                channelId: channel.ids.id,
+                messageId,
+                isPinned: !wasPinned,
+              }),
+            }),
+          );
+          const payload = (await response.json().catch(() => null)) as {
+            success?: boolean;
+            message?: string;
+          } | null;
+          if (!response.ok || !payload?.success) {
+            throw new Error(payload?.message ?? 'Unable to update pinned message');
+          }
+        } catch (error) {
+          // Roll back the optimistic update and surface the error (e.g. the
+          // 25-active-pins cap, or a 403 for members who cannot manage the channel).
+          setPinnedMessageIds((current) => {
+            const next = new Set(current);
+            if (wasPinned) {
+              next.add(messageId);
+            } else {
+              next.delete(messageId);
+            }
+            return next;
+          });
+          toast.error(
+            error instanceof Error ? error.message : 'Unable to update pinned message',
+          );
+        } finally {
+          setPendingMessageAction(setPinningMessageIds, messageId, false);
+        }
+      };
+      void persistPin();
+    },
+    [
+      channel.ids.id,
+      pinnedMessageIds,
       readOnly,
       runWithNetworkActivity,
       setPendingMessageAction,
@@ -1685,6 +1968,31 @@ export function MessagesContainer({
   ]);
 
   useEffect(() => {
+    if (readOnly || !enableMessageEdit) {
+      setEditTextMessage(async () => null);
+      return;
+    }
+    setEditTextMessage(async ({ messageId, content, mentions }) => {
+      if (!messageWriteClient) return null;
+      const updated = await messageWriteClient.editTextMessage({
+        orgId: channel.ids.orgId,
+        messageId,
+        content,
+        mentions,
+      });
+      updateMessage(messageId, updated);
+      return updated;
+    });
+  }, [
+    channel.ids.orgId,
+    enableMessageEdit,
+    messageWriteClient,
+    readOnly,
+    setEditTextMessage,
+    updateMessage,
+  ]);
+
+  useEffect(() => {
     setThreadHandlers({
       onAddMessage: addMessage,
       onUpdateMessage: updateMessage,
@@ -1873,10 +2181,21 @@ export function MessagesContainer({
       onToggleSaved: handleToggleSaved,
       onToggleHidden: handleToggleHidden,
       onDelete: handleDeleteMessage,
+      onRetrySend: enableMessageSendReliability ? handleRetryFailedSend : undefined,
+      onEditFailedSend: enableMessageSendReliability ? handleEditFailedSend : undefined,
+      onDiscardFailedSend: enableMessageSendReliability
+        ? handleDiscardFailedSend
+        : undefined,
       getMessageActionState,
       currentUserId,
       currentUserProfile: resolvedCurrentUserProfile,
       currentUserCanDeleteAnyMessages: currentUserProfile?.kind === 'staff',
+      currentUserCanPinMessages:
+        enableMessagePinning &&
+        (currentUserProfile?.kind === 'staff' || currentUserProfile?.kind === 'educator'),
+      pinnedMessageIds,
+      pinningMessageIds: new Set(Object.keys(pinningMessageIds)),
+      onTogglePinned: handleTogglePinned,
       isReadOnly: readOnly,
       onSendThreadReply: handleSendThreadReply,
       lastReadMessageId,
@@ -1897,6 +2216,10 @@ export function MessagesContainer({
     handleToggleSaved,
     handleToggleHidden,
     handleDeleteMessage,
+    handleRetryFailedSend,
+    handleEditFailedSend,
+    handleDiscardFailedSend,
+    enableMessageSendReliability,
     getMessageActionState,
     currentUserId,
     currentUserProfile?.kind,
@@ -1910,6 +2233,10 @@ export function MessagesContainer({
     handleLoadOlderMessages,
     markChannelRead,
     setComposerPrefillRequest,
+    enableMessagePinning,
+    pinnedMessageIds,
+    pinningMessageIds,
+    handleTogglePinned,
   ]);
 
   const renderActiveTabContent = () => {
@@ -2003,6 +2330,40 @@ export function MessagesContainer({
               prefillRequest={composerPrefillRequest}
               onTypingStart={handleTypingStart}
               onTypingStop={handleTypingStop}
+              enableScheduledSend={enableScheduledSend}
+              onScheduleSend={
+                enableScheduledSend
+                  ? async ({ content, mentions, sendAt, timezone }) => {
+                      const response = await runWithNetworkActivity(() =>
+                        window.fetch('/api/messages/scheduled', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            channelId: channel.ids.id,
+                            content,
+                            mentions,
+                            sendAt,
+                            timezone,
+                          }),
+                        }),
+                      );
+                      const payload = (await response.json().catch(() => null)) as {
+                        success?: boolean;
+                        message?: string;
+                      } | null;
+                      if (!response.ok || !payload?.success) {
+                        throw new Error(payload?.message ?? 'Unable to schedule message');
+                      }
+                    }
+                  : undefined
+              }
+              enableMessageReplyReference={enableMessageReplyReference}
+              enableMessageListFormatting={enableMessageListFormatting}
+              replyTarget={enableMessageReplyReference ? replyTarget : null}
+              onClearReply={clearReplyTo}
+              enableMessageDrafts={enableMessageDrafts}
+              draftScope={draftScope}
+              enableMessageSendReliability={enableMessageSendReliability}
             />
           )}
         </>

@@ -8,7 +8,27 @@ type ChannelReadState = {
   lastReadMessageId: string | null;
   lastReadAt: string | null;
   unreadCount: number;
+  isManuallyUnread?: boolean;
+  manuallyUnreadFromMessageId?: string | null;
 } | null;
+
+function markChannelListRowManuallyUnread(
+  items: ChannelListItem[] | undefined,
+  channelId: string,
+): ChannelListItem[] | undefined {
+  if (!Array.isArray(items) || items.length === 0) return items;
+
+  let didChange = false;
+  const nextItems = items.map((item) => {
+    if (item.id !== channelId || item.is_manually_unread === true) {
+      return item;
+    }
+    didChange = true;
+    return { ...item, is_manually_unread: true };
+  });
+
+  return didChange ? nextItems : items;
+}
 
 function updateChannelListUnreadCount(
   items: ChannelListItem[] | undefined,
@@ -18,13 +38,17 @@ function updateChannelListUnreadCount(
 
   let didChange = false;
   const nextItems = items.map((item) => {
-    if (item.id !== channelId || (item.unread_count ?? 0) === 0) {
+    if (item.id !== channelId) return item;
+    // Reading the channel clears both real unread messages and an explicit
+    // "mark unread" flag (the server clears the flag on read too).
+    if ((item.unread_count ?? 0) === 0 && item.is_manually_unread !== true) {
       return item;
     }
     didChange = true;
     return {
       ...item,
       unread_count: 0,
+      is_manually_unread: false,
     };
   });
 
@@ -94,6 +118,8 @@ export function applyOptimisticChannelReadState(input: {
       lastReadMessageId,
       lastReadAt,
       unreadCount: 0,
+      isManuallyUnread: false,
+      manuallyUnreadFromMessageId: null,
     }),
   );
 
@@ -110,6 +136,64 @@ export function applyOptimisticChannelReadState(input: {
   queryClient.setQueryData<ChannelListItem[]>(
     queryKeys.supervisedDirectMessages(orgId, accountId),
     (current) => updateChannelListUnreadCount(current, channelId),
+  );
+}
+
+/**
+ * Mirrors applyOptimisticChannelReadState for the opposite direction: the user
+ * explicitly marked a conversation unread, so the conversation list should show
+ * the unread treatment straight away (the channel-list endpoints don't return a
+ * manual-unread flag yet, so this cache patch is what drives the list row).
+ */
+export function applyOptimisticChannelManualUnread(input: {
+  queryClient: QueryClient;
+  orgId: string;
+  profileId: string;
+  accountId: string;
+  channelId: string;
+  profileKind?: string | null;
+  fromMessageId?: string | null;
+}) {
+  const {
+    queryClient,
+    orgId,
+    profileId,
+    accountId,
+    channelId,
+    profileKind,
+    fromMessageId,
+  } = input;
+
+  queryClient.setQueryData<ChannelReadState>(
+    queryKeys.channelReadState(channelId, accountId),
+    (current) => ({
+      channelId,
+      lastReadMessageId: current?.lastReadMessageId ?? null,
+      lastReadAt: current?.lastReadAt ?? null,
+      unreadCount: current?.unreadCount ?? 0,
+      isManuallyUnread: true,
+      manuallyUnreadFromMessageId: fromMessageId ?? null,
+    }),
+  );
+
+  queryClient.setQueryData<ChannelListItem[]>(
+    queryKeys.directMessages(orgId, profileId),
+    (current) => markChannelListRowManuallyUnread(current, channelId),
+  );
+
+  queryClient.setQueryData<ChannelListItem[]>(
+    ['learningSpaceChannels', orgId, profileId, profileKind ?? null],
+    (current) => markChannelListRowManuallyUnread(current, channelId),
+  );
+
+  queryClient.setQueriesData<ChannelListItem[]>(
+    { queryKey: ['learningSpaceChannels', orgId, profileId] },
+    (current) => markChannelListRowManuallyUnread(current, channelId),
+  );
+
+  queryClient.setQueryData<ChannelListItem[]>(
+    queryKeys.supervisedDirectMessages(orgId, accountId),
+    (current) => markChannelListRowManuallyUnread(current, channelId),
   );
 }
 

@@ -21,7 +21,9 @@ export {
   fetchDirectMessages,
   fetchFamilyLinks,
   fetchIsChannelMember,
+  fetchConversationNotificationMode,
   fetchNotificationPreferences,
+  setConversationNotificationMode,
   fetchProfilesByAccountIds,
   fetchSupervisedDirectMessages,
   findDirectMessageChannelForProfiles,
@@ -29,20 +31,38 @@ export {
 } from './channel/queries';
 export {
   buildMessageStoragePath,
+  cancelScheduledMessage,
   deleteMessage,
+  editTextMessage,
   fetchChannelMessages,
   fetchChannelReadState,
+  fetchPinnedMessages,
+  fetchScheduledMessages,
+  fetchLinkPreview,
   fetchThreadMessages,
   markChannelReadState,
+  markChannelUnread,
   markChannelsReadByIds,
   markThreadReadState,
+  scheduleMessage,
+  searchChannelMessages,
   sendFileMessage,
   sendFilesMessage,
+  sendScheduledMessageNow,
   sendTextMessage,
+  toggleMessagePin,
   toggleReaction,
+  updateScheduledMessage,
   uploadChannelFile,
 } from './messages/queries';
-export type { FileAttachmentInput } from './messages/queries';
+export type {
+  FileAttachmentInput,
+  MessageSearchResult,
+  ScheduledMessage,
+  LinkPreviewMetadata,
+  SendTextMessageOptions,
+} from './messages/queries';
+export type { ConversationNotificationMode } from './channel/queries';
 export {
   fetchLearningSpaceChannels,
   fetchLearningSpaces,

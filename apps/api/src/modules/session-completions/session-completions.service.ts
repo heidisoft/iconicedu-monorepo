@@ -11,6 +11,7 @@ import type {
   AdminConfirmSessionCompletionInput,
   AdminCreateSessionCompletionInput,
   AdminDeleteSessionCompletionInput,
+  AdminDisputeSessionCompletionInput,
   AdminOrgProfileOptionVM,
   AdminSessionCompletionActorVM,
   AdminSessionCompletionGuardianVM,
@@ -51,6 +52,7 @@ const DISPUTE_CATEGORIES = [
   'teacher_absent',
   'student_absent',
   'technical_issue',
+  'did_not_happen',
   'other',
 ] as const;
 
@@ -1051,6 +1053,120 @@ export class SessionCompletionsService {
     );
 
     return { success: true, confirmedCount: updated?.length ?? 0 };
+  }
+
+  /**
+   * Staff override analogous to `adminConfirm`, but for reporting a problem
+   * (e.g. "did not happen") directly from the admin table instead of waiting on
+   * a participant to flag their own row. Settles every still-open (pending or
+   * auto_confirmed) row for the occurrence at once. Blocked once any row is
+   * already 'confirmed' — undo the confirmation first — the same way `confirm()`
+   * itself is blocked by an open dispute.
+   */
+  async adminDispute(authUserId: string, body: AdminDisputeSessionCompletionInput) {
+    if (!body?.orgId || !isUuid(body.orgId)) {
+      throw new BadRequestException('Invalid orgId');
+    }
+    if (!body?.scheduleId || !isUuid(body.scheduleId)) {
+      throw new BadRequestException('Invalid scheduleId');
+    }
+    if (!body?.occurrenceKey || !Number.isFinite(Date.parse(body.occurrenceKey))) {
+      throw new BadRequestException('Invalid occurrenceKey');
+    }
+    if (!DISPUTE_CATEGORIES.includes(body.disputeCategory)) {
+      throw new BadRequestException('Invalid disputeCategory');
+    }
+    const disputeReason = normalizeText(body.disputeReason, 500);
+
+    const supabase = createSupabaseServiceClient();
+    const account = await this.resolveAccount(supabase, authUserId, body.orgId);
+    await this.assertAdminAccess(supabase, account, body.orgId);
+
+    const { data: rows, error } = await supabase
+      .from('class_session_completions')
+      .select('*')
+      .eq('org_id', body.orgId)
+      .eq('schedule_id', body.scheduleId)
+      .eq('occurrence_key', body.occurrenceKey)
+      .is('deleted_at', null)
+      .returns<ClassSessionCompletionRow[]>();
+
+    if (error) throw new InternalServerErrorException(error.message);
+    if (!rows?.length) throw new NotFoundException('Session completion not found');
+
+    if (rows.some((row) => row.status === 'confirmed')) {
+      throw new ConflictException(
+        "This session has already been confirmed, so a problem can't be " +
+          'reported here. Undo the confirmation first.',
+      );
+    }
+
+    const openRows = rows.filter(
+      (row) => row.status === 'pending' || row.status === 'auto_confirmed',
+    );
+    if (!openRows.length) {
+      return { success: true, alreadyResolved: true, disputedCount: 0 };
+    }
+
+    const { data: staffProfile, error: staffProfileError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('account_id', account.id)
+      .eq('org_id', body.orgId)
+      .is('deleted_at', null)
+      .limit(1)
+      .maybeSingle<{ id: string }>();
+    if (staffProfileError)
+      throw new InternalServerErrorException(staffProfileError.message);
+
+    const now = new Date().toISOString();
+    const { data: updated, error: updateError } = await supabase
+      .from('class_session_completions')
+      .update({
+        status: 'disputed',
+        dispute_category: body.disputeCategory,
+        dispute_reason: disputeReason,
+        reschedule_requested: body.rescheduleRequested ?? false,
+        disputed_at: now,
+        resolved_at: now,
+        updated_at: now,
+        updated_by: staffProfile?.id ?? account.id,
+      })
+      .in(
+        'id',
+        openRows.map((row) => row.id),
+      )
+      .eq('org_id', body.orgId)
+      .in('status', ['pending', 'auto_confirmed'])
+      .select('id')
+      .returns<Array<{ id: string }>>();
+
+    if (updateError) throw new InternalServerErrorException(updateError.message);
+
+    this.logger.log(
+      `session completion admin-disputed scheduleId=${body.scheduleId} ` +
+        `occurrenceKey=${body.occurrenceKey} count=${updated?.length ?? 0}`,
+    );
+
+    await this.publishDisputeNotifications({
+      supabase,
+      row: {
+        ...openRows[0],
+        profile_id: staffProfile?.id ?? account.id,
+        role: 'staff',
+      },
+      disputeCategory: body.disputeCategory,
+      disputeReason,
+      rescheduleRequested: body.rescheduleRequested ?? false,
+    });
+
+    await Promise.all(
+      openRows.map((row) =>
+        this.markRelatedActivityFeedItemsRead(supabase, body.orgId, row),
+      ),
+    );
+
+    return { success: true, disputedCount: updated?.length ?? 0 };
   }
 
   /**
