@@ -409,6 +409,7 @@ function TableSection({
   selectedMonth,
   orgId,
   allowVerifiedDurationOverride,
+  showDisputeDetails,
 }: {
   rowsPromise: Promise<AdminSessionCompletionVM[]>;
   schedulesPromise: Promise<ScheduleOptionRow[]>;
@@ -416,6 +417,7 @@ function TableSection({
   selectedMonth: string;
   orgId: string;
   allowVerifiedDurationOverride: boolean;
+  showDisputeDetails: boolean;
 }) {
   const rows = React.use(rowsPromise);
   const schedules = React.use(schedulesPromise);
@@ -430,6 +432,7 @@ function TableSection({
       schedules={schedules}
       orgId={orgId}
       allowVerifiedDurationOverride={allowVerifiedDurationOverride}
+      showDisputeDetails={showDisputeDetails}
     />
   );
 }
@@ -443,6 +446,7 @@ export function SessionAttendanceDashboard({
   monthOptions,
   orgId,
   allowVerifiedDurationOverride,
+  showDisputeDetails,
 }: {
   rowsPromise: Promise<AdminSessionCompletionVM[]>;
   trendRowsPromise: Promise<AdminSessionCompletionVM[]>;
@@ -452,6 +456,7 @@ export function SessionAttendanceDashboard({
   monthOptions: string[];
   orgId: string;
   allowVerifiedDurationOverride: boolean;
+  showDisputeDetails: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -524,6 +529,7 @@ export function SessionAttendanceDashboard({
           selectedMonth={selectedMonth}
           orgId={orgId}
           allowVerifiedDurationOverride={allowVerifiedDurationOverride}
+          showDisputeDetails={showDisputeDetails}
         />
       </React.Suspense>
     </div>

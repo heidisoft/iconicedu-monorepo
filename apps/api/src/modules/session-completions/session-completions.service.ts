@@ -1951,6 +1951,18 @@ export class SessionCompletionsService {
                 confirmedAt: row.resolved_at ?? row.confirmed_at ?? row.updated_at,
               }
             : null;
+        // Surfaces why this person (or staff, reporting on their behalf via
+        // adminDispute) flagged the session, so admin doesn't have to guess from
+        // the bare 'Disputed' status alone.
+        const disputeDetails =
+          row.status === 'disputed' && row.dispute_category
+            ? {
+                category: row.dispute_category,
+                reason: row.dispute_reason ?? null,
+                rescheduleRequested: row.reschedule_requested,
+                disputedAt: row.disputed_at ?? row.resolved_at ?? row.updated_at,
+              }
+            : null;
         participants.set(key, {
           profileId: row.profile_id,
           displayName:
@@ -1961,6 +1973,7 @@ export class SessionCompletionsService {
           status: row.status,
           rating: row.rating ?? null,
           confirmedByStaff,
+          disputeDetails,
         });
       });
 

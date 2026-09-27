@@ -15,6 +15,7 @@ import {
   enableMobileAppleSignIn,
   enableMobileDirectMessageStart,
   enableMobileGoogleSignIn,
+  enableSessionCompletionDisputeDetails,
   enableSessionCompletionVerifiedDuration,
   getFlagsProviderData,
   isVercelFlagsSdkConfigured,
@@ -91,6 +92,16 @@ describe('web flags', () => {
     expect(enableSessionCompletionVerifiedDuration.defaultValue).toBe(false);
     expect(webFlags.enableSessionCompletionVerifiedDuration).toBe(
       enableSessionCompletionVerifiedDuration,
+    );
+  });
+
+  it('declares the session completion dispute details flag off by default', () => {
+    expect(enableSessionCompletionDisputeDetails.key).toBe(
+      'enable-session-completion-dispute-details',
+    );
+    expect(enableSessionCompletionDisputeDetails.defaultValue).toBe(false);
+    expect(webFlags.enableSessionCompletionDisputeDetails).toBe(
+      enableSessionCompletionDisputeDetails,
     );
   });
 
