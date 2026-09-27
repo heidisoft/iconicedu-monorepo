@@ -70,6 +70,7 @@ export function buildAdminMenuSections(
       title: 'Settings',
       iconKey: 'system',
       links: [
+        { title: 'General', url: `${basePath}/admin/settings/general` },
         { title: 'Subjects', url: `${basePath}/admin/settings/subjects` },
         { title: 'Activity controls', url: `${basePath}/admin/settings/activity` },
         { title: 'Roles & policies', url: `${basePath}/admin/settings/roles` },

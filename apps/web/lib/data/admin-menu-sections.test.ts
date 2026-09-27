@@ -125,6 +125,7 @@ describe('buildAdminMenuSections', () => {
       '/admin/attendance/sessions',
       '/admin/channels',
       '/admin/classrooms',
+      '/admin/settings/general',
       '/admin/settings/activity',
       '/admin/settings/roles',
       '/admin/settings/subjects',
