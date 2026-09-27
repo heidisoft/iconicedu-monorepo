@@ -12,6 +12,8 @@ import {
   Loader2,
   MoreHorizontal,
   MoreVertical,
+  Pin,
+  PinOff,
   Pencil,
   Trash2,
 } from 'lucide-react';
@@ -50,6 +52,11 @@ type MessageManagementMenuProps = {
   onEdit?: () => void;
   feed?: boolean;
   children?: ReactElement;
+  /** Gated by the enableMessagePinning flag AND (typically) a channel-manager check. */
+  canPinMessages?: boolean;
+  isPinned?: boolean;
+  isPinning?: boolean;
+  onTogglePinned?: () => void;
 };
 
 // flag-exempt: match mobile's post menu and long-press access without repeated feed controls.
@@ -65,6 +72,10 @@ export function MessageManagementMenu({
   onEdit,
   feed,
   children,
+  canPinMessages,
+  isPinned,
+  isPinning,
+  onTogglePinned,
 }: MessageManagementMenuProps) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [isMarkingUnread, setIsMarkingUnread] = useState(false);
@@ -156,6 +167,25 @@ export function MessageManagementMenu({
           <Item className={itemClass} onSelect={(event) => event.preventDefault()}>
             <Copy className="mr-2 h-4 w-4" />
             Copy text
+          </Item>
+        </>
+      )}
+      {canPinMessages && (
+        <>
+          <Separator className="-mx-1 my-1 h-px bg-border" />
+          <Item
+            className={itemClass}
+            disabled={isReadOnly || isPinning}
+            onSelect={onTogglePinned}
+          >
+            {isPinning ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : isPinned ? (
+              <PinOff className="mr-2 h-4 w-4" />
+            ) : (
+              <Pin className="mr-2 h-4 w-4" />
+            )}
+            {isPinned ? 'Unpin message' : 'Pin message'}
           </Item>
         </>
       )}

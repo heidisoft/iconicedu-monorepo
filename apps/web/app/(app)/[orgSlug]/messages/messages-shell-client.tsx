@@ -143,6 +143,9 @@ type MessagesShellClientProps = {
   currentUserProfile?: UserProfileVM | null;
   readOnly?: boolean;
   showCreateMessageTypeButton?: boolean;
+  enableMessagePinning?: boolean;
+  enableMessageSearch?: boolean;
+  enableScheduledSend?: boolean;
   enableMessageMarkUnread?: boolean;
   enableMessageReplyReference?: boolean;
   enableNotificationConversationControls?: boolean;
@@ -183,6 +186,9 @@ export function MessagesShellClient({
   currentUserProfile,
   readOnly = false,
   showCreateMessageTypeButton = true,
+  enableMessagePinning = false,
+  enableMessageSearch = false,
+  enableScheduledSend = false,
   enableMessageMarkUnread = false,
   enableMessageReplyReference = false,
   enableNotificationConversationControls = false,
@@ -537,6 +543,9 @@ export function MessagesShellClient({
         currentUserProfile={currentUserProfile}
         readOnly={readOnly}
         showCreateMessageTypeButton={showCreateMessageTypeButton}
+        enableMessagePinning={enableMessagePinning}
+        enableMessageSearch={enableMessageSearch}
+        enableScheduledSend={enableScheduledSend}
         enableMessageMarkUnread={enableMessageMarkUnread}
         enableMessageReplyReference={enableMessageReplyReference}
         enableNotificationConversationControls={enableNotificationConversationControls}

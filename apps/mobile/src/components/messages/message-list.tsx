@@ -464,6 +464,16 @@ export type MessageListProps = {
   manuallyUnreadFromMessageId?: string | null;
   onSendAnnotation?: (attachment: import('./attachment-sheet').AttachmentPayload) => void;
   messageUiThemeKey?: 'classic' | 'feed';
+  /** Gated by `enableMessagePinning` — ids of currently-pinned messages, for the pin indicator. */
+  pinnedMessageIds?: Set<string>;
+  /**
+   * Gated by `enableMessageSearch` — set from a tapped search result to both
+   * visually highlight that message and (classic theme only) scroll it into
+   * view. Calls `onScrollToMessageResult(false)` and leaves the list
+   * untouched if the message isn't in the currently-loaded page.
+   */
+  highlightMessageId?: string | null;
+  onScrollToMessageResult?: (found: boolean) => void;
 };
 
 const REPLY_HIGHLIGHT_DURATION_MS = 1600;
@@ -497,6 +507,9 @@ export const MessageList: React.FC<MessageListProps> = ({
   manuallyUnreadFromMessageId,
   onSendAnnotation,
   messageUiThemeKey = 'classic',
+  pinnedMessageIds,
+  highlightMessageId,
+  onScrollToMessageResult,
 }) => {
   const flatListRef = useRef<FlatList>(null);
   const { colors } = useTheme();
@@ -595,6 +608,51 @@ export const MessageList: React.FC<MessageListProps> = ({
     maybeMarkUnreadAsViewed();
   }, [maybeMarkUnreadAsViewed]);
 
+  // ── Search-result navigation (issue #264 P2) ──────────────────────────────
+  // Scrolls to a message tapped from search, if it's in the currently-loaded
+  // page. `onScrollToIndexFailed` covers the case where FlatList hasn't yet
+  // measured that far (common right after mount) by retrying once.
+  useEffect(() => {
+    if (!highlightMessageId) return;
+    const index = listData.findIndex(
+      (item) =>
+        !isDateSeparator(item) &&
+        !isUnreadSeparator(item) &&
+        item.ids.id === highlightMessageId,
+    );
+    if (index < 0) {
+      onScrollToMessageResult?.(false);
+      return;
+    }
+    requestAnimationFrame(() => {
+      try {
+        flatListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
+      } catch {
+        // handled by onScrollToIndexFailed below
+      }
+    });
+    onScrollToMessageResult?.(true);
+  }, [highlightMessageId, listData, onScrollToMessageResult]);
+
+  const handleScrollToIndexFailed = useCallback(
+    (info: { index: number; averageItemLength: number }) => {
+      // Standard FlatList workaround: scroll to an estimated offset first,
+      // then retry the precise scrollToIndex once layout has caught up.
+      flatListRef.current?.scrollToOffset({
+        offset: info.averageItemLength * info.index,
+        animated: false,
+      });
+      setTimeout(() => {
+        flatListRef.current?.scrollToIndex({
+          index: info.index,
+          animated: true,
+          viewPosition: 0.5,
+        });
+      }, 100);
+    },
+    [],
+  );
+
   const handleReactionToggle = useCallback(
     (messageId: string, emoji: string) => {
       preserveOffsetAfterReactionRef.current = true;
@@ -690,8 +748,12 @@ export const MessageList: React.FC<MessageListProps> = ({
           isReadOnly={isReadOnly}
           onSendAnnotation={onSendAnnotation}
           messageUiThemeKey={messageUiThemeKey}
+          isPinned={pinnedMessageIds?.has(item.ids.id) ?? false}
           onReplyReferencePress={handleReplyReferencePress}
-          isHighlighted={highlightedMessageId === item.ids.id}
+          isHighlighted={
+            (!!highlightMessageId && item.ids.id === highlightMessageId) ||
+            highlightedMessageId === item.ids.id
+          }
         />
       );
     },
@@ -708,6 +770,8 @@ export const MessageList: React.FC<MessageListProps> = ({
       isReadOnly,
       onSendAnnotation,
       messageUiThemeKey,
+      pinnedMessageIds,
+      highlightMessageId,
       handleReplyReferencePress,
       highlightedMessageId,
     ],
@@ -768,10 +832,7 @@ export const MessageList: React.FC<MessageListProps> = ({
       refreshing={refreshing}
       onEndReached={onLoadMore}
       onEndReachedThreshold={0.3}
-      onScrollToIndexFailed={() => {
-        // Item not yet measured (variable-height inverted list) — degrade
-        // gracefully rather than throwing.
-      }}
+      onScrollToIndexFailed={handleScrollToIndexFailed}
       onScroll={(event) => {
         const offsetY = event.nativeEvent.contentOffset.y;
         scrollOffsetRef.current = offsetY;

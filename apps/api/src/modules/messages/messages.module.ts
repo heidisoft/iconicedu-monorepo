@@ -7,5 +7,6 @@ import { MessagesService } from '@iconicedu/api/modules/messages/messages.servic
   imports: [AuthModule],
   controllers: [MessagesController],
   providers: [MessagesService],
+  exports: [MessagesService],
 })
 export class MessagesModule {}

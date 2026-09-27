@@ -36,6 +36,11 @@ interface MessagesStateContextValue {
   channel: ChannelVM;
   isReadOnly: boolean;
   currentUserId: string;
+  /** Staff/educators can manage the channel (pin messages, etc.) — see MessagesShell wiring. */
+  canManageChannel: boolean;
+  enableMessagePinning: boolean;
+  enableMessageSearch: boolean;
+  enableScheduledSend: boolean;
   savedCount: number;
   homeworkCount: number;
   sessionSummaryCount: number;
@@ -163,6 +168,10 @@ export function MessagesStateProvider({
   currentUserId: initialCurrentUserId = '',
   isReadOnly = false,
   showCreateMessageTypeButton = true,
+  canManageChannel = false,
+  enableMessagePinning = false,
+  enableMessageSearch = false,
+  enableScheduledSend = false,
   enableMessageMarkUnread = false,
   enableMessageReplyReference = false,
   enableNotificationConversationControls = false,
@@ -176,6 +185,10 @@ export function MessagesStateProvider({
   currentUserId?: string;
   isReadOnly?: boolean;
   showCreateMessageTypeButton?: boolean;
+  canManageChannel?: boolean;
+  enableMessagePinning?: boolean;
+  enableMessageSearch?: boolean;
+  enableScheduledSend?: boolean;
   enableMessageMarkUnread?: boolean;
   enableMessageReplyReference?: boolean;
   enableNotificationConversationControls?: boolean;
@@ -344,6 +357,10 @@ export function MessagesStateProvider({
       channel,
       isReadOnly,
       currentUserId,
+      canManageChannel,
+      enableMessagePinning,
+      enableMessageSearch,
+      enableScheduledSend,
       savedCount,
       homeworkCount,
       sessionSummaryCount,
@@ -395,6 +412,10 @@ export function MessagesStateProvider({
       channel,
       isReadOnly,
       currentUserId,
+      canManageChannel,
+      enableMessagePinning,
+      enableMessageSearch,
+      enableScheduledSend,
       savedCount,
       homeworkCount,
       sessionSummaryCount,

@@ -19,7 +19,10 @@ import {
   getDashboardProfileContext,
 } from '@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth';
 import {
+  enableMessagePinning,
+  enableMessageSearch,
   enableMessageTypeComposer,
+  enableScheduledSend,
   enableMessageMarkUnread,
   enableMessageReplyReference,
   enableNotificationConversationControls,
@@ -57,11 +60,12 @@ export default async function Page({
   if (!channel) {
     notFound();
   }
-  const showCreateMessageTypeButton = await enableMessageTypeComposer.run({
-    identify: { profileId: profileResponse.data?.id ?? null },
-  });
   const identify = { profileId: profileResponse.data?.id ?? null };
   const [
+    showCreateMessageTypeButton,
+    showMessagePinning,
+    showMessageSearch,
+    showScheduledSend,
     markUnreadEnabled,
     replyReferenceEnabled,
     notificationConversationControlsEnabled,
@@ -70,6 +74,10 @@ export default async function Page({
     messageEditEnabled,
     messageSendReliabilityEnabled,
   ] = await Promise.all([
+    enableMessageTypeComposer.run({ identify }),
+    enableMessagePinning.run({ identify }),
+    enableMessageSearch.run({ identify }),
+    enableScheduledSend.run({ identify }),
     enableMessageMarkUnread.run({ identify }),
     enableMessageReplyReference.run({ identify }),
     enableNotificationConversationControls.run({ identify }),
@@ -94,6 +102,9 @@ export default async function Page({
         currentUserProfile={currentUserProfile}
         readOnly={isStaffReadOnly}
         showCreateMessageTypeButton={showCreateMessageTypeButton}
+        enableMessagePinning={showMessagePinning}
+        enableMessageSearch={showMessageSearch}
+        enableScheduledSend={showScheduledSend}
         enableMessageMarkUnread={markUnreadEnabled}
         enableMessageReplyReference={replyReferenceEnabled}
         enableNotificationConversationControls={notificationConversationControlsEnabled}

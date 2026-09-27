@@ -71,6 +71,10 @@ interface MessageItemProps {
   inlineThreadContent?: ReactNode;
   feedGroupPosition?: 'single' | 'first' | 'middle' | 'last';
   showActionControls?: boolean;
+  canPinMessages?: boolean;
+  pinnedMessageIds?: ReadonlySet<string>;
+  pinningMessageIds?: ReadonlySet<string>;
+  onTogglePinned?: (messageId: string) => void;
 }
 
 export const MessageItem = memo(function MessageItem({
@@ -94,6 +98,10 @@ export const MessageItem = memo(function MessageItem({
   inlineThreadContent,
   feedGroupPosition,
   showActionControls,
+  canPinMessages = false,
+  pinnedMessageIds,
+  pinningMessageIds,
+  onTogglePinned,
 }: MessageItemProps) {
   if (!isMessageVisibleToUser(message, currentUserId)) {
     return null;
@@ -117,6 +125,10 @@ export const MessageItem = memo(function MessageItem({
 
   const handleDelete = () => {
     onDelete?.(message.ids.id);
+  };
+
+  const handleTogglePinned = () => {
+    onTogglePinned?.(message.ids.id);
   };
 
   const handleRetrySend = () => {
@@ -151,6 +163,10 @@ export const MessageItem = memo(function MessageItem({
     inlineThreadContent,
     feedGroupPosition,
     showActionControls,
+    canPinMessages,
+    isPinned: pinnedMessageIds?.has(message.ids.id) ?? false,
+    isPinning: pinningMessageIds?.has(message.ids.id) ?? false,
+    onTogglePinned: handleTogglePinned,
   };
 
   if (isTextMessage(message)) {

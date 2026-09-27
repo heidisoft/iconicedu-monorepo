@@ -8,6 +8,9 @@ import { UsersModule } from '@iconicedu/api/modules/users/users.module';
 import { ChannelsModule } from '@iconicedu/api/modules/channels/channels.module';
 import { ClassesModule } from '@iconicedu/api/modules/classes/classes.module';
 import { MessagesModule } from '@iconicedu/api/modules/messages/messages.module';
+import { MessagePinsModule } from '@iconicedu/api/modules/message-pins/message-pins.module';
+import { MessageSearchModule } from '@iconicedu/api/modules/message-search/message-search.module';
+import { ScheduledMessagesModule } from '@iconicedu/api/modules/scheduled-messages/scheduled-messages.module';
 import { RemindersModule } from '@iconicedu/api/modules/reminders/reminders.module';
 import { AnalyticsModule } from '@iconicedu/api/analytics/analytics.module';
 import { ActivityFeedModule } from '@iconicedu/api/modules/activity-feed/activity-feed.module';
@@ -43,6 +46,9 @@ import { RequestLoggingInterceptor } from '@iconicedu/api/observability/request-
     ChannelsModule,
     ClassesModule,
     MessagesModule,
+    MessagePinsModule,
+    MessageSearchModule,
+    ScheduledMessagesModule,
     ActivityFeedModule,
     SessionCompletionsModule,
     RemindersModule,

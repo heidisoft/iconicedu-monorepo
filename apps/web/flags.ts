@@ -199,6 +199,22 @@ export const enableAdminSessionAttendanceAnalytics = flag<
   },
 });
 
+export const enableMessagePinning = flag<boolean, { profileId?: string | null }>({
+  key: platformFeatureFlagKeys.enableMessagePinning,
+  description: 'Allows staff and educators to pin messages within a channel.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: platformFeatureFlagKeys.enableMessagePinning,
+      profileId: entities?.profileId,
+    });
+  },
+});
+
 export const enableMessageMarkUnread = flag<boolean, { profileId?: string | null }>({
   key: platformFeatureFlagKeys.enableMessageMarkUnread,
   description: 'Shows the "Mark unread" message action and enables the mark-unread API.',
@@ -210,6 +226,22 @@ export const enableMessageMarkUnread = flag<boolean, { profileId?: string | null
   async decide({ entities }) {
     return evaluateWebBooleanFlag({
       flagKey: platformFeatureFlagKeys.enableMessageMarkUnread,
+      profileId: entities?.profileId,
+    });
+  },
+});
+
+export const enableMessageSearch = flag<boolean, { profileId?: string | null }>({
+  key: platformFeatureFlagKeys.enableMessageSearch,
+  description: 'Shows the in-channel message search entry point.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: platformFeatureFlagKeys.enableMessageSearch,
       profileId: entities?.profileId,
     });
   },
@@ -227,6 +259,22 @@ export const enableMessageReplyReference = flag<boolean, { profileId?: string | 
   async decide({ entities }) {
     return evaluateWebBooleanFlag({
       flagKey: platformFeatureFlagKeys.enableMessageReplyReference,
+      profileId: entities?.profileId,
+    });
+  },
+});
+
+export const enableScheduledSend = flag<boolean, { profileId?: string | null }>({
+  key: platformFeatureFlagKeys.enableScheduledSend,
+  description: 'Allows composing messages to send at a future scheduled time.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: platformFeatureFlagKeys.enableScheduledSend,
       profileId: entities?.profileId,
     });
   },
@@ -346,7 +394,10 @@ export const webFlags = {
   enableChannelCommunications,
   enableClassScheduleSeriesReschedule,
   enableMarketingSitePages,
+  enableMessagePinning,
+  enableMessageSearch,
   enableMessageTypeComposer,
+  enableScheduledSend,
   enableMessageMarkUnread,
   enableMessageReplyReference,
   enableNotificationConversationControls,

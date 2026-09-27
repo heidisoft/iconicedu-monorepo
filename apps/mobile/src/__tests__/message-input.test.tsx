@@ -1,5 +1,6 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react-native';
+import { Alert } from 'react-native';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
 import { MessageInput } from '@/components/messages/message-input';
 
 describe('MessageInput', () => {
@@ -86,5 +87,181 @@ describe('MessageInput', () => {
     );
 
     expect(screen.getByPlaceholderText('This placeholder should t...')).toBeTruthy();
+  });
+});
+
+// ─── Scheduled send (issue #264 P2) ────────────────────────────────────────
+
+describe('MessageInput — scheduled send', () => {
+  let alertSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    alertSpy.mockRestore();
+  });
+
+  it('does not offer scheduling on long-press when enableScheduledSend is false (flag-off inertness)', () => {
+    const onSend = jest.fn();
+    const onScheduleSend = jest.fn();
+    render(
+      <MessageInput
+        onSend={onSend}
+        onScheduleSend={onScheduleSend}
+        enableScheduledSend={false}
+      />,
+    );
+
+    fireEvent.changeText(screen.getByLabelText('Message input'), 'Hello');
+    fireEvent(screen.getByLabelText('Send message'), 'longPress');
+
+    expect(alertSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not offer scheduling on long-press when onScheduleSend is not provided (flag-off inertness)', () => {
+    const onSend = jest.fn();
+    render(<MessageInput onSend={onSend} enableScheduledSend />);
+
+    fireEvent.changeText(screen.getByLabelText('Message input'), 'Hello');
+    fireEvent(screen.getByLabelText('Send message'), 'longPress');
+
+    expect(alertSpy).not.toHaveBeenCalled();
+  });
+
+  it('long-pressing send offers "Send now" which sends immediately (branching)', () => {
+    const onSend = jest.fn();
+    const onScheduleSend = jest.fn();
+    render(
+      <MessageInput
+        onSend={onSend}
+        onScheduleSend={onScheduleSend}
+        enableScheduledSend
+      />,
+    );
+
+    fireEvent.changeText(screen.getByLabelText('Message input'), 'Hello');
+    fireEvent(screen.getByLabelText('Send message'), 'longPress');
+
+    expect(alertSpy).toHaveBeenCalledWith(
+      'Send message',
+      undefined,
+      expect.arrayContaining([
+        expect.objectContaining({ text: 'Cancel' }),
+        expect.objectContaining({ text: 'Schedule send' }),
+        expect.objectContaining({ text: 'Send now' }),
+      ]),
+    );
+
+    // Simulate the user tapping "Send now" in the alert.
+    const buttons = alertSpy.mock.calls[0][2] as Array<{
+      text: string;
+      onPress?: () => void;
+    }>;
+    buttons.find((b) => b.text === 'Send now')?.onPress?.();
+
+    expect(onSend).toHaveBeenCalledWith('Hello');
+    expect(onScheduleSend).not.toHaveBeenCalled();
+  });
+
+  it('long-pressing send offers "Schedule send" which opens the date/time picker and, on confirm, calls onScheduleSend with a timezone-aware sendAt (branching)', async () => {
+    const onSend = jest.fn();
+    const onScheduleSend = jest.fn().mockResolvedValue(undefined);
+    render(
+      <MessageInput
+        onSend={onSend}
+        onScheduleSend={onScheduleSend}
+        enableScheduledSend
+      />,
+    );
+
+    fireEvent.changeText(
+      screen.getByLabelText('Message input'),
+      'Remember to bring gear',
+    );
+    fireEvent(screen.getByLabelText('Send message'), 'longPress');
+
+    const buttons = alertSpy.mock.calls[0][2] as Array<{
+      text: string;
+      onPress?: () => void;
+    }>;
+    buttons.find((b) => b.text === 'Schedule send')?.onPress?.();
+
+    // The picker (iOS path renders a Confirm button; Android drives a native
+    // dialog directly — this test environment resolves as iOS by default).
+    const confirmButton = await screen.findByLabelText('Confirm scheduled time');
+    fireEvent.press(confirmButton);
+
+    await waitFor(() => {
+      expect(onScheduleSend).toHaveBeenCalledWith(
+        expect.objectContaining({ content: 'Remember to bring gear' }),
+      );
+    });
+    const call = onScheduleSend.mock.calls[0][0];
+    expect(typeof call.sendAt).toBe('string');
+    expect(() => new Date(call.sendAt).toISOString()).not.toThrow();
+    // timezone is either a resolved IANA string or null — never undefined
+    expect(call.timezone === null || typeof call.timezone === 'string').toBe(true);
+    expect(onSend).not.toHaveBeenCalled();
+  });
+
+  it('clears the composer after a successful schedule', async () => {
+    const onScheduleSend = jest.fn().mockResolvedValue(undefined);
+    render(
+      <MessageInput
+        onSend={jest.fn()}
+        onScheduleSend={onScheduleSend}
+        enableScheduledSend
+      />,
+    );
+
+    fireEvent.changeText(screen.getByLabelText('Message input'), 'Later message');
+    fireEvent(screen.getByLabelText('Send message'), 'longPress');
+    const buttons = alertSpy.mock.calls[0][2] as Array<{
+      text: string;
+      onPress?: () => void;
+    }>;
+    buttons.find((b) => b.text === 'Schedule send')?.onPress?.();
+
+    const confirmButton = await screen.findByLabelText('Confirm scheduled time');
+    fireEvent.press(confirmButton);
+
+    await waitFor(() => {
+      expect(onScheduleSend).toHaveBeenCalled();
+    });
+    await waitFor(() => {
+      expect(screen.getByLabelText('Message input').props.value).toBe('');
+    });
+  });
+
+  it('surfaces a scheduling error via Alert instead of crashing, and keeps the draft text', async () => {
+    const onScheduleSend = jest.fn().mockRejectedValue(new Error('Network error'));
+    render(
+      <MessageInput
+        onSend={jest.fn()}
+        onScheduleSend={onScheduleSend}
+        enableScheduledSend
+      />,
+    );
+
+    fireEvent.changeText(screen.getByLabelText('Message input'), 'Later message');
+    fireEvent(screen.getByLabelText('Send message'), 'longPress');
+    const buttons = alertSpy.mock.calls[0][2] as Array<{
+      text: string;
+      onPress?: () => void;
+    }>;
+    buttons.find((b) => b.text === 'Schedule send')?.onPress?.();
+
+    const confirmButton = await screen.findByLabelText('Confirm scheduled time');
+    fireEvent.press(confirmButton);
+
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalledWith(
+        'Unable to schedule message',
+        'Network error',
+      );
+    });
+    expect(screen.getByLabelText('Message input').props.value).toBe('Later message');
   });
 });

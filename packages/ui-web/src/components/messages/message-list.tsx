@@ -101,6 +101,10 @@ interface MessageListProps {
   currentUserId?: string;
   currentUserProfile?: UserProfileVM | null;
   currentUserCanDeleteAnyMessages?: boolean;
+  currentUserCanPinMessages?: boolean;
+  pinnedMessageIds?: ReadonlySet<string>;
+  pinningMessageIds?: ReadonlySet<string>;
+  onTogglePinned?: (messageId: string) => void;
   isReadOnly?: boolean;
   lastReadMessageId?: UUID;
   lastReadAt?: ISODateTime;
@@ -224,6 +228,10 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
       currentUserId,
       currentUserProfile,
       currentUserCanDeleteAnyMessages = false,
+      currentUserCanPinMessages = false,
+      pinnedMessageIds,
+      pinningMessageIds,
+      onTogglePinned,
       isReadOnly = false,
       lastReadMessageId,
       lastReadAt,
@@ -686,6 +694,10 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                     onToggleSaved={() => onToggleSaved?.(reply.ids.id)}
                     onToggleHidden={() => onToggleHidden?.(reply.ids.id)}
                     onDelete={() => onDelete?.(reply.ids.id)}
+                    canPinMessages={currentUserCanPinMessages}
+                    isPinned={pinnedMessageIds?.has(reply.ids.id) ?? false}
+                    isPinning={pinningMessageIds?.has(reply.ids.id) ?? false}
+                    onTogglePinned={() => onTogglePinned?.(reply.ids.id)}
                     feed
                   >
                     <div
@@ -894,6 +906,10 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
             actionState={getMessageActionState?.(message.ids.id)}
             currentUserId={currentUserId}
             currentUserCanDeleteAnyMessages={currentUserCanDeleteAnyMessages}
+            canPinMessages={currentUserCanPinMessages}
+            pinnedMessageIds={pinnedMessageIds}
+            pinningMessageIds={pinningMessageIds}
+            onTogglePinned={onTogglePinned}
             messageUiThemeKey={messageUiThemeKey}
             inlineThreadContent={feedInlineThreadContent}
             feedGroupPosition={feedGroupPosition}
@@ -1025,6 +1041,16 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                                   }
                                   onToggleHidden={() =>
                                     onToggleHidden?.(headerMessage.ids.id)
+                                  }
+                                  canPinMessages={currentUserCanPinMessages}
+                                  isPinned={
+                                    pinnedMessageIds?.has(headerMessage.ids.id) ?? false
+                                  }
+                                  isPinning={
+                                    pinningMessageIds?.has(headerMessage.ids.id) ?? false
+                                  }
+                                  onTogglePinned={() =>
+                                    onTogglePinned?.(headerMessage.ids.id)
                                   }
                                   onDelete={() => onDelete?.(headerMessage.ids.id)}
                                   feed
@@ -1440,6 +1466,10 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(
                         actionState={getMessageActionState?.(message.ids.id)}
                         currentUserId={currentUserId}
                         currentUserCanDeleteAnyMessages={currentUserCanDeleteAnyMessages}
+                        canPinMessages={currentUserCanPinMessages}
+                        pinnedMessageIds={pinnedMessageIds}
+                        pinningMessageIds={pinningMessageIds}
+                        onTogglePinned={onTogglePinned}
                         messageUiThemeKey={messageUiThemeKey}
                         inlineThreadContent={feedInlineThreadContent}
                         feedGroupPosition={feedGroupPosition}
