@@ -19,6 +19,8 @@ import {
   getDashboardProfileContext,
 } from '@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth';
 import {
+  enableAiRefine,
+  enableAiSuggestedReplies,
   enableMessagePinning,
   enableMessageSearch,
   enableMessageTypeComposer,
@@ -63,6 +65,8 @@ export default async function Page({
   const identify = { profileId: profileResponse.data?.id ?? null };
   const [
     showCreateMessageTypeButton,
+    showAiRefine,
+    showAiSuggestedReplies,
     showMessagePinning,
     showMessageSearch,
     showScheduledSend,
@@ -75,6 +79,8 @@ export default async function Page({
     messageSendReliabilityEnabled,
   ] = await Promise.all([
     enableMessageTypeComposer.run({ identify }),
+    enableAiRefine.run({ identify }),
+    enableAiSuggestedReplies.run({ identify }),
     enableMessagePinning.run({ identify }),
     enableMessageSearch.run({ identify }),
     enableScheduledSend.run({ identify }),
@@ -102,6 +108,8 @@ export default async function Page({
         currentUserProfile={currentUserProfile}
         readOnly={isStaffReadOnly}
         showCreateMessageTypeButton={showCreateMessageTypeButton}
+        showAiRefine={showAiRefine}
+        showAiSuggestedReplies={showAiSuggestedReplies}
         enableMessagePinning={showMessagePinning}
         enableMessageSearch={showMessageSearch}
         enableScheduledSend={showScheduledSend}

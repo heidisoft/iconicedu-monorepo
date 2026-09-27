@@ -1017,6 +1017,9 @@ export default function DmConversationScreen() {
             onTypingStop={broadcastTypingStop}
             replyTo={threadReplyTarget}
             onCancelReply={() => setThreadReplyTarget(null)}
+            orgId={orgId}
+            channelId={channelId}
+            profileId={profileId}
             enableScheduledSend={p2.enableScheduledSend}
             onScheduleSend={p2.scheduleSend}
             quoteReplyTo={quoteReplyTarget}

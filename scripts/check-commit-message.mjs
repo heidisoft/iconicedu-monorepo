@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs';
 
 export const CONVENTIONAL_HEADER =
-  /^(feat|fix|docs|refactor|perf|test|build|ci|chore|style|revert)(\([a-z0-9][a-z0-9./_-]*\))?!?: ([a-z0-9].*)$/;
+  /^(feat|fix|docs|refactor|perf|test|build|ci|chore|style|revert)(\([a-z0-9][a-z0-9./_-]*\))?!?: ([A-Za-z0-9].*)$/;
 
 export function validateCommitMessage(message) {
   const header = message.trim().split(/\r?\n/, 1)[0] ?? '';

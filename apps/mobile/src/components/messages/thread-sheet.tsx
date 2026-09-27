@@ -281,7 +281,13 @@ export const ThreadSheet: React.FC<ThreadSheetProps> = ({
             )}
 
             {/* Reply input */}
-            <MessageInput onSend={handleSend} placeholder="Reply in thread…" />
+            <MessageInput
+              onSend={handleSend}
+              placeholder="Reply in thread…"
+              orgId={parentMessage?.ids.orgId ?? ''}
+              channelId={resolvedChannelId}
+              profileId={currentProfileId}
+            />
           </Pressable>
         </KeyboardAvoidingView>
       </Pressable>

@@ -4,6 +4,8 @@ export const platformFeatureFlagKeys = {
   enableMobileGoogleSignIn: 'enable-mobile-google-sign-in',
   enableMobileAppleSignIn: 'enable-mobile-apple-sign-in',
   sessionCompletionCarousel: 'session-completion-carousel',
+  enableAiRefine: 'enable-ai-refine',
+  enableAiSuggestedReplies: 'enable-ai-suggested-replies',
   enableMessagePinning: 'enable-message-pinning',
   enableMessageSearch: 'enable-message-search',
   enableScheduledSend: 'enable-scheduled-send',

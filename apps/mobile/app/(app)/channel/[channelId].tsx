@@ -982,6 +982,9 @@ export default function ChannelConversationScreen() {
             quoteReplyTo={quoteReplyTarget}
             onCancelQuoteReply={() => setQuoteReplyTarget(null)}
             uploading={pendingUploads.some((p) => !p.failed)}
+            orgId={orgId}
+            channelId={channelId}
+            profileId={profileId}
             enableScheduledSend={p2.enableScheduledSend}
             onScheduleSend={p2.scheduleSend}
             enableDrafts={enableMessageDrafts}

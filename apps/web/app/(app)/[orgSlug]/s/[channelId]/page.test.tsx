@@ -7,6 +7,8 @@ import Page from '@iconicedu/web/app/(app)/[orgSlug]/s/[channelId]/page';
 const learningSpaceShellMock = vi.fn(() => null);
 const buildChannelByIdMock = vi.fn();
 const enableMessageTypeComposerRunMock = vi.fn(async () => true);
+const enableAiRefineRunMock = vi.fn(async () => true);
+const enableAiSuggestedRepliesRunMock = vi.fn(async () => true);
 const enableP1MessagingFlagRunMock = vi.fn(async () => false);
 const enableMessageDraftsRunMock = vi.fn(async () => false);
 const enableMessageEditRunMock = vi.fn(async () => false);
@@ -54,6 +56,12 @@ vi.mock('@iconicedu/web/flags', () => ({
   enableMessageTypeComposer: {
     run: (...args: unknown[]) => enableMessageTypeComposerRunMock(...args),
   },
+  enableAiRefine: {
+    run: (...args: unknown[]) => enableAiRefineRunMock(...args),
+  },
+  enableAiSuggestedReplies: {
+    run: (...args: unknown[]) => enableAiSuggestedRepliesRunMock(...args),
+  },
   enableMessagePinning: { run: async () => false },
   enableMessageSearch: { run: async () => false },
   enableScheduledSend: { run: async () => false },
@@ -97,6 +105,8 @@ describe('d/s/[channelId] page', () => {
           currentUserProfile: { ids: { id: 'profile-1', orgId: 'org-1' } },
           readOnly: false,
           showCreateMessageTypeButton: true,
+          showAiRefine: true,
+          showAiSuggestedReplies: true,
         }),
       );
     });

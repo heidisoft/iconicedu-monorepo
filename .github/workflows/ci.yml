@@ -1032,23 +1032,38 @@ jobs:
             fi
           fi
 
-          LATEST_DEPLOYMENT_JSON=$(curl -sf \
+          # Best-effort only: Vercel's own GitHub integration already redeploys
+          # previews on every push, so a failure here just means the preview
+          # picks up the fresh env vars on the *next* push instead of this one
+          # — not worth failing the whole job over. Surface the real API
+          # error instead of swallowing it (curl -f hides the response body).
+          DEPLOY_LIST_FILE=$(mktemp)
+          DEPLOY_LIST_STATUS=$(curl -sS -o "$DEPLOY_LIST_FILE" -w "%{http_code}" \
             -H "Authorization: Bearer $VERCEL_TOKEN" \
-            "https://api.vercel.com/v6/deployments?projectId=${PROJECT_ID}&target=preview&limit=1&meta-githubCommitRef=${BRANCH}${TEAM_AMP}" \
-          )
-          LATEST_DEPLOYMENT_ID=$(echo "$LATEST_DEPLOYMENT_JSON" | jq -r '.deployments[0].uid // ""')
-          LATEST_DEPLOYMENT_URL=$(echo "$LATEST_DEPLOYMENT_JSON" | jq -r '.deployments[0].url // ""')
+            "https://api.vercel.com/v6/deployments?projectId=${PROJECT_ID}&target=preview&limit=1&meta-githubCommitRef=${BRANCH}${TEAM_AMP}")
+          LATEST_DEPLOYMENT_ID=""
+          LATEST_DEPLOYMENT_URL=""
+          if [[ "$DEPLOY_LIST_STATUS" =~ ^2[0-9][0-9]$ ]]; then
+            LATEST_DEPLOYMENT_ID=$(jq -r '.deployments[0].uid // ""' "$DEPLOY_LIST_FILE")
+            LATEST_DEPLOYMENT_URL=$(jq -r '.deployments[0].url // ""' "$DEPLOY_LIST_FILE")
+          else
+            echo "::warning::Could not list Vercel deployments (HTTP $DEPLOY_LIST_STATUS): $(cat "$DEPLOY_LIST_FILE")"
+          fi
 
+          REDEPLOY_URL=""
           if [[ "$VERCEL_ENV_CONFIGURED" == "true" && -n "$LATEST_DEPLOYMENT_ID" ]]; then
-            REDEPLOY_URL=$(curl -sf -X POST \
+            REDEPLOY_FILE=$(mktemp)
+            REDEPLOY_STATUS=$(curl -sS -o "$REDEPLOY_FILE" -w "%{http_code}" -X POST \
               -H "Authorization: Bearer $VERCEL_TOKEN" \
               -H "Content-Type: application/json" \
               "https://api.vercel.com/v13/deployments${TEAM_Q}" \
               -d "$(jq -n --arg deploymentId "$LATEST_DEPLOYMENT_ID" \
-                '{"deploymentId":$deploymentId,"target":"preview","withLatestCommit":true}')" \
-              | jq -r '.url // ""')
-          else
-            REDEPLOY_URL=""
+                '{"deploymentId":$deploymentId,"target":"preview","withLatestCommit":true}')")
+            if [[ "$REDEPLOY_STATUS" =~ ^2[0-9][0-9]$ ]]; then
+              REDEPLOY_URL=$(jq -r '.url // ""' "$REDEPLOY_FILE")
+            else
+              echo "::warning::Could not trigger Vercel redeploy (HTTP $REDEPLOY_STATUS): $(cat "$REDEPLOY_FILE")"
+            fi
           fi
 
           if [[ -n "$REDEPLOY_URL" ]]; then

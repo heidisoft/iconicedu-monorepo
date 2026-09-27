@@ -786,6 +786,9 @@ export default function SpaceDetailScreen() {
             quoteReplyTo={quoteReplyTarget}
             onCancelQuoteReply={() => setQuoteReplyTarget(null)}
             uploading={pendingUploads.some((upload) => !upload.failed)}
+            orgId={orgId}
+            channelId={channelId}
+            profileId={profileId}
             enableScheduledSend={p2.enableScheduledSend}
             onScheduleSend={p2.scheduleSend}
             editingMessage={editingMessage}

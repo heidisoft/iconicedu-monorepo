@@ -1,5 +1,11 @@
 import { File as ExpoFile } from 'expo-file-system';
 import type {
+  AiAssistEligibilityInput,
+  AiAssistEligibilityResult,
+  AiRefineDraftInput,
+  AiRefineDraftResult,
+  AiSuggestedRepliesInput,
+  AiSuggestedRepliesResult,
   MessageEditTextInput,
   MessageMentionVM,
   MessageSendFileInput,
@@ -140,6 +146,24 @@ export async function markThreadReadState(input: {
     input,
   );
   return response.unreadCount ?? 0;
+}
+
+export async function refineDraftWithAi(
+  input: AiRefineDraftInput,
+): Promise<AiRefineDraftResult> {
+  return apiPost('/ai-assist/refine', input);
+}
+
+export async function fetchSuggestedReplies(
+  input: AiSuggestedRepliesInput,
+): Promise<AiSuggestedRepliesResult> {
+  return apiPost('/ai-assist/suggested-replies', input);
+}
+
+export async function fetchAiAssistEligibility(
+  input: AiAssistEligibilityInput,
+): Promise<AiAssistEligibilityResult> {
+  return apiGet('/ai-assist/eligibility', input);
 }
 
 export type SendTextMessageOptions = {

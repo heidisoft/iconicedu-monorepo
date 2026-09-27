@@ -22,6 +22,8 @@ import type { AppColors } from '@/lib/theme';
 import type { MessageMentionVM, MessageVM } from '@iconicedu/shared-types';
 import { EmojiPicker } from './emoji-picker';
 import { AttachmentSheet, type AttachmentPayload } from './attachment-sheet';
+import { AiRefineSheet } from './ai-refine-sheet';
+import { AiSuggestedReplies } from './ai-suggested-replies';
 import { ScheduleDateTimePicker } from './schedule-date-time-picker';
 import { getDeviceTimezone } from '@/lib/messages/schedule-send';
 import {
@@ -32,6 +34,7 @@ import {
   FileText,
   Play,
   Pause,
+  Sparkles,
   Clock,
   List,
   ListOrdered,
@@ -41,6 +44,7 @@ import {
   Check,
 } from 'lucide-react-native';
 import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
+import { useAiAssistEligibility } from '@/hooks/use-ai-assist-eligibility';
 import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
 import { fetchLinkPreview, type LinkPreviewMetadata } from '@/lib/api/queries';
 import { findFirstMessageLink } from '@/lib/messages/link-opening';
@@ -59,6 +63,13 @@ import {
   rankMentionCandidates,
   type MentionCandidate,
 } from '@/lib/messages/message-mentions';
+
+// Minimum non-whitespace characters typed before "Refine with AI" appears —
+// picked within the 10-20 char range called out in issue #264 so the
+// affordance only shows once there's a meaningful draft to refine.
+const AI_REFINE_MIN_CHARS = 15;
+// How long the post-replace "Undo" banner stays up before auto-dismissing.
+const AI_REPLACE_UNDO_DURATION_MS = 6000;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -128,6 +139,15 @@ type MessageInputProps = {
   replyTo?: MessageVM | null;
   /** Called when the user dismisses the reply preview with ✕. */
   onCancelReply?: () => void;
+  /**
+   * Org/channel/profile context for the AI-assist features (issue #264).
+   * "Refine with AI" and "Suggested replies" only render when all three are
+   * provided AND their respective flag resolves true.
+   */
+  orgId?: string;
+  channelId?: string;
+  profileId?: string;
+
   /** Gated by `enableScheduledSend`. When set, long-pressing send offers "Schedule send". */
   enableScheduledSend?: boolean;
   /** Called with the composed text + picked absolute send time when the user confirms scheduling. */
@@ -363,6 +383,42 @@ function makeStyles(C: AppColors, bottomInset: number, keyboardVisible: boolean)
       color: C.textMuted,
     },
 
+    // "Refine with AI" trigger — icon-only button inside the pill, to the
+    // right of the text input, shown once the draft passes the
+    // non-whitespace character threshold.
+    refineTriggerBtn: {
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: C.tealBg,
+      marginLeft: 6,
+    },
+
+    // Undo banner — shown briefly after "Replace" is accepted from the
+    // refine preview, since RN TextInput has no reliable native undo.
+    undoBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      backgroundColor: C.tealBg,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: C.border,
+    },
+    undoText: {
+      flex: 1,
+      fontSize: 13,
+      color: C.teal,
+    },
+    undoAction: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: C.teal,
+    },
+
     // Progress bar — sits just above the hairline border while sending
     progressBarWrap: {
       height: 2,
@@ -546,6 +602,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   onTypingStop,
   replyTo,
   onCancelReply,
+  orgId,
+  channelId,
+  profileId,
   enableScheduledSend = false,
   onScheduleSend,
   quoteReplyTo,
@@ -572,10 +631,13 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const [loadedImageUris, setLoadedImageUris] = useState<Set<string>>(new Set());
   const [audioPlaying, setAudioPlaying] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [refineSheetVisible, setRefineSheetVisible] = useState(false);
+  const [undoBanner, setUndoBanner] = useState<{ previousText: string } | null>(null);
   const [selection, setSelection] = useState<TextSelection>({ start: 0, end: 0 });
   const [savingEdit, setSavingEdit] = useState(false);
   const audioSoundRef = useRef<AudioPlayer | null>(null);
   const audioSubRef = useRef<{ remove(): void } | null>(null);
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput>(null);
@@ -583,6 +645,14 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     () => makeStyles(colors, insets.bottom, keyboardVisible),
     [colors, insets.bottom, keyboardVisible],
   );
+
+  const hasAiContext = Boolean(orgId && channelId && profileId);
+  const aiAssistEligibility = useAiAssistEligibility({ orgId, profileId });
+  const canUseAiRefine = hasAiContext && aiAssistEligibility.enableAiRefine;
+  const canUseAiSuggestedReplies =
+    hasAiContext && aiAssistEligibility.enableAiSuggestedReplies;
+  const nonWhitespaceLength = text.replace(/\s/g, '').length;
+  const showRefineTrigger = canUseAiRefine && nonWhitespaceLength >= AI_REFINE_MIN_CHARS;
 
   const enableMobileLinkPreviews = useMobileFeatureFlag(
     mobileFeatureFlagKeys.enableMobileLinkPreviews,
@@ -795,6 +865,13 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     return () => {
       audioSubRef.current?.remove();
       audioSoundRef.current?.remove();
+    };
+  }, []);
+
+  // Cleanup the AI-replace undo timer on unmount
+  useEffect(() => {
+    return () => {
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
     };
   }, []);
 
@@ -1039,6 +1116,43 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     [onSend, runSendProgress],
   );
 
+  // ── AI-assist (issue #264) ────────────────────────────────────────────────
+
+  const handleRefineReplace = useCallback(
+    (refinedText: string) => {
+      setRefineSheetVisible(false);
+      const previousText = text;
+      setUndoBanner({ previousText });
+      setText(refinedText);
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+      undoTimerRef.current = setTimeout(
+        () => setUndoBanner(null),
+        AI_REPLACE_UNDO_DURATION_MS,
+      );
+    },
+    [text],
+  );
+
+  const handleUndoReplace = useCallback(() => {
+    if (!undoBanner) return;
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    setText(undoBanner.previousText);
+    setUndoBanner(null);
+  }, [undoBanner]);
+
+  const handleSuggestionSelect = useCallback(
+    (suggestion: string) => {
+      setText(suggestion);
+      if (suggestion.length > 0) {
+        onTypingChange?.();
+      } else {
+        onTypingStop?.();
+      }
+      requestAnimationFrame(() => inputRef.current?.focus());
+    },
+    [onTypingChange, onTypingStop],
+  );
+
   const handleSaveEdit = useCallback(async () => {
     if (!editingMessage || !onSaveEdit) return;
     const trimmed = text.trim();
@@ -1112,6 +1226,17 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             <X size={18} color={colors.textMuted} />
           </TouchableOpacity>
         </View>
+      )}
+
+      {/* AI: Suggested replies — explicit-invoke only, never automatic */}
+      {canUseAiSuggestedReplies && (
+        <AiSuggestedReplies
+          orgId={orgId!}
+          channelId={channelId!}
+          profileId={profileId!}
+          disabled={disabled}
+          onSelect={handleSuggestionSelect}
+        />
       )}
 
       {/* Link preview card — composer-time only; dismiss hides the card without
@@ -1254,6 +1379,20 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         </View>
       )}
 
+      {/* AI: undo banner — shown briefly after "Replace" is accepted */}
+      {undoBanner && (
+        <View style={s.undoBanner}>
+          <Sparkles size={14} color={colors.teal} />
+          <Text style={s.undoText}>Draft replaced with an AI suggestion</Text>
+          <TouchableOpacity
+            onPress={handleUndoReplace}
+            accessibilityLabel="Undo AI replace"
+          >
+            <Text style={s.undoAction}>Undo</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Progress bar — shown just above the hairline border while sending */}
       {sending && (
         <View style={s.progressBarWrap}>
@@ -1386,6 +1525,17 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             editable={!disabled}
             accessibilityLabel="Message input"
           />
+          {showRefineTrigger && (
+            <TouchableOpacity
+              style={s.refineTriggerBtn}
+              onPress={() => setRefineSheetVisible(true)}
+              disabled={disabled}
+              accessibilityLabel="Refine with AI"
+              accessibilityState={{ disabled: disabled ?? false }}
+            >
+              <Sparkles size={16} color={colors.teal} />
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Right action area: Save/Cancel while editing; send/emoji otherwise */}
@@ -1467,6 +1617,17 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         disabled={disabled}
       />
 
+      {canUseAiRefine && (
+        <AiRefineSheet
+          visible={refineSheetVisible}
+          onClose={() => setRefineSheetVisible(false)}
+          draftText={text}
+          orgId={orgId!}
+          channelId={channelId!}
+          profileId={profileId!}
+          onReplace={handleRefineReplace}
+        />
+      )}
       {enableScheduledSend && onScheduleSend && (
         <ScheduleDateTimePicker
           visible={schedulePickerVisible}
