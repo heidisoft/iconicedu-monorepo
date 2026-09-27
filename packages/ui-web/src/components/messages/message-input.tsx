@@ -2103,84 +2103,6 @@ export function MessageInput({
                       : 'Record voice message'}
                   </TooltipContent>
                 </Tooltip>
-                {showAiSuggestedReplies ? (
-                  <>
-                    <div className="mx-1 h-4 w-px bg-border" />
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                          aria-label="Suggested replies"
-                          title="Suggested replies"
-                          disabled={isSuggestedRepliesLoading}
-                          onClick={() => void handleFetchSuggestedReplies()}
-                        >
-                          {isSuggestedRepliesLoading ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Sparkles className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Suggested replies</TooltipContent>
-                    </Tooltip>
-                  </>
-                ) : null}
-                {showAiRefine && content.trim().length >= AI_REFINE_MIN_CONTENT_LENGTH ? (
-                  <>
-                    <div className="mx-1 h-4 w-px bg-border" />
-                    <DropdownMenu
-                      open={isAiRefineMenuOpen}
-                      onOpenChange={(open) => {
-                        if (open) {
-                          setAiRefineSelection(captureTextareaSelection());
-                        }
-                        setIsAiRefineMenuOpen(open);
-                      }}
-                    >
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 gap-1 px-2 text-muted-foreground hover:text-foreground"
-                          aria-label="Refine with AI"
-                          title="Refine with AI"
-                          disabled={isAiRefineLoading}
-                        >
-                          {isAiRefineLoading ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <Sparkles className="h-3.5 w-3.5" />
-                          )}
-                          <Badge variant="secondary" className="h-4 px-1 text-[10px]">
-                            AI
-                          </Badge>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="start" className="w-64">
-                        <DropdownMenuLabel>Refine with AI</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        {AI_REFINE_INSTRUCTIONS.map((item) => (
-                          <DropdownMenuItem
-                            key={item.value}
-                            onSelect={() => handleSelectAiRefineInstruction(item.value)}
-                          >
-                            <div className="flex min-w-0 flex-col">
-                              <span className="truncate font-medium">{item.label}</span>
-                              <span className="truncate text-xs text-muted-foreground">
-                                {item.description}
-                              </span>
-                            </div>
-                          </DropdownMenuItem>
-                        ))}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </>
-                ) : null}
                 {showCreateMessageTypeButton ? (
                   <>
                     <div className="mx-1 h-4 w-px bg-border" />
@@ -2237,6 +2159,75 @@ export function MessageInput({
               </div>
             </TooltipProvider>
             <div className="flex items-center gap-1.5">
+              {showAiSuggestedReplies ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                      aria-label="Suggested replies"
+                      title="Suggested replies"
+                      disabled={isSuggestedRepliesLoading}
+                      onClick={() => void handleFetchSuggestedReplies()}
+                    >
+                      {isSuggestedRepliesLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Sparkles className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Suggested replies</TooltipContent>
+                </Tooltip>
+              ) : null}
+              {showAiRefine && content.trim().length >= AI_REFINE_MIN_CONTENT_LENGTH ? (
+                <DropdownMenu
+                  open={isAiRefineMenuOpen}
+                  onOpenChange={(open) => {
+                    if (open) {
+                      setAiRefineSelection(captureTextareaSelection());
+                    }
+                    setIsAiRefineMenuOpen(open);
+                  }}
+                >
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                      aria-label="Refine with AI"
+                      title="Refine with AI"
+                      disabled={isAiRefineLoading}
+                    >
+                      {isAiRefineLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Sparkles className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-64">
+                    <DropdownMenuLabel>Refine with AI</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {AI_REFINE_INSTRUCTIONS.map((item) => (
+                      <DropdownMenuItem
+                        key={item.value}
+                        onSelect={() => handleSelectAiRefineInstruction(item.value)}
+                      >
+                        <div className="flex min-w-0 flex-col">
+                          <span className="truncate font-medium">{item.label}</span>
+                          <span className="truncate text-xs text-muted-foreground">
+                            {item.description}
+                          </span>
+                        </div>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : null}
               {enableScheduledSend && onScheduleSend ? (
                 <Popover
                   open={isScheduleOpen}

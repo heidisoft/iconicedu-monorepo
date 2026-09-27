@@ -1,14 +1,18 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { MessageInput } from '@/components/messages/message-input';
-import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
 
 const mockUseMobileFeatureFlag = jest.fn();
+const mockUseAiAssistEligibility = jest.fn();
 const mockRefineDraftWithAi = jest.fn();
 const mockFetchSuggestedReplies = jest.fn();
 
 jest.mock('@/hooks/use-mobile-feature-flag', () => ({
   useMobileFeatureFlag: (key: string) => mockUseMobileFeatureFlag(key),
+}));
+
+jest.mock('@/hooks/use-ai-assist-eligibility', () => ({
+  useAiAssistEligibility: (...args: unknown[]) => mockUseAiAssistEligibility(...args),
 }));
 
 jest.mock('@/lib/api/messages/queries', () => ({
@@ -25,10 +29,16 @@ const aiContext = { orgId: 'org-1', channelId: 'channel-1', profileId: 'profile-
 describe('MessageInput AI-assist gating', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUseMobileFeatureFlag.mockReturnValue(false);
+    // Server-derived eligibility (see AiAssistService.getEligibility / PR #269
+    // review) — mirrors the real default of "off" until the server says otherwise.
+    mockUseAiAssistEligibility.mockReturnValue({
+      enableAiRefine: false,
+      enableAiSuggestedReplies: false,
+    });
   });
 
   it('renders neither AI affordance when both flags are off', () => {
-    mockUseMobileFeatureFlag.mockReturnValue(false);
     render(<MessageInput onSend={jest.fn()} {...aiContext} />);
 
     fireEvent.changeText(
@@ -41,7 +51,10 @@ describe('MessageInput AI-assist gating', () => {
   });
 
   it('renders neither AI affordance when flags are on but org/channel/profile context is missing', () => {
-    mockUseMobileFeatureFlag.mockReturnValue(true);
+    mockUseAiAssistEligibility.mockReturnValue({
+      enableAiRefine: true,
+      enableAiSuggestedReplies: true,
+    });
     render(<MessageInput onSend={jest.fn()} />);
 
     fireEvent.changeText(
@@ -54,9 +67,10 @@ describe('MessageInput AI-assist gating', () => {
   });
 
   it('shows "Suggested replies" but not "Refine with AI" below the character threshold', () => {
-    mockUseMobileFeatureFlag.mockImplementation(
-      (key: string) => key === mobileFeatureFlagKeys.enableAiSuggestedReplies,
-    );
+    mockUseAiAssistEligibility.mockReturnValue({
+      enableAiRefine: false,
+      enableAiSuggestedReplies: true,
+    });
     render(<MessageInput onSend={jest.fn()} {...aiContext} />);
 
     expect(screen.getByLabelText('Suggested replies')).toBeTruthy();
@@ -64,9 +78,10 @@ describe('MessageInput AI-assist gating', () => {
   });
 
   it('shows "Refine with AI" only once the draft passes the non-whitespace threshold', () => {
-    mockUseMobileFeatureFlag.mockImplementation(
-      (key: string) => key === mobileFeatureFlagKeys.enableAiRefine,
-    );
+    mockUseAiAssistEligibility.mockReturnValue({
+      enableAiRefine: true,
+      enableAiSuggestedReplies: false,
+    });
     render(<MessageInput onSend={jest.fn()} {...aiContext} />);
 
     const input = screen.getByLabelText('Message input');
@@ -78,9 +93,10 @@ describe('MessageInput AI-assist gating', () => {
   });
 
   it('tapping a suggested-reply chip inserts editable text into the composer and focuses it', async () => {
-    mockUseMobileFeatureFlag.mockImplementation(
-      (key: string) => key === mobileFeatureFlagKeys.enableAiSuggestedReplies,
-    );
+    mockUseAiAssistEligibility.mockReturnValue({
+      enableAiRefine: false,
+      enableAiSuggestedReplies: true,
+    });
     mockFetchSuggestedReplies.mockResolvedValue({
       suggestions: ['Sounds great, thanks!'],
     });
@@ -99,9 +115,10 @@ describe('MessageInput AI-assist gating', () => {
   });
 
   it('replacing the draft via refine shows an Undo banner that restores the previous text', async () => {
-    mockUseMobileFeatureFlag.mockImplementation(
-      (key: string) => key === mobileFeatureFlagKeys.enableAiRefine,
-    );
+    mockUseAiAssistEligibility.mockReturnValue({
+      enableAiRefine: true,
+      enableAiSuggestedReplies: false,
+    });
     mockRefineDraftWithAi.mockResolvedValue({
       refinedText: 'This is the refined draft.',
       factsPreserved: true,

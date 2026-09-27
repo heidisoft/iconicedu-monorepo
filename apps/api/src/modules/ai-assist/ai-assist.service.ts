@@ -5,6 +5,8 @@ import {
   Logger,
 } from '@nestjs/common';
 import type {
+  AiAssistEligibilityInput,
+  AiAssistEligibilityResult,
   AiRefineDraftInput,
   AiRefineDraftResult,
   AiSuggestedRepliesInput,
@@ -87,22 +89,69 @@ export class AiAssistService {
     return actor;
   }
 
+  private async isFlagEnabled(
+    flagKey: 'enableAiRefine' | 'enableAiSuggestedReplies',
+    profileId: string,
+  ): Promise<boolean> {
+    return evaluateApiBooleanFlag({
+      flagKey: apiFeatureFlagKeys[flagKey],
+      distinctId: profileId,
+    });
+  }
+
   /** Server-side rollout gate — mirrors the client-visible flag but is enforced independently of it. */
   private async requireFlagEnabled(
     flagKey: 'enableAiRefine' | 'enableAiSuggestedReplies',
     profileId: string,
   ) {
-    const enabled = await evaluateApiBooleanFlag({
-      flagKey: apiFeatureFlagKeys[flagKey],
-      distinctId: profileId,
-    });
+    const enabled = await this.isFlagEnabled(flagKey, profileId);
     if (!enabled) {
       throw new ForbiddenException('AI assist is not available for this profile');
     }
   }
 
-  /** Simple per-profile daily cap, enforced server-side — a coarse proxy for a real per-org cost budget. */
-  private async enforceRateLimit(input: {
+  /**
+   * What the composer should show, computed server-side with the same
+   * profile-kind eligibility and PostHog evaluation (keyed by `profileId`)
+   * that the real refine/suggested-replies calls enforce. Mobile clients
+   * identify their PostHog session with the auth user id (see
+   * auth-provider.tsx), which can differ from `profileId` — evaluating
+   * these flags client-side against that identity can show/hide the
+   * composer affordance inconsistently with what the API will actually
+   * allow. Never throws: any ineligibility just reads as "off".
+   */
+  async getEligibility(
+    authUserId: string,
+    accessToken: string,
+    input: AiAssistEligibilityInput,
+  ): Promise<AiAssistEligibilityResult> {
+    try {
+      await this.requireEligibleActor({
+        authUserId,
+        accessToken,
+        orgId: input.orgId,
+        profileId: input.profileId,
+      });
+    } catch {
+      return { enableAiRefine: false, enableAiSuggestedReplies: false };
+    }
+
+    const [enableAiRefine, enableAiSuggestedReplies] = await Promise.all([
+      this.isFlagEnabled('enableAiRefine', input.profileId),
+      this.isFlagEnabled('enableAiSuggestedReplies', input.profileId),
+    ]);
+
+    return { enableAiRefine, enableAiSuggestedReplies };
+  }
+
+  /**
+   * Simple per-profile daily cap, enforced server-side — a coarse proxy for
+   * a real per-org cost budget. Reserves the usage row atomically (check +
+   * insert under one DB-side advisory lock) *before* calling Claude, so
+   * concurrent requests from the same profile can't all observe capacity
+   * and burst past the cap before any of them records usage.
+   */
+  private async reserveRateLimit(input: {
     orgId: string;
     profileId: string;
     kind: 'refine' | 'suggested_replies';
@@ -110,37 +159,24 @@ export class AiAssistService {
   }) {
     const serviceSupabase = createSupabaseServiceClient();
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const { count, error } = await serviceSupabase
-      .from('ai_assist_usage')
-      .select('id', { count: 'exact', head: true })
-      .eq('org_id', input.orgId)
-      .eq('profile_id', input.profileId)
-      .eq('kind', input.kind)
-      .gte('created_at', since);
+    const { data: reserved, error } = await serviceSupabase.rpc(
+      'reserve_ai_assist_usage',
+      {
+        p_org_id: input.orgId,
+        p_profile_id: input.profileId,
+        p_kind: input.kind,
+        p_daily_limit: input.limit,
+        p_since: since,
+      },
+    );
     if (error) {
-      this.logger.warn('ai_assist.rate_limit_check_failed', { error: error.message });
-      return; // fail open on the count check itself, not on the AI call
+      this.logger.warn('ai_assist.rate_limit_reserve_failed', { error: error.message });
+      return; // fail open on the reservation itself, not on the AI call
     }
-    if ((count ?? 0) >= input.limit) {
+    if (!reserved) {
       throw new ForbiddenException(
         "You've reached today's AI assist limit for this feature. Please try again tomorrow.",
       );
-    }
-  }
-
-  private async recordUsage(input: {
-    orgId: string;
-    profileId: string;
-    kind: 'refine' | 'suggested_replies';
-  }) {
-    const serviceSupabase = createSupabaseServiceClient();
-    const { error } = await serviceSupabase.from('ai_assist_usage').insert({
-      org_id: input.orgId,
-      profile_id: input.profileId,
-      kind: input.kind,
-    });
-    if (error) {
-      this.logger.warn('ai_assist.usage_record_failed', { error: error.message });
     }
   }
 
@@ -194,7 +230,7 @@ export class AiAssistService {
     // draft never leaves the client otherwise, but the channel context
     // still needs authorization the same as any other message action.
     await this.requireChannelMembership(input.orgId, input.channelId, input.profileId);
-    await this.enforceRateLimit({
+    await this.reserveRateLimit({
       orgId: input.orgId,
       profileId: input.profileId,
       kind: 'refine',
@@ -217,11 +253,6 @@ export class AiAssistService {
       profileId: input.profileId,
       instruction: input.instruction,
       durationMs: Date.now() - startedAt,
-    });
-    void this.recordUsage({
-      orgId: input.orgId,
-      profileId: input.profileId,
-      kind: 'refine',
     });
 
     const { preserved, missing } = checkFactPreservation(draftToRefine, refinedText);
@@ -249,7 +280,7 @@ export class AiAssistService {
     });
     await this.requireFlagEnabled('enableAiSuggestedReplies', input.profileId);
     await this.requireChannelMembership(input.orgId, input.channelId, input.profileId);
-    await this.enforceRateLimit({
+    await this.reserveRateLimit({
       orgId: input.orgId,
       profileId: input.profileId,
       kind: 'suggested_replies',
@@ -293,11 +324,6 @@ export class AiAssistService {
       profileId: input.profileId,
       contextMessageCount: lines.length,
       durationMs: Date.now() - startedAt,
-    });
-    void this.recordUsage({
-      orgId: input.orgId,
-      profileId: input.profileId,
-      kind: 'suggested_replies',
     });
 
     return { suggestions: parseSuggestions(raw) };

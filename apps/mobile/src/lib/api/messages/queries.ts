@@ -1,5 +1,7 @@
 import { File as ExpoFile } from 'expo-file-system';
 import type {
+  AiAssistEligibilityInput,
+  AiAssistEligibilityResult,
   AiRefineDraftInput,
   AiRefineDraftResult,
   AiSuggestedRepliesInput,
@@ -156,6 +158,12 @@ export async function fetchSuggestedReplies(
   input: AiSuggestedRepliesInput,
 ): Promise<AiSuggestedRepliesResult> {
   return apiPost('/ai-assist/suggested-replies', input);
+}
+
+export async function fetchAiAssistEligibility(
+  input: AiAssistEligibilityInput,
+): Promise<AiAssistEligibilityResult> {
+  return apiGet('/ai-assist/eligibility', input);
 }
 
 export type SendTextMessageOptions = {

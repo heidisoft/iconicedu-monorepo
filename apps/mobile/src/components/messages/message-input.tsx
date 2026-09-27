@@ -44,6 +44,7 @@ import {
   Check,
 } from 'lucide-react-native';
 import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
+import { useAiAssistEligibility } from '@/hooks/use-ai-assist-eligibility';
 import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
 import { fetchLinkPreview, type LinkPreviewMetadata } from '@/lib/api/queries';
 import { findFirstMessageLink } from '@/lib/messages/link-opening';
@@ -382,28 +383,17 @@ function makeStyles(C: AppColors, bottomInset: number, keyboardVisible: boolean)
       color: C.textMuted,
     },
 
-    // "Refine with AI" trigger — right-aligned slim row above the bar,
-    // shown once the draft passes the non-whitespace character threshold.
-    refineTriggerRow: {
-      flexDirection: 'row',
-      justifyContent: 'flex-end',
-      paddingHorizontal: 12,
-      paddingTop: 6,
-      backgroundColor: C.bg,
-    },
+    // "Refine with AI" trigger — icon-only button inside the pill, to the
+    // right of the text input, shown once the draft passes the
+    // non-whitespace character threshold.
     refineTriggerBtn: {
-      flexDirection: 'row',
+      width: 26,
+      height: 26,
+      borderRadius: 13,
       alignItems: 'center',
-      gap: 5,
-      paddingHorizontal: 10,
-      paddingVertical: 6,
-      borderRadius: 14,
+      justifyContent: 'center',
       backgroundColor: C.tealBg,
-    },
-    refineTriggerLabel: {
-      fontSize: 12,
-      fontWeight: '600',
-      color: C.teal,
+      marginLeft: 6,
     },
 
     // Undo banner — shown briefly after "Replace" is accepted from the
@@ -656,13 +646,11 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     [colors, insets.bottom, keyboardVisible],
   );
 
-  const enableAiRefine = useMobileFeatureFlag(mobileFeatureFlagKeys.enableAiRefine);
-  const enableAiSuggestedReplies = useMobileFeatureFlag(
-    mobileFeatureFlagKeys.enableAiSuggestedReplies,
-  );
   const hasAiContext = Boolean(orgId && channelId && profileId);
-  const canUseAiRefine = enableAiRefine && hasAiContext;
-  const canUseAiSuggestedReplies = enableAiSuggestedReplies && hasAiContext;
+  const aiAssistEligibility = useAiAssistEligibility({ orgId, profileId });
+  const canUseAiRefine = hasAiContext && aiAssistEligibility.enableAiRefine;
+  const canUseAiSuggestedReplies =
+    hasAiContext && aiAssistEligibility.enableAiSuggestedReplies;
   const nonWhitespaceLength = text.replace(/\s/g, '').length;
   const showRefineTrigger = canUseAiRefine && nonWhitespaceLength >= AI_REFINE_MIN_CHARS;
 
@@ -1405,22 +1393,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         </View>
       )}
 
-      {/* AI: "Refine with AI" trigger — appears once the draft has enough content */}
-      {showRefineTrigger && (
-        <View style={s.refineTriggerRow}>
-          <TouchableOpacity
-            style={s.refineTriggerBtn}
-            onPress={() => setRefineSheetVisible(true)}
-            disabled={disabled}
-            accessibilityLabel="Refine with AI"
-            accessibilityState={{ disabled: disabled ?? false }}
-          >
-            <Sparkles size={13} color={colors.teal} />
-            <Text style={s.refineTriggerLabel}>Refine with AI</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
       {/* Progress bar — shown just above the hairline border while sending */}
       {sending && (
         <View style={s.progressBarWrap}>
@@ -1553,6 +1525,17 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             editable={!disabled}
             accessibilityLabel="Message input"
           />
+          {showRefineTrigger && (
+            <TouchableOpacity
+              style={s.refineTriggerBtn}
+              onPress={() => setRefineSheetVisible(true)}
+              disabled={disabled}
+              accessibilityLabel="Refine with AI"
+              accessibilityState={{ disabled: disabled ?? false }}
+            >
+              <Sparkles size={16} color={colors.teal} />
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Right action area: Save/Cancel while editing; send/emoji otherwise */}

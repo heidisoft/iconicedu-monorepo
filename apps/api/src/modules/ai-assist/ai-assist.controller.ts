@@ -1,5 +1,6 @@
-import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
 import type {
+  AiAssistEligibilityInput,
   AiRefineDraftInput,
   AiSuggestedRepliesInput,
 } from '@iconicedu/shared-types';
@@ -29,5 +30,16 @@ export class AiAssistController {
   ) {
     const accessToken = extractBearerToken(req.headers.authorization);
     return this.aiAssistService.suggestReplies(req.user.id, accessToken, body);
+  }
+
+  /** Lets clients gate the composer affordances on the same server-computed truth `refine`/`suggested-replies` enforce, rather than evaluating flags client-side against a different identity. */
+  @Get('eligibility')
+  @UseGuards(AuthGuard)
+  eligibility(
+    @Req() req: AuthenticatedRequest,
+    @Query() query: AiAssistEligibilityInput,
+  ) {
+    const accessToken = extractBearerToken(req.headers.authorization);
+    return this.aiAssistService.getEligibility(req.user.id, accessToken, query);
   }
 }

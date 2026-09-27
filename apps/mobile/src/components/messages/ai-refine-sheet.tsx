@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -255,9 +255,18 @@ export const AiRefineSheet: React.FC<AiRefineSheetProps> = ({
   const [result, setResult] = useState<AiRefineDraftResult | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Reset all state whenever the sheet closes so the next open starts fresh.
+  // Guards against a slow refine response landing after the sheet has
+  // closed (or a newer refine has started): each call captures the current
+  // generation, and only applies its result/error if nothing has
+  // invalidated it in the meantime.
+  const generationRef = useRef(0);
+
+  // Reset all state whenever the sheet closes so the next open starts
+  // fresh, and invalidate any refine request still in flight so its
+  // response can't land after the fact and silently overwrite a newer draft.
   useEffect(() => {
     if (!visible) {
+      generationRef.current += 1;
       setStage('picker');
       setInstruction(null);
       setTargetLanguage('');
@@ -269,6 +278,7 @@ export const AiRefineSheet: React.FC<AiRefineSheetProps> = ({
 
   const runRefine = useCallback(
     async (instructionToUse: AiRefineInstruction) => {
+      const generation = ++generationRef.current;
       setStage('loading');
       setErrorMessage(null);
       try {
@@ -283,9 +293,11 @@ export const AiRefineSheet: React.FC<AiRefineSheetProps> = ({
           targetLanguage:
             instructionToUse === 'translate' ? targetLanguage.trim() : undefined,
         });
+        if (generationRef.current !== generation) return;
         setResult(res);
         setStage('preview');
       } catch (error) {
+        if (generationRef.current !== generation) return;
         reportMobileObservedError({
           error,
           source: 'mobile.messages.ai_refine_sheet.refine',

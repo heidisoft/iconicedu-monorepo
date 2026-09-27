@@ -51,26 +51,25 @@ function setUpSupabase(input: { membershipFound: boolean; usageCount?: number })
     data: input.membershipFound ? { id: 'member-1' } : null,
     error: null,
   });
-  const usageCountChain = makeChain({
-    data: null,
-    error: null,
-    count: input.usageCount ?? 0,
-  });
-  (usageCountChain as unknown as { then: (resolve: (v: unknown) => void) => void }).then =
-    (resolve) => resolve({ data: null, error: null, count: input.usageCount ?? 0 });
-  const usageInsertChain = makeChain({ data: null, error: null });
 
-  let usageCallCount = 0;
   const from = jest.fn((table: string) => {
     if (table === 'channel_members') return membershipChain;
-    if (table === 'ai_assist_usage') {
-      usageCallCount += 1;
-      return usageCallCount === 1 ? usageCountChain : usageInsertChain;
-    }
     throw new Error(`unexpected table ${table}`);
   });
-  jest.mocked(createSupabaseServiceClient).mockReturnValue({ from } as never);
-  return { usageInsertChain };
+
+  // Mirrors reserve_ai_assist_usage's atomic check-and-reserve: reserved
+  // (and thus the AI call proceeds) only while usage is still under the
+  // daily limit passed for this call.
+  const rpc = jest.fn((fn: string, args: { p_daily_limit: number }) => {
+    if (fn === 'reserve_ai_assist_usage') {
+      const usageCount = input.usageCount ?? 0;
+      return Promise.resolve({ data: usageCount < args.p_daily_limit, error: null });
+    }
+    throw new Error(`unexpected rpc ${fn}`);
+  });
+
+  jest.mocked(createSupabaseServiceClient).mockReturnValue({ from, rpc } as never);
+  return { rpc };
 }
 
 describe('AiAssistService.refineDraft', () => {
@@ -334,5 +333,41 @@ describe('AiAssistService.suggestReplies', () => {
       profileId: PROFILE_ID,
     });
     expect(result.suggestions).toEqual([]);
+  });
+});
+
+describe('AiAssistService.getEligibility', () => {
+  beforeEach(() => {
+    jest.mocked(createSupabaseServiceClient).mockReset();
+    jest.mocked(evaluateApiBooleanFlag).mockReset();
+  });
+
+  it('reports both flags off for an ineligible profile kind, without evaluating PostHog', async () => {
+    const service = new AiAssistService(makeMessagesServiceMock('child'));
+
+    const result = await service.getEligibility('auth-user-1', 'token', {
+      orgId: ORG_ID,
+      profileId: PROFILE_ID,
+    });
+
+    expect(result).toEqual({ enableAiRefine: false, enableAiSuggestedReplies: false });
+    expect(evaluateApiBooleanFlag).not.toHaveBeenCalled();
+  });
+
+  it("evaluates each flag with the profile's id as the PostHog distinct id", async () => {
+    jest
+      .mocked(evaluateApiBooleanFlag)
+      .mockImplementation(async ({ flagKey }) => flagKey === 'enable-ai-refine');
+    const service = new AiAssistService(makeMessagesServiceMock('educator'));
+
+    const result = await service.getEligibility('auth-user-1', 'token', {
+      orgId: ORG_ID,
+      profileId: PROFILE_ID,
+    });
+
+    expect(result).toEqual({ enableAiRefine: true, enableAiSuggestedReplies: false });
+    expect(evaluateApiBooleanFlag).toHaveBeenCalledWith(
+      expect.objectContaining({ distinctId: PROFILE_ID }),
+    );
   });
 });

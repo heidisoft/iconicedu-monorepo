@@ -54,3 +54,23 @@ export type AiSuggestedRepliesResult = {
   /** Always 2–3 short, editable suggestions. Never auto-sent. */
   suggestions: string[];
 };
+
+export type AiAssistEligibilityInput = {
+  orgId: string;
+  profileId: string;
+};
+
+/**
+ * Server-computed truth for whether `profileId` can use each AI-assist
+ * capability, mirroring the same profile-kind eligibility check and
+ * PostHog flag evaluation (keyed by `profileId`, not the auth user id)
+ * that `AiAssistService` enforces on the real refine/suggested-replies
+ * calls. Clients should gate the composer affordances on this rather than
+ * evaluating the flags themselves against a different identity — see PR
+ * #269 review: mobile's PostHog client is identified by auth user id,
+ * which can diverge from the profile id the API gates on.
+ */
+export type AiAssistEligibilityResult = {
+  enableAiRefine: boolean;
+  enableAiSuggestedReplies: boolean;
+};

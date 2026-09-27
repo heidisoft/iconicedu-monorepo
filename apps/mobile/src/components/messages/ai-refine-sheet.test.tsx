@@ -147,6 +147,49 @@ describe('AiRefineSheet', () => {
     expect(mockRefineDraftWithAi).toHaveBeenCalledTimes(2);
   });
 
+  it('discards a refine response that resolves after the sheet has closed', async () => {
+    let resolveRefine: (value: unknown) => void = () => {};
+    mockRefineDraftWithAi.mockReturnValue(
+      new Promise((resolve) => {
+        resolveRefine = resolve;
+      }),
+    );
+    const onClose = jest.fn();
+
+    const { rerender } = render(
+      <AiRefineSheet {...baseProps} onClose={onClose} onReplace={jest.fn()} />,
+    );
+    fireEvent.press(screen.getByLabelText('Proofread'));
+    expect(screen.getByText('Refining your draft…')).toBeTruthy();
+
+    // Sheet closes while the request is still in flight (e.g. the user
+    // dismissed it, or the composer unmounted it) — state resets to picker.
+    rerender(
+      <AiRefineSheet
+        {...baseProps}
+        visible={false}
+        onClose={onClose}
+        onReplace={jest.fn()}
+      />,
+    );
+    rerender(
+      <AiRefineSheet {...baseProps} visible onClose={onClose} onReplace={jest.fn()} />,
+    );
+    expect(screen.getByLabelText('Proofread')).toBeTruthy();
+
+    // The stale response now lands — it must not resurrect the preview for
+    // a request the user already dismissed.
+    resolveRefine({
+      refinedText: 'stale rewrite from the dismissed request',
+      factsPreserved: true,
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(screen.queryByText('stale rewrite from the dismissed request')).toBeNull();
+    expect(screen.getByLabelText('Proofread')).toBeTruthy();
+  });
+
   it('dismisses without changes when "Keep original" is pressed', async () => {
     mockRefineDraftWithAi.mockResolvedValue({
       refinedText: 'Fixed draft.',

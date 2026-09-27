@@ -50,6 +50,15 @@ export async function completeWithClaude(input: {
     if (!textBlock?.text) {
       throw new InternalServerErrorException('AI assist returned an empty response');
     }
+    if (response.stop_reason === 'max_tokens') {
+      // The response was cut off mid-generation — returning it as a
+      // successful rewrite would silently hand back truncated text (and,
+      // for `refineDraft`, a fact-preservation check that never sees the
+      // dropped tail can misreport `factsPreserved: true`).
+      throw new InternalServerErrorException(
+        'AI assist response was truncated — try a shorter draft or selection',
+      );
+    }
     return textBlock.text.trim();
   } catch (error) {
     if (error instanceof InternalServerErrorException) throw error;
