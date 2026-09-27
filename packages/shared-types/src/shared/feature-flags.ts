@@ -18,6 +18,7 @@ export const platformFeatureFlagKeys = {
   enableMessageEdit: 'enable-message-edit',
   enableMobileMessageComposerParity: 'enable-mobile-message-composer-parity',
   enableMessageSendReliability: 'enable-message-send-reliability',
+  enableSessionCompletionVerifiedDuration: 'enable-session-completion-verified-duration',
 } as const;
 
 export type PlatformFeatureFlagKey =

@@ -958,15 +958,23 @@ export class SessionCompletionsService {
   }
 
   /**
-   * Staff override for a whole occurrence: settles every still-open (pending or
-   * auto_confirmed) participant row at once, rather than the single owned row
-   * `confirm()` handles. Unlike `confirm()`, the caller need not be a party to
-   * the session — authorization is admin-role-based (`assertAdminAccess`), the
-   * same gate `listForAdmin` uses. Flipping status away from 'pending' is what
-   * stops the teacher/parent prompt from resurfacing: their own `confirm()` call
-   * (or the mobile prompt driving it) treats a non-pending row as already
-   * resolved, and the completion-check reminder job only ever targets pending
-   * rows.
+   * Staff override for a whole occurrence: settles every still-open (pending,
+   * auto_confirmed, or disputed) participant row at once, rather than the single
+   * owned row `confirm()` handles. Unlike `confirm()`, the caller need not be a
+   * party to the session — authorization is admin-role-based
+   * (`assertAdminAccess`), the same gate `listForAdmin` uses. Flipping status away
+   * from 'pending' is what stops the teacher/parent prompt from resurfacing:
+   * their own `confirm()` call (or the mobile prompt driving it) treats a
+   * non-pending row as already resolved, and the completion-check reminder job
+   * only ever targets pending rows.
+   *
+   * Also doubles as dispute resolution: a disputed row (e.g. a parent reporting
+   * "not completed full 1h" because the teacher/student had an emergency
+   * partway through) can be confirmed here too — there is no separate
+   * undo-dispute action, so this is the only path back to 'confirmed' once
+   * disputed. The original dispute_category/dispute_reason are left on the row
+   * as a record of what was reported; `adminUndoConfirm` restores 'disputed'
+   * rather than 'pending' when undoing one of these.
    */
   async adminConfirm(authUserId: string, body: AdminConfirmSessionCompletionInput) {
     if (!body?.orgId || !isUuid(body.orgId)) {
@@ -978,6 +986,14 @@ export class SessionCompletionsService {
     if (!body?.occurrenceKey || !Number.isFinite(Date.parse(body.occurrenceKey))) {
       throw new BadRequestException('Invalid occurrenceKey');
     }
+    let verifiedMinutes: number | null = null;
+    if (body.verifiedMinutes !== undefined) {
+      if (!Number.isFinite(body.verifiedMinutes) || body.verifiedMinutes < 0) {
+        throw new BadRequestException('Invalid verifiedMinutes');
+      }
+      verifiedMinutes = Math.round(body.verifiedMinutes);
+    }
+    const verificationNote = normalizeText(body.verificationNote, 500);
 
     const supabase = createSupabaseServiceClient();
     const account = await this.resolveAccount(supabase, authUserId, body.orgId);
@@ -995,18 +1011,27 @@ export class SessionCompletionsService {
     if (error) throw new InternalServerErrorException(error.message);
     if (!rows?.length) throw new NotFoundException('Session completion not found');
 
-    if (rows.some((row) => row.status === 'disputed')) {
-      throw new ConflictException(
-        "This session has an open dispute, so it can't be confirmed here. " +
-          'Resolve the dispute first.',
-      );
+    const resolvableRows = rows.filter(
+      (row) =>
+        row.status === 'pending' ||
+        row.status === 'auto_confirmed' ||
+        row.status === 'disputed',
+    );
+    if (!resolvableRows.length) {
+      return { success: true, alreadyResolved: true, confirmedCount: 0 };
     }
 
-    const openRows = rows.filter(
-      (row) => row.status === 'pending' || row.status === 'auto_confirmed',
+    const scheduledMinutes = Math.round(
+      (new Date(resolvableRows[0].session_end_at).getTime() -
+        new Date(body.occurrenceKey).getTime()) /
+        60_000,
     );
-    if (!openRows.length) {
-      return { success: true, alreadyResolved: true, confirmedCount: 0 };
+    if (verifiedMinutes === null) {
+      verifiedMinutes = scheduledMinutes;
+    } else if (verifiedMinutes !== scheduledMinutes && !verificationNote) {
+      throw new BadRequestException(
+        'A note is required when the verified duration differs from the scheduled duration',
+      );
     }
 
     const { data: staffProfile, error: staffProfileError } = await supabase
@@ -1027,15 +1052,17 @@ export class SessionCompletionsService {
         status: 'confirmed',
         confirmed_at: now,
         resolved_at: now,
+        verified_minutes: verifiedMinutes,
+        verification_note: verificationNote,
         updated_at: now,
         updated_by: staffProfile?.id ?? account.id,
       })
       .in(
         'id',
-        openRows.map((row) => row.id),
+        resolvableRows.map((row) => row.id),
       )
       .eq('org_id', body.orgId)
-      .in('status', ['pending', 'auto_confirmed'])
+      .in('status', ['pending', 'auto_confirmed', 'disputed'])
       .select('id')
       .returns<Array<{ id: string }>>();
 
@@ -1043,11 +1070,12 @@ export class SessionCompletionsService {
 
     this.logger.log(
       `session completion admin-confirmed scheduleId=${body.scheduleId} ` +
-        `occurrenceKey=${body.occurrenceKey} count=${updated?.length ?? 0}`,
+        `occurrenceKey=${body.occurrenceKey} count=${updated?.length ?? 0} ` +
+        `verifiedMinutes=${verifiedMinutes}`,
     );
 
     await Promise.all(
-      openRows.map((row) =>
+      resolvableRows.map((row) =>
         this.markRelatedActivityFeedItemsRead(supabase, body.orgId, row),
       ),
     );
@@ -1228,33 +1256,77 @@ export class SessionCompletionsService {
       throw new BadRequestException('Undo window has expired');
     }
 
-    const now = new Date().toISOString();
-    const { data: updated, error: updateError } = await supabase
-      .from('class_session_completions')
-      .update({
-        status: 'pending',
-        confirmed_at: null,
-        resolved_at: null,
-        updated_at: now,
-        updated_by: staffId,
-      })
-      .in(
-        'id',
-        undoableRows.map((row) => row.id),
-      )
-      .eq('org_id', body.orgId)
-      .eq('status', 'confirmed')
-      .select('id')
-      .returns<Array<{ id: string }>>();
+    // A row's dispute_category/dispute_reason are never cleared when adminConfirm
+    // resolves a dispute (see adminConfirm), so their presence here means this
+    // confirm was a dispute resolution — undo restores 'disputed' (with its
+    // original resolved_at) rather than 'pending', preserving the parent's report
+    // instead of silently discarding it.
+    const wasDisputed = (row: ClassSessionCompletionRow) => Boolean(row.dispute_category);
+    const disputedRows = undoableRows.filter(wasDisputed);
+    const pendingRows = undoableRows.filter((row) => !wasDisputed(row));
 
-    if (updateError) throw new InternalServerErrorException(updateError.message);
+    const now = new Date().toISOString();
+    let undoneCount = 0;
+
+    if (pendingRows.length) {
+      const { data: updated, error: updateError } = await supabase
+        .from('class_session_completions')
+        .update({
+          status: 'pending',
+          confirmed_at: null,
+          resolved_at: null,
+          verified_minutes: null,
+          verification_note: null,
+          updated_at: now,
+          updated_by: staffId,
+        })
+        .in(
+          'id',
+          pendingRows.map((row) => row.id),
+        )
+        .eq('org_id', body.orgId)
+        .eq('status', 'confirmed')
+        .select('id')
+        .returns<Array<{ id: string }>>();
+      if (updateError) throw new InternalServerErrorException(updateError.message);
+      undoneCount += updated?.length ?? 0;
+    }
+
+    if (disputedRows.length) {
+      // Per-row (not bulk) because each row restores its own original
+      // resolved_at (== its disputed_at, as set by adminDispute) rather than a
+      // single shared value.
+      const results = await Promise.all(
+        disputedRows.map((row) =>
+          supabase
+            .from('class_session_completions')
+            .update({
+              status: 'disputed',
+              confirmed_at: null,
+              resolved_at: row.disputed_at,
+              verified_minutes: null,
+              verification_note: null,
+              updated_at: now,
+              updated_by: staffId,
+            })
+            .eq('id', row.id)
+            .eq('org_id', body.orgId)
+            .eq('status', 'confirmed')
+            .select('id')
+            .returns<Array<{ id: string }>>(),
+        ),
+      );
+      const updateError = results.find((result) => result.error)?.error;
+      if (updateError) throw new InternalServerErrorException(updateError.message);
+      undoneCount += results.reduce((sum, result) => sum + (result.data?.length ?? 0), 0);
+    }
 
     this.logger.log(
       `session completion admin-confirm undone scheduleId=${body.scheduleId} ` +
-        `occurrenceKey=${body.occurrenceKey} count=${updated?.length ?? 0}`,
+        `occurrenceKey=${body.occurrenceKey} count=${undoneCount}`,
     );
 
-    return { success: true, undoneCount: updated?.length ?? 0 };
+    return { success: true, undoneCount };
   }
 
   /**
@@ -1827,6 +1899,9 @@ export class SessionCompletionsService {
       const ratings = rows
         .map((row) => row.rating)
         .filter((rating): rating is number => typeof rating === 'number');
+      // Set uniformly across every row for the occurrence by adminConfirm, so any
+      // row carrying it reflects the whole occurrence's verified duration.
+      const verifiedRow = rows.find((row) => row.verified_minutes != null);
 
       // Include every guardian recipient, even if absent from the current
       // roster/family links or still awaiting confirmation.
@@ -1914,6 +1989,8 @@ export class SessionCompletionsService {
         averageRating: ratings.length
           ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length
           : null,
+        verifiedMinutes: verifiedRow?.verified_minutes ?? null,
+        verificationNote: verifiedRow?.verification_note ?? null,
       };
     });
   }

@@ -422,6 +422,26 @@ export const enableMessageSendReliability = flag<boolean, { profileId?: string |
   },
 });
 
+export const enableSessionCompletionVerifiedDuration = flag<
+  boolean,
+  { profileId?: string | null }
+>({
+  key: platformFeatureFlagKeys.enableSessionCompletionVerifiedDuration,
+  description:
+    'Lets staff confirm a completed session with a verified partial duration (and note) instead of only the full scheduled length, and use it to resolve an open dispute.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: platformFeatureFlagKeys.enableSessionCompletionVerifiedDuration,
+      profileId: entities?.profileId,
+    });
+  },
+});
+
 export const webFlags = {
   enableAdminSessionAttendanceAnalytics,
   enableAiRefine,
@@ -446,6 +466,7 @@ export const webFlags = {
   enableMessageEdit,
   enableMobileMessageComposerParity,
   enableMessageSendReliability,
+  enableSessionCompletionVerifiedDuration,
 } as const;
 
 export type WebFlagKey = keyof typeof webFlags;

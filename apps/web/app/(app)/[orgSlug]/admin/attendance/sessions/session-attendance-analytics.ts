@@ -130,10 +130,13 @@ export function filterCompletions(
   });
 }
 
-// Scheduled length of the occurrence: end minus its start (occurrenceKey). Returns
-// 0 when either bound is unparseable or non-positive — some backfilled rows carry
-// no distinct end time, so end === start.
+// Staff-verified length when set (see adminConfirm in
+// session-completions.service.ts — e.g. a teacher who only ran 30 of a
+// scheduled 60 minutes), otherwise the scheduled length: end minus start
+// (occurrenceKey). Returns 0 when neither is available — some backfilled rows
+// carry no distinct end time, so end === start.
 export function getCompletionDurationHours(row: AdminSessionCompletionVM) {
+  if (row.verifiedMinutes != null) return row.verifiedMinutes / 60;
   const start = new Date(row.occurrenceKey).getTime();
   const end = new Date(row.sessionEndAt).getTime();
   if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return 0;

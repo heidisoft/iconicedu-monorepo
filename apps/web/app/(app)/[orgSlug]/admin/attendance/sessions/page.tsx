@@ -12,7 +12,10 @@ import {
   buildRecentCompletionMonthKeys,
   completionMonthKeyToUtcRange,
 } from '@iconicedu/web/app/(app)/[orgSlug]/admin/attendance/sessions/session-attendance-analytics';
-import { enableAdminSessionAttendanceAnalytics } from '@iconicedu/web/flags';
+import {
+  enableAdminSessionAttendanceAnalytics,
+  enableSessionCompletionVerifiedDuration,
+} from '@iconicedu/web/flags';
 import { requireAdminOrgContext } from '@iconicedu/web/lib/admin/require-admin-org-context';
 import {
   listAdminSessionCompletions,
@@ -49,6 +52,11 @@ export default async function AdminCompletedSessionsPage({
     (await enableAdminSessionAttendanceAnalytics.run({
       identify: { profileId: adminContext.actorProfileId },
     }));
+  const verifiedDurationEnabled =
+    adminContext.ok &&
+    (await enableSessionCompletionVerifiedDuration.run({
+      identify: { profileId: adminContext.actorProfileId },
+    }));
 
   // A rolling three-month interval can intersect four calendar months.
   // The API clamps both month requests and the default view to that interval.
@@ -67,7 +75,12 @@ export default async function AdminCompletedSessionsPage({
           title="Completed sessions"
           description="Review session confirmations from the past three months."
         />
-        <CompletedSessionsTable rows={rows} schedules={schedules} orgId={org.id} />
+        <CompletedSessionsTable
+          rows={rows}
+          schedules={schedules}
+          orgId={org.id}
+          allowVerifiedDurationOverride={verifiedDurationEnabled}
+        />
       </AdminPageShell>
     );
   }
@@ -106,6 +119,7 @@ export default async function AdminCompletedSessionsPage({
         selectedMonth={selectedMonth}
         monthOptions={monthOptions}
         orgId={org.id}
+        allowVerifiedDurationOverride={verifiedDurationEnabled}
       />
     </AdminPageShell>
   );

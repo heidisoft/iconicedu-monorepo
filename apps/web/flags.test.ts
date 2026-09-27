@@ -15,6 +15,7 @@ import {
   enableMobileAppleSignIn,
   enableMobileDirectMessageStart,
   enableMobileGoogleSignIn,
+  enableSessionCompletionVerifiedDuration,
   getFlagsProviderData,
   isVercelFlagsSdkConfigured,
   webFlags,
@@ -80,6 +81,16 @@ describe('web flags', () => {
     expect(enableAdminSessionAttendanceAnalytics.defaultValue).toBe(false);
     expect(webFlags.enableAdminSessionAttendanceAnalytics).toBe(
       enableAdminSessionAttendanceAnalytics,
+    );
+  });
+
+  it('declares the session completion verified duration flag off by default', () => {
+    expect(enableSessionCompletionVerifiedDuration.key).toBe(
+      'enable-session-completion-verified-duration',
+    );
+    expect(enableSessionCompletionVerifiedDuration.defaultValue).toBe(false);
+    expect(webFlags.enableSessionCompletionVerifiedDuration).toBe(
+      enableSessionCompletionVerifiedDuration,
     );
   });
 

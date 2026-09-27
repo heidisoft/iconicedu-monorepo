@@ -50,10 +50,19 @@ export type SkipSessionCompletionRatingInput = {
 // the schedule/occurrence pair, not individual row ids. Confirming settles
 // every still-open (pending/auto_confirmed) row for the occurrence, which is
 // also what stops the confirm prompt from resurfacing for the teacher/parent.
+// verifiedMinutes/verificationNote let staff record the session's actual length
+// when confirming, instead of implicitly assuming the full scheduled duration —
+// e.g. a teacher who only ran 30 of a scheduled 60 minutes. When verifiedMinutes
+// is omitted, the server defaults it to the scheduled duration (unchanged
+// behavior). verificationNote is required only when verifiedMinutes is provided
+// and differs from the scheduled duration; see adminConfirm in
+// session-completions.service.ts.
 export type AdminConfirmSessionCompletionInput = {
   orgId: UUID;
   scheduleId: UUID;
   occurrenceKey: string;
+  verifiedMinutes?: number;
+  verificationNote?: string;
 };
 
 // Reverts a staff `adminConfirm` back to 'pending' for the occurrence, mirroring the

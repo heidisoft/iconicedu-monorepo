@@ -408,12 +408,14 @@ function TableSection({
   filters,
   selectedMonth,
   orgId,
+  allowVerifiedDurationOverride,
 }: {
   rowsPromise: Promise<AdminSessionCompletionVM[]>;
   schedulesPromise: Promise<ScheduleOptionRow[]>;
   filters: Filters;
   selectedMonth: string;
   orgId: string;
+  allowVerifiedDurationOverride: boolean;
 }) {
   const rows = React.use(rowsPromise);
   const schedules = React.use(schedulesPromise);
@@ -422,7 +424,14 @@ function TableSection({
     [filters, rows, selectedMonth],
   );
 
-  return <CompletedSessionsTable rows={filtered} schedules={schedules} orgId={orgId} />;
+  return (
+    <CompletedSessionsTable
+      rows={filtered}
+      schedules={schedules}
+      orgId={orgId}
+      allowVerifiedDurationOverride={allowVerifiedDurationOverride}
+    />
+  );
 }
 
 export function SessionAttendanceDashboard({
@@ -433,6 +442,7 @@ export function SessionAttendanceDashboard({
   selectedMonth,
   monthOptions,
   orgId,
+  allowVerifiedDurationOverride,
 }: {
   rowsPromise: Promise<AdminSessionCompletionVM[]>;
   trendRowsPromise: Promise<AdminSessionCompletionVM[]>;
@@ -441,6 +451,7 @@ export function SessionAttendanceDashboard({
   selectedMonth: string;
   monthOptions: string[];
   orgId: string;
+  allowVerifiedDurationOverride: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -512,6 +523,7 @@ export function SessionAttendanceDashboard({
           filters={filters}
           selectedMonth={selectedMonth}
           orgId={orgId}
+          allowVerifiedDurationOverride={allowVerifiedDurationOverride}
         />
       </React.Suspense>
     </div>
