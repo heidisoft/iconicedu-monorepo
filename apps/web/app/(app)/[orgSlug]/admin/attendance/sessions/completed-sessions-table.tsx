@@ -606,13 +606,17 @@ export function CompletedSessionsTable({
   rows,
   schedules,
   orgId,
+  allowVerifiedDurationOverride = false,
 }: {
   rows: AdminSessionCompletionVM[];
   schedules: ScheduleOptionRow[];
   orgId: string;
+  /** Gated by the enableSessionCompletionVerifiedDuration flag (see flags.ts). */
+  allowVerifiedDurationOverride?: boolean;
 }) {
   const router = useRouter();
   const [page, setPage] = React.useState(1);
+  const [confirmingId, setConfirmingId] = React.useState<string | null>(null);
 
   // Filters upstream replace `rows` with a new array, so reset back to page 1
   // whenever the underlying result set changes rather than stranding the user
@@ -663,6 +667,36 @@ export function CompletedSessionsTable({
           }),
       },
     });
+  };
+
+  // Legacy path for when allowVerifiedDurationOverride is off: confirms with no
+  // verifiedMinutes/verificationNote (the server then defaults to the full
+  // scheduled duration), same as before ConfirmSessionDialog existed. Kept
+  // alongside the dialog so the flag can gate the new fields without disabling
+  // staff confirmation entirely.
+  const handleStaffConfirm = async (row: AdminSessionCompletionVM) => {
+    if (confirmingId) return;
+    setConfirmingId(row.id);
+    try {
+      const response = await fetch('/api/admin/session-completions/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orgId: row.orgId,
+          scheduleId: row.scheduleId,
+          occurrenceKey: row.occurrenceKey,
+        }),
+      });
+      const result = await response.json();
+      if (!result?.success) {
+        throw new Error(result?.message ?? 'Unable to confirm session.');
+      }
+      handleConfirmed(row);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to confirm session.');
+    } finally {
+      setConfirmingId(null);
+    }
   };
 
   // Removes a wrong entry rather than resolving a real one: either one
@@ -829,24 +863,52 @@ export function CompletedSessionsTable({
                 <TableCell>
                   <div className="flex flex-wrap items-center gap-2">
                     {needsConfirmation ? (
-                      <>
-                        {hasDispute && (
-                          <span className="text-xs text-muted-foreground">
-                            Dispute reported
-                          </span>
-                        )}
-                        <ConfirmSessionDialog
-                          row={row}
-                          resolvesDispute={hasDispute}
-                          onSubmitted={() => handleConfirmed(row)}
-                        />
-                        {!hasDispute && (
+                      allowVerifiedDurationOverride ? (
+                        <>
+                          {hasDispute && (
+                            <span className="text-xs text-muted-foreground">
+                              Dispute reported
+                            </span>
+                          )}
+                          <ConfirmSessionDialog
+                            row={row}
+                            resolvesDispute={hasDispute}
+                            onSubmitted={() => handleConfirmed(row)}
+                          />
+                          {!hasDispute && (
+                            <DisputeSessionDialog
+                              row={row}
+                              onSubmitted={() => router.refresh()}
+                            />
+                          )}
+                        </>
+                      ) : hasDispute ? (
+                        <span className="text-xs text-muted-foreground">
+                          Dispute reported
+                        </span>
+                      ) : (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={confirmingId === row.id}
+                            onClick={() => void handleStaffConfirm(row)}
+                          >
+                            {confirmingId === row.id ? (
+                              <Loader2
+                                className="size-4 animate-spin"
+                                aria-hidden="true"
+                              />
+                            ) : (
+                              'Confirm'
+                            )}
+                          </Button>
                           <DisputeSessionDialog
                             row={row}
                             onSubmitted={() => router.refresh()}
                           />
-                        )}
-                      </>
+                        </>
+                      )
                     ) : (
                       <span className="text-xs text-muted-foreground">Confirmed</span>
                     )}
