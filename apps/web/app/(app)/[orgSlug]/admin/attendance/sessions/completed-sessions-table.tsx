@@ -86,6 +86,11 @@ function getSessionDurationSeconds(row: AdminSessionCompletionVM) {
   return (end - start) / 1000;
 }
 
+function getScheduledMinutes(row: AdminSessionCompletionVM) {
+  const seconds = getSessionDurationSeconds(row);
+  return seconds != null ? Math.round(seconds / 60) : 0;
+}
+
 // Every student across the given classrooms, deduplicated by profile —
 // picking one first narrows the classroom list to just their classes, rather
 // than making the admin hunt for the right classroom by name.
@@ -339,6 +344,140 @@ function CreateSessionDialog({
   );
 }
 
+// Lets staff confirm a session with the actual verified duration instead of
+// implicitly assuming the full scheduled length — e.g. a teacher who only ran
+// 30 of a scheduled 60 minutes. Pre-filled with the scheduled duration so the
+// common (full-length) case is still just one extra click; a note is only
+// required once staff change the minutes to something else. Also doubles as
+// dispute resolution: confirming a session a parent already reported as
+// incomplete settles the dispute too (see adminConfirm in
+// session-completions.service.ts), so this dialog is offered even when the
+// occurrence has an open dispute.
+function ConfirmSessionDialog({
+  row,
+  resolvesDispute,
+  onSubmitted,
+}: {
+  row: AdminSessionCompletionVM;
+  resolvesDispute: boolean;
+  onSubmitted: () => void;
+}) {
+  const scheduledMinutes = getScheduledMinutes(row);
+  const [open, setOpen] = React.useState(false);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [verifiedMinutes, setVerifiedMinutes] = React.useState(String(scheduledMinutes));
+  const [note, setNote] = React.useState('');
+
+  const handleOpenChange = (next: boolean) => {
+    if (isSubmitting) return;
+    setOpen(next);
+    if (!next) {
+      setVerifiedMinutes(String(scheduledMinutes));
+      setNote('');
+    }
+  };
+
+  const parsedMinutes = Number(verifiedMinutes);
+  const isOverride = Number.isFinite(parsedMinutes) && parsedMinutes !== scheduledMinutes;
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!Number.isFinite(parsedMinutes) || parsedMinutes < 0) {
+      toast.error('Enter a valid number of minutes');
+      return;
+    }
+    if (isOverride && !note.trim()) {
+      toast.error('Add a note explaining the change in duration');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const response = await fetch('/api/admin/session-completions/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orgId: row.orgId,
+          scheduleId: row.scheduleId,
+          occurrenceKey: row.occurrenceKey,
+          verifiedMinutes: parsedMinutes,
+          verificationNote: note.trim() || undefined,
+        }),
+      });
+      const result = await response.json();
+      if (!result?.success) {
+        throw new Error(result?.message ?? 'Unable to confirm session.');
+      }
+      handleOpenChange(false);
+      onSubmitted();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to confirm session.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" type="button">
+          {resolvesDispute ? 'Confirm anyway' : 'Confirm'}
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="space-y-4 sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Confirm this session</DialogTitle>
+          <DialogDescription>
+            {resolvesDispute
+              ? 'This session was reported as a problem. Confirming settles the dispute — record how many minutes actually ran.'
+              : 'Settles every open submission for this session as confirmed. Adjust the minutes if the session ran short.'}
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={(event) => void handleSubmit(event)} className="space-y-4">
+          <div className="space-y-1">
+            <Label htmlFor="confirm-session-minutes">Verified minutes</Label>
+            <Input
+              id="confirm-session-minutes"
+              type="number"
+              min={0}
+              value={verifiedMinutes}
+              onChange={(event) => setVerifiedMinutes(event.target.value)}
+              disabled={isSubmitting}
+            />
+            <p className="text-xs text-muted-foreground">
+              Scheduled for {scheduledMinutes} minutes.
+            </p>
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="confirm-session-note">
+              Note{isOverride ? ' (required)' : ' (optional)'}
+            </Label>
+            <Textarea
+              id="confirm-session-note"
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              disabled={isSubmitting}
+              maxLength={500}
+              placeholder="Why the verified duration differs from the schedule…"
+            />
+          </div>
+          <DialogFooter>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-1.5 size-4 animate-spin" aria-hidden="true" />
+                  Confirming…
+                </>
+              ) : (
+                'Confirm session'
+              )}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // Lets staff report that a session had a problem (most commonly, neither the
 // tutor nor the student showed up) directly from the admin table, instead of
 // waiting for a participant to flag their own row. Settles every still-open
@@ -474,7 +613,6 @@ export function CompletedSessionsTable({
 }) {
   const router = useRouter();
   const [page, setPage] = React.useState(1);
-  const [confirmingId, setConfirmingId] = React.useState<string | null>(null);
 
   // Filters upstream replace `rows` with a new array, so reset back to page 1
   // whenever the underlying result set changes rather than stranding the user
@@ -510,42 +648,21 @@ export function CompletedSessionsTable({
   // teacher/parent's own confirm prompt stops resurfacing for it too. A brief
   // "Undo" action on the success toast lets an admin reverse a mis-click before
   // that state settles elsewhere (participant ratings, notifications, etc).
-  const handleStaffConfirm = async (row: AdminSessionCompletionVM) => {
-    if (confirmingId) return;
-    setConfirmingId(row.id);
-    try {
-      const response = await fetch('/api/admin/session-completions/confirm', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orgId: row.orgId,
-          scheduleId: row.scheduleId,
-          occurrenceKey: row.occurrenceKey,
-        }),
-      });
-      const result = await response.json();
-      if (!result?.success) {
-        throw new Error(result?.message ?? 'Unable to confirm session.');
-      }
-      router.refresh();
-      toast.success('Session confirmed', {
-        duration: UNDO_WINDOW_MS,
-        action: {
-          label: 'Undo',
-          onClick: () =>
-            toast.promise(handleUndoStaffConfirm(row), {
-              loading: 'Undoing confirmation…',
-              success: 'Confirmation undone',
-              error: (error) =>
-                error instanceof Error ? error.message : 'Unable to undo confirmation.',
-            }),
-        },
-      });
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Unable to confirm session.');
-    } finally {
-      setConfirmingId(null);
-    }
+  const handleConfirmed = (row: AdminSessionCompletionVM) => {
+    router.refresh();
+    toast.success('Session confirmed', {
+      duration: UNDO_WINDOW_MS,
+      action: {
+        label: 'Undo',
+        onClick: () =>
+          toast.promise(handleUndoStaffConfirm(row), {
+            loading: 'Undoing confirmation…',
+            success: 'Confirmation undone',
+            error: (error) =>
+              error instanceof Error ? error.message : 'Unable to undo confirmation.',
+          }),
+      },
+    });
   };
 
   // Removes a wrong entry rather than resolving a real one: either one
@@ -638,6 +755,15 @@ export function CompletedSessionsTable({
                     {formatAttendanceTimeOfDay(row.sessionEndAt)} (
                     {formatAttendanceDuration(getSessionDurationSeconds(row))})
                   </p>
+                  {row.verifiedMinutes != null &&
+                    row.verifiedMinutes !== getScheduledMinutes(row) && (
+                      <p
+                        className="text-xs text-warning"
+                        title={row.verificationNote ?? ''}
+                      >
+                        Verified: {row.verifiedMinutes} min
+                      </p>
+                    )}
                 </TableCell>
                 <TableCell>
                   <ul className="space-y-2">
@@ -702,28 +828,24 @@ export function CompletedSessionsTable({
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-wrap items-center gap-2">
-                    {hasDispute ? (
-                      <span className="text-xs text-muted-foreground">
-                        Dispute reported
-                      </span>
-                    ) : needsConfirmation ? (
+                    {needsConfirmation ? (
                       <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={confirmingId === row.id}
-                          onClick={() => void handleStaffConfirm(row)}
-                        >
-                          {confirmingId === row.id ? (
-                            <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                          ) : (
-                            'Confirm'
-                          )}
-                        </Button>
-                        <DisputeSessionDialog
+                        {hasDispute && (
+                          <span className="text-xs text-muted-foreground">
+                            Dispute reported
+                          </span>
+                        )}
+                        <ConfirmSessionDialog
                           row={row}
-                          onSubmitted={() => router.refresh()}
+                          resolvesDispute={hasDispute}
+                          onSubmitted={() => handleConfirmed(row)}
                         />
+                        {!hasDispute && (
+                          <DisputeSessionDialog
+                            row={row}
+                            onSubmitted={() => router.refresh()}
+                          />
+                        )}
                       </>
                     ) : (
                       <span className="text-xs text-muted-foreground">Confirmed</span>

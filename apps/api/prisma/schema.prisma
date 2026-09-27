@@ -47,6 +47,8 @@ model ClassSessionCompletion {
   disputeCategory     String?                      @map("dispute_category")
   disputeReason       String?                      @map("dispute_reason")
   rescheduleRequested Boolean                      @default(false) @map("reschedule_requested")
+  verifiedMinutes     Int?                         @map("verified_minutes")
+  verificationNote    String?                      @map("verification_note")
   rating              Int?                         @db.SmallInt
   ratingComment       String?                      @map("rating_comment")
   channelId           String?                      @map("channel_id") @db.Uuid
