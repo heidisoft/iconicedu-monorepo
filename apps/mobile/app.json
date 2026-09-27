@@ -23,7 +23,6 @@
     },
     "ios": {
       "supportsTablet": true,
-      "buildNumber": "2",
       "bundleIdentifier": "com.heidisoft.iconicedu",
       "userInterfaceStyle": "automatic",
       "infoPlist": {
@@ -43,7 +42,6 @@
         "foregroundImage": "./assets/icon.png"
       },
       "package": "com.heidisoft.iconicedu",
-      "versionCode": 100,
       "userInterfaceStyle": "automatic",
       "resizeableActivity": true,
       "permissions": [
