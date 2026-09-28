@@ -367,19 +367,35 @@ Confirm the production project's current backup and point-in-time recovery confi
 
 ## Environment Variables Reference
 
-| Variable                               | Web                     | Mobile | API | Notes                                                                                                   |
-| -------------------------------------- | ----------------------- | ------ | --- | ------------------------------------------------------------------------------------------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`             | ✅                      | —      | —   | Public, browser-safe                                                                                    |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | ✅                      | —      | —   | Public, browser-safe                                                                                    |
-| `SUPABASE_SERVICE_ROLE_KEY`            | —                       | —      | ✅  | API-only privileged credential                                                                          |
-| `EXPO_PUBLIC_SUPABASE_URL`             | —                       | ✅     | —   | Inlined at build time                                                                                   |
-| `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | —                       | ✅     | —   | Inlined at build time                                                                                   |
-| `DATABASE_URL`                         | —                       | —      | ✅  | Pooled Postgres URL                                                                                     |
-| `DIRECT_URL`                           | —                       | —      | ✅  | Non-pooled schema tooling URL                                                                           |
-| `SUPABASE_URL`                         | —                       | —      | ✅  |                                                                                                         |
-| `SUPABASE_JWT_SECRET`                  | —                       | —      | ✅  | From Supabase JWT settings                                                                              |
-| `INTERNAL_EVENTS_TOKEN`                | ✅ (server/admin tools) | —      | ✅  | Match Supabase Edge Function secret                                                                     |
-| `INTERNAL_REMINDERS_TOKEN`             | ✅ (server/admin tools) | —      | ✅  | Match Supabase Edge Function secret                                                                     |
-| `EXPO_ACCESS_TOKEN`                    | —                       | —      | ✅  | Expo push provider token                                                                                |
-| `NEXT_PUBLIC_TURNSTILE_SITE_KEY`       | ✅                      | —      | —   | Public Cloudflare Turnstile site key; optional — no widget when unset. See [turnstile.md](turnstile.md) |
-| `EXPO_PUBLIC_TURNSTILE_SITE_KEY`       | —                       | ✅     | —   | Same key for mobile; inlined at build/OTA time. See [turnstile.md](turnstile.md)                        |
+| Variable                               | Web                     | Mobile | API | Notes                                                                                                                                                                     |
+| -------------------------------------- | ----------------------- | ------ | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`             | ✅                      | —      | —   | Public, browser-safe                                                                                                                                                      |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | ✅                      | —      | —   | Public, browser-safe                                                                                                                                                      |
+| `SUPABASE_SERVICE_ROLE_KEY`            | —                       | —      | ✅  | API-only privileged credential                                                                                                                                            |
+| `EXPO_PUBLIC_SUPABASE_URL`             | —                       | ✅     | —   | Inlined at build time                                                                                                                                                     |
+| `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | —                       | ✅     | —   | Inlined at build time                                                                                                                                                     |
+| `DATABASE_URL`                         | —                       | —      | ✅  | Pooled Postgres URL                                                                                                                                                       |
+| `DIRECT_URL`                           | —                       | —      | ✅  | Non-pooled schema tooling URL                                                                                                                                             |
+| `SUPABASE_URL`                         | —                       | —      | ✅  |                                                                                                                                                                           |
+| `SUPABASE_JWT_SECRET`                  | —                       | —      | ✅  | From Supabase JWT settings                                                                                                                                                |
+| `INTERNAL_EVENTS_TOKEN`                | ✅ (server/admin tools) | —      | ✅  | Match Supabase Edge Function secret                                                                                                                                       |
+| `INTERNAL_REMINDERS_TOKEN`             | ✅ (server/admin tools) | —      | ✅  | Match Supabase Edge Function secret                                                                                                                                       |
+| `EXPO_ACCESS_TOKEN`                    | —                       | —      | ✅  | Expo push provider token                                                                                                                                                  |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY`       | ✅                      | —      | —   | Public Cloudflare Turnstile site key; optional — no widget when unset. See [turnstile.md](turnstile.md)                                                                   |
+| `EXPO_PUBLIC_TURNSTILE_SITE_KEY`       | —                       | ✅     | —   | Same key for mobile; inlined at build/OTA time. See [turnstile.md](turnstile.md)                                                                                          |
+| `AI_PROVIDER_KEY_ENCRYPTION_KEY`       | ✅                      | —      | ✅  | Encrypts each org's AI provider API key at rest; same value required on web and API. Optional — AI settings are just unconfigurable without it. `openssl rand -base64 32` |
+
+## Adding A New Required Environment Variable
+
+A new env var has more consumers than it looks like it does — missing one silently breaks the feature in exactly one environment (a past miss: an env var reached Railway PR previews but not Vercel PR previews, so saving settings 500'd only on preview, not locally or in production). Wire every consumer in the same change:
+
+1. **Local dev**: add it to `apps/api/.env.example` and/or `apps/web/.env.local.example` (whichever app(s) read it), with a comment on where the real value comes from.
+2. **Production**: add an entry to the relevant array(s) — `railway` (apps/api) and/or `vercel` (apps/web) — in [`ops/env/production.env.json`](../../ops/env/production.env.json). This is the only place production env resolution is defined; the CI job that deploys to production reads this manifest generically, so nothing else to touch there.
+3. **PR previews**: unlike production, the two PR-preview steps in [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) do **not** read the manifest — each hardcodes its own variable list and both need the addition separately:
+   - The `Configure Railway PR environment` step building `VARS_JSON` (apps/api preview).
+   - The `Configure Vercel preview env vars` step building `VERCEL_ENV_PAYLOAD` (apps/web preview).
+4. **Secret vs. var**: if the value is sensitive (a key, token, or anything that shouldn't be readable by anyone with repo read access), add it as a GitHub **secret** (`secrets.<NAME>`), not a variable (`vars.<NAME>`) — Settings → Secrets and variables → Actions.
+5. **This reference table**: add a row above with which app(s) read it and any setup notes (how to generate it, whether it's optional, what breaks without it).
+6. Confirm required vs. optional deliberately — `"optional": true` in the manifest and an `if length > 0` guard in the CI payload mean CI won't fail without it, but say plainly in this table what silently doesn't work when it's missing.
+
+Local edits only reach your own machine; step 1 alone is not enough for anyone else, preview, or production to have the variable.

@@ -20,6 +20,8 @@ import {
   Switch,
   toast,
 } from '@iconicedu/ui-web';
+import { createApiClient } from '@iconicedu/web/lib/api/http-client';
+import { createSupabaseBrowserClient } from '@iconicedu/web/lib/supabase/client';
 
 type AiSettingsSectionProps = {
   orgId: string;
@@ -36,6 +38,7 @@ const PROVIDER_MODEL_PLACEHOLDERS: Record<AiProviderId, string> = {
 };
 
 export function AiSettingsSection({ orgId }: AiSettingsSectionProps) {
+  const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
   const [settings, setSettings] = React.useState<OrgAiSettingsVM | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isSaving, setIsSaving] = React.useState(false);
@@ -48,53 +51,42 @@ export function AiSettingsSection({ orgId }: AiSettingsSectionProps) {
   const loadSettings = React.useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(
-        `/api/admin/settings/ai?orgId=${encodeURIComponent(orgId)}`,
-      );
-      const payload = (await response.json()) as {
-        success?: boolean;
-        message?: string;
-        data?: OrgAiSettingsVM;
-      };
-      if (!response.ok || !payload.success || !payload.data) {
-        throw new Error(payload.message ?? 'Failed to load AI settings.');
-      }
-      setSettings(payload.data);
-      setProvider(payload.data.provider);
-      setModel(payload.data.model ?? '');
-      setMessagingFeaturesEnabled(payload.data.messagingFeaturesEnabled);
+      const api = createApiClient(supabase);
+      const data = await api.get<OrgAiSettingsVM>('/org-ai-settings', { orgId });
+      setSettings(data);
+      setProvider(data.provider);
+      setModel(data.model ?? '');
+      setMessagingFeaturesEnabled(data.messagingFeaturesEnabled);
       setApiKey('');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to load AI settings.');
     } finally {
       setIsLoading(false);
     }
-  }, [orgId]);
+  }, [orgId, supabase]);
 
   React.useEffect(() => {
     void loadSettings();
   }, [loadSettings]);
 
-  const willHaveApiKey = Boolean(apiKey.trim()) || Boolean(settings?.hasApiKey);
+  // A key saved for one provider isn't valid for another, so switching
+  // providers always requires a fresh key — mirrors the check apps/api
+  // enforces on save.
+  const providerChanged = Boolean(settings) && provider !== settings?.provider;
+  const willHaveApiKey =
+    Boolean(apiKey.trim()) || (Boolean(settings?.hasApiKey) && !providerChanged);
 
   const handleSave = React.useCallback(async () => {
     setIsSaving(true);
     try {
-      const response = await fetch('/api/admin/settings/ai', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orgId,
-          provider,
-          model: model.trim() || null,
-          apiKey: apiKey.trim() || undefined,
-          messagingFeaturesEnabled,
-        }),
+      const api = createApiClient(supabase);
+      await api.put<OrgAiSettingsVM>('/org-ai-settings', {
+        orgId,
+        provider,
+        model: model.trim() || null,
+        apiKey: apiKey.trim() || undefined,
+        messagingFeaturesEnabled,
       });
-      const payload = (await response.json()) as { success?: boolean; message?: string };
-      if (!response.ok || !payload.success) {
-        throw new Error(payload.message ?? 'Failed to save AI settings.');
-      }
       toast.success('AI settings saved');
       await loadSettings();
     } catch (error) {
@@ -102,7 +94,7 @@ export function AiSettingsSection({ orgId }: AiSettingsSectionProps) {
     } finally {
       setIsSaving(false);
     }
-  }, [apiKey, loadSettings, messagingFeaturesEnabled, model, orgId, provider]);
+  }, [apiKey, loadSettings, messagingFeaturesEnabled, model, orgId, provider, supabase]);
 
   if (isLoading) {
     return (
@@ -183,16 +175,18 @@ export function AiSettingsSection({ orgId }: AiSettingsSectionProps) {
             value={apiKey}
             onChange={(event) => setApiKey(event.target.value)}
             placeholder={
-              settings?.hasApiKey
+              settings?.hasApiKey && !providerChanged
                 ? `Saved key ending in •••• ${settings.apiKeyLastFour}`
                 : 'Paste the provider API key'
             }
             disabled={isSaving}
           />
           <p className="text-xs text-muted-foreground">
-            {settings?.hasApiKey
-              ? 'Leave blank to keep the currently saved key, or paste a new one to rotate it.'
-              : 'This key is encrypted before it is stored and is never shown again.'}
+            {providerChanged
+              ? 'Switching providers — enter a new API key for the selected provider.'
+              : settings?.hasApiKey
+                ? 'Leave blank to keep the currently saved key, or paste a new one to rotate it.'
+                : 'This key is encrypted before it is stored and is never shown again.'}
           </p>
         </div>
 

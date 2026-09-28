@@ -6,6 +6,8 @@ import {
   AdminPageHeading,
   AdminPageShell,
 } from '@iconicedu/web/components/admin/admin-page-layout';
+import { enableOrgAiProviderSettings } from '@iconicedu/web/flags';
+import { requireAdminOrgContext } from '@iconicedu/web/lib/admin/require-admin-org-context';
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 
@@ -24,6 +26,16 @@ export default async function AdminGeneralSettingsPage({
   const org = await buildOrgBySlug(supabase, orgSlug);
 
   if (!org) {
+    notFound();
+  }
+
+  const adminContext = await requireAdminOrgContext(org.id);
+  const orgAiSettingsEnabled =
+    adminContext.ok &&
+    (await enableOrgAiProviderSettings.run({
+      identify: { profileId: adminContext.actorProfileId },
+    }));
+  if (!orgAiSettingsEnabled) {
     notFound();
   }
 

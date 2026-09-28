@@ -20,6 +20,7 @@ export const platformFeatureFlagKeys = {
   enableMessageSendReliability: 'enable-message-send-reliability',
   enableSessionCompletionVerifiedDuration: 'enable-session-completion-verified-duration',
   enableSessionCompletionDisputeDetails: 'enable-session-completion-dispute-details',
+  enableOrgAiProviderSettings: 'enable-org-ai-provider-settings',
 } as const;
 
 export type PlatformFeatureFlagKey =
