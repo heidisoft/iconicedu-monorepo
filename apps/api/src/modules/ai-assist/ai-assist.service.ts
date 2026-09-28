@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Injectable,
   Logger,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import type {
   AiAssistEligibilityInput,
@@ -18,7 +19,7 @@ import {
   apiFeatureFlagKeys,
   evaluateApiBooleanFlag,
 } from '@iconicedu/api/lib/flags/posthog-openfeature';
-import { completeWithClaude } from '@iconicedu/api/lib/ai/anthropic-client';
+import { OrgAiSettingsService } from '@iconicedu/api/lib/ai/org-ai-settings.service';
 import { checkFactPreservation } from '@iconicedu/api/lib/ai/fact-preservation';
 import {
   buildRefineSystemPrompt,
@@ -69,7 +70,10 @@ function messagePreviewText(message: MessageVM): string {
 export class AiAssistService {
   private readonly logger = new Logger(AiAssistService.name);
 
-  constructor(private readonly messagesService: MessagesService) {}
+  constructor(
+    private readonly messagesService: MessagesService,
+    private readonly orgAiSettingsService: OrgAiSettingsService,
+  ) {}
 
   private async requireEligibleActor(input: {
     authUserId: string;
@@ -136,12 +140,29 @@ export class AiAssistService {
       return { enableAiRefine: false, enableAiSuggestedReplies: false };
     }
 
+    // The org admin's on/off switch and provider key gate everything below —
+    // no point evaluating the rollout flags for an org that hasn't set one up.
+    const orgEnabled = await this.orgAiSettingsService.isEnabledForOrg(input.orgId);
+    if (!orgEnabled) {
+      return { enableAiRefine: false, enableAiSuggestedReplies: false };
+    }
+
     const [enableAiRefine, enableAiSuggestedReplies] = await Promise.all([
       this.isFlagEnabled('enableAiRefine', input.profileId),
       this.isFlagEnabled('enableAiSuggestedReplies', input.profileId),
     ]);
 
     return { enableAiRefine, enableAiSuggestedReplies };
+  }
+
+  /** Throws when the org hasn't configured and enabled an AI provider — checked before any rate-limit reservation or provider call. */
+  private async requireOrgAiEnabled(orgId: string) {
+    const enabled = await this.orgAiSettingsService.isEnabledForOrg(orgId);
+    if (!enabled) {
+      throw new ServiceUnavailableException(
+        'AI assist is not configured for this organization',
+      );
+    }
   }
 
   /**
@@ -230,6 +251,7 @@ export class AiAssistService {
     // draft never leaves the client otherwise, but the channel context
     // still needs authorization the same as any other message action.
     await this.requireChannelMembership(input.orgId, input.channelId, input.profileId);
+    await this.requireOrgAiEnabled(input.orgId);
     await this.reserveRateLimit({
       orgId: input.orgId,
       profileId: input.profileId,
@@ -238,7 +260,7 @@ export class AiAssistService {
     });
 
     const startedAt = Date.now();
-    const refinedText = await completeWithClaude({
+    const refinedText = await this.orgAiSettingsService.completeForOrg(input.orgId, {
       system: buildRefineSystemPrompt(),
       userContent: buildRefineUserContent({
         instruction: input.instruction,
@@ -280,6 +302,7 @@ export class AiAssistService {
     });
     await this.requireFlagEnabled('enableAiSuggestedReplies', input.profileId);
     await this.requireChannelMembership(input.orgId, input.channelId, input.profileId);
+    await this.requireOrgAiEnabled(input.orgId);
     await this.reserveRateLimit({
       orgId: input.orgId,
       profileId: input.profileId,
@@ -314,7 +337,7 @@ export class AiAssistService {
     }
 
     const startedAt = Date.now();
-    const raw = await completeWithClaude({
+    const raw = await this.orgAiSettingsService.completeForOrg(input.orgId, {
       system: buildSuggestedRepliesSystemPrompt(),
       userContent: buildSuggestedRepliesUserContent(lines),
       maxTokens: 512,

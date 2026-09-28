@@ -5,6 +5,7 @@ export function buildAdminMenuSections(
   options: {
     includeReports?: boolean;
     includeAssessments?: boolean;
+    includeOrgAiSettings?: boolean;
   } = {},
 ): AdminMenuSectionVM[] {
   const activityLinks = [
@@ -77,6 +78,14 @@ export function buildAdminMenuSections(
       ],
     },
   ];
+
+  if (options.includeOrgAiSettings) {
+    const settingsSection = sections.find((section) => section.title === 'Settings');
+    settingsSection?.links.unshift({
+      title: 'General',
+      url: `${basePath}/admin/settings/general`,
+    });
+  }
 
   if (options.includeAssessments) {
     sections.splice(1, 0, {

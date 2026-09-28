@@ -21,7 +21,11 @@ import {
   listActiveOrgSubjectCatalog,
   mapOrgSubjectRowsToOptions,
 } from '@iconicedu/web/lib/subjects/queries/org-subject-catalog.query';
-import { enableAssessments, enableMessageDrafts } from '@iconicedu/web/flags';
+import {
+  enableAssessments,
+  enableMessageDrafts,
+  enableOrgAiProviderSettings,
+} from '@iconicedu/web/flags';
 
 export const metadata: Metadata = {
   title: {
@@ -100,6 +104,9 @@ export default async function Layout({
   const messageDraftsEnabled = await enableMessageDrafts.run({
     identify: { profileId: familyViewResolution.effectiveProfile.id },
   });
+  const orgAiSettingsEnabled = await enableOrgAiProviderSettings.run({
+    identify: { profileId: familyViewResolution.effectiveProfile.id },
+  });
   const includeReports = false;
 
   return (
@@ -112,6 +119,7 @@ export default async function Layout({
         adminSections={buildAdminMenuSections(`/${orgSlug}`, {
           includeReports,
           includeAssessments: assessmentsEnabled,
+          includeOrgAiSettings: orgAiSettingsEnabled,
         })}
         subjectOptions={subjectOptions}
         enableMessageDrafts={messageDraftsEnabled}

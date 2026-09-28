@@ -1,15 +1,16 @@
 import { AiAssistService } from './ai-assist.service';
 import { MessagesService } from '@iconicedu/api/modules/messages/messages.service';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
-import { completeWithClaude } from '@iconicedu/api/lib/ai/anthropic-client';
+import type { OrgAiSettingsService } from '@iconicedu/api/lib/ai/org-ai-settings.service';
 import { evaluateApiBooleanFlag } from '@iconicedu/api/lib/flags/posthog-openfeature';
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 
 jest.mock('@iconicedu/api/lib/supabase/service', () => ({
   createSupabaseServiceClient: jest.fn(),
-}));
-jest.mock('@iconicedu/api/lib/ai/anthropic-client', () => ({
-  completeWithClaude: jest.fn(),
 }));
 jest.mock('@iconicedu/api/lib/flags/posthog-openfeature', () => ({
   apiFeatureFlagKeys: {
@@ -46,6 +47,14 @@ function makeMessagesServiceMock(profileKind: string) {
   } as unknown as MessagesService;
 }
 
+/** Defaults to an org with AI enabled — tests that care about the disabled path override `isEnabledForOrg`. */
+function makeOrgAiSettingsServiceMock() {
+  return {
+    isEnabledForOrg: jest.fn(async () => true),
+    completeForOrg: jest.fn(),
+  } as unknown as jest.Mocked<OrgAiSettingsService>;
+}
+
 function setUpSupabase(input: { membershipFound: boolean; usageCount?: number }) {
   const membershipChain = makeChain({
     data: input.membershipFound ? { id: 'member-1' } : null,
@@ -75,14 +84,17 @@ function setUpSupabase(input: { membershipFound: boolean; usageCount?: number })
 describe('AiAssistService.refineDraft', () => {
   beforeEach(() => {
     jest.mocked(createSupabaseServiceClient).mockReset();
-    jest.mocked(completeWithClaude).mockReset();
     jest.mocked(evaluateApiBooleanFlag).mockReset().mockResolvedValue(true);
   });
 
   it('rejects when the enable-ai-refine flag is off', async () => {
     setUpSupabase({ membershipFound: true });
     jest.mocked(evaluateApiBooleanFlag).mockResolvedValue(false);
-    const service = new AiAssistService(makeMessagesServiceMock('guardian'));
+    const orgAiSettingsService = makeOrgAiSettingsServiceMock();
+    const service = new AiAssistService(
+      makeMessagesServiceMock('guardian'),
+      orgAiSettingsService,
+    );
 
     await expect(
       service.refineDraft('auth-user-1', 'token', {
@@ -93,12 +105,16 @@ describe('AiAssistService.refineDraft', () => {
         instruction: 'proofread',
       }),
     ).rejects.toBeInstanceOf(ForbiddenException);
-    expect(completeWithClaude).not.toHaveBeenCalled();
+    expect(orgAiSettingsService.completeForOrg).not.toHaveBeenCalled();
   });
 
   it('rejects a profile kind that is not eligible (e.g. child)', async () => {
     setUpSupabase({ membershipFound: true });
-    const service = new AiAssistService(makeMessagesServiceMock('child'));
+    const orgAiSettingsService = makeOrgAiSettingsServiceMock();
+    const service = new AiAssistService(
+      makeMessagesServiceMock('child'),
+      orgAiSettingsService,
+    );
 
     await expect(
       service.refineDraft('auth-user-1', 'token', {
@@ -109,12 +125,16 @@ describe('AiAssistService.refineDraft', () => {
         instruction: 'proofread',
       }),
     ).rejects.toBeInstanceOf(ForbiddenException);
-    expect(completeWithClaude).not.toHaveBeenCalled();
+    expect(orgAiSettingsService.completeForOrg).not.toHaveBeenCalled();
   });
 
   it('rejects when the profile is not a member of the channel', async () => {
     setUpSupabase({ membershipFound: false });
-    const service = new AiAssistService(makeMessagesServiceMock('guardian'));
+    const orgAiSettingsService = makeOrgAiSettingsServiceMock();
+    const service = new AiAssistService(
+      makeMessagesServiceMock('guardian'),
+      orgAiSettingsService,
+    );
 
     await expect(
       service.refineDraft('auth-user-1', 'token', {
@@ -125,12 +145,15 @@ describe('AiAssistService.refineDraft', () => {
         instruction: 'proofread',
       }),
     ).rejects.toBeInstanceOf(ForbiddenException);
-    expect(completeWithClaude).not.toHaveBeenCalled();
+    expect(orgAiSettingsService.completeForOrg).not.toHaveBeenCalled();
   });
 
   it('rejects empty content', async () => {
     setUpSupabase({ membershipFound: true });
-    const service = new AiAssistService(makeMessagesServiceMock('guardian'));
+    const service = new AiAssistService(
+      makeMessagesServiceMock('guardian'),
+      makeOrgAiSettingsServiceMock(),
+    );
 
     await expect(
       service.refineDraft('auth-user-1', 'token', {
@@ -145,7 +168,10 @@ describe('AiAssistService.refineDraft', () => {
 
   it('rejects content over the size cap', async () => {
     setUpSupabase({ membershipFound: true });
-    const service = new AiAssistService(makeMessagesServiceMock('guardian'));
+    const service = new AiAssistService(
+      makeMessagesServiceMock('guardian'),
+      makeOrgAiSettingsServiceMock(),
+    );
 
     await expect(
       service.refineDraft('auth-user-1', 'token', {
@@ -160,7 +186,10 @@ describe('AiAssistService.refineDraft', () => {
 
   it('requires customInstruction for the custom instruction', async () => {
     setUpSupabase({ membershipFound: true });
-    const service = new AiAssistService(makeMessagesServiceMock('guardian'));
+    const service = new AiAssistService(
+      makeMessagesServiceMock('guardian'),
+      makeOrgAiSettingsServiceMock(),
+    );
 
     await expect(
       service.refineDraft('auth-user-1', 'token', {
@@ -175,7 +204,10 @@ describe('AiAssistService.refineDraft', () => {
 
   it('requires targetLanguage for the translate instruction', async () => {
     setUpSupabase({ membershipFound: true });
-    const service = new AiAssistService(makeMessagesServiceMock('guardian'));
+    const service = new AiAssistService(
+      makeMessagesServiceMock('guardian'),
+      makeOrgAiSettingsServiceMock(),
+    );
 
     await expect(
       service.refineDraft('auth-user-1', 'token', {
@@ -188,9 +220,34 @@ describe('AiAssistService.refineDraft', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  it('rejects when the org has not configured/enabled an AI provider', async () => {
+    setUpSupabase({ membershipFound: true });
+    const orgAiSettingsService = makeOrgAiSettingsServiceMock();
+    orgAiSettingsService.isEnabledForOrg.mockResolvedValue(false);
+    const service = new AiAssistService(
+      makeMessagesServiceMock('guardian'),
+      orgAiSettingsService,
+    );
+
+    await expect(
+      service.refineDraft('auth-user-1', 'token', {
+        orgId: ORG_ID,
+        channelId: CHANNEL_ID,
+        profileId: PROFILE_ID,
+        content: 'hello there',
+        instruction: 'proofread',
+      }),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    expect(orgAiSettingsService.completeForOrg).not.toHaveBeenCalled();
+  });
+
   it("rejects once the profile has hit today's rate limit", async () => {
     setUpSupabase({ membershipFound: true, usageCount: 30 });
-    const service = new AiAssistService(makeMessagesServiceMock('guardian'));
+    const orgAiSettingsService = makeOrgAiSettingsServiceMock();
+    const service = new AiAssistService(
+      makeMessagesServiceMock('guardian'),
+      orgAiSettingsService,
+    );
 
     await expect(
       service.refineDraft('auth-user-1', 'token', {
@@ -201,13 +258,17 @@ describe('AiAssistService.refineDraft', () => {
         instruction: 'proofread',
       }),
     ).rejects.toBeInstanceOf(ForbiddenException);
-    expect(completeWithClaude).not.toHaveBeenCalled();
+    expect(orgAiSettingsService.completeForOrg).not.toHaveBeenCalled();
   });
 
   it('refines only the selected span and flags a dropped fact', async () => {
     setUpSupabase({ membershipFound: true, usageCount: 0 });
-    jest.mocked(completeWithClaude).mockResolvedValue('Thanks for the update');
-    const service = new AiAssistService(makeMessagesServiceMock('guardian'));
+    const orgAiSettingsService = makeOrgAiSettingsServiceMock();
+    orgAiSettingsService.completeForOrg.mockResolvedValue('Thanks for the update');
+    const service = new AiAssistService(
+      makeMessagesServiceMock('guardian'),
+      orgAiSettingsService,
+    );
 
     const result = await service.refineDraft('auth-user-1', 'token', {
       orgId: ORG_ID,
@@ -225,8 +286,12 @@ describe('AiAssistService.refineDraft', () => {
 
   it('succeeds and reports facts preserved when nothing important was dropped', async () => {
     setUpSupabase({ membershipFound: true, usageCount: 0 });
-    jest.mocked(completeWithClaude).mockResolvedValue('hi there!');
-    const service = new AiAssistService(makeMessagesServiceMock('educator'));
+    const orgAiSettingsService = makeOrgAiSettingsServiceMock();
+    orgAiSettingsService.completeForOrg.mockResolvedValue('hi there!');
+    const service = new AiAssistService(
+      makeMessagesServiceMock('educator'),
+      orgAiSettingsService,
+    );
 
     const result = await service.refineDraft('auth-user-1', 'token', {
       orgId: ORG_ID,
@@ -247,14 +312,16 @@ describe('AiAssistService.refineDraft', () => {
 describe('AiAssistService.suggestReplies', () => {
   beforeEach(() => {
     jest.mocked(createSupabaseServiceClient).mockReset();
-    jest.mocked(completeWithClaude).mockReset();
     jest.mocked(evaluateApiBooleanFlag).mockReset().mockResolvedValue(true);
   });
 
   it('rejects when the enable-ai-suggested-replies flag is off', async () => {
     setUpSupabase({ membershipFound: true });
     jest.mocked(evaluateApiBooleanFlag).mockResolvedValue(false);
-    const service = new AiAssistService(makeMessagesServiceMock('guardian'));
+    const service = new AiAssistService(
+      makeMessagesServiceMock('guardian'),
+      makeOrgAiSettingsServiceMock(),
+    );
 
     await expect(
       service.suggestReplies('auth-user-1', 'token', {
@@ -267,7 +334,10 @@ describe('AiAssistService.suggestReplies', () => {
 
   it('rejects an ineligible profile kind', async () => {
     setUpSupabase({ membershipFound: true });
-    const service = new AiAssistService(makeMessagesServiceMock('child'));
+    const service = new AiAssistService(
+      makeMessagesServiceMock('child'),
+      makeOrgAiSettingsServiceMock(),
+    );
 
     await expect(
       service.suggestReplies('auth-user-1', 'token', {
@@ -278,9 +348,37 @@ describe('AiAssistService.suggestReplies', () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
+  it('rejects when the org has not configured/enabled an AI provider', async () => {
+    setUpSupabase({ membershipFound: true });
+    const orgAiSettingsService = makeOrgAiSettingsServiceMock();
+    orgAiSettingsService.isEnabledForOrg.mockResolvedValue(false);
+    const messagesService = makeMessagesServiceMock('guardian');
+    (messagesService.getChannelMessages as jest.Mock).mockResolvedValue([
+      {
+        ids: { id: 'm1' },
+        core: { type: 'text', sender: { profile: { displayName: 'Alice' } } },
+        content: { text: 'hi' },
+      },
+    ]);
+    const service = new AiAssistService(messagesService, orgAiSettingsService);
+
+    await expect(
+      service.suggestReplies('auth-user-1', 'token', {
+        orgId: ORG_ID,
+        channelId: CHANNEL_ID,
+        profileId: PROFILE_ID,
+      }),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    expect(orgAiSettingsService.completeForOrg).not.toHaveBeenCalled();
+  });
+
   it('returns an empty suggestion list when the channel has no messages', async () => {
     setUpSupabase({ membershipFound: true });
-    const service = new AiAssistService(makeMessagesServiceMock('staff'));
+    const orgAiSettingsService = makeOrgAiSettingsServiceMock();
+    const service = new AiAssistService(
+      makeMessagesServiceMock('staff'),
+      orgAiSettingsService,
+    );
 
     const result = await service.suggestReplies('auth-user-1', 'token', {
       orgId: ORG_ID,
@@ -288,14 +386,15 @@ describe('AiAssistService.suggestReplies', () => {
       profileId: PROFILE_ID,
     });
     expect(result).toEqual({ suggestions: [] });
-    expect(completeWithClaude).not.toHaveBeenCalled();
+    expect(orgAiSettingsService.completeForOrg).not.toHaveBeenCalled();
   });
 
   it('parses a JSON array response, ignoring a stray code fence', async () => {
     setUpSupabase({ membershipFound: true });
-    jest
-      .mocked(completeWithClaude)
-      .mockResolvedValue('```json\n["Sounds good!", "Can we confirm the time?"]\n```');
+    const orgAiSettingsService = makeOrgAiSettingsServiceMock();
+    orgAiSettingsService.completeForOrg.mockResolvedValue(
+      '```json\n["Sounds good!", "Can we confirm the time?"]\n```',
+    );
     const messagesService = makeMessagesServiceMock('guardian');
     (messagesService.getChannelMessages as jest.Mock).mockResolvedValue([
       {
@@ -304,7 +403,7 @@ describe('AiAssistService.suggestReplies', () => {
         content: { text: 'When is the trip?' },
       },
     ]);
-    const service = new AiAssistService(messagesService);
+    const service = new AiAssistService(messagesService, orgAiSettingsService);
 
     const result = await service.suggestReplies('auth-user-1', 'token', {
       orgId: ORG_ID,
@@ -316,7 +415,8 @@ describe('AiAssistService.suggestReplies', () => {
 
   it('returns no suggestions when the model output is not valid JSON', async () => {
     setUpSupabase({ membershipFound: true });
-    jest.mocked(completeWithClaude).mockResolvedValue('Sure, happy to help!');
+    const orgAiSettingsService = makeOrgAiSettingsServiceMock();
+    orgAiSettingsService.completeForOrg.mockResolvedValue('Sure, happy to help!');
     const messagesService = makeMessagesServiceMock('guardian');
     (messagesService.getChannelMessages as jest.Mock).mockResolvedValue([
       {
@@ -325,7 +425,7 @@ describe('AiAssistService.suggestReplies', () => {
         content: { text: 'hi' },
       },
     ]);
-    const service = new AiAssistService(messagesService);
+    const service = new AiAssistService(messagesService, orgAiSettingsService);
 
     const result = await service.suggestReplies('auth-user-1', 'token', {
       orgId: ORG_ID,
@@ -343,7 +443,29 @@ describe('AiAssistService.getEligibility', () => {
   });
 
   it('reports both flags off for an ineligible profile kind, without evaluating PostHog', async () => {
-    const service = new AiAssistService(makeMessagesServiceMock('child'));
+    const orgAiSettingsService = makeOrgAiSettingsServiceMock();
+    const service = new AiAssistService(
+      makeMessagesServiceMock('child'),
+      orgAiSettingsService,
+    );
+
+    const result = await service.getEligibility('auth-user-1', 'token', {
+      orgId: ORG_ID,
+      profileId: PROFILE_ID,
+    });
+
+    expect(result).toEqual({ enableAiRefine: false, enableAiSuggestedReplies: false });
+    expect(evaluateApiBooleanFlag).not.toHaveBeenCalled();
+    expect(orgAiSettingsService.isEnabledForOrg).not.toHaveBeenCalled();
+  });
+
+  it('reports both flags off when the org has not enabled AI, without evaluating PostHog', async () => {
+    const orgAiSettingsService = makeOrgAiSettingsServiceMock();
+    orgAiSettingsService.isEnabledForOrg.mockResolvedValue(false);
+    const service = new AiAssistService(
+      makeMessagesServiceMock('educator'),
+      orgAiSettingsService,
+    );
 
     const result = await service.getEligibility('auth-user-1', 'token', {
       orgId: ORG_ID,
@@ -358,7 +480,10 @@ describe('AiAssistService.getEligibility', () => {
     jest
       .mocked(evaluateApiBooleanFlag)
       .mockImplementation(async ({ flagKey }) => flagKey === 'enable-ai-refine');
-    const service = new AiAssistService(makeMessagesServiceMock('educator'));
+    const service = new AiAssistService(
+      makeMessagesServiceMock('educator'),
+      makeOrgAiSettingsServiceMock(),
+    );
 
     const result = await service.getEligibility('auth-user-1', 'token', {
       orgId: ORG_ID,
