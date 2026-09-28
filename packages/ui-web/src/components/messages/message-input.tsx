@@ -72,6 +72,7 @@ import {
   BookOpen,
   ClipboardCheck,
   Sparkles,
+  Lightbulb,
   Clock,
   type LucideIcon,
 } from 'lucide-react';
@@ -2175,7 +2176,7 @@ export function MessageInput({
                       {isSuggestedRepliesLoading ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
-                        <Sparkles className="h-4 w-4" />
+                        <Lightbulb className="h-4 w-4" />
                       )}
                     </Button>
                   </TooltipTrigger>
