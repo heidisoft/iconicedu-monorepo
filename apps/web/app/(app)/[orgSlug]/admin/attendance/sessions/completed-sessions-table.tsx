@@ -37,6 +37,9 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
   Input,
   Label,
   Select,
@@ -851,16 +854,37 @@ export function CompletedSessionsTable({
                               </p>
                             )}
                             {disputed && showDisputeDetails && person.disputeDetails && (
-                              <p className="text-xs text-muted-foreground">
-                                {DISPUTE_CATEGORY_LABELS.get(
-                                  person.disputeDetails.category,
-                                ) ?? person.disputeDetails.category}
-                                {person.disputeDetails.reason
-                                  ? `: ${person.disputeDetails.reason}`
-                                  : ''}
-                                {person.disputeDetails.rescheduleRequested &&
-                                  ' · Reschedule requested'}
-                              </p>
+                              <HoverCard>
+                                <HoverCardTrigger asChild>
+                                  <p className="max-w-[16rem] cursor-default truncate text-xs text-muted-foreground">
+                                    {DISPUTE_CATEGORY_LABELS.get(
+                                      person.disputeDetails.category,
+                                    ) ?? person.disputeDetails.category}
+                                    {person.disputeDetails.reason
+                                      ? `: ${person.disputeDetails.reason}`
+                                      : ''}
+                                    {person.disputeDetails.rescheduleRequested &&
+                                      ' · Reschedule requested'}
+                                  </p>
+                                </HoverCardTrigger>
+                                <HoverCardContent className="w-72 text-xs">
+                                  <p className="font-medium text-foreground">
+                                    {DISPUTE_CATEGORY_LABELS.get(
+                                      person.disputeDetails.category,
+                                    ) ?? person.disputeDetails.category}
+                                  </p>
+                                  {person.disputeDetails.reason && (
+                                    <p className="mt-1 whitespace-normal text-muted-foreground">
+                                      {person.disputeDetails.reason}
+                                    </p>
+                                  )}
+                                  {person.disputeDetails.rescheduleRequested && (
+                                    <p className="mt-1 text-muted-foreground">
+                                      Reschedule requested
+                                    </p>
+                                  )}
+                                </HoverCardContent>
+                              </HoverCard>
                             )}
                           </div>
                           <Button
