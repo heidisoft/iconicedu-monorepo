@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
+import { ChevronDown, Loader2 } from 'lucide-react';
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 import type {
   AdminOrgProfileOptionVM,
@@ -20,6 +20,11 @@ import {
   AdminFilterBar,
   FilterDropdown,
 } from '@iconicedu/web/components/admin/admin-filter-bar';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@iconicedu/ui-web/ui/collapsible';
 import { CompletedSessionsTable } from '@iconicedu/web/app/(app)/[orgSlug]/admin/attendance/sessions/completed-sessions-table';
 import {
   OverviewSkeleton,
@@ -177,39 +182,55 @@ function Breakdown({
   role: 'educator' | 'guardian';
   hoursLabel: string;
 }) {
+  const [isOpen, setIsOpen] = React.useState(false);
   const people = buildConfirmerBreakdown(rows, role);
   return (
     <div className="overflow-hidden rounded-xl border bg-card">
-      <div className="border-b px-6 py-4">
-        <h2 className="text-sm font-semibold">{title}</h2>
-      </div>
-      <div className="space-y-4 px-6 py-5">
-        {people.length === 0 ? (
-          <p className="py-12 text-center text-sm text-muted-foreground">
-            No matching tutors or parents.
-          </p>
-        ) : (
-          people.map((person) => (
-            <div key={person.id}>
-              <div className="mb-1.5 flex items-center justify-between gap-3 text-sm">
-                <span className="truncate font-medium">{person.name}</span>
-                <span className="shrink-0 text-muted-foreground">
-                  {person.sessions} / {person.total} confirmed · {person.percentage}%
-                </span>
-              </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full bg-primary"
-                  style={{ width: `${person.percentage}%` }}
-                />
-              </div>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {person.hours.toFixed(1)}h {hoursLabel}
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className="flex w-full items-center justify-between px-6 py-4 text-left"
+          >
+            <h2 className="text-sm font-semibold">{title}</h2>
+            <ChevronDown
+              aria-hidden="true"
+              className={`size-4 shrink-0 text-muted-foreground transition-transform ${
+                isOpen ? 'rotate-180' : ''
+              }`}
+            />
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="border-t">
+          <div className="space-y-4 px-6 py-5">
+            {people.length === 0 ? (
+              <p className="py-12 text-center text-sm text-muted-foreground">
+                No matching tutors or parents.
               </p>
-            </div>
-          ))
-        )}
-      </div>
+            ) : (
+              people.map((person) => (
+                <div key={person.id}>
+                  <div className="mb-1.5 flex items-center justify-between gap-3 text-sm">
+                    <span className="truncate font-medium">{person.name}</span>
+                    <span className="shrink-0 text-muted-foreground">
+                      {person.sessions} / {person.total} confirmed · {person.percentage}%
+                    </span>
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full bg-primary"
+                      style={{ width: `${person.percentage}%` }}
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {person.hours.toFixed(1)}h {hoursLabel}
+                  </p>
+                </div>
+              ))
+            )}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   );
 }
@@ -324,11 +345,11 @@ function OverviewSection({
               options: options(classrooms, 'All classrooms'),
             },
             {
-              label: 'Method',
+              label: 'Status',
               value: filters.method,
               onChange: update('method'),
               options: [
-                { value: 'all', label: 'All methods' },
+                { value: 'all', label: 'All statuses' },
                 { value: 'confirmed', label: 'Confirmed' },
                 { value: 'auto_confirmed', label: 'Auto-confirmed' },
                 { value: 'mixed', label: 'Mixed' },
