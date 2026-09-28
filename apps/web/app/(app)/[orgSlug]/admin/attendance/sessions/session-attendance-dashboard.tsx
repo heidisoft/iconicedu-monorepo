@@ -344,19 +344,6 @@ function OverviewSection({
               onChange: update('classroomId'),
               options: options(classrooms, 'All classrooms'),
             },
-            {
-              label: 'Status',
-              value: filters.method,
-              onChange: update('method'),
-              options: [
-                { value: 'all', label: 'All statuses' },
-                { value: 'confirmed', label: 'Confirmed' },
-                { value: 'auto_confirmed', label: 'Auto-confirmed' },
-                { value: 'mixed', label: 'Mixed' },
-                { value: 'pending', label: 'Pending' },
-                { value: 'disputed', label: 'Disputed' },
-              ],
-            },
           ]}
         />
         <p className="px-1 text-right text-xs text-muted-foreground">
@@ -412,6 +399,21 @@ function OverviewSection({
             options: [
               { value: 'all', label: 'All students' },
               ...students.map((name) => ({ value: name, label: name })),
+            ],
+          }}
+        />
+        <FilterDropdown
+          group={{
+            label: 'Status',
+            value: filters.method,
+            onChange: update('method'),
+            options: [
+              { value: 'all', label: 'All statuses' },
+              { value: 'confirmed', label: 'Confirmed' },
+              { value: 'auto_confirmed', label: 'Auto-confirmed' },
+              { value: 'mixed', label: 'Mixed' },
+              { value: 'pending', label: 'Pending' },
+              { value: 'disputed', label: 'Disputed' },
             ],
           }}
         />
