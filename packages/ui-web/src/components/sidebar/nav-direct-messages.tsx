@@ -141,7 +141,7 @@ export function NavDirectMessages({
       {/* <SidebarGroupAction title="Add Project">
         <Plus /> <span className="sr-only">Add Project</span>
       </SidebarGroupAction> */}
-      <SidebarMenu>
+      <SidebarMenu className="max-h-72 overflow-y-auto">
         {sortedDirectMessages.map((item) => {
           const isActive = item.ids.id === activeChannelId;
           const otherParticipant =
@@ -158,7 +158,7 @@ export function NavDirectMessages({
           );
           const unreadCount = getDirectMessageItemUnreadCount(item, currentUserId);
           return (
-            <SidebarMenuItem key={item.ids.id} className="py-1">
+            <SidebarMenuItem key={item.ids.id} className="py-0.5">
               <SidebarMenuButton
                 asChild
                 isActive={isActive}
