@@ -683,7 +683,9 @@ export function CompletedSessionsTable({
   // verifiedMinutes/verificationNote (the server then defaults to the full
   // scheduled duration), same as before ConfirmSessionDialog existed. Kept
   // alongside the dialog so the flag can gate the new fields without disabling
-  // staff confirmation entirely.
+  // staff confirmation entirely. adminConfirm resolves 'disputed' rows the
+  // same way it resolves 'pending'/'auto_confirmed' ones, so this also
+  // doubles as the flag-off dispute-resolution action ("Confirm anyway").
   const handleStaffConfirm = async (row: AdminSessionCompletionVM) => {
     if (confirmingId) return;
     setConfirmingId(row.id);
@@ -926,9 +928,26 @@ export function CompletedSessionsTable({
                           )}
                         </>
                       ) : hasDispute ? (
-                        <span className="text-xs text-muted-foreground">
-                          Dispute reported
-                        </span>
+                        <>
+                          <span className="text-xs text-muted-foreground">
+                            Dispute reported
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={confirmingId === row.id}
+                            onClick={() => void handleStaffConfirm(row)}
+                          >
+                            {confirmingId === row.id ? (
+                              <Loader2
+                                className="size-4 animate-spin"
+                                aria-hidden="true"
+                              />
+                            ) : (
+                              'Confirm anyway'
+                            )}
+                          </Button>
+                        </>
                       ) : (
                         <>
                           <Button
