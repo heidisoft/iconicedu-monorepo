@@ -5,12 +5,11 @@ export type ReleaseNotes = {
 };
 
 export const currentReleaseNotes: ReleaseNotes = {
-  id: '2026-09-06-fresh-look',
-  title: 'A fresh new look',
+  id: '2026-09-29-ai-messaging',
+  title: 'Write messages faster with AI',
   items: [
-    'Refreshed the whole app with a calmer forest-green and sage colour theme.',
-    'Redesigned session cards, home overview tiles and chat bubbles.',
-    'Softer, more consistent cards, badges and status pills throughout.',
-    'Improved contrast and polish in dark mode.',
+    '"Refine with AI" rewrites your draft — clearer, shorter, warmer, more professional, or translated — right from the composer.',
+    'AI-suggested replies offer 2–3 quick options above the composer for messages you receive.',
+    'Nothing is ever sent automatically — you always review and edit before sending.',
   ],
 };
