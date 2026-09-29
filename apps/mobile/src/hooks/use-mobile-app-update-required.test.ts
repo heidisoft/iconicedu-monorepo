@@ -18,7 +18,7 @@ jest.mock('@/lib/build-info', () => ({
 
 function mockClient(payload: unknown) {
   (useMobileFeatureFlagClient as jest.Mock).mockReturnValue({
-    reloadFeatureFlags: jest.fn().mockResolvedValue(undefined),
+    reloadFeatureFlagsAsync: jest.fn().mockResolvedValue(undefined),
     getFeatureFlagPayload: jest.fn().mockResolvedValue(payload),
   });
 }
@@ -101,9 +101,22 @@ describe('useMobileAppUpdateRequired', () => {
     expect(result.current.shouldShow).toBe(false);
   });
 
+  it('tolerates a malformed payload (non-string fields) without crashing, treating them as unset', async () => {
+    mockClient({ ios: 2, message: { nested: true }, iosUrl: null });
+
+    const { result } = renderHook(() => useMobileAppUpdateRequired());
+
+    await waitFor(() => {
+      expect(useMobileFeatureFlagClient).toHaveBeenCalled();
+    });
+    expect(() => result.current.message).not.toThrow();
+    expect(result.current.shouldShow).toBe(false);
+    expect(result.current.message).toMatch(/update/i);
+  });
+
   it('tolerates a flag-fetch failure by not showing the banner', async () => {
     (useMobileFeatureFlagClient as jest.Mock).mockReturnValue({
-      reloadFeatureFlags: jest.fn().mockRejectedValue(new Error('network')),
+      reloadFeatureFlagsAsync: jest.fn().mockRejectedValue(new Error('network')),
       getFeatureFlagPayload: jest.fn(),
     });
 

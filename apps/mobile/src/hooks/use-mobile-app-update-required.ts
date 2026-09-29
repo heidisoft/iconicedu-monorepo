@@ -19,9 +19,28 @@ type UseMobileAppUpdateRequiredResult = {
   dismiss: () => void;
 };
 
+function asString(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined;
+}
+
+/**
+ * A PostHog flag payload is edited by hand on a dashboard, so nothing about
+ * its shape is guaranteed — a field could be a number, an object, anything.
+ * Every field is read through `asString` so a malformed edit degrades to
+ * "that field is unset" instead of a non-string reaching a later
+ * `.trim()` call (in isVersionAtLeast/getAppStoreUrl/the message getter)
+ * and throwing outside this effect's try/catch.
+ */
 function parsePayload(value: unknown): MobileMinAppVersionPayload | null {
   if (!value || typeof value !== 'object') return null;
-  return value as MobileMinAppVersionPayload;
+  const raw = value as Record<string, unknown>;
+  return {
+    ios: asString(raw.ios),
+    android: asString(raw.android),
+    message: asString(raw.message),
+    iosUrl: asString(raw.iosUrl),
+    androidUrl: asString(raw.androidUrl),
+  };
 }
 
 /**
@@ -42,7 +61,12 @@ export function useMobileAppUpdateRequired(): UseMobileAppUpdateRequiredResult {
     async function evaluate() {
       if (!client) return;
       try {
-        await client.reloadFeatureFlags?.();
+        // reloadFeatureFlags() returns void and only *starts* the request —
+        // reading the payload right after it would race the network call and
+        // see stale/cached data on a first launch or right after the flag
+        // changes. reloadFeatureFlagsAsync() resolves once the refresh (and
+        // its persistence) actually completes.
+        await client.reloadFeatureFlagsAsync?.();
         const value = await client.getFeatureFlagPayload?.(
           mobileFeatureFlagKeys.mobileMinAppVersion,
         );
