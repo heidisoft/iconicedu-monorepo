@@ -8,11 +8,13 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppProviders } from '@/providers/app-providers';
 import { useTheme } from '@/providers/theme-provider';
 import { useAuth } from '@/providers/auth-provider';
+import { useFamilyView } from '@/providers/family-view-provider';
 import { ScreenTracker } from '@/components/analytics/screen-tracker';
 import { AppLifecycleTracker } from '@/components/analytics/app-lifecycle-tracker';
 import { PresenceTracker } from '@/components/presence/presence-tracker';
 import { WhatsNewModal } from '@/components/updates/whats-new-modal';
 import { UpdateRequiredBanner } from '@/components/updates/update-required-banner';
+import { useAiAssistEligibility } from '@/hooks/use-ai-assist-eligibility';
 import { useAppUpdate } from '@/hooks/use-app-update';
 import { useMobileAppUpdateRequired } from '@/hooks/use-mobile-app-update-required';
 import { useWhatsNewReleaseNotes } from '@/hooks/use-whats-new-release-notes';
@@ -34,9 +36,23 @@ const styles = StyleSheet.create({
 function RootContent() {
   const { isDark } = useTheme();
   const { loading } = useAuth();
+  const familyView = useFamilyView();
   const whatsNew = useWhatsNewReleaseNotes();
   const appUpdateRequired = useMobileAppUpdateRequired();
   useAppUpdate();
+
+  // Same server-derived truth MessageInput gates its own AI buttons on
+  // (org has AI configured + profile kind + PostHog rollout) — see
+  // AiAssistService.getEligibility. A release note flagged
+  // requiresAiAssistEligibility only shows once this says the profile can
+  // actually use at least one of the capabilities it announces.
+  const orgId = (familyView.account?.org_id as string | undefined) ?? null;
+  const profileId = (familyView.profile?.id as string | undefined) ?? null;
+  const aiAssistEligibility = useAiAssistEligibility({ orgId, profileId });
+  const isWhatsNewEligible =
+    !whatsNew.releaseNotes.requiresAiAssistEligibility ||
+    aiAssistEligibility.enableAiRefine ||
+    aiAssistEligibility.enableAiSuggestedReplies;
 
   if (loading) {
     return <SpinnerScreen />;
@@ -58,7 +74,7 @@ function RootContent() {
       <PresenceTracker />
       <Slot />
       <WhatsNewModal
-        visible={whatsNew.shouldShow}
+        visible={whatsNew.shouldShow && isWhatsNewEligible}
         releaseNotes={whatsNew.releaseNotes}
         onDismiss={whatsNew.dismiss}
       />
