@@ -21,6 +21,7 @@ export const platformFeatureFlagKeys = {
   enableSessionCompletionVerifiedDuration: 'enable-session-completion-verified-duration',
   enableSessionCompletionDisputeDetails: 'enable-session-completion-dispute-details',
   enableOrgAiProviderSettings: 'enable-org-ai-provider-settings',
+  mobileMinAppVersion: 'mobile-min-app-version',
 } as const;
 
 export type PlatformFeatureFlagKey =

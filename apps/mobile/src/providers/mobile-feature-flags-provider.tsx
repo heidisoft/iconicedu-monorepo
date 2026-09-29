@@ -3,6 +3,8 @@ import React, { createContext, useContext } from 'react';
 export type MobileFeatureFlagClient = {
   isFeatureEnabled?: (key: string) => boolean | Promise<boolean>;
   getFeatureFlag?: (key: string) => unknown | Promise<unknown>;
+  /** The JSON payload attached to a flag (independent of its boolean/variant value) — used for non-boolean config flags like the min-app-version nudge. */
+  getFeatureFlagPayload?: (key: string) => unknown | Promise<unknown>;
   reloadFeatureFlags?: () => void | Promise<void>;
 };
 

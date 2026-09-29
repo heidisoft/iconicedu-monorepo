@@ -12,7 +12,9 @@ import { ScreenTracker } from '@/components/analytics/screen-tracker';
 import { AppLifecycleTracker } from '@/components/analytics/app-lifecycle-tracker';
 import { PresenceTracker } from '@/components/presence/presence-tracker';
 import { WhatsNewModal } from '@/components/updates/whats-new-modal';
+import { UpdateRequiredBanner } from '@/components/updates/update-required-banner';
 import { useAppUpdate } from '@/hooks/use-app-update';
+import { useMobileAppUpdateRequired } from '@/hooks/use-mobile-app-update-required';
 import { useWhatsNewReleaseNotes } from '@/hooks/use-whats-new-release-notes';
 
 function SpinnerScreen() {
@@ -33,6 +35,7 @@ function RootContent() {
   const { isDark } = useTheme();
   const { loading } = useAuth();
   const whatsNew = useWhatsNewReleaseNotes();
+  const appUpdateRequired = useMobileAppUpdateRequired();
   useAppUpdate();
 
   if (loading) {
@@ -58,6 +61,12 @@ function RootContent() {
         visible={whatsNew.shouldShow}
         releaseNotes={whatsNew.releaseNotes}
         onDismiss={whatsNew.dismiss}
+      />
+      <UpdateRequiredBanner
+        visible={appUpdateRequired.shouldShow}
+        message={appUpdateRequired.message}
+        storeUrl={appUpdateRequired.storeUrl}
+        onDismiss={appUpdateRequired.dismiss}
       />
       <PortalHost />
     </>
