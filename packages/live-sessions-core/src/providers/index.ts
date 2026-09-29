@@ -1,7 +1,7 @@
 import type { LiveSessionProviderVM } from '@iconicedu/shared-types';
 
-import type { LiveSessionProviderAdapter } from '@iconicedu/web/lib/live-sessions/types';
-import { dailyLiveSessionProvider } from '@iconicedu/web/lib/live-sessions/providers/daily-provider';
+import type { LiveSessionProviderAdapter } from '../types';
+import { dailyLiveSessionProvider } from './daily-provider';
 
 const providers = new Map<LiveSessionProviderVM, LiveSessionProviderAdapter>([
   ['daily', dailyLiveSessionProvider],

@@ -45,6 +45,7 @@ import { ChannelTopicIconBadge } from '@/lib/learning-space-icons';
 import { RoleNameIndicator } from '@/components/profile/role-name-indicator';
 import { useAccount } from '@/hooks/use-account';
 import { useProfile } from '@/hooks/use-profile';
+import { useJoinLiveSession } from '@/hooks/use-join-live-session';
 import {
   ensureDirectMessageChannelForProfiles,
   fetchChannelMembers,
@@ -326,6 +327,8 @@ export type ChannelInfoSheetProps = {
   }> | null;
   messages?: MessageVM[];
   liveJoinUrl?: string | null;
+  /** True when this channel has live sessions configured, even with no static `liveJoinUrl` yet. */
+  liveSessionEnabled?: boolean;
   onJoinPress?: () => void;
   onClose: () => void;
   onProfilePress?: (user: UserProfileVM) => void;
@@ -1276,6 +1279,7 @@ export function ChannelInfoSheet({
   members,
   messages = [],
   liveJoinUrl,
+  liveSessionEnabled = false,
   onJoinPress,
   onClose,
   onProfilePress,
@@ -1291,6 +1295,7 @@ export function ChannelInfoSheet({
   const queryClient = useQueryClient();
   const { data: account } = useAccount();
   const { data: profile } = useProfile();
+  const joinLiveSession = useJoinLiveSession();
   const s = useMemo(() => makeStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const orgId = account?.org_id ?? '';
@@ -1341,21 +1346,32 @@ export function ChannelInfoSheet({
 
   const handleJoinPress = useCallback(
     (closeSheet?: () => void) => {
-      if (!liveJoinUrl) return;
+      if (!liveJoinUrl && !(liveSessionEnabled && channelId)) return;
       onJoinPress?.();
 
       if (joinTransitionTimeoutRef.current) {
         clearTimeout(joinTransitionTimeoutRef.current);
       }
-      const openJoinTarget = () => {
-        if (isExternalJoinHref(liveJoinUrl)) {
+      const openJoinTarget = async () => {
+        let joinHref = liveJoinUrl ?? null;
+        if (!joinHref && channelId) {
+          try {
+            const result = await joinLiveSession.mutateAsync(channelId);
+            joinHref = result.joinPath;
+          } catch {
+            return;
+          }
+        }
+        if (!joinHref) return;
+
+        if (isExternalJoinHref(joinHref)) {
           setExternalJoinTarget({
-            joinHref: liveJoinUrl,
-            providerLabel: resolveExternalJoinProviderLabel(liveJoinUrl),
+            joinHref,
+            providerLabel: resolveExternalJoinProviderLabel(joinHref),
           });
           return;
         }
-        Linking.openURL(liveJoinUrl).catch(() => null);
+        Linking.openURL(joinHref).catch(() => null);
       };
 
       closeSheet?.();
@@ -1364,10 +1380,10 @@ export function ChannelInfoSheet({
       }
       joinTransitionTimeoutRef.current = setTimeout(() => {
         joinTransitionTimeoutRef.current = null;
-        openJoinTarget();
+        void openJoinTarget();
       }, JOIN_AFTER_CLOSE_DELAY_MS);
     },
-    [liveJoinUrl, onClose, onJoinPress],
+    [channelId, joinLiveSession, liveJoinUrl, liveSessionEnabled, onClose, onJoinPress],
   );
   const handleOpenJoinHref = useCallback((joinHref: string) => {
     Linking.openURL(joinHref).catch(() => null);
@@ -1697,7 +1713,7 @@ export function ChannelInfoSheet({
                 />
                 <Text style={s.heroNameCompact}>{title}</Text>
                 {!!subtitle && <Text style={s.heroSub}>{subtitle}</Text>}
-                {!!liveJoinUrl && (
+                {(!!liveJoinUrl || (liveSessionEnabled && !!channelId)) && (
                   <TouchableOpacity
                     style={s.heroJoinButton}
                     onPress={() => handleJoinPress(close)}

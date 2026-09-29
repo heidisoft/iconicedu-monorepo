@@ -25,6 +25,7 @@ import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 import { usePushConsent } from '@/providers/push-consent-provider';
 import { fetchSpaceChannelMetaByChannelId } from '@/lib/api/queries';
+import { useJoinLiveSession } from '@/hooks/use-join-live-session';
 import {
   MESSAGE_TITLE_FONT_SIZE,
   MESSAGE_TITLE_FONT_WEIGHT,
@@ -207,6 +208,7 @@ export function SessionCard({
   const { colors } = useTheme();
   const s = useMemo(() => makeStyles(colors), [colors]);
   const { requestPushConsent } = usePushConsent();
+  const joinLiveSession = useJoinLiveSession();
   const router = useRouter();
   const [externalJoinTarget, setExternalJoinTarget] = useState<{
     joinHref: string;
@@ -303,8 +305,21 @@ export function SessionCard({
                 handleOpenJoinHref(joinHref);
                 return;
               }
+
+              const result = await joinLiveSession.mutateAsync(session.channelId);
+              if (isExternalJoinHref(result.joinPath)) {
+                setExternalJoinTarget({
+                  joinHref: result.joinPath,
+                  providerLabel: resolveExternalJoinProviderLabel(result.joinPath),
+                });
+                return;
+              }
+
+              void requestPushConsent();
+              handleOpenJoinHref(result.joinPath);
+              return;
             } catch {
-              // Best effort join resolution. Fall back to the classroom if the lookup fails.
+              // Best effort join resolution. Fall back to the classroom if it fails.
             } finally {
               setIsResolvingJoin(false);
             }

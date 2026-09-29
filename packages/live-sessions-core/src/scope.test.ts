@@ -1,16 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@iconicedu/ui-web/lib/class-schedule-utils', () => ({
+vi.mock('./scheduling/expand-recurring-events', () => ({
   expandRecurringEvents: vi.fn(),
 }));
 
-vi.mock('@iconicedu/web/lib/schedules/builders/class-schedule.builder', () => ({
+vi.mock('./scheduling/class-schedule.builder', () => ({
   buildClassSchedulesByOrg: vi.fn(),
 }));
 
-import { expandRecurringEvents } from '@iconicedu/ui-web/lib/class-schedule-utils';
-import { buildClassSchedulesByOrg } from '@iconicedu/web/lib/schedules/builders/class-schedule.builder';
-import { resolveChannelLiveSessionScope } from '@iconicedu/web/lib/live-sessions/scope';
+import { expandRecurringEvents } from './scheduling/expand-recurring-events';
+import { buildClassSchedulesByOrg } from './scheduling/class-schedule.builder';
+import { resolveChannelLiveSessionScope } from './scope';
 
 describe('resolveChannelLiveSessionScope', () => {
   beforeEach(() => {

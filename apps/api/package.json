@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.127.0",
+    "@iconicedu/live-sessions-core": "workspace:*",
     "@iconicedu/shared-types": "workspace:*",
     "@iconicedu/utils": "workspace:*",
     "@nestjs/common": "^11.1.9",
@@ -38,6 +39,7 @@
     "@openfeature/server-sdk": "^1.21.0",
     "@prisma/adapter-pg": "^7.0.1",
     "@prisma/client": "^7.0.1",
+    "@supabase/supabase-js": "^2.86.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
     "jsonwebtoken": "^9.0.2",
@@ -55,6 +57,8 @@
     ],
     "moduleNameMapper": {
       "^@iconicedu/api/(.*)$": "<rootDir>/src/$1",
+      "^@iconicedu/live-sessions-core/(.*)$": "<rootDir>/../../packages/live-sessions-core/src/$1",
+      "^@iconicedu/live-sessions-core$": "<rootDir>/../../packages/live-sessions-core/src",
       "^@iconicedu/shared-types/(.*)$": "<rootDir>/../../packages/shared-types/src/$1",
       "^@iconicedu/shared-types$": "<rootDir>/../../packages/shared-types/src",
       "^@iconicedu/utils$": "<rootDir>/../../packages/utils/src"

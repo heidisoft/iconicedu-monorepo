@@ -1,9 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  __test__,
-  dailyLiveSessionProvider,
-} from '@iconicedu/web/lib/live-sessions/providers/daily-provider';
+import { __test__, dailyLiveSessionProvider } from './daily-provider';
 
 describe('daily live session provider', () => {
   afterEach(() => {

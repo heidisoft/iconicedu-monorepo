@@ -6,6 +6,7 @@ import { PrismaModule } from '@iconicedu/api/prisma/prisma.module';
 import { AuthModule } from '@iconicedu/api/modules/auth/auth.module';
 import { UsersModule } from '@iconicedu/api/modules/users/users.module';
 import { ChannelsModule } from '@iconicedu/api/modules/channels/channels.module';
+import { LiveSessionsModule } from '@iconicedu/api/modules/live-sessions/live-sessions.module';
 import { ClassesModule } from '@iconicedu/api/modules/classes/classes.module';
 import { MessagesModule } from '@iconicedu/api/modules/messages/messages.module';
 import { AiAssistModule } from '@iconicedu/api/modules/ai-assist/ai-assist.module';
@@ -46,6 +47,7 @@ import { RequestLoggingInterceptor } from '@iconicedu/api/observability/request-
     AdminToolsModule,
     UsersModule,
     ChannelsModule,
+    LiveSessionsModule,
     ClassesModule,
     MessagesModule,
     AiAssistModule,

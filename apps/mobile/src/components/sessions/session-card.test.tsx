@@ -6,6 +6,7 @@ import { SessionCard, type ClassSession } from './session-card';
 const mockPush = jest.fn();
 const mockOpenURL = jest.fn();
 const mockFetchSpaceChannelMetaByChannelId = jest.fn();
+const mockJoinLiveSessionMutateAsync = jest.fn();
 
 jest.mock('@/providers/theme-provider', () => ({
   useTheme: () => ({
@@ -33,6 +34,11 @@ jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }));
 jest.mock('@/lib/api/queries', () => ({
   fetchSpaceChannelMetaByChannelId: (...args: unknown[]) =>
     mockFetchSpaceChannelMetaByChannelId(...args),
+}));
+jest.mock('@/hooks/use-join-live-session', () => ({
+  useJoinLiveSession: () => ({
+    mutateAsync: (...args: unknown[]) => mockJoinLiveSessionMutateAsync(...args),
+  }),
 }));
 jest.mock('lucide-react-native', () => ({
   Video: ({ testID }: { testID?: string }) => {
@@ -98,6 +104,10 @@ describe('SessionCard', () => {
     mockPush.mockClear();
     mockOpenURL.mockClear();
     mockFetchSpaceChannelMetaByChannelId.mockReset();
+    mockJoinLiveSessionMutateAsync.mockReset();
+    mockJoinLiveSessionMutateAsync.mockRejectedValue(
+      new Error('Live sessions are not enabled for this channel'),
+    );
   });
 
   it('renders without crashing', () => {
@@ -307,6 +317,35 @@ describe('SessionCard', () => {
         params: { channelId: 'channel-1', tab: 'sessions' },
       }),
     );
+  });
+
+  it('creates and joins a live session via the API when no link is configured', async () => {
+    mockFetchSpaceChannelMetaByChannelId.mockResolvedValue({
+      liveSession: null,
+    });
+    mockJoinLiveSessionMutateAsync.mockResolvedValue({
+      sessionId: 'session-1',
+      joinPath: '/acme/live-sessions/session-1',
+      status: 'live',
+      created: true,
+      provider: 'daily',
+    });
+
+    render(<SessionCard session={baseSession} />);
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Join session'));
+    });
+
+    await waitFor(() =>
+      expect(mockJoinLiveSessionMutateAsync).toHaveBeenCalledWith('channel-1'),
+    );
+    await waitFor(() =>
+      expect(mockOpenURL).toHaveBeenCalledWith(
+        'http://localhost:3000/acme/live-sessions/session-1',
+      ),
+    );
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it('shows Recording button for past sessions', () => {

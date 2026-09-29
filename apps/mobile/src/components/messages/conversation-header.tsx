@@ -131,6 +131,8 @@ export type ConversationHeaderProps = {
   onMore?: () => void;
   liveJoinUrl?: string | null;
   onJoinPress?: () => void;
+  /** Called to create/fetch a join href when no static `liveJoinUrl` is available. */
+  onResolveJoinHref?: () => Promise<string | null>;
   secondaryAvatarSeed?: string | null;
   secondaryAvatarThemeKey?: string | null;
   secondaryAvatarRole?: string | null;
@@ -618,6 +620,7 @@ export function ConversationHeader({
   onMore,
   liveJoinUrl,
   onJoinPress,
+  onResolveJoinHref,
   secondaryAvatarSeed,
   secondaryAvatarThemeKey,
   secondaryAvatarRole,
@@ -631,6 +634,7 @@ export function ConversationHeader({
     joinHref: string;
     providerLabel: string | null;
   } | null>(null);
+  const [isResolvingJoin, setIsResolvingJoin] = useState(false);
 
   const isDm = kind === 'dm';
   const useElevatedHeader = kind !== 'space';
@@ -699,18 +703,33 @@ export function ConversationHeader({
     Linking.openURL(joinHref).catch(() => null);
   }, []);
 
-  const handleJoinPress = useCallback(() => {
-    if (!liveJoinUrl) return;
+  const handleJoinPress = useCallback(async () => {
+    if (!liveJoinUrl && !onResolveJoinHref) return;
+    if (isResolvingJoin) return;
     onJoinPress?.();
-    if (isExternalJoinHref(liveJoinUrl)) {
+
+    let joinHref = liveJoinUrl ?? null;
+    if (!joinHref && onResolveJoinHref) {
+      setIsResolvingJoin(true);
+      try {
+        joinHref = await onResolveJoinHref();
+      } catch {
+        joinHref = null;
+      } finally {
+        setIsResolvingJoin(false);
+      }
+    }
+    if (!joinHref) return;
+
+    if (isExternalJoinHref(joinHref)) {
       setExternalJoinTarget({
-        joinHref: liveJoinUrl,
-        providerLabel: resolveExternalJoinProviderLabel(liveJoinUrl),
+        joinHref,
+        providerLabel: resolveExternalJoinProviderLabel(joinHref),
       });
       return;
     }
-    handleOpenJoinHref(liveJoinUrl);
-  }, [handleOpenJoinHref, liveJoinUrl, onJoinPress]);
+    handleOpenJoinHref(joinHref);
+  }, [handleOpenJoinHref, isResolvingJoin, liveJoinUrl, onJoinPress, onResolveJoinHref]);
   const handleShareJoinHref = useCallback(async () => {
     if (!externalJoinTarget?.joinHref) return;
     try {
@@ -932,12 +951,13 @@ export function ConversationHeader({
           <View style={s.titleBlock}>{titleContent}</View>
         )}
 
-        {(liveJoinUrl || !isReadOnly) && (
+        {(liveJoinUrl || onResolveJoinHref || !isReadOnly) && (
           <View style={s.actions}>
-            {liveJoinUrl ? (
+            {liveJoinUrl || onResolveJoinHref ? (
               <TouchableOpacity
-                style={s.joinPill}
+                style={[s.joinPill, isResolvingJoin && { opacity: 0.6 }]}
                 onPress={handleJoinPress}
+                disabled={isResolvingJoin}
                 activeOpacity={0.85}
                 accessibilityLabel="Join live session"
               >

@@ -1,9 +1,8 @@
-import { expandRecurringEvents } from '@iconicedu/ui-web/lib/class-schedule-utils';
 import type { ClassScheduleVM } from '@iconicedu/shared-types';
 
-import type { ResolvedLiveSessionScope } from '@iconicedu/web/lib/live-sessions/types';
-import { buildClassSchedulesByOrg } from '@iconicedu/web/lib/schedules/builders/class-schedule.builder';
-import type { SupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
+import { expandRecurringEvents } from './scheduling/expand-recurring-events';
+import type { ResolvedLiveSessionScope, LiveSessionSupabaseClient } from './types';
+import { buildClassSchedulesByOrg } from './scheduling/class-schedule.builder';
 
 const UPCOMING_OCCURRENCE_LOOKAHEAD_MS = 30 * 24 * 60 * 60 * 1000;
 const RECENT_OCCURRENCE_GRACE_MS = 30 * 60 * 1000;
@@ -50,7 +49,7 @@ function findRelevantOccurrence(schedule: ClassScheduleVM, now: Date) {
 }
 
 export async function resolveChannelLiveSessionScope(input: {
-  supabase: SupabaseServiceClient;
+  supabase: LiveSessionSupabaseClient;
   orgId: string;
   channelId: string;
   now?: Date;

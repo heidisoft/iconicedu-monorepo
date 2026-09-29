@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { Animated, Linking, Share } from 'react-native';
 import { ConversationHeader } from './conversation-header';
 import {
@@ -352,6 +352,27 @@ describe('ConversationHeader', () => {
 
     expect(Linking.openURL).toHaveBeenCalledWith('/live-sessions/session-1');
     expect(screen.queryByText('Session ready to join')).toBeNull();
+  });
+
+  it('resolves and opens a join href when no static link is configured', async () => {
+    const onResolveJoinHref = jest.fn().mockResolvedValue('/live-sessions/session-2');
+    render(
+      <ConversationHeader
+        {...baseProps}
+        kind="space"
+        onResolveJoinHref={onResolveJoinHref}
+        onMore={jest.fn()}
+      />,
+    );
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Join live session'));
+    });
+
+    expect(onResolveJoinHref).toHaveBeenCalledTimes(1);
+    await waitFor(() =>
+      expect(Linking.openURL).toHaveBeenCalledWith('/live-sessions/session-2'),
+    );
   });
 
   it('renders dual avatar initials when secondaryAvatarSeed provided', () => {
