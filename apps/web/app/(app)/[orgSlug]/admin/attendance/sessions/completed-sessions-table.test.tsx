@@ -76,11 +76,13 @@ describe('CompletedSessionsTable', () => {
     expect(within(people[2]).getByText('Rating: 4.0 / 5')).toBeInTheDocument();
     expect(within(people[3]).getByText('(Parent) · Disputed')).toBeInTheDocument();
     expect(screen.queryByText('4.5 / 5')).not.toBeInTheDocument();
-    // A disputed participant blocks the staff "Confirm" action for the occurrence
-    // (allowVerifiedDurationOverride defaults off — see the dedicated test below
-    // for the flagged-on dispute-resolution path).
+    // A disputed participant swaps the plain "Confirm" action for "Confirm
+    // anyway" even with allowVerifiedDurationOverride off (default here) — see
+    // the dedicated test below for the flagged-on dispute-resolution path,
+    // which additionally offers a verified-duration override.
     expect(screen.getByText('Dispute reported')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Confirm' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Confirm anyway' })).toBeInTheDocument();
   });
 
   const rowWithDisputeDetails: AdminSessionCompletionVM = {
