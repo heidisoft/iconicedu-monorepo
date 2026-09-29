@@ -10,6 +10,7 @@ export * from './shared/subjects';
 export * from './shared/channel-icons';
 export * from './shared/learning-space-icons';
 export * from './shared/feature-flags';
+export * from './shared/mobile-app-update';
 export * from './shared/class-request';
 export * from './vm/class-schedule';
 export * from './vm/channel';
