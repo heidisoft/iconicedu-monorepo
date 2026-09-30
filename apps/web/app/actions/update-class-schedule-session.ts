@@ -11,8 +11,8 @@ import {
   weekdayTokenFromLocalDate,
 } from '@iconicedu/web/lib/admin/learning-space-schedule-hash';
 import { createApiClient } from '@iconicedu/web/lib/api/http-client';
+import { getClassScheduleSessionContext } from '@iconicedu/web/lib/api/schedules';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
-import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 import { getLocalDate } from '@iconicedu/utils';
 import { enableClassScheduleSeriesReschedule } from '@iconicedu/web/flags';
 
@@ -106,51 +106,16 @@ export async function updateClassScheduleSessionAction(
     throw new Error('Profile record not found');
   }
 
-  const serviceSupabase = createSupabaseServiceClient();
-  const { data: scheduleRow, error: scheduleError } = await serviceSupabase
-    .from('class_schedules')
-    .select(
-      'id, org_id, source_learning_space_id, source_channel_id, timezone, title, start_at, end_at',
-    )
-    .eq('id', input.scheduleId)
-    .eq('org_id', org.id)
-    .is('deleted_at', null)
-    .maybeSingle<{
-      id: string;
-      org_id: string;
-      source_learning_space_id: string | null;
-      source_channel_id: string | null;
-      timezone: string | null;
-      title: string;
-      start_at: string;
-      end_at: string;
-    }>();
+  const sessionContext = await getClassScheduleSessionContext(supabase, {
+    orgId: org.id,
+    scheduleId: input.scheduleId,
+  });
 
-  if (scheduleError) {
-    throw new Error(scheduleError.message);
-  }
-
-  if (!scheduleRow?.source_learning_space_id) {
+  if (!sessionContext.sourceLearningSpaceId) {
     throw new Error('Session not found.');
   }
 
-  const { data: learningSpaceRow, error: learningSpaceError } = await serviceSupabase
-    .from('learning_spaces')
-    .select('status, archived_at')
-    .eq('id', scheduleRow.source_learning_space_id)
-    .eq('org_id', org.id)
-    .is('deleted_at', null)
-    .maybeSingle<{ status: string | null; archived_at: string | null }>();
-
-  if (learningSpaceError) {
-    throw new Error(learningSpaceError.message);
-  }
-
-  if (learningSpaceRow?.archived_at || learningSpaceRow?.status === 'archived') {
-    throw new Error('Archived classrooms cannot be changed.');
-  }
-
-  const detail = await getLearningSpaceDetail(scheduleRow.source_learning_space_id);
+  const detail = await getLearningSpaceDetail(sessionContext.sourceLearningSpaceId);
   const targetSchedule = detail.schedules.find(
     (schedule) => schedule.id === input.scheduleId,
   );
@@ -162,12 +127,12 @@ export async function updateClassScheduleSessionAction(
   const normalizedReason = normalizeReason(input.reason);
   const isRecurringSchedule = Boolean(targetSchedule.rule);
   const scheduleTimezone =
-    targetSchedule.timezone || scheduleRow.timezone || input.timezone;
+    targetSchedule.timezone || sessionContext.timezone || input.timezone;
   const api = createApiClient(supabase);
   const revalidateScheduleViews = () => {
     revalidatePath(`/${input.orgSlug}/class-schedule`);
-    if (scheduleRow.source_channel_id) {
-      revalidatePath(`/${input.orgSlug}/s/${scheduleRow.source_channel_id}`);
+    if (sessionContext.sourceChannelId) {
+      revalidatePath(`/${input.orgSlug}/s/${sessionContext.sourceChannelId}`);
     }
   };
 
