@@ -53,6 +53,12 @@ function createServiceSupabaseStub(input?: {
     accountId: string;
     kind?: string;
   }>;
+  extraProfiles?: Array<{
+    id: string;
+    accountId: string;
+    kind?: string;
+  }>;
+  orgStaffAccountIds?: string[];
 }) {
   let liveSessionRow: Record<string, unknown> | null =
     input?.activeLiveSessionRow ?? null;
@@ -62,9 +68,12 @@ function createServiceSupabaseStub(input?: {
   const memberProfileIds = new Set(input?.memberProfileIds ?? ['profile-1']);
   const familyLinks = input?.familyLinks ?? [];
   const childProfiles = input?.childProfiles ?? [];
+  const extraProfiles = input?.extraProfiles ?? [];
+  const orgStaffAccountIds = new Set(input?.orgStaffAccountIds ?? []);
   const availableProfiles = [
     { id: 'profile-1', accountId: 'account-1', kind: 'educator' },
     ...childProfiles,
+    ...extraProfiles,
   ];
 
   return {
@@ -238,9 +247,64 @@ function createServiceSupabaseStub(input?: {
                   !filters.profileIds || filters.profileIds.includes(profile.id),
               )
               .filter((profile) => !filters.kind || profile.kind === filters.kind)
-              .map((profile) => ({ id: profile.id })),
+              .map((profile) => ({
+                id: profile.id,
+                account_id: profile.accountId,
+                kind: profile.kind,
+              })),
             error: null,
           }),
+        };
+      }
+
+      if (table === 'user_roles') {
+        const filters: { accountIds?: string[] } = {};
+        return {
+          select() {
+            return this;
+          },
+          eq() {
+            return this;
+          },
+          in(column: string, values: string[]) {
+            if (column === 'account_id') {
+              filters.accountIds = values;
+            }
+            return this;
+          },
+          is() {
+            return this;
+          },
+          limit() {
+            return this;
+          },
+          returns: async () => ({
+            data: (filters.accountIds ?? [])
+              .filter((accountId) => orgStaffAccountIds.has(accountId))
+              .map((accountId) => ({ id: `role-${accountId}` })),
+            error: null,
+          }),
+        };
+      }
+
+      if (table === 'accounts') {
+        return {
+          select() {
+            return this;
+          },
+          eq() {
+            return this;
+          },
+          in() {
+            return this;
+          },
+          is() {
+            return this;
+          },
+          limit() {
+            return this;
+          },
+          returns: async () => ({ data: [], error: null }),
         };
       }
 
@@ -646,6 +710,39 @@ describe('createOrJoinLiveSession', () => {
         orgSlug: 'iconic-academy',
       }),
     ).rejects.toThrow('Unauthorized');
+  });
+
+  it('allows an org staff member to join even without a channel_members row', async () => {
+    const serviceSupabase = createServiceSupabaseStub({
+      memberProfileIds: ['profile-other-1'],
+      extraProfiles: [
+        { id: 'profile-staff-1', accountId: 'account-staff-1', kind: 'staff' },
+      ],
+      orgStaffAccountIds: ['account-staff-1'],
+    });
+
+    const result = await createOrJoinLiveSession({
+      serviceSupabase: serviceSupabase as never,
+      actor: {
+        ...DEFAULT_ACTOR,
+        account: { id: 'account-staff-1', org_id: 'org-1' },
+        profile: {
+          id: 'profile-staff-1',
+          account_id: 'account-staff-1',
+          kind: 'staff',
+          display_name: 'Sam Staff',
+          first_name: 'Sam',
+          last_name: 'Staff',
+        } as unknown as ProfileRow,
+      },
+      channelId: 'channel-1',
+      orgSlug: 'iconic-academy',
+    });
+
+    expect(result).toMatchObject({
+      sessionId: 'live-session-1',
+      created: true,
+    });
   });
 
   it('uses schedule-derived learningSpaceId and scheduleId when channel metadata is missing', async () => {

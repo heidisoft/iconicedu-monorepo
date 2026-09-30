@@ -124,6 +124,74 @@ async function getChannelSummary(
     .maybeSingle<ChannelSummaryRow>();
 }
 
+/**
+ * Org owners/admins/staff can join or monitor any live session in their org
+ * even when they aren't an explicit channel member — mirrors
+ * apps/api's channels.service.ts hasRosterReadRole, which grants the same
+ * org-role-based bypass for viewing a channel's roster.
+ */
+async function hasOrgStaffRole(
+  supabase: LiveSessionSupabaseClient,
+  orgId: string,
+  profileIds: string[],
+): Promise<boolean> {
+  if (!profileIds.length) {
+    return false;
+  }
+
+  const profilesResponse = await supabase
+    .from('profiles')
+    .select('account_id, kind')
+    .eq('org_id', orgId)
+    .in('id', profileIds)
+    .is('deleted_at', null)
+    .returns<Array<{ account_id: string | null; kind: string | null }>>();
+  if (profilesResponse.error) {
+    throw new Error(profilesResponse.error.message);
+  }
+
+  const rows = profilesResponse.data ?? [];
+  if (rows.some((row) => row.kind === 'staff')) {
+    return true;
+  }
+
+  const accountIds = Array.from(
+    new Set(rows.map((row) => row.account_id).filter((id): id is string => Boolean(id))),
+  );
+  if (!accountIds.length) {
+    return false;
+  }
+
+  const [roleResponse, accountResponse] = await Promise.all([
+    supabase
+      .from('user_roles')
+      .select('id')
+      .eq('org_id', orgId)
+      .in('account_id', accountIds)
+      .in('role_key', ['owner', 'admin', 'staff'])
+      .is('deleted_at', null)
+      .limit(1)
+      .returns<Array<{ id: string }>>(),
+    supabase
+      .from('accounts')
+      .select('id')
+      .in('id', accountIds)
+      .eq('org_id', orgId)
+      .in('primary_role', ['owner', 'admin', 'staff'])
+      .is('deleted_at', null)
+      .limit(1)
+      .returns<Array<{ id: string }>>(),
+  ]);
+  if (roleResponse.error) {
+    throw new Error(roleResponse.error.message);
+  }
+  if (accountResponse.error) {
+    throw new Error(accountResponse.error.message);
+  }
+
+  return Boolean(roleResponse.data?.[0]?.id || accountResponse.data?.[0]?.id);
+}
+
 export async function verifyChannelMembership(
   supabase: LiveSessionSupabaseClient,
   orgId: string,
@@ -148,7 +216,11 @@ export async function verifyChannelMembership(
     throw new Error(response.error.message);
   }
 
-  return Boolean(response.data?.[0]?.id);
+  if (response.data?.[0]?.id) {
+    return true;
+  }
+
+  return hasOrgStaffRole(supabase, orgId, profileIds);
 }
 
 async function assertLearningSpaceIsActionable(input: {
