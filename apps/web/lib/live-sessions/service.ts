@@ -60,6 +60,7 @@ type ChannelSummaryRow = {
   topic: string;
   purpose: string;
   primary_entity_id?: string | null;
+  primary_entity_kind?: string | null;
   live_session_config?: Record<string, unknown> | null;
 };
 
@@ -156,7 +157,9 @@ async function getChannelSummary(
 ) {
   return supabase
     .from('channels')
-    .select('id, org_id, kind, topic, purpose, primary_entity_id, live_session_config')
+    .select(
+      'id, org_id, kind, topic, purpose, primary_entity_id, primary_entity_kind, live_session_config',
+    )
     .eq('org_id', orgId)
     .eq('id', channelId)
     .is('deleted_at', null)
@@ -188,6 +191,89 @@ async function verifyChannelMembership(
   }
 
   return Boolean(response.data?.[0]?.id);
+}
+
+/**
+ * Roles that operate a classroom without sitting on its roster.
+ *
+ * Mirrors `can_operationally_post_to_classroom_channel` (migration
+ * 20260613000000): staff/admin/owner already hold operational authority in
+ * learning-space channels, and `can_staff_observe_channel` (migration
+ * 20260217000000) already shows them the classroom and its schedule. Join was
+ * the odd one out — it asked only for a `channel_members` row, so these users
+ * saw a Join button the endpoint then rejected with 403.
+ */
+const SUPERVISORY_ROLE_KEYS = ['owner', 'admin', 'staff'] as const;
+
+function isClassroomChannel(channel: {
+  purpose: string;
+  primary_entity_kind?: string | null;
+}) {
+  return (
+    channel.purpose === 'learning-space' ||
+    channel.primary_entity_kind === 'learning_space'
+  );
+}
+
+/**
+ * May this actor join a classroom live session by virtue of supervising it?
+ *
+ * Deliberately narrower than "is an admin": the grant is scoped to learning-space
+ * channels in the actor's own org, so it never opens a DM or support huddle to
+ * someone who was not invited to it.
+ */
+async function canSuperviseClassroomChannel(input: {
+  supabase: SupabaseServiceClient;
+  orgId: string;
+  channel: { purpose: string; primary_entity_kind?: string | null };
+  profile: ProfileRow;
+}) {
+  if (!isClassroomChannel(input.channel)) {
+    return false;
+  }
+
+  if (input.profile.kind === 'staff') {
+    return true;
+  }
+
+  const accountId = input.profile.account_id;
+  if (!accountId) {
+    return false;
+  }
+
+  const roleResponse = await input.supabase
+    .from('user_roles')
+    .select('id')
+    .eq('org_id', input.orgId)
+    .eq('account_id', accountId)
+    .in('role_key', SUPERVISORY_ROLE_KEYS)
+    .is('deleted_at', null)
+    .limit(1)
+    .returns<Array<{ id: string }>>();
+
+  if (roleResponse.error) {
+    throw new Error(roleResponse.error.message);
+  }
+
+  if (roleResponse.data?.[0]?.id) {
+    return true;
+  }
+
+  const accountResponse = await input.supabase
+    .from('accounts')
+    .select('id')
+    .eq('org_id', input.orgId)
+    .eq('id', accountId)
+    .in('primary_role', SUPERVISORY_ROLE_KEYS)
+    .is('deleted_at', null)
+    .limit(1)
+    .returns<Array<{ id: string }>>();
+
+  if (accountResponse.error) {
+    throw new Error(accountResponse.error.message);
+  }
+
+  return Boolean(accountResponse.data?.[0]?.id);
 }
 
 async function assertLearningSpaceIsActionable(input: {
@@ -620,7 +706,15 @@ export async function createOrJoinLiveSession(input: {
     channel.id,
     authorizedProfileIds,
   );
-  if (!hasMembership) {
+  if (
+    !hasMembership &&
+    !(await canSuperviseClassroomChannel({
+      supabase: input.serviceSupabase,
+      orgId: channel.org_id,
+      channel,
+      profile,
+    }))
+  ) {
     throw new Error('Unauthorized');
   }
 
@@ -1029,7 +1123,28 @@ export async function resolveLiveSessionJoinAccess(input: {
     authorizedProfileIds,
   );
   if (!hasMembership) {
-    throw new Error('Unauthorized');
+    // Holding a room URL is not authorization, so the supervision branch is
+    // re-checked here rather than trusted from the join call that issued it.
+    const channelResponse = await getChannelSummary(
+      input.serviceSupabase,
+      sessionResponse.data.org_id,
+      sessionResponse.data.channel_id,
+    );
+    if (channelResponse.error) {
+      throw new Error(channelResponse.error.message);
+    }
+    const channel = channelResponse.data;
+    if (
+      !channel ||
+      !(await canSuperviseClassroomChannel({
+        supabase: input.serviceSupabase,
+        orgId: sessionResponse.data.org_id,
+        channel,
+        profile: input.profile,
+      }))
+    ) {
+      throw new Error('Unauthorized');
+    }
   }
 
   const provider = getLiveSessionProvider(
