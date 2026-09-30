@@ -78,6 +78,8 @@ export async function HomePageContent({ orgSlug }: { orgSlug: string }) {
   return (
     <HomePageInfographicClient
       orgSlug={orgSlug}
+      orgId={account.org_id}
+      currentUserId={currentUserProfile?.ids.id}
       isStaffView={metrics.isStaffView}
       isParentView={!metrics.isStaffView && metrics.activeRole === 'parents'}
       isStudentView={!metrics.isStaffView && metrics.activeRole === 'students'}

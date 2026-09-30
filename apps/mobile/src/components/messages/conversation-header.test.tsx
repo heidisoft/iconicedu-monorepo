@@ -292,7 +292,9 @@ describe('ConversationHeader', () => {
 
     fireEvent.press(screen.getByLabelText('Join live session'));
 
-    expect(Linking.openURL).toHaveBeenCalledWith('/live-sessions/session-1');
+    expect(Linking.openURL).toHaveBeenCalledWith(
+      'http://localhost:3000/live-sessions/session-1',
+    );
     expect(screen.queryByTestId('more-icon')).toBeNull();
   });
 
@@ -350,7 +352,9 @@ describe('ConversationHeader', () => {
 
     fireEvent.press(screen.getByLabelText('Join live session'));
 
-    expect(Linking.openURL).toHaveBeenCalledWith('/live-sessions/session-1');
+    expect(Linking.openURL).toHaveBeenCalledWith(
+      'http://localhost:3000/live-sessions/session-1',
+    );
     expect(screen.queryByText('Session ready to join')).toBeNull();
   });
 
@@ -371,7 +375,9 @@ describe('ConversationHeader', () => {
 
     expect(onResolveJoinHref).toHaveBeenCalledTimes(1);
     await waitFor(() =>
-      expect(Linking.openURL).toHaveBeenCalledWith('/live-sessions/session-2'),
+      expect(Linking.openURL).toHaveBeenCalledWith(
+        'http://localhost:3000/live-sessions/session-2',
+      ),
     );
   });
 

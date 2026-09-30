@@ -44,6 +44,11 @@ import { RoleAvatarBadge } from '@/components/profile/role-avatar-badge';
 import { RoleNameIndicator } from '@/components/profile/role-name-indicator';
 import type { PresenceDisplayStatus } from '@/hooks/use-online-profile-ids';
 import { profileAvatarColors } from '@/lib/profile-avatar-colors';
+import {
+  isExternalJoinHref,
+  resolveExternalJoinProviderLabel,
+  resolveJoinHrefForMobile,
+} from '@/lib/messages/live-session-join';
 
 const THEME_KEY_COLORS: Record<string, { bg: string; fg: string }> = {
   slate: { bg: '#667487', fg: '#ffffff' },
@@ -74,28 +79,6 @@ function getInitials(name: string): string {
   const words = name.trim().split(/\s+/);
   if (words.length >= 2) return (words[0]![0]! + words[1]![0]!).toUpperCase();
   return name[0]?.toUpperCase() ?? '?';
-}
-
-function isExternalJoinHref(joinHref?: string | null): boolean {
-  return Boolean(joinHref && /^https?:\/\//i.test(joinHref));
-}
-
-function resolveExternalJoinProviderLabel(joinHref?: string | null) {
-  if (!joinHref || !isExternalJoinHref(joinHref)) {
-    return null;
-  }
-
-  try {
-    const hostname = new URL(joinHref).hostname.toLowerCase();
-    if (hostname.includes('zoom')) return 'Zoom';
-    if (hostname.includes('jitsi')) return 'Jitsi';
-    if (hostname.includes('meet.google')) return 'Google Meet';
-    if (hostname.includes('teams.microsoft')) return 'Microsoft Teams';
-  } catch {
-    return null;
-  }
-
-  return null;
 }
 
 export type ConversationHeaderProps = {
@@ -700,7 +683,7 @@ export function ConversationHeader({
   }, [localTimeIcon]);
 
   const handleOpenJoinHref = useCallback((joinHref: string) => {
-    Linking.openURL(joinHref).catch(() => null);
+    Linking.openURL(resolveJoinHrefForMobile(joinHref)).catch(() => null);
   }, []);
 
   const handleJoinPress = useCallback(async () => {

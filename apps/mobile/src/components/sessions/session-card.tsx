@@ -27,6 +27,11 @@ import { usePushConsent } from '@/providers/push-consent-provider';
 import { fetchSpaceChannelMetaByChannelId } from '@/lib/api/queries';
 import { useJoinLiveSession } from '@/hooks/use-join-live-session';
 import {
+  isExternalJoinHref,
+  resolveExternalJoinProviderLabel,
+  resolveJoinHrefForMobile,
+} from '@/lib/messages/live-session-join';
+import {
   MESSAGE_TITLE_FONT_SIZE,
   MESSAGE_TITLE_FONT_WEIGHT,
 } from '@/lib/message-title-typography';
@@ -141,42 +146,6 @@ function buildParticipantGroups(
     kind,
     participants: participants.filter((participant) => participant.kind === kind),
   })).filter((group) => group.participants.length > 0);
-}
-
-function isExternalJoinHref(joinHref?: string | null): boolean {
-  return Boolean(joinHref && /^https?:\/\//i.test(joinHref));
-}
-
-function resolveExternalJoinProviderLabel(joinHref?: string | null) {
-  if (!joinHref || !isExternalJoinHref(joinHref)) {
-    return null;
-  }
-
-  try {
-    const hostname = new URL(joinHref).hostname.toLowerCase();
-    if (hostname.includes('zoom')) return 'Zoom';
-    if (hostname.includes('jitsi')) return 'Jitsi';
-    if (hostname.includes('meet.google')) return 'Google Meet';
-    if (hostname.includes('teams.microsoft')) return 'Microsoft Teams';
-  } catch {
-    return null;
-  }
-
-  return null;
-}
-
-function resolveJoinHrefForMobile(joinHref: string): string {
-  if (isExternalJoinHref(joinHref)) {
-    return joinHref;
-  }
-
-  const webBaseUrl = process.env.EXPO_PUBLIC_WEB_URL?.trim() || 'http://localhost:3000';
-
-  try {
-    return new URL(joinHref, webBaseUrl).toString();
-  } catch {
-    return joinHref;
-  }
 }
 
 // ─── SessionCard ────────────────────────────────────────────────────────────────

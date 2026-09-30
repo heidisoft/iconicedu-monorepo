@@ -47,6 +47,11 @@ import { useAccount } from '@/hooks/use-account';
 import { useProfile } from '@/hooks/use-profile';
 import { useJoinLiveSession } from '@/hooks/use-join-live-session';
 import {
+  isExternalJoinHref,
+  resolveExternalJoinProviderLabel,
+  resolveJoinHrefForMobile,
+} from '@/lib/messages/live-session-join';
+import {
   ensureDirectMessageChannelForProfiles,
   fetchChannelMembers,
   queryKeys,
@@ -74,28 +79,6 @@ function getInitials(name: string): string {
   const words = name.trim().split(/\s+/);
   if (words.length >= 2) return (words[0]![0]! + words[1]![0]!).toUpperCase();
   return name[0]?.toUpperCase() ?? '?';
-}
-
-function isExternalJoinHref(joinHref?: string | null): boolean {
-  return Boolean(joinHref && /^https?:\/\//i.test(joinHref));
-}
-
-function resolveExternalJoinProviderLabel(joinHref?: string | null) {
-  if (!joinHref || !isExternalJoinHref(joinHref)) {
-    return null;
-  }
-
-  try {
-    const hostname = new URL(joinHref).hostname.toLowerCase();
-    if (hostname.includes('zoom')) return 'Zoom';
-    if (hostname.includes('jitsi')) return 'Jitsi';
-    if (hostname.includes('meet.google')) return 'Google Meet';
-    if (hostname.includes('teams.microsoft')) return 'Microsoft Teams';
-  } catch {
-    return null;
-  }
-
-  return null;
 }
 
 function themeAvatarColor(
@@ -1371,7 +1354,7 @@ export function ChannelInfoSheet({
           });
           return;
         }
-        Linking.openURL(joinHref).catch(() => null);
+        Linking.openURL(resolveJoinHrefForMobile(joinHref)).catch(() => null);
       };
 
       closeSheet?.();
@@ -1386,7 +1369,7 @@ export function ChannelInfoSheet({
     [channelId, joinLiveSession, liveJoinUrl, liveSessionEnabled, onClose, onJoinPress],
   );
   const handleOpenJoinHref = useCallback((joinHref: string) => {
-    Linking.openURL(joinHref).catch(() => null);
+    Linking.openURL(resolveJoinHrefForMobile(joinHref)).catch(() => null);
   }, []);
   const handleShareJoinHref = useCallback(async () => {
     if (!externalJoinTarget?.joinHref) return;

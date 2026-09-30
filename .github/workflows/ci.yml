@@ -897,6 +897,9 @@ jobs:
             --arg phk   "${{ secrets.POSTHOG_KEY }}" \
             --arg phh   "${{ vars.POSTHOG_HOST || 'https://t.iconicedu.lk' }}" \
             --arg aiKey   "${{ secrets.AI_PROVIDER_KEY_ENCRYPTION_KEY }}" \
+            --arg dailyKey  "${{ secrets.DAILY_API_KEY }}" \
+            --arg dailyBase "${{ vars.DAILY_REST_BASE_URL }}" \
+            --arg dailyWh   "${{ secrets.DAILY_WEBHOOK_SECRET }}" \
             '{DATABASE_URL:$db, DIRECT_URL:$dir, SUPABASE_URL:$surl,
               SUPABASE_SERVICE_ROLE_KEY:$srkey, SUPABASE_ANON_KEY:$anon, SUPABASE_JWT_SECRET:$jwt,
               INTERNAL_EVENTS_TOKEN:$evt,
@@ -904,7 +907,10 @@ jobs:
               EXPO_ACCESS_TOKEN:$expo,
               NODE_ENV:"production", NEXT_PUBLIC_APP_ENV:"preview",
               POSTHOG_KEY:$phk, POSTHOG_HOST:$phh}
-              + (if ($aiKey | length) > 0 then {AI_PROVIDER_KEY_ENCRYPTION_KEY:$aiKey} else {} end)')
+              + (if ($aiKey | length) > 0 then {AI_PROVIDER_KEY_ENCRYPTION_KEY:$aiKey} else {} end)
+              + (if ($dailyKey | length) > 0 then {DAILY_API_KEY:$dailyKey} else {} end)
+              + (if ($dailyBase | length) > 0 then {DAILY_REST_BASE_URL:$dailyBase} else {} end)
+              + (if ($dailyWh | length) > 0 then {DAILY_WEBHOOK_SECRET:$dailyWh} else {} end)')
 
           jq -r 'keys[]' <<< "$VARS_JSON" | while read -r KEY; do
             VALUE=$(jq -r --arg key "$KEY" '.[$key]' <<< "$VARS_JSON")
