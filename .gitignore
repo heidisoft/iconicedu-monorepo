@@ -31,3 +31,8 @@ local.properties
 coverage
 apps/web/.vercel/
 /.claude
+
+# Committed vendor-fix source files (applied to node_modules via postinstall)
+# live under paths that look like build output ("build" rule above) but
+# aren't — keep them trackable.
+!scripts/vendor-fixes/**
