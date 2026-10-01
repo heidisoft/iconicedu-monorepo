@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { __test__ } from '@iconicedu/web/lib/live-sessions/expected-participants';
+import { __test__ } from './expected-participants';
 
 describe('expected-participants', () => {
   it('returns the default hybrid attendance policy when config is missing', () => {

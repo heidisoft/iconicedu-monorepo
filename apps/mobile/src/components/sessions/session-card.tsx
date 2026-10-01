@@ -25,6 +25,12 @@ import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 import { usePushConsent } from '@/providers/push-consent-provider';
 import { fetchSpaceChannelMetaByChannelId } from '@/lib/api/queries';
+import { useJoinLiveSession } from '@/hooks/use-join-live-session';
+import {
+  isExternalJoinHref,
+  resolveExternalJoinProviderLabel,
+  resolveJoinHrefForMobile,
+} from '@/lib/messages/live-session-join';
 import {
   MESSAGE_TITLE_FONT_SIZE,
   MESSAGE_TITLE_FONT_WEIGHT,
@@ -142,42 +148,6 @@ function buildParticipantGroups(
   })).filter((group) => group.participants.length > 0);
 }
 
-function isExternalJoinHref(joinHref?: string | null): boolean {
-  return Boolean(joinHref && /^https?:\/\//i.test(joinHref));
-}
-
-function resolveExternalJoinProviderLabel(joinHref?: string | null) {
-  if (!joinHref || !isExternalJoinHref(joinHref)) {
-    return null;
-  }
-
-  try {
-    const hostname = new URL(joinHref).hostname.toLowerCase();
-    if (hostname.includes('zoom')) return 'Zoom';
-    if (hostname.includes('jitsi')) return 'Jitsi';
-    if (hostname.includes('meet.google')) return 'Google Meet';
-    if (hostname.includes('teams.microsoft')) return 'Microsoft Teams';
-  } catch {
-    return null;
-  }
-
-  return null;
-}
-
-function resolveJoinHrefForMobile(joinHref: string): string {
-  if (isExternalJoinHref(joinHref)) {
-    return joinHref;
-  }
-
-  const webBaseUrl = process.env.EXPO_PUBLIC_WEB_URL?.trim() || 'http://localhost:3000';
-
-  try {
-    return new URL(joinHref, webBaseUrl).toString();
-  } catch {
-    return joinHref;
-  }
-}
-
 // ─── SessionCard ────────────────────────────────────────────────────────────────
 
 export function SessionCard({
@@ -207,6 +177,7 @@ export function SessionCard({
   const { colors } = useTheme();
   const s = useMemo(() => makeStyles(colors), [colors]);
   const { requestPushConsent } = usePushConsent();
+  const joinLiveSession = useJoinLiveSession();
   const router = useRouter();
   const [externalJoinTarget, setExternalJoinTarget] = useState<{
     joinHref: string;
@@ -285,6 +256,27 @@ export function SessionCard({
           if (session.channelId) {
             setIsResolvingJoin(true);
             try {
+              // Precedence matches web's session-card: prefer the server
+              // join handler (creates/reuses the live session and records
+              // attendance) before falling back to the bare static
+              // channel-level link.
+              try {
+                const result = await joinLiveSession.mutateAsync(session.channelId);
+                if (isExternalJoinHref(result.joinPath)) {
+                  setExternalJoinTarget({
+                    joinHref: result.joinPath,
+                    providerLabel: resolveExternalJoinProviderLabel(result.joinPath),
+                  });
+                  return;
+                }
+
+                void requestPushConsent();
+                handleOpenJoinHref(result.joinPath);
+                return;
+              } catch {
+                // Fall through to the static channel-level link below.
+              }
+
               const channelMeta = await fetchSpaceChannelMetaByChannelId(
                 session.channelId,
               );
@@ -304,7 +296,7 @@ export function SessionCard({
                 return;
               }
             } catch {
-              // Best effort join resolution. Fall back to the classroom if the lookup fails.
+              // Best effort join resolution. Fall back to the classroom if it fails.
             } finally {
               setIsResolvingJoin(false);
             }

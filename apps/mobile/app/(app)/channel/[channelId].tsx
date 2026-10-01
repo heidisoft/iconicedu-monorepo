@@ -51,6 +51,7 @@ import { resolveChannelTopicIconKey } from '@/lib/learning-space-icons';
 import { buildMobileChannelEmptyStateCopy } from '@/lib/message-empty-state';
 import { reportMobileObservedError } from '@/lib/analytics/report-error';
 import { useMarkRead } from '@/hooks/use-mark-read';
+import { useJoinLiveSession } from '@/hooks/use-join-live-session';
 import { applyOptimisticChannelManualUnread } from '@/lib/messages/apply-optimistic-channel-read-state';
 import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
 import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
@@ -223,9 +224,10 @@ export default function ChannelConversationScreen() {
   const s = useMemo(() => makeStyles(colors), [colors]);
   const messageTheme = resolveMobileMessageUiTheme(resolvedMessageUiThemeKey);
   const ThemedMessageList = messageTheme.MessageList;
+  const liveSessionEnabled = Boolean(channelMeta?.liveSession?.enabled);
   const resolvedLiveJoinUrl =
     channelMeta?.liveSession?.joinUrl ??
-    (channelMeta?.liveSession?.enabled ? (liveSession?.meetingLink ?? null) : null);
+    (liveSessionEnabled ? (liveSession?.meetingLink ?? null) : null);
 
   // ── Info sheet state ──
   const [infoVisible, setInfoVisible] = useState(false);
@@ -374,6 +376,7 @@ export default function ChannelConversationScreen() {
   } = usePushNudge();
   const { requestPushConsent } = usePushConsent();
   const scheduleConsentRequestedRef = useRef(false);
+  const joinLiveSession = useJoinLiveSession();
 
   const handlePushNotificationMoment = useCallback(async () => {
     const showedConsent = await requestPushConsent();
@@ -381,6 +384,12 @@ export default function ChannelConversationScreen() {
       await triggerNudge();
     }
   }, [requestPushConsent, triggerNudge]);
+
+  const handleResolveJoinHref = useCallback(async () => {
+    if (!channelId) return null;
+    const result = await joinLiveSession.mutateAsync(channelId);
+    return result.joinPath;
+  }, [channelId, joinLiveSession]);
 
   useEffect(() => {
     if (activeTab !== 'sessions' || scheduleConsentRequestedRef.current) return;
@@ -891,6 +900,7 @@ export default function ChannelConversationScreen() {
         onBack={() => router.back()}
         onMore={() => setInfoVisible(true)}
         liveJoinUrl={resolvedLiveJoinUrl}
+        onResolveJoinHref={liveSessionEnabled ? handleResolveJoinHref : undefined}
         onJoinPress={() => void handlePushNotificationMoment()}
       />
 
@@ -1015,6 +1025,7 @@ export default function ChannelConversationScreen() {
         themeKey={resolvedThemeKey}
         messages={messages ?? []}
         liveJoinUrl={resolvedLiveJoinUrl}
+        liveSessionEnabled={liveSessionEnabled}
         onJoinPress={() => void handlePushNotificationMoment()}
         onClose={() => setInfoVisible(false)}
         onProfilePress={(user) => {

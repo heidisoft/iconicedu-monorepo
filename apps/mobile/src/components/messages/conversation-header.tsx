@@ -44,6 +44,11 @@ import { RoleAvatarBadge } from '@/components/profile/role-avatar-badge';
 import { RoleNameIndicator } from '@/components/profile/role-name-indicator';
 import type { PresenceDisplayStatus } from '@/hooks/use-online-profile-ids';
 import { profileAvatarColors } from '@/lib/profile-avatar-colors';
+import {
+  isExternalJoinHref,
+  resolveExternalJoinProviderLabel,
+  resolveJoinHrefForMobile,
+} from '@/lib/messages/live-session-join';
 
 const THEME_KEY_COLORS: Record<string, { bg: string; fg: string }> = {
   slate: { bg: '#667487', fg: '#ffffff' },
@@ -74,28 +79,6 @@ function getInitials(name: string): string {
   const words = name.trim().split(/\s+/);
   if (words.length >= 2) return (words[0]![0]! + words[1]![0]!).toUpperCase();
   return name[0]?.toUpperCase() ?? '?';
-}
-
-function isExternalJoinHref(joinHref?: string | null): boolean {
-  return Boolean(joinHref && /^https?:\/\//i.test(joinHref));
-}
-
-function resolveExternalJoinProviderLabel(joinHref?: string | null) {
-  if (!joinHref || !isExternalJoinHref(joinHref)) {
-    return null;
-  }
-
-  try {
-    const hostname = new URL(joinHref).hostname.toLowerCase();
-    if (hostname.includes('zoom')) return 'Zoom';
-    if (hostname.includes('jitsi')) return 'Jitsi';
-    if (hostname.includes('meet.google')) return 'Google Meet';
-    if (hostname.includes('teams.microsoft')) return 'Microsoft Teams';
-  } catch {
-    return null;
-  }
-
-  return null;
 }
 
 export type ConversationHeaderProps = {
@@ -131,6 +114,8 @@ export type ConversationHeaderProps = {
   onMore?: () => void;
   liveJoinUrl?: string | null;
   onJoinPress?: () => void;
+  /** Called to create/fetch a join href when no static `liveJoinUrl` is available. */
+  onResolveJoinHref?: () => Promise<string | null>;
   secondaryAvatarSeed?: string | null;
   secondaryAvatarThemeKey?: string | null;
   secondaryAvatarRole?: string | null;
@@ -618,6 +603,7 @@ export function ConversationHeader({
   onMore,
   liveJoinUrl,
   onJoinPress,
+  onResolveJoinHref,
   secondaryAvatarSeed,
   secondaryAvatarThemeKey,
   secondaryAvatarRole,
@@ -631,6 +617,7 @@ export function ConversationHeader({
     joinHref: string;
     providerLabel: string | null;
   } | null>(null);
+  const [isResolvingJoin, setIsResolvingJoin] = useState(false);
 
   const isDm = kind === 'dm';
   const useElevatedHeader = kind !== 'space';
@@ -696,21 +683,41 @@ export function ConversationHeader({
   }, [localTimeIcon]);
 
   const handleOpenJoinHref = useCallback((joinHref: string) => {
-    Linking.openURL(joinHref).catch(() => null);
+    Linking.openURL(resolveJoinHrefForMobile(joinHref)).catch(() => null);
   }, []);
 
-  const handleJoinPress = useCallback(() => {
-    if (!liveJoinUrl) return;
+  const handleJoinPress = useCallback(async () => {
+    if (!liveJoinUrl && !onResolveJoinHref) return;
+    if (isResolvingJoin) return;
     onJoinPress?.();
-    if (isExternalJoinHref(liveJoinUrl)) {
+
+    // Precedence matches web's header pill: prefer the server join handler
+    // (creates/reuses the live session and records attendance) over the
+    // static channel-level link, which is only a fallback for when the
+    // dynamic handler isn't wired or fails.
+    let joinHref: string | null = null;
+    if (onResolveJoinHref) {
+      setIsResolvingJoin(true);
+      try {
+        joinHref = await onResolveJoinHref();
+      } catch {
+        joinHref = null;
+      } finally {
+        setIsResolvingJoin(false);
+      }
+    }
+    joinHref ??= liveJoinUrl ?? null;
+    if (!joinHref) return;
+
+    if (isExternalJoinHref(joinHref)) {
       setExternalJoinTarget({
-        joinHref: liveJoinUrl,
-        providerLabel: resolveExternalJoinProviderLabel(liveJoinUrl),
+        joinHref,
+        providerLabel: resolveExternalJoinProviderLabel(joinHref),
       });
       return;
     }
-    handleOpenJoinHref(liveJoinUrl);
-  }, [handleOpenJoinHref, liveJoinUrl, onJoinPress]);
+    handleOpenJoinHref(joinHref);
+  }, [handleOpenJoinHref, isResolvingJoin, liveJoinUrl, onJoinPress, onResolveJoinHref]);
   const handleShareJoinHref = useCallback(async () => {
     if (!externalJoinTarget?.joinHref) return;
     try {
@@ -932,12 +939,13 @@ export function ConversationHeader({
           <View style={s.titleBlock}>{titleContent}</View>
         )}
 
-        {(liveJoinUrl || !isReadOnly) && (
+        {(liveJoinUrl || onResolveJoinHref || !isReadOnly) && (
           <View style={s.actions}>
-            {liveJoinUrl ? (
+            {liveJoinUrl || onResolveJoinHref ? (
               <TouchableOpacity
-                style={s.joinPill}
+                style={[s.joinPill, isResolvingJoin && { opacity: 0.6 }]}
                 onPress={handleJoinPress}
+                disabled={isResolvingJoin}
                 activeOpacity={0.85}
                 accessibilityLabel="Join live session"
               >

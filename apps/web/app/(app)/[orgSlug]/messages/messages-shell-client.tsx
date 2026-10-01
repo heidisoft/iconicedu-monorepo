@@ -25,6 +25,7 @@ import { MessagesShell } from '@iconicedu/ui-web';
 import { ExternalLiveSessionJoinDialog } from '@iconicedu/ui-web/components/messages/external-live-session-join-dialog';
 import { useExternalLiveSessionJoinDialog } from '@iconicedu/ui-web/components/messages/use-external-live-session-join-dialog';
 
+import { createApiClient } from '@iconicedu/web/lib/api/http-client';
 import { createSupabaseMessagesRealtimeClient } from '@iconicedu/web/lib/messages/realtime/supabase-messages-realtime-client';
 import { createSupabaseBrowserClient } from '@iconicedu/web/lib/supabase/client';
 import {
@@ -182,7 +183,6 @@ type MessagesShellClientProps = {
 };
 
 export function MessagesShellClient({
-  orgSlug,
   channel,
   currentUserId,
   currentUserProfile,
@@ -433,33 +433,23 @@ export function MessagesShellClient({
   );
 
   const joinLiveSession = useCallback(async () => {
-    if (typeof window === 'undefined') {
-      return;
+    if (!currentUserId) {
+      throw new Error('Current user is required');
     }
 
-    const response = await window.fetch(
-      `/api/channels/${channelState.ids.id}/live-sessions/join`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ orgSlug }),
-      },
+    const payload = await createApiClient(presenceClient).post<{ joinPath: string }>(
+      `/channels/${channelState.ids.id}/live-sessions/join`,
+      { orgId: channelState.ids.orgId, profileId: currentUserId },
     );
 
-    const payload = (await response.json().catch(() => null)) as {
-      success?: boolean;
-      joinPath?: string;
-      error?: string;
-    } | null;
-
-    if (!response.ok || !payload?.success || !payload.joinPath) {
-      throw new Error(payload?.error ?? 'Failed to join live session');
-    }
-
     handleResolvedJoinHref(payload.joinPath);
-  }, [channelState.ids.id, handleResolvedJoinHref, orgSlug]);
+  }, [
+    channelState.ids.id,
+    channelState.ids.orgId,
+    currentUserId,
+    handleResolvedJoinHref,
+    presenceClient,
+  ]);
 
   useEffect(() => {
     setChannelState(channel);

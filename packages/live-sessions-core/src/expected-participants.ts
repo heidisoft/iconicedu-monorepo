@@ -4,8 +4,7 @@ import type {
   LiveSessionAttendancePolicyVM,
 } from '@iconicedu/shared-types';
 
-import type { ResolvedLiveSessionScope } from '@iconicedu/web/lib/live-sessions/types';
-import type { SupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
+import type { ResolvedLiveSessionScope, LiveSessionSupabaseClient } from './types';
 
 type ChannelLiveSessionRowRecord = {
   id: string;
@@ -60,7 +59,7 @@ export function getLiveSessionAttendancePolicy(
 }
 
 async function listChannelMemberProfileIds(input: {
-  supabase: SupabaseServiceClient;
+  supabase: LiveSessionSupabaseClient;
   orgId: string;
   channelId: string;
 }) {
@@ -118,7 +117,7 @@ function buildExpectedParticipantRows(input: {
 }
 
 export async function snapshotExpectedParticipantsForLiveSession(input: {
-  supabase: SupabaseServiceClient;
+  supabase: LiveSessionSupabaseClient;
   session: ChannelLiveSessionRowRecord;
   scope: ResolvedLiveSessionScope;
   createdBy?: string | null;

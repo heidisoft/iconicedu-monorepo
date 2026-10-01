@@ -1,8 +1,11 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type {
   ClassScheduleVM,
   LiveSessionModeVM,
   LiveSessionProviderVM,
 } from '@iconicedu/shared-types';
+
+export type LiveSessionSupabaseClient = SupabaseClient;
 
 export type LiveSessionStatus = 'starting' | 'live' | 'ended' | 'failed';
 

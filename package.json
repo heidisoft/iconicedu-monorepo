@@ -80,7 +80,8 @@
     "test:guard:supabase-access-control": "node --test scripts/check-supabase-access-control.test.mjs",
     "test:guard:auth-signout-scopes": "node --test scripts/check-auth-signout-scopes.test.mjs",
     "test:commitlint": "node --test scripts/check-commit-message.test.mjs",
-    "prepare": "husky"
+    "prepare": "husky",
+    "postinstall": "node scripts/apply-vendor-fixes.mjs"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.0",

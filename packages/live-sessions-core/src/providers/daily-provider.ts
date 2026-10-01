@@ -7,7 +7,7 @@ import type {
   LiveSessionJoinAccessInput,
   LiveSessionJoinAccessResult,
   NormalizedLiveSessionParticipantEvent,
-} from '@iconicedu/web/lib/live-sessions/types';
+} from '../types';
 
 const DEFAULT_DAILY_REST_BASE_URL = 'https://api.daily.co/v1';
 
