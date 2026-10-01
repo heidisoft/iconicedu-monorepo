@@ -70,6 +70,236 @@ describe('SchedulesService authorization', () => {
     jest.clearAllMocks();
   });
 
+  describe('getLearningSpaceEditContext', () => {
+    function makeEditContextClient(input: {
+      participants: Array<{ profile_id: string }>;
+      schedules: Array<Record<string, unknown>>;
+      recurrences?: Array<Record<string, unknown>>;
+      exceptions?: Array<Record<string, unknown>>;
+      overrides?: Array<Record<string, unknown>>;
+      channel: Record<string, unknown> | null;
+    }) {
+      const resultFor = (table: string) => {
+        switch (table) {
+          case 'learning_space_participants':
+            return { data: input.participants, error: null };
+          case 'class_schedules':
+            return { data: input.schedules, error: null };
+          case 'channels':
+            return { data: input.channel, error: null };
+          case 'class_schedule_recurrence':
+            return { data: input.recurrences ?? [], error: null };
+          case 'class_schedule_recurrence_exceptions':
+            return { data: input.exceptions ?? [], error: null };
+          case 'class_schedule_recurrence_overrides':
+            return { data: input.overrides ?? [], error: null };
+          default:
+            return { data: null, error: null };
+        }
+      };
+
+      return {
+        from: jest.fn((table: string) => {
+          const chain: Record<string, unknown> = {
+            select: jest.fn(() => chain),
+            eq: jest.fn(() => chain),
+            in: jest.fn(() => chain),
+            is: jest.fn(() => chain),
+            returns: jest.fn(async () => resultFor(table)),
+            maybeSingle: jest.fn(async () => resultFor(table)),
+            then: (resolve: (value: unknown) => void) => resolve(resultFor(table)),
+          };
+          return chain;
+        }),
+      };
+    }
+
+    function mockActor() {
+      createSupabaseSessionClientMock.mockReturnValue({
+        auth: {
+          getUser: jest.fn(async () => ({
+            data: { user: { id: 'auth-user-1' } },
+            error: null,
+          })),
+        },
+      } as never);
+      createSupabaseServiceClientMock
+        .mockReturnValueOnce(
+          makeSingleResult({
+            id: 'account-1',
+            active_profile_id: 'profile-staff',
+          }) as never,
+        )
+        .mockReturnValueOnce(makeSingleResult([{ role_key: 'staff' }]) as never);
+    }
+
+    it('returns a mapped context with correctly scoped recurrence/exception/override reads', async () => {
+      mockActor();
+      const client = makeEditContextClient({
+        participants: [{ profile_id: 'profile-1' }, { profile_id: 'profile-2' }],
+        schedules: [
+          {
+            id: 'schedule-1',
+            title: 'Algebra I',
+            start_at: '2026-03-14T14:00:00.000Z',
+            end_at: '2026-03-14T15:00:00.000Z',
+            timezone: 'America/New_York',
+          },
+        ],
+        recurrences: [
+          {
+            id: 'recurrence-1',
+            schedule_id: 'schedule-1',
+            frequency: 'weekly',
+            interval: 1,
+            count: null,
+            until: null,
+            timezone: 'America/New_York',
+            bysecond: null,
+            byminute: [0],
+            byhour: [14],
+            byday: ['SA'],
+            bymonthday: null,
+            byyearday: null,
+            byweekno: null,
+            bymonth: null,
+            bysetpos: null,
+            wkst: 'MO',
+          },
+        ],
+        exceptions: [
+          {
+            recurrence_id: 'recurrence-1',
+            occurrence_key: '2026-03-21T14:00:00.000Z',
+            reason: 'Holiday',
+          },
+        ],
+        overrides: [
+          {
+            recurrence_id: 'recurrence-1',
+            occurrence_key: '2026-03-28T14:00:00.000Z',
+            patch: { startAt: '2026-03-28T15:00:00.000Z' },
+          },
+        ],
+        channel: {
+          topic: 'Algebra I',
+          description: 'Weekly algebra',
+          icon_key: 'book-open',
+          ui_theme_key: 'teal',
+          ui_defaults: { messageUiThemeKey: 'feed' },
+          live_session_config: { enabled: true },
+        },
+      });
+      createSupabaseServiceClientMock.mockReturnValueOnce(client as never);
+
+      const service = new SchedulesService();
+      const result = await service.getLearningSpaceEditContext('token-1', {
+        orgId: 'org-1',
+        learningSpaceId: 'space-1',
+        channelId: 'channel-1',
+      });
+
+      expect(result).toEqual({
+        participantProfileIds: ['profile-1', 'profile-2'],
+        schedules: [
+          {
+            id: 'schedule-1',
+            title: 'Algebra I',
+            startAt: '2026-03-14T14:00:00.000Z',
+            endAt: '2026-03-14T15:00:00.000Z',
+            timezone: 'America/New_York',
+          },
+        ],
+        recurrences: [
+          {
+            id: 'recurrence-1',
+            scheduleId: 'schedule-1',
+            frequency: 'weekly',
+            interval: 1,
+            count: null,
+            until: null,
+            timezone: 'America/New_York',
+            bySecond: null,
+            byMinute: [0],
+            byHour: [14],
+            byDay: ['SA'],
+            byMonthDay: null,
+            byYearDay: null,
+            byWeekNo: null,
+            byMonth: null,
+            bySetPos: null,
+            wkst: 'MO',
+          },
+        ],
+        exceptions: [
+          {
+            recurrenceId: 'recurrence-1',
+            occurrenceKey: '2026-03-21T14:00:00.000Z',
+            reason: 'Holiday',
+          },
+        ],
+        overrides: [
+          {
+            recurrenceId: 'recurrence-1',
+            occurrenceKey: '2026-03-28T14:00:00.000Z',
+            patch: { startAt: '2026-03-28T15:00:00.000Z' },
+          },
+        ],
+        channel: {
+          topic: 'Algebra I',
+          description: 'Weekly algebra',
+          iconKey: 'book-open',
+          themeKey: 'teal',
+          uiDefaults: { messageUiThemeKey: 'feed' },
+          liveSessionConfig: { enabled: true },
+        },
+      });
+
+      // Recurrence/exception/override reads must be scoped to this learning
+      // space's own schedules — not every schedule in the org.
+      const recurrenceCall = client.from.mock.results.find(
+        (_, index) => client.from.mock.calls[index][0] === 'class_schedule_recurrence',
+      );
+      expect(recurrenceCall).toBeDefined();
+      const recurrenceChain = recurrenceCall!.value as { in: jest.Mock };
+      expect(recurrenceChain.in).toHaveBeenCalledWith('schedule_id', ['schedule-1']);
+
+      const exceptionsCallIndex = client.from.mock.calls.findIndex(
+        (call) => call[0] === 'class_schedule_recurrence_exceptions',
+      );
+      const exceptionsChain = client.from.mock.results[exceptionsCallIndex].value as {
+        in: jest.Mock;
+      };
+      expect(exceptionsChain.in).toHaveBeenCalledWith('recurrence_id', ['recurrence-1']);
+    });
+
+    it('short-circuits recurrence/exception/override reads when the space has no schedules', async () => {
+      mockActor();
+      const client = makeEditContextClient({
+        participants: [],
+        schedules: [],
+        channel: null,
+      });
+      createSupabaseServiceClientMock.mockReturnValueOnce(client as never);
+
+      const service = new SchedulesService();
+      const result = await service.getLearningSpaceEditContext('token-1', {
+        orgId: 'org-1',
+        learningSpaceId: 'space-1',
+        channelId: 'channel-1',
+      });
+
+      expect(result.schedules).toEqual([]);
+      expect(result.recurrences).toEqual([]);
+      expect(result.exceptions).toEqual([]);
+      expect(result.overrides).toEqual([]);
+      expect(result.channel).toBeNull();
+      expect(
+        client.from.mock.calls.some((call) => call[0] === 'class_schedule_recurrence'),
+      ).toBe(false);
+    });
+  });
+
   it.each(['owner', 'admin', 'staff'])(
     'allows %s to manage learning-space schedules',
     async (roleKey) => {

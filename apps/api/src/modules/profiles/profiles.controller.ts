@@ -26,6 +26,15 @@ export class ProfilesController {
     return this.profilesService.me(extractBearerToken(req.headers.authorization));
   }
 
+  @Post('system')
+  @UseGuards(AuthGuard)
+  ensureSystemProfile(@Req() req: AuthenticatedRequest, @Body() body: { orgId: string }) {
+    return this.profilesService.ensureSystemProfile(
+      extractBearerToken(req.headers.authorization),
+      body.orgId,
+    );
+  }
+
   @Get('by-account')
   @UseGuards(AuthGuard)
   byAccount(@Req() req: AuthenticatedRequest, @Query('accountId') accountId: string) {

@@ -4,6 +4,7 @@ import {
   InternalServerErrorException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import type {
   AccountRow,
   AvatarSource,
@@ -124,6 +125,64 @@ export class ProfilesService {
       .single();
     if (error) throw new InternalServerErrorException(error.message);
     return account;
+  }
+
+  /** Ensures an org has a `kind: 'system'` profile for attributing
+   * automated actions to, creating one (with its own account row) if none
+   * exists yet. Idempotent — returns the existing id when already present. */
+  async ensureSystemProfile(accessToken: string, orgId: string): Promise<{ id: string }> {
+    await this.requireOrgManager(accessToken, orgId);
+    const supabase = createSupabaseServiceClient();
+
+    const existing = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('org_id', orgId)
+      .eq('kind', 'system')
+      .is('deleted_at', null)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle<{ id: string }>();
+    if (existing.error) {
+      throw new InternalServerErrorException(existing.error.message);
+    }
+    if (existing.data?.id) {
+      return { id: existing.data.id };
+    }
+
+    const now = new Date().toISOString();
+    const accountResponse = await supabase
+      .from('accounts')
+      .insert({ org_id: orgId, status: 'active', created_at: now, updated_at: now })
+      .select('id')
+      .single<{ id: string }>();
+    if (accountResponse.error) {
+      throw new InternalServerErrorException(accountResponse.error.message);
+    }
+
+    const profileResponse = await supabase
+      .from('profiles')
+      .insert({
+        org_id: orgId,
+        account_id: accountResponse.data.id,
+        kind: 'system',
+        display_name: 'System',
+        first_name: 'System',
+        last_name: null,
+        avatar_source: 'seed',
+        avatar_seed: `system:${orgId}:${randomUUID()}`,
+        timezone: 'UTC',
+        status: 'active',
+        created_at: now,
+        updated_at: now,
+      })
+      .select('id')
+      .single<{ id: string }>();
+    if (profileResponse.error) {
+      throw new InternalServerErrorException(profileResponse.error.message);
+    }
+
+    return { id: profileResponse.data.id };
   }
 
   async get(accessToken: string, profileId: string) {
@@ -366,6 +425,40 @@ export class ProfilesService {
     if (error) throw new UnauthorizedException(error.message);
     if (!user) throw new UnauthorizedException('Unauthorized');
     return { user, serviceClient: createSupabaseServiceClient() };
+  }
+
+  /** Gates org-level automation endpoints (like ensureSystemProfile) to
+   * owner/admin/staff, matching apps/web's requireAdminAuthContext role
+   * check and SchedulesService.requireOrgActor's equivalent gate. */
+  private async requireOrgManager(accessToken: string, orgId: string): Promise<void> {
+    const { user, serviceClient } = await this.requireUser(accessToken);
+
+    const { data: account, error: accountError } = await serviceClient
+      .from('accounts')
+      .select('id')
+      .eq('auth_user_id', user.id)
+      .eq('org_id', orgId)
+      .is('deleted_at', null)
+      .maybeSingle<{ id: string }>();
+    if (accountError) throw new InternalServerErrorException(accountError.message);
+    if (!account) throw new ForbiddenException('Not a member of this organization');
+
+    const { data: roles, error: rolesError } = await serviceClient
+      .from('user_roles')
+      .select('role_key')
+      .eq('account_id', account.id)
+      .eq('org_id', orgId)
+      .is('deleted_at', null)
+      .returns<Array<{ role_key: string | null }>>();
+    if (rolesError) throw new InternalServerErrorException(rolesError.message);
+
+    const isManager = (roles ?? []).some(
+      (role) =>
+        role.role_key === 'owner' ||
+        role.role_key === 'admin' ||
+        role.role_key === 'staff',
+    );
+    if (!isManager) throw new ForbiddenException('Forbidden');
   }
 
   private async requireGuardianAccount(
