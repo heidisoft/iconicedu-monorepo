@@ -256,6 +256,27 @@ export function SessionCard({
           if (session.channelId) {
             setIsResolvingJoin(true);
             try {
+              // Precedence matches web's session-card: prefer the server
+              // join handler (creates/reuses the live session and records
+              // attendance) before falling back to the bare static
+              // channel-level link.
+              try {
+                const result = await joinLiveSession.mutateAsync(session.channelId);
+                if (isExternalJoinHref(result.joinPath)) {
+                  setExternalJoinTarget({
+                    joinHref: result.joinPath,
+                    providerLabel: resolveExternalJoinProviderLabel(result.joinPath),
+                  });
+                  return;
+                }
+
+                void requestPushConsent();
+                handleOpenJoinHref(result.joinPath);
+                return;
+              } catch {
+                // Fall through to the static channel-level link below.
+              }
+
               const channelMeta = await fetchSpaceChannelMetaByChannelId(
                 session.channelId,
               );
@@ -274,19 +295,6 @@ export function SessionCard({
                 handleOpenJoinHref(joinHref);
                 return;
               }
-
-              const result = await joinLiveSession.mutateAsync(session.channelId);
-              if (isExternalJoinHref(result.joinPath)) {
-                setExternalJoinTarget({
-                  joinHref: result.joinPath,
-                  providerLabel: resolveExternalJoinProviderLabel(result.joinPath),
-                });
-                return;
-              }
-
-              void requestPushConsent();
-              handleOpenJoinHref(result.joinPath);
-              return;
             } catch {
               // Best effort join resolution. Fall back to the classroom if it fails.
             } finally {

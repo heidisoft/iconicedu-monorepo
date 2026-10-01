@@ -348,6 +348,65 @@ describe('SessionCard', () => {
     expect(mockPush).not.toHaveBeenCalled();
   });
 
+  it('prefers the API join over a configured channel-level link, matching web', async () => {
+    mockFetchSpaceChannelMetaByChannelId.mockResolvedValue({
+      liveSession: {
+        enabled: true,
+        provider: 'custom',
+        mode: 'video',
+        joinUrl: 'https://zoom.us/j/from-channel',
+      },
+    });
+    mockJoinLiveSessionMutateAsync.mockResolvedValue({
+      sessionId: 'session-1',
+      joinPath: '/acme/live-sessions/session-1',
+      status: 'live',
+      created: true,
+      provider: 'daily',
+    });
+
+    render(<SessionCard session={baseSession} />);
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Join session'));
+    });
+
+    await waitFor(() =>
+      expect(mockJoinLiveSessionMutateAsync).toHaveBeenCalledWith('channel-1'),
+    );
+    await waitFor(() =>
+      expect(mockOpenURL).toHaveBeenCalledWith(
+        'http://localhost:3000/acme/live-sessions/session-1',
+      ),
+    );
+    expect(mockFetchSpaceChannelMetaByChannelId).not.toHaveBeenCalled();
+    expect(screen.queryByText('https://zoom.us/j/from-channel')).toBeNull();
+  });
+
+  it('falls back to the configured channel-level link when the API join fails', async () => {
+    mockFetchSpaceChannelMetaByChannelId.mockResolvedValue({
+      liveSession: {
+        enabled: true,
+        provider: 'custom',
+        mode: 'video',
+        joinUrl: 'https://zoom.us/j/from-channel',
+      },
+    });
+    mockJoinLiveSessionMutateAsync.mockRejectedValue(new Error('API unavailable'));
+
+    render(<SessionCard session={baseSession} />);
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Join session'));
+    });
+
+    await waitFor(() =>
+      expect(mockJoinLiveSessionMutateAsync).toHaveBeenCalledWith('channel-1'),
+    );
+    expect(await screen.findByText('Session ready to join')).toBeTruthy();
+    expect(await screen.findByText('https://zoom.us/j/from-channel')).toBeTruthy();
+  });
+
   it('shows Recording button for past sessions', () => {
     render(<SessionCard session={{ ...baseSession, isPast: true }} />);
     expect(screen.getByText('Recording')).toBeTruthy();

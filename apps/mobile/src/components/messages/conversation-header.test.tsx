@@ -381,6 +381,52 @@ describe('ConversationHeader', () => {
     );
   });
 
+  it('prefers the resolved API href over a configured static link, matching web', async () => {
+    const onResolveJoinHref = jest.fn().mockResolvedValue('/live-sessions/session-2');
+    render(
+      <ConversationHeader
+        {...baseProps}
+        kind="space"
+        liveJoinUrl="https://zoom.us/j/room-123"
+        onResolveJoinHref={onResolveJoinHref}
+        onMore={jest.fn()}
+      />,
+    );
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Join live session'));
+    });
+
+    expect(onResolveJoinHref).toHaveBeenCalledTimes(1);
+    await waitFor(() =>
+      expect(Linking.openURL).toHaveBeenCalledWith(
+        'http://localhost:3000/live-sessions/session-2',
+      ),
+    );
+    expect(screen.queryByText('Session ready to join')).toBeNull();
+  });
+
+  it('falls back to the configured static link when the API href resolution fails', async () => {
+    const onResolveJoinHref = jest.fn().mockRejectedValue(new Error('API unavailable'));
+    render(
+      <ConversationHeader
+        {...baseProps}
+        kind="space"
+        liveJoinUrl="https://zoom.us/j/room-123"
+        onResolveJoinHref={onResolveJoinHref}
+        onMore={jest.fn()}
+      />,
+    );
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Join live session'));
+    });
+
+    expect(onResolveJoinHref).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText('Session ready to join')).toBeTruthy();
+    expect(await screen.findByText('https://zoom.us/j/room-123')).toBeTruthy();
+  });
+
   it('renders dual avatar initials when secondaryAvatarSeed provided', () => {
     render(
       <ConversationHeader

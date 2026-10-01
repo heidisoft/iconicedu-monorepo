@@ -691,8 +691,12 @@ export function ConversationHeader({
     if (isResolvingJoin) return;
     onJoinPress?.();
 
-    let joinHref = liveJoinUrl ?? null;
-    if (!joinHref && onResolveJoinHref) {
+    // Precedence matches web's header pill: prefer the server join handler
+    // (creates/reuses the live session and records attendance) over the
+    // static channel-level link, which is only a fallback for when the
+    // dynamic handler isn't wired or fails.
+    let joinHref: string | null = null;
+    if (onResolveJoinHref) {
       setIsResolvingJoin(true);
       try {
         joinHref = await onResolveJoinHref();
@@ -702,6 +706,7 @@ export function ConversationHeader({
         setIsResolvingJoin(false);
       }
     }
+    joinHref ??= liveJoinUrl ?? null;
     if (!joinHref) return;
 
     if (isExternalJoinHref(joinHref)) {
