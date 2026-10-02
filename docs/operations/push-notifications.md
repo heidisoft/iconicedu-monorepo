@@ -6,7 +6,7 @@ End-to-end reference for Expo push notifications: how tokens are managed on devi
 
 ## Last Updated
 
-2026-05-05
+2026-09-16
 
 ## Related Docs
 
@@ -193,6 +193,43 @@ Notes:
 
 ---
 
+## Reminder Push Collapsing
+
+Class session reminders set `collapseId` on the outgoing Expo message so a
+repeat send of the same reminder **replaces** the earlier notification in the
+device tray instead of stacking a second copy beside it. This matters when a
+session is edited more than once in quick succession.
+
+How it is derived:
+
+1. `RemindersService` publishes `reminderDedupeKey` on the `session.reminder.sent`
+   activity payload. It is the raw `reminder_jobs.dedupe_key`:
+   `session.reminder:<orgId>:<learningSpaceId>:<channelId>:<occurrenceStart>:<offsetMinutes>`.
+2. The key rides through `notification.prepare` and `notification.deliver` inside
+   `payload.rawEventPayload`.
+3. `sendPushNotification()` hashes it with `buildReminderPushCollapseId()`
+   (`apps/api/src/lib/notifications/push-collapse.ts`) into
+   `reminder-<32 hex chars>` and sets it as `collapseId`.
+
+The key is hashed rather than sent verbatim because Expo forwards `collapseId`
+as the APNs `apns-collapse-id` header, which rejects values over 64 bytes.
+
+Behavior notes:
+
+- Collapsing is performed by APNs and FCM, not by the app. There is no mobile
+  code involved and no schema change backing it.
+- Only reminders carry a `reminderDedupeKey`, so conversational pushes
+  (`message.posted` and friends) have no `collapseId` and keep stacking, which
+  is the intended behavior for them.
+- The key includes `occurrenceStart`, so a reschedule that **moves the session's
+  start time** produces a different collapse id. That reminder will not replace
+  the stale one already in the tray; the separate `class.session.rescheduled`
+  activity event is what tells the recipient the session moved.
+- Collapsing never touches a notification the recipient already opened or
+  dismissed.
+
+---
+
 ### 4. Dispatch Pipeline
 
 **Cron trigger:** Supabase Edge Function `events-dispatch` runs via `public.configure_edge_function_cron()`.
@@ -230,6 +267,7 @@ Provider behavior:
 
 - `push` resolves the projected `activity_feed_items.id` for the recipient and includes it in metadata so mobile can mark the inbox item read on notification tap.
 - `push` sends through Expo using active `push_tokens`; invalid downstream tokens are revoked lazily by the provider.
+- `push` sets `collapseId` for session reminders so a resend replaces the earlier tray entry — see [Reminder Push Collapsing](#reminder-push-collapsing).
 - `email` and `sms` use the same job title/summary metadata, but currently flow through their own provider wrappers.
 - Every provider outcome writes `event_pipeline_logs` with `succeeded`, `suppressed`, `retryable_failure`, or `fatal_failure`.
 
