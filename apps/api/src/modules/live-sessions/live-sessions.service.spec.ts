@@ -1,8 +1,16 @@
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
 import { loadAndAuthorizeProfile } from '@iconicedu/api/lib/actor/resolve-actor-profile';
-import { createOrJoinLiveSession } from '@iconicedu/live-sessions-core';
+import {
+  createOrJoinLiveSession,
+  getLiveSessionProvider,
+  verifyZoomPasscode,
+} from '@iconicedu/live-sessions-core';
 import { LiveSessionsService } from '@iconicedu/api/modules/live-sessions/live-sessions.service';
 
 jest.mock('@iconicedu/api/lib/supabase/service', () => ({
@@ -19,6 +27,8 @@ jest.mock('@iconicedu/api/lib/actor/resolve-actor-profile', () => ({
 
 jest.mock('@iconicedu/live-sessions-core', () => ({
   createOrJoinLiveSession: jest.fn(),
+  getLiveSessionProvider: jest.fn(),
+  verifyZoomPasscode: jest.fn(),
 }));
 
 describe('LiveSessionsService.joinLiveSession', () => {
@@ -121,5 +131,236 @@ describe('LiveSessionsService.joinLiveSession', () => {
     await expect(
       service.joinLiveSession('token-1', 'channel-1', input),
     ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+});
+
+describe('LiveSessionsService.guestJoinLiveSession', () => {
+  const createSupabaseServiceClientMock = jest.mocked(createSupabaseServiceClient);
+  const getLiveSessionProviderMock = jest.mocked(getLiveSessionProvider);
+  const verifyZoomPasscodeMock = jest.mocked(verifyZoomPasscode);
+
+  const guestInput = { displayName: 'Taylor Reed', passcode: 'abc123xyz9' };
+
+  function mockSessionRow(row: Record<string, unknown> | null) {
+    createSupabaseServiceClientMock.mockReturnValue({
+      from: jest.fn(() => ({
+        select: jest.fn().mockReturnThis(),
+        eq: jest.fn().mockReturnThis(),
+        is: jest.fn().mockReturnThis(),
+        maybeSingle: jest.fn(async () => ({ data: row, error: null })),
+      })),
+    } as never);
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('mints a participant token when the passcode matches', async () => {
+    mockSessionRow({
+      id: 'session-1',
+      provider: 'zoom',
+      status: 'live',
+      provider_session_id: 'ls-session',
+      provider_metadata: { sessionName: 'ls-session', passcode: 'abc123xyz9' },
+    });
+    verifyZoomPasscodeMock.mockReturnValue(true);
+    const getJoinAccess = jest.fn(async () => ({
+      token: 'guest-token',
+      expiresAt: null,
+    }));
+    getLiveSessionProviderMock.mockReturnValue({
+      key: 'zoom',
+      createSession: jest.fn(),
+      getJoinAccess,
+      normalizeWebhook: jest.fn(),
+    });
+
+    const service = new LiveSessionsService();
+    const result = await service.guestJoinLiveSession(
+      'session-1',
+      '127.0.0.1',
+      guestInput,
+    );
+
+    expect(result).toEqual({
+      token: 'guest-token',
+      sessionName: 'ls-session',
+      displayName: 'Taylor Reed',
+      expiresAt: null,
+    });
+    expect(getJoinAccess).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: 'session-1',
+        displayName: 'Taylor Reed',
+        isHost: false,
+      }),
+    );
+    expect(String(getJoinAccess.mock.calls[0][0].profileId)).toMatch(/^guest:/);
+  });
+
+  it('rejects an incorrect passcode without minting a token', async () => {
+    mockSessionRow({
+      id: 'session-1',
+      provider: 'zoom',
+      status: 'live',
+      provider_session_id: 'ls-session',
+      provider_metadata: { sessionName: 'ls-session', passcode: 'abc123xyz9' },
+    });
+    verifyZoomPasscodeMock.mockReturnValue(false);
+
+    const service = new LiveSessionsService();
+    await expect(
+      service.guestJoinLiveSession('session-1', '127.0.0.1', guestInput),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(getLiveSessionProviderMock).not.toHaveBeenCalled();
+  });
+
+  it('404s when the session does not exist', async () => {
+    mockSessionRow(null);
+
+    const service = new LiveSessionsService();
+    await expect(
+      service.guestJoinLiveSession('missing-session', '127.0.0.1', guestInput),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('rejects a non-zoom session', async () => {
+    mockSessionRow({
+      id: 'session-1',
+      provider: 'daily',
+      status: 'live',
+      provider_session_id: 'room-1',
+      provider_metadata: {},
+    });
+
+    const service = new LiveSessionsService();
+    await expect(
+      service.guestJoinLiveSession('session-1', '127.0.0.1', guestInput),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejects a session that has already ended', async () => {
+    mockSessionRow({
+      id: 'session-1',
+      provider: 'zoom',
+      status: 'ended',
+      provider_session_id: 'ls-session',
+      provider_metadata: { passcode: 'abc123xyz9' },
+    });
+
+    const service = new LiveSessionsService();
+    await expect(
+      service.guestJoinLiveSession('session-1', '127.0.0.1', guestInput),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rate-limits repeated attempts from the same session and IP', async () => {
+    mockSessionRow({
+      id: 'session-1',
+      provider: 'zoom',
+      status: 'live',
+      provider_session_id: 'ls-session',
+      provider_metadata: { sessionName: 'ls-session', passcode: 'abc123xyz9' },
+    });
+    verifyZoomPasscodeMock.mockReturnValue(false);
+
+    const service = new LiveSessionsService();
+    const attempt = () =>
+      service.guestJoinLiveSession('session-1', '10.0.0.1', {
+        ...guestInput,
+        passcode: 'wrong',
+      });
+
+    for (let i = 0; i < 5; i += 1) {
+      await expect(attempt()).rejects.toBeInstanceOf(ForbiddenException);
+    }
+    await expect(attempt()).rejects.toThrow('Too many join attempts');
+  });
+});
+
+describe('LiveSessionsService.submitLiveSessionFeedback', () => {
+  const createSupabaseServiceClientMock = jest.mocked(createSupabaseServiceClient);
+
+  const feedbackInput = { rating: 5, displayName: 'Taylor Reed' };
+
+  function mockSessionAndInsert(
+    sessionRow: Record<string, unknown> | null,
+    insertError: { message: string } | null = null,
+  ) {
+    const insert = jest.fn(async () => ({ error: insertError }));
+    createSupabaseServiceClientMock.mockReturnValue({
+      from: jest.fn((table: string) => {
+        if (table === 'channel_live_session_feedback') {
+          return { insert };
+        }
+        return {
+          select: jest.fn().mockReturnThis(),
+          eq: jest.fn().mockReturnThis(),
+          is: jest.fn().mockReturnThis(),
+          maybeSingle: jest.fn(async () => ({ data: sessionRow, error: null })),
+        };
+      }),
+    } as never);
+    return insert;
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('records feedback without a profile_id when no access token is given', async () => {
+    const insert = mockSessionAndInsert({
+      id: 'session-1',
+      org_id: 'org-1',
+      channel_id: 'channel-1',
+    });
+
+    const service = new LiveSessionsService();
+    const result = await service.submitLiveSessionFeedback(
+      'session-1',
+      '127.0.0.1',
+      null,
+      feedbackInput,
+    );
+
+    expect(result).toEqual({ success: true });
+    expect(insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        org_id: 'org-1',
+        live_session_id: 'session-1',
+        channel_id: 'channel-1',
+        profile_id: null,
+        display_name: 'Taylor Reed',
+        rating: 5,
+      }),
+    );
+  });
+
+  it('404s when the session does not exist', async () => {
+    mockSessionAndInsert(null);
+
+    const service = new LiveSessionsService();
+    await expect(
+      service.submitLiveSessionFeedback(
+        'missing-session',
+        '127.0.0.1',
+        null,
+        feedbackInput,
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('rate-limits repeated submissions from the same session and IP', async () => {
+    mockSessionAndInsert({ id: 'session-1', org_id: 'org-1', channel_id: 'channel-1' });
+
+    const service = new LiveSessionsService();
+    const attempt = () =>
+      service.submitLiveSessionFeedback('session-1', '10.0.0.1', null, feedbackInput);
+
+    for (let i = 0; i < 3; i += 1) {
+      await expect(attempt()).resolves.toEqual({ success: true });
+    }
+    await expect(attempt()).rejects.toThrow('Too many feedback submissions');
   });
 });

@@ -43,12 +43,15 @@ export function HomePageInfographicClient({
         throw new Error('Current user is required');
       }
 
-      const payload = await createApiClient(supabase).post<{ joinPath: string }>(
-        `/channels/${item.channelId}/live-sessions/join`,
-        { orgId, profileId: currentUserId },
-      );
+      const payload = await createApiClient(supabase).post<{
+        joinPath: string;
+        provider?: string;
+      }>(`/channels/${item.channelId}/live-sessions/join`, {
+        orgId,
+        profileId: currentUserId,
+      });
 
-      handleResolvedJoinHref(payload.joinPath);
+      handleResolvedJoinHref(payload.joinPath, payload.provider);
     },
     [currentUserId, handleResolvedJoinHref, orgId, supabase],
   );

@@ -115,7 +115,7 @@ export type ConversationHeaderProps = {
   liveJoinUrl?: string | null;
   onJoinPress?: () => void;
   /** Called to create/fetch a join href when no static `liveJoinUrl` is available. */
-  onResolveJoinHref?: () => Promise<string | null>;
+  onResolveJoinHref?: () => Promise<{ href: string; provider?: string } | null>;
   secondaryAvatarSeed?: string | null;
   secondaryAvatarThemeKey?: string | null;
   secondaryAvatarRole?: string | null;
@@ -696,10 +696,13 @@ export function ConversationHeader({
     // static channel-level link, which is only a fallback for when the
     // dynamic handler isn't wired or fails.
     let joinHref: string | null = null;
+    let providerHint: string | undefined;
     if (onResolveJoinHref) {
       setIsResolvingJoin(true);
       try {
-        joinHref = await onResolveJoinHref();
+        const resolved = await onResolveJoinHref();
+        joinHref = resolved?.href ?? null;
+        providerHint = resolved?.provider;
       } catch {
         joinHref = null;
       } finally {
@@ -712,7 +715,7 @@ export function ConversationHeader({
     if (isExternalJoinHref(joinHref)) {
       setExternalJoinTarget({
         joinHref,
-        providerLabel: resolveExternalJoinProviderLabel(joinHref),
+        providerLabel: resolveExternalJoinProviderLabel(joinHref, providerHint),
       });
       return;
     }

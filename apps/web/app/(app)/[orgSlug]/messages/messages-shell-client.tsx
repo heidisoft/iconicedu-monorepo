@@ -437,12 +437,15 @@ export function MessagesShellClient({
       throw new Error('Current user is required');
     }
 
-    const payload = await createApiClient(presenceClient).post<{ joinPath: string }>(
-      `/channels/${channelState.ids.id}/live-sessions/join`,
-      { orgId: channelState.ids.orgId, profileId: currentUserId },
-    );
+    const payload = await createApiClient(presenceClient).post<{
+      joinPath: string;
+      provider?: string;
+    }>(`/channels/${channelState.ids.id}/live-sessions/join`, {
+      orgId: channelState.ids.orgId,
+      profileId: currentUserId,
+    });
 
-    handleResolvedJoinHref(payload.joinPath);
+    handleResolvedJoinHref(payload.joinPath, payload.provider);
   }, [
     channelState.ids.id,
     channelState.ids.orgId,

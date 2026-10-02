@@ -1,6 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Loader2, MonitorUp } from 'lucide-react';
 
@@ -31,28 +32,55 @@ const DailyLiveSessionEmbed = dynamic(
   },
 );
 
+const ZoomVideoSessionEmbed = dynamic(
+  () =>
+    import('@iconicedu/web/components/live-sessions/zoom-video-session-embed').then(
+      (module) => module.ZoomVideoSessionEmbed,
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex min-h-[70vh] items-center justify-center rounded-2xl border border-border bg-card">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading live session...
+        </div>
+      </div>
+    ),
+  },
+);
+
 export function LiveSessionHost({
   provider,
   joinUrl,
   token,
   externalJoinUrl,
+  zoomSessionName,
+  displayName,
   channelKind,
   mode,
   channelTopic,
   channelPurpose,
   returnPath,
+  liveSessionId,
+  accessToken,
 }: {
   provider: LiveSessionProviderVM;
   joinUrl?: string | null;
   token?: string | null;
   externalJoinUrl?: string | null;
+  zoomSessionName?: string | null;
+  displayName?: string | null;
   channelKind?: string | null;
   mode?: 'video' | 'audio' | null;
   channelTopic?: string | null;
   channelPurpose?: string | null;
   returnPath: string;
+  liveSessionId: string;
+  accessToken?: string | null;
 }) {
   const [isLoaded, setIsLoaded] = useState(false);
+  const router = useRouter();
   const heading = getLiveSessionHostHeading({ provider, channelTopic });
 
   if (provider === 'daily' && joinUrl) {
@@ -66,6 +94,27 @@ export function LiveSessionHost({
           mode={mode ?? null}
           returnPath={returnPath}
           meetingName={heading}
+        />
+      </div>
+    );
+  }
+
+  // Zoom's join_path normally points members at the public /live/<id> page
+  // directly (see join.ts), so this branch isn't on the usual path — it's
+  // defense-in-depth for the case where this internal page gets reached for
+  // a Zoom-provider session (an old link, a session row from before a
+  // provider switch, etc.) instead of silently showing a dead "no embeddable
+  // join URL" error.
+  if (provider === 'zoom' && token && zoomSessionName) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 py-4">
+        <ZoomVideoSessionEmbed
+          sessionName={zoomSessionName}
+          token={token}
+          displayName={displayName ?? 'You'}
+          liveSessionId={liveSessionId}
+          accessToken={accessToken}
+          onLeave={() => router.push(returnPath)}
         />
       </div>
     );

@@ -25,17 +25,20 @@ export function useExternalLiveSessionJoinDialog(input?: {
     setTarget(null);
   }, []);
 
-  const openExternalJoinDialog = useCallback((joinHref: string) => {
-    setTarget({
-      joinHref,
-      providerLabel: resolveExternalJoinProviderLabel(joinHref),
-    });
-  }, []);
+  const openExternalJoinDialog = useCallback(
+    (joinHref: string, providerHint?: string | null) => {
+      setTarget({
+        joinHref,
+        providerLabel: resolveExternalJoinProviderLabel(joinHref, providerHint),
+      });
+    },
+    [],
+  );
 
   const handleResolvedJoinHref = useCallback(
-    (joinHref: string) => {
+    (joinHref: string, providerHint?: string | null) => {
       if (isExternalJoinHref(joinHref)) {
-        openExternalJoinDialog(joinHref);
+        openExternalJoinDialog(joinHref, providerHint);
         return;
       }
 

@@ -359,7 +359,9 @@ describe('ConversationHeader', () => {
   });
 
   it('resolves and opens a join href when no static link is configured', async () => {
-    const onResolveJoinHref = jest.fn().mockResolvedValue('/live-sessions/session-2');
+    const onResolveJoinHref = jest
+      .fn()
+      .mockResolvedValue({ href: '/live-sessions/session-2' });
     render(
       <ConversationHeader
         {...baseProps}
@@ -382,7 +384,9 @@ describe('ConversationHeader', () => {
   });
 
   it('prefers the resolved API href over a configured static link, matching web', async () => {
-    const onResolveJoinHref = jest.fn().mockResolvedValue('/live-sessions/session-2');
+    const onResolveJoinHref = jest
+      .fn()
+      .mockResolvedValue({ href: '/live-sessions/session-2' });
     render(
       <ConversationHeader
         {...baseProps}

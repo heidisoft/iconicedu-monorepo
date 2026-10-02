@@ -312,6 +312,7 @@ export async function resolveLiveSessionJoinAccess(input: {
     providerMetadata: sessionResponse.data.provider_metadata ?? {},
     profileId: input.profile.id,
     displayName,
+    isHost: input.profile.id === sessionResponse.data.started_by_profile_id,
   });
 
   return {
