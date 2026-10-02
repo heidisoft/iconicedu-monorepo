@@ -70,6 +70,190 @@ describe('SchedulesService authorization', () => {
     jest.clearAllMocks();
   });
 
+  describe('listForCalendar', () => {
+    function makeThenableChain(result: { data: unknown; error: unknown }) {
+      const chain: Record<string, unknown> = {
+        from: jest.fn(() => chain),
+        select: jest.fn(() => chain),
+        eq: jest.fn(() => chain),
+        is: jest.fn(() => chain),
+        order: jest.fn(() => chain),
+        in: jest.fn(() => chain),
+        then: (resolve: (value: typeof result) => void) => resolve(result),
+      };
+      return chain;
+    }
+
+    it('returns mapped schedules across every source_kind, including archive metadata', async () => {
+      createSupabaseSessionClientMock.mockReturnValue(
+        makeThenableChain({
+          data: [
+            {
+              id: 'schedule-class',
+              org_id: 'org-1',
+              title: 'Algebra I',
+              description: null,
+              location: null,
+              meeting_link: null,
+              start_at: '2026-09-02T09:00:00.000Z',
+              end_at: '2026-09-02T10:00:00.000Z',
+              timezone: 'UTC',
+              status: 'scheduled',
+              visibility: 'private',
+              theme_key: 'blue',
+              source_kind: 'class_session',
+              source_learning_space_id: 'space-1',
+              source_channel_id: 'channel-1',
+              source_session_id: null,
+              source_owner_user_id: null,
+              source_created_by_user_id: null,
+              source_related_learning_space_id: null,
+              created_at: '2026-08-01T00:00:00.000Z',
+              created_by: 'profile-1',
+              updated_at: null,
+              updated_by: null,
+              participants: [
+                {
+                  profile_id: 'profile-child-1',
+                  role: 'child',
+                  status: 'accepted',
+                  display_name: 'Ada',
+                  avatar_url: null,
+                  theme_key: 'green',
+                },
+              ],
+              recurrence: [],
+            },
+            {
+              id: 'schedule-availability',
+              org_id: 'org-1',
+              title: 'Office hours',
+              description: null,
+              location: null,
+              meeting_link: null,
+              start_at: '2026-09-03T09:00:00.000Z',
+              end_at: '2026-09-03T10:00:00.000Z',
+              timezone: 'UTC',
+              status: 'scheduled',
+              visibility: 'private',
+              theme_key: null,
+              source_kind: 'availability_block',
+              source_learning_space_id: null,
+              source_channel_id: null,
+              source_session_id: null,
+              source_owner_user_id: 'user-1',
+              source_created_by_user_id: null,
+              source_related_learning_space_id: null,
+              created_at: '2026-08-01T00:00:00.000Z',
+              created_by: 'profile-1',
+              updated_at: null,
+              updated_by: null,
+              participants: [],
+              recurrence: [],
+            },
+            {
+              id: 'schedule-manual',
+              org_id: 'org-1',
+              title: 'Reminder',
+              description: null,
+              location: null,
+              meeting_link: null,
+              start_at: '2026-09-04T09:00:00.000Z',
+              end_at: '2026-09-04T10:00:00.000Z',
+              timezone: 'UTC',
+              status: 'scheduled',
+              visibility: 'private',
+              theme_key: null,
+              source_kind: 'manual',
+              source_learning_space_id: null,
+              source_channel_id: null,
+              source_session_id: null,
+              source_owner_user_id: null,
+              source_created_by_user_id: 'user-2',
+              source_related_learning_space_id: null,
+              created_at: '2026-08-01T00:00:00.000Z',
+              created_by: 'profile-1',
+              updated_at: null,
+              updated_by: null,
+              participants: [],
+              recurrence: [],
+            },
+          ],
+          error: null,
+        }) as never,
+      );
+      createSupabaseServiceClientMock.mockReturnValue(
+        makeThenableChain({
+          data: [
+            {
+              id: 'space-1',
+              status: 'archived',
+              archived_at: '2026-08-15T00:00:00.000Z',
+            },
+          ],
+          error: null,
+        }) as never,
+      );
+
+      const service = new SchedulesService();
+      const result = await service.listForCalendar('token-1', { orgId: 'org-1' });
+
+      expect(result).toEqual([
+        expect.objectContaining({
+          ids: { id: 'schedule-class', orgId: 'org-1' },
+          source: {
+            kind: 'class_session',
+            learningSpaceId: 'space-1',
+            channelId: 'channel-1',
+            sessionId: undefined,
+            archivedAt: '2026-08-15T00:00:00.000Z',
+            learningSpaceStatus: 'archived',
+          },
+          participants: [
+            expect.objectContaining({
+              ids: { id: 'profile-child-1', orgId: 'org-1' },
+              displayName: 'Ada',
+            }),
+          ],
+        }),
+        expect.objectContaining({
+          ids: { id: 'schedule-availability', orgId: 'org-1' },
+          source: { kind: 'availability_block', ownerUserId: 'user-1' },
+        }),
+        expect.objectContaining({
+          ids: { id: 'schedule-manual', orgId: 'org-1' },
+          source: { kind: 'manual', createdByUserId: 'user-2', relatedTo: undefined },
+        }),
+      ]);
+    });
+
+    it('short-circuits without querying when scheduleIds is an empty array', async () => {
+      const service = new SchedulesService();
+      const result = await service.listForCalendar('token-1', {
+        orgId: 'org-1',
+        scheduleIds: [],
+      });
+
+      expect(result).toEqual([]);
+      expect(createSupabaseSessionClientMock).not.toHaveBeenCalled();
+    });
+
+    it('filters by scheduleIds and channelId when provided', async () => {
+      const chain = makeThenableChain({ data: [], error: null });
+      createSupabaseSessionClientMock.mockReturnValue(chain as never);
+
+      const service = new SchedulesService();
+      await service.listForCalendar('token-1', {
+        orgId: 'org-1',
+        channelId: 'channel-1',
+        scheduleIds: ['schedule-1', 'schedule-2'],
+      });
+
+      expect(chain.eq).toHaveBeenCalledWith('source_channel_id', 'channel-1');
+      expect(chain.in).toHaveBeenCalledWith('id', ['schedule-1', 'schedule-2']);
+    });
+  });
+
   it.each(['owner', 'admin', 'staff'])(
     'allows %s to manage learning-space schedules',
     async (roleKey) => {
