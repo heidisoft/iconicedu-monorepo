@@ -19,7 +19,7 @@ features. Read this before touching
 
 ## Last Updated
 
-2026-10-02
+2026-10-03
 
 ## Related Docs
 
@@ -276,3 +276,36 @@ bg-muted`), not assume React tree nesting implies DOM nesting; `tsc` will
   tweak — `otherParticipant` is singular throughout the component. Scope that
   properly before starting rather than bolting arrays onto the existing
   single-peer assumptions.
+
+---
+
+## 9. SDK upgrade checklist
+
+Treat every `@zoom/videosdk` version change as an integration upgrade, not a
+routine dependency bump. Before merging:
+
+1. Read the Zoom Video SDK web release notes for every version crossed and
+   inspect the installed `node_modules/@zoom/videosdk/dist/types/*.d.ts` files
+   for changed event payloads, return unions, and renamed enums.
+2. Re-verify the lifecycle contract in `zoom-video-session-embed.tsx`:
+   `checkSystemRequirements()` runs before `init()`, init keeps
+   `patchJsMedia`, `stayAwake`, and `leaveOnPageUnload` enabled, every `on()`
+   has a matching `off()`, and leave/unmount ends with `destroyClient()`.
+3. Exercise connection transitions (`Connected`, `Reconnecting`, `Closed`,
+   and `Fail`) and device permission/media-failure events. A terminal state
+   must never leave a frozen call UI on screen.
+4. Manually test Chrome, Safari, and Firefox at desktop and narrow mobile
+   widths: pre-join preview, mic/camera, screen sharing, tile overlays,
+   participant state, reconnect, leave, and host end-for-everyone. Confirm the
+   persistent control bar does not obscure the active tile or shared content.
+5. Re-test the known doc/package mismatches in §4 and remove a workaround only
+   when the installed types and real browser behavior both confirm the new
+   contract.
+6. Run focused web tests plus `pnpm lint:affected`,
+   `pnpm typecheck:affected`, and `pnpm test:affected`. For a major SDK bump,
+   also run the full `pnpm run ci` and record browser evidence in the PR.
+
+The custom UI intentionally follows the UI Toolkit's interaction contract
+(persistent controls, participant/media state visibility, explicit
+connection recovery, and deterministic cleanup) while using IconicEdu design
+tokens. Any future visual redesign must preserve those behaviors.

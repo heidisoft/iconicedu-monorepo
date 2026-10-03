@@ -111,24 +111,30 @@ export function DevicePreviewStep({
         ) : null}
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex w-full items-center gap-3">
         <Button
           type="button"
           variant="outline"
-          size="icon"
+          className="h-11 flex-1"
+          aria-label={muted ? 'Turn microphone on' : 'Turn microphone off'}
+          aria-pressed={!muted}
           onClick={() => setMuted((previous) => !previous)}
           disabled={isLoading && !permissionError}
         >
           {muted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+          {muted ? 'Mic off' : 'Mic on'}
         </Button>
         <Button
           type="button"
           variant="outline"
-          size="icon"
+          className="h-11 flex-1"
+          aria-label={videoOff ? 'Turn camera on' : 'Turn camera off'}
+          aria-pressed={!videoOff}
           onClick={() => setVideoOff((previous) => !previous)}
           disabled={isLoading && !permissionError}
         >
           {videoOff ? <VideoOff className="h-4 w-4" /> : <Video className="h-4 w-4" />}
+          {videoOff ? 'Camera off' : 'Camera on'}
         </Button>
       </div>
 

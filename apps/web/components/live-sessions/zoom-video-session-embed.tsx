@@ -255,6 +255,26 @@ async function leaveWhiteboardCleanly(client: ZoomClient, selfUserId: number | n
   }
 }
 
+// Zoom owns process-wide media workers behind createClient(). Always destroy
+// them after leave so a later session can initialize cleanly after route
+// navigation or an SDK upgrade. The WeakSet prevents the UI action and React
+// cleanup from racing the same client through teardown twice.
+const disposedZoomClients = new WeakSet<ZoomClient>();
+
+async function disposeZoomClient(
+  client: ZoomClient,
+  selfUserId: number | null,
+  endSession = false,
+) {
+  if (disposedZoomClients.has(client)) {
+    return;
+  }
+  disposedZoomClients.add(client);
+  await leaveWhiteboardCleanly(client, selfUserId);
+  await client.leave(endSession).catch(() => null);
+  await ZoomVideo.destroyClient().catch(() => null);
+}
+
 // Some Zoom Video SDK calls resolve with `'' | ExecutedFailure` instead of
 // rejecting on failure. client.join() in particular does NOT follow that
 // pattern in practice — on success it resolves with the local Participant
@@ -511,30 +531,6 @@ function PoppingIcon({
   );
 }
 
-// Small circular corner badge — Google Meet's convention for per-tile status
-// (muted, camera off, raised hand) rather than cramming icons into the name
-// pill at the bottom.
-function TileCornerBadge({
-  tone = 'neutral',
-  children,
-}: {
-  tone?: 'neutral' | 'warning';
-  children: React.ReactNode;
-}) {
-  return (
-    <div
-      className={cn(
-        'flex h-6 w-6 shrink-0 items-center justify-center rounded-full shadow-sm',
-        tone === 'warning'
-          ? 'bg-warning text-warning-foreground'
-          : 'bg-popover/90 text-popover-foreground backdrop-blur-sm',
-      )}
-    >
-      {children}
-    </div>
-  );
-}
-
 function VideoTile({
   label,
   isSelf,
@@ -554,13 +550,17 @@ function VideoTile({
   className?: string;
   networkLevel?: NetworkLevel;
   handRaised?: boolean;
-  // Which top corner the status badges sit in — pass whichever side keeps
-  // them away from the screen's own edge for that tile's position (e.g. a
-  // tile pinned to the right of the layout should badge on its top-left).
+  // Which bottom corner the status badge sits in — pass whichever side keeps
+  // it away from the screen's own edge for that tile's position.
   cornerSide?: 'left' | 'right';
 }) {
   return (
-    <div className={cn('relative overflow-hidden rounded-xl bg-muted', className)}>
+    <div
+      className={cn(
+        'relative overflow-hidden rounded-xl border border-border/80 bg-muted shadow-lg ring-1 ring-foreground/10',
+        className,
+      )}
+    >
       <div
         ref={videoContainerRef}
         // Mirroring (self-view only) is applied via the SDK's own
@@ -591,31 +591,31 @@ function VideoTile({
       ) : null}
       <div
         className={cn(
-          'absolute top-2 flex flex-col gap-1',
+          'absolute bottom-2 z-20 flex h-7 items-center gap-1.5 rounded-full bg-popover/95 px-2 text-popover-foreground shadow-md backdrop-blur-sm',
           cornerSide === 'left' ? 'left-2' : 'right-2',
         )}
+        aria-label={`${label} status`}
       >
         {handRaised ? (
-          <TileCornerBadge tone="warning">
-            <Hand className="h-3.5 w-3.5" />
-          </TileCornerBadge>
+          <Hand className="h-4 w-4 text-warning" aria-label="Hand raised" />
         ) : null}
-        <TileCornerBadge>
-          {isMuted ? (
-            <MicOff className="h-3.5 w-3.5 text-destructive" />
-          ) : (
-            <Mic className="h-3.5 w-3.5" />
-          )}
-        </TileCornerBadge>
-        <TileCornerBadge>
-          {isVideoOn ? (
-            <Video className="h-3.5 w-3.5" />
-          ) : (
-            <VideoOff className="h-3.5 w-3.5 text-destructive" />
-          )}
-        </TileCornerBadge>
+        {isMuted ? (
+          <MicOff className="h-4 w-4 text-destructive" aria-label="Microphone off" />
+        ) : (
+          <Mic className="h-4 w-4" aria-label="Microphone on" />
+        )}
+        {isVideoOn ? (
+          <Video className="h-4 w-4" aria-label="Camera on" />
+        ) : (
+          <VideoOff className="h-4 w-4 text-destructive" aria-label="Camera off" />
+        )}
       </div>
-      <OverlayBadge className="absolute bottom-2 left-2">
+      <OverlayBadge
+        className={cn(
+          'absolute bottom-2 z-20 max-w-[calc(100%-5rem)]',
+          cornerSide === 'left' ? 'right-2' : 'left-2',
+        )}
+      >
         {networkLevel ? <NetworkLevelIcon level={networkLevel} /> : null}
         <span className="min-w-0 truncate">
           {label}
@@ -697,6 +697,7 @@ export function ZoomVideoSessionEmbed({
   const whiteboardContainerRef = useRef<HTMLDivElement | null>(null);
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
   const activePanelRef = useRef<SidePanel>(null);
+  const isLeavingRef = useRef(false);
 
   const [status, setStatus] = useState<'connecting' | 'connected' | 'error'>(
     'connecting',
@@ -760,6 +761,9 @@ export function ZoomVideoSessionEmbed({
   const [activeMicId, setActiveMicId] = useState<string | null>(null);
   const [activeSpeakerId, setActiveSpeakerId] = useState<string | null>(null);
   const [supportsVirtualBackground, setSupportsVirtualBackground] = useState(false);
+  const [supportsScreenShare, setSupportsScreenShare] = useState(true);
+  const [mediaError, setMediaError] = useState<string | null>(null);
+  const [sessionEndMessage, setSessionEndMessage] = useState<string | null>(null);
   const [backgroundPreset, setBackgroundPreset] = useState<BackgroundPreset>('none');
   const [isMirrored, setIsMirrored] = useState(() => {
     try {
@@ -786,8 +790,6 @@ export function ZoomVideoSessionEmbed({
   const [isPresentingWhiteboard, setIsPresentingWhiteboard] = useState(false);
   const [supportsWhiteboard, setSupportsWhiteboard] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isControlsVisible, setIsControlsVisible] = useState(true);
-  const controlsHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Updates the ref synchronously alongside state, rather than via a
   // separate effect that only runs after commit (a tick later). Event
@@ -881,47 +883,6 @@ export function ZoomVideoSessionEmbed({
     isVideoOn,
     isPipActive,
   ]);
-
-  // Floating control bar auto-hides after a few seconds of no mouse/keyboard
-  // activity (like a video player's controls), and reappears on the next
-  // movement. It keeps its normal responsive sizing/wrapping at every
-  // viewport width — there's no separate manual "minimize" state.
-  useEffect(() => {
-    // Don't let the bar fade out from under an open settings popover or
-    // chat/users panel just because the mouse happens to sit still while
-    // the user reads it — the popover itself is portaled elsewhere in the
-    // DOM, so it wouldn't disappear, but its trigger button would.
-    if (isSettingsOpen || activePanel) {
-      setIsControlsVisible(true);
-      if (controlsHideTimerRef.current) {
-        clearTimeout(controlsHideTimerRef.current);
-      }
-      return;
-    }
-    const CONTROLS_HIDE_DELAY_MS = 3500;
-    const handleActivity = () => {
-      setIsControlsVisible(true);
-      if (controlsHideTimerRef.current) {
-        clearTimeout(controlsHideTimerRef.current);
-      }
-      controlsHideTimerRef.current = setTimeout(
-        () => setIsControlsVisible(false),
-        CONTROLS_HIDE_DELAY_MS,
-      );
-    };
-    handleActivity();
-    window.addEventListener('mousemove', handleActivity);
-    window.addEventListener('touchstart', handleActivity);
-    window.addEventListener('keydown', handleActivity);
-    return () => {
-      window.removeEventListener('mousemove', handleActivity);
-      window.removeEventListener('touchstart', handleActivity);
-      window.removeEventListener('keydown', handleActivity);
-      if (controlsHideTimerRef.current) {
-        clearTimeout(controlsHideTimerRef.current);
-      }
-    };
-  }, [isSettingsOpen, activePanel]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1226,8 +1187,30 @@ export function ZoomVideoSessionEmbed({
       );
     };
 
-    const handleConnectionChange = (payload: { state: ConnectionState }) => {
+    const handleConnectionChange = (payload: {
+      state: ConnectionState;
+      reason?: string;
+      errorCode?: number;
+    }) => {
       setConnectionState(payload.state);
+      if (isLeavingRef.current) {
+        return;
+      }
+      if (payload.state === ConnectionState.Closed) {
+        setSessionEndMessage(
+          payload.reason
+            ? `The class ended (${payload.reason}).`
+            : 'The class has ended or you were disconnected.',
+        );
+      } else if (payload.state === ConnectionState.Fail) {
+        setSessionEndMessage(
+          payload.errorCode
+            ? `The connection failed (error ${payload.errorCode}). Please rejoin the class.`
+            : 'The connection failed. Please rejoin the class.',
+        );
+      } else if (payload.state === ConnectionState.Connected) {
+        setSessionEndMessage(null);
+      }
       if (
         payload.state === ConnectionState.Reconnecting ||
         payload.state === ConnectionState.Fail
@@ -1243,6 +1226,29 @@ export function ZoomVideoSessionEmbed({
           accessToken,
         );
       }
+    };
+
+    const handleDevicePermissionChange = (payload: {
+      name: 'microphone' | 'camera';
+      state: 'denied' | 'granted' | 'prompt';
+    }) => {
+      if (payload.state === 'denied') {
+        setMediaError(
+          `${payload.name === 'camera' ? 'Camera' : 'Microphone'} access is blocked. Allow access in your browser settings, then refresh.`,
+        );
+      } else if (payload.state === 'granted') {
+        setMediaError(null);
+      }
+    };
+
+    const handleActiveMediaFailed = (payload: {
+      code: number;
+      message: string;
+      type: 'audio' | 'video' | 'sharing';
+    }) => {
+      setMediaError(
+        `${payload.type === 'audio' ? 'Audio' : payload.type === 'video' ? 'Video' : 'Screen sharing'} stopped unexpectedly. ${payload.message || 'Refresh to reconnect your media.'}`,
+      );
     };
 
     const handleCommandChannelMessage = (payload: { senderId: number; text: string }) => {
@@ -1294,14 +1300,27 @@ export function ZoomVideoSessionEmbed({
     client.on('device-change', handleDeviceChange);
     client.on('network-quality-change', handleNetworkQualityChange);
     client.on('connection-change', handleConnectionChange);
+    client.on('device-permission-change', handleDevicePermissionChange);
+    client.on('active-media-failed', handleActiveMediaFailed);
     client.on('command-channel-message', handleCommandChannelMessage);
     client.on('caption-message', handleCaptionMessage);
 
     async function connect() {
       try {
+        const compatibility = ZoomVideo.checkSystemRequirements();
+        setSupportsScreenShare(compatibility.screen);
+        if (!compatibility.audio || !compatibility.video) {
+          throw new Error(
+            'This browser does not support the audio and video features required for this class. Update your browser or use a current version of Chrome, Edge, Firefox, or Safari.',
+          );
+        }
         // patchJsMedia: Zoom's own recommended default (off by default) —
         // automatically applies the latest media dependency fixes.
-        const initResult = await client.init('en-US', 'Global', { patchJsMedia: true });
+        const initResult = await client.init('en-US', 'Global', {
+          patchJsMedia: true,
+          stayAwake: true,
+          leaveOnPageUnload: true,
+        });
         if (isZoomExecutedFailure(initResult)) {
           throw initResult;
         }
@@ -1470,14 +1489,14 @@ export function ZoomVideoSessionEmbed({
       client.off('device-change', handleDeviceChange);
       client.off('network-quality-change', handleNetworkQualityChange);
       client.off('connection-change', handleConnectionChange);
+      client.off('device-permission-change', handleDevicePermissionChange);
+      client.off('active-media-failed', handleActiveMediaFailed);
       client.off('command-channel-message', handleCommandChannelMessage);
       client.off('caption-message', handleCaptionMessage);
       if (captionClearTimerRef.current) {
         clearTimeout(captionClearTimerRef.current);
       }
-      void leaveWhiteboardCleanly(client, selfUserIdRef.current).then(() =>
-        client.leave().catch(() => null),
-      );
+      void disposeZoomClient(client, selfUserIdRef.current);
     };
   }, [
     sessionName,
@@ -1662,14 +1681,12 @@ export function ZoomVideoSessionEmbed({
     }
     const next = !isHandRaised;
     setIsHandRaised(next);
-    void client
-      .getCommandClient()
-      .send(
-        JSON.stringify({
-          type: 'raise-hand',
-          raised: next,
-        } satisfies CommandChannelPayload),
-      );
+    void client.getCommandClient().send(
+      JSON.stringify({
+        type: 'raise-hand',
+        raised: next,
+      } satisfies CommandChannelPayload),
+    );
   }, [isHandRaised]);
 
   // Same command-channel approach as raise-hand — Video SDK also has no
@@ -1755,9 +1772,8 @@ export function ZoomVideoSessionEmbed({
       },
       accessToken,
     );
-    void leaveWhiteboardCleanly(client, selfUserIdRef.current).then(() =>
-      client.leave(true).catch(() => null),
-    );
+    isLeavingRef.current = true;
+    void disposeZoomClient(client, selfUserIdRef.current, true);
     setShowEndForAllConfirm(false);
     setShowFeedbackPrompt(true);
   }, [isSelfHost, liveSessionId, accessToken]);
@@ -1985,10 +2001,9 @@ export function ZoomVideoSessionEmbed({
   // immediately, so there's a chance to rate the session on the way out.
   const handleLeave = useCallback(() => {
     const client = clientRef.current;
+    isLeavingRef.current = true;
     if (client) {
-      void leaveWhiteboardCleanly(client, selfUserIdRef.current).then(() =>
-        client.leave().catch(() => null),
-      );
+      void disposeZoomClient(client, selfUserIdRef.current);
     }
     setShowFeedbackPrompt(true);
   }, []);
@@ -2219,6 +2234,27 @@ export function ZoomVideoSessionEmbed({
           {whiteboardError ? (
             <div className="absolute inset-x-4 top-16 z-20 mx-auto w-fit max-w-sm rounded-lg bg-destructive px-3 py-2 text-center text-xs font-medium text-destructive-foreground shadow-sm">
               {whiteboardError}
+            </div>
+          ) : null}
+
+          {mediaError ? (
+            <div
+              className="absolute inset-x-4 top-16 z-30 mx-auto flex w-fit max-w-lg items-center gap-3 rounded-xl border border-destructive/40 bg-popover/95 px-4 py-3 text-sm text-popover-foreground shadow-lg backdrop-blur-sm"
+              role="alert"
+            >
+              <span>{mediaError}</span>
+              <Button type="button" size="sm" onClick={() => window.location.reload()}>
+                Refresh
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label="Dismiss media warning"
+                onClick={() => setMediaError(null)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
             </div>
           ) : null}
 
@@ -2486,17 +2522,18 @@ export function ZoomVideoSessionEmbed({
           ) : null}
         </div>
 
-        {/* Floating control bar: overlays the video. Auto-hiding after
-              inactivity and manually minimizing both collapse to the same
-              small handle below rather than disappearing entirely. */}
-        {isControlsVisible ? (
-          // bottom offset is set via inline style, not a Tailwind arbitrary
-          // value — nesting max()/env() inside a bracketed class is fragile
-          // across Tailwind/PostCSS versions and silently drops the whole
-          // declaration if it fails to parse, which is what left this bar
-          // with no bottom anchor at all (it rendered at the top instead).
-          // Inline style hands the calc straight to the browser, no
-          // intermediary parser involved.
+        {/* Keep the required call controls persistently visible. Zoom's UI
+              Toolkit treats this as a required component, and hiding it on
+              inactivity made the most important actions hard to discover on
+              touch and keyboard-only devices. */}
+        {/* Bottom offset is set via inline style, not a Tailwind arbitrary
+              value — nesting max()/env() inside a bracketed class is fragile
+              across Tailwind/PostCSS versions and silently drops the whole
+              declaration if it fails to parse, which is what left this bar
+              with no bottom anchor at all (it rendered at the top instead).
+              Inline style hands the calc straight to the browser, no
+              intermediary parser involved. */}
+        {status === 'connected' ? (
           <div
             className="absolute inset-x-0 z-30 flex justify-center px-2"
             style={{ bottom: 'max(1rem, env(safe-area-inset-bottom))' }}
@@ -2525,6 +2562,9 @@ export function ZoomVideoSessionEmbed({
                     type="button"
                     variant="outline"
                     size="icon"
+                    className="h-11 w-11 sm:w-auto sm:px-3"
+                    aria-label={isMuted ? 'Unmute microphone' : 'Mute microphone'}
+                    aria-pressed={!isMuted}
                     onClick={() => void toggleMute()}
                   >
                     <PoppingIcon toggleKey={isMuted}>
@@ -2534,6 +2574,9 @@ export function ZoomVideoSessionEmbed({
                         <Mic className="h-4 w-4" />
                       )}
                     </PoppingIcon>
+                    <span className="hidden sm:inline">
+                      {isMuted ? 'Unmute' : 'Mute'}
+                    </span>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>{isMuted ? 'Unmute' : 'Mute'}</TooltipContent>
@@ -2545,6 +2588,9 @@ export function ZoomVideoSessionEmbed({
                     type="button"
                     variant="outline"
                     size="icon"
+                    className="h-11 w-11 sm:w-auto sm:px-3"
+                    aria-label={isVideoOn ? 'Stop camera' : 'Start camera'}
+                    aria-pressed={isVideoOn}
                     onClick={() => void toggleVideo()}
                   >
                     <PoppingIcon toggleKey={isVideoOn}>
@@ -2554,6 +2600,9 @@ export function ZoomVideoSessionEmbed({
                         <VideoOff className="h-4 w-4" />
                       )}
                     </PoppingIcon>
+                    <span className="hidden sm:inline">
+                      {isVideoOn ? 'Stop video' : 'Start video'}
+                    </span>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -2567,7 +2616,10 @@ export function ZoomVideoSessionEmbed({
                     type="button"
                     variant={isSharingScreen ? 'default' : 'outline'}
                     size="icon"
-                    disabled={isWhiteboardActive}
+                    className="h-11 w-11 sm:w-auto sm:px-3"
+                    aria-label={isSharingScreen ? 'Stop sharing screen' : 'Share screen'}
+                    aria-pressed={isSharingScreen}
+                    disabled={isWhiteboardActive || !supportsScreenShare}
                     onClick={() => void toggleScreenShare()}
                   >
                     <PoppingIcon toggleKey={isSharingScreen}>
@@ -2577,12 +2629,17 @@ export function ZoomVideoSessionEmbed({
                         <MonitorUp className="h-4 w-4" />
                       )}
                     </PoppingIcon>
+                    <span className="hidden sm:inline">
+                      {isSharingScreen ? 'Stop share' : 'Share'}
+                    </span>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  {isWhiteboardActive
-                    ? 'End the whiteboard to share your screen'
-                    : 'Share screen'}
+                  {!supportsScreenShare
+                    ? 'Screen sharing is not supported by this browser'
+                    : isWhiteboardActive
+                      ? 'End the whiteboard to share your screen'
+                      : 'Share screen'}
                 </TooltipContent>
               </Tooltip>
 
@@ -3094,11 +3151,17 @@ export function ZoomVideoSessionEmbed({
                     type="button"
                     variant={isHandRaised ? 'default' : 'outline'}
                     size="icon"
+                    className="h-11 w-11 sm:w-auto sm:px-3"
+                    aria-label={isHandRaised ? 'Lower hand' : 'Raise hand'}
+                    aria-pressed={isHandRaised}
                     onClick={toggleHandRaise}
                   >
                     <PoppingIcon toggleKey={isHandRaised}>
                       <Hand className="h-4 w-4" />
                     </PoppingIcon>
+                    <span className="hidden sm:inline">
+                      {isHandRaised ? 'Lower hand' : 'Raise hand'}
+                    </span>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -3155,6 +3218,14 @@ export function ZoomVideoSessionEmbed({
                     type="button"
                     variant="destructive"
                     size="icon"
+                    className="h-11 w-11 sm:w-auto sm:px-3"
+                    aria-label={
+                      isSelfHost && !otherParticipant
+                        ? 'End class'
+                        : isSelfHost
+                          ? 'Leave or end class'
+                          : 'Leave class'
+                    }
                     onClick={() => setShowEndForAllConfirm(true)}
                   >
                     <PoppingIcon toggleKey={isSelfHost && !otherParticipant}>
@@ -3164,6 +3235,9 @@ export function ZoomVideoSessionEmbed({
                         <PhoneOff className="h-4 w-4" />
                       )}
                     </PoppingIcon>
+                    <span className="hidden sm:inline">
+                      {isSelfHost && !otherParticipant ? 'End class' : 'Leave'}
+                    </span>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -3191,9 +3265,36 @@ export function ZoomVideoSessionEmbed({
         ) : null}
 
         {connectionState === ConnectionState.Reconnecting ? (
-          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-2 bg-background/80 text-sm text-muted-foreground">
+          <div
+            className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-2 bg-background/85 text-sm text-muted-foreground backdrop-blur-sm"
+            role="status"
+            aria-live="assertive"
+          >
             <Loader2 className="h-5 w-5 animate-spin" />
-            Reconnecting…
+            <span className="font-medium text-foreground">Reconnecting to class…</span>
+            <span>
+              Keep this tab open. Your audio and video will resume automatically.
+            </span>
+          </div>
+        ) : null}
+
+        {sessionEndMessage ? (
+          <div
+            className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-background/95 px-6 text-center backdrop-blur-sm"
+            role="alert"
+          >
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+              <PhoneOff className="h-6 w-6 text-muted-foreground" />
+            </div>
+            <div className="max-w-md space-y-1">
+              <h2 className="text-lg font-semibold text-foreground">
+                Class disconnected
+              </h2>
+              <p className="text-sm text-muted-foreground">{sessionEndMessage}</p>
+            </div>
+            <Button type="button" onClick={finishLeaving}>
+              Return to class page
+            </Button>
           </div>
         ) : null}
 
