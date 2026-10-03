@@ -364,3 +364,182 @@ describe('LiveSessionsService.submitLiveSessionFeedback', () => {
     await expect(attempt()).rejects.toThrow('Too many feedback submissions');
   });
 });
+
+describe('LiveSessionsService.reportLiveSessionQualityEvent', () => {
+  const createSupabaseServiceClientMock = jest.mocked(createSupabaseServiceClient);
+
+  const qualityInput = {
+    displayName: 'Taylor Reed',
+    metric: 'network_quality' as const,
+    level: 'bad',
+    occurredAt: '2026-01-01T00:00:00.000Z',
+  };
+
+  function mockSessionAndInsert(
+    sessionRow: Record<string, unknown> | null,
+    insertError: { message: string } | null = null,
+  ) {
+    const insert = jest.fn(async () => ({ error: insertError }));
+    createSupabaseServiceClientMock.mockReturnValue({
+      from: jest.fn((table: string) => {
+        if (table === 'channel_live_session_quality_events') {
+          return { insert };
+        }
+        return {
+          select: jest.fn().mockReturnThis(),
+          eq: jest.fn().mockReturnThis(),
+          is: jest.fn().mockReturnThis(),
+          maybeSingle: jest.fn(async () => ({ data: sessionRow, error: null })),
+        };
+      }),
+    } as never);
+    return insert;
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('records a quality event without a profile_id when no access token is given', async () => {
+    const insert = mockSessionAndInsert({
+      id: 'session-1',
+      org_id: 'org-1',
+      channel_id: 'channel-1',
+    });
+
+    const service = new LiveSessionsService();
+    const result = await service.reportLiveSessionQualityEvent(
+      'session-1',
+      '127.0.0.1',
+      null,
+      qualityInput,
+    );
+
+    expect(result).toEqual({ success: true });
+    expect(insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        org_id: 'org-1',
+        live_session_id: 'session-1',
+        channel_id: 'channel-1',
+        profile_id: null,
+        display_name: 'Taylor Reed',
+        metric: 'network_quality',
+        level: 'bad',
+        occurred_at: '2026-01-01T00:00:00.000Z',
+      }),
+    );
+  });
+
+  it('404s when the session does not exist', async () => {
+    mockSessionAndInsert(null);
+
+    const service = new LiveSessionsService();
+    await expect(
+      service.reportLiveSessionQualityEvent(
+        'missing-session',
+        '127.0.0.1',
+        null,
+        qualityInput,
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('rate-limits repeated reports from the same session and IP', async () => {
+    mockSessionAndInsert({ id: 'session-1', org_id: 'org-1', channel_id: 'channel-1' });
+
+    const service = new LiveSessionsService();
+    const attempt = () =>
+      service.reportLiveSessionQualityEvent('session-1', '10.0.0.2', null, qualityInput);
+
+    for (let i = 0; i < 30; i += 1) {
+      await expect(attempt()).resolves.toEqual({ success: true });
+    }
+    await expect(attempt()).rejects.toThrow('Too many quality reports');
+  });
+});
+
+describe('LiveSessionsService.logLiveSessionAuditEvent', () => {
+  const createSupabaseServiceClientMock = jest.mocked(createSupabaseServiceClient);
+
+  const auditInput = {
+    action: 'mute_participant' as const,
+    targetDisplayName: 'Riley Student',
+    occurredAt: '2026-01-01T00:00:00.000Z',
+  };
+
+  function mockSessionAndInsert(
+    sessionRow: Record<string, unknown> | null,
+    insertError: { message: string } | null = null,
+  ) {
+    const insert = jest.fn(async () => ({ error: insertError }));
+    createSupabaseServiceClientMock.mockReturnValue({
+      from: jest.fn((table: string) => {
+        if (table === 'channel_live_session_audit_events') {
+          return { insert };
+        }
+        return {
+          select: jest.fn().mockReturnThis(),
+          eq: jest.fn().mockReturnThis(),
+          is: jest.fn().mockReturnThis(),
+          maybeSingle: jest.fn(async () => ({ data: sessionRow, error: null })),
+        };
+      }),
+    } as never);
+    return insert;
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('records an audit event without an actor_profile_id when no access token is given', async () => {
+    const insert = mockSessionAndInsert({
+      id: 'session-1',
+      org_id: 'org-1',
+      channel_id: 'channel-1',
+    });
+
+    const service = new LiveSessionsService();
+    const result = await service.logLiveSessionAuditEvent(
+      'session-1',
+      '127.0.0.1',
+      null,
+      auditInput,
+    );
+
+    expect(result).toEqual({ success: true });
+    expect(insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        org_id: 'org-1',
+        live_session_id: 'session-1',
+        channel_id: 'channel-1',
+        actor_profile_id: null,
+        action: 'mute_participant',
+        metadata: { targetDisplayName: 'Riley Student' },
+        occurred_at: '2026-01-01T00:00:00.000Z',
+      }),
+    );
+  });
+
+  it('404s when the session does not exist', async () => {
+    mockSessionAndInsert(null);
+
+    const service = new LiveSessionsService();
+    await expect(
+      service.logLiveSessionAuditEvent('missing-session', '127.0.0.1', null, auditInput),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('rate-limits repeated audit logs from the same session and IP', async () => {
+    mockSessionAndInsert({ id: 'session-1', org_id: 'org-1', channel_id: 'channel-1' });
+
+    const service = new LiveSessionsService();
+    const attempt = () =>
+      service.logLiveSessionAuditEvent('session-1', '10.0.0.3', null, auditInput);
+
+    for (let i = 0; i < 60; i += 1) {
+      await expect(attempt()).resolves.toEqual({ success: true });
+    }
+    await expect(attempt()).rejects.toThrow('Too many audit events');
+  });
+});

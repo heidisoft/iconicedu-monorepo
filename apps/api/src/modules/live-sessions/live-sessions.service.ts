@@ -22,6 +22,8 @@ import { loadAndAuthorizeProfile } from '@iconicedu/api/lib/actor/resolve-actor-
 import type { JoinLiveSessionDto } from '@iconicedu/api/modules/live-sessions/dto/join-live-session.dto';
 import type { GuestJoinLiveSessionDto } from '@iconicedu/api/modules/live-sessions/dto/guest-join-live-session.dto';
 import type { SubmitLiveSessionFeedbackDto } from '@iconicedu/api/modules/live-sessions/dto/submit-live-session-feedback.dto';
+import type { ReportLiveSessionQualityEventDto } from '@iconicedu/api/modules/live-sessions/dto/report-live-session-quality-event.dto';
+import type { LogLiveSessionAuditEventDto } from '@iconicedu/api/modules/live-sessions/dto/log-live-session-audit-event.dto';
 
 async function resolveOrgSlug(
   serviceSupabase: ReturnType<typeof createSupabaseServiceClient>,
@@ -133,6 +135,78 @@ function checkFeedbackRateLimit(key: string) {
       'Too many feedback submissions, try again shortly',
       HttpStatus.TOO_MANY_REQUESTS,
     );
+  }
+
+  existing.count += 1;
+}
+
+// Quality events are client-throttled to only fire on a level change (see
+// the Zoom embed), so a session rarely sends more than a handful per minute
+// in practice — this is a generous backstop, not the primary throttle.
+const QUALITY_EVENT_RATE_LIMIT = 30;
+const QUALITY_EVENT_RATE_WINDOW_MS = 60_000;
+const QUALITY_EVENT_SWEEP_INTERVAL_CALLS = 100;
+const qualityEventAttempts = new Map<
+  string,
+  { count: number; windowStartedAt: number }
+>();
+let qualityEventCallsSinceSweep = 0;
+
+function checkQualityEventRateLimit(key: string) {
+  const now = Date.now();
+
+  qualityEventCallsSinceSweep += 1;
+  if (qualityEventCallsSinceSweep >= QUALITY_EVENT_SWEEP_INTERVAL_CALLS) {
+    qualityEventCallsSinceSweep = 0;
+    for (const [mapKey, entry] of qualityEventAttempts) {
+      if (now - entry.windowStartedAt > QUALITY_EVENT_RATE_WINDOW_MS) {
+        qualityEventAttempts.delete(mapKey);
+      }
+    }
+  }
+
+  const existing = qualityEventAttempts.get(key);
+  if (!existing || now - existing.windowStartedAt > QUALITY_EVENT_RATE_WINDOW_MS) {
+    qualityEventAttempts.set(key, { count: 1, windowStartedAt: now });
+    return;
+  }
+
+  if (existing.count >= QUALITY_EVENT_RATE_LIMIT) {
+    throw new HttpException('Too many quality reports', HttpStatus.TOO_MANY_REQUESTS);
+  }
+
+  existing.count += 1;
+}
+
+// A handful of privileged actions per session is the expected case — this is
+// a backstop against a misbehaving client, not an expected usage ceiling.
+const AUDIT_EVENT_RATE_LIMIT = 60;
+const AUDIT_EVENT_RATE_WINDOW_MS = 60_000;
+const AUDIT_EVENT_SWEEP_INTERVAL_CALLS = 100;
+const auditEventAttempts = new Map<string, { count: number; windowStartedAt: number }>();
+let auditEventCallsSinceSweep = 0;
+
+function checkAuditEventRateLimit(key: string) {
+  const now = Date.now();
+
+  auditEventCallsSinceSweep += 1;
+  if (auditEventCallsSinceSweep >= AUDIT_EVENT_SWEEP_INTERVAL_CALLS) {
+    auditEventCallsSinceSweep = 0;
+    for (const [mapKey, entry] of auditEventAttempts) {
+      if (now - entry.windowStartedAt > AUDIT_EVENT_RATE_WINDOW_MS) {
+        auditEventAttempts.delete(mapKey);
+      }
+    }
+  }
+
+  const existing = auditEventAttempts.get(key);
+  if (!existing || now - existing.windowStartedAt > AUDIT_EVENT_RATE_WINDOW_MS) {
+    auditEventAttempts.set(key, { count: 1, windowStartedAt: now });
+    return;
+  }
+
+  if (existing.count >= AUDIT_EVENT_RATE_LIMIT) {
+    throw new HttpException('Too many audit events', HttpStatus.TOO_MANY_REQUESTS);
   }
 
   existing.count += 1;
@@ -479,6 +553,110 @@ export class LiveSessionsService {
         profile_id: profileId,
         display_name: input.displayName,
         rating: input.rating,
+      });
+
+    if (insertResponse.error) {
+      throw new InternalServerErrorException(insertResponse.error.message);
+    }
+
+    return { success: true as const };
+  }
+
+  // Lets staff spot which active/past rooms had connection trouble (FR-043) —
+  // see the Zoom embed's network-quality-change/connection-change listeners,
+  // which call this only on a degraded transition, not on every tick.
+  async reportLiveSessionQualityEvent(
+    sessionId: string,
+    clientIp: string,
+    accessToken: string | null,
+    input: ReportLiveSessionQualityEventDto,
+  ) {
+    checkQualityEventRateLimit(`${sessionId}:${clientIp}`);
+
+    const serviceSupabase = createSupabaseServiceClient();
+    const sessionResponse = await serviceSupabase
+      .from('channel_live_sessions')
+      .select('id, org_id, channel_id')
+      .eq('id', sessionId)
+      .is('deleted_at', null)
+      .maybeSingle<{ id: string; org_id: string; channel_id: string }>();
+
+    if (sessionResponse.error) {
+      throw new InternalServerErrorException(sessionResponse.error.message);
+    }
+    const session = sessionResponse.data;
+    if (!session) {
+      throw new NotFoundException('Live session not found');
+    }
+
+    const profileId = accessToken
+      ? await this.resolveProfileIdForAccessToken(accessToken, session.org_id)
+      : null;
+
+    const insertResponse = await serviceSupabase
+      .from('channel_live_session_quality_events')
+      .insert({
+        org_id: session.org_id,
+        live_session_id: session.id,
+        channel_id: session.channel_id,
+        profile_id: profileId,
+        display_name: input.displayName,
+        metric: input.metric,
+        level: input.level,
+        occurred_at: input.occurredAt,
+      });
+
+    if (insertResponse.error) {
+      throw new InternalServerErrorException(insertResponse.error.message);
+    }
+
+    return { success: true as const };
+  }
+
+  // Stub audit trail for privileged in-session actions (FR-044) — records
+  // who did what, but has no admin UI surfacing it yet. Covers only the
+  // actions that exist today (host-forced mute, end-for-everyone, and
+  // automatic recording start); extend ACTIONS in the DTO as more are built.
+  async logLiveSessionAuditEvent(
+    sessionId: string,
+    clientIp: string,
+    accessToken: string | null,
+    input: LogLiveSessionAuditEventDto,
+  ) {
+    checkAuditEventRateLimit(`${sessionId}:${clientIp}`);
+
+    const serviceSupabase = createSupabaseServiceClient();
+    const sessionResponse = await serviceSupabase
+      .from('channel_live_sessions')
+      .select('id, org_id, channel_id')
+      .eq('id', sessionId)
+      .is('deleted_at', null)
+      .maybeSingle<{ id: string; org_id: string; channel_id: string }>();
+
+    if (sessionResponse.error) {
+      throw new InternalServerErrorException(sessionResponse.error.message);
+    }
+    const session = sessionResponse.data;
+    if (!session) {
+      throw new NotFoundException('Live session not found');
+    }
+
+    const actorProfileId = accessToken
+      ? await this.resolveProfileIdForAccessToken(accessToken, session.org_id)
+      : null;
+
+    const insertResponse = await serviceSupabase
+      .from('channel_live_session_audit_events')
+      .insert({
+        org_id: session.org_id,
+        live_session_id: session.id,
+        channel_id: session.channel_id,
+        actor_profile_id: actorProfileId,
+        action: input.action,
+        metadata: input.targetDisplayName
+          ? { targetDisplayName: input.targetDisplayName }
+          : {},
+        occurred_at: input.occurredAt,
       });
 
     if (insertResponse.error) {

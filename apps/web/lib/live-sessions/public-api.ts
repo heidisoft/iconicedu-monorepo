@@ -81,3 +81,58 @@ export async function submitLiveSessionFeedback(
     return { status: 0, message: 'Unable to reach the server' };
   }
 }
+
+// Fire-and-forget telemetry — the embed's network-quality-change /
+// connection-change listeners call this on a degraded transition. Never
+// throws: a dropped quality report shouldn't surface as a user-facing error
+// on top of the connection trouble it's trying to report.
+export async function reportLiveSessionQualityEvent(
+  sessionId: string,
+  body: {
+    displayName: string;
+    metric: 'network_quality' | 'connection_state';
+    level: string;
+    occurredAt: string;
+  },
+  accessToken?: string | null,
+): Promise<void> {
+  try {
+    await fetch(`${getApiUrl()}/live-sessions/${sessionId}/quality-events`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    // Best effort — see doc comment above.
+  }
+}
+
+// Stub audit trail for privileged in-session actions — see
+// logLiveSessionAuditEvent on the API side for scope/limitations. Also
+// fire-and-forget: a privileged action already happened by the time this is
+// called, so a failed audit write shouldn't block or error out the action.
+export async function logLiveSessionAuditEvent(
+  sessionId: string,
+  body: {
+    action: 'mute_participant' | 'end_session_for_all' | 'recording_started';
+    targetDisplayName?: string | null;
+    occurredAt: string;
+  },
+  accessToken?: string | null,
+): Promise<void> {
+  try {
+    await fetch(`${getApiUrl()}/live-sessions/${sessionId}/audit-events`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    // Best effort — see doc comment above.
+  }
+}

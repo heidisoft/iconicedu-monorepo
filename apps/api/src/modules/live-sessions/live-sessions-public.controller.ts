@@ -3,6 +3,8 @@ import { Body, Controller, Get, Param, Post, Req } from '@nestjs/common';
 import { LiveSessionsService } from '@iconicedu/api/modules/live-sessions/live-sessions.service';
 import { parseGuestJoinLiveSessionDto } from '@iconicedu/api/modules/live-sessions/dto/guest-join-live-session.dto';
 import { parseSubmitLiveSessionFeedbackDto } from '@iconicedu/api/modules/live-sessions/dto/submit-live-session-feedback.dto';
+import { parseReportLiveSessionQualityEventDto } from '@iconicedu/api/modules/live-sessions/dto/report-live-session-quality-event.dto';
+import { parseLogLiveSessionAuditEventDto } from '@iconicedu/api/modules/live-sessions/dto/log-live-session-audit-event.dto';
 import { extractOptionalBearerToken } from '@iconicedu/api/lib/http/authenticated-request';
 
 type IpAddressRequest = {
@@ -70,6 +72,38 @@ export class LiveSessionsPublicController {
       resolveClientIp(req),
       extractOptionalBearerToken(req.headers.authorization),
       parseSubmitLiveSessionFeedbackDto(body),
+    );
+  }
+
+  // Fire-and-forget telemetry from the Zoom embed's network-quality-change /
+  // connection-change listeners — see reportLiveSessionQualityEvent for why
+  // this stays public-but-auth-aware rather than requiring a member token.
+  @Post(':sessionId/quality-events')
+  reportQualityEvent(
+    @Req() req: IpAddressRequest & { headers: { authorization?: string } },
+    @Param('sessionId') sessionId: string,
+    @Body() body: unknown,
+  ) {
+    return this.liveSessionsService.reportLiveSessionQualityEvent(
+      sessionId,
+      resolveClientIp(req),
+      extractOptionalBearerToken(req.headers.authorization),
+      parseReportLiveSessionQualityEventDto(body),
+    );
+  }
+
+  // Stub audit trail — see logLiveSessionAuditEvent's doc comment.
+  @Post(':sessionId/audit-events')
+  logAuditEvent(
+    @Req() req: IpAddressRequest & { headers: { authorization?: string } },
+    @Param('sessionId') sessionId: string,
+    @Body() body: unknown,
+  ) {
+    return this.liveSessionsService.logLiveSessionAuditEvent(
+      sessionId,
+      resolveClientIp(req),
+      extractOptionalBearerToken(req.headers.authorization),
+      parseLogLiveSessionAuditEventDto(body),
     );
   }
 }

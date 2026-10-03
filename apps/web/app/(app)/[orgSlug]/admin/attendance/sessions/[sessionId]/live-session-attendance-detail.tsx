@@ -12,6 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from '@iconicedu/ui-web';
+import type { LiveSessionQualityEventRow } from '@iconicedu/web/lib/admin/live-session-attendance';
 import {
   formatAttendanceDateTime,
   formatAttendanceDuration,
@@ -21,10 +22,20 @@ import {
 
 type LiveSessionAttendanceDetailProps = {
   detail: LiveSessionAttendanceDetailVM;
+  qualityEvents: LiveSessionQualityEventRow[];
+};
+
+const QUALITY_LEVEL_LABEL: Record<string, string> = {
+  bad: 'Poor network',
+  normal: 'Fair network',
+  good: 'Network recovered',
+  reconnecting: 'Reconnecting',
+  fail: 'Connection failed',
 };
 
 export function LiveSessionAttendanceDetail({
   detail,
+  qualityEvents,
 }: LiveSessionAttendanceDetailProps) {
   return (
     <div className="grid gap-4">
@@ -136,6 +147,34 @@ export function LiveSessionAttendanceDetail({
                 <div className="text-right text-muted-foreground">
                   <div>{formatAttendanceDateTime(event.occurredAt)}</div>
                   <div className="capitalize">{event.source.replace('_', ' ')}</div>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {qualityEvents.length ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Connection quality issues</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {qualityEvents.map((event) => (
+              <div
+                key={event.id}
+                className="flex items-center justify-between gap-4 text-sm"
+              >
+                <div className="flex flex-col gap-1">
+                  <span className="font-medium text-foreground">
+                    {event.display_name}
+                  </span>
+                  <Badge variant={event.level === 'good' ? 'secondary' : 'destructive'}>
+                    {QUALITY_LEVEL_LABEL[event.level] ?? event.level}
+                  </Badge>
+                </div>
+                <div className="text-right text-muted-foreground">
+                  {formatAttendanceDateTime(event.occurred_at)}
                 </div>
               </div>
             ))}

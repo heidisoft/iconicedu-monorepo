@@ -68,6 +68,7 @@ Internal engineers, operators, and AI assistants.
 - [Architecture](codebase/ARCHITECTURE.md)
 - [Conventions](codebase/CONVENTIONS.md)
 - [Integrations](codebase/INTEGRATIONS.md)
+- [Zoom Video SDK Integration](codebase/ZOOM_VIDEO_SDK_INTEGRATION.md)
 - [Testing](codebase/TESTING.md)
 - [Concerns](codebase/CONCERNS.md)
 

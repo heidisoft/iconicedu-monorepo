@@ -143,7 +143,7 @@ async function getChannelSummary(
  * apps/api's channels.service.ts hasRosterReadRole, which grants the same
  * org-role-based bypass for viewing a channel's roster.
  */
-async function hasOrgStaffRole(
+export async function hasOrgStaffRole(
   supabase: LiveSessionSupabaseClient,
   orgId: string,
   profileIds: string[],
