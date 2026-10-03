@@ -123,6 +123,45 @@ export class SchedulesService {
     return this.attachLearningSpaceArchiveMetadata(input.orgId, data ?? []);
   }
 
+  async getSessionEditContext(
+    accessToken: string,
+    input: { orgId: string; scheduleId: string },
+  ): Promise<{
+    scheduleId: string;
+    title: string;
+    startAt: string;
+    endAt: string;
+    timezone: string | null;
+    sourceLearningSpaceId: string | null;
+    sourceChannelId: string | null;
+  }> {
+    await this.requireOrgActor(accessToken, input.orgId);
+    const supabase = createSupabaseServiceClient();
+    const activityContext = await this.loadRescheduleActivityContext(
+      supabase,
+      input.orgId,
+      input.scheduleId,
+    );
+    if (!activityContext) {
+      throw new BadRequestException('Schedule not found');
+    }
+    await this.assertLearningSpaceEditable(
+      supabase,
+      input.orgId,
+      activityContext.learningSpaceId,
+    );
+
+    return {
+      scheduleId: activityContext.scheduleId,
+      title: activityContext.title,
+      startAt: activityContext.startAt,
+      endAt: activityContext.endAt,
+      timezone: activityContext.timezone,
+      sourceLearningSpaceId: activityContext.learningSpaceId,
+      sourceChannelId: activityContext.channelId,
+    };
+  }
+
   async createException(
     accessToken: string,
     body: { orgId: string; scheduleId: string; date: string; reason?: string | null },
@@ -446,6 +485,14 @@ export class SchedulesService {
       dto.orgId,
       dto.scheduleId,
     );
+    if (!activityContext) {
+      throw new BadRequestException('Schedule not found');
+    }
+    await this.assertLearningSpaceEditable(
+      supabase,
+      dto.orgId,
+      activityContext.learningSpaceId,
+    );
 
     const { data: recurrenceRow, error: recurrenceError } = await supabase
       .from('class_schedule_recurrence')
@@ -647,6 +694,11 @@ export class SchedulesService {
     if (!activityContext) {
       throw new BadRequestException('Schedule not found');
     }
+    await this.assertLearningSpaceEditable(
+      supabase,
+      dto.orgId,
+      activityContext.learningSpaceId,
+    );
 
     const recurrenceDetail = await this.loadRecurrenceSplitDetail(
       supabase,
@@ -1925,6 +1977,32 @@ export class SchedulesService {
       if (deleteRecurrenceError) {
         throw new InternalServerErrorException(deleteRecurrenceError.message);
       }
+    }
+  }
+
+  /** Mirrors the archived-classroom gate apps/web used to enforce client-side
+   * via a direct `learning_spaces` read — now enforced here so every caller
+   * (not just web) is blocked from editing sessions in an archived space. */
+  private async assertLearningSpaceEditable(
+    supabase: SupabaseServiceClient,
+    orgId: string,
+    learningSpaceId: string | null,
+  ): Promise<void> {
+    if (!learningSpaceId) return;
+
+    const { data, error } = await supabase
+      .from('learning_spaces')
+      .select('status, archived_at')
+      .eq('id', learningSpaceId)
+      .eq('org_id', orgId)
+      .is('deleted_at', null)
+      .maybeSingle<{ status: string | null; archived_at: string | null }>();
+
+    if (error) {
+      throw new InternalServerErrorException(error.message);
+    }
+    if (data?.archived_at || data?.status === 'archived') {
+      throw new BadRequestException('Archived classrooms cannot be changed.');
     }
   }
 
