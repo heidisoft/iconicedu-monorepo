@@ -705,8 +705,8 @@ describe('createOrJoinLiveSession', () => {
   });
 
   it('returns a full shareable URL as the join path for the zoom provider', async () => {
-    const previousWebAppUrl = process.env.WEB_APP_URL;
-    process.env.WEB_APP_URL = 'https://app.iconicedu.lk/';
+    const previousWebUrl = process.env.WEB_URL;
+    process.env.WEB_URL = 'https://app.iconicedu.lk/';
 
     try {
       const serviceSupabase = createServiceSupabaseStub({
@@ -739,17 +739,17 @@ describe('createOrJoinLiveSession', () => {
 
       await scheduler.flush();
     } finally {
-      if (previousWebAppUrl === undefined) {
-        delete process.env.WEB_APP_URL;
+      if (previousWebUrl === undefined) {
+        delete process.env.WEB_URL;
       } else {
-        process.env.WEB_APP_URL = previousWebAppUrl;
+        process.env.WEB_URL = previousWebUrl;
       }
     }
   });
 
   it('appends the passcode as a query param so members can join with one click', async () => {
-    const previousWebAppUrl = process.env.WEB_APP_URL;
-    process.env.WEB_APP_URL = 'https://app.iconicedu.lk';
+    const previousWebUrl = process.env.WEB_URL;
+    process.env.WEB_URL = 'https://app.iconicedu.lk';
     vi.mocked(getLiveSessionProvider).mockReturnValueOnce({
       key: 'zoom',
       createSession: vi.fn(async ({ sessionId }: { sessionId: string }) => ({
@@ -787,10 +787,10 @@ describe('createOrJoinLiveSession', () => {
 
       await scheduler.flush();
     } finally {
-      if (previousWebAppUrl === undefined) {
-        delete process.env.WEB_APP_URL;
+      if (previousWebUrl === undefined) {
+        delete process.env.WEB_URL;
       } else {
-        process.env.WEB_APP_URL = previousWebAppUrl;
+        process.env.WEB_URL = previousWebUrl;
       }
     }
   });
