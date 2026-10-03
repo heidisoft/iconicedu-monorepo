@@ -26,6 +26,7 @@ features. Read this before touching
 - [Documentation Hub](../README.md)
 - [External Integrations](INTEGRATIONS.md) — one-line inventory row for Zoom
 - [Architecture Overview](ARCHITECTURE.md)
+- [ADR-005: Zoom Video SDK as a live-session video provider](../decisions/005-zoom-video-sdk-live-sessions.md) — why Zoom/Video SDK/hand-built UI were chosen, alternatives considered, and accepted trade-offs
 - [ADR-004: API-first frontend boundary](../decisions/004-api-first-frontend-boundary.md)
 
 ---
