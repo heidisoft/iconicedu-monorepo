@@ -10,7 +10,7 @@ Internal engineers, operators, and AI assistants.
 
 ## Last Updated
 
-2026-08-14
+2026-10-04
 
 ## Related Docs
 
@@ -69,6 +69,7 @@ Internal engineers, operators, and AI assistants.
 - [Conventions](codebase/CONVENTIONS.md)
 - [Integrations](codebase/INTEGRATIONS.md)
 - [Zoom Video SDK Integration](codebase/ZOOM_VIDEO_SDK_INTEGRATION.md)
+- [Zoom Video SDK UX Parity](codebase/ZOOM_VIDEO_SDK_UX_PARITY.md)
 - [Testing](codebase/TESTING.md)
 - [Concerns](codebase/CONCERNS.md)
 

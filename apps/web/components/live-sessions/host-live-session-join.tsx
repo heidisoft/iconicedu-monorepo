@@ -2,10 +2,14 @@
 
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 import { DevicePreviewStep } from '@iconicedu/web/components/live-sessions/device-preview-step';
+import {
+  readLiveSessionRecovery,
+  rememberLiveSession,
+} from '@iconicedu/web/lib/live-sessions/browser-session';
+import { ZoomSessionLoadingScreen } from './zoom-video/zoom-session-loading-screen';
 
 const ZoomVideoSessionEmbed = dynamic(
   () =>
@@ -14,14 +18,7 @@ const ZoomVideoSessionEmbed = dynamic(
     ),
   {
     ssr: false,
-    loading: () => (
-      <div className="flex min-h-[70vh] items-center justify-center rounded-2xl border border-border bg-card">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Loading session...
-        </div>
-      </div>
-    ),
+    loading: () => <ZoomSessionLoadingScreen />,
   },
 );
 
@@ -32,6 +29,7 @@ export function HostLiveSessionJoin({
   sessionTitle,
   liveSessionId,
   accessToken,
+  sessionPasscode,
 }: {
   sessionName: string;
   token: string;
@@ -39,19 +37,33 @@ export function HostLiveSessionJoin({
   sessionTitle: string;
   liveSessionId: string;
   accessToken?: string | null;
+  sessionPasscode?: string | null;
 }) {
   const router = useRouter();
   const [devicePreferences, setDevicePreferences] = useState<{
     muted: boolean;
     videoOff: boolean;
   } | null>(null);
+  const [recoveryChecked, setRecoveryChecked] = useState(false);
+
+  useEffect(() => {
+    setDevicePreferences(readLiveSessionRecovery(liveSessionId));
+    setRecoveryChecked(true);
+  }, [liveSessionId]);
+
+  if (!recoveryChecked) {
+    return <ZoomSessionLoadingScreen label="Restoring session…" />;
+  }
 
   if (!devicePreferences) {
     return (
       <DevicePreviewStep
         displayName={displayName}
         sessionTitle={sessionTitle}
-        onJoin={setDevicePreferences}
+        onJoin={(preferences) => {
+          rememberLiveSession(liveSessionId, preferences);
+          setDevicePreferences(preferences);
+        }}
       />
     );
   }
@@ -59,12 +71,14 @@ export function HostLiveSessionJoin({
   return (
     <ZoomVideoSessionEmbed
       sessionName={sessionName}
+      sessionTitle={sessionTitle}
       token={token}
       displayName={displayName}
       initialMuted={devicePreferences.muted}
       initialVideoOff={devicePreferences.videoOff}
       liveSessionId={liveSessionId}
       accessToken={accessToken}
+      sessionPasscode={sessionPasscode}
       // This page is reached via the public /live/:sessionId link, which
       // doesn't carry an org-scoped return path — without this, leaving (or
       // finishing the post-session rating) did nothing at all, since

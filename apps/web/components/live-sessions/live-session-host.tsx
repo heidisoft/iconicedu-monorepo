@@ -13,6 +13,7 @@ import {
   getEmbeddedLiveSessionTitle,
 } from '@iconicedu/web/lib/live-sessions/embed';
 import { getLiveSessionHostHeading } from '@iconicedu/web/components/live-sessions/live-session-host.utils';
+import { ZoomSessionLoadingScreen } from './zoom-video/zoom-session-loading-screen';
 
 const DailyLiveSessionEmbed = dynamic(
   () =>
@@ -21,14 +22,7 @@ const DailyLiveSessionEmbed = dynamic(
     ),
   {
     ssr: false,
-    loading: () => (
-      <div className="flex min-h-[70vh] items-center justify-center rounded-2xl border border-border bg-card">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Loading live session...
-        </div>
-      </div>
-    ),
+    loading: () => <ZoomSessionLoadingScreen label="Loading live session…" />,
   },
 );
 
@@ -56,6 +50,7 @@ export function LiveSessionHost({
   token,
   externalJoinUrl,
   zoomSessionName,
+  zoomPasscode,
   displayName,
   channelKind,
   mode,
@@ -70,6 +65,7 @@ export function LiveSessionHost({
   token?: string | null;
   externalJoinUrl?: string | null;
   zoomSessionName?: string | null;
+  zoomPasscode?: string | null;
   displayName?: string | null;
   channelKind?: string | null;
   mode?: 'video' | 'audio' | null;
@@ -110,6 +106,8 @@ export function LiveSessionHost({
       <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 py-4">
         <ZoomVideoSessionEmbed
           sessionName={zoomSessionName}
+          sessionPasscode={zoomPasscode}
+          sessionTitle={heading}
           token={token}
           displayName={displayName ?? 'You'}
           liveSessionId={liveSessionId}

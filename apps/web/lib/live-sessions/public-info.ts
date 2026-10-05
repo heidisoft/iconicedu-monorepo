@@ -22,7 +22,12 @@ export type PublicLiveSessionInfo =
       isActive: true;
       sessionTitle: string;
       isHost: true;
-      hostJoin: { token: string; sessionName: string; displayName: string };
+      hostJoin: {
+        token: string;
+        sessionName: string;
+        displayName: string;
+        passcode: string | null;
+      };
     };
 
 export async function getPublicLiveSessionInfo(

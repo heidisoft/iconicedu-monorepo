@@ -47,9 +47,10 @@ nothing to put in an iframe `src`. You get an SDK Key/Secret, mint a
 short-lived JWT per participant, and build **100% of the meeting UI yourself**
 (video tiles, mute/camera/leave controls, chat, whiteboard surface,
 annotation toolbar — all of it) using `@zoom/videosdk` as a raw audio/video
-engine. This is why `zoom-video-session-embed.tsx` is ~3,100 lines — it is
-not a wrapper around a Zoom-provided widget, it's a full custom video-call
-UI built on the app's own `@iconicedu/ui-web` design system.
+engine. It is not a wrapper around a Zoom-provided widget; it is a custom
+video-call UI built on the app's own `@iconicedu/ui-web` design system. The
+session shell coordinates SDK state, while reusable meeting UI lives in the
+adjacent `zoom-video/` component directory.
 
 Earlier in this project a Zoom pre-built UI toolkit
 (`@zoom/videosdk-ui-toolkit`) was tried and deliberately abandoned in favor
@@ -88,17 +89,21 @@ packages/live-sessions-core/src/
 
 apps/web/
   components/live-sessions/
-    zoom-video-session-embed.tsx    THE component — ~3,100 lines, all client
-                                    UI: tiles, toolbar, settings, chat,
-                                    participants, whiteboard, annotation,
-                                    recording, captions, reactions, quality
-                                    monitoring reporting
+    zoom-video-session-embed.tsx    session orchestrator: SDK event wiring,
+                                    media targets, and meeting state
+    zoom-video/                     focused gallery, tile, header, panel,
+                                    toolbar, feedback, and notice components
     daily-live-session-embed.tsx    sibling Daily embed (older, simpler —
                                     worth comparing when deciding whether a
                                     Zoom feature belongs here too)
     host-live-session-join.tsx       host-side join wrapper (passes onLeave)
     live-session-host.tsx           branches on provider to pick an embed
   lib/live-sessions/
+    browser-session.ts              tab-scoped refresh recovery; cleared on
+                                    deliberate leave and bounded by token TTL
+    zoom-session-lifecycle.ts       SDK acquisition, compatibility checks,
+                                    init/join, normalized failures, and
+                                    Strict Mode-safe teardown
     service.ts                      resolveLiveSessionJoinAccess (host
                                     determination lives here),
                                     processLiveSessionProviderWebhook
@@ -143,18 +148,18 @@ supabase/migrations/
 
 ## 3. Key decision points (with rationale)
 
-| Decision                       | What was chosen                                                                                                                                     | Why                                                                                                                                                                                                                                                                                                                                 |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Provider auth model            | Custom HS256 JWT signed with the Video SDK Key/Secret, **not** OAuth                                                                                | Video SDK's join auth is unrelated to Zoom's Server-to-Server OAuth (that's reserved, unimplemented, for optional future REST calls like recording retrieval)                                                                                                                                                                       |
-| Host determination             | `profile.kind === 'educator'` OR org staff role (owner/admin/staff) — see `resolveLiveSessionJoinAccess` in `apps/web/lib/live-sessions/service.ts` | **Previously** host was `profile.id === started_by_profile_id` — whoever happened to call join first. A student joining early could outrank the teacher. Fixed 2026-10-02; `hasOrgStaffRole` was made an exported function in `join.ts` specifically to be reusable here                                                            |
-| Default screen-share privilege | `SharePrivilege.MultipleShare` (anyone can share, teacher can restrict via Settings → Advanced)                                                     | Matches "student can share, teacher can restrict" requirement without a backend policy table — this is a **client/session-scoped** Zoom setting, not persisted to the database. It resets every new session instance                                                                                                                |
-| Local share preview element    | Always `<video>`, never `<canvas>`, chosen unconditionally                                                                                          | A real observed SDK console warning ("Use Video element instead of Canvas element when WebCodecs enabled") on WebCodecs-capable browsers; `<video>` was confirmed to work in both cases. `stream.isStartShareScreenWithVideoElement()` exists but was deliberately left unused — don't "improve" this without re-testing both paths |
-| Raise hand / reactions         | Built on the generic `CommandChannel` (`client.getCommandClient().send()`), not a dedicated API                                                     | **Confirmed: no native raise-hand or reaction-send API exists in this installed SDK version.** `reaction.sendEmojiReactionRequest` appears only in exception-code doc comments, not in any exported type — do not assume it exists without re-checking `node_modules/@zoom/videosdk/dist/types/*.d.ts` after any SDK upgrade        |
-| Whiteboard permission locking  | Not implemented — flagged as currently impossible                                                                                                   | `setWhiteboardPermission()` / `lockWhiteboardPermission()` / `getWhiteboardPermission()` are **commented out** in `whiteboard.d.ts` in the installed SDK version, despite the `WhiteboardSharePermissionCode` enum existing. Re-check after an SDK bump — this may become available                                                 |
-| Annotation tool coverage       | Only Pen/Highlighter/Arrow/Eraser exposed in the UI                                                                                                 | `AnnotationToolType` actually also has `Spotlight` (laser pointer), `Line`, `Rectangle`/`Ellipse`/`Diamond` (+ fill variants), and stamp shapes — these are real, unused, easy wins if asked for. No `Text` or equation tool exists anywhere in the SDK (whiteboard or annotation)                                                  |
-| Multi-participant UI           | Data model assumes exactly one `otherParticipant` (1:1 tutoring)                                                                                    | `peer-share-state-change` (concurrent multi-share) and `SubsessionClient` (breakout rooms) are real, fully unused APIs — building true group/gallery support is a bigger, deliberate scope decision, not a bug                                                                                                                      |
-| Audit logging                  | New `channel_live_session_audit_events` table, logged from the **client** after the action already happened                                         | Fire-and-forget by design — a failed audit write must never block or roll back a privileged action. Currently a stub: only `mute_participant`, `end_session_for_all`, `recording_started` are logged, and there is no admin UI reading this table yet                                                                               |
-| Connection-quality monitoring  | Self-reported only (`payload.userId === selfUserIdRef.current` before reporting to the backend)                                                     | Avoids every observer separately reporting the same remote peer's perceived quality, which would duplicate/conflict. Each client reports its _own_ degraded transitions only                                                                                                                                                        |
+| Decision                       | What was chosen                                                                                                                                     | Why                                                                                                                                                                                                                                                                                                                          |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Provider auth model            | Custom HS256 JWT signed with the Video SDK Key/Secret, **not** OAuth                                                                                | Video SDK's join auth is unrelated to Zoom's Server-to-Server OAuth (that's reserved, unimplemented, for optional future REST calls like recording retrieval)                                                                                                                                                                |
+| Host determination             | `profile.kind === 'educator'` OR org staff role (owner/admin/staff) — see `resolveLiveSessionJoinAccess` in `apps/web/lib/live-sessions/service.ts` | **Previously** host was `profile.id === started_by_profile_id` — whoever happened to call join first. A student joining early could outrank the teacher. Fixed 2026-10-02; `hasOrgStaffRole` was made an exported function in `join.ts` specifically to be reusable here                                                     |
+| Default screen-share privilege | `SharePrivilege.MultipleShare` (anyone can share, teacher can restrict via Settings → Advanced)                                                     | Matches "student can share, teacher can restrict" requirement without a backend policy table — this is a **client/session-scoped** Zoom setting, not persisted to the database. It resets every new session instance                                                                                                         |
+| Local share preview element    | Select `<video>` or `<canvas>` with `stream.isStartShareScreenWithVideoElement()`                                                                   | Zoom requires `<video>` on WebCodecs-capable paths and `<canvas>` on other paths. Passing one element unconditionally can publish a share while leaving the presenter with a blank main stage. Keep both mounted at non-zero dimensions and let the installed SDK choose.                                                    |
+| Raise hand / reactions         | Built on the generic `CommandChannel` (`client.getCommandClient().send()`), not a dedicated API                                                     | **Confirmed: no native raise-hand or reaction-send API exists in this installed SDK version.** `reaction.sendEmojiReactionRequest` appears only in exception-code doc comments, not in any exported type — do not assume it exists without re-checking `node_modules/@zoom/videosdk/dist/types/*.d.ts` after any SDK upgrade |
+| Whiteboard permission locking  | Not implemented — flagged as currently impossible                                                                                                   | `setWhiteboardPermission()` / `lockWhiteboardPermission()` / `getWhiteboardPermission()` are **commented out** in `whiteboard.d.ts` in the installed SDK version, despite the `WhiteboardSharePermissionCode` enum existing. Re-check after an SDK bump — this may become available                                          |
+| Annotation tool coverage       | Only Pen/Highlighter/Arrow/Eraser exposed in the UI                                                                                                 | `AnnotationToolType` actually also has `Spotlight` (laser pointer), `Line`, `Rectangle`/`Ellipse`/`Diamond` (+ fill variants), and stamp shapes — these are real, unused, easy wins if asked for. No `Text` or equation tool exists anywhere in the SDK (whiteboard or annotation)                                           |
+| Multi-participant UI           | Keep every remote SDK participant in an ID-keyed collection and give each participant a stable video render target                                  | The gallery grows automatically from one full-stage tile to a responsive grid; screen sharing switches the same participant collection into a scrollable filmstrip. `peer-share-state-change` (concurrent multi-share) and `SubsessionClient` (breakout rooms) remain separate, currently unused capabilities.               |
+| Audit logging                  | New `channel_live_session_audit_events` table, logged from the **client** after the action already happened                                         | Fire-and-forget by design — a failed audit write must never block or roll back a privileged action. Currently a stub: only `mute_participant`, `end_session_for_all`, `recording_started` are logged, and there is no admin UI reading this table yet                                                                        |
+| Connection-quality monitoring  | Self-reported only (`payload.userId === selfUserIdRef.current` before reporting to the backend)                                                     | Avoids every observer separately reporting the same remote peer's perceived quality, which would duplicate/conflict. Each client reports its _own_ degraded transitions only                                                                                                                                                 |
 
 ---
 
@@ -168,12 +173,14 @@ These were confirmed by grepping the **installed** `node_modules/@zoom/videosdk/
 - `stream.mirrorVideo(mirrored: boolean)` is the SDK's own mirror API — use it instead of a CSS transform; it only affects local rendering, never the transmitted track.
 - `client.leave(end?: boolean)` — passing `true` ends the session for every participant, not just the caller. Easy to miss since the no-argument form is far more commonly shown in examples.
 - `'passively-stop-share'` event payload is the **bare `PassiveStopShareReason` enum value**, not wrapped in an object: `PrivilegeChange | StopScreenCapture`. Needed to keep `isSharingScreen` in sync when the user stops sharing via the browser's native "Stop sharing" bar instead of our own button.
+- Video SDK 2.5 supports concurrent presenters. Keep `SharePrivilege.MultipleShare` plus `simultaneousShareView: true`, derive the current presenters from `getShareUserList()` on `peer-share-state-change`, and switch the full-size received surface with `switchShareView(userId)`. The meeting UI intentionally uses presenter tabs instead of shrinking up to four shared screens into an unreadable grid, especially on mobile.
 - `'network-quality-change'` fires per-user, per-direction: `{ userId, type: 'uplink'|'downlink', level: 0-5 }` (0-1 bad, 2 normal, 3-5 good). Uplink and downlink must be tracked **separately** — merging into a single "worst-ever" value without separately-updatable slots means a later improvement on one direction gets permanently masked by an old bad reading on the other.
 - `'connection-change'` is about **your own** connection (`ConnectionState`: `Connected | Reconnecting | Closed | Fail`), not a specific remote peer's.
 - `'annotation-privilege-change'` fires for **viewers only** — a presenter disabling "viewer can annotate" should not affect their own annotation rights; gate any reaction to this event on "am I currently the presenter."
 - `CommandChannel.send(text, target?)` — `target` can be a `userId`, `{ userKey | userGuid }`, or `{ scope: 'currentSession' | 'all' }` (the latter reaches breakout rooms too). Omitting `target` broadcasts to the current session.
 - `RecordingClient.canStartRecording()` must be checked before `startCloudRecording()` — it covers the case where cloud recording isn't enabled for the account/session. `startCloudRecording()` resolves to `'' | Error` rather than rejecting on failure — check the resolved value, don't rely solely on a try/catch or the `'recording-change'` event.
 - `WhiteboardClient.canStartWhiteboard()` is the single authoritative start-gate (folds in permissions, current sharing state, and whiteboard status) — a `false` result used to be a silent no-op before this was wired up to show an error.
+- `canStartWhiteboard()` may still return `true` before `startWhiteboardScreen()` fails with `get confId or mmrToken failed`. Treat that as a provider capability/entitlement failure: show the standard in-meeting notice, hide Whiteboard for the remainder of the session, and do not send the caught error through `console.error` because the Next.js development overlay can present it as an uncaught application failure.
 - `LiveTranscriptionClient` (captions) is a complete, fully real API (`startLiveTranscription`, `disableCaptions`, `lockTranscriptionLanguage`, `getFullTranscriptionHistory`, etc.) that was entirely unused until the current captions stub.
 - `SubsessionClient` is Zoom's name for **breakout rooms** (`createSubsessions`, `assignUserToSubsession`, `closeAllSubsessions`, `askForHelp`, `broadcast`, ...) — fully real, fully unused.
 
@@ -181,6 +188,35 @@ These were confirmed by grepping the **installed** `node_modules/@zoom/videosdk/
 
 ## 5. Non-obvious bugs fixed this cycle (read before touching layout/CSS)
 
+- **Keep SDK lifecycle outside the meeting UI:** client acquisition,
+  compatibility validation, maintained `init()` options, `join()` result
+  handling, error normalization, whiteboard cleanup, leave/destroy, and the
+  Strict Mode disposal delay live in `zoom-session-lifecycle.ts`. UI event
+  subscriptions remain in the embed because they update component state.
+  Add lifecycle behavior and tests in the adapter instead of rebuilding this
+  sequence inside the component.
+- **Refresh recovery is tab-scoped, not a permanent remembered join:** once
+  the participant confirms Join, `browser-session.ts` stores the device
+  preferences (and, for a guest, the short-lived join result) in
+  `sessionStorage`. Refreshing the same tab therefore reconnects directly
+  instead of reopening passcode/device setup. Guest recovery never outlives
+  the token's `expiresAt`; member recovery has a 12-hour ceiling. Deliberate
+  Leave/End clears the marker before feedback is shown. Do not move this to
+  `localStorage`: reopening a browser later should not unexpectedly join a
+  call, and a guest credential should remain as short-lived as possible.
+- **Post-call feedback is a page state, not a meeting modal:** leaving first
+  disconnects from Zoom and clears recovery, then replaces the meeting with a
+  full-screen feedback view. The recording state remains visibly indicated,
+  but it no longer opens a blocking in-call consent dialog.
+- **React Strict Mode can race SDK teardown against the next join:** Zoom's
+  `createClient()` returns a singleton. React's development-only effect
+  setup/cleanup/setup probe used to call `leave()`/`destroyClient()` during the
+  probe cleanup, so the second setup attempted `join()` while Zoom was still
+  in `LEAVING_MEETING` and failed with `OPERATION_CANCELLED` error 3. Unmount
+  cleanup is now deferred by one event-loop turn and cancelled if the same
+  client is immediately reacquired; explicit Leave/End actions still dispose
+  synchronously. Do not replace the scheduled cleanup with a direct dispose
+  without re-testing under React Strict Mode.
 - **Tailwind arbitrary value silently drops a whole declaration:** `bottom-[max(1rem,env(safe-area-inset-bottom))]` (nested function calls with a comma inside Tailwind's bracket syntax) silently failed to compile and dropped the entire `bottom` rule across multiple Tailwind/PostCSS versions — this was the root cause of a recurring "control bar isn't at the bottom" complaint across several review cycles. **Fixed by moving to inline `style={{ bottom: 'max(1rem, env(safe-area-inset-bottom))' }}`.** If a Tailwind arbitrary value involving nested `()`/commas silently has no effect, suspect the parser, not your class name.
 - **Gallery/side-by-side tiles invisible:** the `sideBySide` grid had no explicit `grid-rows-*`, so its row defaulted to `auto` (indefinite height) — every tile's `h-full` then resolved against an indefinite height and collapsed to zero. Fixed with `grid-rows-2 sm:grid-rows-1` (Tailwind's numeric `grid-rows-N` emits `repeat(N, minmax(0,1fr))`, which is a _definite_ track size, unlike the default).
 - **Full-screen portal stuck after leaving:** Next.js App Router's `router.push()` runs inside a transition that can keep the old page's DOM (including a `fixed inset-0 z-40` full-screen embed) mounted and visible on top of the destination page until the transition settles, or indefinitely if the embed doesn't unmount cleanly. Fixed with a `hasLeft` state that makes the component `return null` immediately on leave, independent of the parent's navigation timing.
@@ -204,8 +240,8 @@ action), host/co-host-adjacent host-fix (educator/staff always host),
 annotation (subset of tools), whiteboard (start/view/stop/export-to-PDF, no
 permission locking — see §4), chat, raise hand, reactions, network-quality +
 connection-state indicators, "leave vs. end-for-everyone" with confirmation,
-captions (stub), recording (auto-starts for host, `canStartRecording()`
-gated), post-call feedback/rating, guest passcode join, connection-quality
+captions (stub), recording status/disclosure (automatic recording is currently
+disabled), post-call feedback/rating, guest passcode join, connection-quality
 reporting to a new admin-visible table, audit-event logging (stub, no UI),
 webhook-driven attendance tracking, admin attendance dashboard.
 
@@ -221,7 +257,10 @@ webhook-driven attendance tracking, admin attendance dashboard.
 
 ### Not implemented (confirmed real gaps, not yet asked for)
 
-Waiting room / admit-participant flow, remove/kick a participant
+Waiting room / admit-participant flow (the installed `@zoom/videosdk` client
+exposes no admission, approve, reject, or approve-all API; implement an
+application-level pre-join gate if this becomes a product requirement),
+remove/kick a participant
 (`client.removeUser()` is real and unused), co-host promotion
 (`client.makeManager()`/`makeHost()` real and unused), disable a remote
 participant's camera (no such API exists in Video SDK at all — audio has

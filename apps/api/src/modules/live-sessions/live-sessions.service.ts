@@ -440,6 +440,10 @@ export class LiveSessionsService {
             ? joinAccess.metadata.sessionName
             : session.id,
         displayName,
+        passcode:
+          typeof session.provider_metadata?.passcode === 'string'
+            ? session.provider_metadata.passcode
+            : null,
       },
     };
   }

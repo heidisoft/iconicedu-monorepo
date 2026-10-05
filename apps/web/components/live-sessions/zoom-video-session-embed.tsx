@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import ZoomVideo, {
+import {
   AnnotationClearType,
   AnnotationToolType,
   ConnectionState,
@@ -13,22 +13,10 @@ import ZoomVideo, {
   WhiteboardStatus,
 } from '@zoom/videosdk';
 import {
-  Angry,
-  ArrowUpRight,
   Captions,
-  Circle,
-  Columns2,
   Download,
-  Eraser,
-  Frown,
   Hand,
-  Highlighter,
-  Image as ImageIcon,
-  ImageOff,
-  Laugh,
-  LayoutGrid,
   Loader2,
-  Meh,
   MessageSquare,
   Mic,
   MicOff,
@@ -36,27 +24,15 @@ import {
   MonitorX,
   OctagonX,
   PenTool,
-  Pencil,
   PictureInPicture2,
   PhoneOff,
-  Redo2,
-  Send,
-  Settings as SettingsIcon,
-  SignalHigh,
-  SignalLow,
-  SignalMedium,
-  Smile,
+  Settings,
   SmilePlus,
-  Trash2,
-  Undo2,
-  Users as UsersIcon,
+  Users,
   Video,
   VideoOff,
-  X,
 } from 'lucide-react';
 
-import { Avatar, AvatarFallback } from '@iconicedu/ui-web/ui/avatar';
-import { Badge } from '@iconicedu/ui-web/ui/badge';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import {
   AlertDialog,
@@ -68,46 +44,75 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@iconicedu/ui-web/ui/alert-dialog';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@iconicedu/ui-web/ui/dialog';
-import { Input } from '@iconicedu/ui-web/ui/input';
-import { Label } from '@iconicedu/ui-web/ui/label';
-import {
-  Popover,
-  PopoverContent,
-  PopoverHeader,
-  PopoverTitle,
-  PopoverTrigger,
-} from '@iconicedu/ui-web/ui/popover';
-import { RadioGroup, RadioGroupItem } from '@iconicedu/ui-web/ui/radio-group';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@iconicedu/ui-web/ui/select';
-import { Separator } from '@iconicedu/ui-web/ui/separator';
-import { Switch } from '@iconicedu/ui-web/ui/switch';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@iconicedu/ui-web/ui/tabs';
+import { clearLiveSessionRecovery } from '@iconicedu/web/lib/live-sessions/browser-session';
+import { Popover, PopoverContent, PopoverTrigger } from '@iconicedu/ui-web/ui/popover';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@iconicedu/ui-web/ui/tooltip';
-import { cn, getInitials } from '@iconicedu/ui-web/lib/utils';
+import { cn } from '@iconicedu/ui-web/lib/utils';
 import {
   logLiveSessionAuditEvent,
   reportLiveSessionQualityEvent,
   submitLiveSessionFeedback,
 } from '@iconicedu/web/lib/live-sessions/public-api';
+import {
+  acquireZoomClient,
+  describeZoomFailure,
+  describeZoomWhiteboardFailure,
+  disposeZoomClient,
+  dumpZoomFailure,
+  initializeAndJoinZoomSession,
+  scheduleZoomClientDisposal,
+  type ZoomClient,
+} from '@iconicedu/web/lib/live-sessions/zoom-session-lifecycle';
+import {
+  BACKGROUND_PRESETS,
+  MIRROR_VIDEO_STORAGE_KEY,
+  REACTION_EMOJIS,
+} from './zoom-video/zoom-video-session.constants';
+import { attachCameraTile, detachCameraTile } from './zoom-video/zoom-video-media';
+import type {
+  AudioProcessingMode,
+  BackgroundPreset,
+  ChatMessageItem,
+  CommandChannelPayload,
+  FloatingReaction,
+  MediaDeviceOption,
+  NetworkLevel,
+  RemoteParticipant,
+  SidePanel,
+} from './zoom-video/zoom-video-session.types';
+import {
+  collapseNetworkLevel,
+  createFloatingReaction,
+  shouldUsePresentationLayout,
+} from './zoom-video/zoom-video-session.utils';
+import {
+  MeetingControlButton,
+  OverlayBadge,
+  PoppingIcon,
+} from './zoom-video/zoom-meeting-controls';
+import { ZoomMeetingNotice } from './zoom-video/zoom-meeting-notice';
+import { ZoomMeetingHeader } from './zoom-video/zoom-meeting-header';
+import { ZoomMeetingLayoutStyles } from './zoom-video/zoom-meeting-layout-styles';
+import {
+  ZoomMeetingDockButton,
+  ZoomMeetingSideDock,
+} from './zoom-video/zoom-meeting-side-dock';
+import { ZoomMeetingTimer } from './zoom-video/zoom-meeting-timer';
+import { ZoomParticipantGallery } from './zoom-video/zoom-participant-gallery';
+import { ZoomFeedbackScreen } from './zoom-video/zoom-feedback-screen';
+import { ZoomAnnotationControls } from './zoom-video/zoom-annotation-controls';
+import { ZoomChatPanel } from './zoom-video/zoom-chat-panel';
+import { ZoomParticipantsPanel } from './zoom-video/zoom-participants-panel';
+import { ZoomSettingsPanel } from './zoom-video/zoom-settings-panel';
+import { ZoomShareStage } from './zoom-video/zoom-share-stage';
+import { ZoomShareFilmstrip } from './zoom-video/zoom-share-filmstrip';
+import { ZoomMoreControls } from './zoom-video/zoom-more-controls';
+import { ZoomShareMeetingDialog } from './zoom-video/zoom-share-meeting-dialog';
 
 // The Document Picture-in-Picture API (Chromium-based browsers only, as of
 // writing) has no TypeScript lib types yet — unlike window.open(), the PiP
@@ -126,264 +131,6 @@ declare global {
 
 const PIP_SUPPORTED =
   typeof window !== 'undefined' && 'documentPictureInPicture' in window;
-
-type ZoomClient = ReturnType<typeof ZoomVideo.createClient>;
-type MediaDeviceOption = { label: string; deviceId: string };
-type ChatMessageItem = {
-  id: string;
-  senderUserId: number;
-  senderName: string;
-  message: string;
-  timestamp: number;
-};
-type SidePanel = 'chat' | 'users' | null;
-type ViewMode = 'speaker' | 'sideBySide';
-type AudioProcessingMode = 'original' | 'noiseSuppression';
-type BackgroundPreset = 'none' | 'blur' | 'classroom' | 'study';
-// Collapses the SDK's 0-5 uplink/downlink levels into three buckets for both
-// the signal icon and the quality-events sent to the backend.
-type NetworkLevel = 'bad' | 'normal' | 'good';
-type FloatingReaction = {
-  id: string;
-  emoji: string;
-  // Randomized per-reaction so a burst of clicks drifts/tumbles outward
-  // instead of every emoji stacking in an identical straight line up the
-  // middle of the screen.
-  dx: number;
-  rotate: number;
-  durationMs: number;
-};
-type CommandChannelPayload =
-  | { type: 'raise-hand'; raised: boolean }
-  | { type: 'reaction'; emoji: string };
-
-const MIRROR_VIDEO_STORAGE_KEY = 'iconicedu:zoom-session:mirror-video';
-const REACTION_EMOJIS = ['👍', '👏', '🎉', '❤️', '😂'];
-
-// Reuses the same branded preset images as the Daily embed's virtual
-// background picker (daily-live-session-embed.utils.ts) for consistency
-// across providers, rather than shipping a second, Zoom-only asset set.
-const BACKGROUND_PRESETS: Array<{
-  value: Exclude<BackgroundPreset, 'none' | 'blur'>;
-  label: string;
-  src: string;
-}> = [
-  {
-    value: 'classroom',
-    label: 'Classroom',
-    src: '/live-session-backgrounds/classroom.svg',
-  },
-  { value: 'study', label: 'Study', src: '/live-session-backgrounds/study.svg' },
-];
-
-const ANNOTATION_COLORS: Array<{ label: string; value: number }> = [
-  { label: 'Red', value: 0xffff0000 },
-  { label: 'Yellow', value: 0xffffd60a },
-  { label: 'Green', value: 0xff22c55e },
-  { label: 'Blue', value: 0xff3b82f6 },
-  { label: 'Black', value: 0xff000000 },
-];
-
-type RemoteParticipant = {
-  userId: number;
-  displayName: string;
-  muted: boolean;
-  bVideoOn: boolean;
-  isHost: boolean;
-};
-
-async function attachCameraTile(
-  client: ZoomClient,
-  userId: number,
-  container: HTMLElement,
-) {
-  try {
-    const element = await client
-      .getMediaStream()
-      .attachVideo(userId, VideoQuality.Video_360P);
-    if (!(element instanceof HTMLElement)) {
-      return;
-    }
-    element.setAttribute('data-zoom-user-id', String(userId));
-    element.className = 'h-full w-full object-cover';
-    // The <video-player> element attachVideo() returns must be a descendant
-    // of a <video-player-container> (Zoom's own custom element) — without
-    // one, the player doesn't get the SDK's internal sizing logic applied
-    // and can render smaller than its actual container, leaving a visible
-    // gap. A plain <div> container (what this used to append straight into)
-    // doesn't satisfy that. Custom elements also default to `display:
-    // inline` with no intrinsic size, so it needs explicit sizing itself.
-    let playerContainer = container.querySelector('video-player-container');
-    if (!playerContainer) {
-      playerContainer = document.createElement('video-player-container');
-      playerContainer.className = 'block h-full w-full';
-      container.replaceChildren(playerContainer);
-    }
-    playerContainer.replaceChildren(element);
-  } catch {
-    // Best effort — the tile just won't render for this participant.
-  }
-}
-
-async function detachCameraTile(
-  client: ZoomClient,
-  userId: number,
-  container: HTMLElement,
-) {
-  try {
-    await client.getMediaStream().detachVideo(userId);
-  } catch {
-    // Already gone.
-  } finally {
-    container.replaceChildren();
-  }
-}
-
-// Explicitly stop presenting/viewing before leaving the session — an abrupt
-// client.leave() still ends the session, but a clean stop lets peers receive
-// the 'Stop' event right away instead of waiting on it to time out.
-async function leaveWhiteboardCleanly(client: ZoomClient, selfUserId: number | null) {
-  const whiteboardClient = client.getWhiteboardClient();
-  const presenter = whiteboardClient.getWhiteboardPresenter();
-  if (!presenter) {
-    return;
-  }
-  if (presenter.userId === selfUserId) {
-    await whiteboardClient.stopWhiteboardScreen().catch(() => null);
-  } else {
-    await whiteboardClient.stopWhiteboardView().catch(() => null);
-  }
-}
-
-// Zoom owns process-wide media workers behind createClient(). Always destroy
-// them after leave so a later session can initialize cleanly after route
-// navigation or an SDK upgrade. The WeakSet prevents the UI action and React
-// cleanup from racing the same client through teardown twice.
-const disposedZoomClients = new WeakSet<ZoomClient>();
-
-async function disposeZoomClient(
-  client: ZoomClient,
-  selfUserId: number | null,
-  endSession = false,
-) {
-  if (disposedZoomClients.has(client)) {
-    return;
-  }
-  disposedZoomClients.add(client);
-  await leaveWhiteboardCleanly(client, selfUserId);
-  await client.leave(endSession).catch(() => null);
-  await ZoomVideo.destroyClient().catch(() => null);
-}
-
-// Some Zoom Video SDK calls resolve with `'' | ExecutedFailure` instead of
-// rejecting on failure. client.join() in particular does NOT follow that
-// pattern in practice — on success it resolves with the local Participant
-// object (avatar, bVideoOn, muted, ...), not ''. So only treat a resolved
-// value as a failure when it actually has the ExecutedFailure shape, or a
-// successful join gets misreported as an error.
-function isZoomExecutedFailure(
-  value: unknown,
-): value is { type?: unknown; reason: string; errorCode?: unknown } {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    typeof (value as Record<string, unknown>).reason === 'string'
-  );
-}
-
-function describeZoomFailure(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  if (error && typeof error === 'object') {
-    const candidate = error as { reason?: unknown; type?: unknown; message?: unknown };
-    if (typeof candidate.reason === 'string') {
-      return candidate.reason;
-    }
-    if (typeof candidate.type === 'string') {
-      return candidate.type;
-    }
-    if (typeof candidate.message === 'string') {
-      return candidate.message;
-    }
-  }
-  if (typeof error === 'string' && error) {
-    return error;
-  }
-  return 'Failed to join session';
-}
-
-// Safe best-effort dump for on-page display during setup/testing — avoids
-// needing the browser DevTools console, which has repeatedly been missed.
-function dumpZoomFailure(error: unknown): string {
-  if (error instanceof Error) {
-    return `${error.name}: ${error.message}${error.stack ? `\n${error.stack}` : ''}`;
-  }
-  try {
-    const seen = new WeakSet();
-    return JSON.stringify(
-      error,
-      (_key, value) => {
-        if (typeof value === 'object' && value !== null) {
-          if (seen.has(value)) {
-            return '[circular]';
-          }
-          seen.add(value);
-        }
-        return value;
-      },
-      2,
-    );
-  } catch {
-    return String(error);
-  }
-}
-
-function formatElapsed(totalSeconds: number) {
-  const minutes = Math.floor(totalSeconds / 60)
-    .toString()
-    .padStart(2, '0');
-  const seconds = (totalSeconds % 60).toString().padStart(2, '0');
-  return `${minutes}:${seconds}`;
-}
-
-// Per the SDK docs: 0,1 = bad; 2 = normal; 3,4,5 = good. The worse of
-// uplink/downlink decides the collapsed level shown to the user.
-function collapseNetworkLevel(level: number): NetworkLevel {
-  if (level <= 1) {
-    return 'bad';
-  }
-  if (level === 2) {
-    return 'normal';
-  }
-  return 'good';
-}
-
-function worseNetworkLevel(a: NetworkLevel, b: NetworkLevel): NetworkLevel {
-  const rank: Record<NetworkLevel, number> = { bad: 0, normal: 1, good: 2 };
-  return rank[a] <= rank[b] ? a : b;
-}
-
-function getNetworkLevel(
-  byUserId: Record<number, { uplink: NetworkLevel; downlink: NetworkLevel }>,
-  userId: number | null,
-): NetworkLevel | undefined {
-  if (userId === null) {
-    return undefined;
-  }
-  const entry = byUserId[userId];
-  return entry ? worseNetworkLevel(entry.uplink, entry.downlink) : undefined;
-}
-
-function createFloatingReaction(emoji: string): FloatingReaction {
-  return {
-    id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    emoji,
-    dx: Math.round((Math.random() - 0.5) * 160),
-    rotate: Math.round((Math.random() - 0.5) * 50),
-    durationMs: 2600 + Math.round(Math.random() * 900),
-  };
-}
 
 // A single shared AudioContext, created lazily on first use — Chrome caps
 // how many can exist concurrently, so reuse one for the whole page rather
@@ -440,227 +187,15 @@ function playJoinChime() {
   }
 }
 
-function formatClockTime(timestamp: number) {
-  return new Date(timestamp).toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit',
+function waitForWhiteboardSurface() {
+  return new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
   });
-}
-
-function annotationColorToHex(value: number) {
-  return `#${value.toString(16).padStart(8, '0').slice(2)}`;
-}
-
-function OverlayBadge({
-  className,
-  children,
-}: {
-  className?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div
-      className={cn(
-        'flex max-w-full items-center gap-1.5 rounded-full bg-popover/90 px-2.5 py-1 text-xs font-medium text-popover-foreground shadow-sm backdrop-blur-sm',
-        className,
-      )}
-    >
-      {children}
-    </div>
-  );
-}
-
-function IconToolbarButton({
-  label,
-  active,
-  onClick,
-  children,
-}: {
-  label: string;
-  active?: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          onClick={onClick}
-          className={cn(
-            'flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-popover-foreground transition-colors hover:bg-accent',
-            active && 'bg-accent text-accent-foreground',
-          )}
-        >
-          {children}
-        </button>
-      </TooltipTrigger>
-      <TooltipContent>{label}</TooltipContent>
-    </Tooltip>
-  );
-}
-
-function NetworkLevelIcon({ level }: { level: NetworkLevel }) {
-  if (level === 'bad') {
-    return <SignalLow className="h-3 w-3 text-destructive" />;
-  }
-  if (level === 'normal') {
-    return <SignalMedium className="h-3 w-3 text-warning" />;
-  }
-  return <SignalHigh className="h-3 w-3 text-success" />;
-}
-
-// Re-keying on toggleKey forces React to remount this span whenever a toggle
-// button's state flips, which re-triggers the icon-pop CSS animation (see
-// the embed's <style> block) — a quick, consistent "that registered" pop
-// every time a control is switched back and forth, not just on first click.
-function PoppingIcon({
-  toggleKey,
-  children,
-}: {
-  toggleKey: string | boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <span
-      key={String(toggleKey)}
-      className="inline-flex animate-[icon-pop_260ms_cubic-bezier(0.34,1.56,0.64,1)]"
-    >
-      {children}
-    </span>
-  );
-}
-
-function VideoTile({
-  label,
-  isSelf,
-  isMuted,
-  isVideoOn,
-  videoContainerRef,
-  className,
-  networkLevel,
-  handRaised,
-  cornerSide = 'right',
-}: {
-  label: string;
-  isSelf: boolean;
-  isMuted: boolean;
-  isVideoOn: boolean;
-  videoContainerRef: React.RefObject<HTMLDivElement | null>;
-  className?: string;
-  networkLevel?: NetworkLevel;
-  handRaised?: boolean;
-  // Which bottom corner the status badge sits in — pass whichever side keeps
-  // it away from the screen's own edge for that tile's position.
-  cornerSide?: 'left' | 'right';
-}) {
-  return (
-    <div
-      className={cn(
-        'relative overflow-hidden rounded-xl border border-border/80 bg-muted shadow-lg ring-1 ring-foreground/10',
-        className,
-      )}
-    >
-      <div
-        ref={videoContainerRef}
-        // Mirroring (self-view only) is applied via the SDK's own
-        // mirrorVideo() — see toggleMirror() — rather than a CSS transform,
-        // so it's consistent with Zoom's "Mirror my video" setting and only
-        // affects local rendering, never the captured/transmitted track.
-        // attachCameraTile sizes the <video-player-container>/<video-player>
-        // it creates directly via className, but this selector keeps them
-        // full-size even if Zoom ever re-creates either element internally.
-        className="h-full w-full [&>video-player-container]:block [&>video-player-container]:h-full [&>video-player-container]:w-full [&_video-player]:h-full [&_video-player]:w-full"
-      />
-      {!isVideoOn ? (
-        <div className="absolute inset-0 flex items-center justify-center bg-muted">
-          {/* Scales with the tile instead of a fixed size, so it still reads
-                as a face on a full speaker tile and doesn't blow out a tiny
-                mini-tile during a share — clamped between a sensible floor
-                and ceiling either way. */}
-          <Avatar
-            size="lg"
-            className="aspect-square shrink-0"
-            style={{ height: 'clamp(2rem, 40%, 7rem)', width: 'auto' }}
-          >
-            <AvatarFallback className="text-base sm:text-2xl">
-              {getInitials(label)}
-            </AvatarFallback>
-          </Avatar>
-        </div>
-      ) : null}
-      <div
-        className={cn(
-          'absolute bottom-2 z-20 flex h-7 items-center gap-1.5 rounded-full bg-popover/95 px-2 text-popover-foreground shadow-md backdrop-blur-sm',
-          cornerSide === 'left' ? 'left-2' : 'right-2',
-        )}
-        aria-label={`${label} status`}
-      >
-        {handRaised ? (
-          <Hand className="h-4 w-4 text-warning" aria-label="Hand raised" />
-        ) : null}
-        {isMuted ? (
-          <MicOff className="h-4 w-4 text-destructive" aria-label="Microphone off" />
-        ) : (
-          <Mic className="h-4 w-4" aria-label="Microphone on" />
-        )}
-        {isVideoOn ? (
-          <Video className="h-4 w-4" aria-label="Camera on" />
-        ) : (
-          <VideoOff className="h-4 w-4 text-destructive" aria-label="Camera off" />
-        )}
-      </div>
-      <OverlayBadge
-        className={cn(
-          'absolute bottom-2 z-20 max-w-[calc(100%-5rem)]',
-          cornerSide === 'left' ? 'right-2' : 'left-2',
-        )}
-      >
-        {networkLevel ? <NetworkLevelIcon level={networkLevel} /> : null}
-        <span className="min-w-0 truncate">
-          {label}
-          {isSelf ? ' (You)' : ''}
-        </span>
-      </OverlayBadge>
-    </div>
-  );
-}
-
-function DeviceSelect({
-  label,
-  devices,
-  selectedId,
-  onChange,
-}: {
-  label: string;
-  devices: MediaDeviceOption[];
-  selectedId: string | null;
-  onChange: (deviceId: string) => void;
-}) {
-  if (devices.length === 0) {
-    return null;
-  }
-  return (
-    <div className="space-y-1.5">
-      <p className="text-xs font-medium text-muted-foreground">{label}</p>
-      <Select value={selectedId ?? undefined} onValueChange={onChange}>
-        <SelectTrigger className="w-full">
-          <SelectValue placeholder={`Choose ${label.toLowerCase()}`} />
-        </SelectTrigger>
-        <SelectContent>
-          {devices.map((device) => (
-            <SelectItem key={device.deviceId} value={device.deviceId}>
-              {device.label || device.deviceId}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
 }
 
 export function ZoomVideoSessionEmbed({
   sessionName,
+  sessionTitle,
   token,
   displayName,
   initialMuted,
@@ -668,8 +203,10 @@ export function ZoomVideoSessionEmbed({
   onLeave,
   liveSessionId,
   accessToken,
+  sessionPasscode,
 }: {
   sessionName: string;
+  sessionTitle?: string;
   token: string;
   displayName: string;
   initialMuted?: boolean;
@@ -680,24 +217,23 @@ export function ZoomVideoSessionEmbed({
   // post-session feedback submission below.
   liveSessionId: string;
   accessToken?: string | null;
+  sessionPasscode?: string | null;
 }) {
   const clientRef = useRef<ZoomClient | null>(null);
   const selfUserIdRef = useRef<number | null>(null);
   const activeShareUserIdRef = useRef<number | null>(null);
-  const otherParticipantRef = useRef<RemoteParticipant | null>(null);
+  const remoteParticipantsRef = useRef<RemoteParticipant[]>([]);
   const selfVideoRef = useRef<HTMLDivElement | null>(null);
-  const mainVideoRef = useRef<HTMLDivElement | null>(null);
+  const remoteVideoRefs = useRef(new Map<number, HTMLDivElement>());
   const pipWindowRef = useRef<Window | null>(null);
   const shareCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  // startShareScreen accepts HTMLCanvasElement | HTMLVideoElement, but the
-  // SDK logs "Use Video element instead of Canvas element when WebCodecs
-  // enabled" (and the share otherwise fails to render) on browsers where
-  // WebCodecs is available — a <video> element works on both.
+  const localShareCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const localShareVideoRef = useRef<HTMLVideoElement | null>(null);
   const whiteboardContainerRef = useRef<HTMLDivElement | null>(null);
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
   const activePanelRef = useRef<SidePanel>(null);
   const isLeavingRef = useRef(false);
+  const isHandRaisedRef = useRef(false);
 
   const [status, setStatus] = useState<'connecting' | 'connected' | 'error'>(
     'connecting',
@@ -707,6 +243,9 @@ export function ZoomVideoSessionEmbed({
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOn, setIsVideoOn] = useState(true);
   const [isSharingScreen, setIsSharingScreen] = useState(false);
+  const [localShareRenderTarget, setLocalShareRenderTarget] = useState<
+    'canvas' | 'video'
+  >('canvas');
   const [shareError, setShareError] = useState<string | null>(null);
   // Whether the active presenter currently allows viewers to annotate —
   // defaults true (Zoom's own default) and is kept in sync via
@@ -716,18 +255,28 @@ export function ZoomVideoSessionEmbed({
   const [whiteboardError, setWhiteboardError] = useState<string | null>(null);
   const [isPipActive, setIsPipActive] = useState(false);
   const [activeShareUserId, setActiveShareUserId] = useState<number | null>(null);
-  const [otherParticipant, setOtherParticipant] = useState<RemoteParticipant | null>(
-    null,
-  );
+  const [sharePresenters, setSharePresenters] = useState<
+    Array<{ userId: number; displayName: string }>
+  >([]);
+  const [shareContentDimensions, setShareContentDimensions] = useState({
+    width: 16,
+    height: 9,
+  });
+  const [remoteParticipants, setRemoteParticipants] = useState<RemoteParticipant[]>([]);
+  const [selfAvatar, setSelfAvatar] = useState<string | undefined>();
+  const [activeSpeakerUserId, setActiveSpeakerUserId] = useState<number | null>(null);
+  const [galleryPage, setGalleryPage] = useState(0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [isHandRaised, setIsHandRaised] = useState(false);
-  const [isOtherHandRaised, setIsOtherHandRaised] = useState(false);
+  const [raisedHandUserIds, setRaisedHandUserIds] = useState<Set<number>>(
+    () => new Set(),
+  );
   const [floatingReactions, setFloatingReactions] = useState<FloatingReaction[]>([]);
   // Uplink and downlink arrive as separate events, tracked separately so a
   // later improvement on one direction isn't permanently masked by an older
   // bad reading on the other — the displayed/reported level is the worse of
   // whatever the two most-recently-reported values currently are.
-  const [networkQualityByUserId, setNetworkQualityByUserId] = useState<
+  const [, setNetworkQualityByUserId] = useState<
     Record<number, { uplink: NetworkLevel; downlink: NetworkLevel }>
   >({});
   const [connectionState, setConnectionState] = useState<ConnectionState>(
@@ -742,10 +291,8 @@ export function ZoomVideoSessionEmbed({
   const [isAnnotating, setIsAnnotating] = useState(false);
   const [annotationTool, setAnnotationTool] = useState(AnnotationToolType.Pen);
   const [recordingStatus, setRecordingStatus] = useState<RecordingStatus | null>(null);
-  const [recordingError, setRecordingError] = useState<string | null>(null);
   const [showRecordingBanner, setShowRecordingBanner] = useState(false);
   const [isSelfHost, setIsSelfHost] = useState(false);
-  const [hasAcknowledgedRecording, setHasAcknowledgedRecording] = useState(false);
   const [showFeedbackPrompt, setShowFeedbackPrompt] = useState(false);
   const [hasLeft, setHasLeft] = useState(false);
   const [feedbackRating, setFeedbackRating] = useState<number | null>(null);
@@ -783,29 +330,19 @@ export function ZoomVideoSessionEmbed({
   );
   const [hwAccelEncode, setHwAccelEncode] = useState(true);
   const [hwAccelDecode, setHwAccelDecode] = useState(true);
-  const [viewMode, setViewMode] = useState<ViewMode>('sideBySide');
   const [whiteboardStatus, setWhiteboardStatus] = useState<WhiteboardStatus>(
     WhiteboardStatus.Closed,
   );
   const [isPresentingWhiteboard, setIsPresentingWhiteboard] = useState(false);
-  const [supportsWhiteboard, setSupportsWhiteboard] = useState(true);
+  const [supportsWhiteboard, setSupportsWhiteboard] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [showMobileControls, setShowMobileControls] = useState(false);
 
-  // Updates the ref synchronously alongside state, rather than via a
-  // separate effect that only runs after commit (a tick later). Event
-  // handlers below read otherParticipantRef.current to decide whether a
-  // second participant should be recorded; a one-tick-stale ref let two
-  // back-to-back 'user-added' events both see null and both "win".
-  const updateOtherParticipant = useCallback(
-    (
-      update:
-        | RemoteParticipant
-        | null
-        | ((previous: RemoteParticipant | null) => RemoteParticipant | null),
-    ) => {
-      setOtherParticipant((previous) => {
-        const next = typeof update === 'function' ? update(previous) : update;
-        otherParticipantRef.current = next;
+  const updateRemoteParticipants = useCallback(
+    (update: (previous: RemoteParticipant[]) => RemoteParticipant[]) => {
+      setRemoteParticipants((previous) => {
+        const next = update(previous);
+        remoteParticipantsRef.current = next;
         return next;
       });
     },
@@ -828,12 +365,7 @@ export function ZoomVideoSessionEmbed({
   }, [status]);
 
   useEffect(() => {
-    if (recordingStatus !== RecordingStatus.Recording) {
-      // Re-arms consent for the next recording instance, if the host stops
-      // and later restarts recording within the same session.
-      setHasAcknowledgedRecording(false);
-      return;
-    }
+    if (recordingStatus !== RecordingStatus.Recording) return;
     setShowRecordingBanner(true);
     const timeout = setTimeout(() => setShowRecordingBanner(false), 5000);
     return () => clearTimeout(timeout);
@@ -863,30 +395,50 @@ export function ZoomVideoSessionEmbed({
       return;
     }
     const selfId = selfUserIdRef.current;
+    const hasPresentation =
+      activeShareUserId !== null ||
+      isSharingScreen ||
+      whiteboardStatus !== WhiteboardStatus.Closed;
+    const selfIsThumbnail = hasPresentation;
+    const participantCount = remoteParticipants.length + 1;
+    const galleryQuality =
+      participantCount === 1
+        ? VideoQuality.Video_720P
+        : participantCount >= 10
+          ? VideoQuality.Video_180P
+          : VideoQuality.Video_360P;
     if (isVideoOn && selfId !== null && selfVideoRef.current) {
-      void attachCameraTile(client, selfId, selfVideoRef.current);
+      void attachCameraTile(
+        client,
+        selfId,
+        selfVideoRef.current,
+        selfIsThumbnail ? VideoQuality.Video_180P : galleryQuality,
+      );
     }
-    // Skip while the browser's Picture-in-Picture window owns this node
-    // (see enterPip) — mainVideoRef.current is the now-empty div left behind
-    // in the main document, not the live video, so re-attaching here would
-    // just grow a second, redundant copy instead of restoring anything.
-    if (otherParticipant?.bVideoOn && mainVideoRef.current && !isPipActive) {
-      void attachCameraTile(client, otherParticipant.userId, mainVideoRef.current);
-    }
+    remoteParticipants.forEach((participant, index) => {
+      const container = remoteVideoRefs.current.get(participant.userId);
+      if (!participant.bVideoOn || !container || (isPipActive && index === 0)) return;
+      void attachCameraTile(
+        client,
+        participant.userId,
+        container,
+        hasPresentation ? VideoQuality.Video_180P : galleryQuality,
+      );
+    });
   }, [
     status,
-    viewMode,
     activeShareUserId,
+    isSharingScreen,
     whiteboardStatus,
-    otherParticipant?.userId,
-    otherParticipant?.bVideoOn,
+    remoteParticipants,
     isVideoOn,
     isPipActive,
+    galleryPage,
   ]);
 
   useEffect(() => {
     let cancelled = false;
-    const client = ZoomVideo.createClient();
+    const client = acquireZoomClient();
     clientRef.current = client;
 
     const refreshDeviceLists = () => {
@@ -924,7 +476,9 @@ export function ZoomVideoSessionEmbed({
       );
     };
 
-    const handleUserAdded = (payload: Array<{ userId: number; displayName: string }>) => {
+    const handleUserAdded = (
+      payload: Array<{ userId: number; displayName: string; avatar?: string }>,
+    ) => {
       const selfId = selfUserIdRef.current;
       // 'user-added' can fire for our own join before client.join() resolves
       // (selfUserIdRef isn't set yet) — without this guard, `userId !== null`
@@ -936,54 +490,71 @@ export function ZoomVideoSessionEmbed({
       if (selfId === null) {
         return;
       }
-      const candidate = payload.find((user) => user.userId !== selfId);
-      if (candidate && !otherParticipantRef.current) {
-        updateOtherParticipant({
-          userId: candidate.userId,
-          displayName: candidate.displayName,
-          muted: false,
-          bVideoOn: false,
-          isHost: false,
-        });
+      const added = payload.filter((user) => user.userId !== selfId);
+      if (added.length) {
+        updateRemoteParticipants((previous) => [
+          ...previous,
+          ...added
+            .filter((candidate) =>
+              previous.every((participant) => participant.userId !== candidate.userId),
+            )
+            .map((candidate) => ({
+              userId: candidate.userId,
+              displayName: candidate.displayName,
+              avatar: candidate.avatar,
+              muted: false,
+              bVideoOn: false,
+              isHost: false,
+            })),
+        ]);
         playJoinChime();
       }
     };
 
     const handleUserRemoved = (payload: Array<{ userId: number }>) => {
-      const current = otherParticipantRef.current;
-      if (current && payload.some((user) => user.userId === current.userId)) {
-        if (mainVideoRef.current) {
-          mainVideoRef.current.replaceChildren();
-        }
-        updateOtherParticipant(null);
-      }
+      const removedIds = new Set(payload.map((user) => user.userId));
+      removedIds.forEach((userId) => {
+        remoteVideoRefs.current.get(userId)?.replaceChildren();
+        remoteVideoRefs.current.delete(userId);
+      });
+      updateRemoteParticipants((previous) =>
+        previous.filter((participant) => !removedIds.has(participant.userId)),
+      );
+      setRaisedHandUserIds((previous) => {
+        const next = new Set(previous);
+        removedIds.forEach((userId) => next.delete(userId));
+        return next;
+      });
+      setActiveSpeakerUserId((userId) =>
+        userId !== null && removedIds.has(userId) ? null : userId,
+      );
     };
 
     const handleUserUpdated = (
       payload: Array<{
         userId: number;
+        displayName?: string;
+        avatar?: string;
         muted?: boolean;
         bVideoOn?: boolean;
         isHost?: boolean;
       }>,
     ) => {
-      const current = otherParticipantRef.current;
-      if (!current) {
-        return;
-      }
-      const update = payload.find((user) => user.userId === current.userId);
-      if (!update) {
-        return;
-      }
-      updateOtherParticipant((previous) =>
-        previous
-          ? {
-              ...previous,
-              muted: update.muted ?? previous.muted,
-              bVideoOn: update.bVideoOn ?? previous.bVideoOn,
-              isHost: update.isHost ?? previous.isHost,
-            }
-          : previous,
+      const updates = new Map(payload.map((user) => [user.userId, user]));
+      updateRemoteParticipants((previous) =>
+        previous.map((participant) => {
+          const update = updates.get(participant.userId);
+          return update
+            ? {
+                ...participant,
+                displayName: update.displayName ?? participant.displayName,
+                avatar: update.avatar ?? participant.avatar,
+                muted: update.muted ?? participant.muted,
+                bVideoOn: update.bVideoOn ?? participant.bVideoOn,
+                isHost: update.isHost ?? participant.isHost,
+              }
+            : participant;
+        }),
       );
     };
 
@@ -993,22 +564,31 @@ export function ZoomVideoSessionEmbed({
     }) => {
       const selfId = selfUserIdRef.current;
       const isSelf = payload.userId === selfId;
-      const container = isSelf ? selfVideoRef.current : mainVideoRef.current;
-      if (!container) {
-        return;
-      }
-      if (payload.action === 'Start') {
-        void attachCameraTile(client, payload.userId, container);
-      } else {
-        void detachCameraTile(client, payload.userId, container);
+      const container = isSelf
+        ? selfVideoRef.current
+        : remoteVideoRefs.current.get(payload.userId);
+      if (container) {
+        if (payload.action === 'Start') {
+          void attachCameraTile(client, payload.userId, container);
+        } else {
+          void detachCameraTile(client, payload.userId, container);
+        }
       }
       if (isSelf) {
         setIsVideoOn(payload.action === 'Start');
       } else {
-        updateOtherParticipant((previous) =>
-          previous ? { ...previous, bVideoOn: payload.action === 'Start' } : previous,
+        updateRemoteParticipants((previous) =>
+          previous.map((participant) =>
+            participant.userId === payload.userId
+              ? { ...participant, bVideoOn: payload.action === 'Start' }
+              : participant,
+          ),
         );
       }
+    };
+
+    const handleActiveSpeaker = (payload: Array<{ userId: number }>) => {
+      setActiveSpeakerUserId(payload[0]?.userId ?? null);
     };
 
     const handleActiveShareChange = (payload: {
@@ -1030,9 +610,48 @@ export function ZoomVideoSessionEmbed({
         if (payload.userId !== selfId) {
           void client
             .getMediaStream()
-            .detachShareView(payload.userId)
+            .stopShareView()
             .catch(() => null);
         }
+      }
+    };
+
+    const syncSharePresenters = () => {
+      const presenters = client
+        .getMediaStream()
+        .getShareUserList()
+        .map((participant) => ({
+          userId: participant.userId,
+          displayName: participant.displayName,
+        }));
+      setSharePresenters(presenters);
+      return presenters;
+    };
+
+    const handlePeerShareStateChange = (payload: {
+      action: 'Start' | 'Stop';
+      userId: number;
+    }) => {
+      // Let the SDK update getShareUserList() before reading the new snapshot.
+      setTimeout(() => {
+        const presenters = syncSharePresenters();
+        if (
+          payload.action === 'Stop' &&
+          activeShareUserIdRef.current === null &&
+          presenters.length > 0
+        ) {
+          void client.getMediaStream().switchShareView(presenters[0].userId);
+        }
+      }, 0);
+    };
+
+    const handleShareContentDimensionChange = (payload: {
+      type: 'sended' | 'received';
+      width: number;
+      height: number;
+    }) => {
+      if (payload.width > 0 && payload.height > 0) {
+        setShareContentDimensions({ width: payload.width, height: payload.height });
       }
     };
 
@@ -1097,7 +716,7 @@ export function ZoomVideoSessionEmbed({
     // Mirrors the SDK's own documented pattern for this event (see
     // event_peer_whiteboard_state_change's JSDoc example): when someone else
     // starts presenting, auto-join as a viewer; when they stop, leave.
-    const handlePeerWhiteboardStateChange = (payload: {
+    const handlePeerWhiteboardStateChange = async (payload: {
       action: 'Start' | 'Stop';
       userId: number;
     }) => {
@@ -1107,14 +726,30 @@ export function ZoomVideoSessionEmbed({
       }
       const whiteboardClient = client.getWhiteboardClient();
       if (payload.action === 'Start') {
-        if (whiteboardContainerRef.current) {
-          void whiteboardClient.startWhiteboardView(
+        setWhiteboardError(null);
+        setWhiteboardStatus(WhiteboardStatus.Pending);
+        await waitForWhiteboardSurface();
+        if (!whiteboardContainerRef.current) return;
+        try {
+          const result = await whiteboardClient.startWhiteboardView(
             whiteboardContainerRef.current,
             payload.userId,
           );
+          if (result instanceof Error) throw result;
+          setWhiteboardStatus(WhiteboardStatus.InProgress);
+        } catch (error) {
+          setWhiteboardStatus(WhiteboardStatus.Closed);
+          setWhiteboardError(describeZoomWhiteboardFailure(error));
         }
       } else {
-        void whiteboardClient.stopWhiteboardView();
+        try {
+          const result = await whiteboardClient.stopWhiteboardView();
+          if (result instanceof Error) throw result;
+        } catch (error) {
+          setWhiteboardError(describeZoomWhiteboardFailure(error));
+        } finally {
+          setWhiteboardStatus(WhiteboardStatus.Closed);
+        }
       }
     };
 
@@ -1262,7 +897,21 @@ export function ZoomVideoSessionEmbed({
         return;
       }
       if (parsed.type === 'raise-hand') {
-        setIsOtherHandRaised(parsed.raised);
+        setRaisedHandUserIds((previous) => {
+          const next = new Set(previous);
+          if (parsed.raised) next.add(payload.senderId);
+          else next.delete(payload.senderId);
+          return next;
+        });
+        return;
+      }
+      if (parsed.type === 'raise-hand-state-request' && isHandRaisedRef.current) {
+        void client.getCommandClient().send(
+          JSON.stringify({
+            type: 'raise-hand',
+            raised: true,
+          } satisfies CommandChannelPayload),
+        );
         return;
       }
       if (parsed.type === 'reaction') {
@@ -1288,7 +937,10 @@ export function ZoomVideoSessionEmbed({
     client.on('user-removed', handleUserRemoved);
     client.on('user-updated', handleUserUpdated);
     client.on('peer-video-state-change', handlePeerVideoStateChange);
+    client.on('active-speaker', handleActiveSpeaker);
     client.on('active-share-change', handleActiveShareChange);
+    client.on('peer-share-state-change', handlePeerShareStateChange);
+    client.on('share-content-dimension-change', handleShareContentDimensionChange);
     client.on('annotation-viewer-draw-request', handleAnnotationViewerDrawRequest);
     client.on('annotation-privilege-change', handleAnnotationPrivilegeChange);
     client.on('passively-stop-share', handlePassivelyStopShare);
@@ -1307,93 +959,44 @@ export function ZoomVideoSessionEmbed({
 
     async function connect() {
       try {
-        const compatibility = ZoomVideo.checkSystemRequirements();
-        setSupportsScreenShare(compatibility.screen);
-        if (!compatibility.audio || !compatibility.video) {
-          throw new Error(
-            'This browser does not support the audio and video features required for this class. Update your browser or use a current version of Chrome, Edge, Firefox, or Safari.',
-          );
-        }
-        // patchJsMedia: Zoom's own recommended default (off by default) —
-        // automatically applies the latest media dependency fixes.
-        const initResult = await client.init('en-US', 'Global', {
-          patchJsMedia: true,
-          stayAwake: true,
-          leaveOnPageUnload: true,
+        const { compatibility, self } = await initializeAndJoinZoomSession(client, {
+          sessionName,
+          token,
+          displayName,
         });
-        if (isZoomExecutedFailure(initResult)) {
-          throw initResult;
-        }
-        const joinResult = await client.join(sessionName, token, displayName);
-        if (isZoomExecutedFailure(joinResult)) {
-          throw joinResult;
-        }
+        setSupportsScreenShare(compatibility.screen);
         if (cancelled) {
           return;
         }
-        const self = client.getCurrentUserInfo();
         selfUserIdRef.current = self.userId;
+        setSelfAvatar(self.avatar);
         setIsSelfHost(self.isHost);
         setStatus('connected');
+        syncSharePresenters();
         playJoinChime();
         setRecordingStatus(client.getRecordingClient().getCloudRecordingStatus());
 
-        // The host (whoever actually started the session — see the page
-        // server component's host-detection logic) starts recording
-        // automatically. canStartRecording() covers the case where cloud
-        // recording isn't enabled for this Zoom account/session; a resolved
-        // Error from startCloudRecording() (it follows the `'' | Error`
-        // pattern, not ExecutedFailure — doesn't reject) is also checked
-        // explicitly and surfaced, rather than trusting the optimistic
-        // 'recording-change' event alone.
-        if (self.isHost) {
-          const recordingClient = client.getRecordingClient();
-          if (recordingClient.canStartRecording()) {
-            const recordingResult = await recordingClient
-              .startCloudRecording()
-              .catch((error) => {
-                return error instanceof Error ? error : new Error(String(error));
-              });
-            if (recordingResult instanceof Error) {
-              // eslint-disable-next-line no-console
-              console.error('Zoom cloud recording failed to start', recordingResult);
-              setRecordingError(
-                'Recording could not be started — check that cloud recording is enabled for this Zoom account.',
-              );
-              setRecordingStatus(RecordingStatus.Stopped);
-            } else {
-              void logLiveSessionAuditEvent(
-                liveSessionId,
-                {
-                  action: 'recording_started',
-                  targetDisplayName: null,
-                  occurredAt: new Date().toISOString(),
-                },
-                accessToken,
-              );
-            }
-          } else {
-            setRecordingError(
-              'Cloud recording is not available for this session (check the Zoom account’s recording settings).',
-            );
-          }
-        }
-
-        const existingOther = client
+        const existingRemoteParticipants = client
           .getAllUser()
-          .find((user) => user.userId !== self.userId);
-        if (existingOther) {
-          updateOtherParticipant({
-            userId: existingOther.userId,
-            displayName: existingOther.displayName,
-            muted: existingOther.muted ?? false,
-            bVideoOn: existingOther.bVideoOn,
-            isHost: existingOther.isHost,
-          });
-          if (existingOther.bVideoOn && mainVideoRef.current) {
-            void attachCameraTile(client, existingOther.userId, mainVideoRef.current);
-          }
-        }
+          .filter((user) => user.userId !== self.userId)
+          .map((user) => ({
+            userId: user.userId,
+            displayName: user.displayName,
+            avatar: user.avatar,
+            muted: user.muted ?? false,
+            bVideoOn: user.bVideoOn,
+            isHost: user.isHost,
+          }));
+        updateRemoteParticipants(() => existingRemoteParticipants);
+
+        // Command-channel messages are ephemeral. Ask participants to replay
+        // their current hand state so someone joining late sees every raised
+        // hand instead of only changes made after they arrived.
+        void client.getCommandClient().send(
+          JSON.stringify({
+            type: 'raise-hand-state-request',
+          } satisfies CommandChannelPayload),
+        );
 
         const whiteboardClient = client.getWhiteboardClient();
         setSupportsWhiteboard(whiteboardClient.isWhiteboardEnabled());
@@ -1404,14 +1007,20 @@ export function ZoomVideoSessionEmbed({
         // who were already in the session when it started.
         const existingPresenter = whiteboardClient.getWhiteboardPresenter();
         if (existingPresenter && existingPresenter.userId !== self.userId) {
-          setWhiteboardStatus(whiteboardClient.getWhiteboardStatus());
+          setWhiteboardStatus(WhiteboardStatus.Pending);
+          await waitForWhiteboardSurface();
           if (whiteboardContainerRef.current) {
-            await whiteboardClient
-              .startWhiteboardView(
+            try {
+              const result = await whiteboardClient.startWhiteboardView(
                 whiteboardContainerRef.current,
                 existingPresenter.userId,
-              )
-              .catch(() => null);
+              );
+              if (result instanceof Error) throw result;
+              setWhiteboardStatus(WhiteboardStatus.InProgress);
+            } catch (error) {
+              setWhiteboardStatus(WhiteboardStatus.Closed);
+              setWhiteboardError(describeZoomWhiteboardFailure(error));
+            }
           }
         }
 
@@ -1477,7 +1086,10 @@ export function ZoomVideoSessionEmbed({
       client.off('user-removed', handleUserRemoved);
       client.off('user-updated', handleUserUpdated);
       client.off('peer-video-state-change', handlePeerVideoStateChange);
+      client.off('active-speaker', handleActiveSpeaker);
       client.off('active-share-change', handleActiveShareChange);
+      client.off('peer-share-state-change', handlePeerShareStateChange);
+      client.off('share-content-dimension-change', handleShareContentDimensionChange);
       client.off('annotation-viewer-draw-request', handleAnnotationViewerDrawRequest);
       client.off('annotation-privilege-change', handleAnnotationPrivilegeChange);
       client.off('passively-stop-share', handlePassivelyStopShare);
@@ -1496,7 +1108,7 @@ export function ZoomVideoSessionEmbed({
       if (captionClearTimerRef.current) {
         clearTimeout(captionClearTimerRef.current);
       }
-      void disposeZoomClient(client, selfUserIdRef.current);
+      scheduleZoomClientDisposal(client, selfUserIdRef.current);
     };
   }, [
     sessionName,
@@ -1504,7 +1116,7 @@ export function ZoomVideoSessionEmbed({
     displayName,
     initialMuted,
     initialVideoOff,
-    updateOtherParticipant,
+    updateRemoteParticipants,
     liveSessionId,
     accessToken,
   ]);
@@ -1554,7 +1166,7 @@ export function ZoomVideoSessionEmbed({
 
   const toggleScreenShare = useCallback(async () => {
     const client = clientRef.current;
-    if (!client || !localShareVideoRef.current) {
+    if (!client || !localShareVideoRef.current || !localShareCanvasRef.current) {
       return;
     }
     const stream = client.getMediaStream();
@@ -1564,7 +1176,12 @@ export function ZoomVideoSessionEmbed({
       setIsSharingScreen(false);
     } else {
       try {
-        await stream.startShareScreen(localShareVideoRef.current, {
+        const useVideoElement = stream.isStartShareScreenWithVideoElement();
+        setLocalShareRenderTarget(useVideoElement ? 'video' : 'canvas');
+        const renderTarget = useVideoElement
+          ? localShareVideoRef.current
+          : localShareCanvasRef.current;
+        await stream.startShareScreen(renderTarget, {
           // Lets me keep viewing others' shares while my own is active —
           // only meaningful (and only offered) when the host has allowed
           // multiple simultaneous presenters via the Advanced share-privilege
@@ -1572,6 +1189,14 @@ export function ZoomVideoSessionEmbed({
           simultaneousShareView: sharePrivilege === SharePrivilege.MultipleShare,
         });
         setIsSharingScreen(true);
+        setTimeout(() => {
+          setSharePresenters(
+            stream.getShareUserList().map((participant) => ({
+              userId: participant.userId,
+              displayName: participant.displayName,
+            })),
+          );
+        }, 0);
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Zoom screen share failed to start', error);
@@ -1584,40 +1209,59 @@ export function ZoomVideoSessionEmbed({
     }
   }, [isSharingScreen, sharePrivilege]);
 
-  const toggleAnnotation = useCallback(async () => {
-    const client = clientRef.current;
-    if (!client) {
-      return;
-    }
-    const stream = client.getMediaStream();
-    setShareError(null);
-    if (isAnnotating) {
-      await stream.stopAnnotation().catch(() => null);
-      setIsAnnotating(false);
-    } else {
-      // canDoAnnotation() reflects whether the Video SDK app itself has the
-      // Annotation feature enabled (Zoom Marketplace → your app → Features) —
-      // the same kind of account-level gate that silently broke the
-      // whiteboard before canStartWhiteboard() was checked there. Previously
-      // a false/thrown result here was swallowed with zero feedback, so
-      // clicking Annotate looked like it did nothing at all.
-      if (!stream.canDoAnnotation()) {
-        setShareError(
-          "Annotation couldn't be started — it may not be enabled for this account, or the account owner needs to turn it on for this app in the Zoom Marketplace.",
-        );
-        return;
-      }
+  const selectSharedScreen = useCallback(
+    async (userId: number) => {
+      const client = clientRef.current;
+      if (!client || userId === activeShareUserId) return;
       try {
-        await stream.startAnnotation();
-        stream.getAnnotationController().setToolType(annotationTool);
-        setIsAnnotating(true);
+        const result = await client.getMediaStream().switchShareView(userId);
+        if (result instanceof Error) throw result;
       } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error('Zoom annotation failed to start', error);
         setShareError(describeZoomFailure(error));
       }
-    }
-  }, [isAnnotating, annotationTool]);
+    },
+    [activeShareUserId],
+  );
+
+  const toggleAnnotation = useCallback(
+    async (requestedTool?: AnnotationToolType) => {
+      const client = clientRef.current;
+      if (!client) {
+        return;
+      }
+      const stream = client.getMediaStream();
+      setShareError(null);
+      if (isAnnotating) {
+        await stream.stopAnnotation().catch(() => null);
+        setIsAnnotating(false);
+      } else {
+        // canDoAnnotation() reflects whether the Video SDK app itself has the
+        // Annotation feature enabled (Zoom Marketplace → your app → Features) —
+        // the same kind of account-level gate that silently broke the
+        // whiteboard before canStartWhiteboard() was checked there. Previously
+        // a false/thrown result here was swallowed with zero feedback, so
+        // clicking Annotate looked like it did nothing at all.
+        if (!stream.canDoAnnotation()) {
+          setShareError(
+            "Annotation couldn't be started — it may not be enabled for this account, or the account owner needs to turn it on for this app in the Zoom Marketplace.",
+          );
+          return;
+        }
+        try {
+          await stream.startAnnotation();
+          const selectedTool = requestedTool ?? annotationTool;
+          stream.getAnnotationController().setToolType(selectedTool);
+          setAnnotationTool(selectedTool);
+          setIsAnnotating(true);
+        } catch (error) {
+          // eslint-disable-next-line no-console
+          console.error('Zoom annotation failed to start', error);
+          setShareError(describeZoomFailure(error));
+        }
+      }
+    },
+    [isAnnotating, annotationTool],
+  );
 
   const selectAnnotationTool = useCallback((tool: AnnotationToolType) => {
     setAnnotationTool(tool);
@@ -1635,9 +1279,19 @@ export function ZoomVideoSessionEmbed({
     }
     setWhiteboardError(null);
     const whiteboardClient = client.getWhiteboardClient();
-    if (isPresentingWhiteboard) {
-      await whiteboardClient.stopWhiteboardScreen();
-      setIsPresentingWhiteboard(false);
+    const presenter = whiteboardClient.getWhiteboardPresenter();
+    const isCurrentUserPresenting = presenter?.userId === selfUserIdRef.current;
+    if (isCurrentUserPresenting) {
+      try {
+        const result = await whiteboardClient.stopWhiteboardScreen();
+        if (result instanceof Error) throw result;
+        setIsPresentingWhiteboard(false);
+        setWhiteboardStatus(WhiteboardStatus.Closed);
+      } catch (error) {
+        setWhiteboardError(describeZoomWhiteboardFailure(error));
+      }
+    } else if (presenter) {
+      setWhiteboardError('Another participant is already presenting a whiteboard.');
     } else if (whiteboardContainerRef.current) {
       // canStartWhiteboard() is Zoom's single authoritative gate — it folds
       // in permissions, current sharing state, and whiteboard status, so it
@@ -1654,20 +1308,40 @@ export function ZoomVideoSessionEmbed({
         return;
       }
       try {
-        await whiteboardClient.startWhiteboardScreen(whiteboardContainerRef.current);
+        // Reveal the mounted render target before Zoom initializes against
+        // its painted dimensions. React state updates asynchronously, so wait
+        // for two animation frames, matching the sample's required ordering:
+        // show the surface first, then call startWhiteboardScreen().
+        setWhiteboardStatus(WhiteboardStatus.Pending);
+        await waitForWhiteboardSurface();
+        if (!whiteboardContainerRef.current) {
+          setWhiteboardStatus(WhiteboardStatus.Closed);
+          return;
+        }
+        const result = await whiteboardClient.startWhiteboardScreen(
+          whiteboardContainerRef.current,
+        );
+        if (result instanceof Error) throw result;
         setIsPresentingWhiteboard(true);
+        setWhiteboardStatus(WhiteboardStatus.InProgress);
       } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error('Zoom whiteboard failed to start', error);
-        setWhiteboardError(describeZoomFailure(error));
+        setWhiteboardStatus(WhiteboardStatus.Closed);
+        setIsPresentingWhiteboard(false);
+        setWhiteboardError(describeZoomWhiteboardFailure(error));
       }
     }
-  }, [isPresentingWhiteboard, activeShareUserId]);
+  }, [activeShareUserId]);
 
-  const exportWhiteboardPdf = useCallback(() => {
-    void clientRef.current
-      ?.getWhiteboardClient()
-      .exportWhiteboard('pdf', `whiteboard-${sessionName}`);
+  const exportWhiteboardPdf = useCallback(async () => {
+    setWhiteboardError(null);
+    try {
+      const result = await clientRef.current
+        ?.getWhiteboardClient()
+        .exportWhiteboard('pdf', `whiteboard-${sessionName}`);
+      if (result instanceof Error) throw result;
+    } catch (error) {
+      setWhiteboardError(describeZoomWhiteboardFailure(error));
+    }
   }, [sessionName]);
 
   // Video SDK has no built-in raise-hand API — this broadcasts a small JSON
@@ -1680,6 +1354,7 @@ export function ZoomVideoSessionEmbed({
       return;
     }
     const next = !isHandRaised;
+    isHandRaisedRef.current = next;
     setIsHandRaised(next);
     void client.getCommandClient().send(
       JSON.stringify({
@@ -1773,6 +1448,7 @@ export function ZoomVideoSessionEmbed({
       accessToken,
     );
     isLeavingRef.current = true;
+    clearLiveSessionRecovery(liveSessionId);
     void disposeZoomClient(client, selfUserIdRef.current, true);
     setShowEndForAllConfirm(false);
     setShowFeedbackPrompt(true);
@@ -1792,7 +1468,10 @@ export function ZoomVideoSessionEmbed({
   // after the move instead of going blank. Falls back to a no-op wherever
   // the API isn't supported (anything non-Chromium, as of writing).
   const enterPip = useCallback(async () => {
-    const sourceContainer = mainVideoRef.current;
+    const firstRemoteParticipant = remoteParticipantsRef.current[0];
+    const sourceContainer = firstRemoteParticipant
+      ? remoteVideoRefs.current.get(firstRemoteParticipant.userId)
+      : null;
     if (!PIP_SUPPORTED || pipWindowRef.current || !sourceContainer?.firstChild) {
       return;
     }
@@ -1923,28 +1602,31 @@ export function ZoomVideoSessionEmbed({
     setBackgroundPreset(preset);
   }, []);
 
-  const toggleMirror = useCallback(async () => {
-    const client = clientRef.current;
-    if (!client) {
-      return;
-    }
-    const next = !isMirrored;
-    const result = await client
-      .getMediaStream()
-      .mirrorVideo(next)
-      .catch(() => null);
-    if (result === null || result instanceof Error) {
-      return;
-    }
-    isMirroredRef.current = next;
-    setIsMirrored(next);
-    try {
-      localStorage.setItem(MIRROR_VIDEO_STORAGE_KEY, String(next));
-    } catch {
-      // Private browsing / storage disabled — the preference just won't
-      // persist across sessions, which is a harmless degradation.
-    }
-  }, [isMirrored]);
+  const toggleMirror = useCallback(
+    async (enabled?: boolean) => {
+      const client = clientRef.current;
+      if (!client) {
+        return;
+      }
+      const next = enabled ?? !isMirrored;
+      const result = await client
+        .getMediaStream()
+        .mirrorVideo(next)
+        .catch(() => null);
+      if (result === null || result instanceof Error) {
+        return;
+      }
+      isMirroredRef.current = next;
+      setIsMirrored(next);
+      try {
+        localStorage.setItem(MIRROR_VIDEO_STORAGE_KEY, String(next));
+      } catch {
+        // Private browsing / storage disabled — the preference just won't
+        // persist across sessions, which is a harmless degradation.
+      }
+    },
+    [isMirrored],
+  );
 
   const selectAudioProcessing = useCallback(async (mode: AudioProcessingMode) => {
     const client = clientRef.current;
@@ -1995,18 +1677,17 @@ export function ZoomVideoSessionEmbed({
     setSharePrivilege(privilege);
   }, []);
 
-  // Leaving the Zoom session itself must never be blocked on anything — see
-  // the comments below — but navigating away (onLeave) now waits for the
-  // feedback prompt to be dismissed (submit or skip), rather than firing
-  // immediately, so there's a chance to rate the session on the way out.
+  // Disconnect and clear refresh recovery before showing post-call feedback.
+  // An intentional leave must never rejoin the participant after a refresh.
   const handleLeave = useCallback(() => {
     const client = clientRef.current;
     isLeavingRef.current = true;
+    clearLiveSessionRecovery(liveSessionId);
     if (client) {
       void disposeZoomClient(client, selfUserIdRef.current);
     }
     setShowFeedbackPrompt(true);
-  }, []);
+  }, [liveSessionId]);
 
   // This renders as a `fixed inset-0 z-40` portal covering the entire
   // viewport. router.push() in Next.js App Router runs inside a transition
@@ -2018,10 +1699,11 @@ export function ZoomVideoSessionEmbed({
   // this component stop rendering itself immediately, independent of
   // whatever the caller's onLeave navigation does or how long it takes.
   const finishLeaving = useCallback(() => {
+    clearLiveSessionRecovery(liveSessionId);
     setShowFeedbackPrompt(false);
     setHasLeft(true);
     onLeave?.();
-  }, [onLeave]);
+  }, [liveSessionId, onLeave]);
 
   const submitFeedback = useCallback(async () => {
     if (feedbackRating === null) {
@@ -2038,7 +1720,7 @@ export function ZoomVideoSessionEmbed({
     finishLeaving();
   }, [feedbackRating, liveSessionId, displayName, accessToken, finishLeaving]);
 
-  const participantCount = otherParticipant ? 2 : 1;
+  const participantCount = remoteParticipants.length + 1;
 
   if (hasLeft) {
     return null;
@@ -2068,22 +1750,31 @@ export function ZoomVideoSessionEmbed({
   const isSomeoneSharing = activeShareUserId !== null;
   const isLocalShare =
     activeShareUserId !== null && activeShareUserId === selfUserIdRef.current;
+  const isShowingLocalShare =
+    isLocalShare || (isSharingScreen && activeShareUserId === null);
+  const meetingNotice = mediaError
+    ? {
+        message: mediaError,
+        onDismiss: () => setMediaError(null),
+        action: { label: 'Refresh', onClick: () => window.location.reload() },
+      }
+    : shareError
+      ? { message: shareError, onDismiss: () => setShareError(null) }
+      : whiteboardError
+        ? { message: whiteboardError, onDismiss: () => setWhiteboardError(null) }
+        : captionsError
+          ? { message: captionsError, onDismiss: () => setCaptionsError(null) }
+          : null;
   const isWhiteboardActive = whiteboardStatus !== WhiteboardStatus.Closed;
-  const effectiveViewMode: ViewMode =
-    isSomeoneSharing || isWhiteboardActive ? 'speaker' : viewMode;
-  const isAloneInSpeakerView =
-    !otherParticipant &&
-    !isSomeoneSharing &&
-    !isWhiteboardActive &&
-    effectiveViewMode === 'speaker';
-  // Mirrors Zoom's own UI Toolkit: non-host participants must explicitly
-  // acknowledge an in-progress recording (Stay) or leave — a passive banner
-  // alone isn't disclosure/consent. The host already opted in by starting it.
-  const shouldShowRecordingConsent =
-    recordingStatus === RecordingStatus.Recording &&
-    !isSelfHost &&
-    !hasAcknowledgedRecording;
-
+  // Zoom can publish the local share before its active-share participant ID
+  // reaches the user state. Drive the presentation layout from either signal
+  // so the self tile moves into the filmstrip immediately instead of leaving
+  // the reserved right rail empty during that synchronization window.
+  const isPresentationLayoutActive = shouldUsePresentationLayout({
+    hasActiveShareUser: isSomeoneSharing,
+    isShowingLocalShare,
+    isWhiteboardActive,
+  });
   // Rendered via a portal straight to document.body: a `fixed inset-0`
   // element only actually covers the real viewport if no ancestor sets a
   // transform/filter/etc. (any of which creates its own containing block
@@ -2093,431 +1784,139 @@ export function ZoomVideoSessionEmbed({
   // whatever box happens to wrap this component on a given page.
   return createPortal(
     <TooltipProvider delayDuration={300}>
-      <Dialog open={shouldShowRecordingConsent} onOpenChange={() => {}}>
-        <DialogContent showCloseButton={false}>
-          <DialogHeader>
-            <DialogTitle>This session is being recorded</DialogTitle>
-            <DialogDescription>
-              By staying in this session, you consent to being recorded. If you don&apos;t
-              consent, you can leave now.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={handleLeave}>
-              Leave
-            </Button>
-            <Button type="button" onClick={() => setHasAcknowledgedRecording(true)}>
-              Stay
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      <Dialog
-        open={showFeedbackPrompt}
-        onOpenChange={(open) => {
-          if (!open) {
-            finishLeaving();
-          }
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>How was your session?</DialogTitle>
-            <DialogDescription>
-              Your feedback helps us improve future sessions.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex items-center justify-center gap-2 py-2">
-            {(
-              [
-                { rating: 1, label: 'Terrible', icon: Angry },
-                { rating: 2, label: 'Poor', icon: Frown },
-                { rating: 3, label: 'Okay', icon: Meh },
-                { rating: 4, label: 'Good', icon: Smile },
-                { rating: 5, label: 'Great', icon: Laugh },
-              ] as const
-            ).map(({ rating, label, icon: Icon }) => (
-              <button
-                key={rating}
-                type="button"
-                onClick={() => setFeedbackRating(rating)}
-                className={cn(
-                  'flex cursor-pointer flex-col items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent',
-                  feedbackRating === rating && 'bg-accent text-foreground',
-                )}
-              >
-                <Icon
-                  className={cn(
-                    'h-7 w-7',
-                    feedbackRating === rating ? 'text-primary' : undefined,
-                  )}
-                />
-                {label}
-              </button>
-            ))}
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={finishLeaving}>
-              Skip
-            </Button>
-            <Button
-              type="button"
-              disabled={feedbackRating === null || isFeedbackSubmitting}
-              onClick={() => void submitFeedback()}
-            >
-              {isFeedbackSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              Submit
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      <div className="fixed inset-0 z-40 flex flex-col bg-background">
-        <div className="relative min-h-0 flex-1 overflow-hidden bg-muted">
-          {status === 'connecting' ? (
-            <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 bg-muted text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Connecting…
-            </div>
-          ) : null}
-
-          {/* Header — timer/REC/participant count now live in the
-                floating toolbar below instead of a separate overlay. */}
-          <div className="absolute left-4 right-4 top-4 z-10 flex items-center justify-end gap-2">
-            {!isSomeoneSharing ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setViewMode((mode) =>
-                        mode === 'speaker' ? 'sideBySide' : 'speaker',
-                      )
-                    }
-                    className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-popover/90 text-popover-foreground shadow-sm backdrop-blur-sm transition-all hover:bg-accent active:scale-90"
-                  >
-                    <PoppingIcon toggleKey={viewMode}>
-                      {viewMode === 'speaker' ? (
-                        <Columns2 className="h-4 w-4" />
-                      ) : (
-                        <LayoutGrid className="h-4 w-4" />
-                      )}
-                    </PoppingIcon>
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {viewMode === 'speaker'
-                    ? 'Switch to side-by-side'
-                    : 'Switch to speaker view'}
-                </TooltipContent>
-              </Tooltip>
-            ) : null}
-          </div>
-
-          {showRecordingBanner ? (
-            <OverlayBadge className="absolute inset-x-0 top-16 z-20 mx-auto w-fit">
-              This session is being recorded
-            </OverlayBadge>
-          ) : null}
-
-          {recordingError ? (
-            <div className="absolute inset-x-4 top-16 z-20 mx-auto w-fit max-w-sm rounded-lg bg-destructive px-3 py-2 text-center text-xs font-medium text-destructive-foreground shadow-sm">
-              {recordingError}
-            </div>
-          ) : null}
-
-          {shareError ? (
-            <div className="absolute inset-x-4 top-16 z-20 mx-auto w-fit max-w-sm rounded-lg bg-destructive px-3 py-2 text-center text-xs font-medium text-destructive-foreground shadow-sm">
-              {shareError}
-            </div>
-          ) : null}
-
-          {whiteboardError ? (
-            <div className="absolute inset-x-4 top-16 z-20 mx-auto w-fit max-w-sm rounded-lg bg-destructive px-3 py-2 text-center text-xs font-medium text-destructive-foreground shadow-sm">
-              {whiteboardError}
-            </div>
-          ) : null}
-
-          {mediaError ? (
-            <div
-              className="absolute inset-x-4 top-16 z-30 mx-auto flex w-fit max-w-lg items-center gap-3 rounded-xl border border-destructive/40 bg-popover/95 px-4 py-3 text-sm text-popover-foreground shadow-lg backdrop-blur-sm"
-              role="alert"
-            >
-              <span>{mediaError}</span>
-              <Button type="button" size="sm" onClick={() => window.location.reload()}>
-                Refresh
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label="Dismiss media warning"
-                onClick={() => setMediaError(null)}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          ) : null}
-
-          {isAnnotating ? (
-            <div className="absolute bottom-4 left-4 z-10 flex flex-wrap items-center gap-1.5 rounded-2xl border border-border bg-popover/95 p-2 shadow-sm backdrop-blur-sm">
-              {(
-                [
-                  { tool: AnnotationToolType.Pen, icon: Pencil, label: 'Pen' },
-                  {
-                    tool: AnnotationToolType.Highlighter,
-                    icon: Highlighter,
-                    label: 'Highlighter',
-                  },
-                  { tool: AnnotationToolType.Arrow, icon: ArrowUpRight, label: 'Arrow' },
-                  { tool: AnnotationToolType.Eraser, icon: Eraser, label: 'Eraser' },
-                ] as const
-              ).map(({ tool, icon: Icon, label }) => (
-                <IconToolbarButton
-                  key={label}
-                  label={label}
-                  active={annotationTool === tool}
-                  onClick={() => selectAnnotationTool(tool)}
-                >
-                  <Icon className="h-4 w-4" />
-                </IconToolbarButton>
-              ))}
-              <Separator orientation="vertical" className="mx-1 h-5" />
-              {ANNOTATION_COLORS.map((color) => (
-                <button
-                  key={color.label}
-                  type="button"
-                  title={color.label}
-                  onClick={() => selectAnnotationColor(color.value)}
-                  className="h-5 w-5 cursor-pointer rounded-full ring-1 ring-border"
-                  style={{ backgroundColor: annotationColorToHex(color.value) }}
-                />
-              ))}
-              <Separator orientation="vertical" className="mx-1 h-5" />
-              <IconToolbarButton
-                label="Undo"
-                onClick={() =>
-                  clientRef.current?.getMediaStream().getAnnotationController().undo()
-                }
-              >
-                <Undo2 className="h-4 w-4" />
-              </IconToolbarButton>
-              <IconToolbarButton
-                label="Redo"
-                onClick={() =>
-                  clientRef.current?.getMediaStream().getAnnotationController().redo()
-                }
-              >
-                <Redo2 className="h-4 w-4" />
-              </IconToolbarButton>
-              <IconToolbarButton
-                label="Clear my annotations"
-                onClick={() =>
-                  clientRef.current
-                    ?.getMediaStream()
-                    .getAnnotationController()
-                    .clear(AnnotationClearType.Mine)
-                }
-              >
-                <Trash2 className="h-4 w-4" />
-              </IconToolbarButton>
-              <IconToolbarButton
-                label="Close annotation"
-                onClick={() => void toggleAnnotation()}
-              >
-                <X className="h-4 w-4" />
-              </IconToolbarButton>
-            </div>
-          ) : null}
-
-          <canvas
-            ref={shareCanvasRef}
-            className={cn(
-              'h-full w-full rounded-xl',
-              isSomeoneSharing && !isLocalShare ? 'block' : 'hidden',
-            )}
-          />
-
-          {/* Local share preview: absolutely positioned and never
-                display:none, so it always has real on-screen dimensions —
-                startShareScreen() needs a non-zero render target the moment
-                sharing starts, before isLocalShare can even become true
-                (that only flips once the active-share-change event arrives,
-                after the share has already begun). It fills the same main
-                slot the canvas above uses for a remote share. */}
-          <video
-            ref={localShareVideoRef}
-            autoPlay
-            playsInline
-            muted
-            className={cn(
-              'absolute inset-0 z-10 h-full w-full rounded-xl bg-black object-contain',
-              isLocalShare ? 'opacity-100' : 'pointer-events-none opacity-0',
-            )}
-          />
-
+      {showFeedbackPrompt ? (
+        <ZoomFeedbackScreen
+          rating={feedbackRating}
+          isSubmitting={isFeedbackSubmitting}
+          onRatingChange={setFeedbackRating}
+          onSubmit={() => void submitFeedback()}
+          onSkip={finishLeaving}
+        />
+      ) : null}
+      <div className="zoom-meeting-shell fixed inset-0 z-40 flex flex-col bg-background">
+        <div
+          className={cn(
+            'relative min-h-0 flex-1 overflow-hidden bg-background transition-opacity duration-500 ease-out motion-reduce:transition-none',
+            status === 'connecting' ? 'opacity-70' : 'opacity-100',
+          )}
+        >
           <div
-            ref={whiteboardContainerRef}
             className={cn(
-              'h-full w-full overflow-hidden rounded-xl bg-background',
-              isWhiteboardActive ? 'block' : 'hidden',
+              'absolute inset-0 z-40 flex items-center justify-center gap-2 bg-muted text-sm text-muted-foreground transition-opacity duration-500 ease-out motion-reduce:transition-none',
+              status === 'connecting'
+                ? 'pointer-events-auto opacity-100'
+                : 'pointer-events-none opacity-0',
             )}
+            aria-hidden={status !== 'connecting'}
+          >
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Connecting…
+          </div>
+
+          <ZoomMeetingHeader
+            title={sessionTitle ?? 'Live class'}
+            participantCount={participantCount}
+            recordingStatus={recordingStatus}
           />
 
-          {!isSomeoneSharing &&
-          !isWhiteboardActive &&
-          effectiveViewMode === 'sideBySide' ? (
-            <div className="grid h-full w-full grid-cols-1 grid-rows-2 gap-3 sm:grid-cols-2 sm:grid-rows-1">
-              <VideoTile
-                label={displayName}
-                isSelf
-                isMuted={isMuted}
-                isVideoOn={isVideoOn}
-                videoContainerRef={selfVideoRef}
-                className="h-full w-full"
-                networkLevel={getNetworkLevel(
-                  networkQualityByUserId,
-                  selfUserIdRef.current,
-                )}
-                handRaised={isHandRaised}
-                cornerSide="right"
-              />
-              {otherParticipant ? (
-                <VideoTile
-                  label={otherParticipant.displayName}
-                  isSelf={false}
-                  isMuted={otherParticipant.muted}
-                  isVideoOn={otherParticipant.bVideoOn}
-                  videoContainerRef={mainVideoRef}
-                  className="h-full w-full"
-                  networkLevel={getNetworkLevel(
-                    networkQualityByUserId,
-                    otherParticipant.userId,
-                  )}
-                  handRaised={isOtherHandRaised}
-                  cornerSide="left"
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center rounded-xl bg-muted text-sm text-muted-foreground">
-                  Waiting for the other person to join…
-                </div>
-              )}
-            </div>
+          {meetingNotice ? (
+            <ZoomMeetingNotice
+              {...meetingNotice}
+              className={isShowingLocalShare ? 'top-32' : 'top-20 sm:top-24'}
+            />
+          ) : showRecordingBanner && !isAnnotating ? (
+            <ZoomMeetingNotice
+              message="This session is being recorded"
+              tone="warning"
+              onDismiss={() => setShowRecordingBanner(false)}
+              className={isShowingLocalShare ? 'top-32' : 'top-20 sm:top-24'}
+            />
           ) : null}
 
-          {!isSomeoneSharing && !isWhiteboardActive && effectiveViewMode === 'speaker' ? (
-            otherParticipant ? (
-              <VideoTile
-                label={otherParticipant.displayName}
-                isSelf={false}
-                isMuted={otherParticipant.muted}
-                isVideoOn={otherParticipant.bVideoOn}
-                videoContainerRef={mainVideoRef}
-                className="h-full w-full"
-                networkLevel={getNetworkLevel(
-                  networkQualityByUserId,
-                  otherParticipant.userId,
-                )}
-                handRaised={isOtherHandRaised}
-                cornerSide="right"
-              />
-            ) : (
-              // Alone so far — show your own camera as the main view
-              // instead of a tiny corner PiP next to an empty "waiting"
-              // message. The self-PiP block below is suppressed via
-              // isAloneInSpeakerView so selfVideoRef only attaches here.
-              <VideoTile
-                label={displayName}
-                isSelf
-                isMuted={isMuted}
-                isVideoOn={isVideoOn}
-                videoContainerRef={selfVideoRef}
-                className="h-full w-full"
-                networkLevel={getNetworkLevel(
-                  networkQualityByUserId,
-                  selfUserIdRef.current,
-                )}
-                handRaised={isHandRaised}
-                cornerSide="right"
-              />
-            )
-          ) : null}
+          <ZoomAnnotationControls
+            available={isShowingLocalShare || (isSomeoneSharing && canAnnotate)}
+            isAnnotating={isAnnotating}
+            selectedTool={annotationTool}
+            onStart={(tool) => void toggleAnnotation(tool)}
+            onSelectTool={selectAnnotationTool}
+            onSelectColor={selectAnnotationColor}
+            onUndo={() =>
+              clientRef.current?.getMediaStream().getAnnotationController().undo()
+            }
+            onRedo={() =>
+              clientRef.current?.getMediaStream().getAnnotationController().redo()
+            }
+            onClear={() =>
+              clientRef.current
+                ?.getMediaStream()
+                .getAnnotationController()
+                .clear(AnnotationClearType.Mine)
+            }
+            onClose={() => void toggleAnnotation()}
+          />
 
-          {/* Persistent alert while sharing — unlike the recording banner
-                this never auto-dismisses, since "you're sharing" stays
-                relevant for the whole duration, not just a few seconds. */}
-          {isLocalShare ? (
-            <div className="absolute inset-x-0 top-16 z-20 mx-auto flex w-fit items-center gap-2 rounded-full bg-popover/95 py-1.5 pl-3 pr-1.5 text-xs font-medium text-popover-foreground shadow-lg backdrop-blur-sm">
-              <MonitorUp className="h-3.5 w-3.5" />
-              You&apos;re sharing your screen
-              <Button
-                type="button"
-                size="xs"
-                variant="destructive"
-                onClick={() => void toggleScreenShare()}
-              >
-                Stop sharing
-              </Button>
-            </div>
+          <ZoomShareStage
+            remoteCanvasRef={shareCanvasRef}
+            localCanvasRef={localShareCanvasRef}
+            localVideoRef={localShareVideoRef}
+            whiteboardContainerRef={whiteboardContainerRef}
+            dimensions={shareContentDimensions}
+            showRemoteShare={isSomeoneSharing && !isShowingLocalShare}
+            showLocalShare={isShowingLocalShare}
+            showWhiteboard={isWhiteboardActive}
+            whiteboardLoading={whiteboardStatus === WhiteboardStatus.Pending}
+            localRenderTarget={localShareRenderTarget}
+            sidebarOpen={activePanel !== null}
+            sharePresenters={sharePresenters}
+            activeShareUserId={activeShareUserId}
+            onSelectShare={(userId) => void selectSharedScreen(userId)}
+          />
+
+          {!isPresentationLayoutActive ? (
+            <ZoomParticipantGallery
+              displayName={displayName}
+              selfAvatar={selfAvatar}
+              selfMuted={isMuted}
+              selfVideoOn={isVideoOn}
+              selfHandRaised={isHandRaised}
+              selfVideoRef={selfVideoRef}
+              remoteParticipants={remoteParticipants}
+              raisedHandUserIds={raisedHandUserIds}
+              activeSpeakerUserId={activeSpeakerUserId}
+              selfUserId={selfUserIdRef.current}
+              sidebarOpen={activePanel !== null}
+              page={galleryPage}
+              onPageChange={setGalleryPage}
+              onRemoteContainer={(userId, element) => {
+                if (element) remoteVideoRefs.current.set(userId, element);
+                else remoteVideoRefs.current.delete(userId);
+              }}
+            />
           ) : null}
 
           {isPresentingWhiteboard ? (
-            <OverlayBadge className="absolute inset-x-0 top-16 z-10 mx-auto w-fit">
+            <OverlayBadge className="absolute inset-x-0 top-20 z-10 mx-auto w-fit animate-in fade-in-0 slide-in-from-top-2 duration-300 motion-reduce:animate-none sm:top-24">
               You&apos;re presenting the whiteboard
             </OverlayBadge>
           ) : null}
 
-          {isSomeoneSharing || isWhiteboardActive ? (
-            // Both participants shrink to small tiles once the shared
-            // screen or whiteboard takes over the main view — previously
-            // only your own camera did, leaving the other person's feed
-            // with nowhere to render while they were off in the
-            // (unused, in this state) main slot.
-            <div className="absolute bottom-4 right-4 z-20 flex flex-col gap-2 sm:flex-row">
-              {otherParticipant ? (
-                <VideoTile
-                  label={otherParticipant.displayName}
-                  isSelf={false}
-                  isMuted={otherParticipant.muted}
-                  isVideoOn={otherParticipant.bVideoOn}
-                  videoContainerRef={mainVideoRef}
-                  className="aspect-video w-28 sm:w-36"
-                  networkLevel={getNetworkLevel(
-                    networkQualityByUserId,
-                    otherParticipant.userId,
-                  )}
-                  handRaised={isOtherHandRaised}
-                  cornerSide="left"
-                />
-              ) : null}
-              <VideoTile
-                label={displayName}
-                isSelf
-                isMuted={isMuted}
-                isVideoOn={isVideoOn}
-                videoContainerRef={selfVideoRef}
-                className="aspect-video w-28 sm:w-36"
-                networkLevel={getNetworkLevel(
-                  networkQualityByUserId,
-                  selfUserIdRef.current,
-                )}
-                handRaised={isHandRaised}
-                cornerSide="left"
-              />
-            </div>
-          ) : effectiveViewMode === 'speaker' && !isAloneInSpeakerView ? (
-            <VideoTile
-              label={displayName}
-              isSelf
-              isMuted={isMuted}
-              isVideoOn={isVideoOn}
-              videoContainerRef={selfVideoRef}
-              className="absolute bottom-4 right-4 z-10 aspect-video w-32 sm:w-48"
-              networkLevel={getNetworkLevel(
-                networkQualityByUserId,
-                selfUserIdRef.current,
-              )}
-              handRaised={isHandRaised}
-              cornerSide="left"
+          {isPresentationLayoutActive ? (
+            <ZoomShareFilmstrip
+              displayName={displayName}
+              selfAvatar={selfAvatar}
+              selfMuted={isMuted}
+              selfVideoOn={isVideoOn}
+              selfHandRaised={isHandRaised}
+              selfVideoRef={selfVideoRef}
+              remoteParticipants={remoteParticipants}
+              raisedHandUserIds={raisedHandUserIds}
+              activeSpeakerUserId={activeSpeakerUserId}
+              selfUserId={selfUserIdRef.current}
+              sidebarOpen={activePanel !== null}
+              onRemoteContainer={(userId, element) => {
+                if (element) remoteVideoRefs.current.set(userId, element);
+                else remoteVideoRefs.current.delete(userId);
+              }}
             />
           ) : null}
         </div>
@@ -2535,35 +1934,22 @@ export function ZoomVideoSessionEmbed({
               intermediary parser involved. */}
         {status === 'connected' ? (
           <div
-            className="absolute inset-x-0 z-30 flex justify-center px-2"
-            style={{ bottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+            className="zoom-meeting-gutter-padding absolute inset-x-0 z-30 overflow-x-auto pb-1 sm:overflow-visible"
+            style={{ bottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}
           >
-            <div className="flex max-w-full flex-wrap items-center justify-center gap-2 rounded-full border border-border bg-popover/95 px-3 py-2 shadow-lg backdrop-blur-sm sm:gap-3 sm:px-4 sm:py-2.5">
-              <div className="flex items-center gap-2 px-1">
-                <span className="text-xs font-medium tabular-nums text-popover-foreground">
-                  {formatElapsed(elapsedSeconds)}
-                </span>
-                {recordingStatus === RecordingStatus.Recording ? (
-                  <span className="flex items-center gap-1 text-xs font-medium text-destructive">
-                    <Circle className="h-2 w-2 animate-pulse fill-destructive text-destructive" />
-                    REC
-                  </span>
-                ) : null}
-                <span className="flex items-center gap-1 text-xs font-medium text-popover-foreground">
-                  <UsersIcon className="h-3.5 w-3.5" />
-                  {participantCount}
-                </span>
-              </div>
-              <Separator orientation="vertical" className="h-5" />
+            <div
+              className="zoom-toolbar relative mx-auto flex w-full items-center justify-center gap-1 sm:gap-1.5"
+              role="toolbar"
+              aria-label="Class controls"
+              data-mobile-expanded={showMobileControls}
+            >
+              <ZoomMeetingTimer elapsedSeconds={elapsedSeconds} />
 
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="h-11 w-11 sm:w-auto sm:px-3"
-                    aria-label={isMuted ? 'Unmute microphone' : 'Mute microphone'}
+                  <MeetingControlButton
+                    label={isMuted ? 'Unmute microphone' : 'Mute microphone'}
+                    tone={isMuted ? 'danger' : 'neutral'}
                     aria-pressed={!isMuted}
                     onClick={() => void toggleMute()}
                   >
@@ -2574,22 +1960,16 @@ export function ZoomVideoSessionEmbed({
                         <Mic className="h-4 w-4" />
                       )}
                     </PoppingIcon>
-                    <span className="hidden sm:inline">
-                      {isMuted ? 'Unmute' : 'Mute'}
-                    </span>
-                  </Button>
+                  </MeetingControlButton>
                 </TooltipTrigger>
                 <TooltipContent>{isMuted ? 'Unmute' : 'Mute'}</TooltipContent>
               </Tooltip>
 
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="h-11 w-11 sm:w-auto sm:px-3"
-                    aria-label={isVideoOn ? 'Stop camera' : 'Start camera'}
+                  <MeetingControlButton
+                    label={isVideoOn ? 'Stop camera' : 'Start camera'}
+                    tone={isVideoOn ? 'neutral' : 'danger'}
                     aria-pressed={isVideoOn}
                     onClick={() => void toggleVideo()}
                   >
@@ -2600,10 +1980,7 @@ export function ZoomVideoSessionEmbed({
                         <VideoOff className="h-4 w-4" />
                       )}
                     </PoppingIcon>
-                    <span className="hidden sm:inline">
-                      {isVideoOn ? 'Stop video' : 'Start video'}
-                    </span>
-                  </Button>
+                  </MeetingControlButton>
                 </TooltipTrigger>
                 <TooltipContent>
                   {isVideoOn ? 'Stop video' : 'Start video'}
@@ -2612,12 +1989,9 @@ export function ZoomVideoSessionEmbed({
 
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    variant={isSharingScreen ? 'default' : 'outline'}
-                    size="icon"
-                    className="h-11 w-11 sm:w-auto sm:px-3"
-                    aria-label={isSharingScreen ? 'Stop sharing screen' : 'Share screen'}
+                  <MeetingControlButton
+                    label={isSharingScreen ? 'Stop sharing screen' : 'Share screen'}
+                    tone={isSharingScreen ? 'active' : 'neutral'}
                     aria-pressed={isSharingScreen}
                     disabled={isWhiteboardActive || !supportsScreenShare}
                     onClick={() => void toggleScreenShare()}
@@ -2629,10 +2003,7 @@ export function ZoomVideoSessionEmbed({
                         <MonitorUp className="h-4 w-4" />
                       )}
                     </PoppingIcon>
-                    <span className="hidden sm:inline">
-                      {isSharingScreen ? 'Stop share' : 'Share'}
-                    </span>
-                  </Button>
+                  </MeetingControlButton>
                 </TooltipTrigger>
                 <TooltipContent>
                   {!supportsScreenShare
@@ -2643,30 +2014,52 @@ export function ZoomVideoSessionEmbed({
                 </TooltipContent>
               </Tooltip>
 
-              {isSomeoneSharing && (isLocalShare || canAnnotate) ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      variant={isAnnotating ? 'default' : 'outline'}
-                      size="icon"
-                      onClick={() => void toggleAnnotation()}
-                    >
-                      <PoppingIcon toggleKey={isAnnotating}>
-                        <Pencil className="h-4 w-4" />
-                      </PoppingIcon>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Annotate</TooltipContent>
-                </Tooltip>
-              ) : null}
+              <ZoomShareMeetingDialog
+                meetingTitle={sessionTitle ?? sessionName}
+                meetingPasscode={sessionPasscode}
+              />
+
+              <ZoomSettingsPanel
+                open={isSettingsOpen}
+                hideTrigger
+                cameras={cameraList}
+                microphones={micList}
+                speakers={speakerList}
+                activeCameraId={activeCameraId}
+                activeMicrophoneId={activeMicId}
+                activeSpeakerId={activeSpeakerId}
+                audioProcessing={audioProcessing}
+                backgroundPreset={backgroundPreset}
+                sharePrivilege={sharePrivilege}
+                isMirrored={isMirrored}
+                hardwareAcceleration={{ encode: hwAccelEncode, decode: hwAccelDecode }}
+                supportsNoiseSuppression={supportsNoiseSuppression}
+                supportsVirtualBackground={supportsVirtualBackground}
+                isHost={isSelfHost}
+                onOpenChange={(open) => {
+                  setIsSettingsOpen(open);
+                  if (open) setActivePanel(null);
+                }}
+                onSelectCamera={selectCamera}
+                onSelectMicrophone={selectMicrophone}
+                onSelectSpeaker={selectSpeaker}
+                onSelectAudioProcessing={(mode) => void selectAudioProcessing(mode)}
+                onToggleMirror={(enabled) => void toggleMirror(enabled)}
+                onSelectBackground={(preset) => void selectBackgroundPreset(preset)}
+                onToggleHardwareAcceleration={toggleHardwareAcceleration}
+                onSelectSharePrivilege={(privilege) =>
+                  void selectSharePrivilege(privilege)
+                }
+              />
+
               {supportsWhiteboard && (!isSomeoneSharing || isPresentingWhiteboard) ? (
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      variant={isPresentingWhiteboard ? 'default' : 'outline'}
-                      size="icon"
+                    <MeetingControlButton
+                      label={
+                        isPresentingWhiteboard ? 'Stop whiteboard' : 'Start whiteboard'
+                      }
+                      tone={isPresentingWhiteboard ? 'active' : 'neutral'}
                       disabled={
                         !isPresentingWhiteboard &&
                         (isSomeoneSharing || isWhiteboardActive)
@@ -2674,9 +2067,9 @@ export function ZoomVideoSessionEmbed({
                       onClick={() => void toggleWhiteboard()}
                     >
                       <PoppingIcon toggleKey={isPresentingWhiteboard}>
-                        <PenTool className="h-4 w-4" />
+                        <PenTool className="size-4" />
                       </PoppingIcon>
-                    </Button>
+                    </MeetingControlButton>
                   </TooltipTrigger>
                   <TooltipContent>
                     {isPresentingWhiteboard
@@ -2687,540 +2080,181 @@ export function ZoomVideoSessionEmbed({
                   </TooltipContent>
                 </Tooltip>
               ) : null}
-              {isWhiteboardActive ? (
+
+              <ZoomMoreControls
+                open={showMobileControls}
+                onOpenChange={setShowMobileControls}
+                actions={[
+                  {
+                    id: 'participants',
+                    label: `Participants (${remoteParticipants.length + 1})`,
+                    icon: <Users />,
+                    active: activePanel === 'users',
+                    mobileOnly: true,
+                    onSelect: () => setActivePanel('users'),
+                  },
+                  {
+                    id: 'messages',
+                    label: unreadChatCount
+                      ? `Messages (${unreadChatCount} unread)`
+                      : 'Messages',
+                    icon: <MessageSquare />,
+                    active: activePanel === 'chat',
+                    mobileOnly: true,
+                    onSelect: () => setActivePanel('chat'),
+                  },
+                  ...(isWhiteboardActive
+                    ? [
+                        {
+                          id: 'export-whiteboard',
+                          label: 'Export whiteboard as PDF',
+                          icon: <Download />,
+                          onSelect: exportWhiteboardPdf,
+                        },
+                      ]
+                    : []),
+                  ...(PIP_SUPPORTED && remoteParticipants.length > 0
+                    ? [
+                        {
+                          id: 'picture-in-picture',
+                          label: isPipActive
+                            ? 'Exit picture-in-picture'
+                            : 'Picture-in-picture',
+                          icon: <PictureInPicture2 />,
+                          active: isPipActive,
+                          onSelect: () => (isPipActive ? exitPip() : void enterPip()),
+                        },
+                      ]
+                    : []),
+                  {
+                    id: 'captions',
+                    label: isCaptionsOn ? 'Turn off captions' : 'Turn on captions',
+                    icon: <Captions />,
+                    active: isCaptionsOn,
+                    onSelect: () => void toggleCaptions(),
+                  },
+                  {
+                    id: 'settings',
+                    label: 'Audio and video settings',
+                    icon: <Settings />,
+                    active: isSettingsOpen,
+                    onSelect: () => {
+                      setActivePanel(null);
+                      setIsSettingsOpen(true);
+                    },
+                  },
+                ]}
+              />
+              <ZoomMeetingSideDock>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={exportWhiteboardPdf}
+                    <ZoomMeetingDockButton
+                      label={isHandRaised ? 'Lower hand' : 'Raise hand'}
+                      active={isHandRaised}
+                      className="size-12 px-0 shadow-md ring-1 ring-border/70"
+                      aria-pressed={isHandRaised}
+                      onClick={toggleHandRaise}
                     >
-                      <Download className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Export whiteboard as PDF</TooltipContent>
-                </Tooltip>
-              ) : null}
-              {PIP_SUPPORTED && otherParticipant ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      variant={isPipActive ? 'default' : 'outline'}
-                      size="icon"
-                      onClick={() => (isPipActive ? exitPip() : void enterPip())}
-                    >
-                      <PoppingIcon toggleKey={isPipActive}>
-                        <PictureInPicture2 className="h-4 w-4" />
+                      <PoppingIcon toggleKey={isHandRaised}>
+                        <Hand className="size-5" />
                       </PoppingIcon>
-                    </Button>
+                    </ZoomMeetingDockButton>
                   </TooltipTrigger>
                   <TooltipContent>
-                    {isPipActive ? 'Exit picture-in-picture' : 'Picture-in-picture'}
+                    {isHandRaised ? 'Lower hand' : 'Raise hand'}
                   </TooltipContent>
                 </Tooltip>
-              ) : null}
-              <Popover
-                open={activePanel === 'chat'}
-                onOpenChange={(open) => setActivePanel(open ? 'chat' : null)}
-              >
-                <PopoverTrigger asChild>
-                  <Button
-                    type="button"
-                    variant={activePanel === 'chat' ? 'default' : 'outline'}
-                    size="icon"
-                    className="relative"
-                  >
-                    <MessageSquare className="h-4 w-4" />
-                    {unreadChatCount > 0 ? (
-                      <Badge
-                        variant="destructive"
-                        className="absolute -right-1.5 -top-1.5 h-4 min-w-4 justify-center rounded-full px-1 text-[10px]"
-                      >
-                        {unreadChatCount}
-                      </Badge>
-                    ) : null}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent
-                  align="center"
-                  side="top"
-                  sideOffset={12}
-                  className="flex h-96 w-72 flex-col gap-0 p-0 sm:w-80"
-                >
-                  <PopoverHeader className="border-b border-border px-4 py-3">
-                    <PopoverTitle>Chat</PopoverTitle>
-                  </PopoverHeader>
-                  <div
-                    ref={chatScrollRef}
-                    className="flex-1 space-y-3 overflow-y-auto px-4 py-3"
-                  >
-                    {chatMessages.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">No messages yet.</p>
-                    ) : (
-                      chatMessages.map((item) => {
-                        const isOwnMessage = item.senderUserId === selfUserIdRef.current;
-                        return (
-                          <div
-                            key={item.id}
-                            className={cn(
-                              'flex flex-col gap-1',
-                              isOwnMessage && 'items-end',
-                            )}
-                          >
-                            <div className="flex items-baseline gap-2 px-1">
-                              <span className="text-xs font-medium text-muted-foreground">
-                                {isOwnMessage ? 'You' : item.senderName}
-                              </span>
-                              <span className="text-[10px] text-muted-foreground">
-                                {formatClockTime(item.timestamp)}
-                              </span>
-                            </div>
-                            <p
-                              className={cn(
-                                'max-w-[85%] rounded-2xl px-3 py-1.5 text-sm break-words',
-                                isOwnMessage
-                                  ? 'bg-primary text-primary-foreground'
-                                  : 'bg-muted text-foreground',
-                              )}
-                            >
-                              {item.message}
-                            </p>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                  <form
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      void sendChatMessage();
-                    }}
-                    className="flex items-center gap-2 border-t border-border p-3"
-                  >
-                    <Input
-                      value={chatDraft}
-                      onChange={(event) => setChatDraft(event.target.value)}
-                      placeholder="Type a message"
-                      className="flex-1"
-                    />
-                    <Button type="submit" size="icon" disabled={!chatDraft.trim()}>
-                      <Send className="h-4 w-4" />
-                    </Button>
-                  </form>
-                </PopoverContent>
-              </Popover>
 
-              <Popover
-                open={activePanel === 'users'}
-                onOpenChange={(open) => setActivePanel(open ? 'users' : null)}
-              >
-                <PopoverTrigger asChild>
-                  <Button
-                    type="button"
-                    variant={activePanel === 'users' ? 'default' : 'outline'}
-                    size="icon"
-                  >
-                    <UsersIcon className="h-4 w-4" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent
-                  align="center"
-                  side="top"
-                  sideOffset={12}
-                  className="w-72 gap-0 p-0 sm:w-80"
-                >
-                  <PopoverHeader className="border-b border-border px-4 py-3">
-                    <PopoverTitle>Participants</PopoverTitle>
-                  </PopoverHeader>
-                  <div className="max-h-80 space-y-1 overflow-y-auto px-2 py-3">
-                    {[
-                      {
-                        userId: selfUserIdRef.current ?? -1,
-                        name: displayName,
-                        isYou: true,
-                        isHost: isSelfHost,
-                        muted: isMuted,
-                        videoOn: isVideoOn,
-                        handRaised: isHandRaised,
-                      },
-                      ...(otherParticipant
-                        ? [
-                            {
-                              userId: otherParticipant.userId,
-                              name: otherParticipant.displayName,
-                              isYou: false,
-                              isHost: otherParticipant.isHost,
-                              muted: otherParticipant.muted,
-                              videoOn: otherParticipant.bVideoOn,
-                              handRaised: isOtherHandRaised,
-                            },
-                          ]
-                        : []),
-                    ].map((participant) => (
-                      <div
-                        key={participant.userId}
-                        className="flex items-center gap-2.5 rounded-lg px-2 py-2 hover:bg-accent"
-                      >
-                        <Avatar size="sm">
-                          <AvatarFallback>{getInitials(participant.name)}</AvatarFallback>
-                        </Avatar>
-                        <span className="flex-1 truncate text-sm">
-                          {participant.name}
-                          {participant.isYou ? (
-                            <span className="text-muted-foreground"> (You)</span>
-                          ) : null}
-                        </span>
-                        {participant.handRaised ? (
-                          <Hand className="h-3.5 w-3.5 text-warning" />
-                        ) : null}
-                        {participant.isHost ? (
-                          <Badge variant="secondary">Host</Badge>
-                        ) : null}
-                        {participant.muted ? (
-                          <MicOff className="h-3.5 w-3.5 text-muted-foreground" />
-                        ) : null}
-                        {!participant.videoOn ? (
-                          <VideoOff className="h-3.5 w-3.5 text-muted-foreground" />
-                        ) : null}
-                        {isSelfHost && !participant.isYou && !participant.muted ? (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6"
-                                onClick={() =>
-                                  muteParticipant(participant.userId, participant.name)
-                                }
-                              >
-                                <MicOff className="h-3.5 w-3.5" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Mute {participant.name}</TooltipContent>
-                          </Tooltip>
-                        ) : null}
-                      </div>
-                    ))}
-                  </div>
-                </PopoverContent>
-              </Popover>
-
-              <Popover open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    type="button"
-                    variant={isSettingsOpen ? 'default' : 'outline'}
-                    size="icon"
-                  >
-                    <SettingsIcon className="h-4 w-4" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent
-                  align="center"
-                  side="top"
-                  sideOffset={12}
-                  className="max-h-[70vh] w-80 overflow-y-auto"
-                >
-                  <PopoverHeader>
-                    <PopoverTitle>Settings</PopoverTitle>
-                  </PopoverHeader>
-                  <Tabs defaultValue="audio">
-                    <TabsList className="w-full">
-                      <TabsTrigger value="audio">Audio</TabsTrigger>
-                      <TabsTrigger value="video">Video</TabsTrigger>
-                      <TabsTrigger value="advanced">Advanced</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="audio" className="space-y-4 pt-1">
-                      <DeviceSelect
-                        label="Microphone"
-                        devices={micList}
-                        selectedId={activeMicId}
-                        onChange={selectMicrophone}
-                      />
-                      <DeviceSelect
-                        label="Speaker"
-                        devices={speakerList}
-                        selectedId={activeSpeakerId}
-                        onChange={selectSpeaker}
-                      />
-                      {supportsNoiseSuppression ? (
-                        <div className="space-y-1.5">
-                          <p className="text-xs font-medium text-muted-foreground">
-                            Audio processing
-                          </p>
-                          <RadioGroup
-                            value={audioProcessing}
-                            onValueChange={(value) =>
-                              void selectAudioProcessing(value as AudioProcessingMode)
-                            }
-                          >
-                            <div className="flex items-center gap-2">
-                              <RadioGroupItem value="original" id="audio-original" />
-                              <Label
-                                htmlFor="audio-original"
-                                className="text-sm font-normal"
-                              >
-                                Original sound
-                              </Label>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <RadioGroupItem
-                                value="noiseSuppression"
-                                id="audio-noise-suppression"
-                              />
-                              <Label
-                                htmlFor="audio-noise-suppression"
-                                className="text-sm font-normal"
-                              >
-                                Background noise suppression
-                              </Label>
-                            </div>
-                          </RadioGroup>
-                        </div>
-                      ) : null}
-                    </TabsContent>
-                    <TabsContent value="video" className="space-y-4 pt-1">
-                      <DeviceSelect
-                        label="Camera"
-                        devices={cameraList}
-                        selectedId={activeCameraId}
-                        onChange={selectCamera}
-                      />
-                      <div className="flex items-center justify-between gap-2">
-                        <Label htmlFor="mirror-video" className="text-sm font-normal">
-                          Mirror my video
-                        </Label>
-                        <Switch
-                          id="mirror-video"
-                          checked={isMirrored}
-                          onCheckedChange={toggleMirror}
-                        />
-                      </div>
-                      {supportsVirtualBackground ? (
-                        <div className="space-y-1.5">
-                          <p className="text-xs font-medium text-muted-foreground">
-                            Background
-                          </p>
-                          <div className="grid grid-cols-2 gap-2">
-                            <button
-                              type="button"
-                              onClick={() => void selectBackgroundPreset('none')}
-                              className={cn(
-                                'flex aspect-video cursor-pointer items-center justify-center gap-1.5 rounded-lg border text-xs text-muted-foreground',
-                                backgroundPreset === 'none'
-                                  ? 'border-primary ring-1 ring-primary'
-                                  : 'border-border',
-                              )}
-                            >
-                              <ImageOff className="h-3.5 w-3.5" />
-                              None
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void selectBackgroundPreset('blur')}
-                              className={cn(
-                                'flex aspect-video cursor-pointer items-center justify-center gap-1.5 rounded-lg border text-xs text-muted-foreground',
-                                backgroundPreset === 'blur'
-                                  ? 'border-primary ring-1 ring-primary'
-                                  : 'border-border',
-                              )}
-                            >
-                              <ImageIcon className="h-3.5 w-3.5" />
-                              Blur
-                            </button>
-                            {BACKGROUND_PRESETS.map((preset) => (
-                              <button
-                                key={preset.value}
-                                type="button"
-                                onClick={() => void selectBackgroundPreset(preset.value)}
-                                className={cn(
-                                  'relative aspect-video cursor-pointer overflow-hidden rounded-lg border',
-                                  backgroundPreset === preset.value
-                                    ? 'border-primary ring-1 ring-primary'
-                                    : 'border-border',
-                                )}
-                              >
-                                <img
-                                  src={preset.src}
-                                  alt={preset.label}
-                                  className="h-full w-full object-cover"
-                                />
-                                <span className="absolute inset-x-0 bottom-0 bg-popover/90 px-1.5 py-0.5 text-[10px] text-popover-foreground">
-                                  {preset.label}
-                                </span>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      ) : null}
-                    </TabsContent>
-                    <TabsContent value="advanced" className="space-y-4 pt-1">
-                      <div className="space-y-1.5">
-                        <p className="text-xs font-medium text-muted-foreground">
-                          Hardware acceleration
-                        </p>
-                        <div className="flex items-center justify-between gap-2">
-                          <Label htmlFor="hw-accel-send" className="text-sm font-normal">
-                            Sending
-                          </Label>
-                          <Switch
-                            id="hw-accel-send"
-                            checked={hwAccelEncode}
-                            onCheckedChange={(checked) =>
-                              toggleHardwareAcceleration('encode', checked)
-                            }
-                          />
-                        </div>
-                        <div className="flex items-center justify-between gap-2">
-                          <Label
-                            htmlFor="hw-accel-receive"
-                            className="text-sm font-normal"
-                          >
-                            Receiving
-                          </Label>
-                          <Switch
-                            id="hw-accel-receive"
-                            checked={hwAccelDecode}
-                            onCheckedChange={(checked) =>
-                              toggleHardwareAcceleration('decode', checked)
-                            }
-                          />
-                        </div>
-                      </div>
-                      {isSelfHost ? (
-                        <div className="space-y-1.5">
-                          <p className="text-xs font-medium text-muted-foreground">
-                            Share screen settings
-                          </p>
-                          <RadioGroup
-                            value={String(sharePrivilege)}
-                            onValueChange={(value) =>
-                              void selectSharePrivilege(Number(value) as SharePrivilege)
-                            }
-                          >
-                            <div className="flex items-center gap-2">
-                              <RadioGroupItem
-                                value={String(SharePrivilege.Locked)}
-                                id="share-privilege-locked"
-                              />
-                              <Label
-                                htmlFor="share-privilege-locked"
-                                className="text-sm font-normal"
-                              >
-                                Only the host can share
-                              </Label>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <RadioGroupItem
-                                value={String(SharePrivilege.MultipleShare)}
-                                id="share-privilege-multiple"
-                              />
-                              <Label
-                                htmlFor="share-privilege-multiple"
-                                className="text-sm font-normal"
-                              >
-                                Multiple participants can share simultaneously
-                              </Label>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <RadioGroupItem
-                                value={String(SharePrivilege.Unlocked)}
-                                id="share-privilege-one-at-a-time"
-                              />
-                              <Label
-                                htmlFor="share-privilege-one-at-a-time"
-                                className="text-sm font-normal"
-                              >
-                                One participant can share at a time
-                              </Label>
-                            </div>
-                          </RadioGroup>
-                        </div>
-                      ) : null}
-                    </TabsContent>
-                  </Tabs>
-                </PopoverContent>
-              </Popover>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    variant={isHandRaised ? 'default' : 'outline'}
-                    size="icon"
-                    className="h-11 w-11 sm:w-auto sm:px-3"
-                    aria-label={isHandRaised ? 'Lower hand' : 'Raise hand'}
-                    aria-pressed={isHandRaised}
-                    onClick={toggleHandRaise}
-                  >
-                    <PoppingIcon toggleKey={isHandRaised}>
-                      <Hand className="h-4 w-4" />
-                    </PoppingIcon>
-                    <span className="hidden sm:inline">
-                      {isHandRaised ? 'Lower hand' : 'Raise hand'}
-                    </span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {isHandRaised ? 'Lower hand' : 'Raise hand'}
-                </TooltipContent>
-              </Tooltip>
-
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button type="button" variant="outline" size="icon">
-                    <SmilePlus className="h-4 w-4" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent
-                  align="center"
-                  side="top"
-                  sideOffset={12}
-                  className="flex w-fit gap-1 p-2"
-                >
-                  {REACTION_EMOJIS.map((emoji) => (
-                    <button
-                      key={emoji}
-                      type="button"
-                      className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-xl hover:bg-accent"
-                      onClick={() => sendReaction(emoji)}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <ZoomMeetingDockButton
+                      label="Open reactions"
+                      active={false}
+                      className="size-12 px-0 shadow-md ring-1 ring-border/70"
                     >
-                      {emoji}
-                    </button>
-                  ))}
-                </PopoverContent>
-              </Popover>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    variant={isCaptionsOn ? 'default' : 'outline'}
-                    size="icon"
-                    onClick={() => void toggleCaptions()}
+                      <SmilePlus className="size-5" />
+                    </ZoomMeetingDockButton>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    align="end"
+                    side="top"
+                    sideOffset={12}
+                    className="flex w-fit gap-1 p-2"
                   >
-                    <PoppingIcon toggleKey={isCaptionsOn}>
-                      <Captions className="h-4 w-4" />
-                    </PoppingIcon>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {isCaptionsOn ? 'Turn off captions' : 'Turn on captions (beta)'}
-                </TooltipContent>
-              </Tooltip>
+                    {REACTION_EMOJIS.map((emoji) => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        className="flex size-10 cursor-pointer items-center justify-center rounded-lg text-xl hover:bg-accent"
+                        onClick={() => sendReaction(emoji)}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </PopoverContent>
+                </Popover>
+
+                <ZoomParticipantsPanel
+                  open={activePanel === 'users'}
+                  canMuteOthers={isSelfHost}
+                  className="zoom-toolbar-people zoom-toolbar-secondary"
+                  participants={[
+                    {
+                      userId: selfUserIdRef.current ?? -1,
+                      name: displayName,
+                      avatarUrl: selfAvatar,
+                      isYou: true,
+                      isHost: isSelfHost,
+                      muted: isMuted,
+                      videoOn: isVideoOn,
+                      handRaised: isHandRaised,
+                      isSpeaking:
+                        selfUserIdRef.current !== null &&
+                        activeSpeakerUserId === selfUserIdRef.current,
+                    },
+                    ...remoteParticipants.map((participant) => ({
+                      userId: participant.userId,
+                      name: participant.displayName,
+                      avatarUrl: participant.avatar,
+                      isYou: false,
+                      isHost: participant.isHost,
+                      muted: participant.muted,
+                      videoOn: participant.bVideoOn,
+                      handRaised: raisedHandUserIds.has(participant.userId),
+                      isSpeaking: activeSpeakerUserId === participant.userId,
+                    })),
+                  ]}
+                  onOpenChange={(open) => {
+                    setActivePanel(open ? 'users' : null);
+                    if (open) setIsSettingsOpen(false);
+                  }}
+                  onMute={(userId, name) => muteParticipant(userId, name)}
+                />
+
+                <ZoomChatPanel
+                  open={activePanel === 'chat'}
+                  unreadCount={unreadChatCount}
+                  messages={chatMessages}
+                  draft={chatDraft}
+                  selfUserId={selfUserIdRef.current}
+                  scrollRef={chatScrollRef}
+                  className="zoom-toolbar-chat zoom-toolbar-secondary"
+                  onOpenChange={(open) => {
+                    setActivePanel(open ? 'chat' : null);
+                    if (open) setIsSettingsOpen(false);
+                  }}
+                  onDraftChange={setChatDraft}
+                  onSend={() => void sendChatMessage()}
+                />
+              </ZoomMeetingSideDock>
 
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="icon"
-                    className="h-11 w-11 sm:w-auto sm:px-3"
-                    aria-label={
-                      isSelfHost && !otherParticipant
+                  <MeetingControlButton
+                    tone="danger"
+                    className="zoom-toolbar-leave sticky right-0 z-10"
+                    label={
+                      isSelfHost && remoteParticipants.length === 0
                         ? 'End class'
                         : isSelfHost
                           ? 'Leave or end class'
@@ -3228,20 +2262,19 @@ export function ZoomVideoSessionEmbed({
                     }
                     onClick={() => setShowEndForAllConfirm(true)}
                   >
-                    <PoppingIcon toggleKey={isSelfHost && !otherParticipant}>
-                      {isSelfHost && !otherParticipant ? (
+                    <PoppingIcon
+                      toggleKey={isSelfHost && remoteParticipants.length === 0}
+                    >
+                      {isSelfHost && remoteParticipants.length === 0 ? (
                         <OctagonX className="h-4 w-4" />
                       ) : (
                         <PhoneOff className="h-4 w-4" />
                       )}
                     </PoppingIcon>
-                    <span className="hidden sm:inline">
-                      {isSelfHost && !otherParticipant ? 'End class' : 'Leave'}
-                    </span>
-                  </Button>
+                  </MeetingControlButton>
                 </TooltipTrigger>
                 <TooltipContent>
-                  {isSelfHost && !otherParticipant
+                  {isSelfHost && remoteParticipants.length === 0
                     ? 'End class'
                     : isSelfHost
                       ? 'Leave or end class'
@@ -3249,12 +2282,6 @@ export function ZoomVideoSessionEmbed({
                 </TooltipContent>
               </Tooltip>
             </div>
-          </div>
-        ) : null}
-
-        {captionsError ? (
-          <div className="absolute inset-x-4 bottom-24 z-20 mx-auto w-fit max-w-sm rounded-lg bg-destructive px-3 py-2 text-center text-xs font-medium text-destructive-foreground shadow-sm">
-            {captionsError}
           </div>
         ) : null}
 
@@ -3321,38 +2348,7 @@ export function ZoomVideoSessionEmbed({
           ))}
         </div>
 
-        <style>{`
-          @keyframes float-reaction {
-            /* Two segments, not three — each keyframe's own
-                animation-timing-function governs the segment it starts,
-                so this is a quick springy pop-in followed by one
-                continuous, uninterrupted ease-out float+fade, instead of
-                three separate easing curves chained back to back (which
-                read as a stutter at every keyframe boundary). */
-            0% {
-              transform: translate(-50%, -50%) translate(0, 0) rotate(0deg) scale(0.3);
-              opacity: 0;
-              animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
-            }
-            12% {
-              transform: translate(-50%, -50%) translate(calc(var(--dx) * 0.08), -6px)
-                rotate(calc(var(--rot) * 0.08)) scale(1.1);
-              opacity: 1;
-              animation-timing-function: ease-out;
-            }
-            100% {
-              transform: translate(-50%, -50%) translate(var(--dx), -340px) rotate(var(--rot))
-                scale(0.95);
-              opacity: 0;
-            }
-          }
-
-          @keyframes icon-pop {
-            0% { transform: scale(0.55); }
-            60% { transform: scale(1.18); }
-            100% { transform: scale(1); }
-          }
-        `}</style>
+        <ZoomMeetingLayoutStyles />
       </div>
 
       <AlertDialog open={showEndForAllConfirm} onOpenChange={setShowEndForAllConfirm}>
@@ -3372,7 +2368,7 @@ export function ZoomVideoSessionEmbed({
                 </AlertDialogAction>
               </AlertDialogFooter>
             </>
-          ) : !otherParticipant ? (
+          ) : remoteParticipants.length === 0 ? (
             <>
               <AlertDialogHeader>
                 <AlertDialogTitle>End the class?</AlertDialogTitle>

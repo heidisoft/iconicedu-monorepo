@@ -1,0 +1,161 @@
+'use client';
+
+import type { Ref } from 'react';
+import { AudioLines, Hand, Mic, MicOff, Video, VideoOff } from 'lucide-react';
+
+import { Avatar, AvatarFallback, AvatarImage } from '@iconicedu/ui-web/ui/avatar';
+import { cn, getInitials } from '@iconicedu/ui-web/lib/utils';
+import { OverlayBadge } from './zoom-meeting-controls';
+
+function TileMediaStatus({
+  kind,
+  enabled,
+  compact = false,
+}: {
+  kind: 'microphone' | 'camera';
+  enabled: boolean;
+  compact?: boolean;
+}) {
+  const Icon =
+    kind === 'microphone' ? (enabled ? Mic : MicOff) : enabled ? Video : VideoOff;
+  const label = `${kind === 'microphone' ? 'Microphone' : 'Camera'} ${enabled ? 'on' : 'off'}`;
+
+  return (
+    <span
+      className={cn(
+        'inline-flex shrink-0 items-center justify-center rounded-full bg-black/70 text-white shadow-sm backdrop-blur-lg',
+        compact ? 'size-6' : 'size-8',
+        !enabled && 'text-destructive',
+      )}
+      aria-label={label}
+      title={label}
+    >
+      <Icon
+        className={compact ? 'size-3' : 'size-4'}
+        strokeWidth={2.25}
+        aria-hidden="true"
+      />
+    </span>
+  );
+}
+
+export function ZoomVideoTile({
+  label,
+  avatarUrl,
+  isSelf,
+  isMuted,
+  isVideoOn,
+  videoContainerRef,
+  className,
+  handRaised,
+  handPosition = 'right',
+  density = 'default',
+  isSpeaking = false,
+}: {
+  label: string;
+  avatarUrl?: string;
+  isSelf: boolean;
+  isMuted: boolean;
+  isVideoOn: boolean;
+  videoContainerRef: Ref<HTMLDivElement>;
+  className?: string;
+  handRaised?: boolean;
+  handPosition?: 'left' | 'right';
+  density?: 'default' | 'compact';
+  isSpeaking?: boolean;
+}) {
+  const compact = density === 'compact';
+  const resolvedHandPosition =
+    isSpeaking && handPosition === 'left' ? 'right' : handPosition;
+
+  return (
+    <div
+      className={cn(
+        'zoom-video-tile relative isolate overflow-hidden bg-secondary shadow-inner transition-[inset,width,height,transform,opacity] duration-300 ease-out motion-reduce:transition-none',
+        compact ? 'rounded-2xl' : 'rounded-3xl sm:rounded-[2rem]',
+        isSpeaking && 'ring-2 ring-inset ring-primary',
+        className,
+      )}
+    >
+      <div
+        ref={videoContainerRef}
+        className="absolute inset-0 z-0 h-full w-full [&>video-player-container]:block [&>video-player-container]:h-full [&>video-player-container]:w-full [&_video-player]:h-full [&_video-player]:w-full [&_video-player]:object-cover"
+      />
+      {!isVideoOn ? (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-secondary">
+          <Avatar
+            size="lg"
+            className="aspect-square shrink-0 bg-background/90 text-foreground shadow-sm ring-4 ring-background/50"
+            style={{ height: 'clamp(4rem, 36%, 11rem)', width: 'auto' }}
+          >
+            {avatarUrl ? <AvatarImage src={avatarUrl} alt="" /> : null}
+            <AvatarFallback className="bg-background/90 text-base font-medium text-foreground sm:text-2xl">
+              {getInitials(label)}
+            </AvatarFallback>
+          </Avatar>
+        </div>
+      ) : null}
+      {handRaised ? (
+        <span
+          className={cn(
+            'absolute z-30 inline-flex shrink-0 animate-in items-center justify-center gap-1.5 rounded-full bg-amber-400 font-semibold text-amber-950 shadow-lg ring-2 ring-white/80 zoom-in-75 backdrop-blur-lg',
+            compact ? 'top-2 size-9' : 'top-4 h-11 px-3 sm:h-12 sm:px-4',
+            resolvedHandPosition === 'left'
+              ? compact
+                ? 'left-2'
+                : 'left-4'
+              : compact
+                ? 'right-2'
+                : 'right-4',
+          )}
+          aria-label="Hand raised"
+          title="Hand raised"
+        >
+          <Hand
+            className={compact ? 'size-4.5' : 'size-5 sm:size-6'}
+            strokeWidth={2.5}
+            aria-hidden="true"
+          />
+          {compact ? null : <span className="text-xs sm:text-sm">Hand raised</span>}
+        </span>
+      ) : null}
+      {isSpeaking ? (
+        <span
+          className={cn(
+            'absolute top-2 left-2 z-30 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md',
+            compact ? 'size-7' : 'size-9 sm:top-4 sm:left-4',
+          )}
+          aria-label={`${label} is speaking`}
+        >
+          <AudioLines className={compact ? 'size-3.5' : 'size-4'} aria-hidden="true" />
+        </span>
+      ) : null}
+      <div
+        className={cn(
+          'absolute z-30 flex min-w-0 items-center',
+          compact ? 'gap-1' : 'gap-1.5',
+        )}
+        style={
+          compact
+            ? { left: '0.5rem', right: '0.5rem', bottom: '0.5rem' }
+            : { left: '1rem', right: '1rem', bottom: '1rem' }
+        }
+        aria-label={`${label} status`}
+      >
+        <OverlayBadge
+          className={cn(
+            'min-w-0 bg-black/70 py-0 font-medium text-white shadow-sm backdrop-blur-lg',
+            compact ? 'h-6 px-2 text-[10px]' : 'h-8 px-3 text-xs',
+          )}
+        >
+          <span className="min-w-0 truncate">
+            {label}
+            {isSelf ? ' (You)' : ''}
+          </span>
+        </OverlayBadge>
+        <TileMediaStatus kind="microphone" enabled={!isMuted} compact={compact} />
+        <TileMediaStatus kind="camera" enabled={isVideoOn} compact={compact} />
+      </div>
+    </div>
+  );
+}

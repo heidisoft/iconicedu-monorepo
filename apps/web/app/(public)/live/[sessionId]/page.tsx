@@ -58,6 +58,7 @@ export default async function PublicLiveSessionPage({
           sessionTitle={info.sessionTitle}
           liveSessionId={sessionId}
           accessToken={authSession?.access_token ?? null}
+          sessionPasscode={info.hostJoin.passcode}
         />
       </div>
     );

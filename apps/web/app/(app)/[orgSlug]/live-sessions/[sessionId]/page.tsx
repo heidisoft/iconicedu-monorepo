@@ -83,6 +83,11 @@ export default async function Page({
               ? joinAccess.metadata.sessionName
               : null
           }
+          zoomPasscode={
+            typeof session.provider_metadata?.passcode === 'string'
+              ? session.provider_metadata.passcode
+              : null
+          }
           displayName={
             typeof joinAccess.metadata?.displayName === 'string'
               ? joinAccess.metadata.displayName

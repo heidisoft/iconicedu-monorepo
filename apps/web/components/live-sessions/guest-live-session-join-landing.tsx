@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 
 import { Button } from '@iconicedu/ui-web/ui/button';
@@ -13,6 +13,27 @@ import {
   type GuestLiveSessionJoinResult,
 } from '@iconicedu/web/lib/live-sessions/public-api';
 import { DevicePreviewStep } from '@iconicedu/web/components/live-sessions/device-preview-step';
+import {
+  readLiveSessionRecovery,
+  rememberLiveSession,
+} from '@iconicedu/web/lib/live-sessions/browser-session';
+import { ZoomSessionLoadingScreen } from './zoom-video/zoom-session-loading-screen';
+
+type GuestRecoveryPayload = GuestLiveSessionJoinResult & { passcode: string };
+type JoinedGuest = GuestRecoveryPayload & {
+  initialMuted: boolean;
+  initialVideoOff: boolean;
+};
+
+function restoreGuestJoin(sessionId: string): JoinedGuest | null {
+  const recovery = readLiveSessionRecovery<GuestRecoveryPayload>(sessionId);
+  if (!recovery?.payload) return null;
+  return {
+    ...recovery.payload,
+    initialMuted: recovery.muted,
+    initialVideoOff: recovery.videoOff,
+  };
+}
 
 const ZoomVideoSessionEmbed = dynamic(
   () =>
@@ -21,14 +42,7 @@ const ZoomVideoSessionEmbed = dynamic(
     ),
   {
     ssr: false,
-    loading: () => (
-      <div className="flex min-h-[70vh] items-center justify-center rounded-2xl border border-border bg-card">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Loading session...
-        </div>
-      </div>
-    ),
+    loading: () => <ZoomSessionLoadingScreen />,
   },
 );
 
@@ -46,10 +60,13 @@ export function GuestLiveSessionJoinLanding({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingJoin, setPendingJoin] = useState<GuestLiveSessionJoinResult | null>(null);
-  const [joined, setJoined] = useState<
-    | (GuestLiveSessionJoinResult & { initialMuted: boolean; initialVideoOff: boolean })
-    | null
-  >(null);
+  const [joined, setJoined] = useState<JoinedGuest | null>(null);
+  const [recoveryChecked, setRecoveryChecked] = useState(false);
+
+  useEffect(() => {
+    setJoined(restoreGuestJoin(sessionId));
+    setRecoveryChecked(true);
+  }, [sessionId]);
 
   const handleSubmit = useCallback(
     async (event: React.FormEvent<HTMLFormElement>) => {
@@ -76,16 +93,22 @@ export function GuestLiveSessionJoinLanding({
     [displayName, passcode, sessionId],
   );
 
+  if (!recoveryChecked) {
+    return <ZoomSessionLoadingScreen label="Restoring session…" />;
+  }
+
   if (joined) {
     return (
       <div className="flex min-h-screen flex-col gap-4 px-4 py-4">
         <ZoomVideoSessionEmbed
           sessionName={joined.sessionName}
+          sessionTitle={sessionTitle}
           token={joined.token}
           displayName={joined.displayName}
           initialMuted={joined.initialMuted}
           initialVideoOff={joined.initialVideoOff}
           liveSessionId={sessionId}
+          sessionPasscode={joined.passcode}
           onLeave={() => {
             setJoined(null);
             setPendingJoin(null);
@@ -100,9 +123,22 @@ export function GuestLiveSessionJoinLanding({
       <DevicePreviewStep
         displayName={pendingJoin.displayName}
         sessionTitle={sessionTitle}
-        onJoin={({ muted: initialMuted, videoOff: initialVideoOff }) =>
-          setJoined({ ...pendingJoin, initialMuted, initialVideoOff })
-        }
+        onJoin={({ muted: initialMuted, videoOff: initialVideoOff }) => {
+          rememberLiveSession(
+            sessionId,
+            { muted: initialMuted, videoOff: initialVideoOff },
+            {
+              expiresAt: pendingJoin.expiresAt,
+              payload: { ...pendingJoin, passcode: passcode.trim() },
+            },
+          );
+          setJoined({
+            ...pendingJoin,
+            passcode: passcode.trim(),
+            initialMuted,
+            initialVideoOff,
+          });
+        }}
       />
     );
   }
