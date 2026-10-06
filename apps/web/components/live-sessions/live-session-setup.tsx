@@ -20,7 +20,6 @@ export type LiveSessionMeetingRenderer = ComponentType<LiveSessionMeetingProps>;
  * Inject a renderer in tests to exercise the complete flow without Zoom or real credentials.
  */
 export function LiveSessionSetup({
-  screenAnnotationsEnabled = false,
   sessionId,
   sessionTitle,
   initialCredentials,
@@ -32,7 +31,6 @@ export function LiveSessionSetup({
   returnPath = '/',
   MeetingRenderer = ZoomMeetingRenderer,
 }: {
-  screenAnnotationsEnabled?: boolean;
   sessionId: string;
   sessionTitle: string;
   initialCredentials?: LiveSessionJoinCredentialsVM | null;
@@ -76,7 +74,6 @@ export function LiveSessionSetup({
   return (
     <div className="flex min-h-screen flex-col gap-4 px-4 py-4">
       <MeetingRenderer
-        screenAnnotationsEnabled={screenAnnotationsEnabled}
         sessionName={setup.credentials.sessionName}
         token={setup.credentials.token}
         displayName={setup.credentials.displayName}

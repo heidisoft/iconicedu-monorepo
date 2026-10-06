@@ -201,7 +201,6 @@ const ScreenAnnotationOverlay = dynamic(
 );
 
 export function ZoomVideoSessionEmbed({
-  screenAnnotationsEnabled = false,
   sessionName,
   sessionTitle,
   token,
@@ -214,7 +213,6 @@ export function ZoomVideoSessionEmbed({
   sessionPasscode,
   settings = DEFAULT_LIVE_SESSION_SETTINGS,
 }: {
-  screenAnnotationsEnabled?: boolean;
   sessionName: string;
   sessionTitle?: string;
   token: string;
@@ -1589,7 +1587,7 @@ export function ZoomVideoSessionEmbed({
 
           <ZoomShareStage
             annotationOverlay={
-              screenAnnotationsEnabled && accessToken && !isWhiteboardActive
+              accessToken && !isWhiteboardActive
                 ? (size) => (
                     <ScreenAnnotationOverlay
                       key={`${liveSessionId}:${activeShareUserId ?? selfUserIdRef.current}`}

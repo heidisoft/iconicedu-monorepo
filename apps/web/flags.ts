@@ -498,24 +498,7 @@ export const enableClassroomMeetingSettings = flag<
   },
 });
 
-export const enableScreenAnnotations = flag<boolean, { profileId?: string | null }>({
-  key: platformFeatureFlagKeys.enableScreenAnnotations,
-  description: 'Enables collaborative Konva annotations on Zoom screen shares.',
-  options: [
-    { label: 'Off', value: false },
-    { label: 'On', value: true },
-  ],
-  defaultValue: false,
-  async decide({ entities }) {
-    return evaluateWebBooleanFlag({
-      flagKey: platformFeatureFlagKeys.enableScreenAnnotations,
-      profileId: entities?.profileId,
-    });
-  },
-});
-
 export const webFlags = {
-  enableScreenAnnotations,
   enableClassroomMeetingSettings,
   enableAdminSessionAttendanceAnalytics,
   enableAiRefine,

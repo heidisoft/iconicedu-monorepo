@@ -7,26 +7,17 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import {
-  platformFeatureFlagKeys,
   type AnnotationContext,
   type AnnotationCommit,
   type AnnotationOperation,
 } from '@iconicedu/shared-types';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
-import { evaluateApiBooleanFlag } from '@iconicedu/api/lib/flags/posthog-openfeature';
 @Injectable()
 export class ScreenAnnotationsService {
   private async user(accessToken: string) {
     const { data, error } = await createSupabaseSessionClient(accessToken).auth.getUser();
     if (error || !data.user) throw new ForbiddenException('Authentication required');
-    if (
-      !(await evaluateApiBooleanFlag({
-        flagKey: platformFeatureFlagKeys.enableScreenAnnotations,
-        distinctId: data.user.id,
-      }))
-    )
-      throw new ForbiddenException('Screen annotations are not enabled');
     return data.user.id;
   }
   private fail(message: string): never {

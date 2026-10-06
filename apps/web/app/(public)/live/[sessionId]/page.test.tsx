@@ -2,14 +2,12 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import PublicLiveSessionPage from './page';
 
 const mocks = vi.hoisted(() => ({
-  flag: vi.fn(),
   info: vi.fn(),
   getSession: vi.fn(),
   notFound: vi.fn(() => {
     throw new Error('not found');
   }),
 }));
-vi.mock('@iconicedu/web/flags', () => ({ enableScreenAnnotations: { run: mocks.flag } }));
 vi.mock('next/navigation', () => ({ notFound: mocks.notFound }));
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
   createSupabaseServerClient: async () => ({ auth: { getSession: mocks.getSession } }),
@@ -25,7 +23,6 @@ const params = Promise.resolve({ sessionId: 'demo' });
 describe('public live session route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.flag.mockResolvedValue(false);
     mocks.getSession.mockResolvedValue({
       data: {
         session: { access_token: 'synthetic-auth', user: { id: 'synthetic-user' } },
@@ -78,30 +75,25 @@ describe('public live session route', () => {
       returnPath: '/',
     });
   });
-  it('gates the annotation overlay OFF and ON using the signed-in identity', async () => {
+  it('passes authentication directly without an annotation rollout flag', async () => {
     mocks.info.mockResolvedValue({
       exists: true,
       isActive: true,
       isHost: false,
       sessionTitle: 'Science',
     });
-    const off = await PublicLiveSessionPage({
+    const participant = await PublicLiveSessionPage({
       params,
       searchParams: Promise.resolve({}),
     });
-    expect(off.props.screenAnnotationsEnabled).toBe(false);
-    mocks.flag.mockResolvedValue(true);
-    const on = await PublicLiveSessionPage({ params, searchParams: Promise.resolve({}) });
-    expect(on.props.screenAnnotationsEnabled).toBe(true);
-    expect(mocks.flag).toHaveBeenCalledWith({
-      identify: { profileId: 'synthetic-user' },
-    });
+    expect(participant.props.accessToken).toBe('synthetic-auth');
+    expect(participant.props).not.toHaveProperty('screenAnnotationsEnabled');
     mocks.getSession.mockResolvedValue({ data: { session: null } });
     const guest = await PublicLiveSessionPage({
       params,
       searchParams: Promise.resolve({}),
     });
-    expect(guest.props.screenAnnotationsEnabled).toBe(false);
+    expect(guest.props.accessToken).toBeNull();
   });
   it('shows the ended state rather than mounting setup', async () => {
     mocks.info.mockResolvedValue({

@@ -6,7 +6,7 @@ Describe the web annotation overlay, synchronization and authorization used with
 
 ## Intended Audience
 
-Engineers maintaining live sessions and operators enabling the feature.
+Engineers maintaining live sessions and operators maintaining the feature.
 
 ## Related Docs
 
@@ -16,7 +16,7 @@ Engineers maintaining live sessions and operators enabling the feature.
 
 ## Rollout
 
-`screen-share-annotations` is catalogued in shared feature flags and `apps/web/flags.ts`, with a default of OFF. Enable it for the signed-in Supabase user IDs participating in the pilot; both the public live-session page and API evaluate the flag against that identity. Apply `20261006143000_screen_annotations.sql` before enabling it. Disabling the flag prevents API reads/writes and hides the overlay on the next page load. No new environment variables are required.
+Screen annotations are available directly to eligible signed-in participants, without a feature flag, as requested by the product owner. Apply `20261006143000_screen_annotations.sql` before running the feature. No new environment variables are required.
 
 Zoom's built-in annotation API is no longer called by the meeting renderer. Zoom continues to own audio, video and screen-sharing render targets. Anonymous passcode guests can join the meeting, but annotations require a signed-in account with channel membership (or the session starter). A Zoom host role supplied by a client does not grant annotation permissions.
 
@@ -38,7 +38,7 @@ While an annotation tool is active, V selects, P draws, H highlights, T edits te
 
 ## Authorization And State
 
-The session starter is the annotation moderator. Other channel members edit and erase their own objects only after the tutor enables student drawing. Moderators can edit all objects, clear their own/student/all annotations and change student permissions. The API verifies the bearer token and feature flag; service-only database functions independently resolve membership, bind ownership and enforce capabilities.
+The session starter is the annotation moderator. Other channel members edit and erase their own objects only after the tutor enables student drawing. Moderators can edit all objects, clear their own/student/all annotations and change student permissions. The API verifies the bearer token; service-only database functions independently resolve membership, bind ownership and enforce capabilities.
 
 Each active presenter key has a distinct annotation session UUID. Share changes/end close the tutor's current annotation session, retaining its final snapshot. Each completed operation updates the current snapshot under a database row lock and increments its revision. Object versions prevent stale edits or undo from overriding tutor moderation. Deletes remain tombstones. Receipts make retries with the same event ID idempotent. Local undo/redo history is bounded to 100 operations and does not survive a page reload.
 
@@ -59,7 +59,7 @@ Changing student permissions immediately cancels local student input and filters
 
 ## Verification
 
-Unit tests cover coordinate transforms, simplification, sequence buffering, tombstones, flag gating, payload validation, idempotent retries, undo/redo, preview spoofing and revision-gap recovery. `supabase/tests/screen_annotations.test.sql` checks database permissions, ownership, stale versions and private-topic authorization. The Playwright fixture at `/visual-test/screen-annotations` exercises real Konva rendering without Zoom credentials or database writes and is unavailable in production.
+Unit tests cover coordinate transforms, simplification, sequence buffering, tombstones, authentication, payload validation, idempotent retries, undo/redo, preview spoofing and revision-gap recovery. `supabase/tests/screen_annotations.test.sql` checks database permissions, ownership, stale versions and private-topic authorization. The Playwright fixture at `/visual-test/screen-annotations` exercises real Konva rendering without Zoom credentials or database writes and is unavailable in production.
 
 Run the focused checks:
 

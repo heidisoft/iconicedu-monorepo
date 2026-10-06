@@ -1,10 +1,8 @@
 import { ScreenAnnotationsService } from './screen-annotations.service';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
-import { evaluateApiBooleanFlag } from '@iconicedu/api/lib/flags/posthog-openfeature';
 jest.mock('@iconicedu/api/lib/supabase/service');
 jest.mock('@iconicedu/api/lib/supabase/session');
-jest.mock('@iconicedu/api/lib/flags/posthog-openfeature');
 const rpc = jest.fn();
 const getUser = jest.fn();
 beforeEach(() => {
@@ -20,15 +18,18 @@ beforeEach(() => {
       typeof createSupabaseSessionClient
     >);
   getUser.mockResolvedValue({ data: { user: { id: 'verified-user' } }, error: null });
-  jest.mocked(evaluateApiBooleanFlag).mockResolvedValue(true);
 });
 describe('screen annotation authorization', () => {
-  it('gates OFF on the server before accessing any annotation state', async () => {
-    jest.mocked(evaluateApiBooleanFlag).mockResolvedValue(false);
+  it('loads annotation state for an authenticated participant without a rollout flag', async () => {
+    rpc.mockResolvedValue({ data: { roomId: 'room' }, error: null });
     await expect(
       new ScreenAnnotationsService().context('token', 'session', '123'),
-    ).rejects.toThrow('not enabled');
-    expect(rpc).not.toHaveBeenCalled();
+    ).resolves.toEqual({ roomId: 'room' });
+    expect(rpc).toHaveBeenCalledWith('screen_annotation_context', {
+      p_session: 'session',
+      p_user: 'verified-user',
+      p_share: '123',
+    });
   });
   it('uses the verified token user for membership and object ownership', async () => {
     rpc.mockResolvedValue({ data: { revision: 1 }, error: null });
