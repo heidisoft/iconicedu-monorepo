@@ -460,38 +460,41 @@ export function AnnotationOverlay({
     if (root.current?.hasPointerCapture(event.pointerId))
       root.current.releasePointerCapture(event.pointerId);
   };
-  const transformObject = (object: AnnotationObject, node: Konva.Group) => {
-    if (!canEdit(object)) return;
-    const geometry = annotationGeometry(object, width, height);
-    const transformed = {
-      ...object,
-      points: object.points.map((point) => ({
-        ...point,
-        x: Math.max(
-          0,
-          Math.min(
-            1,
-            (node.x() + (point.x * width - geometry.left) * node.scaleX()) / width,
+  const transformObject = useCallback(
+    (object: AnnotationObject, node: Konva.Group) => {
+      if (!canEdit(object)) return;
+      const geometry = annotationGeometry(object, width, height);
+      const transformed = {
+        ...object,
+        points: object.points.map((point) => ({
+          ...point,
+          x: Math.max(
+            0,
+            Math.min(
+              1,
+              (node.x() + (point.x * width - geometry.left) * node.scaleX()) / width,
+            ),
           ),
-        ),
-        y: Math.max(
-          0,
-          Math.min(
-            1,
-            (node.y() + (point.y * height - geometry.top) * node.scaleY()) / height,
+          y: Math.max(
+            0,
+            Math.min(
+              1,
+              (node.y() + (point.y * height - geometry.top) * node.scaleY()) / height,
+            ),
           ),
-        ),
-      })),
-      rotation: node.rotation(),
-      style: {
-        ...object.style,
-        fontSize: Math.max(8, Math.min(96, object.style.fontSize * node.scaleY())),
-      },
-    };
-    node.scaleX(1);
-    node.scaleY(1);
-    swallow(put(transformed));
-  };
+        })),
+        rotation: node.rotation(),
+        style: {
+          ...object.style,
+          fontSize: Math.max(8, Math.min(96, object.style.fontSize * node.scaleY())),
+        },
+      };
+      node.scaleX(1);
+      node.scaleY(1);
+      swallow(put(transformed));
+    },
+    [canEdit, width, height, put],
+  );
   const save = () => {
     if (!stage.current) return;
     const canvas = document.createElement('canvas');
