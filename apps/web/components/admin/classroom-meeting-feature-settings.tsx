@@ -17,6 +17,7 @@ export function ClassroomMeetingFeatureSettings({
 }) {
   const params = useParams<{ orgSlug: string }>();
   const [enabled, setEnabled] = useState(false);
+  const [whiteboardProviderAvailable, setWhiteboardProviderAvailable] = useState(false);
   const [error, setError] = useState(false);
   const current = useRef({ value, onChange });
   current.current = { value, onChange };
@@ -30,6 +31,7 @@ export function ClassroomMeetingFeatureSettings({
       .then((response) => {
         if (cancelled) return;
         setEnabled(response.enabled);
+        setWhiteboardProviderAvailable(response.whiteboardProviderAvailable === true);
         if (response.enabled)
           current.current.onChange({
             ...current.current.value,
@@ -53,6 +55,7 @@ export function ClassroomMeetingFeatureSettings({
   return (
     <MeetingFeatureSettings
       value={value.settings}
+      whiteboardProviderAvailable={whiteboardProviderAvailable}
       disabled={!value.enabled}
       onChange={(settings) => onChange({ ...value, settings })}
     />

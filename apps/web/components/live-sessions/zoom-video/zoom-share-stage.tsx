@@ -20,6 +20,7 @@ export function ZoomShareStage({
   localCanvasRef,
   localVideoRef,
   whiteboardContainerRef,
+  whiteboardContent,
   dimensions,
   showRemoteShare,
   showLocalShare,
@@ -36,6 +37,7 @@ export function ZoomShareStage({
   localCanvasRef: Ref<HTMLCanvasElement>;
   localVideoRef: Ref<HTMLVideoElement>;
   whiteboardContainerRef: Ref<HTMLDivElement>;
+  whiteboardContent?: ReactNode;
   dimensions: ShareDimensions;
   showRemoteShare: boolean;
   showLocalShare: boolean;
@@ -150,7 +152,9 @@ export function ZoomShareStage({
       >
         {/* Zoom requires an empty mounting element; keep loading UI in the
             wrapper so the SDK owns this child exclusively. */}
-        <div ref={whiteboardContainerRef} className="absolute inset-0" />
+        {whiteboardContent ?? (
+          <div ref={whiteboardContainerRef} className="absolute inset-0" />
+        )}
         {whiteboardLoading ? (
           <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-background/80 backdrop-blur-sm">
             <div className="flex items-center gap-2 rounded-full bg-card px-4 py-2 text-sm font-medium shadow-sm ring-1 ring-border">

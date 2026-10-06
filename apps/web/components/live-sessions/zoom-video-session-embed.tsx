@@ -37,7 +37,9 @@ import {
   DEFAULT_LIVE_SESSION_SETTINGS,
   type LiveSessionSettingsVM,
 } from '@iconicedu/shared-types';
-import { useZoomWhiteboardFeature } from './zoom-video/use-zoom-whiteboard-feature';
+import { useMeetingWhiteboard } from '../whiteboard/use-meeting-whiteboard';
+import { ClassroomWhiteboard } from '../whiteboard/classroom-whiteboard';
+import type { WhiteboardAccessVM } from '@iconicedu/shared-types';
 import { useZoomMessagesFeature } from './zoom-video/use-zoom-messages-feature';
 import { useZoomRecordingFeature } from './zoom-video/use-zoom-recording-feature';
 import { Button } from '@iconicedu/ui-web/ui/button';
@@ -212,8 +214,10 @@ export function ZoomVideoSessionEmbed({
   accessToken,
   sessionPasscode,
   settings = DEFAULT_LIVE_SESSION_SETTINGS,
+  whiteboardAccess,
 }: {
   sessionName: string;
+  whiteboardAccess?: WhiteboardAccessVM;
   sessionTitle?: string;
   token: string;
   displayName: string;
@@ -383,11 +387,12 @@ export function ZoomVideoSessionEmbed({
   );
   const [hwAccelEncode, setHwAccelEncode] = useState(true);
   const [hwAccelDecode, setHwAccelDecode] = useState(true);
-  const whiteboard = useZoomWhiteboardFeature(
+  const whiteboard = useMeetingWhiteboard(
     status === 'connected' ? clientRef.current : null,
     settings.whiteboard.enabled,
     sessionName,
     activeShareUserId,
+    whiteboardAccess,
   );
   const {
     containerRef: whiteboardContainerRef,
@@ -1602,6 +1607,14 @@ export function ZoomVideoSessionEmbed({
             localCanvasRef={localShareCanvasRef}
             localVideoRef={localShareVideoRef}
             whiteboardContainerRef={whiteboardContainerRef}
+            whiteboardContent={
+              whiteboard.nativeToken && isWhiteboardActive ? (
+                <ClassroomWhiteboard
+                  token={whiteboard.nativeToken}
+                  title={sessionTitle}
+                />
+              ) : undefined
+            }
             dimensions={shareContentDimensions}
             showRemoteShare={isSomeoneSharing && !isShowingLocalShare}
             showLocalShare={isShowingLocalShare}
@@ -1774,16 +1787,30 @@ export function ZoomVideoSessionEmbed({
               {supportsWhiteboard && (!isSomeoneSharing || isPresentingWhiteboard) ? (
                 <MeetingControlButton
                   tooltip={
-                    isPresentingWhiteboard
-                      ? 'Stop whiteboard'
-                      : isWhiteboardActive
-                        ? 'The other person is presenting the whiteboard'
+                    whiteboard.nativeToken
+                      ? isWhiteboardActive
+                        ? 'Hide whiteboard'
+                        : 'Open whiteboard'
+                      : isPresentingWhiteboard
+                        ? 'Stop whiteboard'
+                        : isWhiteboardActive
+                          ? 'The other person is presenting the whiteboard'
+                          : 'Start whiteboard'
+                  }
+                  label={
+                    whiteboard.nativeToken
+                      ? isWhiteboardActive
+                        ? 'Hide whiteboard'
+                        : 'Open whiteboard'
+                      : isPresentingWhiteboard
+                        ? 'Stop whiteboard'
                         : 'Start whiteboard'
                   }
-                  label={isPresentingWhiteboard ? 'Stop whiteboard' : 'Start whiteboard'}
                   tone={isPresentingWhiteboard ? 'active' : 'neutral'}
                   disabled={
-                    !isPresentingWhiteboard && (isSomeoneSharing || isWhiteboardActive)
+                    !whiteboard.nativeToken &&
+                    !isPresentingWhiteboard &&
+                    (isSomeoneSharing || isWhiteboardActive)
                   }
                   onClick={() => void toggleWhiteboard()}
                 >
@@ -1823,7 +1850,7 @@ export function ZoomVideoSessionEmbed({
                     mobileOnly: true,
                     onSelect: () => setActivePanel('chat'),
                   },
-                  ...(isWhiteboardActive
+                  ...(isWhiteboardActive && !whiteboard.nativeToken
                     ? [
                         {
                           id: 'export-whiteboard',

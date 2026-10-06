@@ -498,7 +498,25 @@ export const enableClassroomMeetingSettings = flag<
   },
 });
 
+export const enableClassroomWhiteboard = flag<boolean, { profileId?: string | null }>({
+  key: platformFeatureFlagKeys.enableClassroomWhiteboard,
+  description:
+    'Uses the application collaborative whiteboard with Excalidraw by default.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: platformFeatureFlagKeys.enableClassroomWhiteboard,
+      profileId: entities?.profileId,
+    });
+  },
+});
+
 export const webFlags = {
+  enableClassroomWhiteboard,
   enableClassroomMeetingSettings,
   enableAdminSessionAttendanceAnalytics,
   enableAiRefine,

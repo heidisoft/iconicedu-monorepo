@@ -64,13 +64,38 @@ export function MeetingFeatureSettings({
   value,
   onChange,
   disabled = false,
+  whiteboardProviderAvailable = false,
 }: {
   value: LiveSessionSettingsVM;
   onChange: (settings: LiveSessionSettingsVM) => void;
   disabled?: boolean;
+  whiteboardProviderAvailable?: boolean;
 }) {
   return (
     <div className="grid gap-4 md:grid-cols-2" aria-label="Meeting features">
+      {whiteboardProviderAvailable && (
+        <label className="text-sm font-medium">
+          Whiteboard provider
+          <select
+            aria-label="Whiteboard provider"
+            className="mt-1 block min-h-11 w-full rounded border border-border bg-background px-3"
+            disabled={disabled || !value.whiteboard.enabled}
+            value={value.whiteboard.provider ?? 'excalidraw'}
+            onChange={(event) =>
+              onChange({
+                ...value,
+                whiteboard: {
+                  ...value.whiteboard,
+                  provider: event.target.value as 'excalidraw' | 'zoom',
+                },
+              })
+            }
+          >
+            <option value="excalidraw">Class whiteboard (Excalidraw)</option>
+            <option value="zoom">Zoom Whiteboard</option>
+          </select>
+        </label>
+      )}
       {OPTIONS.map((option) => {
         const inverted = option.section === 'recording' && option.key === 'allowStop';
         const checked = (value[option.section] as unknown as Record<string, boolean>)[

@@ -1,0 +1,16 @@
+/* Native application controls own tools, pages and assets. Scope overrides to this canvas. */
+.classroom-whiteboard-canvas .excalidraw .App-toolbar,
+.classroom-whiteboard-canvas .excalidraw .App-menu_top,
+.classroom-whiteboard-canvas .excalidraw .App-menu_bottom,
+.classroom-whiteboard-canvas .excalidraw .layer-ui__wrapper__top-right,
+.classroom-whiteboard-canvas .excalidraw .HelpButton,
+.classroom-whiteboard-canvas .excalidraw .sidebar-trigger,
+.classroom-whiteboard-canvas .excalidraw .welcome-screen {
+  display: none !important;
+}
+.classroom-whiteboard-canvas .excalidraw {
+  --color-primary: var(--primary);
+}
+.classroom-whiteboard-canvas {
+  min-height: 180px;
+}
