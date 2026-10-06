@@ -1,6 +1,6 @@
 import { createRef, type ComponentProps } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ZoomShareStage } from './zoom-share-stage';
 
@@ -27,6 +27,24 @@ function renderStage(overrides: Partial<ComponentProps<typeof ZoomShareStage>> =
 }
 
 describe('ZoomShareStage', () => {
+  afterEach(() => vi.restoreAllMocks());
+  it('mounts the annotation overlay only on the displayed share', () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000);
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(800);
+    renderStage({
+      annotationOverlay: (size) => (
+        <output aria-label="Overlay dimensions">
+          {size.width}:{size.height}
+        </output>
+      ),
+    });
+    expect(screen.getAllByLabelText('Overlay dimensions')).toHaveLength(1);
+    expect(screen.getByLabelText('Overlay dimensions')).toHaveTextContent('1000:562.5');
+  });
+  it('keeps the annotation engine unmounted when no overlay is enabled', () => {
+    renderStage();
+    expect(screen.queryByLabelText('Overlay dimensions')).not.toBeInTheDocument();
+  });
   it('keeps every Zoom render target mounted while showing the active surface', () => {
     const { container } = renderStage();
 

@@ -59,3 +59,8 @@ recording with stop locking, hidden collaboration controls, read-only messages,
 flag-off behavior and failed-save retry. It uses `/visual-test/meeting-settings`,
 which is unavailable in production, with synthetic API responses and a synthetic
 recording client. No real meeting, account or hardware is required.
+
+- `e2e/screen-annotations.spec.ts`: real Konva drawing, text editing, shape tools,
+  formatting, pointer mode and aspect-fit resizing at `/visual-test/screen-annotations`.
+  Uses a deterministic injected annotation engine; no Zoom credentials are required.
+  The fixture is unavailable in production.

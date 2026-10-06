@@ -1,5 +1,7 @@
 'use client';
 
+import dynamic from 'next/dynamic';
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
@@ -75,8 +77,6 @@ import {
 import {
   executeZoomCollaborationCommand,
   enableZoomLiveCaptions,
-  setZoomAnnotationEnabled,
-  hasZoomAnnotationShare,
 } from '@iconicedu/web/lib/live-sessions/zoom-collaboration';
 import { attachCameraTile, detachCameraTile } from './zoom-video/zoom-video-media';
 import type {
@@ -111,7 +111,6 @@ import {
 import { ZoomMeetingTimer } from './zoom-video/zoom-meeting-timer';
 import { ZoomParticipantGallery } from './zoom-video/zoom-participant-gallery';
 import { ZoomFeedbackScreen } from './zoom-video/zoom-feedback-screen';
-import { ZoomAnnotationControls } from './zoom-video/zoom-annotation-controls';
 import { ZoomChatPanel } from './zoom-video/zoom-chat-panel';
 import { ZoomParticipantsPanel } from './zoom-video/zoom-participants-panel';
 import { ZoomSettingsPanel } from './zoom-video/zoom-settings-panel';
@@ -193,7 +192,16 @@ function playJoinChime() {
   }
 }
 
+const ScreenAnnotationOverlay = dynamic(
+  () =>
+    import('../screen-annotations/annotation-overlay').then(
+      (module) => module.AnnotationOverlay,
+    ),
+  { ssr: false },
+);
+
 export function ZoomVideoSessionEmbed({
+  screenAnnotationsEnabled = false,
   sessionName,
   sessionTitle,
   token,
@@ -206,6 +214,7 @@ export function ZoomVideoSessionEmbed({
   sessionPasscode,
   settings = DEFAULT_LIVE_SESSION_SETTINGS,
 }: {
+  screenAnnotationsEnabled?: boolean;
   sessionName: string;
   sessionTitle?: string;
   token: string;
@@ -264,11 +273,7 @@ export function ZoomVideoSessionEmbed({
     'canvas' | 'video'
   >('canvas');
   const [shareError, setShareError] = useState<string | null>(null);
-  // Whether the active presenter currently allows viewers to annotate —
-  // defaults true (Zoom's own default) and is kept in sync via
-  // 'annotation-privilege-change' so the Annotate button only appears when
-  // it would actually work, instead of always showing and failing silently.
-  const [canAnnotate, setCanAnnotate] = useState(true);
+
   const [isPipActive, setIsPipActive] = useState(false);
   const [activeShareUserId, setActiveShareUserId] = useState<number | null>(null);
   const [sharePresenters, setSharePresenters] = useState<
@@ -326,9 +331,7 @@ export function ZoomVideoSessionEmbed({
   const [showEndForAllConfirm, setShowEndForAllConfirm] = useState(false);
   const lastReportedQualityLevelRef = useRef<NetworkLevel | null>(null);
   const captionClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [isAnnotating, setIsAnnotating] = useState(false);
-  const [annotationPending, setAnnotationPending] = useState(false);
-  const annotationPendingRef = useRef(false);
+
   const [isSelfHost, setIsSelfHost] = useState(false);
   const recording = useZoomRecordingFeature(
     status === 'connected' ? clientRef.current : null,
@@ -418,12 +421,6 @@ export function ZoomVideoSessionEmbed({
     const interval = setInterval(() => setElapsedSeconds((seconds) => seconds + 1), 1000);
     return () => clearInterval(interval);
   }, [status]);
-
-  useEffect(() => {
-    if (!hasZoomAnnotationShare(activeShareUserId, isSharingScreen) && isAnnotating) {
-      setIsAnnotating(false);
-    }
-  }, [activeShareUserId, isSharingScreen, isAnnotating]);
 
   useEffect(() => {
     chatScrollRef.current?.scrollTo({ top: chatScrollRef.current.scrollHeight });
@@ -703,34 +700,6 @@ export function ZoomVideoSessionEmbed({
       }
     };
 
-    // If the other side starts annotating while I'm the one sharing, Zoom
-    // requires the presenter to also call startAnnotation() before the
-    // viewer's drawing is actually let through — auto-approve it.
-    const handleAnnotationViewerDrawRequest = () => {
-      void executeZoomCollaborationCommand(() =>
-        client.getMediaStream().startAnnotation(),
-      ).catch((error) => setShareError(describeZoomFailure(error)));
-    };
-
-    // Presenters always keep full rights to their own share regardless of
-    // this setting — it only governs whether *viewers* can annotate, so skip
-    // it entirely when the local user is the one currently presenting.
-    const handleAnnotationPrivilegeChange = (payload: {
-      isAnnotationEnabled: boolean;
-    }) => {
-      if (activeShareUserIdRef.current === selfUserIdRef.current) {
-        return;
-      }
-      setCanAnnotate(payload.isAnnotationEnabled);
-      if (!payload.isAnnotationEnabled) {
-        setIsAnnotating(false);
-        void client
-          .getMediaStream()
-          .stopAnnotation()
-          .catch(() => null);
-      }
-    };
-
     // Fires when sharing stops for a reason other than our own
     // stopShareScreen() call — the browser's native "Stop sharing" bar, or
     // the share privilege changing out from under us. Without this,
@@ -904,8 +873,6 @@ export function ZoomVideoSessionEmbed({
     client.on('active-share-change', handleActiveShareChange);
     client.on('peer-share-state-change', handlePeerShareStateChange);
     client.on('share-content-dimension-change', handleShareContentDimensionChange);
-    client.on('annotation-viewer-draw-request', handleAnnotationViewerDrawRequest);
-    client.on('annotation-privilege-change', handleAnnotationPrivilegeChange);
     client.on('passively-stop-share', handlePassivelyStopShare);
     client.on('share-privilege-change', handleSharePrivilegeChange);
     client.on('device-change', handleDeviceChange);
@@ -1027,8 +994,6 @@ export function ZoomVideoSessionEmbed({
       client.off('active-share-change', handleActiveShareChange);
       client.off('peer-share-state-change', handlePeerShareStateChange);
       client.off('share-content-dimension-change', handleShareContentDimensionChange);
-      client.off('annotation-viewer-draw-request', handleAnnotationViewerDrawRequest);
-      client.off('annotation-privilege-change', handleAnnotationPrivilegeChange);
       client.off('passively-stop-share', handlePassivelyStopShare);
       client.off('share-privilege-change', handleSharePrivilegeChange);
       client.off('device-change', handleDeviceChange);
@@ -1158,23 +1123,6 @@ export function ZoomVideoSessionEmbed({
     },
     [activeShareUserId],
   );
-
-  const toggleAnnotation = useCallback(async () => {
-    const client = clientRef.current;
-    if (!client || annotationPendingRef.current) return;
-    annotationPendingRef.current = true;
-    setAnnotationPending(true);
-    setShareError(null);
-    try {
-      await setZoomAnnotationEnabled(client.getMediaStream(), !isAnnotating);
-      setIsAnnotating(!isAnnotating);
-    } catch (error) {
-      setShareError(describeZoomFailure(error));
-    } finally {
-      annotationPendingRef.current = false;
-      setAnnotationPending(false);
-    }
-  }, [isAnnotating]);
 
   // Video SDK has no built-in raise-hand API — this broadcasts a small JSON
   // payload over the generic command channel instead (see
@@ -1630,7 +1578,7 @@ export function ZoomVideoSessionEmbed({
               {...meetingNotice}
               className={isShowingLocalShare ? 'top-32' : 'top-20 sm:top-24'}
             />
-          ) : recording.showBanner && !isAnnotating ? (
+          ) : recording.showBanner ? (
             <ZoomMeetingNotice
               message="This session is being recorded"
               tone="warning"
@@ -1639,14 +1587,19 @@ export function ZoomVideoSessionEmbed({
             />
           ) : null}
 
-          <ZoomAnnotationControls
-            available={isShowingLocalShare || (isSomeoneSharing && canAnnotate)}
-            isAnnotating={isAnnotating}
-            pending={annotationPending}
-            onToggle={() => void toggleAnnotation()}
-          />
-
           <ZoomShareStage
+            annotationOverlay={
+              screenAnnotationsEnabled && accessToken && !isWhiteboardActive
+                ? (size) => (
+                    <ScreenAnnotationOverlay
+                      key={`${liveSessionId}:${activeShareUserId ?? selfUserIdRef.current}`}
+                      sessionId={liveSessionId}
+                      shareKey={String(activeShareUserId ?? selfUserIdRef.current ?? 0)}
+                      {...size}
+                    />
+                  )
+                : undefined
+            }
             remoteCanvasRef={shareCanvasRef}
             localCanvasRef={localShareCanvasRef}
             localVideoRef={localShareVideoRef}

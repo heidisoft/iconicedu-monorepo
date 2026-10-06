@@ -1,3 +1,4 @@
+import { enableScreenAnnotations } from '@iconicedu/web/flags';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
@@ -52,6 +53,12 @@ export default async function PublicLiveSessionPage({
   return (
     <LiveSessionSetup
       key={`${sessionId}:${authSession?.user?.id ?? 'guest'}`}
+      screenAnnotationsEnabled={
+        Boolean(authSession) &&
+        (await enableScreenAnnotations.run({
+          identify: { profileId: authSession?.user.id },
+        }))
+      }
       sessionId={sessionId}
       sessionTitle={info.sessionTitle}
       settings={info.settings}

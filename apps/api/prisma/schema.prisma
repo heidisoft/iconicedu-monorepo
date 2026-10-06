@@ -247,3 +247,28 @@ model AssessmentResult {
 
   @@map("assessment_results")
 }
+
+model ScreenAnnotationSession {
+  id              String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  liveSessionId   String                    @map("live_session_id") @db.Uuid
+  shareKey        String                    @map("share_key")
+  revision        Int                       @default(0)
+  studentsEnabled Boolean                   @default(false) @map("students_enabled")
+  objects         Json                      @default("[]")
+  createdAt       DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
+  endedAt         DateTime?                 @map("ended_at") @db.Timestamptz(6)
+  receipts        ScreenAnnotationReceipt[]
+
+  @@map("screen_annotation_sessions")
+}
+
+model ScreenAnnotationReceipt {
+  sessionId String                  @map("session_id") @db.Uuid
+  eventId   String                  @map("event_id") @db.Uuid
+  userId    String                  @map("user_id") @db.Uuid
+  result    Json
+  session   ScreenAnnotationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@id([sessionId, eventId])
+  @@map("screen_annotation_receipts")
+}

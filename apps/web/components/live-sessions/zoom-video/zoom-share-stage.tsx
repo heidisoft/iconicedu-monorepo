@@ -1,6 +1,7 @@
 'use client';
 
-import type { Ref } from 'react';
+import type { Ref, ReactNode } from 'react';
+import { SharedContentSurface } from '@iconicedu/ui-web';
 import { Loader2 } from 'lucide-react';
 
 import { cn } from '@iconicedu/ui-web/lib/utils';
@@ -14,6 +15,7 @@ const shareStageClassName =
   'zoom-share-stage absolute inset-x-4 bottom-44 top-20 flex items-center justify-center overflow-hidden rounded-3xl bg-card shadow-sm ring-1 ring-border/60 transition-[inset,opacity] duration-300 ease-out motion-reduce:transition-none sm:inset-x-6 sm:bottom-52 sm:top-24 lg:bottom-32';
 
 export function ZoomShareStage({
+  annotationOverlay,
   remoteCanvasRef,
   localCanvasRef,
   localVideoRef,
@@ -29,6 +31,7 @@ export function ZoomShareStage({
   activeShareUserId,
   onSelectShare,
 }: {
+  annotationOverlay?: (size: { width: number; height: number }) => ReactNode;
   remoteCanvasRef: Ref<HTMLCanvasElement>;
   localCanvasRef: Ref<HTMLCanvasElement>;
   localVideoRef: Ref<HTMLVideoElement>;
@@ -84,11 +87,17 @@ export function ZoomShareStage({
         aria-hidden={!showRemoteShare}
       >
         {shareSwitcher}
-        <canvas
-          ref={remoteCanvasRef}
-          className="block h-auto w-full max-h-full max-w-full object-contain"
-          style={{ aspectRatio }}
-        />
+        <SharedContentSurface
+          source={dimensions}
+          overlay={showRemoteShare ? annotationOverlay : undefined}
+        >
+          <canvas
+            data-share-source="active"
+            ref={remoteCanvasRef}
+            className="absolute inset-0 h-full w-full object-contain"
+            style={{ aspectRatio }}
+          />
+        </SharedContentSurface>
       </div>
 
       {/* Zoom selects the local canvas or video renderer by browser capability.
@@ -103,24 +112,31 @@ export function ZoomShareStage({
         aria-hidden={!showLocalShare}
       >
         {shareSwitcher}
-        <canvas
-          ref={localCanvasRef}
-          className={cn(
-            'absolute h-auto w-full max-h-full max-w-full object-contain',
-            localRenderTarget === 'canvas' ? 'opacity-100' : 'opacity-0',
-          )}
-          style={{ aspectRatio }}
-        />
-        <video
-          ref={localVideoRef}
-          autoPlay
-          playsInline
-          muted
-          className={cn(
-            'absolute h-full w-full object-contain',
-            localRenderTarget === 'video' ? 'opacity-100' : 'opacity-0',
-          )}
-        />
+        <SharedContentSurface
+          source={dimensions}
+          overlay={showLocalShare ? annotationOverlay : undefined}
+        >
+          <canvas
+            data-share-source={localRenderTarget === 'canvas' ? 'active' : undefined}
+            ref={localCanvasRef}
+            className={cn(
+              'absolute inset-0 h-full w-full object-contain',
+              localRenderTarget === 'canvas' ? 'opacity-100' : 'opacity-0',
+            )}
+            style={{ aspectRatio }}
+          />
+          <video
+            data-share-source={localRenderTarget === 'video' ? 'active' : undefined}
+            ref={localVideoRef}
+            autoPlay
+            playsInline
+            muted
+            className={cn(
+              'absolute h-full w-full object-contain',
+              localRenderTarget === 'video' ? 'opacity-100' : 'opacity-0',
+            )}
+          />
+        </SharedContentSurface>
       </div>
 
       <div

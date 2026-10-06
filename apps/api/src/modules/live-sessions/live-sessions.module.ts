@@ -1,3 +1,5 @@
+import { ScreenAnnotationsService } from '../screen-annotations/screen-annotations.service';
+import { ScreenAnnotationsController } from '../screen-annotations/screen-annotations.controller';
 import { ClassroomMeetingSettingsService } from './classroom-meeting-settings.service';
 import { ClassroomMeetingSettingsController } from './classroom-meeting-settings.controller';
 import { Module } from '@nestjs/common';
@@ -8,8 +10,13 @@ import { LiveSessionsPublicController } from '@iconicedu/api/modules/live-sessio
 
 @Module({
   imports: [AuthModule],
-  providers: [LiveSessionsService, ClassroomMeetingSettingsService],
+  providers: [
+    ScreenAnnotationsService,
+    LiveSessionsService,
+    ClassroomMeetingSettingsService,
+  ],
   controllers: [
+    ScreenAnnotationsController,
     LiveSessionsController,
     LiveSessionsPublicController,
     ClassroomMeetingSettingsController,

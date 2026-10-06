@@ -103,3 +103,4 @@ export {
   MessageCircle,
 } from 'lucide-react';
 export { Briefcase, GraduationCap, Shield, User, Users } from 'lucide-react';
+export { SharedContentSurface } from './ui/shared-content-surface';

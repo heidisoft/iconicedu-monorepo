@@ -50,3 +50,4 @@ export * from './vm/assessment-result';
 export * from './payloads/admin-tools';
 
 export * from './vm/live-session-settings';
+export * from './vm/screen-annotation';

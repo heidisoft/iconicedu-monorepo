@@ -1,4 +1,5 @@
 export const platformFeatureFlagKeys = {
+  enableScreenAnnotations: 'screen-share-annotations',
   enableClassroomMeetingSettings: 'classroom-meeting-settings',
   enableMobileDirectMessageStart: 'enable-mobile-direct-message-start',
   enableMobileOnboardingAddressSearch: 'enable-mobile-onboarding-address-search',
