@@ -26,10 +26,15 @@ export function useExternalLiveSessionJoinDialog(input?: {
   }, []);
 
   const openExternalJoinDialog = useCallback(
-    (joinHref: string, providerHint?: string | null) => {
+    (
+      joinHref: string,
+      providerHint?: string | null,
+      options?: Pick<ExternalLiveSessionJoinTarget, 'isInternal' | 'copyHref'>,
+    ) => {
       setTarget({
         joinHref,
         providerLabel: resolveExternalJoinProviderLabel(joinHref, providerHint),
+        ...options,
       });
     },
     [],

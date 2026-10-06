@@ -13,6 +13,7 @@ import {
   getEmbeddedLiveSessionTitle,
 } from '@iconicedu/web/lib/live-sessions/embed';
 import { getLiveSessionHostHeading } from '@iconicedu/web/components/live-sessions/live-session-host.utils';
+import { ZoomMeetingRenderer as ZoomVideoSessionEmbed } from './zoom-meeting-renderer';
 import { ZoomSessionLoadingScreen } from './zoom-video/zoom-session-loading-screen';
 
 const DailyLiveSessionEmbed = dynamic(
@@ -23,24 +24,6 @@ const DailyLiveSessionEmbed = dynamic(
   {
     ssr: false,
     loading: () => <ZoomSessionLoadingScreen label="Loading live session…" />,
-  },
-);
-
-const ZoomVideoSessionEmbed = dynamic(
-  () =>
-    import('@iconicedu/web/components/live-sessions/zoom-video-session-embed').then(
-      (module) => module.ZoomVideoSessionEmbed,
-    ),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex min-h-[70vh] items-center justify-center rounded-2xl border border-border bg-card">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Loading live session...
-        </div>
-      </div>
-    ),
   },
 );
 

@@ -479,7 +479,27 @@ export const enableOrgAiProviderSettings = flag<boolean, { profileId?: string | 
   },
 });
 
+export const enableClassroomMeetingSettings = flag<
+  boolean,
+  { profileId?: string | null }
+>({
+  key: platformFeatureFlagKeys.enableClassroomMeetingSettings,
+  description: 'Enables configurable Classroom recording and collaboration modules.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: platformFeatureFlagKeys.enableClassroomMeetingSettings,
+      profileId: entities?.profileId,
+    });
+  },
+});
+
 export const webFlags = {
+  enableClassroomMeetingSettings,
   enableAdminSessionAttendanceAnalytics,
   enableAiRefine,
   enableAiSuggestedReplies,

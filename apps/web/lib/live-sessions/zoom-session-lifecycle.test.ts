@@ -71,6 +71,48 @@ describe('Zoom session lifecycle', () => {
     expect(client.init).not.toHaveBeenCalled();
   });
 
+  it('shares an in-flight join when Strict Mode replays setup', async () => {
+    const client = createClient();
+    let finishInit!: (value: string) => void;
+    vi.mocked(client.init).mockReturnValue(
+      new Promise((resolve) => {
+        finishInit = resolve;
+      }),
+    );
+    const input = { sessionName: 'math-class', token: 'test-token', displayName: 'Alex' };
+    const first = initializeAndJoinZoomSession(client, input);
+    const replay = initializeAndJoinZoomSession(client, { ...input });
+
+    expect(replay).toBe(first);
+    expect(client.init).toHaveBeenCalledOnce();
+    expect(client.join).not.toHaveBeenCalled();
+    finishInit('');
+    await Promise.all([first, replay]);
+    expect(client.join).toHaveBeenCalledOnce();
+  });
+
+  it('allows retry after a failed initialization without retaining a rejected join', async () => {
+    const client = createClient();
+    const failure = { type: 'INVALID_OPERATION', reason: 'Initialization failed' };
+    vi.mocked(client.init).mockResolvedValueOnce(failure as never);
+    const input = { sessionName: 'math-class', token: 'test-token', displayName: 'Alex' };
+    await expect(initializeAndJoinZoomSession(client, input)).rejects.toEqual(failure);
+    await initializeAndJoinZoomSession(client, input);
+    expect(client.init).toHaveBeenCalledTimes(2);
+    expect(client.join).toHaveBeenCalledOnce();
+  });
+
+  it('does not reuse an in-flight join for different credentials', async () => {
+    const client = createClient();
+    const input = { sessionName: 'math-class', token: 'test-token', displayName: 'Alex' };
+    const first = initializeAndJoinZoomSession(client, input);
+    await expect(
+      initializeAndJoinZoomSession(client, { ...input, token: 'other-token' }),
+    ).rejects.toThrow('already in progress');
+    await first;
+    expect(client.join).toHaveBeenCalledOnce();
+  });
+
   it('recognizes resolved Zoom failures without rejecting successful join objects', () => {
     expect(
       isZoomExecutedFailure({ type: 'OPERATION_CANCELLED', reason: 'LEAVING' }),
@@ -90,7 +132,7 @@ describe('Zoom session lifecycle', () => {
     expect(
       describeZoomWhiteboardFailure(new Error('get confId or mmrToken failed')),
     ).toBe(
-      "Whiteboard isn't available for this session. The Zoom account owner may need to enable Whiteboard for this Video SDK app.",
+      'Zoom could not authenticate the whiteboard for this session. Try rejoining. If it still fails, ask the host to check Zoom Whiteboard access and network connectivity.',
     );
   });
 });

@@ -12,17 +12,28 @@ describe('ZoomRecordingIndicator', () => {
       screen.getByRole('status', { name: 'Recording in progress' }),
     ).toHaveTextContent('Recording');
 
+    expect(
+      screen
+        .getByRole('status', { name: 'Recording in progress' })
+        .querySelector('.bg-destructive'),
+    ).not.toBeNull();
     view.rerender(<ZoomRecordingIndicator status={RecordingStatus.Paused} />);
     expect(screen.getByRole('status', { name: 'Recording paused' })).toHaveTextContent(
       'Paused',
     );
   });
 
-  it('keeps the recording status visible while recording is stopped', () => {
-    render(<ZoomRecordingIndicator status={RecordingStatus.Stopped} />);
+  it.each([RecordingStatus.Stopped, null])(
+    'shows the recording label with a neutral dot when inactive (%s)',
+    (status) => {
+      const { container } = render(<ZoomRecordingIndicator status={status} />);
 
-    expect(screen.getByRole('status', { name: 'Not recording' })).toHaveTextContent(
-      'Record',
-    );
-  });
+      expect(screen.getByRole('status', { name: 'Not recording' })).toHaveTextContent(
+        'Recording',
+      );
+      expect(container.querySelector('[aria-hidden="true"]')).toHaveClass(
+        'bg-muted-foreground/60',
+      );
+    },
+  );
 });

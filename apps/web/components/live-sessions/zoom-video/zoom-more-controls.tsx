@@ -1,8 +1,8 @@
 'use client';
 
-import type { ReactNode } from 'react';
-import { MoreHorizontal, X } from 'lucide-react';
-import { Button } from '@iconicedu/ui-web/ui/button';
+import type { MeetingFeatureAction } from './meeting-feature-action';
+import { Ellipsis, X } from 'lucide-react';
+import { IconActionButton } from '@iconicedu/ui-web/ui/icon-action-button';
 import {
   Drawer,
   DrawerClose,
@@ -22,17 +22,13 @@ import { useIsMobile } from '@iconicedu/ui-web/hooks/use-mobile';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 import { MeetingControlButton } from './zoom-meeting-controls';
 
-export type ZoomMoreAction = {
-  id: string;
-  label: string;
-  icon: ReactNode;
-  active?: boolean;
-  disabled?: boolean;
-  mobileOnly?: boolean;
-  onSelect: () => void;
-};
-
-function ActionRow({ action, close }: { action: ZoomMoreAction; close: () => void }) {
+function ActionRow({
+  action,
+  close,
+}: {
+  action: MeetingFeatureAction;
+  close: () => void;
+}) {
   return (
     <button
       type="button"
@@ -59,12 +55,23 @@ export function ZoomMoreControls({
   open,
   actions,
   onOpenChange,
+  error,
 }: {
   open: boolean;
-  actions: ZoomMoreAction[];
+  error?: string | null;
+  actions: MeetingFeatureAction[];
   onOpenChange: (open: boolean) => void;
 }) {
   const isMobile = useIsMobile();
+  const menuActions = actions;
+  const featureError = error ? (
+    <p
+      role="alert"
+      className="absolute bottom-full left-1/2 mb-2 w-64 -translate-x-1/2 rounded-xl border border-border bg-popover p-3 text-xs text-popover-foreground shadow-lg"
+    >
+      {error}
+    </p>
+  ) : null;
   const trigger = (
     <MeetingControlButton
       label={open ? 'Close more controls' : 'More controls'}
@@ -72,62 +79,67 @@ export function ZoomMoreControls({
       className="zoom-toolbar-more"
       aria-expanded={open}
     >
-      <MoreHorizontal className="size-4" />
+      <Ellipsis className="size-4" />
     </MeetingControlButton>
   );
 
   if (isMobile) {
     return (
-      <Drawer open={open} onOpenChange={onOpenChange} dismissible>
-        <DrawerTrigger asChild>{trigger}</DrawerTrigger>
-        <DrawerContent className="pb-[max(1rem,env(safe-area-inset-bottom))]">
-          <DrawerHeader className="relative pr-14 text-left">
-            <DrawerTitle>More controls</DrawerTitle>
-            <DrawerDescription>Additional tools for this class</DrawerDescription>
-            <DrawerClose asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="absolute right-4 top-3 rounded-full"
-                aria-label="Close more controls"
-              >
-                <X />
-              </Button>
-            </DrawerClose>
-          </DrawerHeader>
-          <div className="grid grid-cols-2 gap-1 px-4 pb-2">
-            {actions.map((action) => (
-              <ActionRow
-                key={action.id}
-                action={action}
-                close={() => onOpenChange(false)}
-              />
-            ))}
-          </div>
-        </DrawerContent>
-      </Drawer>
+      <>
+        <Drawer open={open} onOpenChange={onOpenChange} dismissible>
+          <DrawerTrigger asChild>{trigger}</DrawerTrigger>
+          <DrawerContent className="pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <DrawerHeader className="relative pr-14 text-left">
+              <DrawerTitle>More controls</DrawerTitle>
+              <DrawerDescription>Additional tools for this class</DrawerDescription>
+              <DrawerClose asChild>
+                <IconActionButton
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-4 top-3 rounded-full"
+                  label="Close more controls"
+                >
+                  <X />
+                </IconActionButton>
+              </DrawerClose>
+            </DrawerHeader>
+            <div className="grid grid-cols-2 gap-1 px-4 pb-2">
+              {menuActions.map((action) => (
+                <ActionRow
+                  key={action.id}
+                  action={action}
+                  close={() => onOpenChange(false)}
+                />
+              ))}
+            </div>
+          </DrawerContent>
+        </Drawer>
+        {featureError}
+      </>
     );
   }
 
   return (
-    <DropdownMenu open={open} onOpenChange={onOpenChange}>
-      <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
-      <DropdownMenuContent side="top" align="center" sideOffset={12} className="w-64">
-        {actions
-          .filter((action) => !action.mobileOnly)
-          .map((action) => (
-            <DropdownMenuItem
-              key={action.id}
-              disabled={action.disabled}
-              className={cn('min-h-11', action.active && 'bg-primary/10 text-primary')}
-              onSelect={action.onSelect}
-            >
-              {action.icon}
-              {action.label}
-            </DropdownMenuItem>
-          ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <>
+      <DropdownMenu open={open} onOpenChange={onOpenChange}>
+        <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+        <DropdownMenuContent side="top" align="center" sideOffset={12} className="w-64">
+          {menuActions
+            .filter((action) => !action.mobileOnly)
+            .map((action) => (
+              <DropdownMenuItem
+                key={action.id}
+                disabled={action.disabled}
+                className={cn('min-h-11', action.active && 'bg-primary/10 text-primary')}
+                onSelect={action.onSelect}
+              >
+                {action.icon}
+                {action.label}
+              </DropdownMenuItem>
+            ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {featureError}
+    </>
   );
 }

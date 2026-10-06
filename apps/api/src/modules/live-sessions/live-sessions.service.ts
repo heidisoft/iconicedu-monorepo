@@ -1,3 +1,10 @@
+import { platformFeatureFlagKeys } from '@iconicedu/shared-types';
+import { evaluateApiBooleanFlag } from '@iconicedu/api/lib/flags/posthog-openfeature';
+import { parseLiveSessionSettings, settingsFromSnapshot } from './live-session-settings';
+import type {
+  LiveSessionJoinCredentialsVM,
+  PublicLiveSessionInfoVM,
+} from '@iconicedu/shared-types';
 import { randomUUID } from 'node:crypto';
 
 import {
@@ -47,11 +54,14 @@ async function resolveOrgSlug(
 }
 
 type ChannelLiveSessionPublicRow = {
+  org_id: string;
   id: string;
   provider: string;
   status: 'starting' | 'live' | 'ended' | 'failed';
   provider_session_id: string | null;
   provider_metadata: Record<string, unknown> | null;
+  channel_id?: string;
+  app_metadata?: Record<string, unknown> | null;
 };
 
 // Best-effort, process-local guard against passcode brute-forcing on the
@@ -235,6 +245,31 @@ export class LiveSessionsService {
     ]);
 
     const { data: authUser } = await sessionSupabase.auth.getUser();
+    const channelSettings = await serviceSupabase
+      .from('channels')
+      .select('live_session_config')
+      .eq('id', channelId)
+      .eq('org_id', input.orgId)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (channelSettings.error)
+      throw new InternalServerErrorException('Unable to load meeting settings');
+    const config = channelSettings.data?.live_session_config as Record<
+      string,
+      unknown
+    > | null;
+    const configurable =
+      config?.settings &&
+      (await evaluateApiBooleanFlag({
+        flagKey: platformFeatureFlagKeys.enableClassroomMeetingSettings,
+        distinctId:
+          typeof config.settingsProfileId === 'string'
+            ? config.settingsProfileId
+            : profile.id,
+      }));
+    const meetingSettings = configurable
+      ? parseLiveSessionSettings(config.settings)
+      : undefined;
 
     try {
       return await createOrJoinLiveSession({
@@ -246,6 +281,7 @@ export class LiveSessionsService {
         },
         channelId,
         orgSlug,
+        ...(meetingSettings ? { meetingSettings } : {}),
         onPostJoinSideEffectError: (info) => {
           this.logger.error(
             `Post-join side effects failed for session ${info.sessionId} in channel ${info.channelId}`,
@@ -277,13 +313,16 @@ export class LiveSessionsService {
     sessionId: string,
     clientIp: string,
     input: GuestJoinLiveSessionDto,
-  ) {
+    accessToken: string | null = null,
+  ): Promise<LiveSessionJoinCredentialsVM> {
     checkGuestJoinRateLimit(`${sessionId}:${clientIp}`);
 
     const serviceSupabase = createSupabaseServiceClient();
     const sessionResponse = await serviceSupabase
       .from('channel_live_sessions')
-      .select('id, provider, status, provider_session_id, provider_metadata')
+      .select(
+        'id, org_id, provider, status, channel_id, provider_session_id, provider_metadata, app_metadata',
+      )
       .eq('id', sessionId)
       .is('deleted_at', null)
       .maybeSingle<ChannelLiveSessionPublicRow>();
@@ -302,6 +341,7 @@ export class LiveSessionsService {
       throw new BadRequestException('Live session is not active');
     }
 
+    const settings = settingsFromSnapshot(session.app_metadata);
     const metadata = session.provider_metadata ?? {};
     const storedPasscode =
       typeof metadata.passcode === 'string' ? metadata.passcode : null;
@@ -309,22 +349,46 @@ export class LiveSessionsService {
       throw new ForbiddenException('Incorrect passcode');
     }
 
+    const identity = accessToken
+      ? await this.resolveLiveSessionIdentity(accessToken, session.org_id)
+      : null;
+    if (!settings.invite.enabled) {
+      if (!identity?.profileId || !session.channel_id)
+        throw new ForbiddenException('Shared invitations are disabled');
+      const membership = await serviceSupabase
+        .from('channel_members')
+        .select('id')
+        .eq('org_id', session.org_id)
+        .eq('channel_id', session.channel_id)
+        .eq('profile_id', identity.profileId)
+        .is('deleted_at', null)
+        .maybeSingle();
+      if (membership.error)
+        throw new InternalServerErrorException('Unable to verify meeting membership');
+      if (!membership.data)
+        throw new ForbiddenException('Shared invitations are disabled');
+    }
+    const displayName = identity?.displayName ?? input.displayName;
     const provider = getLiveSessionProvider('zoom');
     const joinAccess = await provider.getJoinAccess({
       sessionId: session.id,
       providerSessionId: session.provider_session_id,
       providerMetadata: metadata,
-      profileId: `guest:${randomUUID()}`,
-      displayName: input.displayName,
+      profileId: identity?.profileId ?? `guest:${randomUUID()}`,
+      displayName,
       isHost: false,
     });
+
+    if (!joinAccess.token)
+      throw new InternalServerErrorException('Unable to issue session credentials');
 
     return {
       token: joinAccess.token,
       sessionName:
         typeof metadata.sessionName === 'string' ? metadata.sessionName : session.id,
-      displayName: input.displayName,
+      displayName,
       expiresAt: joinAccess.expiresAt ?? null,
+      settings,
     };
   }
 
@@ -334,23 +398,28 @@ export class LiveSessionsService {
   // directly with a service-role client) keeps privileged reads and the
   // host-detection logic in the one place other live-session authorization
   // already lives.
-  async getPublicLiveSessionInfo(sessionId: string, accessToken: string | null) {
+  async getPublicLiveSessionInfo(
+    sessionId: string,
+    accessToken: string | null,
+  ): Promise<PublicLiveSessionInfoVM> {
     const serviceSupabase = createSupabaseServiceClient();
     const sessionResponse = await serviceSupabase
       .from('channel_live_sessions')
       .select(
-        'id, provider, status, channel_id, started_by_profile_id, provider_session_id, provider_metadata',
+        'id, org_id, provider, status, channel_id, started_by_profile_id, provider_session_id, provider_metadata, app_metadata',
       )
       .eq('id', sessionId)
       .is('deleted_at', null)
       .maybeSingle<{
         id: string;
+        org_id: string;
         provider: string;
         status: 'starting' | 'live' | 'ended' | 'failed';
         channel_id: string;
         started_by_profile_id: string;
         provider_session_id: string | null;
         provider_metadata: Record<string, unknown> | null;
+        app_metadata?: Record<string, unknown> | null;
       }>();
 
     if (sessionResponse.error) {
@@ -367,6 +436,7 @@ export class LiveSessionsService {
       .eq('id', session.channel_id)
       .maybeSingle<{ topic: string | null }>();
     const sessionTitle = channelResponse.data?.topic ?? 'Live Session';
+    const settings = settingsFromSnapshot(session.app_metadata);
 
     if (session.status !== 'starting' && session.status !== 'live') {
       return { exists: true as const, isActive: false as const, sessionTitle };
@@ -377,11 +447,16 @@ export class LiveSessionsService {
       : false;
 
     if (!isSessionStarter) {
+      const identity = accessToken
+        ? await this.resolveLiveSessionIdentity(accessToken, session.org_id)
+        : null;
       return {
         exists: true as const,
         isActive: true as const,
         sessionTitle,
         isHost: false as const,
+        settings,
+        ...(identity ? { participant: { displayName: identity.displayName } } : {}),
       };
     }
 
@@ -402,6 +477,7 @@ export class LiveSessionsService {
         isActive: true as const,
         sessionTitle,
         isHost: false as const,
+        settings,
       };
     }
 
@@ -425,6 +501,7 @@ export class LiveSessionsService {
         isActive: true as const,
         sessionTitle,
         isHost: false as const,
+        settings,
       };
     }
 
@@ -433,8 +510,11 @@ export class LiveSessionsService {
       isActive: true as const,
       sessionTitle,
       isHost: true as const,
+      settings,
       hostJoin: {
         token: joinAccess.token,
+        expiresAt: joinAccess.expiresAt ?? null,
+        settings,
         sessionName:
           typeof joinAccess.metadata?.sessionName === 'string'
             ? joinAccess.metadata.sessionName
@@ -446,6 +526,48 @@ export class LiveSessionsService {
             : null,
       },
     };
+  }
+
+  /** Resolve only the verified caller's identity in the session org.
+   * Passcode verification remains mandatory for non-hosts, including callers
+   * without an org profile. Their Zoom identity is still an anonymous guest.
+   */
+  private async resolveLiveSessionIdentity(accessToken: string, orgId: string) {
+    const { data } = await createSupabaseSessionClient(accessToken).auth.getUser();
+    const user = data.user;
+    if (!user) return null;
+    const service = createSupabaseServiceClient();
+    const account = await service
+      .from('accounts')
+      .select('id')
+      .eq('auth_user_id', user.id)
+      .maybeSingle<{ id: string }>();
+    if (account.error)
+      throw new InternalServerErrorException('Unable to resolve participant identity');
+    const profile = account.data
+      ? await service
+          .from('profiles')
+          .select('id, display_name, first_name, last_name')
+          .eq('account_id', account.data.id)
+          .eq('org_id', orgId)
+          .is('deleted_at', null)
+          .maybeSingle<{
+            id: string;
+            display_name: string | null;
+            first_name: string | null;
+            last_name: string | null;
+          }>()
+      : null;
+    if (profile?.error)
+      throw new InternalServerErrorException('Unable to resolve participant identity');
+    const row = profile?.data;
+    const metadataName = user.user_metadata?.full_name ?? user.user_metadata?.name;
+    const displayName =
+      row?.display_name?.trim() ||
+      [row?.first_name, row?.last_name].filter(Boolean).join(' ').trim() ||
+      (typeof metadataName === 'string' ? metadataName.trim() : '') ||
+      'Participant';
+    return { profileId: row?.id ?? null, displayName: displayName.slice(0, 80) };
   }
 
   // Verifies the bearer token the normal way (a real Supabase auth call, not

@@ -7,7 +7,7 @@ import { cn } from '@iconicedu/ui-web/lib/utils';
 export function ZoomRecordingIndicator({ status }: { status: RecordingStatus | null }) {
   const isRecording = status === 'Recording';
   const isPaused = status === 'Paused';
-  const label = isRecording ? 'Recording' : isPaused ? 'Paused' : 'Record';
+  const label = isPaused ? 'Paused' : 'Recording';
 
   return (
     <div

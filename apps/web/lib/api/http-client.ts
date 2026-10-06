@@ -38,12 +38,25 @@ async function getAuthHeaders(supabase: SupabaseClient): Promise<Record<string, 
   };
 }
 
+export class ApiHttpError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'ApiHttpError';
+  }
+}
+
 async function parseResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const errorBody = (await response.json().catch(() => null)) as {
       message?: string;
     } | null;
-    throw new Error(errorBody?.message ?? `API error ${response.status}`);
+    throw new ApiHttpError(
+      response.status,
+      errorBody?.message ?? `API error ${response.status}`,
+    );
   }
 
   const contentLength = response.headers.get('content-length');
@@ -60,9 +73,25 @@ async function parseResponse<T>(response: Response): Promise<T> {
 }
 
 export function createApiClient(supabase: SupabaseClient) {
+  return createHttpClient(() => getAuthHeaders(supabase));
+}
+
+/** Use only for API endpoints whose controllers explicitly allow anonymous access. */
+export function createPublicApiClient(accessToken?: string | null) {
+  return createHttpClient(async () => ({
+    'Content-Type': 'application/json',
+    ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+  }));
+}
+
+function createHttpClient(getHeaders: () => Promise<Record<string, string>>) {
   const apiUrl = resolveApiUrl();
 
-  async function get<T>(path: string, params?: QueryParams): Promise<T> {
+  async function get<T>(
+    path: string,
+    params?: QueryParams,
+    options?: Pick<RequestInit, 'cache'>,
+  ): Promise<T> {
     const query = new URLSearchParams();
     Object.entries(params ?? {}).forEach(([key, value]) => {
       if (value === undefined || value === null || value === '') return;
@@ -71,8 +100,9 @@ export function createApiClient(supabase: SupabaseClient) {
 
     const url = `${apiUrl}${path}${query.size ? `?${query.toString()}` : ''}`;
     const response = await fetch(url, {
+      ...options,
       method: 'GET',
-      headers: await getAuthHeaders(supabase),
+      headers: await getHeaders(),
     });
 
     return parseResponse<T>(response);
@@ -81,7 +111,7 @@ export function createApiClient(supabase: SupabaseClient) {
   async function post<T>(path: string, body: unknown): Promise<T> {
     const response = await fetch(`${apiUrl}${path}`, {
       method: 'POST',
-      headers: await getAuthHeaders(supabase),
+      headers: await getHeaders(),
       body: JSON.stringify(body),
     });
 
@@ -91,7 +121,7 @@ export function createApiClient(supabase: SupabaseClient) {
   async function put<T>(path: string, body?: unknown): Promise<T> {
     const response = await fetch(`${apiUrl}${path}`, {
       method: 'PUT',
-      headers: await getAuthHeaders(supabase),
+      headers: await getHeaders(),
       body: JSON.stringify(body ?? {}),
     });
 
@@ -101,7 +131,7 @@ export function createApiClient(supabase: SupabaseClient) {
   async function patch<T>(path: string, body?: unknown): Promise<T> {
     const response = await fetch(`${apiUrl}${path}`, {
       method: 'PATCH',
-      headers: await getAuthHeaders(supabase),
+      headers: await getHeaders(),
       body: JSON.stringify(body ?? {}),
     });
 
@@ -111,7 +141,7 @@ export function createApiClient(supabase: SupabaseClient) {
   async function del<T>(path: string, body?: unknown): Promise<T> {
     const response = await fetch(`${apiUrl}${path}`, {
       method: 'DELETE',
-      headers: await getAuthHeaders(supabase),
+      headers: await getHeaders(),
       body: JSON.stringify(body ?? {}),
     });
 

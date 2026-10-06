@@ -449,6 +449,7 @@ export async function createOrJoinLiveSession(input: {
   };
   channelId: string;
   orgSlug: string;
+  meetingSettings?: import('@iconicedu/shared-types').LiveSessionSettingsVM;
   schedulePostJoinSideEffects?: PostJoinSideEffectsScheduler;
   onPostJoinSideEffectError?: (info: PostJoinSideEffectErrorInfo) => void;
 }): Promise<CreateOrJoinLiveSessionResult> {
@@ -603,6 +604,7 @@ export async function createOrJoinLiveSession(input: {
       attendance_policy: getLiveSessionAttendancePolicy(null),
       report_status: 'pending',
       app_metadata: {
+        ...(input.meetingSettings ? { meetingSettings: input.meetingSettings } : {}),
         channelTopic: channel.topic ?? null,
         learningSpaceId,
         mode: liveSessionConfig.mode ?? 'video',

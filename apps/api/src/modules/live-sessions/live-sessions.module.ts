@@ -1,3 +1,5 @@
+import { ClassroomMeetingSettingsService } from './classroom-meeting-settings.service';
+import { ClassroomMeetingSettingsController } from './classroom-meeting-settings.controller';
 import { Module } from '@nestjs/common';
 import { AuthModule } from '@iconicedu/api/modules/auth/auth.module';
 import { LiveSessionsService } from '@iconicedu/api/modules/live-sessions/live-sessions.service';
@@ -6,7 +8,11 @@ import { LiveSessionsPublicController } from '@iconicedu/api/modules/live-sessio
 
 @Module({
   imports: [AuthModule],
-  providers: [LiveSessionsService],
-  controllers: [LiveSessionsController, LiveSessionsPublicController],
+  providers: [LiveSessionsService, ClassroomMeetingSettingsService],
+  controllers: [
+    LiveSessionsController,
+    LiveSessionsPublicController,
+    ClassroomMeetingSettingsController,
+  ],
 })
 export class LiveSessionsModule {}

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DEFAULT_LIVE_SESSION_SETTINGS } from '@iconicedu/shared-types';
 import type { ProfileRow } from '@iconicedu/shared-types';
 
 vi.mock('./scope', () => ({
@@ -994,5 +995,26 @@ describe('createOrJoinLiveSession', () => {
     expect(errorSpy).not.toHaveBeenCalled();
 
     errorSpy.mockRestore();
+  });
+});
+
+it('snapshots API-authorized meeting settings when creating a session', async () => {
+  vi.mocked(resolveChannelLiveSessionScope).mockResolvedValue({
+    scopeKey: 'channel:channel-1',
+  });
+  const serviceSupabase = createServiceSupabaseStub();
+  const meetingSettings = {
+    ...DEFAULT_LIVE_SESSION_SETTINGS,
+    recording: { enabled: true, autoStart: true, allowStop: false },
+  };
+  await createOrJoinLiveSession({
+    serviceSupabase: serviceSupabase as never,
+    actor: DEFAULT_ACTOR,
+    channelId: 'channel-1',
+    orgSlug: 'academy',
+    meetingSettings,
+  });
+  expect(serviceSupabase.state.liveSessionRow?.app_metadata).toMatchObject({
+    meetingSettings,
   });
 });

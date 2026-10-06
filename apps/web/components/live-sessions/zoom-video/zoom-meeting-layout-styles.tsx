@@ -24,12 +24,38 @@ export function ZoomMeetingLayoutStyles() {
         bottom: 6rem;
       }
 
+      /* flag-exempt: preserve existing gallery tile proportions at every viewport size. */
+      .zoom-gallery-cell {
+        container-type: size;
+        display: grid;
+        place-items: center;
+        width: 100%;
+        height: 100%;
+        min-width: 0;
+        min-height: 0;
+      }
+
+      .zoom-gallery-tile {
+        width: min(100cqw, calc(100cqh * 16 / 9));
+        aspect-ratio: 16 / 9;
+      }
+
+      .zoom-meeting-shell .zoom-toolbar button svg.lucide {
+        width: 20px;
+        height: 20px;
+        stroke-width: 2;
+      }
+
       .zoom-toolbar-secondary {
         display: none !important;
       }
 
       .zoom-toolbar-side-actions {
         top: -3.5rem;
+      }
+
+      .zoom-toolbar-share-link {
+        order: 4;
       }
 
       .zoom-toolbar-more {

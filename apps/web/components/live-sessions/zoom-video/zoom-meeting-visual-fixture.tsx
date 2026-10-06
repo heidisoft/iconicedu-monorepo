@@ -6,7 +6,7 @@ import {
   MessageSquare,
   Mic,
   MonitorUp,
-  PenTool,
+  Pencil,
   PhoneOff,
   Settings,
   SmilePlus,
@@ -24,6 +24,7 @@ import { ZoomMeetingDockButton, ZoomMeetingSideDock } from './zoom-meeting-side-
 import { ZoomMeetingTimer } from './zoom-meeting-timer';
 import { ZoomParticipantGallery } from './zoom-participant-gallery';
 import { ZoomParticipantsPanel } from './zoom-participants-panel';
+import { useMeetingRecordingControl } from './zoom-recording-control';
 import { ZoomMoreControls } from './zoom-more-controls';
 import { ZoomShareMeetingDialog } from './zoom-share-meeting-dialog';
 import type { SidePanel } from './zoom-video-session.types';
@@ -52,20 +53,46 @@ const participants = [
   },
 ];
 
-export function ZoomMeetingVisualFixture() {
+export function ZoomMeetingVisualFixture({
+  participantCount = 4,
+}: {
+  participantCount?: number;
+}) {
+  const [recordingStatus, setRecordingStatus] = useState<RecordingStatus>(
+    'Recording' as RecordingStatus,
+  );
+  const recordingStatusRef = useRef(recordingStatus);
   const selfVideoRef = useRef<HTMLDivElement>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const [activePanel, setActivePanel] = useState<SidePanel>(null);
   const [mobileExpanded, setMobileExpanded] = useState(false);
   const [galleryPage, setGalleryPage] = useState(0);
 
+  const recording = useMeetingRecordingControl({
+    canManage: true,
+    status: recordingStatus,
+    onStatusChange: setRecordingStatus,
+    client: {
+      canStartRecording: () => true,
+      startCloudRecording: async () => {
+        recordingStatusRef.current = 'Recording' as RecordingStatus;
+        return '';
+      },
+      stopCloudRecording: async () => {
+        recordingStatusRef.current = 'Stopped' as RecordingStatus;
+        return '';
+      },
+      getCloudRecordingStatus: () => recordingStatusRef.current,
+    },
+  });
+
   return (
     <TooltipProvider delayDuration={0}>
       <main className="zoom-meeting-shell fixed inset-0 overflow-hidden bg-background">
         <ZoomMeetingHeader
           title="Airbnb: Product Management Structure"
-          participantCount={4}
-          recordingStatus={'Recording' as RecordingStatus}
+          participantCount={participantCount}
+          recordingStatus={recordingStatus}
         />
 
         <ZoomParticipantGallery
@@ -74,7 +101,7 @@ export function ZoomMeetingVisualFixture() {
           selfVideoOn={false}
           selfHandRaised={false}
           selfVideoRef={selfVideoRef}
-          remoteParticipants={participants}
+          remoteParticipants={participants.slice(0, participantCount - 1)}
           raisedHandUserIds={new Set([4])}
           activeSpeakerUserId={3}
           selfUserId={1}
@@ -104,17 +131,21 @@ export function ZoomMeetingVisualFixture() {
             <MeetingControlButton label="Share screen">
               <MonitorUp />
             </MeetingControlButton>
+
+            <MeetingControlButton label="Start whiteboard">
+              <Pencil />
+            </MeetingControlButton>
+
             <ZoomShareMeetingDialog
               meetingTitle="Airbnb: Product Management Structure"
               meetingPasscode="demo-1234"
             />
-            <MeetingControlButton label="Start whiteboard">
-              <PenTool />
-            </MeetingControlButton>
             <ZoomMoreControls
+              error={recording.error}
               open={mobileExpanded}
               onOpenChange={setMobileExpanded}
               actions={[
+                ...(recording.action ? [recording.action] : []),
                 {
                   id: 'participants',
                   label: 'Participants (4)',

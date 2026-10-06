@@ -41,4 +41,45 @@ describe('ZoomParticipantsPanel', () => {
 
     expect(screen.getByRole('button', { name: 'Participants' })).toHaveTextContent('2');
   });
+  it('shows a remote participant hand and emoji reaction in the list', () => {
+    const participant = {
+      userId: 42,
+      name: 'Sam Lee',
+      isYou: false,
+      isHost: false,
+      muted: false,
+      videoOn: false,
+      handRaised: true,
+      isSpeaking: false,
+      reaction: '🎉',
+    };
+    const view = render(
+      <TooltipProvider>
+        <ZoomParticipantsPanel
+          open
+          canMuteOthers={false}
+          participants={[participant]}
+          onOpenChange={vi.fn()}
+          onMute={vi.fn()}
+        />
+      </TooltipProvider>,
+    );
+    expect(screen.getByLabelText('Sam Lee raised their hand')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Sam Lee reacted 🎉' })).toBeInTheDocument();
+    view.rerender(
+      <TooltipProvider>
+        <ZoomParticipantsPanel
+          open
+          canMuteOthers={false}
+          participants={[{ ...participant, handRaised: false, reaction: undefined }]}
+          onOpenChange={vi.fn()}
+          onMute={vi.fn()}
+        />
+      </TooltipProvider>,
+    );
+    expect(screen.queryByLabelText('Sam Lee raised their hand')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('img', { name: 'Sam Lee reacted 🎉' }),
+    ).not.toBeInTheDocument();
+  });
 });

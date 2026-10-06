@@ -39,3 +39,23 @@ Do not commit an authenticated storage-state file. It contains reusable session 
 - `e2e/marketing-smoke.spec.ts`: public landing page smoke test.
 - `e2e/sidebar-learning-spaces.spec.ts`: student sidebar classes header visibility (requires auth).
 - `e2e/supervised-readonly.spec.ts`: supervised view controls disabled + thread open behavior (requires auth).
+
+- `e2e/live-session-setup.spec.ts`: deterministic host/member/guest setup,
+  passcode correction, refresh recovery, feedback, source/homepage navigation,
+  the ready-to-join dialog, cancellation, clipboard copying and new-tab behavior.
+  Uses production setup components at `/visual-test/live-session-setup`, synthetic
+  API responses, denied media preview and an injected meeting renderer. No live
+  Zoom credentials or database writes are required; live Zoom behavior is outside
+  this spec. The fixture is unavailable in production.
+
+Run the setup regression suite against the development server:
+
+```bash
+pnpm --filter web exec playwright test e2e/live-session-setup.spec.ts
+```
+
+`classroom-meeting-settings.spec.ts` covers modular meeting options, automatic
+recording with stop locking, hidden collaboration controls, read-only messages,
+flag-off behavior and failed-save retry. It uses `/visual-test/meeting-settings`,
+which is unavailable in production, with synthetic API responses and a synthetic
+recording client. No real meeting, account or hardware is required.

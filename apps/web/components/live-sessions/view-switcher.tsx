@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronDown, LayoutGrid, Monitor, Share2 } from 'lucide-react';
+import { ChevronDown, LayoutGrid, Monitor, MonitorUp } from 'lucide-react';
 
 import { Button } from '@iconicedu/ui-web/ui/button';
 import {
@@ -33,7 +33,7 @@ const viewOptions = [
   {
     id: 'shared-content' as const,
     label: 'Shared Content',
-    icon: Share2,
+    icon: MonitorUp,
     description: 'Focus on shared screen',
   },
 ];

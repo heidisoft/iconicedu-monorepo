@@ -3,11 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  AnnotationClearType,
-  AnnotationToolType,
+  ChatPrivilege,
   ConnectionState,
   PassiveStopShareReason,
-  RecordingStatus,
   SharePrivilege,
   VideoQuality,
   WhiteboardStatus,
@@ -23,7 +21,7 @@ import {
   MonitorUp,
   MonitorX,
   OctagonX,
-  PenTool,
+  Pencil,
   PictureInPicture2,
   PhoneOff,
   Settings,
@@ -33,6 +31,13 @@ import {
   VideoOff,
 } from 'lucide-react';
 
+import {
+  DEFAULT_LIVE_SESSION_SETTINGS,
+  type LiveSessionSettingsVM,
+} from '@iconicedu/shared-types';
+import { useZoomWhiteboardFeature } from './zoom-video/use-zoom-whiteboard-feature';
+import { useZoomMessagesFeature } from './zoom-video/use-zoom-messages-feature';
+import { useZoomRecordingFeature } from './zoom-video/use-zoom-recording-feature';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import {
   AlertDialog,
@@ -46,12 +51,7 @@ import {
 } from '@iconicedu/ui-web/ui/alert-dialog';
 import { clearLiveSessionRecovery } from '@iconicedu/web/lib/live-sessions/browser-session';
 import { Popover, PopoverContent, PopoverTrigger } from '@iconicedu/ui-web/ui/popover';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@iconicedu/ui-web/ui/tooltip';
+import { TooltipProvider } from '@iconicedu/ui-web/ui/tooltip';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 import {
   logLiveSessionAuditEvent,
@@ -61,7 +61,6 @@ import {
 import {
   acquireZoomClient,
   describeZoomFailure,
-  describeZoomWhiteboardFailure,
   disposeZoomClient,
   dumpZoomFailure,
   initializeAndJoinZoomSession,
@@ -73,11 +72,16 @@ import {
   MIRROR_VIDEO_STORAGE_KEY,
   REACTION_EMOJIS,
 } from './zoom-video/zoom-video-session.constants';
+import {
+  executeZoomCollaborationCommand,
+  enableZoomLiveCaptions,
+  setZoomAnnotationEnabled,
+  hasZoomAnnotationShare,
+} from '@iconicedu/web/lib/live-sessions/zoom-collaboration';
 import { attachCameraTile, detachCameraTile } from './zoom-video/zoom-video-media';
 import type {
   AudioProcessingMode,
   BackgroundPreset,
-  ChatMessageItem,
   CommandChannelPayload,
   FloatingReaction,
   MediaDeviceOption,
@@ -88,6 +92,8 @@ import type {
 import {
   collapseNetworkLevel,
   createFloatingReaction,
+  getReactionOrigin,
+  parseParticipantCommand,
   shouldUsePresentationLayout,
 } from './zoom-video/zoom-video-session.utils';
 import {
@@ -187,12 +193,6 @@ function playJoinChime() {
   }
 }
 
-function waitForWhiteboardSurface() {
-  return new Promise<void>((resolve) => {
-    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
-  });
-}
-
 export function ZoomVideoSessionEmbed({
   sessionName,
   sessionTitle,
@@ -204,6 +204,7 @@ export function ZoomVideoSessionEmbed({
   liveSessionId,
   accessToken,
   sessionPasscode,
+  settings = DEFAULT_LIVE_SESSION_SETTINGS,
 }: {
   sessionName: string;
   sessionTitle?: string;
@@ -218,20 +219,36 @@ export function ZoomVideoSessionEmbed({
   liveSessionId: string;
   accessToken?: string | null;
   sessionPasscode?: string | null;
+  settings?: LiveSessionSettingsVM;
 }) {
   const clientRef = useRef<ZoomClient | null>(null);
   const selfUserIdRef = useRef<number | null>(null);
   const activeShareUserIdRef = useRef<number | null>(null);
   const remoteParticipantsRef = useRef<RemoteParticipant[]>([]);
+  const reactionOverlayRef = useRef<HTMLDivElement | null>(null);
   const selfVideoRef = useRef<HTMLDivElement | null>(null);
   const remoteVideoRefs = useRef(new Map<number, HTMLDivElement>());
+  // flag-exempt: correct the origin of the existing reaction animation.
+  const createParticipantReaction = useCallback((emoji: string, userId: number) => {
+    const tile =
+      userId === selfUserIdRef.current
+        ? selfVideoRef.current
+        : remoteVideoRefs.current.get(userId);
+    const overlay = reactionOverlayRef.current;
+    if (!tile || !overlay) return null;
+    const tileRect = tile.getBoundingClientRect();
+    if (tileRect.width === 0 || tileRect.height === 0) return null;
+    return createFloatingReaction(
+      emoji,
+      getReactionOrigin(tileRect, overlay.getBoundingClientRect()),
+    );
+  }, []);
+
   const pipWindowRef = useRef<Window | null>(null);
   const shareCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const localShareCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const localShareVideoRef = useRef<HTMLVideoElement | null>(null);
-  const whiteboardContainerRef = useRef<HTMLDivElement | null>(null);
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
-  const activePanelRef = useRef<SidePanel>(null);
   const isLeavingRef = useRef(false);
   const isHandRaisedRef = useRef(false);
 
@@ -252,7 +269,6 @@ export function ZoomVideoSessionEmbed({
   // 'annotation-privilege-change' so the Annotate button only appears when
   // it would actually work, instead of always showing and failing silently.
   const [canAnnotate, setCanAnnotate] = useState(true);
-  const [whiteboardError, setWhiteboardError] = useState<string | null>(null);
   const [isPipActive, setIsPipActive] = useState(false);
   const [activeShareUserId, setActiveShareUserId] = useState<number | null>(null);
   const [sharePresenters, setSharePresenters] = useState<
@@ -272,6 +288,28 @@ export function ZoomVideoSessionEmbed({
     () => new Set(),
   );
   const [floatingReactions, setFloatingReactions] = useState<FloatingReaction[]>([]);
+  const [participantReactions, setParticipantReactions] = useState<
+    Record<number, { id: string; emoji: string }>
+  >({});
+  const showParticipantReaction = useCallback(
+    (emoji: string, userId: number) => {
+      const reaction = createParticipantReaction(emoji, userId);
+      const id = reaction?.id ?? `${Date.now()}-${Math.random()}`;
+      setParticipantReactions((previous) => ({ ...previous, [userId]: { id, emoji } }));
+      if (reaction) setFloatingReactions((previous) => [...previous, reaction]);
+      setTimeout(() => {
+        setFloatingReactions((previous) => previous.filter((item) => item.id !== id));
+        setParticipantReactions((previous) => {
+          if (previous[userId]?.id !== id) return previous;
+          const next = { ...previous };
+          delete next[userId];
+          return next;
+        });
+      }, reaction?.durationMs ?? 3000);
+    },
+    [createParticipantReaction],
+  );
+
   // Uplink and downlink arrive as separate events, tracked separately so a
   // later improvement on one direction isn't permanently masked by an older
   // bad reading on the other — the displayed/reported level is the worse of
@@ -289,18 +327,32 @@ export function ZoomVideoSessionEmbed({
   const lastReportedQualityLevelRef = useRef<NetworkLevel | null>(null);
   const captionClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isAnnotating, setIsAnnotating] = useState(false);
-  const [annotationTool, setAnnotationTool] = useState(AnnotationToolType.Pen);
-  const [recordingStatus, setRecordingStatus] = useState<RecordingStatus | null>(null);
-  const [showRecordingBanner, setShowRecordingBanner] = useState(false);
+  const [annotationPending, setAnnotationPending] = useState(false);
+  const annotationPendingRef = useRef(false);
   const [isSelfHost, setIsSelfHost] = useState(false);
+  const recording = useZoomRecordingFeature(
+    status === 'connected' ? clientRef.current : null,
+    isSelfHost,
+    settings.recording,
+  );
+  const recordingStatus = recording.status;
   const [showFeedbackPrompt, setShowFeedbackPrompt] = useState(false);
   const [hasLeft, setHasLeft] = useState(false);
   const [feedbackRating, setFeedbackRating] = useState<number | null>(null);
   const [isFeedbackSubmitting, setIsFeedbackSubmitting] = useState(false);
   const [activePanel, setActivePanel] = useState<SidePanel>(null);
-  const [chatMessages, setChatMessages] = useState<ChatMessageItem[]>([]);
-  const [chatDraft, setChatDraft] = useState('');
-  const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const messages = useZoomMessagesFeature(
+    status === 'connected' ? clientRef.current : null,
+    settings.messages,
+    activePanel === 'chat',
+    displayName,
+  );
+  const {
+    messages: chatMessages,
+    draft: chatDraft,
+    setDraft: setChatDraft,
+    unreadCount: unreadChatCount,
+  } = messages;
   const [cameraList, setCameraList] = useState<MediaDeviceOption[]>([]);
   const [micList, setMicList] = useState<MediaDeviceOption[]>([]);
   const [speakerList, setSpeakerList] = useState<MediaDeviceOption[]>([]);
@@ -330,11 +382,21 @@ export function ZoomVideoSessionEmbed({
   );
   const [hwAccelEncode, setHwAccelEncode] = useState(true);
   const [hwAccelDecode, setHwAccelDecode] = useState(true);
-  const [whiteboardStatus, setWhiteboardStatus] = useState<WhiteboardStatus>(
-    WhiteboardStatus.Closed,
+  const whiteboard = useZoomWhiteboardFeature(
+    status === 'connected' ? clientRef.current : null,
+    settings.whiteboard.enabled,
+    sessionName,
+    activeShareUserId,
   );
-  const [isPresentingWhiteboard, setIsPresentingWhiteboard] = useState(false);
-  const [supportsWhiteboard, setSupportsWhiteboard] = useState(false);
+  const {
+    containerRef: whiteboardContainerRef,
+    status: whiteboardStatus,
+    presenting: isPresentingWhiteboard,
+    supported: supportsWhiteboard,
+    error: whiteboardError,
+    toggle: toggleWhiteboard,
+    exportPdf: exportWhiteboardPdf,
+  } = whiteboard;
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showMobileControls, setShowMobileControls] = useState(false);
 
@@ -350,13 +412,6 @@ export function ZoomVideoSessionEmbed({
   );
 
   useEffect(() => {
-    activePanelRef.current = activePanel;
-    if (activePanel === 'chat') {
-      setUnreadChatCount(0);
-    }
-  }, [activePanel]);
-
-  useEffect(() => {
     if (status !== 'connected') {
       return;
     }
@@ -365,17 +420,10 @@ export function ZoomVideoSessionEmbed({
   }, [status]);
 
   useEffect(() => {
-    if (recordingStatus !== RecordingStatus.Recording) return;
-    setShowRecordingBanner(true);
-    const timeout = setTimeout(() => setShowRecordingBanner(false), 5000);
-    return () => clearTimeout(timeout);
-  }, [recordingStatus]);
-
-  useEffect(() => {
-    if (activeShareUserId === null && isAnnotating) {
+    if (!hasZoomAnnotationShare(activeShareUserId, isSharingScreen) && isAnnotating) {
       setIsAnnotating(false);
     }
-  }, [activeShareUserId, isAnnotating]);
+  }, [activeShareUserId, isSharingScreen, isAnnotating]);
 
   useEffect(() => {
     chatScrollRef.current?.scrollTo({ top: chatScrollRef.current.scrollHeight });
@@ -659,7 +707,9 @@ export function ZoomVideoSessionEmbed({
     // requires the presenter to also call startAnnotation() before the
     // viewer's drawing is actually let through — auto-approve it.
     const handleAnnotationViewerDrawRequest = () => {
-      void client.getMediaStream().startAnnotation();
+      void executeZoomCollaborationCommand(() =>
+        client.getMediaStream().startAnnotation(),
+      ).catch((error) => setShareError(describeZoomFailure(error)));
     };
 
     // Presenters always keep full rights to their own share regardless of
@@ -700,81 +750,6 @@ export function ZoomVideoSessionEmbed({
     // another of their devices).
     const handleSharePrivilegeChange = (payload: { privilege: SharePrivilege }) => {
       setSharePrivilege(payload.privilege);
-    };
-
-    const handleRecordingChange = (recordingStatusPayload: RecordingStatus) => {
-      setRecordingStatus(recordingStatusPayload);
-    };
-
-    const handleWhiteboardStatusChange = (status: WhiteboardStatus) => {
-      setWhiteboardStatus(status);
-      if (status === WhiteboardStatus.Closed) {
-        setIsPresentingWhiteboard(false);
-      }
-    };
-
-    // Mirrors the SDK's own documented pattern for this event (see
-    // event_peer_whiteboard_state_change's JSDoc example): when someone else
-    // starts presenting, auto-join as a viewer; when they stop, leave.
-    const handlePeerWhiteboardStateChange = async (payload: {
-      action: 'Start' | 'Stop';
-      userId: number;
-    }) => {
-      const selfId = selfUserIdRef.current;
-      if (payload.userId === selfId) {
-        return;
-      }
-      const whiteboardClient = client.getWhiteboardClient();
-      if (payload.action === 'Start') {
-        setWhiteboardError(null);
-        setWhiteboardStatus(WhiteboardStatus.Pending);
-        await waitForWhiteboardSurface();
-        if (!whiteboardContainerRef.current) return;
-        try {
-          const result = await whiteboardClient.startWhiteboardView(
-            whiteboardContainerRef.current,
-            payload.userId,
-          );
-          if (result instanceof Error) throw result;
-          setWhiteboardStatus(WhiteboardStatus.InProgress);
-        } catch (error) {
-          setWhiteboardStatus(WhiteboardStatus.Closed);
-          setWhiteboardError(describeZoomWhiteboardFailure(error));
-        }
-      } else {
-        try {
-          const result = await whiteboardClient.stopWhiteboardView();
-          if (result instanceof Error) throw result;
-        } catch (error) {
-          setWhiteboardError(describeZoomWhiteboardFailure(error));
-        } finally {
-          setWhiteboardStatus(WhiteboardStatus.Closed);
-        }
-      }
-    };
-
-    const handleChatMessage = (payload: {
-      id?: string;
-      message?: string;
-      sender: { userId: number; name: string };
-      timestamp: number;
-    }) => {
-      if (!payload.message) {
-        return;
-      }
-      setChatMessages((previous) => [
-        ...previous,
-        {
-          id: payload.id ?? `${payload.sender.userId}-${payload.timestamp}`,
-          senderUserId: payload.sender.userId,
-          senderName: payload.sender.name,
-          message: payload.message as string,
-          timestamp: payload.timestamp,
-        },
-      ]);
-      if (activePanelRef.current !== 'chat') {
-        setUnreadChatCount((count) => count + 1);
-      }
     };
 
     const handleDeviceChange = () => refreshDeviceLists();
@@ -886,21 +861,15 @@ export function ZoomVideoSessionEmbed({
       );
     };
 
-    const handleCommandChannelMessage = (payload: { senderId: number; text: string }) => {
-      if (payload.senderId === selfUserIdRef.current) {
-        return;
-      }
-      let parsed: CommandChannelPayload;
-      try {
-        parsed = JSON.parse(payload.text) as CommandChannelPayload;
-      } catch {
-        return;
-      }
+    const handleCommandChannelMessage = (payload: { senderId: string; text: string }) => {
+      const command = parseParticipantCommand(payload.senderId, payload.text);
+      if (!command || command.userId === selfUserIdRef.current) return;
+      const { userId, payload: parsed } = command;
       if (parsed.type === 'raise-hand') {
         setRaisedHandUserIds((previous) => {
           const next = new Set(previous);
-          if (parsed.raised) next.add(payload.senderId);
-          else next.delete(payload.senderId);
+          if (parsed.raised) next.add(userId);
+          else next.delete(userId);
           return next;
         });
         return;
@@ -915,13 +884,7 @@ export function ZoomVideoSessionEmbed({
         return;
       }
       if (parsed.type === 'reaction') {
-        const reaction = createFloatingReaction(parsed.emoji);
-        setFloatingReactions((previous) => [...previous, reaction]);
-        setTimeout(() => {
-          setFloatingReactions((previous) =>
-            previous.filter((item) => item.id !== reaction.id),
-          );
-        }, reaction.durationMs);
+        showParticipantReaction(parsed.emoji, userId);
       }
     };
 
@@ -945,10 +908,6 @@ export function ZoomVideoSessionEmbed({
     client.on('annotation-privilege-change', handleAnnotationPrivilegeChange);
     client.on('passively-stop-share', handlePassivelyStopShare);
     client.on('share-privilege-change', handleSharePrivilegeChange);
-    client.on('recording-change', handleRecordingChange);
-    client.on('whiteboard-status-change', handleWhiteboardStatusChange);
-    client.on('peer-whiteboard-state-change', handlePeerWhiteboardStateChange);
-    client.on('chat-on-message', handleChatMessage);
     client.on('device-change', handleDeviceChange);
     client.on('network-quality-change', handleNetworkQualityChange);
     client.on('connection-change', handleConnectionChange);
@@ -971,10 +930,14 @@ export function ZoomVideoSessionEmbed({
         selfUserIdRef.current = self.userId;
         setSelfAvatar(self.avatar);
         setIsSelfHost(self.isHost);
+        if (self.isHost && (!settings.messages.visible || !settings.messages.enabled)) {
+          await executeZoomCollaborationCommand(() =>
+            client.getChatClient().setPrivilege(ChatPrivilege.NoOne),
+          );
+        }
         setStatus('connected');
         syncSharePresenters();
         playJoinChime();
-        setRecordingStatus(client.getRecordingClient().getCloudRecordingStatus());
 
         const existingRemoteParticipants = client
           .getAllUser()
@@ -997,32 +960,6 @@ export function ZoomVideoSessionEmbed({
             type: 'raise-hand-state-request',
           } satisfies CommandChannelPayload),
         );
-
-        const whiteboardClient = client.getWhiteboardClient();
-        setSupportsWhiteboard(whiteboardClient.isWhiteboardEnabled());
-
-        // Late join: someone may already be presenting a whiteboard before we
-        // connect — getWhiteboardPresenter() catches that, since the
-        // 'peer-whiteboard-state-change' Start event only fires for joiners
-        // who were already in the session when it started.
-        const existingPresenter = whiteboardClient.getWhiteboardPresenter();
-        if (existingPresenter && existingPresenter.userId !== self.userId) {
-          setWhiteboardStatus(WhiteboardStatus.Pending);
-          await waitForWhiteboardSurface();
-          if (whiteboardContainerRef.current) {
-            try {
-              const result = await whiteboardClient.startWhiteboardView(
-                whiteboardContainerRef.current,
-                existingPresenter.userId,
-              );
-              if (result instanceof Error) throw result;
-              setWhiteboardStatus(WhiteboardStatus.InProgress);
-            } catch (error) {
-              setWhiteboardStatus(WhiteboardStatus.Closed);
-              setWhiteboardError(describeZoomWhiteboardFailure(error));
-            }
-          }
-        }
 
         const stream = client.getMediaStream();
         refreshDeviceLists();
@@ -1094,10 +1031,6 @@ export function ZoomVideoSessionEmbed({
       client.off('annotation-privilege-change', handleAnnotationPrivilegeChange);
       client.off('passively-stop-share', handlePassivelyStopShare);
       client.off('share-privilege-change', handleSharePrivilegeChange);
-      client.off('recording-change', handleRecordingChange);
-      client.off('whiteboard-status-change', handleWhiteboardStatusChange);
-      client.off('peer-whiteboard-state-change', handlePeerWhiteboardStateChange);
-      client.off('chat-on-message', handleChatMessage);
       client.off('device-change', handleDeviceChange);
       client.off('network-quality-change', handleNetworkQualityChange);
       client.off('connection-change', handleConnectionChange);
@@ -1117,8 +1050,10 @@ export function ZoomVideoSessionEmbed({
     initialMuted,
     initialVideoOff,
     updateRemoteParticipants,
+    showParticipantReaction,
     liveSessionId,
     accessToken,
+    settings,
   ]);
 
   const toggleMute = useCallback(async () => {
@@ -1144,11 +1079,12 @@ export function ZoomVideoSessionEmbed({
     const stream = client.getMediaStream();
     const container = selfVideoRef.current;
     if (isVideoOn) {
+      // Cover the renderer before the SDK stops delivering camera frames.
+      setIsVideoOn(false);
       await stream.stopVideo().catch(() => null);
       if (container) {
         await detachCameraTile(client, selfId, container);
       }
-      setIsVideoOn(false);
     } else {
       try {
         await stream.startVideo();
@@ -1223,126 +1159,22 @@ export function ZoomVideoSessionEmbed({
     [activeShareUserId],
   );
 
-  const toggleAnnotation = useCallback(
-    async (requestedTool?: AnnotationToolType) => {
-      const client = clientRef.current;
-      if (!client) {
-        return;
-      }
-      const stream = client.getMediaStream();
-      setShareError(null);
-      if (isAnnotating) {
-        await stream.stopAnnotation().catch(() => null);
-        setIsAnnotating(false);
-      } else {
-        // canDoAnnotation() reflects whether the Video SDK app itself has the
-        // Annotation feature enabled (Zoom Marketplace → your app → Features) —
-        // the same kind of account-level gate that silently broke the
-        // whiteboard before canStartWhiteboard() was checked there. Previously
-        // a false/thrown result here was swallowed with zero feedback, so
-        // clicking Annotate looked like it did nothing at all.
-        if (!stream.canDoAnnotation()) {
-          setShareError(
-            "Annotation couldn't be started — it may not be enabled for this account, or the account owner needs to turn it on for this app in the Zoom Marketplace.",
-          );
-          return;
-        }
-        try {
-          await stream.startAnnotation();
-          const selectedTool = requestedTool ?? annotationTool;
-          stream.getAnnotationController().setToolType(selectedTool);
-          setAnnotationTool(selectedTool);
-          setIsAnnotating(true);
-        } catch (error) {
-          // eslint-disable-next-line no-console
-          console.error('Zoom annotation failed to start', error);
-          setShareError(describeZoomFailure(error));
-        }
-      }
-    },
-    [isAnnotating, annotationTool],
-  );
-
-  const selectAnnotationTool = useCallback((tool: AnnotationToolType) => {
-    setAnnotationTool(tool);
-    clientRef.current?.getMediaStream().getAnnotationController().setToolType(tool);
-  }, []);
-
-  const selectAnnotationColor = useCallback((color: number) => {
-    clientRef.current?.getMediaStream().getAnnotationController().setToolColor(color);
-  }, []);
-
-  const toggleWhiteboard = useCallback(async () => {
+  const toggleAnnotation = useCallback(async () => {
     const client = clientRef.current;
-    if (!client) {
-      return;
-    }
-    setWhiteboardError(null);
-    const whiteboardClient = client.getWhiteboardClient();
-    const presenter = whiteboardClient.getWhiteboardPresenter();
-    const isCurrentUserPresenting = presenter?.userId === selfUserIdRef.current;
-    if (isCurrentUserPresenting) {
-      try {
-        const result = await whiteboardClient.stopWhiteboardScreen();
-        if (result instanceof Error) throw result;
-        setIsPresentingWhiteboard(false);
-        setWhiteboardStatus(WhiteboardStatus.Closed);
-      } catch (error) {
-        setWhiteboardError(describeZoomWhiteboardFailure(error));
-      }
-    } else if (presenter) {
-      setWhiteboardError('Another participant is already presenting a whiteboard.');
-    } else if (whiteboardContainerRef.current) {
-      // canStartWhiteboard() is Zoom's single authoritative gate — it folds
-      // in permissions, current sharing state, and whiteboard status, so it
-      // catches cases (e.g. a non-host lacking whiteboard permission) that
-      // our own isSomeoneSharing/isWhiteboardActive checks can't see. It was
-      // previously a silent no-op when this returned false — clicking the
-      // button looked like it did nothing at all.
-      if (!whiteboardClient.canStartWhiteboard()) {
-        setWhiteboardError(
-          activeShareUserId !== null
-            ? 'End screen sharing before starting the whiteboard.'
-            : "Whiteboard couldn't be started — you may not have permission, or it's unavailable for this account.",
-        );
-        return;
-      }
-      try {
-        // Reveal the mounted render target before Zoom initializes against
-        // its painted dimensions. React state updates asynchronously, so wait
-        // for two animation frames, matching the sample's required ordering:
-        // show the surface first, then call startWhiteboardScreen().
-        setWhiteboardStatus(WhiteboardStatus.Pending);
-        await waitForWhiteboardSurface();
-        if (!whiteboardContainerRef.current) {
-          setWhiteboardStatus(WhiteboardStatus.Closed);
-          return;
-        }
-        const result = await whiteboardClient.startWhiteboardScreen(
-          whiteboardContainerRef.current,
-        );
-        if (result instanceof Error) throw result;
-        setIsPresentingWhiteboard(true);
-        setWhiteboardStatus(WhiteboardStatus.InProgress);
-      } catch (error) {
-        setWhiteboardStatus(WhiteboardStatus.Closed);
-        setIsPresentingWhiteboard(false);
-        setWhiteboardError(describeZoomWhiteboardFailure(error));
-      }
-    }
-  }, [activeShareUserId]);
-
-  const exportWhiteboardPdf = useCallback(async () => {
-    setWhiteboardError(null);
+    if (!client || annotationPendingRef.current) return;
+    annotationPendingRef.current = true;
+    setAnnotationPending(true);
+    setShareError(null);
     try {
-      const result = await clientRef.current
-        ?.getWhiteboardClient()
-        .exportWhiteboard('pdf', `whiteboard-${sessionName}`);
-      if (result instanceof Error) throw result;
+      await setZoomAnnotationEnabled(client.getMediaStream(), !isAnnotating);
+      setIsAnnotating(!isAnnotating);
     } catch (error) {
-      setWhiteboardError(describeZoomWhiteboardFailure(error));
+      setShareError(describeZoomFailure(error));
+    } finally {
+      annotationPendingRef.current = false;
+      setAnnotationPending(false);
     }
-  }, [sessionName]);
+  }, [isAnnotating]);
 
   // Video SDK has no built-in raise-hand API — this broadcasts a small JSON
   // payload over the generic command channel instead (see
@@ -1366,22 +1198,21 @@ export function ZoomVideoSessionEmbed({
 
   // Same command-channel approach as raise-hand — Video SDK also has no
   // native emoji-reaction API in this version.
-  const sendReaction = useCallback((emoji: string) => {
-    const client = clientRef.current;
-    if (!client) {
-      return;
-    }
-    const reaction = createFloatingReaction(emoji);
-    setFloatingReactions((previous) => [...previous, reaction]);
-    setTimeout(() => {
-      setFloatingReactions((previous) =>
-        previous.filter((item) => item.id !== reaction.id),
-      );
-    }, reaction.durationMs);
-    void client
-      .getCommandClient()
-      .send(JSON.stringify({ type: 'reaction', emoji } satisfies CommandChannelPayload));
-  }, []);
+  const sendReaction = useCallback(
+    (emoji: string) => {
+      const client = clientRef.current;
+      if (!client) {
+        return;
+      }
+      showParticipantReaction(emoji, client.getCurrentUserInfo().userId);
+      void client
+        .getCommandClient()
+        .send(
+          JSON.stringify({ type: 'reaction', emoji } satisfies CommandChannelPayload),
+        );
+    },
+    [showParticipantReaction],
+  );
 
   const toggleCaptions = useCallback(async () => {
     const client = clientRef.current;
@@ -1391,18 +1222,17 @@ export function ZoomVideoSessionEmbed({
     setCaptionsError(null);
     const transcriptionClient = client.getLiveTranscriptionClient();
     if (isCaptionsOn) {
-      transcriptionClient.disableCaptions(true);
       setIsCaptionsOn(false);
       setCaptionText('');
       return;
     }
     try {
-      await transcriptionClient.startLiveTranscription();
-      transcriptionClient.disableCaptions(false);
+      await enableZoomLiveCaptions(
+        transcriptionClient,
+        client.getCurrentUserInfo().isHost,
+      );
       setIsCaptionsOn(true);
     } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Zoom live captions failed to start', error);
       setCaptionsError(describeZoomFailure(error));
     }
   }, [isCaptionsOn]);
@@ -1532,30 +1362,6 @@ export function ZoomVideoSessionEmbed({
   useEffect(() => {
     return () => exitPip();
   }, [exitPip]);
-
-  const sendChatMessage = useCallback(async () => {
-    const client = clientRef.current;
-    const text = chatDraft.trim();
-    if (!client || !text) {
-      return;
-    }
-    setChatDraft('');
-    const result = await client.getChatClient().sendToAll(text);
-    if (result instanceof Error) {
-      return;
-    }
-    // Zoom doesn't echo your own sent message back through 'chat-on-message'.
-    setChatMessages((previous) => [
-      ...previous,
-      {
-        id: result.id ?? `self-${result.timestamp}`,
-        senderUserId: selfUserIdRef.current ?? -1,
-        senderName: displayName,
-        message: text,
-        timestamp: result.timestamp,
-      },
-    ]);
-  }, [chatDraft, displayName]);
 
   const selectCamera = useCallback((deviceId: string) => {
     setActiveCameraId(deviceId);
@@ -1761,7 +1567,7 @@ export function ZoomVideoSessionEmbed({
     : shareError
       ? { message: shareError, onDismiss: () => setShareError(null) }
       : whiteboardError
-        ? { message: whiteboardError, onDismiss: () => setWhiteboardError(null) }
+        ? { message: whiteboardError, onDismiss: whiteboard.dismissError }
         : captionsError
           ? { message: captionsError, onDismiss: () => setCaptionsError(null) }
           : null;
@@ -1824,11 +1630,11 @@ export function ZoomVideoSessionEmbed({
               {...meetingNotice}
               className={isShowingLocalShare ? 'top-32' : 'top-20 sm:top-24'}
             />
-          ) : showRecordingBanner && !isAnnotating ? (
+          ) : recording.showBanner && !isAnnotating ? (
             <ZoomMeetingNotice
               message="This session is being recorded"
               tone="warning"
-              onDismiss={() => setShowRecordingBanner(false)}
+              onDismiss={recording.dismissBanner}
               className={isShowingLocalShare ? 'top-32' : 'top-20 sm:top-24'}
             />
           ) : null}
@@ -1836,23 +1642,8 @@ export function ZoomVideoSessionEmbed({
           <ZoomAnnotationControls
             available={isShowingLocalShare || (isSomeoneSharing && canAnnotate)}
             isAnnotating={isAnnotating}
-            selectedTool={annotationTool}
-            onStart={(tool) => void toggleAnnotation(tool)}
-            onSelectTool={selectAnnotationTool}
-            onSelectColor={selectAnnotationColor}
-            onUndo={() =>
-              clientRef.current?.getMediaStream().getAnnotationController().undo()
-            }
-            onRedo={() =>
-              clientRef.current?.getMediaStream().getAnnotationController().redo()
-            }
-            onClear={() =>
-              clientRef.current
-                ?.getMediaStream()
-                .getAnnotationController()
-                .clear(AnnotationClearType.Mine)
-            }
-            onClose={() => void toggleAnnotation()}
+            pending={annotationPending}
+            onToggle={() => void toggleAnnotation()}
           />
 
           <ZoomShareStage
@@ -1945,79 +1736,56 @@ export function ZoomVideoSessionEmbed({
             >
               <ZoomMeetingTimer elapsedSeconds={elapsedSeconds} />
 
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <MeetingControlButton
-                    label={isMuted ? 'Unmute microphone' : 'Mute microphone'}
-                    tone={isMuted ? 'danger' : 'neutral'}
-                    aria-pressed={!isMuted}
-                    onClick={() => void toggleMute()}
-                  >
-                    <PoppingIcon toggleKey={isMuted}>
-                      {isMuted ? (
-                        <MicOff className="h-4 w-4" />
-                      ) : (
-                        <Mic className="h-4 w-4" />
-                      )}
-                    </PoppingIcon>
-                  </MeetingControlButton>
-                </TooltipTrigger>
-                <TooltipContent>{isMuted ? 'Unmute' : 'Mute'}</TooltipContent>
-              </Tooltip>
+              <MeetingControlButton
+                tooltip={isMuted ? 'Unmute' : 'Mute'}
+                label={isMuted ? 'Unmute microphone' : 'Mute microphone'}
+                tone={isMuted ? 'danger' : 'neutral'}
+                aria-pressed={!isMuted}
+                onClick={() => void toggleMute()}
+              >
+                <PoppingIcon toggleKey={isMuted}>
+                  {isMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                </PoppingIcon>
+              </MeetingControlButton>
 
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <MeetingControlButton
-                    label={isVideoOn ? 'Stop camera' : 'Start camera'}
-                    tone={isVideoOn ? 'neutral' : 'danger'}
-                    aria-pressed={isVideoOn}
-                    onClick={() => void toggleVideo()}
-                  >
-                    <PoppingIcon toggleKey={isVideoOn}>
-                      {isVideoOn ? (
-                        <Video className="h-4 w-4" />
-                      ) : (
-                        <VideoOff className="h-4 w-4" />
-                      )}
-                    </PoppingIcon>
-                  </MeetingControlButton>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {isVideoOn ? 'Stop video' : 'Start video'}
-                </TooltipContent>
-              </Tooltip>
+              <MeetingControlButton
+                tooltip={isVideoOn ? 'Stop video' : 'Start video'}
+                label={isVideoOn ? 'Stop camera' : 'Start camera'}
+                tone={isVideoOn ? 'neutral' : 'danger'}
+                aria-pressed={isVideoOn}
+                onClick={() => void toggleVideo()}
+              >
+                <PoppingIcon toggleKey={isVideoOn}>
+                  {isVideoOn ? (
+                    <Video className="h-4 w-4" />
+                  ) : (
+                    <VideoOff className="h-4 w-4" />
+                  )}
+                </PoppingIcon>
+              </MeetingControlButton>
 
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <MeetingControlButton
-                    label={isSharingScreen ? 'Stop sharing screen' : 'Share screen'}
-                    tone={isSharingScreen ? 'active' : 'neutral'}
-                    aria-pressed={isSharingScreen}
-                    disabled={isWhiteboardActive || !supportsScreenShare}
-                    onClick={() => void toggleScreenShare()}
-                  >
-                    <PoppingIcon toggleKey={isSharingScreen}>
-                      {isSharingScreen ? (
-                        <MonitorX className="h-4 w-4" />
-                      ) : (
-                        <MonitorUp className="h-4 w-4" />
-                      )}
-                    </PoppingIcon>
-                  </MeetingControlButton>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {!supportsScreenShare
+              <MeetingControlButton
+                tooltip={
+                  !supportsScreenShare
                     ? 'Screen sharing is not supported by this browser'
                     : isWhiteboardActive
                       ? 'End the whiteboard to share your screen'
-                      : 'Share screen'}
-                </TooltipContent>
-              </Tooltip>
-
-              <ZoomShareMeetingDialog
-                meetingTitle={sessionTitle ?? sessionName}
-                meetingPasscode={sessionPasscode}
-              />
+                      : 'Share screen'
+                }
+                label={isSharingScreen ? 'Stop sharing screen' : 'Share screen'}
+                tone={isSharingScreen ? 'active' : 'neutral'}
+                aria-pressed={isSharingScreen}
+                disabled={isWhiteboardActive || !supportsScreenShare}
+                onClick={() => void toggleScreenShare()}
+              >
+                <PoppingIcon toggleKey={isSharingScreen}>
+                  {isSharingScreen ? (
+                    <MonitorX className="h-4 w-4" />
+                  ) : (
+                    <MonitorUp className="h-4 w-4" />
+                  )}
+                </PoppingIcon>
+              </MeetingControlButton>
 
               <ZoomSettingsPanel
                 open={isSettingsOpen}
@@ -2053,38 +1821,39 @@ export function ZoomVideoSessionEmbed({
               />
 
               {supportsWhiteboard && (!isSomeoneSharing || isPresentingWhiteboard) ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <MeetingControlButton
-                      label={
-                        isPresentingWhiteboard ? 'Stop whiteboard' : 'Start whiteboard'
-                      }
-                      tone={isPresentingWhiteboard ? 'active' : 'neutral'}
-                      disabled={
-                        !isPresentingWhiteboard &&
-                        (isSomeoneSharing || isWhiteboardActive)
-                      }
-                      onClick={() => void toggleWhiteboard()}
-                    >
-                      <PoppingIcon toggleKey={isPresentingWhiteboard}>
-                        <PenTool className="size-4" />
-                      </PoppingIcon>
-                    </MeetingControlButton>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    {isPresentingWhiteboard
+                <MeetingControlButton
+                  tooltip={
+                    isPresentingWhiteboard
                       ? 'Stop whiteboard'
                       : isWhiteboardActive
                         ? 'The other person is presenting the whiteboard'
-                        : 'Start whiteboard'}
-                  </TooltipContent>
-                </Tooltip>
+                        : 'Start whiteboard'
+                  }
+                  label={isPresentingWhiteboard ? 'Stop whiteboard' : 'Start whiteboard'}
+                  tone={isPresentingWhiteboard ? 'active' : 'neutral'}
+                  disabled={
+                    !isPresentingWhiteboard && (isSomeoneSharing || isWhiteboardActive)
+                  }
+                  onClick={() => void toggleWhiteboard()}
+                >
+                  <PoppingIcon toggleKey={isPresentingWhiteboard}>
+                    <Pencil className="size-4" />
+                  </PoppingIcon>
+                </MeetingControlButton>
               ) : null}
 
+              {settings.invite.enabled ? (
+                <ZoomShareMeetingDialog
+                  meetingTitle={sessionTitle ?? sessionName}
+                  meetingPasscode={sessionPasscode}
+                />
+              ) : null}
               <ZoomMoreControls
+                error={recording.error ?? messages.error}
                 open={showMobileControls}
                 onOpenChange={setShowMobileControls}
                 actions={[
+                  ...(recording.action ? [recording.action] : []),
                   {
                     id: 'participants',
                     label: `Participants (${remoteParticipants.length + 1})`,
@@ -2143,27 +1912,25 @@ export function ZoomVideoSessionEmbed({
                       setIsSettingsOpen(true);
                     },
                   },
-                ]}
+                ].filter(
+                  (action) =>
+                    (action.id !== 'participants' || settings.participants.visible) &&
+                    (action.id !== 'messages' || settings.messages.visible),
+                )}
               />
               <ZoomMeetingSideDock>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <ZoomMeetingDockButton
-                      label={isHandRaised ? 'Lower hand' : 'Raise hand'}
-                      active={isHandRaised}
-                      className="size-12 px-0 shadow-md ring-1 ring-border/70"
-                      aria-pressed={isHandRaised}
-                      onClick={toggleHandRaise}
-                    >
-                      <PoppingIcon toggleKey={isHandRaised}>
-                        <Hand className="size-5" />
-                      </PoppingIcon>
-                    </ZoomMeetingDockButton>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    {isHandRaised ? 'Lower hand' : 'Raise hand'}
-                  </TooltipContent>
-                </Tooltip>
+                <ZoomMeetingDockButton
+                  tooltip={isHandRaised ? 'Lower hand' : 'Raise hand'}
+                  label={isHandRaised ? 'Lower hand' : 'Raise hand'}
+                  active={isHandRaised}
+                  className="size-12 px-0 shadow-md ring-1 ring-border/70"
+                  aria-pressed={isHandRaised}
+                  onClick={toggleHandRaise}
+                >
+                  <PoppingIcon toggleKey={isHandRaised}>
+                    <Hand className="size-5" />
+                  </PoppingIcon>
+                </ZoomMeetingDockButton>
 
                 <Popover>
                   <PopoverTrigger asChild>
@@ -2194,93 +1961,95 @@ export function ZoomVideoSessionEmbed({
                   </PopoverContent>
                 </Popover>
 
-                <ZoomParticipantsPanel
-                  open={activePanel === 'users'}
-                  canMuteOthers={isSelfHost}
-                  className="zoom-toolbar-people zoom-toolbar-secondary"
-                  participants={[
-                    {
-                      userId: selfUserIdRef.current ?? -1,
-                      name: displayName,
-                      avatarUrl: selfAvatar,
-                      isYou: true,
-                      isHost: isSelfHost,
-                      muted: isMuted,
-                      videoOn: isVideoOn,
-                      handRaised: isHandRaised,
-                      isSpeaking:
-                        selfUserIdRef.current !== null &&
-                        activeSpeakerUserId === selfUserIdRef.current,
-                    },
-                    ...remoteParticipants.map((participant) => ({
-                      userId: participant.userId,
-                      name: participant.displayName,
-                      avatarUrl: participant.avatar,
-                      isYou: false,
-                      isHost: participant.isHost,
-                      muted: participant.muted,
-                      videoOn: participant.bVideoOn,
-                      handRaised: raisedHandUserIds.has(participant.userId),
-                      isSpeaking: activeSpeakerUserId === participant.userId,
-                    })),
-                  ]}
-                  onOpenChange={(open) => {
-                    setActivePanel(open ? 'users' : null);
-                    if (open) setIsSettingsOpen(false);
-                  }}
-                  onMute={(userId, name) => muteParticipant(userId, name)}
-                />
+                {settings.participants.visible ? (
+                  <ZoomParticipantsPanel
+                    open={activePanel === 'users'}
+                    canMuteOthers={isSelfHost}
+                    className="zoom-toolbar-people zoom-toolbar-secondary"
+                    participants={[
+                      {
+                        userId: selfUserIdRef.current ?? -1,
+                        name: displayName,
+                        avatarUrl: selfAvatar,
+                        isYou: true,
+                        isHost: isSelfHost,
+                        muted: isMuted,
+                        videoOn: isVideoOn,
+                        handRaised: isHandRaised,
+                        reaction:
+                          participantReactions[selfUserIdRef.current ?? -1]?.emoji,
+                        isSpeaking:
+                          selfUserIdRef.current !== null &&
+                          activeSpeakerUserId === selfUserIdRef.current,
+                      },
+                      ...remoteParticipants.map((participant) => ({
+                        userId: participant.userId,
+                        name: participant.displayName,
+                        avatarUrl: participant.avatar,
+                        isYou: false,
+                        isHost: participant.isHost,
+                        muted: participant.muted,
+                        videoOn: participant.bVideoOn,
+                        handRaised: raisedHandUserIds.has(participant.userId),
+                        reaction: participantReactions[participant.userId]?.emoji,
+                        isSpeaking: activeSpeakerUserId === participant.userId,
+                      })),
+                    ]}
+                    onOpenChange={(open) => {
+                      setActivePanel(open ? 'users' : null);
+                      if (open) setIsSettingsOpen(false);
+                    }}
+                    onMute={(userId, name) => muteParticipant(userId, name)}
+                  />
+                ) : null}
 
-                <ZoomChatPanel
-                  open={activePanel === 'chat'}
-                  unreadCount={unreadChatCount}
-                  messages={chatMessages}
-                  draft={chatDraft}
-                  selfUserId={selfUserIdRef.current}
-                  scrollRef={chatScrollRef}
-                  className="zoom-toolbar-chat zoom-toolbar-secondary"
-                  onOpenChange={(open) => {
-                    setActivePanel(open ? 'chat' : null);
-                    if (open) setIsSettingsOpen(false);
-                  }}
-                  onDraftChange={setChatDraft}
-                  onSend={() => void sendChatMessage()}
-                />
+                {settings.messages.visible ? (
+                  <ZoomChatPanel
+                    enabled={settings.messages.enabled}
+                    open={activePanel === 'chat'}
+                    unreadCount={unreadChatCount}
+                    messages={chatMessages}
+                    draft={chatDraft}
+                    selfUserId={selfUserIdRef.current}
+                    scrollRef={chatScrollRef}
+                    className="zoom-toolbar-chat zoom-toolbar-secondary"
+                    onOpenChange={(open) => {
+                      setActivePanel(open ? 'chat' : null);
+                      if (open) setIsSettingsOpen(false);
+                    }}
+                    onDraftChange={setChatDraft}
+                    onSend={() => void messages.send()}
+                  />
+                ) : null}
               </ZoomMeetingSideDock>
 
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <MeetingControlButton
-                    tone="danger"
-                    className="zoom-toolbar-leave sticky right-0 z-10"
-                    label={
-                      isSelfHost && remoteParticipants.length === 0
-                        ? 'End class'
-                        : isSelfHost
-                          ? 'Leave or end class'
-                          : 'Leave class'
-                    }
-                    onClick={() => setShowEndForAllConfirm(true)}
-                  >
-                    <PoppingIcon
-                      toggleKey={isSelfHost && remoteParticipants.length === 0}
-                    >
-                      {isSelfHost && remoteParticipants.length === 0 ? (
-                        <OctagonX className="h-4 w-4" />
-                      ) : (
-                        <PhoneOff className="h-4 w-4" />
-                      )}
-                    </PoppingIcon>
-                  </MeetingControlButton>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {isSelfHost && remoteParticipants.length === 0
+              <MeetingControlButton
+                tooltip={
+                  isSelfHost && remoteParticipants.length === 0
                     ? 'End class'
                     : isSelfHost
                       ? 'Leave or end class'
-                      : 'Leave'}
-                </TooltipContent>
-              </Tooltip>
+                      : 'Leave'
+                }
+                tone="danger"
+                className="zoom-toolbar-leave sticky right-0 z-10"
+                label={
+                  isSelfHost && remoteParticipants.length === 0
+                    ? 'End class'
+                    : isSelfHost
+                      ? 'Leave or end class'
+                      : 'Leave class'
+                }
+                onClick={() => setShowEndForAllConfirm(true)}
+              >
+                <PoppingIcon toggleKey={isSelfHost && remoteParticipants.length === 0}>
+                  {isSelfHost && remoteParticipants.length === 0 ? (
+                    <OctagonX className="h-4 w-4" />
+                  ) : (
+                    <PhoneOff className="h-4 w-4" />
+                  )}
+                </PoppingIcon>
+              </MeetingControlButton>
             </div>
           </div>
         ) : null}
@@ -2325,18 +2094,20 @@ export function ZoomVideoSessionEmbed({
           </div>
         ) : null}
 
-        {/* Pops up from the middle of the stage, drifts/tumbles outward by
-              a random amount (see createFloatingReaction), then floats up
-              and fades — a bit of per-reaction randomness reads as more
-              alive than every click producing an identical straight-up
-              float in the same spot. */}
-        <div className="pointer-events-none absolute inset-0 z-30 overflow-hidden">
+        {/* Reactions pop from the sender's visible tile, then drift up and fade. */}
+        <div
+          ref={reactionOverlayRef}
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 z-30 overflow-hidden"
+        >
           {floatingReactions.map((reaction) => (
             <span
               key={reaction.id}
-              className="absolute left-1/2 top-1/2 text-5xl will-change-transform"
+              className="absolute text-5xl will-change-transform"
               style={
                 {
+                  left: reaction.origin.x,
+                  top: reaction.origin.y,
                   '--dx': `${reaction.dx}px`,
                   '--rot': `${reaction.rotate}deg`,
                   animation: `float-reaction ${reaction.durationMs}ms forwards`,

@@ -56,4 +56,51 @@ describe('DevicePreviewStep', () => {
       expect(onJoin).toHaveBeenCalledWith({ muted: true, videoOff: true }),
     );
   });
+  it.each(['denied', 'unavailable'])(
+    'defaults both devices off when preview is %s',
+    async (mode) => {
+      if (mode === 'unavailable')
+        Object.defineProperty(navigator, 'mediaDevices', {
+          configurable: true,
+          value: undefined,
+        });
+      else
+        vi.mocked(navigator.mediaDevices.getUserMedia).mockRejectedValue(
+          new Error('Denied'),
+        );
+      const onJoin = vi.fn();
+      const user = userEvent.setup();
+      render(
+        <DevicePreviewStep displayName="Alex" sessionTitle="Science" onJoin={onJoin} />,
+      );
+      await screen.findByText(
+        'Camera/microphone access was blocked. You can still join with them off and enable them later.',
+      );
+      await user.click(screen.getByRole('button', { name: 'Join session' }));
+      expect(onJoin).toHaveBeenCalledWith({ muted: true, videoOff: true });
+    },
+  );
+
+  it('stops a preview stream that arrives after the component unmounts', async () => {
+    let finish!: (stream: MediaStream) => void;
+    vi.mocked(navigator.mediaDevices.getUserMedia).mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
+    const view = render(
+      <DevicePreviewStep
+        displayName="Alex"
+        sessionTitle="Science"
+        onJoin={() => undefined}
+      />,
+    );
+    await waitFor(() => expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalled());
+    view.unmount();
+    finish({ getTracks: () => [audioTrack, videoTrack] } as unknown as MediaStream);
+    await waitFor(() => {
+      expect(audioTrack.stop).toHaveBeenCalledOnce();
+      expect(videoTrack.stop).toHaveBeenCalledOnce();
+    });
+  });
 });

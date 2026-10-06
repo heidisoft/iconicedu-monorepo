@@ -1,3 +1,5 @@
+import { evaluateApiBooleanFlag } from '@iconicedu/api/lib/flags/posthog-openfeature';
+import { DEFAULT_LIVE_SESSION_SETTINGS } from '@iconicedu/shared-types';
 import {
   BadRequestException,
   ForbiddenException,
@@ -12,6 +14,10 @@ import {
   verifyZoomPasscode,
 } from '@iconicedu/live-sessions-core';
 import { LiveSessionsService } from '@iconicedu/api/modules/live-sessions/live-sessions.service';
+
+jest.mock('@iconicedu/api/lib/flags/posthog-openfeature', () => ({
+  evaluateApiBooleanFlag: jest.fn(),
+}));
 
 jest.mock('@iconicedu/api/lib/supabase/service', () => ({
   createSupabaseServiceClient: jest.fn(),
@@ -41,6 +47,7 @@ describe('LiveSessionsService.joinLiveSession', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.mocked(evaluateApiBooleanFlag).mockResolvedValue(false);
     createSupabaseServiceClientMock.mockReturnValue({
       from: jest.fn(() => ({
         select: jest.fn().mockReturnThis(),
@@ -61,6 +68,51 @@ describe('LiveSessionsService.joinLiveSession', () => {
       },
     } as never);
   });
+
+  it.each([false, true])(
+    'uses the saved manager flag to snapshot policy only when enabled=%s',
+    async (enabled) => {
+      jest.mocked(evaluateApiBooleanFlag).mockResolvedValue(enabled);
+      loadAndAuthorizeProfileMock.mockResolvedValue({
+        profile: { id: 'participant', account_id: 'account', org_id: 'org-1' } as never,
+        account: { id: 'account', org_id: 'org-1' },
+      });
+      const policy = { ...DEFAULT_LIVE_SESSION_SETTINGS, invite: { enabled: false } };
+      createSupabaseServiceClientMock.mockReturnValue({
+        from: (table: string) => ({
+          select: jest.fn().mockReturnThis(),
+          eq: jest.fn().mockReturnThis(),
+          is: jest.fn().mockReturnThis(),
+          maybeSingle: async () => ({
+            data:
+              table === 'orgs'
+                ? { slug: 'academy' }
+                : {
+                    live_session_config: {
+                      settings: policy,
+                      settingsProfileId: 'manager',
+                    },
+                  },
+            error: null,
+          }),
+        }),
+      } as never);
+      createOrJoinLiveSessionMock.mockResolvedValue({
+        sessionId: 'session',
+        joinPath: '/live/session',
+        status: 'live',
+        created: true,
+        provider: 'zoom',
+      });
+      await new LiveSessionsService().joinLiveSession('token', 'channel', input);
+      expect(evaluateApiBooleanFlag).toHaveBeenCalledWith(
+        expect.objectContaining({ distinctId: 'manager' }),
+      );
+      const call = createOrJoinLiveSessionMock.mock.calls[0][0];
+      if (enabled) expect(call.meetingSettings).toEqual(policy);
+      else expect(call).not.toHaveProperty('meetingSettings');
+    },
+  );
 
   it('joins a live session once the acting profile is authorized', async () => {
     loadAndAuthorizeProfileMock.mockResolvedValue({
@@ -188,6 +240,7 @@ describe('LiveSessionsService.guestJoinLiveSession', () => {
       sessionName: 'ls-session',
       displayName: 'Taylor Reed',
       expiresAt: null,
+      settings: DEFAULT_LIVE_SESSION_SETTINGS,
     });
     expect(getJoinAccess).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -197,6 +250,29 @@ describe('LiveSessionsService.guestJoinLiveSession', () => {
       }),
     );
     expect(String(getJoinAccess.mock.calls[0][0].profileId)).toMatch(/^guest:/);
+  });
+
+  it('rejects anonymous shared-link joins when invitations are disabled', async () => {
+    mockSessionRow({
+      id: 'invite-disabled-session',
+      org_id: 'org',
+      channel_id: 'channel',
+      provider: 'zoom',
+      status: 'live',
+      provider_metadata: { passcode: 'abc123xyz9' },
+      app_metadata: {
+        meetingSettings: { ...DEFAULT_LIVE_SESSION_SETTINGS, invite: { enabled: false } },
+      },
+    });
+    verifyZoomPasscodeMock.mockReturnValue(true);
+    await expect(
+      new LiveSessionsService().guestJoinLiveSession(
+        'invite-disabled-session',
+        'test-invite-ip',
+        guestInput,
+      ),
+    ).rejects.toThrow('Shared invitations are disabled');
+    expect(getLiveSessionProviderMock).not.toHaveBeenCalled();
   });
 
   it('rejects an incorrect passcode without minting a token', async () => {

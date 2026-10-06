@@ -1,91 +1,46 @@
-// Public (no-auth) endpoints, called from the client — unlike the rest of
-// apps/web/lib/live-sessions, which runs server-side with a service-role
-// Supabase client. Mirrors the pattern in lib/assessments/api.ts's public
-// delivery lookup: NEXT_PUBLIC_API_URL only, since this also runs in the browser.
-const DEFAULT_LOCAL_API_URL = 'http://localhost:3001';
+import type { LiveSessionJoinCredentialsVM } from '@iconicedu/shared-types';
+import { ApiHttpError, createPublicApiClient } from '@iconicedu/web/lib/api/http-client';
 
-function getApiUrl() {
-  return (process.env.NEXT_PUBLIC_API_URL ?? DEFAULT_LOCAL_API_URL).replace(/\/+$/, '');
+export type GuestLiveSessionJoinResult = LiveSessionJoinCredentialsVM;
+export type GuestLiveSessionJoinError = { status: number; message: string };
+
+function describeRequestFailure(error: unknown): GuestLiveSessionJoinError {
+  return error instanceof ApiHttpError
+    ? { status: error.status, message: error.message }
+    : { status: 0, message: 'Unable to reach the server' };
 }
-
-export type GuestLiveSessionJoinResult = {
-  token: string;
-  sessionName: string;
-  displayName: string;
-  expiresAt: string | null;
-};
-
-export type GuestLiveSessionJoinError = {
-  status: number;
-  message: string;
-};
 
 export async function guestJoinLiveSession(
   sessionId: string,
   body: { displayName: string; passcode: string },
+  accessToken?: string | null,
 ): Promise<GuestLiveSessionJoinResult | GuestLiveSessionJoinError> {
   try {
-    const res = await fetch(`${getApiUrl()}/live-sessions/${sessionId}/guest-join`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-
-    if (!res.ok) {
-      const payload = await res.json().catch(() => null);
-      return {
-        status: res.status,
-        message:
-          typeof payload?.message === 'string'
-            ? payload.message
-            : 'Failed to join session',
-      };
-    }
-
-    return res.json();
-  } catch {
-    return { status: 0, message: 'Unable to reach the server' };
+    return await createPublicApiClient(accessToken).post<GuestLiveSessionJoinResult>(
+      `/live-sessions/${encodeURIComponent(sessionId)}/guest-join`,
+      body,
+    );
+  } catch (error) {
+    return describeRequestFailure(error);
   }
 }
 
-// Accepts an optional Supabase access token so a signed-in host/member's
-// rating is attributed to their profile — omit it for an anonymous guest.
 export async function submitLiveSessionFeedback(
   sessionId: string,
   body: { rating: number; displayName: string },
   accessToken?: string | null,
 ): Promise<{ success: true } | GuestLiveSessionJoinError> {
   try {
-    const res = await fetch(`${getApiUrl()}/live-sessions/${sessionId}/feedback`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!res.ok) {
-      const payload = await res.json().catch(() => null);
-      return {
-        status: res.status,
-        message:
-          typeof payload?.message === 'string'
-            ? payload.message
-            : 'Failed to submit feedback',
-      };
-    }
-
-    return res.json();
-  } catch {
-    return { status: 0, message: 'Unable to reach the server' };
+    return await createPublicApiClient(accessToken).post<{ success: true }>(
+      `/live-sessions/${encodeURIComponent(sessionId)}/feedback`,
+      body,
+    );
+  } catch (error) {
+    return describeRequestFailure(error);
   }
 }
 
-// Fire-and-forget telemetry — the embed's network-quality-change /
-// connection-change listeners call this on a degraded transition. Never
-// throws: a dropped quality report shouldn't surface as a user-facing error
-// on top of the connection trouble it's trying to report.
+/** Telemetry is best effort and cannot block a meeting action. */
 export async function reportLiveSessionQualityEvent(
   sessionId: string,
   body: {
@@ -97,23 +52,16 @@ export async function reportLiveSessionQualityEvent(
   accessToken?: string | null,
 ): Promise<void> {
   try {
-    await fetch(`${getApiUrl()}/live-sessions/${sessionId}/quality-events`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-      },
-      body: JSON.stringify(body),
-    });
+    await createPublicApiClient(accessToken).post(
+      `/live-sessions/${encodeURIComponent(sessionId)}/quality-events`,
+      body,
+    );
   } catch {
-    // Best effort — see doc comment above.
+    /* A dropped quality report must not interrupt the session. */
   }
 }
 
-// Stub audit trail for privileged in-session actions — see
-// logLiveSessionAuditEvent on the API side for scope/limitations. Also
-// fire-and-forget: a privileged action already happened by the time this is
-// called, so a failed audit write shouldn't block or error out the action.
+/** Privileged actions complete independently of their best-effort audit report. */
 export async function logLiveSessionAuditEvent(
   sessionId: string,
   body: {
@@ -124,15 +72,11 @@ export async function logLiveSessionAuditEvent(
   accessToken?: string | null,
 ): Promise<void> {
   try {
-    await fetch(`${getApiUrl()}/live-sessions/${sessionId}/audit-events`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-      },
-      body: JSON.stringify(body),
-    });
+    await createPublicApiClient(accessToken).post(
+      `/live-sessions/${encodeURIComponent(sessionId)}/audit-events`,
+      body,
+    );
   } catch {
-    // Best effort — see doc comment above.
+    /* A dropped audit report must not interrupt the session. */
   }
 }

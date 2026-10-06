@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-import { HostLiveSessionJoin } from '@iconicedu/web/components/live-sessions/host-live-session-join';
-import { GuestLiveSessionJoinLanding } from '@iconicedu/web/components/live-sessions/guest-live-session-join-landing';
+import { LiveSessionSetup } from '@iconicedu/web/components/live-sessions/live-session-setup';
+import { getLiveSessionReturnPath } from '@iconicedu/web/lib/live-sessions/navigation';
 import { getPublicLiveSessionInfo } from '@iconicedu/web/lib/live-sessions/public-info';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 
@@ -15,10 +15,10 @@ export default async function PublicLiveSessionPage({
   searchParams,
 }: {
   params: Promise<{ sessionId: string }>;
-  searchParams: Promise<{ passcode?: string }>;
+  searchParams: Promise<{ passcode?: string; returnTo?: string }>;
 }) {
   const { sessionId } = await params;
-  const { passcode } = await searchParams;
+  const { passcode, returnTo } = await searchParams;
 
   // Forwarding the visitor's own access token (if signed in) lets apps/api
   // determine host status — everything else about this session (existence,
@@ -48,27 +48,23 @@ export default async function PublicLiveSessionPage({
     );
   }
 
-  if (info.isHost) {
-    return (
-      <div className="flex min-h-screen flex-col gap-4 px-4 py-4">
-        <HostLiveSessionJoin
-          sessionName={info.hostJoin.sessionName}
-          token={info.hostJoin.token}
-          displayName={info.hostJoin.displayName}
-          sessionTitle={info.sessionTitle}
-          liveSessionId={sessionId}
-          accessToken={authSession?.access_token ?? null}
-          sessionPasscode={info.hostJoin.passcode}
-        />
-      </div>
-    );
-  }
-
+  // flag-exempt: maintenance fixes to identity, setup and leave navigation for existing sessions.
   return (
-    <GuestLiveSessionJoinLanding
+    <LiveSessionSetup
+      key={`${sessionId}:${authSession?.user?.id ?? 'guest'}`}
       sessionId={sessionId}
       sessionTitle={info.sessionTitle}
-      initialPasscode={passcode ?? null}
+      settings={info.settings}
+      initialCredentials={info.isHost ? info.hostJoin : null}
+      initialPasscode={info.isHost ? info.hostJoin.passcode : (passcode ?? null)}
+      participantName={
+        info.isHost ? info.hostJoin.displayName : info.participant?.displayName
+      }
+      identityKey={
+        info.isHost || info.participant ? (authSession?.user?.id ?? null) : null
+      }
+      accessToken={authSession?.access_token ?? null}
+      returnPath={getLiveSessionReturnPath(returnTo)}
     />
   );
 }

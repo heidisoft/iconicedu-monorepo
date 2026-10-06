@@ -1,7 +1,7 @@
 'use client';
 
 import type { FormEvent, RefObject } from 'react';
-import { Button } from '@iconicedu/ui-web/ui/button';
+import { IconActionButton } from '@iconicedu/ui-web/ui/icon-action-button';
 import { Input } from '@iconicedu/ui-web/ui/input';
 import {
   Sheet,
@@ -17,6 +17,7 @@ import { ZoomMeetingDockButton } from './zoom-meeting-side-dock';
 
 export function ZoomChatPanel({
   open,
+  enabled = true,
   unreadCount,
   messages,
   draft,
@@ -28,6 +29,7 @@ export function ZoomChatPanel({
   onSend,
 }: {
   open: boolean;
+  enabled?: boolean;
   unreadCount: number;
   messages: ChatMessageItem[];
   draft: string;
@@ -40,7 +42,7 @@ export function ZoomChatPanel({
 }) {
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    onSend();
+    if (enabled) onSend();
   };
 
   return (
@@ -95,27 +97,33 @@ export function ZoomChatPanel({
             })
           )}
         </div>
-        <form
-          onSubmit={submit}
-          className="mx-8 mb-8 mt-4 flex items-center gap-2 rounded-full bg-muted p-1.5"
-        >
-          <Input
-            value={draft}
-            onChange={(event) => onDraftChange(event.target.value)}
-            placeholder="Send a message"
-            className="flex-1 border-0 bg-transparent shadow-none focus-visible:ring-0"
-          />
-          <Button
-            type="submit"
-            size="icon-sm"
-            variant="ghost"
-            className="rounded-full"
-            disabled={!draft.trim()}
-            aria-label="Send message"
+        {enabled ? (
+          <form
+            onSubmit={submit}
+            className="mx-8 mb-8 mt-4 flex items-center gap-2 rounded-full bg-muted p-1.5"
           >
-            <Send />
-          </Button>
-        </form>
+            <Input
+              value={draft}
+              onChange={(event) => onDraftChange(event.target.value)}
+              placeholder="Send a message"
+              className="flex-1 border-0 bg-transparent shadow-none focus-visible:ring-0"
+            />
+            <IconActionButton
+              type="submit"
+              size="icon-sm"
+              variant="ghost"
+              className="rounded-full"
+              disabled={!draft.trim()}
+              label="Send message"
+            >
+              <Send />
+            </IconActionButton>
+          </form>
+        ) : (
+          <p className="px-8 py-6 text-sm text-muted-foreground">
+            Sending messages is disabled for this meeting.
+          </p>
+        )}
       </SheetContent>
     </Sheet>
   );

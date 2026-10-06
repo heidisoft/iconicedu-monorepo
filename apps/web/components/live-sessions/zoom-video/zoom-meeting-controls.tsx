@@ -1,6 +1,6 @@
 'use client';
 
-import type { ComponentProps, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import {
   Mic,
   MicOff,
@@ -11,7 +11,10 @@ import {
   VideoOff,
 } from 'lucide-react';
 
-import { Button } from '@iconicedu/ui-web/ui/button';
+import {
+  IconActionButton,
+  type IconActionButtonProps,
+} from '@iconicedu/ui-web/ui/icon-action-button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@iconicedu/ui-web/ui/tooltip';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 import { TOOLBAR_ACTION_CLASS } from './zoom-video-session.constants';
@@ -36,35 +39,26 @@ export function OverlayBadge({
   );
 }
 
-export function IconToolbarButton({
-  label,
-  active,
-  onClick,
-  children,
-}: {
-  label: string;
+export interface IconToolbarButtonProps extends Omit<IconActionButtonProps, 'variant'> {
   active?: boolean;
-  onClick: () => void;
-  children: ReactNode;
-}) {
+}
+
+export function IconToolbarButton({
+  active,
+  className,
+  ...props
+}: IconToolbarButtonProps) {
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          onClick={onClick}
-          className={cn(
-            'flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg transition-colors hover:bg-accent',
-            active && 'bg-accent text-accent-foreground',
-          )}
-          aria-label={label}
-          aria-pressed={active}
-        >
-          {children}
-        </button>
-      </TooltipTrigger>
-      <TooltipContent>{label}</TooltipContent>
-    </Tooltip>
+    <IconActionButton
+      {...props}
+      variant="ghost"
+      aria-pressed={active}
+      className={cn(
+        'size-8 rounded-lg',
+        active && 'bg-accent text-accent-foreground',
+        className,
+      )}
+    />
   );
 }
 
@@ -103,14 +97,13 @@ export function PoppingIcon({
   );
 }
 
-type MeetingControlButtonProps = Omit<
-  ComponentProps<typeof Button>,
-  'aria-label' | 'size' | 'variant'
-> & {
-  label: string;
+export interface MeetingControlButtonProps extends Omit<
+  IconActionButtonProps,
+  'size' | 'variant'
+> {
   tone?: 'neutral' | 'active' | 'danger';
   mobileSecondary?: boolean;
-};
+}
 
 export function MeetingControlButton({
   label,
@@ -121,9 +114,8 @@ export function MeetingControlButton({
   ...props
 }: MeetingControlButtonProps) {
   return (
-    <Button
+    <IconActionButton
       {...props}
-      type="button"
       size="icon-lg"
       variant={
         tone === 'danger' ? 'destructive' : tone === 'active' ? 'default' : 'meeting'
@@ -134,11 +126,10 @@ export function MeetingControlButton({
         mobileSecondary && 'zoom-toolbar-secondary',
         className,
       )}
-      aria-label={label}
+      label={label}
     >
       {children}
-      <span className="sr-only">{label}</span>
-    </Button>
+    </IconActionButton>
   );
 }
 

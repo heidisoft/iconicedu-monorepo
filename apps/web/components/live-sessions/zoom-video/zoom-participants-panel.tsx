@@ -4,7 +4,7 @@ import { AudioLines, EllipsisVertical, Hand, MicOff, Users } from 'lucide-react'
 
 import { Avatar, AvatarFallback, AvatarImage } from '@iconicedu/ui-web/ui/avatar';
 import { Badge } from '@iconicedu/ui-web/ui/badge';
-import { Button } from '@iconicedu/ui-web/ui/button';
+import { IconActionButton } from '@iconicedu/ui-web/ui/icon-action-button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,6 +31,7 @@ export type ParticipantListItem = {
   muted: boolean;
   videoOn: boolean;
   handRaised: boolean;
+  reaction?: string;
   isSpeaking: boolean;
 };
 
@@ -101,6 +102,15 @@ export function ZoomParticipantsPanel({
                 ) : null}
               </div>
               <div className="flex items-center gap-1.5">
+                {participant.reaction ? (
+                  <span
+                    className="inline-flex size-8 items-center justify-center text-2xl"
+                    role="img"
+                    aria-label={`${participant.name} reacted ${participant.reaction}`}
+                  >
+                    {participant.reaction}
+                  </span>
+                ) : null}
                 {participant.handRaised ? (
                   <span
                     className="inline-flex size-8 items-center justify-center rounded-full bg-amber-400 text-amber-950 shadow-sm"
@@ -125,15 +135,14 @@ export function ZoomParticipantsPanel({
               </div>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button
-                    type="button"
+                  <IconActionButton
                     variant="secondary"
                     size="icon"
                     className="rounded-full"
-                    aria-label={`Options for ${participant.name}`}
+                    label={`Options for ${participant.name}`}
                   >
                     <EllipsisVertical />
-                  </Button>
+                  </IconActionButton>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-44">
                   {canMuteOthers && !participant.isYou && !participant.muted ? (

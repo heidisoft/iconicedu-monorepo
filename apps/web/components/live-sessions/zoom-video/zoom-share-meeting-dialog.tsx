@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Check, Copy, Share2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Check, Copy, Share } from 'lucide-react';
 import { Button } from '@iconicedu/ui-web/ui/button';
+import { IconActionButton } from '@iconicedu/ui-web/ui/icon-action-button';
 import { Input } from '@iconicedu/ui-web/ui/input';
 import { Label } from '@iconicedu/ui-web/ui/label';
 import { MeetingControlButton } from './zoom-meeting-controls';
@@ -24,14 +25,34 @@ export function ZoomShareMeetingDialog({
 }) {
   const [open, setOpen] = useState(false);
   const [meetingUrl, setMeetingUrl] = useState('');
-  const [copied, setCopied] = useState(false);
+  const [copiedTarget, setCopiedTarget] = useState<
+    'link' | 'passcode' | 'invitation' | null
+  >(null);
+  const copyResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [copyError, setCopyError] = useState(false);
 
   useEffect(() => {
     setMeetingUrl(getShareableMeetingUrl());
+    return () => {
+      if (copyResetTimer.current) clearTimeout(copyResetTimer.current);
+    };
   }, []);
 
-  const copyMeetingDetails = async () => {
+  const copyText = async (text: string, target: 'link' | 'passcode' | 'invitation') => {
+    if (!text) return;
+    if (copyResetTimer.current) clearTimeout(copyResetTimer.current);
+    setCopiedTarget(null);
+    setCopyError(false);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedTarget(target);
+      copyResetTimer.current = setTimeout(() => setCopiedTarget(null), 2000);
+    } catch {
+      setCopyError(true);
+    }
+  };
+
+  const copyMeetingDetails = () => {
     if (!meetingUrl) return;
     const invitation = [
       meetingTitle,
@@ -40,15 +61,7 @@ export function ZoomShareMeetingDialog({
     ]
       .filter(Boolean)
       .join('\n');
-
-    try {
-      await navigator.clipboard.writeText(invitation);
-      setCopyError(false);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 2000);
-    } catch {
-      setCopyError(true);
-    }
+    return copyText(invitation, 'invitation');
   };
 
   return (
@@ -60,9 +73,10 @@ export function ZoomShareMeetingDialog({
       trigger={
         <MeetingControlButton
           label="Share meeting link"
+          className="zoom-toolbar-share-link"
           tone={open ? 'active' : 'neutral'}
         >
-          <Share2 className="size-4" />
+          <Share className="size-4" />
         </MeetingControlButton>
       }
     >
@@ -79,31 +93,50 @@ export function ZoomShareMeetingDialog({
               className="h-11 min-w-0 flex-1 border-0 bg-transparent shadow-none focus-visible:ring-0"
               onFocus={(event) => event.currentTarget.select()}
             />
-            <Button
-              type="button"
+            <IconActionButton
               variant="ghost"
               size="icon"
               className="shrink-0 rounded-full"
-              aria-label="Copy meeting details"
+              label="Copy join link"
               disabled={!meetingUrl}
-              onClick={() => void copyMeetingDetails()}
+              onClick={() => void copyText(meetingUrl, 'link')}
             >
-              {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-            </Button>
+              {copiedTarget === 'link' ? (
+                <Check className="size-4" />
+              ) : (
+                <Copy className="size-4" />
+              )}
+            </IconActionButton>
           </div>
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="zoom-meeting-passcode">Passcode</Label>
-          <Input
-            id="zoom-meeting-passcode"
-            value={meetingPasscode ?? 'Not available'}
-            type="text"
-            readOnly
-            aria-label="Meeting passcode"
-            className="h-11 rounded-xl bg-muted"
-            onFocus={(event) => event.currentTarget.select()}
-          />
+          <div className="flex items-center gap-2 rounded-2xl bg-muted p-1.5">
+            <Input
+              id="zoom-meeting-passcode"
+              value={meetingPasscode || 'Not available'}
+              type="text"
+              readOnly
+              aria-label="Meeting passcode"
+              className="h-11 min-w-0 flex-1 border-0 bg-transparent shadow-none focus-visible:ring-0"
+              onFocus={(event) => event.currentTarget.select()}
+            />
+            <IconActionButton
+              variant="ghost"
+              size="icon"
+              className="shrink-0 rounded-full"
+              label="Copy passcode"
+              disabled={!meetingPasscode}
+              onClick={() => void copyText(meetingPasscode ?? '', 'passcode')}
+            >
+              {copiedTarget === 'passcode' ? (
+                <Check className="size-4" />
+              ) : (
+                <Copy className="size-4" />
+              )}
+            </IconActionButton>
+          </div>
         </div>
 
         <Button
@@ -111,12 +144,16 @@ export function ZoomShareMeetingDialog({
           className="w-full rounded-full"
           onClick={() => void copyMeetingDetails()}
         >
-          {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-          {copied ? 'Invitation copied' : 'Copy invitation'}
+          {copiedTarget === 'invitation' ? (
+            <Check className="size-4" />
+          ) : (
+            <Copy className="size-4" />
+          )}
+          {copiedTarget === 'invitation' ? 'Invitation copied' : 'Copy invitation'}
         </Button>
         {copyError ? (
           <p role="alert" className="px-2 text-xs text-destructive">
-            The invitation couldn&apos;t be copied. Select the details above and copy them
+            The details couldn&apos;t be copied. Select the details above and copy them
             manually.
           </p>
         ) : null}

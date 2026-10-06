@@ -1,10 +1,14 @@
 'use client';
 
-import type { ComponentProps, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 import { Badge } from '@iconicedu/ui-web/ui/badge';
-import { Button } from '@iconicedu/ui-web/ui/button';
+import {
+  IconActionButton,
+  type IconActionButtonProps,
+} from '@iconicedu/ui-web/ui/icon-action-button';
 import { cn } from '@iconicedu/ui-web/lib/utils';
+import { MEETING_TOOLBAR_ICON_CLASS } from './zoom-video-session.constants';
 
 export function ZoomMeetingSideDock({
   children,
@@ -25,34 +29,39 @@ export function ZoomMeetingSideDock({
   );
 }
 
+export interface ZoomMeetingDockButtonProps extends Omit<
+  IconActionButtonProps,
+  'variant'
+> {
+  count?: number;
+  active: boolean;
+  attention?: boolean;
+  compact?: boolean;
+}
+
 export function ZoomMeetingDockButton({
   label,
   count,
   active,
   attention = false,
   compact = false,
+  size = 'default',
   className,
   children,
   ...props
-}: Omit<ComponentProps<typeof Button>, 'aria-label' | 'variant'> & {
-  label: string;
-  count?: number;
-  active: boolean;
-  attention?: boolean;
-  compact?: boolean;
-  children: ReactNode;
-}) {
+}: ZoomMeetingDockButtonProps) {
   return (
-    <Button
+    <IconActionButton
       {...props}
-      type="button"
+      size={size}
       variant={active ? 'default' : 'meeting'}
       className={cn(
         'rounded-full',
+        MEETING_TOOLBAR_ICON_CLASS,
         compact ? 'h-9 gap-1.5 px-2 sm:h-10' : 'h-10 px-2.5 sm:h-12 sm:px-3',
         className,
       )}
-      aria-label={label}
+      label={label}
     >
       {children}
       {count !== undefined ? (
@@ -66,6 +75,6 @@ export function ZoomMeetingDockButton({
           {count}
         </Badge>
       ) : null}
-    </Button>
+    </IconActionButton>
   );
 }

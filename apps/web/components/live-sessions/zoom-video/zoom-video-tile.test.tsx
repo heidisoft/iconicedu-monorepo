@@ -1,5 +1,5 @@
 import { createRef } from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import { TooltipProvider } from '@iconicedu/ui-web/ui/tooltip';
@@ -45,4 +45,33 @@ describe('ZoomVideoTile', () => {
       'ring-primary',
     );
   });
+});
+
+it('keeps the avatar until attachment and fades it out without unmounting it', async () => {
+  const ref = createRef<HTMLDivElement>();
+  const tile = (on: boolean) => (
+    <TooltipProvider>
+      <ZoomVideoTile
+        label="Alex"
+        isSelf
+        isMuted={false}
+        isVideoOn={on}
+        videoContainerRef={ref}
+      />
+    </TooltipProvider>
+  );
+  const { container, rerender } = render(tile(true));
+  const placeholder = container.querySelector('[data-camera-placeholder]');
+  expect(placeholder).toHaveAttribute('aria-hidden', 'false');
+  ref.current!.appendChild(document.createElement('video-player'));
+  await waitFor(() => expect(placeholder).toHaveAttribute('aria-hidden', 'true'));
+  expect(placeholder).toHaveClass(
+    'transition-opacity',
+    'duration-200',
+    'motion-reduce:transition-none',
+  );
+  rerender(tile(false));
+  expect(placeholder).toHaveAttribute('aria-hidden', 'false');
+  expect(placeholder).not.toHaveClass('transition-opacity');
+  expect(container.querySelector('[data-camera-placeholder]')).toBe(placeholder);
 });

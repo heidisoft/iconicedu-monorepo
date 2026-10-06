@@ -15,6 +15,7 @@ export type NetworkLevel = 'bad' | 'normal' | 'good';
 export type FloatingReaction = {
   id: string;
   emoji: string;
+  origin: { x: number; y: number };
   dx: number;
   rotate: number;
   durationMs: number;

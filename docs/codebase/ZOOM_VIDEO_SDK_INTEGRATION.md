@@ -46,7 +46,7 @@ participant-minute). Video SDK has **no Zoom-hosted join URL** — there is
 nothing to put in an iframe `src`. You get an SDK Key/Secret, mint a
 short-lived JWT per participant, and build **100% of the meeting UI yourself**
 (video tiles, mute/camera/leave controls, chat, whiteboard surface,
-annotation toolbar — all of it) using `@zoom/videosdk` as a raw audio/video
+annotation toggle — all of it) using `@zoom/videosdk` as a raw audio/video
 engine. It is not a wrapper around a Zoom-provided widget; it is a custom
 video-call UI built on the app's own `@iconicedu/ui-web` design system. The
 session shell coordinates SDK state, while reusable meeting UI lives in the
@@ -74,6 +74,28 @@ limitation, not an oversight.
 
 ---
 
+## Service selection
+
+Use the service that owns the feature; an enabled subscription does not mean the application invokes it.
+
+| Feature                                  | Owning Zoom service and API                                                                                                                                  | Current integration                                                                                                                                                  |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Video, audio, chat, screen sharing       | Video SDK Session; `@zoom/videosdk` media/chat clients, API-side Video SDK JWT signing                                                                       | Implemented; sessions start through SDK join, without a Meetings REST create call                                                                                    |
+| Whiteboard and screen-share annotation   | Video SDK `getWhiteboardClient()` and media-stream annotation APIs                                                                                           | Implemented; interactive Whiteboard account/device access must still pass SDK capability checks                                                                      |
+| Start/stop cloud recording               | Video SDK Cloud Recording; `getRecordingClient().startCloudRecording()/stopCloudRecording()`                                                                 | Implemented; host and account capability checks                                                                                                                      |
+| Live captions and translation            | Developer Live Translation and Transcription; `getLiveTranscriptionClient()`                                                                                 | Captions implemented; translation language selection is not implemented. Caption visibility is local; `disableCaptions` is host-only and changes session-wide access |
+| Recording transcript and AI summary      | Video SDK Cloud Recording Transcript / AI Summary; host JWT `cloud_recording_transcript_option` (`1` transcript, `2` transcript plus summary)                | Not requested by current JWTs; retrieval and completion-webhook handling are not implemented                                                                         |
+| Recording files and generated artifacts  | Video SDK REST `GET /videosdk/sessions/{sessionId}/recordings` and `session.recording_transcript_completed` / `session.recording_summary_completed` webhooks | Any implementation belongs in `apps/api`, using Video SDK REST authentication and the actual Zoom session ID, not the app's session name or a Zoom Meetings ID       |
+| SIP/H.323 room devices                   | Video SDK Cloud Room Connector                                                                                                                               | Not currently integrated; unrelated to browser whiteboard mounting                                                                                                   |
+| Provider quality telemetry subscriptions | Video SDK Quality of Service Subscription                                                                                                                    | Not currently consumed; UI network-quality events and our API quality reports are separate from QSS ingestion                                                        |
+| Synchronized customer/agent web browsing | Cobrowse SDK                                                                                                                                                 | Not integrated; do not substitute its annotation APIs for Video SDK screen-share annotation                                                                          |
+| Standalone media transcription           | Scribe API                                                                                                                                                   | Not integrated; use Video SDK LTT for existing live-session captions                                                                                                 |
+| Standalone AI workloads                  | Zoom AI Services APIs                                                                                                                                        | Not integrated; separate service clients/authentication are needed when an AI workload is added                                                                      |
+
+Sources: [Video SDK authorization](https://developers.zoom.us/docs/video-sdk/auth/), [cloud recording and generated artifacts](https://developers.zoom.us/docs/build/cloud-recording/), [live transcription and translation](https://developers.zoom.us/docs/video-sdk/web/transcription-translation/), [Whiteboard](https://developers.zoom.us/docs/video-sdk/web/whiteboard/), [Cobrowse](https://developers.zoom.us/docs/cobrowse-sdk/), and [AI Services](https://developers.zoom.us/docs/ai-services/).
+
+Recording transcript/summary generation must be selected deliberately before session startup. Service availability alone does not enable it, and generating these artifacts incurs usage charges. The current participant-event webhook normalizer does not ingest recording artifacts. Do not treat ignored completion events or a stopped recording indicator as proof that an artifact has been saved in the application.
+
 ## 2. Architecture map
 
 ```
@@ -96,7 +118,11 @@ apps/web/
     daily-live-session-embed.tsx    sibling Daily embed (older, simpler —
                                     worth comparing when deciding whether a
                                     Zoom feature belongs here too)
-    host-live-session-join.tsx       host-side join wrapper (passes onLeave)
+    live-session-setup.tsx          public setup composition root; owns navigation
+    use-live-session-setup.ts        SDK-free join, recovery and device state
+    live-session-join-form.tsx       controlled anonymous identity/passcode form
+    zoom-meeting-renderer.tsx        single browser-only dynamic SDK boundary
+    use-live-session-navigation.ts  Home/Messages join URL normalization
     live-session-host.tsx           branches on provider to pick an embed
   lib/live-sessions/
     browser-session.ts              tab-scoped refresh recovery; cleared on
@@ -107,12 +133,12 @@ apps/web/
     service.ts                      resolveLiveSessionJoinAccess (host
                                     determination lives here),
                                     processLiveSessionProviderWebhook
-    public-api.ts                   client-side fetch helpers (guest-join,
+    public-api.ts                   typed public API adapters (guest-join,
                                     feedback, quality-events, audit-events)
   lib/admin/
     live-session-attendance.ts      admin dashboard queries, including
                                     getAdminLiveSessionQualityEvents
-  app/(public)/live/[sessionId]/    guest landing page (passcode entry)
+  app/(public)/live/[sessionId]/    auth-aware public setup (host/member/guest)
   app/(app)/[orgSlug]/admin/attendance/sessions/[sessionId]/
     live-session-attendance-detail.tsx   renders the "Connection quality
                                         issues" card
@@ -146,6 +172,63 @@ supabase/migrations/
 
 ---
 
+### Public `/live` setup and return navigation
+
+`apps/api` verifies the optional bearer token before returning participant identity.
+Hosts receive fresh host-role credentials through `public-info`; non-hosts receive
+only their own display name. Non-host token issuance still requires the session
+passcode, including signed-in participants. `guest-join` overrides a submitted
+name with the verified identity and scopes profile attribution to the session's
+organization. Signed-in visitors without an org profile retain a guest Zoom
+identity and never receive host privileges.
+
+The Server Component forwards that contract into `LiveSessionSetup`:
+
+1. Hosts go directly to device preview. Signed-in participants with a shared
+   passcode automatically request participant credentials, then preview devices.
+   Without a passcode they enter only the passcode. Anonymous visitors enter
+   their name and, if missing from the link, the passcode.
+2. `useLiveSessionSetup` owns recovery, credential requests, errors and device
+   preferences. It has no router or Zoom imports. The form owns input presentation;
+   `DevicePreviewStep` owns its browser media stream and stops it before joining.
+   Permission denial or unavailable media APIs default both devices off.
+3. `ZoomMeetingRenderer` is the sole dynamic browser-only SDK import used by
+   setup and the provider container. The setup component accepts a renderer prop
+   for tests; production uses the real meeting orchestrator.
+4. Home and Messages use `useLiveSessionNavigation` to show the existing
+   “Session ready to join” dialog for both relative and same-origin absolute
+   Zoom URLs. Its Open Zoom action opens a new tab and captures the source
+   pathname, query and anchor in `returnTo`. Copy link and the in-meeting share
+   dialog omit `returnTo`, so recipients of shared links return home. Cancelling
+   the dialog leaves the source page open. External providers keep their dialog,
+   and other internal app routes retain normal navigation.
+5. After leaving and completing or skipping feedback, setup clears recovery and
+   replaces the meeting route with the captured source. Direct/shared URLs without
+   a source return to `/`. Both the server and client reject external destinations,
+   protocol-relative links, backslashes/control characters and another `/live`
+   route. Refresh preserves the source in the URL and device preferences in
+   tab-scoped storage. Expired or malformed recovery cannot skip setup. Recovery also binds to the
+   authenticated user and host/participant role, so a later sign-in cannot reuse
+   someone else’s credentials, even when display names match.
+
+Dependency direction is route → setup → hook/form/preview/renderer. Presentational
+components communicate via typed props and callbacks; the hook uses the typed
+public API client. API contracts live in `packages/shared-types`. The duplicated
+host and guest wrappers were removed. The Zoom orchestrator remains responsible
+for live SDK events and media cleanup; it does not decide a return destination.
+
+`flag-exempt: maintenance fixes to existing authenticated join, recovery and leave
+navigation; no new meeting capability or rollout is introduced.`
+
+Unit coverage is co-located with the route, setup, navigation, HTTP adapters,
+device preview and API identity service. `e2e/live-session-setup.spec.ts` exercises
+the production setup through a development-only fixture, with synthetic credential
+responses and an injected meeting renderer. It verifies signed-in/anonymous joins,
+permission-denied preview, refresh recovery, passcode correction, source/homepage
+navigation, feedback completion, the ready-to-join dialog, cancellation, clipboard
+copying and opening a new tab with the captured source. It does not verify live Zoom connectivity,
+host recording, whiteboard or annotation. Test fixtures return 404 in production.
+
 ## 3. Key decision points (with rationale)
 
 | Decision                       | What was chosen                                                                                                                                     | Why                                                                                                                                                                                                                                                                                                                          |
@@ -156,7 +239,7 @@ supabase/migrations/
 | Local share preview element    | Select `<video>` or `<canvas>` with `stream.isStartShareScreenWithVideoElement()`                                                                   | Zoom requires `<video>` on WebCodecs-capable paths and `<canvas>` on other paths. Passing one element unconditionally can publish a share while leaving the presenter with a blank main stage. Keep both mounted at non-zero dimensions and let the installed SDK choose.                                                    |
 | Raise hand / reactions         | Built on the generic `CommandChannel` (`client.getCommandClient().send()`), not a dedicated API                                                     | **Confirmed: no native raise-hand or reaction-send API exists in this installed SDK version.** `reaction.sendEmojiReactionRequest` appears only in exception-code doc comments, not in any exported type — do not assume it exists without re-checking `node_modules/@zoom/videosdk/dist/types/*.d.ts` after any SDK upgrade |
 | Whiteboard permission locking  | Not implemented — flagged as currently impossible                                                                                                   | `setWhiteboardPermission()` / `lockWhiteboardPermission()` / `getWhiteboardPermission()` are **commented out** in `whiteboard.d.ts` in the installed SDK version, despite the `WhiteboardSharePermissionCode` enum existing. Re-check after an SDK bump — this may become available                                          |
-| Annotation tool coverage       | Only Pen/Highlighter/Arrow/Eraser exposed in the UI                                                                                                 | `AnnotationToolType` actually also has `Spotlight` (laser pointer), `Line`, `Rectangle`/`Ellipse`/`Diamond` (+ fill variants), and stamp shapes — these are real, unused, easy wins if asked for. No `Text` or equation tool exists anywhere in the SDK (whiteboard or annotation)                                           |
+| Annotation tool coverage       | Single pencil start/stop toggle; SDK Pen selected after a confirmed start                                                                           | `AnnotationToolType` actually also has `Spotlight` (laser pointer), `Line`, `Rectangle`/`Ellipse`/`Diamond` (+ fill variants), and stamp shapes — these are real, unused, easy wins if asked for. No `Text` or equation tool exists anywhere in the SDK (whiteboard or annotation)                                           |
 | Multi-participant UI           | Keep every remote SDK participant in an ID-keyed collection and give each participant a stable video render target                                  | The gallery grows automatically from one full-stage tile to a responsive grid; screen sharing switches the same participant collection into a scrollable filmstrip. `peer-share-state-change` (concurrent multi-share) and `SubsessionClient` (breakout rooms) remain separate, currently unused capabilities.               |
 | Audit logging                  | New `channel_live_session_audit_events` table, logged from the **client** after the action already happened                                         | Fire-and-forget by design — a failed audit write must never block or roll back a privileged action. Currently a stub: only `mute_participant`, `end_session_for_all`, `recording_started` are logged, and there is no admin UI reading this table yet                                                                        |
 | Connection-quality monitoring  | Self-reported only (`payload.userId === selfUserIdRef.current` before reporting to the backend)                                                     | Avoids every observer separately reporting the same remote peer's perceived quality, which would duplicate/conflict. Each client reports its _own_ degraded transitions only                                                                                                                                                 |
@@ -179,8 +262,11 @@ These were confirmed by grepping the **installed** `node_modules/@zoom/videosdk/
 - `'annotation-privilege-change'` fires for **viewers only** — a presenter disabling "viewer can annotate" should not affect their own annotation rights; gate any reaction to this event on "am I currently the presenter."
 - `CommandChannel.send(text, target?)` — `target` can be a `userId`, `{ userKey | userGuid }`, or `{ scope: 'currentSession' | 'all' }` (the latter reaches breakout rooms too). Omitting `target` broadcasts to the current session.
 - `RecordingClient.canStartRecording()` must be checked before `startCloudRecording()` — it covers the case where cloud recording isn't enabled for the account/session. `startCloudRecording()` resolves to `'' | Error` rather than rejecting on failure — check the resolved value, don't rely solely on a try/catch or the `'recording-change'` event.
+- Annotation and whiteboard commands may resolve Zoom failure objects rather than reject. Check both JavaScript errors and `ExecutedFailure` results before marking collaboration active; annotation tool setup is checked too. Unsupported whiteboard viewers use Zoom’s compatible screen-share stream rather than attempting to open an interactive whiteboard.
+- Keep presenter annotation active while local screen sharing is active, even if Zoom has not selected an `activeShareUserId`. Clear annotation state only once both local and remote sharing have ended.
+- Reference implementation: [Zoom Video SDK Web Whiteboard sample](https://github.com/zoom/videosdk-web-whiteboard/blob/16040c18857d929e432e512adcb2e11819583e07/src/main.ts). The integration follows its initialization, visible empty mounting surface, presenter/viewer start and stop, late-join, PDF export, and leave cleanup sequence. Use `whiteboard-status-change` to determine loading readiness as specified in [Zoom's whiteboard guide](https://developers.zoom.us/docs/video-sdk/web/whiteboard/); a resolved start command must not force `InProgress` or the presenting banner. API-side JWT signing uses host role `1` and participant role `0` per [Zoom's authorization contract](https://developers.zoom.us/docs/video-sdk/auth/); the sample token helper's CLI role descriptions are reversed and should not be copied.
 - `WhiteboardClient.canStartWhiteboard()` is the single authoritative start-gate (folds in permissions, current sharing state, and whiteboard status) — a `false` result used to be a silent no-op before this was wired up to show an error.
-- `canStartWhiteboard()` may still return `true` before `startWhiteboardScreen()` fails with `get confId or mmrToken failed`. Treat that as a provider capability/entitlement failure: show the standard in-meeting notice, hide Whiteboard for the remainder of the session, and do not send the caught error through `console.error` because the Next.js development overlay can present it as an uncaught application failure.
+- `canStartWhiteboard()` may still return `true` before `startWhiteboardScreen()` fails with `get confId or mmrToken failed`. The embedded board can also raise this credential error asynchronously after the start command resolves. Handle this specific runtime failure while a board is active, clear the presenting state and blank surface, stop the board best effort, and show the in-meeting notice. Ignore late status events from the failed attempt until a new start. The error alone does not distinguish account access from provider or network failures; users can rejoin and retry.
 - `LiveTranscriptionClient` (captions) is a complete, fully real API (`startLiveTranscription`, `disableCaptions`, `lockTranscriptionLanguage`, `getFullTranscriptionHistory`, etc.) that was entirely unused until the current captions stub.
 - `SubsessionClient` is Zoom's name for **breakout rooms** (`createSubsessions`, `assignUserToSubsession`, `closeAllSubsessions`, `askForHelp`, `broadcast`, ...) — fully real, fully unused.
 
@@ -215,7 +301,10 @@ These were confirmed by grepping the **installed** `node_modules/@zoom/videosdk/
   in `LEAVING_MEETING` and failed with `OPERATION_CANCELLED` error 3. Unmount
   cleanup is now deferred by one event-loop turn and cancelled if the same
   client is immediately reacquired; explicit Leave/End actions still dispose
-  synchronously. Do not replace the scheduled cleanup with a direct dispose
+  synchronously. Replayed setup also shares the in-flight initialization and
+  join promise for identical session credentials, so it cannot concurrently
+  initialize or join the singleton twice. Failed joins release that promise
+  so retries can proceed. Do not replace the scheduled cleanup with a direct dispose
   without re-testing under React Strict Mode.
 - **Tailwind arbitrary value silently drops a whole declaration:** `bottom-[max(1rem,env(safe-area-inset-bottom))]` (nested function calls with a comma inside Tailwind's bracket syntax) silently failed to compile and dropped the entire `bottom` rule across multiple Tailwind/PostCSS versions — this was the root cause of a recurring "control bar isn't at the bottom" complaint across several review cycles. **Fixed by moving to inline `style={{ bottom: 'max(1rem, env(safe-area-inset-bottom))' }}`.** If a Tailwind arbitrary value involving nested `()`/commas silently has no effect, suspect the parser, not your class name.
 - **Gallery/side-by-side tiles invisible:** the `sideBySide` grid had no explicit `grid-rows-*`, so its row defaulted to `auto` (indefinite height) — every tile's `h-full` then resolved against an indefinite height and collapsed to zero. Fixed with `grid-rows-2 sm:grid-rows-1` (Tailwind's numeric `grid-rows-N` emits `repeat(N, minmax(0,1fr))`, which is a _definite_ track size, unlike the default).
@@ -237,7 +326,7 @@ stale** the moment new work lands — confirm against the actual code
 Camera/mic + pre-call device selection, screen share (teacher + student,
 host-configurable 3-way privilege), participant list (read-only + host mute
 action), host/co-host-adjacent host-fix (educator/staff always host),
-annotation (subset of tools), whiteboard (start/view/stop/export-to-PDF, no
+annotation (single pencil toggle), whiteboard (start/view/stop/export-to-PDF, no
 permission locking — see §4), chat, raise hand, reactions, network-quality +
 connection-state indicators, "leave vs. end-for-everyone" with confirmation,
 captions (stub), recording status/disclosure (automatic recording is currently
@@ -348,3 +437,78 @@ The custom UI intentionally follows the UI Toolkit's interaction contract
 (persistent controls, participant/media state visibility, explicit
 connection recovery, and deterministic cleanup) while using IconicEdu design
 tokens. Any future visual redesign must preserve those behaviors.
+
+Camera renderer stability is owned by `zoom-video-media.ts`. Attachments are
+serialized per DOM surface. Repeated media-state updates retain the existing
+player, quality changes reuse that player, and detachment targets the specific
+player rather than every view of a participant. Keep the camera-off avatar
+visible before removing the stopped renderer. Unit tests cover duplicate events,
+quality changes, retry and stop/start races; `zoom-media-stability.spec.ts` checks
+unaffected player identity in Chromium using the development-only `/visual-test/zoom-media`
+fixture. The synthetic renderer does not verify live Zoom frame delivery.
+
+Camera tiles keep a persistent avatar overlay until a video player is attached
+and the browser has a paint opportunity. Camera-on fades the overlay out over
+200 ms; camera-off covers the stopped surface immediately. Reduced-motion users
+get an immediate transition. This avoids exposing an empty attachment surface,
+but does not claim first-frame readiness from Zoom's attachment promise.
+
+### Classroom meeting modules and creation policy
+
+`classroom-meeting-settings` is a catalogued, default-off rollout flag. The API
+checks it before accepting settings writes and when starting a new meeting, using
+the manager who saved the policy as the rollout identity. The Classroom creation
+and edit forms load settings from `GET /classroom-meeting-settings` and send writes
+through the typed API client to `PUT /classroom-meeting-settings`. The API verifies
+manager roles, the caller's own account/profile, and the Classroom's organization.
+The flag-off path preserves legacy meeting behavior.
+
+Classroom defaults live in `channels.live_session_config.settings`; each new
+meeting snapshots its effective policy in `channel_live_sessions.app_metadata.meetingSettings`.
+Existing meetings retain their snapshot, even after a Classroom edit or flag
+change. Meetings without a snapshot use the documented defaults below. No Prisma
+model change is needed because these are existing JSON fields. Apply the forward
+migration `20261006060000_preserve_classroom_meeting_settings.sql` so older provider
+and mode saves preserve the API-owned policy.
+
+| Classroom option       | Default | Meeting behavior                                                                                                                    |
+| ---------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Recording              | On      | Hosts may start cloud recording when Zoom permits it.                                                                               |
+| Start Recording        | Off     | Automatically attempts recording once when the host connects.                                                                       |
+| Disable Stop Recording | Off     | Disables the in-app stop action while recording is active.                                                                          |
+| Whiteboard             | On      | Enables the whiteboard module and its controls.                                                                                     |
+| Shared Invite          | On      | Enables sharing; when off, participant credential issuance requires authenticated Classroom membership in addition to the passcode. |
+| Show Participants      | On      | Shows the participant list and management panel; video tiles remain visible.                                                        |
+| Messages               | On      | Shows the in-call messages module.                                                                                                  |
+| Enable Messages        | On      | Enables sending; turning it off leaves a read-only panel and applies Zoom's `ChatPrivilege.NoOne` from the host.                    |
+
+Turning Recording off clears automatic start and stop locking. Hiding Messages
+also disables sending. These dependencies are validated in the API. Cloud recording
+still requires the Zoom account capability. Stop locking controls the application
+UI; it does not revoke the Zoom host's provider privileges or prevent ending a call.
+
+| Module                           | Ownership and dependencies                                                                                                                                              |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `use-zoom-recording-feature.ts`  | Recording SDK subscription, confirmed status, policy-controlled start/stop through `zoom-recording-control.tsx`; generic More controls only receive actions and errors. |
+| `use-zoom-messages-feature.ts`   | Chat SDK subscription, unread count, drafts, sending guards and retry errors; `zoom-chat-panel.tsx` renders the panel.                                                  |
+| `use-zoom-whiteboard-feature.ts` | Whiteboard surface, SDK events, late-join recovery, start/stop/export and credential failures.                                                                          |
+| `zoom-video-media.ts`            | Per-surface camera attachment lifecycle and renderer stability.                                                                                                         |
+| `meeting-feature-settings.tsx`   | Controlled, SDK-free option editor with independent recording, collaboration and visibility groups.                                                                     |
+| `zoom-video-session-embed.tsx`   | Connection and media composition root; supplies immutable policy and composes feature modules and existing presentation components.                                     |
+
+Each SDK feature removes its own event subscriptions on disconnect. Whiteboard
+work waiting for a drawing surface is cancelled when its connection changes.
+Messages preserve an unsent draft when sending fails. Automatic recording reports
+failure without falsely showing an active recording; hosts can retry manually.
+
+Classroom CRUD predates the frontend/API boundary migration; new meeting-option
+writes go exclusively through `apps/api`. If options fail after a Classroom was
+created, the create response carries its id. The form retries as an update to that
+same Classroom. This is a recoverable two-step save, not a database transaction.
+
+Tests cover API validation, manager/tenant boundaries, flag-off writes, disabled
+modules, recording start and stop locking, whiteboard cleanup, and draft recovery.
+`classroom-meeting-settings.spec.ts` exercises the real option editor, typed HTTP
+client and recording control with synthetic API/SDK responses; it does not verify
+live Zoom account capability. To roll back the rollout, disable the flag for new
+meetings; existing snapshots remain effective until their meeting ends.

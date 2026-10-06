@@ -1,6 +1,6 @@
 'use client';
 
-import type { Ref } from 'react';
+import { useCallback, useEffect, useRef, useState, type Ref } from 'react';
 import { AudioLines, Hand, Mic, MicOff, Video, VideoOff } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@iconicedu/ui-web/ui/avatar';
@@ -23,7 +23,7 @@ function TileMediaStatus({
   return (
     <span
       className={cn(
-        'inline-flex shrink-0 items-center justify-center rounded-full bg-black/70 text-white shadow-sm backdrop-blur-lg',
+        'inline-flex shrink-0 items-center justify-center rounded-full bg-black/45 text-white shadow-sm backdrop-blur-lg',
         compact ? 'size-6' : 'size-8',
         !enabled && 'text-destructive',
       )}
@@ -64,6 +64,41 @@ export function ZoomVideoTile({
   density?: 'default' | 'compact';
   isSpeaking?: boolean;
 }) {
+  const surfaceRef = useRef<HTMLDivElement>(null);
+  const [rendererReady, setRendererReady] = useState(false);
+  const setSurfaceRef = useCallback(
+    (element: HTMLDivElement | null) => {
+      surfaceRef.current = element;
+      if (typeof videoContainerRef === 'function') videoContainerRef(element);
+      else if (videoContainerRef) videoContainerRef.current = element;
+    },
+    [videoContainerRef],
+  );
+
+  useEffect(() => {
+    setRendererReady(false);
+    const surface = surfaceRef.current;
+    if (!isVideoOn || !surface) return;
+    let frame = 0;
+    const checkRenderer = () => {
+      cancelAnimationFrame(frame);
+      if (!surface.querySelector('video-player')) {
+        setRendererReady(false);
+        return;
+      }
+      // Allow the attached surface a browser paint opportunity before revealing
+      // it. Attachment is not a guarantee that Zoom has delivered its first frame.
+      frame = requestAnimationFrame(() => setRendererReady(true));
+    };
+    const observer = new MutationObserver(checkRenderer);
+    observer.observe(surface, { childList: true, subtree: true });
+    checkRenderer();
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(frame);
+    };
+  }, [isVideoOn]);
+  const revealVideo = isVideoOn && rendererReady;
   const compact = density === 'compact';
   const resolvedHandPosition =
     isSpeaking && handPosition === 'left' ? 'right' : handPosition;
@@ -78,23 +113,30 @@ export function ZoomVideoTile({
       )}
     >
       <div
-        ref={videoContainerRef}
+        ref={setSurfaceRef}
         className="absolute inset-0 z-0 h-full w-full [&>video-player-container]:block [&>video-player-container]:h-full [&>video-player-container]:w-full [&_video-player]:h-full [&_video-player]:w-full [&_video-player]:object-cover"
       />
-      {!isVideoOn ? (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-secondary">
-          <Avatar
-            size="lg"
-            className="aspect-square shrink-0 bg-background/90 text-foreground shadow-sm ring-4 ring-background/50"
-            style={{ height: 'clamp(4rem, 36%, 11rem)', width: 'auto' }}
-          >
-            {avatarUrl ? <AvatarImage src={avatarUrl} alt="" /> : null}
-            <AvatarFallback className="bg-background/90 text-base font-medium text-foreground sm:text-2xl">
-              {getInitials(label)}
-            </AvatarFallback>
-          </Avatar>
-        </div>
-      ) : null}
+      <div
+        data-camera-placeholder
+        aria-hidden={revealVideo}
+        className={cn(
+          'pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-secondary motion-reduce:transition-none',
+          revealVideo
+            ? 'opacity-0 transition-opacity duration-200 ease-out'
+            : 'opacity-100',
+        )}
+      >
+        <Avatar
+          size="lg"
+          className="aspect-square shrink-0 bg-background/90 text-foreground shadow-sm ring-4 ring-background/50"
+          style={{ height: 'clamp(4rem, 36%, 11rem)', width: 'auto' }}
+        >
+          {avatarUrl ? <AvatarImage src={avatarUrl} alt="" /> : null}
+          <AvatarFallback className="bg-background/90 text-base font-medium text-foreground sm:text-2xl">
+            {getInitials(label)}
+          </AvatarFallback>
+        </Avatar>
+      </div>
       {handRaised ? (
         <span
           className={cn(
@@ -144,7 +186,7 @@ export function ZoomVideoTile({
       >
         <OverlayBadge
           className={cn(
-            'min-w-0 bg-black/70 py-0 font-medium text-white shadow-sm backdrop-blur-lg',
+            'min-w-0 bg-black/45 py-0 font-medium text-white shadow-sm backdrop-blur-lg',
             compact ? 'h-6 px-2 text-[10px]' : 'h-8 px-3 text-xs',
           )}
         >

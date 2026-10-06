@@ -141,12 +141,22 @@ API cannot implement the behavior. Unmarked items remain parity targets.
     - Use accessible Shadcn button sizes and focus treatments.
 
 17. [x] **Keep recording state truthful.**
-    - Display the recording indicator in the header.
+    - Display the recording indicator in the header. Its inactive label is
+      RECORDING with a neutral dot; active recording shows a red dot. Keep the
+      accessible status explicit when recording is inactive.
     - Change its label and visual state only when Zoom reports recording,
       paused, or stopped status.
+    - Host start/stop controls live in More (desktop menu or mobile sheet), use
+      the SDK cloud-recording client, and are available without a feature flag.
+    - Cloud recording must be enabled on the Zoom account/session. Unsupported
+      sessions disable Start; SDK failures leave the confirmed indicator intact.
+    - Both active and paused recordings can be stopped. Guests see the shared
+      recording indicator without recording controls.
 
 18. **Add the reference utility entry points where they fit the product.**
-    - Invite/copy meeting link.
+    - Invite/copy meeting link lives immediately to the left of More in the toolbar.
+      Join link and passcode each have a copy button; Copy invitation copies both
+      details together.
     - Meeting agenda.
     - Keep these separate from annotation and SDK media controls.
 
@@ -184,6 +194,23 @@ API cannot implement the behavior. Unmarked items remain parity targets.
       recording information, next meeting, and rejoin.
     - IconicEdu currently needs a simpler feedback flow; add summary details
       only when backed by reliable session data.
+
+Emoji reactions start at the center of the sender's visible participant tile
+in both gallery and screen-share layouts, then pop, drift upward, and fade.
+The latest emoji also appears temporarily beside the sender in the participants
+list, including participants whose tiles are hidden. Raised hands remain visible
+on both tiles and the participants list until lowered. Command-channel sender IDs
+are normalized from Zoom strings to numeric participant IDs.
+
+Gallery tiles maintain 16:9 proportions and fit within both the available width
+and height of their grid cell, including a single participant and an open sidebar.
+
+Annotation uses one floating pencil toggle to start or stop drawing with Zoom's
+Pen tool; no custom tool palette is shown. Start, stop, and pen-selection failures
+leave the toggle truthful and display a message. Whiteboard start/view/stop/export
+also check SDK failure objects. Interactive whiteboard requires a supported
+platform and Zoom account permissions; unsupported viewers use the SDK sharing
+stream. See [Zoom's whiteboard documentation](https://developers.zoom.us/docs/video-sdk/web/whiteboard/).
 
 ## Responsive Requirements
 

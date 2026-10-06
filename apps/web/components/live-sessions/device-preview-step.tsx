@@ -28,8 +28,12 @@ export function DevicePreviewStep({
 
   useEffect(() => {
     let cancelled = false;
-    navigator.mediaDevices
-      .getUserMedia({ video: true, audio: true })
+    Promise.resolve()
+      .then(() => {
+        if (!navigator.mediaDevices?.getUserMedia)
+          throw new Error('Media preview unavailable');
+        return navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      })
       .then((stream) => {
         if (cancelled) {
           stream.getTracks().forEach((track) => track.stop());
@@ -46,6 +50,8 @@ export function DevicePreviewStep({
           return;
         }
         setIsLoading(false);
+        setMuted(true);
+        setVideoOff(true);
         setPermissionError(
           'Camera/microphone access was blocked. You can still join with them off and enable them later.',
         );

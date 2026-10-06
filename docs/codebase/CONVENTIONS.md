@@ -41,6 +41,28 @@
 - Sensitive-data redaction: `AGENTS.md` mandates user-safe error messages to clients with diagnostic detail retained server-side only; service-role keys and JWT secrets must never appear in logs, fixtures, or PRs.
 - TypeScript null policy: database rows use `null` (matching Postgres), function parameters/optional fields use `undefined`; explicit `?? false` required where RN accessibility props reject `null`.
 
+### Icons
+
+- Use Lucide for interface icons: `lucide-react` on web and `lucide-react-native`
+  on mobile. Keep brand artwork, decorative SVG patterns, and emoji content as assets.
+- Reuse the same icon for the same action across toolbars, menus, and panels.
+  Meeting controls use `Mic`/`MicOff`, `Video`/`VideoOff`, `MonitorUp`/`MonitorX`
+  for screen sharing, `Share` for meeting invitations, `Users` for participants,
+  `MessageSquare` for meeting chat, `Hand` for raised hands, `SmilePlus` for reactions,
+  `Pencil` for whiteboard drawing, `Settings` for setup, `Ellipsis` for more controls,
+  `Circle`/`Square` for starting/stopping recording, and `PhoneOff` for leaving.
+  Use `ExternalLink` for opening another tab.
+- Use `IconActionButton` from `@iconicedu/ui-web/ui/icon-action-button` for icon-only
+  meeting actions. Its exported `IconActionButtonProps` interface requires an
+  accessible `label` and icon content; the tooltip defaults to that label. Use
+  `tooltip` to explain a disabled action or supply a more detailed description.
+  Forward trigger props and refs through this primitive; do not add nested tooltip
+  wrappers. Toggle actions supply `aria-pressed`; disclosure triggers retain their
+  `aria-expanded`/`aria-haspopup` behavior. Visible text buttons and menu rows can
+  use their visible labels directly.
+- Meeting toolbar icons use 20 CSS pixels and a stroke width of 2. Compact media
+  indicators and menu rows may use smaller icons appropriate to their context.
+
 ### 5) Testing Conventions
 
 - Test file naming/location: co-located `*.test.ts(x)` (web, mobile) or `*.spec.ts` (API), next to the source file — not a separate `tests/` tree, with a small `apps/mobile/src/__tests__/` catch-all for cross-cutting cases.

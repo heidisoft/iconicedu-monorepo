@@ -1,62 +1,57 @@
-import { AnnotationToolType } from '@zoom/videosdk';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-
 import { TooltipProvider } from '@iconicedu/ui-web/ui/tooltip';
 import { ZoomAnnotationControls } from './zoom-annotation-controls';
 
 describe('ZoomAnnotationControls', () => {
-  it('starts annotation from the floating pencil control', async () => {
+  it('keeps a single pencil toggle when annotation starts and stops', async () => {
     const user = userEvent.setup();
-    const onStart = vi.fn();
-
-    render(
+    const onToggle = vi.fn();
+    const view = render(
       <TooltipProvider>
-        <ZoomAnnotationControls
-          available
-          isAnnotating={false}
-          selectedTool={AnnotationToolType.Pen}
-          onStart={onStart}
-          onSelectTool={vi.fn()}
-          onSelectColor={vi.fn()}
-          onUndo={vi.fn()}
-          onRedo={vi.fn()}
-          onClear={vi.fn()}
-          onClose={vi.fn()}
-        />
+        <ZoomAnnotationControls available isAnnotating={false} onToggle={onToggle} />
       </TooltipProvider>,
     );
-
     await user.click(screen.getByRole('button', { name: 'Annotate shared screen' }));
-    expect(onStart).toHaveBeenCalledWith();
+    expect(onToggle).toHaveBeenCalledOnce();
+    view.rerender(
+      <TooltipProvider>
+        <ZoomAnnotationControls available isAnnotating onToggle={onToggle} />
+      </TooltipProvider>,
+    );
+    expect(screen.getAllByRole('button')).toHaveLength(1);
+    expect(
+      screen.queryByRole('toolbar', { name: 'Annotation tools' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Stop annotating' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await user.click(screen.getByRole('button', { name: 'Stop annotating' }));
+    expect(onToggle).toHaveBeenCalledTimes(2);
   });
-
-  it('places the pencil in a safe bottom-left dock above the meeting controls', () => {
+  it('disables duplicate clicks while starting', () => {
     render(
       <TooltipProvider>
         <ZoomAnnotationControls
           available
           isAnnotating={false}
-          selectedTool={AnnotationToolType.Pen}
-          onStart={vi.fn()}
-          onSelectTool={vi.fn()}
-          onSelectColor={vi.fn()}
-          onUndo={vi.fn()}
-          onRedo={vi.fn()}
-          onClear={vi.fn()}
-          onClose={vi.fn()}
+          pending
+          onToggle={vi.fn()}
         />
       </TooltipProvider>,
     );
-
-    const dock = screen.getByRole('button', {
-      name: 'Annotate shared screen',
-    }).parentElement;
-
-    expect(dock).toHaveClass('left-4', 'sm:left-6');
-    expect(dock).toHaveStyle({
-      bottom: 'calc(max(1.5rem, env(safe-area-inset-bottom)) + 4.75rem)',
-    });
+    expect(screen.getByRole('button', { name: 'Annotate shared screen' })).toBeDisabled();
+  });
+  it('hides annotation when no eligible shared screen is available', () => {
+    render(
+      <ZoomAnnotationControls
+        available={false}
+        isAnnotating={false}
+        onToggle={vi.fn()}
+      />,
+    );
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 });

@@ -1,4 +1,8 @@
-import type { FloatingReaction, NetworkLevel } from './zoom-video-session.types';
+import type {
+  CommandChannelPayload,
+  FloatingReaction,
+  NetworkLevel,
+} from './zoom-video-session.types';
 
 export function formatElapsed(totalSeconds: number) {
   const minutes = Math.floor(totalSeconds / 60)
@@ -28,10 +32,24 @@ export function getNetworkLevel(
   return entry ? worseNetworkLevel(entry.uplink, entry.downlink) : undefined;
 }
 
-export function createFloatingReaction(emoji: string): FloatingReaction {
+export function getReactionOrigin(
+  tile: Pick<DOMRect, 'left' | 'top' | 'width' | 'height'>,
+  overlay: Pick<DOMRect, 'left' | 'top'>,
+) {
+  return {
+    x: tile.left + tile.width / 2 - overlay.left,
+    y: tile.top + tile.height / 2 - overlay.top,
+  };
+}
+
+export function createFloatingReaction(
+  emoji: string,
+  origin: FloatingReaction['origin'],
+): FloatingReaction {
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
     emoji,
+    origin,
     dx: Math.round((Math.random() - 0.5) * 160),
     rotate: Math.round((Math.random() - 0.5) * 50),
     durationMs: 2600 + Math.round(Math.random() * 900),
@@ -49,10 +67,6 @@ export function formatRelativeTime(timestamp: number, now = Date.now()) {
   return `${elapsedDays} d ago`;
 }
 
-export function annotationColorToHex(value: number) {
-  return `#${value.toString(16).padStart(8, '0').slice(2)}`;
-}
-
 export function shouldUsePresentationLayout({
   hasActiveShareUser,
   isShowingLocalShare,
@@ -63,4 +77,29 @@ export function shouldUsePresentationLayout({
   isWhiteboardActive: boolean;
 }) {
   return hasActiveShareUser || isShowingLocalShare || isWhiteboardActive;
+}
+
+export function parseParticipantCommand(senderId: string | number, text: string) {
+  const userId = Number(senderId);
+  if (!String(senderId).trim() || !Number.isSafeInteger(userId) || userId <= 0)
+    return null;
+  try {
+    const payload: unknown = JSON.parse(text);
+    if (!payload || typeof payload !== 'object' || !('type' in payload)) return null;
+    if (
+      (payload.type === 'raise-hand' &&
+        'raised' in payload &&
+        typeof payload.raised === 'boolean') ||
+      payload.type === 'raise-hand-state-request' ||
+      (payload.type === 'reaction' &&
+        'emoji' in payload &&
+        typeof payload.emoji === 'string' &&
+        payload.emoji.length > 0)
+    ) {
+      return { userId, payload: payload as CommandChannelPayload };
+    }
+  } catch {
+    return null;
+  }
+  return null;
 }

@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
+import { TooltipProvider } from '@iconicedu/ui-web/ui/tooltip';
 import { ZoomMeetingNotice } from './zoom-meeting-notice';
 
 describe('ZoomMeetingNotice', () => {
@@ -11,12 +12,14 @@ describe('ZoomMeetingNotice', () => {
     const onAction = vi.fn();
 
     render(
-      <ZoomMeetingNotice
-        message="This session is being recorded"
-        tone="warning"
-        onDismiss={onDismiss}
-        action={{ label: 'Review', onClick: onAction }}
-      />,
+      <TooltipProvider>
+        <ZoomMeetingNotice
+          message="This session is being recorded"
+          tone="warning"
+          onDismiss={onDismiss}
+          action={{ label: 'Review', onClick: onAction }}
+        />
+      </TooltipProvider>,
     );
 
     expect(screen.getByRole('status')).toHaveTextContent('being recorded');

@@ -16,6 +16,23 @@ test.describe('Zoom meeting responsive parity', () => {
     const messages = page.getByRole('button', { name: 'Messages' });
 
     await expect(header).toBeVisible();
+    const shareLinkBox = await page
+      .getByRole('button', { name: 'Share meeting link', exact: true })
+      .boundingBox();
+    const moreBox = await page
+      .getByRole('button', { name: 'More controls', exact: true })
+      .boundingBox();
+    expect(shareLinkBox!.x + shareLinkBox!.width).toBeLessThanOrEqual(moreBox!.x);
+    expect(moreBox!.x - (shareLinkBox!.x + shareLinkBox!.width)).toBeLessThan(10);
+
+    await expect(
+      page
+        .getByRole('toolbar', { name: 'Class controls' })
+        .getByRole('button', { name: 'Share meeting link', exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Stop recording', exact: true }),
+    ).toHaveCount(0);
     await expect(page.getByRole('heading')).toHaveText(
       'Airbnb: Product Management Structure',
     );
@@ -40,6 +57,31 @@ test.describe('Zoom meeting responsive parity', () => {
     );
     expect(messagesBox!.x + messagesBox!.width).toBeLessThanOrEqual(1440);
 
+    for (const label of [
+      'Mute microphone',
+      'Stop camera',
+      'Share screen',
+      'Share meeting link',
+      'Start whiteboard',
+      'Raise hand',
+      'Open reactions',
+      'Participants',
+      'Messages',
+    ]) {
+      const icon = page
+        .getByRole('button', { name: label, exact: true })
+        .locator('svg.lucide')
+        .first();
+      await expect(icon).toHaveCSS('width', '20px');
+      await expect(icon).toHaveCSS('height', '20px');
+      await expect(icon).toHaveCSS('stroke-width', '2px');
+    }
+    await expect(
+      page
+        .getByRole('button', { name: 'Share meeting link', exact: true })
+        .locator('svg'),
+    ).toHaveClass(/lucide-share(?: |$)/);
+
     const tileBox = await page.locator('.zoom-video-tile').first().boundingBox();
     expect(tileBox).not.toBeNull();
     expect(tileBox!.width / tileBox!.height).toBeCloseTo(16 / 9, 1);
@@ -61,6 +103,7 @@ test.describe('Zoom meeting responsive parity', () => {
       const tileBox = await tiles.nth(index).boundingBox();
       expect(tileBox).not.toBeNull();
       expect(tileBox!.x + tileBox!.width).toBeLessThanOrEqual(panelBox!.x);
+      expect(tileBox!.width / tileBox!.height).toBeCloseTo(16 / 9, 1);
     }
   });
 
@@ -112,6 +155,7 @@ test.describe('Zoom meeting responsive parity', () => {
       const tileBox = await tile.boundingBox();
       expect(tileBox).not.toBeNull();
       expect(tileBox!.x + tileBox!.width).toBeLessThanOrEqual(panelBox!.x);
+      expect(tileBox!.width / tileBox!.height).toBeCloseTo(16 / 9, 1);
     }
   });
 
@@ -134,6 +178,9 @@ test.describe('Zoom meeting responsive parity', () => {
 
     await page.getByRole('button', { name: 'More controls' }).click();
     await expect(page.getByRole('heading', { name: 'More controls' })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Stop recording', exact: true }),
+    ).toBeVisible();
     await expect(page.getByRole('button', { name: 'Participants (4)' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Messages (2 unread)' })).toBeVisible();
     await expect(
@@ -175,4 +222,91 @@ test.describe('Zoom meeting responsive parity', () => {
 
     expect(new Set([neutralColor, activeColor, destructiveColor]).size).toBe(3);
   });
+});
+
+test('fits gallery tiles at 16:9 for one to four participants', async ({ page }) => {
+  for (const viewport of [
+    { width: 1440, height: 900 },
+    { width: 1440, height: 500 },
+    { width: 390, height: 844 },
+    { width: 844, height: 390 },
+  ]) {
+    await page.setViewportSize(viewport);
+    for (const count of [1, 2, 3, 4]) {
+      await page.goto(`${fixturePath}?participants=${count}`);
+      const tiles = page.locator('.zoom-gallery-tile');
+      await expect(tiles).toHaveCount(count);
+      const gallery = await page.locator('.zoom-participant-gallery').boundingBox();
+      for (let index = 0; index < count; index += 1) {
+        const tile = await tiles.nth(index).boundingBox();
+        expect(tile).not.toBeNull();
+        expect(tile!.width / tile!.height).toBeCloseTo(16 / 9, 1);
+        expect(tile!.y).toBeGreaterThanOrEqual(gallery!.y - 1);
+        expect(tile!.y + tile!.height).toBeLessThanOrEqual(
+          gallery!.y + gallery!.height + 1,
+        );
+        expect(tile!.x + tile!.width).toBeLessThanOrEqual(viewport.width);
+      }
+    }
+  }
+});
+
+test('updates the header recording indicator when toolbar recording changes', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(fixturePath);
+  await page.getByRole('button', { name: 'More controls', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Stop recording', exact: true }).click();
+  await expect(page.getByRole('status', { name: 'Not recording' })).toHaveText(
+    'Recording',
+  );
+  await page.getByRole('button', { name: 'More controls', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Start recording', exact: true }).click();
+  await expect(page.getByRole('status', { name: 'Recording in progress' })).toHaveText(
+    'Recording',
+  );
+});
+
+test('changes recording from the mobile More sheet', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(fixturePath);
+  await expect(
+    page
+      .getByRole('toolbar', { name: 'Class controls' })
+      .getByRole('button', { name: 'Share meeting link', exact: true }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'More controls', exact: true }).click();
+  await page.getByRole('button', { name: 'Stop recording', exact: true }).click();
+  await expect(page.getByRole('status', { name: 'Not recording' })).toBeVisible();
+  await page.getByRole('button', { name: 'More controls', exact: true }).click();
+  await page.getByRole('button', { name: 'Start recording', exact: true }).click();
+  await expect(page.getByRole('status', { name: 'Recording in progress' })).toBeVisible();
+});
+
+test('gives every meeting toolbar action one descriptive tooltip', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(fixturePath);
+  for (const label of [
+    'Mute microphone',
+    'Stop camera',
+    'Share screen',
+    'Start whiteboard',
+    'Share meeting link',
+    'More controls',
+    'Raise hand',
+    'Open reactions',
+    'Participants',
+    'Messages',
+    'Leave class',
+  ]) {
+    await page.getByRole('button', { name: label, exact: true }).hover();
+    const tooltip = page.getByRole('tooltip');
+    await expect(tooltip).toHaveCount(1);
+    await expect(tooltip).toHaveText(label);
+    await page.mouse.move(0, 0);
+    await expect(tooltip).toHaveCount(0);
+  }
+  await page.getByRole('button', { name: 'Share meeting link', exact: true }).focus();
+  await expect(page.getByRole('tooltip')).toHaveText('Share meeting link');
 });

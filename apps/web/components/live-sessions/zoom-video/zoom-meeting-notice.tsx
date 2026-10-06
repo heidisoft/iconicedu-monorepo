@@ -3,6 +3,7 @@
 import { CircleAlert, TriangleAlert, X } from 'lucide-react';
 
 import { Button } from '@iconicedu/ui-web/ui/button';
+import { IconActionButton } from '@iconicedu/ui-web/ui/icon-action-button';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 
 export type MeetingNoticeModel = {
@@ -48,15 +49,14 @@ export function ZoomMeetingNotice({
           </Button>
         ) : null}
         {onDismiss ? (
-          <Button
-            type="button"
+          <IconActionButton
             variant="ghost"
             size="icon-sm"
-            aria-label="Dismiss message"
+            label="Dismiss message"
             onClick={onDismiss}
           >
             <X />
-          </Button>
+          </IconActionButton>
         ) : null}
       </div>
     </div>

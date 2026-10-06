@@ -24,7 +24,8 @@ function resolveClientIp(req: IpAddressRequest): string {
 }
 
 // No AuthGuard anywhere in this controller — every route here is intentionally
-// public, gated by a session passcode rather than a bearer token. Kept
+// public. Guest join requires a passcode; optional verified bearer tokens
+// resolve identity without granting additional privileges. Kept
 // separate from LiveSessionsController so that's obvious at a glance rather
 // than relying on a missing @UseGuards being noticed in review.
 @Controller('live-sessions')
@@ -33,7 +34,7 @@ export class LiveSessionsPublicController {
 
   @Post(':sessionId/guest-join')
   guestJoin(
-    @Req() req: IpAddressRequest,
+    @Req() req: IpAddressRequest & { headers: { authorization?: string } },
     @Param('sessionId') sessionId: string,
     @Body() body: unknown,
   ) {
@@ -41,12 +42,13 @@ export class LiveSessionsPublicController {
       sessionId,
       resolveClientIp(req),
       parseGuestJoinLiveSessionDto(body),
+      extractOptionalBearerToken(req.headers.authorization),
     );
   }
 
   // Backs the /live/:sessionId landing page. Signing in is optional — pass a
   // bearer token to additionally learn whether the caller is the session's
-  // host, which carries a one-click host join (see getPublicLiveSessionInfo).
+  // host or resolve their own participant name (see getPublicLiveSessionInfo).
   @Get(':sessionId/public-info')
   publicInfo(
     @Req() req: { headers: { authorization?: string } },

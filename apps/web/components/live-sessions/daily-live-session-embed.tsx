@@ -22,7 +22,8 @@ import {
   Loader2,
   Mic,
   MicOff,
-  MonitorUp,
+  ExternalLink,
+  Settings,
   RefreshCw,
   Users,
   Video,
@@ -724,7 +725,7 @@ function DailyLiveSessionSurface({
                     variant="outline"
                     onClick={() => setIsSettingsOpen((open) => !open)}
                   >
-                    <MonitorUp className="h-4 w-4" />
+                    <Settings className="h-4 w-4" />
                     {isSettingsOpen ? 'Hide setup' : 'Setup'}
                   </Button>
                 </div>
@@ -746,7 +747,7 @@ function DailyLiveSessionSurface({
                       rel="noreferrer"
                       className="flex items-center gap-2 transition-colors hover:text-foreground"
                     >
-                      <MonitorUp className="h-4 w-4" />
+                      <ExternalLink className="h-4 w-4" />
                       <span>Open this live session in a new tab</span>
                     </a>
                   ) : null}

@@ -4,12 +4,12 @@ import {
   ChevronDown,
   Hand,
   Info,
-  MessageCircle,
+  MessageSquare,
   Mic,
   MicOff,
   MonitorUp,
-  MoreVertical,
-  Phone,
+  Ellipsis,
+  PhoneOff,
   Settings,
   Users,
   Video,
@@ -222,7 +222,7 @@ export function ControlBar({
                 className="h-10 w-10 rounded-full"
                 title="More options"
               >
-                <MoreVertical className="h-5 w-5" />
+                <Ellipsis className="h-5 w-5" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="center" className="w-56">
@@ -246,7 +246,7 @@ export function ControlBar({
             {isEnding ? (
               <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
             ) : (
-              <Phone className="h-5 w-5 rotate-[135deg]" />
+              <PhoneOff className="h-5 w-5" />
             )}
           </Button>
         </div>
@@ -277,7 +277,7 @@ export function ControlBar({
                 className="h-10 w-10 rounded-full text-muted-foreground"
                 title="Chat"
               >
-                <MessageCircle className="h-5 w-5" />
+                <MessageSquare className="h-5 w-5" />
               </Button>
               <Button
                 size="icon"

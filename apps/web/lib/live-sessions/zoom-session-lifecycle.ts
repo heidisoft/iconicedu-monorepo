@@ -4,6 +4,15 @@ export type ZoomClient = ReturnType<typeof ZoomVideo.createClient>;
 
 const disposedClients = new WeakSet<ZoomClient>();
 const pendingDisposals = new WeakMap<ZoomClient, ReturnType<typeof setTimeout>>();
+type ZoomJoinInput = { sessionName: string; token: string; displayName: string };
+type ZoomJoinResult = {
+  compatibility: ReturnType<typeof ZoomVideo.checkSystemRequirements>;
+  self: ReturnType<ZoomClient['getCurrentUserInfo']>;
+};
+const pendingJoins = new WeakMap<
+  ZoomClient,
+  { input: ZoomJoinInput; promise: Promise<ZoomJoinResult> }
+>();
 
 export function isZoomExecutedFailure(
   value: unknown,
@@ -30,7 +39,7 @@ export function describeZoomFailure(error: unknown): string {
 export function describeZoomWhiteboardFailure(error: unknown): string {
   const detail = describeZoomFailure(error);
   if (/confId|mmrToken/i.test(detail)) {
-    return "Whiteboard isn't available for this session. The Zoom account owner may need to enable Whiteboard for this Video SDK app.";
+    return 'Zoom could not authenticate the whiteboard for this session. Try rejoining. If it still fails, ask the host to check Zoom Whiteboard access and network connectivity.';
   }
   return detail === 'Failed to join session'
     ? "Whiteboard couldn't be started. Try again or ask the meeting host to check Whiteboard access."
@@ -65,10 +74,33 @@ export function acquireZoomClient(): ZoomClient {
   return client;
 }
 
-export async function initializeAndJoinZoomSession(
+export function initializeAndJoinZoomSession(
   client: ZoomClient,
-  input: { sessionName: string; token: string; displayName: string },
-) {
+  input: ZoomJoinInput,
+): Promise<ZoomJoinResult> {
+  const pending = pendingJoins.get(client);
+  if (pending) {
+    if (
+      pending.input.sessionName !== input.sessionName ||
+      pending.input.token !== input.token ||
+      pending.input.displayName !== input.displayName
+    ) {
+      return Promise.reject(
+        new Error('A different Zoom session join is already in progress.'),
+      );
+    }
+    return pending.promise;
+  }
+  // Zoom creates a singleton client. Strict Mode replays the effect while the
+  // first init/join is still pending; replay must await it, not start another.
+  const promise = joinZoomSession(client, input).finally(() => {
+    pendingJoins.delete(client);
+  });
+  pendingJoins.set(client, { input: { ...input }, promise });
+  return promise;
+}
+
+async function joinZoomSession(client: ZoomClient, input: ZoomJoinInput) {
   const compatibility = ZoomVideo.checkSystemRequirements();
   if (!compatibility.audio || !compatibility.video) {
     throw new Error(

@@ -1,11 +1,10 @@
 'use client';
 
 import { useCallback, useMemo, type ComponentProps } from 'react';
-import { useRouter } from 'next/navigation';
 import { DashboardHomeInfographicSection } from '@iconicedu/ui-web';
 import type { DashboardUpcomingSessionListItem } from '@iconicedu/ui-web/components/dashboard/dashboard-home-infographic-section';
 import { ExternalLiveSessionJoinDialog } from '@iconicedu/ui-web/components/messages/external-live-session-join-dialog';
-import { useExternalLiveSessionJoinDialog } from '@iconicedu/ui-web/components/messages/use-external-live-session-join-dialog';
+import { useLiveSessionNavigation } from '@iconicedu/web/components/live-sessions/use-live-session-navigation';
 
 import { createApiClient } from '@iconicedu/web/lib/api/http-client';
 import { createSupabaseBrowserClient } from '@iconicedu/web/lib/supabase/client';
@@ -22,14 +21,9 @@ export function HomePageInfographicClient({
   currentUserId,
   ...props
 }: HomePageInfographicClientProps) {
-  const router = useRouter();
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const { externalJoinTarget, closeExternalJoinDialog, handleResolvedJoinHref } =
-    useExternalLiveSessionJoinDialog({
-      onInternalJoinHref: (joinHref) => {
-        router.push(joinHref);
-      },
-    });
+    useLiveSessionNavigation();
 
   const handleJoinSession = useCallback(
     async (item: DashboardUpcomingSessionListItem) => {

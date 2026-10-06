@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  annotationColorToHex,
   collapseNetworkLevel,
+  createFloatingReaction,
+  getReactionOrigin,
+  parseParticipantCommand,
   formatElapsed,
   formatRelativeTime,
   getNetworkLevel,
@@ -33,10 +35,6 @@ describe('zoom video session utilities', () => {
     );
   });
 
-  it('converts the SDK annotation color format to CSS hex', () => {
-    expect(annotationColorToHex(0xff3b82f6)).toBe('#3b82f6');
-  });
-
   it('shows the presentation filmstrip before Zoom syncs the local share user', () => {
     expect(
       shouldUsePresentationLayout({
@@ -45,5 +43,56 @@ describe('zoom video session utilities', () => {
         isWhiteboardActive: false,
       }),
     ).toBe(true);
+  });
+});
+
+describe('reaction origins', () => {
+  it('starts at the sender tile center relative to the overlay', () => {
+    const origin = getReactionOrigin(
+      { left: 500, top: 200, width: 240, height: 160 },
+      { left: 100, top: 50 },
+    );
+    expect(origin).toEqual({ x: 520, y: 230 });
+    expect(createFloatingReaction('🎉', origin).origin).toEqual(origin);
+  });
+  it('uses the smaller filmstrip tile center during presentation', () => {
+    expect(
+      getReactionOrigin(
+        { left: 24, top: 600, width: 120, height: 80 },
+        { left: 24, top: 100 },
+      ),
+    ).toEqual({ x: 60, y: 540 });
+  });
+});
+
+describe('participant command messages', () => {
+  it('normalizes Zoom string sender IDs for remote hand and reaction state', () => {
+    expect(parseParticipantCommand('42', '{"type":"raise-hand","raised":true}')).toEqual({
+      userId: 42,
+      payload: { type: 'raise-hand', raised: true },
+    });
+    expect(parseParticipantCommand('42', '{"type":"raise-hand","raised":false}')).toEqual(
+      { userId: 42, payload: { type: 'raise-hand', raised: false } },
+    );
+    expect(parseParticipantCommand('42', '{"type":"reaction","emoji":"🎉"}')).toEqual({
+      userId: 42,
+      payload: { type: 'reaction', emoji: '🎉' },
+    });
+    expect(
+      parseParticipantCommand('42', '{"type":"raise-hand-state-request"}')?.userId,
+    ).toBe(42);
+  });
+  it('ignores invalid sender IDs and malformed messages', () => {
+    for (const id of ['', 'invalid', '0', '-1', '1.5'])
+      expect(
+        parseParticipantCommand(id, '{"type":"raise-hand","raised":true}'),
+      ).toBeNull();
+    for (const message of [
+      'null',
+      '{',
+      '{"type":"raise-hand","raised":"false"}',
+      '{"type":"reaction","emoji":42}',
+    ])
+      expect(parseParticipantCommand('42', message)).toBeNull();
   });
 });
