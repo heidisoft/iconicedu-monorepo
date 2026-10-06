@@ -272,3 +272,30 @@ model ScreenAnnotationReceipt {
   @@id([sessionId, eventId])
   @@map("screen_annotation_receipts")
 }
+
+model ClassroomWhiteboard {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId             String   @map("org_id") @db.Uuid
+  channelId         String   @map("channel_id") @db.Uuid
+  scopeKey          String   @map("scope_key")
+  revision          Int      @default(0)
+  document          Json
+  appliedOperations Json     @default("[]") @map("applied_operations")
+  updatedAt         DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([orgId, channelId, scopeKey])
+  @@map("classroom_whiteboards")
+}
+
+model ClassroomWhiteboardAccess {
+  tokenHash     String   @id @map("token_hash")
+  boardId       String   @map("board_id") @db.Uuid
+  liveSessionId String   @map("live_session_id") @db.Uuid
+  role          String
+  displayName   String   @map("display_name")
+  expiresAt     DateTime @map("expires_at") @db.Timestamptz(6)
+  lastSeenAt    DateTime @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+
+  @@index([boardId, lastSeenAt])
+  @@map("classroom_whiteboard_access")
+}

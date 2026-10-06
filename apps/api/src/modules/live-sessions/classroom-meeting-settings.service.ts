@@ -93,12 +93,23 @@ export class ClassroomMeetingSettingsService {
       flagKey: platformFeatureFlagKeys.enableClassroomMeetingSettings,
       distinctId: profile.data.id,
     });
+    const whiteboardProviderAvailable =
+      enabled &&
+      (await evaluateApiBooleanFlag({
+        flagKey: platformFeatureFlagKeys.enableClassroomWhiteboard,
+        distinctId: profile.data.id,
+      }));
     if (!enabled || !classroomId)
-      return { enabled, settings: structuredClone(DEFAULT_LIVE_SESSION_SETTINGS) };
+      return {
+        enabled,
+        whiteboardProviderAvailable,
+        settings: structuredClone(DEFAULT_LIVE_SESSION_SETTINGS),
+      };
     const channel = await this.channel(supabase, org.data.id, classroomId);
     const stored = channel.live_session_config as Record<string, unknown> | null;
     return {
       enabled,
+      whiteboardProviderAvailable,
       settings: stored?.settings
         ? parseLiveSessionSettings(stored.settings)
         : structuredClone(DEFAULT_LIVE_SESSION_SETTINGS),

@@ -1,7 +1,7 @@
 /** Provider-independent policy snapshotted when a Classroom meeting starts. */
 export interface LiveSessionSettingsVM {
   recording: { enabled: boolean; autoStart: boolean; allowStop: boolean };
-  whiteboard: { enabled: boolean };
+  whiteboard: { enabled: boolean; provider?: 'excalidraw' | 'zoom' };
   invite: { enabled: boolean };
   participants: { visible: boolean };
   messages: { visible: boolean; enabled: boolean };
@@ -18,5 +18,6 @@ export const DEFAULT_LIVE_SESSION_SETTINGS: LiveSessionSettingsVM = {
 
 export type ClassroomMeetingSettingsVM = {
   enabled: boolean;
+  whiteboardProviderAvailable?: boolean;
   settings: LiveSessionSettingsVM;
 };

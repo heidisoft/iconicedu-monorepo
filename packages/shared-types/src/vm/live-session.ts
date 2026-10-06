@@ -155,6 +155,7 @@ export interface LiveSessionAttendanceFilterVM {
 
 /** Credentials issued by apps/api after host authorization or passcode verification. */
 export type LiveSessionJoinCredentialsVM = {
+  whiteboard?: import('./whiteboard').WhiteboardAccessVM;
   token: string;
   sessionName: string;
   displayName: string;

@@ -18,6 +18,12 @@ export function parseLiveSessionSettings(value: unknown): LiveSessionSettingsVM 
       throw new BadRequestException(`Invalid ${key} settings`);
     const target = result[key as keyof LiveSessionSettingsVM] as Record<string, boolean>;
     for (const [option, setting] of Object.entries(section)) {
+      if (key === 'whiteboard' && option === 'provider') {
+        if (setting !== 'zoom' && setting !== 'excalidraw')
+          throw new BadRequestException('Invalid whiteboard provider');
+        result.whiteboard.provider = setting;
+        continue;
+      }
       if (
         !Object.prototype.hasOwnProperty.call(target, option) ||
         typeof setting !== 'boolean'

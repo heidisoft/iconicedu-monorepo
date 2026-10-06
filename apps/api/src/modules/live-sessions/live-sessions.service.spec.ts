@@ -236,6 +236,7 @@ describe('LiveSessionsService.guestJoinLiveSession', () => {
     );
 
     expect(result).toEqual({
+      whiteboard: { provider: 'zoom' },
       token: 'guest-token',
       sessionName: 'ls-session',
       displayName: 'Taylor Reed',

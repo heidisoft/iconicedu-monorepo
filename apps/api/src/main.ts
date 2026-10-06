@@ -14,6 +14,8 @@ async function bootstrap() {
   // limiting (see LiveSessionsPublicController's guest-join endpoint).
   app.set('trust proxy', 1);
   app.use(requestContextMiddleware);
+  // Whiteboard batches are bounded to 1 MB by the API codec; allow parser overhead.
+  app.useBodyParser('json', { limit: '2mb' });
 
   app.useGlobalPipes(
     new ValidationPipe({

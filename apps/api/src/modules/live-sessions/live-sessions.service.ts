@@ -1,3 +1,4 @@
+import { issueWhiteboardAccess } from '../whiteboards/whiteboard-access';
 import { platformFeatureFlagKeys } from '@iconicedu/shared-types';
 import { evaluateApiBooleanFlag } from '@iconicedu/api/lib/flags/posthog-openfeature';
 import { parseLiveSessionSettings, settingsFromSnapshot } from './live-session-settings';
@@ -224,6 +225,20 @@ function checkAuditEventRateLimit(key: string) {
 
 @Injectable()
 export class LiveSessionsService {
+  /** Optional collaboration failures cannot prevent authorized audio/video joins. */
+  private async whiteboardAccess(
+    sessionId: string,
+    role: 'teacher' | 'student',
+    name: string,
+  ) {
+    try {
+      return await issueWhiteboardAccess(sessionId, role, name);
+    } catch {
+      this.logger.warn('Class whiteboard unavailable during authorized meeting join');
+      return { provider: 'excalidraw' as const, unavailable: true };
+    }
+  }
+
   private readonly logger = new Logger(LiveSessionsService.name);
 
   async joinLiveSession(
@@ -383,6 +398,9 @@ export class LiveSessionsService {
       throw new InternalServerErrorException('Unable to issue session credentials');
 
     return {
+      ...(settings.whiteboard.enabled
+        ? { whiteboard: await this.whiteboardAccess(session.id, 'student', displayName) }
+        : {}),
       token: joinAccess.token,
       sessionName:
         typeof metadata.sessionName === 'string' ? metadata.sessionName : session.id,
@@ -512,6 +530,11 @@ export class LiveSessionsService {
       isHost: true as const,
       settings,
       hostJoin: {
+        ...(settings.whiteboard.enabled
+          ? {
+              whiteboard: await this.whiteboardAccess(session.id, 'teacher', displayName),
+            }
+          : {}),
         token: joinAccess.token,
         expiresAt: joinAccess.expiresAt ?? null,
         settings,
