@@ -512,3 +512,7 @@ modules, recording start and stop locking, whiteboard cleanup, and draft recover
 client and recording control with synthetic API/SDK responses; it does not verify
 live Zoom account capability. To roll back the rollout, disable the flag for new
 meetings; existing snapshots remain effective until their meeting ends.
+
+## Application whiteboard provider
+
+The `classroom-whiteboard` rollout selects the native Excalidraw board by default; Classroom settings can retain Zoom Whiteboard. Canvas, persistence and collaboration ownership, security, and tests are documented in [Classroom Whiteboard](CLASSROOM_WHITEBOARD.md). The existing Zoom whiteboard hook remains the Zoom provider, and screen-share annotation still uses Zoom.

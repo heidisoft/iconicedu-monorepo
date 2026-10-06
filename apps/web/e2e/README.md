@@ -64,3 +64,7 @@ recording client. No real meeting, account or hardware is required.
   formatting, pointer mode and aspect-fit resizing at `/visual-test/screen-annotations`.
   Uses a deterministic injected annotation engine; no Zoom credentials are required.
   The fixture is unavailable in production.
+
+### Native Classroom whiteboard
+
+`classroom-whiteboard.spec.ts` runs the real Excalidraw UI against local API/Supabase, including two-context collaboration. Start API on 3001, web on 3000 and local Supabase, apply migrations, then run `PLAYWRIGHT_SKIP_WEBSERVER=1 pnpm --filter web exec playwright test classroom-whiteboard.spec.ts --workers=1`. The helper creates and cleans synthetic organizations in the local database container; no production URL is supported. This suite uses a development-only class entry and does not require Zoom credentials.
