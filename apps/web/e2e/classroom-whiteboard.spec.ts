@@ -565,6 +565,11 @@ test('reveals grouped whiteboard controls on demand on mobile and in fullscreen'
         .getByRole('menuitemradio', { name: 'Ellipse' }),
     ).toBeVisible();
     await page.getByRole('menuitemradio', { name: 'Ellipse' }).click();
+    await page.getByRole('button', { name: 'Tool options', exact: true }).click();
+    await expect(
+      page.getByTestId('classroom-whiteboard').getByTestId('compact-tool-options'),
+    ).toBeVisible();
+    await page.keyboard.press('Escape');
     const selectBounds = await page
       .getByRole('button', { name: 'Select', exact: true })
       .boundingBox();
@@ -585,7 +590,7 @@ test('reveals grouped whiteboard controls on demand on mobile and in fullscreen'
   }
 });
 
-test('shows contextual styles, preserves choices and syncs styled drawings', async ({
+test('keeps tool options compact and explicit, saves colors and supports pen variants', async ({
   browser,
   request,
 }) => {
@@ -593,16 +598,19 @@ test('shows contextual styles, preserves choices and syncs styled drawings', asy
   const { page, context } = await joinClassAs(browser, fixture.teacher);
   try {
     await page.getByRole('button', { name: 'Pen', exact: true }).click();
-    const panel = page.locator('.selected-shape-actions');
-    await expect(panel.getByText('Stroke', { exact: true })).toBeVisible();
-    await expect(panel.getByText('Stroke width', { exact: true })).toBeVisible();
-    await panel.getByTitle('#e03131', { exact: true }).click();
-    const opacity = panel.getByRole('slider');
+    await expect(page.getByTestId('compact-tool-options')).toHaveCount(0);
+    await expect(page.locator('.selected-shape-actions')).not.toBeVisible();
+    await page.getByRole('button', { name: 'Pen', exact: true }).click();
+    const panel = page.getByTestId('compact-tool-options');
+    await expect(panel.getByRole('group', { name: 'Pen type' })).toBeVisible();
+    await panel.getByRole('button', { name: 'Red stroke', exact: true }).click();
+    const opacity = panel.getByRole('slider', { name: 'Opacity' });
     await opacity.focus();
     await opacity.press('Home');
-    for (let i = 0; i < 6; i++) await opacity.press('ArrowRight');
+    for (let i = 0; i < 10; i++) await opacity.press('ArrowRight');
     await expect(opacity).toHaveValue('60');
-    // Choosing Pen again must retain the styles the user picked.
+    await page.keyboard.press('Escape');
+    await expect(page.getByLabel('Pen color #e03131')).toBeVisible();
     await draw(page);
     const read = async () =>
       (
@@ -615,33 +623,23 @@ test('shows contextual styles, preserves choices and syncs styled drawings', asy
     await expect.poll(async () => (await read())[0]?.data.strokeColor).toBe('#e03131');
     expect((await read())[0].data.opacity).toBe(60);
     await page.getByRole('button', { name: 'Select', exact: true }).click();
-    const canvasBox = await page.getByTestId('whiteboard-canvas').boundingBox();
-    if (!canvasBox) throw new Error('Canvas unavailable');
-    await page.mouse.click(
-      canvasBox.x + canvasBox.width / 2 + 30,
-      canvasBox.y + canvasBox.height / 2 + 25,
-    );
-    await expect(panel.getByTitle('#1971c2', { exact: true })).toBeVisible();
-    await panel.getByTitle('#1971c2', { exact: true }).click();
+    const box = await page.getByTestId('whiteboard-canvas').boundingBox();
+    if (!box) throw new Error('Canvas unavailable');
+    await page.mouse.click(box.x + box.width / 2 + 30, box.y + box.height / 2 + 25);
+    await page.getByRole('button', { name: 'Tool options', exact: true }).click();
+    await panel.getByRole('button', { name: 'Blue stroke', exact: true }).click();
     await expect.poll(async () => (await read())[0]?.data.strokeColor).toBe('#1971c2');
+    await page.keyboard.press('Escape');
     await page.getByRole('button', { name: 'Undo', exact: true }).click();
     await expect.poll(async () => (await read())[0]?.data.strokeColor).toBe('#e03131');
-    await page.getByRole('button', { name: 'Shapes', exact: true }).click();
-    await page.getByRole('menuitemradio', { name: 'Rectangle', exact: true }).click();
-    await expect(panel.getByText('Background', { exact: true })).toBeVisible();
-    await panel.getByTitle('#a5d8ff', { exact: true }).click();
-    await expect(panel.getByText('Fill', { exact: true })).toBeVisible();
-    await page.getByRole('button', { name: 'Pan', exact: true }).click();
-    await expect(panel).toHaveCount(0);
     await page.setViewportSize({ width: 390, height: 844 });
     await page.getByRole('button', { name: 'Pen', exact: true }).click();
-    const mobilePanel = page.locator('.App-mobile-menu');
-    await expect(mobilePanel.getByText('Stroke', { exact: true })).toBeVisible();
-    await page.getByRole('button', { name: 'Hide tool options' }).click();
-    await expect(mobilePanel).toHaveCount(0);
-    await page.getByRole('button', { name: 'Show tool options' }).click();
-    await expect(mobilePanel.getByRole('slider')).toHaveValue('60');
-    await page.screenshot({ path: '/tmp/iconicedu-whiteboard-tool-options.png' });
+    await expect(panel).toHaveCount(0);
+    await page.getByRole('button', { name: 'Pen', exact: true }).click();
+    await panel.getByRole('button', { name: 'Marker', exact: true }).click();
+    await expect(panel.getByRole('button', { name: 'Stroke width 8' })).toBeVisible();
+    await expect(page.locator('.App-mobile-menu')).not.toBeVisible();
+    await page.screenshot({ path: '/tmp/iconicedu-whiteboard-compact-options.png' });
   } finally {
     await context.close();
     fixture.cleanup();

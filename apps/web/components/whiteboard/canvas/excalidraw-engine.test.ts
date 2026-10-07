@@ -36,6 +36,16 @@ function fixture() {
     scrollY: 0,
     zoom: { value: 1 },
     selectedElementIds: {} as Record<string, boolean>,
+    currentItemStrokeColor: '#1e1e1e',
+    currentItemBackgroundColor: 'transparent',
+    currentItemStrokeWidth: 2,
+    currentItemOpacity: 100,
+    currentItemFillStyle: 'solid',
+    currentItemFontSize: 20,
+    currentItemFontFamily: 2,
+    currentItemStartArrowhead: null,
+    currentItemEndArrowhead: 'arrow',
+    currentItemTextAlign: 'left',
   };
   const api = {
     getSceneElementsIncludingDeleted: () => elements,
@@ -68,6 +78,26 @@ function fixture() {
   };
 }
 describe('Excalidraw canvas adapter', () => {
+  it('does not restyle a selected object when choosing a pen variant for new strokes', () => {
+    const { engine } = fixture();
+    engine.insertNote();
+    const original = engine.getElements();
+    engine.setTool('freedraw');
+    engine.setStyle({ strokeWidth: 6, opacity: 100, strokeColor: '#1971c2' });
+    expect(engine.getElements()).toEqual(original);
+    expect(engine.getStyle().strokeWidth).toBe(6);
+  });
+  it('restores each drawing tool color when switching tools', () => {
+    const { engine } = fixture();
+    engine.setTool('freedraw');
+    engine.setStyle({ strokeColor: '#e03131' });
+    engine.setTool('text');
+    engine.setStyle({ strokeColor: '#1971c2' });
+    engine.setTool('freedraw');
+    expect(engine.getStyle().strokeColor).toBe('#e03131');
+    engine.setTool('text');
+    expect(engine.getStyle().strokeColor).toBe('#1971c2');
+  });
   it('inserts an editable bound note and a stamp through normal scene transactions', () => {
     const { engine, api, changed } = fixture();
     engine.insertNote();
@@ -95,9 +125,9 @@ describe('Excalidraw canvas adapter', () => {
   it('opens contextual options without resetting ordinary drawing styles', () => {
     const { engine, api } = fixture();
     engine.setTool('freedraw');
-    expect(api.updateScene).toHaveBeenLastCalledWith({ appState: { openMenu: 'shape' } });
+    expect(api.updateScene).toHaveBeenLastCalledWith({ appState: { openMenu: null } });
     engine.setTool('rectangle');
-    expect(api.updateScene).toHaveBeenLastCalledWith({ appState: { openMenu: 'shape' } });
+    expect(api.updateScene).toHaveBeenLastCalledWith({ appState: { openMenu: null } });
     engine.setTool('hand');
     expect(api.updateScene).toHaveBeenLastCalledWith({ appState: { openMenu: null } });
     engine.setTool('highlighter');
@@ -106,7 +136,10 @@ describe('Excalidraw canvas adapter', () => {
     });
     engine.setTool('freedraw');
     expect(api.updateScene).toHaveBeenLastCalledWith({
-      appState: { currentItemOpacity: 100, currentItemStrokeWidth: 2 },
+      appState: expect.objectContaining({
+        currentItemOpacity: 100,
+        currentItemStrokeWidth: 2,
+      }),
     });
   });
   it('converts neutral assets into grouped selected canvas elements', () => {

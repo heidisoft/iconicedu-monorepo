@@ -1,4 +1,6 @@
 /* Native application controls own tools, pages and assets. Scope overrides to this canvas. */
+.classroom-whiteboard-canvas .excalidraw .App-menu_top,
+.classroom-whiteboard-canvas .excalidraw .App-mobile-menu,
 .classroom-whiteboard-canvas .excalidraw .App-toolbar,
 .classroom-whiteboard-canvas .excalidraw .App-menu_bottom,
 .classroom-whiteboard-canvas .excalidraw .layer-ui__wrapper__top-right,
@@ -37,23 +39,6 @@
   background: var(--card);
 }
 
-/* Keep the engine's contextual style controls, underneath our floating toolbar. */
-.classroom-whiteboard-canvas .excalidraw .App-menu_top {
-  display: block;
-  margin-top: 56px;
-}
-.classroom-whiteboard-canvas
-  .excalidraw
-  .App-menu_top__left
-  > :not(.selected-shape-actions),
-.classroom-whiteboard-canvas .excalidraw .shapes-section,
-.classroom-whiteboard-canvas .excalidraw .App-top-bar {
-  display: none !important;
-}
-.classroom-whiteboard-canvas .excalidraw .selected-shape-actions .Island {
-  overflow-y: auto;
-  box-shadow: 0 4px 16px color-mix(in srgb, var(--foreground) 8%, transparent);
-}
 .classroom-whiteboard-canvas .excalidraw {
   --color-surface-low: var(--card);
   --color-surface-mid: var(--muted);
@@ -61,23 +46,6 @@
   --text-primary-color: var(--foreground);
   --button-hover-bg: var(--accent);
   --color-on-primary-container: var(--primary);
-}
-.classroom-whiteboard-canvas .excalidraw .App-mobile-menu {
-  max-height: 38dvh;
-  overflow-y: auto;
-  padding-bottom: 3rem;
-}
-@media (max-width: 1023px) {
-  .classroom-whiteboard-canvas .excalidraw .App-menu_top {
-    margin-top: 124px;
-  }
-}
-
-.classroom-whiteboard-canvas .whiteboard-style-toggle {
-  display: none;
-}
-.classroom-whiteboard-canvas:has(.excalidraw--mobile) .whiteboard-style-toggle {
-  display: block;
 }
 .classroom-whiteboard-canvas .excalidraw {
   --color-slider-track: var(--primary);

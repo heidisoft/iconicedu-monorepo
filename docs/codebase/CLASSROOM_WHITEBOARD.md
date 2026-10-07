@@ -8,7 +8,7 @@ The board uses the application theme for its paper, subtle dotted background, fl
 
 ## Meeting drawing and annotation tools
 
-The compact toolbar keeps the common drawing tools directly available. Shapes includes Line, Arrow, Rectangle, Ellipse, Diamond and Frame. Arrow style options include endpoint arrowheads and elbow connectors; selecting objects exposes native grouping, alignment, duplication and layer controls.
+The compact toolbar keeps the common drawing tools directly available. Shapes includes Line, Arrow, Rectangle, Ellipse, Diamond and Frame. Compact line options include endpoint arrowheads. Grouping, duplication and layer commands remain available in the canvas context menu.
 
 More actions provides editable sticky notes, check/star/question stamps, lasso selection, a pixel eraser for pen strokes and a local laser pointer. Notes use a rectangle with bound text, so resizing and editing stay in the normal scene format. Lasso selects objects by their centers within the drawn polygon. Pixel erasing clips freehand strokes into remaining paths, respecting rotation and zoom; it leaves shapes, text and locked strokes untouched. Stroke fragments retain colors and line styles but use simulated pressure. A gesture participates in the existing undo, autosave and collaboration paths.
 
@@ -16,7 +16,7 @@ The laser is explicitly local: it does not broadcast attention to other particip
 
 ## Contextual tool options
 
-Selecting a drawing tool shows the engine's themed style panel underneath the floating toolbar. Selecting existing objects exposes their styles too. The panel shows relevant controls such as stroke and background colors, fill, line width, opacity, text formatting and arrow settings. Ordinary tool changes preserve style choices; Highlighter applies its own opacity and width defaults. Styles are stored on drawing elements and use the existing autosave, collaboration and undo paths. Mobile uses a scrollable bottom panel with a Show/Hide tool options button.
+Drawing tools select on the first click and reveal compact options on a repeated click. Pen, Pencil, Marker and Highlighter share a pen menu; object and stroke erasing share the eraser menu. Pen, text and shape icons show small color indicators. Drawing tools restore their last-used styles when reselected. A separate Tool options button edits active styles or selected objects. Shape controls include fill color/pattern, text controls offer font family/size/alignment and line tools expose arrowhead choices, and common color, width and opacity choices remain nearby. The large engine properties panel is hidden on desktop and mobile. Popovers use the application theme, dismiss with Escape/outside clicks, and stay inside fullscreen. Styles save and sync through the existing element operation and undo paths.
 
 ## Infinite canvas
 

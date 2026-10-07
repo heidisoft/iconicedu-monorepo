@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   ArrowUpRight,
   Circle,
@@ -28,6 +28,7 @@ import {
   Stamp,
   ScanLine,
   LassoSelect,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { IconActionButton } from '@iconicedu/ui-web/ui/icon-action-button';
 import { Button } from '@iconicedu/ui-web/ui/button';
@@ -42,7 +43,14 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuCheckboxItem,
 } from '@iconicedu/ui-web/ui/dropdown-menu';
-import type { WhiteboardEngine, WhiteboardTool } from '../canvas/whiteboard-engine';
+import {
+  defaultWhiteboardStyle,
+  type WhiteboardStyle,
+  type WhiteboardEngine,
+  type WhiteboardTool,
+} from '../canvas/whiteboard-engine';
+import { Popover, PopoverTrigger, PopoverContent } from '@iconicedu/ui-web/ui/popover';
+import { CompactToolOptions } from './compact-tool-options';
 export const whiteboardTools = [
   { tool: 'selection', label: 'Select', icon: MousePointer2, shortcut: 'V' },
   { tool: 'freedraw', label: 'Pen', icon: Pencil, shortcut: 'P' },
@@ -61,6 +69,7 @@ const actionClass =
   'size-8 shrink-0 rounded-lg text-foreground hover:bg-muted hover:text-foreground aria-pressed:bg-primary/10 aria-pressed:text-primary';
 export function WhiteboardToolbar({
   engine,
+  style = defaultWhiteboardStyle,
   editable,
   tool,
   onTool,
@@ -70,6 +79,7 @@ export function WhiteboardToolbar({
   libraryOpen,
 }: {
   engine: WhiteboardEngine | null;
+  style?: WhiteboardStyle;
   editable: boolean;
   tool: WhiteboardTool;
   onTool: (tool: WhiteboardTool) => void;
@@ -78,6 +88,18 @@ export function WhiteboardToolbar({
   onLibrary?: () => void;
   libraryOpen?: boolean;
 }) {
+  const [options, setOptions] = useState<string | null>(null);
+  const [colors, setColors] = useState<Record<string, string>>({});
+  useEffect(() => {
+    setOptions(null);
+  }, [tool]);
+  useEffect(() => {
+    setColors((previous) =>
+      previous[tool] === style.strokeColor
+        ? previous
+        : { ...previous, [tool]: style.strokeColor },
+    );
+  }, [tool, style.strokeColor]);
   const [grid, setGrid] = useState<'none' | 'dots' | 'lines'>('dots');
   const [snap, setSnap] = useState(false);
   const [menu, setMenu] = useState<string | null>(null);
@@ -101,20 +123,78 @@ export function WhiteboardToolbar({
       className="flex min-w-0 flex-wrap items-center gap-0.5"
     >
       <div role="group" aria-label="Drawing tools" className="flex items-center gap-0.5">
-        {whiteboardTools.slice(0, 6).map(({ tool: next, label, icon: Icon, ...rest }) => (
-          <IconActionButton
-            key={next}
-            label={label}
-            tooltip={`${label}${'shortcut' in rest ? ` (${rest.shortcut})` : ''}`}
-            variant="ghost"
-            aria-pressed={tool === next}
-            disabled={!engine || (!editable && next !== 'hand')}
-            className={actionClass}
-            onClick={() => choose(next)}
-          >
-            <Icon className="size-4" aria-hidden="true" />
-          </IconActionButton>
-        ))}
+        {whiteboardTools
+          .slice(0, 6)
+          .filter((item) => item.tool !== 'highlighter')
+          .map(({ tool: next, label, icon: Icon, ...rest }) => {
+            const styled = ['freedraw', 'text', 'eraser'].includes(next);
+            const color =
+              tool === next || (next === 'freedraw' && tool === 'highlighter')
+                ? style.strokeColor
+                : (colors[next] ?? defaultWhiteboardStyle.strokeColor);
+            const button = (
+              <IconActionButton
+                label={label}
+                tooltip={`${label}${'shortcut' in rest ? ` (${rest.shortcut})` : ''}${styled ? ' · click again for options' : ''}`}
+                variant="ghost"
+                aria-pressed={
+                  tool === next ||
+                  (next === 'freedraw' && tool === 'highlighter') ||
+                  (next === 'eraser' && tool === 'pixel-eraser')
+                }
+                disabled={!engine || (!editable && next !== 'hand')}
+                className={`${actionClass} relative`}
+                onClick={() => {
+                  if (
+                    tool !== next &&
+                    !(next === 'freedraw' && tool === 'highlighter') &&
+                    !(next === 'eraser' && tool === 'pixel-eraser')
+                  )
+                    choose(next);
+                }}
+              >
+                {next === 'freedraw' && tool === 'highlighter' ? (
+                  <Highlighter className="size-4" aria-hidden="true" />
+                ) : (
+                  <Icon className="size-4" aria-hidden="true" />
+                )}
+                {['freedraw', 'text'].includes(next) && (
+                  <span
+                    aria-label={`${label} color ${color}`}
+                    className="absolute bottom-1 right-1 size-1.5 rounded-full ring-1 ring-card"
+                    style={{ backgroundColor: color }}
+                  />
+                )}
+              </IconActionButton>
+            );
+            if (!styled) return <span key={next}>{button}</span>;
+            const active =
+              tool === next ||
+              (next === 'freedraw' && tool === 'highlighter') ||
+              (next === 'eraser' && tool === 'pixel-eraser');
+            return (
+              <Popover
+                key={next}
+                open={options === next}
+                onOpenChange={(open) => setOptions(open && active ? next : null)}
+              >
+                <PopoverTrigger asChild>{button}</PopoverTrigger>
+                <PopoverContent
+                  container={portal}
+                  align="start"
+                  className="w-60 gap-2 rounded-xl border border-border/60 p-3 shadow-md"
+                  aria-label={`${label} options`}
+                >
+                  <CompactToolOptions
+                    engine={engine}
+                    tool={tool}
+                    style={style}
+                    onTool={choose}
+                  />
+                </PopoverContent>
+              </Popover>
+            );
+          })}
       </div>
       <DropdownMenu {...menuProps('shapes')}>
         <DropdownMenuTrigger asChild>
@@ -124,9 +204,18 @@ export function WhiteboardToolbar({
             aria-label="Shapes"
             aria-pressed={Boolean(activeShape)}
             title={activeShape ? `Shapes · ${activeShape.label}` : 'Shapes'}
-            className={actionClass}
+            className={`${actionClass} relative`}
           >
             <ShapeIcon className="size-4" aria-hidden="true" />
+            <span
+              aria-label={`Shape color ${activeShape ? style.strokeColor : (colors.rectangle ?? defaultWhiteboardStyle.strokeColor)}`}
+              className="absolute bottom-1 right-1 size-1.5 rounded-full ring-1 ring-card"
+              style={{
+                backgroundColor: activeShape
+                  ? style.strokeColor
+                  : (colors.rectangle ?? defaultWhiteboardStyle.strokeColor),
+              }}
+            />
             <ChevronDown className="size-2.5" aria-hidden="true" />
           </Button>
         </DropdownMenuTrigger>
@@ -154,6 +243,42 @@ export function WhiteboardToolbar({
           </DropdownMenuRadioGroup>
         </DropdownMenuContent>
       </DropdownMenu>
+      <Popover
+        open={options === 'style'}
+        onOpenChange={(open) => setOptions(open ? 'style' : null)}
+      >
+        <PopoverTrigger asChild>
+          <IconActionButton
+            label="Tool options"
+            tooltip="Style and selected object options"
+            className={actionClass}
+            variant="ghost"
+            disabled={!engine || !editable || tool === 'hand' || tool === 'laser'}
+          >
+            <SlidersHorizontal className="size-4" />
+          </IconActionButton>
+        </PopoverTrigger>
+        <PopoverContent
+          container={portal}
+          align="start"
+          className="w-60 gap-2 rounded-xl border border-border/60 p-3 shadow-md"
+          aria-label="Tool options"
+        >
+          <CompactToolOptions
+            engine={engine}
+            tool={
+              tool === 'selection' && style.selectedType === 'text'
+                ? 'text'
+                : tool === 'selection' &&
+                    ['line', 'arrow'].includes(style.selectedType ?? '')
+                  ? 'arrow'
+                  : tool
+            }
+            style={style}
+            onTool={choose}
+          />
+        </PopoverContent>
+      </Popover>
       {onLibrary && (
         <IconActionButton
           label="Library"
