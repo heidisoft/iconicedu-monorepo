@@ -594,6 +594,11 @@ test('reveals grouped whiteboard controls on demand on mobile and in fullscreen'
     const details = await page.getByTestId('whiteboard-board-details').boundingBox();
     expect(compactToolbar!.x + compactToolbar!.width).toBeLessThan(details!.x);
     expect(details!.x + details!.width).toBeGreaterThan(1100);
+    const boardBounds = await page.getByTestId('classroom-whiteboard').boundingBox();
+    expect(boardBounds!.x + boardBounds!.width - details!.x - details!.width).toBeCloseTo(
+      13,
+      0,
+    );
     await page.screenshot({ path: '/tmp/iconicedu-whiteboard-toolbar-desktop.png' });
     await page.evaluate(() => document.exitFullscreen());
   } finally {

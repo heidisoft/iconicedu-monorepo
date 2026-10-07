@@ -37,7 +37,7 @@ export function WhiteboardBoardDetails({
   return (
     <header
       data-testid="whiteboard-board-details"
-      className="pointer-events-auto relative ml-auto flex max-w-full flex-wrap items-center justify-end gap-1.5 rounded-md border border-border bg-card px-2 py-1 shadow-sm"
+      className="pointer-events-auto relative col-start-1 row-start-1 @min-[760px]:col-start-2 justify-self-end flex max-w-full flex-wrap items-center justify-end gap-1.5 rounded-md border border-border bg-card px-2 py-1 shadow-sm"
     >
       <DropdownMenu open={boardMenu} onOpenChange={setBoardMenu}>
         <h2 className="min-w-0 max-w-48 flex-1 text-sm font-medium">

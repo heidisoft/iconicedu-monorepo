@@ -104,7 +104,7 @@ export function ClassroomWhiteboard({
       data-board-id={snapshot.id}
       data-element-count={page.elements.filter((e) => !e.deleted).length}
     >
-      <div className="pointer-events-none absolute inset-x-3 top-3 z-20 flex flex-wrap items-start justify-between gap-2">
+      <div className="pointer-events-none absolute inset-x-3 top-3 z-20 grid grid-cols-1 items-start gap-2 @min-[760px]:grid-cols-[minmax(0,1fr)_auto]">
         <WhiteboardBoardDetails
           title={title}
           presence={snapshot.presence}
@@ -121,7 +121,7 @@ export function ClassroomWhiteboard({
         <aside
           data-testid="whiteboard-overlay-toolbar"
           aria-label="Drawing controls"
-          className="pointer-events-auto order-2 @min-[760px]:-order-1 max-w-full w-fit overflow-x-auto rounded-md border border-border bg-card p-1 shadow-sm"
+          className="pointer-events-auto col-start-1 row-start-2 @min-[760px]:row-start-1 justify-self-start max-w-full w-fit overflow-x-auto rounded-md border border-border bg-card p-1 shadow-sm"
         >
           <WhiteboardToolbar
             engine={engine}
