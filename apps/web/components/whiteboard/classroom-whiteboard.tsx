@@ -122,10 +122,10 @@ export function ClassroomWhiteboard({
                 type="button"
                 variant="ghost"
                 aria-label="Board options"
-                className="h-9 max-w-full gap-2 rounded-lg px-1"
+                className="h-8 max-w-full gap-2 rounded-lg px-1"
               >
-                <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <PanelsTopLeft size={17} aria-hidden="true" />
+                <span className="flex size-6 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <PanelsTopLeft size={15} aria-hidden="true" />
                 </span>
                 <span className="truncate" title={title}>
                   {title}
@@ -199,7 +199,7 @@ export function ClassroomWhiteboard({
           aria-label="Whiteboard participants"
           className="flex items-center gap-1.5 border-l border-border/60 pl-2"
         >
-          <Users size={16} className="text-muted-foreground" aria-hidden="true" />
+          <Users size={14} className="text-muted-foreground" aria-hidden="true" />
           <div className="flex -space-x-2">
             {snapshot.presence.slice(0, 4).map((p, index) => (
               <span
@@ -207,7 +207,7 @@ export function ClassroomWhiteboard({
                 role="img"
                 title={`${p.name}${p.role === 'teacher' ? ' (teacher)' : ''}`}
                 aria-label={`${p.name}${p.role === 'teacher' ? ' (teacher)' : ''}`}
-                className={`flex size-7 items-center justify-center rounded-full border-2 border-card text-[11px] font-medium ${index % 3 === 0 ? 'bg-primary/15 text-primary' : index % 3 === 1 ? 'bg-secondary text-secondary-foreground' : 'bg-accent text-accent-foreground'}`}
+                className={`flex size-6 items-center justify-center rounded-full border-2 border-card text-[11px] font-medium ${index % 3 === 0 ? 'bg-primary/15 text-primary' : index % 3 === 1 ? 'bg-secondary text-secondary-foreground' : 'bg-accent text-accent-foreground'}`}
               >
                 {p.name
                   .trim()
@@ -220,7 +220,7 @@ export function ClassroomWhiteboard({
             ))}
             {snapshot.presence.length > 4 && (
               <span
-                className="flex size-7 items-center justify-center rounded-full border-2 border-card bg-muted text-[11px] text-muted-foreground"
+                className="flex size-6 items-center justify-center rounded-full border-2 border-card bg-muted text-[11px] text-muted-foreground"
                 aria-label={`${snapshot.presence.length - 4} more participants`}
               >
                 +{snapshot.presence.length - 4}
