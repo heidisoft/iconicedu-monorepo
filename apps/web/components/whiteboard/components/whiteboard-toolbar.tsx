@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, type ComponentProps } from 'react';
 import {
   ArrowUpRight,
   Circle,
@@ -23,7 +23,6 @@ import {
   Library,
   Diamond,
   Frame,
-  ScanLine,
 } from 'lucide-react';
 import { IconActionButton } from '@iconicedu/ui-web/ui/icon-action-button';
 import { Button } from '@iconicedu/ui-web/ui/button';
@@ -39,9 +38,25 @@ import {
   DropdownMenuCheckboxItem,
 } from '@iconicedu/ui-web/ui/dropdown-menu';
 import type { WhiteboardEngine, WhiteboardTool } from '../canvas/whiteboard-engine';
+function LaserPointerIcon(props: ComponentProps<'svg'>) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <path d="m4 17 9-9 3 3-9 9H4v-3Z" />
+      <path d="m11 10 3 3M17 7l4-4M18 10h3M14 6V3" />
+    </svg>
+  );
+}
 export const whiteboardTools = [
   { tool: 'selection', label: 'Select', icon: MousePointer2, shortcut: 'V' },
-  { tool: 'laser', label: 'Laser pointer', icon: ScanLine, shortcut: 'K' },
+  { tool: 'laser', label: 'Laser pointer', icon: LaserPointerIcon, shortcut: 'K' },
   { tool: 'freedraw', label: 'Pen', icon: Pencil, shortcut: 'P' },
   { tool: 'text', label: 'Text', icon: Type, shortcut: 'T' },
   { tool: 'eraser', label: 'Eraser', icon: Eraser },
