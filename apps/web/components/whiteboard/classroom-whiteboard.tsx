@@ -25,12 +25,7 @@ import {
 } from '@iconicedu/ui-web/ui/alert-dialog';
 import type { WhiteboardRepository } from '@iconicedu/web/lib/whiteboard/api';
 import type { WhiteboardCollaborationProvider } from './collaboration/provider';
-import {
-  defaultWhiteboardStyle,
-  type WhiteboardStyle,
-  type WhiteboardEngine,
-  type WhiteboardTool,
-} from './canvas/whiteboard-engine';
+import type { WhiteboardEngine, WhiteboardTool } from './canvas/whiteboard-engine';
 import { WhiteboardToolbar } from './components/whiteboard-toolbar';
 import { WhiteboardLibrary } from './components/whiteboard-library';
 import { useWhiteboard } from './use-whiteboard';
@@ -53,7 +48,6 @@ export function ClassroomWhiteboard({
 }) {
   const board = useWhiteboard(token, repository, collaboration);
   const [engine, setEngine] = useState<WhiteboardEngine | null>(null);
-  const [style, setStyle] = useState<WhiteboardStyle>(defaultWhiteboardStyle);
   const [tool, setTool] = useState<WhiteboardTool>('selection');
   const [boardMenu, setBoardMenu] = useState(false);
   const [library, setLibrary] = useState(false);
@@ -189,7 +183,6 @@ export function ClassroomWhiteboard({
         <div className="order-last w-full border-t border-border/60 pt-1 md:order-0 md:w-auto md:border-l md:border-t-0 md:pl-2 md:pt-0">
           <WhiteboardToolbar
             engine={engine}
-            style={style}
             editable={editable}
             tool={tool}
             onTool={setTool}
@@ -295,7 +288,6 @@ export function ClassroomWhiteboard({
             onChange={board.changeElements}
             onEngine={setEngine}
             onToolChange={setTool}
-            onStyleChange={setStyle}
           />
         </ErrorBoundary>
         {library && (

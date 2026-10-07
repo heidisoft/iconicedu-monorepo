@@ -10,11 +10,7 @@ import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';
 import type { ExcalidrawElement } from '@excalidraw/excalidraw/element/types';
 import type { WhiteboardElementVM } from '@iconicedu/shared-types';
 import type { WhiteboardAsset } from '../assets/registry';
-import type {
-  WhiteboardEngine,
-  WhiteboardTool,
-  WhiteboardStyle,
-} from './whiteboard-engine';
+import type { WhiteboardEngine, WhiteboardTool } from './whiteboard-engine';
 import { insidePolygon, eraseStroke, type Point } from './annotation-geometry';
 import { SceneHistory, changedElements } from './scene-history';
 
@@ -41,107 +37,6 @@ export class ExcalidrawWhiteboardEngine implements WhiteboardEngine {
     private readonly changed: (elements: WhiteboardElementVM[]) => void,
     private readonly gridChanged?: (mode: 'none' | 'dots' | 'lines') => void,
   ) {}
-  getStyle(): WhiteboardStyle {
-    const state = this.api.getAppState();
-    const selected = this.api
-      .getSceneElements()
-      .find((e) => state.selectedElementIds[e.id]);
-    return {
-      selectedType: selected?.type,
-      strokeColor: selected?.strokeColor ?? state.currentItemStrokeColor,
-      backgroundColor: selected?.backgroundColor ?? state.currentItemBackgroundColor,
-      strokeWidth: selected?.strokeWidth ?? state.currentItemStrokeWidth,
-      opacity: selected?.opacity ?? state.currentItemOpacity,
-      fillStyle: selected?.fillStyle ?? state.currentItemFillStyle,
-      fontSize: selected?.type === 'text' ? selected.fontSize : state.currentItemFontSize,
-      fontFamily:
-        selected?.type === 'text' ? selected.fontFamily : state.currentItemFontFamily,
-      startArrowhead:
-        selected?.type === 'arrow' || selected?.type === 'line'
-          ? selected.startArrowhead
-          : state.currentItemStartArrowhead,
-      endArrowhead:
-        selected?.type === 'arrow' || selected?.type === 'line'
-          ? selected.endArrowhead
-          : state.currentItemEndArrowhead,
-      textAlign: (selected?.type === 'text'
-        ? selected.textAlign
-        : state.currentItemTextAlign) as WhiteboardStyle['textAlign'],
-    };
-  }
-  setStyle(style: Partial<WhiteboardStyle>) {
-    const current = this.getStyle();
-    const next = { ...current, ...style };
-    const selected = this.api.getAppState().selectedElementIds;
-    const appState = {
-      currentItemStrokeColor: next.strokeColor,
-      currentItemBackgroundColor: next.backgroundColor,
-      currentItemStrokeWidth: next.strokeWidth,
-      currentItemOpacity: next.opacity,
-      currentItemFillStyle: next.fillStyle,
-      currentItemFontSize: next.fontSize,
-      currentItemFontFamily: next.fontFamily as ReturnType<
-        ExcalidrawImperativeAPI['getAppState']
-      >['currentItemFontFamily'],
-      currentItemStartArrowhead: next.startArrowhead as ReturnType<
-        ExcalidrawImperativeAPI['getAppState']
-      >['currentItemStartArrowhead'],
-      currentItemEndArrowhead: next.endArrowhead as ReturnType<
-        ExcalidrawImperativeAPI['getAppState']
-      >['currentItemEndArrowhead'],
-      currentItemTextAlign: next.textAlign,
-    };
-    if (!Object.values(selected).some(Boolean)) {
-      this.api.updateScene({ appState });
-      return;
-    }
-    this.commit();
-    this.transact(() =>
-      this.api.updateScene({
-        appState,
-        elements: restoreElements(
-          this.api.getSceneElementsIncludingDeleted().map((e) => {
-            // Bound labels participate in text formatting when their container is selected.
-            const target =
-              selected[e.id] ||
-              (e.type === 'text' && e.containerId && selected[e.containerId]);
-            if (!target || e.isDeleted || e.locked) return e;
-            const {
-              fontSize,
-              fontFamily,
-              textAlign,
-              startArrowhead,
-              endArrowhead,
-              ...drawing
-            } = style;
-            return e.type === 'text'
-              ? newElementWith(e, {
-                  ...drawing,
-                  ...(fontSize === undefined ? {} : { fontSize }),
-                  ...(fontFamily === undefined
-                    ? {}
-                    : { fontFamily: fontFamily as typeof e.fontFamily }),
-                  ...(textAlign === undefined ? {} : { textAlign }),
-                })
-              : e.type === 'arrow' || e.type === 'line'
-                ? newElementWith(e, {
-                    ...drawing,
-                    ...(startArrowhead === undefined
-                      ? {}
-                      : { startArrowhead: startArrowhead as typeof e.startArrowhead }),
-                    ...(endArrowhead === undefined
-                      ? {}
-                      : { endArrowhead: endArrowhead as typeof e.endArrowhead }),
-                  })
-                : newElementWith(e, drawing);
-          }),
-          null,
-          { refreshDimensions: true },
-        ),
-        captureUpdate: CaptureUpdateAction.NEVER,
-      }),
-    );
-  }
   getElements() {
     return wrapCanvasElements(this.api.getSceneElementsIncludingDeleted());
   }
@@ -191,19 +86,7 @@ export class ExcalidrawWhiteboardEngine implements WhiteboardEngine {
     this.changed(this.getElements());
   }
   private lastTool: WhiteboardTool = 'selection';
-  private toolStyles = new Map<WhiteboardTool, WhiteboardStyle>();
   setTool(tool: WhiteboardTool) {
-    if (
-      !['selection', 'hand', 'eraser', 'laser', 'lasso', 'pixel-eraser'].includes(
-        this.lastTool,
-      )
-    )
-      this.toolStyles.set(this.lastTool, this.getStyle());
-    const saved = this.toolStyles.get(tool);
-    if (tool !== 'selection')
-      this.api.updateScene({
-        appState: { selectedElementIds: {}, selectedGroupIds: {} },
-      });
     this.api.setActiveTool({
       type:
         tool === 'highlighter'
@@ -212,29 +95,14 @@ export class ExcalidrawWhiteboardEngine implements WhiteboardEngine {
             ? 'selection'
             : tool,
     });
-    this.api.updateScene({ appState: { openMenu: null } });
-    if (saved)
-      this.api.updateScene({
-        appState: {
-          currentItemStrokeColor: saved.strokeColor,
-          currentItemBackgroundColor: saved.backgroundColor,
-          currentItemStrokeWidth: saved.strokeWidth,
-          currentItemOpacity: saved.opacity,
-          currentItemFillStyle: saved.fillStyle,
-          currentItemFontSize: saved.fontSize,
-          currentItemFontFamily: saved.fontFamily as ReturnType<
-            ExcalidrawImperativeAPI['getAppState']
-          >['currentItemFontFamily'],
-          currentItemStartArrowhead: saved.startArrowhead as ReturnType<
-            ExcalidrawImperativeAPI['getAppState']
-          >['currentItemStartArrowhead'],
-          currentItemEndArrowhead: saved.endArrowhead as ReturnType<
-            ExcalidrawImperativeAPI['getAppState']
-          >['currentItemEndArrowhead'],
-          currentItemTextAlign: saved.textAlign,
-        },
-      });
-    else if (tool === 'highlighter' || this.lastTool === 'highlighter')
+    this.api.updateScene({
+      appState: {
+        openMenu: ['hand', 'eraser', 'laser', 'lasso', 'pixel-eraser'].includes(tool)
+          ? null
+          : 'shape',
+      },
+    });
+    if (tool === 'highlighter' || this.lastTool === 'highlighter')
       this.api.updateScene({
         appState: {
           currentItemOpacity: tool === 'highlighter' ? 35 : 100,
