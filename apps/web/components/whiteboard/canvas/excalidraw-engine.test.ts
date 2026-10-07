@@ -68,22 +68,6 @@ function fixture() {
   };
 }
 describe('Excalidraw canvas adapter', () => {
-  it('inserts an editable bound note and a stamp through normal scene transactions', () => {
-    const { engine, api, changed } = fixture();
-    engine.insertNote();
-    const note = engine.getElements();
-    expect(note).toHaveLength(2);
-    const shape = note.find((e) => e.data.type === 'rectangle')!;
-    const text = note.find((e) => e.data.type === 'text')!;
-    expect(text.data.containerId).toBe(shape.id);
-    expect(shape.data.boundElements).toEqual([{ id: text.id, type: 'text' }]);
-    engine.insertStamp('★');
-    expect(engine.getElements().some((e) => e.data.text === '★')).toBe(true);
-    expect(changed).toHaveBeenCalledTimes(2);
-    expect(api.setActiveTool).toHaveBeenLastCalledWith({ type: 'selection' });
-    engine.undo();
-    expect(engine.getElements().filter((e) => !e.deleted)).toHaveLength(2);
-  });
   it('enables grid snapping without modifying document elements', () => {
     const { engine, api } = fixture();
     engine.setGrid('lines', true);
@@ -100,14 +84,9 @@ describe('Excalidraw canvas adapter', () => {
     expect(api.updateScene).toHaveBeenLastCalledWith({ appState: { openMenu: 'shape' } });
     engine.setTool('hand');
     expect(api.updateScene).toHaveBeenLastCalledWith({ appState: { openMenu: null } });
-    engine.setTool('highlighter');
-    expect(api.updateScene).toHaveBeenLastCalledWith({
-      appState: { currentItemOpacity: 35, currentItemStrokeWidth: 8 },
-    });
-    engine.setTool('freedraw');
-    expect(api.updateScene).toHaveBeenLastCalledWith({
-      appState: { currentItemOpacity: 100, currentItemStrokeWidth: 2 },
-    });
+    engine.setTool('laser');
+    expect(api.setActiveTool).toHaveBeenLastCalledWith({ type: 'laser' });
+    expect(api.updateScene).toHaveBeenLastCalledWith({ appState: { openMenu: null } });
   });
   it('converts neutral assets into grouped selected canvas elements', () => {
     const { engine, api } = fixture();

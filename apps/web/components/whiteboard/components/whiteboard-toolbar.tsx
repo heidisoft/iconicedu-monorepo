@@ -4,7 +4,6 @@ import {
   ArrowUpRight,
   Circle,
   Eraser,
-  Highlighter,
   Hand,
   Minus,
   MousePointer2,
@@ -24,10 +23,7 @@ import {
   Library,
   Diamond,
   Frame,
-  StickyNote,
-  Stamp,
   ScanLine,
-  LassoSelect,
 } from 'lucide-react';
 import { IconActionButton } from '@iconicedu/ui-web/ui/icon-action-button';
 import { Button } from '@iconicedu/ui-web/ui/button';
@@ -45,9 +41,9 @@ import {
 import type { WhiteboardEngine, WhiteboardTool } from '../canvas/whiteboard-engine';
 export const whiteboardTools = [
   { tool: 'selection', label: 'Select', icon: MousePointer2, shortcut: 'V' },
+  { tool: 'laser', label: 'Laser pointer', icon: ScanLine, shortcut: 'K' },
   { tool: 'freedraw', label: 'Pen', icon: Pencil, shortcut: 'P' },
   { tool: 'text', label: 'Text', icon: Type, shortcut: 'T' },
-  { tool: 'highlighter', label: 'Highlighter', icon: Highlighter },
   { tool: 'eraser', label: 'Eraser', icon: Eraser },
   { tool: 'hand', label: 'Pan', icon: Hand, shortcut: 'H' },
   { tool: 'line', label: 'Line', icon: Minus },
@@ -271,76 +267,6 @@ export function WhiteboardToolbar({
           className="w-56 border border-border/60 shadow-sm"
           align="end"
         >
-          <DropdownMenuLabel>Meeting tools</DropdownMenuLabel>
-          <DropdownMenuItem
-            className="min-h-11"
-            disabled={!editable || !engine}
-            onSelect={() => {
-              engine?.insertNote();
-              onTool('selection');
-            }}
-          >
-            <StickyNote />
-            Sticky note
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            className="min-h-11"
-            disabled={!editable || !engine}
-            onSelect={() => {
-              engine?.insertStamp('✓');
-              onTool('selection');
-            }}
-          >
-            <Stamp />
-            Check mark stamp
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            className="min-h-11"
-            disabled={!editable || !engine}
-            onSelect={() => {
-              engine?.insertStamp('★');
-              onTool('selection');
-            }}
-          >
-            <Stamp />
-            Star stamp
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            className="min-h-11"
-            disabled={!editable || !engine}
-            onSelect={() => {
-              engine?.insertStamp('?');
-              onTool('selection');
-            }}
-          >
-            <Stamp />
-            Question stamp
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            className="min-h-11"
-            disabled={!editable || !engine}
-            onSelect={() => choose('lasso')}
-          >
-            <LassoSelect />
-            Lasso select
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            className="min-h-11"
-            disabled={!editable || !engine}
-            onSelect={() => choose('pixel-eraser')}
-          >
-            <Eraser />
-            Pixel eraser (pen strokes)
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            className="min-h-11"
-            disabled={!editable || !engine}
-            onSelect={() => choose('laser')}
-          >
-            <ScanLine />
-            Laser pointer (local)
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
           <DropdownMenuLabel>More actions</DropdownMenuLabel>
           <DropdownMenuItem
             className="min-h-11"

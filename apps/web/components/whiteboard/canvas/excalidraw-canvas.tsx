@@ -26,8 +26,6 @@ export function ExcalidrawCanvas({
   onEngine: (engine: WhiteboardEngine | null) => void;
   onToolChange: (tool: WhiteboardTool) => void;
 }) {
-  const gesture = useRef<Array<[number, number]>>([]);
-  const [lasso, setLasso] = useState<Array<[number, number]>>([]);
   const { resolvedTheme } = useTheme();
   const theme = resolvedTheme === 'dark' ? 'dark' : 'light';
   const [grid, setGrid] = useState<'none' | 'dots' | 'lines'>('dots');
@@ -92,72 +90,9 @@ export function ExcalidrawCanvas({
           });
         }
       }}
-      onPointerDownCapture={(event) => {
-        if (
-          editable &&
-          ['lasso', 'pixel-eraser'].includes(tool) &&
-          (event.target as HTMLElement).tagName === 'CANVAS'
-        ) {
-          event.preventDefault();
-          event.stopPropagation();
-          event.currentTarget.setPointerCapture(event.pointerId);
-          const box = event.currentTarget.getBoundingClientRect(),
-            state = api?.getAppState();
-          if (!state) return;
-          gesture.current = [
-            [
-              (event.clientX - box.left) / state.zoom.value - state.scrollX,
-              (event.clientY - box.top) / state.zoom.value - state.scrollY,
-            ],
-          ];
-          engineRef.current?.begin();
-          if (tool === 'pixel-eraser')
-            engineRef.current?.erasePixels(gesture.current[0], 10 / state.zoom.value);
-          else setLasso([[event.clientX - box.left, event.clientY - box.top]]);
-        } else engineRef.current?.begin();
-      }}
-      onPointerMoveCapture={(event) => {
-        if (
-          !gesture.current.length ||
-          !editable ||
-          !['lasso', 'pixel-eraser'].includes(tool)
-        )
-          return;
-        event.preventDefault();
-        event.stopPropagation();
-        const box = event.currentTarget.getBoundingClientRect(),
-          state = api?.getAppState();
-        if (!state) return;
-        const point: [number, number] = [
-          (event.clientX - box.left) / state.zoom.value - state.scrollX,
-          (event.clientY - box.top) / state.zoom.value - state.scrollY,
-        ];
-        gesture.current.push(point);
-        if (tool === 'pixel-eraser')
-          engineRef.current?.erasePixels(point, 10 / state.zoom.value);
-        else
-          setLasso((previous) => [
-            ...previous,
-            [event.clientX - box.left, event.clientY - box.top],
-          ]);
-      }}
-      onPointerUpCapture={(event) => {
-        if (gesture.current.length) {
-          event.preventDefault();
-          event.stopPropagation();
-          if (tool === 'lasso') engineRef.current?.selectLasso(gesture.current);
-          gesture.current = [];
-          setLasso([]);
-          if (event.currentTarget.hasPointerCapture(event.pointerId))
-            event.currentTarget.releasePointerCapture(event.pointerId);
-        }
-        requestAnimationFrame(() => engineRef.current?.commit());
-      }}
-      onPointerCancelCapture={() => {
-        gesture.current = [];
-        setLasso([]);
-        engineRef.current?.commit();
-      }}
+      onPointerDownCapture={() => engineRef.current?.begin()}
+      onPointerUpCapture={() => requestAnimationFrame(() => engineRef.current?.commit())}
+      onPointerCancelCapture={() => engineRef.current?.commit()}
       onKeyDownCapture={(event) => {
         if (
           (event.target as HTMLElement).closest('input,textarea,[contenteditable="true"]')
@@ -276,20 +211,6 @@ export function ExcalidrawCanvas({
         }}
         onPointerUp={() => requestAnimationFrame(() => engineRef.current?.commit())}
       />
-      {lasso.length > 1 && (
-        <svg
-          className="pointer-events-none absolute inset-0 z-30 h-full w-full"
-          aria-hidden="true"
-        >
-          <polygon
-            points={lasso.map((p) => p.join(',')).join(' ')}
-            fill="var(--primary)"
-            fillOpacity="0.08"
-            stroke="var(--primary)"
-            strokeDasharray="5 4"
-          />
-        </svg>
-      )}
       {editable && hasStyleOptions && (
         <button
           type="button"

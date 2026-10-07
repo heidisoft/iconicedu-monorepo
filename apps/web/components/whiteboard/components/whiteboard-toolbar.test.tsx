@@ -78,6 +78,33 @@ describe('native whiteboard controls', () => {
     await user.click(screen.getByRole('menuitem', { name: /Redo/ }));
     expect(engine.redo).toHaveBeenCalledOnce();
   });
+  it('places native laser beside Select and removes custom drawing tools', async () => {
+    const user = userEvent.setup();
+    const engine = { setTool: vi.fn() } as unknown as WhiteboardEngine;
+    render(
+      <WhiteboardToolbar
+        engine={engine}
+        editable
+        tool="selection"
+        onTool={vi.fn()}
+        onClear={vi.fn()}
+      />,
+    );
+    const select = screen.getByRole('button', { name: 'Select', exact: true });
+    const laser = screen.getByRole('button', { name: 'Laser pointer', exact: true });
+    expect(select.nextElementSibling).toBe(laser);
+    await user.click(laser);
+    expect(engine.setTool).toHaveBeenCalledWith('laser');
+    expect(
+      screen.queryByRole('button', { name: 'Highlighter', exact: true }),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'More whiteboard actions' }));
+    expect(
+      screen.queryByRole('menuitem', {
+        name: /Sticky note|stamp|Lasso|Pixel eraser|Laser/,
+      }),
+    ).not.toBeInTheDocument();
+  });
   it('searches and inserts educational assets', () => {
     const insert = vi.fn();
     render(<WhiteboardLibrary disabled={false} onInsert={insert} />);
