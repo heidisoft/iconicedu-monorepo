@@ -1,3 +1,4 @@
+import type { WhiteboardDocumentVM } from '@iconicedu/shared-types';
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { expect, type Browser, type BrowserContext, type Page } from '@playwright/test';
@@ -47,6 +48,10 @@ export function createWhiteboardClass() {
     page,
     teacher,
     student,
+    seedDocument: (document: WhiteboardDocumentVM) =>
+      sql(
+        `update public.classroom_whiteboards set document='${JSON.stringify(document).replace(/'/g, "''")}'::jsonb where id='${board}';`,
+      ),
     cleanup: () => sql(`delete from public.orgs where id='${org}';`),
   };
 }

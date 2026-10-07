@@ -1,7 +1,9 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { Excalidraw } from '@excalidraw/excalidraw';
+import { useTheme } from 'next-themes';
+import { CaptureUpdateAction, Excalidraw, restoreElements } from '@excalidraw/excalidraw';
 import '@excalidraw/excalidraw/index.css';
+import type { ExcalidrawElement } from '@excalidraw/excalidraw/element/types';
 import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';
 import type { WhiteboardElementVM } from '@iconicedu/shared-types';
 import { ExcalidrawWhiteboardEngine, wrapCanvasElements } from './excalidraw-engine';
@@ -22,6 +24,8 @@ export function ExcalidrawCanvas({
   onEngine: (engine: WhiteboardEngine | null) => void;
   onToolChange: (tool: WhiteboardTool) => void;
 }) {
+  const { resolvedTheme } = useTheme();
+  const theme = resolvedTheme === 'dark' ? 'dark' : 'light';
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
   const engineRef = useRef<ExcalidrawWhiteboardEngine | null>(null);
   const onChangeRef = useRef(onChange);
@@ -55,6 +59,13 @@ export function ExcalidrawCanvas({
     }
   }, [elements]);
   useEffect(() => engineRef.current?.setEditable(editable), [editable]);
+  useEffect(() => {
+    if (!api) return;
+    api.updateScene({
+      appState: { viewBackgroundColor: 'transparent', theme },
+      captureUpdate: CaptureUpdateAction.NEVER,
+    });
+  }, [api, theme]);
   return (
     <div
       className="classroom-whiteboard-canvas relative min-h-0 flex-1"
@@ -90,8 +101,8 @@ export function ExcalidrawCanvas({
           event.stopPropagation();
           engineRef.current?.deleteSelection();
         } else if (
-          editable &&
-          ['p', 'v', 't'].includes(event.key.toLowerCase()) &&
+          (editable || event.key.toLowerCase() === 'h') &&
+          ['p', 'v', 't', 'h'].includes(event.key.toLowerCase()) &&
           !event.metaKey &&
           !event.ctrlKey
         ) {
@@ -102,7 +113,9 @@ export function ExcalidrawCanvas({
               ? 'freedraw'
               : event.key.toLowerCase() === 'v'
                 ? 'selection'
-                : 'text';
+                : event.key.toLowerCase() === 'h'
+                  ? 'hand'
+                  : 'text';
           engineRef.current?.setTool(nextTool);
           onToolChange(nextTool);
         } else if (['+', '=', '-'].includes(event.key)) {
@@ -113,10 +126,15 @@ export function ExcalidrawCanvas({
       }}
     >
       <Excalidraw
+        theme={theme}
         excalidrawAPI={setApi}
         initialData={{
+          elements: restoreElements(
+            elements.map((element) => element.data) as unknown as ExcalidrawElement[],
+            null,
+          ),
           appState: {
-            viewBackgroundColor: '#ffffff',
+            viewBackgroundColor: 'transparent',
             currentItemRoughness: 0,
             currentItemFontFamily: 2,
             currentItemStrokeWidth: 2,

@@ -2,6 +2,16 @@
 
 The application whiteboard uses Excalidraw as a canvas engine under native Classroom controls. Video, canvas, persistence and collaboration are independently replaceable. Zoom Whiteboard remains available through its existing SDK adapter.
 
+## Appearance
+
+The board uses the application theme for its paper, subtle dotted background, flat control surfaces and muted borders. A single compact top bar combines the board title, essential drawing tools, library and participant initials. Select, Pen, Text, Highlighter, Eraser and Pan appear first. Shapes, view controls and less-used actions open keyboard-accessible menus; export and student editing live under the board title. Undo remains directly available, with Redo and teacher-only board clearing under More. Menus dismiss after selection and return focus to their trigger, and remain available in fullscreen. The bar wraps into a dedicated tool row on narrow screens, with the canvas filling the remaining space. Selected tools use a soft primary tint. The Excalidraw renderer follows light/dark mode without rewriting saved drawings; the dotted paper is a local visual aid and is not included in scene exports.
+
+## Infinite canvas
+
+One continuous workspace replaces page navigation. Scroll to pan, use Space + drag or the Pan tool, and Ctrl/Command + scroll to zoom. View → Fit content brings the drawings back into view. Touch users can pan and pinch to zoom. Panning changes only the local viewport; drawings retain their world coordinates.
+
+The API projects older multi-page documents into one canvas, arranging subsequent pages vertically with a gap and preserving geometry, deletions, groups and bindings. IDs from later pages are namespaced to keep duplicated scenes distinct. The next atomic save persists this layout. Legacy page aliases translate queued drawing edits; obsolete page-management requests ask the client to rejoin. The `pages[0]` field remains an internal compatibility partition, not a user-facing page.
+
 ## Rollout and provider selection
 
 `classroom-whiteboard` is catalogued in `apps/web/flags.ts` with a false default. API evaluation uses the meeting starter's profile, so all participants receive the same provider choice. Existing local/preview API flag behavior enables flags automatically; production requires an explicit rollout. When enabled, an unspecified provider selects Excalidraw. Classroom meeting options expose Excalidraw and Zoom when both the meeting-settings and whiteboard flags are enabled. `whiteboard.enabled: false` disables board access. Explicit Zoom selection or flag OFF uses the existing Zoom provider.
@@ -14,9 +24,9 @@ Boards have their own UUID and an organization, channel and class-occurrence key
 
 `20261006120000_classroom_whiteboards.sql` creates `classroom_whiteboards`, `classroom_whiteboard_access` and the atomic compare-and-swap function. Both tables enable RLS and deny all table access to anonymous/authenticated frontend roles. Only `apps/api` accesses them. Prisma models mirror the schema. No new environment variable is required. The API JSON parser accepts up to 2 MB so valid whiteboard batches above the default 100 KB parser limit can reach the stricter 1 MB operation validator.
 
-An opaque random capability is scoped to exactly one board and authorized meeting, a teacher/student role, and an expiry. Only its SHA-256 hash is stored. Capabilities travel in Authorization headers, never URLs. Each API request checks the capability, meeting activity and whiteboard setting. Teacher-only page management and student locks are checked in the API on every mutation and conflict retry. A teacher is the verified meeting host; other joiners are students. Invite disabling continues to enforce Classroom membership before guest credentials are issued.
+An opaque random capability is scoped to exactly one board and authorized meeting, a teacher/student role, and an expiry. Only its SHA-256 hash is stored. Capabilities travel in Authorization headers, never URLs. Each API request checks the capability, meeting activity and whiteboard setting. Teacher-only board clearing and student locks are checked in the API on every mutation and conflict retry. A teacher is the verified meeting host; other joiners are students. Invite disabling continues to enforce Classroom membership before guest credentials are issued.
 
-Canvas inputs are bounded: up to 50 pages, 5,000 elements per page and 8 MB per document. Images, files, links, iframes and embeddable content are not accepted. Validation belongs in the API, not the presentation layer. Application assets consist of neutral line, text and rectangle primitives.
+Canvas inputs are bounded: 5,000 elements on new boards and 8 MB per document. Existing larger boards retain their content and can edit or clear it. Images, files, links, iframes and embeddable content are not accepted. Validation belongs in the API, not the presentation layer. Application assets consist of neutral line, text and rectangle primitives.
 
 ## Modules
 
@@ -27,7 +37,7 @@ Canvas inputs are bounded: up to 50 pages, 5,000 elements per page and 8 MB per 
 - `collaboration/provider.ts`: injectable collaboration interface and HTTP implementation. It does not import React, Zoom or Supabase.
 - `persistence/autosave-queue.ts`: serial debounced incremental writes, retry IDs and refresh recovery drafts.
 - `use-whiteboard.ts`: local board orchestration and pending-element overlays.
-- `classroom-whiteboard.tsx` and `components/`: native toolbar, page navigation, library, presence, student lock and destructive-action confirmation.
+- `classroom-whiteboard.tsx` and `components/`: native toolbar, infinite canvas, library, presence, student lock and destructive-action confirmation.
 - `use-native-whiteboard-feature.ts`: synchronizes teacher presentation, peer views and late joins through the same collaboration interface.
 - `use-meeting-whiteboard.ts`: meeting boundary chooses the application board or `useZoomWhiteboardFeature`; the native board does not import Zoom.
 
@@ -39,7 +49,7 @@ The API atomically compares board revisions before writing. On conflict it reloa
 
 HTTP collaboration polls every 1.5 seconds with only one request in flight. Unchanged reads omit the document and return presence/permissions. Reconnect reloads authoritative state and overlays pending elements. Presence expires after 15 seconds without a successful read. Supabase Realtime is intentionally not required: shared-link guests need no Supabase identity and no client broadcast can bypass a teacher lock. A future Realtime invalidation adapter can implement the same interface and call refresh, with appropriate RLS; authoritative writes still pass through the API.
 
-Canvas initialization and remote updates use Excalidraw `CaptureUpdateAction.NEVER`. Application history records local changed element IDs only, preserving unrelated remote additions during undo. Redo and undo create new element versions so peers converge. Teacher page clearing is an API-authorized structural operation. Structural page actions do not enter local drawing undo history. Page switching resets local history; viewport and selection remain local. Native keyboard handling supports undo/redo, Delete and P while typing inputs retain their shortcuts. Excalidraw supplies selection, shape, text and viewport interactions. SVG exports the current page; native PDF export is not provided. Zoom retains its own PDF export.
+Canvas initialization and remote updates use Excalidraw `CaptureUpdateAction.NEVER`. Application history records local changed element IDs only, preserving unrelated remote additions during undo. Redo and undo create new element versions so peers converge. Teacher board clearing is an API-authorized operation outside local drawing undo history. Viewport and selection remain local. Native keyboard handling supports undo/redo, Delete and P while typing inputs retain their shortcuts. Excalidraw supplies selection, shape, text and viewport interactions. SVG exports the whole board; native PDF export is not provided. Zoom retains its own PDF export.
 
 ## Verification
 

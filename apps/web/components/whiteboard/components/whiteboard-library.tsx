@@ -15,7 +15,7 @@ export function WhiteboardLibrary({
     <aside
       aria-label="Educational library"
       data-testid="asset-library"
-      className="absolute inset-y-0 right-0 z-20 w-64 max-w-full overflow-auto border-l border-border bg-card p-3 shadow-lg"
+      className="absolute bottom-3 right-3 top-3 z-30 w-64 max-w-[calc(100%-24px)] overflow-auto rounded-2xl border border-border/60 bg-card p-4 shadow-sm"
     >
       <h3 className="mb-3 font-semibold">Educational library</h3>
       <Input
@@ -32,7 +32,7 @@ export function WhiteboardLibrary({
               key={asset.id}
               variant="outline"
               disabled={disabled}
-              className="mb-2 w-full justify-start"
+              className="mb-2 min-h-11 w-full justify-start rounded-xl border-border/50 bg-muted/30 font-normal hover:bg-primary/10 hover:text-primary"
               onClick={() => onInsert(asset)}
             >
               {asset.name}

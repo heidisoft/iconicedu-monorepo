@@ -56,42 +56,121 @@ test.describe('native class whiteboard with real API persistence and collaborati
       other.cleanup();
     }
   });
-  test('creates independent pages, duplicates, reorders and deletes them', async ({
+  test('pans one infinite canvas without paging or changing saved geometry', async ({
     browser,
+    request,
   }) => {
     const { page, context } = await joinClassAs(browser, fixture.teacher);
-    await draw(page);
-    await expect(page.getByText('Saved', { exact: true })).toBeVisible();
-    await page.getByRole('button', { name: 'Add page', exact: true }).click();
-    await expect(
-      page.getByRole('combobox', { name: 'Current page' }).locator('option'),
-    ).toHaveCount(2);
-    await page.getByRole('combobox', { name: 'Current page' }).selectOption({ index: 1 });
-    await expect(page.getByTestId('classroom-whiteboard')).toHaveAttribute(
-      'data-element-count',
-      '0',
+    await expect(page.getByRole('combobox', { name: 'Current page' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Add page', exact: true })).toHaveCount(
+      0,
     );
     await draw(page);
+    await expect(page.getByText('Saved', { exact: true })).toBeVisible();
+    const read = async () =>
+      (
+        await (
+          await request.get('http://127.0.0.1:3001/whiteboards/current', {
+            headers: { Authorization: `Bearer ${fixture.teacher}` },
+          })
+        ).json()
+      ).document;
+    const before = await read();
+    expect(before.layout).toBe('infinite');
+    const canvas = page.getByTestId('whiteboard-canvas');
+    const box = await canvas.boundingBox();
+    if (!box) throw new Error('Canvas unavailable');
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.wheel(0, 700);
+    await page.waitForTimeout(300);
     await draw(page);
     await expect(page.getByText('Saved', { exact: true })).toBeVisible();
-    await page.getByRole('combobox', { name: 'Current page' }).selectOption({ index: 0 });
-    await expect(page.getByTestId('classroom-whiteboard')).toHaveAttribute(
-      'data-element-count',
-      '1',
+    await expect.poll(async () => (await read()).pages[0].elements.length).toBe(2);
+    const after = await read();
+    expect(after.pages).toHaveLength(1);
+    expect(
+      after.pages[0].elements.find(
+        (e: { id: string }) => e.id === before.pages[0].elements[0].id,
+      ).data,
+    ).toEqual(before.pages[0].elements[0].data);
+    expect(
+      Math.abs(after.pages[0].elements[1].data.y - after.pages[0].elements[0].data.y),
+    ).toBeGreaterThan(300);
+    await page.getByRole('button', { name: 'Pan', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Pan', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true',
     );
-    await page.getByRole('combobox', { name: 'Current page' }).selectOption({ index: 1 });
+    await page.reload();
+    await page.getByRole('button', { name: 'Join class whiteboard' }).click();
     await expect(page.getByTestId('classroom-whiteboard')).toHaveAttribute(
       'data-element-count',
       '2',
     );
-    await page.getByRole('button', { name: 'Duplicate page', exact: true }).click();
-    await expect(page.getByRole('combobox').locator('option')).toHaveCount(3);
+    await context.close();
+  });
+  test('preserves duplicate drawings from old pages in one persisted canvas', async ({
+    browser,
+    request,
+  }) => {
+    const element = {
+      id: 'duplicate',
+      version: 1,
+      nonce: 1,
+      deleted: false,
+      data: {
+        id: 'duplicate',
+        version: 1,
+        versionNonce: 1,
+        isDeleted: false,
+        type: 'rectangle',
+        x: 100,
+        y: 100,
+        width: 100,
+        height: 60,
+        angle: 0,
+        strokeColor: '#1f2a26',
+        backgroundColor: 'transparent',
+        fillStyle: 'solid',
+        strokeWidth: 2,
+        roughness: 0,
+        link: null,
+      },
+    };
+    fixture.seedDocument({
+      schemaVersion: 1,
+      studentEditing: true,
+      pages: [
+        { id: fixture.page, title: 'First page', elements: [element] },
+        { id: 'legacy-second', title: 'Second page', elements: [element] },
+      ],
+    });
+    const { page, context } = await joinClassAs(browser, fixture.teacher);
+    await expect(page.getByTestId('classroom-whiteboard')).toHaveAttribute(
+      'data-element-count',
+      '2',
+    );
+    await draw(page);
     await expect(page.getByText('Saved', { exact: true })).toBeVisible();
-    await page.getByRole('button', { name: 'Move page earlier' }).click();
-    await expect(page.getByText('Saved', { exact: true })).toBeVisible();
-    await page.getByRole('button', { name: 'Delete page', exact: true }).click();
-    await page.getByRole('button', { name: 'Confirm', exact: true }).click();
-    await expect(page.getByRole('combobox').locator('option')).toHaveCount(2);
+    const response = await request.get('http://127.0.0.1:3001/whiteboards/current', {
+      headers: { Authorization: `Bearer ${fixture.teacher}` },
+    });
+    const { document } = await response.json();
+    expect(document.layout).toBe('infinite');
+    expect(document.pages).toHaveLength(1);
+    expect(document.pages[0].elements).toHaveLength(3);
+    expect(
+      new Set(document.pages[0].elements.map((e: { id: string }) => e.id)).size,
+    ).toBe(3);
+    expect(document.pages[0].elements[1].data.y).toBeGreaterThan(
+      document.pages[0].elements[0].data.y + 100,
+    );
+    await page.reload();
+    await page.getByRole('button', { name: 'Join class whiteboard' }).click();
+    await expect(page.getByTestId('classroom-whiteboard')).toHaveAttribute(
+      'data-element-count',
+      '3',
+    );
     await context.close();
   });
   test('inserts, selects and deletes a coordinate plane through the library', async ({
@@ -169,7 +248,8 @@ test.describe('native class whiteboard with real API persistence and collaborati
   }) => {
     const teacher = await joinClassAs(browser, fixture.teacher),
       student = await joinClassAs(browser, fixture.student);
-    await teacher.page.getByRole('checkbox', { name: 'Student editing' }).uncheck();
+    await teacher.page.getByRole('button', { name: 'Board options' }).click();
+    await teacher.page.getByRole('menuitemcheckbox', { name: 'Student editing' }).click();
     await expect(teacher.page.getByText('Saved', { exact: true })).toBeVisible();
     await expect(
       student.page.getByRole('button', { name: 'Pen', exact: true }),
@@ -183,7 +263,8 @@ test.describe('native class whiteboard with real API persistence and collaborati
     );
     expect(response.status()).toBe(403);
     await expect(teacher.page.getByText('Saved', { exact: true })).toBeVisible();
-    await teacher.page.getByRole('checkbox', { name: 'Student editing' }).check();
+    await teacher.page.getByRole('button', { name: 'Board options' }).click();
+    await teacher.page.getByRole('menuitemcheckbox', { name: 'Student editing' }).click();
     await expect(
       student.page.getByRole('button', { name: 'Pen', exact: true }),
     ).toBeEnabled();
@@ -210,9 +291,11 @@ test.describe('native class whiteboard with real API persistence and collaborati
       'data-element-count',
       '2',
     );
-    await expect(teacher.page.getByLabel('Whiteboard participants')).toContainText(
-      'Test student',
-    );
+    await expect(
+      teacher.page
+        .getByLabel('Whiteboard participants')
+        .getByRole('img', { name: 'Test student', exact: true }),
+    ).toBeVisible();
     await teacher.context.close();
     await student.context.close();
   });
@@ -242,7 +325,8 @@ test.describe('native class whiteboard with real API persistence and collaborati
       'data-element-count',
       '0',
     );
-    await page.getByRole('button', { name: 'Redo', exact: true }).click();
+    await page.getByRole('button', { name: 'More whiteboard actions' }).click();
+    await page.getByRole('menuitem', { name: /Redo/ }).click();
     await expect(page.getByTestId('classroom-whiteboard')).toHaveAttribute(
       'data-element-count',
       '1',
@@ -252,14 +336,16 @@ test.describe('native class whiteboard with real API persistence and collaborati
   test('confirms clearing and preserves work on cancel', async ({ browser }) => {
     const { page, context } = await joinClassAs(browser, fixture.teacher);
     await draw(page);
-    await page.getByRole('button', { name: 'Clear page', exact: true }).click();
+    await page.getByRole('button', { name: 'More whiteboard actions' }).click();
+    await page.getByRole('menuitem', { name: 'Clear board', exact: true }).click();
     await expect(page.getByRole('alertdialog')).toBeVisible();
     await page.getByRole('button', { name: 'Cancel', exact: true }).click();
     await expect(page.getByTestId('classroom-whiteboard')).toHaveAttribute(
       'data-element-count',
       '1',
     );
-    await page.getByRole('button', { name: 'Clear page', exact: true }).click();
+    await page.getByRole('button', { name: 'More whiteboard actions' }).click();
+    await page.getByRole('menuitem', { name: 'Clear board', exact: true }).click();
     await page.getByRole('button', { name: 'Confirm', exact: true }).click();
     await expect(page.getByTestId('classroom-whiteboard')).toHaveAttribute(
       'data-element-count',
@@ -281,7 +367,7 @@ test.describe('native class whiteboard with real API persistence and collaborati
       'data-element-count',
       '24',
     );
-    await expect(page.getByRole('combobox', { name: 'Current page' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Pan', exact: true })).toBeVisible();
     await context.close();
   });
   test('shares teacher presentation with peers and late joiners without video SDK commands', async ({
@@ -370,4 +456,114 @@ test.describe('native class whiteboard with real API persistence and collaborati
       expect(response.status()).toBe(403);
     }
   });
+});
+
+test('uses themed paper and soft controls without changing saved drawings', async ({
+  browser,
+}) => {
+  const fixture = createWhiteboardClass();
+  const { page, context } = await joinClassAs(browser, fixture.teacher);
+  try {
+    await draw(page);
+    await expect(page.getByText('Saved', { exact: true })).toBeVisible();
+    const canvas = page.getByTestId('whiteboard-canvas');
+    const light = await canvas.evaluate((node) => ({
+      background: getComputedStyle(node).backgroundColor,
+      pattern: getComputedStyle(node).backgroundImage,
+    }));
+    expect(light.pattern).toContain('radial-gradient');
+    await expect(page.getByRole('button', { name: 'Pen', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await page.screenshot({ path: '/tmp/iconicedu-whiteboard-light.png' });
+    await page.evaluate(() => localStorage.setItem('theme', 'dark'));
+    await page.reload();
+    await page.getByRole('button', { name: 'Join class whiteboard' }).click();
+    await expect(page.locator('.excalidraw.theme--dark')).toBeVisible();
+    await expect(page.getByTestId('classroom-whiteboard')).toHaveAttribute(
+      'data-element-count',
+      '1',
+    );
+    await page.getByRole('button', { name: 'View controls' }).click();
+    await page.getByRole('menuitem', { name: 'Fit content', exact: true }).click();
+    await expect
+      .poll(async () =>
+        canvas.locator('canvas.static').evaluate((node) => {
+          const canvas = node as HTMLCanvasElement;
+          const pixels = canvas
+            .getContext('2d')!
+            .getImageData(0, 0, canvas.width, canvas.height).data;
+          for (let i = 3; i < pixels.length; i += 4) if (pixels[i] > 0) return true;
+          return false;
+        }),
+      )
+      .toBe(true);
+    const dark = await canvas.evaluate((node) => getComputedStyle(node).backgroundColor);
+    expect(dark).not.toEqual(light.background);
+    await page.screenshot({ path: '/tmp/iconicedu-whiteboard-dark.png' });
+  } finally {
+    await context.close();
+    fixture.cleanup();
+  }
+});
+
+test('reveals grouped whiteboard controls on demand on mobile and in fullscreen', async ({
+  browser,
+}) => {
+  const fixture = createWhiteboardClass();
+  let context: Awaited<ReturnType<typeof joinClassAs>>['context'] | undefined;
+  try {
+    const joined = await joinClassAs(browser, fixture.teacher, 'Geometry class', {
+      width: 390,
+      height: 844,
+    });
+    context = joined.context;
+    const page = joined.page;
+    await expect(page.getByRole('menu')).toHaveCount(0);
+    await expect(page.getByRole('menuitem', { name: 'Export board' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Shapes', exact: true }).click();
+    await expect(page.getByRole('menuitemradio', { name: 'Rectangle' })).toBeVisible();
+    await page.screenshot({ path: '/tmp/iconicedu-whiteboard-toolbar-mobile.png' });
+    await page.getByRole('menuitemradio', { name: 'Rectangle' }).click();
+    await expect(
+      page.getByRole('button', { name: 'Shapes', exact: true }),
+    ).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', { name: 'Shapes', exact: true })).toBeFocused();
+    await page.getByRole('button', { name: 'View controls' }).focus();
+    await page.keyboard.press('ArrowDown');
+    await expect(page.getByRole('menuitem', { name: 'Fit content' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('button', { name: 'View controls' })).toBeFocused();
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page
+      .getByTestId('classroom-whiteboard')
+      .evaluate((node) => node.requestFullscreen());
+    await page.getByRole('button', { name: 'Board options' }).click();
+    await expect(
+      page
+        .getByTestId('classroom-whiteboard')
+        .getByRole('menuitem', { name: 'Export board' }),
+    ).toBeVisible();
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: 'Shapes', exact: true }).click();
+    await expect(
+      page
+        .getByTestId('classroom-whiteboard')
+        .getByRole('menuitemradio', { name: 'Ellipse' }),
+    ).toBeVisible();
+    await page.getByRole('menuitemradio', { name: 'Ellipse' }).click();
+    const selectBounds = await page
+      .getByRole('button', { name: 'Select', exact: true })
+      .boundingBox();
+    const participantBounds = await page
+      .getByLabel('Whiteboard participants')
+      .boundingBox();
+    expect(selectBounds!.x).toBeLessThan(participantBounds!.x);
+    await page.screenshot({ path: '/tmp/iconicedu-whiteboard-toolbar-desktop.png' });
+    await page.evaluate(() => document.exitFullscreen());
+  } finally {
+    await context?.close();
+    fixture.cleanup();
+  }
 });

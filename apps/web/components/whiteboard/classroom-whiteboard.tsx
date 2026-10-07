@@ -1,9 +1,18 @@
 'use client';
 import dynamic from 'next/dynamic';
 import { useState } from 'react';
-import { Library, Download } from 'lucide-react';
+import { Download, PanelsTopLeft, Users, ChevronDown } from 'lucide-react';
 import { ErrorBoundary } from '@iconicedu/ui-web/components/error-boundary';
 import { Button } from '@iconicedu/ui-web/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuCheckboxItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from '@iconicedu/ui-web/ui/dropdown-menu';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,7 +27,6 @@ import type { WhiteboardRepository } from '@iconicedu/web/lib/whiteboard/api';
 import type { WhiteboardCollaborationProvider } from './collaboration/provider';
 import type { WhiteboardEngine, WhiteboardTool } from './canvas/whiteboard-engine';
 import { WhiteboardToolbar } from './components/whiteboard-toolbar';
-import { WhiteboardPages } from './components/whiteboard-pages';
 import { WhiteboardLibrary } from './components/whiteboard-library';
 import { useWhiteboard } from './use-whiteboard';
 const Canvas = dynamic(
@@ -41,10 +49,9 @@ export function ClassroomWhiteboard({
   const board = useWhiteboard(token, repository, collaboration);
   const [engine, setEngine] = useState<WhiteboardEngine | null>(null);
   const [tool, setTool] = useState<WhiteboardTool>('selection');
+  const [boardMenu, setBoardMenu] = useState(false);
   const [library, setLibrary] = useState(false);
-  const [confirmation, setConfirmation] = useState<'clear' | 'delete' | 'discard' | null>(
-    null,
-  );
+  const [confirmation, setConfirmation] = useState<'clear' | 'discard' | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
   const snapshot = board.snapshot;
   if (!snapshot)
@@ -65,20 +72,10 @@ export function ClassroomWhiteboard({
         </div>
       </section>
     );
-  const page =
-    snapshot.document.pages.find((p) => p.id === board.pageId) ??
-    snapshot.document.pages[0];
+  const page = snapshot.document.pages[0];
   const teacher = snapshot.role === 'teacher';
   const editable = teacher || snapshot.document.studentEditing;
   const busy = board.saveStatus === 'saving';
-  const add = (sourceId?: string) =>
-    board.operate({
-      id: crypto.randomUUID(),
-      type: 'add-page',
-      pageId: crypto.randomUUID(),
-      title: `Page ${snapshot.document.pages.length + 1}`,
-      sourceId,
-    });
   const exportRecovery = () => {
     const url = URL.createObjectURL(
       new Blob([board.recovery()], { type: 'application/json' }),
@@ -108,15 +105,85 @@ export function ClassroomWhiteboard({
   };
   return (
     <section
-      className="flex h-full min-h-0 flex-col overflow-hidden bg-background text-foreground"
+      className="classroom-whiteboard flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border/60 bg-background text-foreground"
       aria-label={title}
       data-testid="classroom-whiteboard"
       data-board-id={snapshot.id}
       data-element-count={page.elements.filter((e) => !e.deleted).length}
     >
-      <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-card px-3 py-2">
-        <h2 className="mr-auto text-sm font-semibold">{title}</h2>
-        <span role="status" aria-live="polite" className="text-xs text-muted-foreground">
+      <header className="m-2 mb-0 flex shrink-0 flex-wrap items-center gap-2 rounded-2xl border border-border/60 bg-card px-3 py-2 shadow-sm">
+        <DropdownMenu open={boardMenu} onOpenChange={setBoardMenu}>
+          <h2 className="min-w-0 max-w-56 text-sm font-medium">
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                aria-label="Board options"
+                className="h-11 max-w-full gap-2 rounded-xl px-1"
+              >
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <PanelsTopLeft size={17} aria-hidden="true" />
+                </span>
+                <span className="truncate" title={title}>
+                  {title}
+                </span>
+                <ChevronDown
+                  size={14}
+                  className="shrink-0 text-muted-foreground"
+                  aria-hidden="true"
+                />
+              </Button>
+            </DropdownMenuTrigger>
+          </h2>
+          <DropdownMenuContent
+            container={
+              typeof document === 'undefined' ? undefined : document.fullscreenElement
+            }
+            className="w-60 border border-border/60 shadow-sm"
+          >
+            <DropdownMenuLabel>Board options</DropdownMenuLabel>
+            <DropdownMenuItem className="min-h-11" onSelect={() => void exportScene()}>
+              <Download />
+              Export board
+            </DropdownMenuItem>
+            {teacher && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuCheckboxItem
+                  className="min-h-11"
+                  checked={snapshot.document.studentEditing}
+                  disabled={busy}
+                  onCheckedChange={(enabled) =>
+                    board.operate({
+                      id: crypto.randomUUID(),
+                      type: 'student-editing',
+                      enabled,
+                    })
+                  }
+                >
+                  Student editing
+                </DropdownMenuCheckboxItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <div className="order-last w-full border-t border-border/60 pt-1 md:order-0 md:w-auto md:flex-1 md:border-l md:border-t-0 md:pl-2 md:pt-0">
+          <WhiteboardToolbar
+            engine={engine}
+            editable={editable}
+            tool={tool}
+            onTool={setTool}
+            canClear={teacher}
+            onClear={() => setConfirmation('clear')}
+            onLibrary={() => setLibrary(!library)}
+            libraryOpen={library}
+          />
+        </div>
+        <span
+          role="status"
+          aria-live="polite"
+          className="ml-auto text-xs text-muted-foreground"
+        >
           {board.connection !== 'connected'
             ? 'Reconnecting…'
             : board.saveStatus === 'saved'
@@ -125,49 +192,40 @@ export function ClassroomWhiteboard({
                 ? 'Saving…'
                 : 'Unsaved · retrying'}
         </span>
-        <Button
-          size="sm"
-          variant="outline"
-          aria-expanded={library}
-          onClick={() => setLibrary(!library)}
+        <div
+          aria-label="Whiteboard participants"
+          className="flex items-center gap-2 border-l border-border/60 pl-3"
         >
-          <Library className="mr-1 h-4 w-4" />
-          Library
-        </Button>
-        <Button size="sm" variant="outline" onClick={() => void exportScene()}>
-          <Download className="mr-1 h-4 w-4" />
-          Export page
-        </Button>
-        {teacher && (
-          <label className="flex min-h-11 items-center gap-2 text-xs">
-            <input
-              type="checkbox"
-              aria-label="Student editing"
-              checked={snapshot.document.studentEditing}
-              disabled={busy}
-              onChange={(e) =>
-                board.operate({
-                  id: crypto.randomUUID(),
-                  type: 'student-editing',
-                  enabled: e.target.checked,
-                })
-              }
-            />
-            Student editing
-          </label>
-        )}
+          <Users size={16} className="text-muted-foreground" aria-hidden="true" />
+          <div className="flex -space-x-2">
+            {snapshot.presence.slice(0, 4).map((p, index) => (
+              <span
+                key={p.id}
+                role="img"
+                title={`${p.name}${p.role === 'teacher' ? ' (teacher)' : ''}`}
+                aria-label={`${p.name}${p.role === 'teacher' ? ' (teacher)' : ''}`}
+                className={`flex size-8 items-center justify-center rounded-full border-2 border-card text-[11px] font-medium ${index % 3 === 0 ? 'bg-primary/15 text-primary' : index % 3 === 1 ? 'bg-secondary text-secondary-foreground' : 'bg-accent text-accent-foreground'}`}
+              >
+                {p.name
+                  .trim()
+                  .split(/\s+/)
+                  .slice(0, 2)
+                  .map((part) => part[0])
+                  .join('')
+                  .toUpperCase() || '?'}
+              </span>
+            ))}
+            {snapshot.presence.length > 4 && (
+              <span
+                className="flex size-8 items-center justify-center rounded-full border-2 border-card bg-muted text-[11px] text-muted-foreground"
+                aria-label={`${snapshot.presence.length - 4} more participants`}
+              >
+                +{snapshot.presence.length - 4}
+              </span>
+            )}
+          </div>
+        </div>
       </header>
-      <div
-        aria-label="Whiteboard participants"
-        className="flex shrink-0 gap-3 overflow-x-auto px-3 py-1 text-xs text-muted-foreground"
-      >
-        {snapshot.presence.map((p) => (
-          <span key={p.id} className="whitespace-nowrap">
-            ● {p.name}
-            {p.role === 'teacher' ? ' (teacher)' : ''}
-          </span>
-        ))}
-      </div>
       {(board.error || exportError) && (
         <div role="alert" className="flex items-center gap-2 px-3 py-1 text-sm">
           {board.error ?? exportError}
@@ -195,20 +253,12 @@ export function ClassroomWhiteboard({
           Your teacher has locked student editing.
         </p>
       )}
-      <WhiteboardToolbar
-        engine={engine}
-        editable={editable}
-        tool={tool}
-        onTool={setTool}
-        canClear={teacher}
-        onClear={() => setConfirmation('clear')}
-      />
-      <div className="relative flex min-h-0 flex-1">
+      <div className="relative m-2 flex min-h-0 flex-1 overflow-hidden rounded-2xl border border-border/50 bg-card">
         <ErrorBoundary
           key={page.id}
           fallback={
             <div role="alert" className="p-4">
-              This page could not be rendered. Switch pages or rejoin the class to retry.
+              The whiteboard could not be rendered. Rejoin the class to retry.
             </div>
           }
         >
@@ -234,27 +284,10 @@ export function ClassroomWhiteboard({
             }}
           />
         )}
+        <p className="pointer-events-none absolute bottom-3 left-3 hidden rounded-xl border border-border/50 bg-card/90 px-3 py-1.5 text-[11px] text-muted-foreground sm:block">
+          Scroll to pan · Space + drag · Ctrl/⌘ + scroll to zoom
+        </p>
       </div>
-      <WhiteboardPages
-        pages={snapshot.document.pages}
-        activeId={page.id}
-        teacher={teacher}
-        busy={busy}
-        onSelect={board.setPageId}
-        onAdd={() => add()}
-        onDuplicate={() => add(page.id)}
-        onDelete={() => setConfirmation('delete')}
-        onMove={() => {
-          const i = snapshot.document.pages.findIndex((p) => p.id === page.id);
-          if (i > 0)
-            board.operate({
-              id: crypto.randomUUID(),
-              type: 'reorder-page',
-              pageId: page.id,
-              beforeId: snapshot.document.pages[i - 1].id,
-            });
-        }}
-      />
       <AlertDialog
         open={confirmation !== null}
         onOpenChange={(open) => {
@@ -265,15 +298,13 @@ export function ClassroomWhiteboard({
           <AlertDialogHeader>
             <AlertDialogTitle>
               {confirmation === 'clear'
-                ? 'Clear this page?'
-                : confirmation === 'discard'
-                  ? 'Discard unsaved changes?'
-                  : 'Delete this page?'}
+                ? 'Clear the whiteboard?'
+                : 'Discard unsaved changes?'}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {confirmation === 'discard'
                 ? 'Download your unsaved work first. This restores the saved board and removes pending local changes.'
-                : 'This removes the page content for everyone in this class.'}
+                : 'This removes the whiteboard content for everyone in this class.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -285,12 +316,6 @@ export function ClassroomWhiteboard({
                   board.operate({
                     id: crypto.randomUUID(),
                     type: 'clear-page',
-                    pageId: page.id,
-                  });
-                else
-                  board.operate({
-                    id: crypto.randomUUID(),
-                    type: 'delete-page',
                     pageId: page.id,
                   });
                 setConfirmation(null);

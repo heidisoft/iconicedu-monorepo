@@ -1,13 +1,16 @@
 'use client';
+import { useState } from 'react';
 import {
   ArrowUpRight,
   Circle,
   Eraser,
   Highlighter,
+  Hand,
   Minus,
   MousePointer2,
   Pencil,
   Redo2,
+  Shapes,
   Square,
   Type,
   Undo2,
@@ -16,20 +19,37 @@ import {
   Scan,
   RotateCcw,
   Trash2,
+  Ellipsis,
+  ChevronDown,
+  Library,
 } from 'lucide-react';
 import { IconActionButton } from '@iconicedu/ui-web/ui/icon-action-button';
+import { Button } from '@iconicedu/ui-web/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+} from '@iconicedu/ui-web/ui/dropdown-menu';
 import type { WhiteboardEngine, WhiteboardTool } from '../canvas/whiteboard-engine';
 export const whiteboardTools = [
-  { tool: 'selection', label: 'Select', icon: MousePointer2 },
-  { tool: 'freedraw', label: 'Pen', icon: Pencil },
+  { tool: 'selection', label: 'Select', icon: MousePointer2, shortcut: 'V' },
+  { tool: 'freedraw', label: 'Pen', icon: Pencil, shortcut: 'P' },
+  { tool: 'text', label: 'Text', icon: Type, shortcut: 'T' },
   { tool: 'highlighter', label: 'Highlighter', icon: Highlighter },
   { tool: 'eraser', label: 'Eraser', icon: Eraser },
-  { tool: 'text', label: 'Text', icon: Type },
+  { tool: 'hand', label: 'Pan', icon: Hand, shortcut: 'H' },
   { tool: 'line', label: 'Line', icon: Minus },
   { tool: 'arrow', label: 'Arrow', icon: ArrowUpRight },
   { tool: 'rectangle', label: 'Rectangle', icon: Square },
   { tool: 'ellipse', label: 'Ellipse', icon: Circle },
 ] as const;
+const actionClass =
+  'size-11 shrink-0 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground aria-pressed:bg-primary/10 aria-pressed:text-primary';
 export function WhiteboardToolbar({
   engine,
   editable,
@@ -37,6 +57,8 @@ export function WhiteboardToolbar({
   onTool,
   onClear,
   canClear = editable,
+  onLibrary,
+  libraryOpen,
 }: {
   engine: WhiteboardEngine | null;
   editable: boolean;
@@ -44,90 +66,202 @@ export function WhiteboardToolbar({
   onTool: (tool: WhiteboardTool) => void;
   onClear: () => void;
   canClear?: boolean;
+  onLibrary?: () => void;
+  libraryOpen?: boolean;
 }) {
+  const [menu, setMenu] = useState<string | null>(null);
+  const portal = typeof document === 'undefined' ? undefined : document.fullscreenElement;
+  const shapeTools = whiteboardTools.slice(6);
+  const activeShape = shapeTools.find((item) => item.tool === tool);
+  const ShapeIcon = activeShape?.icon ?? Shapes;
+  const choose = (next: WhiteboardTool) => {
+    onTool(next);
+    engine?.setTool(next);
+  };
+  const menuProps = (name: string) => ({
+    open: menu === name,
+    onOpenChange: (open: boolean) => setMenu(open ? name : null),
+  });
   return (
     <div
       role="toolbar"
       aria-label="Whiteboard tools"
       data-testid="whiteboard-toolbar"
-      className="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-border bg-card p-2"
+      className="flex min-w-0 flex-wrap items-center gap-0.5"
     >
-      {whiteboardTools.map(({ tool: next, label, icon: Icon }) => (
-        <IconActionButton
-          key={next}
-          label={label}
-          variant={tool === next ? 'default' : 'ghost'}
-          aria-pressed={tool === next}
-          disabled={!engine || !editable}
-          className="h-11 w-11 shrink-0"
-          onClick={() => {
-            onTool(next);
-            engine?.setTool(next);
-          }}
+      <div role="group" aria-label="Drawing tools" className="flex items-center gap-0.5">
+        {whiteboardTools.slice(0, 6).map(({ tool: next, label, icon: Icon, ...rest }) => (
+          <IconActionButton
+            key={next}
+            label={label}
+            tooltip={`${label}${'shortcut' in rest ? ` (${rest.shortcut})` : ''}`}
+            variant="ghost"
+            aria-pressed={tool === next}
+            disabled={!engine || (!editable && next !== 'hand')}
+            className={actionClass}
+            onClick={() => choose(next)}
+          >
+            <Icon className="size-5" aria-hidden="true" />
+          </IconActionButton>
+        ))}
+      </div>
+      <DropdownMenu {...menuProps('shapes')}>
+        <DropdownMenuTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            aria-label="Shapes"
+            aria-pressed={Boolean(activeShape)}
+            title={activeShape ? `Shapes · ${activeShape.label}` : 'Shapes'}
+            className={actionClass}
+          >
+            <ShapeIcon className="size-5" aria-hidden="true" />
+            <ChevronDown className="size-2.5" aria-hidden="true" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          container={portal}
+          className="w-56 border border-border/60 shadow-sm"
+          align="start"
         >
-          <Icon className="h-5 w-5" />
+          <DropdownMenuLabel>Shapes</DropdownMenuLabel>
+          <DropdownMenuRadioGroup
+            value={tool}
+            onValueChange={(value) => choose(value as WhiteboardTool)}
+          >
+            {shapeTools.map(({ tool: next, label, icon: Icon }) => (
+              <DropdownMenuRadioItem
+                key={next}
+                value={next}
+                disabled={!engine || !editable}
+                className="min-h-11"
+              >
+                <Icon aria-hidden="true" />
+                {label}
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {onLibrary && (
+        <IconActionButton
+          label="Library"
+          tooltip="Educational library"
+          variant="ghost"
+          aria-pressed={libraryOpen}
+          className={actionClass}
+          onClick={onLibrary}
+        >
+          <Library className="size-5" aria-hidden="true" />
         </IconActionButton>
-      ))}
-      <span className="mx-1 h-6 border-r border-border" />
+      )}
+      <span aria-hidden="true" className="mx-1 h-6 w-px bg-border/60" />
       <IconActionButton
-        variant="ghost"
         label="Undo"
+        tooltip="Undo (⌘/Ctrl+Z)"
+        variant="ghost"
         disabled={!editable || !engine}
+        className={actionClass}
         onClick={() => engine?.undo()}
-        className="h-11 w-11 shrink-0"
       >
-        <Undo2 className="h-5 w-5" />
+        <Undo2 className="size-5" aria-hidden="true" />
       </IconActionButton>
-      <IconActionButton
-        variant="ghost"
-        label="Redo"
-        disabled={!editable || !engine}
-        onClick={() => engine?.redo()}
-        className="h-11 w-11 shrink-0"
-      >
-        <Redo2 className="h-5 w-5" />
-      </IconActionButton>
-      <IconActionButton
-        variant="ghost"
-        label="Zoom out"
-        onClick={() => engine?.zoomBy(-0.1)}
-        className="h-11 w-11 shrink-0"
-      >
-        <ZoomOut className="h-5 w-5" />
-      </IconActionButton>
-      <IconActionButton
-        variant="ghost"
-        label="Zoom in"
-        onClick={() => engine?.zoomBy(0.1)}
-        className="h-11 w-11 shrink-0"
-      >
-        <ZoomIn className="h-5 w-5" />
-      </IconActionButton>
-      <IconActionButton
-        variant="ghost"
-        label="Fit content"
-        onClick={() => engine?.zoomToFit()}
-        className="h-11 w-11 shrink-0"
-      >
-        <Scan className="h-5 w-5" />
-      </IconActionButton>
-      <IconActionButton
-        variant="ghost"
-        label="Reset zoom to 100%"
-        onClick={() => engine?.resetZoom()}
-        className="h-11 w-11 shrink-0"
-      >
-        <RotateCcw className="h-5 w-5" />
-      </IconActionButton>
-      <IconActionButton
-        variant="ghost"
-        label="Clear page"
-        disabled={!editable || !engine || !canClear}
-        onClick={onClear}
-        className="h-11 w-11 shrink-0"
-      >
-        <Trash2 className="h-5 w-5" />
-      </IconActionButton>
+      <DropdownMenu {...menuProps('view')}>
+        <DropdownMenuTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            aria-label="View controls"
+            title="Zoom and fit"
+            className={actionClass}
+          >
+            <Scan className="size-5" aria-hidden="true" />
+            <ChevronDown className="size-2.5" aria-hidden="true" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          container={portal}
+          className="w-56 border border-border/60 shadow-sm"
+          align="start"
+        >
+          <DropdownMenuLabel>View</DropdownMenuLabel>
+          <DropdownMenuItem
+            className="min-h-11"
+            disabled={!engine}
+            onSelect={() => engine?.zoomToFit()}
+          >
+            <Scan />
+            Fit content
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            className="min-h-11"
+            disabled={!engine}
+            onSelect={() => engine?.zoomBy(0.1)}
+          >
+            <ZoomIn />
+            Zoom in
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className="min-h-11"
+            disabled={!engine}
+            onSelect={() => engine?.zoomBy(-0.1)}
+          >
+            <ZoomOut />
+            Zoom out
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className="min-h-11"
+            disabled={!engine}
+            onSelect={() => engine?.resetZoom()}
+          >
+            <RotateCcw />
+            Reset zoom to 100%
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <DropdownMenu {...menuProps('more')}>
+        <DropdownMenuTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            aria-label="More whiteboard actions"
+            title="More actions"
+            className={actionClass}
+          >
+            <Ellipsis className="size-5" aria-hidden="true" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          container={portal}
+          className="w-56 border border-border/60 shadow-sm"
+          align="end"
+        >
+          <DropdownMenuLabel>More actions</DropdownMenuLabel>
+          <DropdownMenuItem
+            className="min-h-11"
+            disabled={!engine || !editable}
+            onSelect={() => engine?.redo()}
+          >
+            <Redo2 />
+            Redo<span className="ml-auto text-xs text-muted-foreground">⇧⌘Z</span>
+          </DropdownMenuItem>
+          {canClear && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                variant="destructive"
+                className="min-h-11"
+                disabled={!engine || !editable}
+                onSelect={onClear}
+              >
+                <Trash2 />
+                Clear board
+              </DropdownMenuItem>
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }

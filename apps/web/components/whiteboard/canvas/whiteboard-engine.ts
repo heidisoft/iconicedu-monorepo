@@ -2,6 +2,7 @@ import type { WhiteboardElementVM } from '@iconicedu/shared-types';
 import type { WhiteboardAsset } from '../assets/registry';
 export type WhiteboardTool =
   | 'selection'
+  | 'hand'
   | 'freedraw'
   | 'highlighter'
   | 'eraser'

@@ -23,7 +23,6 @@ export function useWhiteboard(
   collaboration?: WhiteboardCollaborationProvider,
 ) {
   const [snapshot, setSnapshot] = useState<WhiteboardSnapshotVM | null>(null);
-  const [pageId, setPageId] = useState<string | null>(null);
   const [connection, setConnection] = useState<CollaborationStatus>('connecting');
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
   const [error, setError] = useState<string | null>(null);
@@ -59,11 +58,6 @@ export function useWhiteboard(
     }
     snapshotRef.current = next;
     setSnapshot(next);
-    setPageId((previous) =>
-      next.document.pages.some((p) => p.id === previous)
-        ? previous
-        : next.document.pages[0].id,
-    );
   }, []);
   useEffect(() => {
     setSnapshot(null);
@@ -111,7 +105,7 @@ export function useWhiteboard(
   const changeElements = useCallback(
     (elements: WhiteboardElementVM[]) => {
       const current = snapshotRef.current;
-      const page = current?.document.pages.find((p) => p.id === pageId);
+      const page = current?.document.pages[0];
       if (
         !current ||
         !page ||
@@ -125,7 +119,7 @@ export function useWhiteboard(
         document: {
           ...current.document,
           pages: current.document.pages.map((p) =>
-            p.id === pageId ? { ...p, elements } : p,
+            p.id === page.id ? { ...p, elements } : p,
           ),
         },
       };
@@ -143,12 +137,10 @@ export function useWhiteboard(
         elements: changed,
       });
     },
-    [pageId, operate],
+    [operate],
   );
   return {
     snapshot,
-    pageId,
-    setPageId,
     connection,
     saveStatus,
     error,

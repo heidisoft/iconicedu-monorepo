@@ -10,7 +10,28 @@
 }
 .classroom-whiteboard-canvas .excalidraw {
   --color-primary: var(--primary);
+  --color-primary-light: var(--primary-subtle);
+  --color-surface-primary-container: var(--primary-subtle);
+  --color-on-surface: var(--foreground);
+  background: transparent;
 }
 .classroom-whiteboard-canvas {
   min-height: 180px;
+}
+
+/* Theme-driven paper: a quiet dotted grid underneath the transparent drawing canvas. */
+.classroom-whiteboard-canvas {
+  background-color: var(--card);
+  background-image: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--foreground) 13%, transparent) 1px,
+    transparent 1px
+  );
+  background-size: 24px 24px;
+}
+.classroom-whiteboard-canvas .excalidraw .Island {
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  box-shadow: none;
+  background: var(--card);
 }
