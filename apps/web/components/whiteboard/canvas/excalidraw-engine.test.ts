@@ -68,6 +68,30 @@ function fixture() {
   };
 }
 describe('Excalidraw canvas adapter', () => {
+  it('inserts an editable bound note and a stamp through normal scene transactions', () => {
+    const { engine, api, changed } = fixture();
+    engine.insertNote();
+    const note = engine.getElements();
+    expect(note).toHaveLength(2);
+    const shape = note.find((e) => e.data.type === 'rectangle')!;
+    const text = note.find((e) => e.data.type === 'text')!;
+    expect(text.data.containerId).toBe(shape.id);
+    expect(shape.data.boundElements).toEqual([{ id: text.id, type: 'text' }]);
+    engine.insertStamp('★');
+    expect(engine.getElements().some((e) => e.data.text === '★')).toBe(true);
+    expect(changed).toHaveBeenCalledTimes(2);
+    expect(api.setActiveTool).toHaveBeenLastCalledWith({ type: 'selection' });
+    engine.undo();
+    expect(engine.getElements().filter((e) => !e.deleted)).toHaveLength(2);
+  });
+  it('enables grid snapping without modifying document elements', () => {
+    const { engine, api } = fixture();
+    engine.setGrid('lines', true);
+    expect(api.updateScene).toHaveBeenLastCalledWith({
+      appState: { gridSize: 24, gridModeEnabled: true },
+    });
+    expect(engine.getElements()).toEqual([]);
+  });
   it('opens contextual options without resetting ordinary drawing styles', () => {
     const { engine, api } = fixture();
     engine.setTool('freedraw');

@@ -22,6 +22,12 @@ import {
   Ellipsis,
   ChevronDown,
   Library,
+  Diamond,
+  Frame,
+  StickyNote,
+  Stamp,
+  ScanLine,
+  LassoSelect,
 } from 'lucide-react';
 import { IconActionButton } from '@iconicedu/ui-web/ui/icon-action-button';
 import { Button } from '@iconicedu/ui-web/ui/button';
@@ -34,6 +40,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
+  DropdownMenuCheckboxItem,
 } from '@iconicedu/ui-web/ui/dropdown-menu';
 import type { WhiteboardEngine, WhiteboardTool } from '../canvas/whiteboard-engine';
 export const whiteboardTools = [
@@ -47,6 +54,8 @@ export const whiteboardTools = [
   { tool: 'arrow', label: 'Arrow', icon: ArrowUpRight },
   { tool: 'rectangle', label: 'Rectangle', icon: Square },
   { tool: 'ellipse', label: 'Ellipse', icon: Circle },
+  { tool: 'diamond', label: 'Diamond', icon: Diamond },
+  { tool: 'frame', label: 'Frame', icon: Frame },
 ] as const;
 const actionClass =
   'size-8 shrink-0 rounded-lg text-foreground hover:bg-muted hover:text-foreground aria-pressed:bg-primary/10 aria-pressed:text-primary';
@@ -69,6 +78,8 @@ export function WhiteboardToolbar({
   onLibrary?: () => void;
   libraryOpen?: boolean;
 }) {
+  const [grid, setGrid] = useState<'none' | 'dots' | 'lines'>('dots');
+  const [snap, setSnap] = useState(false);
   const [menu, setMenu] = useState<string | null>(null);
   const portal = typeof document === 'undefined' ? undefined : document.fullscreenElement;
   const shapeTools = whiteboardTools.slice(6);
@@ -185,6 +196,29 @@ export function WhiteboardToolbar({
           align="start"
         >
           <DropdownMenuLabel>View</DropdownMenuLabel>
+          <DropdownMenuRadioGroup
+            value={grid}
+            onValueChange={(value) => {
+              const next = value as 'none' | 'dots' | 'lines';
+              setGrid(next);
+              engine?.setGrid(next, snap);
+            }}
+          >
+            <DropdownMenuRadioItem value="none">No grid</DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="dots">Dot grid</DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="lines">Line grid</DropdownMenuRadioItem>
+          </DropdownMenuRadioGroup>
+          <DropdownMenuCheckboxItem
+            checked={snap}
+            disabled={!engine}
+            onCheckedChange={(enabled) => {
+              setSnap(enabled);
+              engine?.setGrid(grid, enabled);
+            }}
+          >
+            Snap to grid
+          </DropdownMenuCheckboxItem>
+          <DropdownMenuSeparator />
           <DropdownMenuItem
             className="min-h-11"
             disabled={!engine}
@@ -237,6 +271,76 @@ export function WhiteboardToolbar({
           className="w-56 border border-border/60 shadow-sm"
           align="end"
         >
+          <DropdownMenuLabel>Meeting tools</DropdownMenuLabel>
+          <DropdownMenuItem
+            className="min-h-11"
+            disabled={!editable || !engine}
+            onSelect={() => {
+              engine?.insertNote();
+              onTool('selection');
+            }}
+          >
+            <StickyNote />
+            Sticky note
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className="min-h-11"
+            disabled={!editable || !engine}
+            onSelect={() => {
+              engine?.insertStamp('✓');
+              onTool('selection');
+            }}
+          >
+            <Stamp />
+            Check mark stamp
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className="min-h-11"
+            disabled={!editable || !engine}
+            onSelect={() => {
+              engine?.insertStamp('★');
+              onTool('selection');
+            }}
+          >
+            <Stamp />
+            Star stamp
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className="min-h-11"
+            disabled={!editable || !engine}
+            onSelect={() => {
+              engine?.insertStamp('?');
+              onTool('selection');
+            }}
+          >
+            <Stamp />
+            Question stamp
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className="min-h-11"
+            disabled={!editable || !engine}
+            onSelect={() => choose('lasso')}
+          >
+            <LassoSelect />
+            Lasso select
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className="min-h-11"
+            disabled={!editable || !engine}
+            onSelect={() => choose('pixel-eraser')}
+          >
+            <Eraser />
+            Pixel eraser (pen strokes)
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className="min-h-11"
+            disabled={!editable || !engine}
+            onSelect={() => choose('laser')}
+          >
+            <ScanLine />
+            Laser pointer (local)
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
           <DropdownMenuLabel>More actions</DropdownMenuLabel>
           <DropdownMenuItem
             className="min-h-11"

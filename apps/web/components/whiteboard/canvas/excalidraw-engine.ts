@@ -2,13 +2,16 @@ import {
   CaptureUpdateAction,
   convertToExcalidrawElements,
   exportToSvg,
+  exportToBlob,
   restoreElements,
+  newElementWith,
 } from '@excalidraw/excalidraw';
 import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';
 import type { ExcalidrawElement } from '@excalidraw/excalidraw/element/types';
 import type { WhiteboardElementVM } from '@iconicedu/shared-types';
 import type { WhiteboardAsset } from '../assets/registry';
 import type { WhiteboardEngine, WhiteboardTool } from './whiteboard-engine';
+import { insidePolygon, eraseStroke, type Point } from './annotation-geometry';
 import { SceneHistory, changedElements } from './scene-history';
 
 export function wrapCanvasElements(
@@ -32,6 +35,7 @@ export class ExcalidrawWhiteboardEngine implements WhiteboardEngine {
   constructor(
     private readonly api: ExcalidrawImperativeAPI,
     private readonly changed: (elements: WhiteboardElementVM[]) => void,
+    private readonly gridChanged?: (mode: 'none' | 'dots' | 'lines') => void,
   ) {}
   getElements() {
     return wrapCanvasElements(this.api.getSceneElementsIncludingDeleted());
@@ -83,9 +87,20 @@ export class ExcalidrawWhiteboardEngine implements WhiteboardEngine {
   }
   private lastTool: WhiteboardTool = 'selection';
   setTool(tool: WhiteboardTool) {
-    this.api.setActiveTool({ type: tool === 'highlighter' ? 'freedraw' : tool });
+    this.api.setActiveTool({
+      type:
+        tool === 'highlighter'
+          ? 'freedraw'
+          : tool === 'lasso' || tool === 'pixel-eraser'
+            ? 'selection'
+            : tool,
+    });
     this.api.updateScene({
-      appState: { openMenu: tool === 'hand' || tool === 'eraser' ? null : 'shape' },
+      appState: {
+        openMenu: ['hand', 'eraser', 'laser', 'lasso', 'pixel-eraser'].includes(tool)
+          ? null
+          : 'shape',
+      },
     });
     if (tool === 'highlighter' || this.lastTool === 'highlighter')
       this.api.updateScene({
@@ -95,6 +110,119 @@ export class ExcalidrawWhiteboardEngine implements WhiteboardEngine {
         },
       });
     this.lastTool = tool;
+  }
+  selectLasso(points: Point[]) {
+    const selected = this.api
+      .getSceneElements()
+      .filter(
+        (e) =>
+          !e.locked && insidePolygon([e.x + e.width / 2, e.y + e.height / 2], points),
+      );
+    this.api.updateScene({
+      appState: {
+        selectedElementIds: Object.fromEntries(selected.map((e) => [e.id, true])),
+        openMenu: 'shape',
+      },
+    });
+  }
+  erasePixels(point: Point, radius: number) {
+    const elements = this.api.getSceneElementsIncludingDeleted();
+    const next: ExcalidrawElement[] = [];
+    let changed = false;
+    for (const e of elements) {
+      if (e.type !== 'freedraw' || e.isDeleted || e.locked) {
+        next.push(e);
+        continue;
+      }
+      const cx = e.x + e.width / 2,
+        cy = e.y + e.height / 2;
+      const world: Point[] = e.points.map(([px, py]) => {
+        const dx = e.x + px - cx,
+          dy = e.y + py - cy;
+        return [
+          cx + dx * Math.cos(e.angle) - dy * Math.sin(e.angle),
+          cy + dx * Math.sin(e.angle) + dy * Math.cos(e.angle),
+        ];
+      });
+      const paths = eraseStroke(world, point, radius + e.strokeWidth / 2);
+      if (paths.length === 1 && JSON.stringify(paths[0]) === JSON.stringify(world)) {
+        next.push(e);
+        continue;
+      }
+      changed = true;
+      next.push(newElementWith(e, { isDeleted: true }));
+      for (const path of paths) {
+        const x = Math.min(...path.map((p) => p[0])),
+          y = Math.min(...path.map((p) => p[1]));
+        next.push(
+          newElementWith(
+            { ...e, id: crypto.randomUUID(), index: null },
+            {
+              x,
+              y,
+              angle: 0,
+              width: Math.max(...path.map((p) => p[0])) - x,
+              height: Math.max(...path.map((p) => p[1])) - y,
+              points: path.map((p) => [p[0] - x, p[1] - y]),
+              pressures: [],
+              simulatePressure: true,
+              isDeleted: false,
+            },
+          ),
+        );
+      }
+    }
+    if (changed)
+      this.api.updateScene({ elements: next, captureUpdate: CaptureUpdateAction.NEVER });
+  }
+  insertNote() {
+    const state = this.api.getAppState();
+    const x = state.width / 2 / state.zoom.value - state.scrollX - 100;
+    const y = state.height / 2 / state.zoom.value - state.scrollY - 90;
+    const elements = convertToExcalidrawElements([
+      {
+        type: 'rectangle',
+        x,
+        y,
+        width: 200,
+        height: 180,
+        backgroundColor: '#fff3bf',
+        strokeColor: '#e9c46a',
+        fillStyle: 'solid',
+        roughness: 0,
+        label: { text: 'Double-click to edit', fontSize: 20, fontFamily: 2 },
+      },
+    ]);
+    this.transact(() =>
+      this.api.updateScene({
+        elements: [...this.api.getSceneElementsIncludingDeleted(), ...elements],
+        appState: {
+          selectedElementIds: Object.fromEntries(elements.map((e) => [e.id, true])),
+          openMenu: 'shape',
+        },
+        captureUpdate: CaptureUpdateAction.NEVER,
+      }),
+    );
+    this.api.setActiveTool({ type: 'selection' });
+  }
+  insertStamp(text: string) {
+    this.insertAsset({
+      id: 'stamp',
+      name: 'Stamp',
+      category: 'Annotations',
+      tags: [],
+      width: 48,
+      height: 48,
+      primitives: [{ type: 'text', x: 0, y: 0, text, size: 40 }],
+    });
+    this.api.setActiveTool({ type: 'selection' });
+  }
+  setGrid(mode: 'none' | 'dots' | 'lines', snap: boolean) {
+    this.api.updateScene({
+      appState: { gridSize: 24, gridModeEnabled: snap },
+    });
+    // Grid appearance is local UI state; snapping remains owned by the canvas engine.
+    this.gridChanged?.(mode);
   }
   insertAsset(asset: WhiteboardAsset) {
     const state = this.api.getAppState();
@@ -203,6 +331,18 @@ export class ExcalidrawWhiteboardEngine implements WhiteboardEngine {
   }
   setEditable(editable: boolean) {
     this.api.updateScene({ appState: { viewModeEnabled: !editable } });
+  }
+  exportPng() {
+    return exportToBlob({
+      elements: this.api.getSceneElements(),
+      appState: {
+        ...this.api.getAppState(),
+        viewBackgroundColor: '#ffffff',
+        exportBackground: true,
+      },
+      files: this.api.getFiles(),
+      mimeType: 'image/png',
+    });
   }
   exportSvg() {
     return exportToSvg({

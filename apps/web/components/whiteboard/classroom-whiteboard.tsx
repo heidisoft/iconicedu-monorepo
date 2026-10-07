@@ -86,17 +86,20 @@ export function ClassroomWhiteboard({
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
-  const exportScene = async () => {
+  const exportScene = async (format: 'svg' | 'png' = 'svg') => {
     try {
       setExportError(null);
       if (!engine) return;
-      const svg = await engine.exportSvg();
-      const url = URL.createObjectURL(
-        new Blob([new XMLSerializer().serializeToString(svg)], { type: 'image/svg+xml' }),
-      );
+      const blob =
+        format === 'png'
+          ? await engine.exportPng()
+          : new Blob([new XMLSerializer().serializeToString(await engine.exportSvg())], {
+              type: 'image/svg+xml',
+            });
+      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'class-whiteboard.svg';
+      a.download = `class-whiteboard.${format}`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch {
@@ -148,6 +151,13 @@ export function ClassroomWhiteboard({
             <DropdownMenuItem className="min-h-11" onSelect={() => void exportScene()}>
               <Download />
               Export board
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="min-h-11"
+              onSelect={() => void exportScene('png')}
+            >
+              <Download />
+              Export PNG
             </DropdownMenuItem>
             {teacher && (
               <>
@@ -274,6 +284,7 @@ export function ClassroomWhiteboard({
             key={page.id}
             elements={page.elements}
             editable={editable}
+            tool={tool}
             onChange={board.changeElements}
             onEngine={setEngine}
             onToolChange={setTool}

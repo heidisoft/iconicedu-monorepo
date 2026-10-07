@@ -96,3 +96,19 @@
     min-height: 44px;
   }
 }
+
+.classroom-whiteboard-canvas[data-grid='none'] {
+  background-image: none;
+}
+.classroom-whiteboard-canvas[data-grid='lines'] {
+  background-image:
+    linear-gradient(
+      color-mix(in srgb, var(--foreground) 9%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--foreground) 9%, transparent) 1px,
+      transparent 1px
+    );
+}

@@ -647,3 +647,156 @@ test('shows contextual styles, preserves choices and syncs styled drawings', asy
     fixture.cleanup();
   }
 });
+
+test('uses meeting annotations, pixel erasing, lasso, grid controls and PNG export', async ({
+  browser,
+  request,
+}) => {
+  const fixture = createWhiteboardClass();
+  const { page, context } = await joinClassAs(browser, fixture.teacher);
+  const read = async () =>
+    (
+      await (
+        await request.get('http://127.0.0.1:3001/whiteboards/current', {
+          headers: { Authorization: `Bearer ${fixture.teacher}` },
+        })
+      ).json()
+    ).document.pages[0].elements;
+  const more = async (name: string) => {
+    await page.getByRole('button', { name: 'More whiteboard actions' }).click();
+    await page.getByRole('menuitem', { name, exact: true }).click();
+  };
+  try {
+    await draw(page);
+    await expect(page.getByText('Saved', { exact: true })).toBeVisible();
+    const box = await page.getByTestId('whiteboard-canvas').boundingBox();
+    if (!box) throw new Error('Canvas missing');
+    await more('Pixel eraser (pen strokes)');
+    await page.mouse.click(box.x + box.width / 2 + 30, box.y + box.height / 2 + 25);
+    await expect
+      .poll(
+        async () => (await read()).filter((e: { deleted: boolean }) => !e.deleted).length,
+      )
+      .toBe(2);
+    await page.getByRole('button', { name: 'Undo', exact: true }).click();
+    await expect
+      .poll(
+        async () => (await read()).filter((e: { deleted: boolean }) => !e.deleted).length,
+      )
+      .toBe(1);
+    await more('Lasso select');
+    await page.mouse.move(box.x + box.width / 2 - 20, box.y + box.height / 2 - 20);
+    await page.mouse.down();
+    for (const [x, y] of [
+      [100, -20],
+      [100, 80],
+      [-20, 80],
+      [-20, -20],
+    ])
+      await page.mouse.move(box.x + box.width / 2 + x, box.y + box.height / 2 + y, {
+        steps: 5,
+      });
+    await page.mouse.up();
+    await page.getByTestId('whiteboard-canvas').press('Delete');
+    await expect
+      .poll(
+        async () => (await read()).filter((e: { deleted: boolean }) => !e.deleted).length,
+      )
+      .toBe(0);
+    await more('Sticky note');
+    await expect
+      .poll(
+        async () => (await read()).filter((e: { deleted: boolean }) => !e.deleted).length,
+      )
+      .toBe(2);
+    const note = (await read()).find(
+      (e: { data: { type: string }; deleted: boolean }) =>
+        e.data.type === 'rectangle' && !e.deleted,
+    );
+    expect(note.data.boundElements).toHaveLength(1);
+    await more('Star stamp');
+    await expect
+      .poll(async () =>
+        (await read()).some((e: { data: { text?: string } }) => e.data.text === '★'),
+      )
+      .toBe(true);
+    await page.getByRole('button', { name: 'View controls' }).click();
+    await page.getByRole('menuitemradio', { name: 'Line grid', exact: true }).click();
+    await expect(page.getByTestId('whiteboard-canvas')).toHaveAttribute(
+      'data-grid',
+      'lines',
+    );
+    await page.getByRole('button', { name: 'Board options' }).click();
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByRole('menuitem', { name: 'Export PNG', exact: true }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toBe('class-whiteboard.png');
+    await more('Laser pointer (local)');
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 100, box.y + box.height / 2 + 100, {
+      steps: 5,
+    });
+    await page.mouse.up();
+    await expect(page.getByTestId('classroom-whiteboard')).toHaveAttribute(
+      'data-element-count',
+      '3',
+    );
+  } finally {
+    await context.close();
+    fixture.cleanup();
+  }
+});
+
+test('persists diamond shapes and organizational frames', async ({
+  browser,
+  request,
+}) => {
+  const fixture = createWhiteboardClass();
+  const { page, context } = await joinClassAs(browser, fixture.teacher);
+  try {
+    const box = await page.getByTestId('whiteboard-canvas').boundingBox();
+    if (!box) throw new Error('Canvas unavailable');
+    const drawShape = async (name: string, start: number, end: number) => {
+      await page.getByRole('button', { name: 'Shapes', exact: true }).click();
+      await page.getByRole('menuitemradio', { name, exact: true }).click();
+      await page.mouse.move(
+        box.x + box.width / 2 + start,
+        box.y + box.height / 2 + start,
+      );
+      await page.mouse.down();
+      await page.mouse.move(box.x + box.width / 2 + end, box.y + box.height / 2 + end, {
+        steps: 8,
+      });
+      await page.mouse.up();
+    };
+    await drawShape('Diamond', 0, 60);
+    await expect(page.getByText('Saved', { exact: true })).toBeVisible();
+    await drawShape('Frame', -30, 100);
+    await expect(page.getByTestId('classroom-whiteboard')).toHaveAttribute(
+      'data-element-count',
+      '2',
+    );
+    await expect(page.getByText('Saved', { exact: true })).toBeVisible();
+    const response = await request.get('http://127.0.0.1:3001/whiteboards/current', {
+      headers: { Authorization: `Bearer ${fixture.teacher}` },
+    });
+    const { document } = await response.json();
+    const elements = document.pages[0].elements;
+    expect(
+      elements.some((e: { data: { type: string } }) => e.data.type === 'diamond'),
+    ).toBe(true);
+    expect(
+      elements.some((e: { data: { type: string } }) => e.data.type === 'frame'),
+    ).toBe(true);
+    await page.reload();
+    await page.getByRole('button', { name: 'Join class whiteboard' }).click();
+    await expect(page.getByTestId('classroom-whiteboard')).toHaveAttribute(
+      'data-element-count',
+      '2',
+    );
+  } finally {
+    await context.close();
+    fixture.cleanup();
+  }
+});
