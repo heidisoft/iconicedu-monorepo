@@ -113,18 +113,18 @@ export function ClassroomWhiteboard({
     >
       <header
         data-testid="whiteboard-overlay-toolbar"
-        className="absolute left-3 top-3 z-20 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-2 rounded-2xl border border-border/60 bg-card px-3 py-2 shadow-md md:w-fit"
+        className="absolute left-3 top-3 z-20 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-1.5 rounded-xl border border-border/50 bg-card px-2 py-1 shadow-sm md:w-fit"
       >
         <DropdownMenu open={boardMenu} onOpenChange={setBoardMenu}>
-          <h2 className="min-w-0 max-w-56 text-sm font-medium">
+          <h2 className="min-w-0 max-w-48 text-sm font-medium">
             <DropdownMenuTrigger asChild>
               <Button
                 type="button"
                 variant="ghost"
                 aria-label="Board options"
-                className="h-11 max-w-full gap-2 rounded-xl px-1"
+                className="h-9 max-w-full gap-2 rounded-lg px-1"
               >
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <PanelsTopLeft size={17} aria-hidden="true" />
                 </span>
                 <span className="truncate" title={title}>
@@ -197,7 +197,7 @@ export function ClassroomWhiteboard({
         </span>
         <div
           aria-label="Whiteboard participants"
-          className="flex items-center gap-2 border-l border-border/60 pl-3"
+          className="flex items-center gap-1.5 border-l border-border/60 pl-2"
         >
           <Users size={16} className="text-muted-foreground" aria-hidden="true" />
           <div className="flex -space-x-2">
@@ -207,7 +207,7 @@ export function ClassroomWhiteboard({
                 role="img"
                 title={`${p.name}${p.role === 'teacher' ? ' (teacher)' : ''}`}
                 aria-label={`${p.name}${p.role === 'teacher' ? ' (teacher)' : ''}`}
-                className={`flex size-8 items-center justify-center rounded-full border-2 border-card text-[11px] font-medium ${index % 3 === 0 ? 'bg-primary/15 text-primary' : index % 3 === 1 ? 'bg-secondary text-secondary-foreground' : 'bg-accent text-accent-foreground'}`}
+                className={`flex size-7 items-center justify-center rounded-full border-2 border-card text-[11px] font-medium ${index % 3 === 0 ? 'bg-primary/15 text-primary' : index % 3 === 1 ? 'bg-secondary text-secondary-foreground' : 'bg-accent text-accent-foreground'}`}
               >
                 {p.name
                   .trim()
@@ -220,7 +220,7 @@ export function ClassroomWhiteboard({
             ))}
             {snapshot.presence.length > 4 && (
               <span
-                className="flex size-8 items-center justify-center rounded-full border-2 border-card bg-muted text-[11px] text-muted-foreground"
+                className="flex size-7 items-center justify-center rounded-full border-2 border-card bg-muted text-[11px] text-muted-foreground"
                 aria-label={`${snapshot.presence.length - 4} more participants`}
               >
                 +{snapshot.presence.length - 4}

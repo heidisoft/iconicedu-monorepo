@@ -49,7 +49,7 @@ export const whiteboardTools = [
   { tool: 'ellipse', label: 'Ellipse', icon: Circle },
 ] as const;
 const actionClass =
-  'size-11 shrink-0 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground aria-pressed:bg-primary/10 aria-pressed:text-primary';
+  'size-9 shrink-0 rounded-lg text-foreground hover:bg-muted hover:text-foreground aria-pressed:bg-primary/10 aria-pressed:text-primary';
 export function WhiteboardToolbar({
   engine,
   editable,
@@ -101,7 +101,7 @@ export function WhiteboardToolbar({
             className={actionClass}
             onClick={() => choose(next)}
           >
-            <Icon className="size-5" aria-hidden="true" />
+            <Icon className="size-[18px]" aria-hidden="true" />
           </IconActionButton>
         ))}
       </div>
@@ -115,7 +115,7 @@ export function WhiteboardToolbar({
             title={activeShape ? `Shapes · ${activeShape.label}` : 'Shapes'}
             className={actionClass}
           >
-            <ShapeIcon className="size-5" aria-hidden="true" />
+            <ShapeIcon className="size-[18px]" aria-hidden="true" />
             <ChevronDown className="size-2.5" aria-hidden="true" />
           </Button>
         </DropdownMenuTrigger>
@@ -152,7 +152,7 @@ export function WhiteboardToolbar({
           className={actionClass}
           onClick={onLibrary}
         >
-          <Library className="size-5" aria-hidden="true" />
+          <Library className="size-[18px]" aria-hidden="true" />
         </IconActionButton>
       )}
       <span aria-hidden="true" className="mx-1 h-6 w-px bg-border/60" />
@@ -164,7 +164,7 @@ export function WhiteboardToolbar({
         className={actionClass}
         onClick={() => engine?.undo()}
       >
-        <Undo2 className="size-5" aria-hidden="true" />
+        <Undo2 className="size-[18px]" aria-hidden="true" />
       </IconActionButton>
       <DropdownMenu {...menuProps('view')}>
         <DropdownMenuTrigger asChild>
@@ -175,7 +175,7 @@ export function WhiteboardToolbar({
             title="Zoom and fit"
             className={actionClass}
           >
-            <Scan className="size-5" aria-hidden="true" />
+            <Scan className="size-[18px]" aria-hidden="true" />
             <ChevronDown className="size-2.5" aria-hidden="true" />
           </Button>
         </DropdownMenuTrigger>
@@ -229,7 +229,7 @@ export function WhiteboardToolbar({
             title="More actions"
             className={actionClass}
           >
-            <Ellipsis className="size-5" aria-hidden="true" />
+            <Ellipsis className="size-[18px]" aria-hidden="true" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent

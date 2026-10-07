@@ -40,7 +40,7 @@
 /* Keep the engine's contextual style controls, underneath our floating toolbar. */
 .classroom-whiteboard-canvas .excalidraw .App-menu_top {
   display: block;
-  margin-top: 76px;
+  margin-top: 60px;
 }
 .classroom-whiteboard-canvas
   .excalidraw
@@ -69,7 +69,7 @@
 }
 @media (max-width: 1023px) {
   .classroom-whiteboard-canvas .excalidraw .App-menu_top {
-    margin-top: 148px;
+    margin-top: 124px;
   }
 }
 
@@ -86,4 +86,13 @@
 /* Links are not part of the classroom document contract. */
 .classroom-whiteboard-canvas .excalidraw .panelColumn button[title*='+K'] {
   display: none;
+}
+
+/* Preserve comfortable touch targets while keeping desktop controls compact. */
+@media (pointer: coarse) {
+  .classroom-whiteboard [data-testid='whiteboard-toolbar'] button,
+  .classroom-whiteboard button[aria-label='Board options'] {
+    min-width: 44px;
+    min-height: 44px;
+  }
 }
