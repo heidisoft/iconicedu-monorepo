@@ -1,3 +1,4 @@
+import { continuousCanvas } from './continuous-canvas';
 import {
   ConflictException,
   ForbiddenException,
@@ -95,7 +96,9 @@ export class WhiteboardsService {
     return {
       id: board.id,
       revision: board.revision,
-      ...(revision === board.revision ? {} : { document: board.document }),
+      ...(revision === board.revision
+        ? {}
+        : { document: continuousCanvas(board.document) }),
       role,
       presence: (presence.data ?? []).map((p) => ({
         id: p.token_hash.slice(0, 16),

@@ -47,8 +47,9 @@ export async function issueWhiteboardAccess(
       : `ad-hoc:${sessionId}`;
   const initial: WhiteboardDocumentVM = {
     schemaVersion: 1,
+    layout: 'infinite',
     studentEditing: true,
-    pages: [{ id: randomUUID(), title: 'Page 1', elements: [] }],
+    pages: [{ id: randomUUID(), title: 'Canvas', elements: [] }],
   };
   const board = await db.from('classroom_whiteboards').upsert(
     {

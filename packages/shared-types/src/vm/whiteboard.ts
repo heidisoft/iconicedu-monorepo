@@ -15,6 +15,10 @@ export interface WhiteboardPageVM {
 }
 export interface WhiteboardDocumentVM {
   schemaVersion: 1;
+  /** One unbounded viewport; pages[0] is the internal persistence partition. */
+  layout?: 'infinite';
+  /** Compatibility transforms for incremental drafts created by older paged clients. */
+  legacyPages?: Array<{ id: string; title: string; offsetX: number; offsetY: number }>;
   pages: WhiteboardPageVM[];
   studentEditing: boolean;
   presenting?: boolean;

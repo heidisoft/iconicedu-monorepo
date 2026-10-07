@@ -1,3 +1,4 @@
+import { continuousCanvas, translateLegacyElement } from './continuous-canvas';
 import { validateExcalidrawPayload } from './excalidraw-scene-validation';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import type {
@@ -107,7 +108,7 @@ export function applyWhiteboardOperation(
 ): WhiteboardDocumentVM {
   if (role !== 'teacher' && (op.type !== 'elements' || !document.studentEditing))
     throw new ForbiddenException('Whiteboard editing is locked');
-  const next = structuredClone(document);
+  const next = continuousCanvas(document);
   if (op.type === 'presentation') {
     next.presenting = op.enabled;
     return next;
@@ -116,45 +117,27 @@ export function applyWhiteboardOperation(
     next.studentEditing = op.enabled;
     return next;
   }
-  if (op.type === 'add-page') {
-    if (next.deletedPageIds?.includes(op.pageId)) return next;
-    if (next.pages.some((p) => p.id === op.pageId)) return next;
-    if (next.pages.length >= 50) throw new BadRequestException('Maximum 50 pages');
-    const source = op.sourceId ? next.pages.find((p) => p.id === op.sourceId) : null;
-    if (op.sourceId && !source) throw new BadRequestException('Source page not found');
-    next.pages.push({
-      id: op.pageId,
-      title: op.title,
-      elements: structuredClone(source?.elements ?? []),
-    });
-    return next;
-  }
-  const page = next.pages.find((p) => p.id === op.pageId);
-  if (!page) throw new BadRequestException('Page no longer exists');
+  if (op.type === 'add-page' || op.type === 'delete-page' || op.type === 'reorder-page')
+    throw new BadRequestException(
+      'Page controls have been replaced by an infinite canvas. Rejoin the whiteboard.',
+    );
+  const page = next.pages[0];
+  const legacy = next.legacyPages?.find((item) => item.id === op.pageId);
+  if (op.pageId !== page.id && !legacy)
+    throw new BadRequestException('Canvas no longer exists');
   if (op.type === 'clear-page') {
+    if (legacy)
+      throw new BadRequestException('Rejoin the whiteboard before clearing the canvas');
     page.elements = page.elements.map((e) => ({
       ...e,
       deleted: true,
       version: e.version + 1,
       data: { ...e.data, isDeleted: true, version: e.version + 1 },
     }));
-  } else if (op.type === 'delete-page') {
-    if (next.pages.length === 1) throw new BadRequestException('Keep at least one page');
-    next.pages = next.pages.filter((p) => p.id !== op.pageId);
-    next.deletedPageIds = [...(next.deletedPageIds ?? []), op.pageId];
-  } else if (op.type === 'reorder-page') {
-    if (op.beforeId === op.pageId) return next;
-    if (op.beforeId && !next.pages.some((p) => p.id === op.beforeId))
-      throw new BadRequestException('Target page not found');
-    next.pages = next.pages.filter((p) => p.id !== page.id);
-    next.pages.splice(
-      op.beforeId ? next.pages.findIndex((p) => p.id === op.beforeId) : next.pages.length,
-      0,
-      page,
-    );
   } else {
     const merged = new Map(page.elements.map((e) => [e.id, e]));
-    for (const element of op.elements) {
+    for (const incoming of op.elements) {
+      const element = legacy ? translateLegacyElement(incoming, legacy) : incoming;
       const existing = merged.get(element.id);
       // Deterministic per-element LWW order: version then nonce; tombstones prevent replay resurrection.
       if (
@@ -164,8 +147,8 @@ export function applyWhiteboardOperation(
       )
         merged.set(element.id, element);
     }
-    if (merged.size > 5000)
-      throw new BadRequestException('Maximum 5000 elements per page');
+    if (merged.size > Math.max(5000, page.elements.length))
+      throw new BadRequestException('Whiteboard element limit reached');
     page.elements = [...merged.values()];
   }
   if (Buffer.byteLength(JSON.stringify(next), 'utf8') > 8_000_000)

@@ -28,45 +28,29 @@ const element = (version = 1, deleted = false): WhiteboardElementVM => ({
   },
 });
 describe('whiteboard document and trust boundary', () => {
-  it('adds, duplicates, reorders and deletes independent pages', () => {
-    let doc = applyWhiteboardOperation(
+  it('replaces page management with a single canvas and clears all its content', () => {
+    const doc = applyWhiteboardOperation(
       initial(),
-      { id: 'a', type: 'elements', pageId: 'one', elements: [element()] },
+      { id: 'draw', type: 'elements', pageId: 'one', elements: [element()] },
       'teacher',
     );
-    doc = applyWhiteboardOperation(
+    expect(doc.layout).toBe('infinite');
+    for (const type of ['add-page', 'delete-page', 'reorder-page'] as const) {
+      expect(() =>
+        applyWhiteboardOperation(
+          doc,
+          { id: type, type, pageId: 'one', title: 'Copy' },
+          'teacher',
+        ),
+      ).toThrow('infinite canvas');
+    }
+    const cleared = applyWhiteboardOperation(
       doc,
-      { id: 'b', type: 'add-page', pageId: 'two', title: 'Copy', sourceId: 'one' },
+      { id: 'clear', type: 'clear-page', pageId: 'one' },
       'teacher',
     );
-    doc.pages[1].elements[0].data.x = 100;
-    expect(doc.pages[0].elements[0].data.x).toBe(0);
-    doc = applyWhiteboardOperation(
-      doc,
-      { id: 'c', type: 'reorder-page', pageId: 'two', beforeId: 'one' },
-      'teacher',
-    );
-    expect(doc.pages[0].id).toBe('two');
-    doc = applyWhiteboardOperation(
-      doc,
-      { id: 'd', type: 'delete-page', pageId: 'two' },
-      'teacher',
-    );
-    expect(doc.pages).toHaveLength(1);
-    expect(
-      applyWhiteboardOperation(
-        doc,
-        { id: 'replayed-add', type: 'add-page', pageId: 'two', title: 'Copy' },
-        'teacher',
-      ).pages,
-    ).toHaveLength(1);
-    expect(() =>
-      applyWhiteboardOperation(
-        doc,
-        { id: 'e', type: 'delete-page', pageId: 'one' },
-        'teacher',
-      ),
-    ).toThrow('Keep at least');
+    expect(cleared.pages[0].elements[0].deleted).toBe(true);
+    expect(doc.pages[0].elements[0].deleted).toBe(false);
   });
   it('allows students to draw while rejecting page management and locked edits', () => {
     expect(
@@ -146,14 +130,14 @@ describe('whiteboard document and trust boundary', () => {
         { id: 'a', type: 'add-page', pageId: 'two', title: 'copy', sourceId: 'missing' },
         'teacher',
       ),
-    ).toThrow('Source');
+    ).toThrow('infinite canvas');
     expect(() =>
       applyWhiteboardOperation(
         initial(),
         { id: 'a', type: 'elements', pageId: 'missing', elements: [] },
         'teacher',
       ),
-    ).toThrow('Page');
+    ).toThrow('Canvas');
     for (const value of [
       null,
       [],
