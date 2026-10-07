@@ -3,6 +3,7 @@ const supportedTypes = new Set([
   'rectangle',
   'ellipse',
   'diamond',
+  'frame',
   'line',
   'arrow',
   'freedraw',

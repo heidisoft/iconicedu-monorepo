@@ -12,6 +12,8 @@ describe('canvas scene codec', () => {
   it('accepts basic shapes, text and bounded freehand points', () => {
     for (const data of [
       shape,
+      { ...shape, type: 'diamond' },
+      { ...shape, type: 'frame' },
       {
         ...shape,
         type: 'freedraw',
