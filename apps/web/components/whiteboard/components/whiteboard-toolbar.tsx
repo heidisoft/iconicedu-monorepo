@@ -55,8 +55,8 @@ function LaserPointerIcon(props: ComponentProps<'svg'>) {
   );
 }
 export const whiteboardTools = [
-  { tool: 'selection', label: 'Select', icon: MousePointer2, shortcut: 'V' },
   { tool: 'laser', label: 'Laser pointer', icon: LaserPointerIcon, shortcut: 'K' },
+  { tool: 'selection', label: 'Select', icon: MousePointer2, shortcut: 'V' },
   { tool: 'freedraw', label: 'Pen', icon: Pencil, shortcut: 'P' },
   { tool: 'text', label: 'Text', icon: Type, shortcut: 'T' },
   { tool: 'eraser', label: 'Eraser', icon: Eraser },

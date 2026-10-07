@@ -78,7 +78,7 @@ describe('native whiteboard controls', () => {
     await user.click(screen.getByRole('menuitem', { name: /Redo/ }));
     expect(engine.redo).toHaveBeenCalledOnce();
   });
-  it('places native laser beside Select and removes custom drawing tools', async () => {
+  it('places native laser first and removes custom drawing tools', async () => {
     const user = userEvent.setup();
     const engine = { setTool: vi.fn() } as unknown as WhiteboardEngine;
     render(
@@ -92,7 +92,8 @@ describe('native whiteboard controls', () => {
     );
     const select = screen.getByRole('button', { name: 'Select', exact: true });
     const laser = screen.getByRole('button', { name: 'Laser pointer', exact: true });
-    expect(select.nextElementSibling).toBe(laser);
+    expect(laser.parentElement?.firstElementChild).toBe(laser);
+    expect(laser.nextElementSibling).toBe(select);
     await user.click(laser);
     expect(engine.setTool).toHaveBeenCalledWith('laser');
     expect(
