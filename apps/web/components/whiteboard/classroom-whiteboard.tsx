@@ -100,18 +100,21 @@ export function ClassroomWhiteboard({
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch {
-      setExportError('Unable to export this page. Try again.');
+      setExportError('Unable to export this board. Try again.');
     }
   };
   return (
     <section
-      className="classroom-whiteboard flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border/60 bg-background text-foreground"
+      className="classroom-whiteboard relative flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border/60 bg-background text-foreground"
       aria-label={title}
       data-testid="classroom-whiteboard"
       data-board-id={snapshot.id}
       data-element-count={page.elements.filter((e) => !e.deleted).length}
     >
-      <header className="m-2 mb-0 flex shrink-0 flex-wrap items-center gap-2 rounded-2xl border border-border/60 bg-card px-3 py-2 shadow-sm">
+      <header
+        data-testid="whiteboard-overlay-toolbar"
+        className="absolute left-3 top-3 z-20 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-2 rounded-2xl border border-border/60 bg-card px-3 py-2 shadow-md md:w-fit"
+      >
         <DropdownMenu open={boardMenu} onOpenChange={setBoardMenu}>
           <h2 className="min-w-0 max-w-56 text-sm font-medium">
             <DropdownMenuTrigger asChild>
@@ -167,7 +170,7 @@ export function ClassroomWhiteboard({
             )}
           </DropdownMenuContent>
         </DropdownMenu>
-        <div className="order-last w-full border-t border-border/60 pt-1 md:order-0 md:w-auto md:flex-1 md:border-l md:border-t-0 md:pl-2 md:pt-0">
+        <div className="order-last w-full border-t border-border/60 pt-1 md:order-0 md:w-auto md:border-l md:border-t-0 md:pl-2 md:pt-0">
           <WhiteboardToolbar
             engine={engine}
             editable={editable}
@@ -226,34 +229,39 @@ export function ClassroomWhiteboard({
           </div>
         </div>
       </header>
-      {(board.error || exportError) && (
-        <div role="alert" className="flex items-center gap-2 px-3 py-1 text-sm">
-          {board.error ?? exportError}
-          <Button size="sm" variant="outline" onClick={board.retry}>
-            Retry save
-          </Button>
-          {board.error && (
-            <>
-              <Button size="sm" variant="outline" onClick={exportRecovery}>
-                Download unsaved work
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setConfirmation('discard')}
-              >
-                Discard unsaved changes
-              </Button>
-            </>
-          )}
-        </div>
-      )}
-      {!editable && (
-        <p className="px-3 py-1 text-sm text-muted-foreground">
-          Your teacher has locked student editing.
-        </p>
-      )}
-      <div className="relative m-2 flex min-h-0 flex-1 overflow-hidden rounded-2xl border border-border/50 bg-card">
+      <div className="absolute inset-x-3 bottom-12 z-20 flex flex-col gap-2">
+        {(board.error || exportError) && (
+          <div
+            role="alert"
+            className="flex flex-wrap items-center gap-2 rounded-xl border border-border/60 bg-card px-3 py-2 text-sm shadow-sm"
+          >
+            {board.error ?? exportError}
+            <Button size="sm" variant="outline" onClick={board.retry}>
+              Retry save
+            </Button>
+            {board.error && (
+              <>
+                <Button size="sm" variant="outline" onClick={exportRecovery}>
+                  Download unsaved work
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setConfirmation('discard')}
+                >
+                  Discard unsaved changes
+                </Button>
+              </>
+            )}
+          </div>
+        )}
+        {!editable && (
+          <p className="w-fit rounded-xl border border-border/60 bg-card px-3 py-2 text-sm text-muted-foreground shadow-sm">
+            Your teacher has locked student editing.
+          </p>
+        )}
+      </div>
+      <div className="relative flex min-h-0 flex-1 overflow-hidden rounded-2xl bg-card">
         <ErrorBoundary
           key={page.id}
           fallback={

@@ -84,8 +84,10 @@ export async function draw(page: Page) {
   await page.getByRole('button', { name: 'Pen', exact: true }).click();
   const box = await page.getByTestId('whiteboard-canvas').boundingBox();
   if (!box) throw new Error('Canvas missing');
-  await page.mouse.move(box.x + 100, box.y + 100);
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
-  await page.mouse.move(box.x + 160, box.y + 150, { steps: 8 });
+  await page.mouse.move(box.x + box.width / 2 + 60, box.y + box.height / 2 + 50, {
+    steps: 8,
+  });
   await page.mouse.up();
 }

@@ -15,7 +15,7 @@ export function WhiteboardLibrary({
     <aside
       aria-label="Educational library"
       data-testid="asset-library"
-      className="absolute bottom-3 right-3 top-3 z-30 w-64 max-w-[calc(100%-24px)] overflow-auto rounded-2xl border border-border/60 bg-card p-4 shadow-sm"
+      className="absolute bottom-3 right-3 top-44 z-30 md:top-20 w-64 max-w-[calc(100%-24px)] overflow-auto rounded-2xl border border-border/60 bg-card p-4 shadow-sm"
     >
       <h3 className="mb-3 font-semibold">Educational library</h3>
       <Input

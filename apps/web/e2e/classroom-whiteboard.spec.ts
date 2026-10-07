@@ -520,6 +520,18 @@ test('reveals grouped whiteboard controls on demand on mobile and in fullscreen'
     });
     context = joined.context;
     const page = joined.page;
+    const canvasBounds = await page.getByTestId('whiteboard-canvas').boundingBox();
+    const toolbarBounds = await page
+      .getByTestId('whiteboard-overlay-toolbar')
+      .boundingBox();
+    expect(toolbarBounds!.y).toBeGreaterThan(canvasBounds!.y);
+    expect(toolbarBounds!.y + toolbarBounds!.height).toBeLessThan(
+      canvasBounds!.y + canvasBounds!.height,
+    );
+    expect(toolbarBounds!.x).toBeGreaterThan(canvasBounds!.x);
+    expect(toolbarBounds!.x + toolbarBounds!.width).toBeLessThanOrEqual(
+      canvasBounds!.x + canvasBounds!.width,
+    );
     await expect(page.getByRole('menu')).toHaveCount(0);
     await expect(page.getByRole('menuitem', { name: 'Export board' })).toHaveCount(0);
     await page.getByRole('button', { name: 'Shapes', exact: true }).click();
