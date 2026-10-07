@@ -98,11 +98,7 @@ import {
   parseParticipantCommand,
   shouldUsePresentationLayout,
 } from './zoom-video/zoom-video-session.utils';
-import {
-  MeetingControlButton,
-  OverlayBadge,
-  PoppingIcon,
-} from './zoom-video/zoom-meeting-controls';
+import { MeetingControlButton, PoppingIcon } from './zoom-video/zoom-meeting-controls';
 import { ZoomMeetingNotice } from './zoom-video/zoom-meeting-notice';
 import { ZoomMeetingHeader } from './zoom-video/zoom-meeting-header';
 import { ZoomMeetingLayoutStyles } from './zoom-video/zoom-meeting-layout-styles';
@@ -1647,12 +1643,6 @@ export function ZoomVideoSessionEmbed({
                 else remoteVideoRefs.current.delete(userId);
               }}
             />
-          ) : null}
-
-          {isPresentingWhiteboard ? (
-            <OverlayBadge className="absolute inset-x-0 top-20 z-10 mx-auto w-fit animate-in fade-in-0 slide-in-from-top-2 duration-300 motion-reduce:animate-none sm:top-24">
-              You&apos;re presenting the whiteboard
-            </OverlayBadge>
           ) : null}
 
           {isPresentationLayoutActive ? (
