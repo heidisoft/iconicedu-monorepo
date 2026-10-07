@@ -32,7 +32,7 @@
 }
 .classroom-whiteboard-canvas .excalidraw .Island {
   border: 1px solid var(--border);
-  border-radius: 1rem;
+  border-radius: 0.375rem;
   box-shadow: none;
   background: var(--card);
 }
@@ -41,6 +41,7 @@
 .classroom-whiteboard-canvas .excalidraw .App-menu_top {
   display: block;
   margin-top: 56px;
+  margin-left: 60px;
 }
 .classroom-whiteboard-canvas
   .excalidraw
@@ -66,11 +67,6 @@
   max-height: 38dvh;
   overflow-y: auto;
   padding-bottom: 3rem;
-}
-@media (max-width: 1023px) {
-  .classroom-whiteboard-canvas .excalidraw .App-menu_top {
-    margin-top: 124px;
-  }
 }
 
 .classroom-whiteboard-canvas .whiteboard-style-toggle {

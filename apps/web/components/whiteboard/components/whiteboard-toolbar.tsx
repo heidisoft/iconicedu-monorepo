@@ -69,7 +69,7 @@ export const whiteboardTools = [
   { tool: 'frame', label: 'Frame', icon: Frame },
 ] as const;
 const actionClass =
-  'size-8 shrink-0 rounded-lg text-foreground hover:bg-muted hover:text-foreground aria-pressed:bg-primary/10 aria-pressed:text-primary';
+  'size-8 shrink-0 rounded-sm text-foreground hover:bg-muted hover:text-foreground aria-pressed:bg-primary/10 aria-pressed:text-primary';
 export function WhiteboardToolbar({
   engine,
   editable,
@@ -107,11 +107,16 @@ export function WhiteboardToolbar({
   return (
     <div
       role="toolbar"
+      aria-orientation="vertical"
       aria-label="Whiteboard tools"
       data-testid="whiteboard-toolbar"
-      className="flex min-w-0 flex-wrap items-center gap-0.5"
+      className="flex min-w-0 flex-col items-center gap-1"
     >
-      <div role="group" aria-label="Drawing tools" className="flex items-center gap-0.5">
+      <div
+        role="group"
+        aria-label="Drawing tools"
+        className="flex flex-col items-center gap-1"
+      >
         {whiteboardTools.slice(0, 6).map(({ tool: next, label, icon: Icon, ...rest }) => (
           <IconActionButton
             key={next}
@@ -177,7 +182,7 @@ export function WhiteboardToolbar({
           <Library className="size-4" aria-hidden="true" />
         </IconActionButton>
       )}
-      <span aria-hidden="true" className="mx-1 h-6 w-px bg-border/60" />
+      <span aria-hidden="true" className="my-1 h-px w-6 bg-border" />
       <IconActionButton
         label="Undo"
         tooltip="Undo (⌘/Ctrl+Z)"

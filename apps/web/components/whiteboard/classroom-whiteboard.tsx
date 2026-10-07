@@ -1,18 +1,8 @@
 'use client';
 import dynamic from 'next/dynamic';
 import { useState } from 'react';
-import { Download, PanelsTopLeft, Users, ChevronDown } from 'lucide-react';
 import { ErrorBoundary } from '@iconicedu/ui-web/components/error-boundary';
 import { Button } from '@iconicedu/ui-web/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuCheckboxItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-} from '@iconicedu/ui-web/ui/dropdown-menu';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,6 +16,7 @@ import {
 import type { WhiteboardRepository } from '@iconicedu/web/lib/whiteboard/api';
 import type { WhiteboardCollaborationProvider } from './collaboration/provider';
 import type { WhiteboardEngine, WhiteboardTool } from './canvas/whiteboard-engine';
+import { WhiteboardBoardDetails } from './components/whiteboard-board-details';
 import { WhiteboardToolbar } from './components/whiteboard-toolbar';
 import { WhiteboardLibrary } from './components/whiteboard-library';
 import { useWhiteboard } from './use-whiteboard';
@@ -49,7 +40,6 @@ export function ClassroomWhiteboard({
   const board = useWhiteboard(token, repository, collaboration);
   const [engine, setEngine] = useState<WhiteboardEngine | null>(null);
   const [tool, setTool] = useState<WhiteboardTool>('selection');
-  const [boardMenu, setBoardMenu] = useState(false);
   const [library, setLibrary] = useState(false);
   const [confirmation, setConfirmation] = useState<'clear' | 'discard' | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -114,131 +104,35 @@ export function ClassroomWhiteboard({
       data-board-id={snapshot.id}
       data-element-count={page.elements.filter((e) => !e.deleted).length}
     >
-      <header
+      <WhiteboardBoardDetails
+        title={title}
+        presence={snapshot.presence}
+        connection={board.connection}
+        saveStatus={board.saveStatus}
+        teacher={teacher}
+        studentEditing={snapshot.document.studentEditing}
+        busy={busy}
+        onExport={(format) => void exportScene(format)}
+        onStudentEditing={(enabled) =>
+          board.operate({ id: crypto.randomUUID(), type: 'student-editing', enabled })
+        }
+      />
+      <aside
         data-testid="whiteboard-overlay-toolbar"
-        className="absolute left-3 top-3 z-20 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-1.5 rounded-xl border border-border/50 bg-card px-2 py-1 shadow-sm md:w-fit"
+        aria-label="Drawing controls"
+        className="absolute left-3 top-3 z-20 max-h-[calc(100%-1.5rem)] w-fit overflow-y-auto rounded-md border border-border bg-card p-1 shadow-sm"
       >
-        <DropdownMenu open={boardMenu} onOpenChange={setBoardMenu}>
-          <h2 className="min-w-0 max-w-48 text-sm font-medium">
-            <DropdownMenuTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                aria-label="Board options"
-                className="h-8 max-w-full gap-2 rounded-lg px-1"
-              >
-                <span className="flex size-6 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <PanelsTopLeft size={15} aria-hidden="true" />
-                </span>
-                <span className="truncate" title={title}>
-                  {title}
-                </span>
-                <ChevronDown
-                  size={14}
-                  className="shrink-0 text-muted-foreground"
-                  aria-hidden="true"
-                />
-              </Button>
-            </DropdownMenuTrigger>
-          </h2>
-          <DropdownMenuContent
-            container={
-              typeof document === 'undefined' ? undefined : document.fullscreenElement
-            }
-            className="w-60 border border-border/60 shadow-sm"
-          >
-            <DropdownMenuLabel>Board options</DropdownMenuLabel>
-            <DropdownMenuItem className="min-h-11" onSelect={() => void exportScene()}>
-              <Download />
-              Export board
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              className="min-h-11"
-              onSelect={() => void exportScene('png')}
-            >
-              <Download />
-              Export PNG
-            </DropdownMenuItem>
-            {teacher && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuCheckboxItem
-                  className="min-h-11"
-                  checked={snapshot.document.studentEditing}
-                  disabled={busy}
-                  onCheckedChange={(enabled) =>
-                    board.operate({
-                      id: crypto.randomUUID(),
-                      type: 'student-editing',
-                      enabled,
-                    })
-                  }
-                >
-                  Student editing
-                </DropdownMenuCheckboxItem>
-              </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <div className="order-last w-full border-t border-border/60 pt-1 md:order-0 md:w-auto md:border-l md:border-t-0 md:pl-2 md:pt-0">
-          <WhiteboardToolbar
-            engine={engine}
-            editable={editable}
-            tool={tool}
-            onTool={setTool}
-            canClear={teacher}
-            onClear={() => setConfirmation('clear')}
-            onLibrary={() => setLibrary(!library)}
-            libraryOpen={library}
-          />
-        </div>
-        <span
-          role="status"
-          aria-live="polite"
-          className="ml-auto text-xs text-muted-foreground"
-        >
-          {board.connection !== 'connected'
-            ? 'Reconnecting…'
-            : board.saveStatus === 'saved'
-              ? 'Saved'
-              : board.saveStatus === 'saving'
-                ? 'Saving…'
-                : 'Unsaved · retrying'}
-        </span>
-        <div
-          aria-label="Whiteboard participants"
-          className="flex items-center gap-1.5 border-l border-border/60 pl-2"
-        >
-          <Users size={14} className="text-muted-foreground" aria-hidden="true" />
-          <div className="flex -space-x-2">
-            {snapshot.presence.slice(0, 4).map((p, index) => (
-              <span
-                key={p.id}
-                role="img"
-                title={`${p.name}${p.role === 'teacher' ? ' (teacher)' : ''}`}
-                aria-label={`${p.name}${p.role === 'teacher' ? ' (teacher)' : ''}`}
-                className={`flex size-6 items-center justify-center rounded-full border-2 border-card text-[11px] font-medium ${index % 3 === 0 ? 'bg-primary/15 text-primary' : index % 3 === 1 ? 'bg-secondary text-secondary-foreground' : 'bg-accent text-accent-foreground'}`}
-              >
-                {p.name
-                  .trim()
-                  .split(/\s+/)
-                  .slice(0, 2)
-                  .map((part) => part[0])
-                  .join('')
-                  .toUpperCase() || '?'}
-              </span>
-            ))}
-            {snapshot.presence.length > 4 && (
-              <span
-                className="flex size-6 items-center justify-center rounded-full border-2 border-card bg-muted text-[11px] text-muted-foreground"
-                aria-label={`${snapshot.presence.length - 4} more participants`}
-              >
-                +{snapshot.presence.length - 4}
-              </span>
-            )}
-          </div>
-        </div>
-      </header>
+        <WhiteboardToolbar
+          engine={engine}
+          editable={editable}
+          tool={tool}
+          onTool={setTool}
+          canClear={teacher}
+          onClear={() => setConfirmation('clear')}
+          onLibrary={() => setLibrary(!library)}
+          libraryOpen={library}
+        />
+      </aside>
       <div className="absolute inset-x-3 bottom-12 z-20 flex flex-col gap-2">
         {(board.error || exportError) && (
           <div

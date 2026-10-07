@@ -532,6 +532,17 @@ test('reveals grouped whiteboard controls on demand on mobile and in fullscreen'
     expect(toolbarBounds!.x + toolbarBounds!.width).toBeLessThanOrEqual(
       canvasBounds!.x + canvasBounds!.width,
     );
+    const mobileDetails = await page
+      .getByTestId('whiteboard-board-details')
+      .boundingBox();
+    expect(toolbarBounds!.x + toolbarBounds!.width).toBeLessThan(mobileDetails!.x);
+    expect(mobileDetails!.x + mobileDetails!.width).toBeLessThanOrEqual(
+      canvasBounds!.x + canvasBounds!.width,
+    );
+    await expect(page.getByTestId('whiteboard-toolbar')).toHaveAttribute(
+      'aria-orientation',
+      'vertical',
+    );
     await expect(page.getByRole('menu')).toHaveCount(0);
     await expect(page.getByRole('menuitem', { name: 'Export board' })).toHaveCount(0);
     await page.getByRole('button', { name: 'Shapes', exact: true }).click();
@@ -576,7 +587,11 @@ test('reveals grouped whiteboard controls on demand on mobile and in fullscreen'
     const compactToolbar = await page
       .getByTestId('whiteboard-overlay-toolbar')
       .boundingBox();
-    expect(compactToolbar!.height).toBeLessThanOrEqual(42);
+    expect(compactToolbar!.width).toBeLessThanOrEqual(44);
+    expect(compactToolbar!.height).toBeGreaterThan(compactToolbar!.width);
+    const details = await page.getByTestId('whiteboard-board-details').boundingBox();
+    expect(compactToolbar!.x + compactToolbar!.width).toBeLessThan(details!.x);
+    expect(details!.x + details!.width).toBeGreaterThan(1100);
     await page.screenshot({ path: '/tmp/iconicedu-whiteboard-toolbar-desktop.png' });
     await page.evaluate(() => document.exitFullscreen());
   } finally {
