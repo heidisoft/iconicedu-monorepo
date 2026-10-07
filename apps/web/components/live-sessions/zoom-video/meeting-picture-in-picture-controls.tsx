@@ -30,8 +30,10 @@ export function MeetingPictureInPictureControls({
   pip,
   settingsOpen,
   onSettingsOpenChange,
+  onCallSettings,
 }: {
   pip: ReturnType<typeof useMeetingPictureInPicture>;
+  onCallSettings?: () => void;
   settingsOpen: boolean;
   onSettingsOpenChange: (open: boolean) => void;
 }) {
@@ -45,8 +47,12 @@ export function MeetingPictureInPictureControls({
             <Button
               variant="ghost"
               size="icon-sm"
-              aria-label="Picture-in-picture settings"
-              onClick={() => onSettingsOpenChange(true)}
+              aria-label={
+                onCallSettings ? 'Call settings' : 'Picture-in-picture settings'
+              }
+              onClick={() =>
+                onCallSettings ? onCallSettings() : onSettingsOpenChange(true)
+              }
             >
               <Settings2 className="size-4" />
             </Button>
@@ -109,28 +115,7 @@ export function MeetingPictureInPictureControls({
         title="Picture-in-picture"
         description="Keep your call visible while using other tabs or presenting."
       >
-        <label className="flex flex-col gap-2 text-sm" htmlFor="automatic-meeting-pip">
-          Open automatically
-          <select
-            id="automatic-meeting-pip"
-            className="h-10 rounded-md border border-input bg-background px-3"
-            value={pip.mode}
-            disabled={!pip.supported}
-            onChange={(event) =>
-              pip.setAutomaticMode(event.target.value as AutomaticPipMode)
-            }
-          >
-            <option value="always">When switching tabs or sharing</option>
-            <option value="tabs">When switching tabs</option>
-            <option value="sharing">When sharing</option>
-            <option value="never">Never</option>
-          </select>
-        </label>
-        <p className="text-sm text-muted-foreground">
-          {pip.supported
-            ? 'Allow Automatic picture-in-picture in your browser’s site settings. If your browser asks for a click when sharing, use Open floating call.'
-            : 'Use a supported desktop browser such as Chrome or Edge for a floating call window.'}
-        </p>
+        <MeetingPipSettings pip={pip} />
       </ZoomMeetingDialog>
       <style>{`
       [data-meeting-pip] .zoom-meeting-shell { top: 44px; }
@@ -140,6 +125,39 @@ export function MeetingPictureInPictureControls({
       [data-meeting-pip] .zoom-toolbar { justify-content: flex-start; }
       [data-meeting-pip] .zoom-meeting-gutter-padding { overflow-x: auto; }
     `}</style>
+    </>
+  );
+}
+
+export function MeetingPipSettings({
+  pip,
+}: {
+  pip: ReturnType<typeof useMeetingPictureInPicture>;
+}) {
+  return (
+    <>
+      <label className="flex flex-col gap-2 text-sm" htmlFor="automatic-meeting-pip">
+        Open automatically
+        <select
+          id="automatic-meeting-pip"
+          className="h-10 rounded-md border border-input bg-background px-3"
+          value={pip.mode}
+          disabled={!pip.supported}
+          onChange={(event) =>
+            pip.setAutomaticMode(event.target.value as AutomaticPipMode)
+          }
+        >
+          <option value="always">When switching tabs or sharing</option>
+          <option value="tabs">When switching tabs</option>
+          <option value="sharing">When sharing</option>
+          <option value="never">Never</option>
+        </select>
+      </label>
+      <p className="text-sm text-muted-foreground">
+        {pip.supported
+          ? 'Allow Automatic picture-in-picture in your browser’s site settings. If your browser asks for a click when sharing, use Open floating call.'
+          : 'Use a supported desktop browser such as Chrome or Edge for a floating call window.'}
+      </p>
     </>
   );
 }

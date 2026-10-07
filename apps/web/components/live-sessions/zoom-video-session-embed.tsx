@@ -117,6 +117,7 @@ import { ZoomMoreControls } from './zoom-video/zoom-more-controls';
 import { useMeetingPictureInPicture } from './zoom-video/use-meeting-picture-in-picture';
 import {
   MeetingPictureInPictureControls,
+  MeetingPipSettings,
   MeetingPipProviders,
 } from './zoom-video/meeting-picture-in-picture-controls';
 import { ZoomShareMeetingDialog } from './zoom-video/zoom-share-meeting-dialog';
@@ -1455,6 +1456,10 @@ export function ZoomVideoSessionEmbed({
     <MeetingPipProviders container={pip.pipWindow?.document.body}>
       <MeetingPictureInPictureControls
         pip={pip}
+        onCallSettings={() => {
+          setActivePanel(null);
+          setIsSettingsOpen(true);
+        }}
         settingsOpen={showPipSettings}
         onSettingsOpenChange={setShowPipSettings}
       />
@@ -1669,6 +1674,7 @@ export function ZoomVideoSessionEmbed({
               </MeetingControlButton>
 
               <ZoomSettingsPanel
+                pictureInPictureSettings={<MeetingPipSettings pip={pip} />}
                 open={isSettingsOpen}
                 hideTrigger
                 cameras={cameraList}
@@ -1791,12 +1797,6 @@ export function ZoomVideoSessionEmbed({
                       ]
                     : []),
                   {
-                    id: 'pip-settings',
-                    label: 'Picture-in-picture settings',
-                    icon: <PictureInPicture2 />,
-                    onSelect: () => setShowPipSettings(true),
-                  },
-                  {
                     id: 'captions',
                     label: isCaptionsOn ? 'Turn off captions' : 'Turn on captions',
                     icon: <Captions />,
@@ -1805,7 +1805,7 @@ export function ZoomVideoSessionEmbed({
                   },
                   {
                     id: 'settings',
-                    label: 'Audio and video settings',
+                    label: 'Call settings',
                     icon: <Settings />,
                     active: isSettingsOpen,
                     onSelect: () => {

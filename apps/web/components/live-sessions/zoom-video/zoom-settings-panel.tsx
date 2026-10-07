@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { SharePrivilege } from '@zoom/videosdk';
 import { Image as ImageIcon, ImageOff, Settings } from 'lucide-react';
 import { Label } from '@iconicedu/ui-web/ui/label';
@@ -57,6 +58,7 @@ function DeviceSelect({
 type Props = {
   open: boolean;
   hideTrigger?: boolean;
+  pictureInPictureSettings?: ReactNode;
   cameras: MediaDeviceOption[];
   microphones: MediaDeviceOption[];
   speakers: MediaDeviceOption[];
@@ -108,8 +110,8 @@ export function ZoomSettingsPanel(props: Props) {
     <ZoomMeetingDialog
       open={props.open}
       onOpenChange={props.onOpenChange}
-      title="Audio and video settings"
-      description="Choose the devices and processing used in this class."
+      title="Call settings"
+      description="Manage video, audio and how your call appears."
       trigger={
         !props.hideTrigger ? (
           <MeetingControlButton label="Settings" tone={props.open ? 'active' : 'neutral'}>
@@ -295,6 +297,15 @@ export function ZoomSettingsPanel(props: Props) {
           ) : null}
         </TabsContent>
       </Tabs>
+      {props.pictureInPictureSettings && (
+        <section
+          className="space-y-3 border-t border-border pt-4"
+          aria-label="Picture-in-picture preferences"
+        >
+          <h3 className="text-sm font-medium">Picture-in-picture</h3>
+          {props.pictureInPictureSettings}
+        </section>
+      )}
     </ZoomMeetingDialog>
   );
 }
