@@ -18,6 +18,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@iconicedu/ui-web/ui/dropdown-menu';
+import { usePortalContainer } from '@iconicedu/ui-web/ui/portal-container';
 import { useIsMobile } from '@iconicedu/ui-web/hooks/use-mobile';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 import { MeetingControlButton } from './zoom-meeting-controls';
@@ -62,7 +63,10 @@ export function ZoomMoreControls({
   actions: MeetingFeatureAction[];
   onOpenChange: (open: boolean) => void;
 }) {
-  const isMobile = useIsMobile();
+  const portalContainer = usePortalContainer();
+  const mobileViewport = useIsMobile();
+  // A compact floating call uses a menu in its own document instead of a mobile sheet.
+  const isMobile = mobileViewport && !portalContainer;
   const menuActions = actions;
   const featureError = error ? (
     <p

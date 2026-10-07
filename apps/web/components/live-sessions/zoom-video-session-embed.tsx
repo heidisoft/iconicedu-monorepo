@@ -55,7 +55,6 @@ import {
 } from '@iconicedu/ui-web/ui/alert-dialog';
 import { clearLiveSessionRecovery } from '@iconicedu/web/lib/live-sessions/browser-session';
 import { Popover, PopoverContent, PopoverTrigger } from '@iconicedu/ui-web/ui/popover';
-import { TooltipProvider } from '@iconicedu/ui-web/ui/tooltip';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 import {
   logLiveSessionAuditEvent,
@@ -115,26 +114,14 @@ import { ZoomSettingsPanel } from './zoom-video/zoom-settings-panel';
 import { ZoomShareStage } from './zoom-video/zoom-share-stage';
 import { ZoomShareFilmstrip } from './zoom-video/zoom-share-filmstrip';
 import { ZoomMoreControls } from './zoom-video/zoom-more-controls';
+import { useMeetingPictureInPicture } from './zoom-video/use-meeting-picture-in-picture';
+import {
+  MeetingPictureInPictureControls,
+  MeetingPipProviders,
+} from './zoom-video/meeting-picture-in-picture-controls';
 import { ZoomShareMeetingDialog } from './zoom-video/zoom-share-meeting-dialog';
 
-// The Document Picture-in-Picture API (Chromium-based browsers only, as of
-// writing) has no TypeScript lib types yet — unlike window.open(), the PiP
-// window shares the opener's JS realm/custom-element registry, which is
-// exactly what lets a live Zoom <video-player> element keep rendering after
-// being moved into it.
-interface DocumentPictureInPictureApi {
-  requestWindow(options?: { width?: number; height?: number }): Promise<Window>;
-}
-
-declare global {
-  interface Window {
-    documentPictureInPicture?: DocumentPictureInPictureApi;
-  }
-}
-
-const PIP_SUPPORTED =
-  typeof window !== 'undefined' && 'documentPictureInPicture' in window;
-
+// flag-exempt: repair and complete the existing Video SDK picture-in-picture lifecycle.
 // A single shared AudioContext, created lazily on first use — Chrome caps
 // how many can exist concurrently, so reuse one for the whole page rather
 // than creating a new one per chime.
@@ -251,7 +238,6 @@ export function ZoomVideoSessionEmbed({
     );
   }, []);
 
-  const pipWindowRef = useRef<Window | null>(null);
   const shareCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const localShareCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const localShareVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -272,7 +258,7 @@ export function ZoomVideoSessionEmbed({
   >('canvas');
   const [shareError, setShareError] = useState<string | null>(null);
 
-  const [isPipActive, setIsPipActive] = useState(false);
+  const [showPipSettings, setShowPipSettings] = useState(false);
   const [activeShareUserId, setActiveShareUserId] = useState<number | null>(null);
   const [sharePresenters, setSharePresenters] = useState<
     Array<{ userId: number; displayName: string }>
@@ -459,9 +445,9 @@ export function ZoomVideoSessionEmbed({
         selfIsThumbnail ? VideoQuality.Video_180P : galleryQuality,
       );
     }
-    remoteParticipants.forEach((participant, index) => {
+    remoteParticipants.forEach((participant) => {
       const container = remoteVideoRefs.current.get(participant.userId);
-      if (!participant.bVideoOn || !container || (isPipActive && index === 0)) return;
+      if (!participant.bVideoOn || !container) return;
       void attachCameraTile(
         client,
         participant.userId,
@@ -476,7 +462,6 @@ export function ZoomVideoSessionEmbed({
     whiteboardStatus,
     remoteParticipants,
     isVideoOn,
-    isPipActive,
     galleryPage,
   ]);
 
@@ -1231,84 +1216,15 @@ export function ZoomVideoSessionEmbed({
     setShowFeedbackPrompt(true);
   }, [isSelfHost, liveSessionId, accessToken]);
 
-  const exitPip = useCallback(() => {
-    const pipWindow = pipWindowRef.current;
-    if (pipWindow && !pipWindow.closed) {
-      pipWindow.close();
-    }
-  }, []);
-
-  // Moves (not clones) the other participant's live video node into a real
-  // floating always-on-top window via the Document Picture-in-Picture API —
-  // unlike window.open(), that window shares this page's JS realm and custom
-  // element registry, so Zoom's <video-player> keeps rendering normally
-  // after the move instead of going blank. Falls back to a no-op wherever
-  // the API isn't supported (anything non-Chromium, as of writing).
-  const enterPip = useCallback(async () => {
-    const firstRemoteParticipant = remoteParticipantsRef.current[0];
-    const sourceContainer = firstRemoteParticipant
-      ? remoteVideoRefs.current.get(firstRemoteParticipant.userId)
-      : null;
-    if (!PIP_SUPPORTED || pipWindowRef.current || !sourceContainer?.firstChild) {
-      return;
-    }
-    try {
-      const pipWindow = await window.documentPictureInPicture!.requestWindow({
-        width: 320,
-        height: 180,
-      });
-      pipWindowRef.current = pipWindow;
-
-      const style = pipWindow.document.createElement('style');
-      style.textContent = `
-        html, body { margin: 0; padding: 0; height: 100%; background: #000; overflow: hidden; }
-        body > * { display: block; width: 100%; height: 100%; object-fit: cover; }
-      `;
-      pipWindow.document.head.append(style);
-
-      while (sourceContainer.firstChild) {
-        pipWindow.document.body.append(sourceContainer.firstChild);
-      }
-      setIsPipActive(true);
-
-      // Fires whichever way the PiP window closes — the user closing it
-      // directly, or us calling pipWindow.close() from exitPip/the
-      // visibility-change handler — so this is the one place that needs to
-      // move the content back home and reset state.
-      pipWindow.addEventListener('pagehide', () => {
-        while (pipWindow.document.body.firstChild) {
-          sourceContainer.append(pipWindow.document.body.firstChild);
-        }
-        pipWindowRef.current = null;
-        setIsPipActive(false);
-      });
-    } catch {
-      // Declined (e.g. called outside a user-activation context) — the call
-      // just stays in-tab, same as before this feature existed.
-    }
-  }, []);
-
-  // Automatically floats the other participant's video when the viewer
-  // switches tabs or minimizes the window, and restores it when they come
-  // back — the manual button below still works independently of this.
-  useEffect(() => {
-    if (!PIP_SUPPORTED || status !== 'connected') {
-      return;
-    }
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        void enterPip();
-      } else {
-        exitPip();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [status, enterPip, exitPip]);
-
-  useEffect(() => {
-    return () => exitPip();
-  }, [exitPip]);
+  const pip = useMeetingPictureInPicture({
+    connected: status === 'connected' && !showFeedbackPrompt,
+    sharing: isSharingScreen,
+    cameraActive: isVideoOn,
+    microphoneActive: !isMuted,
+  });
+  const isPipActive = !!pip.pipWindow;
+  const exitPip = pip.restore;
+  const enterPip = () => pip.open();
 
   const selectCamera = useCallback((deviceId: string) => {
     setActiveCameraId(deviceId);
@@ -1536,7 +1452,12 @@ export function ZoomVideoSessionEmbed({
   // floating control bar and panels truly anchor to the screen, not to
   // whatever box happens to wrap this component on a given page.
   return createPortal(
-    <TooltipProvider delayDuration={300}>
+    <MeetingPipProviders container={pip.pipWindow?.document.body}>
+      <MeetingPictureInPictureControls
+        pip={pip}
+        settingsOpen={showPipSettings}
+        onSettingsOpenChange={setShowPipSettings}
+      />
       {showFeedbackPrompt ? (
         <ZoomFeedbackScreen
           rating={feedbackRating}
@@ -1720,16 +1641,22 @@ export function ZoomVideoSessionEmbed({
 
               <MeetingControlButton
                 tooltip={
-                  !supportsScreenShare
-                    ? 'Screen sharing is not supported by this browser'
-                    : isWhiteboardActive
-                      ? 'End the whiteboard to share your screen'
-                      : 'Share screen'
+                  isPipActive && !isSharingScreen
+                    ? 'Return to the call to start sharing'
+                    : !supportsScreenShare
+                      ? 'Screen sharing is not supported by this browser'
+                      : isWhiteboardActive
+                        ? 'End the whiteboard to share your screen'
+                        : 'Share screen'
                 }
                 label={isSharingScreen ? 'Stop sharing screen' : 'Share screen'}
                 tone={isSharingScreen ? 'active' : 'neutral'}
                 aria-pressed={isSharingScreen}
-                disabled={isWhiteboardActive || !supportsScreenShare}
+                disabled={
+                  isWhiteboardActive ||
+                  !supportsScreenShare ||
+                  (isPipActive && !isSharingScreen)
+                }
                 onClick={() => void toggleScreenShare()}
               >
                 <PoppingIcon toggleKey={isSharingScreen}>
@@ -1850,7 +1777,7 @@ export function ZoomVideoSessionEmbed({
                         },
                       ]
                     : []),
-                  ...(PIP_SUPPORTED && remoteParticipants.length > 0
+                  ...(pip.supported
                     ? [
                         {
                           id: 'picture-in-picture',
@@ -1863,6 +1790,12 @@ export function ZoomVideoSessionEmbed({
                         },
                       ]
                     : []),
+                  {
+                    id: 'pip-settings',
+                    label: 'Picture-in-picture settings',
+                    icon: <PictureInPicture2 />,
+                    onSelect: () => setShowPipSettings(true),
+                  },
                   {
                     id: 'captions',
                     label: isCaptionsOn ? 'Turn off captions' : 'Turn on captions',
@@ -2145,7 +2078,7 @@ export function ZoomVideoSessionEmbed({
           )}
         </AlertDialogContent>
       </AlertDialog>
-    </TooltipProvider>,
-    document.body,
+    </MeetingPipProviders>,
+    pip.host ?? document.body,
   );
 }
