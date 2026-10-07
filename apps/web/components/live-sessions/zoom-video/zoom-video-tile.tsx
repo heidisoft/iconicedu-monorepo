@@ -121,11 +121,7 @@ export function ZoomVideoTile({
       )}
     >
       <FocusedFullscreenStyles />
-      <FocusedFullscreenButton
-        fullscreen={fullscreen}
-        label={`${label} video`}
-        placement="bottom"
-      />
+      <FocusedFullscreenButton fullscreen={fullscreen} label={`${label} video`} />
       <div
         ref={setSurfaceRef}
         className="absolute inset-0 z-0 h-full w-full [&>video-player-container]:block [&>video-player-container]:h-full [&>video-player-container]:w-full [&_video-player]:h-full [&_video-player]:w-full [&_video-player]:object-cover"

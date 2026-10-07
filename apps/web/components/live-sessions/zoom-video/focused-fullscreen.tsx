@@ -50,12 +50,10 @@ export function FocusedFullscreenButton({
   fullscreen,
   label,
   visible = true,
-  placement = 'top',
 }: {
   fullscreen: ReturnType<typeof useFocusedFullscreen>;
   label: string;
   visible?: boolean;
-  placement?: 'top' | 'bottom';
 }) {
   if (!visible) return null;
   return (
@@ -64,7 +62,7 @@ export function FocusedFullscreenButton({
         type="button"
         variant="secondary"
         size="icon-sm"
-        className={`focused-fullscreen-control absolute right-3 ${placement === 'bottom' && !fullscreen.active ? 'bottom-3' : 'top-3'} z-40 shadow-sm`}
+        className="focused-fullscreen-control absolute right-3 bottom-3 z-40 shadow-sm"
         aria-label={fullscreen.active ? 'Exit fullscreen' : `View ${label} fullscreen`}
         aria-pressed={fullscreen.active}
         title={
@@ -86,7 +84,7 @@ export function FocusedFullscreenButton({
       {fullscreen.error && (
         <div
           role="alert"
-          className="absolute right-3 top-14 z-40 flex max-w-[calc(100%-1.5rem)] items-center gap-2 rounded-md border border-border bg-card p-2 text-sm shadow-sm"
+          className="absolute right-3 bottom-14 z-40 flex max-w-[calc(100%-1.5rem)] items-center gap-2 rounded-md border border-border bg-card p-2 text-sm shadow-sm"
         >
           {fullscreen.error}
           <Button
@@ -122,7 +120,6 @@ export function FocusedFullscreenStyles() {
     }
     [data-focused-content]:fullscreen::backdrop { background: black; }
     [data-focused-content='video']:fullscreen { background: black; }
-    [data-focused-content='whiteboard']:not(:fullscreen) [data-testid='whiteboard-board-details'] { margin-right: 2.75rem; }
     [data-focused-content='video']:fullscreen video-player { object-fit: contain !important; }
     [data-focused-content='video']:fullscreen > [data-tile-overlay],
     [data-focused-content]:fullscreen [data-share-switcher],

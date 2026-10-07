@@ -1,6 +1,6 @@
-import { act, renderHook } from '@testing-library/react';
+import { act, render, screen, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useFocusedFullscreen } from './focused-fullscreen';
+import { FocusedFullscreenButton, useFocusedFullscreen } from './focused-fullscreen';
 
 let target: HTMLDivElement;
 let active: Element | null;
@@ -71,3 +71,24 @@ describe('focused content fullscreen', () => {
     expect(target.parentElement).toBe(document.body);
   });
 });
+
+it.each([false, true])(
+  'keeps the fullscreen control at the bottom when active=%s',
+  (active) => {
+    render(
+      <FocusedFullscreenButton
+        label="whiteboard"
+        fullscreen={{
+          setTarget: vi.fn(),
+          active,
+          supported: true,
+          toggle: vi.fn(),
+          error: null,
+          dismissError: vi.fn(),
+        }}
+      />,
+    );
+    expect(screen.getByRole('button')).toHaveClass('bottom-3');
+    expect(screen.getByRole('button')).not.toHaveClass('top-3');
+  },
+);
