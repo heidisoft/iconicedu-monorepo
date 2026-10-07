@@ -26,6 +26,8 @@ export function ExcalidrawCanvas({
 }) {
   const { resolvedTheme } = useTheme();
   const theme = resolvedTheme === 'dark' ? 'dark' : 'light';
+  const [optionsOpen, setOptionsOpen] = useState(false);
+  const [hasStyleOptions, setHasStyleOptions] = useState(false);
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
   const engineRef = useRef<ExcalidrawWhiteboardEngine | null>(null);
   const onChangeRef = useRef(onChange);
@@ -182,7 +184,13 @@ export function ExcalidrawCanvas({
             toggleTheme: false,
           },
         }}
-        onChange={(next) => {
+        onChange={(next, state) => {
+          setOptionsOpen(state.openMenu === 'shape');
+          setHasStyleOptions(
+            !['hand', 'eraser'].includes(state.activeTool.type) &&
+              (state.activeTool.type !== 'selection' ||
+                Object.keys(state.selectedElementIds).length > 0),
+          );
           if (!engineRef.current) return;
           const wrapped = wrapCanvasElements(next);
           const fingerprint = sceneFingerprint(wrapped);
@@ -195,6 +203,18 @@ export function ExcalidrawCanvas({
         }}
         onPointerUp={() => requestAnimationFrame(() => engineRef.current?.commit())}
       />
+      {editable && hasStyleOptions && (
+        <button
+          type="button"
+          className="whiteboard-style-toggle absolute bottom-3 right-3 z-40 rounded-xl border border-border/60 bg-card px-3 py-2 text-xs text-foreground shadow-sm"
+          aria-expanded={optionsOpen}
+          onClick={() =>
+            api?.updateScene({ appState: { openMenu: optionsOpen ? null : 'shape' } })
+          }
+        >
+          {optionsOpen ? 'Hide tool options' : 'Show tool options'}
+        </button>
+      )}
     </div>
   );
 }

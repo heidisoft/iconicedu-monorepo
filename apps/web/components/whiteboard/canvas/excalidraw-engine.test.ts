@@ -68,6 +68,23 @@ function fixture() {
   };
 }
 describe('Excalidraw canvas adapter', () => {
+  it('opens contextual options without resetting ordinary drawing styles', () => {
+    const { engine, api } = fixture();
+    engine.setTool('freedraw');
+    expect(api.updateScene).toHaveBeenLastCalledWith({ appState: { openMenu: 'shape' } });
+    engine.setTool('rectangle');
+    expect(api.updateScene).toHaveBeenLastCalledWith({ appState: { openMenu: 'shape' } });
+    engine.setTool('hand');
+    expect(api.updateScene).toHaveBeenLastCalledWith({ appState: { openMenu: null } });
+    engine.setTool('highlighter');
+    expect(api.updateScene).toHaveBeenLastCalledWith({
+      appState: { currentItemOpacity: 35, currentItemStrokeWidth: 8 },
+    });
+    engine.setTool('freedraw');
+    expect(api.updateScene).toHaveBeenLastCalledWith({
+      appState: { currentItemOpacity: 100, currentItemStrokeWidth: 2 },
+    });
+  });
   it('converts neutral assets into grouped selected canvas elements', () => {
     const { engine, api } = fixture();
     engine.insertAsset(educationalAssets.get('math-number-line'));

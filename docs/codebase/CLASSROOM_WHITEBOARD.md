@@ -6,6 +6,10 @@ The application whiteboard uses Excalidraw as a canvas engine under native Class
 
 The board uses the application theme for its paper, subtle dotted background, flat control surfaces and muted borders. A compact rounded toolbar floats over the canvas near the top left and combines the board title, essential drawing tools, library and participant initials. Select, Pen, Text, Highlighter, Eraser and Pan appear first. Shapes, view controls and less-used actions open keyboard-accessible menus; export and student editing live under the board title. Undo remains directly available, with Redo and teacher-only board clearing under More. Menus dismiss after selection and return focus to their trigger, and remain available in fullscreen. The bar wraps into a dedicated tool row on narrow screens, with the canvas extending underneath the toolbar across the entire board. Selected tools use a soft primary tint. The Excalidraw renderer follows light/dark mode without rewriting saved drawings; the dotted paper is a local visual aid and is not included in scene exports.
 
+## Contextual tool options
+
+Selecting a drawing tool shows the engine's themed style panel underneath the floating toolbar. Selecting existing objects exposes their styles too. The panel shows relevant controls such as stroke and background colors, fill, line width, opacity, text formatting and arrow settings. Ordinary tool changes preserve style choices; Highlighter applies its own opacity and width defaults. Styles are stored on drawing elements and use the existing autosave, collaboration and undo paths. Mobile uses a scrollable bottom panel with a Show/Hide tool options button.
+
 ## Infinite canvas
 
 One continuous workspace replaces page navigation. Scroll to pan, use Space + drag or the Pan tool, and Ctrl/Command + scroll to zoom. View → Fit content brings the drawings back into view. Touch users can pan and pinch to zoom. Panning changes only the local viewport; drawings retain their world coordinates.

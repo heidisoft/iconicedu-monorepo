@@ -81,17 +81,20 @@ export class ExcalidrawWhiteboardEngine implements WhiteboardEngine {
     this.history.record(before, this.getElements());
     this.changed(this.getElements());
   }
+  private lastTool: WhiteboardTool = 'selection';
   setTool(tool: WhiteboardTool) {
     this.api.setActiveTool({ type: tool === 'highlighter' ? 'freedraw' : tool });
     this.api.updateScene({
-      appState: {
-        currentItemOpacity: tool === 'highlighter' ? 35 : 100,
-        currentItemStrokeWidth: tool === 'highlighter' ? 8 : 2,
-        currentItemRoughness: 0,
-        currentItemFillStyle: 'solid',
-        currentItemFontFamily: 2,
-      },
+      appState: { openMenu: tool === 'hand' || tool === 'eraser' ? null : 'shape' },
     });
+    if (tool === 'highlighter' || this.lastTool === 'highlighter')
+      this.api.updateScene({
+        appState: {
+          currentItemOpacity: tool === 'highlighter' ? 35 : 100,
+          currentItemStrokeWidth: tool === 'highlighter' ? 8 : 2,
+        },
+      });
+    this.lastTool = tool;
   }
   insertAsset(asset: WhiteboardAsset) {
     const state = this.api.getAppState();
