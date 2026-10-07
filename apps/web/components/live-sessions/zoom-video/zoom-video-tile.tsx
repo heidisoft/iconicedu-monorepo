@@ -5,6 +5,11 @@ import { AudioLines, Hand, Mic, MicOff, Video, VideoOff } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@iconicedu/ui-web/ui/avatar';
 import { cn, getInitials } from '@iconicedu/ui-web/lib/utils';
+import {
+  useFocusedFullscreen,
+  FocusedFullscreenButton,
+  FocusedFullscreenStyles,
+} from './focused-fullscreen';
 import { OverlayBadge } from './zoom-meeting-controls';
 
 function TileMediaStatus({
@@ -64,6 +69,7 @@ export function ZoomVideoTile({
   density?: 'default' | 'compact';
   isSpeaking?: boolean;
 }) {
+  const fullscreen = useFocusedFullscreen();
   const surfaceRef = useRef<HTMLDivElement>(null);
   const [rendererReady, setRendererReady] = useState(false);
   const setSurfaceRef = useCallback(
@@ -105,6 +111,8 @@ export function ZoomVideoTile({
 
   return (
     <div
+      ref={fullscreen.setTarget}
+      data-focused-content="video"
       className={cn(
         'zoom-video-tile relative isolate overflow-hidden bg-secondary shadow-inner transition-[inset,width,height,transform,opacity] duration-300 ease-out motion-reduce:transition-none',
         compact ? 'rounded-2xl' : 'rounded-3xl sm:rounded-[2rem]',
@@ -112,6 +120,12 @@ export function ZoomVideoTile({
         className,
       )}
     >
+      <FocusedFullscreenStyles />
+      <FocusedFullscreenButton
+        fullscreen={fullscreen}
+        label={`${label} video`}
+        placement="bottom"
+      />
       <div
         ref={setSurfaceRef}
         className="absolute inset-0 z-0 h-full w-full [&>video-player-container]:block [&>video-player-container]:h-full [&>video-player-container]:w-full [&_video-player]:h-full [&_video-player]:w-full [&_video-player]:object-cover"
@@ -150,6 +164,7 @@ export function ZoomVideoTile({
                 ? 'right-2'
                 : 'right-4',
           )}
+          data-tile-overlay
           aria-label="Hand raised"
           title="Hand raised"
         >
@@ -167,6 +182,7 @@ export function ZoomVideoTile({
             'absolute top-2 left-2 z-30 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md',
             compact ? 'size-7' : 'size-9 sm:top-4 sm:left-4',
           )}
+          data-tile-overlay
           aria-label={`${label} is speaking`}
         >
           <AudioLines className={compact ? 'size-3.5' : 'size-4'} aria-hidden="true" />
@@ -179,9 +195,10 @@ export function ZoomVideoTile({
         )}
         style={
           compact
-            ? { left: '0.5rem', right: '0.5rem', bottom: '0.5rem' }
-            : { left: '1rem', right: '1rem', bottom: '1rem' }
+            ? { left: '0.5rem', right: '3rem', bottom: '0.5rem' }
+            : { left: '1rem', right: '3.5rem', bottom: '1rem' }
         }
+        data-tile-overlay
         aria-label={`${label} status`}
       >
         <OverlayBadge

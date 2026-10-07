@@ -4,6 +4,11 @@ import type { Ref, ReactNode } from 'react';
 import { SharedContentSurface } from '@iconicedu/ui-web';
 import { Loader2 } from 'lucide-react';
 
+import {
+  useFocusedFullscreen,
+  FocusedFullscreenButton,
+  FocusedFullscreenStyles,
+} from './focused-fullscreen';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 
 type ShareDimensions = {
@@ -49,11 +54,15 @@ export function ZoomShareStage({
   activeShareUserId: number | null;
   onSelectShare: (userId: number) => void;
 }) {
+  const remoteFullscreen = useFocusedFullscreen(showRemoteShare);
+  const localFullscreen = useFocusedFullscreen(showLocalShare);
+  const boardFullscreen = useFocusedFullscreen(showWhiteboard);
   const aspectRatio = `${dimensions.width} / ${dimensions.height}`;
 
   const shareSwitcher =
     sharePresenters.length > 1 ? (
       <div
+        data-share-switcher
         role="tablist"
         aria-label="Shared screens"
         className="absolute left-1/2 top-3 z-20 flex max-w-[calc(100%-1.5rem)] -translate-x-1/2 gap-1 overflow-x-auto rounded-full bg-background/90 p-1 shadow-md ring-1 ring-border backdrop-blur"
@@ -80,7 +89,10 @@ export function ZoomShareStage({
 
   return (
     <>
+      <FocusedFullscreenStyles />
       <div
+        ref={remoteFullscreen.setTarget}
+        data-focused-content="share"
         className={cn(
           shareStageClassName,
           showRemoteShare ? 'opacity-100' : 'pointer-events-none opacity-0',
@@ -88,6 +100,11 @@ export function ZoomShareStage({
         )}
         aria-hidden={!showRemoteShare}
       >
+        <FocusedFullscreenButton
+          fullscreen={remoteFullscreen}
+          label="shared screen"
+          visible={showRemoteShare}
+        />
         {shareSwitcher}
         <SharedContentSurface
           source={dimensions}
@@ -105,6 +122,8 @@ export function ZoomShareStage({
       {/* Zoom selects the local canvas or video renderer by browser capability.
           Both targets must remain mounted and measurable while sharing. */}
       <div
+        ref={localFullscreen.setTarget}
+        data-focused-content="share"
         className={cn(
           shareStageClassName,
           'z-10',
@@ -113,6 +132,11 @@ export function ZoomShareStage({
         )}
         aria-hidden={!showLocalShare}
       >
+        <FocusedFullscreenButton
+          fullscreen={localFullscreen}
+          label="shared screen"
+          visible={showLocalShare}
+        />
         {shareSwitcher}
         <SharedContentSurface
           source={dimensions}
@@ -142,6 +166,8 @@ export function ZoomShareStage({
       </div>
 
       <div
+        ref={boardFullscreen.setTarget}
+        data-focused-content="whiteboard"
         className={cn(
           shareStageClassName,
           'block bg-background',
@@ -150,6 +176,11 @@ export function ZoomShareStage({
         )}
         aria-hidden={!showWhiteboard}
       >
+        <FocusedFullscreenButton
+          fullscreen={boardFullscreen}
+          label="whiteboard"
+          visible={showWhiteboard}
+        />
         {/* Zoom requires an empty mounting element; keep loading UI in the
             wrapper so the SDK owns this child exclusively. */}
         {whiteboardContent ?? (

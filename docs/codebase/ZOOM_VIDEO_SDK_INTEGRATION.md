@@ -528,3 +528,9 @@ The original tab displays Bring call back here while the floating call is active
 `flag-exempt: maintenance correction of the existing Video SDK picture-in-picture action and lifecycle.` This replaces the previous single-video move and browser-blocked visibility trigger. It does not alter other providers' embedded calls. Google Meet's PiP features and browser permissions are documented in [Google Meet Help](https://support.google.com/meet/answer/13665919?hl=en); browser automatic entry is documented by [Chrome](https://developer.chrome.com/blog/automatic-picture-in-picture).
 
 Tests cover DOM identity, existing input, live control handlers, cross-window menus, browser-close restoration, duplicate/denied requests, preferences, disconnection and pending-open cleanup. The browser suite exercises the native Document Picture-in-Picture API and its control events, and simulates automatic browser entry with a real second document. Browser-managed automatic permission and live Zoom media need a manual supported-browser check.
+
+## Focused content fullscreen
+
+Each camera tile and active shared screen or whiteboard has a View fullscreen action. It requests browser fullscreen on the existing content container, so participant tiles, call navigation and side panels stay outside the fullscreen surface. Media and canvas nodes remain mounted, preserving playback, annotations and board state. Video labels and badges, share switchers and application whiteboard toolbars are hidden while focused. Exit fullscreen and the browser Escape action restore the regular call layout. Ending the focused share or whiteboard also exits fullscreen. Unsupported windows, including browser-restricted picture-in-picture windows, offer a disabled control explaining that the user should return to the main call.
+
+`flag-exempt: user explicitly requested call and annotation UI without feature flags.`

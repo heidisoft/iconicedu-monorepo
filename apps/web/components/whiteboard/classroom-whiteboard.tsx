@@ -199,7 +199,10 @@ export function ClassroomWhiteboard({
             }}
           />
         )}
-        <p className="pointer-events-none absolute bottom-3 left-3 hidden rounded-xl border border-border/50 bg-card/90 px-3 py-1.5 text-[11px] text-muted-foreground sm:block">
+        <p
+          data-whiteboard-hint
+          className="pointer-events-none absolute bottom-3 left-3 hidden rounded-xl border border-border/50 bg-card/90 px-3 py-1.5 text-[11px] text-muted-foreground sm:block"
+        >
           Scroll to pan · Space + drag · Ctrl/⌘ + scroll to zoom
         </p>
       </div>

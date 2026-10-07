@@ -54,6 +54,7 @@ export function ZoomMediaFixture() {
         <div className="grid h-80 grid-cols-2">
           <div data-testid="self">
             <ZoomVideoTile
+              className="h-full w-full"
               label="Self"
               isSelf
               isMuted={muted}
@@ -63,6 +64,7 @@ export function ZoomMediaFixture() {
           </div>
           <div data-testid="remote">
             <ZoomVideoTile
+              className="h-full w-full"
               label="Remote"
               isSelf={false}
               isMuted={false}
