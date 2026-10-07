@@ -4,7 +4,7 @@ The application whiteboard uses Excalidraw as a canvas engine under native Class
 
 ## Appearance
 
-The board uses theme colors, subtle dotted paper and crisp, lightly rounded controls. Drawing tools form a vertical floating rail on the left, with the laser pointer first. The board title, save status and participant initials occupy a separate top-right overlay. Board details wrap and truncate long titles on narrow displays; the tool rail scrolls when the available height is short. Desktop buttons remain 32 px, with 44 px touch targets. Menus and the native contextual style panel remain available in fullscreen. The style panel sits beside the rail; on mobile it uses the existing bottom panel. Tool selection uses a soft primary tint. Theme changes do not rewrite saved drawings.
+The board uses theme colors, subtle dotted paper and crisp, lightly rounded controls. Drawing tools form a horizontal floating toolbar on the left, with the laser pointer first. The board title, save status and participant initials occupy a separate top-right overlay. Board details wrap and truncate long titles on narrow displays; the tools move to their own row and scroll horizontally when space is limited. Desktop buttons remain 32 px, with 44 px touch targets. Menus and the native contextual style panel remain available in fullscreen. The style panel sits below the toolbar; on mobile it uses the existing bottom panel. Tool selection uses a soft primary tint. Theme changes do not rewrite saved drawings.
 
 ## Meeting drawing and annotation tools
 

@@ -535,13 +535,15 @@ test('reveals grouped whiteboard controls on demand on mobile and in fullscreen'
     const mobileDetails = await page
       .getByTestId('whiteboard-board-details')
       .boundingBox();
-    expect(toolbarBounds!.x + toolbarBounds!.width).toBeLessThan(mobileDetails!.x);
+    expect(toolbarBounds!.y).toBeGreaterThanOrEqual(
+      mobileDetails!.y + mobileDetails!.height,
+    );
     expect(mobileDetails!.x + mobileDetails!.width).toBeLessThanOrEqual(
       canvasBounds!.x + canvasBounds!.width,
     );
     await expect(page.getByTestId('whiteboard-toolbar')).toHaveAttribute(
       'aria-orientation',
-      'vertical',
+      'horizontal',
     );
     await expect(page.getByRole('menu')).toHaveCount(0);
     await expect(page.getByRole('menuitem', { name: 'Export board' })).toHaveCount(0);
@@ -587,8 +589,8 @@ test('reveals grouped whiteboard controls on demand on mobile and in fullscreen'
     const compactToolbar = await page
       .getByTestId('whiteboard-overlay-toolbar')
       .boundingBox();
-    expect(compactToolbar!.width).toBeLessThanOrEqual(44);
-    expect(compactToolbar!.height).toBeGreaterThan(compactToolbar!.width);
+    expect(compactToolbar!.height).toBeLessThanOrEqual(44);
+    expect(compactToolbar!.width).toBeGreaterThan(compactToolbar!.height);
     const details = await page.getByTestId('whiteboard-board-details').boundingBox();
     expect(compactToolbar!.x + compactToolbar!.width).toBeLessThan(details!.x);
     expect(details!.x + details!.width).toBeGreaterThan(1100);

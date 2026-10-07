@@ -107,16 +107,12 @@ export function WhiteboardToolbar({
   return (
     <div
       role="toolbar"
-      aria-orientation="vertical"
+      aria-orientation="horizontal"
       aria-label="Whiteboard tools"
       data-testid="whiteboard-toolbar"
-      className="flex min-w-0 flex-col items-center gap-1"
+      className="flex min-w-max items-center gap-1"
     >
-      <div
-        role="group"
-        aria-label="Drawing tools"
-        className="flex flex-col items-center gap-1"
-      >
+      <div role="group" aria-label="Drawing tools" className="flex items-center gap-1">
         {whiteboardTools.slice(0, 6).map(({ tool: next, label, icon: Icon, ...rest }) => (
           <IconActionButton
             key={next}
@@ -182,7 +178,7 @@ export function WhiteboardToolbar({
           <Library className="size-4" aria-hidden="true" />
         </IconActionButton>
       )}
-      <span aria-hidden="true" className="my-1 h-px w-6 bg-border" />
+      <span aria-hidden="true" className="mx-1 h-6 w-px bg-border" />
       <IconActionButton
         label="Undo"
         tooltip="Undo (⌘/Ctrl+Z)"

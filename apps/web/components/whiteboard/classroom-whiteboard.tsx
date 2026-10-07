@@ -98,41 +98,43 @@ export function ClassroomWhiteboard({
   };
   return (
     <section
-      className="classroom-whiteboard relative flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border/60 bg-background text-foreground"
+      className="classroom-whiteboard @container relative flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border/60 bg-background text-foreground"
       aria-label={title}
       data-testid="classroom-whiteboard"
       data-board-id={snapshot.id}
       data-element-count={page.elements.filter((e) => !e.deleted).length}
     >
-      <WhiteboardBoardDetails
-        title={title}
-        presence={snapshot.presence}
-        connection={board.connection}
-        saveStatus={board.saveStatus}
-        teacher={teacher}
-        studentEditing={snapshot.document.studentEditing}
-        busy={busy}
-        onExport={(format) => void exportScene(format)}
-        onStudentEditing={(enabled) =>
-          board.operate({ id: crypto.randomUUID(), type: 'student-editing', enabled })
-        }
-      />
-      <aside
-        data-testid="whiteboard-overlay-toolbar"
-        aria-label="Drawing controls"
-        className="absolute left-3 top-3 z-20 max-h-[calc(100%-1.5rem)] w-fit overflow-y-auto rounded-md border border-border bg-card p-1 shadow-sm"
-      >
-        <WhiteboardToolbar
-          engine={engine}
-          editable={editable}
-          tool={tool}
-          onTool={setTool}
-          canClear={teacher}
-          onClear={() => setConfirmation('clear')}
-          onLibrary={() => setLibrary(!library)}
-          libraryOpen={library}
+      <div className="pointer-events-none absolute inset-x-3 top-3 z-20 flex flex-wrap items-start justify-between gap-2">
+        <WhiteboardBoardDetails
+          title={title}
+          presence={snapshot.presence}
+          connection={board.connection}
+          saveStatus={board.saveStatus}
+          teacher={teacher}
+          studentEditing={snapshot.document.studentEditing}
+          busy={busy}
+          onExport={(format) => void exportScene(format)}
+          onStudentEditing={(enabled) =>
+            board.operate({ id: crypto.randomUUID(), type: 'student-editing', enabled })
+          }
         />
-      </aside>
+        <aside
+          data-testid="whiteboard-overlay-toolbar"
+          aria-label="Drawing controls"
+          className="pointer-events-auto order-2 @min-[760px]:-order-1 max-w-full w-fit overflow-x-auto rounded-md border border-border bg-card p-1 shadow-sm"
+        >
+          <WhiteboardToolbar
+            engine={engine}
+            editable={editable}
+            tool={tool}
+            onTool={setTool}
+            canClear={teacher}
+            onClear={() => setConfirmation('clear')}
+            onLibrary={() => setLibrary(!library)}
+            libraryOpen={library}
+          />
+        </aside>
+      </div>
       <div className="absolute inset-x-3 bottom-12 z-20 flex flex-col gap-2">
         {(board.error || exportError) && (
           <div
