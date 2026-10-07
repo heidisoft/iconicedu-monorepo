@@ -4,13 +4,13 @@ The application whiteboard uses Excalidraw as a canvas engine under native Class
 
 ## Appearance
 
-The board uses theme colors, subtle dotted paper and crisp, lightly rounded controls. Drawing tools form a horizontal floating toolbar on the left, with the laser pointer first. The board title, save status and participant initials occupy a separate top-right overlay. Board details wrap and truncate long titles on narrow displays; the tools move to their own row and scroll horizontally when space is limited. Desktop buttons remain 32 px, with 44 px touch targets. Menus and the native contextual style panel remain available in fullscreen. The style panel sits below the toolbar; on mobile it uses the existing bottom panel. Tool selection uses a soft primary tint. Theme changes do not rewrite saved drawings.
+The board uses theme colors, subtle dotted paper and crisp, lightly rounded controls. Drawing tools form a horizontal floating toolbar on the left, with Pan first, followed by the laser pointer and Select. The board title, save status and participant initials occupy a separate top-right overlay. Board details wrap and truncate long titles on narrow displays; the tools move to their own row and scroll horizontally when space is limited. Desktop buttons remain 32 px, with 44 px touch targets. Menus and the native contextual style panel remain available in fullscreen. The style panel sits below the toolbar; on mobile it uses the existing bottom panel. Tool selection uses a soft primary tint. Theme changes do not rewrite saved drawings.
 
 ## Meeting drawing and annotation tools
 
 The compact toolbar keeps the common drawing tools directly available. Shapes includes Line, Arrow, Rectangle, Ellipse, Diamond and Frame. Arrow style options include endpoint arrowheads and elbow connectors; selecting objects exposes native grouping, alignment, duplication and layer controls.
 
-Drawing tools map directly to the installed Excalidraw tool types. The native laser pointer comes first, followed by Select and draws transient local trails without adding document elements. Custom highlighter, sticky note, stamp, lasso and pixel eraser tools are not included.
+Drawing tools map directly to the installed Excalidraw tool types. The native laser pointer sits between Pan and Select and draws transient local trails without adding document elements. Custom highlighter, sticky note, stamp, lasso and pixel eraser tools are not included.
 
 The laser is explicitly local: it does not broadcast attention to other participants or persist marks. Shared laser/cursor transport, smart shape recognition and rich text lists/emphasis are not implemented. View offers no grid, dots or lines, plus engine-native snap to grid; when snapping is enabled the engine also displays its alignment grid. These preferences affect the local viewport only. Board options exports SVG or PNG. PNG uses a white paper background for portability; it does not change saved board colors. Pages remain removed.
 
