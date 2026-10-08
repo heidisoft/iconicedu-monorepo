@@ -163,7 +163,7 @@ export function ClassroomWhiteboard({
         )}
         {!editable && (
           <p className="w-fit rounded-xl border border-border/60 bg-card px-3 py-2 text-sm text-muted-foreground shadow-sm">
-            Your teacher has locked student editing.
+            The presenter has disabled participant annotations.
           </p>
         )}
       </div>

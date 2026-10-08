@@ -147,7 +147,7 @@ describe('screen annotation toolbar', () => {
     expect(screen.getByRole('button', { name: 'Rectangle', exact: true })).toBeDisabled();
     click('More');
     expect(
-      screen.queryByRole('checkbox', { name: 'Allow students to annotate' }),
+      screen.queryByRole('checkbox', { name: 'Allow participants to annotate' }),
     ).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Save PNG', exact: true })).toBeEnabled();
   });
@@ -167,7 +167,9 @@ describe('screen annotation toolbar', () => {
     click('More');
     click('Clear all');
     expect(props.clear).toHaveBeenCalledWith('all');
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Allow students to annotate' }));
+    fireEvent.click(
+      screen.getByRole('checkbox', { name: 'Allow participants to annotate' }),
+    );
     expect(props.onPermissions).toHaveBeenCalledWith(false);
     fireEvent.pointerDown(document.body);
     expect(

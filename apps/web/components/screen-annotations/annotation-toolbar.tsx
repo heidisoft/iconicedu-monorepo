@@ -740,7 +740,7 @@ export function AnnotationToolbar({
                         className={button}
                         onClick={() => clear('students')}
                       >
-                        Clear students
+                        Clear participants
                       </button>
                       <button
                         type="button"
@@ -762,7 +762,7 @@ export function AnnotationToolbar({
                           checked={studentsEnabled}
                           onChange={(event) => onPermissions(event.target.checked)}
                         />{' '}
-                        Allow students to annotate
+                        Allow participants to annotate
                       </label>
                     </>
                   )}

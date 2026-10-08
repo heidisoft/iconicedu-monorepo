@@ -78,7 +78,7 @@ test('supports shape variants, formatting and nonpersistent vanishing marks', as
   }
   await page.getByRole('button', { name: 'More', exact: true }).click();
   await expect(
-    page.getByRole('checkbox', { name: 'Allow students to annotate' }),
+    page.getByRole('checkbox', { name: 'Allow participants to annotate' }),
   ).toBeChecked();
   await expect(page.getByLabel('Annotation count')).toHaveText('4 marks');
   await page.getByRole('button', { name: 'Clear all', exact: true }).click();

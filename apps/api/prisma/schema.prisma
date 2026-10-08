@@ -253,7 +253,7 @@ model ScreenAnnotationSession {
   liveSessionId   String                    @map("live_session_id") @db.Uuid
   shareKey        String                    @map("share_key")
   revision        Int                       @default(0)
-  studentsEnabled Boolean                   @default(false) @map("students_enabled")
+  studentsEnabled Boolean                   @default(true) @map("students_enabled")
   objects         Json                      @default("[]")
   createdAt       DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
   endedAt         DateTime?                 @map("ended_at") @db.Timestamptz(6)

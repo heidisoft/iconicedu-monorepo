@@ -66,7 +66,10 @@ describe('authorized whiteboard provider issuance', () => {
     expect(result.provider).toBe('excalidraw');
     expect(result.token).toHaveLength(43);
     expect(board.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({ scope_key: 'scheduled:schedule:2026-10-06T12:00:00Z' }),
+      expect.objectContaining({
+        scope_key: 'scheduled:schedule:2026-10-06T12:00:00Z',
+        document: expect.objectContaining({ studentEditing: true }),
+      }),
       expect.objectContaining({ ignoreDuplicates: true }),
     );
     expect(access.insert).toHaveBeenCalledWith(

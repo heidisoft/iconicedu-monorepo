@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(25);
+select plan(26);
 -- Synthetic identities: never depend on seed accounts or production data.
 insert into public.orgs(id, name, slug) values ('91000000-0000-4000-8000-000000000001', 'Annotation test', 'annotation-test-only');
 insert into auth.users(id) values ('92000000-0000-4000-8000-000000000001'), ('92000000-0000-4000-8000-000000000002'), ('92000000-0000-4000-8000-000000000003');
@@ -20,15 +20,19 @@ create temporary table annotation_test_context as select public.screen_annotatio
 create function pg_temp.annotation_room() returns uuid language sql as $$ select (value->'snapshot'->>'roomId')::uuid from annotation_test_context $$;
 create function pg_temp.annotation_op(kind text, extra jsonb default '{}'::jsonb) returns jsonb language sql as $$ select jsonb_build_object('eventId', gen_random_uuid(), 'kind', kind) || extra $$;
 select is((select value->'actor'->>'role' from annotation_test_context), 'educator', 'starter owns tutor rights without trusting client roles');
-select is((select value->'snapshot'->>'studentsEnabled' from annotation_test_context), 'false', 'student drawing defaults off');
+select is((select value->'snapshot'->>'studentsEnabled' from annotation_test_context), 'true', 'participant drawing defaults on');
 select throws_ok($$select public.screen_annotation_context('96000000-0000-4000-8000-000000000001','92000000-0000-4000-8000-000000000003','123')$$, 'P0001', 'annotation_forbidden', 'outsider cannot load snapshot');
+select lives_ok($$select public.screen_annotation_apply(pg_temp.annotation_room(),'92000000-0000-4000-8000-000000000002',pg_temp.annotation_op('clear','{"scope":"mine"}'))$$, 'participant can annotate without presenter enabling it');
+do $$ begin
+  perform public.screen_annotation_apply(pg_temp.annotation_room(),'92000000-0000-4000-8000-000000000001',pg_temp.annotation_op('permissions','{"enabled":false}'));
+end $$;
 select throws_ok($$select public.screen_annotation_apply(pg_temp.annotation_room(),'92000000-0000-4000-8000-000000000002',pg_temp.annotation_op('clear','{"scope":"mine"}'))$$, 'P0001', 'annotation_forbidden', 'disabled student cannot mutate');
 select lives_ok($$select public.screen_annotation_apply(pg_temp.annotation_room(),'92000000-0000-4000-8000-000000000001',pg_temp.annotation_op('permissions','{"enabled":true}'))$$, 'tutor enables student drawing');
 create temporary table annotation_test_operation as select pg_temp.annotation_op('put', '{"baseVersion":0,"object":{"id":"97000000-0000-4000-8000-000000000001","creatorId":"forged-tutor","creatorRole":"educator","type":"pen","points":[{"x":0.1,"y":0.2}],"style":{"color":"#ff0000","width":3,"opacity":1,"fontSize":24,"bold":false,"italic":false},"rotation":0}}') as value;
 select lives_ok($$select public.screen_annotation_apply(pg_temp.annotation_room(),'92000000-0000-4000-8000-000000000002',(select value from annotation_test_operation))$$, 'enabled student creates own object');
 select is((select objects->0->>'creatorId' from public.screen_annotation_sessions where id = pg_temp.annotation_room()), '92000000-0000-4000-8000-000000000002', 'server replaces forged creator identity');
 select lives_ok($$select public.screen_annotation_apply(pg_temp.annotation_room(),'92000000-0000-4000-8000-000000000002',(select value from annotation_test_operation))$$, 'duplicate operation is idempotent');
-select is((select revision from public.screen_annotation_sessions where id = pg_temp.annotation_room()), 2, 'retry does not increment revision');
+select is((select revision from public.screen_annotation_sessions where id = pg_temp.annotation_room()), 4, 'retry does not increment revision');
 select throws_ok($$select public.screen_annotation_apply(pg_temp.annotation_room(),'92000000-0000-4000-8000-000000000002',pg_temp.annotation_op('permissions','{"enabled":false}'))$$, 'P0001', 'annotation_forbidden', 'student cannot change permissions');
 select throws_ok($$select public.screen_annotation_apply(pg_temp.annotation_room(),'92000000-0000-4000-8000-000000000002',pg_temp.annotation_op('clear','{"scope":"all"}'))$$, 'P0001', 'annotation_forbidden', 'student cannot clear all');
 select throws_ok($$select public.screen_annotation_apply(pg_temp.annotation_room(),'92000000-0000-4000-8000-000000000002',pg_temp.annotation_op('delete','{"id":"97000000-0000-4000-8000-000000000001","baseVersion":0}'))$$, 'P0001', 'annotation_conflict', 'stale versions are rejected');

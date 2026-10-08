@@ -249,7 +249,9 @@ test.describe('native class whiteboard with real API persistence and collaborati
     const teacher = await joinClassAs(browser, fixture.teacher),
       student = await joinClassAs(browser, fixture.student);
     await teacher.page.getByRole('button', { name: 'Board options' }).click();
-    await teacher.page.getByRole('menuitemcheckbox', { name: 'Student editing' }).click();
+    await teacher.page
+      .getByRole('menuitemcheckbox', { name: 'Allow participants to annotate' })
+      .click();
     await expect(teacher.page.getByText('Saved', { exact: true })).toBeVisible();
     await expect(
       student.page.getByRole('button', { name: 'Pen', exact: true }),
@@ -264,7 +266,9 @@ test.describe('native class whiteboard with real API persistence and collaborati
     expect(response.status()).toBe(403);
     await expect(teacher.page.getByText('Saved', { exact: true })).toBeVisible();
     await teacher.page.getByRole('button', { name: 'Board options' }).click();
-    await teacher.page.getByRole('menuitemcheckbox', { name: 'Student editing' }).click();
+    await teacher.page
+      .getByRole('menuitemcheckbox', { name: 'Allow participants to annotate' })
+      .click();
     await expect(
       student.page.getByRole('button', { name: 'Pen', exact: true }),
     ).toBeEnabled();

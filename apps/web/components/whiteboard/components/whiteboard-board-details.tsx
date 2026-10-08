@@ -86,7 +86,7 @@ export function WhiteboardBoardDetails({
                 disabled={busy}
                 onCheckedChange={onStudentEditing}
               >
-                Student editing
+                Allow participants to annotate
               </DropdownMenuCheckboxItem>
             </>
           )}
