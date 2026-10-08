@@ -75,3 +75,22 @@ it('keeps the avatar until attachment and fades it out without unmounting it', a
   expect(placeholder).not.toHaveClass('transition-opacity');
   expect(container.querySelector('[data-camera-placeholder]')).toBe(placeholder);
 });
+
+it('does not show a speaking badge or ring for a muted microphone', () => {
+  const { container } = render(
+    <TooltipProvider>
+      <ZoomVideoTile
+        label="Muted participant"
+        isSelf={false}
+        isMuted
+        isVideoOn={false}
+        isSpeaking
+        videoContainerRef={createRef<HTMLDivElement>()}
+      />
+    </TooltipProvider>,
+  );
+  expect(
+    screen.queryByLabelText('Muted participant is speaking'),
+  ).not.toBeInTheDocument();
+  expect(container.querySelector('.zoom-video-tile')).not.toHaveClass('ring-primary');
+});

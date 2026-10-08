@@ -55,7 +55,7 @@ export function ZoomVideoTile({
   handRaised,
   handPosition = 'right',
   density = 'default',
-  isSpeaking = false,
+  isSpeaking: speaking = false,
 }: {
   label: string;
   avatarUrl?: string;
@@ -69,6 +69,7 @@ export function ZoomVideoTile({
   density?: 'default' | 'compact';
   isSpeaking?: boolean;
 }) {
+  const isSpeaking = speaking && !isMuted;
   const fullscreen = useFocusedFullscreen();
   const surfaceRef = useRef<HTMLDivElement>(null);
   const [rendererReady, setRendererReady] = useState(false);

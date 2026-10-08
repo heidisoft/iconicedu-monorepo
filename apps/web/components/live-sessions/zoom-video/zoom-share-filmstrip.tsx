@@ -16,6 +16,7 @@ export function ZoomShareFilmstrip({
   remoteParticipants,
   raisedHandUserIds,
   activeSpeakerUserId,
+  speakingUserIds,
   selfUserId,
   sidebarOpen,
   onRemoteContainer,
@@ -29,6 +30,7 @@ export function ZoomShareFilmstrip({
   remoteParticipants: RemoteParticipant[];
   raisedHandUserIds: Set<number>;
   activeSpeakerUserId: number | null;
+  speakingUserIds?: ReadonlySet<number>;
   selfUserId: number | null;
   sidebarOpen: boolean;
   onRemoteContainer: (userId: number, element: HTMLDivElement | null) => void;
@@ -53,7 +55,12 @@ export function ZoomShareFilmstrip({
           className="zoom-video-tile-filmstrip aspect-video w-28 sm:w-36 lg:w-full"
           handRaised={raisedHandUserIds.has(participant.userId)}
           density="compact"
-          isSpeaking={activeSpeakerUserId === participant.userId}
+          isSpeaking={
+            !participant.muted &&
+            (speakingUserIds
+              ? speakingUserIds.has(participant.userId)
+              : activeSpeakerUserId === participant.userId)
+          }
         />
       ))}
       <ZoomVideoTile
@@ -66,7 +73,13 @@ export function ZoomShareFilmstrip({
         className="zoom-video-tile-filmstrip aspect-video w-28 sm:w-36 lg:w-full"
         handRaised={selfHandRaised}
         density="compact"
-        isSpeaking={selfUserId !== null && activeSpeakerUserId === selfUserId}
+        isSpeaking={
+          !selfMuted &&
+          selfUserId !== null &&
+          (speakingUserIds
+            ? speakingUserIds.has(selfUserId)
+            : activeSpeakerUserId === selfUserId)
+        }
       />
     </div>
   );

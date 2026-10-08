@@ -18,6 +18,7 @@ export function ZoomParticipantGallery({
   remoteParticipants,
   raisedHandUserIds,
   activeSpeakerUserId,
+  speakingUserIds,
   selfUserId,
   onRemoteContainer,
   sidebarOpen,
@@ -33,6 +34,7 @@ export function ZoomParticipantGallery({
   remoteParticipants: RemoteParticipant[];
   raisedHandUserIds: Set<number>;
   activeSpeakerUserId: number | null;
+  speakingUserIds?: ReadonlySet<number>;
   selfUserId: number | null;
   onRemoteContainer: (userId: number, element: HTMLDivElement | null) => void;
   sidebarOpen: boolean;
@@ -74,7 +76,13 @@ export function ZoomParticipantGallery({
               className="zoom-gallery-tile aspect-video"
               handRaised={selfHandRaised}
               handPosition="right"
-              isSpeaking={selfUserId !== null && activeSpeakerUserId === selfUserId}
+              isSpeaking={
+                !selfMuted &&
+                selfUserId !== null &&
+                (speakingUserIds
+                  ? speakingUserIds.has(selfUserId)
+                  : activeSpeakerUserId === selfUserId)
+              }
             />
           </div>
         ) : null}
@@ -92,7 +100,12 @@ export function ZoomParticipantGallery({
               className="zoom-gallery-tile aspect-video"
               handRaised={raisedHandUserIds.has(participant.userId)}
               handPosition={index % 2 === 0 ? 'left' : 'right'}
-              isSpeaking={activeSpeakerUserId === participant.userId}
+              isSpeaking={
+                !participant.muted &&
+                (speakingUserIds
+                  ? speakingUserIds.has(participant.userId)
+                  : activeSpeakerUserId === participant.userId)
+              }
             />
           </div>
         ))}

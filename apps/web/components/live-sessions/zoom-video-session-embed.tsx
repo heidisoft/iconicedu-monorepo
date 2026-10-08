@@ -1,6 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { useSpeakingParticipants } from './zoom-video/use-speaking-participants';
 import { annotationApi } from '../screen-annotations/annotation-api';
 import { createShareAnnotationLifecycle } from '../screen-annotations/share-annotation-lifecycle';
 
@@ -286,6 +287,12 @@ export function ZoomVideoSessionEmbed({
   });
   const [remoteParticipants, setRemoteParticipants] = useState<RemoteParticipant[]>([]);
   const [selfAvatar, setSelfAvatar] = useState<string | undefined>();
+  const speakingUserIds = useSpeakingParticipants(
+    clientRef.current,
+    status === 'connected',
+    selfUserIdRef.current,
+    isMuted,
+  );
   const [activeSpeakerUserId, setActiveSpeakerUserId] = useState<number | null>(null);
   const [galleryPage, setGalleryPage] = useState(0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -1586,6 +1593,7 @@ export function ZoomVideoSessionEmbed({
               selfVideoRef={selfVideoRef}
               remoteParticipants={remoteParticipants}
               raisedHandUserIds={raisedHandUserIds}
+              speakingUserIds={speakingUserIds}
               activeSpeakerUserId={activeSpeakerUserId}
               selfUserId={selfUserIdRef.current}
               sidebarOpen={activePanel !== null}
@@ -1608,6 +1616,7 @@ export function ZoomVideoSessionEmbed({
               selfVideoRef={selfVideoRef}
               remoteParticipants={remoteParticipants}
               raisedHandUserIds={raisedHandUserIds}
+              speakingUserIds={speakingUserIds}
               activeSpeakerUserId={activeSpeakerUserId}
               selfUserId={selfUserIdRef.current}
               sidebarOpen={activePanel !== null}
@@ -1908,7 +1917,8 @@ export function ZoomVideoSessionEmbed({
                           participantReactions[selfUserIdRef.current ?? -1]?.emoji,
                         isSpeaking:
                           selfUserIdRef.current !== null &&
-                          activeSpeakerUserId === selfUserIdRef.current,
+                          speakingUserIds.has(selfUserIdRef.current ?? -1) &&
+                          !isMuted,
                       },
                       ...remoteParticipants.map((participant) => ({
                         userId: participant.userId,
@@ -1920,7 +1930,8 @@ export function ZoomVideoSessionEmbed({
                         videoOn: participant.bVideoOn,
                         handRaised: raisedHandUserIds.has(participant.userId),
                         reaction: participantReactions[participant.userId]?.emoji,
-                        isSpeaking: activeSpeakerUserId === participant.userId,
+                        isSpeaking:
+                          speakingUserIds.has(participant.userId) && !participant.muted,
                       })),
                     ]}
                     onOpenChange={(open) => {
