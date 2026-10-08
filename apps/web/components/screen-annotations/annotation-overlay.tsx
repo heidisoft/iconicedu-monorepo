@@ -4,6 +4,7 @@ import { Layer, Rect, Stage, Transformer } from 'react-konva';
 import { AnnotationPointer } from './annotation-pointer';
 import type Konva from 'konva';
 import type {
+  AnnotationContext,
   AnnotationObject,
   AnnotationPoint,
   AnnotationPreview,
@@ -38,14 +39,19 @@ export function AnnotationOverlay({
   width,
   height,
   useAnnotations = useScreenAnnotations,
+  onContext,
 }: {
   sessionId: string;
   shareKey: string;
   width: number;
   height: number;
   useAnnotations?: typeof useScreenAnnotations;
+  onContext?: (context: AnnotationContext) => void;
 }) {
   const engine = useAnnotations(sessionId, shareKey);
+  useEffect(() => {
+    if (engine.context) onContext?.(engine.context);
+  }, [engine.context, onContext]);
   const engineRef = useRef(engine);
   engineRef.current = engine;
   const root = useRef<HTMLDivElement>(null);

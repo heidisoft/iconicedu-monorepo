@@ -542,3 +542,7 @@ The screen-share annotation toolbar matches the whiteboard’s compact controls:
 Annotation panels use compact theme surfaces and aligned controls. Format groups color, stroke, text and pen settings; Shapes groups lines, outlines, fills and highlights; More groups selection, board clearing, and sharing/view controls. Color swatches indicate the current choice, and panels scroll within the shared surface when space is limited.
 
 New whiteboards and screen-share annotation sessions allow authorized participants to annotate by default. Presenters can disable this with **Allow participants to annotate**. Existing saved restrictions remain unchanged. Screen-share defaults require migration `20261007233000_enable_participant_annotations_by_default.sql`; membership checks and presenter-only moderation remain enforced.
+
+### Screen-share annotation synchronization
+
+Annotation overlays use one room per live session and presenter share ID. Switching views, resizing or remounting an overlay only detaches its subscriptions; it does not close the shared room. Actual SDK peer-share stop, passive local stop, explicit Stop sharing and presenter leave close the corresponding room. Duplicate stop notifications share one close request. Viewers arriving before a presenter initializes the room retry promptly, then use Realtime broadcasts for live previews and committed drawings, with periodic snapshot recovery. The local two-browser collaboration test covers drawing in both directions, live previews, canvas rendering and restoring the presenter view without losing marks.

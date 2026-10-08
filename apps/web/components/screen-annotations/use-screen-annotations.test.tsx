@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AnnotationContext, AnnotationObject } from '@iconicedu/shared-types';
+import { ApiHttpError } from '@iconicedu/web/lib/api/http-client';
 import { useScreenAnnotations } from './use-screen-annotations';
 const mocks = vi.hoisted(() => ({
   context: vi.fn(),
@@ -89,6 +90,31 @@ beforeEach(() => {
   });
 });
 describe('annotation client', () => {
+  it('does not close the shared session when the presenter view unmounts', async () => {
+    const { result, unmount } = renderHook(() => useScreenAnnotations('session', '123'));
+    await waitFor(() => expect(result.current.connected).toBe(true));
+    unmount();
+    expect(mocks.apply).not.toHaveBeenCalled();
+  });
+  it('quickly retries when a viewer arrives before the presenter creates the room', async () => {
+    vi.useFakeTimers();
+    try {
+      mocks.context.mockRejectedValueOnce(new ApiHttpError(404, 'Not started'));
+      const { result, unmount } = renderHook(() =>
+        useScreenAnnotations('session', '123'),
+      );
+      await act(async () => {});
+      expect(result.current.context).toBeNull();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+      expect(result.current.context?.snapshot.roomId).toBe('room');
+      expect(result.current.connected).toBe(true);
+      unmount();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it('renders locally before acknowledgement, retries with the same event ID and records history', async () => {
     let acknowledge!: (value: unknown) => void;
     mocks.apply

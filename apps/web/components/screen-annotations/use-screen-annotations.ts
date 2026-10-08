@@ -105,31 +105,30 @@ export function useScreenAnnotations(sessionId: string, shareKey: string) {
   useEffect(() => {
     let alive = true;
     const effectGeneration = ++generation.current;
-    void refresh().catch((error: unknown) => {
-      if (alive && !(error instanceof ApiHttpError && error.status === 404))
-        setError(
-          error instanceof Error ? error.message : 'Unable to connect annotations',
-        );
-    });
-    const timer = setInterval(
-      () =>
-        void refresh().catch(() => {
-          if (alive) setConnected(false);
-        }),
-      10000,
-    );
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const poll = async () => {
+      try {
+        await refresh();
+      } catch (error: unknown) {
+        if (alive) {
+          setConnected(false);
+          if (!(error instanceof ApiHttpError && error.status === 404))
+            setError(
+              error instanceof Error ? error.message : 'Unable to connect annotations',
+            );
+        }
+      } finally {
+        // A viewer can arrive before the presenter creates the annotation room.
+        if (alive)
+          timer = setTimeout(() => void poll(), contextRef.current ? 10000 : 1000);
+      }
+    };
+    void poll();
     return () => {
       alive = false;
       generation.current = effectGeneration + 1;
-      const current = contextRef.current;
-      if (current?.actor.role === 'educator' && !current.snapshot.ended)
-        void api
-          .apply(current.snapshot.roomId, { eventId: crypto.randomUUID(), kind: 'end' })
-          .catch(() => {
-            /* The next share lifecycle reconciles a failed close. */
-          });
       contextRef.current = null;
-      clearInterval(timer);
+      clearTimeout(timer);
     };
   }, [api, refresh]);
   const roomId = context?.snapshot.roomId;

@@ -1,6 +1,8 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { annotationApi } from '../screen-annotations/annotation-api';
+import { createShareAnnotationLifecycle } from '../screen-annotations/share-annotation-lifecycle';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -258,6 +260,20 @@ export function ZoomVideoSessionEmbed({
     'canvas' | 'video'
   >('canvas');
   const [shareError, setShareError] = useState<string | null>(null);
+  const [annotationLifecycle] = useState(() =>
+    createShareAnnotationLifecycle(annotationApi().apply),
+  );
+  const endShareAnnotations = useCallback(
+    (userId: number | null) => {
+      if (userId === null) return;
+      void annotationLifecycle
+        .end(String(userId))
+        .catch(() =>
+          setShareError('Unable to close annotations for the ended screen share.'),
+        );
+    },
+    [annotationLifecycle],
+  );
 
   const [showPipSettings, setShowPipSettings] = useState(false);
   const [activeShareUserId, setActiveShareUserId] = useState<number | null>(null);
@@ -662,6 +678,7 @@ export function ZoomVideoSessionEmbed({
       action: 'Start' | 'Stop';
       userId: number;
     }) => {
+      if (payload.action === 'Stop') endShareAnnotations(payload.userId);
       // Let the SDK update getShareUserList() before reading the new snapshot.
       setTimeout(() => {
         const presenters = syncSharePresenters();
@@ -691,6 +708,7 @@ export function ZoomVideoSessionEmbed({
     // isSharingScreen stays stuck true and the "Stop sharing" banner lingers
     // even though the share has actually already ended.
     const handlePassivelyStopShare = (reason: PassiveStopShareReason) => {
+      endShareAnnotations(selfUserIdRef.current);
       setIsSharingScreen(false);
       if (reason === PassiveStopShareReason.PrivilegeChange) {
         setShareError(
@@ -1004,6 +1022,7 @@ export function ZoomVideoSessionEmbed({
     liveSessionId,
     accessToken,
     settings,
+    endShareAnnotations,
   ]);
 
   const toggleMute = useCallback(async () => {
@@ -1059,6 +1078,7 @@ export function ZoomVideoSessionEmbed({
     setShareError(null);
     if (isSharingScreen) {
       await stream.stopShareScreen().catch(() => null);
+      endShareAnnotations(selfUserIdRef.current);
       setIsSharingScreen(false);
     } else {
       try {
@@ -1093,7 +1113,7 @@ export function ZoomVideoSessionEmbed({
         }
       }
     }
-  }, [isSharingScreen, sharePrivilege]);
+  }, [isSharingScreen, sharePrivilege, endShareAnnotations]);
 
   const selectSharedScreen = useCallback(
     async (userId: number) => {
@@ -1353,11 +1373,12 @@ export function ZoomVideoSessionEmbed({
     const client = clientRef.current;
     isLeavingRef.current = true;
     clearLiveSessionRecovery(liveSessionId);
+    endShareAnnotations(selfUserIdRef.current);
     if (client) {
       void disposeZoomClient(client, selfUserIdRef.current);
     }
     setShowFeedbackPrompt(true);
-  }, [liveSessionId]);
+  }, [liveSessionId, endShareAnnotations]);
 
   // This renders as a `fixed inset-0 z-40` portal covering the entire
   // viewport. router.push() in Next.js App Router runs inside a transition
@@ -1518,6 +1539,12 @@ export function ZoomVideoSessionEmbed({
                 ? (size) => (
                     <ScreenAnnotationOverlay
                       key={`${liveSessionId}:${activeShareUserId ?? selfUserIdRef.current}`}
+                      onContext={(context) =>
+                        annotationLifecycle.remember(
+                          String(activeShareUserId ?? selfUserIdRef.current ?? 0),
+                          context,
+                        )
+                      }
                       sessionId={liveSessionId}
                       shareKey={String(activeShareUserId ?? selfUserIdRef.current ?? 0)}
                       {...size}
