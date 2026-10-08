@@ -97,6 +97,14 @@ test('opens from a pen button and keeps grouped tools usable in a narrow viewer'
     'aria-pressed',
     'true',
   );
+  const pen = toolbar.getByRole('button', { name: 'Pen', exact: true });
+  await expect(pen).toHaveCSS('width', '32px');
+  await expect(pen.locator('svg')).toHaveAttribute('width', '16');
+  await expect(toolbar).toHaveCSS('overflow-x', 'auto');
+  await expect(toolbar).toHaveCSS('flex-wrap', 'nowrap');
+  expect(
+    await toolbar.evaluate((element) => element.scrollWidth > element.clientWidth),
+  ).toBe(true);
   await toolbar.getByRole('button', { name: 'Shapes', exact: true }).click();
   const shapes = page.getByRole('group', { name: 'Shapes', exact: true });
   await expect(shapes).toBeVisible();

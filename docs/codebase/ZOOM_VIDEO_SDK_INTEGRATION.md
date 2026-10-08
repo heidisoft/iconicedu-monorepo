@@ -534,3 +534,7 @@ Tests cover DOM identity, existing input, live control handlers, cross-window me
 Each camera tile and active shared screen or whiteboard has a bottom-right View fullscreen action. The exit action stays in the same bottom-right position while fullscreen. It requests browser fullscreen on the existing content container, so participant tiles, call navigation and side panels stay outside the fullscreen surface. Media and canvas nodes remain mounted, preserving playback, annotations and board state. Video labels and badges, share switchers and application whiteboard toolbars are hidden while focused. Exit fullscreen and the browser Escape action restore the regular call layout. Ending the focused share or whiteboard also exits fullscreen. Unsupported windows, including browser-restricted picture-in-picture windows, offer a disabled control explaining that the user should return to the main call.
 
 `flag-exempt: user explicitly requested call and annotation UI without feature flags.`
+
+### Screen-share annotation toolbar appearance
+
+The screen-share annotation toolbar matches the whiteboard’s compact controls: 32 px icon buttons, 16 px icons, lightly rounded corners, theme card colors and a subtle border and shadow. Primary controls use icons with accessible labels and hover titles; grouped tool panels retain visible labels. The horizontal toolbar scrolls on narrow shared surfaces, and tool panels render outside the scrolling strip. Existing annotation tools, permissions, docking and formatting remain available.

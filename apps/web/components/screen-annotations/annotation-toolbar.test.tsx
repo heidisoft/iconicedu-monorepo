@@ -59,6 +59,27 @@ describe('screen annotation toolbar', () => {
     expect(screen.getAllByRole('button')).toHaveLength(1);
     expect(screen.getByRole('button', { name: 'Open annotation toolbar' })).toHaveFocus();
   });
+  it('uses compact icon controls and a horizontal scrolling toolbar', () => {
+    setup();
+    click('Open annotation toolbar');
+    const toolbar = screen.getByRole('toolbar', { name: 'Screen annotations' });
+    expect(toolbar).toHaveAttribute('aria-orientation', 'horizontal');
+    expect(toolbar).toHaveClass(
+      'overflow-x-auto',
+      'flex-nowrap',
+      'rounded-md',
+      'bg-card',
+      'shadow-sm',
+    );
+    const pen = screen.getByRole('button', { name: 'Pen', exact: true });
+    expect(pen).toHaveClass('size-8', 'rounded-sm');
+    expect(pen.querySelector('svg')).toHaveAttribute('width', '16');
+    expect(pen.querySelector('span')).toHaveClass('sr-only');
+    click('Shapes');
+    const shape = screen.getByRole('button', { name: 'Rectangle', exact: true });
+    expect(shape).toHaveClass('min-h-11');
+    expect(shape.querySelector('span')).not.toHaveClass('sr-only');
+  });
   it('groups every advanced tool, closes a group after selection, and shows its active state', () => {
     const props = setup({ tool: 'ellipseFilled' });
     click('Open annotation toolbar');

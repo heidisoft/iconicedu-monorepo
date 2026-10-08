@@ -83,7 +83,9 @@ const stamps: AnnotationTool[] = [
 ];
 const attention: AnnotationTool[] = ['spotlight', 'pointerArrow', 'vanishingPen'];
 const iconButton =
-  'flex min-h-11 min-w-11 flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 disabled:pointer-events-none aria-pressed:bg-accent aria-pressed:text-accent-foreground';
+  'flex size-8 shrink-0 items-center justify-center rounded-sm p-0 text-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 disabled:pointer-events-none aria-pressed:bg-primary/10 aria-pressed:text-primary';
+const menuToolButton = `${iconButton} min-h-11 w-full flex-col gap-1 px-2 py-2`;
+
 function ToolButton({
   tool,
   active,
@@ -102,7 +104,7 @@ function ToolButton({
   return (
     <button
       type="button"
-      className={iconButton}
+      className={compact ? iconButton : menuToolButton}
       aria-label={item.label}
       aria-pressed={active}
       disabled={disabled}
@@ -111,18 +113,12 @@ function ToolButton({
     >
       <Icon
         aria-hidden="true"
-        size={20}
-        strokeWidth={1.8}
+        size={16}
+        strokeWidth={2}
         fill={'filled' in item ? 'currentColor' : 'none'}
         className={'highlight' in item ? 'rounded bg-current/20' : undefined}
       />
-      <span
-        className={
-          compact
-            ? 'hidden text-[10px] leading-tight sm:block'
-            : 'text-[10px] leading-tight'
-        }
-      >
+      <span className={compact ? 'sr-only' : 'text-[10px] leading-tight'}>
         {item.label}
       </span>
     </button>
@@ -169,11 +165,11 @@ function ToolMenu({
         onClick={toggle}
         title={label}
       >
-        <span className="flex items-center gap-0.5">
+        <span className="flex shrink-0 items-center gap-1">
           {icon}
           <ChevronDown aria-hidden="true" size={10} />
         </span>
-        <span className="hidden text-[10px] leading-tight sm:block">{label}</span>
+        <span className="sr-only">{label}</span>
       </button>
       {open &&
         surface &&
@@ -184,7 +180,7 @@ function ToolMenu({
             tabIndex={-1}
             data-annotation-panel
             aria-label={label}
-            className="pointer-events-auto absolute left-2 z-40 w-64 max-w-[calc(100%-16px)] overflow-y-auto rounded-2xl bg-popover p-3 text-popover-foreground shadow-xl ring-1 ring-border"
+            className="pointer-events-auto absolute left-2 z-40 w-64 max-w-[calc(100%-16px)] overflow-y-auto rounded-md border border-border bg-popover p-3 text-popover-foreground shadow-sm"
             style={{
               [side === 'top' ? 'bottom' : 'top']: inset,
               maxHeight: `calc(100% - ${inset + 8}px)`,
@@ -196,7 +192,7 @@ function ToolMenu({
               <button
                 type="button"
                 aria-label={`Close ${label}`}
-                className="flex size-11 items-center justify-center rounded-lg hover:bg-accent"
+                className={iconButton}
                 onClick={toggle}
               >
                 <X size={16} aria-hidden="true" />
@@ -385,7 +381,8 @@ export function AnnotationToolbar({
         ref={toolbarRef}
         role="toolbar"
         aria-label="Screen annotations"
-        className={`pointer-events-auto absolute z-30 flex w-fit max-w-[calc(100%-16px)] flex-wrap items-center gap-0.5 rounded-2xl bg-background/95 p-1.5 text-foreground shadow-xl ring-1 ring-border backdrop-blur-md ${dock === 'top' ? 'left-2 top-2' : dock === 'bottom' ? 'bottom-2 left-2' : dock === 'left' ? 'left-2 top-2' : dock === 'right' ? 'right-2 top-2' : ''}`}
+        aria-orientation="horizontal"
+        className={`pointer-events-auto absolute z-30 flex w-fit max-w-[calc(100%-16px)] flex-nowrap items-center gap-1 overflow-x-auto rounded-md border border-border bg-card p-1 text-foreground shadow-sm ${dock === 'top' ? 'left-2 top-2' : dock === 'bottom' ? 'bottom-2 left-2' : dock === 'left' ? 'left-2 top-2' : dock === 'right' ? 'right-2 top-2' : ''}`}
         style={dock === 'floating' ? { left: position.x, top: position.y } : undefined}
         onPointerDown={(event) => event.stopPropagation()}
         onKeyDown={(event) => {
@@ -414,9 +411,9 @@ export function AnnotationToolbar({
           }}
         >
           {expanded ? (
-            <X size={18} aria-hidden="true" />
+            <X size={16} aria-hidden="true" />
           ) : (
-            <Pencil size={22} aria-hidden="true" />
+            <Pencil size={16} aria-hidden="true" />
           )}
           <span className="sr-only">{expanded ? 'Close annotations' : 'Annotate'}</span>
         </button>
@@ -424,7 +421,7 @@ export function AnnotationToolbar({
           <>
             <button
               type="button"
-              className={`${button} touch-none`}
+              className={`${iconButton} touch-none`}
               aria-label="Drag annotation toolbar"
               onPointerDown={(event) => {
                 const bounds = event.currentTarget.parentElement!.getBoundingClientRect();
@@ -459,7 +456,7 @@ export function AnnotationToolbar({
             <div
               role="group"
               aria-label="Drawing tools"
-              className="flex flex-wrap items-center gap-0.5"
+              className="flex shrink-0 items-center gap-1"
             >
               {(
                 [
@@ -481,29 +478,29 @@ export function AnnotationToolbar({
                 />
               ))}
             </div>
-            <span aria-hidden="true" className="mx-1 h-8 w-px bg-border" />
+            <span aria-hidden="true" className="mx-1 h-6 w-px shrink-0 bg-border" />
             <div
               role="group"
               aria-label="More drawing tools"
-              className="flex items-center gap-0.5"
+              className="flex shrink-0 items-center gap-1"
             >
               <ToolMenu
                 {...menuProps('Shapes')}
-                icon={<Square size={20} aria-hidden="true" />}
+                icon={<Square size={16} aria-hidden="true" />}
                 active={shapes.includes(tool)}
               >
                 {grid(shapes)}
               </ToolMenu>
               <ToolMenu
                 {...menuProps('Stamps')}
-                icon={<Stamp size={20} aria-hidden="true" />}
+                icon={<Stamp size={16} aria-hidden="true" />}
                 active={stamps.includes(tool)}
               >
                 {grid(stamps)}
               </ToolMenu>
               <ToolMenu
                 {...menuProps('Attention')}
-                icon={<LocateFixed size={20} aria-hidden="true" />}
+                icon={<LocateFixed size={16} aria-hidden="true" />}
                 active={attention.includes(tool)}
               >
                 {grid(attention)}
@@ -512,11 +509,11 @@ export function AnnotationToolbar({
                 </p>
               </ToolMenu>
             </div>
-            <span aria-hidden="true" className="mx-1 h-8 w-px bg-border" />
+            <span aria-hidden="true" className="mx-1 h-6 w-px shrink-0 bg-border" />
             <div
               role="group"
               aria-label="Annotation history"
-              className="flex items-center gap-0.5"
+              className="flex shrink-0 items-center gap-1"
             >
               <button
                 type="button"
@@ -526,8 +523,8 @@ export function AnnotationToolbar({
                 disabled={!canDraw || !undoCount}
                 onClick={undo}
               >
-                <Undo2 size={20} aria-hidden="true" />
-                <span className="hidden text-[10px] sm:block">Undo</span>
+                <Undo2 size={16} aria-hidden="true" />
+                <span className="sr-only">Undo</span>
               </button>
               <button
                 type="button"
@@ -537,15 +534,15 @@ export function AnnotationToolbar({
                 disabled={!canDraw || !redoCount}
                 onClick={redo}
               >
-                <Redo2 size={20} aria-hidden="true" />
-                <span className="hidden text-[10px] sm:block">Redo</span>
+                <Redo2 size={16} aria-hidden="true" />
+                <span className="sr-only">Redo</span>
               </button>
             </div>
             <ToolMenu
               {...menuProps('Format')}
               icon={
                 <span className="relative">
-                  <Palette size={20} aria-hidden="true" />
+                  <Palette size={16} aria-hidden="true" />
                   <span
                     className="absolute -bottom-1 -right-1 size-2.5 rounded-full ring-1 ring-border"
                     style={{ backgroundColor: color }}
@@ -659,7 +656,7 @@ export function AnnotationToolbar({
             </ToolMenu>
             <ToolMenu
               {...menuProps('More')}
-              icon={<Ellipsis size={20} aria-hidden="true" />}
+              icon={<Ellipsis size={16} aria-hidden="true" />}
             >
               <div className="grid gap-1">
                 <button
