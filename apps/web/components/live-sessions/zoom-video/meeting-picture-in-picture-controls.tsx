@@ -79,7 +79,9 @@ export function MeetingPictureInPictureControls({
           document.body,
         )}
       {!pip.pipWindow &&
-        (pip.error || pip.returned || (pip.sharePrompt && !dismissedPrompt)) && (
+        (pip.error ||
+          pip.returned ||
+          ((pip.sharePrompt || pip.automaticBlocked) && !dismissedPrompt)) && (
           <div
             role={pip.error ? 'alert' : 'status'}
             className="fixed right-4 top-20 z-50 flex max-w-[calc(100%-2rem)] flex-wrap items-center gap-2 rounded-lg border border-border bg-card p-3 text-sm shadow-sm"
@@ -88,7 +90,9 @@ export function MeetingPictureInPictureControls({
               {pip.error ??
                 (pip.returned
                   ? 'Your call is back in this tab.'
-                  : 'Keep your call visible while presenting.')}
+                  : pip.automaticBlocked
+                    ? 'Allow Automatic picture-in-picture in your browser’s site settings to keep the call visible when switching tabs.'
+                    : 'Keep your call visible while presenting.')}
             </span>
             {!pip.error && (
               <Button size="sm" onClick={() => void pip.open()}>

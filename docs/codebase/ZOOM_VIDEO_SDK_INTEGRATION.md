@@ -546,3 +546,9 @@ New whiteboards and screen-share annotation sessions allow authorized participan
 ### Screen-share annotation synchronization
 
 Annotation overlays use one room per live session and presenter share ID. Switching views, resizing or remounting an overlay only detaches its subscriptions; it does not close the shared room. Actual SDK peer-share stop, passive local stop, explicit Stop sharing and presenter leave close the corresponding room. Duplicate stop notifications share one close request. Viewers arriving before a presenter initializes the room retry promptly, then use Realtime broadcasts for live previews and committed drawings, with periodic snapshot recovery. The local two-browser collaboration test covers drawing in both directions, live previews, canvas rendering and restoring the presenter view without losing marks.
+
+### Call speaking indicators and automatic PiP
+
+Speaking indicators track the complete SDK active-speaker list and the local audio-level event, clear stale activity, and suppress speaking badges for muted microphones. Gallery, shared-screen filmstrip and participant list use the same activity set. Screen-share annotation launchers remain visible during initialization or reconnection; drawing stays disabled until the server grants access. Their visibility no longer depends on the optional meeting token prop.
+
+Tab-switch PiP registers the browser media-session handler, keeps conferencing playback state current and attempts automatic opening on visibility changes. Browser permission still controls whether a window may open. If denied, the main call offers a manual floating-call action and explains how to allow Automatic picture-in-picture in site settings; a successful request clears the prompt. The Never preference disables automatic tab-switch attempts.

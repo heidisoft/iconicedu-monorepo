@@ -32,6 +32,7 @@ export function useMeetingPictureInPicture({
   const [error, setError] = useState<string | null>(null);
   const [returned, setReturned] = useState(false);
   const [sharePrompt, setSharePrompt] = useState(false);
+  const [automaticBlocked, setAutomaticBlocked] = useState(false);
   const activeWindow = useRef<Window | null>(null);
   const opening = useRef(false);
   const mounted = useRef(false);
@@ -154,7 +155,9 @@ export function useMeetingPictureInPicture({
         setError(null);
         setReturned(false);
         setSharePrompt(false);
+        setAutomaticBlocked(false);
       } catch {
+        if (mounted.current && automatic) setAutomaticBlocked(true);
         if (mounted.current && !automatic)
           setError(
             'Unable to open picture-in-picture. Allow it in your browser’s site settings, then try again.',
@@ -189,8 +192,18 @@ export function useMeetingPictureInPicture({
   }, [connected, supported, autoTab, open]);
 
   useEffect(() => {
+    if (!connected || !supported || !autoTab) return;
+    const onVisibility = () => {
+      if (document.hidden) void open(true);
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [connected, supported, autoTab, open]);
+
+  useEffect(() => {
     if (!navigator.mediaSession) return;
     try {
+      navigator.mediaSession.playbackState = connected ? 'playing' : 'none';
       void navigator.mediaSession
         .setCameraActive?.(connected && cameraActive)
         ?.catch(() => {});
@@ -226,5 +239,6 @@ export function useMeetingPictureInPicture({
     returned,
     dismissReturn: () => setReturned(false),
     sharePrompt,
+    automaticBlocked,
   };
 }

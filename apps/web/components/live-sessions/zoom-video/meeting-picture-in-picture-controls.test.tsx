@@ -20,6 +20,7 @@ function preferences(): ReturnType<typeof useMeetingPictureInPicture> {
     returned: false,
     dismissReturn: vi.fn(),
     sharePrompt: false,
+    automaticBlocked: false,
   };
 }
 

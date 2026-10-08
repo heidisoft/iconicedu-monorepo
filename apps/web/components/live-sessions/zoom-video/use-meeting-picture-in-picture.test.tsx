@@ -86,6 +86,27 @@ describe('meeting picture-in-picture lifecycle', () => {
     await act(async () => actions.get('enterpictureinpicture')?.());
     expect(request).toHaveBeenCalledOnce();
   });
+  it('attempts automatic tab-switch entry and explains a browser denial', async () => {
+    request.mockRejectedValueOnce(new DOMException('Denied', 'NotAllowedError'));
+    const { result, unmount } = renderHook(() => useMeetingPictureInPicture(initial));
+    Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+    try {
+      await act(async () => document.dispatchEvent(new Event('visibilitychange')));
+      expect(request).toHaveBeenCalledOnce();
+      expect(result.current.automaticBlocked).toBe(true);
+      expect(result.current.error).toBeNull();
+      await act(async () => actions.get('enterpictureinpicture')?.());
+      expect(result.current.pipWindow).toBe(target);
+      expect(result.current.automaticBlocked).toBe(false);
+      act(() => result.current.restore());
+      act(() => result.current.setAutomaticMode('never'));
+      await act(async () => document.dispatchEvent(new Event('visibilitychange')));
+      expect(request).toHaveBeenCalledTimes(2);
+    } finally {
+      Object.defineProperty(document, 'hidden', { configurable: true, value: false });
+      unmount();
+    }
+  });
   it('does not open duplicate windows during concurrent requests', async () => {
     const { result } = renderHook(() => useMeetingPictureInPicture(initial));
     await act(async () => Promise.all([result.current.open(), result.current.open()]));
