@@ -295,17 +295,17 @@ export function ZoomSettingsPanel(props: Props) {
               </RadioGroup>
             </div>
           ) : null}
+          {props.pictureInPictureSettings && (
+            <section
+              className="space-y-3 border-t border-border pt-4"
+              aria-label="Picture-in-picture preferences"
+            >
+              <h3 className="text-sm font-medium">Picture-in-picture</h3>
+              {props.pictureInPictureSettings}
+            </section>
+          )}
         </TabsContent>
       </Tabs>
-      {props.pictureInPictureSettings && (
-        <section
-          className="space-y-3 border-t border-border pt-4"
-          aria-label="Picture-in-picture preferences"
-        >
-          <h3 className="text-sm font-medium">Picture-in-picture</h3>
-          {props.pictureInPictureSettings}
-        </section>
-      )}
     </ZoomMeetingDialog>
   );
 }

@@ -28,7 +28,7 @@ export function useMeetingPictureInPicture({
 }) {
   const [host, setHost] = useState<HTMLDivElement | null>(null);
   const [pipWindow, setPipWindow] = useState<Window | null>(null);
-  const [mode, setMode] = useState<AutomaticPipMode>('always');
+  const [mode, setMode] = useState<AutomaticPipMode>('tabs');
   const [error, setError] = useState<string | null>(null);
   const [returned, setReturned] = useState(false);
   const [sharePrompt, setSharePrompt] = useState(false);

@@ -46,6 +46,22 @@ afterEach(() => {
 });
 
 describe('meeting picture-in-picture lifecycle', () => {
+  it('defaults to tab switching without opening when sharing starts', () => {
+    const { result, rerender } = renderHook(
+      (props) => useMeetingPictureInPicture(props),
+      { initialProps: initial },
+    );
+    expect(result.current.mode).toBe('tabs');
+    expect(actions.get('enterpictureinpicture')).toBeTypeOf('function');
+    rerender({ ...initial, sharing: true });
+    expect(request).not.toHaveBeenCalled();
+    expect(result.current.sharePrompt).toBe(false);
+  });
+  it('preserves an explicitly saved automatic preference', () => {
+    localStorage.setItem('meeting-automatic-pip', 'always');
+    const { result } = renderHook(() => useMeetingPictureInPicture(initial));
+    expect(result.current.mode).toBe('always');
+  });
   it('moves the same portal root and restores its live content when closed', async () => {
     const { result } = renderHook(() => useMeetingPictureInPicture(initial));
     const host = result.current.host!;
@@ -89,6 +105,7 @@ describe('meeting picture-in-picture lifecycle', () => {
       (props) => useMeetingPictureInPicture(props),
       { initialProps: initial },
     );
+    act(() => result.current.setAutomaticMode('sharing'));
     rerender({ ...initial, sharing: true });
     await waitFor(() => expect(request).toHaveBeenCalledOnce());
     expect(result.current.sharePrompt).toBe(true);
