@@ -1542,7 +1542,7 @@ export function ZoomVideoSessionEmbed({
 
           <ZoomShareStage
             annotationOverlay={
-              accessToken && !isWhiteboardActive
+              !isWhiteboardActive
                 ? (size) => (
                     <ScreenAnnotationOverlay
                       key={`${liveSessionId}:${activeShareUserId ?? selfUserIdRef.current}`}

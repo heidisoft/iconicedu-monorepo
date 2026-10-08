@@ -66,7 +66,23 @@ async function join(
   );
   const page = await context.newPage();
   await page.goto('/visual-test/collaborative-annotations');
-  await page.getByRole('button', { name: 'Join annotation test' }).click();
+  let release!: () => void;
+  const snapshotGate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(/\/screen-annotations\//, async (route) => {
+    await snapshotGate;
+    await route.continue();
+  });
+  try {
+    await page.getByRole('button', { name: 'Join annotation test' }).click();
+    await expect(
+      page.getByRole('button', { name: 'Open annotation toolbar' }),
+    ).toBeVisible();
+  } finally {
+    release();
+  }
+
   await expect(page.getByLabel('Annotation connection')).toHaveText('Connected', {
     timeout: 20000,
   });

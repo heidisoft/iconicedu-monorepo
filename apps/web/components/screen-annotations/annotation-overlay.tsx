@@ -529,12 +529,6 @@ export function AnnotationOverlay({
       setLocalError('The shared screen cannot be exported in this browser.');
     }
   };
-  if (!engine.context)
-    return engine.error ? (
-      <div className="pointer-events-none absolute bottom-3 left-3 rounded-md bg-background p-2 text-xs text-muted-foreground">
-        {engine.error}
-      </div>
-    ) : null;
   return (
     <div
       ref={root}
@@ -700,7 +694,7 @@ export function AnnotationOverlay({
           setTool={setTool}
           canDraw={engine.canDraw}
           tutor={tutor}
-          studentsEnabled={engine.context.snapshot.studentsEnabled}
+          studentsEnabled={engine.context?.snapshot.studentsEnabled ?? false}
           onPermissions={(enabled) =>
             swallow(
               engine.execute({
