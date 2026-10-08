@@ -272,3 +272,26 @@ describe('annotation client', () => {
     expect(result.current.objects[0].version).toBe(3);
   });
 });
+
+it('connects shared-link guests without Supabase authentication and polls shared marks', async () => {
+  vi.useFakeTimers();
+  try {
+    const { result, unmount } = renderHook(() =>
+      useScreenAnnotations('session', '123', 'guest-capability'),
+    );
+    await act(async () => {});
+    expect(result.current.connected).toBe(true);
+    expect(mocks.subscriptions.size).toBe(0);
+    mocks.context.mockResolvedValue({
+      ...context,
+      snapshot: { ...context.snapshot, revision: 1, objects: [object] },
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+    expect(result.current.objects).toHaveLength(1);
+    unmount();
+  } finally {
+    vi.useRealTimers();
+  }
+});

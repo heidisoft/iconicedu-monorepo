@@ -201,9 +201,11 @@ export function ZoomVideoSessionEmbed({
   accessToken,
   sessionPasscode,
   settings = DEFAULT_LIVE_SESSION_SETTINGS,
+  annotationToken,
   whiteboardAccess,
 }: {
   sessionName: string;
+  annotationToken?: string;
   whiteboardAccess?: WhiteboardAccessVM;
   sessionTitle?: string;
   token: string;
@@ -1545,6 +1547,7 @@ export function ZoomVideoSessionEmbed({
               !isWhiteboardActive
                 ? (size) => (
                     <ScreenAnnotationOverlay
+                      annotationToken={annotationToken}
                       key={`${liveSessionId}:${activeShareUserId ?? selfUserIdRef.current}`}
                       onContext={(context) =>
                         annotationLifecycle.remember(

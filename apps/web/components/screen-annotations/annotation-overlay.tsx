@@ -40,15 +40,17 @@ export function AnnotationOverlay({
   height,
   useAnnotations = useScreenAnnotations,
   onContext,
+  annotationToken,
 }: {
   sessionId: string;
+  annotationToken?: string;
   shareKey: string;
   width: number;
   height: number;
   useAnnotations?: typeof useScreenAnnotations;
   onContext?: (context: AnnotationContext) => void;
 }) {
-  const engine = useAnnotations(sessionId, shareKey);
+  const engine = useAnnotations(sessionId, shareKey, annotationToken);
   useEffect(() => {
     if (engine.context) onContext?.(engine.context);
   }, [engine.context, onContext]);

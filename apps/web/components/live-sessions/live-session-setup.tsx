@@ -79,6 +79,7 @@ export function LiveSessionSetup({
         displayName={setup.credentials.displayName}
         sessionTitle={sessionTitle}
         settings={setup.credentials.settings ?? settings}
+        annotationToken={setup.credentials.annotationToken}
         whiteboardAccess={setup.credentials.whiteboard}
         liveSessionId={sessionId}
         sessionPasscode={setup.passcode}

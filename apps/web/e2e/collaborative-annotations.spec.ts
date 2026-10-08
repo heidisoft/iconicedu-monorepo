@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { randomUUID, randomBytes } from 'node:crypto';
+import { randomUUID, randomBytes, createHash } from 'node:crypto';
 import { expect, test, type Browser, type Page } from '@playwright/test';
 function sql(statement: string) {
   execFileSync(
@@ -57,7 +57,7 @@ function fixture() {
 }
 async function join(
   browser: Browser,
-  entry: { email: string; password: string; sessionId: string },
+  entry: { email: string; password: string; sessionId: string; annotationToken?: string },
 ) {
   const context = await browser.newContext();
   await context.addInitScript(
@@ -160,6 +160,36 @@ test('synchronizes annotations in both directions and survives presenter view re
       .toBe(true);
     await teacher.context.close();
     await participant.context.close();
+  } finally {
+    data.cleanup();
+  }
+});
+
+test('shared-link guest sees presenter marks and draws without an account session', async ({
+  browser,
+}) => {
+  const data = fixture();
+  try {
+    const teacher = await join(browser, { ...data.actors[0], sessionId: data.sessionId });
+    const token = randomBytes(32).toString('base64url');
+    sql(
+      `insert into public.screen_annotation_access(live_session_id,token_hash,display_name,expires_at) values ('${data.sessionId}','${createHash('sha256').update(token).digest('hex')}','Guest',now()+interval '1 hour');`,
+    );
+    const guest = await join(browser, {
+      email: '',
+      password: '',
+      sessionId: data.sessionId,
+      annotationToken: token,
+    });
+    await draw(teacher.page);
+    await expect(guest.page.getByLabel('Synchronized marks')).toHaveText('1');
+    await draw(guest.page);
+    await expect(teacher.page.getByLabel('Synchronized marks')).toHaveText('2');
+    await expect(guest.page.getByText('Not authenticated', { exact: true })).toHaveCount(
+      0,
+    );
+    await teacher.context.close();
+    await guest.context.close();
   } finally {
     data.cleanup();
   }

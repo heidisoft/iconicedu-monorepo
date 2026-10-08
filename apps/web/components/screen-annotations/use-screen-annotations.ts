@@ -20,8 +20,12 @@ type RemoteDraft = {
   timestamp: number;
   clientId: string;
 };
-export function useScreenAnnotations(sessionId: string, shareKey: string) {
-  const api = useMemo(annotationApi, []);
+export function useScreenAnnotations(
+  sessionId: string,
+  shareKey: string,
+  annotationToken?: string,
+) {
+  const api = useMemo(() => annotationApi(annotationToken), [annotationToken]);
   const [context, setContext] = useState<AnnotationContext | null>(null);
   const contextRef = useRef<AnnotationContext | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -65,7 +69,8 @@ export function useScreenAnnotations(sessionId: string, shareKey: string) {
     )
       publishContext(value);
     setError(null);
-  }, [api, sessionId, shareKey, publishContext]);
+    if (annotationToken) setConnected(true);
+  }, [annotationToken, api, sessionId, shareKey, publishContext]);
   const receiveCommit = useCallback(
     (commit: AnnotationCommit) => {
       const current = contextRef.current;
@@ -120,7 +125,10 @@ export function useScreenAnnotations(sessionId: string, shareKey: string) {
       } finally {
         // A viewer can arrive before the presenter creates the annotation room.
         if (alive)
-          timer = setTimeout(() => void poll(), contextRef.current ? 10000 : 1000);
+          timer = setTimeout(
+            () => void poll(),
+            annotationToken ? 500 : contextRef.current ? 10000 : 1000,
+          );
       }
     };
     void poll();
@@ -130,7 +138,7 @@ export function useScreenAnnotations(sessionId: string, shareKey: string) {
       contextRef.current = null;
       clearTimeout(timer);
     };
-  }, [api, refresh]);
+  }, [annotationToken, api, refresh]);
   const roomId = context?.snapshot.roomId;
   const canDraw = Boolean(
     context &&
@@ -143,7 +151,7 @@ export function useScreenAnnotations(sessionId: string, shareKey: string) {
       .sort()
       .join(',') ?? '';
   useEffect(() => {
-    if (!roomId || !contextRef.current) return;
+    if (annotationToken || !roomId || !contextRef.current) return;
     const supabase = createSupabaseBrowserClient();
     const channels: RealtimeChannel[] = [];
     const drafts = new Map<string, RemoteDraft>();
@@ -386,7 +394,7 @@ export function useScreenAnnotations(sessionId: string, shareKey: string) {
       setPointers({});
       for (const channel of channels) void supabase.removeChannel(channel);
     };
-  }, [roomId, actorsKey, canDraw, receiveCommit, refresh]);
+  }, [annotationToken, roomId, actorsKey, canDraw, receiveCommit, refresh]);
   const broadcast = useCallback((event: AnnotationPreview) => {
     if (event.kind === 'vanish')
       setVanishing((previous) => [

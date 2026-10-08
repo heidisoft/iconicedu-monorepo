@@ -8,8 +8,14 @@ const Overlay = dynamic(
   () => import('./annotation-overlay').then((module) => module.AnnotationOverlay),
   { ssr: false },
 );
-function SharedScreen({ sessionId }: { sessionId: string }) {
-  const engine = useScreenAnnotations(sessionId, '123');
+function SharedScreen({
+  sessionId,
+  annotationToken,
+}: {
+  sessionId: string;
+  annotationToken?: string;
+}) {
+  const engine = useScreenAnnotations(sessionId, '123', annotationToken);
   return (
     <>
       <output aria-label="Live preview marks">{engine.remoteDrafts.length}</output>
@@ -40,6 +46,7 @@ function SharedScreen({ sessionId }: { sessionId: string }) {
 }
 export function CollaborativeAnnotationFixture() {
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [annotationToken, setAnnotationToken] = useState<string>();
   const [visible, setVisible] = useState(true);
   const [error, setError] = useState('');
   return (
@@ -49,7 +56,17 @@ export function CollaborativeAnnotationFixture() {
           void (async () => {
             const entry = JSON.parse(
               sessionStorage.getItem('annotation-test-entry') ?? '{}',
-            ) as { email: string; password: string; sessionId: string };
+            ) as {
+              email: string;
+              password: string;
+              sessionId: string;
+              annotationToken?: string;
+            };
+            if (entry.annotationToken) {
+              setAnnotationToken(entry.annotationToken);
+              setSessionId(entry.sessionId);
+              return;
+            }
             const result = await createSupabaseBrowserClient().auth.signInWithPassword({
               email: entry.email,
               password: entry.password,
@@ -65,7 +82,9 @@ export function CollaborativeAnnotationFixture() {
       <button onClick={() => setVisible((previous) => !previous)}>
         {visible ? 'Hide shared screen' : 'Show shared screen'}
       </button>
-      {sessionId && visible && <SharedScreen sessionId={sessionId} />}
+      {sessionId && visible && (
+        <SharedScreen sessionId={sessionId} annotationToken={annotationToken} />
+      )}
     </main>
   );
 }
