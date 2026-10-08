@@ -84,8 +84,22 @@ const stamps: AnnotationTool[] = [
 const attention: AnnotationTool[] = ['spotlight', 'pointerArrow', 'vanishingPen'];
 const iconButton =
   'flex size-8 shrink-0 items-center justify-center rounded-sm p-0 text-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 disabled:pointer-events-none aria-pressed:bg-primary/10 aria-pressed:text-primary';
-const menuToolButton = `${iconButton} min-h-11 w-full flex-col gap-1 px-2 py-2`;
+const menuToolButton = `${iconButton} min-h-11 h-auto w-full flex-col gap-1 px-1 py-1.5`;
 
+function PanelSection({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <fieldset className="min-w-0 space-y-2 border-t border-border pt-2 first:border-0 first:pt-0">
+      <legend className="sr-only">{label}</legend>
+      <p aria-hidden="true" className="text-[11px] font-medium text-muted-foreground">
+        {label}
+      </p>
+      {children}
+    </fieldset>
+  );
+}
+const fieldClass =
+  'h-8 min-w-0 rounded-sm border border-input bg-background px-2 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
+const rowClass = 'flex min-h-8 items-center justify-between gap-2 text-xs';
 function ToolButton({
   tool,
   active,
@@ -180,14 +194,14 @@ function ToolMenu({
             tabIndex={-1}
             data-annotation-panel
             aria-label={label}
-            className="pointer-events-auto absolute left-2 z-40 w-64 max-w-[calc(100%-16px)] overflow-y-auto rounded-md border border-border bg-popover p-3 text-popover-foreground shadow-sm"
+            className="pointer-events-auto absolute left-2 z-40 w-60 max-w-[calc(100%-16px)] overflow-y-auto rounded-md border border-border bg-popover p-2 text-popover-foreground shadow-sm"
             style={{
               [side === 'top' ? 'bottom' : 'top']: inset,
               maxHeight: `calc(100% - ${inset + 8}px)`,
             }}
             onPointerDown={(event) => event.stopPropagation()}
           >
-            <div className="mb-2 flex items-center justify-between">
+            <div className="mb-1 flex items-center justify-between">
               <p className="text-xs font-semibold">{label}</p>
               <button
                 type="button"
@@ -309,8 +323,7 @@ export function AnnotationToolbar({
   };
   useEffect(() => {
     if (!surface || !toolbarRef.current) return;
-    const measure = () =>
-      setInset(surface.clientHeight > 360 ? toolbarRef.current!.offsetHeight + 16 : 8);
+    const measure = () => setInset(toolbarRef.current!.offsetHeight + 16);
     const observer = new ResizeObserver(measure);
     observer.observe(surface);
     observer.observe(toolbarRef.current);
@@ -319,7 +332,7 @@ export function AnnotationToolbar({
   }, [surface]);
   const side = dock === 'bottom' ? 'top' : 'bottom';
   const button =
-    'min-h-11 rounded-lg px-3 text-xs text-left hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40';
+    'flex min-h-8 w-full items-center rounded-sm px-2 py-1 text-xs text-left hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40';
   const close = () => {
     setExpanded(false);
     setPanel(null);
@@ -489,7 +502,18 @@ export function AnnotationToolbar({
                 icon={<Square size={16} aria-hidden="true" />}
                 active={shapes.includes(tool)}
               >
-                {grid(shapes)}
+                <div className="space-y-3">
+                  <PanelSection label="Lines and arrows">
+                    {grid(shapes.slice(0, 3))}
+                  </PanelSection>
+                  <PanelSection label="Outline shapes">
+                    {grid(shapes.slice(3, 6))}
+                  </PanelSection>
+                  <PanelSection label="Filled shapes">
+                    {grid(shapes.slice(6, 8))}
+                  </PanelSection>
+                  <PanelSection label="Highlights">{grid(shapes.slice(8))}</PanelSection>
+                </div>
               </ToolMenu>
               <ToolMenu
                 {...menuProps('Stamps')}
@@ -550,103 +574,124 @@ export function AnnotationToolbar({
                 </span>
               }
             >
-              <div className="grid gap-2">
-                <label className="flex items-center justify-between text-xs">
-                  Color
-                  <input
-                    aria-label="Annotation color"
-                    type="color"
-                    value={color}
-                    onChange={(event) => setColor(event.target.value)}
-                  />
-                </label>
-                <div className="flex flex-wrap gap-1">
-                  {[
-                    '#000000',
-                    '#ef4444',
-                    '#f97316',
-                    '#facc15',
-                    '#22c55e',
-                    '#3b82f6',
-                    '#a855f7',
-                    '#ffffff',
-                  ].map((value) => (
-                    <button
-                      key={value}
-                      type="button"
-                      aria-label={`Color ${value}`}
-                      className="size-11 rounded-md border"
-                      style={{ backgroundColor: value }}
-                      onClick={() => setColor(value)}
+              <div className="space-y-3">
+                <PanelSection label="Color">
+                  <label className={rowClass}>
+                    Custom color
+                    <input
+                      aria-label="Annotation color"
+                      type="color"
+                      className="h-7 w-8 cursor-pointer rounded-sm border border-input bg-background p-0.5"
+                      value={color}
+                      onChange={(event) => setColor(event.target.value)}
                     />
-                  ))}
-                </div>
-                <label className="text-xs">
-                  Width
-                  <select
-                    aria-label="Stroke width"
-                    className="ml-2 min-h-11 bg-background"
-                    value={width}
-                    onChange={(event) => setWidth(Number(event.target.value))}
-                  >
-                    <option value={1}>Thin</option>
-                    <option value={3}>Medium</option>
-                    <option value={6}>Thick</option>
-                    <option value={18}>Wide</option>
-                  </select>
-                </label>
-                <label className="text-xs">
-                  Opacity
-                  <input
-                    aria-label="Annotation opacity"
-                    type="range"
-                    min={0.05}
-                    max={1}
-                    step={0.05}
-                    value={opacity}
-                    onChange={(event) => setOpacity(Number(event.target.value))}
-                  />
-                </label>
-                <label className="text-xs">
-                  Text size
-                  <input
-                    aria-label="Text size"
-                    type="number"
-                    min={8}
-                    max={96}
-                    value={fontSize}
-                    onChange={(event) =>
-                      setFontSize(Math.max(8, Math.min(96, Number(event.target.value))))
-                    }
-                  />
-                </label>
-                <label className="text-xs">
-                  <input
-                    type="checkbox"
-                    checked={bold}
-                    onChange={(event) => setBold(event.target.checked)}
-                  />{' '}
-                  Bold
-                </label>
-                <label className="text-xs">
-                  <input
-                    type="checkbox"
-                    checked={italic}
-                    onChange={(event) => setItalic(event.target.checked)}
-                  />{' '}
-                  Italic
-                </label>
-                <label className="text-xs">
-                  <input
-                    type="checkbox"
-                    checked={pressure}
-                    onChange={(event) => setPressure(event.target.checked)}
-                  />{' '}
-                  Pressure sensitive pen
-                </label>
+                  </label>
+                  <div className="grid grid-cols-8 gap-1">
+                    {[
+                      '#000000',
+                      '#ef4444',
+                      '#f97316',
+                      '#facc15',
+                      '#22c55e',
+                      '#3b82f6',
+                      '#a855f7',
+                      '#ffffff',
+                    ].map((value) => (
+                      <button
+                        key={value}
+                        type="button"
+                        aria-label={`Color ${value}`}
+                        aria-pressed={color.toLowerCase() === value}
+                        title={`Color ${value}`}
+                        className="aspect-square w-full rounded-sm border border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring aria-pressed:ring-2 aria-pressed:ring-primary aria-pressed:ring-offset-1"
+                        style={{ backgroundColor: value }}
+                        onClick={() => setColor(value)}
+                      />
+                    ))}
+                  </div>
+                </PanelSection>
+                <PanelSection label="Stroke">
+                  <label className={rowClass}>
+                    Width
+                    <select
+                      aria-label="Stroke width"
+                      className={fieldClass}
+                      value={width}
+                      onChange={(event) => setWidth(Number(event.target.value))}
+                    >
+                      <option value={1}>Thin</option>
+                      <option value={3}>Medium</option>
+                      <option value={6}>Thick</option>
+                      <option value={18}>Wide</option>
+                    </select>
+                  </label>
+                  <label className={rowClass}>
+                    <span>
+                      Opacity{' '}
+                      <span className="text-muted-foreground">
+                        {Math.round(opacity * 100)}%
+                      </span>
+                    </span>
+                    <input
+                      aria-label="Annotation opacity"
+                      type="range"
+                      className="min-w-0 w-28 accent-primary"
+                      min={0.05}
+                      max={1}
+                      step={0.05}
+                      value={opacity}
+                      onChange={(event) => setOpacity(Number(event.target.value))}
+                    />
+                  </label>
+                </PanelSection>
+                <PanelSection label="Text">
+                  <label className={rowClass}>
+                    Text size
+                    <input
+                      aria-label="Text size"
+                      type="number"
+                      className={`${fieldClass} w-16`}
+                      min={8}
+                      max={96}
+                      value={fontSize}
+                      onChange={(event) =>
+                        setFontSize(Math.max(8, Math.min(96, Number(event.target.value))))
+                      }
+                    />
+                  </label>
+                  <label className="flex min-h-8 items-center gap-2 text-xs">
+                    <input
+                      type="checkbox"
+                      className="size-3.5 shrink-0 accent-primary"
+                      checked={bold}
+                      onChange={(event) => setBold(event.target.checked)}
+                    />{' '}
+                    Bold
+                  </label>
+                  <label className="flex min-h-8 items-center gap-2 text-xs">
+                    <input
+                      type="checkbox"
+                      className="size-3.5 shrink-0 accent-primary"
+                      checked={italic}
+                      onChange={(event) => setItalic(event.target.checked)}
+                    />{' '}
+                    Italic
+                  </label>
+                </PanelSection>
+                <PanelSection label="Pen">
+                  <label className="flex min-h-8 items-center gap-2 text-xs">
+                    <input
+                      type="checkbox"
+                      className="size-3.5 shrink-0 accent-primary"
+                      checked={pressure}
+                      onChange={(event) => setPressure(event.target.checked)}
+                    />{' '}
+                    Pressure sensitive pen
+                  </label>
+                </PanelSection>
                 <button
                   type="button"
-                  className={button}
+                  className={`${button} justify-center border border-border bg-muted`}
                   disabled={!canDraw}
                   onClick={onFormat}
                 >
@@ -658,79 +703,95 @@ export function AnnotationToolbar({
               {...menuProps('More')}
               icon={<Ellipsis size={16} aria-hidden="true" />}
             >
-              <div className="grid gap-1">
-                <button
-                  type="button"
-                  className={button}
-                  disabled={!canDraw}
-                  onClick={() => clear('mine')}
-                >
-                  Clear mine
-                </button>
-                {tutor && (
-                  <>
-                    <button
-                      type="button"
-                      className={button}
-                      onClick={() => clear('students')}
-                    >
-                      Clear students
-                    </button>
-                    <button type="button" className={button} onClick={() => clear('all')}>
-                      Clear all
-                    </button>
-                    <label className="p-2 text-xs">
-                      <input
-                        type="checkbox"
-                        checked={studentsEnabled}
-                        onChange={(event) => onPermissions(event.target.checked)}
-                      />{' '}
-                      Allow students to annotate
-                    </label>
-                  </>
-                )}
-                <button
-                  type="button"
-                  className={button}
-                  disabled={!canDraw}
-                  onClick={onDuplicate}
-                >
-                  <Copy size={16} className="mr-2 inline" aria-hidden="true" />
-                  Duplicate selected
-                </button>
-                <button
-                  type="button"
-                  className={button}
-                  disabled={!canDraw}
-                  onClick={onDelete}
-                >
-                  <Trash2 size={16} className="mr-2 inline" aria-hidden="true" />
-                  Delete selected
-                </button>
-                <button type="button" className={button} onClick={onSave}>
-                  <Download size={16} className="mr-2 inline" aria-hidden="true" />
-                  Save PNG
-                </button>
-                <label className="p-2 text-xs">
-                  <input
-                    type="checkbox"
-                    checked={showNames}
-                    onChange={(event) => setShowNames(event.target.checked)}
-                  />{' '}
-                  Show annotator names
-                </label>
-                <select
-                  aria-label="Toolbar position"
-                  className="min-h-11 bg-background"
-                  value={dock}
-                  onChange={(event) => persist(event.target.value)}
-                >
-                  {['top', 'bottom', 'left', 'right', 'floating'].map((value) => (
-                    <option key={value} value={value}>
-                      {value}
-                    </option>
-                  ))}
-                </select>
+              <div className="space-y-3">
+                <PanelSection label="Selection">
+                  <button
+                    type="button"
+                    className={button}
+                    disabled={!canDraw}
+                    onClick={onDuplicate}
+                  >
+                    <Copy size={16} className="mr-2 inline" aria-hidden="true" />
+                    Duplicate selected
+                  </button>
+                  <button
+                    type="button"
+                    className={button}
+                    disabled={!canDraw}
+                    onClick={onDelete}
+                  >
+                    <Trash2 size={16} className="mr-2 inline" aria-hidden="true" />
+                    Delete selected
+                  </button>
+                </PanelSection>
+                <PanelSection label="Board">
+                  <button
+                    type="button"
+                    className={button}
+                    disabled={!canDraw}
+                    onClick={() => clear('mine')}
+                  >
+                    Clear mine
+                  </button>
+                  {tutor && (
+                    <>
+                      <button
+                        type="button"
+                        className={button}
+                        onClick={() => clear('students')}
+                      >
+                        Clear students
+                      </button>
+                      <button
+                        type="button"
+                        className={button}
+                        onClick={() => clear('all')}
+                      >
+                        Clear all
+                      </button>
+                    </>
+                  )}
+                </PanelSection>
+                <PanelSection label="Sharing and view">
+                  {tutor && (
+                    <>
+                      <label className={rowClass}>
+                        <input
+                          type="checkbox"
+                          className="size-3.5 shrink-0 accent-primary"
+                          checked={studentsEnabled}
+                          onChange={(event) => onPermissions(event.target.checked)}
+                        />{' '}
+                        Allow students to annotate
+                      </label>
+                    </>
+                  )}
+                  <button type="button" className={button} onClick={onSave}>
+                    <Download size={16} className="mr-2 inline" aria-hidden="true" />
+                    Save PNG
+                  </button>
+                  <label className={rowClass}>
+                    <input
+                      type="checkbox"
+                      className="size-3.5 shrink-0 accent-primary"
+                      checked={showNames}
+                      onChange={(event) => setShowNames(event.target.checked)}
+                    />{' '}
+                    Show annotator names
+                  </label>
+                  <select
+                    aria-label="Toolbar position"
+                    className={`${fieldClass} w-full`}
+                    value={dock}
+                    onChange={(event) => persist(event.target.value)}
+                  >
+                    {['top', 'bottom', 'left', 'right', 'floating'].map((value) => (
+                      <option key={value} value={value}>
+                        {value}
+                      </option>
+                    ))}
+                  </select>
+                </PanelSection>
               </div>
             </ToolMenu>
           </>

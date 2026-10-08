@@ -102,6 +102,31 @@ describe('screen annotation toolbar', () => {
     click('Vanishing pen');
     expect(props.setTool).toHaveBeenLastCalledWith('vanishingPen');
   });
+  it('organizes panels into compact labeled sections and marks the selected color', () => {
+    setup();
+    click('Open annotation toolbar');
+    click('Format');
+    for (const name of ['Color', 'Stroke', 'Text', 'Pen']) {
+      expect(screen.getByRole('group', { name, exact: true })).toBeVisible();
+    }
+    expect(screen.getByRole('button', { name: 'Color #ef4444' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    click('Shapes');
+    for (const name of [
+      'Lines and arrows',
+      'Outline shapes',
+      'Filled shapes',
+      'Highlights',
+    ]) {
+      expect(screen.getByRole('group', { name, exact: true })).toBeVisible();
+    }
+    click('More');
+    for (const name of ['Selection', 'Board', 'Sharing and view']) {
+      expect(screen.getByRole('group', { name, exact: true })).toBeVisible();
+    }
+  });
   it('keeps permission restrictions on primary and grouped tools and history', () => {
     const props = setup({ canDraw: false, tutor: false });
     click('Open annotation toolbar');

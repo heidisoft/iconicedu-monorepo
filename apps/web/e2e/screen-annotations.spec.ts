@@ -116,6 +116,19 @@ test('opens from a pen button and keeps grouped tools usable in a narrow viewer'
   await expect(
     toolbar.getByRole('button', { name: 'Shapes', exact: true }),
   ).toHaveAttribute('aria-pressed', 'true');
+  await toolbar.getByRole('button', { name: 'Format', exact: true }).click();
+  const format = page.getByRole('group', { name: 'Format', exact: true });
+  await expect(format).toBeVisible();
+  await expect(format.getByLabel('Stroke width')).toHaveCSS('height', '32px');
+  await expect(format.getByRole('group', { name: 'Stroke', exact: true })).toBeVisible();
+  await expect(format.getByRole('button', { name: 'Color #ef4444' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  const formatBounds = await format.boundingBox();
+  expect(formatBounds!.width).toBeLessThanOrEqual(240);
+  expect(formatBounds!.x + formatBounds!.width).toBeLessThanOrEqual(390);
+  await page.screenshot({ path: '/tmp/iconicedu-annotation-format-compact.png' });
   await toolbar.getByRole('button', { name: 'Close annotation toolbar' }).click();
   await expect(toolbar.getByRole('button')).toHaveCount(1);
   await toolbar.getByRole('button', { name: 'Open annotation toolbar' }).click();
