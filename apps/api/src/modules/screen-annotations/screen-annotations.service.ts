@@ -1,3 +1,4 @@
+import { hashAnnotationToken } from './annotation-access';
 import {
   ConflictException,
   ForbiddenException,
@@ -21,6 +22,8 @@ export class ScreenAnnotationsService {
     return data.user.id;
   }
   private fail(message: string): never {
+    if (message.includes('annotation_guest_expired'))
+      throw new ForbiddenException('Annotation access expired. Rejoin the meeting.');
     if (message.includes('annotation_conflict'))
       throw new ConflictException('Annotation changed. Please try again.');
     if (message.includes('annotation_not_started'))
@@ -32,6 +35,43 @@ export class ScreenAnnotationsService {
         'This annotation session is full. Start a new screen share.',
       );
     throw new InternalServerErrorException('Unable to synchronize annotations');
+  }
+  private guestHash(token: string) {
+    if (!/^[\w-]{43}$/.test(token))
+      throw new ForbiddenException('Annotation access expired. Rejoin the meeting.');
+    return hashAnnotationToken(token);
+  }
+  async guestContext(
+    token: string,
+    sessionId: string,
+    shareKey: string,
+  ): Promise<AnnotationContext> {
+    const { data, error } = await createSupabaseServiceClient().rpc(
+      'screen_annotation_guest_context',
+      {
+        p_session: sessionId,
+        p_hash: this.guestHash(token),
+        p_share: shareKey,
+      },
+    );
+    if (error) this.fail(error.message);
+    return data as AnnotationContext;
+  }
+  async guestApply(
+    token: string,
+    roomId: string,
+    operation: AnnotationOperation,
+  ): Promise<AnnotationCommit> {
+    const { data, error } = await createSupabaseServiceClient().rpc(
+      'screen_annotation_guest_apply',
+      {
+        p_room: roomId,
+        p_hash: this.guestHash(token),
+        p_operation: operation,
+      },
+    );
+    if (error) this.fail(error.message);
+    return data as AnnotationCommit;
   }
   async context(
     token: string,

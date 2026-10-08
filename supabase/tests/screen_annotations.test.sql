@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(26);
+select plan(36);
 -- Synthetic identities: never depend on seed accounts or production data.
 insert into public.orgs(id, name, slug) values ('91000000-0000-4000-8000-000000000001', 'Annotation test', 'annotation-test-only');
 insert into auth.users(id) values ('92000000-0000-4000-8000-000000000001'), ('92000000-0000-4000-8000-000000000002'), ('92000000-0000-4000-8000-000000000003');
@@ -46,6 +46,20 @@ select ok(public.screen_annotation_topic_access('annotation:room:' || pg_temp.an
 select ok(not public.screen_annotation_topic_access('annotation:room:' || pg_temp.annotation_room() || ':user:92000000-0000-4000-8000-000000000001', true), 'student cannot impersonate tutor topic');
 select ok(not public.screen_annotation_topic_access('annotation:room:' || pg_temp.annotation_room(), true), 'clients cannot forge permanent commits');
 select ok(not has_function_privilege('authenticated','public.screen_annotation_apply(uuid,uuid,jsonb)','execute'), 'frontend cannot bypass API validation through RPC');
+-- Shared-link guests have a meeting-scoped identity and cannot elevate privileges.
+insert into public.screen_annotation_access(id, live_session_id, token_hash, display_name, expires_at)
+values ('98000000-0000-4000-8000-000000000001', '96000000-0000-4000-8000-000000000001', repeat('a',64), 'Guest', now() + interval '1 hour');
+select is(public.screen_annotation_guest_context('96000000-0000-4000-8000-000000000001', repeat('a',64), '123')->'actor'->>'role', 'student', 'guest always receives participant role');
+select is(public.screen_annotation_guest_context('96000000-0000-4000-8000-000000000001', repeat('a',64), '123')->'snapshot'->>'roomId', pg_temp.annotation_room()::text, 'guest reads the same shared annotation room');
+select throws_ok($$select public.screen_annotation_guest_context('96000000-0000-4000-8000-000000000002', repeat('a',64), '123')$$, 'P0001', 'annotation_guest_expired', 'capability cannot access another meeting');
+select throws_ok($$select public.screen_annotation_guest_apply(pg_temp.annotation_room(), repeat('a',64), pg_temp.annotation_op('permissions','{"enabled":false}'))$$, 'P0001', 'annotation_forbidden', 'guest cannot change annotation permissions');
+select throws_ok($$select public.screen_annotation_guest_apply(pg_temp.annotation_room(), repeat('a',64), pg_temp.annotation_op('clear','{"scope":"all"}'))$$, 'P0001', 'annotation_forbidden', 'guest cannot clear another participant marks');
+select lives_ok($$select public.screen_annotation_guest_apply(pg_temp.annotation_room(), repeat('a',64), (select value || '{"eventId":"99000000-0000-4000-8000-000000000001","baseVersion":0}'::jsonb || jsonb_build_object('object',(value->'object') || '{"id":"99000000-0000-4000-8000-000000000002"}'::jsonb) from annotation_test_operation))$$, 'guest can draw when participants are enabled');
+select is((select item->>'creatorId' from public.screen_annotation_sessions, lateral jsonb_array_elements(objects) item where id = pg_temp.annotation_room() and item->>'id' = '99000000-0000-4000-8000-000000000002'), '98000000-0000-4000-8000-000000000001', 'guest cannot forge annotation ownership');
+select ok(not has_function_privilege('anon','public.screen_annotation_guest_apply(uuid,text,jsonb)','execute'), 'guests cannot bypass API validation');
+update public.screen_annotation_access set expires_at = now() - interval '1 second';
+select throws_ok($$select public.screen_annotation_guest_context('96000000-0000-4000-8000-000000000001', repeat('a',64), '123')$$, 'P0001', 'annotation_guest_expired', 'expired guest cannot read annotations');
+select throws_ok($$select public.screen_annotation_guest_apply(pg_temp.annotation_room(), repeat('a',64), pg_temp.annotation_op('clear','{"scope":"mine"}'))$$, 'P0001', 'annotation_guest_expired', 'expired guest cannot mutate annotations');
 select lives_ok($$select public.screen_annotation_apply(pg_temp.annotation_room(),'92000000-0000-4000-8000-000000000001',pg_temp.annotation_op('end'))$$, 'share end saves the final snapshot');
 create temporary table annotation_restarted_context as select public.screen_annotation_context('96000000-0000-4000-8000-000000000001','92000000-0000-4000-8000-000000000001','123') as value;
 select isnt((select value->'snapshot'->>'roomId' from annotation_restarted_context), pg_temp.annotation_room()::text, 'a restarted share has a new session identity');

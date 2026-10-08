@@ -1,3 +1,7 @@
+import { issueAnnotationAccess } from '../screen-annotations/annotation-access';
+jest.mock('../screen-annotations/annotation-access', () => ({
+  issueAnnotationAccess: jest.fn(async () => 'synthetic-annotation-token'),
+}));
 import { DEFAULT_LIVE_SESSION_SETTINGS } from '@iconicedu/shared-types';
 import { ForbiddenException } from '@nestjs/common';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
@@ -126,6 +130,7 @@ describe('public live session identity and authorization', () => {
     });
     expect(result).not.toHaveProperty('hostJoin');
     expect(getJoinAccess).not.toHaveBeenCalled();
+    expect(issueAnnotationAccess).not.toHaveBeenCalled();
     expect(lookupFilters).toContainEqual({
       table: 'profiles',
       filters: { account_id: 'member-account', org_id: 'session-org' },
@@ -180,6 +185,7 @@ describe('public live session identity and authorization', () => {
       ),
     ).rejects.toThrow('Shared invitations are disabled');
     expect(getJoinAccess).not.toHaveBeenCalled();
+    expect(issueAnnotationAccess).not.toHaveBeenCalled();
   });
   it('blocks users without an org profile when shared invites are disabled', async () => {
     invitesEnabled = false;
@@ -193,6 +199,7 @@ describe('public live session identity and authorization', () => {
       ),
     ).rejects.toThrow('Shared invitations are disabled');
     expect(getJoinAccess).not.toHaveBeenCalled();
+    expect(issueAnnotationAccess).not.toHaveBeenCalled();
   });
   it('still requires a correct passcode for signed-in non-hosts', async () => {
     jest.mocked(verifyZoomPasscode).mockReturnValue(false);
@@ -205,6 +212,7 @@ describe('public live session identity and authorization', () => {
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(getJoinAccess).not.toHaveBeenCalled();
+    expect(issueAnnotationAccess).not.toHaveBeenCalled();
   });
   it('does not assign a profile from another org to signed-in visitors', async () => {
     hasOrgProfile = false;
@@ -234,6 +242,8 @@ describe('public live session identity and authorization', () => {
       'invalid',
     );
     expect(joined.displayName).toBe('Guest');
+    expect(joined.annotationToken).toBe('synthetic-annotation-token');
+    expect(issueAnnotationAccess).toHaveBeenCalledWith('session-identity', 'Guest');
     expect(getJoinAccess).toHaveBeenCalledWith(
       expect.objectContaining({
         profileId: expect.stringMatching(/^guest:/),
@@ -264,6 +274,7 @@ describe('public live session identity and authorization', () => {
       ),
     ).toMatchObject({ isActive: false });
     expect(getJoinAccess).not.toHaveBeenCalled();
+    expect(issueAnnotationAccess).not.toHaveBeenCalled();
     expect(createSupabaseSessionClient).not.toHaveBeenCalled();
   });
 });

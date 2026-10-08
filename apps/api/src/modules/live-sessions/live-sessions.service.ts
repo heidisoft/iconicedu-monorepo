@@ -1,3 +1,4 @@
+import { issueAnnotationAccess } from '../screen-annotations/annotation-access';
 import { issueWhiteboardAccess } from '../whiteboards/whiteboard-access';
 import { platformFeatureFlagKeys } from '@iconicedu/shared-types';
 import { evaluateApiBooleanFlag } from '@iconicedu/api/lib/flags/posthog-openfeature';
@@ -398,6 +399,9 @@ export class LiveSessionsService {
       throw new InternalServerErrorException('Unable to issue session credentials');
 
     return {
+      ...(!identity?.profileId
+        ? { annotationToken: await issueAnnotationAccess(session.id, displayName) }
+        : {}),
       ...(settings.whiteboard.enabled
         ? { whiteboard: await this.whiteboardAccess(session.id, 'student', displayName) }
         : {}),

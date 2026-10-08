@@ -155,6 +155,8 @@ export interface LiveSessionAttendanceFilterVM {
 
 /** Credentials issued by apps/api after host authorization or passcode verification. */
 export type LiveSessionJoinCredentialsVM = {
+  /** Meeting-scoped opaque annotation capability for shared-link participants. */
+  annotationToken?: string;
   whiteboard?: import('./whiteboard').WhiteboardAccessVM;
   token: string;
   sessionName: string;

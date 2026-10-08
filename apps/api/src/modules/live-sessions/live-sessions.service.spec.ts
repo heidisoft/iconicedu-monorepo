@@ -1,3 +1,6 @@
+jest.mock('../screen-annotations/annotation-access', () => ({
+  issueAnnotationAccess: jest.fn(async () => 'synthetic-annotation-token'),
+}));
 import { evaluateApiBooleanFlag } from '@iconicedu/api/lib/flags/posthog-openfeature';
 import { DEFAULT_LIVE_SESSION_SETTINGS } from '@iconicedu/shared-types';
 import {
@@ -236,6 +239,7 @@ describe('LiveSessionsService.guestJoinLiveSession', () => {
     );
 
     expect(result).toEqual({
+      annotationToken: 'synthetic-annotation-token',
       whiteboard: { provider: 'zoom' },
       token: 'guest-token',
       sessionName: 'ls-session',

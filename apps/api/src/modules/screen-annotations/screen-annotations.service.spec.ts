@@ -58,3 +58,25 @@ describe('screen annotation authorization', () => {
     ).rejects.toThrow('Annotation changed');
   });
 });
+
+it('hashes guest capabilities and delegates meeting/room scope checks to the transaction', async () => {
+  rpc.mockResolvedValue({ data: { actor: { role: 'student' } }, error: null });
+  const service = new ScreenAnnotationsService();
+  await service.guestContext('a'.repeat(43), 'session', '123');
+  expect(getUser).not.toHaveBeenCalled();
+  expect(rpc).toHaveBeenCalledWith('screen_annotation_guest_context', {
+    p_session: 'session',
+    p_share: '123',
+    p_hash: expect.stringMatching(/^[a-f0-9]{64}$/),
+  });
+  rpc.mockResolvedValue({ data: null, error: { message: 'annotation_guest_expired' } });
+  await expect(
+    service.guestApply('a'.repeat(43), 'other-room', { kind: 'end', eventId: 'event' }),
+  ).rejects.toThrow('Rejoin the meeting');
+});
+it('rejects missing or malformed guest credentials before accessing annotation data', async () => {
+  await expect(
+    new ScreenAnnotationsService().guestContext('', 'session', '123'),
+  ).rejects.toThrow('Rejoin the meeting');
+  expect(rpc).not.toHaveBeenCalled();
+});

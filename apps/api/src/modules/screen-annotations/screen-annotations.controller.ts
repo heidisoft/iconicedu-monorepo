@@ -47,3 +47,35 @@ export class ScreenAnnotationsController {
     );
   }
 }
+
+/** Public transport with opaque meeting capabilities verified on every service call. */
+@Controller('screen-annotations/guest')
+export class GuestScreenAnnotationsController {
+  constructor(private readonly annotations: ScreenAnnotationsService) {}
+  @Get(':sessionId')
+  context(
+    @Req() req: AuthenticatedRequest,
+    @Param('sessionId') sessionId: string,
+    @Query('shareKey') shareKey: string,
+  ) {
+    if (!/^[0-9]{1,16}$/.test(shareKey ?? ''))
+      throw new BadRequestException('Invalid share key');
+    return this.annotations.guestContext(
+      extractBearerToken(req.headers.authorization),
+      annotationUuid(sessionId),
+      shareKey,
+    );
+  }
+  @Post(':roomId/operations')
+  apply(
+    @Req() req: AuthenticatedRequest,
+    @Param('roomId') roomId: string,
+    @Body() body: unknown,
+  ) {
+    return this.annotations.guestApply(
+      extractBearerToken(req.headers.authorization),
+      annotationUuid(roomId),
+      parseAnnotationOperation(body),
+    );
+  }
+}
