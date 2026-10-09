@@ -41,9 +41,11 @@ export function AnnotationOverlay({
   useAnnotations = useScreenAnnotations,
   onContext,
   annotationToken,
+  sourceComposited = false,
 }: {
   sessionId: string;
   annotationToken?: string;
+  sourceComposited?: boolean;
   shareKey: string;
   width: number;
   height: number;
@@ -59,6 +61,12 @@ export function AnnotationOverlay({
   const root = useRef<HTMLDivElement>(null);
   const stage = useRef<Konva.Stage>(null);
   const transformer = useRef<Konva.Transformer>(null);
+  useEffect(() => {
+    const element = root.current;
+    const draw = () => stage.current?.draw();
+    element?.addEventListener('recording-frame', draw);
+    return () => element?.removeEventListener('recording-frame', draw);
+  }, []);
   const coordinates = useMemo(
     () => new AnnotationCoordinateService({ width, height }),
     [width, height],
@@ -534,6 +542,7 @@ export function AnnotationOverlay({
   return (
     <div
       ref={root}
+      data-recording-annotations
       className="absolute inset-0"
       style={{
         pointerEvents: tool === 'cursor' || !engine.canDraw ? 'none' : 'auto',
@@ -550,7 +559,12 @@ export function AnnotationOverlay({
         if (active.current) cancelDraft();
       }}
     >
-      <Stage ref={stage} width={width} height={height}>
+      <Stage
+        ref={stage}
+        width={width}
+        height={height}
+        style={{ opacity: sourceComposited ? 0 : 1 }}
+      >
         <Layer>
           {engine.objects.map((object) => (
             <AnnotationShape

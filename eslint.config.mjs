@@ -113,6 +113,18 @@ export default [
     path.join(__dirname, 'packages/shared-types/tsconfig.json'),
   ),
   {
+    // Executed as a JavaScript worker by Zoom, outside the web TypeScript project.
+    files: ['apps/web/public/meeting-share-processor.js'],
+    languageOptions: {
+      parserOptions: { project: null },
+      globals: {
+        ...globals.worker,
+        ShareProcessor: 'readonly',
+        registerProcessor: 'readonly',
+      },
+    },
+  },
+  {
     files: ['apps/web/tailwind.config.ts', 'packages/ui-web/tailwind.config.ts'],
     languageOptions: {
       parser: tsParser,

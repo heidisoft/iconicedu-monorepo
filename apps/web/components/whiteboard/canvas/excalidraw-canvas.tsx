@@ -76,6 +76,7 @@ export function ExcalidrawCanvas({
   return (
     <div
       className="classroom-whiteboard-canvas relative min-h-0 flex-1"
+      data-recording-whiteboard
       data-testid="whiteboard-canvas"
       data-grid={grid}
       tabIndex={0}
