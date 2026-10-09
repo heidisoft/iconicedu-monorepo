@@ -47,9 +47,7 @@ export function MeetingPictureInPictureControls({
             <Button
               variant="ghost"
               size="icon-sm"
-              aria-label={
-                onCallSettings ? 'Call settings' : 'Picture-in-picture settings'
-              }
+              aria-label={onCallSettings ? 'Settings' : 'Picture-in-picture settings'}
               onClick={() =>
                 onCallSettings ? onCallSettings() : onSettingsOpenChange(true)
               }

@@ -59,7 +59,7 @@ describe('picture-in-picture settings', () => {
         onCallSettings={onCallSettings}
       />,
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Call settings' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
     expect(onCallSettings).toHaveBeenCalledOnce();
     expect(onSettingsOpenChange).not.toHaveBeenCalled();
   });

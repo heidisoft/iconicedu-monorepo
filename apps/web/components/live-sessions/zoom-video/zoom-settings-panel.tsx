@@ -110,7 +110,7 @@ export function ZoomSettingsPanel(props: Props) {
     <ZoomMeetingDialog
       open={props.open}
       onOpenChange={props.onOpenChange}
-      title="Call settings"
+      title="Settings"
       description="Manage video, audio and how your call appears."
       trigger={
         !props.hideTrigger ? (

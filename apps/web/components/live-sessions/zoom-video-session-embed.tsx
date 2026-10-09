@@ -2054,7 +2054,7 @@ export function ZoomVideoSessionEmbed({
                   },
                   {
                     id: 'settings',
-                    label: 'Call settings',
+                    label: 'Settings',
                     icon: <Settings />,
                     active: isSettingsOpen,
                     onSelect: () => {
