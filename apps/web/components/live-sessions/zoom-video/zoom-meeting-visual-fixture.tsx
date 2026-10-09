@@ -18,6 +18,7 @@ import type { RecordingStatus } from '@zoom/videosdk';
 import { TooltipProvider } from '@iconicedu/ui-web/ui/tooltip';
 import { ZoomChatPanel } from './zoom-chat-panel';
 import { MeetingControlButton } from './zoom-meeting-controls';
+import { ZoomMeetingNotice } from './zoom-meeting-notice';
 import { ZoomMeetingHeader } from './zoom-meeting-header';
 import { ZoomMeetingLayoutStyles } from './zoom-meeting-layout-styles';
 import { ZoomMeetingDockButton, ZoomMeetingSideDock } from './zoom-meeting-side-dock';
@@ -55,8 +56,10 @@ const participants = [
 
 export function ZoomMeetingVisualFixture({
   participantCount = 4,
+  showNotice = false,
 }: {
   participantCount?: number;
+  showNotice?: boolean;
 }) {
   const [recordingStatus, setRecordingStatus] = useState<RecordingStatus>(
     'Recording' as RecordingStatus,
@@ -67,6 +70,8 @@ export function ZoomMeetingVisualFixture({
   const [activePanel, setActivePanel] = useState<SidePanel>(null);
   const [mobileExpanded, setMobileExpanded] = useState(false);
   const [galleryPage, setGalleryPage] = useState(0);
+  const [noticeVisible, setNoticeVisible] = useState(showNotice);
+  const [noticeReviewed, setNoticeReviewed] = useState(false);
 
   const recording = useMeetingRecordingControl({
     canManage: true,
@@ -95,6 +100,20 @@ export function ZoomMeetingVisualFixture({
           recordingStatus={recordingStatus}
         />
 
+        {noticeVisible && (
+          <ZoomMeetingNotice
+            title="Recording"
+            message={
+              noticeReviewed
+                ? 'Recording controls are available in More controls.'
+                : 'This session is being recorded. You can review recording controls at any time.'
+            }
+            tone="warning"
+            className="top-20"
+            action={{ label: 'Review', onClick: () => setNoticeReviewed(true) }}
+            onDismiss={() => setNoticeVisible(false)}
+          />
+        )}
         <ZoomParticipantGallery
           displayName="Olawale Adeyeye"
           selfMuted={false}

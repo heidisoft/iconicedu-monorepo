@@ -1,4 +1,5 @@
 'use client';
+import { NotificationCard } from '@iconicedu/ui-web/ui/notification-card';
 
 import type { MeetingFeatureAction } from './meeting-feature-action';
 import { Ellipsis, X } from 'lucide-react';
@@ -69,12 +70,11 @@ export function ZoomMoreControls({
   const isMobile = mobileViewport && !portalContainer;
   const menuActions = actions;
   const featureError = error ? (
-    <p
+    <NotificationCard
       role="alert"
-      className="absolute bottom-full left-1/2 mb-2 w-64 -translate-x-1/2 rounded-xl border border-border bg-popover p-3 text-xs text-popover-foreground shadow-lg"
-    >
-      {error}
-    </p>
+      message={error}
+      className="absolute bottom-full left-1/2 mb-3 w-72 max-w-[calc(100vw-2rem)] -translate-x-1/2"
+    />
   ) : null;
   const trigger = (
     <MeetingControlButton

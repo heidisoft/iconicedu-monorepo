@@ -1727,6 +1727,7 @@ export function ZoomVideoSessionEmbed({
             />
           ) : recording.showBanner ? (
             <ZoomMeetingNotice
+              title="Recording"
               message="This session is being recorded"
               tone="warning"
               onDismiss={recording.dismissBanner}

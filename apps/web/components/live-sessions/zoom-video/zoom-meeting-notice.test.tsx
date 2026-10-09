@@ -14,6 +14,7 @@ describe('ZoomMeetingNotice', () => {
     render(
       <TooltipProvider>
         <ZoomMeetingNotice
+          title="Recording"
           message="This session is being recorded"
           tone="warning"
           onDismiss={onDismiss}
@@ -23,6 +24,7 @@ describe('ZoomMeetingNotice', () => {
     );
 
     expect(screen.getByRole('status')).toHaveTextContent('being recorded');
+    expect(screen.getByText('Recording', { exact: true })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Review' }));
     await user.click(screen.getByRole('button', { name: 'Dismiss message' }));
     expect(onAction).toHaveBeenCalledOnce();

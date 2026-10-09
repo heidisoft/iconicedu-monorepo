@@ -5,7 +5,7 @@ import { ZoomMeetingVisualFixture } from '@iconicedu/web/components/live-session
 export default async function ZoomMeetingVisualFixturePage({
   searchParams,
 }: {
-  searchParams: Promise<{ participants?: string }>;
+  searchParams: Promise<{ participants?: string; notice?: string }>;
 }) {
   // Test fixture only; never expose synthetic meeting data in production.
   // flag-exempt: deterministic browser-test infrastructure, unavailable in production.
@@ -16,6 +16,7 @@ export default async function ZoomMeetingVisualFixturePage({
   return (
     <ZoomMeetingVisualFixture
       participantCount={[1, 2, 3, 4].includes(count) ? count : 4}
+      showNotice={params.notice === '1'}
     />
   );
 }

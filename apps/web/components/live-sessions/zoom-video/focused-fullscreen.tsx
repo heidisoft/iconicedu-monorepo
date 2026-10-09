@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Maximize, Minimize, X } from 'lucide-react';
+import { Maximize, Minimize } from 'lucide-react';
+import { NotificationCard } from '@iconicedu/ui-web/ui/notification-card';
 import { Button } from '@iconicedu/ui-web/ui/button';
 
 /** Fullscreen the existing content node, keeping SDK media and board state mounted. */
@@ -82,20 +83,13 @@ export function FocusedFullscreenButton({
         )}
       </Button>
       {fullscreen.error && (
-        <div
+        <NotificationCard
           role="alert"
-          className="absolute right-3 bottom-14 z-40 flex max-w-[calc(100%-1.5rem)] items-center gap-2 rounded-md border border-border bg-card p-2 text-sm shadow-sm"
-        >
-          {fullscreen.error}
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Dismiss fullscreen error"
-            onClick={fullscreen.dismissError}
-          >
-            <X className="size-4" />
-          </Button>
-        </div>
+          message={fullscreen.error}
+          className="absolute right-3 bottom-14 z-40 w-[calc(100%-1.5rem)]"
+          dismissLabel="Dismiss fullscreen error"
+          onDismiss={fullscreen.dismissError}
+        />
       )}
     </>
   );

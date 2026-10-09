@@ -328,3 +328,25 @@ test('animates only the middle speaking bar and honors reduced motion', async ({
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await expect.poll(animations).toEqual(['none', 'none', 'none']);
 });
+
+for (const width of [390, 1280]) {
+  test(`meeting notification wraps and keeps its actions usable at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto(`${fixturePath}?notice=1`);
+    const card = page
+      .getByRole('status')
+      .filter({ has: page.getByRole('button', { name: 'Review', exact: true }) });
+    await expect(card).toBeVisible();
+    const bounds = await card.boundingBox();
+    expect(bounds!.x).toBeGreaterThanOrEqual(0);
+    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
+    await page.getByRole('button', { name: 'Review', exact: true }).click();
+    await expect(card).toContainText(
+      'Recording controls are available in More controls.',
+    );
+    await page.getByRole('button', { name: 'Dismiss message', exact: true }).click();
+    await expect(card).toHaveCount(0);
+  });
+}
