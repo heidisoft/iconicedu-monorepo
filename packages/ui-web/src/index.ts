@@ -107,3 +107,5 @@ export { SharedContentSurface } from './ui/shared-content-surface';
 
 export * from '@iconicedu/ui-web/ui/speaking-audio-icon';
 export * from '@iconicedu/ui-web/hooks/use-speaking-hold';
+
+export * from '@iconicedu/ui-web/ui/notification-card';
