@@ -80,7 +80,6 @@ export function MeetingPictureInPictureControls({
         )}
       {!pip.pipWindow &&
         (pip.error ||
-          pip.returned ||
           ((pip.sharePrompt || pip.automaticBlocked) && !dismissedPrompt)) && (
           <div
             role={pip.error ? 'alert' : 'status'}
@@ -88,11 +87,9 @@ export function MeetingPictureInPictureControls({
           >
             <span>
               {pip.error ??
-                (pip.returned
-                  ? 'Your call is back in this tab.'
-                  : pip.automaticBlocked
-                    ? 'Allow Automatic picture-in-picture in your browser’s site settings to keep the call visible when switching tabs.'
-                    : 'Keep your call visible while presenting.')}
+                (pip.automaticBlocked
+                  ? 'Allow Automatic picture-in-picture in your browser’s site settings to keep the call visible when switching tabs.'
+                  : 'Keep your call visible while presenting.')}
             </span>
             {!pip.error && (
               <Button size="sm" onClick={() => void pip.open()}>

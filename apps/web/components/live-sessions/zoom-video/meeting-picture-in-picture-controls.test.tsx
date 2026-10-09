@@ -25,6 +25,28 @@ function preferences(): ReturnType<typeof useMeetingPictureInPicture> {
 }
 
 describe('picture-in-picture settings', () => {
+  it('returns to the tab without a notification and still displays errors', () => {
+    const pip = { ...preferences(), returned: true };
+    const { rerender } = render(
+      <MeetingPictureInPictureControls
+        pip={pip}
+        settingsOpen={false}
+        onSettingsOpenChange={vi.fn()}
+      />,
+    );
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Open floating call' }),
+    ).not.toBeInTheDocument();
+    rerender(
+      <MeetingPictureInPictureControls
+        pip={{ ...pip, error: 'Unable to open floating call.' }}
+        settingsOpen={false}
+        onSettingsOpenChange={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('Unable to open floating call.');
+  });
   it('opens the shared call settings from the floating window gear', () => {
     const pip = { ...preferences(), pipWindow: window };
     const onCallSettings = vi.fn();
