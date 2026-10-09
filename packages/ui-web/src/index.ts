@@ -104,3 +104,6 @@ export {
 } from 'lucide-react';
 export { Briefcase, GraduationCap, Shield, User, Users } from 'lucide-react';
 export { SharedContentSurface } from './ui/shared-content-surface';
+
+export * from '@iconicedu/ui-web/ui/speaking-audio-icon';
+export * from '@iconicedu/ui-web/hooks/use-speaking-hold';
