@@ -6,6 +6,35 @@ import { TooltipProvider } from '@iconicedu/ui-web/ui/tooltip';
 import { ZoomVideoTile } from './zoom-video-tile';
 
 describe('ZoomVideoTile', () => {
+  it('changes the microphone beside the name into speaking bars without moving it', () => {
+    const ref = createRef<HTMLDivElement>();
+    const tile = (speaking: boolean, muted = false) => (
+      <TooltipProvider>
+        <ZoomVideoTile
+          label="Alex"
+          isSelf={false}
+          isMuted={muted}
+          isVideoOn={false}
+          isSpeaking={speaking}
+          videoContainerRef={ref}
+        />
+      </TooltipProvider>
+    );
+    const { rerender } = render(tile(false));
+    const indicator = screen.getByLabelText('Microphone on');
+    expect(screen.getByLabelText('Alex status')).toContainElement(indicator);
+    expect(indicator).toHaveAttribute('data-speaking', 'false');
+    rerender(tile(true));
+    expect(screen.getByLabelText('Alex is speaking')).toBe(indicator);
+    expect(indicator).toHaveAttribute('data-speaking', 'true');
+    rerender(tile(false));
+    expect(screen.getByLabelText('Microphone on')).toBe(indicator);
+    expect(indicator).toHaveAttribute('data-speaking', 'false');
+    rerender(tile(true, true));
+    expect(screen.getByLabelText('Microphone off')).toBe(indicator);
+    expect(indicator).toHaveAttribute('data-speaking', 'false');
+    expect(screen.queryByLabelText('Alex is speaking')).not.toBeInTheDocument();
+  });
   it('shows participant identity and both media states', () => {
     render(
       <TooltipProvider>

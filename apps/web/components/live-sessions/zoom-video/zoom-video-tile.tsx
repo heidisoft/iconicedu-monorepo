@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, type Ref } from 'react';
-import { AudioLines, Hand, Mic, MicOff, Video, VideoOff } from 'lucide-react';
+import { Hand, Mic, MicOff, Video, VideoOff } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@iconicedu/ui-web/ui/avatar';
 import { cn, getInitials } from '@iconicedu/ui-web/lib/utils';
@@ -16,30 +16,68 @@ function TileMediaStatus({
   kind,
   enabled,
   compact = false,
+  speakingLabel,
 }: {
   kind: 'microphone' | 'camera';
   enabled: boolean;
   compact?: boolean;
+  speakingLabel?: string;
 }) {
   const Icon =
     kind === 'microphone' ? (enabled ? Mic : MicOff) : enabled ? Video : VideoOff;
   const label = `${kind === 'microphone' ? 'Microphone' : 'Camera'} ${enabled ? 'on' : 'off'}`;
+  const isSpeaking = kind === 'microphone' && enabled && !!speakingLabel;
 
   return (
     <span
       className={cn(
-        'inline-flex shrink-0 items-center justify-center rounded-full bg-black/45 text-white shadow-sm backdrop-blur-lg',
+        'relative inline-flex shrink-0 items-center justify-center rounded-full bg-black/45 text-white shadow-sm backdrop-blur-lg',
         compact ? 'size-6' : 'size-8',
         !enabled && 'text-destructive',
       )}
-      aria-label={label}
-      title={label}
+      data-tile-audio={kind === 'microphone' ? '' : undefined}
+      data-speaking={isSpeaking}
+      aria-label={isSpeaking ? speakingLabel : label}
+      title={isSpeaking ? speakingLabel : label}
     >
       <Icon
-        className={compact ? 'size-3' : 'size-4'}
+        className={cn(
+          compact ? 'size-3' : 'size-4',
+          kind === 'microphone' && 'tile-microphone-icon',
+        )}
         strokeWidth={2.25}
         aria-hidden="true"
       />
+      {kind === 'microphone' && (
+        <>
+          <span
+            className="tile-speaking-bars absolute flex h-3.5 items-center gap-0.5"
+            aria-hidden="true"
+          >
+            <span />
+            <span />
+            <span />
+          </span>
+          <style>{`
+            [data-tile-audio] .tile-microphone-icon,
+            [data-tile-audio] .tile-speaking-bars { transition: opacity 450ms ease-in-out; }
+            [data-tile-audio] .tile-speaking-bars { opacity: 0; }
+            [data-tile-audio][data-speaking="true"] .tile-speaking-bars { opacity: 1; }
+            [data-tile-audio][data-speaking="true"] .tile-microphone-icon { opacity: 0; }
+            .tile-speaking-bars > span { width: 2px; height: 12px; border-radius: 2px; background: currentColor; transform: scaleY(.3); animation: tile-speaking-wave 1.6s ease-in-out infinite; animation-play-state: paused; }
+            .tile-speaking-bars > span:nth-child(2) { animation-delay: -.35s; }
+            .tile-speaking-bars > span:nth-child(3) { animation-delay: -.7s; }
+            [data-tile-audio][data-speaking="true"] .tile-speaking-bars > span { animation-play-state: running; }
+            @keyframes tile-speaking-wave { 0%, 100% { transform: scaleY(.3); } 50% { transform: scaleY(1); } }
+            @media (prefers-reduced-motion: reduce) {
+              [data-tile-audio] .tile-microphone-icon,
+              [data-tile-audio] .tile-speaking-bars { transition: none; }
+              .tile-speaking-bars > span { animation: none; transform: scaleY(.5); }
+              .tile-speaking-bars > span:nth-child(2) { transform: scaleY(1); }
+            }
+          `}</style>
+        </>
+      )}
     </span>
   );
 }
@@ -107,15 +145,13 @@ export function ZoomVideoTile({
   }, [isVideoOn]);
   const revealVideo = isVideoOn && rendererReady;
   const compact = density === 'compact';
-  const resolvedHandPosition =
-    isSpeaking && handPosition === 'left' ? 'right' : handPosition;
 
   return (
     <div
       ref={fullscreen.setTarget}
       data-focused-content="video"
       className={cn(
-        'zoom-video-tile relative isolate overflow-hidden bg-secondary shadow-inner transition-[inset,width,height,transform,opacity] duration-300 ease-out motion-reduce:transition-none',
+        'zoom-video-tile relative isolate overflow-hidden bg-secondary shadow-inner transition-[inset,width,height,transform,opacity,box-shadow] duration-500 ease-out motion-reduce:transition-none',
         compact ? 'rounded-2xl' : 'rounded-3xl sm:rounded-[2rem]',
         isSpeaking && 'ring-2 ring-inset ring-primary',
         className,
@@ -153,7 +189,7 @@ export function ZoomVideoTile({
           className={cn(
             'absolute z-30 inline-flex shrink-0 animate-in items-center justify-center gap-1.5 rounded-full bg-amber-400 font-semibold text-amber-950 shadow-lg ring-2 ring-white/80 zoom-in-75 backdrop-blur-lg',
             compact ? 'top-2 size-9' : 'top-4 h-11 px-3 sm:h-12 sm:px-4',
-            resolvedHandPosition === 'left'
+            handPosition === 'left'
               ? compact
                 ? 'left-2'
                 : 'left-4'
@@ -171,18 +207,6 @@ export function ZoomVideoTile({
             aria-hidden="true"
           />
           {compact ? null : <span className="text-xs sm:text-sm">Hand raised</span>}
-        </span>
-      ) : null}
-      {isSpeaking ? (
-        <span
-          className={cn(
-            'absolute top-2 left-2 z-30 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md',
-            compact ? 'size-7' : 'size-9 sm:top-4 sm:left-4',
-          )}
-          data-tile-overlay
-          aria-label={`${label} is speaking`}
-        >
-          <AudioLines className={compact ? 'size-3.5' : 'size-4'} aria-hidden="true" />
         </span>
       ) : null}
       <div
@@ -209,7 +233,12 @@ export function ZoomVideoTile({
             {isSelf ? ' (You)' : ''}
           </span>
         </OverlayBadge>
-        <TileMediaStatus kind="microphone" enabled={!isMuted} compact={compact} />
+        <TileMediaStatus
+          kind="microphone"
+          enabled={!isMuted}
+          compact={compact}
+          speakingLabel={isSpeaking ? `${label} is speaking` : undefined}
+        />
         <TileMediaStatus kind="camera" enabled={isVideoOn} compact={compact} />
       </div>
     </div>
