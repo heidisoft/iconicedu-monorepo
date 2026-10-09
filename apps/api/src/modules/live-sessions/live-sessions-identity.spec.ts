@@ -1,3 +1,11 @@
+import { issueWhiteboardAccess } from '../whiteboards/whiteboard-access';
+jest.mock('../whiteboards/whiteboard-access', () => ({
+  issueWhiteboardAccess: jest.fn(async (_session, role) => ({
+    provider: 'excalidraw',
+    token: 'synthetic-board-token',
+    role,
+  })),
+}));
 import { issueAnnotationAccess } from '../screen-annotations/annotation-access';
 jest.mock('../screen-annotations/annotation-access', () => ({
   issueAnnotationAccess: jest.fn(async () => 'synthetic-annotation-token'),
@@ -30,6 +38,7 @@ describe('public live session identity and authorization', () => {
   let status: string;
   let invitesEnabled: boolean;
   let isClassMember: boolean;
+  let isTeacher: boolean;
   let lookupFilters: Array<{ table: string; filters: Record<string, unknown> }>;
   beforeEach(() => {
     jest.clearAllMocks();
@@ -38,6 +47,7 @@ describe('public live session identity and authorization', () => {
     status = 'live';
     invitesEnabled = true;
     isClassMember = true;
+    isTeacher = false;
     lookupFilters = [];
     jest.mocked(createSupabaseSessionClient).mockReturnValue({
       auth: {
@@ -51,6 +61,11 @@ describe('public live session identity and authorization', () => {
       },
     } as never);
     jest.mocked(createSupabaseServiceClient).mockReturnValue({
+      rpc: jest.fn(async (_name, args) => ({
+        data:
+          args.p_user === 'host-auth' || (hasOrgProfile && isTeacher && isClassMember),
+        error: null,
+      })),
       from: (table: string) => {
         const filters: Record<string, unknown> = {};
         const query = {
@@ -87,7 +102,7 @@ describe('public live session identity and authorization', () => {
             if (table === 'channel_members' && isClassMember) data = { id: 'membership' };
             if (table === 'channels') data = { topic: 'Science' };
             if (table === 'profiles') {
-              if (filters.id === 'host-profile')
+              if (filters.id === 'host-profile' || filters.account_id === 'host-account')
                 data = {
                   id: 'host-profile',
                   account_id: 'host-account',
@@ -104,7 +119,7 @@ describe('public live session identity and authorization', () => {
             if (table === 'accounts')
               data = filters.id
                 ? { auth_user_id: 'host-auth' }
-                : { id: 'member-account' };
+                : { id: authUserId === 'host-auth' ? 'host-account' : 'member-account' };
             return { data, error: null };
           },
         };
@@ -251,7 +266,7 @@ describe('public live session identity and authorization', () => {
       }),
     );
   });
-  it('issues host-role credentials only for the verified starter', async () => {
+  it('preserves host-role credentials for the verified starter', async () => {
     authUserId = 'host-auth';
     const result = await new LiveSessionsService().getPublicLiveSessionInfo(
       'session-identity',
@@ -264,6 +279,67 @@ describe('public live session identity and authorization', () => {
     expect(getJoinAccess).toHaveBeenCalledWith(
       expect.objectContaining({ profileId: 'host-profile', isHost: true }),
     );
+  });
+  it('gives a signed-in classroom teacher host credentials even when someone else started it', async () => {
+    isTeacher = true;
+    const result = await new LiveSessionsService().getPublicLiveSessionInfo(
+      'session-identity',
+      'synthetic-auth',
+    );
+    expect(result).toMatchObject({
+      isHost: true,
+      hostJoin: { displayName: 'Member Name' },
+    });
+    expect(issueWhiteboardAccess).toHaveBeenCalledWith(
+      'session-identity',
+      'teacher',
+      'Member Name',
+    );
+    expect(getJoinAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ profileId: 'member-profile', isHost: true }),
+    );
+  });
+  it('gives a verified teacher host credentials through guest-join without requiring a passcode', async () => {
+    isTeacher = true;
+    jest.mocked(verifyZoomPasscode).mockReturnValue(false);
+    await new LiveSessionsService().guestJoinLiveSession(
+      'session-identity',
+      'teacher-join',
+      { displayName: 'Ignored', passcode: 'wrong' },
+      'synthetic-auth',
+    );
+    expect(issueWhiteboardAccess).toHaveBeenCalledWith(
+      'session-identity',
+      'teacher',
+      'Member Name',
+    );
+    expect(getJoinAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ profileId: 'member-profile', isHost: true }),
+    );
+  });
+  it('does not make an unrelated teacher a host', async () => {
+    isTeacher = true;
+    isClassMember = false;
+    const result = await new LiveSessionsService().getPublicLiveSessionInfo(
+      'session-identity',
+      'synthetic-auth',
+    );
+    expect(result).toMatchObject({ isHost: false });
+    expect(getJoinAccess).not.toHaveBeenCalled();
+  });
+  it('fails closed if host permission verification fails', async () => {
+    const service = createSupabaseServiceClient() as unknown as { rpc: jest.Mock };
+    service.rpc.mockResolvedValue({
+      data: true,
+      error: { message: 'Database unavailable' },
+    });
+    await expect(
+      new LiveSessionsService().getPublicLiveSessionInfo(
+        'session-identity',
+        'synthetic-auth',
+      ),
+    ).rejects.toThrow('Unable to verify meeting host permissions');
+    expect(getJoinAccess).not.toHaveBeenCalled();
   });
   it('does not resolve identities or issue credentials for ended sessions', async () => {
     status = 'ended';

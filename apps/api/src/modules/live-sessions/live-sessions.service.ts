@@ -361,14 +361,14 @@ export class LiveSessionsService {
     const metadata = session.provider_metadata ?? {};
     const storedPasscode =
       typeof metadata.passcode === 'string' ? metadata.passcode : null;
-    if (!verifyZoomPasscode(storedPasscode, input.passcode)) {
-      throw new ForbiddenException('Incorrect passcode');
-    }
-
     const identity = accessToken
       ? await this.resolveLiveSessionIdentity(accessToken, session.org_id)
       : null;
-    if (!settings.invite.enabled) {
+    const isHost = await this.isMeetingHost(session.id, identity);
+    if (!isHost && !verifyZoomPasscode(storedPasscode, input.passcode)) {
+      throw new ForbiddenException('Incorrect passcode');
+    }
+    if (!settings.invite.enabled && !isHost) {
       if (!identity?.profileId || !session.channel_id)
         throw new ForbiddenException('Shared invitations are disabled');
       const membership = await serviceSupabase
@@ -392,7 +392,7 @@ export class LiveSessionsService {
       providerMetadata: metadata,
       profileId: identity?.profileId ?? `guest:${randomUUID()}`,
       displayName,
-      isHost: false,
+      isHost,
     });
 
     if (!joinAccess.token)
@@ -403,7 +403,13 @@ export class LiveSessionsService {
         ? { annotationToken: await issueAnnotationAccess(session.id, displayName) }
         : {}),
       ...(settings.whiteboard.enabled
-        ? { whiteboard: await this.whiteboardAccess(session.id, 'student', displayName) }
+        ? {
+            whiteboard: await this.whiteboardAccess(
+              session.id,
+              isHost ? 'teacher' : 'student',
+              displayName,
+            ),
+          }
         : {}),
       token: joinAccess.token,
       sessionName:
@@ -464,14 +470,11 @@ export class LiveSessionsService {
       return { exists: true as const, isActive: false as const, sessionTitle };
     }
 
-    const isSessionStarter = accessToken
-      ? await this.isAccessTokenForProfile(accessToken, session.started_by_profile_id)
-      : false;
-
-    if (!isSessionStarter) {
-      const identity = accessToken
-        ? await this.resolveLiveSessionIdentity(accessToken, session.org_id)
-        : null;
+    const identity = accessToken
+      ? await this.resolveLiveSessionIdentity(accessToken, session.org_id)
+      : null;
+    const isHost = await this.isMeetingHost(session.id, identity);
+    if (!isHost || !identity?.profileId) {
       return {
         exists: true as const,
         isActive: true as const,
@@ -481,38 +484,13 @@ export class LiveSessionsService {
         ...(identity ? { participant: { displayName: identity.displayName } } : {}),
       };
     }
-
-    const starterProfileResponse = await serviceSupabase
-      .from('profiles')
-      .select('id, display_name, first_name, last_name')
-      .eq('id', session.started_by_profile_id)
-      .maybeSingle<{
-        id: string;
-        display_name: string | null;
-        first_name: string | null;
-        last_name: string | null;
-      }>();
-    const starterProfile = starterProfileResponse.data;
-    if (!starterProfile) {
-      return {
-        exists: true as const,
-        isActive: true as const,
-        sessionTitle,
-        isHost: false as const,
-        settings,
-      };
-    }
-
-    const displayName =
-      starterProfile.display_name ??
-      ([starterProfile.first_name, starterProfile.last_name].filter(Boolean).join(' ') ||
-        'Host');
+    const displayName = identity.displayName;
     const provider = getLiveSessionProvider(session.provider as LiveSessionProviderVM);
     const joinAccess = await provider.getJoinAccess({
       sessionId: session.id,
       providerSessionId: session.provider_session_id,
       providerMetadata: session.provider_metadata,
-      profileId: starterProfile.id,
+      profileId: identity.profileId,
       displayName,
       isHost: true,
     });
@@ -594,44 +572,30 @@ export class LiveSessionsService {
       [row?.first_name, row?.last_name].filter(Boolean).join(' ').trim() ||
       (typeof metadataName === 'string' ? metadataName.trim() : '') ||
       'Participant';
-    return { profileId: row?.id ?? null, displayName: displayName.slice(0, 80) };
+    return {
+      authUserId: user.id,
+      profileId: row?.id ?? null,
+      displayName: displayName.slice(0, 80),
+    };
   }
 
-  // Verifies the bearer token the normal way (a real Supabase auth call, not
-  // just decoding the JWT) before trusting it for host detection — this
-  // gates who gets a host-role Zoom token (recording auto-start, moderator
-  // capabilities), so it needs real verification, not just a best-effort read.
-  private async isAccessTokenForProfile(
-    accessToken: string,
-    profileId: string,
+  /** The caller identity is verified with auth.getUser before this authorization RPC. */
+  private async isMeetingHost(
+    sessionId: string,
+    identity: { authUserId: string; profileId: string | null } | null,
   ): Promise<boolean> {
-    const sessionSupabase = createSupabaseSessionClient(accessToken);
-    const { data: authData } = await sessionSupabase.auth.getUser();
-    if (!authData.user) {
-      return false;
-    }
-
-    const serviceSupabase = createSupabaseServiceClient();
-    const profileResponse = await serviceSupabase
-      .from('profiles')
-      .select('account_id')
-      .eq('id', profileId)
-      .maybeSingle<{ account_id: string }>();
-    if (!profileResponse.data) {
-      return false;
-    }
-
-    const accountResponse = await serviceSupabase
-      .from('accounts')
-      .select('auth_user_id')
-      .eq('id', profileResponse.data.account_id)
-      .maybeSingle<{ auth_user_id: string | null }>();
-
-    return accountResponse.data?.auth_user_id === authData.user.id;
+    if (!identity?.profileId) return false;
+    const result = await createSupabaseServiceClient().rpc('live_session_can_host', {
+      p_session: sessionId,
+      p_user: identity.authUserId,
+    });
+    if (result.error)
+      throw new InternalServerErrorException('Unable to verify meeting host permissions');
+    return result.data === true;
   }
 
   // Best-effort: resolves the caller's own profile within this session's org
-  // from a bearer token, for attribution only — unlike isAccessTokenForProfile
+  // from a bearer token, for attribution only — unlike isMeetingHost
   // this isn't gating a privileged action, so a verification failure just
   // means the feedback is recorded without a profile_id (same as a guest).
   private async resolveProfileIdForAccessToken(
