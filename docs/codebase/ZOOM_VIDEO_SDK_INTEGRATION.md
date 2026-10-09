@@ -175,6 +175,8 @@ supabase/migrations/
 ### Public `/live` setup and return navigation
 
 `apps/api` verifies the optional bearer token before returning participant identity.
+The verified session starter and active classroom members with an educator profile receive host-role credentials through both `public-info` and authenticated `guest-join`. Signing in alone does not grant host access; students, guests and teachers outside the classroom remain participants. The same database authorization controls screen annotation moderation, and host joins receive teacher whiteboard grants. On join, the client uses Zoom’s `isOriginalHost()` and `reclaimHost()` to acquire the host role if another participant currently holds it. Zoom permits one current host, so the latest authorized host to join takes control.
+
 Hosts receive fresh host-role credentials through `public-info`; non-hosts receive
 only their own display name. Non-host token issuance still requires the session
 passcode, including signed-in participants. `guest-join` overrides a submitted

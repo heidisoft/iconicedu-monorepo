@@ -762,6 +762,8 @@ export function ZoomVideoSessionEmbed({
       }>,
     ) => {
       const updates = new Map(payload.map((user) => [user.userId, user]));
+      const selfUpdate = updates.get(selfUserIdRef.current ?? -1);
+      if (typeof selfUpdate?.isHost === 'boolean') setIsSelfHost(selfUpdate.isHost);
       updateRemoteParticipants((previous) =>
         previous.map((participant) => {
           const update = updates.get(participant.userId);

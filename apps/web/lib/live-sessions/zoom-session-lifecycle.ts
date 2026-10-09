@@ -118,6 +118,12 @@ async function joinZoomSession(client: ZoomClient, input: ZoomJoinInput) {
   const joinResult = await client.join(input.sessionName, input.token, input.displayName);
   if (isZoomExecutedFailure(joinResult)) throw joinResult;
 
+  // Zoom validates the signed host token; no browser role or submitted name grants access.
+  if (client.isOriginalHost() && !client.isHost()) {
+    const hostResult = await client.reclaimHost();
+    if (isZoomExecutedFailure(hostResult)) throw hostResult;
+  }
+
   return { compatibility, self: client.getCurrentUserInfo() };
 }
 

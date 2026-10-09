@@ -21,11 +21,54 @@ function createClient() {
   return {
     init: vi.fn().mockResolvedValue(''),
     join: vi.fn().mockResolvedValue({ userId: 42 }),
+    isOriginalHost: vi.fn().mockReturnValue(false),
+    isHost: vi.fn().mockReturnValue(false),
+    reclaimHost: vi.fn().mockResolvedValue(''),
     getCurrentUserInfo: vi.fn().mockReturnValue({ userId: 42, isHost: false }),
   } as unknown as ZoomClient;
 }
 
 describe('Zoom session lifecycle', () => {
+  it('claims host for a verified host token after joining an existing meeting', async () => {
+    const client = createClient();
+    vi.mocked(client.isOriginalHost).mockReturnValue(true);
+    vi.mocked(client.reclaimHost).mockImplementation(async () => {
+      vi.mocked(client.getCurrentUserInfo).mockReturnValue({
+        userId: 42,
+        isHost: true,
+      } as never);
+      return '';
+    });
+    const result = await initializeAndJoinZoomSession(client, {
+      sessionName: 'class',
+      token: 'host-token',
+      displayName: 'Teacher',
+    });
+    expect(client.reclaimHost).toHaveBeenCalledOnce();
+    expect(result.self.isHost).toBe(true);
+  });
+  it('never claims host for participant credentials', async () => {
+    const client = createClient();
+    await initializeAndJoinZoomSession(client, {
+      sessionName: 'class',
+      token: 'participant-token',
+      displayName: 'Student',
+    });
+    expect(client.reclaimHost).not.toHaveBeenCalled();
+  });
+  it('reports a host claim failure instead of presenting a successful host join', async () => {
+    const client = createClient();
+    vi.mocked(client.isOriginalHost).mockReturnValue(true);
+    const error = { reason: 'Unable to claim host', errorCode: 1 };
+    vi.mocked(client.reclaimHost).mockResolvedValue(error as never);
+    await expect(
+      initializeAndJoinZoomSession(client, {
+        sessionName: 'class',
+        token: 'host-token',
+        displayName: 'Teacher',
+      }),
+    ).rejects.toEqual(error);
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     zoomSdk.checkSystemRequirements.mockReturnValue({
