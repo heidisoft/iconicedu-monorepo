@@ -1,15 +1,8 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import {
-  Mic,
-  MicOff,
-  SignalHigh,
-  SignalLow,
-  SignalMedium,
-  Video,
-  VideoOff,
-} from 'lucide-react';
+import { SpeakingAudioIcon } from '@iconicedu/ui-web/ui/speaking-audio-icon';
+import { SignalHigh, SignalLow, SignalMedium, Video, VideoOff } from 'lucide-react';
 
 import {
   IconActionButton,
@@ -137,14 +130,18 @@ export function MediaStateIndicator({
   kind,
   enabled,
   className,
+  speakingLabel,
 }: {
   kind: 'microphone' | 'camera';
   enabled: boolean;
   className?: string;
+  speakingLabel?: string;
 }) {
-  const Icon =
-    kind === 'microphone' ? (enabled ? Mic : MicOff) : enabled ? Video : VideoOff;
-  const label = `${kind === 'microphone' ? 'Microphone' : 'Camera'} ${enabled ? 'on' : 'off'}`;
+  const Icon = enabled ? Video : VideoOff;
+  const speaking = kind === 'microphone' && enabled && !!speakingLabel;
+  const label = speaking
+    ? speakingLabel
+    : `${kind === 'microphone' ? 'Microphone' : 'Camera'} ${enabled ? 'on' : 'off'}`;
 
   return (
     <Tooltip>
@@ -157,7 +154,13 @@ export function MediaStateIndicator({
           )}
           aria-label={label}
         >
-          <Icon className="size-4" />
+          <>
+            {kind === 'microphone' ? (
+              <SpeakingAudioIcon speaking={speaking} muted={!enabled} />
+            ) : (
+              <Icon className="size-4" />
+            )}
+          </>
         </span>
       </TooltipTrigger>
       <TooltipContent>{label}</TooltipContent>

@@ -1,6 +1,6 @@
 'use client';
 
-import { AudioLines, EllipsisVertical, Hand, MicOff, Users } from 'lucide-react';
+import { EllipsisVertical, Hand, MicOff, Users } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@iconicedu/ui-web/ui/avatar';
 import { Badge } from '@iconicedu/ui-web/ui/badge';
@@ -120,17 +120,15 @@ export function ZoomParticipantsPanel({
                     <Hand className="size-4" strokeWidth={2.5} aria-hidden="true" />
                   </span>
                 ) : null}
-                {participant.isSpeaking ? (
-                  <span
-                    className="inline-flex size-8 items-center justify-center rounded-full bg-primary text-primary-foreground"
-                    aria-label={`${participant.name} is speaking`}
-                  >
-                    <AudioLines className="size-4" aria-hidden="true" />
-                  </span>
-                ) : null}
               </div>
               <div className="flex items-center gap-1.5">
-                <MediaStateIndicator kind="microphone" enabled={!participant.muted} />
+                <MediaStateIndicator
+                  kind="microphone"
+                  enabled={!participant.muted}
+                  speakingLabel={
+                    participant.isSpeaking ? `${participant.name} is speaking` : undefined
+                  }
+                />
                 <MediaStateIndicator kind="camera" enabled={participant.videoOn} />
               </div>
               <DropdownMenu>

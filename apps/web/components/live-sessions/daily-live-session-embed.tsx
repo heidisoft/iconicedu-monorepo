@@ -1,4 +1,6 @@
 'use client';
+import { SpeakingAudioIcon } from '@iconicedu/ui-web/ui/speaking-audio-icon';
+import { useSpeakingHold } from '@iconicedu/ui-web/hooks/use-speaking-hold';
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
@@ -21,7 +23,6 @@ import {
   Camera,
   Loader2,
   Mic,
-  MicOff,
   ExternalLink,
   Settings,
   RefreshCw,
@@ -157,6 +158,9 @@ function DailyParticipantListItem({
     audioState: participant?.tracks.audio.state,
   });
   const isCameraOff = participant?.tracks.video.state !== 'playable';
+  const [audioLevel, setAudioLevel] = useState(0);
+  useAudioLevel(participant?.tracks.audio.persistentTrack, setAudioLevel);
+  const speaking = useSpeakingHold(isDailyParticipantSpeaking(audioLevel), !isMicMuted);
 
   return (
     <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background/70 px-3 py-2">
@@ -174,7 +178,15 @@ function DailyParticipantListItem({
         </div>
       </div>
       <div className="flex items-center gap-2 text-muted-foreground">
-        {isMicMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+        <span
+          aria-label={
+            speaking
+              ? `${participantLabel} is speaking`
+              : `Microphone ${isMicMuted ? 'off' : 'on'}`
+          }
+        >
+          <SpeakingAudioIcon muted={isMicMuted} speaking={speaking} />
+        </span>
         {isCameraOff ? <VideoOff className="h-4 w-4" /> : <Video className="h-4 w-4" />}
       </div>
     </div>
@@ -196,6 +208,9 @@ function DailyPreJoinPreview({
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const videoTrack = participant?.tracks.video.persistentTrack;
+  const [audioLevel, setAudioLevel] = useState(0);
+  useAudioLevel(participant?.tracks.audio.persistentTrack, setAudioLevel);
+  const speaking = useSpeakingHold(isDailyParticipantSpeaking(audioLevel), isMicEnabled);
   const participantInitials = getDailyParticipantInitials(participant?.user_name);
   const participantLabel = meetingName?.trim() || participant?.user_name?.trim() || 'You';
 
@@ -246,14 +261,14 @@ function DailyPreJoinPreview({
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-background/95 to-transparent px-4 py-3">
         <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-          {isMicEnabled ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
+          <SpeakingAudioIcon muted={!isMicEnabled} speaking={speaking} />
           <span>{participantLabel}</span>
         </div>
       </div>
 
       <div className="absolute bottom-4 left-4 right-4 flex items-center justify-center gap-3">
         <div className="rounded-full border border-white/20 bg-black/45 p-3 text-white backdrop-blur">
-          {isMicEnabled ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
+          <SpeakingAudioIcon muted={!isMicEnabled} speaking={speaking} />
         </div>
         <div className="rounded-full border border-white/20 bg-black/45 p-3 text-white backdrop-blur">
           {isCameraEnabled ? (
@@ -495,6 +510,12 @@ function DailyLiveSessionSurface({
   );
   const localParticipant = useParticipant(localSessionId ?? undefined);
   const previewParticipant = callObject.participants().local;
+  const [localAudioLevel, setLocalAudioLevel] = useState(0);
+  useAudioLevel(localParticipant?.tracks.audio.persistentTrack, setLocalAudioLevel);
+  const localSpeaking = useSpeakingHold(
+    isDailyParticipantSpeaking(localAudioLevel),
+    isMicEnabled && meetingState === 'joined-meeting',
+  );
   const isHandRaised = Boolean(
     localParticipant &&
     typeof localParticipant.userData === 'object' &&
@@ -1084,6 +1105,7 @@ function DailyLiveSessionSurface({
           meetingName?.trim() || (isDirectCall ? 'Direct session' : 'Live session')
         }
         isMuted={!isMicEnabled}
+        isSpeaking={localSpeaking}
         isVideoOn={isCameraEnabled}
         isSharing={isScreenSharing}
         isDirectCall={isDirectCall}

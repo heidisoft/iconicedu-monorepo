@@ -6,7 +6,6 @@ import {
   Info,
   MessageSquare,
   Mic,
-  MicOff,
   MonitorUp,
   Ellipsis,
   PhoneOff,
@@ -16,6 +15,7 @@ import {
   VideoOff,
 } from 'lucide-react';
 
+import { SpeakingAudioIcon } from '@iconicedu/ui-web/ui/speaking-audio-icon';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import {
   DropdownMenu,
@@ -35,6 +35,7 @@ interface ControlBarProps {
   currentCameraId?: string | null;
   meetingName: string;
   isMuted: boolean;
+  isSpeaking?: boolean;
   isVideoOn: boolean;
   isSharing: boolean;
   isDirectCall?: boolean;
@@ -61,6 +62,7 @@ export function ControlBar({
   currentCameraId,
   meetingName,
   isMuted,
+  isSpeaking = false,
   isVideoOn,
   isSharing,
   isDirectCall = false,
@@ -134,7 +136,11 @@ export function ControlBar({
               ].join(' ')}
               title={isMuted ? 'Unmute' : 'Mute'}
             >
-              {isMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+              <SpeakingAudioIcon
+                muted={isMuted}
+                speaking={isSpeaking}
+                className="size-5"
+              />
             </Button>
           </div>
 

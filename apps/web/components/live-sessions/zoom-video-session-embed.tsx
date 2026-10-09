@@ -1,4 +1,5 @@
 'use client';
+import { SpeakingAudioIcon } from '@iconicedu/ui-web/ui/speaking-audio-icon';
 import { RecordingContentError } from './zoom-video/meeting-share-compositor';
 import { useRecordingShareCompositor } from './zoom-video/use-recording-share-compositor';
 
@@ -24,8 +25,6 @@ import {
   Hand,
   Loader2,
   MessageSquare,
-  Mic,
-  MicOff,
   MonitorUp,
   MonitorX,
   OctagonX,
@@ -1871,7 +1870,10 @@ export function ZoomVideoSessionEmbed({
                 onClick={() => void toggleMute()}
               >
                 <PoppingIcon toggleKey={isMuted}>
-                  {isMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                  <SpeakingAudioIcon
+                    muted={isMuted}
+                    speaking={speakingUserIds.has(selfUserIdRef.current ?? -1)}
+                  />
                 </PoppingIcon>
               </MeetingControlButton>
 

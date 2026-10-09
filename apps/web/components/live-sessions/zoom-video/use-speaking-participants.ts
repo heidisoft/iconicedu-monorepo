@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import type { ZoomClient } from '@iconicedu/web/lib/live-sessions/zoom-session-lifecycle';
-const SPEAKING_HOLD_MS = 1800;
+import { SPEAKING_HOLD_MS } from '@iconicedu/ui-web/hooks/use-speaking-hold';
 export function useSpeakingParticipants(
   client: ZoomClient | null,
   connected: boolean,

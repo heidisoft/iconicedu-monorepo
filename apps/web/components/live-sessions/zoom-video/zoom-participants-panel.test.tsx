@@ -5,6 +5,40 @@ import { TooltipProvider } from '@iconicedu/ui-web/ui/tooltip';
 import { ZoomParticipantsPanel } from './zoom-participants-panel';
 
 describe('ZoomParticipantsPanel', () => {
+  it('uses the same microphone animation in the list and suppresses it when muted', () => {
+    const participant = {
+      userId: 1,
+      name: 'Alex',
+      isYou: true,
+      isHost: true,
+      muted: false,
+      videoOn: true,
+      handRaised: false,
+      isSpeaking: true,
+    };
+    const panel = (muted: boolean) => (
+      <TooltipProvider>
+        <ZoomParticipantsPanel
+          open
+          canMuteOthers={false}
+          participants={[{ ...participant, muted }]}
+          onOpenChange={vi.fn()}
+          onMute={vi.fn()}
+        />
+      </TooltipProvider>
+    );
+    const { rerender } = render(panel(false));
+    const speaking = screen.getByLabelText('Alex is speaking');
+    expect(speaking.querySelector('[data-audio-indicator]')).toHaveAttribute(
+      'data-speaking',
+      'true',
+    );
+    rerender(panel(true));
+    expect(screen.queryByLabelText('Alex is speaking')).not.toBeInTheDocument();
+    expect(
+      screen.getByLabelText('Microphone off').querySelector('[data-audio-indicator]'),
+    ).toHaveAttribute('data-speaking', 'false');
+  });
   it('shows the participant count on its meeting control', () => {
     render(
       <TooltipProvider>

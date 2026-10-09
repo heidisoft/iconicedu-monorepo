@@ -1,8 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, type Ref } from 'react';
-import { Hand, Mic, MicOff, Video, VideoOff } from 'lucide-react';
+import { Hand, Video, VideoOff } from 'lucide-react';
 
+import { SpeakingAudioIcon } from '@iconicedu/ui-web/ui/speaking-audio-icon';
 import { Avatar, AvatarFallback, AvatarImage } from '@iconicedu/ui-web/ui/avatar';
 import { cn, getInitials } from '@iconicedu/ui-web/lib/utils';
 import {
@@ -23,8 +24,7 @@ function TileMediaStatus({
   compact?: boolean;
   speakingLabel?: string;
 }) {
-  const Icon =
-    kind === 'microphone' ? (enabled ? Mic : MicOff) : enabled ? Video : VideoOff;
+  const Icon = enabled ? Video : VideoOff;
   const label = `${kind === 'microphone' ? 'Microphone' : 'Camera'} ${enabled ? 'on' : 'off'}`;
   const isSpeaking = kind === 'microphone' && enabled && !!speakingLabel;
 
@@ -40,42 +40,18 @@ function TileMediaStatus({
       aria-label={isSpeaking ? speakingLabel : label}
       title={isSpeaking ? speakingLabel : label}
     >
-      <Icon
-        className={cn(
-          compact ? 'size-3' : 'size-4',
-          kind === 'microphone' && 'tile-microphone-icon',
-        )}
-        strokeWidth={2.25}
-        aria-hidden="true"
-      />
-      {kind === 'microphone' && (
-        <>
-          <span
-            className="tile-speaking-bars absolute flex h-3.5 items-center gap-0.5"
-            aria-hidden="true"
-          >
-            <span />
-            <span />
-            <span />
-          </span>
-          <style>{`
-            [data-tile-audio] .tile-microphone-icon,
-            [data-tile-audio] .tile-speaking-bars { transition: opacity 450ms ease-in-out; }
-            [data-tile-audio] .tile-speaking-bars { opacity: 0; }
-            [data-tile-audio][data-speaking="true"] .tile-speaking-bars { opacity: 1; }
-            [data-tile-audio][data-speaking="true"] .tile-microphone-icon { opacity: 0; }
-            .tile-speaking-bars > span { width: 2px; height: 12px; border-radius: 2px; background: currentColor; transform: scaleY(.45); }
-            .tile-speaking-bars > span:nth-child(2) { animation: tile-speaking-wave 1.6s ease-in-out infinite; animation-play-state: paused; }
-            [data-tile-audio][data-speaking="true"] .tile-speaking-bars > span:nth-child(2) { animation-play-state: running; }
-            @keyframes tile-speaking-wave { 0%, 100% { transform: scaleY(.3); } 50% { transform: scaleY(1); } }
-            @media (prefers-reduced-motion: reduce) {
-              [data-tile-audio] .tile-microphone-icon,
-              [data-tile-audio] .tile-speaking-bars { transition: none; }
-              .tile-speaking-bars > span { animation: none; transform: scaleY(.5); }
-              .tile-speaking-bars > span:nth-child(2) { animation: none; transform: scaleY(1); }
-            }
-          `}</style>
-        </>
+      {kind === 'microphone' ? (
+        <SpeakingAudioIcon
+          speaking={isSpeaking}
+          muted={!enabled}
+          className={compact ? 'size-3' : 'size-4'}
+        />
+      ) : (
+        <Icon
+          className={compact ? 'size-3' : 'size-4'}
+          strokeWidth={2.25}
+          aria-hidden="true"
+        />
       )}
     </span>
   );
