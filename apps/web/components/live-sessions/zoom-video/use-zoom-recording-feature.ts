@@ -10,6 +10,7 @@ export function useZoomRecordingFeature(
   client: ZoomClient | null,
   isHost: boolean,
   policy: LiveSessionSettingsVM['recording'],
+  beforeStart?: () => Promise<void>,
 ) {
   const [showBanner, setShowBanner] = useState(false);
   const [status, setStatus] = useState<RecordingStatus | null>(null);
@@ -33,6 +34,7 @@ export function useZoomRecordingFeature(
   }, [status]);
   const control = useMeetingRecordingControl({
     client: client?.getRecordingClient() ?? null,
+    beforeStart,
     canManage: isHost,
     enabled: policy.enabled,
     autoStart: policy.autoStart,

@@ -21,6 +21,8 @@ const shareStageClassName =
 
 export function ZoomShareStage({
   annotationOverlay,
+  selfUserId,
+  localSharing = false,
   remoteCanvasRef,
   localCanvasRef,
   localVideoRef,
@@ -37,7 +39,12 @@ export function ZoomShareStage({
   activeShareUserId,
   onSelectShare,
 }: {
-  annotationOverlay?: (size: { width: number; height: number }) => ReactNode;
+  selfUserId?: number | null;
+  localSharing?: boolean;
+  annotationOverlay?: (
+    size: { width: number; height: number },
+    presenterId?: number | null,
+  ) => ReactNode;
   remoteCanvasRef: Ref<HTMLCanvasElement>;
   localCanvasRef: Ref<HTMLCanvasElement>;
   localVideoRef: Ref<HTMLVideoElement>;
@@ -108,7 +115,11 @@ export function ZoomShareStage({
         {shareSwitcher}
         <SharedContentSurface
           source={dimensions}
-          overlay={showRemoteShare ? annotationOverlay : undefined}
+          overlay={
+            showRemoteShare && annotationOverlay
+              ? (size) => annotationOverlay(size, activeShareUserId)
+              : undefined
+          }
         >
           <canvas
             data-share-source="active"
@@ -140,7 +151,11 @@ export function ZoomShareStage({
         {shareSwitcher}
         <SharedContentSurface
           source={dimensions}
-          overlay={showLocalShare ? annotationOverlay : undefined}
+          overlay={
+            (localSharing || showLocalShare) && annotationOverlay
+              ? (size) => annotationOverlay(size, selfUserId)
+              : undefined
+          }
         >
           <canvas
             data-share-source={localRenderTarget === 'canvas' ? 'active' : undefined}

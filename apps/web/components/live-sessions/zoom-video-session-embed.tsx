@@ -1,4 +1,6 @@
 'use client';
+import { RecordingContentError } from './zoom-video/meeting-share-compositor';
+import { useRecordingShareCompositor } from './zoom-video/use-recording-share-compositor';
 
 import dynamic from 'next/dynamic';
 import { useSpeakingParticipants } from './zoom-video/use-speaking-participants';
@@ -14,6 +16,7 @@ import {
   SharePrivilege,
   VideoQuality,
   WhiteboardStatus,
+  RecordingStatus,
 } from '@zoom/videosdk';
 import {
   Captions,
@@ -343,10 +346,13 @@ export function ZoomVideoSessionEmbed({
   const captionClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [isSelfHost, setIsSelfHost] = useState(false);
+  const prepareRecordingRef = useRef<() => Promise<void>>(async () => {});
+  const boardPublicationRef = useRef(false);
   const recording = useZoomRecordingFeature(
     status === 'connected' ? clientRef.current : null,
     isSelfHost,
     settings.recording,
+    () => prepareRecordingRef.current(),
   );
   const recordingStatus = recording.status;
   const [showFeedbackPrompt, setShowFeedbackPrompt] = useState(false);
@@ -408,9 +414,169 @@ export function ZoomVideoSessionEmbed({
     presenting: isPresentingWhiteboard,
     supported: supportsWhiteboard,
     error: whiteboardError,
-    toggle: toggleWhiteboard,
+    toggle: toggleWhiteboardContent,
     exportPdf: exportWhiteboardPdf,
   } = whiteboard;
+  const pauseRecordingForContentFailure = useCallback(() => {
+    if (!isSelfHost || recordingStatus !== RecordingStatus.Recording) return;
+    const recordingClient = clientRef.current?.getRecordingClient();
+    if (recordingClient)
+      void recordingClient
+        .pauseCloudRecording()
+        .then((result) => {
+          if (result !== '')
+            setShareError(
+              'Shared content could not be captured and recording could not be paused. Stop recording and retry.',
+            );
+        })
+        .catch(() =>
+          setShareError(
+            'Unable to pause recording. Stop recording and retry shared content capture.',
+          ),
+        );
+  }, [isSelfHost, recordingStatus]);
+  const recordingComposition = useRecordingShareCompositor(
+    status === 'connected' && !showFeedbackPrompt ? clientRef.current : null,
+    isSharingScreen,
+    () => {
+      if (boardPublicationRef.current) {
+        const root = whiteboardContainerRef.current?.querySelector<HTMLElement>(
+          '[data-recording-whiteboard]',
+        );
+        return root ? { root, mode: 'whiteboard' } : null;
+      }
+      const root = localShareCanvasRef.current?.parentElement?.querySelector<HTMLElement>(
+        '[data-recording-annotations]',
+      );
+      return root ? { root, mode: 'annotations' } : null;
+    },
+    pauseRecordingForContentFailure,
+    activeShareUserId,
+  );
+  const publishWhiteboardForRecording = async () => {
+    const client = clientRef.current;
+    if (!client || !localShareVideoRef.current || !localShareCanvasRef.current)
+      throw new RecordingContentError(
+        'Recording content is not ready. Retry after joining.',
+      );
+    boardPublicationRef.current = true;
+    recordingComposition.setMode('whiteboard');
+    try {
+      await recordingComposition.prepare();
+      const stream = client.getMediaStream();
+      if (!isSharingScreen) {
+        const video = stream.isStartShareScreenWithVideoElement();
+        setLocalShareRenderTarget(video ? 'video' : 'canvas');
+        const result = await stream.startShareScreen(
+          video ? localShareVideoRef.current : localShareCanvasRef.current,
+          {
+            displaySurface: 'browser',
+            hideShareAudioOption: true,
+            controls: {
+              preferCurrentTab: true,
+              selfBrowserSurface: 'include',
+              systemAudio: 'exclude',
+            },
+          },
+        );
+        if (result !== '')
+          throw new RecordingContentError(
+            'Whiteboard sharing could not start. Confirm the browser sharing prompt and retry.',
+          );
+        setIsSharingScreen(true);
+      }
+    } catch (error) {
+      boardPublicationRef.current = false;
+      const stream = client.getMediaStream();
+      if (
+        !isSharingScreen &&
+        stream.getShareUserList().some((user) => user.userId === selfUserIdRef.current)
+      ) {
+        await stream.stopShareScreen().catch(() => {});
+        setIsSharingScreen(false);
+      }
+      recordingComposition.setMode('annotations');
+      throw error instanceof RecordingContentError
+        ? error
+        : new RecordingContentError(
+            'Whiteboard was not shared. Confirm the browser sharing prompt and retry recording.',
+          );
+    }
+  };
+  prepareRecordingRef.current = async () => {
+    if (whiteboard.nativeToken && whiteboardStatus !== WhiteboardStatus.Closed) {
+      await publishWhiteboardForRecording();
+    } else if (isSharingScreen) {
+      await recordingComposition.prepare();
+    } else if (activeShareUserId !== null) {
+      await recordingComposition.ensurePresenter(activeShareUserId);
+    }
+  };
+  const toggleWhiteboard = async () => {
+    try {
+      const opening = whiteboardStatus === WhiteboardStatus.Closed;
+      if (
+        opening &&
+        whiteboard.nativeToken &&
+        isSelfHost &&
+        recordingStatus === RecordingStatus.Recording
+      )
+        await publishWhiteboardForRecording();
+      await toggleWhiteboardContent();
+      if (!opening && boardPublicationRef.current) {
+        await clientRef.current?.getMediaStream().stopShareScreen();
+        boardPublicationRef.current = false;
+        recordingComposition.setMode('annotations');
+        setIsSharingScreen(false);
+      }
+    } catch (error) {
+      setShareError(
+        error instanceof Error
+          ? error.message
+          : 'Unable to publish whiteboard content for recording.',
+      );
+    }
+  };
+  useEffect(() => {
+    if (
+      isSelfHost &&
+      boardPublicationRef.current &&
+      !isSharingScreen &&
+      whiteboardStatus !== WhiteboardStatus.Closed &&
+      recordingStatus === RecordingStatus.Recording
+    ) {
+      setShareError(
+        'Whiteboard sharing stopped. Resume recording and confirm browser sharing to include the board again.',
+      );
+      pauseRecordingForContentFailure();
+    }
+  }, [
+    isSelfHost,
+    isSharingScreen,
+    whiteboardStatus,
+    recordingStatus,
+    pauseRecordingForContentFailure,
+  ]);
+  useEffect(() => {
+    if (
+      isSelfHost &&
+      whiteboard.nativeToken &&
+      whiteboardStatus !== WhiteboardStatus.Closed &&
+      !boardPublicationRef.current &&
+      recordingStatus === RecordingStatus.Recording
+    ) {
+      setShareError(
+        'The whiteboard needs browser sharing confirmation to appear in this cloud recording. Resume recording to include it.',
+      );
+      pauseRecordingForContentFailure();
+    }
+  }, [
+    isSelfHost,
+    whiteboard.nativeToken,
+    whiteboardStatus,
+    recordingStatus,
+    pauseRecordingForContentFailure,
+  ]);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showMobileControls, setShowMobileControls] = useState(false);
 
@@ -1078,6 +1244,7 @@ export function ZoomVideoSessionEmbed({
     // repeats this same attach/detach — harmless, since both are idempotent.
   }, [isVideoOn]);
 
+  const prepareShareForRecording = recordingComposition.prepare;
   const toggleScreenShare = useCallback(async () => {
     const client = clientRef.current;
     if (!client || !localShareVideoRef.current || !localShareCanvasRef.current) {
@@ -1096,6 +1263,7 @@ export function ZoomVideoSessionEmbed({
         const renderTarget = useVideoElement
           ? localShareVideoRef.current
           : localShareCanvasRef.current;
+        await prepareShareForRecording(recordingStatus === RecordingStatus.Recording);
         await stream.startShareScreen(renderTarget, {
           // Lets me keep viewing others' shares while my own is active —
           // only meaningful (and only offered) when the host has allowed
@@ -1122,7 +1290,13 @@ export function ZoomVideoSessionEmbed({
         }
       }
     }
-  }, [isSharingScreen, sharePrivilege, endShareAnnotations]);
+  }, [
+    isSharingScreen,
+    sharePrivilege,
+    endShareAnnotations,
+    recordingStatus,
+    prepareShareForRecording,
+  ]);
 
   const selectSharedScreen = useCallback(
     async (userId: number) => {
@@ -1459,12 +1633,29 @@ export function ZoomVideoSessionEmbed({
         action: { label: 'Refresh', onClick: () => window.location.reload() },
       }
     : shareError
-      ? { message: shareError, onDismiss: () => setShareError(null) }
-      : whiteboardError
-        ? { message: whiteboardError, onDismiss: whiteboard.dismissError }
-        : captionsError
-          ? { message: captionsError, onDismiss: () => setCaptionsError(null) }
-          : null;
+      ? {
+          message: shareError,
+          onDismiss: () => setShareError(null),
+          ...(recordingStatus === RecordingStatus.Paused &&
+          recording.action?.label === 'Resume recording'
+            ? {
+                action: {
+                  label: 'Resume recording',
+                  onClick: () => recording.action?.onSelect(),
+                },
+              }
+            : {}),
+        }
+      : recordingComposition.error
+        ? {
+            message: recordingComposition.error,
+            onDismiss: recordingComposition.dismissError,
+          }
+        : whiteboardError
+          ? { message: whiteboardError, onDismiss: whiteboard.dismissError }
+          : captionsError
+            ? { message: captionsError, onDismiss: () => setCaptionsError(null) }
+            : null;
   const isWhiteboardActive = whiteboardStatus !== WhiteboardStatus.Closed;
   // Zoom can publish the local share before its active-share participant ID
   // reaches the user state. Drive the presentation layout from either signal
@@ -1543,20 +1734,35 @@ export function ZoomVideoSessionEmbed({
           ) : null}
 
           <ZoomShareStage
+            localSharing={isSharingScreen}
+            selfUserId={selfUserIdRef.current}
             annotationOverlay={
               !isWhiteboardActive
-                ? (size) => (
+                ? (size, presenterId) => (
                     <ScreenAnnotationOverlay
+                      sourceComposited={
+                        presenterId !== selfUserIdRef.current &&
+                        recordingComposition.composited.has(
+                          presenterId ?? activeShareUserId ?? -1,
+                        )
+                      }
                       annotationToken={annotationToken}
-                      key={`${liveSessionId}:${activeShareUserId ?? selfUserIdRef.current}`}
+                      key={`${liveSessionId}:${presenterId ?? activeShareUserId ?? selfUserIdRef.current}`}
                       onContext={(context) =>
                         annotationLifecycle.remember(
-                          String(activeShareUserId ?? selfUserIdRef.current ?? 0),
+                          String(
+                            presenterId ??
+                              activeShareUserId ??
+                              selfUserIdRef.current ??
+                              0,
+                          ),
                           context,
                         )
                       }
                       sessionId={liveSessionId}
-                      shareKey={String(activeShareUserId ?? selfUserIdRef.current ?? 0)}
+                      shareKey={String(
+                        presenterId ?? activeShareUserId ?? selfUserIdRef.current ?? 0,
+                      )}
                       {...size}
                     />
                   )
@@ -1789,7 +1995,7 @@ export function ZoomVideoSessionEmbed({
                 />
               ) : null}
               <ZoomMoreControls
-                error={recording.error ?? messages.error}
+                error={recordingComposition.error ?? recording.error ?? messages.error}
                 open={showMobileControls}
                 onOpenChange={setShowMobileControls}
                 actions={[

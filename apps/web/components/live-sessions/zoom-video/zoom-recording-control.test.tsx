@@ -200,3 +200,49 @@ it('does not automatically record for non-hosts or when recording is disabled', 
   expect(screen.queryByRole('button')).not.toBeInTheDocument();
   expect(client.startCloudRecording).not.toHaveBeenCalled();
 });
+
+it('does not start cloud recording when the shared content cannot be prepared', async () => {
+  const client = createClient();
+  const { RecordingContentError } = await import('./meeting-share-compositor');
+  render(
+    <ZoomRecordingControl
+      canManage
+      client={client}
+      status={RecordingStatus.Stopped}
+      onStatusChange={vi.fn()}
+      beforeStart={async () => {
+        throw new RecordingContentError(
+          'Confirm whiteboard sharing to record its interactions.',
+        );
+      }}
+    />,
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Start recording' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'Confirm whiteboard sharing',
+  );
+  expect(client.startCloudRecording).not.toHaveBeenCalled();
+});
+it('prepares content again before resuming a paused recording', async () => {
+  const client = {
+    ...createClient(),
+    resumeCloudRecording: vi.fn(async () => '' as const),
+  };
+  client.getCloudRecordingStatus.mockReturnValue(RecordingStatus.Paused);
+  const prepare = vi.fn(async () => {});
+  render(
+    <ZoomRecordingControl
+      canManage
+      client={client}
+      status={RecordingStatus.Paused}
+      onStatusChange={vi.fn()}
+      beforeStart={prepare}
+    />,
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Resume recording' }));
+  await waitFor(() => expect(client.resumeCloudRecording).toHaveBeenCalledOnce());
+  expect(prepare.mock.invocationCallOrder[0]).toBeLessThan(
+    client.resumeCloudRecording.mock.invocationCallOrder[0],
+  );
+  expect(client.stopCloudRecording).not.toHaveBeenCalled();
+});
