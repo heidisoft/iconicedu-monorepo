@@ -64,16 +64,15 @@ function TileMediaStatus({
             [data-tile-audio] .tile-speaking-bars { opacity: 0; }
             [data-tile-audio][data-speaking="true"] .tile-speaking-bars { opacity: 1; }
             [data-tile-audio][data-speaking="true"] .tile-microphone-icon { opacity: 0; }
-            .tile-speaking-bars > span { width: 2px; height: 12px; border-radius: 2px; background: currentColor; transform: scaleY(.3); animation: tile-speaking-wave 1.6s ease-in-out infinite; animation-play-state: paused; }
-            .tile-speaking-bars > span:nth-child(2) { animation-delay: -.35s; }
-            .tile-speaking-bars > span:nth-child(3) { animation-delay: -.7s; }
-            [data-tile-audio][data-speaking="true"] .tile-speaking-bars > span { animation-play-state: running; }
+            .tile-speaking-bars > span { width: 2px; height: 12px; border-radius: 2px; background: currentColor; transform: scaleY(.45); }
+            .tile-speaking-bars > span:nth-child(2) { animation: tile-speaking-wave 1.6s ease-in-out infinite; animation-play-state: paused; }
+            [data-tile-audio][data-speaking="true"] .tile-speaking-bars > span:nth-child(2) { animation-play-state: running; }
             @keyframes tile-speaking-wave { 0%, 100% { transform: scaleY(.3); } 50% { transform: scaleY(1); } }
             @media (prefers-reduced-motion: reduce) {
               [data-tile-audio] .tile-microphone-icon,
               [data-tile-audio] .tile-speaking-bars { transition: none; }
               .tile-speaking-bars > span { animation: none; transform: scaleY(.5); }
-              .tile-speaking-bars > span:nth-child(2) { transform: scaleY(1); }
+              .tile-speaking-bars > span:nth-child(2) { animation: none; transform: scaleY(1); }
             }
           `}</style>
         </>

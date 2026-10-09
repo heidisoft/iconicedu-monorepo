@@ -310,3 +310,21 @@ test('gives every meeting toolbar action one descriptive tooltip', async ({ page
   await page.getByRole('button', { name: 'Share meeting link', exact: true }).focus();
   await expect(page.getByRole('tooltip')).toHaveText('Share meeting link');
 });
+
+test('animates only the middle speaking bar and honors reduced motion', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(fixturePath);
+  const bars = page
+    .locator('[data-tile-audio][data-speaking="true"] .tile-speaking-bars')
+    .first();
+  await expect(bars).toBeVisible();
+  const animations = () =>
+    bars.evaluate((element) =>
+      Array.from(element.children).map((bar) => getComputedStyle(bar).animationName),
+    );
+  await expect.poll(animations).toEqual(['none', 'tile-speaking-wave', 'none']);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect.poll(animations).toEqual(['none', 'none', 'none']);
+});
