@@ -619,3 +619,13 @@ existing stroke-width presets. The strip follows the toolbar dock and disappears
 in Pan and Eraser modes. Quick choices update the active drawing style and editable
 selected annotations through the existing annotation commands; More style options
 opens Format, retaining text, opacity, pressure, and custom-color controls.
+
+Screen-share freehand input preserves captured/coalesced samples through saving
+and uses Konva's round-cap, round-join polyline rendering without an additional
+curve or release-time simplification. Stationary pen/highlighter clicks persist
+as single-point dots. Preview-start packets copy their points so later local
+input cannot mutate a queued packet. Switching tools cancels the previous live
+preview, and rejected preview sends are handled separately from saved operations.
+Realtime preview subscriptions reconnect after a fresh share-context handshake,
+even when its room and participant IDs are unchanged. Late send failures from a
+replaced channel cannot report an error into the reopened share.

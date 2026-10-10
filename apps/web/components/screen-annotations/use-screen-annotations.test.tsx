@@ -99,6 +99,61 @@ beforeEach(() => {
   });
 });
 describe('annotation client', () => {
+  it('handles rejected preview sends without an unhandled rejection', async () => {
+    const { result } = renderHook(() => useScreenAnnotations('session', '123'));
+    await waitFor(() => expect(result.current.connected).toBe(true));
+    mocks.send.mockRejectedValueOnce(new Error('WebSocket disconnected'));
+    act(() =>
+      result.current.broadcast({
+        kind: 'start',
+        object,
+        eventId: 'preview',
+        roomId: 'room',
+        clientId: result.current.clientId,
+        userId: 'actor',
+        sequence: 0,
+        timestamp: Date.now(),
+        annotationId: object.id,
+      }),
+    );
+    await waitFor(() =>
+      expect(result.current.error).toBe('Drawing preview connection interrupted'),
+    );
+  });
+  it('ignores a late preview failure from a replaced share channel', async () => {
+    const { result, rerender } = renderHook(
+      ({ share }) => useScreenAnnotations('session', share),
+      { initialProps: { share: '123' } },
+    );
+    await waitFor(() => expect(result.current.connected).toBe(true));
+    let reject!: (error: Error) => void;
+    mocks.send.mockImplementationOnce(
+      () =>
+        new Promise((_resolve, fail) => {
+          reject = fail;
+        }),
+    );
+    act(() =>
+      result.current.broadcast({
+        kind: 'start',
+        object,
+        eventId: 'old-preview',
+        roomId: 'room',
+        clientId: result.current.clientId,
+        userId: 'actor',
+        sequence: 0,
+        timestamp: Date.now(),
+        annotationId: object.id,
+      }),
+    );
+    rerender({ share: '456' });
+    await waitFor(() => expect(mocks.context).toHaveBeenCalledWith('session', '456'));
+    await waitFor(() => expect(result.current.connected).toBe(true));
+    await act(async () => {
+      reject(new Error('Old channel closed'));
+    });
+    expect(result.current.error).toBeNull();
+  });
   it('keeps an acknowledged stroke visible while recovering a missed revision', async () => {
     const { result } = renderHook(() => useScreenAnnotations('session', '123'));
     await waitFor(() => expect(result.current.connected).toBe(true));

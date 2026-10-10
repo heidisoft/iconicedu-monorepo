@@ -32,6 +32,7 @@ export function useScreenAnnotations(
   const contextRef = useRef<AnnotationContext | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
+  const [connectionGeneration, setConnectionGeneration] = useState(0);
   const [optimistic, setOptimistic] = useState<Record<string, AnnotationObject>>({});
   const [remoteDrafts, setRemoteDrafts] = useState<AnnotationObject[]>([]);
   const [pointers, setPointers] = useState<
@@ -64,6 +65,7 @@ export function useScreenAnnotations(
   const publishContext = useCallback((value: AnnotationContext) => {
     contextRef.current = value;
     setContext(value);
+    setConnectionGeneration(generation.current);
   }, []);
   const refresh = useCallback(async () => {
     const currentGeneration = generation.current;
@@ -552,7 +554,15 @@ export function useScreenAnnotations(
       setPointers({});
       for (const channel of channels) void supabase.removeChannel(channel);
     };
-  }, [annotationToken, roomId, actorsKey, canDraw, receiveCommit, refresh]);
+  }, [
+    annotationToken,
+    roomId,
+    actorsKey,
+    canDraw,
+    receiveCommit,
+    refresh,
+    connectionGeneration,
+  ]);
   const broadcast = useCallback((event: AnnotationPreview) => {
     if (event.kind === 'start' && event.object.type === 'vanishingPen') {
       outgoingLasers.current.set(event.annotationId, {
@@ -616,12 +626,19 @@ export function useScreenAnnotations(
       }));
     }
     const channel = ownChannel.current;
-    if (channel)
+    if (channel) {
+      const interrupted = () => {
+        // A disposed/replaced channel must not report errors into the current share.
+        if (ownChannel.current === channel)
+          setError('Drawing preview connection interrupted');
+      };
       void channel
         .send({ type: 'broadcast', event: 'annotation.preview', payload: event })
         .then((status) => {
-          if (status !== 'ok') setError('Drawing preview connection interrupted');
-        });
+          if (status !== 'ok') interrupted();
+        })
+        .catch(interrupted);
+    }
   }, []);
   const execute = useCallback(
     (operation: AnnotationOperation, remember = true): Promise<AnnotationCommit> => {
