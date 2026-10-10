@@ -53,7 +53,15 @@ describe('screen annotation toolbar', () => {
     const primary = within(screen.getByRole('group', { name: 'Drawing tools' }));
     expect(
       primary.getAllByRole('button').map((button) => button.getAttribute('aria-label')),
-    ).toEqual(['Pointer', 'Select', 'Pen', 'Highlighter', 'Text', 'Eraser']);
+    ).toEqual([
+      'Pointer',
+      'Select',
+      'Pen',
+      'Vanishing pen',
+      'Highlighter',
+      'Text',
+      'Eraser',
+    ]);
     click('Close annotation toolbar');
     expect(props.setTool).toHaveBeenLastCalledWith('cursor');
     expect(screen.getAllByRole('button')).toHaveLength(1);
@@ -75,6 +83,18 @@ describe('screen annotation toolbar', () => {
     expect(pen).toHaveClass('size-8', 'rounded-full');
     expect(pen.querySelector('svg')).toHaveAttribute('width', '16');
     expect(pen.querySelector('span')).toHaveClass('sr-only');
+    const drawingTools = screen.getByRole('group', {
+      name: 'Drawing tools',
+      exact: true,
+    });
+    const buttons = Array.from(drawingTools.querySelectorAll('button'));
+    expect(buttons[buttons.indexOf(pen) + 1]).toHaveAccessibleName('Vanishing pen');
+    expect(screen.getByRole('button', { name: 'Shapes', exact: true })).toHaveClass(
+      'h-8',
+      'w-11',
+      'rounded-full',
+    );
+
     click('Shapes');
     const shape = screen.getByRole('button', { name: 'Rectangle', exact: true });
     expect(shape).toHaveClass('min-h-11');
@@ -98,7 +118,6 @@ describe('screen annotation toolbar', () => {
     expect(
       screen.queryByRole('group', { name: 'Stamps', exact: true }),
     ).not.toBeInTheDocument();
-    click('Attention');
     click('Vanishing pen');
     expect(props.setTool).toHaveBeenLastCalledWith('vanishingPen');
   });
@@ -135,6 +154,7 @@ describe('screen annotation toolbar', () => {
     for (const name of [
       'Select',
       'Pen',
+      'Vanishing pen',
       'Highlighter',
       'Text',
       'Eraser',

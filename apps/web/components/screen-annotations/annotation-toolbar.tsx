@@ -20,7 +20,6 @@ import {
   Pencil,
   Redo2,
   Scan,
-  Sparkles,
   Square,
   Star,
   Stamp,
@@ -33,6 +32,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
+import { LaserPointerIcon } from '@iconicedu/ui-web/ui/laser-pointer-icon';
 import type { AnnotationTool } from '@iconicedu/shared-types';
 const tools = {
   cursor: { label: 'Pointer', icon: MousePointer2, shortcut: '' },
@@ -51,7 +51,7 @@ const tools = {
   ellipseFilled: { label: 'Filled ellipse', icon: Circle, filled: true },
   ellipseHighlight: { label: 'Ellipse highlight', icon: Circle, highlight: true },
   diamond: { label: 'Diamond', icon: Diamond },
-  vanishingPen: { label: 'Vanishing pen', icon: Sparkles },
+  vanishingPen: { label: 'Vanishing pen', icon: LaserPointerIcon },
   spotlight: { label: 'Spotlight', icon: LocateFixed },
   pointerArrow: { label: 'Named pointer', icon: MoveUpRight },
   stampCheck: { label: 'Check', icon: Check },
@@ -81,9 +81,11 @@ const stamps: AnnotationTool[] = [
   'stampQuestion',
   'stampArrow',
 ];
-const attention: AnnotationTool[] = ['spotlight', 'pointerArrow', 'vanishingPen'];
-const iconButton =
-  'flex size-8 shrink-0 items-center justify-center rounded-full p-0 text-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 disabled:pointer-events-none aria-pressed:bg-primary/10 aria-pressed:text-primary';
+const attention: AnnotationTool[] = ['spotlight', 'pointerArrow'];
+const buttonStyle =
+  'flex shrink-0 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 disabled:pointer-events-none aria-pressed:bg-primary/10 aria-pressed:text-primary';
+const iconButton = `${buttonStyle} size-8 p-0`;
+const menuTrigger = `${buttonStyle} h-8 w-11 px-2 aria-expanded:bg-muted`;
 const menuToolButton = `${iconButton} min-h-11 h-auto w-full flex-col gap-1 px-1 py-1.5`;
 
 function PanelSection({ label, children }: { label: string; children: ReactNode }) {
@@ -175,7 +177,7 @@ function ToolMenu({
         aria-label={label}
         aria-expanded={open}
         aria-pressed={active}
-        className={iconButton}
+        className={menuTrigger}
         onClick={toggle}
         title={label}
       >
@@ -496,6 +498,7 @@ export function AnnotationToolbar({
                   'cursor',
                   'select',
                   'pen',
+                  'vanishingPen',
                   'highlighter',
                   'text',
                   'eraser',

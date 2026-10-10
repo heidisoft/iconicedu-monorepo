@@ -61,9 +61,9 @@ test('supports shape variants, formatting and nonpersistent vanishing marks', as
     ['Shapes', 'Rectangle highlight'],
     ['Shapes', 'Filled ellipse'],
     ['Shapes', 'Diamond'],
-    ['Attention', 'Vanishing pen'],
+    ['', 'Vanishing pen'],
   ]) {
-    await page.getByRole('button', { name: group, exact: true }).click();
+    if (group) await page.getByRole('button', { name: group, exact: true }).click();
     await page.getByRole('button', { name: tool, exact: true }).click();
     await page.mouse.move(
       surface!.x + surface!.width * 0.1,
