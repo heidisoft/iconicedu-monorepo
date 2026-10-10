@@ -418,3 +418,80 @@ test('offers the same quick-style workflow as whiteboard and keeps options dismi
   await page.getByRole('button', { name: 'Pan', exact: true }).click();
   await expect(strip).toHaveCount(0);
 });
+
+test('reopens repeatedly without errors and paints rapid pen and highlighter dots', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto('/visual-test/screen-annotations');
+  for (let index = 0; index < 5; index++) {
+    await page.getByRole('button', { name: 'Open annotation toolbar' }).click();
+    await page.getByRole('button', { name: 'Highlighter', exact: true }).click();
+    await page.getByRole('button', { name: 'Close annotation toolbar' }).click();
+  }
+  await page.getByRole('button', { name: 'Open annotation toolbar' }).click();
+  const surface = page.locator('[data-shared-content-bounds]');
+  const box = (await surface.boundingBox())!;
+  await surface.locator('[data-recording-annotations]').evaluate((root: HTMLElement) => {
+    const capture = root.setPointerCapture.bind(root);
+    let firstCapture = true;
+    root.setPointerCapture = (id) => {
+      if (firstCapture) {
+        firstCapture = false;
+        throw new DOMException('Pointer is no longer active', 'NotFoundError');
+      }
+      capture(id);
+    };
+    const release = root.releasePointerCapture.bind(root);
+    let first = true;
+    root.releasePointerCapture = (id) => {
+      if (first) {
+        first = false;
+        throw new DOMException('Pointer was already released', 'NotFoundError');
+      }
+      release(id);
+    };
+  });
+  for (const [index, tool] of ['Pen', 'Highlighter'].entries()) {
+    await page.getByRole('button', { name: tool, exact: true }).click();
+    for (let dot = 0; dot < 5; dot++) {
+      const x = box.x + box.width * (0.45 + dot * 0.06);
+      const y = box.y + box.height * (0.5 + index * 0.15);
+      await page.mouse.click(x, y);
+      await expect
+        .poll(() =>
+          surface
+            .locator('canvas')
+            .first()
+            .evaluate(
+              (canvas: HTMLCanvasElement, point) => {
+                const context = canvas.getContext('2d')!;
+                const sx = canvas.width / canvas.getBoundingClientRect().width;
+                const sy = canvas.height / canvas.getBoundingClientRect().height;
+                return context.getImageData(
+                  Math.round(point.x * sx),
+                  Math.round(point.y * sy),
+                  1,
+                  1,
+                ).data[3];
+              },
+              { x: x - box.x, y: y - box.y },
+            ),
+        )
+        .toBeGreaterThan(0);
+    }
+  }
+  await expect(page.getByLabel('Annotation count')).toHaveText('10 marks');
+  await surface.locator('[data-recording-annotations]').evaluate((root: HTMLElement) => {
+    root.setPointerCapture = () => {
+      throw new DOMException('Capture unavailable', 'NotFoundError');
+    };
+  });
+  await page.mouse.move(box.x + box.width * 0.8, box.y + box.height * 0.8);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width + 10, box.y + box.height * 0.85);
+  await page.mouse.up();
+  await expect(page.getByLabel('Annotation count')).toHaveText('11 marks');
+  expect(errors).toEqual([]);
+});

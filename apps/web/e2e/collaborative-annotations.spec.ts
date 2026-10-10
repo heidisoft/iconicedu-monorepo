@@ -95,12 +95,12 @@ async function draw(page: Page, viewer?: Page) {
   const bounds = await page.locator('[data-shared-content-bounds]').boundingBox();
   await page.mouse.move(
     bounds!.x + bounds!.width * 0.2,
-    bounds!.y + bounds!.height * 0.2,
+    bounds!.y + bounds!.height * 0.35,
   );
   await page.mouse.down();
   await page.mouse.move(
     bounds!.x + bounds!.width * 0.4,
-    bounds!.y + bounds!.height * 0.4,
+    bounds!.y + bounds!.height * 0.55,
     { steps: 10 },
   );
   if (viewer)
@@ -354,6 +354,106 @@ test('shares screen laser trails with signed-in participants and shared-link gue
       timeout: 2000,
     });
     await expect(teacher.page.getByLabel('Synchronized marks')).toHaveText('0');
+  } finally {
+    for (const context of contexts) await context.close();
+    data.cleanup();
+  }
+});
+
+test('keeps real API dots and fast highlights after closing and reopening tools', async ({
+  browser,
+}) => {
+  test.setTimeout(60000);
+  const data = fixture();
+  const contexts = [];
+  try {
+    const teacher = await join(browser, { ...data.actors[0], sessionId: data.sessionId });
+    const participant = await join(browser, {
+      ...data.actors[1],
+      sessionId: data.sessionId,
+    });
+    contexts.push(teacher.context, participant.context);
+    const errors: string[] = [];
+    teacher.page.on('pageerror', (error) => errors.push(error.message));
+    const puts: Array<{ object: { type: string; points: unknown[] } }> = [];
+    teacher.page.on('request', (request) => {
+      if (request.url().endsWith('/operations') && request.method() === 'POST') {
+        const operation = request.postDataJSON();
+        if (operation.kind === 'put') puts.push(operation);
+      }
+    });
+    for (let index = 0; index < 3; index++) {
+      await teacher.page.getByRole('button', { name: 'Open annotation toolbar' }).click();
+      await teacher.page
+        .getByRole('button', { name: 'Close annotation toolbar' })
+        .click();
+    }
+    await teacher.page.getByRole('button', { name: 'Open annotation toolbar' }).click();
+    const bounds = (await teacher.page
+      .locator('[data-shared-content-bounds]')
+      .boundingBox())!;
+    for (let index = 0; index < 10; index++) {
+      await teacher.page.mouse.click(
+        bounds.x + bounds.width * (0.45 + index * 0.04),
+        bounds.y + bounds.height * 0.55,
+      );
+    }
+    await teacher.page.getByRole('button', { name: 'Highlighter', exact: true }).click();
+    for (let index = 0; index < 5; index++) {
+      await teacher.page.mouse.move(
+        bounds.x + bounds.width * 0.5,
+        bounds.y + bounds.height * (0.65 + index * 0.04),
+      );
+      await teacher.page.mouse.down();
+      await teacher.page.mouse.move(
+        bounds.x + bounds.width * 0.8,
+        bounds.y + bounds.height * (0.65 + index * 0.04),
+      );
+      await teacher.page.mouse.up();
+    }
+    await expect(teacher.page.getByLabel('Synchronized marks')).toHaveText('15');
+    await expect(participant.page.getByLabel('Synchronized marks')).toHaveText('15', {
+      timeout: 10000,
+    });
+    await expect(
+      teacher.page.locator('[data-recording-annotations] [role="status"]'),
+    ).toHaveCount(0);
+    expect(puts.filter((operation) => operation.object.type === 'pen')).toHaveLength(10);
+    expect(
+      puts
+        .filter((operation) => operation.object.type === 'pen')
+        .every((operation) => operation.object.points.length === 1),
+    ).toBe(true);
+    await teacher.page.mouse.move(
+      bounds.x + bounds.width * 0.5,
+      bounds.y + bounds.height * 0.45,
+    );
+    await teacher.page.mouse.down();
+    await teacher.page
+      .locator('[data-shared-content-bounds] canvas')
+      .first()
+      .evaluate((canvas, box) => {
+        const sample = (index: number) =>
+          new PointerEvent('pointermove', {
+            bubbles: true,
+            pointerId: 1,
+            pointerType: 'mouse',
+            buttons: 1,
+            clientX: box.x + box.width * (0.5 + index * 0.003),
+            clientY: box.y + box.height * 0.45,
+          });
+        const event = sample(80);
+        Object.defineProperty(event, 'getCoalescedEvents', {
+          value: () => Array.from({ length: 80 }, (_, index) => sample(index + 1)),
+        });
+        canvas.dispatchEvent(event);
+      }, bounds);
+    await teacher.page.mouse.up();
+    await expect(participant.page.getByLabel('Synchronized marks')).toHaveText('16', {
+      timeout: 10000,
+    });
+    expect(puts.at(-1)!.object.points.length).toBeGreaterThanOrEqual(82);
+    expect(errors).toEqual([]);
   } finally {
     for (const context of contexts) await context.close();
     data.cleanup();

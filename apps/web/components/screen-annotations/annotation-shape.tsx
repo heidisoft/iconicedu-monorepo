@@ -123,7 +123,11 @@ export const AnnotationShape = memo(function AnnotationShape({
         ]}
       />
     );
-  else if (object.points.length === 1)
+  else if (
+    object.points.every(
+      (point) => point.x === object.points[0].x && point.y === object.points[0].y,
+    )
+  )
     shape = (
       <Circle
         radius={strokeWidth / 2}
@@ -136,7 +140,7 @@ export const AnnotationShape = memo(function AnnotationShape({
       <Line
         {...common}
         points={bounds.points}
-        tension={object.type === 'line' ? 0 : 0.25}
+        tension={0}
         hitStrokeWidth={Math.max(12, strokeWidth)}
       />
     );

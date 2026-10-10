@@ -15,7 +15,6 @@ import {
   AnnotationCoordinateService,
   participantColor,
   moveAnnotation,
-  simplifyAnnotationPoints,
 } from '@iconicedu/utils';
 import { AnnotationShape, annotationGeometry } from './annotation-shape';
 import { AnnotationToolbar } from './annotation-toolbar';
@@ -113,8 +112,15 @@ export function AnnotationOverlay({
   const releasePointer = useCallback(() => {
     const id = pointerId.current;
     pointerId.current = null;
-    if (id !== null && root.current?.hasPointerCapture(id))
-      root.current.releasePointerCapture(id);
+    if (id !== null && root.current?.hasPointerCapture(id)) {
+      try {
+        root.current.releasePointerCapture(id);
+      } catch (error) {
+        // Pointer-up may implicitly release capture before a tool-close event runs.
+        if (!(error instanceof DOMException && error.name === 'NotFoundError'))
+          throw error;
+      }
+    }
   }, []);
   const actor = engine.context?.actor;
   const tutor = actor?.role === 'educator';
@@ -122,26 +128,6 @@ export function AnnotationOverlay({
     (object: AnnotationObject) =>
       engine.canDraw && (tutor || object.creatorId === actor?.userId),
     [engine.canDraw, tutor, actor?.userId],
-  );
-  const setTool = useCallback(
-    (next: AnnotationTool) => {
-      setToolState(next);
-      setSelected([]);
-      setTextEditor(null);
-      active.current = null;
-      pendingPoints.current = [];
-      releasePointer();
-      setDraft(null);
-      setMarquee(null);
-      if (next === 'highlighter' || next.endsWith('Highlight')) {
-        setOpacity(0.25);
-        if (next === 'highlighter') setLineWidth(18);
-      } else {
-        setOpacity(1);
-        if (lineWidth === 18) setLineWidth(3);
-      }
-    },
-    [lineWidth, releasePointer],
   );
   const swallow = (promise: Promise<unknown>) => {
     void promise.catch(() => undefined);
@@ -162,6 +148,28 @@ export function AnnotationOverlay({
       } as AnnotationPreview);
     },
     [],
+  );
+  const setTool = useCallback(
+    (next: AnnotationTool) => {
+      if (active.current)
+        preview({ kind: 'finish' }, active.current.id, ++sequence.current);
+      setToolState(next);
+      setSelected([]);
+      setTextEditor(null);
+      active.current = null;
+      pendingPoints.current = [];
+      releasePointer();
+      setDraft(null);
+      setMarquee(null);
+      if (next === 'highlighter' || next.endsWith('Highlight')) {
+        setOpacity(0.25);
+        if (next === 'highlighter') setLineWidth(18);
+      } else {
+        setOpacity(1);
+        if (lineWidth === 18) setLineWidth(3);
+      }
+    },
+    [lineWidth, releasePointer, preview],
   );
   const flush = useCallback(() => {
     const object = active.current;
@@ -404,12 +412,21 @@ export function AnnotationOverlay({
       return;
     }
     pointerId.current = event.pointerId;
-    root.current?.setPointerCapture(event.pointerId);
+    try {
+      root.current?.setPointerCapture(event.pointerId);
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === 'NotFoundError')) throw error;
+      // Capture is best-effort; an otherwise valid click must still create a dot.
+    }
     active.current = object;
     pendingPoints.current = [];
     sequence.current = 0;
-    setDraft(object);
-    preview({ kind: 'start', object }, object.id, 0);
+    setDraft({ ...object, points: [...object.points] });
+    preview(
+      { kind: 'start', object: { ...object, points: [...object.points] } },
+      object.id,
+      0,
+    );
   };
   const move = (event: React.PointerEvent) => {
     if (!engine.canDraw || touchIds.current.size > 1) return;
@@ -449,7 +466,12 @@ export function AnnotationOverlay({
     // React batches input updates; Konva schedules canvas drawing automatically.
     setDraft({ ...object, points: [...object.points] });
   };
-  const up = (event: React.PointerEvent) => {
+  const up = (
+    event: Pick<
+      PointerEvent,
+      'pointerId' | 'clientX' | 'clientY' | 'pressure' | 'shiftKey'
+    >,
+  ) => {
     touchIds.current.delete(event.pointerId);
     if (marquee) {
       const left = Math.min(marquee.start.x, marquee.end.x);
@@ -502,9 +524,14 @@ export function AnnotationOverlay({
     while (pendingPoints.current.length) flush();
     const object = {
       ...active.current,
-      points: paths.has(tool)
-        ? simplifyAnnotationPoints(active.current.points)
-        : active.current.points,
+      // Preserve the same samples used by the live Konva path on pointer-up.
+      points: active.current.points.every(
+        (point) =>
+          point.x === active.current!.points[0].x &&
+          point.y === active.current!.points[0].y,
+      )
+        ? [active.current.points[0]]
+        : [...active.current.points],
     };
     if (pressure && tool === 'pen')
       object.style = {
@@ -535,6 +562,31 @@ export function AnnotationOverlay({
     releasePointer();
     setDraft(null);
   };
+  const finishInput = useRef(up);
+  finishInput.current = up;
+  const cancelInput = useRef(cancelDraft);
+  cancelInput.current = cancelDraft;
+  useEffect(() => {
+    // Normally capture routes pointer-up to the overlay. Also finish safely when
+    // a browser declines capture and the pointer is released outside the share.
+    const finishOutside = (event: PointerEvent) => {
+      if (
+        event.pointerId === pointerId.current &&
+        !root.current?.contains(event.target as Node)
+      ) {
+        if (event.type === 'pointercancel') {
+          touchIds.current.delete(event.pointerId);
+          cancelInput.current();
+        } else finishInput.current(event);
+      }
+    };
+    document.addEventListener('pointerup', finishOutside);
+    document.addEventListener('pointercancel', finishOutside);
+    return () => {
+      document.removeEventListener('pointerup', finishOutside);
+      document.removeEventListener('pointercancel', finishOutside);
+    };
+  }, []);
   const transformObject = useCallback(
     (object: AnnotationObject, node: Konva.Group) => {
       if (!canEdit(object)) return;
