@@ -496,12 +496,12 @@ export function AnnotationToolbar({
               {(
                 [
                   'cursor',
+                  'vanishingPen',
                   'select',
                   'pen',
-                  'vanishingPen',
-                  'highlighter',
                   'text',
                   'eraser',
+                  'highlighter',
                 ] as AnnotationTool[]
               ).map((item) => (
                 <ToolButton

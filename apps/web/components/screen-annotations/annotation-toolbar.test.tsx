@@ -55,12 +55,12 @@ describe('screen annotation toolbar', () => {
       primary.getAllByRole('button').map((button) => button.getAttribute('aria-label')),
     ).toEqual([
       'Pointer',
+      'Vanishing pen',
       'Select',
       'Pen',
-      'Vanishing pen',
-      'Highlighter',
       'Text',
       'Eraser',
+      'Highlighter',
     ]);
     click('Close annotation toolbar');
     expect(props.setTool).toHaveBeenLastCalledWith('cursor');
@@ -88,7 +88,10 @@ describe('screen annotation toolbar', () => {
       exact: true,
     });
     const buttons = Array.from(drawingTools.querySelectorAll('button'));
-    expect(buttons[buttons.indexOf(pen) + 1]).toHaveAccessibleName('Vanishing pen');
+    expect(buttons[0]).toHaveAccessibleName('Pointer');
+    expect(buttons[1]).toHaveAccessibleName('Vanishing pen');
+    expect(buttons[2]).toHaveAccessibleName('Select');
+    expect(buttons[buttons.indexOf(pen) + 1]).toHaveAccessibleName('Text');
     expect(screen.getByRole('button', { name: 'Shapes', exact: true })).toHaveClass(
       'h-8',
       'w-11',
