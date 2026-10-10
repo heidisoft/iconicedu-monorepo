@@ -1,11 +1,14 @@
 import { continuousCanvas } from './continuous-canvas';
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
   InternalServerErrorException,
 } from '@nestjs/common';
 import type {
+  WhiteboardLaserPresenceVM,
+  WhiteboardLaserSampleVM,
   WhiteboardDocumentVM,
   WhiteboardRole,
   WhiteboardSnapshotVM,
@@ -68,6 +71,70 @@ export class WhiteboardsService {
       document: WhiteboardDocumentVM;
       applied_operations: string[];
     };
+  }
+  async publishLaser(token: string, value: unknown) {
+    if (
+      !Array.isArray(value) ||
+      value.length > 64 ||
+      value.some(
+        (sample) =>
+          !sample ||
+          typeof sample.id !== 'string' ||
+          !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+            sample.id,
+          ) ||
+          !Number.isFinite(sample.x) ||
+          !Number.isFinite(sample.y) ||
+          Math.abs(sample.x) > 10_000_000 ||
+          Math.abs(sample.y) > 10_000_000 ||
+          !['down', 'up'].includes(sample.button),
+      )
+    ) {
+      throw new BadRequestException('Invalid laser samples');
+    }
+    const { db, boardId, role } = await this.access(token);
+    const board = await this.load(db, boardId);
+    if (role !== 'teacher' && !board.document.studentEditing)
+      throw new ForbiddenException('Participant annotation is disabled');
+    const samples: WhiteboardLaserSampleVM[] = value.map(({ id, x, y, button }) => ({
+      id,
+      x,
+      y,
+      button,
+    }));
+    const result = await db
+      .from('classroom_whiteboard_access')
+      .update({
+        laser_samples: samples,
+        laser_updated_at: new Date().toISOString(),
+      })
+      .eq('token_hash', hashWhiteboardToken(token));
+    if (result.error) throw new InternalServerErrorException('Unable to share laser');
+    return { ok: true };
+  }
+  async getLasers(token: string): Promise<WhiteboardLaserPresenceVM[]> {
+    const { db, boardId, sessionId } = await this.access(token);
+    const board = await this.load(db, boardId);
+    const now = Date.now();
+    const result = await db
+      .from('classroom_whiteboard_access')
+      .select('token_hash, role, laser_samples, laser_updated_at')
+      .eq('board_id', boardId)
+      .eq('live_session_id', sessionId)
+      .gt('expires_at', new Date(now).toISOString())
+      .gt('laser_updated_at', new Date(now - 3000).toISOString());
+    if (result.error) throw new InternalServerErrorException('Unable to load lasers');
+    return (result.data ?? [])
+      .filter(
+        (peer) =>
+          peer.token_hash !== hashWhiteboardToken(token) &&
+          (peer.role === 'teacher' || board.document.studentEditing),
+      )
+      .map((peer) => ({
+        actorId: peer.token_hash.slice(0, 16),
+        samples: peer.laser_samples as WhiteboardLaserSampleVM[],
+        expiresAt: Date.parse(peer.laser_updated_at) + 3000,
+      }));
   }
   async get(token: string): Promise<WhiteboardSnapshotVM>;
   async get(

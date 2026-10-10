@@ -315,6 +315,8 @@ model ClassroomWhiteboardAccess {
 
   @@index([boardId, lastSeenAt])
   @@map("classroom_whiteboard_access")
+  laserSamples Json @default("[]") @map("laser_samples")
+  laserUpdatedAt DateTime? @map("laser_updated_at") @db.Timestamptz(6)
 }
 
 model ScreenAnnotationAccess {

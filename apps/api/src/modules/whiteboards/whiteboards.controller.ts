@@ -16,6 +16,14 @@ export class WhiteboardsController {
   mutate(@Req() req: Request, @Body() body: unknown) {
     return this.boards.mutate(this.token(req), body);
   }
+  @Get('current/laser')
+  lasers(@Req() req: Request) {
+    return this.boards.getLasers(this.token(req));
+  }
+  @Post('current/laser')
+  laser(@Req() req: Request, @Body() body: unknown) {
+    return this.boards.publishLaser(this.token(req), body);
+  }
   private token(req: Request) {
     return req.headers.authorization?.replace(/^Bearer /, '') ?? '';
   }

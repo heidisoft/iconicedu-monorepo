@@ -199,3 +199,71 @@ describe('whiteboard API capabilities and atomic persistence', () => {
     ).rejects.toThrow('Unable to save');
   });
 });
+
+describe('ephemeral whiteboard laser transport', () => {
+  const samples = [
+    { id: '00000000-0000-4000-8000-000000000001', x: -120, y: 240, button: 'down' },
+  ];
+  beforeEach(() => jest.clearAllMocks());
+  it('allows capability-authenticated guests without changing saved drawings', async () => {
+    const { db, grant, current } = mockDb('student');
+    await expect(new WhiteboardsService().publishLaser(token, samples)).resolves.toEqual({
+      ok: true,
+    });
+    expect(grant.update).toHaveBeenCalledWith({
+      laser_samples: samples,
+      laser_updated_at: expect.any(String),
+    });
+    expect(grant.eq).toHaveBeenCalledWith('token_hash', hashWhiteboardToken(token));
+    expect(current.update).not.toHaveBeenCalled();
+    expect(db.rpc).not.toHaveBeenCalled();
+  });
+  it('rejects locked participant writes', async () => {
+    const { grant } = mockDb('student', true);
+    await expect(new WhiteboardsService().publishLaser(token, samples)).rejects.toThrow(
+      'Participant annotation is disabled',
+    );
+    expect(grant.update).not.toHaveBeenCalled();
+  });
+  it.each([
+    null,
+    {},
+    Array(65).fill(samples[0]),
+    [{ ...samples[0], x: Infinity }],
+    [{ ...samples[0], button: 'bad' }],
+  ])('rejects invalid or unbounded samples %p', async (value) => {
+    mockDb();
+    await expect(new WhiteboardsService().publishLaser(token, value)).rejects.toThrow(
+      'Invalid laser samples',
+    );
+  });
+  it('scopes fresh laser reads to the verified class and hides grant hashes', async () => {
+    const { grant } = mockDb();
+    const updated = new Date().toISOString();
+    grant.then = builder([
+      {
+        token_hash: 'b'.repeat(64),
+        role: 'student',
+        laser_samples: samples,
+        laser_updated_at: updated,
+      },
+    ]).then;
+    const result = await new WhiteboardsService().getLasers(token);
+    expect(result).toEqual([
+      { actorId: 'b'.repeat(16), samples, expiresAt: Date.parse(updated) + 3000 },
+    ]);
+    expect(grant.eq).toHaveBeenCalledWith('board_id', 'board');
+    expect(grant.eq).toHaveBeenCalledWith('live_session_id', 'session');
+    expect(grant.gt).toHaveBeenCalledWith('laser_updated_at', expect.any(String));
+  });
+  it('rejects invalid and expired capabilities on laser reads and writes', async () => {
+    const { grant } = mockDb();
+    grant.maybeSingle.mockResolvedValue({ data: null, error: null });
+    await expect(new WhiteboardsService().getLasers(token)).rejects.toThrow(
+      'Whiteboard access expired',
+    );
+    await expect(new WhiteboardsService().publishLaser(token, samples)).rejects.toThrow(
+      'Whiteboard access expired',
+    );
+  });
+});

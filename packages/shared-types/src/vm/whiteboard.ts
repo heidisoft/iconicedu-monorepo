@@ -53,3 +53,16 @@ export type WhiteboardOperationVM =
   | { id: string; type: 'reorder-page'; pageId: string; beforeId: string | null }
   | { id: string; type: 'student-editing'; enabled: boolean }
   | { id: string; type: 'presentation'; enabled: boolean };
+
+/** Ephemeral native laser samples, never part of the saved drawing. */
+export interface WhiteboardLaserSampleVM {
+  id: string;
+  x: number;
+  y: number;
+  button: 'down' | 'up';
+}
+export interface WhiteboardLaserPresenceVM {
+  actorId: string;
+  samples: WhiteboardLaserSampleVM[];
+  expiresAt: number;
+}
