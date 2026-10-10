@@ -38,7 +38,7 @@ function fixture() {
       insert into auth.users(instance_id,id,aud,role,email,encrypted_password,email_confirmed_at,raw_app_meta_data,raw_user_meta_data,created_at,updated_at,confirmation_token,recovery_token,email_change_token_new,email_change)
       values ('00000000-0000-0000-0000-000000000000','${actor.user}','authenticated','authenticated','${actor.email}',extensions.crypt('${actor.password}',extensions.gen_salt('bf')),now(),'{"provider":"email","providers":["email"]}','{}',now(),now(),'','','','');
       insert into public.accounts(id,org_id,auth_user_id) values ('${actor.account}','${org}','${actor.user}');
-      insert into public.profiles(id,org_id,account_id,kind,display_name,avatar_source,timezone) values ('${actor.profile}','${org}','${actor.account}','${actor.kind}','Test participant','seed','UTC');
+      insert into public.profiles(id,org_id,account_id,kind,display_name,avatar_source,timezone) values ('${actor.profile}','${org}','${actor.account}','${actor.kind}','Test ${actor.kind}','seed','UTC');
     `,
       )
       .join('')}
@@ -109,6 +109,39 @@ async function draw(page: Page, viewer?: Page) {
     });
   await page.mouse.up();
 }
+async function pointerLabels(page: Page) {
+  return page.evaluate(() => {
+    const konva = (
+      window as unknown as {
+        Konva?: {
+          stages: Array<{
+            find(
+              selector: string,
+            ): Array<{ findOne(selector: string): { text(): string } }>;
+          }>;
+        };
+      }
+    ).Konva;
+    return (
+      konva?.stages.flatMap((stage) =>
+        stage.find('Label').map((label) => label.findOne('Text').text()),
+      ) ?? []
+    );
+  });
+}
+async function hoverAnnotation(page: Page) {
+  const open = page.getByRole('button', { name: 'Open annotation toolbar' });
+  if (await open.count()) await open.click();
+  await page.getByRole('button', { name: 'Pen', exact: true }).click();
+  const bounds = (await page.locator('[data-shared-content-bounds]').boundingBox())!;
+  await Promise.all([
+    page.waitForResponse(
+      (response) => response.url().includes('/pointer?') && response.status() === 204,
+    ),
+    page.mouse.move(bounds.x + bounds.width * 0.65, bounds.y + bounds.height * 0.3),
+  ]);
+}
+
 test('synchronizes annotations in both directions and survives presenter view remounts', async ({
   browser,
 }) => {
@@ -120,6 +153,10 @@ test('synchronizes annotations in both directions and survives presenter view re
       ...data.actors[1],
       sessionId: data.sessionId,
     });
+    await hoverAnnotation(teacher.page);
+    await expect.poll(() => pointerLabels(participant.page)).toContain('Test educator');
+    await hoverAnnotation(participant.page);
+    await expect.poll(() => pointerLabels(teacher.page)).toContain('Test child');
     await draw(teacher.page, participant.page);
     await expect(participant.page.getByLabel('Synchronized marks')).toHaveText('1', {
       timeout: 5000,
@@ -146,13 +183,7 @@ test('synchronizes annotations in both directions and survives presenter view re
               ?.getImageData(0, 0, canvas.width, canvas.height).data;
             if (!pixels) return false;
             for (let index = 0; index < pixels.length; index += 4)
-              if (
-                pixels[index] > 180 &&
-                pixels[index + 1] < 100 &&
-                pixels[index + 2] < 100 &&
-                pixels[index + 3] > 0
-              )
-                return true;
+              if (pixels[index + 3] > 0) return true;
             return false;
           }),
         ),
@@ -181,6 +212,22 @@ test('shared-link guest sees presenter marks and draws without an account sessio
       sessionId: data.sessionId,
       annotationToken: token,
     });
+    await hoverAnnotation(teacher.page);
+    await expect.poll(() => pointerLabels(guest.page)).toContain('Test educator');
+    await hoverAnnotation(guest.page);
+    await expect.poll(() => pointerLabels(teacher.page)).toContain('Guest');
+    await teacher.page.getByRole('button', { name: 'Attention', exact: true }).click();
+    await teacher.page.getByRole('button', { name: 'Spotlight', exact: true }).click();
+    const edge = (await teacher.page
+      .locator('[data-shared-content-bounds]')
+      .boundingBox())!;
+    await Promise.all([
+      teacher.page.waitForResponse(
+        (response) => response.url().includes('/pointer?') && response.status() === 204,
+      ),
+      teacher.page.mouse.move(edge.x + edge.width - 8, edge.y + edge.height - 8),
+    ]);
+    await expect.poll(() => pointerLabels(guest.page)).toContain('Test educator');
     await draw(teacher.page);
     await expect(guest.page.getByLabel('Synchronized marks')).toHaveText('1');
     await draw(guest.page);

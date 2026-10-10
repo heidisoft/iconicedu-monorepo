@@ -8,6 +8,7 @@ import type {
   AnnotationOperation,
   AnnotationPreview,
   AnnotationPoint,
+  AnnotationPointerInput,
 } from '@iconicedu/shared-types';
 import { AnnotationStrokeBuffer, applyAnnotationCommit } from '@iconicedu/utils';
 import { ApiHttpError } from '@iconicedu/web/lib/api/http-client';
@@ -49,6 +50,8 @@ export function useScreenAnnotations(
   >([]);
   const [historyCount, setHistoryCount] = useState({ undo: 0, redo: 0 });
   const ownChannel = useRef<RealtimeChannel | null>(null);
+  const pendingPointer = useRef<AnnotationPointerInput | null>(null);
+  const recentRealtimePointers = useRef(new Map<string, number>());
   const history = useRef<HistoryEntry[]>([]);
   const redo = useRef<HistoryEntry[]>([]);
   const queue = useRef<Promise<unknown>>(Promise.resolve());
@@ -69,6 +72,38 @@ export function useScreenAnnotations(
       value.snapshot.revision >= current.snapshot.revision
     )
       publishContext(value);
+    if (value.pointers)
+      setPointers((previous) => {
+        const effective = contextRef.current ?? value;
+        const allowed = new Map(effective.actors.map((actor) => [actor.userId, actor]));
+        const next = Object.fromEntries(
+          Object.entries(previous).filter(([id, pointer]) => {
+            const actor = allowed.get(id);
+            return (
+              actor &&
+              !effective.snapshot.ended &&
+              (actor.role === 'educator' || effective.snapshot.studentsEnabled) &&
+              pointer.expiresAt >= Date.now()
+            );
+          }),
+        );
+        for (const pointer of value.pointers ?? []) {
+          const actor = allowed.get(pointer.userId);
+          if (
+            !actor ||
+            effective.snapshot.ended ||
+            (actor.role !== 'educator' && !effective.snapshot.studentsEnabled)
+          )
+            continue;
+          if (
+            Date.now() - (recentRealtimePointers.current.get(pointer.userId) ?? 0) <
+            1000
+          )
+            continue;
+          next[pointer.userId] = pointer;
+        }
+        return next;
+      });
     setError(null);
     if (annotationToken) setConnected(true);
   }, [annotationToken, api, sessionId, shareKey, publishContext]);
@@ -125,11 +160,7 @@ export function useScreenAnnotations(
         }
       } finally {
         // A viewer can arrive before the presenter creates the annotation room.
-        if (alive)
-          timer = setTimeout(
-            () => void poll(),
-            annotationToken ? 500 : contextRef.current ? 10000 : 1000,
-          );
+        if (alive) timer = setTimeout(() => void poll(), annotationToken ? 500 : 1000);
       }
     };
     void poll();
@@ -137,6 +168,9 @@ export function useScreenAnnotations(
       alive = false;
       generation.current = effectGeneration + 1;
       contextRef.current = null;
+      pendingPointer.current = null;
+      recentRealtimePointers.current.clear();
+      setPointers({});
       clearTimeout(timer);
     };
   }, [annotationToken, api, refresh]);
@@ -146,6 +180,49 @@ export function useScreenAnnotations(
     !context.snapshot.ended &&
     (context.actor.role === 'educator' || context.snapshot.studentsEnabled),
   );
+  useEffect(() => {
+    if (!canDraw) {
+      pendingPointer.current = null;
+      return;
+    }
+    let alive = true;
+    let saving = false;
+    const timer = setInterval(() => {
+      if (!alive || saving || !pendingPointer.current) return;
+      const pointer = pendingPointer.current;
+      pendingPointer.current = null;
+      saving = true;
+      void api
+        .pointer(sessionId, shareKey, pointer)
+        .catch(() => {
+          // Previews are ephemeral; the next movement retries without affecting saved marks.
+        })
+        .finally(() => {
+          saving = false;
+        });
+    }, 250);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+      pendingPointer.current = null;
+    };
+  }, [api, sessionId, shareKey, canDraw]);
+  useEffect(() => {
+    const timer = setInterval(
+      () =>
+        setPointers((previous) => {
+          if (!Object.values(previous).some((pointer) => pointer.expiresAt < Date.now()))
+            return previous;
+          return Object.fromEntries(
+            Object.entries(previous).filter(
+              ([, pointer]) => pointer.expiresAt >= Date.now(),
+            ),
+          );
+        }),
+      250,
+    );
+    return () => clearInterval(timer);
+  }, []);
   const actorsKey =
     context?.actors
       .map((actor) => actor.userId)
@@ -290,6 +367,7 @@ export function useScreenAnnotations(
         const pointerKey = `${senderId}:${event.clientId}`;
         if (event.sequence <= (pointerSequences.get(pointerKey) ?? -1)) return;
         pointerSequences.set(pointerKey, event.sequence);
+        recentRealtimePointers.current.set(senderId, Date.now());
         setPointers((previous) => ({
           ...previous,
           [senderId]: {
@@ -406,16 +484,24 @@ export function useScreenAnnotations(
         ...previous.slice(-63),
         { object: event.object, expiresAt: event.expiresAt },
       ]);
-    if (event.kind === 'pointer')
+    if (event.kind === 'pointer') {
+      pendingPointer.current = {
+        point: event.point,
+        tool: event.tool,
+        color: event.color ?? '#2563eb',
+      };
+      recentRealtimePointers.current.set(event.userId, Date.now());
       setPointers((previous) => ({
         ...previous,
         [event.userId]: {
           point: event.point,
           tool: event.tool,
+          color: event.color,
           name: contextRef.current?.actor.name ?? '',
           expiresAt: Date.now() + (event.tool === 'spotlight' ? 1500 : 5000),
         },
       }));
+    }
     const channel = ownChannel.current;
     if (channel)
       void channel

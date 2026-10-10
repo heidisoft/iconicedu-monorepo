@@ -1,6 +1,7 @@
 import type {
   AnnotationCommit,
   AnnotationContext,
+  AnnotationPointerInput,
   AnnotationOperation,
 } from '@iconicedu/shared-types';
 import {
@@ -18,6 +19,11 @@ export const annotationApi = (token?: string) => {
       api.get<AnnotationContext>(`${prefix}/${encodeURIComponent(sessionId)}`, {
         shareKey,
       }),
+    pointer: (sessionId: string, shareKey: string, pointer: AnnotationPointerInput) =>
+      api.post<void>(
+        `${prefix}/${encodeURIComponent(sessionId)}/pointer?shareKey=${encodeURIComponent(shareKey)}`,
+        pointer,
+      ),
     apply: (roomId: string, operation: AnnotationOperation) =>
       api.post<AnnotationCommit>(
         `${prefix}/${encodeURIComponent(roomId)}/operations`,

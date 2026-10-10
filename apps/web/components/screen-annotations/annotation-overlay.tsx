@@ -392,10 +392,14 @@ export function AnnotationOverlay({
     if (!engine.canDraw || touchIds.current.size > 1) return;
     const point = eventPoint(event);
     if (!point) return;
-    if (tool === 'spotlight') {
-      publishPointer(point, tool);
+    if (
+      (event.target as HTMLElement).closest(
+        'button,input,textarea,select,[role="toolbar"],[role="group"]',
+      )
+    )
       return;
-    }
+    publishPointer(point, tool === 'spotlight' ? 'spotlight' : 'pointerArrow');
+    if (tool === 'spotlight' || tool === 'pointerArrow') return;
     if (marquee) {
       setMarquee((previous) => (previous ? { ...previous, end: point } : null));
       return;

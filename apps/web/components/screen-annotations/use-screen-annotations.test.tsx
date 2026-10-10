@@ -5,12 +5,17 @@ import { ApiHttpError } from '@iconicedu/web/lib/api/http-client';
 import { useScreenAnnotations } from './use-screen-annotations';
 const mocks = vi.hoisted(() => ({
   context: vi.fn(),
+  pointer: vi.fn(),
   apply: vi.fn(),
   send: vi.fn(),
   subscriptions: new Map<string, (event: { payload: unknown }) => void>(),
 }));
 vi.mock('./annotation-api', () => ({
-  annotationApi: () => ({ context: mocks.context, apply: mocks.apply }),
+  annotationApi: () => ({
+    context: mocks.context,
+    pointer: mocks.pointer,
+    apply: mocks.apply,
+  }),
 }));
 vi.mock('@iconicedu/web/lib/supabase/client', () => ({
   createSupabaseBrowserClient: () => ({
@@ -80,6 +85,7 @@ beforeEach(() => {
   mocks.subscriptions.clear();
   mocks.context.mockResolvedValue(structuredClone(context));
   mocks.send.mockResolvedValue('ok');
+  mocks.pointer.mockResolvedValue(undefined);
   mocks.apply.mockResolvedValue({
     eventId: 'end',
     roomId: 'room',
@@ -200,6 +206,7 @@ describe('annotation client', () => {
       }),
     );
     expect(result.current.pointers.student.color).toBe('#16a34a');
+    expect(result.current.pointers.student.name).toBe('Student');
     act(() =>
       receive({
         payload: { ...pointer, sequence: 2, eventId: 'pointer-two', color: 'invalid' },
@@ -314,11 +321,45 @@ it('connects shared-link guests without Supabase authentication and polls shared
     mocks.context.mockResolvedValue({
       ...context,
       snapshot: { ...context.snapshot, revision: 1, objects: [object] },
+      pointers: [
+        {
+          userId: 'student',
+          name: 'Student',
+          point: { x: 0.2, y: 0.3 },
+          tool: 'spotlight',
+          color: '#16a34a',
+          expiresAt: Date.now() + 3000,
+        },
+      ],
     });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(500);
     });
     expect(result.current.objects).toHaveLength(1);
+    expect(result.current.pointers.student.name).toBe('Student');
+    act(() =>
+      result.current.broadcast({
+        kind: 'pointer',
+        point: { x: 0.4, y: 0.5 },
+        tool: 'spotlight',
+        color: '#2563eb',
+        eventId: 'pointer',
+        roomId: 'room',
+        clientId: 'guest-client',
+        userId: 'actor',
+        sequence: 1,
+        timestamp: Date.now(),
+        annotationId: 'pointer:actor',
+      }),
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    expect(mocks.pointer).toHaveBeenCalledWith('session', '123', {
+      point: { x: 0.4, y: 0.5 },
+      tool: 'spotlight',
+      color: '#2563eb',
+    });
     unmount();
   } finally {
     vi.useRealTimers();
