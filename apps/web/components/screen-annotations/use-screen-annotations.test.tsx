@@ -208,7 +208,7 @@ describe('annotation client', () => {
     await act(async () => {
       await result.current.changeHistory('redo');
     });
-    expect(result.current.objects[0].version).toBe(3);
+    await waitFor(() => expect(result.current.objects[0]?.version).toBe(3));
   });
   it('renders remote pointers with the sender color and ignores malformed colors', async () => {
     const { result } = renderHook(() => useScreenAnnotations('session', '123'));
@@ -331,7 +331,7 @@ describe('annotation client', () => {
       }),
     );
     await waitFor(() => expect(result.current.context?.snapshot.revision).toBe(3));
-    expect(result.current.objects[0].version).toBe(3);
+    await waitFor(() => expect(result.current.objects[0]?.version).toBe(3));
   });
 });
 
