@@ -72,7 +72,7 @@ describe('screen annotation toolbar', () => {
       'shadow-sm',
     );
     const pen = screen.getByRole('button', { name: 'Pen', exact: true });
-    expect(pen).toHaveClass('size-8', 'rounded-sm');
+    expect(pen).toHaveClass('size-8', 'rounded-full');
     expect(pen.querySelector('svg')).toHaveAttribute('width', '16');
     expect(pen.querySelector('span')).toHaveClass('sr-only');
     click('Shapes');

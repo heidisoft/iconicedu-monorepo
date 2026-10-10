@@ -83,7 +83,7 @@ const stamps: AnnotationTool[] = [
 ];
 const attention: AnnotationTool[] = ['spotlight', 'pointerArrow', 'vanishingPen'];
 const iconButton =
-  'flex size-8 shrink-0 items-center justify-center rounded-sm p-0 text-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 disabled:pointer-events-none aria-pressed:bg-primary/10 aria-pressed:text-primary';
+  'flex size-8 shrink-0 items-center justify-center rounded-full p-0 text-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 disabled:pointer-events-none aria-pressed:bg-primary/10 aria-pressed:text-primary';
 const menuToolButton = `${iconButton} min-h-11 h-auto w-full flex-col gap-1 px-1 py-1.5`;
 
 function PanelSection({ label, children }: { label: string; children: ReactNode }) {
@@ -434,7 +434,7 @@ export function AnnotationToolbar({
           aria-label={expanded ? 'Close annotation toolbar' : 'Open annotation toolbar'}
           aria-expanded={expanded}
           title={expanded ? 'Close annotations' : 'Annotate screen'}
-          className={`${iconButton} ${expanded ? '' : 'rounded-full'}`}
+          className={iconButton}
           onClick={() => {
             if (expanded) close();
             else {
