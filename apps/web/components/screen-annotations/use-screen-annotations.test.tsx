@@ -96,6 +96,32 @@ beforeEach(() => {
   });
 });
 describe('annotation client', () => {
+  it('keeps an acknowledged stroke visible while recovering a missed revision', async () => {
+    const { result } = renderHook(() => useScreenAnnotations('session', '123'));
+    await waitFor(() => expect(result.current.connected).toBe(true));
+    // A snapshot refresh can be slower than the operation acknowledgement.
+    mocks.context.mockImplementation(() => new Promise(() => {}));
+    mocks.apply.mockResolvedValueOnce({
+      eventId: 'fast-stroke',
+      roomId: 'room',
+      revision: 3,
+      objects: [{ ...object, version: 1 }],
+      studentsEnabled: true,
+      ended: false,
+    });
+    await act(async () => {
+      await result.current.execute({
+        eventId: 'fast-stroke',
+        kind: 'put',
+        object,
+        baseVersion: 0,
+      });
+    });
+    expect(result.current.objects).toHaveLength(1);
+    expect(result.current.objects[0].version).toBe(1);
+    expect(mocks.context.mock.calls.length).toBeGreaterThan(1);
+  });
+
   it('does not close the shared session when the presenter view unmounts', async () => {
     const { result, unmount } = renderHook(() => useScreenAnnotations('session', '123'));
     await waitFor(() => expect(result.current.connected).toBe(true));

@@ -111,7 +111,7 @@ export function useScreenAnnotations(
     (commit: AnnotationCommit) => {
       const current = contextRef.current;
       if (!current || commit.roomId !== current.snapshot.roomId) return;
-      if (commit.requiresSnapshot || commit.revision > current.snapshot.revision + 1) {
+      if (commit.requiresSnapshot) {
         void refresh().catch(() => setError('Reconnecting annotations…'));
         return;
       }
@@ -119,6 +119,10 @@ export function useScreenAnnotations(
         ...current,
         snapshot: applyAnnotationCommit(current.snapshot, commit),
       });
+      // Keep acknowledged strokes visible even when another participant committed
+      // between polls. The snapshot fills the revision gap without hiding this delta.
+      if (commit.revision > current.snapshot.revision + 1)
+        void refresh().catch(() => setError('Reconnecting annotations…'));
       if (!commit.studentsEnabled || commit.ended) {
         setRemoteDrafts((previous) =>
           commit.ended
