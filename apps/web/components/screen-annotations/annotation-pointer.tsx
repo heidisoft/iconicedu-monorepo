@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useLayoutEffect, useRef } from 'react';
-import { Arrow, Circle, Group, Label, Tag, Text } from 'react-konva';
+import { Circle, Group, Label, Tag, Text } from 'react-konva';
 import Konva from 'konva';
 import type { AnnotationPoint } from '@iconicedu/shared-types';
 /** Tween canvas nodes directly; pointer interpolation does not redraw permanent shapes. */
@@ -63,20 +63,7 @@ export function AnnotationPointer({
   }, [point.x, point.y, width, height]);
   return (
     <Group ref={node} x={initial.current.x} y={initial.current.y} listening={false}>
-      {tool === 'spotlight' ? (
-        <Circle radius={12} fill={color} opacity={0.5} />
-      ) : (
-        <>
-          <Arrow
-            points={[0, -28, 0, -3]}
-            stroke={color}
-            fill={color}
-            strokeWidth={3}
-            pointerLength={8}
-            pointerWidth={8}
-          />
-        </>
-      )}
+      {tool === 'spotlight' && <Circle radius={12} fill={color} opacity={0.5} />}
       <Label ref={label} x={16} y={8} listening={false}>
         <Tag fill={color} cornerRadius={4} />
         <Text
