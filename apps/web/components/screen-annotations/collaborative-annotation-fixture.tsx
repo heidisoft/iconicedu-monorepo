@@ -18,6 +18,7 @@ function SharedScreen({
   const engine = useScreenAnnotations(sessionId, '123', annotationToken);
   return (
     <>
+      <output aria-label="Laser trails">{engine.vanishing.length}</output>
       <output aria-label="Live preview marks">{engine.remoteDrafts.length}</output>
       <output aria-label="Synchronized marks">{engine.objects.length}</output>
       <output aria-label="Annotation connection">

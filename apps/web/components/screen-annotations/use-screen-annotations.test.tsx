@@ -6,6 +6,7 @@ import { useScreenAnnotations } from './use-screen-annotations';
 const mocks = vi.hoisted(() => ({
   context: vi.fn(),
   pointer: vi.fn(),
+  laser: vi.fn(),
   apply: vi.fn(),
   send: vi.fn(),
   subscriptions: new Map<string, (event: { payload: unknown }) => void>(),
@@ -14,6 +15,7 @@ vi.mock('./annotation-api', () => ({
   annotationApi: () => ({
     context: mocks.context,
     pointer: mocks.pointer,
+    laser: mocks.laser,
     apply: mocks.apply,
   }),
 }));
@@ -86,6 +88,7 @@ beforeEach(() => {
   mocks.context.mockResolvedValue(structuredClone(context));
   mocks.send.mockResolvedValue('ok');
   mocks.pointer.mockResolvedValue(undefined);
+  mocks.laser.mockResolvedValue(undefined);
   mocks.apply.mockResolvedValue({
     eventId: 'end',
     roomId: 'room',
@@ -390,4 +393,85 @@ it('connects shared-link guests without Supabase authentication and polls shared
   } finally {
     vi.useRealTimers();
   }
+});
+
+it('shares short guest laser gestures through the API without saving a drawing', async () => {
+  const { result, unmount } = renderHook(() =>
+    useScreenAnnotations('session', '123', 'guest-capability'),
+  );
+  await waitFor(() => expect(result.current.canDraw).toBe(true));
+  const laser = { ...object, type: 'vanishingPen' as const };
+  const common = {
+    roomId: 'room',
+    clientId: 'client',
+    userId: 'actor',
+    annotationId: object.id,
+    timestamp: Date.now(),
+  };
+  act(() => {
+    result.current.broadcast({
+      ...common,
+      eventId: 'start',
+      sequence: 1,
+      kind: 'start',
+      object: laser,
+    });
+    result.current.broadcast({
+      ...common,
+      eventId: 'points',
+      sequence: 2,
+      kind: 'points',
+      points: [{ x: 0.4, y: 0.5 }],
+    });
+    result.current.broadcast({
+      ...common,
+      eventId: 'end',
+      sequence: 3,
+      kind: 'vanish',
+      object: {
+        ...laser,
+        points: [
+          { x: 0.1, y: 0.1 },
+          { x: 0.4, y: 0.5 },
+        ],
+      },
+      expiresAt: Date.now() + 4000,
+    });
+  });
+  await waitFor(() =>
+    expect(mocks.laser).toHaveBeenCalledWith('session', '123', [
+      expect.objectContaining({ finished: true, sequence: 3 }),
+    ]),
+  );
+  expect(result.current.objects).toEqual([]);
+  expect(mocks.apply).not.toHaveBeenCalled();
+  expect(mocks.send).not.toHaveBeenCalled();
+  unmount();
+});
+it('receives and deduplicates API laser trails without a realtime subscription', async () => {
+  const laser = {
+    ...object,
+    id: 'remote-laser',
+    creatorId: 'student',
+    type: 'vanishingPen' as const,
+  };
+  mocks.context.mockResolvedValue({
+    ...context,
+    lasers: [
+      {
+        userId: 'student',
+        strokes: [
+          { object: laser, finished: true, sequence: 2, expiresAt: Date.now() + 3000 },
+        ],
+      },
+    ],
+  });
+  const { result, unmount } = renderHook(() =>
+    useScreenAnnotations('session', '123', 'guest-capability'),
+  );
+  await waitFor(() => expect(result.current.vanishing).toHaveLength(1));
+  expect(result.current.vanishing[0].object.id).toBe('remote-laser');
+  expect(result.current.objects).toEqual([]);
+  expect(mocks.subscriptions.size).toBe(0);
+  unmount();
 });

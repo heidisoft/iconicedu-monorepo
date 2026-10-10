@@ -256,3 +256,106 @@ test('shared-link guest sees presenter marks and draws without an account sessio
     data.cleanup();
   }
 });
+
+test('shares screen laser trails with signed-in participants and shared-link guests without saving marks', async ({
+  browser,
+}) => {
+  test.setTimeout(60000);
+  const data = fixture();
+  const contexts = [];
+  try {
+    const teacher = await join(browser, { ...data.actors[0], sessionId: data.sessionId });
+    contexts.push(teacher.context);
+    const participant = await join(browser, {
+      ...data.actors[1],
+      sessionId: data.sessionId,
+    });
+    contexts.push(participant.context);
+    const token = randomBytes(32).toString('base64url');
+    sql(
+      `insert into public.screen_annotation_access(live_session_id,token_hash,display_name,expires_at) values ('${data.sessionId}','${createHash('sha256').update(token).digest('hex')}','Laser guest',now()+interval '1 hour');`,
+    );
+    const guest = await join(browser, {
+      email: '',
+      password: '',
+      sessionId: data.sessionId,
+      annotationToken: token,
+    });
+    contexts.push(guest.context);
+    for (const [sender, viewers] of [
+      [teacher.page, [participant.page, guest.page]],
+      [guest.page, [teacher.page, participant.page]],
+    ] as const) {
+      const open = sender.getByRole('button', { name: 'Open annotation toolbar' });
+      if (await open.count()) await open.click();
+      await sender.getByRole('button', { name: 'Laser pointer', exact: true }).click();
+      const bounds = (await sender
+        .locator('[data-shared-content-bounds]')
+        .boundingBox())!;
+      await sender.mouse.move(
+        bounds.x + bounds.width * 0.3,
+        bounds.y + bounds.height * 0.3,
+      );
+      await sender.mouse.down();
+      for (let step = 1; step <= 12; step++) {
+        await sender.mouse.move(
+          bounds.x + bounds.width * (0.3 + step * 0.015),
+          bounds.y + bounds.height * (0.3 + step * 0.01),
+        );
+        await sender.waitForTimeout(40);
+      }
+      for (const viewer of viewers)
+        await expect(viewer.getByLabel('Live preview marks')).toHaveText('1');
+      await sender.mouse.up();
+      for (const viewer of viewers) {
+        await expect(viewer.getByLabel('Laser trails')).toHaveText('1');
+        await expect
+          .poll(() =>
+            viewer.locator('.konvajs-content canvas').evaluateAll((canvases) =>
+              canvases.some((node) => {
+                const canvas = node as HTMLCanvasElement;
+                const pixels = canvas
+                  .getContext('2d')
+                  ?.getImageData(0, 0, canvas.width, canvas.height).data;
+                return (
+                  pixels?.some((value, index) => index % 4 === 3 && value > 0) ?? false
+                );
+              }),
+            ),
+          )
+          .toBe(true);
+        await expect(viewer.getByLabel('Synchronized marks')).toHaveText('0');
+      }
+      for (const viewer of [sender, ...viewers]) {
+        await expect(viewer.getByLabel('Laser trails')).toHaveText('0', {
+          timeout: 6000,
+        });
+        await expect(viewer.getByLabel('Live preview marks')).toHaveText('0');
+      }
+    }
+    // A canceled guest laser must disappear promptly through the API fallback.
+    const bounds = (await guest.page
+      .locator('[data-shared-content-bounds]')
+      .boundingBox())!;
+    await guest.page.mouse.move(
+      bounds.x + bounds.width * 0.3,
+      bounds.y + bounds.height * 0.3,
+    );
+    await guest.page.mouse.down();
+    await guest.page.mouse.move(
+      bounds.x + bounds.width * 0.5,
+      bounds.y + bounds.height * 0.5,
+      { steps: 8 },
+    );
+    await expect(teacher.page.getByLabel('Live preview marks')).toHaveText('1');
+    await guest.page.keyboard.press('Escape');
+    await guest.page.mouse.up();
+    await expect(teacher.page.getByLabel('Live preview marks')).toHaveText('0', {
+      timeout: 2000,
+    });
+    await expect(teacher.page.getByLabel('Synchronized marks')).toHaveText('0');
+  } finally {
+    for (const context of contexts) await context.close();
+    data.cleanup();
+  }
+});

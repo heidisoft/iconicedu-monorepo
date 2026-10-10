@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type {
+  AnnotationLaserStroke,
   AnnotationCommit,
   AnnotationContext,
   AnnotationObject,
@@ -49,6 +50,9 @@ export function useScreenAnnotations(
     { object: AnnotationObject; expiresAt: number }[]
   >([]);
   const [historyCount, setHistoryCount] = useState({ undo: 0, redo: 0 });
+  const outgoingLasers = useRef(new Map<string, AnnotationLaserStroke>());
+  const laserVersion = useRef(0);
+  const [polledLasers, setPolledLasers] = useState<AnnotationLaserStroke[]>([]);
   const ownChannel = useRef<RealtimeChannel | null>(null);
   const pendingPointer = useRef<AnnotationPointerInput | null>(null);
   const recentRealtimePointers = useRef(new Map<string, number>());
@@ -104,6 +108,23 @@ export function useScreenAnnotations(
         }
         return next;
       });
+    if (value.lasers) {
+      const effective = contextRef.current ?? value;
+      const allowed = new Map(effective.actors.map((actor) => [actor.userId, actor]));
+      setPolledLasers(
+        value.lasers.flatMap((peer) => {
+          const actor = allowed.get(peer.userId);
+          if (
+            !actor ||
+            peer.userId === effective.actor.userId ||
+            effective.snapshot.ended ||
+            (actor.role !== 'educator' && !effective.snapshot.studentsEnabled)
+          )
+            return [];
+          return peer.strokes.filter((stroke) => stroke.expiresAt > Date.now());
+        }),
+      );
+    }
     setError(null);
     if (annotationToken) setConnected(true);
   }, [annotationToken, api, sessionId, shareKey, publishContext]);
@@ -150,6 +171,8 @@ export function useScreenAnnotations(
   useEffect(() => {
     let alive = true;
     const effectGeneration = ++generation.current;
+    const lasers = outgoingLasers.current;
+    const realtimePointers = recentRealtimePointers.current;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const poll = async () => {
       try {
@@ -164,7 +187,7 @@ export function useScreenAnnotations(
         }
       } finally {
         // A viewer can arrive before the presenter creates the annotation room.
-        if (alive) timer = setTimeout(() => void poll(), annotationToken ? 500 : 1000);
+        if (alive) timer = setTimeout(() => void poll(), 500);
       }
     };
     void poll();
@@ -173,7 +196,10 @@ export function useScreenAnnotations(
       generation.current = effectGeneration + 1;
       contextRef.current = null;
       pendingPointer.current = null;
-      recentRealtimePointers.current.clear();
+      lasers.clear();
+      setPolledLasers([]);
+      setVanishing([]);
+      realtimePointers.clear();
       setPointers({});
       clearTimeout(timer);
     };
@@ -184,6 +210,58 @@ export function useScreenAnnotations(
     !context.snapshot.ended &&
     (context.actor.role === 'educator' || context.snapshot.studentsEnabled),
   );
+  useEffect(() => {
+    if (!canDraw) {
+      outgoingLasers.current.clear();
+      return;
+    }
+    let alive = true;
+    let saving = false;
+    let sent = laserVersion.current;
+    const timer = setInterval(() => {
+      const now = Date.now();
+      for (const [id, stroke] of outgoingLasers.current)
+        if (stroke.expiresAt <= now) outgoingLasers.current.delete(id);
+      if (!alive || saving || sent === laserVersion.current) return;
+      const version = laserVersion.current;
+      saving = true;
+      void api
+        .laser(sessionId, shareKey, Array.from(outgoingLasers.current.values()))
+        .then(() => {
+          if (alive) sent = version;
+        })
+        .catch(() => {
+          /* Native previews continue; the next tick retries this fallback. */
+        })
+        .finally(() => {
+          saving = false;
+        });
+    }, 250);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, [api, sessionId, shareKey, canDraw]);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = Date.now();
+      setVanishing((previous) =>
+        previous.length
+          ? previous
+              .filter((stroke) => stroke.expiresAt > now)
+              .map((stroke) => ({ ...stroke }))
+          : previous,
+      );
+      setPolledLasers((previous) =>
+        previous.length
+          ? previous
+              .filter((stroke) => stroke.expiresAt > now)
+              .map((stroke) => ({ ...stroke }))
+          : previous,
+      );
+    }, 100);
+    return () => clearInterval(timer);
+  }, []);
   useEffect(() => {
     if (!canDraw) {
       pendingPointer.current = null;
@@ -464,13 +542,6 @@ export function useScreenAnnotations(
             )
           : previous,
       );
-      setVanishing((previous) =>
-        previous.length
-          ? previous
-              .filter((stroke) => stroke.expiresAt >= now)
-              .map((stroke) => ({ ...stroke }))
-          : previous,
-      );
     }, 100);
     return () => {
       alive = false;
@@ -483,6 +554,44 @@ export function useScreenAnnotations(
     };
   }, [annotationToken, roomId, actorsKey, canDraw, receiveCommit, refresh]);
   const broadcast = useCallback((event: AnnotationPreview) => {
+    if (event.kind === 'start' && event.object.type === 'vanishingPen') {
+      outgoingLasers.current.set(event.annotationId, {
+        object: event.object,
+        sequence: event.sequence,
+        finished: false,
+        expiresAt: Date.now() + 3000,
+      });
+      laserVersion.current++;
+    } else if (event.kind === 'points') {
+      const previous = outgoingLasers.current.get(event.annotationId);
+      if (previous && event.sequence > previous.sequence) {
+        outgoingLasers.current.set(event.annotationId, {
+          ...previous,
+          object: {
+            ...previous.object,
+            points: [...previous.object.points, ...event.points].slice(-128),
+          },
+          sequence: event.sequence,
+          expiresAt: Date.now() + 3000,
+        });
+        laserVersion.current++;
+      }
+    } else if (event.kind === 'vanish') {
+      outgoingLasers.current.set(event.annotationId, {
+        object: { ...event.object, points: event.object.points.slice(-128) },
+        sequence: event.sequence,
+        finished: true,
+        expiresAt: event.expiresAt,
+      });
+      laserVersion.current++;
+    } else if (
+      event.kind === 'finish' &&
+      outgoingLasers.current.delete(event.annotationId)
+    ) {
+      laserVersion.current++;
+    }
+    while (outgoingLasers.current.size > 8)
+      outgoingLasers.current.delete(outgoingLasers.current.keys().next().value!);
     if (event.kind === 'vanish')
       setVanishing((previous) => [
         ...previous.slice(-63),
@@ -649,9 +758,32 @@ export function useScreenAnnotations(
   return {
     context,
     objects,
-    remoteDrafts,
+    remoteDrafts: [
+      ...remoteDrafts.filter(
+        (object) =>
+          !polledLasers.some(
+            (stroke) => stroke.finished && stroke.object.id === object.id,
+          ),
+      ),
+      ...polledLasers
+        .filter(
+          (stroke) =>
+            !stroke.finished &&
+            !remoteDrafts.some((object) => object.id === stroke.object.id),
+        )
+        .map((stroke) => stroke.object),
+    ],
     pointers,
-    vanishing,
+    vanishing: [
+      ...vanishing,
+      ...polledLasers
+        .filter(
+          (stroke) =>
+            stroke.finished &&
+            !vanishing.some((local) => local.object.id === stroke.object.id),
+        )
+        .map(({ object, expiresAt }) => ({ object, expiresAt })),
+    ],
     connected,
     canDraw,
     error,

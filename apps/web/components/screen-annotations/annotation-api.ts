@@ -1,4 +1,5 @@
 import type {
+  AnnotationLaserStroke,
   AnnotationCommit,
   AnnotationContext,
   AnnotationPointerInput,
@@ -23,6 +24,11 @@ export const annotationApi = (token?: string) => {
       api.post<void>(
         `${prefix}/${encodeURIComponent(sessionId)}/pointer?shareKey=${encodeURIComponent(shareKey)}`,
         pointer,
+      ),
+    laser: (sessionId: string, shareKey: string, strokes: AnnotationLaserStroke[]) =>
+      api.post<void>(
+        `${prefix}/${encodeURIComponent(sessionId)}/laser?shareKey=${encodeURIComponent(shareKey)}`,
+        strokes,
       ),
     apply: (roomId: string, operation: AnnotationOperation) =>
       api.post<AnnotationCommit>(
