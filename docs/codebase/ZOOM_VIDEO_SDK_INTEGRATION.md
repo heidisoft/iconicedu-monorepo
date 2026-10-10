@@ -571,7 +571,7 @@ The existing Zoom cloud recording remains the recording output. The account must
 
 ### Meeting notification appearance
 
-Floating meeting notices, fullscreen and more-controls errors, and picture-in-picture prompts share the themed `NotificationCard` from `packages/ui-web`: a soft blurred surface, rounded outline, optional title and supporting text, pill actions and a circular dismiss control. Text and actions wrap independently on narrow screens. Errors retain alert semantics; informational notices retain status semantics. Existing dismissal and action behavior is unchanged.
+Floating meeting notices, fullscreen and more-controls errors, and picture-in-picture prompts share the themed `NotificationCard` from `packages/ui-web`: a compact content-sized surface with a subtle shadow, theme-colored background, softly rounded corners, optional title and supporting text, compact actions and a neutral dismiss icon. Text and actions wrap independently on narrow screens. Errors retain alert semantics; informational notices retain status semantics. Existing dismissal and action behavior is unchanged.
 
 ### Whiteboard presentation lifetime
 

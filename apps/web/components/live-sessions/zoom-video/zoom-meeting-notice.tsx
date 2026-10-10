@@ -37,7 +37,7 @@ export function ZoomMeetingNotice({
         onDismiss={onDismiss}
         role={tone === 'error' ? 'alert' : 'status'}
         icon={
-          <Icon className={tone === 'warning' ? 'text-warning' : 'text-destructive'} />
+          <Icon className={tone === 'warning' ? 'text-warning' : 'text-destructive/80'} />
         }
       />
     </div>
