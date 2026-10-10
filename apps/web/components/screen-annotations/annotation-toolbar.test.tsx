@@ -53,19 +53,19 @@ describe('screen annotation toolbar', () => {
     const primary = within(screen.getByRole('group', { name: 'Drawing tools' }));
     expect(
       primary.getAllByRole('button').map((button) => button.getAttribute('aria-label')),
-    ).toEqual([
-      'Pointer',
-      'Vanishing pen',
-      'Select',
-      'Pen',
-      'Text',
-      'Eraser',
-      'Highlighter',
-    ]);
+    ).toEqual(['Pan', 'Laser pointer', 'Select', 'Pen', 'Text', 'Eraser']);
     click('Close annotation toolbar');
     expect(props.setTool).toHaveBeenLastCalledWith('cursor');
     expect(screen.getAllByRole('button')).toHaveLength(1);
     expect(screen.getByRole('button', { name: 'Open annotation toolbar' })).toHaveFocus();
+  });
+  it('opens automatically for the presenter and still lets them collapse it', () => {
+    setup({ autoExpand: true });
+    expect(
+      screen.getByRole('button', { name: 'Laser pointer', exact: true }),
+    ).toBeVisible();
+    click('Close annotation toolbar');
+    expect(screen.getByRole('button', { name: 'Open annotation toolbar' })).toBeVisible();
   });
   it('uses compact icon controls and a horizontal scrolling toolbar', () => {
     setup();
@@ -88,8 +88,8 @@ describe('screen annotation toolbar', () => {
       exact: true,
     });
     const buttons = Array.from(drawingTools.querySelectorAll('button'));
-    expect(buttons[0]).toHaveAccessibleName('Pointer');
-    expect(buttons[1]).toHaveAccessibleName('Vanishing pen');
+    expect(buttons[0]).toHaveAccessibleName('Pan');
+    expect(buttons[1]).toHaveAccessibleName('Laser pointer');
     expect(buttons[2]).toHaveAccessibleName('Select');
     expect(buttons[buttons.indexOf(pen) + 1]).toHaveAccessibleName('Text');
     expect(screen.getByRole('button', { name: 'Shapes', exact: true })).toHaveClass(
@@ -121,7 +121,7 @@ describe('screen annotation toolbar', () => {
     expect(
       screen.queryByRole('group', { name: 'Stamps', exact: true }),
     ).not.toBeInTheDocument();
-    click('Vanishing pen');
+    click('Laser pointer');
     expect(props.setTool).toHaveBeenLastCalledWith('vanishingPen');
   });
   it('organizes panels into compact labeled sections and marks the selected color', () => {
@@ -153,11 +153,11 @@ describe('screen annotation toolbar', () => {
     const props = setup({ canDraw: false, tutor: false });
     click('Open annotation toolbar');
     expect(props.setTool).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'Pointer', exact: true })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Pan', exact: true })).toBeEnabled();
     for (const name of [
       'Select',
       'Pen',
-      'Vanishing pen',
+      'Laser pointer',
       'Highlighter',
       'Text',
       'Eraser',

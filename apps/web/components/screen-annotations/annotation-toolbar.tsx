@@ -13,13 +13,14 @@ import {
   GripVertical,
   Heart,
   Highlighter,
+  Hand,
+  Shapes,
   LocateFixed,
   Minus,
   MousePointer2,
   MoveUpRight,
   Pencil,
   Redo2,
-  Scan,
   Square,
   Star,
   Stamp,
@@ -35,10 +36,10 @@ import { createPortal } from 'react-dom';
 import { LaserPointerIcon } from '@iconicedu/ui-web/ui/laser-pointer-icon';
 import type { AnnotationTool } from '@iconicedu/shared-types';
 const tools = {
-  cursor: { label: 'Pointer', icon: MousePointer2, shortcut: '' },
-  select: { label: 'Select', icon: Scan, shortcut: 'V' },
+  cursor: { label: 'Pan', icon: Hand, shortcut: 'H' },
+  select: { label: 'Select', icon: MousePointer2, shortcut: 'V' },
   pen: { label: 'Pen', icon: Pencil, shortcut: 'P' },
-  highlighter: { label: 'Highlighter', icon: Highlighter, shortcut: 'H' },
+  highlighter: { label: 'Highlighter', icon: Highlighter },
   text: { label: 'Text', icon: Type, shortcut: 'T' },
   eraser: { label: 'Eraser', icon: Eraser, shortcut: 'E' },
   line: { label: 'Line', icon: Minus },
@@ -51,7 +52,7 @@ const tools = {
   ellipseFilled: { label: 'Filled ellipse', icon: Circle, filled: true },
   ellipseHighlight: { label: 'Ellipse highlight', icon: Circle, highlight: true },
   diamond: { label: 'Diamond', icon: Diamond },
-  vanishingPen: { label: 'Vanishing pen', icon: LaserPointerIcon },
+  vanishingPen: { label: 'Laser pointer', icon: LaserPointerIcon, shortcut: 'K' },
   spotlight: { label: 'Spotlight', icon: LocateFixed },
   pointerArrow: { label: 'Named pointer', icon: MoveUpRight },
   stampCheck: { label: 'Check', icon: Check },
@@ -222,6 +223,7 @@ function ToolMenu({
   );
 }
 export function AnnotationToolbar({
+  autoExpand = false,
   tool,
   setTool,
   canDraw,
@@ -254,6 +256,7 @@ export function AnnotationToolbar({
   pressure,
   setPressure,
 }: {
+  autoExpand?: boolean;
   tool: AnnotationTool;
   setTool: (tool: AnnotationTool) => void;
   canDraw: boolean;
@@ -288,7 +291,10 @@ export function AnnotationToolbar({
 }) {
   const [surface, setSurface] = useState<HTMLDivElement | null>(null);
   const [inset, setInset] = useState(8);
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(autoExpand);
+  useEffect(() => {
+    if (autoExpand) setExpanded(true);
+  }, [autoExpand]);
   const [panel, setPanel] = useState<string | null>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const launcherRef = useRef<HTMLButtonElement>(null);
@@ -311,7 +317,7 @@ export function AnnotationToolbar({
     );
     return () => animation.cancel();
   }, [expanded]);
-  const [dock, setDock] = useState('bottom');
+  const [dock, setDock] = useState('top');
   const [position, setPosition] = useState({ x: 16, y: 16 });
   const drag = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
   useEffect(() => {
@@ -344,13 +350,32 @@ export function AnnotationToolbar({
   };
   useEffect(() => {
     if (!surface || !toolbarRef.current) return;
-    const measure = () => setInset(toolbarRef.current!.offsetHeight + 16);
+    const measure = () => {
+      const toolbar = toolbarRef.current;
+      if (!toolbar) return;
+      setInset(toolbar.offsetHeight + 16);
+      if (surface.clientWidth > 0 && surface.clientHeight > 0) {
+        setPosition((previous) => {
+          const next = {
+            x: Math.max(
+              8,
+              Math.min(previous.x, surface.clientWidth - toolbar.offsetWidth - 8),
+            ),
+            y: Math.max(
+              8,
+              Math.min(previous.y, surface.clientHeight - toolbar.offsetHeight - 8),
+            ),
+          };
+          return next.x === previous.x && next.y === previous.y ? previous : next;
+        });
+      }
+    };
     const observer = new ResizeObserver(measure);
     observer.observe(surface);
     observer.observe(toolbarRef.current);
     measure();
     return () => observer.disconnect();
-  }, [surface]);
+  }, [surface, expanded, dock]);
   const side = dock === 'bottom' ? 'top' : 'bottom';
   const button =
     'flex min-h-8 w-full items-center rounded-sm px-2 py-1 text-xs text-left hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40';
@@ -421,8 +446,8 @@ export function AnnotationToolbar({
         style={dock === 'floating' ? { left: position.x, top: position.y } : undefined}
         onPointerDown={(event) => event.stopPropagation()}
         onKeyDown={(event) => {
-          event.stopPropagation();
           if (event.key === 'Escape') {
+            event.stopPropagation();
             event.preventDefault();
             if (panel) {
               setPanel(null);
@@ -475,8 +500,24 @@ export function AnnotationToolbar({
                 if (drag.current) {
                   setDock('floating');
                   setPosition({
-                    x: Math.max(0, drag.current.left + event.clientX - drag.current.x),
-                    y: Math.max(0, drag.current.top + event.clientY - drag.current.y),
+                    x: Math.max(
+                      8,
+                      Math.min(
+                        drag.current.left + event.clientX - drag.current.x,
+                        (surface?.clientWidth ?? 0) -
+                          (toolbarRef.current?.offsetWidth ?? 0) -
+                          8,
+                      ),
+                    ),
+                    y: Math.max(
+                      8,
+                      Math.min(
+                        drag.current.top + event.clientY - drag.current.y,
+                        (surface?.clientHeight ?? 0) -
+                          (toolbarRef.current?.offsetHeight ?? 0) -
+                          8,
+                      ),
+                    ),
                   });
                 }
               }}
@@ -501,7 +542,6 @@ export function AnnotationToolbar({
                   'pen',
                   'text',
                   'eraser',
-                  'highlighter',
                 ] as AnnotationTool[]
               ).map((item) => (
                 <ToolButton
@@ -522,7 +562,7 @@ export function AnnotationToolbar({
             >
               <ToolMenu
                 {...menuProps('Shapes')}
-                icon={<Square size={16} aria-hidden="true" />}
+                icon={<Shapes size={16} aria-hidden="true" />}
                 active={shapes.includes(tool)}
               >
                 <div className="space-y-3">
@@ -538,6 +578,13 @@ export function AnnotationToolbar({
                   <PanelSection label="Highlights">{grid(shapes.slice(8))}</PanelSection>
                 </div>
               </ToolMenu>
+              <ToolButton
+                compact
+                tool="highlighter"
+                active={tool === 'highlighter'}
+                disabled={!canDraw}
+                choose={() => choose('highlighter')}
+              />
               <ToolMenu
                 {...menuProps('Stamps')}
                 icon={<Stamp size={16} aria-hidden="true" />}

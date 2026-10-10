@@ -44,10 +44,11 @@ test('draws, edits text, selects objects and stays aligned after resizing', asyn
   expect(after!.width).toBeLessThan(before!.width);
   expect(after!.width / after!.height).toBeCloseTo(16 / 9, 3);
   await page.screenshot({ path: '/tmp/iconicedu-screen-annotations.png' });
-  await toolbar.getByRole('button', { name: 'Pointer', exact: true }).click();
-  await expect(
-    toolbar.getByRole('button', { name: 'Pointer', exact: true }),
-  ).toHaveAttribute('aria-pressed', 'true');
+  await toolbar.getByRole('button', { name: 'Pan', exact: true }).click();
+  await expect(toolbar.getByRole('button', { name: 'Pan', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
 });
 test('supports shape variants, formatting and nonpersistent vanishing marks', async ({
   page,
@@ -61,7 +62,7 @@ test('supports shape variants, formatting and nonpersistent vanishing marks', as
     ['Shapes', 'Rectangle highlight'],
     ['Shapes', 'Filled ellipse'],
     ['Shapes', 'Diamond'],
-    ['', 'Vanishing pen'],
+    ['', 'Laser pointer'],
   ]) {
     if (group) await page.getByRole('button', { name: group, exact: true }).click();
     await page.getByRole('button', { name: tool, exact: true }).click();
@@ -337,4 +338,59 @@ test('shows live ink when saved annotations are composited into the shared video
     .toBe(true);
   await page.mouse.up();
   await expect(page.getByLabel('Annotation count')).toHaveText('1 mark');
+});
+
+test('shows presenter tools and keeps a restored floating toolbar inside a resized share', async ({
+  page,
+}) => {
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      'annotation-toolbar',
+      JSON.stringify({ dock: 'floating', position: { x: 9999, y: 9999 } }),
+    ),
+  );
+  await page.goto('/visual-test/screen-annotations');
+  await page.getByRole('checkbox', { name: 'Presenter view' }).check();
+  const toolbar = page.getByRole('toolbar', { name: 'Screen annotations' });
+  await expect(toolbar).toHaveAttribute('data-expanded', 'true');
+  await expect(toolbar.getByRole('button', { name: 'Pan', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  for (const width of [1200, 390, 800]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect
+      .poll(async () => {
+        const bar = (await toolbar.boundingBox())!;
+        const share = (await page.locator('[data-shared-content-bounds]').boundingBox())!;
+        return (
+          bar.x >= share.x &&
+          bar.y >= share.y &&
+          bar.x + bar.width <= share.x + share.width + 1 &&
+          bar.y + bar.height <= share.y + share.height + 1
+        );
+      })
+      .toBe(true);
+  }
+  await toolbar.getByRole('button', { name: 'Pan', exact: true }).click();
+  await page
+    .getByTestId('annotation-viewer')
+    .evaluate((node) => node.setAttribute('aria-hidden', 'true'));
+  await page.keyboard.press('k');
+  await page
+    .getByTestId('annotation-viewer')
+    .evaluate((node) => node.removeAttribute('aria-hidden'));
+  await expect(toolbar.getByRole('button', { name: 'Pan', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await page.keyboard.press('k');
+  await expect(
+    toolbar.getByRole('button', { name: 'Laser pointer', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await page.keyboard.press('h');
+  await expect(toolbar.getByRole('button', { name: 'Pan', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
 });

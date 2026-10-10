@@ -1742,6 +1742,7 @@ export function ZoomVideoSessionEmbed({
               !isWhiteboardActive
                 ? (size, presenterId) => (
                     <ScreenAnnotationOverlay
+                      presenting={presenterId === selfUserIdRef.current}
                       sourceComposited={
                         presenterId !== selfUserIdRef.current &&
                         recordingComposition.composited.has(

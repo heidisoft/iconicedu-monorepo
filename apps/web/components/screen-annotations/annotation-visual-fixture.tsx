@@ -101,6 +101,7 @@ function useFixtureAnnotations() {
 }
 export function AnnotationVisualFixture() {
   const [portrait, setPortrait] = useState(false);
+  const [presenting, setPresenting] = useState(false);
   const [composited, setComposited] = useState(false);
   const useAnnotations = () => {
     const engine = useFixtureAnnotations();
@@ -124,6 +125,14 @@ export function AnnotationVisualFixture() {
         />
         Simulate composited share
       </label>
+      <label className="ml-4">
+        <input
+          type="checkbox"
+          checked={presenting}
+          onChange={(event) => setPresenting(event.target.checked)}
+        />
+        Presenter view
+      </label>
       <div
         data-testid="annotation-viewer"
         className="relative bg-card"
@@ -138,6 +147,7 @@ export function AnnotationVisualFixture() {
           overlay={(size) => (
             <Overlay
               sourceComposited={composited}
+              presenting={presenting}
               sessionId="fixture-session"
               shareKey="123"
               useAnnotations={useAnnotations}

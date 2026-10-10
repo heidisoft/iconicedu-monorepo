@@ -41,6 +41,29 @@ describe('ZoomShareStage', () => {
     expect(screen.getAllByLabelText('Overlay dimensions')).toHaveLength(1);
     expect(screen.getByLabelText('Overlay dimensions')).toHaveTextContent('1000:562.5');
   });
+  it.each(['canvas', 'video'] as const)(
+    'keeps the presenter annotation overlay visible with the %s renderer',
+    (localRenderTarget) => {
+      vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000);
+      vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(800);
+      renderStage({
+        localSharing: true,
+        selfUserId: 7,
+        showRemoteShare: false,
+        showLocalShare: true,
+        localRenderTarget,
+        annotationOverlay: (_size, presenterId) => (
+          <button>Annotate presenter {presenterId}</button>
+        ),
+      });
+      const launcher = screen.getByRole('button', { name: 'Annotate presenter 7' });
+      expect(launcher).toBeVisible();
+      expect(launcher.closest('.zoom-share-stage')).toHaveAttribute(
+        'aria-hidden',
+        'false',
+      );
+    },
+  );
   it('keeps the annotation engine unmounted when no overlay is enabled', () => {
     renderStage();
     expect(screen.queryByLabelText('Overlay dimensions')).not.toBeInTheDocument();

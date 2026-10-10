@@ -44,10 +44,12 @@ export function AnnotationOverlay({
   onContext,
   annotationToken,
   sourceComposited = false,
+  presenting = false,
 }: {
   sessionId: string;
   annotationToken?: string;
   sourceComposited?: boolean;
+  presenting?: boolean;
   shareKey: string;
   width: number;
   height: number;
@@ -222,7 +224,8 @@ export function AnnotationOverlay({
       const target = event.target as HTMLElement;
       if (
         !engineRef.current.canDraw ||
-        tool === 'cursor' ||
+        root.current?.closest('[aria-hidden="true"]') ||
+        (tool === 'cursor' && !root.current?.querySelector('[data-expanded="true"]')) ||
         target.closest('input,textarea,select,[contenteditable="true"]')
       )
         return;
@@ -246,7 +249,8 @@ export function AnnotationOverlay({
         const shortcuts: Record<string, AnnotationTool> = {
           v: 'select',
           p: 'pen',
-          h: 'highlighter',
+          h: 'cursor',
+          k: 'vanishingPen',
           t: 'text',
           e: 'eraser',
         };
@@ -768,6 +772,7 @@ export function AnnotationOverlay({
       </output>
       <div className="pointer-events-auto">
         <AnnotationToolbar
+          autoExpand={presenting}
           tool={tool}
           setTool={setTool}
           canDraw={engine.canDraw}
