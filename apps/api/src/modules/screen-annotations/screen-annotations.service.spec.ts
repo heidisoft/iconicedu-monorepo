@@ -6,6 +6,7 @@ jest.mock('@iconicedu/api/lib/supabase/session');
 const rpc = jest.fn();
 const getUser = jest.fn();
 const pointerRows = jest.fn();
+const laserRows = jest.fn();
 const upsert = jest.fn();
 const context = {
   actor: { userId: 'verified-user', name: 'Teacher', role: 'educator' },
@@ -16,12 +17,12 @@ beforeEach(() => {
   jest.resetAllMocks();
   jest.mocked(createSupabaseServiceClient).mockReturnValue({
     rpc,
-    from: () => {
+    from: (table: string) => {
       const query = {
         select: () => query,
         eq: () => query,
         gt: () => query,
-        limit: pointerRows,
+        limit: table === 'screen_annotation_lasers' ? laserRows : pointerRows,
         upsert,
       };
       return query;
@@ -34,6 +35,7 @@ beforeEach(() => {
     >);
   getUser.mockResolvedValue({ data: { user: { id: 'verified-user' } }, error: null });
   pointerRows.mockResolvedValue({ data: [], error: null });
+  laserRows.mockResolvedValue({ data: [], error: null });
   upsert.mockResolvedValue({ error: null });
 });
 describe('screen annotation authorization', () => {
@@ -41,7 +43,7 @@ describe('screen annotation authorization', () => {
     rpc.mockResolvedValue({ data: context, error: null });
     await expect(
       new ScreenAnnotationsService().context('token', 'session', '123'),
-    ).resolves.toEqual({ ...context, pointers: [] });
+    ).resolves.toEqual({ ...context, pointers: [], lasers: [] });
     expect(rpc).toHaveBeenCalledWith('screen_annotation_context', {
       p_session: 'session',
       p_user: 'verified-user',
@@ -173,5 +175,60 @@ it('rejects pointer publication by a disabled participant or an expired guest', 
   await expect(
     service.pointer('a'.repeat(43), 'session', '123', input, true),
   ).rejects.toThrow('Rejoin the meeting');
+  expect(upsert).not.toHaveBeenCalled();
+});
+
+it('authorizes signed-in and guest laser writes using the verified room and actor', async () => {
+  rpc.mockResolvedValue({ data: context, error: null });
+  const service = new ScreenAnnotationsService();
+  await service.laser('token', 'session', '123', []);
+  await service.laser('a'.repeat(43), 'session', '123', [], true);
+  expect(upsert).toHaveBeenCalledWith(
+    expect.objectContaining({ room_id: 'room', user_id: 'verified-user', strokes: [] }),
+    { onConflict: 'room_id,user_id' },
+  );
+  expect(rpc).not.toHaveBeenCalledWith('screen_annotation_apply', expect.anything());
+});
+it('filters removed and locked participants and replaces laser identity from verified presence', async () => {
+  rpc.mockResolvedValue({
+    data: { ...context, snapshot: { ...context.snapshot, studentsEnabled: false } },
+    error: null,
+  });
+  const stroke = {
+    object: { creatorId: 'spoof', creatorName: 'Spoof', creatorRole: 'student' },
+    finished: true,
+    sequence: 2,
+    expiresAt: Date.now() + 3000,
+  };
+  laserRows.mockResolvedValue({
+    data: [
+      { user_id: 'verified-user', strokes: [stroke] },
+      { user_id: 'removed', strokes: [stroke] },
+    ],
+    error: null,
+  });
+  const value = await new ScreenAnnotationsService().context('token', 'session', '123');
+  expect(value.lasers).toHaveLength(1);
+  expect(value.lasers?.[0].strokes[0].object).toEqual(
+    expect.objectContaining({
+      creatorId: 'verified-user',
+      creatorName: 'Teacher',
+      creatorRole: 'educator',
+      roomId: 'room',
+    }),
+  );
+});
+it('rejects laser writes when participant annotation is disabled', async () => {
+  rpc.mockResolvedValue({
+    data: {
+      ...context,
+      actor: { ...context.actor, role: 'student' },
+      snapshot: { ...context.snapshot, studentsEnabled: false },
+    },
+    error: null,
+  });
+  await expect(
+    new ScreenAnnotationsService().laser('token', 'session', '123', []),
+  ).rejects.toThrow('Annotation access denied');
   expect(upsert).not.toHaveBeenCalled();
 });

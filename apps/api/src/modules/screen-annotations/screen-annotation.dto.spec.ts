@@ -1,6 +1,7 @@
 import {
   parseAnnotationOperation,
   parseAnnotationPointer,
+  parseAnnotationLasers,
 } from './screen-annotation.dto';
 const id = '10000000-0000-4000-8000-000000000001';
 const input = {
@@ -113,5 +114,42 @@ describe('ephemeral pointer validation', () => {
         color: 'invalid',
       }),
     ).toThrow();
+  });
+});
+
+describe('ephemeral laser validation', () => {
+  const stroke = () => ({
+    object: { ...input.object, type: 'vanishingPen' },
+    sequence: 1,
+    finished: false,
+    expiresAt: Date.now() + 3000,
+  });
+  it('strips forged identity and limits expiry without accepting permanent tools', () => {
+    const value = parseAnnotationLasers([
+      { ...stroke(), expiresAt: Date.now() + 100000 },
+    ])[0];
+    expect(value.object.creatorId).toBe('');
+    expect(value.object.type).toBe('vanishingPen');
+    expect(value.expiresAt).toBeLessThanOrEqual(Date.now() + 4000);
+    expect(() =>
+      parseAnnotationLasers([{ ...stroke(), object: input.object }]),
+    ).toThrow();
+  });
+  it('bounds stroke count, point count, geometry and sequence', () => {
+    expect(() => parseAnnotationLasers(Array(9).fill(stroke()))).toThrow();
+    expect(() =>
+      parseAnnotationLasers([
+        {
+          ...stroke(),
+          object: { ...stroke().object, points: Array(129).fill({ x: 0, y: 0 }) },
+        },
+      ]),
+    ).toThrow();
+    expect(() =>
+      parseAnnotationLasers([
+        { ...stroke(), object: { ...stroke().object, points: [{ x: Infinity, y: 0 }] } },
+      ]),
+    ).toThrow();
+    expect(() => parseAnnotationLasers([{ ...stroke(), sequence: 0.5 }])).toThrow();
   });
 });

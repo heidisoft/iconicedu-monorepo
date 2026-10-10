@@ -77,6 +77,7 @@ export type AnnotationContext = {
   actor: AnnotationActor;
   actors: AnnotationActor[];
   pointers?: AnnotationPointerPresence[];
+  lasers?: AnnotationLaserPresence[];
   snapshot: AnnotationSnapshot;
 };
 export type AnnotationOperation =
@@ -115,3 +116,15 @@ export type AnnotationPreview = {
     }
   | { kind: 'vanish'; object: AnnotationObject; expiresAt: number }
 );
+
+/** Short-lived screen-share laser state. Never an annotation document mutation. */
+export type AnnotationLaserStroke = {
+  object: AnnotationObject;
+  sequence: number;
+  finished: boolean;
+  expiresAt: number;
+};
+export type AnnotationLaserPresence = {
+  userId: string;
+  strokes: AnnotationLaserStroke[];
+};

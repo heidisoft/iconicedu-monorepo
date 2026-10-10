@@ -1,0 +1,10 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+select plan(5);
+select ok((select relrowsecurity from pg_class where oid = 'public.screen_annotation_lasers'::regclass), 'laser presence has RLS enabled');
+select ok(not has_table_privilege('anon', 'public.screen_annotation_lasers', 'SELECT'), 'anonymous clients cannot read lasers directly');
+select ok(not has_table_privilege('authenticated', 'public.screen_annotation_lasers', 'SELECT'), 'signed-in clients cannot bypass meeting scope');
+select ok(not has_table_privilege('authenticated', 'public.screen_annotation_lasers', 'INSERT'), 'clients cannot spoof laser identity');
+select ok(has_table_privilege('service_role', 'public.screen_annotation_lasers', 'INSERT'), 'authorized API can publish lasers');
+select * from finish();
+rollback;

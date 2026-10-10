@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import type {
+  AnnotationLaserStroke,
   AnnotationObject,
   AnnotationPointerInput,
   AnnotationOperation,
@@ -127,4 +128,39 @@ export function parseAnnotationPointer(value: unknown): AnnotationPointerInput {
     tool: input.tool as AnnotationPointerInput['tool'],
     color: input.color,
   };
+}
+
+export function parseAnnotationLasers(value: unknown): AnnotationLaserStroke[] {
+  if (!Array.isArray(value) || value.length > 8)
+    throw new BadRequestException('Invalid laser strokes');
+  return value.map((item) => {
+    const stroke = record(item);
+    const object = record(stroke.object);
+    if (
+      object.type !== 'vanishingPen' ||
+      !Array.isArray(object.points) ||
+      object.points.length > 128
+    )
+      throw new BadRequestException('Invalid laser stroke');
+    const parsed = parseAnnotationOperation({
+      eventId: object.id,
+      kind: 'put',
+      baseVersion: 0,
+      object: { ...object, type: 'pen' },
+    });
+    if (parsed.kind !== 'put' || typeof stroke.finished !== 'boolean')
+      throw new BadRequestException('Invalid laser stroke');
+    const sequence = number(stroke.sequence, 0, 1_000_000);
+    if (!Number.isInteger(sequence))
+      throw new BadRequestException('Invalid laser sequence');
+    return {
+      object: { ...parsed.object, type: 'vanishingPen' },
+      sequence,
+      finished: stroke.finished,
+      expiresAt: Math.min(
+        Date.now() + 4000,
+        number(stroke.expiresAt, 0, Number.MAX_SAFE_INTEGER),
+      ),
+    };
+  });
 }

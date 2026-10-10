@@ -8,6 +8,8 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import {
+  type AnnotationLaserPresence,
+  type AnnotationLaserStroke,
   type AnnotationContext,
   type AnnotationPointerInput,
   type AnnotationPointerPresence,
@@ -47,7 +49,7 @@ export class ScreenAnnotationsService {
     token: string,
     sessionId: string,
     shareKey: string,
-    includePointers = true,
+    includePresence = true,
   ): Promise<AnnotationContext> {
     const { data, error } = await createSupabaseServiceClient().rpc(
       'screen_annotation_guest_context',
@@ -58,17 +60,26 @@ export class ScreenAnnotationsService {
       },
     );
     if (error) this.fail(error.message);
-    return includePointers
-      ? this.withPointers(data as AnnotationContext)
+    return includePresence
+      ? this.withPresence(data as AnnotationContext)
       : (data as AnnotationContext);
   }
-  private async withPointers(context: AnnotationContext): Promise<AnnotationContext> {
-    const { data, error } = await createSupabaseServiceClient()
-      .from('screen_annotation_pointers')
-      .select('user_id, name, role, x, y, tool, color, expires_at')
-      .eq('room_id', context.snapshot.roomId)
-      .gt('expires_at', new Date().toISOString())
-      .limit(128);
+  private async withPresence(context: AnnotationContext): Promise<AnnotationContext> {
+    const db = createSupabaseServiceClient();
+    const [{ data, error }, laserRows] = await Promise.all([
+      db
+        .from('screen_annotation_pointers')
+        .select('user_id, name, role, x, y, tool, color, expires_at')
+        .eq('room_id', context.snapshot.roomId)
+        .gt('expires_at', new Date().toISOString())
+        .limit(128),
+      db
+        .from('screen_annotation_lasers')
+        .select('user_id, strokes')
+        .eq('room_id', context.snapshot.roomId)
+        .gt('expires_at', new Date().toISOString())
+        .limit(128),
+    ]);
     if (error)
       throw new InternalServerErrorException('Unable to load participant pointers');
     const allowed = new Map(context.actors.map((actor) => [actor.userId, actor]));
@@ -91,7 +102,36 @@ export class ScreenAnnotationsService {
         },
       ];
     });
-    return { ...context, pointers };
+    if (laserRows.error)
+      throw new InternalServerErrorException('Unable to load participant lasers');
+    const lasers: AnnotationLaserPresence[] = (laserRows.data ?? []).flatMap((row) => {
+      const actor = allowed.get(row.user_id);
+      if (
+        !actor ||
+        context.snapshot.ended ||
+        (actor.role !== 'educator' && !context.snapshot.studentsEnabled)
+      )
+        return [];
+      return [
+        {
+          userId: actor.userId,
+          strokes: (row.strokes as AnnotationLaserStroke[])
+            .filter((stroke) => stroke.expiresAt > Date.now())
+            .map((stroke) => ({
+              ...stroke,
+              object: {
+                ...stroke.object,
+                roomId: context.snapshot.roomId,
+                shareSessionId: context.snapshot.roomId,
+                creatorId: actor.userId,
+                creatorName: actor.name,
+                creatorRole: actor.role,
+              },
+            })),
+        },
+      ];
+    });
+    return { ...context, pointers, lasers };
   }
   async pointer(
     token: string,
@@ -127,6 +167,35 @@ export class ScreenAnnotationsService {
     if (error)
       throw new InternalServerErrorException('Unable to share participant pointer');
   }
+  async laser(
+    token: string,
+    sessionId: string,
+    shareKey: string,
+    strokes: AnnotationLaserStroke[],
+    guest = false,
+  ) {
+    const context = guest
+      ? await this.guestContext(token, sessionId, shareKey, false)
+      : await this.context(token, sessionId, shareKey, false);
+    if (
+      context.snapshot.ended ||
+      (context.actor.role !== 'educator' && !context.snapshot.studentsEnabled)
+    )
+      throw new ForbiddenException('Annotation access denied');
+    const now = Date.now();
+    const { error } = await createSupabaseServiceClient()
+      .from('screen_annotation_lasers')
+      .upsert(
+        {
+          room_id: context.snapshot.roomId,
+          user_id: context.actor.userId,
+          strokes: strokes.filter((stroke) => stroke.expiresAt > now),
+          expires_at: new Date(now + 4000).toISOString(),
+        },
+        { onConflict: 'room_id,user_id' },
+      );
+    if (error) throw new InternalServerErrorException('Unable to share laser');
+  }
   async guestApply(
     token: string,
     roomId: string,
@@ -147,7 +216,7 @@ export class ScreenAnnotationsService {
     token: string,
     sessionId: string,
     shareKey: string,
-    includePointers = true,
+    includePresence = true,
   ): Promise<AnnotationContext> {
     const userId = await this.user(token);
     const { data, error } = await createSupabaseServiceClient().rpc(
@@ -155,8 +224,8 @@ export class ScreenAnnotationsService {
       { p_session: sessionId, p_user: userId, p_share: shareKey },
     );
     if (error) this.fail(error.message);
-    return includePointers
-      ? this.withPointers(data as AnnotationContext)
+    return includePresence
+      ? this.withPresence(data as AnnotationContext)
       : (data as AnnotationContext);
   }
   async apply(

@@ -20,6 +20,7 @@ import {
   annotationUuid,
   parseAnnotationOperation,
   parseAnnotationPointer,
+  parseAnnotationLasers,
 } from './screen-annotation.dto';
 @Controller('screen-annotations')
 @UseGuards(AuthGuard)
@@ -54,6 +55,23 @@ export class ScreenAnnotationsController {
       annotationUuid(sessionId),
       shareKey,
       parseAnnotationPointer(body),
+    );
+  }
+  @Post(':sessionId/laser')
+  @HttpCode(204)
+  laser(
+    @Req() req: AuthenticatedRequest,
+    @Param('sessionId') sessionId: string,
+    @Query('shareKey') shareKey: string,
+    @Body() body: unknown,
+  ) {
+    if (!/^[0-9]{1,16}$/.test(shareKey ?? ''))
+      throw new BadRequestException('Invalid share key');
+    return this.annotations.laser(
+      extractBearerToken(req.headers.authorization),
+      annotationUuid(sessionId),
+      shareKey,
+      parseAnnotationLasers(body),
     );
   }
   @Post(':roomId/operations')
@@ -103,6 +121,24 @@ export class GuestScreenAnnotationsController {
       annotationUuid(sessionId),
       shareKey,
       parseAnnotationPointer(body),
+      true,
+    );
+  }
+  @Post(':sessionId/laser')
+  @HttpCode(204)
+  laser(
+    @Req() req: AuthenticatedRequest,
+    @Param('sessionId') sessionId: string,
+    @Query('shareKey') shareKey: string,
+    @Body() body: unknown,
+  ) {
+    if (!/^[0-9]{1,16}$/.test(shareKey ?? ''))
+      throw new BadRequestException('Invalid share key');
+    return this.annotations.laser(
+      extractBearerToken(req.headers.authorization),
+      annotationUuid(sessionId),
+      shareKey,
+      parseAnnotationLasers(body),
       true,
     );
   }

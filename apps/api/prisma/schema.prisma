@@ -259,8 +259,20 @@ model ScreenAnnotationSession {
   endedAt         DateTime?                 @map("ended_at") @db.Timestamptz(6)
   receipts        ScreenAnnotationReceipt[]
   pointers        ScreenAnnotationPointer[]
+  lasers          ScreenAnnotationLaser[]
 
   @@map("screen_annotation_sessions")
+}
+
+model ScreenAnnotationLaser {
+  roomId String @map("room_id") @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  strokes Json @default("[]")
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+  room ScreenAnnotationSession @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@id([roomId, userId])
+  @@map("screen_annotation_lasers")
 }
 
 model ScreenAnnotationPointer {
