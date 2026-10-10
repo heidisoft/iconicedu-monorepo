@@ -1,5 +1,6 @@
 'use client';
-import { useState, type ComponentProps } from 'react';
+import { useState } from 'react';
+import { LaserPointerIcon } from '@iconicedu/ui-web/ui/laser-pointer-icon';
 import {
   ArrowUpRight,
   Circle,
@@ -38,22 +39,6 @@ import {
   DropdownMenuCheckboxItem,
 } from '@iconicedu/ui-web/ui/dropdown-menu';
 import type { WhiteboardEngine, WhiteboardTool } from '../canvas/whiteboard-engine';
-function LaserPointerIcon(props: ComponentProps<'svg'>) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      {...props}
-    >
-      <path d="m4 17 9-9 3 3-9 9H4v-3Z" />
-      <path d="m11 10 3 3M17 7l4-4M18 10h3M14 6V3" />
-    </svg>
-  );
-}
 export const whiteboardTools = [
   { tool: 'hand', label: 'Pan', icon: Hand, shortcut: 'H' },
   { tool: 'laser', label: 'Laser pointer', icon: LaserPointerIcon, shortcut: 'K' },
