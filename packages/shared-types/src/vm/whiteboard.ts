@@ -32,6 +32,8 @@ export interface WhiteboardSnapshotVM {
   revision: number;
   /** Live presentation state; refreshed even when document revision is unchanged. */
   presentationActive?: boolean;
+  /** Public presence identifier of the current authorized grant. */
+  actorId?: string;
   document: WhiteboardDocumentVM;
   role: WhiteboardRole;
   presence: Array<{ id: string; name: string; role: WhiteboardRole }>;

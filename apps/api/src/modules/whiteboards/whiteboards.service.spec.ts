@@ -92,6 +92,7 @@ describe('whiteboard API capabilities and atomic persistence', () => {
       grant.then = presence.then;
       const result = await new WhiteboardsService().get(token, board.revision);
       expect(result.presentationActive).toBe(active);
+      expect(result.actorId).toBe(hashWhiteboardToken(token).slice(0, 16));
       expect(result).not.toHaveProperty('document');
       expect(grant.eq).toHaveBeenCalledWith('live_session_id', 'session');
       expect(grant.gt).toHaveBeenCalledWith('last_seen_at', expect.any(String));

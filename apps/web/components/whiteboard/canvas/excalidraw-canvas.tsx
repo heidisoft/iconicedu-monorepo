@@ -13,12 +13,14 @@ import { sceneFingerprint } from './scene-history';
 
 export function ExcalidrawCanvas({
   elements,
+  defaultColor,
   editable,
   tool,
   onChange,
   onEngine,
   onToolChange,
 }: {
+  defaultColor?: string;
   tool: WhiteboardTool;
   elements: WhiteboardElementVM[];
   editable: boolean;
@@ -40,6 +42,18 @@ export function ExcalidrawCanvas({
   const editableRef = useRef(editable);
   editableRef.current = editable;
   const remoteFingerprint = useRef('');
+  const previousDefaultColor = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!api || !defaultColor) return;
+    const previous = previousDefaultColor.current;
+    if (!previous || api.getAppState().currentItemStrokeColor === previous) {
+      api.updateScene({
+        appState: { currentItemStrokeColor: defaultColor },
+        captureUpdate: CaptureUpdateAction.NEVER,
+      });
+    }
+    previousDefaultColor.current = defaultColor;
+  }, [api, defaultColor]);
   useEffect(() => {
     if (!api) return;
     const engine = new ExcalidrawWhiteboardEngine(

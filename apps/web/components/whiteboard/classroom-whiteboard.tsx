@@ -1,6 +1,7 @@
 'use client';
 import dynamic from 'next/dynamic';
 import { useState } from 'react';
+import { participantColor } from '@iconicedu/utils';
 import { ErrorBoundary } from '@iconicedu/ui-web/components/error-boundary';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import {
@@ -179,6 +180,14 @@ export function ClassroomWhiteboard({
           <Canvas
             key={page.id}
             elements={page.elements}
+            defaultColor={
+              snapshot.actorId
+                ? participantColor(
+                    snapshot.actorId,
+                    snapshot.presence.map((person) => person.id),
+                  )
+                : undefined
+            }
             editable={editable}
             tool={tool}
             onChange={board.changeElements}

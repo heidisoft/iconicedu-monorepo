@@ -96,6 +96,11 @@ export type AnnotationPreview = {
   | { kind: 'start'; object: AnnotationObject }
   | { kind: 'points'; points: AnnotationPoint[] }
   | { kind: 'finish' }
-  | { kind: 'pointer'; point: AnnotationPoint; tool: 'spotlight' | 'pointerArrow' }
+  | {
+      kind: 'pointer';
+      point: AnnotationPoint;
+      tool: 'spotlight' | 'pointerArrow';
+      color?: string;
+    }
   | { kind: 'vanish'; object: AnnotationObject; expiresAt: number }
 );

@@ -98,6 +98,7 @@ export class WhiteboardsService {
     return {
       id: board.id,
       revision: board.revision,
+      actorId: hashWhiteboardToken(token).slice(0, 16),
       // Saved content survives a call; presentation belongs to a live presenter grant.
       // Legacy flags without an owner must never reopen a board on join.
       presentationActive:
