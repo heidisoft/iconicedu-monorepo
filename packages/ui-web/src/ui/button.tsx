@@ -26,6 +26,8 @@ const buttonVariants = cva(
           'bg-ink text-ink-foreground hover:bg-ink/85 aria-expanded:bg-ink aria-expanded:text-ink-foreground',
         meeting:
           'bg-secondary text-secondary-foreground hover:bg-secondary/80 aria-expanded:bg-secondary aria-expanded:text-secondary-foreground',
+        toolbar:
+          'text-foreground hover:bg-muted hover:text-foreground aria-pressed:bg-primary/10 aria-pressed:text-primary aria-expanded:bg-muted',
         ghost:
           'hover:bg-muted hover:text-foreground dark:hover:bg-muted/50 aria-expanded:bg-muted aria-expanded:text-foreground',
         destructive:
