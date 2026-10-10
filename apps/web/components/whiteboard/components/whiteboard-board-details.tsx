@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { Download, PanelsTopLeft, Users, ChevronDown } from 'lucide-react';
+import { Download, PanelsTopLeft, Users } from 'lucide-react';
 import type { WhiteboardSnapshotVM } from '@iconicedu/shared-types';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import {
@@ -40,28 +40,17 @@ export function WhiteboardBoardDetails({
       className="pointer-events-auto relative col-start-1 row-start-1 @min-[760px]:col-start-2 justify-self-end flex max-w-full flex-wrap items-center justify-end gap-1.5 rounded-full border border-border bg-card px-2 py-1 shadow-sm"
     >
       <DropdownMenu open={boardMenu} onOpenChange={setBoardMenu}>
-        <h2 className="min-w-0 max-w-48 flex-1 text-sm font-medium">
-          <DropdownMenuTrigger asChild>
-            <Button
-              type="button"
-              variant="toolbar"
-              aria-label="Board options"
-              className="h-8 max-w-full gap-2 rounded-full px-2"
-            >
-              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <PanelsTopLeft size={15} aria-hidden="true" />
-              </span>
-              <span className="truncate" title={title}>
-                {title}
-              </span>
-              <ChevronDown
-                size={14}
-                className="shrink-0 text-muted-foreground"
-                aria-hidden="true"
-              />
-            </Button>
-          </DropdownMenuTrigger>
-        </h2>
+        <DropdownMenuTrigger asChild>
+          <Button
+            type="button"
+            variant="toolbar"
+            aria-label="Board options"
+            title={title}
+            className="size-8 shrink-0 rounded-full p-0 text-primary"
+          >
+            <PanelsTopLeft size={16} aria-hidden="true" />
+          </Button>
+        </DropdownMenuTrigger>
         <DropdownMenuContent
           container={
             typeof document === 'undefined' ? undefined : document.fullscreenElement
