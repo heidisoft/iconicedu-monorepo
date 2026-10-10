@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import {
   ArrowLeftRight,
   ArrowRight,
@@ -290,6 +290,25 @@ export function AnnotationToolbar({
   const [panel, setPanel] = useState<string | null>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const launcherRef = useRef<HTMLButtonElement>(null);
+  const previousToolbarWidth = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    const node = toolbarRef.current;
+    if (!node) return;
+    const nextWidth = node.getBoundingClientRect().width;
+    const previousWidth = previousToolbarWidth.current;
+    previousToolbarWidth.current = nextWidth;
+    if (
+      previousWidth === null ||
+      !node.animate ||
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    )
+      return;
+    const animation = node.animate(
+      [{ width: `${previousWidth}px` }, { width: `${nextWidth}px` }],
+      { duration: 240, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' },
+    );
+    return () => animation.cancel();
+  }, [expanded]);
   const [dock, setDock] = useState('bottom');
   const [position, setPosition] = useState({ x: 16, y: 16 });
   const drag = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
@@ -395,7 +414,8 @@ export function AnnotationToolbar({
         role="toolbar"
         aria-label="Screen annotations"
         aria-orientation="horizontal"
-        className={`pointer-events-auto absolute z-30 flex w-fit max-w-[calc(100%-16px)] flex-nowrap items-center gap-1 overflow-x-auto rounded-md border border-border bg-card p-1 text-foreground shadow-sm ${dock === 'top' ? 'left-2 top-2' : dock === 'bottom' ? 'bottom-2 left-2' : dock === 'left' ? 'left-2 top-2' : dock === 'right' ? 'right-2 top-2' : ''}`}
+        data-expanded={expanded}
+        className={`pointer-events-auto absolute z-30 flex w-fit max-w-[calc(100%-16px)] flex-nowrap items-center gap-1 overflow-x-auto border border-border bg-card p-1 text-foreground shadow-sm transition-[border-radius,box-shadow] duration-200 motion-reduce:transition-none ${expanded ? 'rounded-md' : 'rounded-full'} ${dock === 'top' ? 'left-2 top-2' : dock === 'bottom' ? 'bottom-2 left-2' : dock === 'left' ? 'left-2 top-2' : dock === 'right' ? 'right-2 top-2' : ''}`}
         style={dock === 'floating' ? { left: position.x, top: position.y } : undefined}
         onPointerDown={(event) => event.stopPropagation()}
         onKeyDown={(event) => {
@@ -414,7 +434,7 @@ export function AnnotationToolbar({
           aria-label={expanded ? 'Close annotation toolbar' : 'Open annotation toolbar'}
           aria-expanded={expanded}
           title={expanded ? 'Close annotations' : 'Annotate screen'}
-          className={iconButton}
+          className={`${iconButton} ${expanded ? '' : 'rounded-full'}`}
           onClick={() => {
             if (expanded) close();
             else {

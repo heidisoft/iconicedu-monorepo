@@ -178,6 +178,35 @@ describe('annotation client', () => {
     });
     expect(result.current.objects[0].version).toBe(3);
   });
+  it('renders remote pointers with the sender color and ignores malformed colors', async () => {
+    const { result } = renderHook(() => useScreenAnnotations('session', '123'));
+    await waitFor(() => expect(result.current.connected).toBe(true));
+    const receive = mocks.subscriptions.get(
+      'annotation:room:room:user:student:annotation.preview',
+    )!;
+    const pointer = {
+      roomId: 'room',
+      userId: 'student',
+      clientId: 'client',
+      annotationId: 'pointer:student',
+      timestamp: Date.now(),
+      kind: 'pointer',
+      point: { x: 0.2, y: 0.3 },
+      tool: 'spotlight',
+    };
+    act(() =>
+      receive({
+        payload: { ...pointer, sequence: 1, eventId: 'pointer-one', color: '#16a34a' },
+      }),
+    );
+    expect(result.current.pointers.student.color).toBe('#16a34a');
+    act(() =>
+      receive({
+        payload: { ...pointer, sequence: 2, eventId: 'pointer-two', color: 'invalid' },
+      }),
+    );
+    expect(result.current.pointers.student.color).toBeUndefined();
+  });
   it('rejects spoofed identities, handles points arriving before start, and cancels previews after tutor disables drawing', async () => {
     const { result } = renderHook(() => useScreenAnnotations('session', '123'));
     await waitFor(() => expect(result.current.connected).toBe(true));

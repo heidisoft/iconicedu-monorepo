@@ -576,3 +576,11 @@ Floating meeting notices, fullscreen and more-controls errors, and picture-in-pi
 ### Whiteboard presentation lifetime
 
 Saved classroom board content does not imply an active presentation. The API records the presenting teacher's grant identity and live session when presentation starts, and reports `presentationActive` separately from document revisions. Automatic opening requires that exact teacher grant to have an unexpired heartbeat in the same meeting. Legacy presentation flags and flags from earlier meetings do not reopen the board. After an unexpected disconnect, presentation expires within the existing 15-second presence window plus the polling interval; saved drawings remain available.
+
+### Annotation interaction and participant colors
+
+Screen sharing keeps Konva's native shape primitives and transformer; the whiteboard keeps Excalidraw's native drawing tools and style controls. Participant rosters receive deterministic distinct default colors, including a fallback for meetings larger than the preset palette. Explicit color choices remain local user preferences. Screen-share pointer previews carry the sender's validated color rather than inheriting the viewer's color. Whiteboard defaults use Excalidraw's `currentItemStrokeColor` app state.
+
+The screen-share pen launcher is circular when collapsed and expands with a short native browser width animation. Reduced-motion preferences disable expansion and cursor tween animations. Shift constrains rectangles, ellipses and diamonds to equal pixel dimensions, and lines/arrows to 45-degree increments; endpoints remain inside shared content. Pointer release captures the final endpoint and discards accidental tiny shapes. The mark count remains available to assistive technology without a visible top-right badge.
+
+Konva does not provide a built-in avatar cursor. Excalidraw's collaborator API supports avatar metadata, but its native canvas cursor uses a username label. No custom avatar cursor is added. References: [Konva React drawing example](https://konvajs.org/docs/react/Free_Drawing.html) and [Excalidraw scene API](https://docs.excalidraw.com/docs/@excalidraw/excalidraw/api/props/excalidraw-api).

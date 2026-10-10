@@ -1,6 +1,6 @@
 'use client';
 import { memo } from 'react';
-import { Arrow, Ellipse, Group, Line, Rect, Text } from 'react-konva';
+import { Arrow, Circle, Ellipse, Group, Line, Rect, Text } from 'react-konva';
 import type Konva from 'konva';
 import type { AnnotationObject } from '@iconicedu/shared-types';
 export function annotationGeometry(
@@ -57,6 +57,7 @@ export const AnnotationShape = memo(function AnnotationShape({
   const common = {
     stroke: object.style.color,
     strokeWidth,
+    hitStrokeWidth: Math.max(12, strokeWidth),
     opacity: object.style.opacity,
     lineCap: 'round' as const,
     lineJoin: 'round' as const,
@@ -120,6 +121,14 @@ export const AnnotationShape = memo(function AnnotationShape({
           0,
           bounds.height / 2,
         ]}
+      />
+    );
+  else if (object.points.length === 1)
+    shape = (
+      <Circle
+        radius={strokeWidth / 2}
+        fill={object.style.color}
+        opacity={object.style.opacity}
       />
     );
   else

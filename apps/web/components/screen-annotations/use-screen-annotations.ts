@@ -38,6 +38,7 @@ export function useScreenAnnotations(
       {
         point: AnnotationPoint;
         tool: 'spotlight' | 'pointerArrow';
+        color?: string;
         name: string;
         expiresAt: number;
       }
@@ -294,6 +295,10 @@ export function useScreenAnnotations(
           [senderId]: {
             point: event.point,
             tool: event.tool,
+            color:
+              typeof event.color === 'string' && /^#[0-9a-f]{6}$/i.test(event.color)
+                ? event.color
+                : undefined,
             name: actor.name,
             expiresAt: Date.now() + (event.tool === 'spotlight' ? 1500 : 5000),
           },

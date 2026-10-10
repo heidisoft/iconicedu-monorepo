@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef } from 'react';
 import { Arrow, Circle, Group, Text } from 'react-konva';
-import type Konva from 'konva';
+import Konva from 'konva';
 import type { AnnotationPoint } from '@iconicedu/shared-types';
 /** Tween canvas nodes directly; pointer interpolation does not redraw permanent shapes. */
 export function AnnotationPointer({
@@ -22,7 +22,20 @@ export function AnnotationPointer({
   const node = useRef<Konva.Group>(null);
   const initial = useRef({ x: point.x * width, y: point.y * height });
   useEffect(() => {
-    node.current?.to({ x: point.x * width, y: point.y * height, duration: 0.04 });
+    if (!node.current) return;
+    const position = { x: point.x * width, y: point.y * height };
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      node.current.position(position);
+      return;
+    }
+    const tween = new Konva.Tween({
+      node: node.current,
+      ...position,
+      duration: 0.08,
+      easing: Konva.Easings.EaseOut,
+    });
+    tween.play();
+    return () => tween.destroy();
   }, [point.x, point.y, width, height]);
   return (
     <Group ref={node} x={initial.current.x} y={initial.current.y} listening={false}>

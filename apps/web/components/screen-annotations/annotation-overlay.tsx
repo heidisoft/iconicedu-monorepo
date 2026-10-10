@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Layer, Rect, Stage, Transformer } from 'react-konva';
 import { AnnotationPointer } from './annotation-pointer';
+import { shapeEndpoint } from './annotation-drawing';
 import type Konva from 'konva';
 import type {
   AnnotationContext,
@@ -12,6 +13,7 @@ import type {
 } from '@iconicedu/shared-types';
 import {
   AnnotationCoordinateService,
+  participantColor,
   moveAnnotation,
   simplifyAnnotationPoints,
 } from '@iconicedu/utils';
@@ -72,7 +74,14 @@ export function AnnotationOverlay({
     [width, height],
   );
   const [tool, setToolState] = useState<AnnotationTool>('cursor');
-  const [color, setColor] = useState('#ef4444');
+  const [chosenColor, setChosenColor] = useState<string | null>(null);
+  const setColor = setChosenColor;
+  const color =
+    chosenColor ??
+    participantColor(
+      engine.context?.actor.userId ?? 'participant',
+      engine.context?.actors.map((person) => person.userId),
+    );
   const [lineWidth, setLineWidth] = useState(3);
   const [opacity, setOpacity] = useState(1);
   const [fontSize, setFontSize] = useState(24);
@@ -217,6 +226,9 @@ export function AnnotationOverlay({
         event.preventDefault();
         deleteSelection();
       } else if (event.key === 'Escape') {
+        if (active.current)
+          preview({ kind: 'finish' }, active.current.id, ++sequence.current);
+        pointerId.current = null;
         active.current = null;
         pendingPoints.current = [];
         setDraft(null);
@@ -240,7 +252,7 @@ export function AnnotationOverlay({
     };
     document.addEventListener('keydown', keydown);
     return () => document.removeEventListener('keydown', keydown);
-  }, [tool, deleteSelection, setTool]);
+  }, [tool, deleteSelection, setTool, preview]);
   const eventPoint = (event: React.PointerEvent): AnnotationPoint | null =>
     root.current
       ? coordinates.clientToNormalized(
@@ -282,7 +294,7 @@ export function AnnotationOverlay({
     if (now - lastPointer.current < 40) return;
     lastPointer.current = now;
     preview(
-      { kind: 'pointer', point, tool: pointerTool },
+      { kind: 'pointer', point, tool: pointerTool, color },
       `pointer:${actor?.userId}`,
       ++pointerSequence.current,
     );
@@ -396,16 +408,9 @@ export function AnnotationOverlay({
       pendingPoints.current.push(point);
     } else {
       const start = object.points[0];
-      if (event.shiftKey && tool.startsWith('ellipse')) {
-        const side = Math.min(
-          Math.abs(point.x - start.x) * width,
-          Math.abs(point.y - start.y) * height,
-        );
-        point.x = start.x + (Math.sign(point.x - start.x) * side) / width;
-        point.y = start.y + (Math.sign(point.y - start.y) * side) / height;
-      }
-      object.points = [start, point];
-      pendingPoints.current = [point];
+      const end = shapeEndpoint(object.type, start, point, width, height, event.shiftKey);
+      object.points = [start, end];
+      pendingPoints.current = [end];
     }
     if (frame.current === null)
       frame.current = requestAnimationFrame(() => {
@@ -436,6 +441,30 @@ export function AnnotationOverlay({
       return;
     }
     if (pointerId.current !== event.pointerId || !active.current) return;
+    const endpoint = eventPoint(event);
+    if (endpoint) {
+      if (paths.has(active.current.type)) {
+        if (active.current.points.length < 5000) active.current.points.push(endpoint);
+        else active.current.points[4999] = endpoint;
+        pendingPoints.current.push(endpoint);
+      } else {
+        const start = active.current.points[0];
+        const end = shapeEndpoint(
+          active.current.type,
+          start,
+          endpoint,
+          width,
+          height,
+          event.shiftKey,
+        );
+        active.current.points = [start, end];
+        pendingPoints.current = [end];
+        if (Math.hypot((end.x - start.x) * width, (end.y - start.y) * height) < 3) {
+          cancelDraft();
+          return;
+        }
+      }
+    }
     if (!paths.has(tool) && active.current.points.length < 2) {
       cancelDraft();
       return;
@@ -615,7 +644,13 @@ export function AnnotationOverlay({
                 {...pointer}
                 width={width}
                 height={height}
-                color={color}
+                color={
+                  pointer.color ??
+                  participantColor(
+                    id,
+                    engine.context?.actors.map((person) => person.userId),
+                  )
+                }
               />
             ))}
         </Layer>
@@ -649,7 +684,13 @@ export function AnnotationOverlay({
                 {...pointer}
                 width={width}
                 height={height}
-                color={color}
+                color={
+                  pointer.color ??
+                  participantColor(
+                    id,
+                    engine.context?.actors.map((person) => person.userId),
+                  )
+                }
               />
             ))}
         </Layer>
@@ -698,10 +739,7 @@ export function AnnotationOverlay({
           {hoverName}
         </div>
       )}
-      <output
-        aria-label="Annotation count"
-        className="pointer-events-none absolute right-2 top-2 rounded bg-background px-2 py-1 text-xs text-muted-foreground"
-      >
+      <output aria-label="Annotation count" className="sr-only">
         {engine.objects.length} {engine.objects.length === 1 ? 'mark' : 'marks'}
       </output>
       <div className="pointer-events-auto">
