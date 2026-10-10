@@ -1,3 +1,4 @@
+import { hashWhiteboardToken } from './whiteboard-access';
 import { WhiteboardsService } from './whiteboards.service';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 jest.mock('@iconicedu/api/lib/supabase/service');
@@ -46,10 +47,76 @@ function mockDb(role = 'teacher', locked = false) {
   jest
     .mocked(createSupabaseServiceClient)
     .mockReturnValue(db as unknown as ReturnType<typeof createSupabaseServiceClient>);
-  return { db, grant, current, session };
+  return { db, grant, current, session, presence };
 }
 describe('whiteboard API capabilities and atomic persistence', () => {
   beforeEach(() => jest.clearAllMocks());
+  it.each([
+    ['legacy flag', undefined, [], false],
+    [
+      'disconnected presenter',
+      { presenterId: 'presenter', sessionId: 'session' },
+      [],
+      false,
+    ],
+    [
+      'another meeting',
+      { presenterId: 'presenter', sessionId: 'previous' },
+      [{ token_hash: 'presenter', role: 'teacher' }],
+      false,
+    ],
+    [
+      'student presence',
+      { presenterId: 'presenter', sessionId: 'session' },
+      [{ token_hash: 'presenter', role: 'student' }],
+      false,
+    ],
+    [
+      'active presenter',
+      { presenterId: 'presenter', sessionId: 'session' },
+      [{ token_hash: 'presenter', role: 'teacher' }],
+      true,
+    ],
+  ])(
+    'resolves %s independently of the cached document revision',
+    async (_name, presentation, peers, active) => {
+      const { current, presence, grant } = mockDb();
+      current.single.mockResolvedValue({
+        data: {
+          ...board,
+          document: { ...board.document, presenting: true, presentation },
+        },
+        error: null,
+      });
+      presence.then = builder(peers).then;
+      grant.then = presence.then;
+      const result = await new WhiteboardsService().get(token, board.revision);
+      expect(result.presentationActive).toBe(active);
+      expect(result).not.toHaveProperty('document');
+      expect(grant.eq).toHaveBeenCalledWith('live_session_id', 'session');
+      expect(grant.gt).toHaveBeenCalledWith('last_seen_at', expect.any(String));
+    },
+  );
+  it('records the authorized presenter identity on start and clears it on stop', async () => {
+    const { db, current } = mockDb();
+    const service = new WhiteboardsService();
+    await service.mutate(token, { id: 'start', type: 'presentation', enabled: true });
+    expect(db.rpc.mock.calls[0][1].p_document).toMatchObject({
+      presenting: true,
+      presentation: {
+        presenterId: hashWhiteboardToken(token).slice(0, 16),
+        sessionId: 'session',
+      },
+      pages: [{ id: 'one', elements: board.document.pages[0].elements }],
+    });
+    current.single.mockResolvedValue({
+      data: { ...board, document: db.rpc.mock.calls[0][1].p_document },
+      error: null,
+    });
+    await service.mutate(token, { id: 'stop', type: 'presentation', enabled: false });
+    expect(db.rpc.mock.calls[1][1].p_document.presenting).toBe(false);
+    expect(db.rpc.mock.calls[1][1].p_document).not.toHaveProperty('presentation');
+  });
   it('rejects missing, forged and expired capabilities', async () => {
     const service = new WhiteboardsService();
     await expect(service.get('')).rejects.toThrow('expired');

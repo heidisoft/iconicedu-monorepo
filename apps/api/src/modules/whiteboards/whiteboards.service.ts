@@ -52,6 +52,7 @@ export class WhiteboardsService {
       db,
       boardId: grant.data.board_id as string,
       role: grant.data.role as WhiteboardRole,
+      sessionId: grant.data.live_session_id as string,
     };
   }
   private async load(db: ReturnType<typeof createSupabaseServiceClient>, id: string) {
@@ -77,7 +78,7 @@ export class WhiteboardsService {
     token: string,
     revision?: number,
   ): Promise<WhiteboardSnapshotVM | Omit<WhiteboardSnapshotVM, 'document'>> {
-    const { db, boardId, role } = await this.access(token);
+    const { db, boardId, role, sessionId } = await this.access(token);
     const heartbeat = await db
       .from('classroom_whiteboard_access')
       .update({ last_seen_at: new Date().toISOString() })
@@ -89,6 +90,7 @@ export class WhiteboardsService {
       .from('classroom_whiteboard_access')
       .select('token_hash, display_name, role')
       .eq('board_id', boardId)
+      .eq('live_session_id', sessionId)
       .gt('last_seen_at', new Date(Date.now() - 15_000).toISOString())
       .gt('expires_at', new Date().toISOString());
     if (presence.error)
@@ -96,6 +98,16 @@ export class WhiteboardsService {
     return {
       id: board.id,
       revision: board.revision,
+      // Saved content survives a call; presentation belongs to a live presenter grant.
+      // Legacy flags without an owner must never reopen a board on join.
+      presentationActive:
+        board.document.presenting === true &&
+        board.document.presentation?.sessionId === sessionId &&
+        (presence.data ?? []).some(
+          (p) =>
+            p.role === 'teacher' &&
+            p.token_hash.slice(0, 16) === board.document.presentation?.presenterId,
+        ),
       ...(revision === board.revision
         ? {}
         : { document: continuousCanvas(board.document) }),
@@ -109,12 +121,22 @@ export class WhiteboardsService {
   }
   async mutate(token: string, value: unknown): Promise<WhiteboardSnapshotVM> {
     const op = validateWhiteboardOperation(value);
-    const { db, boardId, role } = await this.access(token);
+    const { db, boardId, role, sessionId } = await this.access(token);
     for (let attempt = 0; attempt < 5; attempt++) {
       const board = await this.load(db, boardId);
       // Check permissions even on replay: a lock cannot be bypassed with an old operation id.
       const document = applyWhiteboardOperation(board.document, op, role);
       if (board.applied_operations.includes(op.id)) return this.get(token);
+      if (op.type === 'presentation') {
+        if (op.enabled) {
+          document.presentation = {
+            presenterId: hashWhiteboardToken(token).slice(0, 16),
+            sessionId,
+          };
+        } else {
+          delete document.presentation;
+        }
+      }
       const saved = await db.rpc('commit_classroom_whiteboard', {
         p_board_id: boardId,
         p_revision: board.revision,

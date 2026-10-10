@@ -22,12 +22,16 @@ export interface WhiteboardDocumentVM {
   pages: WhiteboardPageVM[];
   studentEditing: boolean;
   presenting?: boolean;
+  /** Server-owned identity of the grant and meeting that started presenting. */
+  presentation?: { presenterId: string; sessionId: string };
   /** Retired page IDs prevent delayed add-page messages from resurrecting deleted pages. */
   deletedPageIds?: string[];
 }
 export interface WhiteboardSnapshotVM {
   id: string;
   revision: number;
+  /** Live presentation state; refreshed even when document revision is unchanged. */
+  presentationActive?: boolean;
   document: WhiteboardDocumentVM;
   role: WhiteboardRole;
   presence: Array<{ id: string; name: string; role: WhiteboardRole }>;
