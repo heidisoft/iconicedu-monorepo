@@ -67,7 +67,7 @@ describe('screen annotation toolbar', () => {
     expect(toolbar).toHaveClass(
       'overflow-x-auto',
       'flex-nowrap',
-      'rounded-md',
+      'rounded-full',
       'bg-card',
       'shadow-sm',
     );

@@ -415,7 +415,7 @@ export function AnnotationToolbar({
         aria-label="Screen annotations"
         aria-orientation="horizontal"
         data-expanded={expanded}
-        className={`pointer-events-auto absolute z-30 flex w-fit max-w-[calc(100%-16px)] flex-nowrap items-center gap-1 overflow-x-auto border border-border bg-card p-1 text-foreground shadow-sm transition-[border-radius,box-shadow] duration-200 motion-reduce:transition-none ${expanded ? 'rounded-md' : 'rounded-full'} ${dock === 'top' ? 'left-2 top-2' : dock === 'bottom' ? 'bottom-2 left-2' : dock === 'left' ? 'left-2 top-2' : dock === 'right' ? 'right-2 top-2' : ''}`}
+        className={`pointer-events-auto absolute z-30 flex w-fit max-w-[calc(100%-16px)] flex-nowrap items-center gap-1 overflow-x-auto border border-border bg-card p-1 text-foreground shadow-sm transition-[border-radius,box-shadow] duration-200 motion-reduce:transition-none rounded-full ${dock === 'top' ? 'left-2 top-2' : dock === 'bottom' ? 'bottom-2 left-2' : dock === 'left' ? 'left-2 top-2' : dock === 'right' ? 'right-2 top-2' : ''}`}
         style={dock === 'floating' ? { left: position.x, top: position.y } : undefined}
         onPointerDown={(event) => event.stopPropagation()}
         onKeyDown={(event) => {
