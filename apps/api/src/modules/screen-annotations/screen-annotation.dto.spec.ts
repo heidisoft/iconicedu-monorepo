@@ -1,4 +1,7 @@
-import { parseAnnotationOperation } from './screen-annotation.dto';
+import {
+  parseAnnotationOperation,
+  parseAnnotationPointer,
+} from './screen-annotation.dto';
 const id = '10000000-0000-4000-8000-000000000001';
 const input = {
   eventId: id,
@@ -70,6 +73,45 @@ describe('annotation operation validation', () => {
     ).toThrow();
     expect(() =>
       parseAnnotationOperation({ eventId: id, kind: 'clear', scope: 'everyone' }),
+    ).toThrow();
+  });
+});
+
+describe('ephemeral pointer validation', () => {
+  it('strips client-supplied identities and names', () => {
+    expect(
+      parseAnnotationPointer({
+        point: { x: 0.2, y: 0.3 },
+        tool: 'spotlight',
+        color: '#16a34a',
+        name: 'Spoof',
+        userId: 'other',
+      }),
+    ).toEqual({ point: { x: 0.2, y: 0.3 }, tool: 'spotlight', color: '#16a34a' });
+  });
+  it.each([NaN, Infinity, -1, 2])('rejects invalid coordinate %s', (x) => {
+    expect(() =>
+      parseAnnotationPointer({
+        point: { x, y: 0.2 },
+        tool: 'spotlight',
+        color: '#16a34a',
+      }),
+    ).toThrow();
+  });
+  it('rejects arbitrary tools and colors', () => {
+    expect(() =>
+      parseAnnotationPointer({
+        point: { x: 0.2, y: 0.2 },
+        tool: 'pen',
+        color: '#16a34a',
+      }),
+    ).toThrow();
+    expect(() =>
+      parseAnnotationPointer({
+        point: { x: 0.2, y: 0.2 },
+        tool: 'spotlight',
+        color: 'invalid',
+      }),
     ).toThrow();
   });
 });

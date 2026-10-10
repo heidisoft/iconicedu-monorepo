@@ -63,9 +63,20 @@ export type AnnotationSnapshot = {
   ended: boolean;
   objects: AnnotationObject[];
 };
+export type AnnotationPointerInput = {
+  point: AnnotationPoint;
+  tool: 'spotlight' | 'pointerArrow';
+  color: string;
+};
+export type AnnotationPointerPresence = AnnotationPointerInput & {
+  userId: string;
+  name: string;
+  expiresAt: number;
+};
 export type AnnotationContext = {
   actor: AnnotationActor;
   actors: AnnotationActor[];
+  pointers?: AnnotationPointerPresence[];
   snapshot: AnnotationSnapshot;
 };
 export type AnnotationOperation =

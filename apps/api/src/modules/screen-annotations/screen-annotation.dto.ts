@@ -1,6 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import type {
   AnnotationObject,
+  AnnotationPointerInput,
   AnnotationOperation,
   AnnotationTool,
 } from '@iconicedu/shared-types';
@@ -112,4 +113,18 @@ export function parseAnnotationOperation(value: unknown): AnnotationOperation {
     ...(typeof object.text === 'string' ? { text: object.text } : {}),
   };
   return { eventId, kind: 'put', baseVersion, object: sanitized };
+}
+
+export function parseAnnotationPointer(value: unknown): AnnotationPointerInput {
+  const input = record(value);
+  const point = record(input.point);
+  if (!['spotlight', 'pointerArrow'].includes(String(input.tool)))
+    throw new BadRequestException('Invalid pointer tool');
+  if (typeof input.color !== 'string' || !/^#[0-9a-f]{6}$/i.test(input.color))
+    throw new BadRequestException('Invalid pointer color');
+  return {
+    point: { x: number(point.x, 0, 1), y: number(point.y, 0, 1) },
+    tool: input.tool as AnnotationPointerInput['tool'],
+    color: input.color,
+  };
 }

@@ -9,6 +9,8 @@ import {
 } from '@nestjs/common';
 import {
   type AnnotationContext,
+  type AnnotationPointerInput,
+  type AnnotationPointerPresence,
   type AnnotationCommit,
   type AnnotationOperation,
 } from '@iconicedu/shared-types';
@@ -45,6 +47,7 @@ export class ScreenAnnotationsService {
     token: string,
     sessionId: string,
     shareKey: string,
+    includePointers = true,
   ): Promise<AnnotationContext> {
     const { data, error } = await createSupabaseServiceClient().rpc(
       'screen_annotation_guest_context',
@@ -55,7 +58,74 @@ export class ScreenAnnotationsService {
       },
     );
     if (error) this.fail(error.message);
-    return data as AnnotationContext;
+    return includePointers
+      ? this.withPointers(data as AnnotationContext)
+      : (data as AnnotationContext);
+  }
+  private async withPointers(context: AnnotationContext): Promise<AnnotationContext> {
+    const { data, error } = await createSupabaseServiceClient()
+      .from('screen_annotation_pointers')
+      .select('user_id, name, role, x, y, tool, color, expires_at')
+      .eq('room_id', context.snapshot.roomId)
+      .gt('expires_at', new Date().toISOString())
+      .limit(128);
+    if (error)
+      throw new InternalServerErrorException('Unable to load participant pointers');
+    const allowed = new Map(context.actors.map((actor) => [actor.userId, actor]));
+    const pointers: AnnotationPointerPresence[] = (data ?? []).flatMap((pointer) => {
+      const actor = allowed.get(pointer.user_id);
+      if (
+        !actor ||
+        context.snapshot.ended ||
+        (actor.role !== 'educator' && !context.snapshot.studentsEnabled)
+      )
+        return [];
+      return [
+        {
+          userId: actor.userId,
+          name: actor.name.trim() || 'Participant',
+          point: { x: pointer.x, y: pointer.y },
+          color: pointer.color,
+          tool: pointer.tool as AnnotationPointerInput['tool'],
+          expiresAt: new Date(pointer.expires_at).getTime(),
+        },
+      ];
+    });
+    return { ...context, pointers };
+  }
+  async pointer(
+    token: string,
+    sessionId: string,
+    shareKey: string,
+    input: AnnotationPointerInput,
+    guest = false,
+  ) {
+    const context = guest
+      ? await this.guestContext(token, sessionId, shareKey, false)
+      : await this.context(token, sessionId, shareKey, false);
+    if (
+      context.snapshot.ended ||
+      (context.actor.role !== 'educator' && !context.snapshot.studentsEnabled)
+    )
+      throw new ForbiddenException('Annotation access denied');
+    const { error } = await createSupabaseServiceClient()
+      .from('screen_annotation_pointers')
+      .upsert(
+        {
+          room_id: context.snapshot.roomId,
+          user_id: context.actor.userId,
+          name: context.actor.name.trim().slice(0, 100) || 'Participant',
+          role: context.actor.role,
+          x: input.point.x,
+          y: input.point.y,
+          tool: input.tool,
+          color: input.color,
+          expires_at: new Date(Date.now() + 3000).toISOString(),
+        },
+        { onConflict: 'room_id,user_id' },
+      );
+    if (error)
+      throw new InternalServerErrorException('Unable to share participant pointer');
   }
   async guestApply(
     token: string,
@@ -77,6 +147,7 @@ export class ScreenAnnotationsService {
     token: string,
     sessionId: string,
     shareKey: string,
+    includePointers = true,
   ): Promise<AnnotationContext> {
     const userId = await this.user(token);
     const { data, error } = await createSupabaseServiceClient().rpc(
@@ -84,7 +155,9 @@ export class ScreenAnnotationsService {
       { p_session: sessionId, p_user: userId, p_share: shareKey },
     );
     if (error) this.fail(error.message);
-    return data as AnnotationContext;
+    return includePointers
+      ? this.withPointers(data as AnnotationContext)
+      : (data as AnnotationContext);
   }
   async apply(
     token: string,

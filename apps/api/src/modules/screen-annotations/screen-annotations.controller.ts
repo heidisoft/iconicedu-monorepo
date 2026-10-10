@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
   Param,
   Post,
   Query,
@@ -15,7 +16,11 @@ import {
   type AuthenticatedRequest,
 } from '@iconicedu/api/lib/http/authenticated-request';
 import { ScreenAnnotationsService } from './screen-annotations.service';
-import { annotationUuid, parseAnnotationOperation } from './screen-annotation.dto';
+import {
+  annotationUuid,
+  parseAnnotationOperation,
+  parseAnnotationPointer,
+} from './screen-annotation.dto';
 @Controller('screen-annotations')
 @UseGuards(AuthGuard)
 export class ScreenAnnotationsController {
@@ -32,6 +37,23 @@ export class ScreenAnnotationsController {
       extractBearerToken(req.headers.authorization),
       annotationUuid(sessionId),
       shareKey,
+    );
+  }
+  @Post(':sessionId/pointer')
+  @HttpCode(204)
+  pointer(
+    @Req() req: AuthenticatedRequest,
+    @Param('sessionId') sessionId: string,
+    @Query('shareKey') shareKey: string,
+    @Body() body: unknown,
+  ) {
+    if (!/^[0-9]{1,16}$/.test(shareKey ?? ''))
+      throw new BadRequestException('Invalid share key');
+    return this.annotations.pointer(
+      extractBearerToken(req.headers.authorization),
+      annotationUuid(sessionId),
+      shareKey,
+      parseAnnotationPointer(body),
     );
   }
   @Post(':roomId/operations')
@@ -64,6 +86,24 @@ export class GuestScreenAnnotationsController {
       extractBearerToken(req.headers.authorization),
       annotationUuid(sessionId),
       shareKey,
+    );
+  }
+  @Post(':sessionId/pointer')
+  @HttpCode(204)
+  pointer(
+    @Req() req: AuthenticatedRequest,
+    @Param('sessionId') sessionId: string,
+    @Query('shareKey') shareKey: string,
+    @Body() body: unknown,
+  ) {
+    if (!/^[0-9]{1,16}$/.test(shareKey ?? ''))
+      throw new BadRequestException('Invalid share key');
+    return this.annotations.pointer(
+      extractBearerToken(req.headers.authorization),
+      annotationUuid(sessionId),
+      shareKey,
+      parseAnnotationPointer(body),
+      true,
     );
   }
   @Post(':roomId/operations')
