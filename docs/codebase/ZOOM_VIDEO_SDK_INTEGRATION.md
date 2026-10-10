@@ -606,3 +606,10 @@ permissions; names and creator roles come from the verified roster. Realtime and
 API previews are deduplicated. Fading also runs for shared-link guests, and laser
 strokes never enter the saved annotation document or undo history. Apply migration
 `20261010170000_screen_annotation_laser_presence.sql` with the API deployment.
+
+Whiteboard quick styles use a compact contextual strip for native stroke colors,
+widths, and shape fill. More style options reveals the existing Excalidraw panel;
+choosing a different stroke color, drawing on the canvas, switching tools, or
+pressing Escape dismisses it. Selected-object quick styles use native element
+versioning and the whiteboard history bridge, so they synchronize and support
+undo/redo. Pen presets do not introduce additional brush engines.

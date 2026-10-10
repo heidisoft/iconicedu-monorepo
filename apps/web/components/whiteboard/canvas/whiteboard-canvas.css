@@ -114,3 +114,32 @@
     margin-top: 108px;
   }
 }
+
+.classroom-whiteboard-canvas .whiteboard-quick-styles {
+  top: 56px;
+}
+
+/* Quick styles stay visible; advanced controls are an intentional overlay. */
+.classroom-whiteboard-canvas[data-style-options='false']
+  .excalidraw
+  .selected-shape-actions,
+.classroom-whiteboard-canvas[data-style-options='false'] .excalidraw .App-mobile-menu {
+  display: none !important;
+}
+.classroom-whiteboard-canvas[data-style-options='true'] .excalidraw .App-menu_top {
+  margin-top: 100px;
+}
+@container (max-width: 759px) {
+  .classroom-whiteboard-canvas .whiteboard-quick-styles {
+    top: 108px;
+  }
+  .classroom-whiteboard-canvas[data-style-options='true'] .excalidraw .App-menu_top {
+    margin-top: 152px;
+  }
+}
+@media (pointer: coarse) {
+  .whiteboard-quick-styles button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}

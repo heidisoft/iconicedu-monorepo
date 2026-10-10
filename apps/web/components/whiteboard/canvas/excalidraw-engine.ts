@@ -4,6 +4,7 @@ import {
   exportToSvg,
   exportToBlob,
   restoreElements,
+  newElementWith,
 } from '@excalidraw/excalidraw';
 import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';
 import type { ExcalidrawElement } from '@excalidraw/excalidraw/element/types';
@@ -88,6 +89,42 @@ export class ExcalidrawWhiteboardEngine implements WhiteboardEngine {
     this.api.updateScene({
       appState: { openMenu: ['hand', 'eraser', 'laser'].includes(tool) ? null : 'shape' },
     });
+  }
+  setQuickStyle(style: {
+    strokeColor?: string;
+    strokeWidth?: number;
+    backgroundColor?: string;
+  }) {
+    this.commit();
+    const state = this.api.getAppState();
+    const appState = {
+      currentItemStrokeColor: style.strokeColor ?? state.currentItemStrokeColor,
+      currentItemStrokeWidth: style.strokeWidth ?? state.currentItemStrokeWidth,
+      currentItemBackgroundColor:
+        style.backgroundColor ?? state.currentItemBackgroundColor,
+    };
+    const selected = this.api
+      .getSceneElementsIncludingDeleted()
+      .filter(
+        (element) =>
+          !element.isDeleted && !element.locked && state.selectedElementIds[element.id],
+      );
+    if (!selected.length) {
+      this.api.updateScene({ appState, captureUpdate: CaptureUpdateAction.NEVER });
+      return;
+    }
+    const ids = new Set(selected.map((element) => element.id));
+    this.transact(() =>
+      this.api.updateScene({
+        appState,
+        elements: this.api
+          .getSceneElementsIncludingDeleted()
+          .map((element) =>
+            ids.has(element.id) ? newElementWith(element, style) : element,
+          ),
+        captureUpdate: CaptureUpdateAction.NEVER,
+      }),
+    );
   }
   setGrid(mode: 'none' | 'dots' | 'lines', snap: boolean) {
     this.api.updateScene({

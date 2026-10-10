@@ -10,6 +10,7 @@ import { ExcalidrawWhiteboardEngine, wrapCanvasElements } from './excalidraw-eng
 import type { WhiteboardEngine, WhiteboardTool } from './whiteboard-engine';
 import './whiteboard-canvas.css';
 import { useWhiteboardLaser } from './use-whiteboard-laser';
+import { WhiteboardStyleStrip } from './whiteboard-style-strip';
 import { sceneFingerprint } from './scene-history';
 
 export function ExcalidrawCanvas({
@@ -35,6 +36,12 @@ export function ExcalidrawCanvas({
   const theme = resolvedTheme === 'dark' ? 'dark' : 'light';
   const [grid, setGrid] = useState<'none' | 'dots' | 'lines'>('dots');
   const [optionsOpen, setOptionsOpen] = useState(false);
+  const [quickStyle, setQuickStyle] = useState({
+    color: '#1e293b',
+    width: 2,
+    fill: 'transparent',
+    type: 'selection',
+  });
   const [hasStyleOptions, setHasStyleOptions] = useState(false);
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
   const onPointerUpdate = useWhiteboardLaser(api, token);
@@ -46,6 +53,7 @@ export function ExcalidrawCanvas({
   const editableRef = useRef(editable);
   editableRef.current = editable;
   const remoteFingerprint = useRef('');
+  const previousStyleColor = useRef('');
   const previousDefaultColor = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (!api || !defaultColor) return;
@@ -84,6 +92,7 @@ export function ExcalidrawCanvas({
     }
   }, [elements]);
   useEffect(() => engineRef.current?.setEditable(editable), [editable]);
+  useEffect(() => setOptionsOpen(false), [tool, editable]);
   useEffect(() => {
     if (!api) return;
     api.updateScene({
@@ -97,6 +106,7 @@ export function ExcalidrawCanvas({
       data-recording-whiteboard
       data-testid="whiteboard-canvas"
       data-grid={grid}
+      data-style-options={optionsOpen}
       tabIndex={0}
       aria-label="Drawing canvas"
       onDropCapture={(event) => {
@@ -109,10 +119,20 @@ export function ExcalidrawCanvas({
           });
         }
       }}
-      onPointerDownCapture={() => engineRef.current?.begin()}
+      onPointerDownCapture={(event) => {
+        if ((event.target as HTMLElement).closest('.whiteboard-quick-styles')) return;
+        if (
+          !(event.target as HTMLElement).closest(
+            '.selected-shape-actions,.App-mobile-menu',
+          )
+        )
+          setOptionsOpen(false);
+        engineRef.current?.begin();
+      }}
       onPointerUpCapture={() => requestAnimationFrame(() => engineRef.current?.commit())}
       onPointerCancelCapture={() => engineRef.current?.commit()}
       onKeyDownCapture={(event) => {
+        if (event.key === 'Escape') setOptionsOpen(false);
         if (
           (event.target as HTMLElement).closest('input,textarea,[contenteditable="true"]')
         )
@@ -213,7 +233,22 @@ export function ExcalidrawCanvas({
           },
         }}
         onChange={(next, state) => {
-          setOptionsOpen(state.openMenu === 'shape');
+          const selected = next.find(
+            (element) => !element.isDeleted && state.selectedElementIds[element.id],
+          );
+          const color = selected?.strokeColor ?? state.currentItemStrokeColor;
+          if (previousStyleColor.current && previousStyleColor.current !== color)
+            setOptionsOpen(false);
+          previousStyleColor.current = color;
+          setQuickStyle((previous) => {
+            const value = {
+              color,
+              width: selected?.strokeWidth ?? state.currentItemStrokeWidth,
+              fill: selected?.backgroundColor ?? state.currentItemBackgroundColor,
+              type: selected?.type ?? state.activeTool.type,
+            };
+            return JSON.stringify(previous) === JSON.stringify(value) ? previous : value;
+          });
           setHasStyleOptions(
             !['hand', 'eraser', 'laser'].includes(state.activeTool.type) &&
               (state.activeTool.type !== 'selection' ||
@@ -232,16 +267,22 @@ export function ExcalidrawCanvas({
         onPointerUp={() => requestAnimationFrame(() => engineRef.current?.commit())}
       />
       {editable && hasStyleOptions && (
-        <button
-          type="button"
-          className="whiteboard-style-toggle absolute bottom-3 right-3 z-40 rounded-xl border border-border/60 bg-card px-3 py-2 text-xs text-foreground shadow-sm"
-          aria-expanded={optionsOpen}
-          onClick={() =>
-            api?.updateScene({ appState: { openMenu: optionsOpen ? null : 'shape' } })
-          }
-        >
-          {optionsOpen ? 'Hide tool options' : 'Show tool options'}
-        </button>
+        <WhiteboardStyleStrip
+          {...{ optionsOpen }}
+          color={quickStyle.color}
+          width={quickStyle.width}
+          fill={quickStyle.fill}
+          showWidth={quickStyle.type !== 'text'}
+          showFill={['rectangle', 'ellipse', 'diamond'].includes(quickStyle.type)}
+          onStyle={(style) => {
+            engineRef.current?.setQuickStyle(style);
+            setOptionsOpen(false);
+          }}
+          onMore={() => {
+            setOptionsOpen(!optionsOpen);
+            api?.updateScene({ appState: { openMenu: optionsOpen ? null : 'shape' } });
+          }}
+        />
       )}
     </div>
   );

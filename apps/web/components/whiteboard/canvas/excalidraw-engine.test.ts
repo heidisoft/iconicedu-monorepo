@@ -88,6 +88,30 @@ describe('Excalidraw canvas adapter', () => {
     expect(api.setActiveTool).toHaveBeenLastCalledWith({ type: 'laser' });
     expect(api.updateScene).toHaveBeenLastCalledWith({ appState: { openMenu: null } });
   });
+  it('updates future drawing styles without creating document history', () => {
+    const { engine, api, changed } = fixture();
+    engine.setQuickStyle({ strokeColor: '#1971c2', strokeWidth: 4 });
+    expect(api.getAppState()).toMatchObject({
+      currentItemStrokeColor: '#1971c2',
+      currentItemStrokeWidth: 4,
+    });
+    expect(engine.getElements()).toEqual([]);
+    expect(changed).not.toHaveBeenCalled();
+  });
+  it('styles selected elements with native versioning and supports undo and redo', () => {
+    const { engine, changed } = fixture();
+    engine.insertAsset(educationalAssets.get('math-graph-paper'));
+    const before = engine.getElements();
+    engine.setQuickStyle({ strokeColor: '#1971c2', strokeWidth: 4 });
+    const styled = engine.getElements();
+    expect(styled[0].data.strokeColor).toBe('#1971c2');
+    expect(styled[0].version).toBeGreaterThan(before[0].version);
+    expect(changed).toHaveBeenLastCalledWith(styled);
+    engine.undo();
+    expect(engine.getElements()[0].data.strokeColor).toBe(before[0].data.strokeColor);
+    engine.redo();
+    expect(engine.getElements()[0].data.strokeColor).toBe('#1971c2');
+  });
   it('converts neutral assets into grouped selected canvas elements', () => {
     const { engine, api } = fixture();
     engine.insertAsset(educationalAssets.get('math-number-line'));
