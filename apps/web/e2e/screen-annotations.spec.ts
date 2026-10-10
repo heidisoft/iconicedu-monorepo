@@ -211,3 +211,130 @@ test('opens the toolbar without animation when reduced motion is requested', asy
   await toolbar.getByRole('button', { name: 'Open annotation toolbar' }).click();
   expect(await toolbar.evaluate((node) => node.getAnimations().length)).toBe(0);
 });
+
+test('keeps rapid strokes and the first shape after a tool change', async ({ page }) => {
+  await page.goto('/visual-test/screen-annotations');
+  await page.getByRole('button', { name: 'Open annotation toolbar' }).click();
+  const surface = page.locator('[data-shared-content-bounds]');
+  const box = (await surface.boundingBox())!;
+  await expect(surface.locator('[data-recording-annotations]')).toHaveCSS(
+    'touch-action',
+    'none',
+  );
+  for (let index = 0; index < 6; index++) {
+    await page.mouse.move(
+      box.x + box.width * 0.2,
+      box.y + box.height * (0.2 + index * 0.05),
+    );
+    await page.mouse.down();
+    // An unrelated touch/capture event must not cancel the active mouse stroke.
+    await surface
+      .locator('canvas')
+      .first()
+      .evaluate((canvas) => {
+        canvas.dispatchEvent(
+          new PointerEvent('pointercancel', { bubbles: true, pointerId: 99 }),
+        );
+        canvas.dispatchEvent(
+          new PointerEvent('lostpointercapture', { bubbles: true, pointerId: 99 }),
+        );
+      });
+    await page.mouse.move(
+      box.x + box.width * 0.5,
+      box.y + box.height * (0.22 + index * 0.05),
+    );
+    await page.mouse.up();
+  }
+  await expect(page.getByLabel('Annotation count')).toHaveText('6 marks');
+  await page.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.6);
+  await page.mouse.down();
+  await page.keyboard.press('v');
+  await page.mouse.up();
+  await page.getByRole('button', { name: 'Shapes', exact: true }).click();
+  await page.getByRole('button', { name: 'Rectangle', exact: true }).click();
+  await page.mouse.move(box.x + box.width * 0.65, box.y + box.height * 0.2);
+  await page.mouse.down();
+  // Capture keeps the endpoint even when a fast drag leaves the shared content.
+  await page.mouse.move(box.x + box.width + 5, box.y + box.height * 0.5);
+  await page.mouse.up();
+  await expect(page.getByLabel('Annotation count')).toHaveText('7 marks');
+});
+
+test('preserves coalesced handwriting samples in a fast move', async ({ page }) => {
+  await page.goto('/visual-test/screen-annotations');
+  await page.getByRole('button', { name: 'Open annotation toolbar' }).click();
+  const surface = page.locator('[data-shared-content-bounds]');
+  const box = (await surface.boundingBox())!;
+  await page.mouse.move(box.x + box.width * 0.2, box.y + box.height * 0.2);
+  await page.mouse.down();
+  await surface
+    .locator('canvas')
+    .first()
+    .evaluate((canvas, bounds) => {
+      const sample = (x: number, y: number) =>
+        new PointerEvent('pointermove', {
+          bubbles: true,
+          pointerId: 1,
+          pointerType: 'mouse',
+          buttons: 1,
+          clientX: bounds.x + bounds.width * x,
+          clientY: bounds.y + bounds.height * y,
+        });
+      const move = sample(0.5, 0.2);
+      Object.defineProperty(move, 'getCoalescedEvents', {
+        value: () => [sample(0.3, 0.4), sample(0.4, 0.1), sample(0.5, 0.2)],
+      });
+      canvas.dispatchEvent(move);
+    }, box);
+  await page.mouse.up();
+  await expect(page.getByLabel('Annotation count')).toHaveText('1 mark');
+  const inkHeight = await surface
+    .locator('canvas')
+    .first()
+    .evaluate((canvas: HTMLCanvasElement) => {
+      const { data } = canvas
+        .getContext('2d')!
+        .getImageData(0, 0, canvas.width, canvas.height);
+      let top = canvas.height,
+        bottom = -1;
+      for (let y = 0; y < canvas.height; y++)
+        for (let x = 0; x < canvas.width; x++)
+          if (data[(y * canvas.width + x) * 4 + 3]) {
+            top = Math.min(top, y);
+            bottom = Math.max(bottom, y);
+          }
+      return bottom - top;
+    });
+  expect(inkHeight).toBeGreaterThan(box.height * 0.25);
+});
+
+test('shows live ink when saved annotations are composited into the shared video', async ({
+  page,
+}) => {
+  await page.goto('/visual-test/screen-annotations');
+  await page.getByRole('checkbox', { name: 'Simulate composited share' }).check();
+  await page.getByRole('button', { name: 'Open annotation toolbar' }).click();
+  const surface = page.locator('[data-shared-content-bounds]');
+  const box = (await surface.boundingBox())!;
+  await page.mouse.move(box.x + box.width * 0.2, box.y + box.height * 0.2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.4);
+  await expect
+    .poll(() =>
+      surface
+        .locator('canvas')
+        .nth(1)
+        .evaluate((canvas: HTMLCanvasElement) => {
+          const pixels = canvas
+            .getContext('2d')!
+            .getImageData(0, 0, canvas.width, canvas.height).data;
+          return (
+            pixels.some((value, index) => index % 4 === 3 && value > 0) &&
+            getComputedStyle(canvas.parentElement!.parentElement!).opacity !== '0'
+          );
+        }),
+    )
+    .toBe(true);
+  await page.mouse.up();
+  await expect(page.getByLabel('Annotation count')).toHaveText('1 mark');
+});

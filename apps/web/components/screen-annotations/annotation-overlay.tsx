@@ -106,9 +106,14 @@ export function AnnotationOverlay({
   const sequence = useRef(0);
   const lastPointer = useRef(0);
   const pointerSequence = useRef(0);
-  const frame = useRef<number | null>(null);
   const touchIds = useRef(new Set<number>());
   const pointerId = useRef<number | null>(null);
+  const releasePointer = useCallback(() => {
+    const id = pointerId.current;
+    pointerId.current = null;
+    if (id !== null && root.current?.hasPointerCapture(id))
+      root.current.releasePointerCapture(id);
+  }, []);
   const actor = engine.context?.actor;
   const tutor = actor?.role === 'educator';
   const canEdit = useCallback(
@@ -122,6 +127,8 @@ export function AnnotationOverlay({
       setSelected([]);
       setTextEditor(null);
       active.current = null;
+      pendingPoints.current = [];
+      releasePointer();
       setDraft(null);
       setMarquee(null);
       if (next === 'highlighter' || next.endsWith('Highlight')) {
@@ -132,7 +139,7 @@ export function AnnotationOverlay({
         if (lineWidth === 18) setLineWidth(3);
       }
     },
-    [lineWidth],
+    [lineWidth, releasePointer],
   );
   const swallow = (promise: Promise<unknown>) => {
     void promise.catch(() => undefined);
@@ -164,19 +171,19 @@ export function AnnotationOverlay({
     const timer = setInterval(flush, 40);
     return () => {
       clearInterval(timer);
-      if (frame.current !== null) cancelAnimationFrame(frame.current);
     };
   }, [flush]);
   useEffect(() => {
     if (!engine.canDraw) {
       active.current = null;
       pendingPoints.current = [];
+      releasePointer();
       setDraft(null);
       setSelected([]);
       setTextEditor(null);
       setToolState('cursor');
     }
-  }, [engine.canDraw]);
+  }, [engine.canDraw, releasePointer]);
   useEffect(() => {
     if (!transformer.current || !stage.current) return;
     transformer.current.nodes(
@@ -228,8 +235,8 @@ export function AnnotationOverlay({
       } else if (event.key === 'Escape') {
         if (active.current)
           preview({ kind: 'finish' }, active.current.id, ++sequence.current);
-        pointerId.current = null;
         active.current = null;
+        releasePointer();
         pendingPoints.current = [];
         setDraft(null);
         setSelected([]);
@@ -252,14 +259,26 @@ export function AnnotationOverlay({
     };
     document.addEventListener('keydown', keydown);
     return () => document.removeEventListener('keydown', keydown);
-  }, [tool, deleteSelection, setTool, preview]);
-  const eventPoint = (event: React.PointerEvent): AnnotationPoint | null =>
-    root.current
-      ? coordinates.clientToNormalized(
-          { x: event.clientX, y: event.clientY, pressure: event.pressure },
-          root.current.getBoundingClientRect(),
-        )
-      : null;
+  }, [tool, deleteSelection, setTool, preview, releasePointer]);
+  const eventPoint = (
+    event: Pick<PointerEvent, 'clientX' | 'clientY' | 'pressure'>,
+    clamp = false,
+  ): AnnotationPoint | null => {
+    if (!root.current) return null;
+    const bounds = root.current.getBoundingClientRect();
+    return coordinates.clientToNormalized(
+      {
+        x: clamp
+          ? Math.max(bounds.left, Math.min(event.clientX, bounds.right))
+          : event.clientX,
+        y: clamp
+          ? Math.max(bounds.top, Math.min(event.clientY, bounds.bottom))
+          : event.clientY,
+        pressure: event.pressure,
+      },
+      bounds,
+    );
+  };
   const createObject = (point: AnnotationPoint): AnnotationObject | null => {
     if (!actor || !engine.context) return null;
     const roomId = engine.context.snapshot.roomId;
@@ -305,7 +324,7 @@ export function AnnotationOverlay({
     active.current = null;
     pendingPoints.current = [];
     setDraft(null);
-    pointerId.current = null;
+    releasePointer();
   };
   const down = (event: React.PointerEvent) => {
     if (!engine.canDraw || tool === 'cursor') return;
@@ -390,11 +409,12 @@ export function AnnotationOverlay({
   };
   const move = (event: React.PointerEvent) => {
     if (!engine.canDraw || touchIds.current.size > 1) return;
-    const point = eventPoint(event);
+    const point = eventPoint(event, active.current !== null);
     if (!point) return;
     if (
+      !active.current &&
       (event.target as HTMLElement).closest(
-        'button,input,textarea,select,[role="toolbar"],[role="group"]',
+        'button,input,textarea,select,[role="toolbar"],[data-annotation-panel]',
       )
     )
       return;
@@ -408,20 +428,22 @@ export function AnnotationOverlay({
     if (!object || event.pointerId !== pointerId.current) return;
     if (paths.has(object.type)) {
       if (object.points.length >= 5000) return;
-      object.points.push(point);
-      pendingPoints.current.push(point);
+      // Browsers may combine fast stylus/mouse samples into a single move event.
+      const samples = event.nativeEvent.getCoalescedEvents?.() ?? [];
+      const points = (samples.length ? samples : [event.nativeEvent])
+        .map((sample) => eventPoint(sample, true))
+        .filter((sample): sample is AnnotationPoint => sample !== null)
+        .slice(0, 5000 - object.points.length);
+      object.points.push(...points);
+      pendingPoints.current.push(...points);
     } else {
       const start = object.points[0];
       const end = shapeEndpoint(object.type, start, point, width, height, event.shiftKey);
       object.points = [start, end];
       pendingPoints.current = [end];
     }
-    if (frame.current === null)
-      frame.current = requestAnimationFrame(() => {
-        frame.current = null;
-        if (active.current)
-          setDraft({ ...active.current, points: [...active.current.points] });
-      });
+    // React batches input updates; Konva schedules canvas drawing automatically.
+    setDraft({ ...object, points: [...object.points] });
   };
   const up = (event: React.PointerEvent) => {
     touchIds.current.delete(event.pointerId);
@@ -445,7 +467,7 @@ export function AnnotationOverlay({
       return;
     }
     if (pointerId.current !== event.pointerId || !active.current) return;
-    const endpoint = eventPoint(event);
+    const endpoint = eventPoint(event, true);
     if (endpoint) {
       if (paths.has(active.current.type)) {
         if (active.current.points.length < 5000) active.current.points.push(endpoint);
@@ -497,17 +519,17 @@ export function AnnotationOverlay({
         object.id,
         ++sequence.current,
       );
-    else
+    else {
+      const finishSequence = ++sequence.current;
       swallow(
         put(object, 0).then(() => {
-          preview({ kind: 'finish' }, object.id, ++sequence.current);
+          preview({ kind: 'finish' }, object.id, finishSequence);
         }),
       );
+    }
     active.current = null;
-    pointerId.current = null;
+    releasePointer();
     setDraft(null);
-    if (root.current?.hasPointerCapture(event.pointerId))
-      root.current.releasePointerCapture(event.pointerId);
   };
   const transformObject = useCallback(
     (object: AnnotationObject, node: Konva.Group) => {
@@ -579,26 +601,22 @@ export function AnnotationOverlay({
       className="absolute inset-0"
       style={{
         pointerEvents: tool === 'cursor' || !engine.canDraw ? 'none' : 'auto',
-        touchAction: tool === 'cursor' ? 'auto' : 'pinch-zoom',
+        touchAction: tool === 'cursor' ? 'auto' : 'none',
       }}
       onPointerDown={down}
       onPointerMove={move}
       onPointerUp={up}
       onPointerCancel={(event) => {
         touchIds.current.delete(event.pointerId);
-        cancelDraft();
+        if (pointerId.current === event.pointerId) cancelDraft();
       }}
-      onLostPointerCapture={() => {
-        if (active.current) cancelDraft();
+      onLostPointerCapture={(event) => {
+        if (pointerId.current === event.pointerId && active.current) cancelDraft();
       }}
     >
-      <Stage
-        ref={stage}
-        width={width}
-        height={height}
-        style={{ opacity: sourceComposited ? 0 : 1 }}
-      >
-        <Layer>
+      <Stage ref={stage} width={width} height={height}>
+        {/* Recorded shares already contain saved marks, but live input must stay visible. */}
+        <Layer opacity={sourceComposited ? 0 : 1}>
           {engine.objects.map((object) => (
             <AnnotationShape
               key={object.id}
