@@ -178,6 +178,7 @@ export function ClassroomWhiteboard({
           }
         >
           <Canvas
+            token={token}
             key={page.id}
             elements={page.elements}
             defaultColor={

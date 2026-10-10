@@ -9,10 +9,12 @@ import type { WhiteboardElementVM } from '@iconicedu/shared-types';
 import { ExcalidrawWhiteboardEngine, wrapCanvasElements } from './excalidraw-engine';
 import type { WhiteboardEngine, WhiteboardTool } from './whiteboard-engine';
 import './whiteboard-canvas.css';
+import { useWhiteboardLaser } from './use-whiteboard-laser';
 import { sceneFingerprint } from './scene-history';
 
 export function ExcalidrawCanvas({
   elements,
+  token,
   defaultColor,
   editable,
   tool,
@@ -20,6 +22,7 @@ export function ExcalidrawCanvas({
   onEngine,
   onToolChange,
 }: {
+  token?: string;
   defaultColor?: string;
   tool: WhiteboardTool;
   elements: WhiteboardElementVM[];
@@ -34,6 +37,7 @@ export function ExcalidrawCanvas({
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [hasStyleOptions, setHasStyleOptions] = useState(false);
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
+  const onPointerUpdate = useWhiteboardLaser(api, token);
   const engineRef = useRef<ExcalidrawWhiteboardEngine | null>(null);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
@@ -150,6 +154,7 @@ export function ExcalidrawCanvas({
       }}
     >
       <Excalidraw
+        onPointerUpdate={onPointerUpdate}
         theme={theme}
         excalidrawAPI={setApi}
         initialData={{
