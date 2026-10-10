@@ -1,11 +1,11 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { expect, it, vi } from 'vitest';
-import { WhiteboardStyleStrip } from './whiteboard-style-strip';
+import { DrawingStyleStrip } from '@iconicedu/ui-web/ui/drawing-style-strip';
 it('shows the current custom color and sends native style choices', () => {
   const onStyle = vi.fn();
   const onMore = vi.fn();
   render(
-    <WhiteboardStyleStrip
+    <DrawingStyleStrip
       color="#123456"
       width={2}
       fill="transparent"

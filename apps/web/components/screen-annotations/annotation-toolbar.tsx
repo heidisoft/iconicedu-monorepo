@@ -33,6 +33,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
+import { DrawingStyleStrip } from '@iconicedu/ui-web/ui/drawing-style-strip';
 import { LaserPointerIcon } from '@iconicedu/ui-web/ui/laser-pointer-icon';
 import type { AnnotationTool } from '@iconicedu/shared-types';
 const tools = {
@@ -248,6 +249,7 @@ export function AnnotationToolbar({
   italic,
   setItalic,
   onFormat,
+  onQuickStyle,
   onDuplicate,
   onDelete,
   onSave,
@@ -281,6 +283,7 @@ export function AnnotationToolbar({
   italic: boolean;
   setItalic: (value: boolean) => void;
   onFormat: () => void;
+  onQuickStyle?: (style: { strokeColor?: string; strokeWidth?: number }) => void;
   onDuplicate: () => void;
   onDelete: () => void;
   onSave: () => void;
@@ -348,6 +351,7 @@ export function AnnotationToolbar({
       /* Browser storage is optional. */
     }
   };
+  const showQuickStyles = expanded && canDraw && !['cursor', 'eraser'].includes(tool);
   useEffect(() => {
     if (!surface || !toolbarRef.current) return;
     const measure = () => {
@@ -363,7 +367,13 @@ export function AnnotationToolbar({
             ),
             y: Math.max(
               8,
-              Math.min(previous.y, surface.clientHeight - toolbar.offsetHeight - 8),
+              Math.min(
+                previous.y,
+                surface.clientHeight -
+                  toolbar.offsetHeight -
+                  8 -
+                  (showQuickStyles ? 48 : 0),
+              ),
             ),
           };
           return next.x === previous.x && next.y === previous.y ? previous : next;
@@ -375,8 +385,9 @@ export function AnnotationToolbar({
     observer.observe(toolbarRef.current);
     measure();
     return () => observer.disconnect();
-  }, [surface, expanded, dock]);
+  }, [surface, expanded, dock, showQuickStyles]);
   const side = dock === 'bottom' ? 'top' : 'bottom';
+  const panelInset = inset + (showQuickStyles ? 48 : 0);
   const button =
     'flex min-h-8 w-full items-center rounded-sm px-2 py-1 text-xs text-left hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40';
   const close = () => {
@@ -390,7 +401,7 @@ export function AnnotationToolbar({
       const target = event.target as Element;
       if (
         !toolbarRef.current?.contains(target) &&
-        !target.closest?.('[data-annotation-panel]')
+        !target.closest?.('[data-annotation-panel],[data-annotation-quick-styles]')
       )
         setPanel(null);
     };
@@ -408,7 +419,7 @@ export function AnnotationToolbar({
       toggle: () => setPanel(panel === label ? null : label),
       side,
       surface,
-      inset,
+      inset: panelInset,
     }) as const;
   const grid = (items: AnnotationTool[]) => (
     <div className="grid grid-cols-3 gap-1">
@@ -515,7 +526,8 @@ export function AnnotationToolbar({
                         drag.current.top + event.clientY - drag.current.y,
                         (surface?.clientHeight ?? 0) -
                           (toolbarRef.current?.offsetHeight ?? 0) -
-                          8,
+                          8 -
+                          (showQuickStyles ? 48 : 0),
                       ),
                     ),
                   });
@@ -654,6 +666,7 @@ export function AnnotationToolbar({
                       className="h-7 w-8 cursor-pointer rounded-sm border border-input bg-background p-0.5"
                       value={color}
                       onChange={(event) => setColor(event.target.value)}
+                      onBlur={() => setPanel(null)}
                     />
                   </label>
                   <div className="grid grid-cols-8 gap-1">
@@ -675,7 +688,10 @@ export function AnnotationToolbar({
                         title={`Color ${value}`}
                         className="aspect-square w-full rounded-sm border border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring aria-pressed:ring-2 aria-pressed:ring-primary aria-pressed:ring-offset-1"
                         style={{ backgroundColor: value }}
-                        onClick={() => setColor(value)}
+                        onClick={() => {
+                          setColor(value);
+                          setPanel(null);
+                        }}
                       />
                     ))}
                   </div>
@@ -867,6 +883,35 @@ export function AnnotationToolbar({
           </>
         )}
       </div>
+      {showQuickStyles && (
+        <div
+          data-annotation-quick-styles
+          className="pointer-events-none absolute left-2 right-2 z-30"
+          style={
+            dock === 'floating'
+              ? { left: position.x, top: position.y + inset - 8 }
+              : { [side === 'top' ? 'bottom' : 'top']: inset }
+          }
+        >
+          <DrawingStyleStrip
+            className="pointer-events-auto w-fit"
+            color={color}
+            width={width}
+            widths={[1, 3, 6]}
+            fill="transparent"
+            showWidth={tool !== 'text'}
+            showFill={false}
+            optionsOpen={panel === 'Format'}
+            onStyle={(style) => {
+              onQuickStyle?.(style);
+              if (style.strokeColor !== undefined) setColor(style.strokeColor);
+              if (style.strokeWidth !== undefined) setWidth(style.strokeWidth);
+              setPanel(null);
+            }}
+            onMore={() => setPanel(panel === 'Format' ? null : 'Format')}
+          />
+        </div>
+      )}
     </div>
   );
 }

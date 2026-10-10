@@ -10,7 +10,7 @@ import { ExcalidrawWhiteboardEngine, wrapCanvasElements } from './excalidraw-eng
 import type { WhiteboardEngine, WhiteboardTool } from './whiteboard-engine';
 import './whiteboard-canvas.css';
 import { useWhiteboardLaser } from './use-whiteboard-laser';
-import { WhiteboardStyleStrip } from './whiteboard-style-strip';
+import { DrawingStyleStrip } from '@iconicedu/ui-web/ui/drawing-style-strip';
 import { sceneFingerprint } from './scene-history';
 
 export function ExcalidrawCanvas({
@@ -267,7 +267,8 @@ export function ExcalidrawCanvas({
         onPointerUp={() => requestAnimationFrame(() => engineRef.current?.commit())}
       />
       {editable && hasStyleOptions && (
-        <WhiteboardStyleStrip
+        <DrawingStyleStrip
+          className="whiteboard-quick-styles absolute left-3 z-40"
           {...{ optionsOpen }}
           color={quickStyle.color}
           width={quickStyle.width}

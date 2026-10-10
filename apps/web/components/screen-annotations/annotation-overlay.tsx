@@ -813,6 +813,24 @@ export function AnnotationOverlay({
           showNames={showNames}
           setShowNames={setShowNames}
           onDelete={deleteSelection}
+          onQuickStyle={(style) => {
+            for (const object of engine.objects)
+              if (selected.includes(object.id) && canEdit(object))
+                swallow(
+                  put({
+                    ...object,
+                    style: {
+                      ...object.style,
+                      ...(style.strokeColor !== undefined && {
+                        color: style.strokeColor,
+                      }),
+                      ...(style.strokeWidth !== undefined && {
+                        width: style.strokeWidth,
+                      }),
+                    },
+                  }),
+                );
+          }}
           onFormat={() => {
             for (const object of engine.objects)
               if (selected.includes(object.id) && canEdit(object))

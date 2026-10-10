@@ -613,3 +613,9 @@ choosing a different stroke color, drawing on the canvas, switching tools, or
 pressing Escape dismisses it. Selected-object quick styles use native element
 versioning and the whiteboard history bridge, so they synchronize and support
 undo/redo. Pen presets do not introduce additional brush engines.
+
+Screen-share annotation uses the same quick-style UI as the whiteboard, with its
+existing stroke-width presets. The strip follows the toolbar dock and disappears
+in Pan and Eraser modes. Quick choices update the active drawing style and editable
+selected annotations through the existing annotation commands; More style options
+opens Format, retaining text, opacity, pressure, and custom-color controls.

@@ -45,6 +45,21 @@ const click = (name: string) =>
   fireEvent.click(screen.getByRole('button', { name, exact: true }));
 beforeEach(() => localStorage.clear());
 describe('screen annotation toolbar', () => {
+  it('offers quick styles and closes advanced options after a quick choice', () => {
+    const onQuickStyle = vi.fn();
+    const props = setup({ tool: 'pen', autoExpand: true, onQuickStyle });
+    expect(screen.getByRole('toolbar', { name: 'Drawing styles' })).toBeVisible();
+    click('More style options');
+    expect(screen.getByRole('group', { name: 'Format', exact: true })).toBeVisible();
+    click('Stroke color #1971c2');
+    expect(props.setColor).toHaveBeenLastCalledWith('#1971c2');
+    expect(onQuickStyle).toHaveBeenLastCalledWith({ strokeColor: '#1971c2' });
+    expect(
+      screen.queryByRole('group', { name: 'Format', exact: true }),
+    ).not.toBeInTheDocument();
+    click('Thick stroke');
+    expect(props.setWidth).toHaveBeenLastCalledWith(6);
+  });
   it('starts with a pen launcher, opens drawing tools, and closes into pointer mode', () => {
     const props = setup();
     expect(screen.getAllByRole('button')).toHaveLength(1);

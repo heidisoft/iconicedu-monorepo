@@ -68,7 +68,7 @@ test('supports shape variants, formatting and nonpersistent vanishing marks', as
     await page.getByRole('button', { name: tool, exact: true }).click();
     await page.mouse.move(
       surface!.x + surface!.width * 0.1,
-      surface!.y + surface!.height * 0.15,
+      surface!.y + surface!.height * 0.35,
     );
     await page.mouse.down();
     await page.mouse.move(
@@ -127,10 +127,11 @@ test('opens from a pen button and keeps grouped tools usable in a narrow viewer'
     participantColor('fixture-tutor'),
   );
   await format.getByRole('button', { name: 'Color #ef4444' }).click();
-  await expect(format.getByRole('button', { name: 'Color #ef4444' })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
+  await expect(format).toHaveCount(0);
+  await expect(
+    page.getByRole('button', { name: 'Stroke color #ef4444' }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await toolbar.getByRole('button', { name: 'Format', exact: true }).click();
   const formatBounds = await format.boundingBox();
   expect(formatBounds!.width).toBeLessThanOrEqual(240);
   expect(formatBounds!.x + formatBounds!.width).toBeLessThanOrEqual(390);
@@ -393,4 +394,27 @@ test('shows presenter tools and keeps a restored floating toolbar inside a resiz
     'aria-pressed',
     'true',
   );
+});
+
+test('offers the same quick-style workflow as whiteboard and keeps options dismissible', async ({
+  page,
+}) => {
+  await page.goto('/visual-test/screen-annotations');
+  await page.getByRole('button', { name: 'Open annotation toolbar' }).click();
+  const strip = page.getByRole('toolbar', { name: 'Drawing styles' });
+  await expect(strip).toBeVisible();
+  await strip.getByRole('button', { name: 'More style options' }).click();
+  await expect(page.getByRole('group', { name: 'Format', exact: true })).toBeVisible();
+  await strip.getByRole('button', { name: 'Stroke color #1971c2' }).click();
+  await expect(page.getByRole('group', { name: 'Format', exact: true })).toHaveCount(0);
+  await expect(
+    strip.getByRole('button', { name: 'Stroke color #1971c2' }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await strip.getByRole('button', { name: 'Thick stroke' }).click();
+  await expect(strip.getByRole('button', { name: 'Thick stroke' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await page.getByRole('button', { name: 'Pan', exact: true }).click();
+  await expect(strip).toHaveCount(0);
 });
