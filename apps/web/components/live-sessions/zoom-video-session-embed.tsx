@@ -401,7 +401,7 @@ export function ZoomVideoSessionEmbed({
   const [hwAccelEncode, setHwAccelEncode] = useState(true);
   const [hwAccelDecode, setHwAccelDecode] = useState(true);
   const whiteboard = useMeetingWhiteboard(
-    status === 'connected' ? clientRef.current : null,
+    status === 'connected' && !showFeedbackPrompt ? clientRef.current : null,
     settings.whiteboard.enabled,
     sessionName,
     activeShareUserId,

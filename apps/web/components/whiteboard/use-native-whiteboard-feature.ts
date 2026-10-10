@@ -37,7 +37,7 @@ export function useNativeWhiteboardFeature(
     const disconnect = provider.connect(
       (snapshot) => {
         setRole(snapshot.role);
-        const presenting = snapshot.document.presenting === true;
+        const presenting = snapshot.presentationActive === true;
         if (pending.current) return;
         if (presenting !== lastPresentation) {
           lastPresentation = presenting;

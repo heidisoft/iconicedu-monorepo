@@ -14,27 +14,85 @@ const snapshot: WhiteboardSnapshotVM = {
     pages: [{ id: 'one', title: 'Page 1', elements: [] }],
   },
 };
-function fixture(role: 'teacher' | 'student' = 'student') {
+function fixture(role: 'teacher' | 'student' = 'student', initial = snapshot) {
   let receive: (value: WhiteboardSnapshotVM) => void = () => {};
   const save = vi.fn().mockResolvedValue({ ...snapshot, role });
+  const disconnect = vi.fn();
   const collaboration: WhiteboardCollaborationProvider = {
     refresh: vi.fn(),
     connect: (callback) => {
       receive = callback;
-      callback({ ...snapshot, role });
-      return vi.fn();
+      callback({ ...initial, role });
+      return disconnect;
     },
   };
   return {
     repository: { load: async () => snapshot, save },
     collaboration,
+    disconnect,
     receive: (presenting: boolean) =>
       act(() =>
-        receive({ ...snapshot, role, document: { ...snapshot.document, presenting } }),
+        receive({
+          ...snapshot,
+          role,
+          presentationActive: presenting,
+          document: { ...snapshot.document, presenting },
+        }),
       ),
   };
 }
 describe('video-independent whiteboard presentation', () => {
+  it('keeps the meeting view on join when only a saved presentation flag remains', () => {
+    const f = fixture('teacher', {
+      ...snapshot,
+      presentationActive: false,
+      document: { ...snapshot.document, presenting: true },
+    });
+    const { result } = renderHook(() =>
+      useNativeWhiteboardFeature(
+        { provider: 'excalidraw', token: 'capability', role: 'teacher' },
+        true,
+        true,
+        f.repository,
+        f.collaboration,
+      ),
+    );
+    expect(result.current.open).toBe(false);
+    expect(f.repository.save).not.toHaveBeenCalled();
+  });
+  it('opens for a live presentation on initial join and closes when its lease expires', () => {
+    const f = fixture('student', { ...snapshot, presentationActive: true });
+    const { result } = renderHook(() =>
+      useNativeWhiteboardFeature(
+        { provider: 'excalidraw', token: 'capability' },
+        true,
+        true,
+        f.repository,
+        f.collaboration,
+      ),
+    );
+    expect(result.current.open).toBe(true);
+    f.receive(false);
+    expect(result.current.open).toBe(false);
+  });
+  it('stops presentation heartbeats when leaving the meeting', () => {
+    const f = fixture('teacher', { ...snapshot, presentationActive: true });
+    const { result, rerender } = renderHook(
+      ({ connected }) =>
+        useNativeWhiteboardFeature(
+          { provider: 'excalidraw', token: 'capability', role: 'teacher' },
+          true,
+          connected,
+          f.repository,
+          f.collaboration,
+        ),
+      { initialProps: { connected: true } },
+    );
+    expect(result.current.open).toBe(true);
+    rerender({ connected: false });
+    expect(f.disconnect).toHaveBeenCalledTimes(1);
+    expect(result.current.open).toBe(false);
+  });
   it('opens for peer presentation and late joins while permitting students to hide locally', async () => {
     const f = fixture();
     const { result } = renderHook(() =>

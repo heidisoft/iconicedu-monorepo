@@ -572,3 +572,7 @@ The existing Zoom cloud recording remains the recording output. The account must
 ### Meeting notification appearance
 
 Floating meeting notices, fullscreen and more-controls errors, and picture-in-picture prompts share the themed `NotificationCard` from `packages/ui-web`: a soft blurred surface, rounded outline, optional title and supporting text, pill actions and a circular dismiss control. Text and actions wrap independently on narrow screens. Errors retain alert semantics; informational notices retain status semantics. Existing dismissal and action behavior is unchanged.
+
+### Whiteboard presentation lifetime
+
+Saved classroom board content does not imply an active presentation. The API records the presenting teacher's grant identity and live session when presentation starts, and reports `presentationActive` separately from document revisions. Automatic opening requires that exact teacher grant to have an unexpired heartbeat in the same meeting. Legacy presentation flags and flags from earlier meetings do not reopen the board. After an unexpected disconnect, presentation expires within the existing 15-second presence window plus the polling interval; saved drawings remain available.
