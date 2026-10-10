@@ -122,7 +122,7 @@ export function ClassroomWhiteboard({
         <aside
           data-testid="whiteboard-overlay-toolbar"
           aria-label="Drawing controls"
-          className="pointer-events-auto col-start-1 row-start-2 @min-[760px]:row-start-1 justify-self-start max-w-full w-fit overflow-x-auto rounded-md border border-border bg-card p-1 shadow-sm"
+          className="pointer-events-auto col-start-1 row-start-2 @min-[760px]:row-start-1 justify-self-start max-w-full w-fit overflow-x-auto rounded-full border border-border bg-card p-1 shadow-sm"
         >
           <WhiteboardToolbar
             engine={engine}

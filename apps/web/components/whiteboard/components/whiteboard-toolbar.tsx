@@ -53,8 +53,8 @@ export const whiteboardTools = [
   { tool: 'diamond', label: 'Diamond', icon: Diamond },
   { tool: 'frame', label: 'Frame', icon: Frame },
 ] as const;
-const actionClass =
-  'size-8 shrink-0 rounded-sm text-foreground hover:bg-muted hover:text-foreground aria-pressed:bg-primary/10 aria-pressed:text-primary';
+const actionClass = 'size-8 shrink-0 rounded-full';
+const dropdownClass = 'h-8 w-11 shrink-0 gap-1 rounded-full px-2';
 export function WhiteboardToolbar({
   engine,
   editable,
@@ -103,7 +103,7 @@ export function WhiteboardToolbar({
             key={next}
             label={label}
             tooltip={`${label}${'shortcut' in rest ? ` (${rest.shortcut})` : ''}`}
-            variant="ghost"
+            variant="toolbar"
             aria-pressed={tool === next}
             disabled={!engine || (!editable && next !== 'hand')}
             className={actionClass}
@@ -117,11 +117,11 @@ export function WhiteboardToolbar({
         <DropdownMenuTrigger asChild>
           <Button
             type="button"
-            variant="ghost"
+            variant="toolbar"
             aria-label="Shapes"
             aria-pressed={Boolean(activeShape)}
             title={activeShape ? `Shapes · ${activeShape.label}` : 'Shapes'}
-            className={actionClass}
+            className={dropdownClass}
           >
             <ShapeIcon className="size-4" aria-hidden="true" />
             <ChevronDown className="size-2.5" aria-hidden="true" />
@@ -129,7 +129,7 @@ export function WhiteboardToolbar({
         </DropdownMenuTrigger>
         <DropdownMenuContent
           container={portal}
-          className="w-56 border border-border/60 shadow-sm"
+          className="w-56 rounded-xl border border-border/60 shadow-sm"
           align="start"
         >
           <DropdownMenuLabel>Shapes</DropdownMenuLabel>
@@ -155,7 +155,7 @@ export function WhiteboardToolbar({
         <IconActionButton
           label="Library"
           tooltip="Educational library"
-          variant="ghost"
+          variant="toolbar"
           aria-pressed={libraryOpen}
           className={actionClass}
           onClick={onLibrary}
@@ -167,7 +167,7 @@ export function WhiteboardToolbar({
       <IconActionButton
         label="Undo"
         tooltip="Undo (⌘/Ctrl+Z)"
-        variant="ghost"
+        variant="toolbar"
         disabled={!editable || !engine}
         className={actionClass}
         onClick={() => engine?.undo()}
@@ -178,10 +178,10 @@ export function WhiteboardToolbar({
         <DropdownMenuTrigger asChild>
           <Button
             type="button"
-            variant="ghost"
+            variant="toolbar"
             aria-label="View controls"
             title="Zoom and fit"
-            className={actionClass}
+            className={dropdownClass}
           >
             <Scan className="size-4" aria-hidden="true" />
             <ChevronDown className="size-2.5" aria-hidden="true" />
@@ -189,7 +189,7 @@ export function WhiteboardToolbar({
         </DropdownMenuTrigger>
         <DropdownMenuContent
           container={portal}
-          className="w-56 border border-border/60 shadow-sm"
+          className="w-56 rounded-xl border border-border/60 shadow-sm"
           align="start"
         >
           <DropdownMenuLabel>View</DropdownMenuLabel>
@@ -255,7 +255,7 @@ export function WhiteboardToolbar({
         <DropdownMenuTrigger asChild>
           <Button
             type="button"
-            variant="ghost"
+            variant="toolbar"
             aria-label="More whiteboard actions"
             title="More actions"
             className={actionClass}
@@ -265,7 +265,7 @@ export function WhiteboardToolbar({
         </DropdownMenuTrigger>
         <DropdownMenuContent
           container={portal}
-          className="w-56 border border-border/60 shadow-sm"
+          className="w-56 rounded-xl border border-border/60 shadow-sm"
           align="end"
         >
           <DropdownMenuLabel>More actions</DropdownMenuLabel>

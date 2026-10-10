@@ -37,18 +37,18 @@ export function WhiteboardBoardDetails({
   return (
     <header
       data-testid="whiteboard-board-details"
-      className="pointer-events-auto relative col-start-1 row-start-1 @min-[760px]:col-start-2 justify-self-end flex max-w-full flex-wrap items-center justify-end gap-1.5 rounded-md border border-border bg-card px-2 py-1 shadow-sm"
+      className="pointer-events-auto relative col-start-1 row-start-1 @min-[760px]:col-start-2 justify-self-end flex max-w-full flex-wrap items-center justify-end gap-1.5 rounded-full border border-border bg-card px-2 py-1 shadow-sm"
     >
       <DropdownMenu open={boardMenu} onOpenChange={setBoardMenu}>
         <h2 className="min-w-0 max-w-48 flex-1 text-sm font-medium">
           <DropdownMenuTrigger asChild>
             <Button
               type="button"
-              variant="ghost"
+              variant="toolbar"
               aria-label="Board options"
-              className="h-8 max-w-full gap-2 rounded-sm px-1"
+              className="h-8 max-w-full gap-2 rounded-full px-2"
             >
-              <span className="flex size-6 shrink-0 items-center justify-center rounded-sm bg-primary/10 text-primary">
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
                 <PanelsTopLeft size={15} aria-hidden="true" />
               </span>
               <span className="truncate" title={title}>
@@ -66,7 +66,7 @@ export function WhiteboardBoardDetails({
           container={
             typeof document === 'undefined' ? undefined : document.fullscreenElement
           }
-          className="w-60 border border-border/60 shadow-sm"
+          className="w-60 rounded-xl border border-border/60 shadow-sm"
         >
           <DropdownMenuLabel>Board options</DropdownMenuLabel>
           <DropdownMenuItem className="min-h-11" onSelect={() => onExport('svg')}>

@@ -48,6 +48,17 @@ describe('native whiteboard controls', () => {
     expect(
       screen.queryByRole('menuitemradio', { name: 'Rectangle' }),
     ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Pen', exact: true })).toHaveClass(
+      'size-8',
+      'rounded-full',
+    );
+    for (const name of ['Shapes', 'View controls'])
+      expect(screen.getByRole('button', { name })).toHaveClass(
+        'h-8',
+        'w-11',
+        'rounded-full',
+      );
+
     expect(
       screen.queryByRole('menuitem', { name: 'Clear board' }),
     ).not.toBeInTheDocument();
