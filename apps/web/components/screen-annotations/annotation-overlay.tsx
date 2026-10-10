@@ -659,11 +659,12 @@ export function AnnotationOverlay({
         </Layer>
         <Layer listening={false}>
           {Object.entries(engine.pointers)
-            .filter(([, pointer]) => pointer.tool === 'pointerArrow')
+            .filter(([, pointer]) => showNames && pointer.tool === 'pointerArrow')
             .map(([id, pointer]) => (
               <AnnotationPointer
                 key={id}
                 {...pointer}
+                showName={showNames}
                 width={width}
                 height={height}
                 color={
@@ -704,6 +705,7 @@ export function AnnotationOverlay({
               <AnnotationPointer
                 key={id}
                 {...pointer}
+                showName={showNames}
                 width={width}
                 height={height}
                 color={

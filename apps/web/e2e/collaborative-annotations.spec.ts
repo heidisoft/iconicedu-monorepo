@@ -129,6 +129,15 @@ async function pointerLabels(page: Page) {
     );
   });
 }
+async function enableNames(page: Page) {
+  const opener = page.getByRole('button', { name: 'Open annotation toolbar' });
+  if (await opener.count()) await opener.click();
+  await page.getByRole('button', { name: 'More', exact: true }).click();
+  const names = page.getByRole('checkbox', { name: 'Show annotator names' });
+  await expect(names).not.toBeChecked();
+  await names.check();
+  await page.getByRole('button', { name: 'More', exact: true }).click();
+}
 async function hoverAnnotation(page: Page) {
   const open = page.getByRole('button', { name: 'Open annotation toolbar' });
   if (await open.count()) await open.click();
@@ -154,7 +163,10 @@ test('synchronizes annotations in both directions and survives presenter view re
       sessionId: data.sessionId,
     });
     await hoverAnnotation(teacher.page);
+    expect(await pointerLabels(participant.page)).toEqual([]);
+    await enableNames(participant.page);
     await expect.poll(() => pointerLabels(participant.page)).toContain('Test educator');
+    await enableNames(teacher.page);
     await hoverAnnotation(participant.page);
     await expect.poll(() => pointerLabels(teacher.page)).toContain('Test child');
     await draw(teacher.page, participant.page);
@@ -213,7 +225,10 @@ test('shared-link guest sees presenter marks and draws without an account sessio
       annotationToken: token,
     });
     await hoverAnnotation(teacher.page);
+    expect(await pointerLabels(guest.page)).toEqual([]);
+    await enableNames(guest.page);
     await expect.poll(() => pointerLabels(guest.page)).toContain('Test educator');
+    await enableNames(teacher.page);
     await hoverAnnotation(guest.page);
     await expect.poll(() => pointerLabels(teacher.page)).toContain('Guest');
     await teacher.page.getByRole('button', { name: 'Attention', exact: true }).click();

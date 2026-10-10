@@ -11,6 +11,7 @@ export function AnnotationPointer({
   tool,
   name,
   color,
+  showName = false,
 }: {
   point: AnnotationPoint;
   width: number;
@@ -18,6 +19,7 @@ export function AnnotationPointer({
   tool: 'spotlight' | 'pointerArrow';
   name: string;
   color: string;
+  showName?: boolean;
 }) {
   const displayName = name.trim() || 'Participant';
   const node = useRef<Konva.Group>(null);
@@ -43,7 +45,7 @@ export function AnnotationPointer({
         Math.min(8, height - point.y * height - bounds.height - 4),
       ),
     });
-  }, [displayName, point.x, point.y, width, height]);
+  }, [displayName, point.x, point.y, width, height, showName]);
   const initial = useRef({ x: point.x * width, y: point.y * height });
   useEffect(() => {
     if (!node.current) return;
@@ -64,26 +66,28 @@ export function AnnotationPointer({
   return (
     <Group ref={node} x={initial.current.x} y={initial.current.y} listening={false}>
       {tool === 'spotlight' && <Circle radius={12} fill={color} opacity={0.5} />}
-      <Label ref={label} x={16} y={8} listening={false}>
-        <Tag fill={color} cornerRadius={4} />
-        <Text
-          ref={labelText}
-          wrap="none"
-          ellipsis
-          text={displayName}
-          fill={(() => {
-            const channels = color
-              .replace('#', '')
-              .match(/.{2}/g)
-              ?.map((value) => parseInt(value, 16)) ?? [0, 0, 0];
-            return channels[0] * 0.299 + channels[1] * 0.587 + channels[2] * 0.114 > 150
-              ? '#111827'
-              : '#ffffff';
-          })()}
-          fontSize={12}
-          padding={5}
-        />
-      </Label>
+      {showName && (
+        <Label ref={label} x={16} y={8} listening={false}>
+          <Tag fill={color} cornerRadius={4} />
+          <Text
+            ref={labelText}
+            wrap="none"
+            ellipsis
+            text={displayName}
+            fill={(() => {
+              const channels = color
+                .replace('#', '')
+                .match(/.{2}/g)
+                ?.map((value) => parseInt(value, 16)) ?? [0, 0, 0];
+              return channels[0] * 0.299 + channels[1] * 0.587 + channels[2] * 0.114 > 150
+                ? '#111827'
+                : '#ffffff';
+            })()}
+            fontSize={12}
+            padding={5}
+          />
+        </Label>
+      )}
     </Group>
   );
 }
