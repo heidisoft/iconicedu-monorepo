@@ -1010,6 +1010,9 @@ jobs:
             --arg reminders_token "${{ secrets.INTERNAL_REMINDERS_TOKEN }}" \
             --arg turnstile_site_key "${{ secrets.EXPO_PUBLIC_TURNSTILE_SITE_KEY }}" \
             --arg ai_key "${{ secrets.AI_PROVIDER_KEY_ENCRYPTION_KEY }}" \
+            --arg zoom_sdk_key "${{ secrets.ZOOM_VIDEO_SDK_KEY }}" \
+            --arg zoom_sdk_secret "${{ secrets.ZOOM_VIDEO_SDK_SECRET }}" \
+            --arg zoom_webhook_token "${{ secrets.ZOOM_WEBHOOK_SECRET_TOKEN }}" \
             '[
               {key:"API_URL", value:$api_url},
               {key:"NEXT_PUBLIC_API_URL", value:$api_url},
@@ -1023,6 +1026,15 @@ jobs:
             ] else [] end)
             + (if ($ai_key | length) > 0 then [
               {key:"AI_PROVIDER_KEY_ENCRYPTION_KEY", value:$ai_key}
+            ] else [] end)
+            + (if ($zoom_sdk_key | length) > 0 then [
+              {key:"ZOOM_VIDEO_SDK_KEY", value:$zoom_sdk_key}
+            ] else [] end)
+            + (if ($zoom_sdk_secret | length) > 0 then [
+              {key:"ZOOM_VIDEO_SDK_SECRET", value:$zoom_sdk_secret}
+            ] else [] end)
+            + (if ($zoom_webhook_token | length) > 0 then [
+              {key:"ZOOM_WEBHOOK_SECRET_TOKEN", value:$zoom_webhook_token}
             ] else [] end)
             | map(. + {target:["preview"], gitBranch:$branch, type:"encrypted"})')
 

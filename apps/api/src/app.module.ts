@@ -1,3 +1,4 @@
+import { WhiteboardsModule } from './modules/whiteboards/whiteboards.module';
 import { Module } from '@nestjs/common';
 import { AdminToolsModule } from '@iconicedu/api/modules/admin-tools/admin-tools.module';
 import { ConfigModule } from '@nestjs/config';
@@ -40,6 +41,7 @@ import { RequestLoggingInterceptor } from '@iconicedu/api/observability/request-
 
 @Module({
   imports: [
+    WhiteboardsModule,
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
     AnalyticsModule,

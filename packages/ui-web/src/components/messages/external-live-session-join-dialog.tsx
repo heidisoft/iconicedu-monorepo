@@ -16,6 +16,8 @@ import {
 export type ExternalLiveSessionJoinTarget = {
   joinHref: string;
   providerLabel: string | null;
+  isInternal?: boolean;
+  copyHref?: string;
 };
 
 export async function copyExternalLiveSessionJoinLink(
@@ -52,7 +54,7 @@ export function ExternalLiveSessionJoinDialog({
       return;
     }
 
-    setCopied(await copyExternalLiveSessionJoinLink(target.joinHref));
+    setCopied(await copyExternalLiveSessionJoinLink(target.copyHref ?? target.joinHref));
   };
 
   const primaryLabel = target?.providerLabel
@@ -65,8 +67,9 @@ export function ExternalLiveSessionJoinDialog({
         <DialogHeader>
           <DialogTitle>Session ready to join</DialogTitle>
           <DialogDescription>
-            This session opens in an external provider. Stay here until you are ready,
-            then use the link below to join.
+            {target?.isInternal
+              ? 'Stay here until you are ready, then open the session in a new tab to check your camera and microphone before joining.'
+              : 'This session opens in an external provider. Stay here until you are ready, then use the link below to join.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -74,7 +77,9 @@ export function ExternalLiveSessionJoinDialog({
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             Join link
           </p>
-          <p className="mt-2 break-all text-sm text-foreground">{target?.joinHref}</p>
+          <p className="mt-2 break-all text-sm text-foreground">
+            {target?.copyHref ?? target?.joinHref}
+          </p>
         </div>
 
         <DialogFooter showCloseButton>

@@ -1,3 +1,4 @@
+import type { LiveSessionSettingsVM } from './live-session-settings';
 import type {
   ConnectionVM,
   EntityRefVM,
@@ -68,6 +69,7 @@ export type LiveSessionProviderVM = 'daily' | 'zoom' | 'jitsi' | 'custom';
 export type LiveSessionModeVM = 'video' | 'audio';
 
 export interface ChannelLiveSessionConfigVM {
+  settings?: LiveSessionSettingsVM;
   enabled: boolean;
   provider: LiveSessionProviderVM;
   mode?: LiveSessionModeVM | null;

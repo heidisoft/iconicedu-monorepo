@@ -5,6 +5,19 @@ import type {
 } from '@iconicedu/shared-types';
 
 import { getLiveSessionProvider } from './providers';
+import { getWebAppUrl } from './web-app-url';
+
+function buildZoomJoinUrl(
+  sessionId: string,
+  providerMetadata: Record<string, unknown> | undefined,
+): string {
+  const url = new URL(`/live/${sessionId}`, getWebAppUrl());
+  const passcode = providerMetadata?.passcode;
+  if (typeof passcode === 'string' && passcode) {
+    url.searchParams.set('passcode', passcode);
+  }
+  return url.toString();
+}
 import {
   snapshotExpectedParticipantsForLiveSession,
   getLiveSessionAttendancePolicy,
@@ -130,7 +143,7 @@ async function getChannelSummary(
  * apps/api's channels.service.ts hasRosterReadRole, which grants the same
  * org-role-based bypass for viewing a channel's roster.
  */
-async function hasOrgStaffRole(
+export async function hasOrgStaffRole(
   supabase: LiveSessionSupabaseClient,
   orgId: string,
   profileIds: string[],
@@ -436,6 +449,7 @@ export async function createOrJoinLiveSession(input: {
   };
   channelId: string;
   orgSlug: string;
+  meetingSettings?: import('@iconicedu/shared-types').LiveSessionSettingsVM;
   schedulePostJoinSideEffects?: PostJoinSideEffectsScheduler;
   onPostJoinSideEffectError?: (info: PostJoinSideEffectErrorInfo) => void;
 }): Promise<CreateOrJoinLiveSessionResult> {
@@ -498,7 +512,31 @@ export async function createOrJoinLiveSession(input: {
   }
 
   const now = new Date().toISOString();
-  const existingSession = activeSessionResponse.data ?? null;
+  let existingSession = activeSessionResponse.data ?? null;
+
+  if (existingSession && existingSession.provider !== liveSessionConfig.provider) {
+    // The channel's configured provider changed after this session started —
+    // reusing it would silently hand back a stale link for a provider the
+    // channel no longer uses. End it so a fresh session is created below
+    // under the current config instead. Safe: the active-scope unique index
+    // (channel_live_sessions_active_scope_idx) only blocks a second
+    // starting/live row for this scope, not a new one once this is 'ended'.
+    const endStaleSessionResponse = await input.serviceSupabase
+      .from('channel_live_sessions')
+      .update({
+        status: 'ended',
+        ended_at: now,
+        updated_at: now,
+        updated_by: profile.id,
+      })
+      .eq('id', existingSession.id)
+      .eq('org_id', existingSession.org_id);
+    if (endStaleSessionResponse.error) {
+      throw new Error(endStaleSessionResponse.error.message);
+    }
+    existingSession = null;
+  }
+
   if (existingSession) {
     await snapshotExpectedParticipantsForLiveSession({
       supabase: input.serviceSupabase,
@@ -566,6 +604,7 @@ export async function createOrJoinLiveSession(input: {
       attendance_policy: getLiveSessionAttendancePolicy(null),
       report_status: 'pending',
       app_metadata: {
+        ...(input.meetingSettings ? { meetingSettings: input.meetingSettings } : {}),
         channelTopic: channel.topic ?? null,
         learningSpaceId,
         mode: liveSessionConfig.mode ?? 'video',
@@ -729,7 +768,19 @@ export async function createOrJoinLiveSession(input: {
       mode: liveSessionConfig.mode ?? 'video',
     });
 
-    const resolvedJoinPath = `/${input.orgSlug}/live-sessions/${session.id}`;
+    // Zoom's join_path is a full shareable URL to a public landing page rather
+    // than a path relative to the app — this is what makes the client show it
+    // through the same "Session ready to join" copy-link popup used for
+    // external/custom providers (isExternalJoinHref just checks for http(s)://),
+    // instead of silently navigating straight into an embedded room. The
+    // passcode travels in the URL for members so clicking "Open Zoom" joins
+    // immediately; anyone the member shares this link with can join too (the
+    // public guest-join endpoint is the real access boundary, not the URL
+    // itself), and anyone who only has the bare URL enters it manually.
+    const resolvedJoinPath =
+      liveSessionConfig.provider === 'zoom'
+        ? buildZoomJoinUrl(session.id, providerSession.providerMetadata)
+        : `/${input.orgSlug}/live-sessions/${session.id}`;
     const updateResponse = await input.serviceSupabase
       .from('channel_live_sessions')
       .update({

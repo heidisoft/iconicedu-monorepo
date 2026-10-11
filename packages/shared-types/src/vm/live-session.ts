@@ -1,3 +1,4 @@
+import type { LiveSessionSettingsVM } from './live-session-settings';
 import type { ISODateTime, UUID } from '@iconicedu/shared-types/shared/shared';
 import type { LiveSessionProviderVM } from '@iconicedu/shared-types/vm/channel';
 
@@ -151,3 +152,46 @@ export interface LiveSessionAttendanceFilterVM {
   dateTo?: ISODateTime | null;
   status?: LiveSessionAttendanceStatusVM | null;
 }
+
+/** Enrolled child a verified guardian may represent in a live class. */
+export type LiveSessionStudentOptionVM = { profileId: UUID; displayName: string };
+export type LiveSessionJoinRequest = {
+  displayName: string;
+  passcode: string;
+  studentProfileId?: UUID;
+};
+
+/** Credentials issued by apps/api after host authorization or passcode verification. */
+export type LiveSessionJoinCredentialsVM = {
+  /** API-verified student represented by a signed-in guardian. */
+  studentProfileId?: UUID;
+  /** Meeting-scoped opaque annotation capability for shared-link participants. */
+  annotationToken?: string;
+  whiteboard?: import('./whiteboard').WhiteboardAccessVM;
+  token: string;
+  sessionName: string;
+  displayName: string;
+  expiresAt: string | null;
+  settings?: LiveSessionSettingsVM;
+};
+
+/** Public landing data; participant identity never grants host privileges. */
+export type PublicLiveSessionInfoVM =
+  | { exists: false }
+  | { exists: true; isActive: false; sessionTitle: string }
+  | {
+      exists: true;
+      isActive: true;
+      settings?: LiveSessionSettingsVM;
+      sessionTitle: string;
+      isHost: false;
+      participant?: { displayName: string; students?: LiveSessionStudentOptionVM[] };
+    }
+  | {
+      exists: true;
+      isActive: true;
+      settings?: LiveSessionSettingsVM;
+      sessionTitle: string;
+      isHost: true;
+      hostJoin: LiveSessionJoinCredentialsVM & { passcode: string | null };
+    };

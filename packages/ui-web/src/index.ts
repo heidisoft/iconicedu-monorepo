@@ -8,6 +8,7 @@ export * from '@iconicedu/ui-web/components/theme-toggle';
 export * from '@iconicedu/ui-web/ui/avatar';
 export * from '@iconicedu/ui-web/ui/breadcrumb';
 export * from '@iconicedu/ui-web/ui/button';
+export * from '@iconicedu/ui-web/ui/icon-action-button';
 export * from '@iconicedu/ui-web/ui/button-group';
 export * from '@iconicedu/ui-web/ui/dropdown-menu';
 export * from '@iconicedu/ui-web/ui/dot-pattern';
@@ -102,3 +103,9 @@ export {
   MessageCircle,
 } from 'lucide-react';
 export { Briefcase, GraduationCap, Shield, User, Users } from 'lucide-react';
+export { SharedContentSurface } from './ui/shared-content-surface';
+
+export * from '@iconicedu/ui-web/ui/speaking-audio-icon';
+export * from '@iconicedu/ui-web/hooks/use-speaking-hold';
+
+export * from '@iconicedu/ui-web/ui/notification-card';

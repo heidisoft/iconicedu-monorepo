@@ -32,6 +32,9 @@ export default async function Page({
   const { orgSlug, sessionId } = await params;
   const { supabase, account } = await getDashboardAccountContext(orgSlug);
   const { profileResponse } = await getDashboardProfileContext(supabase, account.id);
+  const {
+    data: { session: authSession },
+  } = await supabase.auth.getSession();
 
   if (!profileResponse.data) {
     throw new Error('Profile not found');
@@ -75,11 +78,28 @@ export default async function Page({
               ? joinAccess.metadata.externalJoinUrl
               : null
           }
+          zoomSessionName={
+            typeof joinAccess.metadata?.sessionName === 'string'
+              ? joinAccess.metadata.sessionName
+              : null
+          }
+          zoomPasscode={
+            typeof session.provider_metadata?.passcode === 'string'
+              ? session.provider_metadata.passcode
+              : null
+          }
+          displayName={
+            typeof joinAccess.metadata?.displayName === 'string'
+              ? joinAccess.metadata.displayName
+              : null
+          }
           channelKind={channelResponse.data?.kind ?? null}
           mode={parseLiveSessionMode(channelResponse.data?.live_session_config)}
           channelTopic={channelResponse.data?.topic ?? null}
           channelPurpose={channelResponse.data?.purpose ?? null}
           returnPath={returnPath}
+          liveSessionId={sessionId}
+          accessToken={authSession?.access_token ?? null}
         />
       </div>
     );

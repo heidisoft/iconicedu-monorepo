@@ -1,0 +1,145 @@
+/* Native application controls own tools, pages and assets. Scope overrides to this canvas. */
+.classroom-whiteboard-canvas .excalidraw .App-toolbar,
+.classroom-whiteboard-canvas .excalidraw .App-menu_bottom,
+.classroom-whiteboard-canvas .excalidraw .layer-ui__wrapper__top-right,
+.classroom-whiteboard-canvas .excalidraw .HelpButton,
+.classroom-whiteboard-canvas .excalidraw .sidebar-trigger,
+.classroom-whiteboard-canvas .excalidraw .welcome-screen {
+  display: none !important;
+}
+.classroom-whiteboard-canvas .excalidraw {
+  --color-primary: var(--primary);
+  --color-primary-darker: var(--primary);
+  --color-primary-darkest: var(--primary);
+  --color-primary-light: var(--primary-subtle);
+  --color-surface-primary-container: var(--primary-subtle);
+  --color-on-surface: var(--foreground);
+  background: transparent;
+}
+.classroom-whiteboard-canvas {
+  min-height: 180px;
+}
+
+/* Theme-driven paper: a quiet dotted grid underneath the transparent drawing canvas. */
+.classroom-whiteboard-canvas {
+  background-color: var(--card);
+  background-image: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--foreground) 13%, transparent) 1px,
+    transparent 1px
+  );
+  background-size: 24px 24px;
+}
+.classroom-whiteboard-canvas .excalidraw .Island {
+  border: 1px solid var(--border);
+  border-radius: 0.375rem;
+  box-shadow: none;
+  background: var(--card);
+}
+
+/* Keep the engine's contextual style controls, underneath our floating toolbar. */
+.classroom-whiteboard-canvas .excalidraw .App-menu_top {
+  display: block;
+  margin-top: 56px;
+}
+.classroom-whiteboard-canvas
+  .excalidraw
+  .App-menu_top__left
+  > :not(.selected-shape-actions),
+.classroom-whiteboard-canvas .excalidraw .shapes-section,
+.classroom-whiteboard-canvas .excalidraw .App-top-bar {
+  display: none !important;
+}
+.classroom-whiteboard-canvas .excalidraw .selected-shape-actions .Island {
+  overflow-y: auto;
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--foreground) 8%, transparent);
+}
+.classroom-whiteboard-canvas .excalidraw {
+  --color-surface-low: var(--card);
+  --color-surface-mid: var(--muted);
+  --color-surface-high: var(--accent);
+  --text-primary-color: var(--foreground);
+  --button-hover-bg: var(--accent);
+  --color-on-primary-container: var(--primary);
+}
+.classroom-whiteboard-canvas .excalidraw .App-mobile-menu {
+  max-height: 38dvh;
+  overflow-y: auto;
+  padding-bottom: 3rem;
+}
+
+.classroom-whiteboard-canvas .whiteboard-style-toggle {
+  display: none;
+}
+.classroom-whiteboard-canvas:has(.excalidraw--mobile) .whiteboard-style-toggle {
+  display: block;
+}
+.classroom-whiteboard-canvas .excalidraw {
+  --color-slider-track: var(--primary);
+}
+
+/* Links are not part of the classroom document contract. */
+.classroom-whiteboard-canvas .excalidraw .panelColumn button[title*='+K'] {
+  display: none;
+}
+
+/* Preserve comfortable touch targets while keeping desktop controls compact. */
+@media (pointer: coarse) {
+  .classroom-whiteboard [data-testid='whiteboard-toolbar'] button,
+  .classroom-whiteboard button[aria-label='Board options'] {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+.classroom-whiteboard-canvas[data-grid='none'] {
+  background-image: none;
+}
+.classroom-whiteboard-canvas[data-grid='lines'] {
+  background-image:
+    linear-gradient(
+      color-mix(in srgb, var(--foreground) 9%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--foreground) 9%, transparent) 1px,
+      transparent 1px
+    );
+}
+
+/* Keep native styles below the two stacked overlays on narrow boards. */
+@container (max-width: 759px) {
+  .classroom-whiteboard-canvas .excalidraw .App-menu_top {
+    margin-top: 108px;
+  }
+}
+
+.classroom-whiteboard-canvas .whiteboard-quick-styles {
+  top: 56px;
+}
+
+/* Quick styles stay visible; advanced controls are an intentional overlay. */
+.classroom-whiteboard-canvas[data-style-options='false']
+  .excalidraw
+  .selected-shape-actions,
+.classroom-whiteboard-canvas[data-style-options='false'] .excalidraw .App-mobile-menu {
+  display: none !important;
+}
+.classroom-whiteboard-canvas[data-style-options='true'] .excalidraw .App-menu_top {
+  margin-top: 100px;
+}
+@container (max-width: 759px) {
+  .classroom-whiteboard-canvas .whiteboard-quick-styles {
+    top: 108px;
+  }
+  .classroom-whiteboard-canvas[data-style-options='true'] .excalidraw .App-menu_top {
+    margin-top: 152px;
+  }
+}
+@media (pointer: coarse) {
+  .whiteboard-quick-styles button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}

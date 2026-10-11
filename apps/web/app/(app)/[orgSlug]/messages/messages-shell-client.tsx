@@ -8,7 +8,6 @@ import {
   useState,
   type ComponentType,
 } from 'react';
-import { useRouter } from 'next/navigation';
 import type {
   ChannelVM,
   MessageEditTextInput,
@@ -23,7 +22,7 @@ import type {
 } from '@iconicedu/shared-types';
 import { MessagesShell } from '@iconicedu/ui-web';
 import { ExternalLiveSessionJoinDialog } from '@iconicedu/ui-web/components/messages/external-live-session-join-dialog';
-import { useExternalLiveSessionJoinDialog } from '@iconicedu/ui-web/components/messages/use-external-live-session-join-dialog';
+import { useLiveSessionNavigation } from '@iconicedu/web/components/live-sessions/use-live-session-navigation';
 
 import { createApiClient } from '@iconicedu/web/lib/api/http-client';
 import { createSupabaseMessagesRealtimeClient } from '@iconicedu/web/lib/messages/realtime/supabase-messages-realtime-client';
@@ -210,17 +209,12 @@ export function MessagesShellClient({
   deleteMessage,
   toggleHiddenMessage,
 }: MessagesShellClientProps) {
-  const router = useRouter();
   const [channelState, setChannelState] = useState(channel);
   const onlineProfileIdsRef = useRef(new Set<string>());
   const presenceClient = useMemo(() => createSupabaseBrowserClient(), []);
   const realtimeClient = useMemo(() => createSupabaseMessagesRealtimeClient(), []);
   const { externalJoinTarget, closeExternalJoinDialog, handleResolvedJoinHref } =
-    useExternalLiveSessionJoinDialog({
-      onInternalJoinHref: (joinHref) => {
-        router.push(joinHref);
-      },
-    });
+    useLiveSessionNavigation();
   const messageWriteClient = useMemo(
     () => ({
       sendTextMessage,
@@ -437,12 +431,15 @@ export function MessagesShellClient({
       throw new Error('Current user is required');
     }
 
-    const payload = await createApiClient(presenceClient).post<{ joinPath: string }>(
-      `/channels/${channelState.ids.id}/live-sessions/join`,
-      { orgId: channelState.ids.orgId, profileId: currentUserId },
-    );
+    const payload = await createApiClient(presenceClient).post<{
+      joinPath: string;
+      provider?: string;
+    }>(`/channels/${channelState.ids.id}/live-sessions/join`, {
+      orgId: channelState.ids.orgId,
+      profileId: currentUserId,
+    });
 
-    handleResolvedJoinHref(payload.joinPath);
+    handleResolvedJoinHref(payload.joinPath, payload.provider);
   }, [
     channelState.ids.id,
     channelState.ids.orgId,

@@ -265,7 +265,10 @@ export function SessionCard({
                 if (isExternalJoinHref(result.joinPath)) {
                   setExternalJoinTarget({
                     joinHref: result.joinPath,
-                    providerLabel: resolveExternalJoinProviderLabel(result.joinPath),
+                    providerLabel: resolveExternalJoinProviderLabel(
+                      result.joinPath,
+                      result.provider,
+                    ),
                   });
                   return;
                 }
@@ -286,7 +289,10 @@ export function SessionCard({
                 if (isExternalJoinHref(joinHref)) {
                   setExternalJoinTarget({
                     joinHref,
-                    providerLabel: resolveExternalJoinProviderLabel(joinHref),
+                    providerLabel: resolveExternalJoinProviderLabel(
+                      joinHref,
+                      channelMeta?.liveSession?.provider,
+                    ),
                   });
                   return;
                 }

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DEFAULT_LIVE_SESSION_SETTINGS } from '@iconicedu/shared-types';
 import type { ProfileRow } from '@iconicedu/shared-types';
 
 vi.mock('./scope', () => ({
@@ -20,6 +21,7 @@ vi.mock('./providers', () => ({
 }));
 
 import { resolveChannelLiveSessionScope } from './scope';
+import { getLiveSessionProvider } from './providers';
 import { createOrJoinLiveSession } from './join';
 
 const DEFAULT_ACTOR = {
@@ -65,6 +67,7 @@ function createServiceSupabaseStub(input?: {
   let participantUpserted = false;
   let expectedParticipantsInserted = 0;
   const participantEvents: Array<Record<string, unknown>> = [];
+  const liveSessionUpdates: Array<Record<string, unknown>> = [];
   const memberProfileIds = new Set(input?.memberProfileIds ?? ['profile-1']);
   const familyLinks = input?.familyLinks ?? [];
   const childProfiles = input?.childProfiles ?? [];
@@ -89,6 +92,9 @@ function createServiceSupabaseStub(input?: {
       },
       get participantEvents() {
         return participantEvents;
+      },
+      get liveSessionUpdates() {
+        return liveSessionUpdates;
       },
     },
     from(table: string) {
@@ -355,6 +361,7 @@ function createServiceSupabaseStub(input?: {
             };
           },
           update(payload: Record<string, unknown>) {
+            liveSessionUpdates.push(payload);
             liveSessionRow = {
               ...(liveSessionRow ?? {}),
               ...payload,
@@ -528,6 +535,11 @@ describe('createOrJoinLiveSession', () => {
 
   it('reuses an active live session and still emits the joined activity immediately', async () => {
     const serviceSupabase = createServiceSupabaseStub({
+      liveSessionConfig: {
+        enabled: true,
+        provider: 'daily',
+        mode: 'video',
+      },
       activeLiveSessionRow: {
         id: 'live-session-existing',
         org_id: 'org-1',
@@ -567,6 +579,55 @@ describe('createOrJoinLiveSession', () => {
     });
   });
 
+  it('ends a stale session and creates a fresh one when the channel provider no longer matches', async () => {
+    const serviceSupabase = createServiceSupabaseStub({
+      liveSessionConfig: {
+        enabled: true,
+        provider: 'daily',
+        mode: 'video',
+      },
+      activeLiveSessionRow: {
+        id: 'live-session-existing',
+        org_id: 'org-1',
+        channel_id: 'channel-1',
+        provider: 'custom',
+        session_scope_key: 'channel:channel-1',
+        occurrence_key: '2026-03-02T10:00:00.000Z',
+        status: 'starting',
+        started_by_profile_id: 'profile-2',
+        join_path: 'https://old-provider.example.com/stale-room',
+        started_at: '2026-03-02T10:00:00.000Z',
+        app_metadata: {
+          learningSpaceId: 'space-1',
+          occurrenceLabel: 'Mar 2, 10:00 AM',
+          scheduleTitle: 'Math',
+          mode: 'video',
+        },
+      },
+    });
+    const scheduler = createImmediateScheduler();
+
+    const result = await createOrJoinLiveSession({
+      serviceSupabase: serviceSupabase as never,
+      actor: DEFAULT_ACTOR,
+      channelId: 'channel-1',
+      orgSlug: 'iconic-academy',
+      schedulePostJoinSideEffects: scheduler.schedule,
+    });
+    await scheduler.flush();
+
+    expect(result).toEqual({
+      sessionId: 'live-session-1',
+      joinPath: '/iconic-academy/live-sessions/live-session-1',
+      status: 'live',
+      created: true,
+      provider: 'daily',
+    });
+    expect(serviceSupabase.state.liveSessionUpdates[0]).toMatchObject({
+      status: 'ended',
+    });
+  });
+
   it('does not publish removed session start activity when reusing an outside-schedule huddle session', async () => {
     vi.mocked(resolveChannelLiveSessionScope).mockResolvedValueOnce({
       scopeKey: 'channel:channel-1',
@@ -580,6 +641,11 @@ describe('createOrJoinLiveSession', () => {
       channel: {
         purpose: 'general',
         primary_entity_id: null,
+      },
+      liveSessionConfig: {
+        enabled: true,
+        provider: 'daily',
+        mode: 'audio',
       },
       activeLiveSessionRow: {
         id: 'live-session-huddle-existing',
@@ -637,6 +703,97 @@ describe('createOrJoinLiveSession', () => {
     });
 
     await scheduler.flush();
+  });
+
+  it('returns a full shareable URL as the join path for the zoom provider', async () => {
+    const previousWebUrl = process.env.WEB_URL;
+    process.env.WEB_URL = 'https://app.iconicedu.lk/';
+
+    try {
+      const serviceSupabase = createServiceSupabaseStub({
+        liveSessionConfig: {
+          enabled: true,
+          provider: 'zoom',
+          mode: 'video',
+        },
+      });
+      const scheduler = createImmediateScheduler();
+
+      const result = await createOrJoinLiveSession({
+        serviceSupabase: serviceSupabase as never,
+        actor: DEFAULT_ACTOR,
+        channelId: 'channel-1',
+        orgSlug: 'iconic-academy',
+        schedulePostJoinSideEffects: scheduler.schedule,
+      });
+
+      expect(result).toEqual({
+        sessionId: 'live-session-1',
+        joinPath: 'https://app.iconicedu.lk/live/live-session-1',
+        status: 'live',
+        created: true,
+        provider: 'zoom',
+      });
+      expect(serviceSupabase.state.liveSessionRow?.join_path).toBe(
+        'https://app.iconicedu.lk/live/live-session-1',
+      );
+
+      await scheduler.flush();
+    } finally {
+      if (previousWebUrl === undefined) {
+        delete process.env.WEB_URL;
+      } else {
+        process.env.WEB_URL = previousWebUrl;
+      }
+    }
+  });
+
+  it('appends the passcode as a query param so members can join with one click', async () => {
+    const previousWebUrl = process.env.WEB_URL;
+    process.env.WEB_URL = 'https://app.iconicedu.lk';
+    vi.mocked(getLiveSessionProvider).mockReturnValueOnce({
+      key: 'zoom',
+      createSession: vi.fn(async ({ sessionId }: { sessionId: string }) => ({
+        providerSessionId: `provider-${sessionId}`,
+        providerMetadata: { passcode: 'abc123xyz9' },
+      })),
+      getJoinAccess: vi.fn(async ({ sessionId }: { sessionId: string }) => ({
+        token: `token-${sessionId}`,
+        metadata: {},
+      })),
+      normalizeWebhook: vi.fn(async () => []),
+    });
+
+    try {
+      const serviceSupabase = createServiceSupabaseStub({
+        liveSessionConfig: {
+          enabled: true,
+          provider: 'zoom',
+          mode: 'video',
+        },
+      });
+      const scheduler = createImmediateScheduler();
+
+      const result = await createOrJoinLiveSession({
+        serviceSupabase: serviceSupabase as never,
+        actor: DEFAULT_ACTOR,
+        channelId: 'channel-1',
+        orgSlug: 'iconic-academy',
+        schedulePostJoinSideEffects: scheduler.schedule,
+      });
+
+      expect(result.joinPath).toBe(
+        'https://app.iconicedu.lk/live/live-session-1?passcode=abc123xyz9',
+      );
+
+      await scheduler.flush();
+    } finally {
+      if (previousWebUrl === undefined) {
+        delete process.env.WEB_URL;
+      } else {
+        process.env.WEB_URL = previousWebUrl;
+      }
+    }
   });
 
   it('allows guardians to join when a linked child is a channel member', async () => {
@@ -838,5 +995,26 @@ describe('createOrJoinLiveSession', () => {
     expect(errorSpy).not.toHaveBeenCalled();
 
     errorSpy.mockRestore();
+  });
+});
+
+it('snapshots API-authorized meeting settings when creating a session', async () => {
+  vi.mocked(resolveChannelLiveSessionScope).mockResolvedValue({
+    scopeKey: 'channel:channel-1',
+  });
+  const serviceSupabase = createServiceSupabaseStub();
+  const meetingSettings = {
+    ...DEFAULT_LIVE_SESSION_SETTINGS,
+    recording: { enabled: true, autoStart: true, allowStop: false },
+  };
+  await createOrJoinLiveSession({
+    serviceSupabase: serviceSupabase as never,
+    actor: DEFAULT_ACTOR,
+    channelId: 'channel-1',
+    orgSlug: 'academy',
+    meetingSettings,
+  });
+  expect(serviceSupabase.state.liveSessionRow?.app_metadata).toMatchObject({
+    meetingSettings,
   });
 });

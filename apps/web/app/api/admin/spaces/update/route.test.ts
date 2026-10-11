@@ -6,6 +6,9 @@ import { resolveAppUrl } from '@iconicedu/web/lib/config/app-url';
 const requireAdminAuthContextMock = vi.fn();
 const updateLearningSpaceFromPayloadMock = vi.fn();
 const APP_URL = resolveAppUrl();
+vi.mock('@iconicedu/web/lib/admin/save-classroom-meeting-settings', () => ({
+  saveClassroomMeetingSettings: vi.fn(),
+}));
 
 vi.mock('@iconicedu/web/lib/admin/_auth-context', () => ({
   requireAdminAuthContext: (...args: unknown[]) => requireAdminAuthContextMock(...args),
@@ -87,5 +90,32 @@ describe('POST /api/admin/spaces/update', () => {
       orgId: 'org-1',
       actorProfileId: 'profile-actor-1',
     });
+  });
+});
+
+it('persists selected meeting options through the API adapter when editing', async () => {
+  requireAdminAuthContextMock.mockResolvedValue({ orgId: 'org', profileId: 'manager' });
+  const { saveClassroomMeetingSettings } =
+    await import('@iconicedu/web/lib/admin/save-classroom-meeting-settings');
+  const response = await POST(
+    new Request(`${APP_URL}/api/admin/spaces/update`, {
+      method: 'POST',
+      body: JSON.stringify({
+        learningSpaceId: 'class',
+        payload: {
+          basics: { title: 'Test', kind: 'small_group', iconKey: 'book' },
+          participants: [{ profileId: 'participant' }],
+          liveSession: {
+            enabled: true,
+            provider: 'zoom',
+            settings: { recording: { autoStart: true } },
+          },
+        },
+      }),
+    }),
+  );
+  expect(response.status).toBe(200);
+  expect(saveClassroomMeetingSettings).toHaveBeenCalledWith('class', {
+    recording: { autoStart: true },
   });
 });

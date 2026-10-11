@@ -1,4 +1,6 @@
 export const platformFeatureFlagKeys = {
+  enableClassroomWhiteboard: 'classroom-whiteboard',
+  enableClassroomMeetingSettings: 'classroom-meeting-settings',
   enableMobileDirectMessageStart: 'enable-mobile-direct-message-start',
   enableMobileOnboardingAddressSearch: 'enable-mobile-onboarding-address-search',
   enableMobileGoogleSignIn: 'enable-mobile-google-sign-in',

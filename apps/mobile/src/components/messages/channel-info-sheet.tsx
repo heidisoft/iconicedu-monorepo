@@ -1340,10 +1340,12 @@ export function ChannelInfoSheet({
         // handler (creates/reuses the live session and records attendance)
         // over the static channel-level link, used only as a fallback.
         let joinHref: string | null = null;
+        let providerHint: string | null = null;
         if (liveSessionEnabled && channelId) {
           try {
             const result = await joinLiveSession.mutateAsync(channelId);
             joinHref = result.joinPath;
+            providerHint = result.provider;
           } catch {
             joinHref = null;
           }
@@ -1354,7 +1356,7 @@ export function ChannelInfoSheet({
         if (isExternalJoinHref(joinHref)) {
           setExternalJoinTarget({
             joinHref,
-            providerLabel: resolveExternalJoinProviderLabel(joinHref),
+            providerLabel: resolveExternalJoinProviderLabel(joinHref, providerHint),
           });
           return;
         }

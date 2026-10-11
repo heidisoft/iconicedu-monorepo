@@ -6,7 +6,10 @@ import { ArrowLeft } from 'lucide-react';
 import { Button } from '@iconicedu/ui-web';
 
 import { LiveSessionAttendanceDetail } from '@iconicedu/web/app/(app)/[orgSlug]/admin/attendance/sessions/[sessionId]/live-session-attendance-detail';
-import { getAdminLiveSessionAttendanceDetail } from '@iconicedu/web/lib/admin/live-session-attendance';
+import {
+  getAdminLiveSessionAttendanceDetail,
+  getAdminLiveSessionQualityEvents,
+} from '@iconicedu/web/lib/admin/live-session-attendance';
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { AdminPageShell } from '@iconicedu/web/components/admin/admin-page-layout';
@@ -33,6 +36,7 @@ export default async function AdminLiveSessionAttendanceDetailPage({
   if (!detail) {
     notFound();
   }
+  const qualityEvents = await getAdminLiveSessionQualityEvents(org.id, sessionId);
 
   return (
     <AdminPageShell title="Session attendance detail">
@@ -56,7 +60,7 @@ export default async function AdminLiveSessionAttendanceDetailPage({
           </p>
         </div>
       </div>
-      <LiveSessionAttendanceDetail detail={detail} />
+      <LiveSessionAttendanceDetail detail={detail} qualityEvents={qualityEvents} />
     </AdminPageShell>
   );
 }

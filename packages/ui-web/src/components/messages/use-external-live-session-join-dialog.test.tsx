@@ -61,6 +61,22 @@ describe('useExternalLiveSessionJoinDialog', () => {
     });
   });
 
+  it('labels an own-domain join link using the provider hint, not the hostname', () => {
+    const { result } = renderHook(() => useExternalLiveSessionJoinDialog());
+
+    act(() => {
+      result.current.handleResolvedJoinHref(
+        'https://app.iconicedu.lk/live/session-1',
+        'zoom',
+      );
+    });
+
+    expect(result.current.externalJoinTarget).toEqual({
+      joinHref: 'https://app.iconicedu.lk/live/session-1',
+      providerLabel: 'Zoom',
+    });
+  });
+
   it('copies the external join link from the dialog', async () => {
     const user = userEvent.setup();
 
