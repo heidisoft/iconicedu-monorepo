@@ -1,12 +1,14 @@
 // Webpack watches this directory in development and discovers files at build
 // time in production. Only filenames enter the client bundle; images remain
 // served from public, without importing their bytes into the settings UI.
+// A lazy context retains directory dependencies for hot reload. A weak context
+// can leave an already-open settings gallery with an outdated file list.
 declare const require: {
   context: (
     directory: string,
     recursive: boolean,
     pattern: RegExp,
-    mode: 'weak',
+    mode: 'lazy',
   ) => { keys(): string[] };
 };
 function discoverFiles(): string[] {
@@ -16,7 +18,7 @@ function discoverFiles(): string[] {
         '../../public/live-session-backgrounds',
         false,
         /\.(?:png|jpe?g|webp|avif|svg)$/i,
-        'weak',
+        'lazy',
       )
       .keys();
   } catch {
