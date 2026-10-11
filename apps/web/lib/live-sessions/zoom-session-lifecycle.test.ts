@@ -89,6 +89,7 @@ describe('Zoom session lifecycle', () => {
 
     expect(client.init).toHaveBeenCalledWith('en-US', 'Global', {
       patchJsMedia: true,
+      enforceVirtualBackground: true,
       stayAwake: true,
       leaveOnPageUnload: true,
     });

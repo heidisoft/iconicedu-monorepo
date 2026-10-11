@@ -3,29 +3,49 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { usePreviewVideoEffects } from './use-preview-video-effects';
 
 const native = vi.hoisted(() => ({
+  init: vi.fn(),
+  supported: vi.fn(),
   start: vi.fn(),
   stop: vi.fn(),
   updateVirtualBackground: vi.fn(),
   switchCamera: vi.fn(),
 }));
-vi.mock('@zoom/videosdk', () => ({ default: { createLocalVideoTrack: () => native } }));
+vi.mock('@zoom/videosdk', () => ({
+  default: {
+    createLocalVideoTrack: () => native,
+    createClient: () => ({
+      init: native.init,
+      getMediaStream: () => ({ isSupportVirtualBackground: native.supported }),
+    }),
+  },
+}));
 
 describe('native preview backgrounds', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    native.init.mockResolvedValue(undefined);
+    native.supported.mockReturnValue(true);
     native.start.mockResolvedValue(undefined);
     native.stop.mockResolvedValue(undefined);
   });
 
   it('uses SDK segmentation and releases the camera before joining', async () => {
-    const canvas = document.createElement('canvas');
+    const surface = document.createElement('div');
     const { result, unmount } = renderHook(() =>
-      usePreviewVideoEffects({ current: canvas }),
+      usePreviewVideoEffects({ current: surface }),
     );
     await act(async () => {
       await result.current.start('camera-one', 'blur');
     });
-    expect(native.start).toHaveBeenCalledWith(canvas, {
+    expect(native.init).toHaveBeenCalledWith('en-US', 'Global', {
+      patchJsMedia: true,
+      enforceVirtualBackground: true,
+    });
+    expect(native.init.mock.invocationCallOrder[0]).toBeLessThan(
+      native.start.mock.invocationCallOrder[0],
+    );
+    expect(surface.querySelector('video-player-container > video-player')).toBeTruthy();
+    expect(native.start).toHaveBeenCalledWith(surface.querySelector('video-player'), {
       imageUrl: 'blur',
       cropped: true,
     });
@@ -50,13 +70,47 @@ describe('native preview backgrounds', () => {
     const error = new Error('Background unavailable');
     native.start.mockResolvedValue(error);
     const { result } = renderHook(() =>
-      usePreviewVideoEffects({ current: document.createElement('canvas') }),
+      usePreviewVideoEffects({ current: document.createElement('div') }),
     );
     await act(async () => {
       await expect(result.current.start(undefined, 'blur')).rejects.toThrow(error);
     });
     expect(native.stop).toHaveBeenCalledOnce();
     expect(result.current.active).toBe(false);
+  });
+
+  it('does not report success when Zoom returns a structured media failure', async () => {
+    const failure = {
+      type: 'INVALID_OPERATION',
+      reason: 'Virtual background is not supported on the current platform',
+    };
+    native.start.mockResolvedValue(failure);
+    const { result } = renderHook(() =>
+      usePreviewVideoEffects({ current: document.createElement('div') }),
+    );
+    await act(async () => {
+      await expect(result.current.start(undefined, 'blur')).rejects.toEqual(failure);
+    });
+    expect(result.current.active).toBe(false);
+    expect(native.stop).toHaveBeenCalledOnce();
+  });
+
+  it('retries initialization after failure without capturing the camera early', async () => {
+    native.init.mockRejectedValueOnce(new Error('Assets unavailable'));
+    const { result } = renderHook(() =>
+      usePreviewVideoEffects({ current: document.createElement('div') }),
+    );
+    await act(async () => {
+      await expect(result.current.start(undefined, 'blur')).rejects.toThrow(
+        'Assets unavailable',
+      );
+    });
+    expect(native.start).not.toHaveBeenCalled();
+    await act(async () => {
+      await result.current.start(undefined, 'blur');
+    });
+    expect(native.init).toHaveBeenCalledTimes(2);
+    expect(result.current.active).toBe(true);
   });
 
   it('releases a pending capture when the preview unmounts', async () => {
@@ -68,7 +122,7 @@ describe('native preview backgrounds', () => {
         }),
     );
     const { result, unmount } = renderHook(() =>
-      usePreviewVideoEffects({ current: document.createElement('canvas') }),
+      usePreviewVideoEffects({ current: document.createElement('div') }),
     );
     const pending = result.current.start(undefined, 'blur');
     await waitFor(() => expect(native.start).toHaveBeenCalledOnce());

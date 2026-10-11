@@ -72,11 +72,11 @@ import {
   disposeZoomClient,
   dumpZoomFailure,
   initializeAndJoinZoomSession,
+  isZoomExecutedFailure,
   scheduleZoomClientDisposal,
   type ZoomClient,
 } from '@iconicedu/web/lib/live-sessions/zoom-session-lifecycle';
 import {
-  BACKGROUND_PRESETS,
   MIRROR_VIDEO_STORAGE_KEY,
   REACTION_EMOJIS,
 } from './zoom-video/zoom-video-session.constants';
@@ -419,6 +419,7 @@ export function ZoomVideoSessionEmbed({
   const [supportsScreenShare, setSupportsScreenShare] = useState(true);
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [sessionEndMessage, setSessionEndMessage] = useState<string | null>(null);
+  const [backgroundError, setBackgroundError] = useState<string | null>(null);
   const [backgroundPreset, setBackgroundPreset] = useState<BackgroundPreset>(
     initialMediaSettings?.backgroundPreset ?? 'none',
   );
@@ -1547,26 +1548,30 @@ export function ZoomVideoSessionEmbed({
       .catch(() => null);
   }, []);
 
-  const selectBackgroundPreset = useCallback(async (preset: BackgroundPreset) => {
-    const client = clientRef.current;
-    if (!client) {
-      return;
-    }
-    const stream = client.getMediaStream();
-    const imageUrl =
-      preset === 'none'
-        ? undefined
-        : preset === 'blur'
-          ? 'blur'
-          : BACKGROUND_PRESETS.find((item) => item.value === preset)?.src;
-    const result = await stream
-      .updateVirtualBackgroundImage(imageUrl, true)
-      .catch(() => null);
-    if (result === null || result instanceof Error) {
-      return;
-    }
-    setBackgroundPreset(preset);
-  }, []);
+  const selectBackgroundPreset = useCallback(
+    async (preset: BackgroundPreset) => {
+      const client = clientRef.current;
+      if (!client) return;
+      if (!isVideoOn) {
+        setBackgroundPreset(preset);
+        setBackgroundError(null);
+        return;
+      }
+      try {
+        const result = await client
+          .getMediaStream()
+          .updateVirtualBackgroundImage(backgroundImageUrl(preset), true);
+        if (result instanceof Error || isZoomExecutedFailure(result)) throw result;
+        setBackgroundPreset(preset);
+        setBackgroundError(null);
+      } catch {
+        setBackgroundError(
+          'The background could not be applied. Your previous effect is still selected. Please try again.',
+        );
+      }
+    },
+    [isVideoOn],
+  );
 
   const toggleMirror = useCallback(
     async (enabled?: boolean) => {
@@ -1980,6 +1985,13 @@ export function ZoomVideoSessionEmbed({
               </MeetingControlButton>
 
               <ZoomSettingsPanel
+                feedback={
+                  backgroundError ? (
+                    <p role="alert" className="mt-3 text-xs text-muted-foreground">
+                      {backgroundError}
+                    </p>
+                  ) : undefined
+                }
                 pictureInPictureSettings={<MeetingPipSettings pip={pip} />}
                 open={isSettingsOpen}
                 hideTrigger

@@ -110,6 +110,7 @@ async function joinZoomSession(client: ZoomClient, input: ZoomJoinInput) {
 
   const initResult = await client.init('en-US', 'Global', {
     patchJsMedia: true,
+    enforceVirtualBackground: true,
     stayAwake: true,
     leaveOnPageUnload: true,
   });

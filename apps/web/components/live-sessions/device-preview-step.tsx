@@ -80,8 +80,8 @@ export function DevicePreviewStep({
   const [muted, setMuted] = useState(false);
   const [videoOff, setVideoOff] = useState(false);
 
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const nativePreview = usePreviewVideoEffects(canvasRef);
+  const effectSurfaceRef = useRef<HTMLDivElement>(null);
+  const nativePreview = usePreviewVideoEffects(effectSurfaceRef);
   const [mediaSettings, setMediaSettings] = useState<MeetingMediaPreferences>(() => {
     let mirrored = true;
     try {
@@ -325,8 +325,9 @@ export function DevicePreviewStep({
       if (mounted.current) {
         setMediaSettings((previous) => ({ ...previous, backgroundPreset: preset }));
         setMediaSettingsChanged(true);
+        setPermissionError(null);
       }
-    } catch {
+    } catch (error) {
       if (mounted.current) {
         await nativePreview.stop();
         const restored = await acquireDevice('video', cameraId);
@@ -334,7 +335,15 @@ export function DevicePreviewStep({
         setMediaSettingsChanged(true);
         if (!restored) setVideoOff(true);
         setPermissionError(
-          'This background could not be applied. Try another background or use None.',
+          (error instanceof Error && error.message.includes('not supported')) ||
+            (typeof error === 'object' &&
+              error !== null &&
+              'reason' in error &&
+              String(error.reason).includes('not supported'))
+            ? 'Background blur is not supported in this browser. Your camera is available without blur.'
+            : restored
+              ? 'Background blur could not start. Your camera has been restored without blur. Please try again.'
+              : 'Your camera could not restart. Check camera permissions and turn your camera on to try again.',
         );
       }
     } finally {
@@ -391,14 +400,12 @@ export function DevicePreviewStep({
             (videoOff || nativePreview.active) && 'hidden',
           )}
         />
-        <canvas
-          ref={canvasRef}
-          width={640}
-          height={360}
+        <div
+          ref={effectSurfaceRef}
           className={cn(
             'absolute inset-0 h-full w-full object-cover',
             mediaSettings.mirrored && '-scale-x-100',
-            (!nativePreview.active || videoOff) && 'hidden',
+            (!nativePreview.active || videoOff) && 'pointer-events-none opacity-0',
           )}
         />
         {!isLoading && videoOff ? (
@@ -597,7 +604,7 @@ export function DevicePreviewStep({
           />
         </Suspense>
       )}
-      {permissionError && (
+      {permissionError && !settingsOpen && (
         <p role="status" className="text-center text-xs text-muted-foreground">
           {permissionError}
         </p>
