@@ -1,4 +1,5 @@
 'use client';
+import { backgroundImageUrl } from './meeting-media-preferences';
 import { SpeakingAudioIcon } from '@iconicedu/ui-web/ui/speaking-audio-icon';
 import { RecordingContentError } from './zoom-video/meeting-share-compositor';
 import { useRecordingShareCompositor } from './zoom-video/use-recording-share-compositor';
@@ -191,12 +192,15 @@ const ScreenAnnotationOverlay = dynamic(
 );
 
 export function ZoomVideoSessionEmbed({
+  initialMediaSettings,
   sessionName,
   sessionTitle,
   token,
   displayName,
   initialMuted,
   initialVideoOff,
+  initialCameraId,
+  initialMicrophoneId,
   onLeave,
   liveSessionId,
   accessToken,
@@ -211,8 +215,11 @@ export function ZoomVideoSessionEmbed({
   sessionTitle?: string;
   token: string;
   displayName: string;
+  initialMediaSettings?: import('./meeting-media-preferences').MeetingMediaPreferences;
   initialMuted?: boolean;
   initialVideoOff?: boolean;
+  initialCameraId?: string;
+  initialMicrophoneId?: string;
   onLeave?: () => void;
   // The channel_live_sessions DB row id — distinct from `sessionName` (the
   // Zoom provider's own session/tpc identifier) — used only for the
@@ -252,6 +259,7 @@ export function ZoomVideoSessionEmbed({
   const isLeavingRef = useRef(false);
   const isHandRaisedRef = useRef(false);
 
+  const preferredCameraRef = useRef(initialCameraId);
   const [status, setStatus] = useState<'connecting' | 'connected' | 'error'>(
     'connecting',
   );
@@ -411,8 +419,11 @@ export function ZoomVideoSessionEmbed({
   const [supportsScreenShare, setSupportsScreenShare] = useState(true);
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [sessionEndMessage, setSessionEndMessage] = useState<string | null>(null);
-  const [backgroundPreset, setBackgroundPreset] = useState<BackgroundPreset>('none');
+  const [backgroundPreset, setBackgroundPreset] = useState<BackgroundPreset>(
+    initialMediaSettings?.backgroundPreset ?? 'none',
+  );
   const [isMirrored, setIsMirrored] = useState(() => {
+    if (initialMediaSettings) return initialMediaSettings.mirrored;
     try {
       return localStorage.getItem(MIRROR_VIDEO_STORAGE_KEY) !== 'false';
     } catch {
@@ -421,15 +432,20 @@ export function ZoomVideoSessionEmbed({
   });
   const isMirroredRef = useRef(isMirrored);
   const [supportsNoiseSuppression, setSupportsNoiseSuppression] = useState(false);
-  const [audioProcessing, setAudioProcessing] =
-    useState<AudioProcessingMode>('noiseSuppression');
+  const [audioProcessing, setAudioProcessing] = useState<AudioProcessingMode>(
+    initialMediaSettings?.audioProcessing ?? 'noiseSuppression',
+  );
   // Matches Zoom's own default (the regular client's Share Screen Settings
   // defaults to "Multiple participants can share simultaneously").
   const [sharePrivilege, setSharePrivilege] = useState<SharePrivilege>(
     SharePrivilege.MultipleShare,
   );
-  const [hwAccelEncode, setHwAccelEncode] = useState(true);
-  const [hwAccelDecode, setHwAccelDecode] = useState(true);
+  const [hwAccelEncode, setHwAccelEncode] = useState(
+    initialMediaSettings?.hardwareAcceleration.encode ?? true,
+  );
+  const [hwAccelDecode, setHwAccelDecode] = useState(
+    initialMediaSettings?.hardwareAcceleration.decode ?? true,
+  );
   const whiteboard = useMeetingWhiteboard(
     status === 'connected' && !showFeedbackPrompt ? clientRef.current : null,
     settings.whiteboard.enabled,
@@ -690,6 +706,7 @@ export function ZoomVideoSessionEmbed({
 
   useEffect(() => {
     let cancelled = false;
+    preferredCameraRef.current = initialCameraId;
     const client = acquireZoomClient();
     clientRef.current = client;
 
@@ -708,7 +725,12 @@ export function ZoomVideoSessionEmbed({
       // why the Select was showing its placeholder instead of a selection.
       // Falling back to the first listed device for either case is the same
       // thing the browser/SDK would actually be using as "default" anyway.
-      const activeCamera = stream.getActiveCamera();
+      const activeCamera = preferredCameraRef.current ?? stream.getActiveCamera();
+      if (
+        preferredCameraRef.current &&
+        !cameras.some((device) => device.deviceId === preferredCameraRef.current)
+      )
+        preferredCameraRef.current = undefined;
       setActiveCameraId(
         cameras.some((device) => device.deviceId === activeCamera)
           ? activeCamera
@@ -1139,12 +1161,28 @@ export function ZoomVideoSessionEmbed({
         refreshDeviceLists();
         setSupportsVirtualBackground(stream.isSupportVirtualBackground());
         setSharePrivilege(stream.getSharePrivilege());
+        if (initialMediaSettings)
+          await stream
+            .enableHardwareAcceleration(initialMediaSettings.hardwareAcceleration)
+            .catch(() => false);
         const noiseSuppressionSupported = stream.isSupportBackgroundNoiseSuppression();
         setSupportsNoiseSuppression(noiseSuppressionSupported);
 
-        await stream.startAudio().catch(() => null);
+        await stream
+          .startAudio({
+            mute: initialMuted ?? false,
+            ...(initialMediaSettings?.speakerId
+              ? { speakerId: initialMediaSettings.speakerId }
+              : {}),
+            originalSound: initialMediaSettings?.audioProcessing === 'original',
+            ...(initialMicrophoneId ? { microphoneId: initialMicrophoneId } : {}),
+          })
+          .catch(() => null);
         refreshDeviceLists();
-        if (noiseSuppressionSupported) {
+        if (initialMediaSettings?.audioProcessing === 'original') {
+          await stream.enableBackgroundNoiseSuppression(false).catch(() => null);
+          await stream.enableOriginalSound(true).catch(() => null);
+        } else if (noiseSuppressionSupported) {
           // Matches Zoom's own default (Background Noise Suppression is
           // pre-selected over Original Sound in the regular Zoom client).
           await stream.enableBackgroundNoiseSuppression(true).catch(() => null);
@@ -1158,7 +1196,20 @@ export function ZoomVideoSessionEmbed({
           setIsVideoOn(false);
         } else {
           try {
-            await stream.startVideo();
+            await stream.startVideo({
+              ...(preferredCameraRef.current
+                ? { cameraId: preferredCameraRef.current }
+                : {}),
+              ...(initialMediaSettings && stream.isSupportVirtualBackground()
+                ? {
+                    virtualBackground: {
+                      imageUrl: backgroundImageUrl(initialMediaSettings.backgroundPreset),
+                      cropped: true,
+                    },
+                  }
+                : {}),
+              mirrored: isMirroredRef.current,
+            });
             setIsVideoOn(true);
             refreshDeviceLists();
             // Don't rely solely on 'peer-video-state-change' for the initial
@@ -1221,6 +1272,9 @@ export function ZoomVideoSessionEmbed({
     displayName,
     initialMuted,
     initialVideoOff,
+    initialCameraId,
+    initialMicrophoneId,
+    initialMediaSettings,
     updateRemoteParticipants,
     showParticipantReaction,
     liveSessionId,
@@ -1261,7 +1315,18 @@ export function ZoomVideoSessionEmbed({
       }
     } else {
       try {
-        await stream.startVideo();
+        await stream.startVideo({
+          ...(preferredCameraRef.current ? { cameraId: preferredCameraRef.current } : {}),
+          ...(stream.isSupportVirtualBackground()
+            ? {
+                virtualBackground: {
+                  imageUrl: backgroundImageUrl(backgroundPreset),
+                  cropped: true,
+                },
+              }
+            : {}),
+          mirrored: isMirroredRef.current,
+        });
         if (container) {
           await attachCameraTile(client, selfId, container);
         }
@@ -1272,7 +1337,7 @@ export function ZoomVideoSessionEmbed({
     }
     // If 'peer-video-state-change' also fires for self, the handler above
     // repeats this same attach/detach — harmless, since both are idempotent.
-  }, [isVideoOn]);
+  }, [isVideoOn, backgroundPreset]);
 
   const prepareShareForRecording = recordingComposition.prepare;
   const toggleScreenShare = useCallback(async () => {
@@ -1458,6 +1523,7 @@ export function ZoomVideoSessionEmbed({
   const enterPip = () => pip.open();
 
   const selectCamera = useCallback((deviceId: string) => {
+    preferredCameraRef.current = deviceId;
     setActiveCameraId(deviceId);
     void clientRef.current
       ?.getMediaStream()

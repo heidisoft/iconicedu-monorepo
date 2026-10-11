@@ -10,6 +10,15 @@ test.describe('live session setup and leave navigation', () => {
         configurable: true,
         value: {
           getUserMedia: () => Promise.reject(new Error('Preview denied for test')),
+          enumerateDevices: () =>
+            Promise.resolve([
+              { kind: 'audioinput', deviceId: 'mic-one', label: 'Built-in mic' },
+              { kind: 'audiooutput', deviceId: 'speaker-one', label: 'Built-in speaker' },
+              { kind: 'audiooutput', deviceId: 'speaker-two', label: 'Headphones' },
+              { kind: 'audioinput', deviceId: 'mic-two', label: 'USB mic' },
+              { kind: 'videoinput', deviceId: 'camera-one', label: 'Built-in camera' },
+              { kind: 'videoinput', deviceId: 'camera-two', label: 'USB camera' },
+            ]),
         },
       });
     });
@@ -18,7 +27,9 @@ test.describe('live session setup and leave navigation', () => {
         json: {
           token: 'synthetic-participant-token',
           sessionName: 'fixture-class',
-          displayName: route.request().postDataJSON().displayName,
+          displayName:
+            route.request().postDataJSON().displayNameOverride ??
+            route.request().postDataJSON().displayName,
           studentProfileId: route.request().postDataJSON().studentProfileId,
           expiresAt: null,
         },
@@ -45,6 +56,94 @@ test.describe('live session setup and leave navigation', () => {
     await page.reload();
     await expect(page.getByRole('heading', { name: 'Meeting as Ben' })).toBeVisible();
     expect(requests).toBe(1);
+  });
+
+  test('preview controls and editable name stay on the video tile', async ({ page }) => {
+    await page.goto(`${fixture}?actor=parent&passcode=demo`);
+    await page.getByRole('radio', { name: 'Alice' }).check();
+    const tile = page.getByRole('group', { name: 'Your video preview' });
+    await expect(tile.getByRole('button', { name: 'Turn microphone on' })).toBeVisible();
+    await expect(tile.getByRole('button', { name: 'Turn camera on' })).toBeVisible();
+    const nameBox = await tile
+      .getByRole('button', { name: 'Change display name, currently Alice' })
+      .boundingBox();
+    const micBox = await tile
+      .getByRole('button', { name: 'Turn microphone on' })
+      .boundingBox();
+    const cameraBox = await tile
+      .getByRole('button', { name: 'Turn camera on' })
+      .boundingBox();
+    const settingsBox = await tile
+      .getByRole('button', { name: 'Settings' })
+      .boundingBox();
+    expect(settingsBox!.width).toBe(32);
+    expect(settingsBox!.height).toBe(cameraBox!.height);
+    expect(settingsBox!.y).toBeCloseTo(cameraBox!.y, 0);
+    expect(settingsBox!.x - (cameraBox!.x + cameraBox!.width)).toBeCloseTo(6, 0);
+    expect(nameBox).not.toBeNull();
+    expect(micBox).not.toBeNull();
+    expect(cameraBox).not.toBeNull();
+    expect(micBox!.x - (nameBox!.x + nameBox!.width)).toBeCloseTo(6, 0);
+    expect(cameraBox!.x - (micBox!.x + micBox!.width)).toBeCloseTo(6, 0);
+    expect(micBox!.y).toBeCloseTo(nameBox!.y, 0);
+    expect(cameraBox!.y).toBeCloseTo(nameBox!.y, 0);
+    await tile
+      .getByRole('button', { name: 'Change display name, currently Alice' })
+      .click();
+    await tile.getByRole('textbox', { name: 'Display name' }).fill('Alice S.');
+    await tile.getByRole('button', { name: 'Save name' }).click();
+    await page.getByRole('button', { name: 'Join session', exact: true }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Meeting as Alice S.' }),
+    ).toBeVisible();
+  });
+
+  test('personal call settings are available before joining and survive reconnect', async ({
+    page,
+  }) => {
+    await page.goto(`${fixture}?actor=member&passcode=demo`);
+    await page.getByRole('button', { name: 'Settings' }).click();
+    await page.getByRole('combobox', { name: 'Speaker' }).click();
+    await page.getByRole('option', { name: 'Headphones' }).click();
+    await page.getByRole('radio', { name: 'Original sound', exact: true }).check();
+    await page.getByRole('tab', { name: 'Video', exact: true }).click();
+    await page.getByRole('button', { name: 'Blur', exact: true }).click();
+    await page.getByRole('switch', { name: 'Mirror my video' }).uncheck();
+    await page.getByRole('tab', { name: 'Advanced', exact: true }).click();
+    await page.getByRole('switch', { name: 'Sending', exact: true }).uncheck();
+    await expect(
+      page.getByRole('region', { name: 'Picture-in-picture preferences' }),
+    ).toBeVisible();
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: 'Join session', exact: true }).click();
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const preferences = page.getByText('Media preferences:', { exact: false });
+      await expect(preferences).toContainText('"backgroundPreset":"blur"');
+      await expect(preferences).toContainText('"audioProcessing":"original"');
+      await expect(preferences).toContainText('"mirrored":false');
+      await expect(preferences).toContainText('"encode":false');
+      await expect(preferences).toContainText('"speakerId":"speaker-two"');
+      if (attempt === 0) await page.reload();
+    }
+  });
+
+  test('selected preview microphone and camera carry into the meeting and refresh recovery', async ({
+    page,
+  }) => {
+    await page.goto(`${fixture}?actor=member&passcode=demo`);
+    await page.getByRole('button', { name: 'Settings' }).click();
+    await page.getByRole('combobox', { name: 'Microphone' }).click();
+    await page.getByRole('option', { name: 'USB mic' }).click();
+    await page.getByRole('tab', { name: 'Video', exact: true }).click();
+    await page.getByRole('combobox', { name: 'Camera', exact: true }).click();
+    await page.getByRole('option', { name: 'USB camera' }).click();
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: 'Join session', exact: true }).click();
+    await expect(page.getByText('Microphone device: mic-two')).toBeVisible();
+    await expect(page.getByText('Camera device: camera-two')).toBeVisible();
+    await page.reload();
+    await expect(page.getByText('Microphone device: mic-two')).toBeVisible();
+    await expect(page.getByText('Camera device: camera-two')).toBeVisible();
   });
 
   test('a signed-in participant skips the name prompt and joins through device preview', async ({
@@ -267,6 +366,15 @@ for (const actor of ['host', 'member', 'guest']) {
         configurable: true,
         value: {
           getUserMedia: () => Promise.reject(new Error('Preview denied for test')),
+          enumerateDevices: () =>
+            Promise.resolve([
+              { kind: 'audioinput', deviceId: 'mic-one', label: 'Built-in mic' },
+              { kind: 'audiooutput', deviceId: 'speaker-one', label: 'Built-in speaker' },
+              { kind: 'audiooutput', deviceId: 'speaker-two', label: 'Headphones' },
+              { kind: 'audioinput', deviceId: 'mic-two', label: 'USB mic' },
+              { kind: 'videoinput', deviceId: 'camera-one', label: 'Built-in camera' },
+              { kind: 'videoinput', deviceId: 'camera-two', label: 'USB camera' },
+            ]),
         },
       });
     });

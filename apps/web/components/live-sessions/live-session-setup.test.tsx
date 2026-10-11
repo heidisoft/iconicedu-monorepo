@@ -101,6 +101,9 @@ describe('live session setup', () => {
     await screen.findByText(
       'Camera/microphone access was blocked. You can still join with them off and enable them later.',
     );
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Join session' })).toBeEnabled(),
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Join session' }));
     expect(await screen.findByText('In meeting as Alex')).toBeVisible();
     expect(screen.getByText('Muted')).toBeVisible();
@@ -113,6 +116,9 @@ describe('live session setup', () => {
     const view = setup({ participantName: 'Alex', initialPasscode: 'demo' });
     await screen.findByText(
       'Camera/microphone access was blocked. You can still join with them off and enable them later.',
+    );
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Join session' })).toBeEnabled(),
     );
     fireEvent.click(screen.getByRole('button', { name: 'Join session' }));
     await screen.findByText('In meeting as Alex');
@@ -184,6 +190,9 @@ describe('live session setup', () => {
     await screen.findByText(
       'Camera/microphone access was blocked. You can still join with them off and enable them later.',
     );
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Join session' })).toBeEnabled(),
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Join session' }));
     await screen.findByText('In meeting as Alex');
     first.unmount();
@@ -213,6 +222,9 @@ describe('live session setup', () => {
     await screen.findByText('Alice');
     expect(screen.queryByLabelText('Your name')).not.toBeInTheDocument();
     expect(mocks.guestJoin).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Join session' })).toBeEnabled(),
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Join session' }));
     await screen.findByText('In meeting as Alice');
     expect(mocks.guestJoin).toHaveBeenCalledExactlyOnceWith(
@@ -269,6 +281,9 @@ describe('live session setup', () => {
     fireEvent.change(screen.getByLabelText('Session passcode'), {
       target: { value: 'correct' },
     });
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Join session' })).toBeEnabled(),
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Join session' }));
     await screen.findByText('In meeting as Alice');
     expect(mocks.guestJoin).toHaveBeenLastCalledWith(
@@ -293,6 +308,9 @@ describe('live session setup', () => {
     };
     const first = setup(props);
     await screen.findByText('Check your camera and microphone before joining.');
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Join session' })).toBeEnabled(),
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Join session' }));
     await screen.findByText('In meeting as Alex');
     first.unmount();
@@ -307,5 +325,52 @@ describe('live session setup', () => {
     expect(await screen.findByRole('radio', { name: 'Alice' })).not.toBeChecked();
     expect(screen.queryByText('In meeting as Alex')).not.toBeInTheDocument();
     expect(mocks.guestJoin).not.toHaveBeenCalled();
+  });
+  it('issues fresh credentials for a preview name edit while retaining the selected child', async () => {
+    const user = userEvent.setup();
+    const students = [{ profileId: 'child-one', displayName: 'Alice' }];
+    mocks.guestJoin.mockResolvedValue({
+      ...credentials,
+      displayName: 'Alice S.',
+      studentProfileId: 'child-one',
+    });
+    setup({ students, initialPasscode: 'demo', accessToken: 'parent-auth' });
+    await user.click(
+      await screen.findByRole('button', { name: 'Change display name, currently Alice' }),
+    );
+    const input = screen.getByRole('textbox', { name: 'Display name' });
+    await user.clear(input);
+    await user.type(input, 'Alice S.');
+    await user.click(screen.getByRole('button', { name: 'Save name' }));
+    await user.click(screen.getByRole('button', { name: 'Join session' }));
+    await screen.findByText('In meeting as Alice S.');
+    expect(mocks.guestJoin).toHaveBeenCalledExactlyOnceWith(
+      'test-session',
+      {
+        displayName: 'Alice',
+        displayNameOverride: 'Alice S.',
+        passcode: 'demo',
+        studentProfileId: 'child-one',
+      },
+      'parent-auth',
+    );
+  });
+  it('can edit a verified host name without inventing a session passcode', async () => {
+    const user = userEvent.setup();
+    mocks.guestJoin.mockResolvedValue({ ...credentials, displayName: 'Alex S.' });
+    setup({ initialCredentials: credentials });
+    await user.click(
+      await screen.findByRole('button', { name: 'Change display name, currently Alex' }),
+    );
+    await user.clear(screen.getByRole('textbox', { name: 'Display name' }));
+    await user.type(screen.getByRole('textbox', { name: 'Display name' }), 'Alex S.');
+    await user.click(screen.getByRole('button', { name: 'Save name' }));
+    await user.click(screen.getByRole('button', { name: 'Join session' }));
+    await screen.findByText('In meeting as Alex S.');
+    expect(mocks.guestJoin).toHaveBeenCalledWith(
+      'test-session',
+      { displayName: 'Alex', displayNameOverride: 'Alex S.', passcode: '' },
+      undefined,
+    );
   });
 });

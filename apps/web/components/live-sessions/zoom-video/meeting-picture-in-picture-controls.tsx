@@ -126,7 +126,10 @@ export function MeetingPictureInPictureControls({
 export function MeetingPipSettings({
   pip,
 }: {
-  pip: ReturnType<typeof useMeetingPictureInPicture>;
+  pip: Pick<
+    ReturnType<typeof useMeetingPictureInPicture>,
+    'mode' | 'supported' | 'setAutomaticMode'
+  >;
 }) {
   return (
     <>

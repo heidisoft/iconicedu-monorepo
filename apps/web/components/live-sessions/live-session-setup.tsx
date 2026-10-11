@@ -128,6 +128,8 @@ export function LiveSessionSetup({
         displayName={setup.credentials.displayName}
         sessionTitle={sessionTitle}
         onJoin={setup.join}
+        busy={setup.busy}
+        error={setup.error}
       />
     );
   return (
@@ -145,6 +147,9 @@ export function LiveSessionSetup({
         accessToken={accessToken}
         initialMuted={setup.preferences.muted}
         initialVideoOff={setup.preferences.videoOff}
+        initialMediaSettings={setup.preferences.mediaSettings}
+        initialCameraId={setup.preferences.cameraId}
+        initialMicrophoneId={setup.preferences.microphoneId}
         onLeave={() => {
           setup.leave();
           router.replace(getLiveSessionReturnPath(returnPath));

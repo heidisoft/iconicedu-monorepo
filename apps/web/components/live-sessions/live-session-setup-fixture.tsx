@@ -28,6 +28,9 @@ const FixtureMeeting = ({
   onLeave,
   initialMuted,
   initialVideoOff,
+  initialCameraId,
+  initialMicrophoneId,
+  initialMediaSettings,
 }: LiveSessionMeetingProps) => {
   const feedback = useMeetingFeedback({ liveSessionId, displayName, onLeave });
   if (feedback.hasLeft) return null;
@@ -46,6 +49,11 @@ const FixtureMeeting = ({
       <h1>Meeting as {displayName}</h1>
       <p>{initialMuted ? 'Microphone off' : 'Microphone on'}</p>
       <p>{initialVideoOff ? 'Camera off' : 'Camera on'}</p>
+      {initialCameraId && <p>Camera device: {initialCameraId}</p>}
+      {initialMicrophoneId && <p>Microphone device: {initialMicrophoneId}</p>}
+      {initialMediaSettings && (
+        <p>Media preferences: {JSON.stringify(initialMediaSettings)}</p>
+      )}
       <Button
         onClick={() => {
           feedback.beginFeedback();

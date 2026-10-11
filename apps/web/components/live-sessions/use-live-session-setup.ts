@@ -6,6 +6,10 @@ import type {
   LiveSessionStudentOptionVM,
   LiveSessionJoinRequest,
 } from '@iconicedu/shared-types';
+import {
+  isMeetingMediaPreferences,
+  type MeetingMediaPreferences,
+} from './meeting-media-preferences';
 import { guestJoinLiveSession } from '@iconicedu/web/lib/live-sessions/public-api';
 import {
   clearLiveSessionRecovery,
@@ -13,8 +17,17 @@ import {
   rememberLiveSession,
 } from '@iconicedu/web/lib/live-sessions/browser-session';
 
-export type DevicePreferences = { muted: boolean; videoOff: boolean };
+export type DevicePreferences = {
+  muted: boolean;
+  videoOff: boolean;
+  mediaSettings?: MeetingMediaPreferences;
+  cameraId?: string;
+  microphoneId?: string;
+};
 type StoredJoin = {
+  mediaSettings?: MeetingMediaPreferences;
+  cameraId?: string;
+  microphoneId?: string;
   credentials: LiveSessionJoinCredentialsVM;
   passcode: string | null;
   participantName: string | null;
@@ -35,6 +48,9 @@ function isStoredJoin(value: unknown): value is StoredJoin {
     (credentials.expiresAt === null || typeof credentials.expiresAt === 'string') &&
     (data.passcode === null || typeof data.passcode === 'string') &&
     (data.participantName === null || typeof data.participantName === 'string') &&
+    (data.mediaSettings === undefined || isMeetingMediaPreferences(data.mediaSettings)) &&
+    (data.cameraId === undefined || typeof data.cameraId === 'string') &&
+    (data.microphoneId === undefined || typeof data.microphoneId === 'string') &&
     typeof data.recoveryIdentity === 'string'
   );
 }
@@ -98,7 +114,13 @@ export function useLiveSessionSetup({
         setPasscode(recovery.payload.passcode);
       }
       setStudentProfileId(recovery.payload.credentials.studentProfileId ?? null);
-      setPreferences({ muted: recovery.muted, videoOff: recovery.videoOff });
+      setPreferences({
+        muted: recovery.muted,
+        videoOff: recovery.videoOff,
+        mediaSettings: recovery.payload.mediaSettings,
+        cameraId: recovery.payload.cameraId,
+        microphoneId: recovery.payload.microphoneId,
+      });
     }
     setReady(true);
     return () => {
@@ -115,7 +137,11 @@ export function useLiveSessionSetup({
 
   const requestJoin = useCallback(
     async (input: LiveSessionJoinRequest) => {
-      if (pending.current || !input.displayName.trim() || !input.passcode.trim())
+      if (
+        pending.current ||
+        !input.displayName.trim() ||
+        (!input.passcode.trim() && !initialCredentials)
+      )
         return null;
       pending.current = true;
       const generation = requestGeneration.current;
@@ -133,7 +159,7 @@ export function useLiveSessionSetup({
       setPasscode(input.passcode);
       return result;
     },
-    [sessionId, accessToken],
+    [sessionId, accessToken, initialCredentials],
   );
 
   useEffect(() => {
@@ -151,7 +177,7 @@ export function useLiveSessionSetup({
   }, [ready, credentials, participantName, initialPasscode, requestJoin, students]);
 
   const join = useCallback(
-    async (devices: DevicePreferences) => {
+    async (devices: DevicePreferences & { displayName?: string }) => {
       let joining = credentials;
       if (students !== undefined) {
         const student = students.find((item) => item.profileId === studentProfileId);
@@ -160,6 +186,22 @@ export function useLiveSessionSetup({
           displayName: student.displayName,
           passcode,
           studentProfileId: student.profileId,
+          ...(devices.displayName && devices.displayName !== student.displayName
+            ? { displayNameOverride: devices.displayName }
+            : {}),
+        });
+      }
+      if (
+        students === undefined &&
+        joining &&
+        devices.displayName &&
+        devices.displayName !== joining.displayName
+      ) {
+        joining = await requestJoin({
+          displayName: joining.displayName,
+          displayNameOverride: devices.displayName,
+          // Hosts may have no session passcode; the API independently rechecks host authorization.
+          passcode: passcode ?? '',
         });
       }
       if (!joining) return;
@@ -167,6 +209,9 @@ export function useLiveSessionSetup({
         expiresAt: joining.expiresAt,
         payload: {
           credentials: joining,
+          mediaSettings: devices.mediaSettings,
+          cameraId: devices.cameraId,
+          microphoneId: devices.microphoneId,
           passcode,
           participantName: participantName ?? null,
           recoveryIdentity,

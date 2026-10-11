@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 export type AutomaticPipMode = 'always' | 'tabs' | 'sharing' | 'never';
-const preferenceKey = 'meeting-automatic-pip';
+export const AUTOMATIC_PIP_STORAGE_KEY = 'meeting-automatic-pip';
+const preferenceKey = AUTOMATIC_PIP_STORAGE_KEY;
 interface DocumentPipApi {
   requestWindow(options?: { width?: number; height?: number }): Promise<Window>;
   readonly window?: Window | null;
