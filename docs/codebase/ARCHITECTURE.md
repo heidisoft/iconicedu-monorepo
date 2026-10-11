@@ -61,3 +61,9 @@ Web/Mobile UI (Server Component or screen)
 ## Extended Sections (Optional)
 
 Not populated — the primary flow, layer table, and risks above cover this repo's architecture at the depth needed for onboarding.
+
+### Parent joins for live classes
+
+The live-session API resolves signed-in guardian accounts to active linked children enrolled in the session's class. Public session info returns those student options only to the verified guardian. The web device preview automatically selects a sole eligible student and requires a choice when multiple students are enrolled. Parents with no eligible student cannot join as the account holder.
+
+The join endpoint rechecks the family link and class enrollment before issuing participant credentials with the student's canonical name and profile ID. It also issues whiteboard and annotation capabilities with that name, keeping the meeting and collaboration identity consistent without granting host privileges. Refresh recovery preserves the selected student only for the same authenticated account while that student remains eligible.

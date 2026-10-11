@@ -39,6 +39,8 @@ describe('public live session identity and authorization', () => {
   let invitesEnabled: boolean;
   let isClassMember: boolean;
   let isTeacher: boolean;
+  let guardian: boolean;
+  let enrolledStudents: string[];
   let lookupFilters: Array<{ table: string; filters: Record<string, unknown> }>;
   beforeEach(() => {
     jest.clearAllMocks();
@@ -48,6 +50,8 @@ describe('public live session identity and authorization', () => {
     invitesEnabled = true;
     isClassMember = true;
     isTeacher = false;
+    guardian = false;
+    enrolledStudents = ['child-one', 'child-two'];
     lookupFilters = [];
     jest.mocked(createSupabaseSessionClient).mockReturnValue({
       auth: {
@@ -70,6 +74,26 @@ describe('public live session identity and authorization', () => {
         const filters: Record<string, unknown> = {};
         const query = {
           select: jest.fn().mockReturnThis(),
+          in: jest.fn((key, value) => {
+            filters[key] = value;
+            return query;
+          }),
+          then: (resolve: (value: unknown) => unknown) => {
+            lookupFilters.push({ table, filters: { ...filters } });
+            const data =
+              table === 'family_links'
+                ? [
+                    { child_account_id: 'child-account-one' },
+                    { child_account_id: 'child-account-two' },
+                  ]
+                : table === 'profiles'
+                  ? [
+                      { id: 'child-one', display_name: 'Alice' },
+                      { id: 'child-two', display_name: 'Ben' },
+                    ]
+                  : enrolledStudents.map((profile_id) => ({ profile_id }));
+            return Promise.resolve({ data, error: null }).then(resolve);
+          },
           is: jest.fn().mockReturnThis(),
           eq: jest.fn((key, value) => {
             filters[key] = value;
@@ -111,6 +135,7 @@ describe('public live session identity and authorization', () => {
               else if (hasOrgProfile && filters.org_id === 'session-org')
                 data = {
                   id: 'member-profile',
+                  kind: guardian ? 'guardian' : 'adult',
                   display_name: 'Member Name',
                   first_name: null,
                   last_name: null,
@@ -353,4 +378,133 @@ describe('public live session identity and authorization', () => {
     expect(issueAnnotationAccess).not.toHaveBeenCalled();
     expect(createSupabaseSessionClient).not.toHaveBeenCalled();
   });
+  it('offers only enrolled linked children and automatically names a single student', async () => {
+    guardian = true;
+    enrolledStudents = ['child-two'];
+    const info = await new LiveSessionsService().getPublicLiveSessionInfo(
+      'session-identity',
+      'auth',
+    );
+    expect(info).toMatchObject({
+      isHost: false,
+      participant: {
+        displayName: 'Ben',
+        students: [{ profileId: 'child-two', displayName: 'Ben' }],
+      },
+    });
+    expect(lookupFilters).toContainEqual({
+      table: 'family_links',
+      filters: { org_id: 'session-org', guardian_account_id: 'member-account' },
+    });
+    expect(lookupFilters).toContainEqual({
+      table: 'profiles',
+      filters: {
+        org_id: 'session-org',
+        kind: 'child',
+        account_id: ['child-account-one', 'child-account-two'],
+        'accounts.status': 'active',
+      },
+    });
+    const joined = await new LiveSessionsService().guestJoinLiveSession(
+      'session-identity',
+      'parent-single',
+      { displayName: 'Parent', passcode: 'demo' },
+      'auth',
+    );
+    expect(joined).toMatchObject({
+      displayName: 'Ben',
+      studentProfileId: 'child-two',
+      annotationToken: 'synthetic-annotation-token',
+    });
+    expect(getJoinAccess).toHaveBeenCalledWith(
+      expect.objectContaining({
+        profileId: 'child-two',
+        displayName: 'Ben',
+        isHost: false,
+      }),
+    );
+    expect(issueWhiteboardAccess).toHaveBeenCalledWith(
+      'session-identity',
+      'student',
+      'Ben',
+    );
+    expect(issueAnnotationAccess).toHaveBeenCalledWith('session-identity', 'Ben');
+  });
+  it('requires a choice for siblings and uses the verified name even if parent has host permission', async () => {
+    guardian = true;
+    isTeacher = true;
+    const service = new LiveSessionsService();
+    await expect(
+      service.guestJoinLiveSession(
+        'session-identity',
+        'parent-choice',
+        { displayName: 'Parent', passcode: 'demo' },
+        'auth',
+      ),
+    ).rejects.toThrow('Choose');
+    await service.guestJoinLiveSession(
+      'session-identity',
+      'parent-chosen',
+      { displayName: 'Forged', passcode: 'demo', studentProfileId: 'child-one' },
+      'auth',
+    );
+    expect(getJoinAccess).toHaveBeenCalledWith(
+      expect.objectContaining({
+        profileId: 'child-one',
+        displayName: 'Alice',
+        isHost: false,
+      }),
+    );
+  });
+  it('rejects children outside the eligible enrollment and parents with no enrolled children', async () => {
+    guardian = true;
+    const service = new LiveSessionsService();
+    await expect(
+      service.guestJoinLiveSession(
+        'session-identity',
+        'parent-invalid',
+        { displayName: 'Parent', passcode: 'demo', studentProfileId: 'unrelated-child' },
+        'auth',
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    enrolledStudents = [];
+    await expect(
+      service.guestJoinLiveSession(
+        'session-identity',
+        'parent-none',
+        { displayName: 'Parent', passcode: 'demo' },
+        'auth',
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(getJoinAccess).not.toHaveBeenCalled();
+  });
+  it('checks selected student membership when shared invitations are disabled', async () => {
+    guardian = true;
+    invitesEnabled = false;
+    await new LiveSessionsService().guestJoinLiveSession(
+      'session-identity',
+      'parent-private',
+      { displayName: 'Parent', passcode: 'demo', studentProfileId: 'child-one' },
+      'auth',
+    );
+    expect(lookupFilters).toContainEqual({
+      table: 'channel_members',
+      filters: { org_id: 'session-org', channel_id: 'class', profile_id: 'child-one' },
+    });
+  });
+  it.each(['member-auth', null])(
+    'rejects represented-student requests from non-parent identities (%s)',
+    async (user) => {
+      authUserId = user;
+      await expect(
+        new LiveSessionsService().guestJoinLiveSession(
+          'session-identity',
+          'spoof-child',
+          { displayName: 'Parent', passcode: 'demo', studentProfileId: 'child-one' },
+          'auth',
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(getJoinAccess).not.toHaveBeenCalled();
+    },
+  );
 });

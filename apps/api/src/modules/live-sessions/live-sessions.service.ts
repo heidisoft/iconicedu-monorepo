@@ -364,19 +364,45 @@ export class LiveSessionsService {
     const identity = accessToken
       ? await this.resolveLiveSessionIdentity(accessToken, session.org_id)
       : null;
-    const isHost = await this.isMeetingHost(session.id, identity);
+    const students = await this.guardianStudents(
+      identity,
+      session.org_id,
+      session.channel_id,
+    );
+    const isHost =
+      students === undefined && (await this.isMeetingHost(session.id, identity));
     if (!isHost && !verifyZoomPasscode(storedPasscode, input.passcode)) {
       throw new ForbiddenException('Incorrect passcode');
     }
+    if (input.studentProfileId && students === undefined)
+      throw new ForbiddenException(
+        'Student selection is only available to linked parents',
+      );
+    const student =
+      students === undefined
+        ? undefined
+        : input.studentProfileId
+          ? students.find((item) => item.profileId === input.studentProfileId)
+          : students.length === 1
+            ? students[0]
+            : undefined;
+    if (students !== undefined && !student) {
+      if (input.studentProfileId || !students.length)
+        throw new ForbiddenException(
+          'No linked student enrolled in this class was selected',
+        );
+      throw new BadRequestException('Choose which student is joining');
+    }
+    const joiningProfileId = student?.profileId ?? identity?.profileId;
     if (!settings.invite.enabled && !isHost) {
-      if (!identity?.profileId || !session.channel_id)
+      if (!joiningProfileId || !session.channel_id)
         throw new ForbiddenException('Shared invitations are disabled');
       const membership = await serviceSupabase
         .from('channel_members')
         .select('id')
         .eq('org_id', session.org_id)
         .eq('channel_id', session.channel_id)
-        .eq('profile_id', identity.profileId)
+        .eq('profile_id', joiningProfileId)
         .is('deleted_at', null)
         .maybeSingle();
       if (membership.error)
@@ -384,13 +410,14 @@ export class LiveSessionsService {
       if (!membership.data)
         throw new ForbiddenException('Shared invitations are disabled');
     }
-    const displayName = identity?.displayName ?? input.displayName;
+    const displayName =
+      student?.displayName ?? identity?.displayName ?? input.displayName;
     const provider = getLiveSessionProvider('zoom');
     const joinAccess = await provider.getJoinAccess({
       sessionId: session.id,
       providerSessionId: session.provider_session_id,
       providerMetadata: metadata,
-      profileId: identity?.profileId ?? `guest:${randomUUID()}`,
+      profileId: joiningProfileId ?? `guest:${randomUUID()}`,
       displayName,
       isHost,
     });
@@ -399,7 +426,8 @@ export class LiveSessionsService {
       throw new InternalServerErrorException('Unable to issue session credentials');
 
     return {
-      ...(!identity?.profileId
+      ...(student ? { studentProfileId: student.profileId } : {}),
+      ...(!identity?.profileId || student
         ? { annotationToken: await issueAnnotationAccess(session.id, displayName) }
         : {}),
       ...(settings.whiteboard.enabled
@@ -473,7 +501,13 @@ export class LiveSessionsService {
     const identity = accessToken
       ? await this.resolveLiveSessionIdentity(accessToken, session.org_id)
       : null;
-    const isHost = await this.isMeetingHost(session.id, identity);
+    const students = await this.guardianStudents(
+      identity,
+      session.org_id,
+      session.channel_id,
+    );
+    const isHost =
+      students === undefined && (await this.isMeetingHost(session.id, identity));
     if (!isHost || !identity?.profileId) {
       return {
         exists: true as const,
@@ -481,7 +515,19 @@ export class LiveSessionsService {
         sessionTitle,
         isHost: false as const,
         settings,
-        ...(identity ? { participant: { displayName: identity.displayName } } : {}),
+        ...(identity
+          ? {
+              participant: {
+                displayName:
+                  students === undefined
+                    ? identity.displayName
+                    : students.length === 1
+                      ? students[0].displayName
+                      : 'Student',
+                ...(students !== undefined ? { students } : {}),
+              },
+            }
+          : {}),
       };
     }
     const displayName = identity.displayName;
@@ -546,18 +592,22 @@ export class LiveSessionsService {
       .from('accounts')
       .select('id')
       .eq('auth_user_id', user.id)
+      .eq('org_id', orgId)
+      .eq('status', 'active')
+      .is('deleted_at', null)
       .maybeSingle<{ id: string }>();
     if (account.error)
       throw new InternalServerErrorException('Unable to resolve participant identity');
     const profile = account.data
       ? await service
           .from('profiles')
-          .select('id, display_name, first_name, last_name')
+          .select('id, kind, display_name, first_name, last_name')
           .eq('account_id', account.data.id)
           .eq('org_id', orgId)
           .is('deleted_at', null)
           .maybeSingle<{
             id: string;
+            kind: string;
             display_name: string | null;
             first_name: string | null;
             last_name: string | null;
@@ -574,9 +624,70 @@ export class LiveSessionsService {
       'Participant';
     return {
       authUserId: user.id,
+      accountId: account.data?.id ?? null,
+      kind: row?.kind ?? null,
       profileId: row?.id ?? null,
       displayName: displayName.slice(0, 80),
     };
+  }
+
+  /** Only active linked children enrolled in this exact class can be represented. */
+  private async guardianStudents(
+    identity: Awaited<ReturnType<LiveSessionsService['resolveLiveSessionIdentity']>>,
+    orgId: string,
+    channelId: string | null | undefined,
+  ): Promise<import('@iconicedu/shared-types').LiveSessionStudentOptionVM[] | undefined> {
+    if (identity?.kind !== 'guardian' || !identity.accountId) return undefined;
+    if (!channelId) return [];
+    const db = createSupabaseServiceClient();
+    const links = await db
+      .from('family_links')
+      .select('child_account_id')
+      .eq('org_id', orgId)
+      .eq('guardian_account_id', identity.accountId)
+      .is('deleted_at', null);
+    if (links.error)
+      throw new InternalServerErrorException('Unable to load linked students');
+    const ids = [
+      ...new Set((links.data ?? []).map((link) => link.child_account_id as string)),
+    ];
+    if (!ids.length) return [];
+    const profiles = await db
+      .from('profiles')
+      .select('id, display_name, first_name, last_name, accounts!inner(id)')
+      .eq('org_id', orgId)
+      .eq('kind', 'child')
+      .in('account_id', ids)
+      .is('deleted_at', null)
+      .eq('accounts.status', 'active')
+      .is('accounts.deleted_at', null);
+    if (profiles.error)
+      throw new InternalServerErrorException('Unable to load linked students');
+    if (!profiles.data?.length) return [];
+    const members = await db
+      .from('channel_members')
+      .select('profile_id')
+      .eq('org_id', orgId)
+      .eq('channel_id', channelId)
+      .in(
+        'profile_id',
+        profiles.data.map((profile) => profile.id),
+      )
+      .is('deleted_at', null);
+    if (members.error)
+      throw new InternalServerErrorException('Unable to verify student enrollment');
+    const enrolled = new Set((members.data ?? []).map((member) => member.profile_id));
+    return profiles.data
+      .filter((profile) => enrolled.has(profile.id))
+      .map((profile) => ({
+        profileId: profile.id,
+        displayName: (
+          profile.display_name?.trim() ||
+          [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim() ||
+          'Student'
+        ).slice(0, 80),
+      }))
+      .sort((left, right) => left.displayName.localeCompare(right.displayName));
   }
 
   /** The caller identity is verified with auth.getUser before this authorization RPC. */

@@ -5,6 +5,7 @@ import type { ComponentType, ComponentProps } from 'react';
 import type {
   LiveSessionJoinCredentialsVM,
   LiveSessionSettingsVM,
+  LiveSessionStudentOptionVM,
 } from '@iconicedu/shared-types';
 import { getLiveSessionReturnPath } from '@iconicedu/web/lib/live-sessions/navigation';
 import { DevicePreviewStep } from './device-preview-step';
@@ -28,6 +29,7 @@ export function LiveSessionSetup({
   accessToken,
   identityKey,
   settings,
+  students,
   returnPath = '/',
   MeetingRenderer = ZoomMeetingRenderer,
 }: {
@@ -39,6 +41,7 @@ export function LiveSessionSetup({
   accessToken?: string | null;
   identityKey?: string | null;
   settings?: LiveSessionSettingsVM;
+  students?: LiveSessionStudentOptionVM[];
   returnPath?: string;
   MeetingRenderer?: LiveSessionMeetingRenderer;
 }) {
@@ -50,8 +53,64 @@ export function LiveSessionSetup({
     participantName,
     accessToken,
     identityKey,
+    students,
   });
   if (!setup.ready) return <ZoomSessionLoadingScreen label="Restoring session…" />;
+  if (students !== undefined && !setup.preferences) {
+    const selected = students.find(
+      (student) => student.profileId === setup.studentProfileId,
+    );
+    return (
+      <DevicePreviewStep
+        displayName={selected?.displayName ?? 'Choose a student'}
+        sessionTitle={sessionTitle}
+        onJoin={setup.join}
+        busy={setup.busy}
+        error={setup.error}
+        joinDisabled={!selected || !setup.passcode?.trim()}
+      >
+        {students.length === 0 ? (
+          <p role="alert" className="text-sm text-muted-foreground">
+            None of your linked students are enrolled in this class. Please contact the
+            teacher.
+          </p>
+        ) : students.length > 1 ? (
+          <fieldset className="w-full space-y-2" disabled={setup.busy}>
+            <legend className="mb-2 text-sm font-medium">Who is joining?</legend>
+            {students.map((student) => (
+              <label
+                key={student.profileId}
+                className="flex cursor-pointer items-center gap-3 rounded-xl border border-border p-3 text-sm has-[:checked]:border-primary has-[:checked]:bg-accent"
+              >
+                <input
+                  type="radio"
+                  name="joining-student"
+                  value={student.profileId}
+                  checked={setup.studentProfileId === student.profileId}
+                  onChange={() => setup.setStudentProfileId(student.profileId)}
+                  className="accent-primary"
+                />
+                {student.displayName}
+              </label>
+            ))}
+          </fieldset>
+        ) : null}
+        {(!initialPasscode || setup.error) && (
+          <label className="w-full space-y-2 text-sm font-medium">
+            Session passcode
+            <input
+              type="password"
+              autoComplete="off"
+              value={setup.passcode ?? ''}
+              disabled={setup.busy}
+              onChange={(event) => setup.setPasscode(event.target.value)}
+              className="h-10 w-full rounded-md border border-input bg-background px-3"
+            />
+          </label>
+        )}
+      </DevicePreviewStep>
+    );
+  }
   if (!setup.credentials)
     return (
       <LiveSessionJoinForm

@@ -1,4 +1,7 @@
-import type { LiveSessionJoinCredentialsVM } from '@iconicedu/shared-types';
+import type {
+  LiveSessionJoinCredentialsVM,
+  LiveSessionJoinRequest,
+} from '@iconicedu/shared-types';
 import { ApiHttpError, createPublicApiClient } from '@iconicedu/web/lib/api/http-client';
 
 export type GuestLiveSessionJoinResult = LiveSessionJoinCredentialsVM;
@@ -12,7 +15,7 @@ function describeRequestFailure(error: unknown): GuestLiveSessionJoinError {
 
 export async function guestJoinLiveSession(
   sessionId: string,
-  body: { displayName: string; passcode: string },
+  body: LiveSessionJoinRequest,
   accessToken?: string | null,
 ): Promise<GuestLiveSessionJoinResult | GuestLiveSessionJoinError> {
   try {

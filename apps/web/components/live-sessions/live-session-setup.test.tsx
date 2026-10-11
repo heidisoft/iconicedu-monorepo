@@ -196,4 +196,116 @@ describe('live session setup', () => {
     await screen.findByText('Check your camera and microphone before joining.');
     expect(mocks.guestJoin).toHaveBeenCalledOnce();
   });
+  it('joins a single linked student directly from preview and restores that student on refresh', async () => {
+    const students = [{ profileId: 'child-one', displayName: 'Alice' }];
+    mocks.guestJoin.mockResolvedValue({
+      ...credentials,
+      displayName: 'Alice',
+      studentProfileId: 'child-one',
+    });
+    const props = {
+      participantName: 'Alice',
+      students,
+      initialPasscode: 'demo',
+      identityKey: 'parent-user',
+    };
+    const view = setup(props);
+    await screen.findByText('Alice');
+    expect(screen.queryByLabelText('Your name')).not.toBeInTheDocument();
+    expect(mocks.guestJoin).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Join session' }));
+    await screen.findByText('In meeting as Alice');
+    expect(mocks.guestJoin).toHaveBeenCalledExactlyOnceWith(
+      'test-session',
+      { displayName: 'Alice', passcode: 'demo', studentProfileId: 'child-one' },
+      undefined,
+    );
+    view.unmount();
+    mocks.guestJoin.mockClear();
+    setup(props);
+    await screen.findByText('In meeting as Alice');
+    expect(mocks.guestJoin).not.toHaveBeenCalled();
+  });
+  it('requires an explicit student choice for siblings before issuing credentials', async () => {
+    mocks.guestJoin.mockResolvedValue({
+      ...credentials,
+      displayName: 'Ben',
+      studentProfileId: 'child-two',
+    });
+    setup({
+      participantName: 'Student',
+      initialPasscode: 'demo',
+      students: [
+        { profileId: 'child-one', displayName: 'Alice' },
+        { profileId: 'child-two', displayName: 'Ben' },
+      ],
+    });
+    const join = await screen.findByRole('button', { name: 'Join session' });
+    expect(join).toBeDisabled();
+    expect(mocks.guestJoin).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('radio', { name: 'Ben' }));
+    expect(join).toBeEnabled();
+    fireEvent.click(join);
+    await screen.findByText('In meeting as Ben');
+    expect(mocks.guestJoin).toHaveBeenCalledWith(
+      'test-session',
+      { displayName: 'Ben', passcode: 'demo', studentProfileId: 'child-two' },
+      undefined,
+    );
+  });
+  it('keeps preview open and allows correcting a rejected parent join passcode', async () => {
+    mocks.guestJoin.mockResolvedValueOnce({ status: 403, message: 'Incorrect passcode' });
+    mocks.guestJoin.mockResolvedValueOnce({
+      ...credentials,
+      displayName: 'Alice',
+      studentProfileId: 'child-one',
+    });
+    setup({
+      initialPasscode: 'wrong',
+      students: [{ profileId: 'child-one', displayName: 'Alice' }],
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Join session' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Incorrect passcode');
+    fireEvent.change(screen.getByLabelText('Session passcode'), {
+      target: { value: 'correct' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Join session' }));
+    await screen.findByText('In meeting as Alice');
+    expect(mocks.guestJoin).toHaveBeenLastCalledWith(
+      'test-session',
+      { displayName: 'Alice', passcode: 'correct', studentProfileId: 'child-one' },
+      undefined,
+    );
+  });
+  it('blocks joining when no linked student is enrolled', async () => {
+    setup({ initialPasscode: 'demo', students: [] });
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'None of your linked students',
+    );
+    expect(screen.getByRole('button', { name: 'Join session' })).toBeDisabled();
+    expect(mocks.guestJoin).not.toHaveBeenCalled();
+  });
+  it('does not restore an account-holder identity or an ineligible child for a parent', async () => {
+    const props = {
+      participantName: 'Student',
+      identityKey: 'parent-user',
+      initialPasscode: 'demo',
+    };
+    const first = setup(props);
+    await screen.findByText('Check your camera and microphone before joining.');
+    fireEvent.click(screen.getByRole('button', { name: 'Join session' }));
+    await screen.findByText('In meeting as Alex');
+    first.unmount();
+    mocks.guestJoin.mockClear();
+    setup({
+      ...props,
+      students: [
+        { profileId: 'child-one', displayName: 'Alice' },
+        { profileId: 'child-two', displayName: 'Ben' },
+      ],
+    });
+    expect(await screen.findByRole('radio', { name: 'Alice' })).not.toBeChecked();
+    expect(screen.queryByText('In meeting as Alex')).not.toBeInTheDocument();
+    expect(mocks.guestJoin).not.toHaveBeenCalled();
+  });
 });

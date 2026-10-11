@@ -1,7 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { LiveSessionJoinCredentialsVM } from '@iconicedu/shared-types';
+import type {
+  LiveSessionJoinCredentialsVM,
+  LiveSessionStudentOptionVM,
+  LiveSessionJoinRequest,
+} from '@iconicedu/shared-types';
 import { guestJoinLiveSession } from '@iconicedu/web/lib/live-sessions/public-api';
 import {
   clearLiveSessionRecovery,
@@ -43,6 +47,7 @@ export function useLiveSessionSetup({
   participantName,
   accessToken,
   identityKey,
+  students,
 }: {
   sessionId: string;
   initialCredentials?: LiveSessionJoinCredentialsVM | null;
@@ -50,8 +55,12 @@ export function useLiveSessionSetup({
   participantName?: string | null;
   accessToken?: string | null;
   identityKey?: string | null;
+  students?: LiveSessionStudentOptionVM[];
 }) {
   const recoveryIdentity = `${initialCredentials ? 'host' : 'participant'}:${identityKey ?? 'anonymous'}`;
+  const [studentProfileId, setStudentProfileId] = useState<string | null>(
+    students?.length === 1 ? students[0].profileId : null,
+  );
   const [credentials, setCredentials] = useState(initialCredentials ?? null);
   const [passcode, setPasscode] = useState(initialPasscode ?? null);
   const [preferences, setPreferences] = useState<DevicePreferences | null>(null);
@@ -66,6 +75,7 @@ export function useLiveSessionSetup({
     setCredentials(initialCredentials ?? null);
     setPasscode(initialPasscode ?? null);
     setPreferences(null);
+    setStudentProfileId(students?.length === 1 ? students[0].profileId : null);
     setBusy(false);
     setError(null);
     pending.current = false;
@@ -75,37 +85,53 @@ export function useLiveSessionSetup({
       recovery &&
       isStoredJoin(recovery.payload) &&
       recovery.payload.recoveryIdentity === recoveryIdentity &&
-      recovery.payload.participantName === (participantName ?? null)
+      recovery.payload.participantName === (participantName ?? null) &&
+      (students === undefined ||
+        students.some(
+          (student) =>
+            student.profileId ===
+            (recovery.payload as StoredJoin).credentials.studentProfileId,
+        ))
     ) {
       if (!initialCredentials) {
         setCredentials(recovery.payload.credentials);
         setPasscode(recovery.payload.passcode);
       }
+      setStudentProfileId(recovery.payload.credentials.studentProfileId ?? null);
       setPreferences({ muted: recovery.muted, videoOff: recovery.videoOff });
     }
     setReady(true);
     return () => {
       requestGeneration.current += 1;
     };
-  }, [sessionId, initialCredentials, participantName, initialPasscode, recoveryIdentity]);
+  }, [
+    sessionId,
+    initialCredentials,
+    participantName,
+    initialPasscode,
+    recoveryIdentity,
+    students,
+  ]);
 
   const requestJoin = useCallback(
-    async (input: { displayName: string; passcode: string }) => {
-      if (pending.current || !input.displayName.trim() || !input.passcode.trim()) return;
+    async (input: LiveSessionJoinRequest) => {
+      if (pending.current || !input.displayName.trim() || !input.passcode.trim())
+        return null;
       pending.current = true;
       const generation = requestGeneration.current;
       setBusy(true);
       setError(null);
       const result = await guestJoinLiveSession(sessionId, input, accessToken);
-      if (generation !== requestGeneration.current) return;
+      if (generation !== requestGeneration.current) return null;
       pending.current = false;
       setBusy(false);
       if ('status' in result) {
         setError(result.message);
-        return;
+        return null;
       }
       setCredentials(result);
       setPasscode(input.passcode);
+      return result;
     },
     [sessionId, accessToken],
   );
@@ -113,6 +139,7 @@ export function useLiveSessionSetup({
   useEffect(() => {
     if (
       !ready ||
+      students !== undefined ||
       credentials ||
       !participantName ||
       !initialPasscode ||
@@ -121,15 +148,25 @@ export function useLiveSessionSetup({
       return;
     autoAttempted.current = true;
     void requestJoin({ displayName: participantName, passcode: initialPasscode });
-  }, [ready, credentials, participantName, initialPasscode, requestJoin]);
+  }, [ready, credentials, participantName, initialPasscode, requestJoin, students]);
 
   const join = useCallback(
-    (devices: DevicePreferences) => {
-      if (!credentials) return;
+    async (devices: DevicePreferences) => {
+      let joining = credentials;
+      if (students !== undefined) {
+        const student = students.find((item) => item.profileId === studentProfileId);
+        if (!student || !passcode) return;
+        joining = await requestJoin({
+          displayName: student.displayName,
+          passcode,
+          studentProfileId: student.profileId,
+        });
+      }
+      if (!joining) return;
       rememberLiveSession(sessionId, devices, {
-        expiresAt: credentials.expiresAt,
+        expiresAt: joining.expiresAt,
         payload: {
-          credentials,
+          credentials: joining,
           passcode,
           participantName: participantName ?? null,
           recoveryIdentity,
@@ -137,7 +174,16 @@ export function useLiveSessionSetup({
       });
       setPreferences(devices);
     },
-    [sessionId, credentials, passcode, participantName, recoveryIdentity],
+    [
+      sessionId,
+      credentials,
+      passcode,
+      participantName,
+      recoveryIdentity,
+      students,
+      studentProfileId,
+      requestJoin,
+    ],
   );
 
   const leave = useCallback(() => {
@@ -147,6 +193,9 @@ export function useLiveSessionSetup({
     ready,
     credentials,
     passcode,
+    setPasscode,
+    studentProfileId,
+    setStudentProfileId,
     preferences,
     busy,
     error,

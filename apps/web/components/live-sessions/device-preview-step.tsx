@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Loader2, Mic, MicOff, Video, VideoOff } from 'lucide-react';
 
 import { Button } from '@iconicedu/ui-web/ui/button';
@@ -8,15 +8,23 @@ import { cn, getInitials } from '@iconicedu/ui-web/lib/utils';
 
 // Plain browser getUserMedia, independent of the Zoom Video SDK — lets
 // someone check their camera/mic before the Zoom client ever initializes.
-// This stream is stopped once they click Join; the Zoom SDK requests its own
+// This stream is stopped when preview unmounts after a successful join; the SDK requests its own
 // camera/mic access internally after that.
 export function DevicePreviewStep({
   displayName,
   sessionTitle,
   onJoin,
+  children,
+  joinDisabled = false,
+  busy = false,
+  error,
 }: {
   displayName: string;
   sessionTitle: string;
+  children?: ReactNode;
+  joinDisabled?: boolean;
+  busy?: boolean;
+  error?: string | null;
   onJoin: (preferences: { muted: boolean; videoOff: boolean }) => void;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -76,7 +84,6 @@ export function DevicePreviewStep({
   }, [muted]);
 
   const handleJoin = () => {
-    streamRef.current?.getTracks().forEach((track) => track.stop());
     onJoin({ muted, videoOff });
   };
 
@@ -89,6 +96,10 @@ export function DevicePreviewStep({
         </p>
       </div>
 
+      <p className="text-sm text-muted-foreground">
+        Joining as <strong className="font-medium text-foreground">{displayName}</strong>
+      </p>
+      {children}
       <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-neutral-900">
         {isLoading ? (
           <div className="absolute inset-0 flex items-center justify-center gap-2 text-sm text-neutral-300">
@@ -144,7 +155,18 @@ export function DevicePreviewStep({
         </Button>
       </div>
 
-      <Button type="button" className="w-full" onClick={handleJoin}>
+      {error && (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
+      <Button
+        type="button"
+        className="w-full"
+        onClick={handleJoin}
+        disabled={joinDisabled || busy}
+      >
+        {busy && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
         Join session
       </Button>
     </div>

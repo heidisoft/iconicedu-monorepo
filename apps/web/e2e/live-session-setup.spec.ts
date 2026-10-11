@@ -19,10 +19,32 @@ test.describe('live session setup and leave navigation', () => {
           token: 'synthetic-participant-token',
           sessionName: 'fixture-class',
           displayName: route.request().postDataJSON().displayName,
+          studentProfileId: route.request().postDataJSON().studentProfileId,
           expiresAt: null,
         },
       });
     });
+  });
+
+  test('a parent chooses the enrolled student in preview and reconnects as that student', async ({
+    page,
+  }) => {
+    let requests = 0;
+    page.on('request', (request) => {
+      if (request.url().endsWith('/guest-join')) requests += 1;
+    });
+    await page.goto(`${fixture}?actor=parent&passcode=demo`);
+    await expect(page.getByRole('group', { name: 'Who is joining?' })).toBeVisible();
+    const join = page.getByRole('button', { name: 'Join session', exact: true });
+    await expect(join).toBeDisabled();
+    expect(requests).toBe(0);
+    await page.getByRole('radio', { name: 'Ben' }).check();
+    await expect(join).toBeEnabled();
+    await join.click();
+    await expect(page.getByRole('heading', { name: 'Meeting as Ben' })).toBeVisible();
+    await page.reload();
+    await expect(page.getByRole('heading', { name: 'Meeting as Ben' })).toBeVisible();
+    expect(requests).toBe(1);
   });
 
   test('a signed-in participant skips the name prompt and joins through device preview', async ({

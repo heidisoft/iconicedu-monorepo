@@ -7,6 +7,11 @@ import { LiveSessionSetup, type LiveSessionMeetingProps } from './live-session-s
 import { ZoomFeedbackScreen } from './zoom-video/zoom-feedback-screen';
 import { useMeetingFeedback } from './zoom-video/use-meeting-feedback';
 
+const parentStudents = [
+  { profileId: '11111111-1111-4111-8111-111111111111', displayName: 'Alice' },
+  { profileId: '22222222-2222-4222-8222-222222222222', displayName: 'Ben' },
+];
+
 const hostCredentials = {
   token: 'synthetic-host-token',
   sessionName: 'fixture-class',
@@ -92,6 +97,7 @@ export function LiveSessionSetupFixture({
       participantName={
         actor === 'guest' ? null : actor === 'host' ? 'Test Teacher' : 'Test Student'
       }
+      students={actor === 'parent' ? parentStudents : undefined}
       initialPasscode={passcode}
       returnPath={returnPath}
       identityKey={actor === 'guest' ? null : `fixture-${actor}`}

@@ -1,9 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
+import type { LiveSessionJoinRequest } from '@iconicedu/shared-types';
 
-export type GuestJoinLiveSessionDto = {
-  displayName: string;
-  passcode: string;
-};
+export type GuestJoinLiveSessionDto = LiveSessionJoinRequest;
 
 const MAX_DISPLAY_NAME_LENGTH = 80;
 
@@ -23,7 +21,18 @@ export function parseGuestJoinLiveSessionDto(input: unknown): GuestJoinLiveSessi
     throw new BadRequestException('passcode is required');
   }
 
+  const studentProfileId = body['studentProfileId'];
+  if (
+    studentProfileId !== undefined &&
+    (typeof studentProfileId !== 'string' ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        studentProfileId,
+      ))
+  )
+    throw new BadRequestException('Invalid student profile');
+
   return {
+    ...(typeof studentProfileId === 'string' ? { studentProfileId } : {}),
     displayName: displayName.trim().slice(0, MAX_DISPLAY_NAME_LENGTH),
     passcode: passcode.trim(),
   };

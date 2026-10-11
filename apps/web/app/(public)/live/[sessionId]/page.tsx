@@ -64,6 +64,7 @@ export default async function PublicLiveSessionPage({
         info.isHost || info.participant ? (authSession?.user?.id ?? null) : null
       }
       accessToken={authSession?.access_token ?? null}
+      students={!info.isHost ? info.participant?.students : undefined}
       returnPath={getLiveSessionReturnPath(returnTo)}
     />
   );
