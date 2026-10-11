@@ -10,7 +10,7 @@ export type ChatMessageItem = {
 };
 export type SidePanel = 'chat' | 'users' | null;
 export type AudioProcessingMode = 'original' | 'noiseSuppression';
-export type BackgroundPreset = 'none' | 'blur' | 'classroom' | 'study';
+export type BackgroundPreset = 'none' | 'blur' | `image:${string}`;
 export type NetworkLevel = 'bad' | 'normal' | 'good';
 export type FloatingReaction = {
   id: string;

@@ -19,7 +19,9 @@ export function isMeetingMediaPreferences(
   const data = value as Partial<MeetingMediaPreferences>;
   return (
     (data.speakerId === undefined || typeof data.speakerId === 'string') &&
-    ['none', 'blur', 'classroom', 'study'].includes(data.backgroundPreset ?? '') &&
+    ['none', 'blur', ...BACKGROUND_PRESETS.map((item) => item.value)].includes(
+      data.backgroundPreset ?? '',
+    ) &&
     ['original', 'noiseSuppression'].includes(data.audioProcessing ?? '') &&
     typeof data.mirrored === 'boolean' &&
     typeof data.hardwareAcceleration?.encode === 'boolean' &&

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { readdirSync } from 'node:fs';
 
 const fixture = '/visual-test/live-session-setup';
 
@@ -107,7 +108,7 @@ test.describe('live session setup and leave navigation', () => {
     await page.getByRole('option', { name: 'Headphones' }).click();
     await page.getByRole('radio', { name: 'Original sound', exact: true }).check();
     await page.getByRole('tab', { name: 'Video', exact: true }).click();
-    await page.getByRole('button', { name: 'Blur', exact: true }).click();
+    await page.getByRole('button', { name: 'Blur background', exact: true }).click();
     await page.getByRole('switch', { name: 'Mirror my video' }).uncheck();
     await page.getByRole('tab', { name: 'Advanced', exact: true }).click();
     await page.getByRole('switch', { name: 'Sending', exact: true }).uncheck();
@@ -125,6 +126,40 @@ test.describe('live session setup and leave navigation', () => {
       await expect(preferences).toContainText('"speakerId":"speaker-two"');
       if (attempt === 0) await page.reload();
     }
+  });
+
+  test('discovers photo backgrounds from the public directory and retains the selection', async ({
+    page,
+  }) => {
+    const images = readdirSync('public/live-session-backgrounds')
+      .filter((file) => /\.(png|jpe?g|webp|avif|svg)$/i.test(file))
+      .sort();
+    await page.goto(`${fixture}?actor=host`);
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    await page.getByRole('tab', { name: 'Video', exact: true }).click();
+    const gallery = page.getByLabel('Photo backgrounds');
+    await expect(gallery.getByRole('button')).toHaveCount(images.length);
+    expect(await gallery.evaluate((element) => getComputedStyle(element).overflowY)).toBe(
+      'visible',
+    );
+    await expect(gallery.locator('img').first()).toHaveAttribute(
+      'src',
+      `/live-session-backgrounds/${encodeURIComponent(images[0])}`,
+    );
+    await gallery.getByRole('button').first().click();
+    await expect(gallery.getByRole('button').first()).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: 'Join session', exact: true }).click();
+    await expect(page.getByText('Media preferences:', { exact: false })).toContainText(
+      `image:${images[0]}`,
+    );
+    await page.reload();
+    await expect(page.getByText('Media preferences:', { exact: false })).toContainText(
+      `image:${images[0]}`,
+    );
   });
 
   test('selected preview microphone and camera carry into the meeting and refresh recovery', async ({

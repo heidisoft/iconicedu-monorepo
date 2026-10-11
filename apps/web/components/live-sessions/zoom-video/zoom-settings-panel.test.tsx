@@ -27,7 +27,7 @@ it('shows picture-in-picture preferences only in Advanced', async () => {
       isMirrored={false}
       hardwareAcceleration={{ encode: false, decode: false }}
       supportsNoiseSuppression={false}
-      supportsVirtualBackground={false}
+      supportsVirtualBackground={true}
       isHost={false}
       onOpenChange={noop}
       onSelectCamera={noop}
@@ -49,6 +49,16 @@ it('shows picture-in-picture preferences only in Advanced', async () => {
   expect(screen.queryByLabelText('Open automatically')).not.toBeInTheDocument();
   await userEvent.click(screen.getByRole('tab', { name: 'Video', exact: true }));
   expect(screen.queryByLabelText('Open automatically')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'No effect', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  expect(screen.queryByText('Classroom')).not.toBeInTheDocument();
+  expect(screen.queryByText('Study')).not.toBeInTheDocument();
+  await userEvent.click(
+    screen.getByRole('button', { name: 'Blur background', exact: true }),
+  );
+  expect(noop).toHaveBeenCalledWith('blur');
   await userEvent.click(screen.getByRole('tab', { name: 'Advanced' }));
   expect(screen.getByLabelText('Open automatically')).toBeVisible();
 });

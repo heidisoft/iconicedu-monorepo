@@ -2,19 +2,19 @@
 
 import type { ReactNode } from 'react';
 import { SharePrivilege } from '@zoom/videosdk';
-import { Image as ImageIcon, ImageOff, Settings } from 'lucide-react';
+import { Check, Settings, UserRound } from 'lucide-react';
 import { Label } from '@iconicedu/ui-web/ui/label';
 import { RadioGroup, RadioGroupItem } from '@iconicedu/ui-web/ui/radio-group';
 import { DeviceSelect } from '../media-device-select';
 import { Switch } from '@iconicedu/ui-web/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@iconicedu/ui-web/ui/tabs';
 import { cn } from '@iconicedu/ui-web/lib/utils';
-import { BACKGROUND_PRESETS } from './zoom-video-session.constants';
 import type {
   AudioProcessingMode,
   BackgroundPreset,
   MediaDeviceOption,
 } from './zoom-video-session.types';
+import { BACKGROUND_PRESETS } from '../background-catalog';
 import { MeetingControlButton } from './zoom-meeting-controls';
 import { ZoomMeetingDialog } from './zoom-meeting-dialog';
 
@@ -154,56 +154,98 @@ export function ZoomSettingsPanel(props: Props) {
             {props.supportsVirtualBackground ? (
               <div className="space-y-1.5">
                 <p className="text-xs font-medium text-muted-foreground">Background</p>
+                <p className="text-xs text-muted-foreground">
+                  Keep yourself clear and soften what&apos;s behind you.
+                </p>
                 <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => props.onSelectBackground('none')}
-                    className={cn(
-                      'flex aspect-video cursor-pointer items-center justify-center gap-1.5 rounded-lg border text-xs text-muted-foreground',
-                      props.backgroundPreset === 'none'
-                        ? 'border-primary ring-1 ring-primary'
-                        : 'border-border',
-                    )}
+                  {(
+                    [
+                      ['none', 'No effect', 'Your original background'],
+                      ['blur', 'Blur background', 'Soften your background'],
+                    ] as const
+                  ).map(([value, label, description]) => {
+                    const selected = props.backgroundPreset === value;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        aria-label={label}
+                        aria-pressed={selected}
+                        onClick={() => props.onSelectBackground(value)}
+                        className={cn(
+                          'relative flex min-w-0 flex-col gap-2 rounded-xl border p-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:opacity-60',
+                          selected
+                            ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                            : 'border-border bg-background hover:bg-muted/50',
+                        )}
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="relative flex h-12 w-full items-end justify-center overflow-hidden rounded-lg bg-secondary"
+                        >
+                          <span
+                            className={cn(
+                              'absolute inset-0 flex items-center justify-between px-3',
+                              value === 'blur' && 'blur-sm',
+                            )}
+                          >
+                            <span className="h-8 w-6 rounded-sm border-2 border-foreground/20" />
+                            <span className="h-5 w-7 rounded-sm bg-primary/20" />
+                          </span>
+                          <UserRound className="relative size-9 rounded-t-full bg-background text-foreground/80" />
+                          {selected && (
+                            <span className="absolute right-1 top-1 rounded-full bg-primary p-0.5 text-primary-foreground">
+                              <Check className="size-3" />
+                            </span>
+                          )}
+                        </span>
+                        <span className="text-xs font-medium text-foreground">
+                          {label}
+                        </span>
+                        <span className="text-[11px] leading-tight text-muted-foreground">
+                          {description}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>{' '}
+                {BACKGROUND_PRESETS.length > 0 && (
+                  <div
+                    className="grid grid-cols-2 gap-2 p-1"
+                    aria-label="Photo backgrounds"
                   >
-                    <ImageOff className="size-3.5" />
-                    None
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => props.onSelectBackground('blur')}
-                    className={cn(
-                      'flex aspect-video cursor-pointer items-center justify-center gap-1.5 rounded-lg border text-xs text-muted-foreground',
-                      props.backgroundPreset === 'blur'
-                        ? 'border-primary ring-1 ring-primary'
-                        : 'border-border',
-                    )}
-                  >
-                    <ImageIcon className="size-3.5" />
-                    Blur
-                  </button>
-                  {BACKGROUND_PRESETS.map((preset) => (
-                    <button
-                      key={preset.value}
-                      type="button"
-                      onClick={() => props.onSelectBackground(preset.value)}
-                      className={cn(
-                        'relative aspect-video cursor-pointer overflow-hidden rounded-lg border',
-                        props.backgroundPreset === preset.value
-                          ? 'border-primary ring-1 ring-primary'
-                          : 'border-border',
-                      )}
-                    >
-                      <img
-                        src={preset.src}
-                        alt={preset.label}
-                        className="h-full w-full object-cover"
-                      />
-                      <span className="absolute inset-x-0 bottom-0 bg-popover/90 px-1.5 py-0.5 text-[10px] text-popover-foreground">
-                        {preset.label}
-                      </span>
-                    </button>
-                  ))}
-                </div>
+                    {BACKGROUND_PRESETS.map((preset) => (
+                      <button
+                        key={preset.value}
+                        type="button"
+                        aria-label={preset.label}
+                        aria-pressed={props.backgroundPreset === preset.value}
+                        onClick={() => props.onSelectBackground(preset.value)}
+                        className={cn(
+                          'relative overflow-hidden rounded-xl border bg-background text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                          props.backgroundPreset === preset.value
+                            ? 'border-primary ring-2 ring-inset ring-primary'
+                            : 'border-border hover:border-primary/50',
+                        )}
+                      >
+                        <img
+                          src={preset.src}
+                          alt=""
+                          loading="lazy"
+                          className="aspect-video w-full object-cover"
+                        />
+                        <span className="block px-2 py-1.5 text-xs font-medium text-foreground">
+                          {preset.label}
+                        </span>
+                        {props.backgroundPreset === preset.value && (
+                          <span className="absolute right-1.5 top-1.5 rounded-full bg-primary p-1 text-primary-foreground">
+                            <Check className="size-3" />
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             ) : null}
           </TabsContent>
