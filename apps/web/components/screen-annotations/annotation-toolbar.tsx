@@ -318,7 +318,7 @@ export function AnnotationToolbar({
       [{ width: `${previousWidth}px` }, { width: `${nextWidth}px` }],
       { duration: 240, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' },
     );
-    return () => animation.cancel();
+    return () => animation?.cancel();
   }, [expanded]);
   const [dock, setDock] = useState('top');
   const [position, setPosition] = useState({ x: 16, y: 16 });

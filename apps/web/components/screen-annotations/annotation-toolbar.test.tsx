@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AnnotationToolbar } from './annotation-toolbar';
 import type { ComponentProps } from 'react';
@@ -45,6 +45,36 @@ const click = (name: string) =>
   fireEvent.click(screen.getByRole('button', { name, exact: true }));
 beforeEach(() => localStorage.clear());
 describe('screen annotation toolbar', () => {
+  it.each([false, true])(
+    'safely cleans up toolbar transitions when animation exists: %s',
+    (hasAnimation) => {
+      const original = Object.getOwnPropertyDescriptor(Element.prototype, 'animate');
+      const cancel = vi.fn();
+      const animate = vi.fn(() => (hasAnimation ? { cancel } : null));
+      Object.defineProperty(Element.prototype, 'animate', {
+        configurable: true,
+        value: animate,
+      });
+      const media = vi.spyOn(window, 'matchMedia').mockReturnValue({
+        matches: false,
+      } as MediaQueryList);
+      try {
+        setup();
+        for (let i = 0; i < 5; i++) {
+          click('Open annotation toolbar');
+          click('Close annotation toolbar');
+        }
+        cleanup();
+        expect(animate).toHaveBeenCalledTimes(10);
+        expect(cancel).toHaveBeenCalledTimes(hasAnimation ? 10 : 0);
+      } finally {
+        cleanup();
+        media.mockRestore();
+        if (original) Object.defineProperty(Element.prototype, 'animate', original);
+        else Reflect.deleteProperty(Element.prototype, 'animate');
+      }
+    },
+  );
   it('offers quick styles and closes advanced options after a quick choice', () => {
     const onQuickStyle = vi.fn();
     const props = setup({ tool: 'pen', autoExpand: true, onQuickStyle });
