@@ -40,6 +40,7 @@ describe('public live session identity and authorization', () => {
   let isClassMember: boolean;
   let isTeacher: boolean;
   let guardian: boolean;
+  let selections: string[];
   let enrolledStudents: string[];
   let lookupFilters: Array<{ table: string; filters: Record<string, unknown> }>;
   beforeEach(() => {
@@ -51,6 +52,7 @@ describe('public live session identity and authorization', () => {
     isClassMember = true;
     isTeacher = false;
     guardian = false;
+    selections = [];
     enrolledStudents = ['child-one', 'child-two'];
     lookupFilters = [];
     jest.mocked(createSupabaseSessionClient).mockReturnValue({
@@ -73,7 +75,10 @@ describe('public live session identity and authorization', () => {
       from: (table: string) => {
         const filters: Record<string, unknown> = {};
         const query = {
-          select: jest.fn().mockReturnThis(),
+          select: jest.fn((selection: string) => {
+            selections.push(selection);
+            return query;
+          }),
           in: jest.fn((key, value) => {
             filters[key] = value;
             return query;
@@ -410,6 +415,9 @@ describe('public live session identity and authorization', () => {
       'parent-single',
       { displayName: 'Parent', passcode: 'demo' },
       'auth',
+    );
+    expect(selections).toContain(
+      'id, display_name, first_name, last_name, accounts!profiles_account_id_fkey!inner(id)',
     );
     expect(joined).toMatchObject({
       displayName: 'Ben',

@@ -654,7 +654,9 @@ export class LiveSessionsService {
     if (!ids.length) return [];
     const profiles = await db
       .from('profiles')
-      .select('id, display_name, first_name, last_name, accounts!inner(id)')
+      .select(
+        'id, display_name, first_name, last_name, accounts!profiles_account_id_fkey!inner(id)',
+      )
       .eq('org_id', orgId)
       .eq('kind', 'child')
       .in('account_id', ids)
