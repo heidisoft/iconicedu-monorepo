@@ -69,6 +69,7 @@ export function ZoomVideoTile({
   handPosition = 'right',
   density = 'default',
   isSpeaking: speaking = false,
+  fullscreenFeatured = false,
 }: {
   label: string;
   avatarUrl?: string;
@@ -81,6 +82,7 @@ export function ZoomVideoTile({
   handPosition?: 'left' | 'right';
   density?: 'default' | 'compact';
   isSpeaking?: boolean;
+  fullscreenFeatured?: boolean;
 }) {
   const isSpeaking = speaking && !isMuted;
   const fullscreen = useFocusedFullscreen();
@@ -125,6 +127,8 @@ export function ZoomVideoTile({
     <div
       ref={fullscreen.setTarget}
       data-focused-content="video"
+      data-self-video={isSelf}
+      data-fullscreen-featured={fullscreenFeatured}
       className={cn(
         'zoom-video-tile relative isolate overflow-hidden bg-secondary shadow-inner transition-[inset,width,height,transform,opacity,box-shadow] duration-500 ease-out motion-reduce:transition-none',
         compact ? 'rounded-2xl' : 'rounded-3xl sm:rounded-[2rem]',

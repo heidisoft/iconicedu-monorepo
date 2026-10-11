@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useFixtureAnnotations } from '../../screen-annotations/annotation-visual-fixture';
 
@@ -13,7 +13,7 @@ const AnnotationOverlay = dynamic(
 );
 import { TooltipProvider } from '@iconicedu/ui-web/ui/tooltip';
 import { ZoomShareStage } from './zoom-share-stage';
-import { ZoomVideoTile } from './zoom-video-tile';
+import { ZoomShareFilmstrip } from './zoom-share-filmstrip';
 
 /** Synthetic renderer fixture; never available in production. */
 export function FocusedFullscreenFixture() {
@@ -25,6 +25,17 @@ export function FocusedFullscreenFixture() {
   const video = useRef<HTMLVideoElement>(null);
   const board = useRef<HTMLDivElement>(null);
   const participant = useRef<HTMLDivElement>(null);
+  const remoteParticipants = useRef(new Map<number, HTMLDivElement>());
+  const [speaker, setSpeaker] = useState(2);
+  const attachPlayers = useCallback(() => {
+    for (const surface of [participant.current, ...remoteParticipants.current.values()]) {
+      if (surface && !surface.querySelector('video-player')) {
+        const player = document.createElement('video-player');
+        player.dataset.identity = 'retained-camera';
+        surface.appendChild(player);
+      }
+    }
+  }, []);
   return (
     <TooltipProvider>
       <main className="fixed inset-0 bg-background text-foreground">
@@ -35,6 +46,9 @@ export function FocusedFullscreenFixture() {
             </button>
           ))}
         </div>
+        <button className="relative z-20" onClick={() => setSpeaker(3)}>
+          Change speaker
+        </button>
         <ZoomShareStage
           remoteCanvasRef={remote}
           localCanvasRef={local}
@@ -88,12 +102,37 @@ export function FocusedFullscreenFixture() {
           className="absolute bottom-0 left-0 h-32 w-48"
           data-testid="participant-strip"
         >
-          <ZoomVideoTile
-            label="Other participant"
-            isSelf={false}
-            isMuted
-            isVideoOn={false}
-            videoContainerRef={participant}
+          <ZoomShareFilmstrip
+            displayName="Self"
+            selfMuted={false}
+            selfVideoOn
+            selfHandRaised={false}
+            selfVideoRef={participant}
+            remoteParticipants={[
+              {
+                userId: 2,
+                displayName: 'Speaker one',
+                muted: false,
+                bVideoOn: true,
+                isHost: false,
+              },
+              {
+                userId: 3,
+                displayName: 'Speaker two',
+                muted: false,
+                bVideoOn: true,
+                isHost: false,
+              },
+            ]}
+            raisedHandUserIds={new Set()}
+            activeSpeakerUserId={speaker}
+            selfUserId={1}
+            sidebarOpen={false}
+            onReady={attachPlayers}
+            onRemoteContainer={(id, node) => {
+              if (node) remoteParticipants.current.set(id, node);
+              else remoteParticipants.current.delete(id);
+            }}
           />
         </div>
       </main>

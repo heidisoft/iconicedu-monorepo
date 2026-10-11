@@ -110,3 +110,146 @@ test('leaves focused fullscreen when the active share ends', async ({ page }) =>
     .evaluate((button: HTMLButtonElement) => button.click());
   await expect.poll(() => page.evaluate(() => document.fullscreenElement)).toBeNull();
 });
+
+for (const mode of ['remote', 'local', 'whiteboard'] as const) {
+  test(`shows movable participant videos in ${mode} fullscreen without replacing players`, async ({
+    page,
+  }) => {
+    await page.goto('/visual-test/focused-fullscreen');
+    await page.getByRole('button', { name: `Show ${mode}`, exact: true }).click();
+    const players = page.locator('video-player');
+    await expect(players).toHaveCount(3);
+    await players.first().evaluate((node) => {
+      (window as unknown as { retainedPlayer: Element }).retainedPlayer = node;
+    });
+    const label = mode === 'whiteboard' ? 'whiteboard' : 'shared screen';
+    await page
+      .getByRole('button', { name: `View ${label} fullscreen`, exact: true })
+      .click();
+    const fullscreen = page.locator('[data-focused-content]:fullscreen');
+    await expect(
+      fullscreen.getByRole('button', { name: 'Show participants', exact: true }),
+    ).toBeVisible();
+    const overlay = fullscreen.getByRole('region', { name: 'Fullscreen participants' });
+    await expect(overlay).toBeHidden();
+    await fullscreen
+      .getByRole('button', { name: 'Show participants', exact: true })
+      .click();
+    await expect(overlay).toBeVisible();
+    await expect(overlay.getByText('Speaker one', { exact: true })).toBeVisible();
+    await expect(overlay.getByText('Speaker two', { exact: true })).toBeHidden();
+    await expect(overlay.getByText('Self (You)', { exact: true })).toBeVisible();
+    await overlay.getByRole('button', { name: 'Hide self-view', exact: true }).click();
+    await expect(overlay.getByText('Self (You)', { exact: true })).toBeHidden();
+    await overlay.getByRole('button', { name: 'Show self-view', exact: true }).click();
+    await page
+      .getByRole('button', { name: 'Change speaker', exact: true })
+      .evaluate((node: HTMLButtonElement) => node.click());
+    await expect(overlay.getByText('Speaker two', { exact: true })).toBeVisible();
+    await expect(overlay.getByText('Speaker one', { exact: true })).toBeHidden();
+    const start = (await overlay.boundingBox())!;
+    const handle = overlay.getByRole('button', { name: 'Move participant videos' });
+    await handle.focus();
+    await page.keyboard.press('ArrowLeft');
+    await page.keyboard.press('ArrowUp');
+    await expect.poll(async () => (await overlay.boundingBox())!.x).toBeLessThan(start.x);
+    const grip = (await handle.boundingBox())!;
+    await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(20, 120, { steps: 5 });
+    await page.mouse.up();
+    await expect.poll(async () => (await overlay.boundingBox())!.x).toBeLessThan(100);
+    await overlay
+      .getByRole('button', { name: 'Hide participant videos', exact: true })
+      .click();
+    await expect(overlay).toBeHidden();
+    await fullscreen
+      .getByRole('button', { name: 'Show participants', exact: true })
+      .click();
+    await expect(overlay).toBeVisible();
+    expect(
+      await page.evaluate(() =>
+        document.contains(
+          (window as unknown as { retainedPlayer: Element }).retainedPlayer,
+        ),
+      ),
+    ).toBe(true);
+    await fullscreen
+      .getByRole('button', { name: 'Exit fullscreen', exact: true })
+      .click();
+    await expect(page.getByText('Speaker one', { exact: true })).toBeVisible();
+    await expect(page.getByText('Speaker two', { exact: true })).toBeVisible();
+    expect(
+      await page.evaluate(() =>
+        document.contains(
+          (window as unknown as { retainedPlayer: Element }).retainedPlayer,
+        ),
+      ),
+    ).toBe(true);
+    await expect(players).toHaveCount(3);
+  });
+}
+
+test('keeps fullscreen video controls reachable on small and resized displays', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 360, height: 640 });
+  await page.goto('/visual-test/focused-fullscreen');
+  await page
+    .getByRole('button', { name: 'View shared screen fullscreen', exact: true })
+    .click();
+  const fullscreen = page.locator('[data-focused-content]:fullscreen');
+  await fullscreen
+    .getByRole('button', { name: 'Show participants', exact: true })
+    .click();
+  const overlay = fullscreen.getByRole('region', { name: 'Fullscreen participants' });
+  const handle = overlay.getByRole('button', { name: 'Move participant videos' });
+  await handle.focus();
+  await page.keyboard.press('ArrowLeft');
+  const browser = await page.context().newCDPSession(page);
+  for (const viewport of [
+    { width: 740, height: 360 },
+    { width: 320, height: 568 },
+  ]) {
+    // Browser windows cannot be resized while fullscreen; emulate viewport changes
+    // directly to exercise the same resize path used by display/orientation changes.
+    await browser.send('Emulation.setDeviceMetricsOverride', {
+      ...viewport,
+      deviceScaleFactor: 1,
+      mobile: false,
+    });
+    await expect
+      .poll(async () => {
+        const bounds = (await overlay.boundingBox())!;
+        return (
+          bounds.x >= 0 &&
+          bounds.y >= 0 &&
+          bounds.x + bounds.width <= viewport.width &&
+          bounds.y + bounds.height <= viewport.height - 40
+        );
+      })
+      .toBe(true);
+    await expect(
+      fullscreen.getByRole('button', { name: 'Hide participants', exact: true }),
+    ).toBeInViewport();
+    await expect(
+      fullscreen.getByRole('button', { name: 'Exit fullscreen', exact: true }),
+    ).toBeInViewport();
+  }
+  await overlay
+    .getByRole('button', { name: 'Hide participant videos', exact: true })
+    .click();
+  await expect(
+    fullscreen.getByRole('button', { name: 'Show participants', exact: true }),
+  ).toBeFocused();
+  await fullscreen.getByRole('button', { name: 'Exit fullscreen', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'View shared screen fullscreen', exact: true })
+    .click();
+  await expect(
+    fullscreen.getByRole('button', { name: 'Show participants', exact: true }),
+  ).toBeVisible();
+  await expect(
+    fullscreen.getByRole('region', { name: 'Fullscreen participants' }),
+  ).toBeHidden();
+});

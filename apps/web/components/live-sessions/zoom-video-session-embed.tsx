@@ -610,7 +610,7 @@ export function ZoomVideoSessionEmbed({
   // unmounts along with its old container, so without this it just goes
   // blank until some unrelated peer-video-state-change event happens to
   // fire next — re-attach into whichever container is current instead.
-  useEffect(() => {
+  const refreshCameraTiles = useCallback(() => {
     const client = clientRef.current;
     if (!client || status !== 'connected') {
       return;
@@ -655,6 +655,8 @@ export function ZoomVideoSessionEmbed({
     isVideoOn,
     galleryPage,
   ]);
+
+  useEffect(refreshCameraTiles, [refreshCameraTiles]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1820,6 +1822,7 @@ export function ZoomVideoSessionEmbed({
 
           {isPresentationLayoutActive ? (
             <ZoomShareFilmstrip
+              onReady={refreshCameraTiles}
               displayName={displayName}
               selfAvatar={selfAvatar}
               selfMuted={isMuted}
