@@ -58,13 +58,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@iconicedu/ui-web/ui/alert-dialog';
-import { clearLiveSessionRecovery } from '@iconicedu/web/lib/live-sessions/browser-session';
+import { useMeetingFeedback } from './zoom-video/use-meeting-feedback';
 import { Popover, PopoverContent, PopoverTrigger } from '@iconicedu/ui-web/ui/popover';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 import {
   logLiveSessionAuditEvent,
   reportLiveSessionQualityEvent,
-  submitLiveSessionFeedback,
 } from '@iconicedu/web/lib/live-sessions/public-api';
 import {
   acquireZoomClient,
@@ -354,10 +353,41 @@ export function ZoomVideoSessionEmbed({
     () => prepareRecordingRef.current(),
   );
   const recordingStatus = recording.status;
-  const [showFeedbackPrompt, setShowFeedbackPrompt] = useState(false);
-  const [hasLeft, setHasLeft] = useState(false);
-  const [feedbackRating, setFeedbackRating] = useState<number | null>(null);
-  const [isFeedbackSubmitting, setIsFeedbackSubmitting] = useState(false);
+  const {
+    showFeedbackPrompt,
+    hasLeft,
+    feedbackRating,
+    setFeedbackRating,
+    isFeedbackSubmitting,
+    beginFeedback,
+    finishLeaving,
+    submitFeedback,
+  } = useMeetingFeedback({
+    liveSessionId,
+    displayName,
+    accessToken,
+    onLeave,
+  });
+  const leaveMeeting = useCallback(
+    (endForEveryone = false, alreadyClosed = false) => {
+      if (isLeavingRef.current) return;
+      isLeavingRef.current = true;
+      setIsSettingsOpen(false);
+      setShowMobileControls(false);
+      setShowPipSettings(false);
+      setShowEndForAllConfirm(false);
+      setActivePanel(null);
+      setSessionEndMessage(null);
+      if (!alreadyClosed) endShareAnnotations(selfUserIdRef.current);
+      const client = clientRef.current;
+      if (client)
+        void disposeZoomClient(client, selfUserIdRef.current, endForEveryone).catch(
+          () => {},
+        );
+      beginFeedback(selfVideoRef.current?.ownerDocument);
+    },
+    [beginFeedback, endShareAnnotations],
+  );
   const [activePanel, setActivePanel] = useState<SidePanel>(null);
   const messages = useZoomMessagesFeature(
     status === 'connected' ? clientRef.current : null,
@@ -957,11 +987,7 @@ export function ZoomVideoSessionEmbed({
         return;
       }
       if (payload.state === ConnectionState.Closed) {
-        setSessionEndMessage(
-          payload.reason
-            ? `The class ended (${payload.reason}).`
-            : 'The class has ended or you were disconnected.',
-        );
+        leaveMeeting(false, true);
       } else if (payload.state === ConnectionState.Fail) {
         setSessionEndMessage(
           payload.errorCode
@@ -1201,6 +1227,7 @@ export function ZoomVideoSessionEmbed({
     accessToken,
     settings,
     endShareAnnotations,
+    leaveMeeting,
   ]);
 
   const toggleMute = useCallback(async () => {
@@ -1416,12 +1443,9 @@ export function ZoomVideoSessionEmbed({
       },
       accessToken,
     );
-    isLeavingRef.current = true;
-    clearLiveSessionRecovery(liveSessionId);
-    void disposeZoomClient(client, selfUserIdRef.current, true);
+    leaveMeeting(true);
     setShowEndForAllConfirm(false);
-    setShowFeedbackPrompt(true);
-  }, [isSelfHost, liveSessionId, accessToken]);
+  }, [isSelfHost, liveSessionId, accessToken, leaveMeeting]);
 
   const pip = useMeetingPictureInPicture({
     connected: status === 'connected' && !showFeedbackPrompt,
@@ -1553,49 +1577,7 @@ export function ZoomVideoSessionEmbed({
     setSharePrivilege(privilege);
   }, []);
 
-  // Disconnect and clear refresh recovery before showing post-call feedback.
-  // An intentional leave must never rejoin the participant after a refresh.
-  const handleLeave = useCallback(() => {
-    const client = clientRef.current;
-    isLeavingRef.current = true;
-    clearLiveSessionRecovery(liveSessionId);
-    endShareAnnotations(selfUserIdRef.current);
-    if (client) {
-      void disposeZoomClient(client, selfUserIdRef.current);
-    }
-    setShowFeedbackPrompt(true);
-  }, [liveSessionId, endShareAnnotations]);
-
-  // This renders as a `fixed inset-0 z-40` portal covering the entire
-  // viewport. router.push() in Next.js App Router runs inside a transition
-  // that can keep the old page's DOM mounted (and thus visible, since it's
-  // on top of everything) until the new page is ready — for most content
-  // that's an invisible, seamless swap, but a full-screen overlay stays
-  // stuck in front of the destination page for however long that takes, or
-  // indefinitely if the embed doesn't unmount cleanly. Setting hasLeft makes
-  // this component stop rendering itself immediately, independent of
-  // whatever the caller's onLeave navigation does or how long it takes.
-  const finishLeaving = useCallback(() => {
-    clearLiveSessionRecovery(liveSessionId);
-    setShowFeedbackPrompt(false);
-    setHasLeft(true);
-    onLeave?.();
-  }, [liveSessionId, onLeave]);
-
-  const submitFeedback = useCallback(async () => {
-    if (feedbackRating === null) {
-      finishLeaving();
-      return;
-    }
-    setIsFeedbackSubmitting(true);
-    await submitLiveSessionFeedback(
-      liveSessionId,
-      { rating: feedbackRating, displayName },
-      accessToken,
-    ).catch(() => null);
-    setIsFeedbackSubmitting(false);
-    finishLeaving();
-  }, [feedbackRating, liveSessionId, displayName, accessToken, finishLeaving]);
+  const handleLeave = useCallback(() => leaveMeeting(), [leaveMeeting]);
 
   const participantCount = remoteParticipants.length + 1;
 
@@ -1696,7 +1678,11 @@ export function ZoomVideoSessionEmbed({
           onSkip={finishLeaving}
         />
       ) : null}
-      <div className="zoom-meeting-shell fixed inset-0 z-40 flex flex-col bg-background">
+      <div
+        className="zoom-meeting-shell fixed inset-0 z-40 flex flex-col bg-background"
+        inert={showFeedbackPrompt || undefined}
+        aria-hidden={showFeedbackPrompt || undefined}
+      >
         <div
           className={cn(
             'relative min-h-0 flex-1 overflow-hidden bg-background transition-opacity duration-500 ease-out motion-reduce:transition-none',
@@ -2245,7 +2231,7 @@ export function ZoomVideoSessionEmbed({
               </h2>
               <p className="text-sm text-muted-foreground">{sessionEndMessage}</p>
             </div>
-            <Button type="button" onClick={finishLeaving}>
+            <Button type="button" onClick={handleLeave}>
               Return to class page
             </Button>
           </div>

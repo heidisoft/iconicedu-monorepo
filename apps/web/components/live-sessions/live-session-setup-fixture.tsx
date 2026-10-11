@@ -1,12 +1,11 @@
 'use client';
 
-import { useState } from 'react';
 import { ExternalLiveSessionJoinDialog } from '@iconicedu/ui-web/components/messages/external-live-session-join-dialog';
 import { useLiveSessionNavigation } from './use-live-session-navigation';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { LiveSessionSetup, type LiveSessionMeetingProps } from './live-session-setup';
 import { ZoomFeedbackScreen } from './zoom-video/zoom-feedback-screen';
-import { clearLiveSessionRecovery } from '@iconicedu/web/lib/live-sessions/browser-session';
+import { useMeetingFeedback } from './zoom-video/use-meeting-feedback';
 
 const hostCredentials = {
   token: 'synthetic-host-token',
@@ -25,16 +24,16 @@ const FixtureMeeting = ({
   initialMuted,
   initialVideoOff,
 }: LiveSessionMeetingProps) => {
-  const [left, setLeft] = useState(false);
-  const [rating, setRating] = useState<number | null>(null);
-  if (left)
+  const feedback = useMeetingFeedback({ liveSessionId, displayName, onLeave });
+  if (feedback.hasLeft) return null;
+  if (feedback.showFeedbackPrompt)
     return (
       <ZoomFeedbackScreen
-        rating={rating}
-        isSubmitting={false}
-        onRatingChange={setRating}
-        onSkip={() => onLeave?.()}
-        onSubmit={() => onLeave?.()}
+        rating={feedback.feedbackRating}
+        isSubmitting={feedback.isFeedbackSubmitting}
+        onRatingChange={feedback.setFeedbackRating}
+        onSkip={feedback.finishLeaving}
+        onSubmit={() => void feedback.submitFeedback()}
       />
     );
   return (
@@ -44,12 +43,12 @@ const FixtureMeeting = ({
       <p>{initialVideoOff ? 'Camera off' : 'Camera on'}</p>
       <Button
         onClick={() => {
-          clearLiveSessionRecovery(liveSessionId);
-          setLeft(true);
+          feedback.beginFeedback();
         }}
       >
         Leave meeting
       </Button>
+      <Button onClick={() => feedback.beginFeedback()}>Host ended meeting</Button>
     </main>
   );
 };

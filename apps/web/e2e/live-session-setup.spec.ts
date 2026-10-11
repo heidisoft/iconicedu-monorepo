@@ -222,3 +222,69 @@ test.describe('live session setup and leave navigation', () => {
     await meeting.close();
   });
 });
+
+for (const actor of ['host', 'member', 'guest']) {
+  test(`host ending a meeting shows feedback before returning ${actor} to their join source`, async ({
+    page,
+  }) => {
+    await page.route('**/live-sessions/*/guest-join', (route) =>
+      route.fulfill({
+        json: {
+          token: 'synthetic',
+          sessionName: 'fixture-class',
+          displayName: `Test ${actor}`,
+          expiresAt: null,
+        },
+      }),
+    );
+    await page.route('**/live-sessions/*/feedback', (route) =>
+      route.fulfill({ json: { success: true } }),
+    );
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'mediaDevices', {
+        configurable: true,
+        value: {
+          getUserMedia: () => Promise.reject(new Error('Preview denied for test')),
+        },
+      });
+    });
+    const destination = `/visual-test/live-session-setup?actor=dialog&from=${actor}`;
+    await page.goto(
+      `/visual-test/live-session-setup?actor=${actor}&passcode=demo&returnTo=${encodeURIComponent(destination)}`,
+    );
+    if (actor === 'guest') {
+      await page.getByLabel('Your name').fill('Guest Participant');
+      await page.getByRole('button', { name: 'Join session', exact: true }).click();
+    }
+    await expect(
+      page.getByText('Check your camera and microphone before joining.'),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Join session', exact: true }).click();
+    if (actor === 'host') {
+      await page
+        .getByRole('button', { name: 'Host ended meeting', exact: true })
+        .evaluate((node) => node.closest('main')!.requestFullscreen());
+    }
+    await page.getByRole('button', { name: 'Host ended meeting', exact: true }).click();
+    await expect
+      .poll(() => page.evaluate(() => !!document.fullscreenElement))
+      .toBe(false);
+    await expect(
+      page.getByRole('heading', { name: 'How was your session?' }),
+    ).toBeVisible();
+    expect(new URL(page.url()).searchParams.get('returnTo')).toBe(destination);
+    expect(
+      await page.evaluate(
+        (id) => sessionStorage.getItem(`iconicedu:live-session:${id}`),
+        `fixture-${actor}`,
+      ),
+    ).toBeNull();
+    if (actor === 'guest')
+      await page.getByRole('button', { name: 'Skip', exact: true }).click();
+    else {
+      await page.getByRole('radio', { name: 'Great', exact: true }).click();
+      await page.getByRole('button', { name: 'Submit', exact: true }).click();
+    }
+    await expect(page).toHaveURL(destination);
+  });
+}
