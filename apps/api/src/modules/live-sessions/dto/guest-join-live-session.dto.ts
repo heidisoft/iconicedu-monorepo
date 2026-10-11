@@ -17,9 +17,20 @@ export function parseGuestJoinLiveSessionDto(input: unknown): GuestJoinLiveSessi
   }
 
   const passcode = body['passcode'];
-  if (typeof passcode !== 'string' || !passcode.trim()) {
+  // Empty passcodes are accepted structurally for hosts; the service verifies host
+  // authorization before deciding whether a correct passcode is required.
+  if (typeof passcode !== 'string') {
     throw new BadRequestException('passcode is required');
   }
+
+  const override = body['displayNameOverride'];
+  if (
+    override !== undefined &&
+    (typeof override !== 'string' ||
+      !override.trim() ||
+      override.trim().length > MAX_DISPLAY_NAME_LENGTH)
+  )
+    throw new BadRequestException('Display name must be between 1 and 80 characters');
 
   const studentProfileId = body['studentProfileId'];
   if (
@@ -32,6 +43,7 @@ export function parseGuestJoinLiveSessionDto(input: unknown): GuestJoinLiveSessi
     throw new BadRequestException('Invalid student profile');
 
   return {
+    ...(typeof override === 'string' ? { displayNameOverride: override.trim() } : {}),
     ...(typeof studentProfileId === 'string' ? { studentProfileId } : {}),
     displayName: displayName.trim().slice(0, MAX_DISPLAY_NAME_LENGTH),
     passcode: passcode.trim(),

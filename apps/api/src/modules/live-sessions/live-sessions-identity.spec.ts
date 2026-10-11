@@ -515,4 +515,47 @@ describe('public live session identity and authorization', () => {
       expect(getJoinAccess).not.toHaveBeenCalled();
     },
   );
+  it('applies an explicit preview label without changing the selected student or permissions', async () => {
+    guardian = true;
+    const joined = await new LiveSessionsService().guestJoinLiveSession(
+      'session-identity',
+      'parent-renamed',
+      {
+        displayName: 'Alice',
+        passcode: 'demo',
+        studentProfileId: 'child-one',
+        displayNameOverride: 'Alice S.',
+      },
+      'auth',
+    );
+    expect(joined).toMatchObject({
+      displayName: 'Alice S.',
+      studentProfileId: 'child-one',
+    });
+    expect(getJoinAccess).toHaveBeenCalledWith(
+      expect.objectContaining({
+        profileId: 'child-one',
+        displayName: 'Alice S.',
+        isHost: false,
+      }),
+    );
+    expect(issueWhiteboardAccess).toHaveBeenCalledWith(
+      'session-identity',
+      'student',
+      'Alice S.',
+    );
+    expect(issueAnnotationAccess).toHaveBeenCalledWith('session-identity', 'Alice S.');
+  });
+  it('still rejects an empty passcode for a renamed non-host', async () => {
+    jest.mocked(verifyZoomPasscode).mockReturnValue(false);
+    await expect(
+      new LiveSessionsService().guestJoinLiveSession(
+        'session-identity',
+        'renamed-no-passcode',
+        { displayName: 'Member', displayNameOverride: 'Member S.', passcode: '' },
+        'auth',
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(getJoinAccess).not.toHaveBeenCalled();
+  });
 });

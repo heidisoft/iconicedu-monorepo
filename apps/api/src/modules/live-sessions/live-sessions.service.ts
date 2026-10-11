@@ -411,7 +411,10 @@ export class LiveSessionsService {
         throw new ForbiddenException('Shared invitations are disabled');
     }
     const displayName =
-      student?.displayName ?? identity?.displayName ?? input.displayName;
+      input.displayNameOverride ??
+      student?.displayName ??
+      identity?.displayName ??
+      input.displayName;
     const provider = getLiveSessionProvider('zoom');
     const joinAccess = await provider.getJoinAccess({
       sessionId: session.id,
@@ -427,7 +430,7 @@ export class LiveSessionsService {
 
     return {
       ...(student ? { studentProfileId: student.profileId } : {}),
-      ...(!identity?.profileId || student
+      ...(!identity?.profileId || student || (!isHost && input.displayNameOverride)
         ? { annotationToken: await issueAnnotationAccess(session.id, displayName) }
         : {}),
       ...(settings.whiteboard.enabled

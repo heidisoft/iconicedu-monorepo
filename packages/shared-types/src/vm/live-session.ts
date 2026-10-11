@@ -156,6 +156,8 @@ export interface LiveSessionAttendanceFilterVM {
 /** Enrolled child a verified guardian may represent in a live class. */
 export type LiveSessionStudentOptionVM = { profileId: UUID; displayName: string };
 export type LiveSessionJoinRequest = {
+  /** Explicit preview edit; changes the meeting label, never the authorized identity. */
+  displayNameOverride?: string;
   displayName: string;
   passcode: string;
   studentProfileId?: UUID;

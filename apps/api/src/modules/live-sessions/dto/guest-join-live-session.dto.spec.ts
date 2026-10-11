@@ -26,4 +26,16 @@ describe('live session student selection request', () => {
       ).toThrow('Invalid student profile');
     },
   );
+  it.each(['', '   ', 123, 'x'.repeat(81)])(
+    'rejects invalid preview name edits: %j',
+    (displayNameOverride) => {
+      expect(() =>
+        parseGuestJoinLiveSessionDto({
+          displayName: 'Alice',
+          passcode: 'demo',
+          displayNameOverride,
+        }),
+      ).toThrow('Display name must');
+    },
+  );
 });
