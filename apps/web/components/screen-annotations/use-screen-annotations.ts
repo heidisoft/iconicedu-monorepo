@@ -766,6 +766,7 @@ export function useScreenAnnotations(
     [execute],
   );
   const objects = useMemo(() => {
+    if (context?.snapshot.ended) return [];
     const map = new Map(
       context?.snapshot.objects.map((object) => [object.id, object]) ?? [],
     );

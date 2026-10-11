@@ -9,7 +9,11 @@ export function applyAnnotationCommit(
   snapshot: AnnotationSnapshot,
   event: AnnotationCommit,
 ): AnnotationSnapshot {
-  if (event.roomId !== snapshot.roomId || event.revision <= snapshot.revision)
+  if (
+    snapshot.ended ||
+    event.roomId !== snapshot.roomId ||
+    event.revision <= snapshot.revision
+  )
     return snapshot;
   const objects = new Map(snapshot.objects.map((object) => [object.id, object]));
   for (const object of event.objects) {
@@ -19,7 +23,7 @@ export function applyAnnotationCommit(
   return {
     ...snapshot,
     revision: event.revision,
-    objects: [...objects.values()],
+    objects: event.ended ? [] : [...objects.values()],
     studentsEnabled: event.studentsEnabled,
     ended: event.ended,
   };

@@ -36,6 +36,28 @@ const snapshot: AnnotationSnapshot = {
   objects: [object],
 };
 describe('annotation synchronization', () => {
+  it('clears ended rooms and rejects delayed updates that could restore drawings', () => {
+    const end = {
+      eventId: 'end',
+      roomId: 'room',
+      revision: 2,
+      objects: [],
+      studentsEnabled: false,
+      ended: true,
+    };
+    const ended = applyAnnotationCommit(snapshot, end);
+    expect(ended.objects).toEqual([]);
+    expect(ended.ended).toBe(true);
+    expect(
+      applyAnnotationCommit(ended, {
+        ...end,
+        eventId: 'late',
+        revision: 3,
+        objects: [object],
+        ended: false,
+      }),
+    ).toBe(ended);
+  });
   it('ignores duplicate, stale and other-room commits and retains tombstones', () => {
     const deletion = {
       eventId: 'event',
