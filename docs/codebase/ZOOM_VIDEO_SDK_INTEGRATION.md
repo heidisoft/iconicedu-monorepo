@@ -629,3 +629,5 @@ preview, and rejected preview sends are handled separately from saved operations
 Realtime preview subscriptions reconnect after a fresh share-context handshake,
 even when its room and participant IDs are unchanged. Late send failures from a
 replaced channel cannot report an error into the reopened share.
+
+Screen-share annotation rooms are scoped to the live meeting and presenter share key. A new meeting starts empty; reloading or reconnecting to an active share retrieves its existing server snapshot. Explicitly stopping and restarting a share creates a fresh room. Ending, failing or deleting the class clears drawings, replay receipts and ephemeral pointer/laser state from all its annotation rooms, including previously stopped shares. Connected clients clear ended canvases and ignore delayed updates. Cleanup runs in the database lifecycle transaction, so it does not depend on a host keeping a browser open. Saved whiteboards have a separate persistence lifecycle.
