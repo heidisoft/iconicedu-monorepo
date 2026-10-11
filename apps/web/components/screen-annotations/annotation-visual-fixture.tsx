@@ -23,7 +23,7 @@ const initial: AnnotationSnapshot = {
   ended: false,
   objects: [],
 };
-function useFixtureAnnotations() {
+export function useFixtureAnnotations() {
   const [snapshot, setSnapshot] = useState(initial);
   const ref = useRef(snapshot);
   ref.current = snapshot;

@@ -117,11 +117,6 @@ export function FocusedFullscreenStyles() {
     [data-focused-content='video']:fullscreen video-player { object-fit: contain !important; }
     [data-focused-content='video']:fullscreen > [data-tile-overlay],
     [data-focused-content]:fullscreen [data-share-switcher],
-    [data-focused-content]:fullscreen [data-testid='whiteboard-board-details'],
-    [data-focused-content]:fullscreen [data-testid='whiteboard-overlay-toolbar'],
-    [data-focused-content]:fullscreen .whiteboard-style-toggle,
-    [data-focused-content]:fullscreen .excalidraw .App-menu_top,
-    [data-focused-content]:fullscreen .excalidraw .App-mobile-menu,
     [data-focused-content]:fullscreen [data-whiteboard-hint] { display: none !important; }
   `}</style>
   );

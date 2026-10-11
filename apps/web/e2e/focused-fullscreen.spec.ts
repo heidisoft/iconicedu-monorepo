@@ -51,7 +51,7 @@ for (const mode of ['remote', 'local', 'whiteboard'] as const) {
     const content =
       mode === 'whiteboard'
         ? surface.getByTestId('live-whiteboard')
-        : surface.locator('canvas');
+        : surface.locator('canvas[data-share-source]');
     await content.evaluate((node) => {
       (node as HTMLElement).dataset.identity = 'live-content';
     });
@@ -79,9 +79,17 @@ for (const mode of ['remote', 'local', 'whiteboard'] as const) {
     expect(navigationIsOutside).toBe(true);
     await expect(content).toHaveAttribute('data-identity', 'live-content');
     if (mode === 'whiteboard') {
-      await expect(page.getByTestId('whiteboard-board-details')).toBeHidden();
-      await expect(page.getByTestId('whiteboard-overlay-toolbar')).toBeHidden();
-    } else await expect(surface.getByRole('tablist')).toBeHidden();
+      await expect(page.getByTestId('whiteboard-board-details')).toBeVisible();
+      await expect(page.getByTestId('whiteboard-overlay-toolbar')).toBeVisible();
+    } else {
+      await expect(surface.getByRole('tablist')).toBeHidden();
+      const toolbar = surface.getByRole('toolbar', { name: 'Screen annotations' });
+      await expect(toolbar).toBeVisible();
+      await toolbar.getByRole('button', { name: 'Pen', exact: true }).click();
+      await toolbar.getByRole('button', { name: 'Format', exact: true }).click();
+      await expect(surface.locator('[data-annotation-panel]')).toBeVisible();
+      await surface.getByRole('button', { name: 'Close Format', exact: true }).click();
+    }
     await surface.getByRole('button', { name: 'Exit fullscreen', exact: true }).click();
     await expect.poll(() => page.evaluate(() => document.fullscreenElement)).toBeNull();
     await expect(content).toHaveAttribute('data-identity', 'live-content');

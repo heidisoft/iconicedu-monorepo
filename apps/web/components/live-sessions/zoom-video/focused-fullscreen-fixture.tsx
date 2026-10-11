@@ -1,6 +1,16 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
+import { useFixtureAnnotations } from '../../screen-annotations/annotation-visual-fixture';
+
+const AnnotationOverlay = dynamic(
+  () =>
+    import('../../screen-annotations/annotation-overlay').then(
+      (module) => module.AnnotationOverlay,
+    ),
+  { ssr: false },
+);
 import { TooltipProvider } from '@iconicedu/ui-web/ui/tooltip';
 import { ZoomShareStage } from './zoom-share-stage';
 import { ZoomVideoTile } from './zoom-video-tile';
@@ -43,6 +53,15 @@ export function FocusedFullscreenFixture() {
           ]}
           activeShareUserId={1}
           onSelectShare={() => {}}
+          annotationOverlay={(size) => (
+            <AnnotationOverlay
+              {...size}
+              presenting
+              sessionId="fullscreen-fixture"
+              shareKey="1"
+              useAnnotations={useFixtureAnnotations}
+            />
+          )}
           whiteboardContent={
             <div className="relative h-full bg-card">
               <div data-testid="whiteboard-board-details">
