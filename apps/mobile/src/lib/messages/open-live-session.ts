@@ -1,5 +1,6 @@
+import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { Linking, Alert } from 'react-native';
+import { Linking, Alert, NativeModules } from 'react-native';
 import { apiPost } from '@/lib/api/http-client';
 import { resolveJoinHrefForMobile } from './live-session-join';
 
@@ -18,6 +19,13 @@ export async function openLiveSession(href: string) {
     const identifier = meetingIdentifier(href);
     if (!identifier) {
       await Linking.openURL(resolveJoinHrefForMobile(href));
+      return;
+    }
+    if (NativeModules.RNZoomVideoSdk) {
+      router.navigate({
+        pathname: '/classroom/[sessionId]',
+        params: { sessionId: identifier },
+      });
       return;
     }
     const { browserPath } = await apiPost<{ browserPath: string }>(

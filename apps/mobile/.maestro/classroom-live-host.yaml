@@ -1,0 +1,41 @@
+appId: com.heidisoft.iconicedu
+name: Real native host meeting controls - use a dedicated test classroom
+---
+- openLink: 'iconicedu://classroom/${SESSION_ID}'
+- tapOn:
+    text: 'Open'
+    optional: true
+- tapOn:
+    text: 'Allow'
+    optional: true
+- extendedWaitUntil:
+    visible: 'Ready to join\?'
+    timeout: 30000
+- tapOn: 'Turn camera off'
+- scrollUntilVisible:
+    element: 'Join now'
+- tapOn: 'Join now'
+- extendedWaitUntil:
+    visible: 'Leave meeting'
+    timeout: 45000
+- runFlow:
+    when:
+      visible: 'Claim host'
+    commands:
+      - tapOn: 'Claim host'
+      - tapOn: 'Claim host'
+- scrollUntilVisible:
+    element: 'Participants.*'
+    direction: UP
+- tapOn: 'Participants.*'
+- scrollUntilVisible:
+    element: 'Make co-host ${PEER_NAME}'
+- tapOn: 'Make co-host ${PEER_NAME}'
+- assertVisible: 'Remove co-host ${PEER_NAME}'
+- tapOn: 'Remove co-host ${PEER_NAME}'
+- scrollUntilVisible:
+    element: 'Leave meeting'
+    direction: UP
+- tapOn: 'Leave meeting'
+- tapOn: 'Leave'
+- assertVisible: 'You left the classroom'

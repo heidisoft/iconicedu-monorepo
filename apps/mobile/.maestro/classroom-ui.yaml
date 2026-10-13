@@ -1,0 +1,78 @@
+appId: com.heidisoft.iconicedu
+name: Native classroom UI lifecycle on iPad and Android tablets
+---
+- runFlow: bootstrap.yaml
+- openLink: iconicedu://classroom-fixture
+- tapOn:
+    text: 'Open'
+    optional: true
+- tapOn:
+    text: 'Allow'
+    optional: true
+- tapOn:
+    text: 'Allow'
+    optional: true
+- extendedWaitUntil:
+    visible: 'Ready to join\?'
+    timeout: 30000
+- assertVisible: 'Native SDK [0-9].*'
+- assertVisible: 'Test teacher'
+- tapOn: 'Turn camera off'
+- scrollUntilVisible:
+    element: 'Test audio and video'
+- tapOn: 'Test audio and video'
+- scrollUntilVisible:
+    element: 'Test speakers'
+- tapOn: 'Test speakers'
+- assertVisible: 'Stop speaker test'
+- tapOn: 'Stop speaker test'
+- tapOn: 'Done testing'
+- scrollUntilVisible:
+    element: 'Join now'
+    direction: UP
+- tapOn: 'Join now'
+- assertVisible: 'Native classroom test'
+- scrollUntilVisible:
+    element: 'Raise hand'
+- tapOn: 'Raise hand'
+- assertVisible: 'Lower hand'
+- tapOn: 'Lower hand'
+- scrollUntilVisible:
+    element: 'Messages'
+- tapOn: 'Messages'
+- scrollUntilVisible:
+    element: 'Message'
+- tapOn: 'Message'
+- inputText: 'Hello from native tablet'
+- scrollUntilVisible:
+    element: 'Send message'
+- tapOn: 'Send message'
+- assertVisible: 'Test teacher: Hello from native tablet'
+- scrollUntilVisible:
+    element: 'Start recording'
+    direction: UP
+- tapOn: 'Start recording'
+- scrollUntilVisible:
+    element: 'Recording active'
+    direction: UP
+- assertVisible: 'Recording active'
+- scrollUntilVisible:
+    element: 'Stop recording'
+- tapOn: 'Stop recording'
+- scrollUntilVisible:
+    element: 'Whiteboard'
+    direction: UP
+- tapOn: 'Whiteboard'
+- scrollUntilVisible:
+    element: 'Allow student editing'
+- tapOn: 'Allow student editing'
+- assertVisible: 'Disable student editing'
+- tapOn: 'Present board'
+- assertVisible: 'Stop presenting board'
+- tapOn: 'Close whiteboard'
+- scrollUntilVisible:
+    element: 'Leave meeting'
+    direction: UP
+- tapOn: 'Leave meeting'
+- tapOn: 'Leave'
+- assertVisible: 'You left the classroom'

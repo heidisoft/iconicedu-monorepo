@@ -103,3 +103,25 @@ export async function apiGet<T>(
 
   return parseResponse<T>(response);
 }
+
+/** Meeting-scoped capabilities are verified by apps/api, not by Supabase auth. */
+export async function capabilityGet<T>(path: string, token: string): Promise<T> {
+  return parseResponse<T>(
+    await fetch(`${resolveApiBaseUrl()}${path}`, {
+      headers: { Authorization: `Bearer ${token}`, 'Cache-Control': 'no-store' },
+    }),
+  );
+}
+export async function capabilityPost<T>(
+  path: string,
+  token: string,
+  body: unknown,
+): Promise<T> {
+  return parseResponse<T>(
+    await fetch(`${resolveApiBaseUrl()}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(body),
+    }),
+  );
+}

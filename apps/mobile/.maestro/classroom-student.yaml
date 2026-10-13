@@ -1,0 +1,33 @@
+appId: com.heidisoft.iconicedu
+name: Students cannot use host controls
+---
+- runFlow: bootstrap.yaml
+- openLink: 'iconicedu://classroom-fixture?role=student'
+- tapOn:
+    text: 'Open'
+    optional: true
+- extendedWaitUntil:
+    visible: 'Ready to join\?'
+    timeout: 30000
+- tapOn: 'Turn camera off'
+- scrollUntilVisible:
+    element: 'Join now'
+- tapOn: 'Join now'
+- scrollUntilVisible:
+    element: 'Leave meeting'
+- assertNotVisible: 'End for everyone'
+- assertNotVisible: 'Start recording'
+- assertNotVisible: 'Claim host'
+- scrollUntilVisible:
+    element: 'Participants'
+    direction: UP
+- tapOn: 'Participants'
+- assertNotVisible: 'Make co-host.*'
+- assertNotVisible: 'Make host.*'
+- assertNotVisible: 'Mute Test student'
+- scrollUntilVisible:
+    element: 'Whiteboard'
+    direction: UP
+- tapOn: 'Whiteboard'
+- assertNotVisible: 'Allow student editing'
+- assertNotVisible: 'Clear board'

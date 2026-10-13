@@ -5,6 +5,7 @@ import { Slot } from 'expo-router';
 import { PortalHost } from '@rn-primitives/portal';
 import { SystemBars } from 'react-native-edge-to-edge';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { NativeClassroomSdkProvider } from '@/providers/native-classroom-sdk-provider';
 import { AppProviders } from '@/providers/app-providers';
 import { useTheme } from '@/providers/theme-provider';
 import { useAuth } from '@/providers/auth-provider';
@@ -93,7 +94,9 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AppProviders>
-        <RootContent />
+        <NativeClassroomSdkProvider>
+          <RootContent />
+        </NativeClassroomSdkProvider>
       </AppProviders>
     </SafeAreaProvider>
   );

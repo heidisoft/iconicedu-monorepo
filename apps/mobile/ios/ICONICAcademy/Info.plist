@@ -53,12 +53,14 @@
       <key>NSAllowsLocalNetworking</key>
       <true/>
     </dict>
+    <key>NSBluetoothAlwaysUsageDescription</key>
+    <string>Use Bluetooth headsets for classroom audio.</string>
     <key>NSBonjourServices</key>
     <array>
       <string>_expo._tcp</string>
     </array>
     <key>NSCameraUsageDescription</key>
-    <string>ICONIC Academy uses your camera only when you choose to take a photo, for example to add an image attachment to a class or direct message.</string>
+    <string>ICONIC Academy uses your camera when you choose classroom video or take a photo, for example to join a live class or attach an image to a message.</string>
     <key>NSFaceIDUsageDescription</key>
     <string>ICONIC Academy uses Face ID only when you choose biometric access, for example to unlock your saved app session more securely.</string>
     <key>NSLocalNetworkUsageDescription</key>
@@ -66,7 +68,7 @@
     <key>NSLocationWhenInUseUsageDescription</key>
     <string>ICONIC Academy uses your location during onboarding to detect your time zone and city, region, and country; for example, this helps show class times in your local time zone.</string>
     <key>NSMicrophoneUsageDescription</key>
-    <string>ICONIC Academy uses your microphone only when you choose to record audio, for example to send a voice message in a class or direct message conversation.</string>
+    <string>ICONIC Academy uses your microphone when you choose classroom audio or record a voice message, for example to speak during a live class.</string>
     <key>NSPhotoLibraryAddUsageDescription</key>
     <string>ICONIC Academy saves images to your photo library only when you choose to save a message image, for example keeping a class attachment for later.</string>
     <key>NSPhotoLibraryUsageDescription</key>

@@ -23,14 +23,24 @@
 //   "Simulator" first (stays correct on normal Xcode installs), fall back
 //   to "DeviceHub" only when that fails.
 
-import { existsSync, mkdirSync, copyFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  copyFileSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const rootDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 const fixesDir = join(rootDir, 'scripts', 'vendor-fixes');
 
+// - react-native-worklets@0.7.2: retain the library output location consumed
+//   by Expo 55 and Reanimated 4.2 when newer Android Gradle plugins move it
+//   under intermediates/cxx. Otherwise both consumers fail to link.
 const fixes = [
+  'react-native-worklets/android/CMakeLists.txt',
   'expo-router/ios/LinkPreview/LinkPreviewNativeActionView.swift',
   '@expo/cli/build/src/start/doctor/apple/SimulatorAppPrerequisite.js',
   '@expo/cli/build/src/start/platforms/ios/ensureSimulatorAppRunning.js',
@@ -54,4 +64,31 @@ for (const relativePath of fixes) {
 
 if (applied > 0) {
   console.log(`[apply-vendor-fixes] Applied ${applied} vendor fix(es) to node_modules.`);
+}
+
+// Zoom 2.6.1's preview canvas can retain its camera subscription when removed.
+// Stop it before releasing the view, including cancellation before session join.
+const zoomViewPath = join(
+  rootDir,
+  'node_modules/@zoom/react-native-videosdk/ios/RNZoomView.m',
+);
+if (existsSync(zoomViewPath)) {
+  const text = readFileSync(zoomViewPath, 'utf8');
+  if (!text.includes('ICONIC stop detached preview')) {
+    const anchor = 'if (newSuperview == nil) {';
+    if (!text.includes(anchor))
+      throw new Error('Review the Zoom preview cleanup fix for this SDK version');
+    writeFileSync(
+      zoomViewPath,
+      text.replace(
+        anchor,
+        `${anchor}
+        // ICONIC stop detached preview
+        if (preview) {
+            [[[ZoomVideoSDK shareInstance] getVideoHelper] stopVideoCanvasPreview:self];
+            preview = NO;
+        }`,
+      ),
+    );
+  }
 }

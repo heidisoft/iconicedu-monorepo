@@ -1,7 +1,9 @@
-import { Linking, Alert } from 'react-native';
+import { Linking, Alert, NativeModules } from 'react-native';
+import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { apiPost } from '@/lib/api/http-client';
 import { openLiveSession, getLiveSessionShareUrl } from './open-live-session';
+jest.mock('expo-router', () => ({ router: { navigate: jest.fn() } }));
 jest.mock('expo-web-browser', () => ({
   openBrowserAsync: jest.fn(),
   WebBrowserPresentationStyle: { FULL_SCREEN: 'fullScreen' },
@@ -10,6 +12,7 @@ jest.mock('@/lib/api/http-client', () => ({ apiPost: jest.fn() }));
 describe('mobile meeting browser and sharing', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    delete NativeModules.RNZoomVideoSdk;
     process.env.EXPO_PUBLIC_WEB_URL = 'https://app.invalid';
     jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
     jest.spyOn(Alert, 'alert').mockImplementation(() => {});
@@ -41,6 +44,16 @@ describe('mobile meeting browser and sharing', () => {
     });
     expect(await getLiveSessionShareUrl('/live/aaaa-bbbb-cccc')).toContain('#invite=');
     expect(apiPost).toHaveBeenCalledWith('/live-sessions/aaaa-bbbb-cccc/invite-link', {});
+  });
+  it('opens the native preview when this binary includes the SDK', async () => {
+    NativeModules.RNZoomVideoSdk = {};
+    await openLiveSession('/live/aaaa-bbbb-cccc');
+    expect(router.navigate).toHaveBeenCalledWith({
+      pathname: '/classroom/[sessionId]',
+      params: { sessionId: 'aaaa-bbbb-cccc' },
+    });
+    expect(apiPost).not.toHaveBeenCalled();
+    expect(WebBrowser.openBrowserAsync).not.toHaveBeenCalled();
   });
   it('leaves external providers on their own links', async () => {
     await openLiveSession('https://zoom.invalid/meeting');

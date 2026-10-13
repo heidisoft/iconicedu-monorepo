@@ -1,0 +1,87 @@
+# Native classroom development and verification
+
+## Purpose
+
+Build and verify the app-owned classroom on iPad/iPhone and Android phones/tablets. Ordinary external Zoom links continue to open the external meeting application. Native Video SDK sessions and ordinary Zoom meetings are separate products.
+
+## Build configuration
+
+Use Node and pnpm versions pinned by the repository. The mobile app includes `@zoom/react-native-videosdk` 2.6.1, whose native dependencies use Zoom Video SDK 2.6.0. Android requires API 28 (Android 9) or newer. The iOS application and broadcast extension target iOS/iPadOS 15.1 or newer. Fire OS/Silk compatibility must be checked on the specific tablet; Android ancestry alone does not establish SDK support.
+
+```bash
+pnpm install --frozen-lockfile
+pnpm --filter @iconicedu/utils build
+pnpm --filter mobile canvas:build
+pnpm --filter mobile native:prebuild
+cd apps/mobile/ios
+pod install
+```
+
+The Expo plugin at `apps/mobile/plugins/with-native-classroom.js` generates native host controls, Android foreground services and the iOS `ClassroomBroadcast` ReplayKit extension. Re-running prebuild must preserve one extension and one source reference for each native bridge. Commit the generated native project changes together with the plugin/templates because this repository tracks native projects.
+
+Register the App Group `group.com.heidisoft.iconicedu.classroom` for the main application and the extension `com.heidisoft.iconicedu.classroom-broadcast` in Apple Developer signing configuration. EAS extension metadata is supplied by the plugin. Full-device sharing requires the user's system broadcast approval; the app cannot suppress this approval. Android also requires system MediaProjection approval and displays foreground notifications for active meeting audio/sharing.
+
+SDK keys and secrets belong only in `apps/api`; never add them to Expo public environment variables. The API's existing Zoom SDK configuration is described in [deployment](../operations/deployment.md). Native clients use the same authenticated join/admission endpoints as web. The application passcode is an API admission credential, not a Zoom transport session password.
+
+A new store/development binary is required for native dependency, entitlement, extension and service changes. The app uses Expo fingerprint runtime versions so an OTA update cannot deliver native SDK JavaScript to an incompatible older binary. Older binaries retain personal browser handoffs. A tablet below Android 9 cannot install the new native build and must retain an existing supported meeting route.
+
+## Classroom boundaries
+
+- Signed-in identity and enrolled-student selection come from the API. Native join links carry a meeting identifier; SDK credentials are renewed when Join is pressed. Preview remains an explicit step.
+- One SDK provider owns the application lifecycle. Route cleanup removes subscriptions and leaves the active session; joining never automatically reclaims host. Eligible teachers/staff claim host explicitly with confirmation. Co-host assignment does not replace the host.
+- The app-owned whiteboard uses a bundled offline Excalidraw canvas with the same scene contract and educational assets as web. API capabilities stay in native code and never enter the WebView. Latin drawing fonts are bundled offline; CJK glyphs use device fallback fonts. The API checks editing and presentation permissions. Save retries retain operation IDs, and pending drawings are recovered locally for the same authorized board. PNG exports use the native share sheet.
+- Screen annotations use the same API rooms and normalized object coordinates as web. Native overlays fit the received content rectangle rather than the surrounding letterbox. A composited share from web already contains its annotations and must not receive duplicate permanent overlays.
+- Cloud recording records SDK media. To include the app-owned board or other native UI, the presenter must approve device screen broadcasting. Drawing on the board alone does not silently start an operating-system broadcast.
+
+## Automated verification
+
+Run focused tests and then the repository's full CI command:
+
+```bash
+pnpm --filter mobile test --runInBand src/lib/classroom src/components/classroom src/lib/messages/open-live-session.test.ts
+pnpm run ci
+```
+
+The tests cover short-code resolution, API-derived identity, parent selection, admission approval, SDK event mapping, preview/join lifecycle, duplicate joins, permission boundaries, cleanup, web-compatible commands and whiteboard recovery. Native compilation is a separate check; TypeScript/Jest cannot prove a native binary links or loads.
+
+For deterministic tablet UI tests, install a development binary and Maestro. Start the dedicated Metro instance with non-production API/Supabase configuration:
+
+```bash
+pnpm --filter mobile canvas:build
+pnpm --filter mobile exec expo start --dev-client --port 8085 --lan
+maestro --device YOUR_DEVICE_ID test apps/mobile/.maestro/classroom-ui.yaml apps/mobile/.maestro/classroom-join-failure.yaml apps/mobile/.maestro/classroom-moderation.yaml apps/mobile/.maestro/classroom-student.yaml apps/mobile/.maestro/classroom-export.yaml
+node apps/mobile/scripts/verify-classroom-export.mjs ios YOUR_DEVICE_ID
+```
+
+The simulator bootstrap opens the development client at `http://127.0.0.1:8085`. On physical tablets, open the development client using the reachable LAN address before running the live flows. Android emulators can use `adb reverse tcp:8085 tcp:8085`. The fixture route is unavailable in release builds. It initializes the actual native SDK and uses deterministic meeting/API adapters for UI scenarios. These flows do **not** prove live Zoom connectivity or media transmission.
+
+For live tests, sign a non-production account into the app, configure the API with a non-production Zoom Video SDK account, and start a dedicated classroom. Keep a second web/native participant connected for moderation and collaboration checks:
+
+```bash
+maestro --device YOUR_DEVICE_ID test -e SESSION_ID=YOUR_TEST_SESSION_ID -e DISPLAY_NAME="Native test teacher" apps/mobile/.maestro/classroom-live.yaml
+maestro --device YOUR_DEVICE_ID test -e SESSION_ID=YOUR_TEST_SESSION_ID -e PEER_NAME="Native test student" apps/mobile/.maestro/classroom-live-host.yaml
+```
+
+Keep account passwords, JWTs and invitation capabilities out of flow files, CLI arguments, screenshots and test artifacts. Meeting identifiers and synthetic display names are sufficient after signing in.
+
+## Physical-device release checks
+
+Before enabling native classroom use for teachers, verify the following on a real iPad and representative Android tablets, with a web participant in the same session:
+
+| Scenario                | Required observation                                                                                                                                     |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Preview and permissions | Camera preview appears before joining; denied permissions remain recoverable; no repeated name/password entry.                                           |
+| Audio self-check        | Microphone recording/activity and speaker playback use the selected route; tests stop before joining or leaving.                                         |
+| Collaboration           | Drawing, editing permissions, educational assets, presentation changes and screen annotations agree between native and web participants.                 |
+| Screen broadcasting     | OS approval appears; another participant receives the screen; cancellation, stopping and leaving remove the broadcast/notification.                      |
+| Host/co-host            | Joining leaves the existing host in place; explicit claim, assignment, revocation and end-for-all affect the intended participants.                      |
+| Recording               | The indicator follows provider state; existing recording is observed; the final recording includes media and explicitly broadcast classroom content.     |
+| Recovery                | Background/foreground, lock/unlock, Bluetooth changes, incoming calls, Wi-Fi/mobile-data switching and process restart preserve a recoverable join path. |
+| Device limits           | Portrait/landscape, split-screen and touch/stylus work on each supported tablet without hiding controls or losing unsaved changes.                       |
+
+A simulator run is useful evidence for navigation, layout and bridge loading. It is not evidence for physical camera, Bluetooth, interruptions, ReplayKit broadcasting or Fire tablet support.
+
+## References
+
+- [Zoom React Native SDK setup](https://developers.zoom.us/docs/video-sdk/react-native/get-started/)
+- [Zoom native screen sharing](https://developers.zoom.us/docs/video-sdk/react-native/share/)

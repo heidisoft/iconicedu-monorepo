@@ -1867,6 +1867,16 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - react-native-zoom-video-sdk (2.6.1):
+    - React-Core
+    - ZoomVideoSDK/CptShare (= 2.6.0)
+    - ZoomVideoSDK/util (= 2.6.0)
+    - ZoomVideoSDK/Whiteboard (= 2.6.0)
+    - ZoomVideoSDK/zContext (= 2.6.0)
+    - ZoomVideoSDK/zm_annoter_dynamic (= 2.6.0)
+    - ZoomVideoSDK/zoomcml (= 2.6.0)
+    - ZoomVideoSDK/ZoomTask (= 2.6.0)
+    - ZoomVideoSDK/ZoomVideoSDK (= 2.6.0)
   - React-NativeModulesApple (0.83.2):
     - hermes-engine
     - React-callinvoker
@@ -2566,6 +2576,15 @@ PODS:
     - libwebp (~> 1.0)
     - SDWebImage/Core (~> 5.17)
   - Yoga (0.0.0)
+  - ZoomVideoSDK/CptShare (2.6.0)
+  - ZoomVideoSDK/util (2.6.0)
+  - ZoomVideoSDK/Whiteboard (2.6.0)
+  - ZoomVideoSDK/zContext (2.6.0)
+  - ZoomVideoSDK/zm_annoter_dynamic (2.6.0)
+  - ZoomVideoSDK/zoomcml (2.6.0)
+  - ZoomVideoSDK/ZoomTask (2.6.0)
+  - ZoomVideoSDK/ZoomVideoSDK (2.6.0)
+  - ZoomVideoSDK/ZoomVideoSDKScreenShare (2.6.0)
 
 DEPENDENCIES:
   - EASClient (from `../../../node_modules/expo-eas-client/ios`)
@@ -2649,6 +2668,7 @@ DEPENDENCIES:
   - react-native-pdf (from `../../../node_modules/react-native-pdf`)
   - react-native-safe-area-context (from `../../../node_modules/react-native-safe-area-context`)
   - react-native-webview (from `../../../node_modules/react-native-webview`)
+  - "react-native-zoom-video-sdk (from `../../../node_modules/@zoom/react-native-videosdk`)"
   - React-NativeModulesApple (from `../../../node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios`)
   - React-networking (from `../../../node_modules/react-native/ReactCommon/react/networking`)
   - React-oscompat (from `../../../node_modules/react-native/ReactCommon/oscompat`)
@@ -2691,6 +2711,7 @@ DEPENDENCIES:
   - RNSVG (from `../../../node_modules/react-native-svg`)
   - RNWorklets (from `../../../node_modules/react-native-worklets`)
   - Yoga (from `../../../node_modules/react-native/ReactCommon/yoga`)
+  - ZoomVideoSDK/ZoomVideoSDKScreenShare (= 2.6.0)
 
 SPEC REPOS:
   trunk:
@@ -2703,6 +2724,7 @@ SPEC REPOS:
     - SDWebImageAVIFCoder
     - SDWebImageSVGCoder
     - SDWebImageWebPCoder
+    - ZoomVideoSDK
 
 EXTERNAL SOURCES:
   EASClient:
@@ -2866,6 +2888,8 @@ EXTERNAL SOURCES:
     :path: "../../../node_modules/react-native-safe-area-context"
   react-native-webview:
     :path: "../../../node_modules/react-native-webview"
+  react-native-zoom-video-sdk:
+    :path: "../../../node_modules/@zoom/react-native-videosdk"
   React-NativeModulesApple:
     :path: "../../../node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios"
   React-networking:
@@ -2990,7 +3014,7 @@ SPEC CHECKSUMS:
   EXUpdates: ac6732d200efef590f4056c333a21f587fc383fe
   EXUpdatesInterface: 4c11f4d1594526258f14d09817dc407acbf24e3b
   FBLazyVector: 32e9ed0301d0fcbc1b2b341dd7fcbf291f51eb83
-  hermes-engine: 464d9724570414be54e976f7cc0219bc25a4466c
+  hermes-engine: fa54667132ea5a41b51c914458de94156c2d2618
   libavif: 5f8e715bea24debec477006f21ef9e95432e254d
   libdav1d: 23581a4d8ec811ff171ed5e2e05cd27bad64c39f
   libwebp: 02b23773aedb6ff1fd38cec7a77b81414c6842a8
@@ -3005,7 +3029,7 @@ SPEC CHECKSUMS:
   React: f4edc7518ccb0b54a6f580d89dd91471844b4990
   React-callinvoker: 79ef4e3f1c021571f6d2dafbe45ca432b2f3a146
   React-Core: c19ad4660fd48bc8abc060d979f8ee37f1fc4a5a
-  React-Core-prebuilt: 093bb7e6a34d019fcceb246bdce9ebf5608ff941
+  React-Core-prebuilt: b87cecec9d6596e81130dbe97862ee111fcf3579
   React-CoreModules: f94ec3ee2bac588d033ad15a2377af746284f8c8
   React-cxxreact: de66364f2d5fb77d3da3cfa927b2fd960892c711
   React-debug: 4f6739c820d7da9c20f48caa985573b6a847e5f5
@@ -3037,6 +3061,7 @@ SPEC CHECKSUMS:
   react-native-pdf: dac049a15aec41db452e372f85184d3f15741b12
   react-native-safe-area-context: 37e680fc4cace3c0030ee46e8987d24f5d3bdab2
   react-native-webview: 0ed52ddb2eafc64a502871218440b8b4d37961c3
+  react-native-zoom-video-sdk: 2995ec535b6a34464373bea86ca68c98d3b4a686
   React-NativeModulesApple: f9fa097fc24cec967b77bfc05f72d2ea7db05b87
   React-networking: 29a9ae1a2e6ce8bb19174cc47110b36ae7ffcbcd
   React-oscompat: 856e980339052dc5a35980a498e24dd8480acf29
@@ -3070,7 +3095,7 @@ SPEC CHECKSUMS:
   ReactAppDependencyProvider: d69159b417e8c9d82b8fe4d0a27def4c3e8f767f
   ReactCodegen: 8c1129cb67e7c89999985ea34e7f01a47fe84280
   ReactCommon: 8868269b67561136a7970be188b40738135af077
-  ReactNativeDependencies: 37ddd33a9b29f3c419ee202e1cd067080c09b1b7
+  ReactNativeDependencies: 798b86f44d1a4e57ce8c77899b71b636b1bc3de9
   RNCAsyncStorage: 3a4f5e2777dae1688b781a487923a08569e27fe4
   RNDateTimePicker: 9c0a849bbe1c256f0854fea255734b715f5ea876
   RNGestureHandler: 5494787ce29288a8941fa825663f2b1fa0a5aaf1
@@ -3083,7 +3108,8 @@ SPEC CHECKSUMS:
   SDWebImageSVGCoder: 15a300a97ec1c8ac958f009c02220ac0402e936c
   SDWebImageWebPCoder: e38c0a70396191361d60c092933e22c20d5b1380
   Yoga: dd994d8c85dca5cc9b10f5df8c01f9ef1d0da191
+  ZoomVideoSDK: 9ec537e245a54bbd0bf89e53a478518f21eb6591
 
-PODFILE CHECKSUM: 5c37dfa29ef22647c706d5a58222463e62ded32d
+PODFILE CHECKSUM: 7bc2a3ffcbe65a14109d9e4267707f18a667d576
 
 COCOAPODS: 1.17.0

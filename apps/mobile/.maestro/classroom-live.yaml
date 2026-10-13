@@ -1,0 +1,27 @@
+appId: com.heidisoft.iconicedu
+name: Live Zoom native join and leave - signed-in test account required
+---
+- openLink: 'iconicedu://classroom/${SESSION_ID}'
+- tapOn:
+    text: 'Open'
+    optional: true
+- tapOn:
+    text: 'Allow'
+    optional: true
+- tapOn:
+    text: 'Allow'
+    optional: true
+- extendedWaitUntil:
+    visible: 'Ready to join\?'
+    timeout: 30000
+- assertVisible: '${DISPLAY_NAME}'
+- assertNotVisible: 'Session passcode'
+- tapOn: 'Turn camera off'
+- tapOn: 'Join now'
+- extendedWaitUntil:
+    visible: 'Leave meeting'
+    timeout: 45000
+- assertNotVisible: 'Unable to join.*'
+- tapOn: 'Leave meeting'
+- tapOn: 'Leave'
+- assertVisible: 'You left the classroom'

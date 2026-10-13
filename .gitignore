@@ -36,3 +36,6 @@ apps/web/.vercel/
 # live under paths that look like build output ("build" rule above) but
 # aren't — keep them trackable.
 !scripts/vendor-fixes/**
+
+# Offline drawing runtime generated for native builds.
+apps/mobile/src/components/classroom/canvas/canvas.generated.ts

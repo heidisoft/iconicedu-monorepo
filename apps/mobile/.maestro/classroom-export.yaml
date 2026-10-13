@@ -1,0 +1,30 @@
+appId: com.heidisoft.iconicedu
+name: Native whiteboard assets and PNG export
+---
+- runFlow: bootstrap.yaml
+- openLink: iconicedu://classroom-fixture
+- tapOn:
+    text: 'Open'
+    optional: true
+- extendedWaitUntil:
+    visible: 'Ready to join\?'
+    timeout: 30000
+- tapOn: 'Turn camera off'
+- scrollUntilVisible:
+    element: 'Join now'
+- tapOn: 'Join now'
+- scrollUntilVisible:
+    element: 'Whiteboard'
+- tapOn: 'Whiteboard'
+- extendedWaitUntil:
+    visible: 'Export whiteboard image'
+    timeout: 30000
+- tapOn: 'Educational library'
+- tapOn: 'Number line'
+- extendedWaitUntil:
+    visible:
+      text: 'Export whiteboard image'
+      enabled: true
+    timeout: 20000
+- tapOn: 'Export whiteboard image'
+- takeScreenshot: native-whiteboard-export

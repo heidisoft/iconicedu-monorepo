@@ -1,0 +1,17 @@
+appId: com.heidisoft.iconicedu
+name: Open the native development build used by classroom UI tests
+---
+- stopApp
+- openLink: 'iconicedu://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A8085'
+- tapOn:
+    text: 'Open'
+    optional: true
+- tapOn:
+    text: 'Continue'
+    optional: true
+- tapOn:
+    point: '50%,10%'
+- extendedWaitUntil:
+    visible:
+      id: 'native-sdk-ready'
+    timeout: 60000

@@ -14,7 +14,9 @@
       "backgroundColor": "#ffffff"
     },
     "platforms": ["ios", "android"],
-    "runtimeVersion": "1.0.0",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
     "updates": {
       "enabled": true,
       "url": "https://u.expo.dev/82adc837-03b9-4b58-93d5-93759e99417a",
@@ -26,16 +28,17 @@
       "bundleIdentifier": "com.heidisoft.iconicedu",
       "userInterfaceStyle": "automatic",
       "infoPlist": {
-        "NSCameraUsageDescription": "ICONIC Academy uses your camera only when you choose to take a photo, for example to add an image attachment to a class or direct message.",
+        "NSCameraUsageDescription": "ICONIC Academy uses your camera when you choose classroom video or take a photo, for example to join a live class or attach an image to a message.",
         "NSFaceIDUsageDescription": "ICONIC Academy uses Face ID only when you choose biometric access, for example to unlock your saved app session more securely.",
         "NSLocationWhenInUseUsageDescription": "ICONIC Academy uses your location during onboarding to detect your time zone and city, region, and country; for example, this helps show class times in your local time zone.",
-        "NSMicrophoneUsageDescription": "ICONIC Academy uses your microphone only when you choose to record audio, for example to send a voice message in a class or direct message conversation.",
+        "NSMicrophoneUsageDescription": "ICONIC Academy uses your microphone when you choose classroom audio or record a voice message, for example to speak during a live class.",
         "NSPhotoLibraryAddUsageDescription": "ICONIC Academy saves images to your photo library only when you choose to save a message image, for example keeping a class attachment for later.",
         "NSPhotoLibraryUsageDescription": "ICONIC Academy uses your photo library only when you choose an image, for example to attach a photo to a class or direct message."
       },
       "config": {
         "usesNonExemptEncryption": false
-      }
+      },
+      "buildNumber": "2"
     },
     "android": {
       "adaptiveIcon": {
@@ -48,7 +51,8 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.POST_NOTIFICATIONS"
-      ]
+      ],
+      "versionCode": 100
     },
     "plugins": [
       "expo-updates",
@@ -75,7 +79,8 @@
           "icon": "./assets/icon.png",
           "color": "#ffffff"
         }
-      ]
+      ],
+      "./plugins/with-native-classroom"
     ],
     "extra": {
       "router": {},
