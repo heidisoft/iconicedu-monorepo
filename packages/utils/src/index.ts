@@ -91,3 +91,6 @@ export function createEnumNormalizer<T extends string>(allowedValues: readonly T
     return null;
   };
 }
+export * from './annotations/coordinates';
+export * from './annotations/state';
+export * from './annotations/participant-color';

@@ -1,0 +1,10 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+select plan(5);
+select ok((select relrowsecurity from pg_class where oid = 'public.screen_annotation_pointers'::regclass), 'pointer presence has RLS enabled');
+select ok(not has_table_privilege('anon', 'public.screen_annotation_pointers', 'SELECT'), 'anonymous clients cannot read pointers directly');
+select ok(not has_table_privilege('authenticated', 'public.screen_annotation_pointers', 'SELECT'), 'authenticated clients cannot bypass meeting scope');
+select ok(not has_table_privilege('authenticated', 'public.screen_annotation_pointers', 'INSERT'), 'authenticated clients cannot spoof pointer identity');
+select ok(has_table_privilege('service_role', 'public.screen_annotation_pointers', 'INSERT'), 'authorized API can publish pointers');
+select * from finish();
+rollback;

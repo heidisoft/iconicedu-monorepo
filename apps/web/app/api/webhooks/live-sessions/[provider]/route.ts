@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import type { LiveSessionProviderVM } from '@iconicedu/shared-types';
+import { handleProviderWebhookChallenge } from '@iconicedu/live-sessions-core';
 import { processLiveSessionProviderWebhook } from '@iconicedu/web/lib/live-sessions/service';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 
@@ -22,6 +23,18 @@ export async function POST(
     }
 
     const body = await request.text();
+
+    // Some providers (e.g. Zoom) send a one-time, unsigned pre-pipeline
+    // handshake before any real events — handled generically via the
+    // adapter's optional handleWebhookChallenge, not a provider name check.
+    const challenge = handleProviderWebhookChallenge(
+      provider,
+      JSON.parse(body) as Record<string, unknown>,
+    );
+    if (challenge) {
+      return NextResponse.json(challenge);
+    }
+
     const result = await processLiveSessionProviderWebhook({
       supabase: createSupabaseServiceClient(),
       provider,

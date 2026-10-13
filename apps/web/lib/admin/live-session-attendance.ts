@@ -1,4 +1,5 @@
 import type {
+  LiveSessionQualityEventVM,
   LiveSessionAttendanceDetailVM,
   LiveSessionAttendanceFilterVM,
   LiveSessionAttendanceListItemVM,
@@ -12,6 +13,7 @@ import {
   getLiveSessionAttendanceDetailRows,
   listLiveSessionAttendanceRows,
 } from '@iconicedu/web/lib/admin/live-session-attendance.query';
+import { createApiClient } from '@iconicedu/web/lib/api/http-client';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 
 export async function getAdminLiveSessionAttendanceList(
@@ -80,4 +82,19 @@ export async function getAdminLiveSessionAttendanceDetail(
     profiles: rows.profiles,
     starterProfile: rows.starterProfile,
   });
+}
+
+export type LiveSessionQualityEventRow = LiveSessionQualityEventVM;
+
+export async function getAdminLiveSessionQualityEvents(
+  orgId: string,
+  liveSessionId: string,
+): Promise<LiveSessionQualityEventVM[]> {
+  if (!orgId || !liveSessionId) return [];
+  const supabase = await createSupabaseServerClient();
+  return createApiClient(supabase).get<LiveSessionQualityEventVM[]>(
+    `/live-sessions/${encodeURIComponent(liveSessionId)}/quality-events`,
+    { orgId },
+    { cache: 'no-store' },
+  );
 }

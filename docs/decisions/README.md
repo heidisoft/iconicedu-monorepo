@@ -10,7 +10,7 @@ Engineers who need rationale for technical choices or need to record a new decis
 
 ## Last Updated
 
-2026-08-14
+2026-10-03
 
 ## Related Docs
 
@@ -23,12 +23,13 @@ ADRs are written when a decision is made and are **never deleted** — if a deci
 
 ## Index
 
-| ADR                                       | Title                                  | Status   |
-| ----------------------------------------- | -------------------------------------- | -------- |
-| [001](001-monorepo-turborepo-pnpm.md)     | Monorepo with Turborepo and pnpm       | Accepted |
-| [002](002-supabase.md)                    | Supabase as database and auth platform | Accepted |
-| [003](003-expo-react-native.md)           | Expo for cross-platform mobile         | Accepted |
-| [004](004-api-first-frontend-boundary.md) | API-first frontend data boundary       | Accepted |
+| ADR                                        | Title                                           | Status   |
+| ------------------------------------------ | ----------------------------------------------- | -------- |
+| [001](001-monorepo-turborepo-pnpm.md)      | Monorepo with Turborepo and pnpm                | Accepted |
+| [002](002-supabase.md)                     | Supabase as database and auth platform          | Accepted |
+| [003](003-expo-react-native.md)            | Expo for cross-platform mobile                  | Accepted |
+| [004](004-api-first-frontend-boundary.md)  | API-first frontend data boundary                | Accepted |
+| [005](005-zoom-video-sdk-live-sessions.md) | Zoom Video SDK as a live-session video provider | Accepted |
 
 ## Creating a new ADR
 

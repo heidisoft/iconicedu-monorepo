@@ -5,5 +5,6 @@ export const ADMIN_LIVE_SESSION_PROVIDER_OPTIONS: Array<{
   label: string;
 }> = [
   { value: 'daily', label: 'Daily Meetings' },
+  { value: 'zoom', label: 'Zoom (Video SDK)' },
   { value: 'custom', label: 'External' },
 ];

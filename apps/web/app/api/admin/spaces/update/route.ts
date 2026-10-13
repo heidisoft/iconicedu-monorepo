@@ -1,3 +1,4 @@
+import { saveClassroomMeetingSettings } from '@iconicedu/web/lib/admin/save-classroom-meeting-settings';
 import { NextResponse } from 'next/server';
 
 import { requireAdminAuthContext } from '@iconicedu/web/lib/admin/_auth-context';
@@ -37,6 +38,13 @@ export async function POST(request: Request) {
       orgId: auth.orgId,
       actorProfileId: auth.profileId,
     });
+    if (
+      payload!.liveSession?.enabled &&
+      payload!.liveSession.provider === 'zoom' &&
+      payload!.liveSession.settings
+    ) {
+      await saveClassroomMeetingSettings(learningSpaceId, payload!.liveSession.settings);
+    }
     return NextResponse.json({ success: true });
   } catch (error) {
     if (error instanceof ParentModeRequiredError) {

@@ -28,6 +28,7 @@ export type LiveSessionJoinAccessInput = {
   providerMetadata?: Record<string, unknown> | null;
   profileId: string;
   displayName: string;
+  isHost?: boolean;
 };
 
 export type LiveSessionJoinAccessResult = {
@@ -66,6 +67,14 @@ export interface LiveSessionProviderAdapter {
     headers: Headers;
     body: string;
   }): Promise<NormalizedLiveSessionParticipantEvent[]>;
+  /**
+   * Optional: answer a provider's own pre-pipeline webhook handshake (e.g.
+   * Zoom's unsigned one-time CRC validation request) before normalizeWebhook
+   * runs. Returns the response body to send back, or null if this payload
+   * isn't a challenge for this provider. Providers that don't have one (e.g.
+   * Daily) simply don't implement this method.
+   */
+  handleWebhookChallenge?(body: Record<string, unknown>): Record<string, unknown> | null;
 }
 
 export type ResolvedLiveSessionScope = {

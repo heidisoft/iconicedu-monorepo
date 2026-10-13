@@ -1,13 +1,19 @@
+import { useMeetingDialogLaunch } from '@/hooks/use-meeting-dialog-launch';
+import {
+  openLiveSession,
+  getLiveSessionShareUrl,
+} from '@/lib/messages/open-live-session';
+import { MeetingPasscode } from '@iconicedu/ui-native/components/MeetingPasscode';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
-  Linking,
   Modal,
   Pressable,
   Share,
+  Alert,
   type ViewStyle,
 } from 'react-native';
 import {
@@ -23,13 +29,11 @@ import {
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
-import { usePushConsent } from '@/providers/push-consent-provider';
 import { fetchSpaceChannelMetaByChannelId } from '@/lib/api/queries';
 import { useJoinLiveSession } from '@/hooks/use-join-live-session';
 import {
   isExternalJoinHref,
   resolveExternalJoinProviderLabel,
-  resolveJoinHrefForMobile,
 } from '@/lib/messages/live-session-join';
 import {
   MESSAGE_TITLE_FONT_SIZE,
@@ -176,12 +180,12 @@ export function SessionCard({
 }) {
   const { colors } = useTheme();
   const s = useMemo(() => makeStyles(colors), [colors]);
-  const { requestPushConsent } = usePushConsent();
   const joinLiveSession = useJoinLiveSession();
   const router = useRouter();
   const [externalJoinTarget, setExternalJoinTarget] = useState<{
     joinHref: string;
     providerLabel: string | null;
+    passcode?: string | null;
   } | null>(null);
   const [isResolvingJoin, setIsResolvingJoin] = useState(false);
 
@@ -219,18 +223,21 @@ export function SessionCard({
             params: { channelId: session.channelId!, tab: pressTarget },
           } as never)
       : undefined;
+  const meetingDialogLaunch = useMeetingDialogLaunch(Boolean(externalJoinTarget));
+
   const handleOpenJoinHref = useCallback((joinHref: string) => {
-    void Linking.openURL(resolveJoinHrefForMobile(joinHref));
+    void openLiveSession(joinHref);
   }, []);
   const handleShareJoinHref = useCallback(async () => {
     if (!externalJoinTarget?.joinHref) return;
     try {
+      const shareUrl = await getLiveSessionShareUrl(externalJoinTarget.joinHref);
       await Share.share({
-        message: externalJoinTarget.joinHref,
-        url: externalJoinTarget.joinHref,
+        message: shareUrl,
+        url: shareUrl,
       });
     } catch {
-      // best effort share
+      Alert.alert('Unable to share meeting', 'Please try again.');
     }
   }, [externalJoinTarget?.joinHref]);
   const handleJoin =
@@ -248,7 +255,6 @@ export function SessionCard({
               });
               return;
             }
-            void requestPushConsent();
             handleOpenJoinHref(session.meetingLink);
             return;
           }
@@ -265,12 +271,15 @@ export function SessionCard({
                 if (isExternalJoinHref(result.joinPath)) {
                   setExternalJoinTarget({
                     joinHref: result.joinPath,
-                    providerLabel: resolveExternalJoinProviderLabel(result.joinPath),
+                    passcode: result.passcode,
+                    providerLabel: resolveExternalJoinProviderLabel(
+                      result.joinPath,
+                      result.provider,
+                    ),
                   });
                   return;
                 }
 
-                void requestPushConsent();
                 handleOpenJoinHref(result.joinPath);
                 return;
               } catch {
@@ -286,12 +295,14 @@ export function SessionCard({
                 if (isExternalJoinHref(joinHref)) {
                   setExternalJoinTarget({
                     joinHref,
-                    providerLabel: resolveExternalJoinProviderLabel(joinHref),
+                    providerLabel: resolveExternalJoinProviderLabel(
+                      joinHref,
+                      channelMeta?.liveSession?.provider,
+                    ),
                   });
                   return;
                 }
 
-                void requestPushConsent();
                 handleOpenJoinHref(joinHref);
                 return;
               }
@@ -301,7 +312,6 @@ export function SessionCard({
               setIsResolvingJoin(false);
             }
 
-            void requestPushConsent();
             router.push({
               pathname: '/(app)/spaces/[channelId]',
               params: { channelId: session.channelId, tab: 'sessions' },
@@ -595,6 +605,7 @@ export function SessionCard({
         animationType="fade"
         transparent={true}
         visible={Boolean(externalJoinTarget)}
+        onDismiss={meetingDialogLaunch.onDismiss}
         onRequestClose={() => setExternalJoinTarget(null)}
       >
         <Pressable style={s.modalBackdrop} onPress={() => setExternalJoinTarget(null)}>
@@ -627,6 +638,11 @@ export function SessionCard({
                 {externalJoinTarget?.joinHref}
               </Text>
             </View>
+            <MeetingPasscode
+              passcode={externalJoinTarget?.passcode}
+              color={colors.text}
+              mutedColor={colors.textMuted}
+            />
             <View style={s.modalFooter}>
               <TouchableOpacity
                 style={[
@@ -647,8 +663,7 @@ export function SessionCard({
                 style={[s.modalButton, { backgroundColor: colors.action }]}
                 onPress={() => {
                   if (externalJoinTarget?.joinHref) {
-                    void requestPushConsent();
-                    handleOpenJoinHref(externalJoinTarget.joinHref);
+                    meetingDialogLaunch.queueLaunch(externalJoinTarget.joinHref);
                   }
                   setExternalJoinTarget(null);
                 }}

@@ -1,3 +1,9 @@
+import { useMeetingDialogLaunch } from '@/hooks/use-meeting-dialog-launch';
+import {
+  openLiveSession,
+  getLiveSessionShareUrl,
+} from '@/lib/messages/open-live-session';
+import { MeetingPasscode } from '@iconicedu/ui-native/components/MeetingPasscode';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
@@ -6,12 +12,12 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Linking,
   Image,
   Platform,
   Modal,
   Pressable,
   Share,
+  Alert,
   type LayoutChangeEvent,
 } from 'react-native';
 import {
@@ -47,7 +53,6 @@ import { profileAvatarColors } from '@/lib/profile-avatar-colors';
 import {
   isExternalJoinHref,
   resolveExternalJoinProviderLabel,
-  resolveJoinHrefForMobile,
 } from '@/lib/messages/live-session-join';
 
 const THEME_KEY_COLORS: Record<string, { bg: string; fg: string }> = {
@@ -115,7 +120,11 @@ export type ConversationHeaderProps = {
   liveJoinUrl?: string | null;
   onJoinPress?: () => void;
   /** Called to create/fetch a join href when no static `liveJoinUrl` is available. */
-  onResolveJoinHref?: () => Promise<string | null>;
+  onResolveJoinHref?: () => Promise<{
+    href: string;
+    provider?: string;
+    passcode?: string | null;
+  } | null>;
   secondaryAvatarSeed?: string | null;
   secondaryAvatarThemeKey?: string | null;
   secondaryAvatarRole?: string | null;
@@ -616,6 +625,7 @@ export function ConversationHeader({
   const [externalJoinTarget, setExternalJoinTarget] = useState<{
     joinHref: string;
     providerLabel: string | null;
+    passcode?: string | null;
   } | null>(null);
   const [isResolvingJoin, setIsResolvingJoin] = useState(false);
 
@@ -682,8 +692,10 @@ export function ConversationHeader({
     }
   }, [localTimeIcon]);
 
+  const meetingDialogLaunch = useMeetingDialogLaunch(Boolean(externalJoinTarget));
+
   const handleOpenJoinHref = useCallback((joinHref: string) => {
-    Linking.openURL(resolveJoinHrefForMobile(joinHref)).catch(() => null);
+    void openLiveSession(joinHref);
   }, []);
 
   const handleJoinPress = useCallback(async () => {
@@ -696,10 +708,15 @@ export function ConversationHeader({
     // static channel-level link, which is only a fallback for when the
     // dynamic handler isn't wired or fails.
     let joinHref: string | null = null;
+    let providerHint: string | undefined;
+    let passcode: string | null | undefined;
     if (onResolveJoinHref) {
       setIsResolvingJoin(true);
       try {
-        joinHref = await onResolveJoinHref();
+        const resolved = await onResolveJoinHref();
+        joinHref = resolved?.href ?? null;
+        providerHint = resolved?.provider;
+        passcode = resolved?.passcode;
       } catch {
         joinHref = null;
       } finally {
@@ -712,7 +729,8 @@ export function ConversationHeader({
     if (isExternalJoinHref(joinHref)) {
       setExternalJoinTarget({
         joinHref,
-        providerLabel: resolveExternalJoinProviderLabel(joinHref),
+        passcode,
+        providerLabel: resolveExternalJoinProviderLabel(joinHref, providerHint),
       });
       return;
     }
@@ -721,12 +739,13 @@ export function ConversationHeader({
   const handleShareJoinHref = useCallback(async () => {
     if (!externalJoinTarget?.joinHref) return;
     try {
+      const shareUrl = await getLiveSessionShareUrl(externalJoinTarget.joinHref);
       await Share.share({
-        message: externalJoinTarget.joinHref,
-        url: externalJoinTarget.joinHref,
+        message: shareUrl,
+        url: shareUrl,
       });
     } catch {
-      // best effort share
+      Alert.alert('Unable to share meeting', 'Please try again.');
     }
   }, [externalJoinTarget?.joinHref]);
 
@@ -970,6 +989,7 @@ export function ConversationHeader({
         animationType="fade"
         transparent={true}
         visible={Boolean(externalJoinTarget)}
+        onDismiss={meetingDialogLaunch.onDismiss}
         onRequestClose={() => setExternalJoinTarget(null)}
       >
         <Pressable style={s.modalBackdrop} onPress={() => setExternalJoinTarget(null)}>
@@ -985,6 +1005,11 @@ export function ConversationHeader({
               <Text style={s.modalLinkLabel}>Join link</Text>
               <Text style={s.modalLinkValue}>{externalJoinTarget?.joinHref}</Text>
             </View>
+            <MeetingPasscode
+              passcode={externalJoinTarget?.passcode}
+              color={colors.text}
+              mutedColor={colors.textMuted}
+            />
             <View style={s.modalFooter}>
               <TouchableOpacity
                 style={[s.modalButton, s.modalButtonSecondary]}
@@ -999,7 +1024,7 @@ export function ConversationHeader({
                 style={[s.modalButton, s.modalButtonPrimary]}
                 onPress={() => {
                   if (externalJoinTarget?.joinHref) {
-                    handleOpenJoinHref(externalJoinTarget.joinHref);
+                    meetingDialogLaunch.queueLaunch(externalJoinTarget.joinHref);
                   }
                   setExternalJoinTarget(null);
                 }}

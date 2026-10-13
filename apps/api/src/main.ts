@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from '@iconicedu/api/app.module';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -6,8 +7,15 @@ import { requestContextMiddleware } from '@iconicedu/api/observability/request-c
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
-  const app = await NestFactory.create(AppModule, { cors: true });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { cors: true });
+  // Trust exactly one hop (the platform's own edge proxy, e.g. Railway)
+  // so req.ip reflects the real client IP rather than the proxy's, and
+  // so a client can't spoof X-Forwarded-For to defeat IP-keyed rate
+  // limiting (see LiveSessionsPublicController's guest-join endpoint).
+  app.set('trust proxy', 1);
   app.use(requestContextMiddleware);
+  // Whiteboard batches are bounded to 1 MB by the API codec; allow parser overhead.
+  app.useBodyParser('json', { limit: '2mb' });
 
   app.useGlobalPipes(
     new ValidationPipe({

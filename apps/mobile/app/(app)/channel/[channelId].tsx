@@ -388,7 +388,11 @@ export default function ChannelConversationScreen() {
   const handleResolveJoinHref = useCallback(async () => {
     if (!channelId) return null;
     const result = await joinLiveSession.mutateAsync(channelId);
-    return result.joinPath;
+    return {
+      href: result.joinPath,
+      provider: result.provider,
+      passcode: result.passcode,
+    };
   }, [channelId, joinLiveSession]);
 
   useEffect(() => {

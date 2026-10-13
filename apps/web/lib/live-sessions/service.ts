@@ -2,6 +2,7 @@ import type { LiveSessionProviderVM, ProfileRow } from '@iconicedu/shared-types'
 
 import {
   getLiveSessionProvider,
+  hasOrgStaffRole,
   insertParticipantEvent,
   resolveAuthorizedLiveSessionProfileIds,
   verifyChannelMembership,
@@ -306,12 +307,27 @@ export async function resolveLiveSessionJoinAccess(input: {
     input.profile.display_name ??
     ([input.profile.first_name, input.profile.last_name].filter(Boolean).join(' ') ||
       'User');
+  // Host is a role, not a race — whoever happens to call join()/start the
+  // session first used to become "host" (started_by_profile_id), which let a
+  // student who joined early outrank the teacher. The educator always hosts;
+  // org staff (owner/admin/staff) also host so they can moderate/observe with
+  // full controls, matching the same bypass verifyChannelMembership grants
+  // them for access in the first place.
+  const isHost =
+    input.profile.kind === 'educator' ||
+    (await hasOrgStaffRole(
+      input.serviceSupabase,
+      sessionResponse.data.org_id,
+      authorizedProfileIds,
+    ));
+
   const joinAccess = await provider.getJoinAccess({
     sessionId: sessionResponse.data.id,
     providerSessionId: sessionResponse.data.provider_session_id ?? null,
     providerMetadata: sessionResponse.data.provider_metadata ?? {},
     profileId: input.profile.id,
     displayName,
+    isHost,
   });
 
   return {

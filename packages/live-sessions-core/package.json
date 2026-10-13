@@ -12,9 +12,11 @@
   "dependencies": {
     "@iconicedu/shared-types": "workspace:*",
     "@iconicedu/utils": "workspace:*",
-    "@supabase/supabase-js": "^2.86.0"
+    "@supabase/supabase-js": "^2.86.0",
+    "jsonwebtoken": "^9.0.2"
   },
   "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22"
   },
   "scripts": {

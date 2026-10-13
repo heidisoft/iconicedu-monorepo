@@ -1,0 +1,220 @@
+import { continuousCanvas } from './continuous-canvas';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  InternalServerErrorException,
+} from '@nestjs/common';
+import type {
+  WhiteboardLaserPresenceVM,
+  WhiteboardLaserSampleVM,
+  WhiteboardDocumentVM,
+  WhiteboardRole,
+  WhiteboardSnapshotVM,
+} from '@iconicedu/shared-types';
+import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
+import { hashWhiteboardToken } from './whiteboard-access';
+import {
+  applyWhiteboardOperation,
+  validateWhiteboardOperation,
+} from './whiteboard-document';
+
+@Injectable()
+export class WhiteboardsService {
+  private async access(token: string) {
+    if (!/^[\w-]{43}$/.test(token))
+      throw new ForbiddenException('Whiteboard access expired. Rejoin the class.');
+    const db = createSupabaseServiceClient();
+    const grant = await db
+      .from('classroom_whiteboard_access')
+      .select('board_id, role, live_session_id')
+      .eq('token_hash', hashWhiteboardToken(token))
+      .gt('expires_at', new Date().toISOString())
+      .maybeSingle();
+    if (grant.error || !grant.data)
+      throw new ForbiddenException('Whiteboard access expired. Rejoin the class.');
+    const session = await db
+      .from('channel_live_sessions')
+      .select('id, status, app_metadata')
+      .eq('id', grant.data.live_session_id)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (
+      session.error ||
+      !session.data ||
+      !['starting', 'live'].includes(session.data.status)
+    )
+      throw new ForbiddenException('This class has ended');
+    const meta = session.data.app_metadata as {
+      meetingSettings?: { whiteboard?: { enabled?: boolean } };
+    } | null;
+    if (meta?.meetingSettings?.whiteboard?.enabled === false)
+      throw new ForbiddenException('Whiteboard is disabled');
+    return {
+      db,
+      boardId: grant.data.board_id as string,
+      role: grant.data.role as WhiteboardRole,
+      sessionId: grant.data.live_session_id as string,
+    };
+  }
+  private async load(db: ReturnType<typeof createSupabaseServiceClient>, id: string) {
+    const board = await db
+      .from('classroom_whiteboards')
+      .select('id, revision, document, applied_operations')
+      .eq('id', id)
+      .single();
+    if (board.error) throw new InternalServerErrorException('Unable to load whiteboard');
+    return board.data as {
+      id: string;
+      revision: number;
+      document: WhiteboardDocumentVM;
+      applied_operations: string[];
+    };
+  }
+  async publishLaser(token: string, value: unknown) {
+    if (
+      !Array.isArray(value) ||
+      value.length > 64 ||
+      value.some(
+        (sample) =>
+          !sample ||
+          typeof sample.id !== 'string' ||
+          !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+            sample.id,
+          ) ||
+          !Number.isFinite(sample.x) ||
+          !Number.isFinite(sample.y) ||
+          Math.abs(sample.x) > 10_000_000 ||
+          Math.abs(sample.y) > 10_000_000 ||
+          !['down', 'up'].includes(sample.button),
+      )
+    ) {
+      throw new BadRequestException('Invalid laser samples');
+    }
+    const { db, boardId, role } = await this.access(token);
+    const board = await this.load(db, boardId);
+    if (role !== 'teacher' && !board.document.studentEditing)
+      throw new ForbiddenException('Participant annotation is disabled');
+    const samples: WhiteboardLaserSampleVM[] = value.map(({ id, x, y, button }) => ({
+      id,
+      x,
+      y,
+      button,
+    }));
+    const result = await db
+      .from('classroom_whiteboard_access')
+      .update({
+        laser_samples: samples,
+        laser_updated_at: new Date().toISOString(),
+      })
+      .eq('token_hash', hashWhiteboardToken(token));
+    if (result.error) throw new InternalServerErrorException('Unable to share laser');
+    return { ok: true };
+  }
+  async getLasers(token: string): Promise<WhiteboardLaserPresenceVM[]> {
+    const { db, boardId, sessionId } = await this.access(token);
+    const board = await this.load(db, boardId);
+    const now = Date.now();
+    const result = await db
+      .from('classroom_whiteboard_access')
+      .select('token_hash, role, laser_samples, laser_updated_at')
+      .eq('board_id', boardId)
+      .eq('live_session_id', sessionId)
+      .gt('expires_at', new Date(now).toISOString())
+      .gt('laser_updated_at', new Date(now - 3000).toISOString());
+    if (result.error) throw new InternalServerErrorException('Unable to load lasers');
+    return (result.data ?? [])
+      .filter(
+        (peer) =>
+          peer.token_hash !== hashWhiteboardToken(token) &&
+          (peer.role === 'teacher' || board.document.studentEditing),
+      )
+      .map((peer) => ({
+        actorId: peer.token_hash.slice(0, 16),
+        samples: peer.laser_samples as WhiteboardLaserSampleVM[],
+        expiresAt: Date.parse(peer.laser_updated_at) + 3000,
+      }));
+  }
+  async get(token: string): Promise<WhiteboardSnapshotVM>;
+  async get(
+    token: string,
+    revision: number,
+  ): Promise<WhiteboardSnapshotVM | Omit<WhiteboardSnapshotVM, 'document'>>;
+  async get(
+    token: string,
+    revision?: number,
+  ): Promise<WhiteboardSnapshotVM | Omit<WhiteboardSnapshotVM, 'document'>> {
+    const { db, boardId, role, sessionId } = await this.access(token);
+    const heartbeat = await db
+      .from('classroom_whiteboard_access')
+      .update({ last_seen_at: new Date().toISOString() })
+      .eq('token_hash', hashWhiteboardToken(token));
+    if (heartbeat.error)
+      throw new InternalServerErrorException('Unable to connect to whiteboard');
+    const board = await this.load(db, boardId);
+    const presence = await db
+      .from('classroom_whiteboard_access')
+      .select('token_hash, display_name, role')
+      .eq('board_id', boardId)
+      .eq('live_session_id', sessionId)
+      .gt('last_seen_at', new Date(Date.now() - 15_000).toISOString())
+      .gt('expires_at', new Date().toISOString());
+    if (presence.error)
+      throw new InternalServerErrorException('Unable to load whiteboard presence');
+    return {
+      id: board.id,
+      revision: board.revision,
+      actorId: hashWhiteboardToken(token).slice(0, 16),
+      // Saved content survives a call; presentation belongs to a live presenter grant.
+      // Legacy flags without an owner must never reopen a board on join.
+      presentationActive:
+        board.document.presenting === true &&
+        board.document.presentation?.sessionId === sessionId &&
+        (presence.data ?? []).some(
+          (p) =>
+            p.role === 'teacher' &&
+            p.token_hash.slice(0, 16) === board.document.presentation?.presenterId,
+        ),
+      ...(revision === board.revision
+        ? {}
+        : { document: continuousCanvas(board.document) }),
+      role,
+      presence: (presence.data ?? []).map((p) => ({
+        id: p.token_hash.slice(0, 16),
+        name: p.display_name,
+        role: p.role as WhiteboardRole,
+      })),
+    };
+  }
+  async mutate(token: string, value: unknown): Promise<WhiteboardSnapshotVM> {
+    const op = validateWhiteboardOperation(value);
+    const { db, boardId, role, sessionId } = await this.access(token);
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const board = await this.load(db, boardId);
+      // Check permissions even on replay: a lock cannot be bypassed with an old operation id.
+      const document = applyWhiteboardOperation(board.document, op, role);
+      if (board.applied_operations.includes(op.id)) return this.get(token);
+      if (op.type === 'presentation') {
+        if (op.enabled) {
+          document.presentation = {
+            presenterId: hashWhiteboardToken(token).slice(0, 16),
+            sessionId,
+          };
+        } else {
+          delete document.presentation;
+        }
+      }
+      const saved = await db.rpc('commit_classroom_whiteboard', {
+        p_board_id: boardId,
+        p_revision: board.revision,
+        p_document: document,
+        p_operation_id: op.id,
+      });
+      if (saved.error)
+        throw new InternalServerErrorException('Unable to save whiteboard');
+      if (saved.data === true) return this.get(token);
+    }
+    throw new ConflictException('Whiteboard is busy. Your changes will retry.');
+  }
+}

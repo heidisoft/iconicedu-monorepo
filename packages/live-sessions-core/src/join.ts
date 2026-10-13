@@ -5,6 +5,14 @@ import type {
 } from '@iconicedu/shared-types';
 
 import { getLiveSessionProvider } from './providers';
+import { getWebAppUrl } from './web-app-url';
+
+function buildZoomJoinUrl(sessionId: string, shareCode?: string | null): string {
+  const identifier = shareCode?.match(/^[a-f0-9]{12}$/)
+    ? shareCode.match(/.{4}/g)!.join('-')
+    : sessionId;
+  return new URL(`/live/${identifier}`, getWebAppUrl()).toString();
+}
 import {
   snapshotExpectedParticipantsForLiveSession,
   getLiveSessionAttendancePolicy,
@@ -31,6 +39,7 @@ export type ChannelLiveSessionRowRecord = {
   started_by_profile_id: string;
   started_message_id?: string | null;
   join_path: string;
+  share_code?: string | null;
   started_at: string;
   ended_at?: string | null;
   failed_at?: string | null;
@@ -58,13 +67,14 @@ type ChannelSummaryRow = {
   live_session_config?: Record<string, unknown> | null;
 };
 
-export type CreateOrJoinLiveSessionResult = {
-  sessionId: string;
-  joinPath: string;
-  status: ChannelLiveSessionRowRecord['status'];
-  created: boolean;
-  provider: LiveSessionProviderVM;
-};
+export type CreateOrJoinLiveSessionResult =
+  import('@iconicedu/shared-types').LiveSessionJoinLinkVM & {
+    sessionId: string;
+    joinPath: string;
+    status: ChannelLiveSessionRowRecord['status'];
+    created: boolean;
+    provider: LiveSessionProviderVM;
+  };
 
 type PostJoinSideEffectsScheduler = (task: () => Promise<void>) => void;
 
@@ -130,7 +140,7 @@ async function getChannelSummary(
  * apps/api's channels.service.ts hasRosterReadRole, which grants the same
  * org-role-based bypass for viewing a channel's roster.
  */
-async function hasOrgStaffRole(
+export async function hasOrgStaffRole(
   supabase: LiveSessionSupabaseClient,
   orgId: string,
   profileIds: string[],
@@ -436,6 +446,7 @@ export async function createOrJoinLiveSession(input: {
   };
   channelId: string;
   orgSlug: string;
+  meetingSettings?: import('@iconicedu/shared-types').LiveSessionSettingsVM;
   schedulePostJoinSideEffects?: PostJoinSideEffectsScheduler;
   onPostJoinSideEffectError?: (info: PostJoinSideEffectErrorInfo) => void;
 }): Promise<CreateOrJoinLiveSessionResult> {
@@ -498,7 +509,31 @@ export async function createOrJoinLiveSession(input: {
   }
 
   const now = new Date().toISOString();
-  const existingSession = activeSessionResponse.data ?? null;
+  let existingSession = activeSessionResponse.data ?? null;
+
+  if (existingSession && existingSession.provider !== liveSessionConfig.provider) {
+    // The channel's configured provider changed after this session started —
+    // reusing it would silently hand back a stale link for a provider the
+    // channel no longer uses. End it so a fresh session is created below
+    // under the current config instead. Safe: the active-scope unique index
+    // (channel_live_sessions_active_scope_idx) only blocks a second
+    // starting/live row for this scope, not a new one once this is 'ended'.
+    const endStaleSessionResponse = await input.serviceSupabase
+      .from('channel_live_sessions')
+      .update({
+        status: 'ended',
+        ended_at: now,
+        updated_at: now,
+        updated_by: profile.id,
+      })
+      .eq('id', existingSession.id)
+      .eq('org_id', existingSession.org_id);
+    if (endStaleSessionResponse.error) {
+      throw new Error(endStaleSessionResponse.error.message);
+    }
+    existingSession = null;
+  }
+
   if (existingSession) {
     await snapshotExpectedParticipantsForLiveSession({
       supabase: input.serviceSupabase,
@@ -537,7 +572,18 @@ export async function createOrJoinLiveSession(input: {
 
     return {
       sessionId: existingSession.id,
-      joinPath: existingSession.join_path,
+      ...(existingSession.provider === 'zoom'
+        ? {
+            passcode:
+              typeof existingSession.provider_metadata?.passcode === 'string'
+                ? existingSession.provider_metadata.passcode
+                : null,
+          }
+        : {}),
+      joinPath:
+        existingSession.provider === 'zoom'
+          ? buildZoomJoinUrl(existingSession.id, existingSession.share_code)
+          : existingSession.join_path,
       status: existingSession.status,
       created: false,
       provider: existingSession.provider as LiveSessionProviderVM,
@@ -566,6 +612,7 @@ export async function createOrJoinLiveSession(input: {
       attendance_policy: getLiveSessionAttendancePolicy(null),
       report_status: 'pending',
       app_metadata: {
+        ...(input.meetingSettings ? { meetingSettings: input.meetingSettings } : {}),
         channelTopic: channel.topic ?? null,
         learningSpaceId,
         mode: liveSessionConfig.mode ?? 'video',
@@ -629,7 +676,18 @@ export async function createOrJoinLiveSession(input: {
       );
       return {
         sessionId: fallbackSession.id,
-        joinPath: fallbackSession.join_path,
+        ...(fallbackSession.provider === 'zoom'
+          ? {
+              passcode:
+                typeof fallbackSession.provider_metadata?.passcode === 'string'
+                  ? fallbackSession.provider_metadata.passcode
+                  : null,
+            }
+          : {}),
+        joinPath:
+          fallbackSession.provider === 'zoom'
+            ? buildZoomJoinUrl(fallbackSession.id, fallbackSession.share_code)
+            : fallbackSession.join_path,
         status: fallbackSession.status,
         created: false,
         provider: fallbackSession.provider as LiveSessionProviderVM,
@@ -729,7 +787,11 @@ export async function createOrJoinLiveSession(input: {
       mode: liveSessionConfig.mode ?? 'video',
     });
 
-    const resolvedJoinPath = `/${input.orgSlug}/live-sessions/${session.id}`;
+    // The meeting code is a public locator. Passcodes are sent only in join POST bodies.
+    const resolvedJoinPath =
+      liveSessionConfig.provider === 'zoom'
+        ? buildZoomJoinUrl(session.id, session.share_code)
+        : `/${input.orgSlug}/live-sessions/${session.id}`;
     const updateResponse = await input.serviceSupabase
       .from('channel_live_sessions')
       .update({
@@ -793,6 +855,14 @@ export async function createOrJoinLiveSession(input: {
     return {
       sessionId: session.id,
       joinPath: resolvedJoinPath,
+      ...(liveSessionConfig.provider === 'zoom'
+        ? {
+            passcode:
+              typeof providerSession.providerMetadata?.passcode === 'string'
+                ? providerSession.providerMetadata.passcode
+                : null,
+          }
+        : {}),
       status: 'live',
       created: true,
       provider: liveSessionConfig.provider,

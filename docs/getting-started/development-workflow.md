@@ -296,3 +296,24 @@ Production configuration and deployment behavior are documented in the [deployme
 Local accounts come from [`supabase/seed.sql`](../../supabase/seed.sql) and use password `Seed123!`. The owner login is `iconicedudev@gmail.com`; role aliases are listed in the [setup guide](setup.md#6-sign-in-with-seed-data).
 
 Hosted preview credentials may differ. Read the generated PR preview comment and do not copy shared credentials into public issues, logs, screenshots, or documentation.
+
+## Meeting Device Validation
+
+Prioritize physical iPads used by students, then Android tablets/phones, with an
+iPhone smoke check. Record model, OS, browser, app build and permission state for
+each result. Browser emulation and iOS Simulator do not verify Bluetooth routing,
+real incoming calls or operating-system background suspension.
+
+Use synthetic accounts and an HTTPS test environment. Open a meeting from the
+signed-in app and verify preview, identity, camera/microphone choices and admission
+before joining. Test portrait, landscape and iPad split view. Refresh preview and
+the meeting; identity and approved admission should survive without name/password
+prompts. Explicit leave should clear tab recovery.
+
+In a live multi-user Zoom session, test app switching, screen lock/unlock, an
+incoming-call interruption, headset connection/disconnection, and switching Wi-Fi
+networks (or Wi-Fi/cellular where available). Confirm remote media behavior, device
+choices and muted/camera-off state after returning. Check automatic reconnection,
+then **Rejoin class** after a terminal failure. Verify explicit host claims,
+co-host moderation and guest admission with a second participant. Never infer
+background-media success from the browser remaining open.

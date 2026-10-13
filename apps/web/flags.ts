@@ -479,7 +479,46 @@ export const enableOrgAiProviderSettings = flag<boolean, { profileId?: string | 
   },
 });
 
+export const enableClassroomMeetingSettings = flag<
+  boolean,
+  { profileId?: string | null }
+>({
+  key: platformFeatureFlagKeys.enableClassroomMeetingSettings,
+  description:
+    'Enables configurable Classroom recording, collaboration, admission modes and co-host controls.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: platformFeatureFlagKeys.enableClassroomMeetingSettings,
+      profileId: entities?.profileId,
+    });
+  },
+});
+
+export const enableClassroomWhiteboard = flag<boolean, { profileId?: string | null }>({
+  key: platformFeatureFlagKeys.enableClassroomWhiteboard,
+  description:
+    'Uses the application collaborative whiteboard with Excalidraw by default.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: platformFeatureFlagKeys.enableClassroomWhiteboard,
+      profileId: entities?.profileId,
+    });
+  },
+});
+
 export const webFlags = {
+  enableClassroomWhiteboard,
+  enableClassroomMeetingSettings,
   enableAdminSessionAttendanceAnalytics,
   enableAiRefine,
   enableAiSuggestedReplies,

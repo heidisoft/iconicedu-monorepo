@@ -33,6 +33,20 @@ describe('Button', () => {
     );
   });
 
+  it('owns toolbar hover and selection colors in the shared variant', () => {
+    render(
+      <Button variant="toolbar" aria-pressed className="size-8 rounded-full">
+        Pen
+      </Button>,
+    );
+    expect(screen.getByRole('button', { name: 'Pen' })).toHaveClass(
+      'hover:bg-muted',
+      'aria-pressed:bg-primary/10',
+      'aria-pressed:text-primary',
+      'rounded-full',
+    );
+  });
+
   it('uses the destructive tokens for destructive actions', () => {
     render(<Button variant="destructive">Delete</Button>);
 

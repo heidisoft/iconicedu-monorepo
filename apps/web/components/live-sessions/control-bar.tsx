@@ -4,18 +4,18 @@ import {
   ChevronDown,
   Hand,
   Info,
-  MessageCircle,
+  MessageSquare,
   Mic,
-  MicOff,
   MonitorUp,
-  MoreVertical,
-  Phone,
+  Ellipsis,
+  PhoneOff,
   Settings,
   Users,
   Video,
   VideoOff,
 } from 'lucide-react';
 
+import { SpeakingAudioIcon } from '@iconicedu/ui-web/ui/speaking-audio-icon';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import {
   DropdownMenu,
@@ -35,6 +35,7 @@ interface ControlBarProps {
   currentCameraId?: string | null;
   meetingName: string;
   isMuted: boolean;
+  isSpeaking?: boolean;
   isVideoOn: boolean;
   isSharing: boolean;
   isDirectCall?: boolean;
@@ -61,6 +62,7 @@ export function ControlBar({
   currentCameraId,
   meetingName,
   isMuted,
+  isSpeaking = false,
   isVideoOn,
   isSharing,
   isDirectCall = false,
@@ -134,7 +136,11 @@ export function ControlBar({
               ].join(' ')}
               title={isMuted ? 'Unmute' : 'Mute'}
             >
-              {isMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+              <SpeakingAudioIcon
+                muted={isMuted}
+                speaking={isSpeaking}
+                className="size-5"
+              />
             </Button>
           </div>
 
@@ -222,7 +228,7 @@ export function ControlBar({
                 className="h-10 w-10 rounded-full"
                 title="More options"
               >
-                <MoreVertical className="h-5 w-5" />
+                <Ellipsis className="h-5 w-5" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="center" className="w-56">
@@ -246,7 +252,7 @@ export function ControlBar({
             {isEnding ? (
               <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
             ) : (
-              <Phone className="h-5 w-5 rotate-[135deg]" />
+              <PhoneOff className="h-5 w-5" />
             )}
           </Button>
         </div>
@@ -277,7 +283,7 @@ export function ControlBar({
                 className="h-10 w-10 rounded-full text-muted-foreground"
                 title="Chat"
               >
-                <MessageCircle className="h-5 w-5" />
+                <MessageSquare className="h-5 w-5" />
               </Button>
               <Button
                 size="icon"

@@ -18,6 +18,7 @@ vi.mock('@iconicedu/live-sessions-core', async (importOriginal) => {
   };
 });
 
+import { getLiveSessionProvider } from '@iconicedu/live-sessions-core';
 import { resolveLiveSessionJoinAccess } from '@iconicedu/web/lib/live-sessions/service';
 
 function createServiceSupabaseStub(input?: {
@@ -237,5 +238,84 @@ describe('resolveLiveSessionJoinAccess', () => {
         } as never,
       }),
     ).rejects.toThrow('Unauthorized');
+  });
+
+  it('hosts the educator regardless of who started the session', async () => {
+    const serviceSupabase = createServiceSupabaseStub({
+      activeLiveSessionRow: {
+        id: 'live-session-1',
+        org_id: 'org-1',
+        channel_id: 'channel-1',
+        provider: 'daily',
+        status: 'live',
+        // A student happened to call join()/start the session first — that
+        // must no longer make them the host (see resolveLiveSessionJoinAccess).
+        started_by_profile_id: 'profile-student-1',
+        provider_metadata: {},
+      },
+      memberProfileIds: ['profile-educator-1'],
+    });
+    const callIndexBefore = vi.mocked(getLiveSessionProvider).mock.calls.length;
+
+    await resolveLiveSessionJoinAccess({
+      serviceSupabase: serviceSupabase as never,
+      liveSessionId: 'live-session-1',
+      profile: {
+        id: 'profile-educator-1',
+        org_id: 'org-1',
+        account_id: 'account-educator-1',
+        kind: 'educator',
+        display_name: 'Jamie Educator',
+        first_name: 'Jamie',
+        last_name: 'Educator',
+      } as never,
+    });
+
+    const providerInstance = vi.mocked(getLiveSessionProvider).mock.results[
+      callIndexBefore
+    ].value as { getJoinAccess: ReturnType<typeof vi.fn> };
+    expect(providerInstance.getJoinAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ isHost: true }),
+    );
+  });
+
+  it('does not host a plain channel member who happened to start the session', async () => {
+    const serviceSupabase = createServiceSupabaseStub({
+      activeLiveSessionRow: {
+        id: 'live-session-1',
+        org_id: 'org-1',
+        channel_id: 'channel-1',
+        provider: 'daily',
+        status: 'live',
+        started_by_profile_id: 'profile-child-1',
+        provider_metadata: {},
+      },
+      memberProfileIds: ['profile-child-1'],
+      childProfiles: [
+        { id: 'profile-child-1', accountId: 'account-child-1', kind: 'child' },
+      ],
+    });
+    const callIndexBefore = vi.mocked(getLiveSessionProvider).mock.calls.length;
+
+    await resolveLiveSessionJoinAccess({
+      serviceSupabase: serviceSupabase as never,
+      liveSessionId: 'live-session-1',
+      profile: {
+        id: 'profile-child-1',
+        org_id: 'org-1',
+        account_id: 'account-child-1',
+        kind: 'child',
+        display_name: 'Riley Child',
+        first_name: 'Riley',
+        last_name: 'Child',
+      } as never,
+    });
+
+    const providerInstance = vi.mocked(getLiveSessionProvider).mock.results[
+      callIndexBefore
+    ].value as { getJoinAccess: ReturnType<typeof vi.fn> };
+    expect(providerInstance.getJoinAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ isHost: false }),
+    );
   });
 });

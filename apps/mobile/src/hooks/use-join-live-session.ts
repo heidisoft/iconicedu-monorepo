@@ -9,6 +9,7 @@ export type JoinLiveSessionResult = {
   status: 'starting' | 'live' | 'ended' | 'failed';
   created: boolean;
   provider: string;
+  passcode?: string | null;
 };
 
 export function useJoinLiveSession() {
