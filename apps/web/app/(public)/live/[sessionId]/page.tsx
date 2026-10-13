@@ -1,13 +1,15 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-import { LiveSessionSetup } from '@iconicedu/web/components/live-sessions/live-session-setup';
+import { LiveSessionLinkEntry } from '@iconicedu/web/components/live-sessions/live-session-link-entry';
 import { getLiveSessionReturnPath } from '@iconicedu/web/lib/live-sessions/navigation';
 import { getPublicLiveSessionInfo } from '@iconicedu/web/lib/live-sessions/public-info';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 
 export const metadata: Metadata = {
   title: 'Join Live Session',
+  robots: { index: false, follow: false },
+  referrer: 'no-referrer',
 };
 
 export default async function PublicLiveSessionPage({
@@ -18,7 +20,7 @@ export default async function PublicLiveSessionPage({
   searchParams: Promise<{ passcode?: string; returnTo?: string }>;
 }) {
   const { sessionId } = await params;
-  const { passcode, returnTo } = await searchParams;
+  const { returnTo } = await searchParams;
 
   // Forwarding the visitor's own access token (if signed in) lets apps/api
   // determine host status — everything else about this session (existence,
@@ -48,15 +50,19 @@ export default async function PublicLiveSessionPage({
     );
   }
 
-  // flag-exempt: maintenance fixes to identity, setup and leave navigation for existing sessions.
+  // flag-exempt: short meeting links are a core feature, enabled unconditionally at user request.
   return (
-    <LiveSessionSetup
+    <LiveSessionLinkEntry
       key={`${sessionId}:${authSession?.user?.id ?? 'guest'}`}
-      sessionId={sessionId}
+      sessionId={info.sessionId ?? sessionId}
+      sharePath={
+        info.shareCode ? `/live/${info.shareCode.match(/.{4}/g)!.join('-')}` : undefined
+      }
+      passcodeRequired={info.isHost ? false : (info.passcodeRequired ?? true)}
       sessionTitle={info.sessionTitle}
       settings={info.settings}
       initialCredentials={info.isHost ? info.hostJoin : null}
-      initialPasscode={info.isHost ? info.hostJoin.passcode : (passcode ?? null)}
+      initialPasscode={info.isHost ? info.hostJoin.passcode : null}
       participantName={
         info.isHost ? info.hostJoin.displayName : info.participant?.displayName
       }

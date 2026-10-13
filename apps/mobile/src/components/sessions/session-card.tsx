@@ -1,13 +1,18 @@
+import {
+  openLiveSession,
+  getLiveSessionShareUrl,
+} from '@/lib/messages/open-live-session';
+import { MeetingPasscode } from '@iconicedu/ui-native/components/MeetingPasscode';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
-  Linking,
   Modal,
   Pressable,
   Share,
+  Alert,
   type ViewStyle,
 } from 'react-native';
 import {
@@ -29,7 +34,6 @@ import { useJoinLiveSession } from '@/hooks/use-join-live-session';
 import {
   isExternalJoinHref,
   resolveExternalJoinProviderLabel,
-  resolveJoinHrefForMobile,
 } from '@/lib/messages/live-session-join';
 import {
   MESSAGE_TITLE_FONT_SIZE,
@@ -182,6 +186,7 @@ export function SessionCard({
   const [externalJoinTarget, setExternalJoinTarget] = useState<{
     joinHref: string;
     providerLabel: string | null;
+    passcode?: string | null;
   } | null>(null);
   const [isResolvingJoin, setIsResolvingJoin] = useState(false);
 
@@ -220,17 +225,18 @@ export function SessionCard({
           } as never)
       : undefined;
   const handleOpenJoinHref = useCallback((joinHref: string) => {
-    void Linking.openURL(resolveJoinHrefForMobile(joinHref));
+    void openLiveSession(joinHref);
   }, []);
   const handleShareJoinHref = useCallback(async () => {
     if (!externalJoinTarget?.joinHref) return;
     try {
+      const shareUrl = await getLiveSessionShareUrl(externalJoinTarget.joinHref);
       await Share.share({
-        message: externalJoinTarget.joinHref,
-        url: externalJoinTarget.joinHref,
+        message: shareUrl,
+        url: shareUrl,
       });
     } catch {
-      // best effort share
+      Alert.alert('Unable to share meeting', 'Please try again.');
     }
   }, [externalJoinTarget?.joinHref]);
   const handleJoin =
@@ -265,6 +271,7 @@ export function SessionCard({
                 if (isExternalJoinHref(result.joinPath)) {
                   setExternalJoinTarget({
                     joinHref: result.joinPath,
+                    passcode: result.passcode,
                     providerLabel: resolveExternalJoinProviderLabel(
                       result.joinPath,
                       result.provider,
@@ -633,6 +640,11 @@ export function SessionCard({
                 {externalJoinTarget?.joinHref}
               </Text>
             </View>
+            <MeetingPasscode
+              passcode={externalJoinTarget?.passcode}
+              color={colors.text}
+              mutedColor={colors.textMuted}
+            />
             <View style={s.modalFooter}>
               <TouchableOpacity
                 style={[

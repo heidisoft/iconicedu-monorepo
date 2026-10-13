@@ -7,16 +7,11 @@ import type {
 import { getLiveSessionProvider } from './providers';
 import { getWebAppUrl } from './web-app-url';
 
-function buildZoomJoinUrl(
-  sessionId: string,
-  providerMetadata: Record<string, unknown> | undefined,
-): string {
-  const url = new URL(`/live/${sessionId}`, getWebAppUrl());
-  const passcode = providerMetadata?.passcode;
-  if (typeof passcode === 'string' && passcode) {
-    url.searchParams.set('passcode', passcode);
-  }
-  return url.toString();
+function buildZoomJoinUrl(sessionId: string, shareCode?: string | null): string {
+  const identifier = shareCode?.match(/^[a-f0-9]{12}$/)
+    ? shareCode.match(/.{4}/g)!.join('-')
+    : sessionId;
+  return new URL(`/live/${identifier}`, getWebAppUrl()).toString();
 }
 import {
   snapshotExpectedParticipantsForLiveSession,
@@ -44,6 +39,7 @@ export type ChannelLiveSessionRowRecord = {
   started_by_profile_id: string;
   started_message_id?: string | null;
   join_path: string;
+  share_code?: string | null;
   started_at: string;
   ended_at?: string | null;
   failed_at?: string | null;
@@ -71,13 +67,14 @@ type ChannelSummaryRow = {
   live_session_config?: Record<string, unknown> | null;
 };
 
-export type CreateOrJoinLiveSessionResult = {
-  sessionId: string;
-  joinPath: string;
-  status: ChannelLiveSessionRowRecord['status'];
-  created: boolean;
-  provider: LiveSessionProviderVM;
-};
+export type CreateOrJoinLiveSessionResult =
+  import('@iconicedu/shared-types').LiveSessionJoinLinkVM & {
+    sessionId: string;
+    joinPath: string;
+    status: ChannelLiveSessionRowRecord['status'];
+    created: boolean;
+    provider: LiveSessionProviderVM;
+  };
 
 type PostJoinSideEffectsScheduler = (task: () => Promise<void>) => void;
 
@@ -575,7 +572,18 @@ export async function createOrJoinLiveSession(input: {
 
     return {
       sessionId: existingSession.id,
-      joinPath: existingSession.join_path,
+      ...(existingSession.provider === 'zoom'
+        ? {
+            passcode:
+              typeof existingSession.provider_metadata?.passcode === 'string'
+                ? existingSession.provider_metadata.passcode
+                : null,
+          }
+        : {}),
+      joinPath:
+        existingSession.provider === 'zoom'
+          ? buildZoomJoinUrl(existingSession.id, existingSession.share_code)
+          : existingSession.join_path,
       status: existingSession.status,
       created: false,
       provider: existingSession.provider as LiveSessionProviderVM,
@@ -668,7 +676,18 @@ export async function createOrJoinLiveSession(input: {
       );
       return {
         sessionId: fallbackSession.id,
-        joinPath: fallbackSession.join_path,
+        ...(fallbackSession.provider === 'zoom'
+          ? {
+              passcode:
+                typeof fallbackSession.provider_metadata?.passcode === 'string'
+                  ? fallbackSession.provider_metadata.passcode
+                  : null,
+            }
+          : {}),
+        joinPath:
+          fallbackSession.provider === 'zoom'
+            ? buildZoomJoinUrl(fallbackSession.id, fallbackSession.share_code)
+            : fallbackSession.join_path,
         status: fallbackSession.status,
         created: false,
         provider: fallbackSession.provider as LiveSessionProviderVM,
@@ -768,18 +787,10 @@ export async function createOrJoinLiveSession(input: {
       mode: liveSessionConfig.mode ?? 'video',
     });
 
-    // Zoom's join_path is a full shareable URL to a public landing page rather
-    // than a path relative to the app — this is what makes the client show it
-    // through the same "Session ready to join" copy-link popup used for
-    // external/custom providers (isExternalJoinHref just checks for http(s)://),
-    // instead of silently navigating straight into an embedded room. The
-    // passcode travels in the URL for members so clicking "Open Zoom" joins
-    // immediately; anyone the member shares this link with can join too (the
-    // public guest-join endpoint is the real access boundary, not the URL
-    // itself), and anyone who only has the bare URL enters it manually.
+    // The meeting code is a public locator. Passcodes are sent only in join POST bodies.
     const resolvedJoinPath =
       liveSessionConfig.provider === 'zoom'
-        ? buildZoomJoinUrl(session.id, providerSession.providerMetadata)
+        ? buildZoomJoinUrl(session.id, session.share_code)
         : `/${input.orgSlug}/live-sessions/${session.id}`;
     const updateResponse = await input.serviceSupabase
       .from('channel_live_sessions')
@@ -844,6 +855,14 @@ export async function createOrJoinLiveSession(input: {
     return {
       sessionId: session.id,
       joinPath: resolvedJoinPath,
+      ...(liveSessionConfig.provider === 'zoom'
+        ? {
+            passcode:
+              typeof providerSession.providerMetadata?.passcode === 'string'
+                ? providerSession.providerMetadata.passcode
+                : null,
+          }
+        : {}),
       status: 'live',
       created: true,
       provider: liveSessionConfig.provider,

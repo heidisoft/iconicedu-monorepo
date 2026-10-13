@@ -43,3 +43,5 @@ export {
   StyledImage,
   StyledFlatList,
 } from '@iconicedu/ui-native/utils/styled';
+
+export * from '@iconicedu/ui-native/components/MeetingPasscode';

@@ -68,3 +68,42 @@ recording client. No real meeting, account or hardware is required.
 ### Native Classroom whiteboard
 
 `classroom-whiteboard.spec.ts` runs the real Excalidraw UI against local API/Supabase, including two-context collaboration. Start API on 3001, web on 3000 and local Supabase, apply migrations, then run `PLAYWRIGHT_SKIP_WEBSERVER=1 pnpm --filter web exec playwright test classroom-whiteboard.spec.ts --workers=1`. The helper creates and cleans synthetic organizations in the local database container; no production URL is supported. This suite uses a development-only class entry and does not require Zoom credentials.
+
+### Meeting links and admission
+
+`meeting-link-admission.spec.ts` exercises the production link bootstrap, preview,
+refresh recovery, identity transfer, waiting-room UI and local API/PostgreSQL
+admission checks. Its helper creates isolated synthetic organizations and removes
+them after each test. Start local Supabase and API, apply all forward migrations,
+and start web before running:
+
+```bash
+PLAYWRIGHT_SKIP_WEBSERVER=1 pnpm --filter web exec playwright test e2e/meeting-link-admission.spec.ts --workers=1 --timeout=60000
+```
+
+The meeting renderer is injected; the API signs credentials normally, but tests
+never connect to Zoom. Live multi-user Zoom host/manager changes and physical
+phone audio routing/background interruptions require separate integration/device
+validation. The fixture is unavailable in production.
+
+`meeting-roles-audio.spec.ts` covers explicit host claiming, co-host assignment and
+revocation, disabled co-host controls, and speaker testing when microphone access
+is denied. Its development-only fixture uses production lifecycle helpers and
+People controls with a synthetic Zoom client. It verifies application behavior;
+it does not validate Zoom's remote role propagation.
+
+### iPad and Android tablet regression
+
+Install WebKit as well as Chromium, then run the tablet suite against local API,
+Supabase and the web development server:
+
+```bash
+pnpm --filter web exec playwright install webkit chromium
+PLAYWRIGHT_SKIP_WEBSERVER=1 pnpm --filter web exec playwright test --config=playwright.tablet.config.ts --workers=1 --timeout=60000
+```
+
+The suite runs link/admission and host/co-host tests under iPad WebKit and Android
+tablet Chromium profiles. It also covers portrait/landscape, narrow split-view
+widths, foreground/device-list refresh, offline/online transitions and identity
+recovery after the **Rejoin class** action. These are browser automation profiles,
+not physical tablet or Expo browser-surface tests.

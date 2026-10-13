@@ -10,6 +10,7 @@ export function LiveSessionJoinForm({
   sessionTitle,
   participantName,
   initialPasscode,
+  passcodeRequired = true,
   busy,
   error,
   onSubmit,
@@ -17,6 +18,7 @@ export function LiveSessionJoinForm({
   sessionTitle: string;
   participantName?: string | null;
   initialPasscode?: string | null;
+  passcodeRequired?: boolean;
   busy: boolean;
   error: string | null;
   onSubmit: (input: { displayName: string; passcode: string }) => void;
@@ -50,7 +52,7 @@ export function LiveSessionJoinForm({
             />
           </div>
         )}
-        {(!initialPasscode || error) && (
+        {passcodeRequired && (!initialPasscode || error) && (
           <div className="space-y-2">
             <Label htmlFor="live-passcode">Session passcode</Label>
             <Input

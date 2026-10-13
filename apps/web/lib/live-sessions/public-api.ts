@@ -1,11 +1,17 @@
 import type {
   LiveSessionJoinCredentialsVM,
   LiveSessionJoinRequest,
+  MeetingAdmissionVM,
 } from '@iconicedu/shared-types';
 import { ApiHttpError, createPublicApiClient } from '@iconicedu/web/lib/api/http-client';
 
-export type GuestLiveSessionJoinResult = LiveSessionJoinCredentialsVM;
-export type GuestLiveSessionJoinError = { status: number; message: string };
+export type GuestLiveSessionJoinResult =
+  | LiveSessionJoinCredentialsVM
+  | { admission: MeetingAdmissionVM };
+export type GuestLiveSessionJoinError = {
+  status: number;
+  message: string;
+};
 
 function describeRequestFailure(error: unknown): GuestLiveSessionJoinError {
   return error instanceof ApiHttpError

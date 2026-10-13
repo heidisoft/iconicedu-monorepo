@@ -1,4 +1,8 @@
 'use client';
+import { subscribeMeetingDeviceRecovery } from '@iconicedu/web/lib/live-sessions/browser-device-recovery';
+import { MeetingConnectionRecovery } from './zoom-video/meeting-connection-recovery';
+import { changeZoomCoHost } from '@iconicedu/web/lib/live-sessions/zoom-session-lifecycle';
+import { MeetingWaitingRoom } from './zoom-video/meeting-waiting-room';
 import { backgroundImageUrl } from './meeting-media-preferences';
 import { SpeakingAudioIcon } from '@iconicedu/ui-web/ui/speaking-audio-icon';
 import { RecordingContentError } from './zoom-video/meeting-share-compositor';
@@ -68,6 +72,7 @@ import {
 } from '@iconicedu/web/lib/live-sessions/public-api';
 import {
   acquireZoomClient,
+  claimZoomSessionHost,
   describeZoomFailure,
   disposeZoomClient,
   dumpZoomFailure,
@@ -205,6 +210,8 @@ export function ZoomVideoSessionEmbed({
   liveSessionId,
   accessToken,
   sessionPasscode,
+  meetingLinkToken,
+  sharePath,
   settings = DEFAULT_LIVE_SESSION_SETTINGS,
   annotationToken,
   whiteboardAccess,
@@ -227,6 +234,8 @@ export function ZoomVideoSessionEmbed({
   liveSessionId: string;
   accessToken?: string | null;
   sessionPasscode?: string | null;
+  meetingLinkToken?: string;
+  sharePath?: string;
   settings?: LiveSessionSettingsVM;
 }) {
   const clientRef = useRef<ZoomClient | null>(null);
@@ -351,7 +360,28 @@ export function ZoomVideoSessionEmbed({
   const lastReportedQualityLevelRef = useRef<NetworkLevel | null>(null);
   const captionClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const [isSelfCoHost, setIsSelfCoHost] = useState(false);
+  const [coHosts, setCoHosts] = useState<Set<number>>(new Set());
   const [isSelfHost, setIsSelfHost] = useState(false);
+  // flag-exempt: restore authorized host controls in the existing meeting flow.
+  const [claimingHost, setClaimingHost] = useState(false);
+  const claimHostInFlight = useRef(false);
+  const claimHost = async () => {
+    const client = clientRef.current;
+    if (!client || claimHostInFlight.current) return;
+    claimHostInFlight.current = true;
+    setClaimingHost(true);
+    try {
+      const self = await claimZoomSessionHost(client);
+      setIsSelfHost(self.isHost);
+      setIsSelfCoHost(client.isManager());
+    } catch (error) {
+      setMediaError(`Could not claim host: ${describeZoomFailure(error)}`);
+    } finally {
+      claimHostInFlight.current = false;
+      setClaimingHost(false);
+    }
+  };
   const prepareRecordingRef = useRef<() => Promise<void>>(async () => {});
   const boardPublicationRef = useRef(false);
   const recording = useZoomRecordingFeature(
@@ -707,11 +737,13 @@ export function ZoomVideoSessionEmbed({
 
   useEffect(() => {
     let cancelled = false;
+    let devicesReady = false;
     preferredCameraRef.current = initialCameraId;
     const client = acquireZoomClient();
     clientRef.current = client;
 
     const refreshDeviceLists = () => {
+      devicesReady = true;
       const stream = client.getMediaStream();
       const cameras = stream.getCameraList();
       const mics = stream.getMicList();
@@ -818,6 +850,15 @@ export function ZoomVideoSessionEmbed({
       const updates = new Map(payload.map((user) => [user.userId, user]));
       const selfUpdate = updates.get(selfUserIdRef.current ?? -1);
       if (typeof selfUpdate?.isHost === 'boolean') setIsSelfHost(selfUpdate.isHost);
+      setIsSelfCoHost(client.isManager());
+      setCoHosts(
+        new Set(
+          client
+            .getAllUser()
+            .filter((user) => user.isManager)
+            .map((user) => user.userId),
+        ),
+      );
       updateRemoteParticipants((previous) =>
         previous.map((participant) => {
           const update = updates.get(participant.userId);
@@ -1127,6 +1168,15 @@ export function ZoomVideoSessionEmbed({
         selfUserIdRef.current = self.userId;
         setSelfAvatar(self.avatar);
         setIsSelfHost(self.isHost);
+        setIsSelfCoHost(client.isManager());
+        setCoHosts(
+          new Set(
+            client
+              .getAllUser()
+              .filter((user) => user.isManager)
+              .map((user) => user.userId),
+          ),
+        );
         if (self.isHost && (!settings.messages.visible || !settings.messages.enabled)) {
           await executeZoomCollaborationCommand(() =>
             client.getChatClient().setPrivilege(ChatPrivilege.NoOne),
@@ -1242,8 +1292,20 @@ export function ZoomVideoSessionEmbed({
     }
 
     void connect();
+    const stopDeviceRecovery = subscribeMeetingDeviceRecovery(() => {
+      if (!cancelled && devicesReady) {
+        try {
+          refreshDeviceLists();
+        } catch {
+          setMediaError(
+            'Could not refresh audio and camera devices. Refresh to reconnect your media.',
+          );
+        }
+      }
+    });
 
     return () => {
+      stopDeviceRecovery();
       cancelled = true;
       client.off('user-added', handleUserAdded);
       client.off('user-removed', handleUserRemoved);
@@ -1474,10 +1536,14 @@ export function ZoomVideoSessionEmbed({
   const muteParticipant = useCallback(
     (userId: number, participantDisplayName: string) => {
       const client = clientRef.current;
-      if (!client || !isSelfHost) {
+      if (!client || (!isSelfHost && !isSelfCoHost)) {
         return;
       }
-      void client.getMediaStream().muteAudio(userId);
+      void executeZoomCollaborationCommand(() =>
+        client.getMediaStream().muteAudio(userId),
+      ).catch((error) =>
+        setMediaError(`Could not mute participant: ${describeZoomFailure(error)}`),
+      );
       void logLiveSessionAuditEvent(
         liveSessionId,
         {
@@ -1488,7 +1554,7 @@ export function ZoomVideoSessionEmbed({
         accessToken,
       );
     },
-    [isSelfHost, liveSessionId, accessToken],
+    [isSelfHost, isSelfCoHost, liveSessionId, accessToken],
   );
 
   // Host-only "End session for everyone" — distinct from the regular Leave
@@ -1924,6 +1990,25 @@ export function ZoomVideoSessionEmbed({
             >
               <ZoomMeetingTimer elapsedSeconds={elapsedSeconds} />
 
+              {(settings.access?.mode ?? 'open') !== 'open' &&
+              (isSelfHost || clientRef.current?.isOriginalHost()) ? (
+                <MeetingWaitingRoom
+                  sessionId={liveSessionId}
+                  accessToken={accessToken}
+                  linkToken={meetingLinkToken}
+                />
+              ) : null}
+              {!isSelfHost && clientRef.current?.isOriginalHost() ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={claimingHost}
+                  onClick={() => void claimHost()}
+                >
+                  {claimingHost ? 'Claiming host…' : 'Claim host'}
+                </Button>
+              ) : null}
+
               <MeetingControlButton
                 tooltip={isMuted ? 'Unmute' : 'Mute'}
                 label={isMuted ? 'Unmute microphone' : 'Mute microphone'}
@@ -2065,6 +2150,8 @@ export function ZoomVideoSessionEmbed({
                 <ZoomShareMeetingDialog
                   meetingTitle={sessionTitle ?? sessionName}
                   meetingPasscode={sessionPasscode}
+                  sharePath={sharePath}
+                  sessionId={liveSessionId}
                 />
               ) : null}
               <ZoomMoreControls
@@ -2183,7 +2270,17 @@ export function ZoomVideoSessionEmbed({
                 {settings.participants.visible ? (
                   <ZoomParticipantsPanel
                     open={activePanel === 'users'}
-                    canMuteOthers={isSelfHost}
+                    canMuteOthers={isSelfHost || isSelfCoHost}
+                    canManageCoHosts={isSelfHost && !!settings.cohosts?.enabled}
+                    onCoHost={(userId, enabled) => {
+                      const client = clientRef.current;
+                      if (!client?.isHost()) return;
+                      void changeZoomCoHost(client, userId, enabled).catch((error) =>
+                        setMediaError(
+                          `Could not update co-host: ${describeZoomFailure(error)}`,
+                        ),
+                      );
+                    }}
                     className="zoom-toolbar-people zoom-toolbar-secondary"
                     participants={[
                       {
@@ -2192,6 +2289,7 @@ export function ZoomVideoSessionEmbed({
                         avatarUrl: selfAvatar,
                         isYou: true,
                         isHost: isSelfHost,
+                        isCoHost: isSelfCoHost,
                         muted: isMuted,
                         videoOn: isVideoOn,
                         handRaised: isHandRaised,
@@ -2208,6 +2306,7 @@ export function ZoomVideoSessionEmbed({
                         avatarUrl: participant.avatar,
                         isYou: false,
                         isHost: participant.isHost,
+                        isCoHost: coHosts.has(participant.userId),
                         muted: participant.muted,
                         videoOn: participant.bVideoOn,
                         handRaised: raisedHandUserIds.has(participant.userId),
@@ -2290,29 +2389,14 @@ export function ZoomVideoSessionEmbed({
             <Loader2 className="h-5 w-5 animate-spin" />
             <span className="font-medium text-foreground">Reconnecting to class…</span>
             <span>
-              Keep this tab open. Your audio and video will resume automatically.
+              Keep this tab open while we reconnect. If audio or video stays off, check
+              your device controls.
             </span>
           </div>
         ) : null}
 
         {sessionEndMessage ? (
-          <div
-            className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-background/95 px-6 text-center backdrop-blur-sm"
-            role="alert"
-          >
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-              <PhoneOff className="h-6 w-6 text-muted-foreground" />
-            </div>
-            <div className="max-w-md space-y-1">
-              <h2 className="text-lg font-semibold text-foreground">
-                Class disconnected
-              </h2>
-              <p className="text-sm text-muted-foreground">{sessionEndMessage}</p>
-            </div>
-            <Button type="button" onClick={handleLeave}>
-              Return to class page
-            </Button>
-          </div>
+          <MeetingConnectionRecovery message={sessionEndMessage} onLeave={handleLeave} />
         ) : null}
 
         {/* Reactions pop from the sender's visible tile, then drift up and fade. */}

@@ -21,6 +21,8 @@ import {
   Settings,
 } from 'lucide-react';
 
+// flag-exempt: completes the existing pre-join audio/device verification.
+import { AudioSelfCheck } from './audio-self-check';
 import { usePreviewVideoEffects } from './use-preview-video-effects';
 import type { MeetingMediaPreferences } from './meeting-media-preferences';
 import { MIRROR_VIDEO_STORAGE_KEY } from './zoom-video/zoom-video-session.constants';
@@ -521,6 +523,11 @@ export function DevicePreviewStep({
           </div>
         </div>
       </div>
+      <AudioSelfCheck
+        stream={streamRef.current}
+        muted={muted}
+        speakerId={mediaSettings.speakerId}
+      />
       {settingsOpen && (
         <Suspense
           fallback={

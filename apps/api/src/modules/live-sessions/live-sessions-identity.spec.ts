@@ -1,3 +1,13 @@
+import { resolveMeetingLink } from './meeting-browser-links';
+jest.mock('./meeting-browser-links', () => ({
+  issueMeetingLink: jest.fn(async () => 'synthetic-invitation-token'),
+  resolveMeetingLink: jest.fn(),
+  redeemMeetingHandoff: jest.fn(),
+}));
+import { evaluateApiBooleanFlag } from '@iconicedu/api/lib/flags/posthog-openfeature';
+jest.mock('@iconicedu/api/lib/flags/posthog-openfeature', () => ({
+  evaluateApiBooleanFlag: jest.fn(),
+}));
 import { issueWhiteboardAccess } from '../whiteboards/whiteboard-access';
 jest.mock('../whiteboards/whiteboard-access', () => ({
   issueWhiteboardAccess: jest.fn(async (_session, role) => ({
@@ -16,6 +26,7 @@ import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
 import {
   getLiveSessionProvider,
+  hasOrgStaffRole,
   verifyZoomPasscode,
 } from '@iconicedu/live-sessions-core';
 import { LiveSessionsService } from './live-sessions.service';
@@ -27,7 +38,9 @@ jest.mock('@iconicedu/api/lib/supabase/session', () => ({
   createSupabaseSessionClient: jest.fn(),
 }));
 jest.mock('@iconicedu/live-sessions-core', () => ({
+  getWebAppUrl: () => 'https://app.invalid',
   getLiveSessionProvider: jest.fn(),
+  hasOrgStaffRole: jest.fn(async () => false),
   verifyZoomPasscode: jest.fn(),
 }));
 
@@ -39,18 +52,22 @@ describe('public live session identity and authorization', () => {
   let invitesEnabled: boolean;
   let isClassMember: boolean;
   let isTeacher: boolean;
+  let isOrgStaff: boolean;
   let guardian: boolean;
   let selections: string[];
   let enrolledStudents: string[];
   let lookupFilters: Array<{ table: string; filters: Record<string, unknown> }>;
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.mocked(hasOrgStaffRole).mockResolvedValue(false);
+    jest.mocked(evaluateApiBooleanFlag).mockResolvedValue(false);
     authUserId = 'member-auth';
     hasOrgProfile = true;
     status = 'live';
     invitesEnabled = true;
     isClassMember = true;
     isTeacher = false;
+    isOrgStaff = false;
     guardian = false;
     selections = [];
     enrolledStudents = ['child-one', 'child-two'];
@@ -69,7 +86,8 @@ describe('public live session identity and authorization', () => {
     jest.mocked(createSupabaseServiceClient).mockReturnValue({
       rpc: jest.fn(async (_name, args) => ({
         data:
-          args.p_user === 'host-auth' || (hasOrgProfile && isTeacher && isClassMember),
+          args.p_user === 'host-auth' ||
+          (hasOrgProfile && ((isTeacher && isClassMember) || isOrgStaff)),
         error: null,
       })),
       from: (table: string) => {
@@ -110,6 +128,7 @@ describe('public live session identity and authorization', () => {
             if (table === 'channel_live_sessions')
               data = {
                 id: 'session-identity',
+                share_code: 'a3f8b2d4c9e1',
                 org_id: 'session-org',
                 channel_id: 'class',
                 provider: 'zoom',
@@ -164,6 +183,52 @@ describe('public live session identity and authorization', () => {
     jest.mocked(getLiveSessionProvider).mockReturnValue({ getJoinAccess } as never);
     jest.mocked(verifyZoomPasscode).mockReturnValue(true);
   });
+  it('resolves a normalized short code to a canonical guest session without credentials', async () => {
+    const info = await new LiveSessionsService().getPublicLiveSessionInfo(
+      'A3F8-B2D4-C9E1',
+      null,
+    );
+    expect(info).toMatchObject({
+      exists: true,
+      isActive: true,
+      isHost: false,
+      sessionId: 'session-identity',
+      shareCode: 'a3f8b2d4c9e1',
+    });
+    expect(lookupFilters).toContainEqual({
+      table: 'channel_live_sessions',
+      filters: { share_code: 'a3f8b2d4c9e1' },
+    });
+    expect(evaluateApiBooleanFlag).not.toHaveBeenCalled();
+    expect(info).not.toHaveProperty('hostJoin');
+    expect(getJoinAccess).not.toHaveBeenCalled();
+  });
+
+  it('returns not found for an unknown or deleted meeting code', async () => {
+    const query = {
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      is: jest.fn().mockReturnThis(),
+      maybeSingle: jest.fn(async () => ({ data: null, error: null })),
+    };
+    jest
+      .mocked(createSupabaseServiceClient)
+      .mockReturnValue({ from: () => query } as never);
+    expect(
+      await new LiveSessionsService().getPublicLiveSessionInfo('a3f8-b2d4-c9e1', null),
+    ).toEqual({ exists: false });
+    expect(query.is).toHaveBeenCalledWith('deleted_at', null);
+    expect(getJoinAccess).not.toHaveBeenCalled();
+  });
+
+  it('shows the ended state for a short code without issuing credentials', async () => {
+    status = 'ended';
+    expect(
+      await new LiveSessionsService().getPublicLiveSessionInfo('a3f8-b2d4-c9e1', null),
+    ).toMatchObject({ exists: true, isActive: false });
+    expect(getJoinAccess).not.toHaveBeenCalled();
+  });
+
   it('returns the signed-in member name without issuing host credentials', async () => {
     const result = await new LiveSessionsService().getPublicLiveSessionInfo(
       'session-identity',
@@ -246,18 +311,44 @@ describe('public live session identity and authorization', () => {
     expect(getJoinAccess).not.toHaveBeenCalled();
     expect(issueAnnotationAccess).not.toHaveBeenCalled();
   });
-  it('still requires a correct passcode for signed-in non-hosts', async () => {
+  it('does not require a passcode for a verified signed-in participant', async () => {
+    jest.mocked(verifyZoomPasscode).mockReturnValue(false);
+    const result = await new LiveSessionsService().guestJoinLiveSession(
+      'session-identity',
+      'signed-in-no-passcode',
+      { displayName: 'Member', passcode: '' },
+      'synthetic-auth',
+    );
+    expect(result).toMatchObject({ meetingPasscode: 'demo' });
+    expect(verifyZoomPasscode).not.toHaveBeenCalled();
+  });
+  it('lets org staff join a classroom without membership or a passcode when invites are disabled', async () => {
+    invitesEnabled = false;
+    isClassMember = false;
+    isOrgStaff = true;
+    jest.mocked(hasOrgStaffRole).mockResolvedValue(true);
+    const result = await new LiveSessionsService().guestJoinLiveSession(
+      'session-identity',
+      'staff-no-passcode',
+      { displayName: 'Staff', passcode: '' },
+      'synthetic-auth',
+    );
+    expect(result).toHaveProperty('token');
+    expect(hasOrgStaffRole).toHaveBeenCalledWith(expect.anything(), 'session-org', [
+      'member-profile',
+    ]);
+    expect(verifyZoomPasscode).not.toHaveBeenCalled();
+  });
+  it('still rejects anonymous visitors with an empty passcode', async () => {
     jest.mocked(verifyZoomPasscode).mockReturnValue(false);
     await expect(
       new LiveSessionsService().guestJoinLiveSession(
         'session-identity',
-        'test-ip-passcode',
-        { displayName: 'Member', passcode: 'wrong' },
-        'synthetic-auth',
+        'anonymous-empty',
+        { displayName: 'Guest', passcode: '' },
+        null,
       ),
-    ).rejects.toBeInstanceOf(ForbiddenException);
-    expect(getJoinAccess).not.toHaveBeenCalled();
-    expect(issueAnnotationAccess).not.toHaveBeenCalled();
+    ).rejects.toThrow('Incorrect passcode');
   });
   it('does not assign a profile from another org to signed-in visitors', async () => {
     hasOrgProfile = false;
@@ -296,6 +387,61 @@ describe('public live session identity and authorization', () => {
       }),
     );
   });
+  it('admits an invitation as a guest without turning it into sender host credentials', async () => {
+    authUserId = null;
+    jest
+      .mocked(resolveMeetingLink)
+      .mockResolvedValue({ purpose: 'invite', auth_user_id: null } as never);
+    jest.mocked(verifyZoomPasscode).mockReturnValue(false);
+    await new LiveSessionsService().guestJoinLiveSession(
+      'session-identity',
+      'invite-guest',
+      { displayName: 'Guest', passcode: '', linkToken: 'a'.repeat(32) },
+    );
+    expect(getJoinAccess).toHaveBeenCalledWith(
+      expect.objectContaining({
+        isHost: false,
+        profileId: expect.stringMatching(/^guest:/),
+      }),
+    );
+    expect(verifyZoomPasscode).not.toHaveBeenCalled();
+  });
+  it('does not let invitation links bypass disabled guest invitations', async () => {
+    authUserId = null;
+    invitesEnabled = false;
+    jest
+      .mocked(resolveMeetingLink)
+      .mockResolvedValue({ purpose: 'invite', auth_user_id: null } as never);
+    await expect(
+      new LiveSessionsService().guestJoinLiveSession(
+        'session-identity',
+        'invite-disabled',
+        { displayName: 'Guest', passcode: '', linkToken: 'a'.repeat(32) },
+      ),
+    ).rejects.toThrow('Shared invitations are disabled');
+    expect(getJoinAccess).not.toHaveBeenCalled();
+  });
+  it('preserves the mobile host identity without a browser login', async () => {
+    authUserId = 'host-auth';
+    jest
+      .mocked(resolveMeetingLink)
+      .mockResolvedValue({ purpose: 'access', auth_user_id: 'host-auth' } as never);
+    const info = await new LiveSessionsService().getPublicLiveSessionInfo(
+      'session-identity',
+      null,
+      'a'.repeat(32),
+    );
+    expect(info).toMatchObject({
+      isHost: true,
+      hostJoin: {
+        displayName: 'Host Name',
+        annotationToken: 'synthetic-annotation-token',
+      },
+    });
+    expect(getJoinAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ isHost: true, profileId: 'host-profile' }),
+    );
+  });
   it('preserves host-role credentials for the verified starter', async () => {
     authUserId = 'host-auth';
     const result = await new LiveSessionsService().getPublicLiveSessionInfo(
@@ -309,6 +455,29 @@ describe('public live session identity and authorization', () => {
     expect(getJoinAccess).toHaveBeenCalledWith(
       expect.objectContaining({ profileId: 'host-profile', isHost: true }),
     );
+  });
+  it('issues host credentials for the verified starter through the join endpoint', async () => {
+    authUserId = 'host-auth';
+    await new LiveSessionsService().guestJoinLiveSession(
+      'session-identity',
+      'starter-join',
+      { displayName: 'Ignored', passcode: '' },
+      'synthetic-host-auth',
+    );
+    expect(getJoinAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ profileId: 'host-profile', isHost: true }),
+    );
+  });
+  it('issues staff host credentials without classroom membership', async () => {
+    isClassMember = false;
+    isOrgStaff = true;
+    jest.mocked(hasOrgStaffRole).mockResolvedValue(true);
+    const result = await new LiveSessionsService().getPublicLiveSessionInfo(
+      'session-identity',
+      'synthetic-staff-auth',
+    );
+    expect(result).toMatchObject({ isHost: true });
+    expect(getJoinAccess).toHaveBeenCalledWith(expect.objectContaining({ isHost: true }));
   });
   it('gives a signed-in classroom teacher host credentials even when someone else started it', async () => {
     isTeacher = true;
@@ -546,14 +715,14 @@ describe('public live session identity and authorization', () => {
     );
     expect(issueAnnotationAccess).toHaveBeenCalledWith('session-identity', 'Alice S.');
   });
-  it('still rejects an empty passcode for a renamed non-host', async () => {
+  it('still rejects an empty passcode for a renamed anonymous guest', async () => {
     jest.mocked(verifyZoomPasscode).mockReturnValue(false);
     await expect(
       new LiveSessionsService().guestJoinLiveSession(
         'session-identity',
         'renamed-no-passcode',
         { displayName: 'Member', displayNameOverride: 'Member S.', passcode: '' },
-        'auth',
+        null,
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(getJoinAccess).not.toHaveBeenCalled();

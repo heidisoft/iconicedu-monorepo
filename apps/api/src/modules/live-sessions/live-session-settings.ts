@@ -10,6 +10,8 @@ export function parseLiveSessionSettings(value: unknown): LiveSessionSettingsVM 
     throw new BadRequestException('Invalid meeting settings');
   const result = structuredClone(DEFAULT_LIVE_SESSION_SETTINGS);
   const input = value as Record<string, unknown>;
+  if (input.access !== undefined) result.access = { mode: 'open' };
+  if (input.cohosts !== undefined) result.cohosts = { enabled: false };
   for (const key of Object.keys(input)) {
     if (!Object.prototype.hasOwnProperty.call(result, key))
       throw new BadRequestException(`Unknown meeting setting: ${key}`);
@@ -18,6 +20,15 @@ export function parseLiveSessionSettings(value: unknown): LiveSessionSettingsVM 
       throw new BadRequestException(`Invalid ${key} settings`);
     const target = result[key as keyof LiveSessionSettingsVM] as Record<string, boolean>;
     for (const [option, setting] of Object.entries(section)) {
+      if (key === 'access' && option === 'mode') {
+        if (
+          typeof setting !== 'string' ||
+          !['open', 'trusted', 'restricted'].includes(setting)
+        )
+          throw new BadRequestException('Invalid admission mode');
+        result.access = { mode: setting as 'open' | 'trusted' | 'restricted' };
+        continue;
+      }
       if (key === 'whiteboard' && option === 'provider') {
         if (setting !== 'zoom' && setting !== 'excalidraw')
           throw new BadRequestException('Invalid whiteboard provider');

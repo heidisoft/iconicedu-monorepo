@@ -5,12 +5,18 @@ import { LiveSessionSetupFixture } from '@iconicedu/web/components/live-sessions
 export default async function LiveSessionSetupFixturePage({
   searchParams,
 }: {
-  searchParams: Promise<{ actor?: string; passcode?: string; returnTo?: string }>;
+  searchParams: Promise<{
+    actor?: string;
+    passcode?: string;
+    returnTo?: string;
+    sessionId?: string;
+  }>;
 }) {
   if (process.env.NODE_ENV === 'production') notFound();
   const params = await searchParams;
   return (
     <LiveSessionSetupFixture
+      sessionId={params.sessionId}
       actor={params.actor ?? 'guest'}
       passcode={params.passcode}
       returnPath={params.returnTo}

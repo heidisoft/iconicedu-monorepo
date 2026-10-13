@@ -1,29 +1,18 @@
 import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
+import type { LiveSessionMemberAccessVM } from '@iconicedu/shared-types';
 import { DashboardHeader } from '@iconicedu/ui-web';
 import {
   getDashboardAccountContext,
   getDashboardProfileContext,
 } from '@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth';
 import { LiveSessionHost } from '@iconicedu/web/components/live-sessions/live-session-host';
-import { getLiveSessionReturnPath } from '@iconicedu/web/components/live-sessions/live-session-host.utils';
-import { resolveLiveSessionJoinAccess } from '@iconicedu/web/lib/live-sessions/service';
-import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
-
-function parseLiveSessionMode(value: unknown): 'video' | 'audio' | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return null;
-  }
-
-  const candidate = value as Record<string, unknown>;
-  return candidate.mode === 'audio' || candidate.mode === 'video' ? candidate.mode : null;
-}
-
+import { createApiClient } from '@iconicedu/web/lib/api/http-client';
 export const metadata: Metadata = {
   title: 'Live Session',
-  description:
-    'Join your live tutoring session and return to the related conversation when finished.',
+  description: 'Join your live tutoring session.',
 };
-
+/** flag-exempt: prevents legacy URLs bypassing the existing Zoom preview/admission flow. */
 export default async function Page({
   params,
 }: {
@@ -32,88 +21,42 @@ export default async function Page({
   const { orgSlug, sessionId } = await params;
   const { supabase, account } = await getDashboardAccountContext(orgSlug);
   const { profileResponse } = await getDashboardProfileContext(supabase, account.id);
-  const {
-    data: { session: authSession },
-  } = await supabase.auth.getSession();
-
-  if (!profileResponse.data) {
-    throw new Error('Profile not found');
-  }
-
+  if (!profileResponse.data) throw new Error('Profile not found');
+  let access: LiveSessionMemberAccessVM;
   try {
-    const serviceSupabase = createSupabaseServiceClient();
-    const { joinAccess, session } = await resolveLiveSessionJoinAccess({
-      serviceSupabase,
-      liveSessionId: sessionId,
-      profile: profileResponse.data,
-    });
-    const channelResponse = await serviceSupabase
-      .from('channels')
-      .select('topic, purpose, kind, live_session_config')
-      .eq('id', session.channel_id)
-      .eq('org_id', session.org_id)
-      .is('deleted_at', null)
-      .maybeSingle<{
-        topic: string;
-        purpose: string;
-        kind: string;
-        live_session_config?: Record<string, unknown> | null;
-      }>();
-    const returnPath = getLiveSessionReturnPath({
-      orgSlug,
-      channelId: session.channel_id,
-      channelKind: channelResponse.data?.kind ?? null,
-      channelPurpose: channelResponse.data?.purpose ?? null,
-    });
-
-    return (
-      <div className="flex h-[calc(100vh-1rem)] flex-col">
-        <DashboardHeader />
-        <LiveSessionHost
-          provider={session.provider as 'daily' | 'zoom' | 'jitsi' | 'custom'}
-          joinUrl={joinAccess.joinUrl ?? null}
-          token={joinAccess.token ?? null}
-          externalJoinUrl={
-            typeof joinAccess.metadata?.externalJoinUrl === 'string'
-              ? joinAccess.metadata.externalJoinUrl
-              : null
-          }
-          zoomSessionName={
-            typeof joinAccess.metadata?.sessionName === 'string'
-              ? joinAccess.metadata.sessionName
-              : null
-          }
-          zoomPasscode={
-            typeof session.provider_metadata?.passcode === 'string'
-              ? session.provider_metadata.passcode
-              : null
-          }
-          displayName={
-            typeof joinAccess.metadata?.displayName === 'string'
-              ? joinAccess.metadata.displayName
-              : null
-          }
-          channelKind={channelResponse.data?.kind ?? null}
-          mode={parseLiveSessionMode(channelResponse.data?.live_session_config)}
-          channelTopic={channelResponse.data?.topic ?? null}
-          channelPurpose={channelResponse.data?.purpose ?? null}
-          returnPath={returnPath}
-          liveSessionId={sessionId}
-          accessToken={authSession?.access_token ?? null}
-        />
-      </div>
+    access = await createApiClient(supabase).post<LiveSessionMemberAccessVM>(
+      `/live-sessions/${encodeURIComponent(sessionId)}/member-access`,
+      { orgId: account.org_id, profileId: profileResponse.data.id },
     );
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Live session unavailable';
-
+  } catch {
     return (
       <div className="flex h-[calc(100vh-1rem)] flex-col">
         <DashboardHeader />
-        <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
-          <h1 className="text-2xl font-semibold">Live session unavailable</h1>
-          <p className="text-sm text-muted-foreground">{message}</p>
+        <div className="m-auto p-6 text-center">
+          <h1 className="text-xl font-semibold">Live session unavailable</h1>
+          <p>Please return to your classroom and try joining again.</p>
         </div>
       </div>
     );
   }
+  if (access.provider === 'zoom')
+    redirect(`${access.joinPath}?returnTo=${encodeURIComponent(access.returnPath)}`);
+  return (
+    <div className="flex h-[calc(100vh-1rem)] flex-col">
+      <DashboardHeader />
+      <LiveSessionHost
+        provider={access.provider}
+        joinUrl={access.joinUrl}
+        token={access.token}
+        externalJoinUrl={access.externalJoinUrl}
+        displayName={access.displayName}
+        channelKind={access.channelKind}
+        mode={access.mode}
+        channelTopic={access.channelTopic}
+        channelPurpose={access.channelPurpose}
+        returnPath={access.returnPath}
+        liveSessionId={sessionId}
+      />
+    </div>
+  );
 }

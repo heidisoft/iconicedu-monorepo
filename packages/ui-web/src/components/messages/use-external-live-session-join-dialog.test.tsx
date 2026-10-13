@@ -7,6 +7,7 @@ import {
   copyExternalLiveSessionJoinLink,
   ExternalLiveSessionJoinDialog,
 } from './external-live-session-join-dialog';
+import { LiveSessionJoinContext } from './live-session-join-context';
 import { useExternalLiveSessionJoinDialog } from './use-external-live-session-join-dialog';
 
 describe('useExternalLiveSessionJoinDialog', () => {
@@ -36,6 +37,52 @@ describe('useExternalLiveSessionJoinDialog', () => {
     });
   });
 
+  it('loads passcodes for URL-only join dialogs through the authenticated app resolver', async () => {
+    const resolveLink = vi.fn().mockResolvedValue({
+      joinPath: 'https://app.invalid/live/a3f8-b2d4-c9e1',
+      provider: 'zoom',
+      passcode: 'test-secret',
+    });
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <LiveSessionJoinContext.Provider value={{ resolveLink, joinChannel: vi.fn() }}>
+        {children}
+      </LiveSessionJoinContext.Provider>
+    );
+    const { result } = renderHook(() => useExternalLiveSessionJoinDialog(), { wrapper });
+    await act(async () => result.current.handleResolvedJoinHref('/live/a3f8-b2d4-c9e1'));
+    expect(result.current.externalJoinTarget).toMatchObject({
+      passcode: 'test-secret',
+      copyHref: 'https://app.invalid/live/a3f8-b2d4-c9e1',
+    });
+    expect(resolveLink).toHaveBeenCalledWith('/live/a3f8-b2d4-c9e1');
+  });
+  it('uses the invitation for both copying and opening while preserving the return path', async () => {
+    const invitation = 'https://app.invalid/live/a3f8-b2d4-c9e1#invite=synthetic-token';
+    const resolveLink = vi.fn().mockResolvedValue({
+      joinPath: 'https://app.invalid/live/a3f8-b2d4-c9e1',
+      sharePath: invitation,
+      passcode: 'test-secret',
+    });
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <LiveSessionJoinContext.Provider value={{ resolveLink, joinChannel: vi.fn() }}>
+        {children}
+      </LiveSessionJoinContext.Provider>
+    );
+    const { result } = renderHook(() => useExternalLiveSessionJoinDialog(), { wrapper });
+    await act(async () =>
+      result.current.openExternalJoinDialog(
+        'https://app.invalid/live/a3f8-b2d4-c9e1?returnTo=%2Fhome',
+        'zoom',
+        { isInternal: true },
+      ),
+    );
+    expect(result.current.externalJoinTarget).toMatchObject({
+      joinHref:
+        'https://app.invalid/live/a3f8-b2d4-c9e1?returnTo=%2Fhome#invite=synthetic-token',
+      copyHref: invitation,
+      linkLoading: false,
+    });
+  });
   it('routes internal join hrefs through the provided navigator', () => {
     const onInternalJoinHref = vi.fn();
     const { result } = renderHook(() =>

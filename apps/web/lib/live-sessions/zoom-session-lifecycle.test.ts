@@ -9,6 +9,8 @@ const zoomSdk = vi.hoisted(() => ({
 vi.mock('@zoom/videosdk', () => ({ default: zoomSdk }));
 
 import {
+  claimZoomSessionHost,
+  changeZoomCoHost,
   describeZoomFailure,
   describeZoomWhiteboardFailure,
   dumpZoomFailure,
@@ -29,23 +31,35 @@ function createClient() {
 }
 
 describe('Zoom session lifecycle', () => {
-  it('claims host for a verified host token after joining an existing meeting', async () => {
+  it('rejects a manual claim from a participant without calling Zoom', async () => {
+    const client = createClient();
+    await expect(claimZoomSessionHost(client)).rejects.toThrow(
+      'You do not have host access.',
+    );
+    expect(client.reclaimHost).not.toHaveBeenCalled();
+  });
+  it('lets an authorized participant claim host again after a transfer', async () => {
     const client = createClient();
     vi.mocked(client.isOriginalHost).mockReturnValue(true);
-    vi.mocked(client.reclaimHost).mockImplementation(async () => {
-      vi.mocked(client.getCurrentUserInfo).mockReturnValue({
-        userId: 42,
-        isHost: true,
-      } as never);
-      return '';
-    });
-    const result = await initializeAndJoinZoomSession(client, {
+    await claimZoomSessionHost(client);
+    expect(client.reclaimHost).toHaveBeenCalledOnce();
+  });
+  it('does not reclaim when already host', async () => {
+    const client = createClient();
+    vi.mocked(client.isOriginalHost).mockReturnValue(true);
+    vi.mocked(client.isHost).mockReturnValue(true);
+    await claimZoomSessionHost(client);
+    expect(client.reclaimHost).not.toHaveBeenCalled();
+  });
+  it('does not displace the current host when another eligible teacher joins', async () => {
+    const client = createClient();
+    vi.mocked(client.isOriginalHost).mockReturnValue(true);
+    await initializeAndJoinZoomSession(client, {
       sessionName: 'class',
       token: 'host-token',
       displayName: 'Teacher',
     });
-    expect(client.reclaimHost).toHaveBeenCalledOnce();
-    expect(result.self.isHost).toBe(true);
+    expect(client.reclaimHost).not.toHaveBeenCalled();
   });
   it('never claims host for participant credentials', async () => {
     const client = createClient();
@@ -56,18 +70,12 @@ describe('Zoom session lifecycle', () => {
     });
     expect(client.reclaimHost).not.toHaveBeenCalled();
   });
-  it('reports a host claim failure instead of presenting a successful host join', async () => {
+  it('reports an explicit host claim failure', async () => {
     const client = createClient();
     vi.mocked(client.isOriginalHost).mockReturnValue(true);
     const error = { reason: 'Unable to claim host', errorCode: 1 };
     vi.mocked(client.reclaimHost).mockResolvedValue(error as never);
-    await expect(
-      initializeAndJoinZoomSession(client, {
-        sessionName: 'class',
-        token: 'host-token',
-        displayName: 'Teacher',
-      }),
-    ).rejects.toEqual(error);
+    await expect(claimZoomSessionHost(client)).rejects.toEqual(error);
   });
   beforeEach(() => {
     vi.clearAllMocks();
@@ -178,5 +186,40 @@ describe('Zoom session lifecycle', () => {
     ).toBe(
       'Zoom could not authenticate the whiteboard for this session. Try rejoining. If it still fails, ask the host to check Zoom Whiteboard access and network connectivity.',
     );
+  });
+});
+
+describe('co-host privileges', () => {
+  it('never calls the provider for an unauthorized participant', async () => {
+    const client = { isHost: () => false, makeManager: vi.fn() } as unknown as Parameters<
+      typeof changeZoomCoHost
+    >[0];
+    await expect(changeZoomCoHost(client, 2, true)).rejects.toThrow(
+      'Only the meeting host',
+    );
+    expect(client.makeManager).not.toHaveBeenCalled();
+  });
+  it('grants and revokes manager rights without transferring the host', async () => {
+    const client = {
+      isHost: () => true,
+      getCurrentUserInfo: () => ({ userId: 1 }),
+      makeManager: vi.fn().mockResolvedValue(''),
+      revokeManager: vi.fn().mockResolvedValue(''),
+      makeHost: vi.fn(),
+    } as unknown as Parameters<typeof changeZoomCoHost>[0];
+    await changeZoomCoHost(client, 2, true);
+    await changeZoomCoHost(client, 2, false);
+    expect(client.makeManager).toHaveBeenCalledWith(2);
+    expect(client.revokeManager).toHaveBeenCalledWith(2);
+    expect(client.makeHost).not.toHaveBeenCalled();
+  });
+  it('surfaces provider permission failures after a role change', async () => {
+    const failure = { reason: 'Insufficient privileges' };
+    const client = {
+      isHost: () => true,
+      getCurrentUserInfo: () => ({ userId: 1 }),
+      makeManager: vi.fn().mockResolvedValue(failure),
+    } as unknown as Parameters<typeof changeZoomCoHost>[0];
+    await expect(changeZoomCoHost(client, 2, true)).rejects.toEqual(failure);
   });
 });

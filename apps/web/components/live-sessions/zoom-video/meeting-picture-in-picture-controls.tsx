@@ -4,8 +4,13 @@ import { createPortal } from 'react-dom';
 import { useState, type ReactNode } from 'react';
 import { PortalContainerProvider } from '@iconicedu/ui-web/ui/portal-container';
 import { TooltipProvider } from '@iconicedu/ui-web/ui/tooltip';
-import { ArrowUpRight, PictureInPicture2, Settings2 } from 'lucide-react';
-import { NotificationCard } from '@iconicedu/ui-web/ui/notification-card';
+import { ArrowUpRight, PictureInPicture2, Settings2, X } from 'lucide-react';
+import {
+  Alert,
+  AlertAction,
+  AlertDescription,
+  AlertTitle,
+} from '@iconicedu/ui-web/ui/alert';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { ZoomMeetingDialog } from './zoom-meeting-dialog';
 import type {
@@ -80,28 +85,41 @@ export function MeetingPictureInPictureControls({
       {!pip.pipWindow &&
         (pip.error ||
           ((pip.sharePrompt || pip.automaticBlocked) && !dismissedPrompt)) && (
-          <NotificationCard
-            title="Picture-in-picture"
+          <Alert
+            variant={pip.error ? 'destructive' : 'default'}
             role={pip.error ? 'alert' : 'status'}
-            className="fixed right-4 top-20 z-50 w-[calc(100%-2rem)] sm:w-auto sm:max-w-xl"
-            message={
-              pip.error ??
-              (pip.automaticBlocked
-                ? 'Allow Automatic picture-in-picture in your browser’s site settings to keep the call visible when switching tabs.'
-                : 'Keep your call visible while presenting.')
-            }
-            action={
-              !pip.error
-                ? { label: 'Open floating call', onClick: () => void pip.open() }
-                : undefined
-            }
-            dismissLabel="Dismiss picture-in-picture message"
-            onDismiss={() => {
-              pip.clearError();
-              pip.dismissReturn();
-              setDismissedPrompt(true);
-            }}
-          />
+            className="fixed left-1/2 top-20 z-50 w-[calc(100%-2rem)] max-w-xl -translate-x-1/2"
+          >
+            <PictureInPicture2 aria-hidden="true" />
+            <AlertTitle>Picture-in-picture</AlertTitle>
+            <AlertDescription className="col-start-2">
+              <p>
+                {pip.error ??
+                  (pip.automaticBlocked
+                    ? 'Allow Automatic picture-in-picture in your browser’s site settings to keep the call visible when switching tabs.'
+                    : 'Keep your call visible while presenting.')}
+              </p>
+              {!pip.error && (
+                <Button size="sm" variant="outline" onClick={() => void pip.open()}>
+                  Open floating call
+                </Button>
+              )}
+            </AlertDescription>
+            <AlertAction>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Dismiss picture-in-picture message"
+                onClick={() => {
+                  pip.clearError();
+                  pip.dismissReturn();
+                  setDismissedPrompt(true);
+                }}
+              >
+                <X aria-hidden="true" />
+              </Button>
+            </AlertAction>
+          </Alert>
         )}
       <ZoomMeetingDialog
         open={settingsOpen}

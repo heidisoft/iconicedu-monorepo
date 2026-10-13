@@ -9,18 +9,25 @@ import { Label } from '@iconicedu/ui-web/ui/label';
 import { MeetingControlButton } from './zoom-meeting-controls';
 import { ZoomMeetingDialog } from './zoom-meeting-dialog';
 
-function getShareableMeetingUrl() {
-  const url = new URL(window.location.href);
+function getShareableMeetingUrl(sharePath?: string, sessionId?: string | null) {
+  const url = new URL(
+    sharePath ?? (sessionId ? `/live/${sessionId}` : window.location.pathname),
+    window.location.origin,
+  );
   url.search = '';
-  url.hash = '';
+  if (!url.hash.startsWith('#invite=')) url.hash = '';
   return url.toString();
 }
 
 export function ZoomShareMeetingDialog({
   meetingTitle,
   meetingPasscode,
+  sharePath,
+  sessionId,
 }: {
   meetingTitle: string;
+  sharePath?: string;
+  sessionId?: string | null;
   meetingPasscode?: string | null;
 }) {
   const [open, setOpen] = useState(false);
@@ -32,11 +39,11 @@ export function ZoomShareMeetingDialog({
   const [copyError, setCopyError] = useState(false);
 
   useEffect(() => {
-    setMeetingUrl(getShareableMeetingUrl());
+    setMeetingUrl(getShareableMeetingUrl(sharePath, sessionId));
     return () => {
       if (copyResetTimer.current) clearTimeout(copyResetTimer.current);
     };
-  }, []);
+  }, [sharePath, sessionId]);
 
   const copyText = async (text: string, target: 'link' | 'passcode' | 'invitation') => {
     if (!text) return;
@@ -69,7 +76,7 @@ export function ZoomShareMeetingDialog({
       open={open}
       onOpenChange={setOpen}
       title="Share meeting link"
-      description="Copy the join link and passcode to share with participants."
+      description="Anyone with an invitation link can join without entering the passcode."
       trigger={
         <MeetingControlButton
           label="Share meeting link"

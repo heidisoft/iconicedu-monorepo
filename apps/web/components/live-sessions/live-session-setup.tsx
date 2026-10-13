@@ -1,5 +1,7 @@
 'use client';
 
+import { Alert, AlertTitle, AlertDescription } from '@iconicedu/ui-web/ui/alert';
+import { Button } from '@iconicedu/ui-web/ui/button';
 import { useRouter } from 'next/navigation';
 import type { ComponentType, ComponentProps } from 'react';
 import type {
@@ -23,6 +25,7 @@ export type LiveSessionMeetingRenderer = ComponentType<LiveSessionMeetingProps>;
 export function LiveSessionSetup({
   sessionId,
   sessionTitle,
+  sharePath,
   initialCredentials,
   initialPasscode,
   participantName,
@@ -30,11 +33,16 @@ export function LiveSessionSetup({
   identityKey,
   settings,
   students,
+  passcodeRequired = true,
+  linkToken,
   returnPath = '/',
   MeetingRenderer = ZoomMeetingRenderer,
 }: {
+  passcodeRequired?: boolean;
+  linkToken?: string;
   sessionId: string;
   sessionTitle: string;
+  sharePath?: string;
   initialCredentials?: LiveSessionJoinCredentialsVM | null;
   initialPasscode?: string | null;
   participantName?: string | null;
@@ -54,8 +62,37 @@ export function LiveSessionSetup({
     accessToken,
     identityKey,
     students,
+    passcodeRequired,
+    linkToken,
   });
   if (!setup.ready) return <ZoomSessionLoadingScreen label="Restoring session…" />;
+  if (setup.waiting)
+    return (
+      <DevicePreviewStep
+        displayName={participantName ?? 'Guest'}
+        sessionTitle={sessionTitle}
+        onJoin={setup.join}
+        joinDisabled
+        error={setup.error}
+      >
+        <Alert>
+          <AlertTitle>Waiting for approval</AlertTitle>
+          <AlertDescription>
+            A teacher or staff member will let you in. You can check your camera and
+            microphone while you wait.
+          </AlertDescription>
+        </Alert>
+        <Button
+          variant="outline"
+          onClick={() => {
+            setup.leave();
+            router.replace(getLiveSessionReturnPath(returnPath));
+          }}
+        >
+          Cancel request
+        </Button>
+      </DevicePreviewStep>
+    );
   if (students !== undefined && !setup.preferences) {
     const selected = students.find(
       (student) => student.profileId === setup.studentProfileId,
@@ -67,7 +104,7 @@ export function LiveSessionSetup({
         onJoin={setup.join}
         busy={setup.busy}
         error={setup.error}
-        joinDisabled={!selected || !setup.passcode?.trim()}
+        joinDisabled={!selected || (passcodeRequired && !setup.passcode?.trim())}
       >
         {students.length === 0 ? (
           <p role="alert" className="text-sm text-muted-foreground">
@@ -95,7 +132,7 @@ export function LiveSessionSetup({
             ))}
           </fieldset>
         ) : null}
-        {(!initialPasscode || setup.error) && (
+        {passcodeRequired && (!initialPasscode || setup.error) && (
           <label className="w-full space-y-2 text-sm font-medium">
             Session passcode
             <input
@@ -117,6 +154,7 @@ export function LiveSessionSetup({
         sessionTitle={sessionTitle}
         participantName={participantName}
         initialPasscode={initialPasscode}
+        passcodeRequired={passcodeRequired}
         busy={setup.busy}
         error={setup.error}
         onSubmit={setup.requestJoin}
@@ -144,7 +182,9 @@ export function LiveSessionSetup({
         whiteboardAccess={setup.credentials.whiteboard}
         liveSessionId={sessionId}
         sessionPasscode={setup.passcode}
+        sharePath={setup.credentials.sharePath ?? sharePath}
         accessToken={accessToken}
+        meetingLinkToken={linkToken}
         initialMuted={setup.preferences.muted}
         initialVideoOff={setup.preferences.videoOff}
         initialMediaSettings={setup.preferences.mediaSettings}

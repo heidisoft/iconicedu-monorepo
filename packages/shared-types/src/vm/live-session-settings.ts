@@ -1,5 +1,7 @@
 /** Provider-independent policy snapshotted when a Classroom meeting starts. */
 export interface LiveSessionSettingsVM {
+  access?: { mode: 'open' | 'trusted' | 'restricted' };
+  cohosts?: { enabled: boolean };
   recording: { enabled: boolean; autoStart: boolean; allowStop: boolean };
   whiteboard: { enabled: boolean; provider?: 'excalidraw' | 'zoom' };
   invite: { enabled: boolean };

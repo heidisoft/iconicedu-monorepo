@@ -1,4 +1,5 @@
 'use client';
+import { LiveSessionJoinProvider } from '@iconicedu/web/components/live-sessions/live-session-join-provider';
 
 import * as React from 'react';
 import type { ReactNode } from 'react';
@@ -2631,7 +2632,14 @@ export function SidebarShell({
         enableMessageDrafts={Boolean(enableMessageDrafts)}
         adminSections={adminSections ?? undefined}
       />
-      <SidebarInset>{children}</SidebarInset>
+      <SidebarInset>
+        <LiveSessionJoinProvider
+          orgId={sidebarData.user.profile.ids.orgId}
+          profileId={sidebarData.user.profile.ids.id}
+        >
+          {children}
+        </LiveSessionJoinProvider>
+      </SidebarInset>
     </>
   );
 }

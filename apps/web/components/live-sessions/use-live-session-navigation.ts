@@ -17,7 +17,7 @@ export function useLiveSessionNavigation() {
   const resolveJoin = dialog.handleResolvedJoinHref;
   const openDialog = dialog.openExternalJoinDialog;
   const handleResolvedJoinHref = useCallback(
-    (href: string, provider?: string | null) => {
+    (href: string, provider?: string | null, passcode?: string | null) => {
       const prepared = withLiveSessionReturnPath(href, window.location);
       const url = new URL(prepared, window.location.href);
       if (url.origin === window.location.origin && /^\/live\/[^/]+$/.test(url.pathname)) {
@@ -25,11 +25,12 @@ export function useLiveSessionNavigation() {
         copyUrl.searchParams.delete('returnTo');
         openDialog(url.toString(), provider ?? 'zoom', {
           isInternal: true,
+          passcode,
           copyHref: copyUrl.toString(),
         });
         return;
       }
-      resolveJoin(prepared, provider);
+      resolveJoin(prepared, provider, passcode);
     },
     [resolveJoin, openDialog],
   );

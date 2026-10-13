@@ -1,3 +1,11 @@
+jest.mock('@/lib/messages/open-live-session', () => ({
+  openLiveSession: jest.fn((href: string) =>
+    require('react-native').Linking.openURL(
+      require('@/lib/messages/live-session-join').resolveJoinHrefForMobile(href),
+    ),
+  ),
+  getLiveSessionShareUrl: jest.fn(async (href: string) => href),
+}));
 import React from 'react';
 import { Linking, Share, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';

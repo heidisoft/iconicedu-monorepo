@@ -156,6 +156,8 @@ export interface LiveSessionAttendanceFilterVM {
 /** Enrolled child a verified guardian may represent in a live class. */
 export type LiveSessionStudentOptionVM = { profileId: UUID; displayName: string };
 export type LiveSessionJoinRequest = {
+  admissionToken?: string;
+  linkToken?: string;
   /** Explicit preview edit; changes the meeting label, never the authorized identity. */
   displayNameOverride?: string;
   displayName: string;
@@ -165,6 +167,7 @@ export type LiveSessionJoinRequest = {
 
 /** Credentials issued by apps/api after host authorization or passcode verification. */
 export type LiveSessionJoinCredentialsVM = {
+  sharePath?: string;
   /** API-verified student represented by a signed-in guardian. */
   studentProfileId?: UUID;
   /** Meeting-scoped opaque annotation capability for shared-link participants. */
@@ -173,6 +176,7 @@ export type LiveSessionJoinCredentialsVM = {
   token: string;
   sessionName: string;
   displayName: string;
+  meetingPasscode?: string | null;
   expiresAt: string | null;
   settings?: LiveSessionSettingsVM;
 };
@@ -184,16 +188,56 @@ export type PublicLiveSessionInfoVM =
   | {
       exists: true;
       isActive: true;
+      sessionId?: string;
+      shareCode?: string;
       settings?: LiveSessionSettingsVM;
       sessionTitle: string;
       isHost: false;
+      passcodeRequired?: boolean;
       participant?: { displayName: string; students?: LiveSessionStudentOptionVM[] };
     }
   | {
       exists: true;
       isActive: true;
+      sessionId?: string;
+      shareCode?: string;
       settings?: LiveSessionSettingsVM;
       sessionTitle: string;
       isHost: true;
       hostJoin: LiveSessionJoinCredentialsVM & { passcode: string | null };
+    };
+
+/** Authorized channel join response; passcode is separate from the public URL. */
+export interface LiveSessionJoinLinkVM {
+  /** Guest invitation capability; distinct from a personal browser handoff. */
+  sharePath?: string;
+  joinPath: string;
+  provider?: LiveSessionProviderVM;
+  passcode?: string | null;
+}
+
+export type MeetingAdmissionVM = {
+  token: string;
+  status: 'waiting' | 'approved' | 'denied' | 'ended';
+};
+export type MeetingWaitingParticipantVM = {
+  id: string;
+  displayName: string;
+  createdAt: string;
+};
+
+/** API-owned routing for legacy signed-in meeting URLs. Zoom never embeds directly. */
+export type LiveSessionMemberAccessVM =
+  | { provider: 'zoom'; joinPath: string; returnPath: string }
+  | {
+      provider: Exclude<LiveSessionProviderVM, 'zoom'>;
+      returnPath: string;
+      channelTopic: string | null;
+      channelPurpose: string | null;
+      channelKind: string | null;
+      mode: 'audio' | 'video' | null;
+      joinUrl: string | null;
+      token: string | null;
+      externalJoinUrl: string | null;
+      displayName: string;
     };

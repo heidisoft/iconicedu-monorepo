@@ -44,11 +44,36 @@ describe('public live session route', () => {
     expect(page.props).toMatchObject({
       participantName: 'Alex',
       returnPath: '/academy/messages',
-      initialPasscode: 'demo',
+      initialPasscode: null,
       accessToken: 'synthetic-auth',
       initialCredentials: null,
     });
     expect(mocks.info).toHaveBeenCalledWith('demo', 'synthetic-auth');
+  });
+  it('resolves and shares short codes unconditionally', async () => {
+    const codeParams = Promise.resolve({ sessionId: 'a3f8-b2d4-c9e1' });
+    mocks.info.mockResolvedValue({
+      exists: true,
+      isActive: true,
+      isHost: false,
+      sessionId: 'resolved-id',
+      shareCode: 'a3f8b2d4c9e1',
+      sessionTitle: 'Science',
+    });
+    const page = await PublicLiveSessionPage({
+      params: codeParams,
+      searchParams: Promise.resolve({ passcode: 'ignored' }),
+    });
+    expect(page.props).toMatchObject({
+      sessionId: 'resolved-id',
+      sharePath: '/live/a3f8-b2d4-c9e1',
+      initialPasscode: null,
+    });
+    const legacy = await PublicLiveSessionPage({
+      params,
+      searchParams: Promise.resolve({}),
+    });
+    expect(legacy.props.sharePath).toBe('/live/a3f8-b2d4-c9e1');
   });
   it('uses host credentials without a name or guest join form', async () => {
     const hostJoin = {

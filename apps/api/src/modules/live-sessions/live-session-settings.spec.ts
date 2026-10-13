@@ -35,3 +35,23 @@ describe('meeting policy validation', () => {
     expect(settingsFromSnapshot(null).recording.autoStart).toBe(false);
   });
 });
+
+describe('meeting admission settings', () => {
+  it.each(['open', 'trusted', 'restricted'])(
+    'accepts %s independently of invitations',
+    (mode) => {
+      expect(
+        parseLiveSessionSettings({ access: { mode }, cohosts: { enabled: true } }),
+      ).toMatchObject({ access: { mode }, cohosts: { enabled: true } });
+    },
+  );
+  it('rejects unknown modes and malformed co-host permissions', () => {
+    expect(() => parseLiveSessionSettings({ access: { mode: 'public' } })).toThrow(
+      'Invalid admission mode',
+    );
+    expect(() => parseLiveSessionSettings({ access: { mode: ['open'] } })).toThrow(
+      'Invalid admission mode',
+    );
+    expect(() => parseLiveSessionSettings({ cohosts: { enabled: 'yes' } })).toThrow();
+  });
+});

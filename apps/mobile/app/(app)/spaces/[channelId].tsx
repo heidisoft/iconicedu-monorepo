@@ -442,7 +442,11 @@ export default function SpaceDetailScreen() {
   const handleResolveJoinHref = useCallback(async () => {
     if (!channelId) return null;
     const result = await joinLiveSession.mutateAsync(channelId);
-    return { href: result.joinPath, provider: result.provider };
+    return {
+      href: result.joinPath,
+      provider: result.provider,
+      passcode: result.passcode,
+    };
   }, [channelId, joinLiveSession]);
 
   useEffect(() => {

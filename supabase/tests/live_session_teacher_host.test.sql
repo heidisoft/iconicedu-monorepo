@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(14);
+select plan(21);
 -- Synthetic identities: never depend on seed accounts or production data.
 insert into public.orgs(id, name, slug) values ('91000000-0000-4000-8000-000000000001', 'Annotation test', 'annotation-test-only');
 insert into auth.users(id) values ('92000000-0000-4000-8000-000000000001'), ('92000000-0000-4000-8000-000000000002'), ('92000000-0000-4000-8000-000000000003');
@@ -18,6 +18,8 @@ insert into public.channel_live_sessions(id, org_id, channel_id, provider, statu
  values ('96000000-0000-4000-8000-000000000001','91000000-0000-4000-8000-000000000001','95000000-0000-4000-8000-000000000001','zoom','live','annotation-test','94000000-0000-4000-8000-000000000001','/live/test');
 select ok(public.live_session_can_host('96000000-0000-4000-8000-000000000001','92000000-0000-4000-8000-000000000001'), 'starter keeps host access');
 select ok(not public.live_session_can_host('96000000-0000-4000-8000-000000000001','92000000-0000-4000-8000-000000000002'), 'signed-in student is not host');
+update public.profiles set kind = 'child' where id = '94000000-0000-4000-8000-000000000001';
+select ok(public.live_session_can_host('96000000-0000-4000-8000-000000000001','92000000-0000-4000-8000-000000000001'), 'signed-in starter retains host even with student profile');
 update public.profiles set kind = 'educator' where id = '94000000-0000-4000-8000-000000000003';
 select ok(not public.live_session_can_host('96000000-0000-4000-8000-000000000001','92000000-0000-4000-8000-000000000003'), 'unrelated teacher is not host');
 insert into public.channel_members(org_id, channel_id, profile_id) values ('91000000-0000-4000-8000-000000000001','95000000-0000-4000-8000-000000000001','94000000-0000-4000-8000-000000000003');
@@ -26,6 +28,21 @@ select is(public.screen_annotation_actor('96000000-0000-4000-8000-000000000001',
 select lives_ok($$select public.screen_annotation_context('96000000-0000-4000-8000-000000000001','92000000-0000-4000-8000-000000000003','teacher-share')$$,'teacher can open annotation room');
 update public.channel_members set deleted_at = now() where profile_id = '94000000-0000-4000-8000-000000000003';
 select ok(not public.live_session_can_host('96000000-0000-4000-8000-000000000001','92000000-0000-4000-8000-000000000003'), 'removed teacher loses access');
+update public.profiles set kind = 'staff' where id = '94000000-0000-4000-8000-000000000003';
+select ok(public.live_session_can_host('96000000-0000-4000-8000-000000000001','92000000-0000-4000-8000-000000000003'), 'staff can host without classroom membership');
+select is(public.screen_annotation_actor('96000000-0000-4000-8000-000000000001','92000000-0000-4000-8000-000000000003')->>'role','educator','staff host can moderate annotations without membership');
+insert into public.screen_annotation_access(id, live_session_id, token_hash, display_name, expires_at, auth_user_id) values ('97000000-0000-4000-8000-000000000001','96000000-0000-4000-8000-000000000001',repeat('b',64),'Staff browser',now() + interval '1 hour','92000000-0000-4000-8000-000000000003');
+select is(public.screen_annotation_actor('96000000-0000-4000-8000-000000000001','97000000-0000-4000-8000-000000000001')->>'role','educator','personal mobile browser retains staff annotation moderation');
+
+update public.profiles set kind = 'child' where id = '94000000-0000-4000-8000-000000000003';
+update public.accounts set primary_role = 'admin' where id = '93000000-0000-4000-8000-000000000003';
+select ok(public.live_session_can_host('96000000-0000-4000-8000-000000000001','92000000-0000-4000-8000-000000000003'), 'primary-role admin can host without membership');
+update public.accounts set primary_role = null where id = '93000000-0000-4000-8000-000000000003';
+insert into public.user_roles(org_id, account_id, role_key) values ('91000000-0000-4000-8000-000000000001','93000000-0000-4000-8000-000000000003','staff');
+select ok(public.live_session_can_host('96000000-0000-4000-8000-000000000001','92000000-0000-4000-8000-000000000003'), 'assigned staff role can host without membership');
+update public.user_roles set deleted_at = now() where account_id = '93000000-0000-4000-8000-000000000003';
+select ok(not public.live_session_can_host('96000000-0000-4000-8000-000000000001','92000000-0000-4000-8000-000000000003'), 'removed staff role loses host eligibility');
+update public.profiles set kind = 'educator' where id = '94000000-0000-4000-8000-000000000003';
 update public.channel_members set deleted_at = null where profile_id = '94000000-0000-4000-8000-000000000003';
 update public.accounts set deleted_at = now() where id = '93000000-0000-4000-8000-000000000003';
 select ok(not public.live_session_can_host('96000000-0000-4000-8000-000000000001','92000000-0000-4000-8000-000000000003'), 'deleted account loses host access');

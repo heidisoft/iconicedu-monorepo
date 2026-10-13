@@ -47,6 +47,25 @@ describe('picture-in-picture settings', () => {
     );
     expect(screen.getByRole('alert')).toHaveTextContent('Unable to open floating call.');
   });
+  it('uses the standard alert and supports opening and dismissing the prompt', () => {
+    const pip = { ...preferences(), automaticBlocked: true };
+    render(
+      <MeetingPictureInPictureControls
+        pip={pip}
+        settingsOpen={false}
+        onSettingsOpenChange={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('status')).toHaveAttribute('data-slot', 'alert');
+    fireEvent.click(screen.getByRole('button', { name: 'Open floating call' }));
+    expect(pip.open).toHaveBeenCalledOnce();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Dismiss picture-in-picture message' }),
+    );
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(pip.clearError).toHaveBeenCalledOnce();
+    expect(pip.dismissReturn).toHaveBeenCalledOnce();
+  });
   it('opens the shared call settings from the floating window gear', () => {
     const pip = { ...preferences(), pipWindow: window };
     const onCallSettings = vi.fn();

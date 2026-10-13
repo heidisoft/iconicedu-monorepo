@@ -28,6 +28,7 @@ export type ParticipantListItem = {
   avatarUrl?: string;
   isYou: boolean;
   isHost: boolean;
+  isCoHost?: boolean;
   muted: boolean;
   videoOn: boolean;
   handRaised: boolean;
@@ -42,10 +43,14 @@ export function ZoomParticipantsPanel({
   className,
   onOpenChange,
   onMute,
+  canManageCoHosts = false,
+  onCoHost,
 }: {
   open: boolean;
   participants: ParticipantListItem[];
   canMuteOthers: boolean;
+  canManageCoHosts?: boolean;
+  onCoHost?: (userId: number, enabled: boolean) => void;
   className?: string;
   onOpenChange: (open: boolean) => void;
   onMute: (userId: number, displayName: string) => void;
@@ -99,6 +104,8 @@ export function ZoomParticipantsPanel({
                 </p>
                 {participant.isHost ? (
                   <p className="text-xs text-muted-foreground">Meeting host</p>
+                ) : participant.isCoHost ? (
+                  <p className="text-xs text-muted-foreground">Co-host</p>
                 ) : null}
               </div>
               <div className="flex items-center gap-1.5">
@@ -143,6 +150,16 @@ export function ZoomParticipantsPanel({
                   </IconActionButton>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-44">
+                  {canManageCoHosts &&
+                  !participant.isYou &&
+                  !participant.isHost &&
+                  onCoHost ? (
+                    <DropdownMenuItem
+                      onSelect={() => onCoHost(participant.userId, !participant.isCoHost)}
+                    >
+                      {participant.isCoHost ? 'Remove co-host' : 'Make co-host'}
+                    </DropdownMenuItem>
+                  ) : null}
                   {canMuteOthers && !participant.isYou && !participant.muted ? (
                     <DropdownMenuItem
                       onSelect={() => onMute(participant.userId, participant.name)}

@@ -16,6 +16,34 @@ describe('ZoomShareMeetingDialog', () => {
     window.history.replaceState({}, '', '/live/test-session?token=private#fragment');
   });
 
+  it('copies the short locator and keeps the passcode separate', async () => {
+    render(
+      <ZoomShareMeetingDialog
+        meetingTitle="Science"
+        meetingPasscode="secret"
+        sharePath="/live/a3f8-b2d4-c9e1"
+        sessionId="full-session-id"
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Share meeting link' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Copy join link' }));
+    await waitFor(() =>
+      expect(writeText).toHaveBeenCalledWith(
+        `${window.location.origin}/live/a3f8-b2d4-c9e1`,
+      ),
+    );
+    expect(writeText.mock.calls[0][0]).not.toContain('secret');
+  });
+
+  it('shares the public landing URL from an authenticated meeting route', async () => {
+    window.history.replaceState({}, '', '/academy/live-sessions/full-session-id');
+    render(<ZoomShareMeetingDialog meetingTitle="Science" sessionId="full-session-id" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Share meeting link' }));
+    expect(screen.getByLabelText('Meeting join link')).toHaveValue(
+      `${window.location.origin}/live/full-session-id`,
+    );
+  });
+
   it('shows the join details and copies a query-free invitation with the passcode', async () => {
     render(
       <ZoomShareMeetingDialog meetingTitle="Science class" meetingPasscode="class-123" />,

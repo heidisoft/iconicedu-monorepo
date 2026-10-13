@@ -285,33 +285,18 @@ test.describe('live session setup and leave navigation', () => {
     await expect(page).toHaveURL('/');
   });
 
-  test('a signed-in shared-link visitor can correct an invalid passcode', async ({
+  test('a signed-in shared-link visitor never sees a passcode prompt', async ({
     page,
   }) => {
-    await page.route('**/live-sessions/*/guest-join', async (route) => {
-      if (route.request().postDataJSON().passcode === 'wrong')
-        await route.fulfill({ status: 403, json: { message: 'Incorrect passcode' } });
-      else
-        await route.fulfill({
-          json: {
-            token: 'synthetic',
-            sessionName: 'fixture-class',
-            displayName: 'Test Student',
-            expiresAt: null,
-          },
-        });
-    });
-    await page.goto(`${fixture}?actor=member&passcode=wrong`);
-    await expect(
-      page.getByRole('alert').filter({ hasText: 'Incorrect passcode' }),
-    ).toHaveText('Incorrect passcode');
-    await expect(page.getByLabel('Your name')).toHaveCount(0);
-    await page.getByLabel('Session passcode').fill('correct');
+    await page.goto(`${fixture}?actor=member`);
+    await expect(page.getByRole('group', { name: 'Your video preview' })).toBeVisible();
+    await expect(page.getByLabel('Session passcode')).toHaveCount(0);
     await page.getByRole('button', { name: 'Join session', exact: true }).click();
     await expect(
-      page.getByText('Check your camera and microphone before joining.'),
+      page.getByRole('heading', { name: 'Meeting as Test Student' }),
     ).toBeVisible();
   });
+
   test('anonymous mobile visitors can enter name and passcode without horizontal overflow', async ({
     page,
   }) => {
@@ -356,7 +341,7 @@ test.describe('live session setup and leave navigation', () => {
     context,
   }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-    await context.route('**/live/fixture-host?*', (route) =>
+    await context.route('**/live/aaaa-bbbb-cccc?*', (route) =>
       route.fulfill({ contentType: 'text/html', body: '<h1>Meeting setup target</h1>' }),
     );
     await page.goto(`${fixture}?actor=dialog`);
@@ -364,15 +349,18 @@ test.describe('live session setup and leave navigation', () => {
     await page.getByRole('button', { name: 'Copy link', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Copied' })).toBeVisible();
     const copied = new URL(await page.evaluate(() => navigator.clipboard.readText()));
-    expect(copied.pathname).toBe('/live/fixture-host');
-    expect(copied.searchParams.get('passcode')).toBe('demo');
+    expect(copied.pathname).toBe('/live/aaaa-bbbb-cccc');
+    expect(copied.searchParams.has('passcode')).toBe(false);
+    expect(copied.hash).toBe('#invite=' + 'a'.repeat(32));
+    await page.getByRole('button', { name: 'Copy passcode', exact: true }).click();
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('DemoPass12');
     expect(copied.searchParams.has('returnTo')).toBe(false);
     const newPage = context.waitForEvent('page');
     await page.getByRole('link', { name: 'Open Zoom' }).click();
     const meeting = await newPage;
     await meeting.waitForLoadState();
     const opened = new URL(meeting.url());
-    expect(opened.pathname).toBe('/live/fixture-host');
+    expect(opened.pathname).toBe('/live/aaaa-bbbb-cccc');
     expect(opened.searchParams.get('returnTo')).toBe(`${fixture}?actor=dialog`);
     await expect(page).toHaveURL(`${fixture}?actor=dialog`);
     await meeting.close();

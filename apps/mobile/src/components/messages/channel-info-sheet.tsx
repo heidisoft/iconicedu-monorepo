@@ -1,3 +1,8 @@
+import {
+  openLiveSession,
+  getLiveSessionShareUrl,
+} from '@/lib/messages/open-live-session';
+import { MeetingPasscode } from '@iconicedu/ui-native/components/MeetingPasscode';
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -49,7 +54,6 @@ import { useJoinLiveSession } from '@/hooks/use-join-live-session';
 import {
   isExternalJoinHref,
   resolveExternalJoinProviderLabel,
-  resolveJoinHrefForMobile,
 } from '@/lib/messages/live-session-join';
 import {
   ensureDirectMessageChannelForProfiles,
@@ -1291,6 +1295,7 @@ export function ChannelInfoSheet({
   const [externalJoinTarget, setExternalJoinTarget] = useState<{
     joinHref: string;
     providerLabel: string | null;
+    passcode?: string | null;
   } | null>(null);
   const joinTransitionTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(
     null,
@@ -1341,11 +1346,13 @@ export function ChannelInfoSheet({
         // over the static channel-level link, used only as a fallback.
         let joinHref: string | null = null;
         let providerHint: string | null = null;
+        let passcode: string | null | undefined;
         if (liveSessionEnabled && channelId) {
           try {
             const result = await joinLiveSession.mutateAsync(channelId);
             joinHref = result.joinPath;
             providerHint = result.provider;
+            passcode = result.passcode;
           } catch {
             joinHref = null;
           }
@@ -1356,11 +1363,12 @@ export function ChannelInfoSheet({
         if (isExternalJoinHref(joinHref)) {
           setExternalJoinTarget({
             joinHref,
+            passcode,
             providerLabel: resolveExternalJoinProviderLabel(joinHref, providerHint),
           });
           return;
         }
-        Linking.openURL(resolveJoinHrefForMobile(joinHref)).catch(() => null);
+        void openLiveSession(joinHref);
       };
 
       closeSheet?.();
@@ -1375,17 +1383,18 @@ export function ChannelInfoSheet({
     [channelId, joinLiveSession, liveJoinUrl, liveSessionEnabled, onClose, onJoinPress],
   );
   const handleOpenJoinHref = useCallback((joinHref: string) => {
-    Linking.openURL(resolveJoinHrefForMobile(joinHref)).catch(() => null);
+    void openLiveSession(joinHref);
   }, []);
   const handleShareJoinHref = useCallback(async () => {
     if (!externalJoinTarget?.joinHref) return;
     try {
+      const shareUrl = await getLiveSessionShareUrl(externalJoinTarget.joinHref);
       await Share.share({
-        message: externalJoinTarget.joinHref,
-        url: externalJoinTarget.joinHref,
+        message: shareUrl,
+        url: shareUrl,
       });
     } catch {
-      // best effort share
+      Alert.alert('Unable to share meeting', 'Please try again.');
     }
   }, [externalJoinTarget?.joinHref]);
 
@@ -1814,6 +1823,11 @@ export function ChannelInfoSheet({
               <Text style={s.modalLinkLabel}>Join link</Text>
               <Text style={s.modalLinkValue}>{externalJoinTarget?.joinHref}</Text>
             </View>
+            <MeetingPasscode
+              passcode={externalJoinTarget?.passcode}
+              color={colors.text}
+              mutedColor={colors.textMuted}
+            />
             <View style={s.modalFooter}>
               <TouchableOpacity
                 style={[s.modalButton, s.modalButtonSecondary]}

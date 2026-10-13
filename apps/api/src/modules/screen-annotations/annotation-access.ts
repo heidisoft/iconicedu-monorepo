@@ -7,12 +7,14 @@ export const hashAnnotationToken = (token: string) =>
 export async function issueAnnotationAccess(
   sessionId: string,
   displayName: string,
+  authUserId?: string,
 ): Promise<string> {
   const token = randomBytes(32).toString('base64url');
   const result = await createSupabaseServiceClient()
     .from('screen_annotation_access')
     .insert({
       live_session_id: sessionId,
+      ...(authUserId ? { auth_user_id: authUserId } : {}),
       token_hash: hashAnnotationToken(token),
       display_name: displayName.slice(0, 100),
       expires_at: new Date(Date.now() + 4 * 3600_000).toISOString(),

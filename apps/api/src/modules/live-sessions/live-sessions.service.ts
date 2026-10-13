@@ -1,3 +1,9 @@
+import { requireMeetingAdmission, meetingAdmissionStatus } from './meeting-admissions';
+import {
+  issueMeetingLink,
+  resolveMeetingLink,
+  redeemMeetingHandoff,
+} from './meeting-browser-links';
 import { issueAnnotationAccess } from '../screen-annotations/annotation-access';
 import { issueWhiteboardAccess } from '../whiteboards/whiteboard-access';
 import { platformFeatureFlagKeys } from '@iconicedu/shared-types';
@@ -5,6 +11,7 @@ import { evaluateApiBooleanFlag } from '@iconicedu/api/lib/flags/posthog-openfea
 import { parseLiveSessionSettings, settingsFromSnapshot } from './live-session-settings';
 import type {
   LiveSessionJoinCredentialsVM,
+  LiveSessionMemberAccessVM,
   PublicLiveSessionInfoVM,
 } from '@iconicedu/shared-types';
 import { randomUUID } from 'node:crypto';
@@ -21,6 +28,10 @@ import {
 } from '@nestjs/common';
 import {
   createOrJoinLiveSession,
+  hasOrgStaffRole,
+  resolveAuthorizedLiveSessionProfileIds,
+  verifyChannelMembership,
+  getWebAppUrl,
   getLiveSessionProvider,
   verifyZoomPasscode,
 } from '@iconicedu/live-sessions-core';
@@ -56,6 +67,7 @@ async function resolveOrgSlug(
 }
 
 type ChannelLiveSessionPublicRow = {
+  share_code?: string | null;
   org_id: string;
   id: string;
   provider: string;
@@ -323,6 +335,311 @@ export class LiveSessionsService {
     }
   }
 
+  async memberAccess(
+    accessToken: string,
+    sessionId: string,
+    input: JoinLiveSessionDto,
+  ): Promise<LiveSessionMemberAccessVM> {
+    const db = createSupabaseServiceClient();
+    const { profile } = await loadAndAuthorizeProfile({
+      sessionSupabase: createSupabaseSessionClient(accessToken),
+      serviceSupabase: db,
+      orgId: input.orgId,
+      profileId: input.profileId,
+    });
+    const result = await db
+      .from('channel_live_sessions')
+      .select(
+        'id, org_id, channel_id, provider, provider_session_id, provider_metadata, share_code, status',
+      )
+      .eq('id', sessionId)
+      .eq('org_id', input.orgId)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (result.error) throw new InternalServerErrorException('Unable to load meeting');
+    const session = result.data;
+    if (!session || !['starting', 'live'].includes(session.status))
+      throw new NotFoundException('Live session is not active');
+    const ids = await resolveAuthorizedLiveSessionProfileIds({
+      supabase: db,
+      orgId: input.orgId,
+      profile,
+    });
+    if (!(await verifyChannelMembership(db, input.orgId, session.channel_id, ids)))
+      throw new ForbiddenException('Classroom access is required');
+    const channelResult = await db
+      .from('channels')
+      .select('topic, purpose, kind, live_session_config')
+      .eq('id', session.channel_id)
+      .eq('org_id', input.orgId)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (channelResult.error || !channelResult.data)
+      throw new NotFoundException('Classroom not found');
+    const channel = channelResult.data;
+    const slug = await resolveOrgSlug(db, input.orgId);
+    const returnPath = `/${slug}/${channel.purpose === 'learning-space' ? 's' : channel.kind === 'dm' || channel.kind === 'group_dm' ? 'dm' : 'c'}/${session.channel_id}`;
+    if (session.provider === 'zoom') {
+      const code =
+        typeof session.share_code === 'string'
+          ? session.share_code.match(/.{4}/g)?.join('-')
+          : null;
+      return { provider: 'zoom', joinPath: `/live/${code ?? session.id}`, returnPath };
+    }
+    const displayName =
+      profile.display_name ??
+      ([profile.first_name, profile.last_name].filter(Boolean).join(' ') ||
+        'Participant');
+    const provider = session.provider as Exclude<LiveSessionProviderVM, 'zoom'>;
+    const access = await getLiveSessionProvider(provider).getJoinAccess({
+      sessionId: session.id,
+      providerSessionId: session.provider_session_id,
+      providerMetadata: session.provider_metadata ?? {},
+      profileId: profile.id,
+      displayName,
+      isHost:
+        profile.kind === 'educator' || (await hasOrgStaffRole(db, input.orgId, ids)),
+    });
+    return {
+      provider,
+      returnPath,
+      channelTopic: channel.topic,
+      channelPurpose: channel.purpose,
+      channelKind: channel.kind,
+      mode:
+        channel.live_session_config?.mode === 'audio'
+          ? 'audio'
+          : channel.live_session_config?.mode === 'video'
+            ? 'video'
+            : null,
+      joinUrl: access.joinUrl ?? null,
+      token: access.token ?? null,
+      externalJoinUrl:
+        typeof access.metadata?.externalJoinUrl === 'string'
+          ? access.metadata.externalJoinUrl
+          : null,
+      displayName,
+    };
+  }
+
+  private async invitationPath(
+    sessionId: string,
+    passcode: string | null,
+    shareCode?: string | null,
+  ) {
+    const token = await issueMeetingLink(sessionId, 'invite', null, passcode);
+    const code = shareCode?.match(/.{4}/g)?.join('-') ?? sessionId;
+    return new URL(`/live/${code}#invite=${token}`, getWebAppUrl()).toString();
+  }
+
+  async createInvitation(accessToken: string, identifier: string) {
+    const info = await this.getPublicLiveSessionInfo(identifier, accessToken);
+    if (!info.exists || !info.isActive || !info.sessionId)
+      throw new NotFoundException('Live session is not active');
+    const orgId = await this.sessionOrg(info.sessionId);
+    const identity = await this.resolveLiveSessionIdentity(accessToken, orgId);
+    if (!identity?.profileId)
+      throw new ForbiddenException('Classroom access is required');
+    return this.getShareInfo(accessToken, identifier, {
+      orgId,
+      profileId: identity.profileId,
+    });
+  }
+
+  async createBrowserHandoff(accessToken: string, identifier: string) {
+    const info = await this.getPublicLiveSessionInfo(identifier, accessToken);
+    if (!info.exists || !info.isActive || !info.sessionId)
+      throw new NotFoundException('Live session is not active');
+    const identity = await this.resolveLiveSessionIdentity(
+      accessToken,
+      await this.sessionOrg(info.sessionId),
+    );
+    if (!identity?.profileId)
+      throw new ForbiddenException('An active organization profile is required');
+    const token = await issueMeetingLink(info.sessionId, 'handoff', identity.authUserId);
+    const path = info.shareCode
+      ? info.shareCode.match(/.{4}/g)!.join('-')
+      : info.sessionId;
+    return {
+      browserPath: new URL(`/live/${path}#handoff=${token}`, getWebAppUrl()).toString(),
+    };
+  }
+
+  private async sessionOrg(sessionId: string) {
+    const result = await createSupabaseServiceClient()
+      .from('channel_live_sessions')
+      .select('org_id')
+      .eq('id', sessionId)
+      .is('deleted_at', null)
+      .single<{ org_id: string }>();
+    if (result.error || !result.data)
+      throw new NotFoundException('Live session not found');
+    return result.data.org_id;
+  }
+
+  async getLinkInfo(
+    identifier: string,
+    token: string,
+    handoff: boolean,
+    accessToken: string | null = null,
+    clientIp = 'unknown',
+    redemptionKey = '',
+  ) {
+    checkGuestJoinRateLimit(`link:${identifier}:${clientIp}`);
+    const publicInfo = await this.getPublicLiveSessionInfo(identifier, null);
+    if (!publicInfo.exists || !publicInfo.isActive || !publicInfo.sessionId)
+      throw new NotFoundException('Live session is not active');
+    const linkToken = handoff
+      ? await redeemMeetingHandoff(token, publicInfo.sessionId, redemptionKey)
+      : token;
+    const info = await this.getPublicLiveSessionInfo(
+      publicInfo.sessionId,
+      handoff ? null : accessToken,
+      linkToken,
+    );
+    return { info, linkToken };
+  }
+
+  async admissionStatus(sessionId: string, token: string, cancel = false) {
+    return meetingAdmissionStatus(sessionId, token, cancel);
+  }
+
+  async moderateAdmissions(
+    sessionId: string,
+    accessToken: string | null,
+    linkToken?: string,
+    decision?: { id: string; approved: boolean },
+  ) {
+    const db = createSupabaseServiceClient();
+    const session = await db
+      .from('channel_live_sessions')
+      .select('id, org_id, provider_metadata, status')
+      .eq('id', sessionId)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (session.error) throw new InternalServerErrorException('Unable to verify meeting');
+    if (!session.data || !['starting', 'live'].includes(session.data.status))
+      throw new NotFoundException('Session has ended');
+    const passcode =
+      typeof session.data.provider_metadata?.passcode === 'string'
+        ? session.data.provider_metadata.passcode
+        : null;
+    const link = linkToken
+      ? await resolveMeetingLink(linkToken, sessionId, passcode)
+      : null;
+    const identity = accessToken
+      ? await this.resolveLiveSessionIdentity(accessToken, session.data.org_id)
+      : link?.auth_user_id
+        ? await this.resolveLiveSessionUser(link.auth_user_id, session.data.org_id)
+        : null;
+    if (!(await this.isMeetingHost(sessionId, identity)))
+      throw new ForbiddenException('Teacher or staff access required');
+    if (decision) {
+      const result = await db
+        .from('live_session_admissions')
+        .update({ status: decision.approved ? 'approved' : 'denied' })
+        .eq('id', decision.id)
+        .eq('live_session_id', sessionId)
+        .eq('status', 'waiting')
+        .gt('expires_at', new Date().toISOString())
+        .select('id')
+        .maybeSingle();
+      if (result.error)
+        throw new InternalServerErrorException('Unable to update admission');
+      if (!result.data) throw new NotFoundException('Request is no longer waiting');
+      return { success: true };
+    }
+    const result = await db
+      .from('live_session_admissions')
+      .select('id, display_name, created_at')
+      .eq('live_session_id', sessionId)
+      .eq('status', 'waiting')
+      .gt('expires_at', new Date().toISOString())
+      .order('created_at')
+      .limit(100);
+    if (result.error)
+      throw new InternalServerErrorException('Unable to load waiting room');
+    return (result.data ?? []).map((row) => ({
+      id: row.id,
+      displayName: row.display_name,
+      createdAt: row.created_at,
+    }));
+  }
+
+  async getShareInfo(accessToken: string, identifier: string, input: JoinLiveSessionDto) {
+    const isCode = /^[a-f0-9]{4}(-[a-f0-9]{4}){2}$/i.test(identifier);
+    if (
+      !isCode &&
+      !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(identifier)
+    )
+      throw new NotFoundException('Live session not found');
+    const serviceSupabase = createSupabaseServiceClient();
+    const { profile } = await loadAndAuthorizeProfile({
+      sessionSupabase: createSupabaseSessionClient(accessToken),
+      serviceSupabase,
+      orgId: input.orgId,
+      profileId: input.profileId,
+    });
+    const response = await serviceSupabase
+      .from('channel_live_sessions')
+      .select('id, org_id, channel_id, share_code, provider, provider_metadata')
+      .eq('org_id', input.orgId)
+      .eq(
+        isCode ? 'share_code' : 'id',
+        isCode ? identifier.replace(/-/g, '').toLowerCase() : identifier,
+      )
+      .is('deleted_at', null)
+      .maybeSingle<{
+        id: string;
+        org_id: string;
+        channel_id: string;
+        share_code: string | null;
+        provider: string;
+        provider_metadata: Record<string, unknown> | null;
+      }>();
+    if (response.error)
+      throw new InternalServerErrorException('Unable to load meeting details');
+    const session = response.data;
+    if (!session || session.provider !== 'zoom')
+      throw new NotFoundException('Live session not found');
+    const profileIds = await resolveAuthorizedLiveSessionProfileIds({
+      supabase: serviceSupabase,
+      orgId: input.orgId,
+      profile,
+    });
+    if (
+      !(await verifyChannelMembership(
+        serviceSupabase,
+        input.orgId,
+        session.channel_id,
+        profileIds,
+      ))
+    )
+      throw new ForbiddenException('Classroom access is required');
+    const code =
+      typeof session.share_code === 'string'
+        ? session.share_code.match(/.{4}/g)?.join('-')
+        : null;
+    const joinPath = new URL(`/live/${code ?? session.id}`, getWebAppUrl()).toString();
+    const invite = await issueMeetingLink(
+      session.id,
+      'invite',
+      null,
+      typeof session.provider_metadata?.passcode === 'string'
+        ? session.provider_metadata.passcode
+        : null,
+    );
+    return {
+      joinPath,
+      sharePath: `${joinPath}#invite=${invite}`,
+      provider: 'zoom' as const,
+      passcode:
+        typeof session.provider_metadata?.passcode === 'string'
+          ? session.provider_metadata.passcode
+          : null,
+    };
+  }
+
   // Public (no-auth): gated by the session's passcode rather than channel
   // membership, so anyone with a shared link can join a Zoom-provider session.
   async guestJoinLiveSession(
@@ -337,7 +654,7 @@ export class LiveSessionsService {
     const sessionResponse = await serviceSupabase
       .from('channel_live_sessions')
       .select(
-        'id, org_id, provider, status, channel_id, provider_session_id, provider_metadata, app_metadata',
+        'id, share_code, org_id, provider, status, channel_id, provider_session_id, provider_metadata, app_metadata',
       )
       .eq('id', sessionId)
       .is('deleted_at', null)
@@ -361,17 +678,30 @@ export class LiveSessionsService {
     const metadata = session.provider_metadata ?? {};
     const storedPasscode =
       typeof metadata.passcode === 'string' ? metadata.passcode : null;
+    const link = input.linkToken
+      ? await resolveMeetingLink(input.linkToken, session.id, storedPasscode)
+      : null;
     const identity = accessToken
       ? await this.resolveLiveSessionIdentity(accessToken, session.org_id)
-      : null;
-    const students = await this.guardianStudents(
-      identity,
-      session.org_id,
-      session.channel_id,
-    );
+      : link?.auth_user_id
+        ? await this.resolveLiveSessionUser(link.auth_user_id, session.org_id)
+        : null;
+    if (link?.auth_user_id && !identity?.profileId)
+      throw new ForbiddenException('Meeting access has expired');
+    const isStaff = identity?.profileId
+      ? await hasOrgStaffRole(serviceSupabase, session.org_id, [identity.profileId])
+      : false;
+    const students = isStaff
+      ? undefined
+      : await this.guardianStudents(identity, session.org_id, session.channel_id);
     const isHost =
       students === undefined && (await this.isMeetingHost(session.id, identity));
-    if (!isHost && !verifyZoomPasscode(storedPasscode, input.passcode)) {
+    if (
+      !identity &&
+      link?.purpose !== 'invite' &&
+      !isHost &&
+      !verifyZoomPasscode(storedPasscode, input.passcode)
+    ) {
       throw new ForbiddenException('Incorrect passcode');
     }
     if (input.studentProfileId && students === undefined)
@@ -394,7 +724,7 @@ export class LiveSessionsService {
       throw new BadRequestException('Choose which student is joining');
     }
     const joiningProfileId = student?.profileId ?? identity?.profileId;
-    if (!settings.invite.enabled && !isHost) {
+    if (!settings.invite.enabled && !isHost && !isStaff) {
       if (!joiningProfileId || !session.channel_id)
         throw new ForbiddenException('Shared invitations are disabled');
       const membership = await serviceSupabase
@@ -415,6 +745,35 @@ export class LiveSessionsService {
       student?.displayName ??
       identity?.displayName ??
       input.displayName;
+    const mode = settings.access?.mode ?? 'open';
+    if (mode !== 'open' && !isHost && !isStaff) {
+      let enrolled = false;
+      if (joiningProfileId) {
+        const membership = await serviceSupabase
+          .from('channel_members')
+          .select('id')
+          .eq('org_id', session.org_id)
+          .eq('channel_id', session.channel_id)
+          .eq('profile_id', joiningProfileId)
+          .is('deleted_at', null)
+          .maybeSingle();
+        if (membership.error)
+          throw new InternalServerErrorException('Unable to verify admission');
+        enrolled = !!membership.data;
+      }
+      if (mode === 'restricted' || !enrolled)
+        await requireMeetingAdmission(
+          session.id,
+          input.admissionToken,
+          JSON.stringify([
+            identity?.authUserId ?? 'guest',
+            student?.profileId ?? null,
+            input.displayName,
+            storedPasscode,
+          ]),
+          displayName,
+        );
+    }
     const provider = getLiveSessionProvider('zoom');
     const joinAccess = await provider.getJoinAccess({
       sessionId: session.id,
@@ -429,9 +788,26 @@ export class LiveSessionsService {
       throw new InternalServerErrorException('Unable to issue session credentials');
 
     return {
+      ...(settings.invite.enabled
+        ? {
+            sharePath: await this.invitationPath(
+              session.id,
+              storedPasscode,
+              session.share_code,
+            ),
+          }
+        : {}),
+      ...(identity ? { meetingPasscode: storedPasscode } : {}),
       ...(student ? { studentProfileId: student.profileId } : {}),
-      ...(!identity?.profileId || student || (!isHost && input.displayNameOverride)
-        ? { annotationToken: await issueAnnotationAccess(session.id, displayName) }
+      ...(!identity?.profileId ||
+      student ||
+      link?.purpose === 'access' ||
+      (!isHost && input.displayNameOverride)
+        ? {
+            annotationToken: await (link?.purpose === 'access' && !student && identity
+              ? issueAnnotationAccess(session.id, displayName, identity.authUserId)
+              : issueAnnotationAccess(session.id, displayName)),
+          }
         : {}),
       ...(settings.whiteboard.enabled
         ? {
@@ -460,17 +836,23 @@ export class LiveSessionsService {
   async getPublicLiveSessionInfo(
     sessionId: string,
     accessToken: string | null,
+    linkToken?: string,
   ): Promise<PublicLiveSessionInfoVM> {
+    const isShareCode = /^[a-f0-9]{4}(-[a-f0-9]{4}){2}$/i.test(sessionId);
     const serviceSupabase = createSupabaseServiceClient();
     const sessionResponse = await serviceSupabase
       .from('channel_live_sessions')
       .select(
-        'id, org_id, provider, status, channel_id, started_by_profile_id, provider_session_id, provider_metadata, app_metadata',
+        'id, share_code, org_id, provider, status, channel_id, started_by_profile_id, provider_session_id, provider_metadata, app_metadata',
       )
-      .eq('id', sessionId)
+      .eq(
+        isShareCode ? 'share_code' : 'id',
+        isShareCode ? sessionId.replace(/-/g, '').toLowerCase() : sessionId,
+      )
       .is('deleted_at', null)
       .maybeSingle<{
         id: string;
+        share_code?: string;
         org_id: string;
         provider: string;
         status: 'starting' | 'live' | 'ended' | 'failed';
@@ -501,23 +883,41 @@ export class LiveSessionsService {
       return { exists: true as const, isActive: false as const, sessionTitle };
     }
 
+    const passcode =
+      typeof session.provider_metadata?.passcode === 'string'
+        ? session.provider_metadata.passcode
+        : null;
+    const link = linkToken
+      ? await resolveMeetingLink(linkToken, session.id, passcode)
+      : null;
     const identity = accessToken
       ? await this.resolveLiveSessionIdentity(accessToken, session.org_id)
-      : null;
-    const students = await this.guardianStudents(
-      identity,
-      session.org_id,
-      session.channel_id,
-    );
+      : link?.auth_user_id
+        ? await this.resolveLiveSessionUser(link.auth_user_id, session.org_id)
+        : null;
+    if (link?.auth_user_id && !identity?.profileId)
+      throw new ForbiddenException('Meeting access has expired');
+    const isStaff = identity?.profileId
+      ? await hasOrgStaffRole(serviceSupabase, session.org_id, [identity.profileId])
+      : false;
+    const students = isStaff
+      ? undefined
+      : await this.guardianStudents(identity, session.org_id, session.channel_id);
     const isHost =
       students === undefined && (await this.isMeetingHost(session.id, identity));
     if (!isHost || !identity?.profileId) {
       return {
         exists: true as const,
         isActive: true as const,
+        sessionId: session.id,
+        shareCode: session.share_code,
         sessionTitle,
         isHost: false as const,
+        passcodeRequired: !identity && !link,
         settings,
+        ...(!identity && link?.purpose === 'invite'
+          ? { participant: { displayName: 'Guest' } }
+          : {}),
         ...(identity
           ? {
               participant: {
@@ -548,8 +948,11 @@ export class LiveSessionsService {
       return {
         exists: true as const,
         isActive: true as const,
+        sessionId: session.id,
+        shareCode: session.share_code,
         sessionTitle,
         isHost: false as const,
+        passcodeRequired: !identity && !link,
         settings,
       };
     }
@@ -557,10 +960,30 @@ export class LiveSessionsService {
     return {
       exists: true as const,
       isActive: true as const,
+      sessionId: session.id,
+      shareCode: session.share_code,
       sessionTitle,
       isHost: true as const,
       settings,
       hostJoin: {
+        ...(link?.purpose === 'access'
+          ? {
+              annotationToken: await issueAnnotationAccess(
+                session.id,
+                displayName,
+                identity.authUserId,
+              ),
+            }
+          : {}),
+        ...(settings.invite.enabled
+          ? {
+              sharePath: await this.invitationPath(
+                session.id,
+                passcode,
+                session.share_code,
+              ),
+            }
+          : {}),
         ...(settings.whiteboard.enabled
           ? {
               whiteboard: await this.whiteboardAccess(session.id, 'teacher', displayName),
@@ -583,18 +1006,26 @@ export class LiveSessionsService {
   }
 
   /** Resolve only the verified caller's identity in the session org.
-   * Passcode verification remains mandatory for non-hosts, including callers
-   * without an org profile. Their Zoom identity is still an anonymous guest.
+   * Passcodes are required only for anonymous guests. Verified callers still
+   * follow invitation policy, guardian enrollment, and tenant checks. Their Zoom identity is still an anonymous guest.
    */
   private async resolveLiveSessionIdentity(accessToken: string, orgId: string) {
     const { data } = await createSupabaseSessionClient(accessToken).auth.getUser();
     const user = data.user;
     if (!user) return null;
+    return this.resolveLiveSessionUser(user.id, orgId, user.user_metadata);
+  }
+
+  private async resolveLiveSessionUser(
+    authUserId: string,
+    orgId: string,
+    userMetadata?: Record<string, unknown>,
+  ) {
     const service = createSupabaseServiceClient();
     const account = await service
       .from('accounts')
       .select('id')
-      .eq('auth_user_id', user.id)
+      .eq('auth_user_id', authUserId)
       .eq('org_id', orgId)
       .eq('status', 'active')
       .is('deleted_at', null)
@@ -619,14 +1050,14 @@ export class LiveSessionsService {
     if (profile?.error)
       throw new InternalServerErrorException('Unable to resolve participant identity');
     const row = profile?.data;
-    const metadataName = user.user_metadata?.full_name ?? user.user_metadata?.name;
+    const metadataName = userMetadata?.full_name ?? userMetadata?.name;
     const displayName =
       row?.display_name?.trim() ||
       [row?.first_name, row?.last_name].filter(Boolean).join(' ').trim() ||
       (typeof metadataName === 'string' ? metadataName.trim() : '') ||
       'Participant';
     return {
-      authUserId: user.id,
+      authUserId,
       accountId: account.data?.id ?? null,
       kind: row?.kind ?? null,
       profileId: row?.id ?? null,

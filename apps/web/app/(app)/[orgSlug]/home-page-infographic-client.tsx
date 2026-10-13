@@ -1,5 +1,7 @@
 'use client';
 
+import type { LiveSessionJoinLinkVM } from '@iconicedu/shared-types';
+
 import { useCallback, useMemo, type ComponentProps } from 'react';
 import { DashboardHomeInfographicSection } from '@iconicedu/ui-web';
 import type { DashboardUpcomingSessionListItem } from '@iconicedu/ui-web/components/dashboard/dashboard-home-infographic-section';
@@ -37,15 +39,15 @@ export function HomePageInfographicClient({
         throw new Error('Current user is required');
       }
 
-      const payload = await createApiClient(supabase).post<{
-        joinPath: string;
-        provider?: string;
-      }>(`/channels/${item.channelId}/live-sessions/join`, {
-        orgId,
-        profileId: currentUserId,
-      });
+      const payload = await createApiClient(supabase).post<LiveSessionJoinLinkVM>(
+        `/channels/${item.channelId}/live-sessions/join`,
+        {
+          orgId,
+          profileId: currentUserId,
+        },
+      );
 
-      handleResolvedJoinHref(payload.joinPath, payload.provider);
+      handleResolvedJoinHref(payload.joinPath, payload.provider, payload.passcode);
     },
     [currentUserId, handleResolvedJoinHref, orgId, supabase],
   );

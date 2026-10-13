@@ -338,6 +338,7 @@ function createServiceSupabaseStub(input?: {
           insert(payload: Record<string, unknown>) {
             liveSessionRow = {
               id: 'live-session-1',
+              share_code: 'a3f8b2d4c9e1',
               org_id: payload.org_id,
               channel_id: payload.channel_id,
               provider: payload.provider,
@@ -729,13 +730,14 @@ describe('createOrJoinLiveSession', () => {
 
       expect(result).toEqual({
         sessionId: 'live-session-1',
-        joinPath: 'https://app.iconicedu.lk/live/live-session-1',
+        joinPath: 'https://app.iconicedu.lk/live/a3f8-b2d4-c9e1',
         status: 'live',
         created: true,
         provider: 'zoom',
+        passcode: null,
       });
       expect(serviceSupabase.state.liveSessionRow?.join_path).toBe(
-        'https://app.iconicedu.lk/live/live-session-1',
+        'https://app.iconicedu.lk/live/a3f8-b2d4-c9e1',
       );
 
       await scheduler.flush();
@@ -748,7 +750,42 @@ describe('createOrJoinLiveSession', () => {
     }
   });
 
-  it('appends the passcode as a query param so members can join with one click', async () => {
+  it.each([true, false])(
+    'reuses meetings with a credential-free link (stored code=%s)',
+    async (hasCode) => {
+      const serviceSupabase = createServiceSupabaseStub({
+        liveSessionConfig: { enabled: true, provider: 'zoom' },
+        activeLiveSessionRow: {
+          id: 'live-session-1',
+          org_id: 'org-1',
+          channel_id: 'channel-1',
+          provider: 'zoom',
+          status: 'live',
+          session_scope_key: 'channel:channel-1',
+          started_by_profile_id: 'profile-1',
+          share_code: hasCode ? 'a3f8b2d4c9e1' : null,
+          provider_metadata: { passcode: 'reused-secret' },
+          join_path: 'https://old.example/live/live-session-1?passcode=secret',
+        },
+      });
+      const scheduler = createImmediateScheduler();
+      const result = await createOrJoinLiveSession({
+        serviceSupabase: serviceSupabase as never,
+        actor: DEFAULT_ACTOR,
+        channelId: 'channel-1',
+        orgSlug: 'academy',
+        schedulePostJoinSideEffects: scheduler.schedule,
+      });
+      expect(new URL(result.joinPath).pathname).toBe(
+        hasCode ? '/live/a3f8-b2d4-c9e1' : '/live/live-session-1',
+      );
+      expect(result.passcode).toBe('reused-secret');
+      expect(new URL(result.joinPath).search).toBe('');
+      await scheduler.flush();
+    },
+  );
+
+  it('creates short join URLs without passcodes by default', async () => {
     const previousWebUrl = process.env.WEB_URL;
     process.env.WEB_URL = 'https://app.iconicedu.lk';
     vi.mocked(getLiveSessionProvider).mockReturnValueOnce({
@@ -782,10 +819,9 @@ describe('createOrJoinLiveSession', () => {
         schedulePostJoinSideEffects: scheduler.schedule,
       });
 
-      expect(result.joinPath).toBe(
-        'https://app.iconicedu.lk/live/live-session-1?passcode=abc123xyz9',
-      );
+      expect(result.joinPath).toBe('https://app.iconicedu.lk/live/a3f8-b2d4-c9e1');
 
+      expect(result.passcode).toBe('abc123xyz9');
       await scheduler.flush();
     } finally {
       if (previousWebUrl === undefined) {

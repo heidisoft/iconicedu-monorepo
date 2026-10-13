@@ -334,10 +334,40 @@ model ClassroomWhiteboardAccess {
 model ScreenAnnotationAccess {
   id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   liveSessionId String   @map("live_session_id") @db.Uuid
+  authUserId    String?  @map("auth_user_id") @db.Uuid
   tokenHash     String   @unique @map("token_hash")
   displayName   String   @map("display_name")
   expiresAt     DateTime @map("expires_at") @db.Timestamptz(6)
 
   @@index([liveSessionId], map: "screen_annotation_access_session_idx")
   @@map("screen_annotation_access")
+}
+
+
+model LiveSessionBrowserLink {
+  tokenHash      String   @id @map("token_hash")
+  liveSessionId  String   @map("live_session_id") @db.Uuid
+  purpose        String
+  authUserId     String?  @map("auth_user_id") @db.Uuid
+  passcodeHash   String?  @map("passcode_hash")
+  redemptionHash String?  @map("redemption_hash")
+  expiresAt      DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([expiresAt], map: "live_session_browser_links_expiry_idx")
+  @@map("live_session_browser_links")
+}
+
+model LiveSessionAdmission {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  liveSessionId String   @map("live_session_id") @db.Uuid
+  tokenHash     String   @unique @map("token_hash")
+  identityHash  String   @map("identity_hash")
+  displayName   String   @map("display_name")
+  status        String   @default("waiting")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  expiresAt     DateTime @default(dbgenerated("(now() + '04:00:00'::interval)")) @map("expires_at") @db.Timestamptz(6)
+
+  @@index([liveSessionId, status, expiresAt], map: "live_session_admissions_waiting_idx")
+  @@map("live_session_admissions")
 }

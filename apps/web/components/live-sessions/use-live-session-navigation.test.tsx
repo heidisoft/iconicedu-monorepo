@@ -9,6 +9,18 @@ describe('live session navigation from app pages', () => {
     vi.clearAllMocks();
     window.history.replaceState({}, '', '/academy/messages?channel=demo');
   });
+  it('carries an API-issued passcode into the ready dialog separately', () => {
+    const { result } = renderHook(() => useLiveSessionNavigation());
+    act(() =>
+      result.current.handleResolvedJoinHref(
+        `${window.location.origin}/live/a3f8-b2d4-c9e1`,
+        'zoom',
+        'class-secret',
+      ),
+    );
+    expect(result.current.externalJoinTarget).toMatchObject({ passcode: 'class-secret' });
+    expect(result.current.externalJoinTarget?.copyHref).not.toContain('class-secret');
+  });
   it('opens the ready-to-join dialog for app-hosted Zoom and captures the source', () => {
     const { result } = renderHook(() => useLiveSessionNavigation());
     act(() =>

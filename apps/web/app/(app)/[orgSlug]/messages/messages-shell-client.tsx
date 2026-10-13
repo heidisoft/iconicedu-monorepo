@@ -1,5 +1,7 @@
 'use client';
 
+import type { LiveSessionJoinLinkVM } from '@iconicedu/shared-types';
+
 import {
   useCallback,
   useEffect,
@@ -431,15 +433,15 @@ export function MessagesShellClient({
       throw new Error('Current user is required');
     }
 
-    const payload = await createApiClient(presenceClient).post<{
-      joinPath: string;
-      provider?: string;
-    }>(`/channels/${channelState.ids.id}/live-sessions/join`, {
-      orgId: channelState.ids.orgId,
-      profileId: currentUserId,
-    });
+    const payload = await createApiClient(presenceClient).post<LiveSessionJoinLinkVM>(
+      `/channels/${channelState.ids.id}/live-sessions/join`,
+      {
+        orgId: channelState.ids.orgId,
+        profileId: currentUserId,
+      },
+    );
 
-    handleResolvedJoinHref(payload.joinPath, payload.provider);
+    handleResolvedJoinHref(payload.joinPath, payload.provider, payload.passcode);
   }, [
     channelState.ids.id,
     channelState.ids.orgId,

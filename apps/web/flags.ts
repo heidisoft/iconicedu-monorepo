@@ -484,7 +484,8 @@ export const enableClassroomMeetingSettings = flag<
   { profileId?: string | null }
 >({
   key: platformFeatureFlagKeys.enableClassroomMeetingSettings,
-  description: 'Enables configurable Classroom recording and collaboration modules.',
+  description:
+    'Enables configurable Classroom recording, collaboration, admission modes and co-host controls.',
   options: [
     { label: 'Off', value: false },
     { label: 'On', value: true },

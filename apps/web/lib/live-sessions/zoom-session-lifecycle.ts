@@ -119,13 +119,33 @@ async function joinZoomSession(client: ZoomClient, input: ZoomJoinInput) {
   const joinResult = await client.join(input.sessionName, input.token, input.displayName);
   if (isZoomExecutedFailure(joinResult)) throw joinResult;
 
-  // Zoom validates the signed host token; no browser role or submitted name grants access.
-  if (client.isOriginalHost() && !client.isHost()) {
-    const hostResult = await client.reclaimHost();
-    if (isZoomExecutedFailure(hostResult)) throw hostResult;
-  }
+  // Joining never displaces an active host. Eligible staff/teachers explicitly claim host.
 
   return { compatibility, self: client.getCurrentUserInfo() };
+}
+
+export async function claimZoomSessionHost(client: ZoomClient) {
+  if (!client.isOriginalHost()) throw new Error('You do not have host access.');
+  if (!client.isHost()) {
+    const result = await client.reclaimHost();
+    if (isZoomExecutedFailure(result)) throw result;
+  }
+  return client.getCurrentUserInfo();
+}
+
+/** Provider enforces manager privileges; UI role labels never grant access. */
+export async function changeZoomCoHost(
+  client: ZoomClient,
+  userId: number,
+  enabled: boolean,
+) {
+  if (!client.isHost()) throw new Error('Only the meeting host can change co-hosts.');
+  if (client.getCurrentUserInfo().userId === userId)
+    throw new Error('Choose another participant.');
+  const result = enabled
+    ? await client.makeManager(userId)
+    : await client.revokeManager(userId);
+  if (isZoomExecutedFailure(result)) throw result;
 }
 
 async function leaveWhiteboardCleanly(client: ZoomClient, selfUserId: number | null) {

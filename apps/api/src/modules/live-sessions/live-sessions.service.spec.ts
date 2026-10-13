@@ -1,3 +1,8 @@
+jest.mock('./meeting-browser-links', () => ({
+  issueMeetingLink: jest.fn(async () => 'synthetic-invitation-token'),
+  resolveMeetingLink: jest.fn(),
+  redeemMeetingHandoff: jest.fn(),
+}));
 jest.mock('../screen-annotations/annotation-access', () => ({
   issueAnnotationAccess: jest.fn(async () => 'synthetic-annotation-token'),
 }));
@@ -14,6 +19,7 @@ import { loadAndAuthorizeProfile } from '@iconicedu/api/lib/actor/resolve-actor-
 import {
   createOrJoinLiveSession,
   getLiveSessionProvider,
+  hasOrgStaffRole,
   verifyZoomPasscode,
 } from '@iconicedu/live-sessions-core';
 import { LiveSessionsService } from '@iconicedu/api/modules/live-sessions/live-sessions.service';
@@ -35,8 +41,10 @@ jest.mock('@iconicedu/api/lib/actor/resolve-actor-profile', () => ({
 }));
 
 jest.mock('@iconicedu/live-sessions-core', () => ({
+  getWebAppUrl: () => 'https://app.invalid',
   createOrJoinLiveSession: jest.fn(),
   getLiveSessionProvider: jest.fn(),
+  hasOrgStaffRole: jest.fn(async () => false),
   verifyZoomPasscode: jest.fn(),
 }));
 
@@ -50,6 +58,7 @@ describe('LiveSessionsService.joinLiveSession', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.mocked(hasOrgStaffRole).mockResolvedValue(false);
     jest.mocked(evaluateApiBooleanFlag).mockResolvedValue(false);
     createSupabaseServiceClientMock.mockReturnValue({
       from: jest.fn(() => ({
@@ -209,6 +218,7 @@ describe('LiveSessionsService.guestJoinLiveSession', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.mocked(hasOrgStaffRole).mockResolvedValue(false);
   });
 
   it('mints a participant token when the passcode matches', async () => {
@@ -239,6 +249,7 @@ describe('LiveSessionsService.guestJoinLiveSession', () => {
     );
 
     expect(result).toEqual({
+      sharePath: 'https://app.invalid/live/session-1#invite=synthetic-invitation-token',
       annotationToken: 'synthetic-annotation-token',
       whiteboard: { provider: 'zoom' },
       token: 'guest-token',
@@ -388,6 +399,7 @@ describe('LiveSessionsService.submitLiveSessionFeedback', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.mocked(hasOrgStaffRole).mockResolvedValue(false);
   });
 
   it('records feedback without a profile_id when no access token is given', async () => {
@@ -479,6 +491,7 @@ describe('LiveSessionsService.reportLiveSessionQualityEvent', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.mocked(hasOrgStaffRole).mockResolvedValue(false);
   });
 
   it('records a quality event without a profile_id when no access token is given', async () => {
@@ -571,6 +584,7 @@ describe('LiveSessionsService.logLiveSessionAuditEvent', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.mocked(hasOrgStaffRole).mockResolvedValue(false);
   });
 
   it('records an audit event without an actor_profile_id when no access token is given', async () => {

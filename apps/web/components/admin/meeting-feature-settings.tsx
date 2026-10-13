@@ -73,6 +73,35 @@ export function MeetingFeatureSettings({
 }) {
   return (
     <div className="grid gap-4 md:grid-cols-2" aria-label="Meeting features">
+      <label className="text-sm font-medium">
+        Meeting access
+        <select
+          aria-label="Meeting access"
+          className="mt-1 block min-h-11 w-full rounded border border-border bg-background px-3"
+          disabled={disabled}
+          value={value.access?.mode ?? 'open'}
+          onChange={(event) =>
+            onChange({
+              ...value,
+              access: { mode: event.target.value as 'open' | 'trusted' | 'restricted' },
+            })
+          }
+        >
+          <option value="open">Open — valid link or signed-in access</option>
+          <option value="trusted">Trusted — enrolled users enter, guests wait</option>
+          <option value="restricted">Restricted — participants need approval</option>
+        </select>
+      </label>
+      <Label className="flex items-center gap-2">
+        <Checkbox
+          checked={value.cohosts?.enabled ?? false}
+          disabled={disabled}
+          onCheckedChange={(enabled) =>
+            onChange({ ...value, cohosts: { enabled: enabled === true } })
+          }
+        />
+        Allow co-host controls
+      </Label>
       {whiteboardProviderAvailable && (
         <label className="text-sm font-medium">
           Whiteboard provider

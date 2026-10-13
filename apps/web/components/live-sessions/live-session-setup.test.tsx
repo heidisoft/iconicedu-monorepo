@@ -47,6 +47,43 @@ describe('live session setup', () => {
       value: { getUserMedia: vi.fn().mockRejectedValue(new Error('Permission denied')) },
     });
   });
+  it('takes an invitation to device preview without prompting for name or passcode', async () => {
+    setup({
+      participantName: 'Alex',
+      passcodeRequired: false,
+      linkToken: 'a'.repeat(32),
+    });
+    await screen.findByText('Check your camera and microphone before joining.');
+    expect(screen.queryByText('In meeting as Alex')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Your name')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Session passcode')).not.toBeInTheDocument();
+    expect(mocks.guestJoin).toHaveBeenCalledExactlyOnceWith(
+      'test-session',
+      {
+        admissionToken: expect.any(String),
+        displayName: 'Alex',
+        passcode: '',
+        linkToken: 'a'.repeat(32),
+      },
+      undefined,
+    );
+  });
+  it('takes a mobile host to device preview with already authorized credentials', async () => {
+    setup({
+      initialCredentials: credentials,
+      participantName: 'Alex',
+      passcodeRequired: false,
+    });
+    await screen.findByText('Check your camera and microphone before joining.');
+    expect(screen.queryByText('In meeting as Alex')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Your name')).not.toBeInTheDocument();
+    expect(mocks.guestJoin).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Join session' })).toBeEnabled(),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Join session' }));
+    await screen.findByText('In meeting as Alex');
+  });
   it('skips the name form for authenticated participants and performs one join in Strict Mode', async () => {
     setup({
       participantName: 'Alex',
@@ -57,8 +94,45 @@ describe('live session setup', () => {
     expect(screen.queryByLabelText('Your name')).not.toBeInTheDocument();
     expect(mocks.guestJoin).toHaveBeenCalledExactlyOnceWith(
       'test-session',
-      { displayName: 'Alex', passcode: 'demo' },
+      { admissionToken: expect.any(String), displayName: 'Alex', passcode: 'demo' },
       'synthetic-auth',
+    );
+  });
+  it('never prompts signed-in participants for a passcode', async () => {
+    setup({
+      participantName: 'Alex',
+      accessToken: 'synthetic-auth',
+      passcodeRequired: false,
+    });
+    await screen.findByText('Check your camera and microphone before joining.');
+    expect(screen.queryByLabelText('Session passcode')).not.toBeInTheDocument();
+    expect(mocks.guestJoin).toHaveBeenCalledExactlyOnceWith(
+      'test-session',
+      { admissionToken: expect.any(String), displayName: 'Alex', passcode: '' },
+      'synthetic-auth',
+    );
+  });
+  it('lets parents select an enrolled child without a passcode', async () => {
+    setup({
+      participantName: 'Parent',
+      accessToken: 'synthetic-auth',
+      passcodeRequired: false,
+      students: [{ profileId: 'child-one', displayName: 'Alice' }],
+    });
+    await screen.findByText('Check your camera and microphone before joining.');
+    expect(screen.queryByLabelText('Session passcode')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Join session/ }));
+    await waitFor(() =>
+      expect(mocks.guestJoin).toHaveBeenCalledWith(
+        'test-session',
+        {
+          admissionToken: expect.any(String),
+          displayName: 'Alice',
+          passcode: '',
+          studentProfileId: 'child-one',
+        },
+        'synthetic-auth',
+      ),
     );
   });
   it('still asks anonymous visitors for their name', async () => {
@@ -69,7 +143,7 @@ describe('live session setup', () => {
     await screen.findByText('Check your camera and microphone before joining.');
     expect(mocks.guestJoin).toHaveBeenCalledWith(
       'test-session',
-      { displayName: 'Sam', passcode: 'demo' },
+      { admissionToken: expect.any(String), displayName: 'Sam', passcode: 'demo' },
       undefined,
     );
   });
@@ -229,7 +303,12 @@ describe('live session setup', () => {
     await screen.findByText('In meeting as Alice');
     expect(mocks.guestJoin).toHaveBeenCalledExactlyOnceWith(
       'test-session',
-      { displayName: 'Alice', passcode: 'demo', studentProfileId: 'child-one' },
+      {
+        admissionToken: expect.any(String),
+        displayName: 'Alice',
+        passcode: 'demo',
+        studentProfileId: 'child-one',
+      },
       undefined,
     );
     view.unmount();
@@ -261,7 +340,12 @@ describe('live session setup', () => {
     await screen.findByText('In meeting as Ben');
     expect(mocks.guestJoin).toHaveBeenCalledWith(
       'test-session',
-      { displayName: 'Ben', passcode: 'demo', studentProfileId: 'child-two' },
+      {
+        admissionToken: expect.any(String),
+        displayName: 'Ben',
+        passcode: 'demo',
+        studentProfileId: 'child-two',
+      },
       undefined,
     );
   });
@@ -288,7 +372,12 @@ describe('live session setup', () => {
     await screen.findByText('In meeting as Alice');
     expect(mocks.guestJoin).toHaveBeenLastCalledWith(
       'test-session',
-      { displayName: 'Alice', passcode: 'correct', studentProfileId: 'child-one' },
+      {
+        admissionToken: expect.any(String),
+        displayName: 'Alice',
+        passcode: 'correct',
+        studentProfileId: 'child-one',
+      },
       undefined,
     );
   });
@@ -347,6 +436,7 @@ describe('live session setup', () => {
     expect(mocks.guestJoin).toHaveBeenCalledExactlyOnceWith(
       'test-session',
       {
+        admissionToken: expect.any(String),
         displayName: 'Alice',
         displayNameOverride: 'Alice S.',
         passcode: 'demo',
@@ -369,7 +459,12 @@ describe('live session setup', () => {
     await screen.findByText('In meeting as Alex S.');
     expect(mocks.guestJoin).toHaveBeenCalledWith(
       'test-session',
-      { displayName: 'Alex', displayNameOverride: 'Alex S.', passcode: '' },
+      {
+        admissionToken: expect.any(String),
+        displayName: 'Alex',
+        displayNameOverride: 'Alex S.',
+        passcode: '',
+      },
       undefined,
     );
   });
