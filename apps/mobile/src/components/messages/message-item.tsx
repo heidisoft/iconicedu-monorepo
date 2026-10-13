@@ -1,3 +1,4 @@
+import { openLiveSession } from '@/lib/messages/open-live-session';
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
@@ -1327,7 +1328,7 @@ function EventCard({
       {!!event.meetingLink && (
         <TouchableOpacity
           style={[s.joinBtn, { backgroundColor: colors.teal }]}
-          onPress={() => Linking.openURL(event.meetingLink!).catch(() => null)}
+          onPress={() => void openLiveSession(event.meetingLink!)}
         >
           <Text style={{ color: colors.tealFg, fontWeight: '700', fontSize: 14 }}>
             Join Meeting
@@ -1478,7 +1479,7 @@ function SessionBookingCard({
       {!!session.meetingLink && (
         <TouchableOpacity
           style={[s.joinBtn, { backgroundColor: colors.teal }]}
-          onPress={() => Linking.openURL(session.meetingLink!).catch(() => null)}
+          onPress={() => void openLiveSession(session.meetingLink!)}
         >
           <Text style={{ color: colors.tealFg, fontWeight: '700', fontSize: 14 }}>
             Join Meeting
@@ -1729,7 +1730,7 @@ function LiveSessionStartedCard({
         activeOpacity={0.8}
         onPress={() => {
           if (!ended && liveSession?.joinUrl) {
-            Linking.openURL(liveSession.joinUrl).catch(() => null);
+            void openLiveSession(liveSession.joinUrl);
           }
         }}
       >

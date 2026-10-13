@@ -5,6 +5,10 @@ import { MessageItem } from '@/components/messages/message-item';
 import type { MessageVM } from '@iconicedu/shared-types';
 import { lightColors as LIGHT } from '@/lib/theme';
 
+const mockOpenLiveSession = jest.fn();
+jest.mock('@/lib/messages/open-live-session', () => ({
+  openLiveSession: (...args: unknown[]) => mockOpenLiveSession(...args),
+}));
 const mockOpenBrowserAsync = jest.fn();
 const mockFetchThreadMessages = jest.fn();
 const mockMarkThreadReadState = jest.fn();
@@ -172,6 +176,36 @@ const pdfFileMessage: MessageVM = {
 } as unknown as MessageVM;
 
 describe('MessageItem', () => {
+  it.each(['event-reminder', 'session-booking', 'live-session-started'])(
+    'uses the personal browser opener for %s joins',
+    (type) => {
+      const href = '/live/aaaa-bbbb-cccc';
+      const message = {
+        ...baseMessage,
+        core: { ...baseMessage.core, type },
+        event: { title: 'Class', startAt: '2025-01-15T10:30:00Z', meetingLink: href },
+        session: {
+          title: 'Class',
+          startAt: '2025-01-15T10:30:00Z',
+          status: 'confirmed',
+          meetingLink: href,
+        },
+        liveSession: {
+          title: 'Class',
+          startedByDisplayName: 'Teacher',
+          status: 'live',
+          joinUrl: href,
+        },
+      } as unknown as MessageVM;
+      render(
+        <MessageItem message={message} isOwn={false} isGroupStart colors={colors} />,
+      );
+      fireEvent.press(
+        screen.getByText(type === 'live-session-started' ? 'Join' : 'Join Meeting'),
+      );
+      expect(mockOpenLiveSession).toHaveBeenCalledWith(href);
+    },
+  );
   beforeEach(() => {
     jest.clearAllMocks();
     mockFetchThreadMessages.mockResolvedValue([

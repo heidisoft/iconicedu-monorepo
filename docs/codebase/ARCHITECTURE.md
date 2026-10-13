@@ -183,7 +183,13 @@ co-hosts remain host-only. Waiting-room approval additionally requires verified
 classroom host eligibility, so promoting an anonymous participant does not grant
 API classroom privileges.
 
-Device preview includes microphone activity and a user-triggered speaker test.
+Native ready dialogs close before launching the meeting browser. On iPad/iOS,
+launch waits for the native modal dismissal callback; Android launches after the
+hidden state is committed. Joining does not trigger a competing notification
+permission prompt. Message meeting buttons use the same personal browser handoff
+as the Sessions screen and show an error if opening fails.
+
+Device preview includes a Test audio and video icon beside Settings. It opens a compact dialog with microphone activity, a user-triggered speaker test, camera guidance, and a shortcut to device settings. Closing it keeps the participant in preview.
 The meter uses the existing preview stream and releases its audio-analysis
 resources without stopping preview tracks. Speaker routing uses browser support;
 unsupported selected outputs show guidance to use device audio settings.
@@ -203,3 +209,5 @@ the meeting refreshes available devices without enabling a camera or microphone.
 A failed Zoom connection offers **Rejoin class**, which reloads with existing
 tab-scoped recovery, independently of the explicit leave action. Browser suspension
 and operating-system audio interruptions do not guarantee continued background media.
+
+Classroom whiteboards under 600 pixels wide hide the Saved/participants bar to prioritize drawing space. The horizontal scrolling toolbar moves to the top, with quick styles below it. Wider boards retain board details and participant controls.

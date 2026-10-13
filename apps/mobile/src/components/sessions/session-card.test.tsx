@@ -7,7 +7,7 @@ jest.mock('@/lib/messages/open-live-session', () => ({
   getLiveSessionShareUrl: jest.fn(async (href: string) => href),
 }));
 import React from 'react';
-import { Linking, Share, StyleSheet } from 'react-native';
+import { Linking, Share, StyleSheet, Modal, Platform } from 'react-native';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { SessionCard, type ClassSession } from './session-card';
 
@@ -242,6 +242,32 @@ describe('SessionCard', () => {
     expect(screen.getByLabelText('Open Zoom')).toBeTruthy();
     expect(screen.getByLabelText('Close join dialog')).toBeTruthy();
     expect(mockOpenURL).not.toHaveBeenCalled();
+  });
+
+  it('opens the iPad meeting only after the ready dialog has dismissed', () => {
+    const originalOS = Platform.OS;
+    Platform.OS = 'ios';
+    try {
+      render(
+        <SessionCard
+          session={{
+            ...baseSession,
+            meetingLink: 'https://app.invalid/live/aaaa-bbbb-cccc',
+          }}
+        />,
+      );
+      fireEvent.press(screen.getByLabelText('Join session'));
+      const onDismiss = screen.UNSAFE_getByType(Modal).props.onDismiss;
+      fireEvent.press(screen.getByLabelText('Open session'));
+      expect(mockOpenURL).not.toHaveBeenCalled();
+      expect(screen.UNSAFE_getByType(Modal).props.visible).toBe(false);
+      act(() => onDismiss());
+      expect(mockOpenURL).toHaveBeenCalledWith('https://app.invalid/live/aaaa-bbbb-cccc');
+      act(() => onDismiss());
+      expect(mockOpenURL).toHaveBeenCalledTimes(1);
+    } finally {
+      Platform.OS = originalOS;
+    }
   });
 
   it('opens internal meeting links directly from the join button', () => {

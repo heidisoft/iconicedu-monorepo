@@ -1,3 +1,4 @@
+import { useMeetingDialogLaunch } from '@/hooks/use-meeting-dialog-launch';
 import {
   openLiveSession,
   getLiveSessionShareUrl,
@@ -691,6 +692,8 @@ export function ConversationHeader({
     }
   }, [localTimeIcon]);
 
+  const meetingDialogLaunch = useMeetingDialogLaunch(Boolean(externalJoinTarget));
+
   const handleOpenJoinHref = useCallback((joinHref: string) => {
     void openLiveSession(joinHref);
   }, []);
@@ -986,6 +989,7 @@ export function ConversationHeader({
         animationType="fade"
         transparent={true}
         visible={Boolean(externalJoinTarget)}
+        onDismiss={meetingDialogLaunch.onDismiss}
         onRequestClose={() => setExternalJoinTarget(null)}
       >
         <Pressable style={s.modalBackdrop} onPress={() => setExternalJoinTarget(null)}>
@@ -1020,7 +1024,7 @@ export function ConversationHeader({
                 style={[s.modalButton, s.modalButtonPrimary]}
                 onPress={() => {
                   if (externalJoinTarget?.joinHref) {
-                    handleOpenJoinHref(externalJoinTarget.joinHref);
+                    meetingDialogLaunch.queueLaunch(externalJoinTarget.joinHref);
                   }
                   setExternalJoinTarget(null);
                 }}

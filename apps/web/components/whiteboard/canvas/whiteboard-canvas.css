@@ -143,3 +143,48 @@
     min-height: 44px;
   }
 }
+
+/* Small boards prioritize drawing space; retain horizontally scrollable tools. */
+@container (max-width: 599px) {
+  .classroom-whiteboard [data-testid='whiteboard-board-details'] {
+    display: none;
+  }
+  .classroom-whiteboard [data-testid='whiteboard-overlay-toolbar'] {
+    grid-row-start: 1;
+  }
+  .classroom-whiteboard-canvas .whiteboard-quick-styles {
+    top: 56px;
+  }
+  .classroom-whiteboard-canvas .excalidraw .App-menu_top {
+    margin-top: 56px;
+  }
+  .classroom-whiteboard-canvas[data-style-options='true'] .excalidraw .App-menu_top {
+    margin-top: 100px;
+  }
+}
+
+/* Touch controls are taller; keep styles clear of both toolbar arrangements. */
+@media (pointer: coarse) {
+  @container (max-width: 759px) {
+    .classroom-whiteboard-canvas .whiteboard-quick-styles {
+      top: 140px;
+    }
+    .classroom-whiteboard-canvas .excalidraw .App-menu_top {
+      margin-top: 140px;
+    }
+    .classroom-whiteboard-canvas[data-style-options='true'] .excalidraw .App-menu_top {
+      margin-top: 196px;
+    }
+  }
+  @container (max-width: 599px) {
+    .classroom-whiteboard-canvas .whiteboard-quick-styles {
+      top: 76px;
+    }
+    .classroom-whiteboard-canvas .excalidraw .App-menu_top {
+      margin-top: 76px;
+    }
+    .classroom-whiteboard-canvas[data-style-options='true'] .excalidraw .App-menu_top {
+      margin-top: 132px;
+    }
+  }
+}

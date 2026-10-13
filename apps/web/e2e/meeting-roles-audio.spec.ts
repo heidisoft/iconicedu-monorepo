@@ -33,6 +33,7 @@ test('preview offers speaker self-check with denied microphone permission', asyn
     }),
   );
   await page.goto('/visual-test/live-session-setup?actor=host');
+  await page.getByRole('button', { name: 'Test audio and video', exact: true }).click();
   await expect(page.getByRole('meter', { name: 'Microphone activity' })).toHaveAttribute(
     'value',
     '0',
