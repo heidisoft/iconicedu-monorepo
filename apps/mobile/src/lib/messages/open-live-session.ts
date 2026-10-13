@@ -2,6 +2,7 @@ import { rememberNativeInvitation } from '@/lib/classroom/link-recovery';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { Linking, Alert, NativeModules } from 'react-native';
+import { supabase } from '@/lib/supabase/client';
 import { apiPost } from '@/lib/api/http-client';
 import { resolveJoinHrefForMobile } from './live-session-join';
 
@@ -38,6 +39,19 @@ export async function openLiveSession(href: string) {
       router.navigate({
         pathname: '/classroom/[sessionId]',
         params: { sessionId: identifier },
+      });
+      return;
+    }
+    const fragment = new URLSearchParams(
+      new URL(resolveJoinHrefForMobile(href)).hash.slice(1),
+    );
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (fragment.has('invite') || fragment.has('handoff') || !session) {
+      await WebBrowser.openBrowserAsync(resolveJoinHrefForMobile(href), {
+        presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
+        enableDefaultShareMenuItem: false,
       });
       return;
     }

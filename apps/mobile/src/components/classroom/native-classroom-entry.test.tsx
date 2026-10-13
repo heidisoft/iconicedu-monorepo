@@ -6,8 +6,12 @@ import {
   readNativeMeetingLink,
   writeNativeMeetingLink,
 } from '@/lib/classroom/link-recovery';
+import { nativeAdmissionToken } from '@/lib/classroom/admission-recovery';
 import { ApiHttpError } from '@/lib/api/http-error';
 import { classroomApi } from '@/lib/classroom/api';
+jest.mock('@/lib/classroom/admission-recovery', () => ({
+  nativeAdmissionToken: jest.fn().mockResolvedValue('00000000000040008000000000000001'),
+}));
 jest.mock('@zoom/react-native-videosdk', () => ({
   ZoomVideoSdkProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
@@ -77,7 +81,7 @@ describe('native real link-entry contract', () => {
       displayName: 'Verified student',
       passcode: '',
       studentProfileId: undefined,
-      admissionToken: undefined,
+      admissionToken: '00000000000040008000000000000001',
     });
     expect(screen.queryByPlaceholderText(/password|name/i)).toBeNull();
   });
@@ -262,4 +266,32 @@ it('clears a revoked invitation from recovery instead of retrying it forever', a
     expiresAt,
   });
   expect(classroomApi.join).not.toHaveBeenCalled();
+});
+
+it('binds admission to the automatically selected single student before the first join', async () => {
+  jest.mocked(readNativeMeetingLink).mockResolvedValue(null);
+  jest.mocked(classroomApi.info).mockResolvedValue({
+    ...info,
+    participant: {
+      displayName: 'Parent',
+      students: [{ profileId: 'student-one', displayName: 'Student one' }],
+    },
+  });
+  jest.mocked(classroomApi.join).mockResolvedValue(credentials);
+  render(<NativeClassroomEntry sessionId="single-student" />);
+  await waitFor(() =>
+    expect(classroomApi.join).toHaveBeenCalledWith(
+      'canonical-session',
+      expect.objectContaining({
+        studentProfileId: 'student-one',
+        admissionToken: expect.stringMatching(/^[\w-]{32}$/),
+      }),
+    ),
+  );
+  expect(nativeAdmissionToken).toHaveBeenCalledWith(
+    'canonical-session',
+    'Parent',
+    'student-one',
+    undefined,
+  );
 });

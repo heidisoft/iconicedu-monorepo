@@ -9,7 +9,9 @@ pnpm exec expo prebuild --no-install > "$TASK_DIR/prebuild.log" 2>&1
 REACT_NATIVE_PACKAGER_HOSTNAME=127.0.0.1 pnpm exec expo start --dev-client --port 8085 --lan > "$TASK_DIR/metro.log" 2>&1 &
 METRO_PID=$!
 EMULATOR_PID=''
+LINK_API_PID=''
 cleanup() {
+  if [[ -n "$LINK_API_PID" ]]; then kill "$LINK_API_PID" 2>/dev/null || true; fi
   kill "$METRO_PID" 2>/dev/null || true
   if [[ -n "$EMULATOR_PID" ]]; then kill "$EMULATOR_PID" 2>/dev/null || true; fi
 }
@@ -63,3 +65,15 @@ node scripts/verify-classroom-export.mjs "$PLATFORM" "$DEVICE_ID"
 if [ "$PLATFORM" = "android" ]; then
   maestro --device "$DEVICE_ID" test .maestro/classroom-picture-in-picture.yaml
 fi
+
+# Exercise the real OS link, encrypted recovery, HTTP client, entry and SDK preview.
+node scripts/classroom-link-test-api.mjs > "$TASK_DIR/link-api.log" 2>&1 &
+LINK_API_PID=$!
+for attempt in $(seq 1 20); do
+  if curl --silent --fail http://127.0.0.1:8999/__health > /dev/null; then break; fi
+  sleep 1
+done
+curl --silent --fail http://127.0.0.1:8999/__health > /dev/null
+if [[ "$PLATFORM" == android ]]; then adb -s "$DEVICE_ID" reverse tcp:8999 tcp:8999; fi
+maestro --device "$DEVICE_ID" test -e RUN_ID="$PLATFORM-${GITHUB_RUN_ID:-local}-$(date +%s)" .maestro/classroom-network-links.yaml
+curl --silent --fail http://127.0.0.1:8999/__assert

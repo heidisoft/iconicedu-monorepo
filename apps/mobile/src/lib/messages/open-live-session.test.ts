@@ -2,10 +2,14 @@ import { Linking, Alert, NativeModules } from 'react-native';
 import { rememberNativeInvitation } from '@/lib/classroom/link-recovery';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
+import { supabase } from '@/lib/supabase/client';
 import { apiPost } from '@/lib/api/http-client';
 import { openLiveSession, getLiveSessionShareUrl } from './open-live-session';
 jest.mock('@/lib/classroom/link-recovery', () => ({
   rememberNativeInvitation: jest.fn().mockResolvedValue(undefined),
+}));
+jest.mock('@/lib/supabase/client', () => ({
+  supabase: { auth: { getSession: jest.fn() } },
 }));
 jest.mock('expo-router', () => ({ router: { navigate: jest.fn() } }));
 jest.mock('expo-web-browser', () => ({
@@ -16,6 +20,10 @@ jest.mock('@/lib/api/http-client', () => ({ apiPost: jest.fn() }));
 describe('mobile meeting browser and sharing', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.mocked(supabase.auth.getSession).mockResolvedValue({
+      data: { session: { user: { id: 'synthetic-member' } } },
+      error: null,
+    } as Awaited<ReturnType<typeof supabase.auth.getSession>>);
     delete NativeModules.RNZoomVideoSdk;
     process.env.EXPO_PUBLIC_WEB_URL = 'https://app.invalid';
     jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
@@ -85,4 +93,19 @@ it('stores native invitations encrypted before navigating without a secret URL p
     pathname: '/classroom/[sessionId]',
     params: { sessionId: 'aaaa-bbbb-cccc' },
   });
+});
+
+it('preserves guest invitations in the browser fallback without requiring login', async () => {
+  delete NativeModules.RNZoomVideoSdk;
+  process.env.EXPO_PUBLIC_WEB_URL = 'https://app.invalid';
+  jest.clearAllMocks();
+  jest
+    .mocked(supabase.auth.getSession)
+    .mockResolvedValue({ data: { session: null }, error: null });
+  await openLiveSession('/live/aaaa#invite=synthetic');
+  expect(apiPost).not.toHaveBeenCalled();
+  expect(WebBrowser.openBrowserAsync).toHaveBeenCalledWith(
+    'https://app.invalid/live/aaaa#invite=synthetic',
+    expect.any(Object),
+  );
 });

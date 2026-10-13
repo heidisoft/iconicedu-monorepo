@@ -21,6 +21,7 @@ import {
   readNativeMeetingLink,
   writeNativeMeetingLink,
 } from '@/lib/classroom/link-recovery';
+import { nativeAdmissionToken } from '@/lib/classroom/admission-recovery';
 import { classroomApi } from '@/lib/classroom/api';
 import { useTheme } from '@/providers/theme-provider';
 import { NativeClassroom } from './native-classroom';
@@ -109,12 +110,25 @@ export function NativeClassroomEntry({
           setStudents(info.participant?.students ?? []);
           return;
         }
+        const joiningStudent =
+          studentProfileId ?? info.participant?.students?.[0]?.profileId;
+        if (joiningStudent) setSelected(joiningStudent);
+        const joinName = info.participant?.displayName ?? guest.current!.displayName;
+        const requestToken =
+          admissionToken ??
+          (await nativeAdmissionToken(
+            info.sessionId ?? sessionId,
+            joinName,
+            joiningStudent,
+            link.current,
+          ));
+        setAdmissionToken(requestToken);
         const result = await api.join(info.sessionId ?? sessionId, {
-          displayName: info.participant?.displayName ?? guest.current!.displayName,
+          displayName: joinName,
           passcode: info.participant ? '' : guest.current!.passcode,
           ...(link.current ? { linkToken: link.current } : {}),
-          studentProfileId,
-          admissionToken,
+          studentProfileId: joiningStudent,
+          admissionToken: requestToken,
         });
         setGuestForm(false);
         if (!info.participant && guest.current)

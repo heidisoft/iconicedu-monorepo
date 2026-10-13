@@ -1,6 +1,7 @@
 import React, { lazy, Suspense } from 'react';
 import { ActivityIndicator, NativeModules, Pressable, Text, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
+import { readNativeMeetingLink } from '@/lib/classroom/link-recovery';
 import { openLiveSession } from '@/lib/messages/open-live-session';
 import { useTheme } from '@/providers/theme-provider';
 const Entry = lazy(() =>
@@ -23,7 +24,13 @@ export default function ClassroomRoute() {
         <Pressable
           accessibilityRole="button"
           onPress={() => {
-            void openLiveSession(`/live/${encodeURIComponent(sessionId)}`);
+            void readNativeMeetingLink(sessionId)
+              .catch(() => null)
+              .then((saved) =>
+                openLiveSession(
+                  `/live/${encodeURIComponent(sessionId)}${saved?.token ? `#invite=${encodeURIComponent(saved.token)}` : ''}`,
+                ),
+              );
           }}
           style={{ padding: 16 }}
         >
