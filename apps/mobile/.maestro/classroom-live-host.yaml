@@ -18,6 +18,9 @@ name: Real native host meeting controls - use a dedicated test classroom
 - extendedWaitUntil:
     visible: 'Leave meeting'
     timeout: 45000
+- scrollUntilVisible:
+    element: 'More controls'
+- tapOn: 'More controls'
 - runFlow:
     when:
       visible: 'Claim host'

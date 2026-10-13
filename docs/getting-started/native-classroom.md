@@ -25,6 +25,19 @@ SDK keys and secrets belong only in `apps/api`; never add them to Expo public en
 
 A new store/development binary is required for native dependency, entitlement, extension and service changes. The app uses Expo fingerprint runtime versions so an OTA update cannot deliver native SDK JavaScript to an incompatible older binary. Older binaries retain personal browser handoffs. A tablet below Android 9 cannot install the new native build and must retain an existing supported meeting route.
 
+## Internal tablet builds
+
+Use the existing `preview` EAS profile for standalone internal builds. It uses internal distribution, the preview environment and the preview update channel; it does not require a running Metro server. Set `EXPO_PUBLIC_API_URL` to the HTTPS test API in the EAS preview environment, and configure the matching non-production Supabase authentication values there. Verify these destinations before building. Zoom SDK secrets remain in the test API environment.
+
+```bash
+cd apps/mobile
+eas device:create
+eas build --profile preview --platform ios
+eas build --profile preview --platform android
+```
+
+Register each test iPad before creating the iOS build so its provisioning profile includes the device. Android internal builds install as APKs. Install the resulting builds on the test tablets, sign in with non-production accounts, and run the live scenarios below with a second participant. The release-style preview builds exclude the development fixtures; run deterministic fixture flows using the development profile instead.
+
 ## Classroom boundaries
 
 - Signed-in identity and enrolled-student selection come from the API. Native join links carry a meeting identifier; SDK credentials are renewed when Join is pressed. Preview remains an explicit step.
@@ -34,6 +47,24 @@ A new store/development binary is required for native dependency, entitlement, e
 - Cloud recording records SDK media. To include the app-owned board or other native UI, the presenter must approve device screen broadcasting. Drawing on the board alone does not silently start an operating-system broadcast.
 
 ## Automated verification
+
+### Web/native compatibility contract
+
+Compare native changes against the owning web flow, rather than copying web-only browser APIs into mobile. The same API contracts govern both clients.
+
+| Capability                              | Web reference                                             | Native implementation / verification                                                                                                                         |
+| --------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Identity, preview and explicit join     | `live-session-setup.tsx`, `device-preview-step.tsx`       | `native-classroom-entry.tsx`, `native-classroom.tsx`; entry unit tests and tablet lifecycle flow                                                             |
+| Admission and host/co-host permissions  | `meeting-waiting-room.tsx`, `zoom-participants-panel.tsx` | Same API admission endpoints; controller tests and moderation/student tablet flows                                                                           |
+| Primary controls and More               | `zoom-meeting-controls.tsx`, `zoom-more-controls.tsx`     | `native-meeting-toolbar.tsx`; accessible round controls and expandable secondary actions                                                                     |
+| Chat, reactions, captions and recording | Web Zoom session hooks                                    | Native SDK adapter and controller; deterministic tests cover events, with live media/recording checks required                                               |
+| Whiteboard and educational assets       | Web Excalidraw canvas                                     | Bundled Excalidraw canvas and shared asset registry; native persistence and PNG export flows                                                                 |
+| Annotation editing                      | `components/screen-annotations`                           | Shared API objects; normalized native SVG shapes, selection, movement, resize, rotation, styles, versioned undo/redo and native export                       |
+| Temporary annotation tools              | Web annotation presence transport                         | Same pointer/laser endpoints; temporary strokes never enter saved drawing history                                                                            |
+| Screen sharing                          | Browser screen capture                                    | Native OS-approved ReplayKit/MediaProjection; verify on physical tablets                                                                                     |
+| Device settings                         | Browser device selectors and processing options           | Native audio routing, camera switching, mirroring, host sharing restrictions, original audio and background effects; hardware-specific verification required |
+
+This table maps implementations and tests; it does not certify full feature parity. Browser picture-in-picture, native device selection and the visual arrangement of preview/settings require separate compatibility checks before parity can be declared complete. Platform-only browser acceleration settings do not map directly to native SDK controls.
 
 Run focused tests and then the repository's full CI command:
 
@@ -49,7 +80,7 @@ For deterministic tablet UI tests, install a development binary and Maestro. Sta
 ```bash
 pnpm --filter mobile canvas:build
 pnpm --filter mobile exec expo start --dev-client --port 8085 --lan
-maestro --device YOUR_DEVICE_ID test apps/mobile/.maestro/classroom-ui.yaml apps/mobile/.maestro/classroom-join-failure.yaml apps/mobile/.maestro/classroom-moderation.yaml apps/mobile/.maestro/classroom-student.yaml apps/mobile/.maestro/classroom-export.yaml
+maestro --device YOUR_DEVICE_ID test apps/mobile/.maestro/classroom-ui.yaml apps/mobile/.maestro/classroom-join-failure.yaml apps/mobile/.maestro/classroom-moderation.yaml apps/mobile/.maestro/classroom-student.yaml apps/mobile/.maestro/classroom-export.yaml apps/mobile/.maestro/classroom-annotations.yaml
 node apps/mobile/scripts/verify-classroom-export.mjs ios YOUR_DEVICE_ID
 ```
 

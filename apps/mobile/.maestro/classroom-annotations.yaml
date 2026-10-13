@@ -1,0 +1,25 @@
+appId: com.heidisoft.iconicedu
+name: Native annotation drawing and versioned history
+---
+- runFlow: bootstrap.yaml
+- openLink: iconicedu://annotation-fixture
+- tapOn:
+    text: 'Open'
+    optional: true
+- extendedWaitUntil:
+    visible: 'Native annotation test'
+    timeout: 30000
+- assertVisible: '0 annotations'
+- swipe:
+    start: '25%,25%'
+    end: '60%,30%'
+    duration: 1000
+- extendedWaitUntil:
+    visible: '1 annotation'
+    timeout: 10000
+- tapOn: 'Undo annotation'
+- assertVisible: '0 annotations'
+- tapOn: 'Redo annotation'
+- assertVisible: '1 annotation'
+- tapOn: 'Export annotations image'
+- takeScreenshot: native-annotation-export

@@ -37,7 +37,7 @@
     "export:bundle": "pnpm canvas:build && EXPO_NO_TELEMETRY=1 npx expo export --platform android --output-dir .expo/dist",
     "canvas:build": "node scripts/build-classroom-canvas.mjs",
     "eas-build-post-install": "pnpm canvas:build",
-    "test:e2e:classroom": "maestro test .maestro/classroom-ui.yaml .maestro/classroom-join-failure.yaml .maestro/classroom-moderation.yaml .maestro/classroom-student.yaml .maestro/classroom-export.yaml",
+    "test:e2e:classroom": "maestro test .maestro/classroom-ui.yaml .maestro/classroom-join-failure.yaml .maestro/classroom-moderation.yaml .maestro/classroom-student.yaml .maestro/classroom-export.yaml .maestro/classroom-annotations.yaml",
     "test:e2e:classroom:live": "maestro test .maestro/classroom-live.yaml",
     "test:e2e:classroom:host": "maestro test .maestro/classroom-live-host.yaml"
   },

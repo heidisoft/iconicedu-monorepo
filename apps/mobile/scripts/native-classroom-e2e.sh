@@ -57,5 +57,5 @@ for attempt in $(seq 1 30); do
   sleep 1
 done
 curl --fail --silent http://127.0.0.1:8085/status > /dev/null
-maestro --device "$DEVICE_ID" test .maestro/classroom-ui.yaml .maestro/classroom-join-failure.yaml .maestro/classroom-moderation.yaml .maestro/classroom-student.yaml .maestro/classroom-export.yaml
+maestro --device "$DEVICE_ID" test .maestro/classroom-ui.yaml .maestro/classroom-join-failure.yaml .maestro/classroom-moderation.yaml .maestro/classroom-student.yaml .maestro/classroom-export.yaml .maestro/classroom-annotations.yaml
 node scripts/verify-classroom-export.mjs "$PLATFORM" "$DEVICE_ID"

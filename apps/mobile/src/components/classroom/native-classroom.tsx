@@ -35,6 +35,7 @@ import {
 import { createZoomNativeAdapter } from '@/lib/classroom/zoom-native-adapter';
 import { classroomApi } from '@/lib/classroom/api';
 import { useTheme } from '@/providers/theme-provider';
+import { NativeMeetingToolbar } from './native-meeting-toolbar';
 import { NativeVideoView } from './native-video-view';
 import { NativeShareStage } from './native-share-stage';
 import { NativeWhiteboard, type NativeWhiteboardRepository } from './native-whiteboard';
@@ -124,6 +125,7 @@ export function NativeClassroom({
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [originalAudio, setOriginalAudio] = useState(false);
+  const [mirrored, setMirrored] = useState(false);
   const [micTest, setMicTest] = useState(false);
   const [speakerTest, setSpeakerTest] = useState(false);
   const [volume, setVolume] = useState(0);
@@ -393,23 +395,6 @@ export function NativeClassroom({
           ) : state.phase === 'ended' ? (
             <>
               <Text style={{ color: colors.text }}>How was your class?</Text>
-              {pageCount > 1 && (
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  {button(
-                    'Previous participants',
-                    () => setPage((previous) => Math.max(0, previous - 1)),
-                    page === 0,
-                  )}
-                  <Text style={{ color: colors.text }}>
-                    Page {Math.min(page, pageCount - 1) + 1} of {pageCount}
-                  </Text>
-                  {button(
-                    'Next participants',
-                    () => setPage((previous) => Math.min(pageCount - 1, previous + 1)),
-                    page >= pageCount - 1,
-                  )}
-                </View>
-              )}
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                 {[1, 2, 3, 4, 5].map((rating) =>
                   button(`${rating} stars`, () => {
@@ -439,8 +424,25 @@ export function NativeClassroom({
               {state.sharingUserId && state.sharingUserId === state.selfId && (
                 <Text style={{ color: colors.text }}>You are sharing your screen</Text>
               )}
+              {pageCount > 1 && (
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  {button(
+                    'Previous participants',
+                    () => setPage((previous) => Math.max(0, previous - 1)),
+                    page === 0,
+                  )}
+                  <Text style={{ color: colors.text }}>
+                    Page {Math.min(page, pageCount - 1) + 1} of {pageCount}
+                  </Text>
+                  {button(
+                    'Next participants',
+                    () => setPage((previous) => Math.min(pageCount - 1, previous + 1)),
+                    page >= pageCount - 1,
+                  )}
+                </View>
+              )}
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                {state.participants.map((user) => (
+                {gridUsers.map((user) => (
                   <View
                     key={user.id}
                     style={{
@@ -463,7 +465,7 @@ export function NativeClassroom({
                   </View>
                 ))}
               </View>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              <NativeMeetingToolbar>
                 {button(
                   state.microphone ? 'Mute microphone' : 'Unmute microphone',
                   () => {
@@ -525,6 +527,23 @@ export function NativeClassroom({
                 {button('Switch camera', () => {
                   void run(() => adapter.switchCamera());
                 })}
+                {adapter.mirror &&
+                  button(mirrored ? 'Stop mirroring my video' : 'Mirror my video', () => {
+                    void run(async () => {
+                      await adapter.mirror?.(!mirrored);
+                      setMirrored(!mirrored);
+                    });
+                  })}
+                {controller.self?.host &&
+                  adapter.lockSharing &&
+                  button('Only host can share', () => {
+                    void run(() => adapter.lockSharing!(true));
+                  })}
+                {controller.self?.host &&
+                  adapter.lockSharing &&
+                  button('Allow participants to share', () => {
+                    void run(() => adapter.lockSharing!(false));
+                  })}
                 {state.sharingUserId &&
                   state.sharingUserId !== state.selfId &&
                   button(annotating ? 'Stop annotating' : 'Annotate shared screen', () =>
@@ -619,7 +638,7 @@ export function NativeClassroom({
                           ],
                         ),
                   )}
-              </View>
+              </NativeMeetingToolbar>
             </>
           )}
           {panel === 'audio' && (
@@ -700,7 +719,7 @@ export function NativeClassroom({
                   })}
                 </View>
               ))}
-              {gridUsers.map((user) => (
+              {state.participants.map((user) => (
                 <View key={user.id}>
                   <Text style={{ color: colors.text }}>{user.name}</Text>
                   {moderator &&

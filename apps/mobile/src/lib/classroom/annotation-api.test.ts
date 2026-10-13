@@ -10,6 +10,19 @@ jest.mock('@/lib/api/http-client', () => ({
 
 describe('native annotation authorization transport', () => {
   beforeEach(() => jest.clearAllMocks());
+  it('uses the existing ephemeral laser endpoint for authenticated and guest participants', async () => {
+    await nativeAnnotationApi('meeting/id', '123').laser([]);
+    expect(apiPost).toHaveBeenCalledWith(
+      '/screen-annotations/meeting%2Fid/laser?shareKey=123',
+      [],
+    );
+    await nativeAnnotationApi('meeting/id', '123', 'synthetic-capability').laser([]);
+    expect(capabilityPost).toHaveBeenCalledWith(
+      '/screen-annotations/guest/meeting%2Fid/laser?shareKey=123',
+      'synthetic-capability',
+      [],
+    );
+  });
   it('uses the authenticated API client and encodes share identity', async () => {
     await nativeAnnotationApi('meeting/id', 'peer & 2').load();
     expect(apiGet).toHaveBeenCalledWith(

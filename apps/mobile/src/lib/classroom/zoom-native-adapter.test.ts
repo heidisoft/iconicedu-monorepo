@@ -62,12 +62,14 @@ function fixture() {
     videoHelper: {
       startVideo: success(),
       stopVideo: success(),
+      mirrorMyVideo: success(),
       switchCamera: jest.fn().mockResolvedValue(true),
     },
     shareHelper: {
       shareScreen: jest.fn(),
       stopShare: success(),
       isOtherSharing: jest.fn().mockResolvedValue(false),
+      lockShare: success(),
       isShareLocked: jest.fn().mockResolvedValue(false),
     },
     userHelper: {
@@ -206,6 +208,31 @@ describe('Zoom native bridge adapter', () => {
     f.zoom.shareHelper.isOtherSharing.mockResolvedValue(true);
     await expect(f.adapter.share(true)).rejects.toThrow();
     expect(f.zoom.shareHelper.shareScreen).not.toHaveBeenCalled();
+  });
+  it('delegates mirroring and sharing restrictions to native SDK controls', async () => {
+    const f = fixture();
+    await f.adapter.mirror!(true);
+    await f.adapter.lockSharing!(true);
+    expect(f.zoom.videoHelper.mirrorMyVideo).toHaveBeenCalledWith(true);
+    expect(f.zoom.shareHelper.lockShare).toHaveBeenCalledWith(true);
+  });
+  it('allows the SDK host to share when participant sharing is locked', async () => {
+    const f = fixture();
+    f.zoom.shareHelper.isShareLocked.mockResolvedValue(true);
+    await expect(f.adapter.share(true)).resolves.toBeUndefined();
+  });
+  it('blocks a participant from starting capture when sharing is locked', async () => {
+    const f = fixture();
+    f.zoom.shareHelper.isShareLocked.mockResolvedValue(true);
+    f.zoom.session.getMySelf.mockResolvedValue({
+      userId: '2',
+      userName: 'Student',
+      isHost: false,
+      isManager: false,
+    });
+    await expect(f.adapter.share(true)).rejects.toThrow('Screen sharing is unavailable');
+    expect(f.zoom.shareHelper.shareScreen).not.toHaveBeenCalled();
+    expect(NativeModules.ClassroomControls.startScreenShare).not.toHaveBeenCalled();
   });
   it('stops the Android capture service when leaving or stopping share', async () => {
     const f = fixture();

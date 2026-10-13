@@ -265,12 +265,18 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
     async switchCamera() {
       checked(await zoom.videoHelper.switchCamera());
     },
+    async mirror(enabled) {
+      checked(await zoom.videoHelper.mirrorMyVideo(enabled));
+    },
+    async lockSharing(locked) {
+      checked(await zoom.shareHelper.lockShare(locked));
+    },
     async share(enabled) {
-      if (
+      const lockedForParticipant =
         enabled &&
-        ((await zoom.shareHelper.isOtherSharing()) ||
-          (await zoom.shareHelper.isShareLocked()))
-      )
+        (await zoom.shareHelper.isShareLocked()) &&
+        !(await new ZoomVideoSdkUser(await zoom.session.getMySelf()).getIsHost());
+      if (enabled && ((await zoom.shareHelper.isOtherSharing()) || lockedForParticipant))
         throw new Error(
           'Screen sharing is unavailable while another presenter is sharing or sharing is locked.',
         );

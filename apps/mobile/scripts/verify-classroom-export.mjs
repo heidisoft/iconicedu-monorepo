@@ -45,4 +45,4 @@ const width = png.readUInt32BE(16),
   height = png.readUInt32BE(20);
 if (latest.time < Date.now() - 120000 || width < 100 || height < 30 || png.length < 1000)
   throw new Error('The latest export is stale, empty, or missing the educational asset');
-console.log(`Verified native whiteboard PNG export (${width} × ${height})`);
+console.log(`Verified native classroom PNG export (${width} × ${height})`);

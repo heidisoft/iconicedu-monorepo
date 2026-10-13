@@ -27,6 +27,10 @@ name: Teacher admits guests, assigns co-hosts and ends the classroom
 - tapOn: 'Remove co-host Test student'
 - assertVisible: 'Make co-host Test student'
 - scrollUntilVisible:
+    element: 'More controls'
+    direction: UP
+- tapOn: 'More controls'
+- scrollUntilVisible:
     element: 'End for everyone'
     direction: UP
 - tapOn: 'End for everyone'

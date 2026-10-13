@@ -33,6 +33,10 @@ name: Native classroom UI lifecycle on iPad and Android tablets
 - tapOn: 'Join now'
 - assertVisible: 'Native classroom test'
 - scrollUntilVisible:
+    element: 'More controls'
+    direction: UP
+- tapOn: 'More controls'
+- scrollUntilVisible:
     element: 'Raise hand'
 - tapOn: 'Raise hand'
 - assertVisible: 'Lower hand'

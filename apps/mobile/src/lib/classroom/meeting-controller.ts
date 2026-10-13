@@ -37,6 +37,8 @@ export interface NativeMeetingAdapter {
   microphone(userId: string, enabled: boolean): Promise<void>;
   camera(enabled: boolean): Promise<void>;
   switchCamera(): Promise<void>;
+  mirror?(enabled: boolean): Promise<void>;
+  lockSharing?(locked: boolean): Promise<void>;
   share(enabled: boolean): Promise<void>;
   cohost(userId: string, enabled: boolean): Promise<void>;
   host(userId: string): Promise<void>;
