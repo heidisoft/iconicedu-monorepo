@@ -1,3 +1,4 @@
+import { useClassroomLasers } from './use-classroom-lasers';
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
@@ -30,6 +31,7 @@ function Canvas() {
   const [elementCount, setElementCount] = useState(0);
   const [search, setSearch] = useState('');
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
+  useClassroomLasers(api);
   const [editable, setEditable] = useState(false);
   const [dark, setDark] = useState(false);
   const observed = useRef(new Map<string, string>());
@@ -104,6 +106,35 @@ function Canvas() {
           </>
         )}
         excalidrawAPI={setApi}
+        onPointerUpdate={(event) => {
+          if (event.pointer.tool === 'laser')
+            send({
+              type: 'laser',
+              x: event.pointer.x,
+              y: event.pointer.y,
+              button: event.button,
+            });
+        }}
+        validateEmbeddable={false}
+        onPaste={(data) =>
+          !(
+            data.files ||
+            data.mixedContent?.some((part) => part.type === 'imageUrl') ||
+            data.elements?.some(
+              (element) =>
+                ![
+                  'rectangle',
+                  'frame',
+                  'ellipse',
+                  'diamond',
+                  'line',
+                  'arrow',
+                  'freedraw',
+                  'text',
+                ].includes(element.type),
+            )
+          )
+        }
         theme={dark ? 'dark' : 'light'}
         viewModeEnabled={!editable}
         initialData={{ appState: { currentItemFontFamily: 2 } }}

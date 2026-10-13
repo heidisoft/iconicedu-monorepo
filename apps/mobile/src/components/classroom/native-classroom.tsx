@@ -35,6 +35,8 @@ import {
 import { createZoomNativeAdapter } from '@/lib/classroom/zoom-native-adapter';
 import { classroomApi } from '@/lib/classroom/api';
 import { useTheme } from '@/providers/theme-provider';
+import { NativeDevicePreview } from './native-device-preview';
+import { NativeClassroomSettings } from './native-classroom-settings';
 import { NativeMeetingToolbar } from './native-meeting-toolbar';
 import { NativeVideoView } from './native-video-view';
 import { NativeShareStage } from './native-share-stage';
@@ -83,6 +85,7 @@ export function NativeClassroom({
   const [panel, setPanel] = useState<
     'none' | 'audio' | 'participants' | 'chat' | 'whiteboard'
   >('none');
+  const [settingsTab, setSettingsTab] = useState<'audio' | 'video'>('audio');
   const [boardPending, setBoardPending] = useState(false);
   const [zoomBoardActive, setZoomBoardActive] = useState(false);
   useEffect(() => {
@@ -320,19 +323,32 @@ export function NativeClassroom({
             </Text>
           )}
           {preview ? (
-            <>
-              <TextInput
-                accessibilityLabel="Your display name"
-                value={displayName}
-                onChangeText={setDisplayName}
-                maxLength={100}
-                style={{
-                  color: colors.text,
-                  backgroundColor: colors.card,
-                  padding: 12,
-                  borderRadius: 12,
-                }}
-              />
+            <NativeDevicePreview
+              displayName={displayName}
+              sessionName={credentials.sessionName}
+              camera={state.camera}
+              microphone={state.microphone}
+              joining={state.phase === 'joining'}
+              onDisplayName={setDisplayName}
+              onCamera={() => {
+                controller.setPreview({ camera: !state.camera });
+                if (!state.camera && !cameraPermission?.granted) void requestCamera();
+              }}
+              onMicrophone={() =>
+                controller.setPreview({ microphone: !state.microphone })
+              }
+              onSettings={() => {
+                setSettingsTab('audio');
+                setPanel('audio');
+              }}
+              onTest={() => {
+                setSettingsTab('audio');
+                setPanel('audio');
+              }}
+              onJoin={() => {
+                void join();
+              }}
+            >
               <View
                 style={{
                   height: width >= 700 ? 350 : 240,
@@ -358,40 +374,7 @@ export function NativeClassroom({
                 button('Allow camera access', () => {
                   void requestCamera();
                 })}
-              {button(state.camera ? 'Turn camera off' : 'Turn camera on', () => {
-                controller.setPreview({ camera: !state.camera });
-                if (!state.camera && !cameraPermission?.granted) void requestCamera();
-              })}
-              {button(state.microphone ? 'Join muted' : 'Join with microphone', () =>
-                controller.setPreview({ microphone: !state.microphone }),
-              )}
-              {button('Blur background', () => {
-                void run(() => adapter.background('blur'));
-              })}
-              {button('Remove background', () => {
-                void run(() => adapter.background('none'));
-              })}
-              {button('Choose background image', () => {
-                void run(async () => {
-                  const result = await ImagePicker.launchImageLibraryAsync({
-                    mediaTypes: ['images'],
-                    quality: 0.8,
-                  });
-                  if (!result.canceled)
-                    await adapter.background('image', result.assets[0].uri);
-                });
-              })}
-              {button('Test audio and video', () =>
-                setPanel(panel === 'audio' ? 'none' : 'audio'),
-              )}
-              {button(
-                state.phase === 'joining' ? 'Joining…' : 'Join now',
-                () => {
-                  void join();
-                },
-                state.phase === 'joining',
-              )}
-            </>
+            </NativeDevicePreview>
           ) : state.phase === 'ended' ? (
             <>
               <Text style={{ color: colors.text }}>How was your class?</Text>
@@ -641,53 +624,101 @@ export function NativeClassroom({
               </NativeMeetingToolbar>
             </>
           )}
-          {panel === 'audio' && (
-            <View style={{ gap: 8 }}>
-              <Text accessibilityRole="header" style={{ color: colors.text }}>
-                Test your audio and video
-              </Text>
-              <Text
-                accessibilityLabel={`Microphone activity ${volume}`}
-                style={{ color: colors.text }}
-              >
-                Microphone activity: {volume}%
-              </Text>
-              {button(micTest ? 'Play microphone recording' : 'Test microphone', () => {
-                void run(async () => {
-                  if (!(micPermission?.granted || (await requestMic()).granted))
-                    throw new Error('Allow microphone access to test audio.');
-                  await adapter.testMicrophone(!micTest);
-                  setMicTest(!micTest);
-                });
-              })}
-              {button(speakerTest ? 'Stop speaker test' : 'Test speakers', () => {
-                void run(async () => {
-                  await adapter.testSpeaker(!speakerTest);
-                  setSpeakerTest(!speakerTest);
-                });
-              })}
-              {button(
-                originalAudio ? 'Use noise suppression' : 'Use original microphone audio',
-                () => {
+          <NativeClassroomSettings
+            open={panel === 'audio'}
+            tab={settingsTab}
+            onTab={setSettingsTab}
+            onClose={() => {
+              void run(async () => {
+                await adapter.stopAudioTests();
+                setMicTest(false);
+                setSpeakerTest(false);
+                setPanel('none');
+              });
+            }}
+            error={error ?? state.error}
+            audio={
+              <View style={{ gap: 8 }}>
+                <Text accessibilityRole="header" style={{ color: colors.text }}>
+                  Test your audio and video
+                </Text>
+                <Text
+                  accessibilityLabel={`Microphone activity ${volume}`}
+                  style={{ color: colors.text }}
+                >
+                  Microphone activity: {volume}%
+                </Text>
+                {button(micTest ? 'Play microphone recording' : 'Test microphone', () => {
                   void run(async () => {
-                    await adapter.originalAudio(!originalAudio);
-                    setOriginalAudio(!originalAudio);
+                    if (!(micPermission?.granted || (await requestMic()).granted))
+                      throw new Error('Allow microphone access to test audio.');
+                    await adapter.testMicrophone(!micTest);
+                    setMicTest(!micTest);
                   });
-                },
-              )}
-              {button('Use speaker', () => {
-                void run(() => adapter.speaker(true));
-              })}
-              {button('Done testing', () => {
-                void run(async () => {
-                  await adapter.stopAudioTests();
-                  setMicTest(false);
-                  setSpeakerTest(false);
-                  setPanel('none');
-                });
-              })}
-            </View>
-          )}
+                })}
+                {button(speakerTest ? 'Stop speaker test' : 'Test speakers', () => {
+                  void run(async () => {
+                    await adapter.testSpeaker(!speakerTest);
+                    setSpeakerTest(!speakerTest);
+                  });
+                })}
+                {button(
+                  originalAudio
+                    ? 'Use noise suppression'
+                    : 'Use original microphone audio',
+                  () => {
+                    void run(async () => {
+                      await adapter.originalAudio(!originalAudio);
+                      setOriginalAudio(!originalAudio);
+                    });
+                  },
+                )}
+                {button('Use speaker', () => {
+                  void run(() => adapter.speaker(true));
+                })}
+                {button('Done testing', () => {
+                  void run(async () => {
+                    await adapter.stopAudioTests();
+                    setMicTest(false);
+                    setSpeakerTest(false);
+                    setPanel('none');
+                  });
+                })}
+              </View>
+            }
+            video={
+              <View style={{ gap: 12 }}>
+                <Text style={{ color: colors.text }}>Camera and background</Text>
+                {button('Blur background', () => {
+                  void run(() => adapter.background('blur'));
+                })}
+                {button('Remove background', () => {
+                  void run(() => adapter.background('none'));
+                })}
+                {button('Choose background image', () => {
+                  void run(async () => {
+                    const result = await ImagePicker.launchImageLibraryAsync({
+                      mediaTypes: ['images'],
+                      quality: 0.8,
+                    });
+                    if (!result.canceled)
+                      await adapter.background('image', result.assets[0].uri);
+                  });
+                })}
+
+                {button('Switch camera', () => {
+                  void run(() => adapter.switchCamera());
+                })}
+                {adapter.mirror &&
+                  button(mirrored ? 'Stop mirroring my video' : 'Mirror my video', () => {
+                    void run(async () => {
+                      await adapter.mirror?.(!mirrored);
+                      setMirrored(!mirrored);
+                    });
+                  })}
+              </View>
+            }
+          />
           {panel === 'participants' && (
             <View style={{ gap: 8 }}>
               {waiting.map((user) => (

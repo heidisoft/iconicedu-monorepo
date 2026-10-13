@@ -21,6 +21,9 @@ name: Native classroom UI lifecycle on iPad and Android tablets
 - scrollUntilVisible:
     element: 'Test audio and video'
 - tapOn: 'Test audio and video'
+- tapOn: 'Video settings tab'
+- assertVisible: 'Choose background image'
+- tapOn: 'Audio settings tab'
 - scrollUntilVisible:
     element: 'Test speakers'
 - tapOn: 'Test speakers'

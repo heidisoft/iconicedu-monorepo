@@ -89,6 +89,35 @@ describe('native collaborative whiteboard recovery', () => {
       jest.mocked(capabilityPost).mock.invocationCallOrder[0],
     );
   });
+  it('sends canvas laser movement through native transport without saving drawing elements', async () => {
+    const screen = render(<NativeWhiteboard token="synthetic-capability" />);
+    await act(async () => {});
+    fireEvent(screen.getByTestId('drawing-canvas'), 'message', {
+      nativeEvent: { data: '{"type":"ready"}' },
+    });
+    await act(async () => {});
+    fireEvent(screen.getByTestId('drawing-canvas'), 'message', {
+      nativeEvent: { data: '{"type":"laser","x":100,"y":200,"button":"down"}' },
+    });
+    await waitFor(() =>
+      expect(capabilityPost).toHaveBeenCalledWith(
+        '/whiteboards/current/laser',
+        'synthetic-capability',
+        [
+          expect.objectContaining({
+            x: 100,
+            y: 200,
+            button: 'down',
+            id: expect.any(String),
+          }),
+        ],
+      ),
+    );
+    expect(
+      jest.mocked(capabilityPost).mock.calls.every((call) => call[0].endsWith('/laser')),
+    ).toBe(true);
+    expect(AsyncStorage.setItem).not.toHaveBeenCalled();
+  });
   it('exports canvas PNGs through the native share sheet without exposing capabilities', async () => {
     const screen = render(<NativeWhiteboard token="synthetic" />);
     fireEvent(screen.getByTestId('drawing-canvas'), 'message', {
@@ -112,14 +141,18 @@ describe('native collaborative whiteboard recovery', () => {
   });
   it('rejects non-image export messages from the canvas', async () => {
     const screen = render(<NativeWhiteboard token="synthetic" />);
-    fireEvent(screen.getByTestId('drawing-canvas'), 'message', {
-      nativeEvent: {
-        data: JSON.stringify({
-          type: 'export',
-          dataUrl: 'data:text/html;base64,aGVsbG8=',
-        }),
-      },
+    await act(async () => {});
+    await act(async () => {
+      fireEvent(screen.getByTestId('drawing-canvas'), 'message', {
+        nativeEvent: {
+          data: JSON.stringify({
+            type: 'export',
+            dataUrl: 'data:text/html;base64,aGVsbG8=',
+          }),
+        },
+      });
     });
+    await waitFor(() => expect(screen.getByText('Retry saving')).toBeTruthy());
     expect(FileSystem.writeAsStringAsync).not.toHaveBeenCalled();
     expect(Sharing.shareAsync).not.toHaveBeenCalled();
   });

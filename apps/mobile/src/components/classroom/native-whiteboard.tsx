@@ -1,3 +1,4 @@
+import { useNativeWhiteboardLasers } from './use-native-whiteboard-lasers';
 import { exportClassroomImage } from '@/lib/classroom/export-image';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -6,6 +7,8 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import type {
   WhiteboardElementVM,
+  WhiteboardLaserPresenceVM,
+  WhiteboardLaserSampleVM,
   WhiteboardOperationVM,
   WhiteboardSnapshotVM,
 } from '@iconicedu/shared-types';
@@ -15,6 +18,8 @@ import { generateClientMessageId } from '@/lib/messages/client-message-id';
 import { classroomCanvasHtml } from './canvas/canvas.generated';
 
 export interface NativeWhiteboardRepository {
+  lasers?(): Promise<WhiteboardLaserPresenceVM[]>;
+  publishLaser?(samples: WhiteboardLaserSampleVM[]): Promise<unknown>;
   load(): Promise<WhiteboardSnapshotVM>;
   save(operation: WhiteboardOperationVM): Promise<WhiteboardSnapshotVM>;
 }
@@ -45,6 +50,23 @@ export function NativeWhiteboard({
   const [boardWidth, setBoardWidth] = useState(0);
   const [ready, setReady] = useState(false);
   const [saving, setSaving] = useState(false);
+  const actorId = snapshot?.actorId;
+  const receiveLasers = useCallback(
+    (presence: WhiteboardLaserPresenceVM[]) => {
+      const peers = presence.filter((peer) => peer.actorId !== actorId);
+      webview.current?.injectJavaScript(
+        `window.classroomLasers && window.classroomLasers(${JSON.stringify(peers).replaceAll('<', '\\u003c')}); true;`,
+      );
+    },
+    [actorId],
+  );
+  const publishLaser = useNativeWhiteboardLasers(
+    token,
+    repository,
+    ready && visible,
+    receiveLasers,
+  );
+
   const queue = useRef<WhiteboardOperationVM[]>([]);
   const busy = useRef(false);
   const drawing = useRef(false);
@@ -281,7 +303,21 @@ export function NativeWhiteboard({
                   type?: string;
                   elements?: WhiteboardElementVM[];
                   dataUrl?: string;
+                  x?: number;
+                  y?: number;
+                  button?: 'down' | 'up';
                 };
+                if (message.type === 'laser') {
+                  if (
+                    typeof message.x === 'number' &&
+                    Number.isFinite(message.x) &&
+                    typeof message.y === 'number' &&
+                    Number.isFinite(message.y) &&
+                    (message.button === 'down' || message.button === 'up')
+                  )
+                    publishLaser({ x: message.x, y: message.y, button: message.button });
+                  return;
+                }
                 if (message.type === 'export-error') {
                   Alert.alert(
                     'Unable to export whiteboard',
