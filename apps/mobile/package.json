@@ -37,7 +37,7 @@
     "export:bundle": "pnpm canvas:build && EXPO_NO_TELEMETRY=1 npx expo export --platform android --output-dir .expo/dist",
     "canvas:build": "node scripts/build-classroom-canvas.mjs",
     "eas-build-post-install": "pnpm canvas:build",
-    "test:e2e:classroom": "maestro test .maestro/classroom-ui.yaml .maestro/classroom-join-failure.yaml .maestro/classroom-moderation.yaml .maestro/classroom-student.yaml .maestro/classroom-link-entry.yaml .maestro/classroom-export.yaml .maestro/classroom-annotations.yaml",
+    "test:e2e:classroom": "maestro test .maestro/classroom-ui.yaml .maestro/classroom-join-failure.yaml .maestro/classroom-moderation.yaml .maestro/classroom-student.yaml .maestro/classroom-link-entry.yaml .maestro/classroom-deep-links.yaml .maestro/classroom-export.yaml .maestro/classroom-annotations.yaml",
     "test:e2e:classroom:live": "maestro test .maestro/classroom-live.yaml",
     "test:e2e:classroom:host": "maestro test .maestro/classroom-live-host.yaml"
   },
@@ -46,6 +46,7 @@
     "@expo/metro-runtime": "^55.0.6",
     "@iconicedu/shared-types": "workspace:*",
     "@iconicedu/ui-native": "workspace:*",
+    "@iconicedu/utils": "workspace:*",
     "@posthog/react-native-plugin": "^2.1.1",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/datetimepicker": "8.6.0",
@@ -58,6 +59,7 @@
     "expo-audio": "~55.0.8",
     "expo-camera": "~55.0.19",
     "expo-constants": "^55.0.7",
+    "expo-crypto": "~55.0.19",
     "expo-document-picker": "^55.0.8",
     "expo-file-system": "~55.0.10",
     "expo-image-manipulator": "~55.0.15",
@@ -88,8 +90,7 @@
     "react-native-svg": "~15.15.3",
     "react-native-webview": "^13.16.1",
     "react-native-worklets": "0.7.2",
-    "tailwindcss": "3",
-    "@iconicedu/utils": "workspace:*"
+    "tailwindcss": "3"
   },
   "devDependencies": {
     "@babel/core": "^7.29.6",

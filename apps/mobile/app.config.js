@@ -1,4 +1,5 @@
 const { expo: baseConfig } = require('./app.json');
+const mobileLinks = require('../../ops/mobile-links.json');
 
 const shortCommit =
   process.env.EAS_BUILD_GIT_COMMIT_HASH?.slice(0, 7) ??
@@ -9,6 +10,28 @@ const shortCommit =
 module.exports = ({ config }) => ({
   ...baseConfig,
   ...config,
+  ios: {
+    ...baseConfig.ios,
+    ...config.ios,
+    associatedDomains: mobileLinks.domains.map((host) => `applinks:${host}`),
+  },
+  android: {
+    ...baseConfig.android,
+    ...config.android,
+    intentFilters: [
+      ...(config.android?.intentFilters ?? []),
+      {
+        action: 'VIEW',
+        autoVerify: true,
+        category: ['BROWSABLE', 'DEFAULT'],
+        data: mobileLinks.domains.map((host) => ({
+          scheme: 'https',
+          host,
+          pathPrefix: '/live/',
+        })),
+      },
+    ],
+  },
   extra: {
     ...(baseConfig.extra ?? {}),
     ...(config.extra ?? {}),

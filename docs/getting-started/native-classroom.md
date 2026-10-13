@@ -124,3 +124,22 @@ A simulator run is useful evidence for navigation, layout and bridge loading. It
 
 - [Zoom React Native SDK setup](https://developers.zoom.us/docs/video-sdk/react-native/get-started/)
 - [Zoom native screen sharing](https://developers.zoom.us/docs/video-sdk/react-native/share/)
+
+## Verified classroom links
+
+Shared HTTPS `/live/<code>#invite=<capability>` links use iOS Universal Links and Android App Links. Installed compatible binaries route to native entry and preview; without the app the existing web route remains available. The OS can honor a user's choice to stay in their browser. Joining always requires the preview's Join action. Signed-in identity, guest recovery and admission still come from `apps/api`.
+
+`app/+native-intent.tsx` handles both cold starts and already-running app links. It saves invitation capabilities in encrypted device storage before navigation. Personal handoffs are redeemed through the API; neither capability is copied into route parameters. Other scheme routes, including authentication callbacks, retain their existing routing. Failed recovery shows a retry instruction instead of silently joining or requiring login.
+
+Deployment configuration lives in `ops/mobile-links.json` and contains only public identifiers:
+
+1. Confirm `domains` matches the actual shared-link host and `EXPO_PUBLIC_WEB_URL` in each build. The initial host follows the existing `app.iconicedu.com` web default; confirm it before release.
+2. Set `iosApplicationIdentifiers` to the exact application identifier from the signed app's entitlements (`application-identifier`, usually `TEAMID.com.heidisoft.iconicedu`). Do not assume the Team ID and application identifier prefix are always equal.
+3. Set `androidCertificateSha256` to the SHA-256 fingerprints of the certificates signing supported builds. Google Play App Signing can use a different certificate from EAS internal builds; register both if both should open links. Do not publish private signing keys or keystores.
+4. Deploy web, and confirm `/.well-known/apple-app-site-association` and `/.well-known/assetlinks.json` return JSON with HTTP 200, without authentication or redirects, on every registered host. Empty identifier arrays deliberately authorize no app until configured.
+5. Run native prebuild and produce new signed EAS binaries. Associated domains and Android intent filters cannot be added by an OTA update alone.
+6. On real iPad/Android tablets, test links tapped in messages/email with the app closed and open, signed in and signed out; verify invitation recovery, waiting-room approval and preview. Also test expired links and the web fallback without the app. Simulator scheme tests cannot certify OS domain association.
+
+This association metadata is a maintenance exemption from web feature flags: it supports existing classroom URLs and changes no classroom authorization or web join behavior. The metadata routes contain no business logic or credentials.
+
+References: [Expo native intent](https://docs.expo.dev/router/advanced/native-intent/), [iOS Universal Links](https://docs.expo.dev/linking/ios-universal-links/), [Android App Links](https://docs.expo.dev/linking/android-app-links/).

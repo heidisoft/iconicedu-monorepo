@@ -9,7 +9,10 @@ const Entry = lazy(() =>
   })),
 );
 export default function ClassroomRoute() {
-  const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
+  const { sessionId, entry } = useLocalSearchParams<{
+    sessionId: string;
+    entry?: string;
+  }>();
   const { colors } = useTheme();
   if (!NativeModules.RNZoomVideoSdk)
     return (
@@ -30,7 +33,7 @@ export default function ClassroomRoute() {
     );
   return (
     <Suspense fallback={<ActivityIndicator accessibilityLabel="Loading classroom" />}>
-      <Entry key={sessionId} sessionId={sessionId} />
+      <Entry key={`${sessionId}:${entry ?? ''}`} sessionId={sessionId} />
     </Suspense>
   );
 }

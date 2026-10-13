@@ -1,3 +1,4 @@
+import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 export type NativeMeetingLinkRecovery = {
   token?: string;
@@ -42,4 +43,34 @@ export async function rememberNativeInvitation(id: string, token: string) {
     displayName: previous?.displayName,
     expiresAt: Date.now() + 7 * 86400000,
   });
+}
+
+/** Persist the retry identity before consuming a single-use personal handoff. */
+export async function nativeHandoffRedemptionKey(id: string, token: string) {
+  const storageKey = `${key(id)}.handoff`;
+  const raw = await SecureStore.getItemAsync(storageKey);
+  if (raw) {
+    try {
+      const saved = JSON.parse(raw) as {
+        token: string;
+        redemptionKey: string;
+        expiresAt: number;
+      };
+      if (
+        saved.token === token &&
+        saved.expiresAt > Date.now() &&
+        /^[\w-]{32}$/.test(saved.redemptionKey)
+      )
+        return saved.redemptionKey;
+    } catch {
+      /* Replace invalid recovery metadata. */
+    }
+  }
+  const redemptionKey = Crypto.randomUUID().replace(/-/g, '');
+  await SecureStore.setItemAsync(
+    storageKey,
+    JSON.stringify({ token, redemptionKey, expiresAt: Date.now() + 60000 }),
+    { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY },
+  );
+  return redemptionKey;
 }

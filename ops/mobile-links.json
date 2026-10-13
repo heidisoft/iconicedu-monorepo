@@ -1,0 +1,6 @@
+{
+  "domains": ["app.iconicedu.com"],
+  "iosApplicationIdentifiers": [],
+  "androidPackage": "com.heidisoft.iconicedu",
+  "androidCertificateSha256": []
+}

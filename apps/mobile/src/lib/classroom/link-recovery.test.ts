@@ -1,9 +1,12 @@
+import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 import {
+  nativeHandoffRedemptionKey,
   readNativeMeetingLink,
   rememberNativeInvitation,
   writeNativeMeetingLink,
 } from './link-recovery';
+jest.mock('expo-crypto', () => ({ randomUUID: jest.fn() }));
 jest.mock('expo-secure-store', () => ({
   getItemAsync: jest.fn(),
   setItemAsync: jest.fn(),
@@ -12,6 +15,11 @@ jest.mock('expo-secure-store', () => ({
 }));
 beforeEach(() => {
   jest.clearAllMocks();
+  jest
+    .mocked(Crypto.randomUUID)
+    .mockReset()
+    .mockReturnValueOnce('00000000-0000-4000-8000-000000000001')
+    .mockReturnValue('00000000-0000-4000-8000-000000000002');
   jest.mocked(SecureStore.getItemAsync).mockResolvedValue(null);
 });
 it('persists invitations and guest names encrypted without storing passcodes or SDK JWTs', async () => {
@@ -42,4 +50,18 @@ it('removes expired and corrupted recovery data', async () => {
   expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith('classroom.link.test');
   jest.mocked(SecureStore.getItemAsync).mockResolvedValue('{broken');
   await expect(readNativeMeetingLink('test')).resolves.toBeNull();
+});
+
+it('reuses a securely persisted handoff retry identity after a lost response', async () => {
+  const value = await nativeHandoffRedemptionKey('test', 'synthetic-handoff');
+  expect(value).toMatch(/^[a-f0-9]{32}$/i);
+  const stored = jest.mocked(SecureStore.setItemAsync).mock.calls[0][1];
+  jest.mocked(SecureStore.getItemAsync).mockResolvedValue(stored);
+  await expect(nativeHandoffRedemptionKey('test', 'synthetic-handoff')).resolves.toBe(
+    value,
+  );
+  expect(SecureStore.setItemAsync).toHaveBeenCalledTimes(1);
+  await expect(nativeHandoffRedemptionKey('test', 'other-handoff')).resolves.not.toBe(
+    value,
+  );
 });
