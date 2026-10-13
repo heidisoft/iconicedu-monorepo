@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { Alert } from 'react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type {
   AnnotationContext,
@@ -220,4 +221,29 @@ describe('native screen annotation delivery', () => {
       'classroom-annotations:room:synthetic-user',
     );
   });
+});
+
+it('sends educator clear-all through the shared API after confirmation', async () => {
+  const dialog = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  const { api, screen } = setup({
+    ...context,
+    actor: { ...context.actor, role: 'educator' },
+  });
+  await waitFor(() =>
+    expect(screen.getByLabelText('Clear all annotations')).toBeTruthy(),
+  );
+  fireEvent.press(screen.getByLabelText('Clear all annotations'));
+  act(() =>
+    dialog.mock.calls
+      .at(-1)?.[2]
+      ?.find((button) => button.text === 'Clear')
+      ?.onPress?.(),
+  );
+  await waitFor(() =>
+    expect(api.save).toHaveBeenCalledWith(
+      'room',
+      expect.objectContaining({ kind: 'clear', scope: 'all' }),
+    ),
+  );
+  dialog.mockRestore();
 });

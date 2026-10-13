@@ -40,11 +40,17 @@ Register each test iPad before creating the iOS build so its provisioning profil
 
 ## Classroom boundaries
 
-- Signed-in identity and enrolled-student selection come from the API. Native join links carry a meeting identifier; SDK credentials are renewed when Join is pressed. Preview remains an explicit step.
+- Signed-in identity and enrolled-student selection come from the API. Guest names and invitation capabilities recover from encrypted device-only storage; passcodes and SDK JWTs are never persisted. Expired/revoked invitation responses clear the stored capability so Retry can use the normal join flow. Plain-link guests can enter a name and passcode; invited guests bypass passcode entry after API verification. Personal browser handoffs retain their browser route. Native join links carry a meeting identifier; SDK credentials are renewed when Join is pressed. Preview remains an explicit step.
 - One SDK provider owns the application lifecycle. Route cleanup removes subscriptions and leaves the active session; joining never automatically reclaims host. Eligible teachers/staff claim host explicitly with confirmation. Co-host assignment does not replace the host.
 - The app-owned whiteboard uses a bundled offline Excalidraw canvas with the same scene contract and educational assets as web. API capabilities stay in native code and never enter the WebView. Latin drawing fonts are bundled offline; CJK glyphs use device fallback fonts. The API checks editing and presentation permissions. Save retries retain operation IDs, and pending drawings are recovered locally for the same authorized board. PNG exports use the native share sheet.
 - Screen annotations use the same API rooms and normalized object coordinates as web. Native overlays fit the received content rectangle rather than the surrounding letterbox. A composited share from web already contains its annotations and must not receive duplicate permanent overlays.
 - Cloud recording records SDK media. To include the app-owned board or other native UI, the presenter must approve device screen broadcasting. Drawing on the board alone does not silently start an operating-system broadcast.
+
+## Platform media controls
+
+Native settings enumerate SDK cameras and OS communication audio routes. On iOS/iPadOS, choosing a headset selects its input and associated communication route; speaker override and system default remain available. Android 12+ exposes available communication devices; older Android versions offer speaker or the OS-selected connected route. Bluetooth and USB availability depends on the tablet and attached hardware. Device lists refresh while settings are open, and disconnected-device selections fail without silently switching cameras.
+
+Floating calls use a dedicated AVKit video-call content source on iOS/iPadOS 16+ and Android activity picture-in-picture on supported devices. The application does not invoke the SDK sample's hard-coded CallKit identity. Automatic entry defaults off and is stored as a local preference. Shared screens take priority over the focused participant, then remote video; leaving clears subscriptions and disables automatic entry. Picture-in-picture is suspended while the whiteboard is open or has pending drawings, preserving unsaved edits. The floating surface contains call video, rather than the full interactive classroom UI. Android users restore the meeting with system controls; iPad camera/background behavior still needs physical-device verification.
 
 ## Automated verification
 
@@ -52,19 +58,21 @@ Register each test iPad before creating the iOS build so its provisioning profil
 
 Compare native changes against the owning web flow, rather than copying web-only browser APIs into mobile. The same API contracts govern both clients.
 
-| Capability                              | Web reference                                             | Native implementation / verification                                                                                                                              |
-| --------------------------------------- | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Identity, preview and explicit join     | `live-session-setup.tsx`, `device-preview-step.tsx`       | `native-classroom-entry.tsx`, `native-device-preview.tsx`; API identity, responsive tablet columns, adjacent settings/audio-check icons and tablet lifecycle flow |
-| Admission and host/co-host permissions  | `meeting-waiting-room.tsx`, `zoom-participants-panel.tsx` | Same API admission endpoints; controller tests and moderation/student tablet flows                                                                                |
-| Primary controls and More               | `zoom-meeting-controls.tsx`, `zoom-more-controls.tsx`     | `native-meeting-toolbar.tsx`; accessible round controls and expandable secondary actions                                                                          |
-| Chat, reactions, captions and recording | Web Zoom session hooks                                    | Native SDK adapter and controller; deterministic tests cover events, with live media/recording checks required                                                    |
-| Whiteboard and educational assets       | Web Excalidraw canvas                                     | Bundled Excalidraw canvas and shared asset registry; native persistence and PNG export flows; ephemeral lasers use the same API presence endpoint as web          |
-| Annotation editing                      | `components/screen-annotations`                           | Shared API objects; normalized native SVG shapes, selection, movement, resize, rotation, styles, versioned undo/redo and native export                            |
-| Temporary annotation tools              | Web annotation presence transport                         | Same pointer/laser endpoints; temporary strokes never enter saved drawing history                                                                                 |
-| Screen sharing                          | Browser screen capture                                    | Native OS-approved ReplayKit/MediaProjection; verify on physical tablets                                                                                          |
-| Device settings                         | Browser device selectors and processing options           | Native audio routing, camera switching, mirroring, host sharing restrictions, original audio and background effects; hardware-specific verification required      |
+| Capability                              | Web reference                                             | Native implementation / verification                                                                                                                                              |
+| --------------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Identity, preview and explicit join     | `live-session-setup.tsx`, `device-preview-step.tsx`       | `native-classroom-entry.tsx`, `native-device-preview.tsx`; API identity, responsive tablet columns, adjacent settings/audio-check icons and tablet lifecycle flow                 |
+| Admission and host/co-host permissions  | `meeting-waiting-room.tsx`, `zoom-participants-panel.tsx` | Same API admission endpoints; controller tests and moderation/student tablet flows                                                                                                |
+| Primary controls and More               | `zoom-meeting-controls.tsx`, `zoom-more-controls.tsx`     | `native-meeting-toolbar.tsx`; accessible round controls and expandable secondary actions                                                                                          |
+| Chat, reactions, captions and recording | Web Zoom session hooks                                    | Native SDK adapter and controller; unread counts, deduplicated chat and reaction expiry; live media/recording checks required                                                     |
+| Whiteboard and educational assets       | Web Excalidraw canvas                                     | Bundled Excalidraw canvas and shared asset registry; native persistence and PNG export flows; ephemeral lasers use the same API presence endpoint as web                          |
+| Annotation editing                      | `components/screen-annotations`                           | Shared API objects; normalized native SVG shapes, selection, movement, resize, rotation, styles, versioned undo/redo and native export                                            |
+| Temporary annotation tools              | Web annotation presence transport                         | Same pointer/laser endpoints; temporary strokes never enter saved drawing history                                                                                                 |
+| Focus and speaking                      | `focused-fullscreen.tsx`, `use-speaking-participants.ts`  | Native focused video/share dialog, four-person gallery pages, SDK-derived speaker borders and avatar fallbacks                                                                    |
+| Floating call                           | `use-meeting-picture-in-picture.ts`                       | AVKit on iOS/iPadOS 16+; Android activity PiP with explicit/automatic entry, compact controls and restoration                                                                     |
+| Screen sharing                          | Browser screen capture                                    | Native OS-approved ReplayKit/MediaProjection; verify on physical tablets                                                                                                          |
+| Device settings                         | Browser device selectors and processing options           | Native audio route/camera selectors with disconnect refresh, mirroring, host sharing restrictions, original audio and background effects; hardware-specific verification required |
 
-This table maps implementations and tests; it does not certify full feature parity. Native picture-in-picture and hardware device selection still require platform compatibility work before full parity can be declared complete. Preview and settings share the web hierarchy, with native touch targets and OS media permissions. Platform-only browser acceleration settings do not map directly to native SDK controls.
+This table maps implementations and tests; it does not certify full feature parity. Native picture-in-picture and hardware device selection are implemented; actual media and connected hardware still require physical-device verification. Preview and settings share the web hierarchy, with native touch targets and OS media permissions. Platform-only browser acceleration settings do not map directly to native SDK controls.
 
 Run focused tests and then the repository's full CI command:
 
@@ -73,20 +81,20 @@ pnpm --filter mobile test --runInBand src/lib/classroom src/components/classroom
 pnpm run ci
 ```
 
-The tests cover short-code resolution, API-derived identity, parent selection, admission approval, SDK event mapping, preview/join lifecycle, duplicate joins, permission boundaries, cleanup, web-compatible commands and whiteboard recovery. Native compilation is a separate check; TypeScript/Jest cannot prove a native binary links or loads.
+The tests cover short-code resolution, API-derived identity, parent selection, admission approval, guest invitation/name recovery, optional-auth HTTP transport, device refresh/selection, PiP configuration ordering and cleanup, SDK event mapping, preview/join lifecycle, duplicate joins, permission boundaries, cleanup, web-compatible commands and whiteboard recovery. Native compilation is a separate check; TypeScript/Jest cannot prove a native binary links or loads.
 
 For deterministic tablet UI tests, install a development binary and Maestro. Start the dedicated Metro instance with non-production API/Supabase configuration:
 
 ```bash
 pnpm --filter mobile canvas:build
 pnpm --filter mobile exec expo start --dev-client --port 8085 --lan
-maestro --device YOUR_DEVICE_ID test apps/mobile/.maestro/classroom-ui.yaml apps/mobile/.maestro/classroom-join-failure.yaml apps/mobile/.maestro/classroom-moderation.yaml apps/mobile/.maestro/classroom-student.yaml apps/mobile/.maestro/classroom-export.yaml apps/mobile/.maestro/classroom-annotations.yaml
+maestro --device YOUR_DEVICE_ID test apps/mobile/.maestro/classroom-ui.yaml apps/mobile/.maestro/classroom-join-failure.yaml apps/mobile/.maestro/classroom-moderation.yaml apps/mobile/.maestro/classroom-student.yaml apps/mobile/.maestro/classroom-link-entry.yaml apps/mobile/.maestro/classroom-export.yaml apps/mobile/.maestro/classroom-annotations.yaml
 node apps/mobile/scripts/verify-classroom-export.mjs ios YOUR_DEVICE_ID
 ```
 
-The simulator bootstrap opens the development client at `http://127.0.0.1:8085`. On physical tablets, open the development client using the reachable LAN address before running the live flows. Android emulators can use `adb reverse tcp:8085 tcp:8085`. The fixture route is unavailable in release builds. It initializes the actual native SDK and uses deterministic meeting/API adapters for UI scenarios. These flows do **not** prove live Zoom connectivity or media transmission.
+The simulator bootstrap opens the development client at `http://127.0.0.1:8085`. On physical tablets, open the development client using the reachable LAN address before running the live flows. Android emulators can use `adb reverse tcp:8085 tcp:8085`. The fixture routes are unavailable in release builds. The link-entry flow renders the real native entry and preview components with synthetic API responses; the Android PiP flow verifies actual OS transitions and restoration without claiming live media transport. Run `classroom-picture-in-picture.yaml` separately on Android after the common flows. It initializes the actual native SDK and uses deterministic meeting/API adapters for UI scenarios. These flows do **not** prove live Zoom connectivity or media transmission.
 
-For live tests, sign a non-production account into the app, configure the API with a non-production Zoom Video SDK account, and start a dedicated classroom. Keep a second web/native participant connected for moderation and collaboration checks:
+For live tests, sign a non-production account into the app, configure the test API with valid Zoom Video SDK credentials (the existing web SDK credentials can be reused), and start a dedicated classroom. Keep a second web/native participant connected for moderation and collaboration checks:
 
 ```bash
 maestro --device YOUR_DEVICE_ID test -e SESSION_ID=YOUR_TEST_SESSION_ID -e DISPLAY_NAME="Native test teacher" apps/mobile/.maestro/classroom-live.yaml

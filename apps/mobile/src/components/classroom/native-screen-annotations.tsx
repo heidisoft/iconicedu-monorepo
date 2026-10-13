@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import Svg, {
   Circle,
@@ -173,6 +173,8 @@ function Shape(props: { object: AnnotationObject; width: number; height: number 
     </G>
   );
 }
+const recoveryKey = (value: AnnotationContext) =>
+  `classroom-annotations:${value.snapshot.roomId}:${value.actor.userId}`;
 /** Screen annotations use the same room, objects and permission checks as web. */
 export function NativeScreenAnnotations({
   sessionId,
@@ -271,10 +273,9 @@ export function NativeScreenAnnotations({
   const queue = useRef<AnnotationOperation[]>([]);
   const busy = useRef(false);
   const recovered = useRef<string | null>(null);
-  const recoveryKey = (value: AnnotationContext) =>
-    `classroom-annotations:${value.snapshot.roomId}:${value.actor.userId}`;
+
   const [pending, setPending] = useState(false);
-  const flush = async () => {
+  const flush = useCallback(async () => {
     if (busy.current || !contextRef.current) return;
     busy.current = true;
     try {
@@ -313,7 +314,7 @@ export function NativeScreenAnnotations({
       busy.current = false;
       setPending(queue.current.length > 0);
     }
-  };
+  }, [api]);
   const save = (
     operation: Omit<AnnotationOperation, 'eventId'> | AnnotationOperation,
   ) => {
@@ -404,7 +405,7 @@ export function NativeScreenAnnotations({
       mounted = false;
       clearInterval(timer);
     };
-  }, [api]);
+  }, [api, flush]);
   const editable =
     !!context &&
     !pending &&
@@ -636,24 +637,26 @@ export function NativeScreenAnnotations({
               );
             })()}
           {draft && <Shape object={draft} width={width} height={height} />}
-          {context?.pointers?.map((pointer) => (
-            <G key={pointer.userId}>
-              <Circle
-                cx={pointer.point.x * width}
-                cy={pointer.point.y * height}
-                r={pointer.tool === 'spotlight' ? 18 : 5}
-                fill={pointer.color}
-                opacity={0.6}
-              />
-              <SvgText
-                x={pointer.point.x * width + 10}
-                y={pointer.point.y * height}
-                fill={pointer.color}
-              >
-                {pointer.name}
-              </SvgText>
-            </G>
-          ))}
+          {context?.pointers
+            ?.filter((pointer) => pointer.expiresAt > now)
+            .map((pointer) => (
+              <G key={pointer.userId}>
+                <Circle
+                  cx={pointer.point.x * width}
+                  cy={pointer.point.y * height}
+                  r={pointer.tool === 'spotlight' ? 18 : 5}
+                  fill={pointer.color}
+                  opacity={0.6}
+                />
+                <SvgText
+                  x={pointer.point.x * width + 10}
+                  y={pointer.point.y * height}
+                  fill={pointer.color}
+                >
+                  {pointer.name}
+                </SvgText>
+              </G>
+            ))}
         </Svg>
       </View>
       {active && (
@@ -898,6 +901,40 @@ export function NativeScreenAnnotations({
             >
               <Text style={{ color: colors.text }}>Clear mine</Text>
             </Pressable>
+            {context?.actor.role === 'educator' &&
+              (['students', 'all'] as const).map((scope) => (
+                <Pressable
+                  key={scope}
+                  accessibilityRole="button"
+                  disabled={!editable}
+                  accessibilityLabel={
+                    scope === 'all'
+                      ? 'Clear all annotations'
+                      : 'Clear student annotations'
+                  }
+                  onPress={() =>
+                    Alert.alert(
+                      'Clear annotations?',
+                      scope === 'all'
+                        ? 'Clear every annotation on this shared screen.'
+                        : 'Clear student annotations on this shared screen.',
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        {
+                          text: 'Clear',
+                          style: 'destructive',
+                          onPress: () => save({ eventId: '', kind: 'clear', scope }),
+                        },
+                      ],
+                    )
+                  }
+                  style={{ padding: 12 }}
+                >
+                  <Text style={{ color: colors.text }}>
+                    {scope === 'all' ? 'Clear all' : 'Clear students'}
+                  </Text>
+                </Pressable>
+              ))}
           </ScrollView>
           {(tool === 'text' || selectedObject?.type === 'text') && (
             <>

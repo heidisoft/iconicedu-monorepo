@@ -12,6 +12,18 @@ import com.facebook.react.defaults.DefaultReactActivityDelegate
 import expo.modules.ReactActivityDelegateWrapper
 
 class MainActivity : ReactActivity() {
+  // Native classroom picture-in-picture
+  override fun onPictureInPictureModeChanged(active: Boolean, config: android.content.res.Configuration) {
+    super.onPictureInPictureModeChanged(active, config)
+    ClassroomPictureInPicture.changed(active)
+  }
+  override fun onUserLeaveHint() {
+    super.onUserLeaveHint()
+    if (android.os.Build.VERSION.SDK_INT < 31 && ClassroomPictureInPicture.automatic) {
+      try { enterPictureInPictureMode(android.app.PictureInPictureParams.Builder().setAspectRatio(android.util.Rational(16, 9)).build()) } catch (_: Exception) { }
+    }
+  }
+
   // Native classroom screen capture
   override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
     super.onActivityResult(requestCode, resultCode, data)

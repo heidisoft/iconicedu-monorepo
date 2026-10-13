@@ -1,3 +1,5 @@
+import { createNativePictureInPicture } from '@/lib/classroom/native-picture-in-picture';
+import { Platform } from 'react-native';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,6 +16,115 @@ import type { classroomApi } from '@/lib/classroom/api';
 import type { WhiteboardSnapshotVM } from '@iconicedu/shared-types';
 
 /** Deterministic native UI coverage; never a substitute for the live SDK suite. */
+export function createClassroomFixtureAdapter(
+  role = 'teacher',
+  failure?: string,
+): NativeMeetingAdapter {
+  let cameraId = 'front',
+    audioId = 'speaker';
+  let send: (event: NativeMeetingEvent) => void = () => {};
+  const users: NativeParticipant[] = [
+    {
+      id: '1',
+      name: 'Test teacher',
+      host: role === 'teacher',
+      cohost: false,
+      muted: true,
+      video: false,
+    },
+    {
+      id: '2',
+      name: 'Test student',
+      host: role !== 'teacher',
+      cohost: false,
+      muted: true,
+      video: false,
+    },
+  ];
+  return {
+    pictureInPicture:
+      Platform.OS === 'android' ? createNativePictureInPicture() : undefined,
+    subscribe: (listener) => {
+      send = listener;
+      return () => {
+        send = () => {};
+      };
+    },
+    async join() {
+      if (failure === 'join') throw new Error('synthetic network failure');
+      send({ type: 'joined', selfId: '1', participants: [...users] });
+    },
+    async leave() {
+      send({ type: 'left', reason: 'BySelf' });
+    },
+    async microphone(id, enabled) {
+      const user = users.find((item) => item.id === id);
+      if (user) user.muted = !enabled;
+      send({ type: 'participants', participants: users.map((item) => ({ ...item })) });
+    },
+    async camera(enabled) {
+      users[0].video = enabled;
+    },
+    async switchCamera() {},
+    async share(enabled) {
+      send({ type: 'share', userId: enabled ? '1' : null });
+    },
+    async cohost(id, enabled) {
+      const user = users.find((item) => item.id === id);
+      if (user) user.cohost = enabled;
+      send({ type: 'participants', participants: users.map((item) => ({ ...item })) });
+    },
+    async host(id) {
+      users.forEach((user) => {
+        user.host = user.id === id;
+      });
+      send({ type: 'participants', participants: users.map((item) => ({ ...item })) });
+    },
+    async claimHost() {
+      users.forEach((user) => {
+        user.host = user.id === '1';
+      });
+      send({ type: 'participants', participants: users.map((item) => ({ ...item })) });
+    },
+    async recording(active) {
+      send({ type: 'recording', active });
+    },
+    async chat(text) {
+      send({ type: 'chat', id: String(Date.now()), sender: 'Test teacher', text });
+    },
+    async command(command) {
+      if (command.type === 'raise-hand')
+        send({ type: 'hand', userId: '1', raised: command.raised });
+    },
+    async devices() {
+      return {
+        cameras: [
+          { id: 'front', label: 'Front camera', selected: cameraId === 'front' },
+          { id: 'back', label: 'Back camera', selected: cameraId === 'back' },
+        ],
+        audio: [
+          { id: 'speaker', label: 'Speaker', selected: audioId === 'speaker' },
+          { id: 'headset', label: 'Test headset', selected: audioId === 'headset' },
+        ],
+        mirrored: false,
+      };
+    },
+    async selectCamera(id) {
+      cameraId = id;
+    },
+    async selectAudioRoute(id) {
+      audioId = id;
+    },
+    async captions() {},
+    async speaker() {},
+    async background() {},
+    async originalAudio() {},
+    async stopAudioTests() {},
+    async testMicrophone() {},
+    async testSpeaker() {},
+  };
+}
+
 function Fixture() {
   const { role = 'teacher', failure } = useLocalSearchParams<{
     role?: string;
@@ -24,88 +135,10 @@ function Fixture() {
   useEffect(() => {
     void getSdkVersion().then(setSdkVersion);
   }, [getSdkVersion]);
-  const adapter = useMemo<NativeMeetingAdapter>(() => {
-    let send: (event: NativeMeetingEvent) => void = () => {};
-    const users: NativeParticipant[] = [
-      {
-        id: '1',
-        name: 'Test teacher',
-        host: role === 'teacher',
-        cohost: false,
-        muted: true,
-        video: false,
-      },
-      {
-        id: '2',
-        name: 'Test student',
-        host: role !== 'teacher',
-        cohost: false,
-        muted: true,
-        video: false,
-      },
-    ];
-    return {
-      subscribe: (listener) => {
-        send = listener;
-        return () => {
-          send = () => {};
-        };
-      },
-      async join() {
-        if (failure === 'join') throw new Error('synthetic network failure');
-        send({ type: 'joined', selfId: '1', participants: [...users] });
-      },
-      async leave() {
-        send({ type: 'left', reason: 'BySelf' });
-      },
-      async microphone(id, enabled) {
-        const user = users.find((item) => item.id === id);
-        if (user) user.muted = !enabled;
-        send({ type: 'participants', participants: users.map((item) => ({ ...item })) });
-      },
-      async camera(enabled) {
-        users[0].video = enabled;
-      },
-      async switchCamera() {},
-      async share(enabled) {
-        send({ type: 'share', userId: enabled ? '1' : null });
-      },
-      async cohost(id, enabled) {
-        const user = users.find((item) => item.id === id);
-        if (user) user.cohost = enabled;
-        send({ type: 'participants', participants: users.map((item) => ({ ...item })) });
-      },
-      async host(id) {
-        users.forEach((user) => {
-          user.host = user.id === id;
-        });
-        send({ type: 'participants', participants: users.map((item) => ({ ...item })) });
-      },
-      async claimHost() {
-        users.forEach((user) => {
-          user.host = user.id === '1';
-        });
-        send({ type: 'participants', participants: users.map((item) => ({ ...item })) });
-      },
-      async recording(active) {
-        send({ type: 'recording', active });
-      },
-      async chat(text) {
-        send({ type: 'chat', id: String(Date.now()), sender: 'Test teacher', text });
-      },
-      async command(command) {
-        if (command.type === 'raise-hand')
-          send({ type: 'hand', userId: '1', raised: command.raised });
-      },
-      async captions() {},
-      async speaker() {},
-      async background() {},
-      async originalAudio() {},
-      async stopAudioTests() {},
-      async testMicrophone() {},
-      async testSpeaker() {},
-    };
-  }, [role, failure]);
+  const adapter = useMemo(
+    () => createClassroomFixtureAdapter(role, failure),
+    [role, failure],
+  );
   const meetingApi = useMemo<
     Pick<typeof classroomApi, 'waiting' | 'admit' | 'audit' | 'quality' | 'feedback'>
   >(() => {

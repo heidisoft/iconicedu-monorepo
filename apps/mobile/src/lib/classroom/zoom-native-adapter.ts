@@ -1,3 +1,4 @@
+import { createNativePictureInPicture } from './native-picture-in-picture';
 import { NativeModules, PermissionsAndroid, Platform } from 'react-native';
 import {
   EventType,
@@ -11,6 +12,7 @@ import type {
   NativeMeetingAdapter,
   NativeMeetingEvent,
   NativeParticipant,
+  NativeMediaDevice,
 } from './meeting-controller';
 
 type Zoom = ReturnType<typeof useZoom>;
@@ -22,6 +24,7 @@ function checked(result: unknown) {
 }
 /** Only this adapter depends on Zoom's bridge/event payloads. Never log credentials. */
 export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
+  const pictureInPicture = createNativePictureInPicture();
   let generation = 0;
   let handRaised = false;
   let selfId: string | null = null;
@@ -29,6 +32,7 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
   let microphonePlayback = false;
   let speakerTest = false;
   return {
+    pictureInPicture,
     subscribe(listener) {
       const current = ++generation;
       let refreshEpoch = 0;
@@ -80,6 +84,16 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
         }
       };
       const subscriptions = [
+        zoom.addListener(EventType.onUserActiveAudioChanged, (value: unknown) => {
+          const users = object(value).changedUsers;
+          if (Array.isArray(users))
+            send({
+              type: 'speaking',
+              userIds: users
+                .map((user) => object(user).userId)
+                .filter((id): id is string => typeof id === 'string'),
+            });
+        }),
         zoom.addListener(EventType.onUserVideoNetworkStatusChanged, (value: unknown) => {
           const event = object(value),
             user = object(event.user);
@@ -245,6 +259,7 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
       });
     },
     async leave(endForAll) {
+      await pictureInPicture?.configure('', false, false).catch(() => {});
       // The wrapper drops this native promise; await the bridge so failures stay recoverable.
       checked(await NativeModules.RNZoomVideoSdk.leaveSession(endForAll));
       await NativeModules.ClassroomControls.stopShareService();
@@ -261,6 +276,38 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
       checked(
         await (enabled ? zoom.videoHelper.startVideo() : zoom.videoHelper.stopVideo()),
       );
+    },
+    async devices() {
+      const [cameras, mirrored, audio] = await Promise.all([
+        zoom.videoHelper.getCameraList(),
+        zoom.videoHelper.isMyVideoMirrored(),
+        NativeModules.ClassroomDevices?.getAudioRoutes() ?? Promise.resolve([]),
+      ]);
+      return {
+        cameras: cameras.map((device) => ({
+          id: device.deviceId,
+          label: device.deviceName,
+          selected: device.isSelectedDevice,
+        })),
+        mirrored,
+        audio: audio as NativeMediaDevice[],
+      };
+    },
+    async selectCamera(id) {
+      const cameras = await zoom.videoHelper.getCameraList();
+      if (!cameras.some((device) => device.deviceId === id))
+        throw new Error('This camera disconnected. Choose another camera.');
+      checked(await zoom.videoHelper.switchCamera(id));
+    },
+    async selectAudioRoute(id) {
+      if (!NativeModules.ClassroomDevices)
+        throw new Error('Update the app to select audio devices.');
+      if (Platform.OS === 'ios') checked(await zoom.audioHelper.setSDKAudioSessionEnv());
+      if (Platform.OS === 'android' && Number(Platform.Version) >= 31)
+        await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+        );
+      checked(await NativeModules.ClassroomDevices.selectAudioRoute(id));
     },
     async switchCamera() {
       checked(await zoom.videoHelper.switchCamera());

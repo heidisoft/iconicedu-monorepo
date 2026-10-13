@@ -5,7 +5,7 @@ import type {
   MeetingAdmissionVM,
   MeetingWaitingParticipantVM,
 } from '@iconicedu/shared-types';
-import { apiGet, apiPost } from '@/lib/api/http-client';
+import { apiPost, publicApiGet, publicApiPost } from '@/lib/api/http-client';
 
 export type ClassroomJoinResult =
   | LiveSessionJoinCredentialsVM
@@ -14,11 +14,18 @@ const route = (id: string, action: string) =>
   `/live-sessions/${encodeURIComponent(id)}/${action}`;
 /** Native meetings share the web authorization/admission contract; secrets stay in apps/api. */
 export const classroomApi = {
-  info: (id: string) => apiGet<PublicLiveSessionInfoVM>(route(id, 'public-info')),
+  info: (id: string) => publicApiGet<PublicLiveSessionInfoVM>(route(id, 'public-info')),
   join: (id: string, body: LiveSessionJoinRequest) =>
-    apiPost<ClassroomJoinResult>(route(id, 'guest-join'), body),
+    publicApiPost<ClassroomJoinResult>(route(id, 'guest-join'), {
+      ...body,
+    }),
+  linkInfo: (id: string, token: string) =>
+    publicApiPost<{ info: PublicLiveSessionInfoVM; linkToken: string }>(
+      route(id, 'link-info'),
+      { token, handoff: false },
+    ),
   admission: (id: string, token: string, cancel = false) =>
-    apiPost<MeetingAdmissionVM>(route(id, 'admission-status'), { token, cancel }),
+    publicApiPost<MeetingAdmissionVM>(route(id, 'admission-status'), { token, cancel }),
   waiting: (id: string) =>
     apiPost<MeetingWaitingParticipantVM[]>(route(id, 'waiting-room'), {}),
   admit: (id: string, decision: { id: string; approved: boolean }) =>
@@ -39,12 +46,15 @@ export const classroomApi = {
     level: string,
     displayName: string,
   ) =>
-    apiPost(route(id, 'quality-events'), {
+    publicApiPost(route(id, 'quality-events'), {
       metric,
       level,
       displayName,
       occurredAt: new Date().toISOString(),
     }),
   feedback: (id: string, rating: number, displayName: string) =>
-    apiPost(route(id, 'feedback'), { rating, displayName }),
+    publicApiPost(route(id, 'feedback'), {
+      rating,
+      displayName,
+    }),
 };

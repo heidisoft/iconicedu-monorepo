@@ -1,8 +1,12 @@
 import { Linking, Alert, NativeModules } from 'react-native';
+import { rememberNativeInvitation } from '@/lib/classroom/link-recovery';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { apiPost } from '@/lib/api/http-client';
 import { openLiveSession, getLiveSessionShareUrl } from './open-live-session';
+jest.mock('@/lib/classroom/link-recovery', () => ({
+  rememberNativeInvitation: jest.fn().mockResolvedValue(undefined),
+}));
 jest.mock('expo-router', () => ({ router: { navigate: jest.fn() } }));
 jest.mock('expo-web-browser', () => ({
   openBrowserAsync: jest.fn(),
@@ -65,5 +69,20 @@ describe('mobile meeting browser and sharing', () => {
     await openLiveSession('/live/aaaa-bbbb-cccc');
     expect(Alert.alert).toHaveBeenCalled();
     expect(WebBrowser.openBrowserAsync).not.toHaveBeenCalled();
+  });
+});
+
+it('stores native invitations encrypted before navigating without a secret URL parameter', async () => {
+  jest.clearAllMocks();
+  NativeModules.RNZoomVideoSdk = {};
+  process.env.EXPO_PUBLIC_WEB_URL = 'https://app.invalid';
+  await openLiveSession('/live/aaaa-bbbb-cccc#invite=synthetic-invitation');
+  expect(rememberNativeInvitation).toHaveBeenCalledWith(
+    'aaaa-bbbb-cccc',
+    'synthetic-invitation',
+  );
+  expect(router.navigate).toHaveBeenCalledWith({
+    pathname: '/classroom/[sessionId]',
+    params: { sessionId: 'aaaa-bbbb-cccc' },
   });
 });

@@ -23,7 +23,7 @@ const primary = (label: string) => {
   if (label === 'Share screen') return { Icon: ScreenShare, active: false };
   if (label === 'Stop sharing screen') return { Icon: ScreenShareOff, active: true };
   if (label === 'Whiteboard') return { Icon: PenLine, active: false };
-  if (label === 'Messages') return { Icon: MessageCircle, active: false };
+  if (label.startsWith('Messages')) return { Icon: MessageCircle, active: false };
   if (label.startsWith('Participants')) return { Icon: Users, active: false };
   if (label === 'Leave meeting') return { Icon: PhoneOff, active: false, danger: true };
   return null;

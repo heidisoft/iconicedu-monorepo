@@ -2,6 +2,11 @@ import React from 'react';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { NativeClassroomEntry } from './native-classroom-entry';
 import { NativeClassroom } from './native-classroom';
+import {
+  readNativeMeetingLink,
+  writeNativeMeetingLink,
+} from '@/lib/classroom/link-recovery';
+import { ApiHttpError } from '@/lib/api/http-error';
 import { classroomApi } from '@/lib/classroom/api';
 jest.mock('@zoom/react-native-videosdk', () => ({
   ZoomVideoSdkProvider: ({ children }: { children: React.ReactNode }) => children,
@@ -27,8 +32,18 @@ jest.mock('./native-classroom', () => {
     ),
   };
 });
-jest.mock('@/lib/classroom/api', () => ({
-  classroomApi: { info: jest.fn(), join: jest.fn(), admission: jest.fn() },
+jest.mock('@/lib/classroom/api', () => {
+  const client = {
+    info: jest.fn(),
+    join: jest.fn(),
+    admission: jest.fn(),
+    linkInfo: jest.fn(),
+  };
+  return { classroomApi: client, createClassroomApi: () => client };
+});
+jest.mock('@/lib/classroom/link-recovery', () => ({
+  readNativeMeetingLink: jest.fn().mockResolvedValue(null),
+  writeNativeMeetingLink: jest.fn().mockResolvedValue(undefined),
 }));
 const credentials = {
   sessionName: 'Test',
@@ -47,6 +62,7 @@ const info = {
 describe('native real link-entry contract', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.mocked(readNativeMeetingLink).mockResolvedValue(null);
     jest.mocked(classroomApi.info).mockResolvedValue(info);
     jest.mocked(classroomApi.join).mockResolvedValue(credentials);
   });
@@ -160,4 +176,90 @@ describe('native real link-entry contract', () => {
     );
     expect(classroomApi.join).not.toHaveBeenCalled();
   });
+});
+
+it('joins a guest with separately entered credentials and shows preview before SDK join', async () => {
+  jest.mocked(classroomApi.info).mockResolvedValue({
+    exists: true,
+    isActive: true,
+    isHost: false,
+    sessionTitle: 'Guest class',
+    sessionId: 'canonical-session',
+    passcodeRequired: true,
+  });
+  jest
+    .mocked(classroomApi.join)
+    .mockResolvedValue({ ...credentials, displayName: 'Guest student' });
+  const screen = render(<NativeClassroomEntry sessionId="guest-code" />);
+  await waitFor(() => expect(screen.getByLabelText('Guest name')).toBeTruthy());
+  fireEvent.changeText(screen.getByLabelText('Guest name'), 'Guest student');
+  fireEvent.changeText(screen.getByLabelText('Session passcode'), 'synthetic-passcode');
+  fireEvent.press(screen.getByLabelText('Continue to preview'));
+  await waitFor(() =>
+    expect(classroomApi.join).toHaveBeenCalledWith(
+      'canonical-session',
+      expect.objectContaining({
+        displayName: 'Guest student',
+        passcode: 'synthetic-passcode',
+      }),
+    ),
+  );
+  await waitFor(() => expect(screen.getByTestId('preview')).toBeTruthy());
+  expect(writeNativeMeetingLink).toHaveBeenCalledWith(
+    'guest-code',
+    expect.not.objectContaining({ passcode: expect.anything() }),
+  );
+});
+it('recovers an invited guest without repeating name or password prompts', async () => {
+  jest.mocked(readNativeMeetingLink).mockResolvedValue({
+    token: 'synthetic-invite',
+    displayName: 'Returning guest',
+    expiresAt: Date.now() + 10000,
+  });
+  jest.mocked(classroomApi.linkInfo).mockResolvedValue({
+    info: {
+      exists: true,
+      isActive: true,
+      isHost: false,
+      sessionTitle: 'Guest class',
+      sessionId: 'canonical-session',
+      passcodeRequired: true,
+    },
+    linkToken: 'synthetic-invite',
+  });
+  jest
+    .mocked(classroomApi.join)
+    .mockResolvedValue({ ...credentials, displayName: 'Returning guest' });
+  const screen = render(<NativeClassroomEntry sessionId="guest-code" />);
+  await waitFor(() => expect(screen.getByTestId('preview')).toBeTruthy());
+  expect(screen.queryByLabelText('Guest name')).toBeNull();
+  expect(screen.queryByLabelText('Session passcode')).toBeNull();
+  expect(classroomApi.join).toHaveBeenCalledWith(
+    'canonical-session',
+    expect.objectContaining({
+      displayName: 'Returning guest',
+      passcode: '',
+      linkToken: 'synthetic-invite',
+    }),
+  );
+});
+
+it('clears a revoked invitation from recovery instead of retrying it forever', async () => {
+  jest.clearAllMocks();
+  const expiresAt = Date.now() + 10000;
+  jest.mocked(readNativeMeetingLink).mockResolvedValue({
+    token: 'revoked-synthetic-invite',
+    displayName: 'Guest',
+    expiresAt,
+  });
+  jest
+    .mocked(classroomApi.linkInfo)
+    .mockRejectedValue(new ApiHttpError('Invitation expired', 401));
+  const screen = render(<NativeClassroomEntry sessionId="guest-code" />);
+  await waitFor(() => expect(screen.getByText('Invitation expired')).toBeTruthy());
+  expect(writeNativeMeetingLink).toHaveBeenCalledWith('guest-code', {
+    displayName: 'Guest',
+    expiresAt,
+  });
+  expect(classroomApi.join).not.toHaveBeenCalled();
 });

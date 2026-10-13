@@ -23,7 +23,15 @@ name: Native classroom UI lifecycle on iPad and Android tablets
 - tapOn: 'Test audio and video'
 - tapOn: 'Video settings tab'
 - assertVisible: 'Choose background image'
+- tapOn: 'Camera device: Back camera'
+- assertVisible:
+    id: 'camera-device-back-selected'
+- tapOn: 'Camera device: Front camera'
 - tapOn: 'Audio settings tab'
+- tapOn: 'Audio device: Test headset'
+- assertVisible:
+    id: 'audio-device-headset-selected'
+- tapOn: 'Audio device: Speaker'
 - scrollUntilVisible:
     element: 'Test speakers'
 - tapOn: 'Test speakers'
@@ -35,6 +43,9 @@ name: Native classroom UI lifecycle on iPad and Android tablets
     direction: UP
 - tapOn: 'Join now'
 - assertVisible: 'Native classroom test'
+- tapOn: 'Focus Test student'
+- assertVisible: 'Close focused video'
+- tapOn: 'Close focused video'
 - scrollUntilVisible:
     element: 'More controls'
     direction: UP

@@ -35,6 +35,9 @@ import {
 import { createZoomNativeAdapter } from '@/lib/classroom/zoom-native-adapter';
 import { classroomApi } from '@/lib/classroom/api';
 import { useTheme } from '@/providers/theme-provider';
+import { useNativePictureInPicture } from './use-native-picture-in-picture';
+import { useNativeMediaDevices } from './use-native-media-devices';
+import { NativeFocusedVideo } from './native-focused-video';
 import { NativeDevicePreview } from './native-device-preview';
 import { NativeClassroomSettings } from './native-classroom-settings';
 import { NativeMeetingToolbar } from './native-meeting-toolbar';
@@ -74,7 +77,7 @@ export function NativeClassroom({
   const { colors } = useTheme();
   const { width } = useWindowDimensions();
   const [page, setPage] = useState(0);
-  const pageSize = width >= 700 ? 9 : 4;
+  const pageSize = 4;
   const pageCount = Math.max(1, Math.ceil(state.participants.length / pageSize));
   const gridUsers = state.participants.slice(
     Math.min(page, pageCount - 1) * pageSize,
@@ -86,7 +89,15 @@ export function NativeClassroom({
     'none' | 'audio' | 'participants' | 'chat' | 'whiteboard'
   >('none');
   const [settingsTab, setSettingsTab] = useState<'audio' | 'video'>('audio');
+  const mediaDevices = useNativeMediaDevices(adapter, panel === 'audio');
   const [boardPending, setBoardPending] = useState(false);
+  const [focused, setFocused] = useState<{ id: string; sharing: boolean } | null>(null);
+  const pip = useNativePictureInPicture(
+    adapter.pictureInPicture,
+    state,
+    focused?.id,
+    boardPending || panel === 'whiteboard',
+  );
   const [zoomBoardActive, setZoomBoardActive] = useState(false);
   useEffect(() => {
     if (state.phase !== 'meeting' || credentials.whiteboard?.provider === 'excalidraw')
@@ -126,9 +137,29 @@ export function NativeClassroom({
   const [captions, setCaptions] = useState(false);
   const [displayName, setDisplayName] = useState(credentials.displayName);
   const [text, setText] = useState('');
+  const [lastReadMessage, setLastReadMessage] = useState<string | null>(null);
+  useEffect(() => {
+    if (panel === 'chat' && state.messages.length)
+      setLastReadMessage(state.messages.at(-1)!.id);
+  }, [panel, state.messages]);
+  const unreadMessages =
+    panel === 'chat'
+      ? 0
+      : state.messages.length -
+        (state.messages.findIndex((message) => message.id === lastReadMessage) + 1);
+  useEffect(() => {
+    if (state.phase === 'ended') {
+      setPanel('none');
+      setFocused(null);
+    }
+  }, [state.phase]);
+
   const [error, setError] = useState<string | null>(null);
   const [originalAudio, setOriginalAudio] = useState(false);
   const [mirrored, setMirrored] = useState(false);
+  useEffect(() => {
+    if (panel === 'audio' && adapter.devices) setMirrored(mediaDevices.devices.mirrored);
+  }, [adapter, panel, mediaDevices.devices.mirrored]);
   const [micTest, setMicTest] = useState(false);
   const [speakerTest, setSpeakerTest] = useState(false);
   const [volume, setVolume] = useState(0);
@@ -155,6 +186,7 @@ export function NativeClassroom({
     [controller],
   );
   useEffect(() => {
+    if (panel !== 'audio') return;
     const subscription = zoom.addListener(
       EventType.onMicSpeakerVolumeChanged,
       (value: unknown) => {
@@ -168,7 +200,7 @@ export function NativeClassroom({
       },
     );
     return () => subscription.remove();
-  }, [zoom]);
+  }, [zoom, panel]);
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (next) => {
       if (next === 'active' && state.phase === 'meeting' && Platform.OS === 'ios')
@@ -275,620 +307,813 @@ export function NativeClassroom({
       setCredentials(fresh);
       await controller.join(fresh);
     });
+  if (Platform.OS === 'android' && pip.active)
+    return (
+      <View
+        testID="classroom-picture-in-picture"
+        style={{ flex: 1, backgroundColor: colors.bg }}
+      >
+        {state.phase === 'ended' ? (
+          <Text style={{ color: colors.text }}>Class ended</Text>
+        ) : (
+          <>
+            {pip.target?.user.video || pip.target?.sharing ? (
+              <NativeVideoView
+                userId={pip.target.user.id}
+                sharing={pip.target.sharing}
+                style={{ flex: 1 }}
+              />
+            ) : null}
+            <Text style={{ color: colors.text, padding: 8 }}>
+              {pip.target?.user.name ?? 'Classroom'}
+            </Text>
+          </>
+        )}
+      </View>
+    );
   const preview = state.phase === 'preview' || state.phase === 'joining';
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <ScrollView
-          automaticallyAdjustKeyboardInsets={false}
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ padding: 16, gap: 12, flexGrow: 1 }}
+    <>
+      <NativeFocusedVideo
+        user={state.participants.find((user) => user.id === focused?.id)}
+        sharing={focused?.sharing ?? false}
+        onClose={() => setFocused(null)}
+      />
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          <Text accessibilityRole="header" style={{ color: colors.text, fontSize: 24 }}>
-            {preview
-              ? 'Ready to join?'
-              : state.phase === 'ended'
-                ? 'You left the classroom'
-                : credentials.sessionName}
-          </Text>
-          {(error || state.error) && (
-            <Text accessibilityRole="alert" style={{ color: colors.text }}>
-              {error ?? state.error}
+          <ScrollView
+            automaticallyAdjustKeyboardInsets={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{ padding: 16, gap: 12, flexGrow: 1 }}
+          >
+            <Text accessibilityRole="header" style={{ color: colors.text, fontSize: 24 }}>
+              {preview
+                ? 'Ready to join?'
+                : state.phase === 'ended'
+                  ? 'You left the classroom'
+                  : credentials.sessionName}
             </Text>
-          )}
-          {state.phase === 'reconnecting' && (
-            <Text accessibilityRole="alert" style={{ color: colors.text }}>
-              Reconnecting to the classroom…
-            </Text>
-          )}
-          {captions && state.caption && (
-            <Text accessibilityLiveRegion="polite" style={{ color: colors.text }}>
-              {state.caption}
-            </Text>
-          )}
-          {state.reactions.length > 0 && (
-            <Text style={{ color: colors.text }}>
-              {state.reactions.map((reaction) => reaction.emoji).join(' ')}
-            </Text>
-          )}
-          {state.network && (
-            <Text style={{ color: colors.text }}>Connection: {state.network}</Text>
-          )}
-          {state.recording && (
-            <Text accessibilityLabel="Recording active" style={{ color: colors.text }}>
-              ● Recording
-            </Text>
-          )}
-          {preview ? (
-            <NativeDevicePreview
-              displayName={displayName}
-              sessionName={credentials.sessionName}
-              camera={state.camera}
-              microphone={state.microphone}
-              joining={state.phase === 'joining'}
-              onDisplayName={setDisplayName}
-              onCamera={() => {
-                controller.setPreview({ camera: !state.camera });
-                if (!state.camera && !cameraPermission?.granted) void requestCamera();
-              }}
-              onMicrophone={() =>
-                controller.setPreview({ microphone: !state.microphone })
-              }
-              onSettings={() => {
-                setSettingsTab('audio');
-                setPanel('audio');
-              }}
-              onTest={() => {
-                setSettingsTab('audio');
-                setPanel('audio');
-              }}
-              onJoin={() => {
-                void join();
-              }}
-            >
-              <View
-                style={{
-                  height: width >= 700 ? 350 : 240,
-                  borderRadius: 16,
-                  overflow: 'hidden',
-                  backgroundColor: colors.card,
+            {(error || state.error) && (
+              <Text accessibilityRole="alert" style={{ color: colors.text }}>
+                {error ?? state.error}
+              </Text>
+            )}
+            {state.phase === 'reconnecting' && (
+              <Text accessibilityRole="alert" style={{ color: colors.text }}>
+                Reconnecting to the classroom…
+              </Text>
+            )}
+            {captions && state.caption && (
+              <Text accessibilityLiveRegion="polite" style={{ color: colors.text }}>
+                {state.caption}
+              </Text>
+            )}
+            {state.reactions.length > 0 && (
+              <Text style={{ color: colors.text }}>
+                {state.reactions.map((reaction) => reaction.emoji).join(' ')}
+              </Text>
+            )}
+            {state.network && (
+              <Text style={{ color: colors.text }}>Connection: {state.network}</Text>
+            )}
+            {state.recording && (
+              <Text accessibilityLabel="Recording active" style={{ color: colors.text }}>
+                ● Recording
+              </Text>
+            )}
+            {preview ? (
+              <NativeDevicePreview
+                displayName={displayName}
+                sessionName={credentials.sessionName}
+                camera={state.camera}
+                microphone={state.microphone}
+                joining={state.phase === 'joining'}
+                onDisplayName={setDisplayName}
+                onCamera={() => {
+                  controller.setPreview({ camera: !state.camera });
+                  if (!state.camera && !cameraPermission?.granted) void requestCamera();
+                }}
+                onMicrophone={() =>
+                  controller.setPreview({ microphone: !state.microphone })
+                }
+                onSettings={() => {
+                  setSettingsTab('audio');
+                  setPanel('audio');
+                }}
+                onTest={() => {
+                  setSettingsTab('audio');
+                  setPanel('audio');
+                }}
+                onJoin={() => {
+                  void join();
                 }}
               >
-                {state.phase === 'preview' &&
-                state.camera &&
-                cameraPermission?.granted ? (
-                  <NativeVideoView preview userId={null} style={{ flex: 1 }} />
-                ) : (
-                  <Text style={{ color: colors.text, padding: 24 }}>
-                    {state.camera
-                      ? 'Allow camera access to see your preview.'
-                      : 'Camera is off'}
-                  </Text>
-                )}
-              </View>
-              {state.camera &&
-                !cameraPermission?.granted &&
-                button('Allow camera access', () => {
-                  void requestCamera();
-                })}
-            </NativeDevicePreview>
-          ) : state.phase === 'ended' ? (
-            <>
-              <Text style={{ color: colors.text }}>How was your class?</Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                {[1, 2, 3, 4, 5].map((rating) =>
-                  button(`${rating} stars`, () => {
-                    void run(() =>
-                      meetingApi
-                        .feedback(sessionId, rating, credentials.displayName)
-                        .then(() => router.back()),
-                    );
-                  }),
-                )}
-              </View>
-              {onRejoin && button('Rejoin classroom', onRejoin)}
-              {button('Close classroom', () => router.back())}
-            </>
-          ) : (
-            <>
-              {state.sharingUserId && state.sharingUserId !== state.selfId && (
-                <NativeShareStage
-                  sessionId={sessionId}
-                  userId={state.sharingUserId}
-                  token={credentials.annotationToken}
-                  height={width >= 700 ? 420 : 250}
-                  annotating={annotating}
-                  composited={state.composited.includes(state.sharingUserId)}
-                />
-              )}
-              {state.sharingUserId && state.sharingUserId === state.selfId && (
-                <Text style={{ color: colors.text }}>You are sharing your screen</Text>
-              )}
-              {pageCount > 1 && (
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  {button(
-                    'Previous participants',
-                    () => setPage((previous) => Math.max(0, previous - 1)),
-                    page === 0,
-                  )}
-                  <Text style={{ color: colors.text }}>
-                    Page {Math.min(page, pageCount - 1) + 1} of {pageCount}
-                  </Text>
-                  {button(
-                    'Next participants',
-                    () => setPage((previous) => Math.min(pageCount - 1, previous + 1)),
-                    page >= pageCount - 1,
+                <View
+                  style={{
+                    height: width >= 700 ? 350 : 240,
+                    borderRadius: 16,
+                    overflow: 'hidden',
+                    backgroundColor: colors.card,
+                  }}
+                >
+                  {state.phase === 'preview' &&
+                  state.camera &&
+                  cameraPermission?.granted ? (
+                    <NativeVideoView preview userId={null} style={{ flex: 1 }} />
+                  ) : (
+                    <Text style={{ color: colors.text, padding: 24 }}>
+                      {state.camera
+                        ? 'Allow camera access to see your preview.'
+                        : 'Camera is off'}
+                    </Text>
                   )}
                 </View>
-              )}
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                {gridUsers.map((user) => (
-                  <View
-                    key={user.id}
-                    style={{
-                      width: width >= 700 ? '31%' : '47%',
-                      minHeight: 150,
-                      backgroundColor: colors.card,
-                      borderRadius: 12,
-                      overflow: 'hidden',
-                    }}
-                  >
-                    {user.video && (
-                      <NativeVideoView userId={user.id} style={{ height: 140 }} />
-                    )}
-                    <Text style={{ color: colors.text, padding: 8 }}>
-                      {user.name}
-                      {state.raisedHands.includes(user.id) ? ' ✋' : ''}
-                      {user.host ? ' · Host' : user.cohost ? ' · Co-host' : ''}
-                      {user.muted ? ' · Muted' : ''}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-              <NativeMeetingToolbar>
-                {button(
-                  state.microphone ? 'Mute microphone' : 'Unmute microphone',
-                  () => {
-                    void run(() => controller.microphone(!state.microphone));
-                  },
-                )}
-                {button('Audio settings', () =>
-                  setPanel(panel === 'audio' ? 'none' : 'audio'),
-                )}
-                {button('Blur background', () => {
-                  void run(() => adapter.background('blur'));
-                })}
-                {button('Remove background', () => {
-                  void run(() => adapter.background('none'));
-                })}
-                {button(state.camera ? 'Stop video' : 'Start video', () => {
-                  void run(() => controller.camera(!state.camera));
-                })}
-                {hostEligible &&
-                  !controller.self?.host &&
-                  button('Claim host', () =>
-                    Alert.alert(
-                      'Claim host access?',
-                      'The current host will become a participant.',
-                      [
-                        { text: 'Cancel', style: 'cancel' },
-                        {
-                          text: 'Claim host',
-                          onPress: () => {
-                            void run(() => controller.claimHost());
-                          },
-                        },
-                      ],
-                    ),
+                {state.camera &&
+                  !cameraPermission?.granted &&
+                  button('Allow camera access', () => {
+                    void requestCamera();
+                  })}
+              </NativeDevicePreview>
+            ) : state.phase === 'ended' ? (
+              <>
+                <Text style={{ color: colors.text }}>How was your class?</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {[1, 2, 3, 4, 5].map((rating) =>
+                    button(`${rating} stars`, () => {
+                      void run(() =>
+                        meetingApi
+                          .feedback(sessionId, rating, credentials.displayName)
+                          .then(() => router.back()),
+                      );
+                    }),
                   )}
-                {button(
-                  state.raisedHands.includes(state.selfId ?? '')
-                    ? 'Lower hand'
-                    : 'Raise hand',
-                  () => {
-                    void run(() =>
-                      controller.raiseHand(
-                        !state.raisedHands.includes(state.selfId ?? ''),
-                      ),
-                    );
-                  },
-                )}
-                {['👏', '👍', '❤️', '😂', '🎉'].map((emoji) =>
-                  button(`React ${emoji}`, () => {
-                    void run(() => controller.react(emoji));
-                  }),
-                )}
-                {button(captions ? 'Turn captions off' : 'Turn captions on', () => {
-                  void run(async () => {
-                    await adapter.captions(!captions);
-                    setCaptions(!captions);
-                  });
-                })}
-                {button('Switch camera', () => {
-                  void run(() => adapter.switchCamera());
-                })}
-                {adapter.mirror &&
-                  button(mirrored ? 'Stop mirroring my video' : 'Mirror my video', () => {
-                    void run(async () => {
-                      await adapter.mirror?.(!mirrored);
-                      setMirrored(!mirrored);
-                    });
-                  })}
-                {controller.self?.host &&
-                  adapter.lockSharing &&
-                  button('Only host can share', () => {
-                    void run(() => adapter.lockSharing!(true));
-                  })}
-                {controller.self?.host &&
-                  adapter.lockSharing &&
-                  button('Allow participants to share', () => {
-                    void run(() => adapter.lockSharing!(false));
-                  })}
+                </View>
+                {onRejoin && button('Rejoin classroom', onRejoin)}
+                {button('Close classroom', () => router.back())}
+              </>
+            ) : (
+              <>
                 {state.sharingUserId &&
                   state.sharingUserId !== state.selfId &&
-                  button(annotating ? 'Stop annotating' : 'Annotate shared screen', () =>
-                    setAnnotating((previous) => !previous),
+                  focused?.id !== state.sharingUserId && (
+                    <NativeShareStage
+                      sessionId={sessionId}
+                      userId={state.sharingUserId}
+                      token={credentials.annotationToken}
+                      height={width >= 700 ? 420 : 250}
+                      annotating={annotating}
+                      composited={state.composited.includes(state.sharingUserId)}
+                    />
                   )}
-                {button(
-                  state.sharingUserId === state.selfId
-                    ? 'Stop sharing screen'
-                    : 'Share screen',
-                  () => {
-                    void run(() =>
-                      controller.share(state.sharingUserId !== state.selfId),
-                    );
-                  },
+                {state.sharingUserId && state.sharingUserId === state.selfId && (
+                  <Text style={{ color: colors.text }}>You are sharing your screen</Text>
                 )}
-                {controller.settings.whiteboard.enabled &&
-                  button('Whiteboard', () =>
-                    setPanel(panel === 'whiteboard' ? 'none' : 'whiteboard'),
+                {pageCount > 1 && (
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    {button(
+                      'Previous participants',
+                      () => setPage((previous) => Math.max(0, previous - 1)),
+                      page === 0,
+                    )}
+                    <Text style={{ color: colors.text }}>
+                      Page {Math.min(page, pageCount - 1) + 1} of {pageCount}
+                    </Text>
+                    {button(
+                      'Next participants',
+                      () => setPage((previous) => Math.min(pageCount - 1, previous + 1)),
+                      page >= pageCount - 1,
+                    )}
+                  </View>
+                )}
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {gridUsers.map((user) => (
+                    <Pressable
+                      key={user.id}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Focus ${user.name}`}
+                      onPress={() => setFocused({ id: user.id, sharing: false })}
+                      style={{
+                        width:
+                          gridUsers.length === 1 || (gridUsers.length <= 2 && width < 700)
+                            ? '100%'
+                            : '47%',
+                        minHeight: 150,
+                        backgroundColor: colors.card,
+                        borderRadius: 12,
+                        overflow: 'hidden',
+                        borderWidth: 2,
+                        borderColor:
+                          state.speaking.includes(user.id) && !user.muted
+                            ? colors.success
+                            : colors.border,
+                      }}
+                    >
+                      {user.video && focused?.id !== user.id ? (
+                        <View pointerEvents="none">
+                          <NativeVideoView
+                            userId={user.id}
+                            style={{ width: '100%', aspectRatio: 16 / 9 }}
+                          />
+                        </View>
+                      ) : (
+                        <View
+                          style={{
+                            aspectRatio: 16 / 9,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <Text style={{ color: colors.text, fontSize: 36 }}>
+                            {user.name
+                              .split(/\s+/)
+                              .map((name) => name[0])
+                              .slice(0, 2)
+                              .join('')}
+                          </Text>
+                        </View>
+                      )}
+                      <Text style={{ color: colors.text, padding: 8 }}>
+                        {user.name}
+                        {state.raisedHands.includes(user.id) ? ' ✋' : ''}
+                        {user.host ? ' · Host' : user.cohost ? ' · Co-host' : ''}
+                        {user.muted ? ' · Muted' : ''}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+                {state.sharingUserId &&
+                  state.sharingUserId !== state.selfId &&
+                  button('Expand shared screen', () =>
+                    setFocused({ id: state.sharingUserId!, sharing: true }),
                   )}
-                {controller.settings.participants.visible &&
-                  button(
-                    `Participants${waiting.length ? ` (${waiting.length} waiting)` : ''}`,
-                    () => setPanel(panel === 'participants' ? 'none' : 'participants'),
-                  )}
-                {controller.settings.messages.visible &&
-                  button('Messages', () => setPanel(panel === 'chat' ? 'none' : 'chat'))}
-                {controller.settings.invite.enabled &&
-                  credentials.sharePath &&
-                  button('Invite', () => {
-                    void run(() =>
-                      Share.share({ message: credentials.sharePath ?? '' }).then(
-                        () => {},
-                      ),
-                    );
-                  })}
-                {moderator &&
-                  controller.settings.recording.enabled &&
-                  button(
-                    state.recording ? 'Stop recording' : 'Start recording',
+                <NativeMeetingToolbar>
+                  {button(
+                    state.microphone ? 'Mute microphone' : 'Unmute microphone',
                     () => {
-                      void run(async () => {
-                        await controller.recording(!state.recording);
-                      });
+                      void run(() => controller.microphone(!state.microphone));
                     },
-                    state.recording && !controller.settings.recording.allowStop,
                   )}
-                {button('Leave meeting', () =>
-                  boardPending
-                    ? Alert.alert(
-                        'Drawing changes are waiting to save',
-                        'Keep the board open and retry saving before leaving.',
-                      )
-                    : Alert.alert(
-                        'Leave classroom?',
-                        'You can rejoin while the class is active.',
+                  {button('Audio settings', () =>
+                    setPanel(panel === 'audio' ? 'none' : 'audio'),
+                  )}
+                  {button('Blur background', () => {
+                    void run(() => adapter.background('blur'));
+                  })}
+                  {button('Remove background', () => {
+                    void run(() => adapter.background('none'));
+                  })}
+                  {button(state.camera ? 'Stop video' : 'Start video', () => {
+                    void run(() => controller.camera(!state.camera));
+                  })}
+                  {hostEligible &&
+                    !controller.self?.host &&
+                    button('Claim host', () =>
+                      Alert.alert(
+                        'Claim host access?',
+                        'The current host will become a participant.',
                         [
                           { text: 'Cancel', style: 'cancel' },
                           {
-                            text: 'Leave',
-                            style: 'destructive',
+                            text: 'Claim host',
                             onPress: () => {
-                              void run(() => controller.leave());
+                              void run(() => controller.claimHost());
                             },
                           },
                         ],
                       ),
-                )}
-                {controller.self?.host &&
-                  button('End for everyone', () =>
+                    )}
+                  {button(
+                    state.raisedHands.includes(state.selfId ?? '')
+                      ? 'Lower hand'
+                      : 'Raise hand',
+                    () => {
+                      void run(() =>
+                        controller.raiseHand(
+                          !state.raisedHands.includes(state.selfId ?? ''),
+                        ),
+                      );
+                    },
+                  )}
+                  {['👏', '👍', '❤️', '😂', '🎉'].map((emoji) =>
+                    button(`React ${emoji}`, () => {
+                      void run(() => controller.react(emoji));
+                    }),
+                  )}
+                  {button(captions ? 'Turn captions off' : 'Turn captions on', () => {
+                    void run(async () => {
+                      await adapter.captions(!captions);
+                      setCaptions(!captions);
+                    });
+                  })}
+                  {pip.supported &&
+                    button(
+                      'Open floating call',
+                      () => {
+                        void run(() => pip.enter());
+                      },
+                      !pip.ready,
+                    )}
+                  {button('Switch camera', () => {
+                    void run(() => adapter.switchCamera());
+                  })}
+                  {adapter.mirror &&
+                    button(
+                      mirrored ? 'Stop mirroring my video' : 'Mirror my video',
+                      () => {
+                        void run(async () => {
+                          await adapter.mirror?.(!mirrored);
+                          setMirrored(!mirrored);
+                        });
+                      },
+                    )}
+                  {controller.self?.host &&
+                    adapter.lockSharing &&
+                    button('Only host can share', () => {
+                      void run(() => adapter.lockSharing!(true));
+                    })}
+                  {controller.self?.host &&
+                    adapter.lockSharing &&
+                    button('Allow participants to share', () => {
+                      void run(() => adapter.lockSharing!(false));
+                    })}
+                  {state.sharingUserId &&
+                    state.sharingUserId !== state.selfId &&
+                    button(
+                      annotating ? 'Stop annotating' : 'Annotate shared screen',
+                      () => setAnnotating((previous) => !previous),
+                    )}
+                  {button(
+                    state.sharingUserId === state.selfId
+                      ? 'Stop sharing screen'
+                      : 'Share screen',
+                    () => {
+                      void run(() =>
+                        controller.share(state.sharingUserId !== state.selfId),
+                      );
+                    },
+                  )}
+                  {controller.settings.whiteboard.enabled &&
+                    button('Whiteboard', () =>
+                      setPanel(panel === 'whiteboard' ? 'none' : 'whiteboard'),
+                    )}
+                  {controller.settings.participants.visible &&
+                    button(
+                      `Participants${waiting.length ? ` (${waiting.length} waiting)` : ''}`,
+                      () => setPanel(panel === 'participants' ? 'none' : 'participants'),
+                    )}
+                  {controller.settings.messages.visible &&
+                    button(
+                      unreadMessages ? `Messages (${unreadMessages} unread)` : 'Messages',
+                      () => setPanel(panel === 'chat' ? 'none' : 'chat'),
+                    )}
+                  {controller.settings.invite.enabled &&
+                    credentials.sharePath &&
+                    button('Invite', () => {
+                      void run(() =>
+                        Share.share({ message: credentials.sharePath ?? '' }).then(
+                          () => {},
+                        ),
+                      );
+                    })}
+                  {moderator &&
+                    controller.settings.recording.enabled &&
+                    button(
+                      state.recording ? 'Stop recording' : 'Start recording',
+                      () => {
+                        void run(async () => {
+                          await controller.recording(!state.recording);
+                        });
+                      },
+                      state.recording && !controller.settings.recording.allowStop,
+                    )}
+                  {button('Leave meeting', () =>
                     boardPending
                       ? Alert.alert(
                           'Drawing changes are waiting to save',
-                          'Retry saving before ending the class.',
+                          'Keep the board open and retry saving before leaving.',
                         )
                       : Alert.alert(
-                          'End class for everyone?',
-                          'Everyone will be disconnected.',
+                          'Leave classroom?',
+                          'You can rejoin while the class is active.',
                           [
                             { text: 'Cancel', style: 'cancel' },
                             {
-                              text: 'End class',
+                              text: 'Leave',
                               style: 'destructive',
                               onPress: () => {
-                                void run(async () => {
-                                  await controller.leave(true);
-                                  await meetingApi
-                                    .audit(sessionId, 'end_session_for_all')
-                                    .catch(() => {});
-                                });
+                                void run(() => controller.leave());
                               },
                             },
                           ],
                         ),
                   )}
-              </NativeMeetingToolbar>
-            </>
-          )}
-          <NativeClassroomSettings
-            open={panel === 'audio'}
-            tab={settingsTab}
-            onTab={setSettingsTab}
-            onClose={() => {
-              void run(async () => {
-                await adapter.stopAudioTests();
-                setMicTest(false);
-                setSpeakerTest(false);
-                setPanel('none');
-              });
-            }}
-            error={error ?? state.error}
-            audio={
-              <View style={{ gap: 8 }}>
-                <Text accessibilityRole="header" style={{ color: colors.text }}>
-                  Test your audio and video
-                </Text>
-                <Text
-                  accessibilityLabel={`Microphone activity ${volume}`}
-                  style={{ color: colors.text }}
-                >
-                  Microphone activity: {volume}%
-                </Text>
-                {button(micTest ? 'Play microphone recording' : 'Test microphone', () => {
-                  void run(async () => {
-                    if (!(micPermission?.granted || (await requestMic()).granted))
-                      throw new Error('Allow microphone access to test audio.');
-                    await adapter.testMicrophone(!micTest);
-                    setMicTest(!micTest);
-                  });
-                })}
-                {button(speakerTest ? 'Stop speaker test' : 'Test speakers', () => {
-                  void run(async () => {
-                    await adapter.testSpeaker(!speakerTest);
-                    setSpeakerTest(!speakerTest);
-                  });
-                })}
-                {button(
-                  originalAudio
-                    ? 'Use noise suppression'
-                    : 'Use original microphone audio',
-                  () => {
-                    void run(async () => {
-                      await adapter.originalAudio(!originalAudio);
-                      setOriginalAudio(!originalAudio);
-                    });
-                  },
-                )}
-                {button('Use speaker', () => {
-                  void run(() => adapter.speaker(true));
-                })}
-                {button('Done testing', () => {
-                  void run(async () => {
-                    await adapter.stopAudioTests();
-                    setMicTest(false);
-                    setSpeakerTest(false);
-                    setPanel('none');
-                  });
-                })}
-              </View>
-            }
-            video={
-              <View style={{ gap: 12 }}>
-                <Text style={{ color: colors.text }}>Camera and background</Text>
-                {button('Blur background', () => {
-                  void run(() => adapter.background('blur'));
-                })}
-                {button('Remove background', () => {
-                  void run(() => adapter.background('none'));
-                })}
-                {button('Choose background image', () => {
-                  void run(async () => {
-                    const result = await ImagePicker.launchImageLibraryAsync({
-                      mediaTypes: ['images'],
-                      quality: 0.8,
-                    });
-                    if (!result.canceled)
-                      await adapter.background('image', result.assets[0].uri);
-                  });
-                })}
-
-                {button('Switch camera', () => {
-                  void run(() => adapter.switchCamera());
-                })}
-                {adapter.mirror &&
-                  button(mirrored ? 'Stop mirroring my video' : 'Mirror my video', () => {
-                    void run(async () => {
-                      await adapter.mirror?.(!mirrored);
-                      setMirrored(!mirrored);
-                    });
-                  })}
-              </View>
-            }
-          />
-          {panel === 'participants' && (
-            <View style={{ gap: 8 }}>
-              {waiting.map((user) => (
-                <View key={user.id}>
-                  <Text style={{ color: colors.text }}>
-                    {user.displayName} is waiting
-                  </Text>
-                  {button(`Admit ${user.displayName}`, () => {
-                    void run(() =>
-                      meetingApi
-                        .admit(sessionId, { id: user.id, approved: true })
-                        .then(() =>
-                          setWaiting((previous) =>
-                            previous.filter((item) => item.id !== user.id),
-                          ),
-                        ),
-                    );
-                  })}
-                  {button(`Decline ${user.displayName}`, () => {
-                    void run(() =>
-                      meetingApi
-                        .admit(sessionId, { id: user.id, approved: false })
-                        .then(() =>
-                          setWaiting((previous) =>
-                            previous.filter((item) => item.id !== user.id),
-                          ),
-                        ),
-                    );
-                  })}
-                </View>
-              ))}
-              {state.participants.map((user) => (
-                <View key={user.id}>
-                  <Text style={{ color: colors.text }}>{user.name}</Text>
-                  {moderator &&
-                    user.id !== state.selfId &&
-                    button(`Mute ${user.name}`, () => {
-                      void run(async () => {
-                        await controller.mute(user.id);
-                        await meetingApi
-                          .audit(sessionId, 'mute_participant', user.name)
-                          .catch(() => {});
-                      });
-                    })}
-                  {controller.self?.host && user.id !== state.selfId && (
-                    <>
-                      {controller.settings.cohosts?.enabled &&
-                        button(
-                          `${user.cohost ? 'Remove co-host' : 'Make co-host'} ${user.name}`,
-                          () => {
-                            void run(() => controller.cohost(user.id, !user.cohost));
-                          },
-                        )}
-                      {button(`Make host ${user.name}`, () =>
-                        Alert.alert(
-                          'Transfer host?',
-                          `${user.name} will become the host.`,
-                          [
-                            { text: 'Cancel', style: 'cancel' },
-                            {
-                              text: 'Transfer',
-                              onPress: () => {
-                                void run(() => controller.transferHost(user.id));
+                  {controller.self?.host &&
+                    button('End for everyone', () =>
+                      boardPending
+                        ? Alert.alert(
+                            'Drawing changes are waiting to save',
+                            'Retry saving before ending the class.',
+                          )
+                        : Alert.alert(
+                            'End class for everyone?',
+                            'Everyone will be disconnected.',
+                            [
+                              { text: 'Cancel', style: 'cancel' },
+                              {
+                                text: 'End class',
+                                style: 'destructive',
+                                onPress: () => {
+                                  void run(async () => {
+                                    await controller.leave(true);
+                                    await meetingApi
+                                      .audit(sessionId, 'end_session_for_all')
+                                      .catch(() => {});
+                                  });
+                                },
                               },
-                            },
-                          ],
-                        ),
+                            ],
+                          ),
+                    )}
+                </NativeMeetingToolbar>
+              </>
+            )}
+            <NativeClassroomSettings
+              open={panel === 'audio'}
+              tab={settingsTab}
+              onTab={setSettingsTab}
+              onClose={() => {
+                void run(async () => {
+                  await adapter.stopAudioTests();
+                  setMicTest(false);
+                  setSpeakerTest(false);
+                  setPanel('none');
+                });
+              }}
+              error={error ?? state.error ?? mediaDevices.error}
+              audio={
+                <View style={{ gap: 8 }}>
+                  {pip.supported && (
+                    <View style={{ gap: 8 }}>
+                      <Pressable
+                        accessibilityRole="switch"
+                        accessibilityLabel="Automatic floating call"
+                        accessibilityState={{ checked: pip.automatic }}
+                        onPress={() => {
+                          void run(() => pip.changeAutomatic(!pip.automatic));
+                        }}
+                        style={{ minHeight: 44, padding: 12 }}
+                      >
+                        <Text style={{ color: colors.text }}>
+                          Automatic floating call: {pip.automatic ? 'On' : 'Off'}
+                        </Text>
+                      </Pressable>
+                      {pip.error && (
+                        <Text accessibilityRole="alert" style={{ color: colors.text }}>
+                          {pip.error}
+                        </Text>
                       )}
-                    </>
-                  )}
-                </View>
-              ))}
-            </View>
-          )}
-          {panel === 'chat' && (
-            <View style={{ gap: 8 }}>
-              {state.messages.map((message) => (
-                <Text key={message.id} style={{ color: colors.text }}>
-                  {message.sender}: {message.text}
-                </Text>
-              ))}
-              {controller.settings.messages.enabled && (
-                <>
-                  <TextInput
-                    accessibilityLabel="Message"
-                    value={text}
-                    onChangeText={setText}
-                    maxLength={2000}
-                    style={{
-                      color: colors.text,
-                      backgroundColor: colors.card,
-                      padding: 12,
-                    }}
-                  />
-                  {button('Send message', () => {
-                    Keyboard.dismiss();
-                    void run(async () => {
-                      await controller.chat(text);
-                      setText('');
-                    });
-                  })}
-                </>
-              )}
-            </View>
-          )}
-          {!preview &&
-            state.phase !== 'ended' &&
-            controller.settings.whiteboard.enabled &&
-            credentials.whiteboard?.provider === 'excalidraw' &&
-            credentials.whiteboard.token && (
-              <View>
-                {state.recording && state.sharingUserId !== state.selfId && (
-                  <Text style={{ color: colors.text }}>
-                    Share your screen to include this whiteboard in the recording.
-                  </Text>
-                )}
-                <NativeWhiteboard
-                  token={credentials.whiteboard.token}
-                  repository={whiteboardRepository}
-                  onPresentation={onBoardPresentation}
-                  onPending={setBoardPending}
-                  visible={panel === 'whiteboard'}
-                  onClose={() => setPanel('none')}
-                  controls={
-                    <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-                      {button(
-                        state.microphone ? 'Mute microphone' : 'Unmute microphone',
-                        () => {
-                          void run(() => controller.microphone(!state.microphone));
-                        },
-                      )}
-                      {button(state.camera ? 'Stop video' : 'Start video', () => {
-                        void run(() => controller.camera(!state.camera));
-                      })}
                     </View>
-                  }
-                />
-              </View>
-            )}
-          {panel === 'whiteboard' &&
-            credentials.whiteboard?.provider === 'excalidraw' &&
-            !credentials.whiteboard.token && (
-              <Text accessibilityRole="alert" style={{ color: colors.text }}>
-                The whiteboard is unavailable. Rejoin the class to retry.
-              </Text>
-            )}
-          {panel === 'whiteboard' &&
-            credentials.whiteboard?.provider !== 'excalidraw' && (
-              <View style={{ height: 450 }}>
-                <WhiteboardView style={{ flex: 1 }} />
-                {moderator &&
-                  button(
-                    zoomBoardActive ? 'Stop presenting whiteboard' : 'Present whiteboard',
+                  )}
+
+                  <Text style={{ color: colors.text }}>Audio device</Text>
+                  {mediaDevices.devices.audio.map((device) => (
+                    <Pressable
+                      key={device.id}
+                      testID={`audio-device-${device.id}-${device.selected ? 'selected' : 'unselected'}`}
+                      accessibilityRole="radio"
+                      accessibilityLabel={`Audio device: ${device.label}`}
+                      accessibilityState={{ checked: device.selected }}
+                      onPress={() => {
+                        void run(() => mediaDevices.select('audio', device.id));
+                      }}
+                      style={{
+                        minHeight: 44,
+                        padding: 12,
+                        borderRadius: 12,
+                        backgroundColor: device.selected
+                          ? colors.actionSubtle
+                          : colors.card,
+                      }}
+                    >
+                      <Text style={{ color: colors.text }}>
+                        {device.selected ? '✓ ' : ''}
+                        {device.label}
+                      </Text>
+                    </Pressable>
+                  ))}
+
+                  <Text accessibilityRole="header" style={{ color: colors.text }}>
+                    Test your audio and video
+                  </Text>
+                  <Text
+                    accessibilityLabel={`Microphone activity ${volume}`}
+                    style={{ color: colors.text }}
+                  >
+                    Microphone activity: {volume}%
+                  </Text>
+                  <View
+                    accessible
+                    accessibilityRole="progressbar"
+                    accessibilityLabel="Microphone level"
+                    accessibilityValue={{
+                      min: 0,
+                      max: 100,
+                      now: Math.max(0, Math.min(100, volume)),
+                    }}
+                    style={{
+                      height: 12,
+                      borderRadius: 6,
+                      backgroundColor: colors.border,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <View
+                      style={{
+                        height: '100%',
+                        width: `${Math.max(0, Math.min(100, volume))}%`,
+                        backgroundColor: colors.success,
+                      }}
+                    />
+                  </View>
+                  {button(
+                    micTest ? 'Play microphone recording' : 'Test microphone',
                     () => {
                       void run(async () => {
-                        const result = await (zoomBoardActive
-                          ? zoom.whiteboardHelper.stopShareWhiteboard()
-                          : zoom.whiteboardHelper.startShareWhiteboard());
-                        if (
-                          result !== 0 &&
-                          String(result) !== 'ZoomVideoSDKError_Success'
-                        )
-                          throw new Error('Unable to present whiteboard.');
+                        if (!(micPermission?.granted || (await requestMic()).granted))
+                          throw new Error('Allow microphone access to test audio.');
+                        await adapter.testMicrophone(!micTest);
+                        setMicTest(!micTest);
                       });
                     },
                   )}
+                  {button(speakerTest ? 'Stop speaker test' : 'Test speakers', () => {
+                    void run(async () => {
+                      await adapter.testSpeaker(!speakerTest);
+                      setSpeakerTest(!speakerTest);
+                    });
+                  })}
+                  {button(
+                    originalAudio
+                      ? 'Use noise suppression'
+                      : 'Use original microphone audio',
+                    () => {
+                      void run(async () => {
+                        await adapter.originalAudio(!originalAudio);
+                        setOriginalAudio(!originalAudio);
+                      });
+                    },
+                  )}
+                  {button('Use speaker', () => {
+                    void run(() => adapter.speaker(true));
+                  })}
+                  {button('Done testing', () => {
+                    void run(async () => {
+                      await adapter.stopAudioTests();
+                      setMicTest(false);
+                      setSpeakerTest(false);
+                      setPanel('none');
+                    });
+                  })}
+                </View>
+              }
+              video={
+                <View style={{ gap: 12 }}>
+                  {mediaDevices.devices.cameras.map((device) => (
+                    <Pressable
+                      key={device.id}
+                      testID={`camera-device-${device.id}-${device.selected ? 'selected' : 'unselected'}`}
+                      accessibilityRole="radio"
+                      accessibilityLabel={`Camera device: ${device.label}`}
+                      accessibilityState={{ checked: device.selected }}
+                      onPress={() => {
+                        void run(() => mediaDevices.select('camera', device.id));
+                      }}
+                      style={{
+                        minHeight: 44,
+                        padding: 12,
+                        borderRadius: 12,
+                        backgroundColor: device.selected
+                          ? colors.actionSubtle
+                          : colors.card,
+                      }}
+                    >
+                      <Text style={{ color: colors.text }}>
+                        {device.selected ? '✓ ' : ''}
+                        {device.label}
+                      </Text>
+                    </Pressable>
+                  ))}
+
+                  <Text style={{ color: colors.text }}>Camera and background</Text>
+                  {button('Blur background', () => {
+                    void run(() => adapter.background('blur'));
+                  })}
+                  {button('Remove background', () => {
+                    void run(() => adapter.background('none'));
+                  })}
+                  {button('Choose background image', () => {
+                    void run(async () => {
+                      const result = await ImagePicker.launchImageLibraryAsync({
+                        mediaTypes: ['images'],
+                        quality: 0.8,
+                      });
+                      if (!result.canceled)
+                        await adapter.background('image', result.assets[0].uri);
+                    });
+                  })}
+
+                  {button('Switch camera', () => {
+                    void run(() => adapter.switchCamera());
+                  })}
+                  {adapter.mirror &&
+                    button(
+                      mirrored ? 'Stop mirroring my video' : 'Mirror my video',
+                      () => {
+                        void run(async () => {
+                          await adapter.mirror?.(!mirrored);
+                          setMirrored(!mirrored);
+                        });
+                      },
+                    )}
+                </View>
+              }
+            />
+            {state.phase !== 'ended' && panel === 'participants' && (
+              <View style={{ gap: 8 }}>
+                {waiting.map((user) => (
+                  <View key={user.id}>
+                    <Text style={{ color: colors.text }}>
+                      {user.displayName} is waiting
+                    </Text>
+                    {button(`Admit ${user.displayName}`, () => {
+                      void run(() =>
+                        meetingApi
+                          .admit(sessionId, { id: user.id, approved: true })
+                          .then(() =>
+                            setWaiting((previous) =>
+                              previous.filter((item) => item.id !== user.id),
+                            ),
+                          ),
+                      );
+                    })}
+                    {button(`Decline ${user.displayName}`, () => {
+                      void run(() =>
+                        meetingApi
+                          .admit(sessionId, { id: user.id, approved: false })
+                          .then(() =>
+                            setWaiting((previous) =>
+                              previous.filter((item) => item.id !== user.id),
+                            ),
+                          ),
+                      );
+                    })}
+                  </View>
+                ))}
+                {state.participants.map((user) => (
+                  <View key={user.id}>
+                    <Text style={{ color: colors.text }}>{user.name}</Text>
+                    {moderator &&
+                      user.id !== state.selfId &&
+                      button(`Mute ${user.name}`, () => {
+                        void run(async () => {
+                          await controller.mute(user.id);
+                          await meetingApi
+                            .audit(sessionId, 'mute_participant', user.name)
+                            .catch(() => {});
+                        });
+                      })}
+                    {controller.self?.host && user.id !== state.selfId && (
+                      <>
+                        {controller.settings.cohosts?.enabled &&
+                          button(
+                            `${user.cohost ? 'Remove co-host' : 'Make co-host'} ${user.name}`,
+                            () => {
+                              void run(() => controller.cohost(user.id, !user.cohost));
+                            },
+                          )}
+                        {button(`Make host ${user.name}`, () =>
+                          Alert.alert(
+                            'Transfer host?',
+                            `${user.name} will become the host.`,
+                            [
+                              { text: 'Cancel', style: 'cancel' },
+                              {
+                                text: 'Transfer',
+                                onPress: () => {
+                                  void run(() => controller.transferHost(user.id));
+                                },
+                              },
+                            ],
+                          ),
+                        )}
+                      </>
+                    )}
+                  </View>
+                ))}
               </View>
             )}
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+            {state.phase !== 'ended' && panel === 'chat' && (
+              <View style={{ gap: 8 }}>
+                {state.messages.map((message) => (
+                  <Text key={message.id} style={{ color: colors.text }}>
+                    {message.sender}: {message.text}
+                  </Text>
+                ))}
+                {controller.settings.messages.enabled && (
+                  <>
+                    <TextInput
+                      accessibilityLabel="Message"
+                      value={text}
+                      onChangeText={setText}
+                      maxLength={2000}
+                      style={{
+                        color: colors.text,
+                        backgroundColor: colors.card,
+                        padding: 12,
+                      }}
+                    />
+                    {button('Send message', () => {
+                      Keyboard.dismiss();
+                      void run(async () => {
+                        await controller.chat(text);
+                        setText('');
+                      });
+                    })}
+                  </>
+                )}
+              </View>
+            )}
+            {!preview &&
+              state.phase !== 'ended' &&
+              controller.settings.whiteboard.enabled &&
+              credentials.whiteboard?.provider === 'excalidraw' &&
+              credentials.whiteboard.token && (
+                <View>
+                  {state.recording && state.sharingUserId !== state.selfId && (
+                    <Text style={{ color: colors.text }}>
+                      Share your screen to include this whiteboard in the recording.
+                    </Text>
+                  )}
+                  <NativeWhiteboard
+                    token={credentials.whiteboard.token}
+                    repository={whiteboardRepository}
+                    onPresentation={onBoardPresentation}
+                    onPending={setBoardPending}
+                    visible={panel === 'whiteboard'}
+                    onClose={() => setPanel('none')}
+                    controls={
+                      <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+                        {button(
+                          state.microphone ? 'Mute microphone' : 'Unmute microphone',
+                          () => {
+                            void run(() => controller.microphone(!state.microphone));
+                          },
+                        )}
+                        {button(state.camera ? 'Stop video' : 'Start video', () => {
+                          void run(() => controller.camera(!state.camera));
+                        })}
+                      </View>
+                    }
+                  />
+                </View>
+              )}
+            {panel === 'whiteboard' &&
+              credentials.whiteboard?.provider === 'excalidraw' &&
+              !credentials.whiteboard.token && (
+                <Text accessibilityRole="alert" style={{ color: colors.text }}>
+                  The whiteboard is unavailable. Rejoin the class to retry.
+                </Text>
+              )}
+            {panel === 'whiteboard' &&
+              credentials.whiteboard?.provider !== 'excalidraw' && (
+                <View style={{ height: 450 }}>
+                  <WhiteboardView style={{ flex: 1 }} />
+                  {moderator &&
+                    button(
+                      zoomBoardActive
+                        ? 'Stop presenting whiteboard'
+                        : 'Present whiteboard',
+                      () => {
+                        void run(async () => {
+                          const result = await (zoomBoardActive
+                            ? zoom.whiteboardHelper.stopShareWhiteboard()
+                            : zoom.whiteboardHelper.startShareWhiteboard());
+                          if (
+                            result !== 0 &&
+                            String(result) !== 'ZoomVideoSDKError_Success'
+                          )
+                            throw new Error('Unable to present whiteboard.');
+                        });
+                      },
+                    )}
+                </View>
+              )}
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </>
   );
 }

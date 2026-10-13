@@ -1,3 +1,4 @@
+import { rememberNativeInvitation } from '@/lib/classroom/link-recovery';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { Linking, Alert, NativeModules } from 'react-native';
@@ -22,6 +23,18 @@ export async function openLiveSession(href: string) {
       return;
     }
     if (NativeModules.RNZoomVideoSdk) {
+      const fragment = new URLSearchParams(
+        new URL(resolveJoinHrefForMobile(href)).hash.slice(1),
+      );
+      if (fragment.has('handoff')) {
+        await WebBrowser.openBrowserAsync(resolveJoinHrefForMobile(href), {
+          presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
+        });
+        return;
+      }
+      const invitation = fragment.get('invite');
+      if (invitation) await rememberNativeInvitation(identifier, invitation);
+
       router.navigate({
         pathname: '/classroom/[sessionId]',
         params: { sessionId: identifier },

@@ -92,3 +92,58 @@ if (existsSync(zoomViewPath)) {
     );
   }
 }
+
+// Zoom 2.6.1 falls through to a second camera switch after selecting by ID on Android.
+const zoomCameraPath = join(
+  rootDir,
+  'node_modules/@zoom/react-native-videosdk/android/src/main/java/com/reactnativezoom/videosdk/RNZoomVideoSdkVideoHelperModule.java',
+);
+if (existsSync(zoomCameraPath)) {
+  const source = readFileSync(zoomCameraPath, 'utf8');
+  if (!source.includes('ICONIC selected camera once')) {
+    const anchor = 'promise.resolve(getVideoHelper().switchCamera(device));';
+    if (!source.includes(anchor))
+      throw new Error('Review Zoom camera selection fix for this SDK version');
+    writeFileSync(
+      zoomCameraPath,
+      source.replace(
+        anchor,
+        anchor + '\n            return; // ICONIC selected camera once',
+      ),
+    );
+  }
+  const selected = readFileSync(zoomCameraPath, 'utf8');
+  if (!selected.includes('ICONIC camera disconnected')) {
+    const anchor = 'return; // ICONIC selected camera once\n          }\n        }';
+    if (!selected.includes(anchor))
+      throw new Error('Review Zoom disconnected camera fix for this SDK version');
+    writeFileSync(
+      zoomCameraPath,
+      selected.replace(
+        anchor,
+        'return; // ICONIC selected camera once\n          }\n          promise.reject("camera_device", "This camera disconnected. Choose another camera.");\n          return; // ICONIC camera disconnected\n        }',
+      ),
+    );
+  }
+}
+
+// Configure the SDK-owned capture session for AVKit multitasking on iOS 16+.
+const zoomSessionPath = join(
+  rootDir,
+  'node_modules/@zoom/react-native-videosdk/ios/RNZoomVideoSdk.m',
+);
+if (existsSync(zoomSessionPath)) {
+  const source = readFileSync(zoomSessionPath, 'utf8');
+  if (!source.includes('ICONIC AVKit multitasking camera')) {
+    const pattern = /(videoOption\.localVideoOn = [^\n]+;)/g;
+    if (!pattern.test(source))
+      throw new Error('Review Zoom multitasking camera fix for this SDK version');
+    writeFileSync(
+      zoomSessionPath,
+      source.replace(
+        pattern,
+        '$1\n        // ICONIC AVKit multitasking camera\n        if (@available(iOS 16.0, *)) videoOption.multitaskingCameraAccessEnabled = YES;',
+      ),
+    );
+  }
+}

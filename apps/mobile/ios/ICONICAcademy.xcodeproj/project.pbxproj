@@ -23,6 +23,8 @@
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
 		D7A99CFB6BC84F768F80E5DE /* CoreVideo.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6E2213861A044CFD9D886CFB /* CoreVideo.framework */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
+		2414236765614920BCD6945A /* ClassroomDevices.mm in Resources */ = {isa = PBXBuildFile; fileRef = 5F6A247FDB9349DCA4D2B84F /* ClassroomDevices.mm */; };
+		7DD7BBB29D0546D5BB8624A0 /* ClassroomPictureInPicture.mm in Resources */ = {isa = PBXBuildFile; fileRef = 7E7670B63A304F58A6938BD3 /* ClassroomPictureInPicture.mm */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -77,6 +79,8 @@
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = ICONICAcademy/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* ICONICAcademy-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "ICONICAcademy-Bridging-Header.h"; path = "ICONICAcademy/ICONICAcademy-Bridging-Header.h"; sourceTree = "<group>"; };
 		FC26F9FDFD6E49BAAA7B19CD /* ClassroomBroadcast.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = undefined; name = ClassroomBroadcast.appex; path = ClassroomBroadcast.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		5F6A247FDB9349DCA4D2B84F /* ClassroomDevices.mm */ = {isa = PBXFileReference; name = "ClassroomDevices.mm"; path = "ICONICAcademy/ClassroomDevices.mm"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		7E7670B63A304F58A6938BD3 /* ClassroomPictureInPicture.mm */ = {isa = PBXFileReference; name = "ClassroomPictureInPicture.mm"; path = "ICONICAcademy/ClassroomPictureInPicture.mm"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -182,6 +186,8 @@
 				1839E5B996866A706E725A77 /* Pods */,
 				88C22C23BF2B3A239372ADDD /* ExpoModulesProviders */,
 				46F4E324F91C43DA9DC82882 /* ClassroomBroadcast */,
+				5F6A247FDB9349DCA4D2B84F /* ClassroomDevices.mm */,
+				7E7670B63A304F58A6938BD3 /* ClassroomPictureInPicture.mm */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -503,6 +509,8 @@
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
 				70892F8ED801D4B103FBA34E /* ExpoModulesProvider.swift in Sources */,
 				47180A428C174DBFA4A43114 /* ClassroomControls.mm in Sources */,
+				2414236765614920BCD6945A /* ClassroomDevices.mm in Resources */,
+				7DD7BBB29D0546D5BB8624A0 /* ClassroomPictureInPicture.mm in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

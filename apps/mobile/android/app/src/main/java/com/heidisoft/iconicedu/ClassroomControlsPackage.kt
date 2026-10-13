@@ -22,6 +22,6 @@ class ClassroomControlsModule(private val context: ReactApplicationContext) : Re
   }
 }
 class ClassroomControlsPackage : ReactPackage {
-  override fun createNativeModules(context: ReactApplicationContext): List<NativeModule> = listOf(ClassroomControlsModule(context))
+  override fun createNativeModules(context: ReactApplicationContext): List<NativeModule> = listOf(ClassroomControlsModule(context), ClassroomDevices(context), ClassroomPictureInPicture(context))
   override fun createViewManagers(context: ReactApplicationContext): List<ViewManager<*, *>> = listOf(ClassroomVideoViewManager())
 }

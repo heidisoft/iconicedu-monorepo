@@ -1,3 +1,4 @@
+import type { NativePictureInPictureAdapter } from './native-picture-in-picture';
 import type {
   LiveSessionJoinCredentialsVM,
   LiveSessionSettingsVM,
@@ -25,8 +26,16 @@ export type NativeMeetingEvent =
   | { type: 'reaction'; userId: string; emoji: string }
   | { type: 'caption'; text: string }
   | { type: 'composition'; userId: string; active: boolean }
+  | { type: 'speaking'; userIds: string[] }
   | { type: 'network'; level: 'good' | 'normal' | 'bad' };
+export type NativeMediaDevice = { id: string; label: string; selected: boolean };
+export type NativeMediaDevices = {
+  cameras: NativeMediaDevice[];
+  audio: NativeMediaDevice[];
+  mirrored: boolean;
+};
 export interface NativeMeetingAdapter {
+  pictureInPicture?: NativePictureInPictureAdapter;
   prepareAudio?(): Promise<void>;
   subscribe(listener: (event: NativeMeetingEvent) => void): () => void;
   join(
@@ -37,6 +46,9 @@ export interface NativeMeetingAdapter {
   microphone(userId: string, enabled: boolean): Promise<void>;
   camera(enabled: boolean): Promise<void>;
   switchCamera(): Promise<void>;
+  devices?(): Promise<NativeMediaDevices>;
+  selectCamera?(id: string): Promise<void>;
+  selectAudioRoute?(id: string): Promise<void>;
   mirror?(enabled: boolean): Promise<void>;
   lockSharing?(locked: boolean): Promise<void>;
   share(enabled: boolean): Promise<void>;
@@ -62,6 +74,7 @@ export type NativeMeetingState = {
   phase: 'preview' | 'joining' | 'meeting' | 'reconnecting' | 'ended';
   selfId: string | null;
   participants: NativeParticipant[];
+  speaking: string[];
   microphone: boolean;
   camera: boolean;
   sharingUserId: string | null;
@@ -78,6 +91,7 @@ const initial = (): NativeMeetingState => ({
   phase: 'preview',
   selfId: null,
   participants: [],
+  speaking: [],
   microphone: false,
   camera: true,
   sharingUserId: null,
@@ -96,6 +110,8 @@ export class NativeMeetingController {
   private listeners = new Set<() => void>();
   private disconnect: (() => void) | null = null;
   private disposed = false;
+  private reactionTimers = new Set<ReturnType<typeof setTimeout>>();
+  private captionTimer: ReturnType<typeof setTimeout> | null = null;
   private busy = false;
   private joinDeadline: ReturnType<typeof setTimeout> | null = null;
   settings: LiveSessionSettingsVM;
@@ -167,11 +183,18 @@ export class NativeMeetingController {
         const self = event.participants.find((user) => user.id === this.state.selfId);
         this.update({
           participants: event.participants,
+          speaking: this.state.speaking.filter((id) =>
+            event.participants.some((user) => user.id === id && !user.muted),
+          ),
+          raisedHands: this.state.raisedHands.filter((id) =>
+            event.participants.some((user) => user.id === id),
+          ),
           ...(self ? { microphone: !self.muted, camera: self.video } : {}),
         });
         break;
       }
       case 'left':
+        this.clearEphemeral();
         if (this.joinDeadline) clearTimeout(this.joinDeadline);
         this.update({ phase: 'ended', sharingUserId: null, recording: false });
         break;
@@ -193,7 +216,12 @@ export class NativeMeetingController {
         this.update({ recording: event.active });
         break;
       case 'chat':
-        this.update({ messages: [...this.state.messages, event].slice(-200) });
+        this.update({
+          messages: [
+            ...this.state.messages.filter((message) => message.id !== event.id),
+            event,
+          ].slice(-200),
+        });
         break;
       case 'hand':
         this.update({
@@ -202,9 +230,24 @@ export class NativeMeetingController {
             : this.state.raisedHands.filter((id) => id !== event.userId),
         });
         break;
-      case 'reaction':
-        this.update({ reactions: [...this.state.reactions, event].slice(-6) });
+      case 'reaction': {
+        this.update({
+          reactions: [
+            ...this.state.reactions.filter(
+              (reaction) => reaction.userId !== event.userId,
+            ),
+            event,
+          ].slice(-6),
+        });
+        const timer = setTimeout(() => {
+          this.reactionTimers.delete(timer);
+          this.update({
+            reactions: this.state.reactions.filter((reaction) => reaction !== event),
+          });
+        }, 3000);
+        this.reactionTimers.add(timer);
         break;
+      }
       case 'composition':
         this.update({
           composited: event.active
@@ -212,17 +255,33 @@ export class NativeMeetingController {
             : this.state.composited.filter((id) => id !== event.userId),
         });
         break;
+      case 'speaking':
+        this.update({
+          speaking: event.userIds.filter((id) =>
+            this.state.participants.some((user) => user.id === id && !user.muted),
+          ),
+        });
+        break;
       case 'network':
         this.update({ network: event.level });
         break;
       case 'caption':
+        if (this.captionTimer) clearTimeout(this.captionTimer);
         this.update({ caption: event.text });
+        this.captionTimer = setTimeout(() => this.update({ caption: '' }), 6000);
         break;
       case 'connection':
         if (this.state.phase === 'meeting' || this.state.phase === 'reconnecting')
           this.update({ phase: event.reconnecting ? 'reconnecting' : 'meeting' });
         break;
     }
+  }
+  private clearEphemeral() {
+    for (const timer of this.reactionTimers) clearTimeout(timer);
+    this.reactionTimers.clear();
+    if (this.captionTimer) clearTimeout(this.captionTimer);
+    this.captionTimer = null;
+    this.update({ reactions: [], caption: '', speaking: [], raisedHands: [] });
   }
   get self() {
     return this.state.participants.find((user) => user.id === this.state.selfId);
@@ -285,11 +344,13 @@ export class NativeMeetingController {
   async leave(endForAll = false) {
     if (endForAll && !this.self?.host) throw new Error('Host access required');
     await this.adapter.leave(endForAll);
+    this.clearEphemeral();
     this.update({ phase: 'ended' });
   }
   async dispose() {
     if (this.disposed) return;
     this.disposed = true;
+    this.clearEphemeral();
     if (this.joinDeadline) clearTimeout(this.joinDeadline);
     this.disconnect?.();
     this.disconnect = null;

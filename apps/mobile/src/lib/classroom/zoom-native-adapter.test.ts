@@ -11,6 +11,7 @@ jest.mock('@zoom/react-native-videosdk', () => ({
   EventType: Object.fromEntries(
     [
       'onUserVideoNetworkStatusChanged',
+      'onUserActiveAudioChanged',
       'onSessionJoin',
       'onSessionLeave',
       'onUserJoin',
@@ -62,6 +63,12 @@ function fixture() {
     videoHelper: {
       startVideo: success(),
       stopVideo: success(),
+      getCameraList: jest
+        .fn()
+        .mockResolvedValue([
+          { deviceId: 'front', deviceName: 'Front camera', isSelectedDevice: true },
+        ]),
+      isMyVideoMirrored: jest.fn().mockResolvedValue(true),
       mirrorMyVideo: success(),
       switchCamera: jest.fn().mockResolvedValue(true),
     },
@@ -99,6 +106,12 @@ function fixture() {
   };
   NativeModules.RNZoomVideoSdk = {
     leaveSession: jest.fn().mockResolvedValue('ZoomVideoSDKError_Success'),
+  };
+  NativeModules.ClassroomDevices = {
+    getAudioRoutes: jest
+      .fn()
+      .mockResolvedValue([{ id: 'speaker', label: 'Speaker', selected: true }]),
+    selectAudioRoute: jest.fn().mockResolvedValue(true),
   };
   NativeModules.ClassroomControls = {
     startMeetingService: jest.fn().mockResolvedValue(true),
@@ -194,6 +207,19 @@ describe('Zoom native bridge adapter', () => {
     await f.adapter.cohost('2', false);
     f.zoom.userHelper.makeManager.mockResolvedValue(false);
     await expect(f.adapter.cohost('2', true)).rejects.toThrow();
+  });
+  it('enumerates actual native devices and selects a camera exactly once', async () => {
+    const f = fixture();
+    await expect(f.adapter.devices!()).resolves.toEqual({
+      cameras: [{ id: 'front', label: 'Front camera', selected: true }],
+      mirrored: true,
+      audio: [{ id: 'speaker', label: 'Speaker', selected: true }],
+    });
+    await f.adapter.selectCamera!('front');
+    expect(f.zoom.videoHelper.switchCamera).toHaveBeenCalledTimes(1);
+    expect(f.zoom.videoHelper.switchCamera).toHaveBeenCalledWith('front');
+    await expect(f.adapter.selectCamera!('disconnected')).rejects.toThrow('disconnected');
+    expect(f.zoom.videoHelper.switchCamera).toHaveBeenCalledTimes(1);
   });
   it('uses the preferred ReplayKit broadcast extension on iPad', async () => {
     const f = fixture();

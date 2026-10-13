@@ -52,6 +52,20 @@ module.exports = function withNativeClassroom(config) {
         ),
       );
       fs.copyFileSync(
+        path.join(__dirname, 'classroom/ClassroomDevices.mm'),
+        path.join(
+          value.modRequest.platformProjectRoot,
+          'ICONICAcademy/ClassroomDevices.mm',
+        ),
+      );
+      fs.copyFileSync(
+        path.join(__dirname, 'classroom/ClassroomPictureInPicture.mm'),
+        path.join(
+          value.modRequest.platformProjectRoot,
+          'ICONICAcademy/ClassroomPictureInPicture.mm',
+        ),
+      );
+      fs.copyFileSync(
         path.join(__dirname, 'classroom/SampleHandler.mm'),
         path.join(folder, 'SampleHandler.mm'),
       );
@@ -89,6 +103,24 @@ module.exports = function withNativeClassroom(config) {
     )
       project.addSourceFile(
         'ICONICAcademy/ClassroomControls.mm',
+        { target: project.getFirstTarget().uuid },
+        project.getFirstProject().firstProject.mainGroup,
+      );
+    if (
+      !project.hasFile('ICONICAcademy/ClassroomDevices.mm') &&
+      !project.hasFile('ClassroomDevices.mm')
+    )
+      project.addSourceFile(
+        'ICONICAcademy/ClassroomDevices.mm',
+        { target: project.getFirstTarget().uuid },
+        project.getFirstProject().firstProject.mainGroup,
+      );
+    if (
+      !project.hasFile('ICONICAcademy/ClassroomPictureInPicture.mm') &&
+      !project.hasFile('ClassroomPictureInPicture.mm')
+    )
+      project.addSourceFile(
+        'ICONICAcademy/ClassroomPictureInPicture.mm',
         { target: project.getFirstTarget().uuid },
         project.getFirstProject().firstProject.mainGroup,
       );
@@ -215,6 +247,23 @@ module.exports = function withNativeClassroom(config) {
     ])
       if (!manifest['uses-permission'].some((item) => item.$['android:name'] === name))
         manifest['uses-permission'].push({ $: { 'android:name': name } });
+    const activity = manifest.application[0].activity?.find(
+      (item) => item.$['android:name'] === '.MainActivity',
+    );
+    if (activity) {
+      activity.$['android:supportsPictureInPicture'] = 'true';
+      activity.$['android:configChanges'] = [
+        ...new Set([
+          ...(activity.$['android:configChanges'] ?? '').split('|'),
+          'screenSize',
+          'smallestScreenSize',
+          'screenLayout',
+          'orientation',
+        ]),
+      ]
+        .filter(Boolean)
+        .join('|');
+    }
     const app = manifest.application[0];
     app.service ??= [];
     if (!app.service.some((item) => item.$['android:name'] === '.ClassroomAudioService'))
@@ -244,6 +293,24 @@ module.exports = function withNativeClassroom(config) {
     return value;
   });
   config = withMainActivity(config, (value) => {
+    const pipMarker = '// Native classroom picture-in-picture';
+    if (!value.modResults.contents.includes(pipMarker))
+      value.modResults.contents = value.modResults.contents.replace(
+        'class MainActivity : ReactActivity() {',
+        `class MainActivity : ReactActivity() {
+  ${pipMarker}
+  override fun onPictureInPictureModeChanged(active: Boolean, config: android.content.res.Configuration) {
+    super.onPictureInPictureModeChanged(active, config)
+    ClassroomPictureInPicture.changed(active)
+  }
+  override fun onUserLeaveHint() {
+    super.onUserLeaveHint()
+    if (android.os.Build.VERSION.SDK_INT < 31 && ClassroomPictureInPicture.automatic) {
+      try { enterPictureInPictureMode(android.app.PictureInPictureParams.Builder().setAspectRatio(android.util.Rational(16, 9)).build()) } catch (_: Exception) { }
+    }
+  }
+`,
+      );
     const marker = '// Native classroom screen capture';
     if (!value.modResults.contents.includes(marker))
       value.modResults.contents = value.modResults.contents.replace(
@@ -279,6 +346,14 @@ module.exports = function withNativeClassroom(config) {
       fs.copyFileSync(
         path.join(__dirname, 'classroom/ClassroomControlsPackage.kt'),
         path.join(folder, 'ClassroomControlsPackage.kt'),
+      );
+      fs.copyFileSync(
+        path.join(__dirname, 'classroom/ClassroomDevices.kt'),
+        path.join(folder, 'ClassroomDevices.kt'),
+      );
+      fs.copyFileSync(
+        path.join(__dirname, 'classroom/ClassroomPictureInPicture.kt'),
+        path.join(folder, 'ClassroomPictureInPicture.kt'),
       );
       fs.copyFileSync(
         path.join(__dirname, 'classroom/ClassroomShareService.kt'),

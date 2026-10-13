@@ -240,3 +240,50 @@ describe('native classroom lifecycle and permissions', () => {
     expect(f.adapter.leave).not.toHaveBeenCalled();
   });
 });
+
+it('expires reactions, deduplicates repeated messages, and clears departed speakers', async () => {
+  jest.useFakeTimers();
+  const f = fixture();
+  await f.connected();
+  f.emit({ type: 'reaction', userId: '2', emoji: '👍' });
+  expect(f.controller.snapshot().reactions).toHaveLength(1);
+  jest.advanceTimersByTime(3000);
+  expect(f.controller.snapshot().reactions).toHaveLength(0);
+  const message = {
+    type: 'chat' as const,
+    id: 'same-message',
+    sender: 'Student',
+    text: 'Hello',
+  };
+  f.emit(message);
+  f.emit(message);
+  expect(f.controller.snapshot().messages).toHaveLength(1);
+  f.emit({ type: 'speaking', userIds: ['1', '2', 'unknown'] });
+  expect(f.controller.snapshot().speaking).toEqual(['2']);
+  f.emit({ type: 'participants', participants: [teacher] });
+  expect(f.controller.snapshot().speaking).toEqual([]);
+  jest.useRealTimers();
+});
+
+it('clears inactive captions after six seconds and removes ephemeral content on leave', async () => {
+  jest.useFakeTimers();
+  const f = fixture();
+  await f.connected();
+  f.emit({ type: 'caption', text: 'First sentence' });
+  jest.advanceTimersByTime(5000);
+  f.emit({ type: 'caption', text: 'Second sentence' });
+  jest.advanceTimersByTime(5000);
+  expect(f.controller.snapshot().caption).toBe('Second sentence');
+  jest.advanceTimersByTime(1000);
+  expect(f.controller.snapshot().caption).toBe('');
+  f.emit({ type: 'caption', text: 'Leaving now' });
+  f.emit({ type: 'reaction', userId: '2', emoji: '👍' });
+  await f.controller.leave();
+  expect(f.controller.snapshot()).toMatchObject({
+    caption: '',
+    reactions: [],
+    speaking: [],
+    raisedHands: [],
+  });
+  jest.useRealTimers();
+});
