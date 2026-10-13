@@ -74,6 +74,7 @@ export async function reportLiveSessionQualityEvent(
 export async function logLiveSessionAuditEvent(
   sessionId: string,
   body: {
+    linkToken?: string;
     action: 'mute_participant' | 'end_session_for_all' | 'recording_started';
     targetDisplayName?: string | null;
     occurredAt: string;

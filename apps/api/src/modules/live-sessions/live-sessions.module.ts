@@ -1,3 +1,5 @@
+import { LiveSessionQualityController } from './live-session-quality.controller';
+import { LiveSessionQualityService } from './live-session-quality.service';
 import { ScreenAnnotationsService } from '../screen-annotations/screen-annotations.service';
 import {
   ScreenAnnotationsController,
@@ -14,11 +16,13 @@ import { LiveSessionsPublicController } from '@iconicedu/api/modules/live-sessio
 @Module({
   imports: [AuthModule],
   providers: [
+    LiveSessionQualityService,
     ScreenAnnotationsService,
     LiveSessionsService,
     ClassroomMeetingSettingsService,
   ],
   controllers: [
+    LiveSessionQualityController,
     GuestScreenAnnotationsController,
     ScreenAnnotationsController,
     LiveSessionsController,

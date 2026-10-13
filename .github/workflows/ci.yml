@@ -900,6 +900,9 @@ jobs:
             --arg dailyKey  "${{ secrets.DAILY_API_KEY }}" \
             --arg dailyBase "${{ vars.DAILY_REST_BASE_URL }}" \
             --arg dailyWh   "${{ secrets.DAILY_WEBHOOK_SECRET }}" \
+            --arg zoomKey "${{ secrets.ZOOM_VIDEO_SDK_KEY }}" \
+            --arg zoomSecret "${{ secrets.ZOOM_VIDEO_SDK_SECRET }}" \
+            --arg zoomWebhook "${{ secrets.ZOOM_WEBHOOK_SECRET_TOKEN }}" \
             '{DATABASE_URL:$db, DIRECT_URL:$dir, SUPABASE_URL:$surl,
               SUPABASE_SERVICE_ROLE_KEY:$srkey, SUPABASE_ANON_KEY:$anon, SUPABASE_JWT_SECRET:$jwt,
               INTERNAL_EVENTS_TOKEN:$evt,
@@ -910,7 +913,10 @@ jobs:
               + (if ($aiKey | length) > 0 then {AI_PROVIDER_KEY_ENCRYPTION_KEY:$aiKey} else {} end)
               + (if ($dailyKey | length) > 0 then {DAILY_API_KEY:$dailyKey} else {} end)
               + (if ($dailyBase | length) > 0 then {DAILY_REST_BASE_URL:$dailyBase} else {} end)
-              + (if ($dailyWh | length) > 0 then {DAILY_WEBHOOK_SECRET:$dailyWh} else {} end)')
+              + (if ($dailyWh | length) > 0 then {DAILY_WEBHOOK_SECRET:$dailyWh} else {} end)
+              + (if ($zoomKey | length) > 0 then {ZOOM_VIDEO_SDK_KEY:$zoomKey} else {} end)
+              + (if ($zoomSecret | length) > 0 then {ZOOM_VIDEO_SDK_SECRET:$zoomSecret} else {} end)
+              + (if ($zoomWebhook | length) > 0 then {ZOOM_WEBHOOK_SECRET_TOKEN:$zoomWebhook} else {} end)')
 
           jq -r 'keys[]' <<< "$VARS_JSON" | while read -r KEY; do
             VALUE=$(jq -r --arg key "$KEY" '.[$key]' <<< "$VARS_JSON")
@@ -926,15 +932,9 @@ jobs:
           done
           echo "Variables set."
 
-          # Step 4: Trigger a deploy for the service in the PR environment.
-          # Ref: https://docs.railway.com/integrations/api/manage-deployments
-          echo "Triggering deploy for service $SERVICE_NAME in environment $ENV_NAME..."
-          api "$(jq -n \
-            --arg pid "$RAILWAY_PROJECT_ID" \
-            --arg sid "$SERVICE_ID" \
-            --arg eid "$ENV_ID" \
-            '{query:"mutation environmentTriggersDeploy($input: EnvironmentTriggersDeployInput!) { environmentTriggersDeploy(input: $input) }", variables:{input:{projectId:$pid, serviceId:$sid, environmentId:$eid}}}')" > /dev/null
-          echo "Deploy triggered. Continuing without waiting for build completion."
+          # Deploy after Vercel resolves the matching preview WEB_URL below.
+          echo "service_id=${SERVICE_ID}" >> "$GITHUB_OUTPUT"
+          echo "environment_id=${ENV_ID}" >> "$GITHUB_OUTPUT"
 
           # Step 5: Fetch the environment/service domain that Railway already assigned.
           # Ref: https://docs.railway.com/integrations/api/manage-domains
@@ -1098,7 +1098,37 @@ jobs:
             echo "vercel_url=https://vercel.com/dashboard" >> "$GITHUB_OUTPUT"
           fi
 
-      # 7. Set branch-specific Edge Function secrets so preview functions talk to preview services.
+      # Configure the API after its matching web URL is available.
+      - name: Configure Railway preview web URL and deploy
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
+          RAILWAY_PROJECT_ID: ${{ vars.RAILWAY_PROJECT_ID }}
+          SERVICE_ID: ${{ steps.railway.outputs.service_id }}
+          ENV_ID: ${{ steps.railway.outputs.environment_id }}
+          WEB_URL: ${{ steps.vercel.outputs.vercel_url }}
+        run: |
+          set -euo pipefail
+          if [[ "$WEB_URL" != https://* || "$WEB_URL" == "https://vercel.com/dashboard" ]]; then
+            echo "::error::A deployed preview web URL is required for meeting links."
+            exit 1
+          fi
+          GQL="https://backboard.railway.app/graphql/v2"
+          api() {
+            local response
+            response=$(curl --fail-with-body --silent --show-error --max-time 30 --retry 2 \
+              -H "Authorization: Bearer $RAILWAY_TOKEN" -H "Content-Type: application/json" \
+              "$GQL" -d "$1")
+            if jq -e '.errors | length > 0' <<< "$response" > /dev/null; then
+              echo "::error::Railway preview configuration failed."
+              exit 1
+            fi
+          }
+          api "$(jq -n --arg pid "$RAILWAY_PROJECT_ID" --arg sid "$SERVICE_ID" \
+            --arg eid "$ENV_ID" --arg url "$WEB_URL" \
+            '{query:"mutation variableUpsert($input: VariableUpsertInput!) { variableUpsert(input: $input) }", variables:{input:{projectId:$pid, serviceId:$sid, environmentId:$eid, name:"WEB_URL", value:$url, skipDeploys:true}}}')"
+          api "$(jq -n --arg pid "$RAILWAY_PROJECT_ID" --arg sid "$SERVICE_ID" --arg eid "$ENV_ID" \
+            '{query:"mutation environmentTriggersDeploy($input: EnvironmentTriggersDeployInput!) { environmentTriggersDeploy(input: $input) }", variables:{input:{projectId:$pid, serviceId:$sid, environmentId:$eid}}}')"
+
       - name: Configure Supabase preview function secrets
         if: >
           steps.railway.outputs.railway_api_url != '' &&
@@ -1675,6 +1705,15 @@ jobs:
           const railway = resolveGroup('railway');
           const vercel = resolveGroup('vercel');
           const supabaseEdge = resolveGroup('supabaseEdge');
+          const apiEnv = Object.fromEntries(railway.map((entry) => [entry.name, entry.value]));
+          if (apiEnv.ZOOM_VIDEO_SDK_KEY || apiEnv.ZOOM_VIDEO_SDK_SECRET) {
+            for (const key of ['ZOOM_VIDEO_SDK_KEY', 'ZOOM_VIDEO_SDK_SECRET', 'WEB_URL']) {
+              if (!apiEnv[key]) missing.push(key);
+            }
+            if (apiEnv.WEB_URL && !/^https:\/\//.test(apiEnv.WEB_URL)) {
+              throw new Error('Production WEB_URL must use HTTPS');
+            }
+          }
 
           if (missing.length > 0) {
             const uniqueMissing = [...new Set(missing)].sort();
@@ -1701,6 +1740,15 @@ jobs:
 
           console.log(`Rendered ${railway.length} Railway vars, ${vercel.length} Vercel vars, and ${supabaseEdge.length} Supabase Edge secrets.`);
           NODE
+
+      - name: Apply production database migrations before API deployment
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_ID: ${{ vars.SUPABASE_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+          supabase link --project-ref "$SUPABASE_PROJECT_ID"
+          supabase db push --linked --include-all
 
       - name: Configure Railway production env and trigger deploy
         env:
@@ -1852,7 +1900,6 @@ jobs:
             --project-ref "$SUPABASE_PROJECT_ID" \
             --env-file /tmp/iconicedu-production-env/supabase.env
 
-          supabase db push --linked --include-all
 
           supabase functions deploy \
             --project-ref "$SUPABASE_PROJECT_ID" \

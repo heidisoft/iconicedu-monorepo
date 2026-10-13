@@ -1,4 +1,5 @@
 import type {
+  LiveSessionQualityEventVM,
   LiveSessionAttendanceDetailVM,
   LiveSessionAttendanceFilterVM,
   LiveSessionAttendanceListItemVM,
@@ -12,6 +13,7 @@ import {
   getLiveSessionAttendanceDetailRows,
   listLiveSessionAttendanceRows,
 } from '@iconicedu/web/lib/admin/live-session-attendance.query';
+import { createApiClient } from '@iconicedu/web/lib/api/http-client';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 
 export async function getAdminLiveSessionAttendanceList(
@@ -82,40 +84,17 @@ export async function getAdminLiveSessionAttendanceDetail(
   });
 }
 
-export type LiveSessionQualityEventRow = {
-  id: string;
-  display_name: string;
-  metric: 'network_quality' | 'connection_state';
-  level: string;
-  occurred_at: string;
-};
+export type LiveSessionQualityEventRow = LiveSessionQualityEventVM;
 
-// Deliberately kept as a standalone read next to the detail VM above rather
-// than threaded through buildLiveSessionAttendanceDetailVM/its VM type — this
-// is a small, independent addition (FR-043: staff identifying rooms with
-// media problems) and the existing builder already has solid test coverage
-// that a new required field would put at risk for no real benefit here.
 export async function getAdminLiveSessionQualityEvents(
   orgId: string,
   liveSessionId: string,
-): Promise<LiveSessionQualityEventRow[]> {
-  if (!orgId || !liveSessionId) {
-    return [];
-  }
-
+): Promise<LiveSessionQualityEventVM[]> {
+  if (!orgId || !liveSessionId) return [];
   const supabase = await createSupabaseServerClient();
-  const response = await supabase
-    .from('channel_live_session_quality_events')
-    .select('id, display_name, metric, level, occurred_at')
-    .eq('org_id', orgId)
-    .eq('live_session_id', liveSessionId)
-    .is('deleted_at', null)
-    .order('occurred_at', { ascending: false })
-    .returns<LiveSessionQualityEventRow[]>();
-
-  if (response.error) {
-    throw new Error(response.error.message);
-  }
-
-  return response.data ?? [];
+  return createApiClient(supabase).get<LiveSessionQualityEventVM[]>(
+    `/live-sessions/${encodeURIComponent(liveSessionId)}/quality-events`,
+    { orgId },
+    { cache: 'no-store' },
+  );
 }

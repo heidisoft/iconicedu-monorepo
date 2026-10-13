@@ -99,7 +99,7 @@ function sweepExpiredGuestJoinAttempts(now: number) {
   }
 }
 
-function checkGuestJoinRateLimit(key: string) {
+function checkGuestJoinRateLimit(key: string, recordFailure = true) {
   const now = Date.now();
 
   guestJoinCallsSinceSweep += 1;
@@ -111,7 +111,7 @@ function checkGuestJoinRateLimit(key: string) {
   const existing = guestJoinAttempts.get(key);
 
   if (!existing || now - existing.windowStartedAt > GUEST_JOIN_RATE_WINDOW_MS) {
-    guestJoinAttempts.set(key, { count: 1, windowStartedAt: now });
+    if (recordFailure) guestJoinAttempts.set(key, { count: 1, windowStartedAt: now });
     return;
   }
 
@@ -122,7 +122,7 @@ function checkGuestJoinRateLimit(key: string) {
     );
   }
 
-  existing.count += 1;
+  if (recordFailure) existing.count += 1;
 }
 
 // Same process-local, sweep-on-interval pattern as the guest-join limiter
@@ -485,19 +485,25 @@ export class LiveSessionsService {
     clientIp = 'unknown',
     redemptionKey = '',
   ) {
-    checkGuestJoinRateLimit(`link:${identifier}:${clientIp}`);
     const publicInfo = await this.getPublicLiveSessionInfo(identifier, null);
     if (!publicInfo.exists || !publicInfo.isActive || !publicInfo.sessionId)
       throw new NotFoundException('Live session is not active');
-    const linkToken = handoff
-      ? await redeemMeetingHandoff(token, publicInfo.sessionId, redemptionKey)
-      : token;
-    const info = await this.getPublicLiveSessionInfo(
-      publicInfo.sessionId,
-      handoff ? null : accessToken,
-      linkToken,
-    );
-    return { info, linkToken };
+    checkGuestJoinRateLimit(`link:${identifier}:${clientIp}`, false);
+    try {
+      const linkToken = handoff
+        ? await redeemMeetingHandoff(token, publicInfo.sessionId, redemptionKey)
+        : token;
+      const info = await this.getPublicLiveSessionInfo(
+        publicInfo.sessionId,
+        handoff ? null : accessToken,
+        linkToken,
+      );
+      return { info, linkToken };
+    } catch (error) {
+      if (error instanceof ForbiddenException)
+        checkGuestJoinRateLimit(`link:${identifier}:${clientIp}`);
+      throw error;
+    }
   }
 
   async admissionStatus(sessionId: string, token: string, cancel = false) {
@@ -648,8 +654,6 @@ export class LiveSessionsService {
     input: GuestJoinLiveSessionDto,
     accessToken: string | null = null,
   ): Promise<LiveSessionJoinCredentialsVM> {
-    checkGuestJoinRateLimit(`${sessionId}:${clientIp}`);
-
     const serviceSupabase = createSupabaseServiceClient();
     const sessionResponse = await serviceSupabase
       .from('channel_live_sessions')
@@ -696,13 +700,12 @@ export class LiveSessionsService {
       : await this.guardianStudents(identity, session.org_id, session.channel_id);
     const isHost =
       students === undefined && (await this.isMeetingHost(session.id, identity));
-    if (
-      !identity &&
-      link?.purpose !== 'invite' &&
-      !isHost &&
-      !verifyZoomPasscode(storedPasscode, input.passcode)
-    ) {
-      throw new ForbiddenException('Incorrect passcode');
+    if (!identity && link?.purpose !== 'invite' && !isHost) {
+      checkGuestJoinRateLimit(`${sessionId}:${clientIp}`, false);
+      if (!verifyZoomPasscode(storedPasscode, input.passcode)) {
+        checkGuestJoinRateLimit(`${sessionId}:${clientIp}`);
+        throw new ForbiddenException('Incorrect passcode');
+      }
     }
     if (input.studentProfileId && students === undefined)
       throw new ForbiddenException(
@@ -1292,10 +1295,15 @@ export class LiveSessionsService {
     const serviceSupabase = createSupabaseServiceClient();
     const sessionResponse = await serviceSupabase
       .from('channel_live_sessions')
-      .select('id, org_id, channel_id')
+      .select('id, org_id, channel_id, provider_metadata')
       .eq('id', sessionId)
       .is('deleted_at', null)
-      .maybeSingle<{ id: string; org_id: string; channel_id: string }>();
+      .maybeSingle<{
+        id: string;
+        org_id: string;
+        channel_id: string;
+        provider_metadata?: Record<string, unknown> | null;
+      }>();
 
     if (sessionResponse.error) {
       throw new InternalServerErrorException(sessionResponse.error.message);
@@ -1305,9 +1313,18 @@ export class LiveSessionsService {
       throw new NotFoundException('Live session not found');
     }
 
-    const actorProfileId = accessToken
-      ? await this.resolveProfileIdForAccessToken(accessToken, session.org_id)
-      : null;
+    let identity: Awaited<ReturnType<LiveSessionsService['resolveLiveSessionIdentity']>> =
+      null;
+    if (accessToken)
+      identity = await this.resolveLiveSessionIdentity(accessToken, session.org_id);
+    else if (input.linkToken) {
+      const link = await resolveMeetingLink(input.linkToken, session.id, null);
+      if (link?.purpose === 'access' && link.auth_user_id)
+        identity = await this.resolveLiveSessionUser(link.auth_user_id, session.org_id);
+    }
+    if (!identity?.profileId || !(await this.isMeetingHost(session.id, identity)))
+      throw new ForbiddenException('Meeting host access required');
+    const actorProfileId = identity.profileId;
 
     const insertResponse = await serviceSupabase
       .from('channel_live_session_audit_events')

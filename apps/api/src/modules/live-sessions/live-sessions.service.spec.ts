@@ -1,3 +1,4 @@
+import { resolveMeetingLink } from './meeting-browser-links';
 jest.mock('./meeting-browser-links', () => ({
   issueMeetingLink: jest.fn(async () => 'synthetic-invitation-token'),
   resolveMeetingLink: jest.fn(),
@@ -266,6 +267,32 @@ describe('LiveSessionsService.guestJoinLiveSession', () => {
       }),
     );
     expect(String(getJoinAccess.mock.calls[0][0].profileId)).toMatch(/^guest:/);
+  });
+
+  it('allows a classroom of successful joins behind one public IP', async () => {
+    mockSessionRow({
+      id: 'shared-ip-session',
+      provider: 'zoom',
+      status: 'live',
+      provider_session_id: 'room',
+      provider_metadata: { sessionName: 'room', passcode: 'correct' },
+    });
+    verifyZoomPasscodeMock.mockReturnValue(true);
+    getLiveSessionProviderMock.mockReturnValue({
+      key: 'zoom',
+      getJoinAccess: jest.fn(async () => ({ token: 'synthetic-token' })),
+      createSession: jest.fn(),
+      normalizeWebhook: jest.fn(),
+    } as never);
+    const service = new LiveSessionsService();
+    for (let i = 0; i < 20; i++) {
+      await expect(
+        service.guestJoinLiveSession('shared-ip-session', 'school-nat', {
+          displayName: `Student ${i}`,
+          passcode: 'correct',
+        }),
+      ).resolves.toMatchObject({ token: 'synthetic-token' });
+    }
   });
 
   it('rejects anonymous shared-link joins when invitations are disabled', async () => {
@@ -567,6 +594,7 @@ describe('LiveSessionsService.logLiveSessionAuditEvent', () => {
   ) {
     const insert = jest.fn(async () => ({ error: insertError }));
     createSupabaseServiceClientMock.mockReturnValue({
+      rpc: jest.fn(async () => ({ data: true, error: null })),
       from: jest.fn((table: string) => {
         if (table === 'channel_live_session_audit_events') {
           return { insert };
@@ -575,7 +603,15 @@ describe('LiveSessionsService.logLiveSessionAuditEvent', () => {
           select: jest.fn().mockReturnThis(),
           eq: jest.fn().mockReturnThis(),
           is: jest.fn().mockReturnThis(),
-          maybeSingle: jest.fn(async () => ({ data: sessionRow, error: null })),
+          maybeSingle: jest.fn(async () => ({
+            data:
+              table === 'accounts'
+                ? { id: 'account-1' }
+                : table === 'profiles'
+                  ? { id: 'host-profile', kind: 'educator', display_name: 'Host' }
+                  : sessionRow,
+            error: null,
+          })),
         };
       }),
     } as never);
@@ -585,9 +621,17 @@ describe('LiveSessionsService.logLiveSessionAuditEvent', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.mocked(hasOrgStaffRole).mockResolvedValue(false);
+    jest.mocked(createSupabaseSessionClient).mockReturnValue({
+      auth: {
+        getUser: jest.fn(async () => ({
+          data: { user: { id: 'host-user' } },
+          error: null,
+        })),
+      },
+    } as never);
   });
 
-  it('records an audit event without an actor_profile_id when no access token is given', async () => {
+  it('records an audit event attributed to the verified host', async () => {
     const insert = mockSessionAndInsert({
       id: 'session-1',
       org_id: 'org-1',
@@ -598,7 +642,7 @@ describe('LiveSessionsService.logLiveSessionAuditEvent', () => {
     const result = await service.logLiveSessionAuditEvent(
       'session-1',
       '127.0.0.1',
-      null,
+      'host-token',
       auditInput,
     );
 
@@ -608,12 +652,82 @@ describe('LiveSessionsService.logLiveSessionAuditEvent', () => {
         org_id: 'org-1',
         live_session_id: 'session-1',
         channel_id: 'channel-1',
-        actor_profile_id: null,
+        actor_profile_id: 'host-profile',
         action: 'mute_participant',
         metadata: { targetDisplayName: 'Riley Student' },
         occurred_at: '2026-01-01T00:00:00.000Z',
       }),
     );
+  });
+
+  it.each(['anonymous', 'non-host', 'invalid-token'])(
+    'rejects %s audit events before inserting',
+    async (kind) => {
+      const insert = mockSessionAndInsert({
+        id: 'session-auth',
+        org_id: 'org-1',
+        channel_id: 'channel-1',
+      });
+      const db = createSupabaseServiceClientMock();
+      if (kind === 'non-host')
+        jest.mocked(db.rpc).mockResolvedValue({ data: false, error: null } as never);
+      if (kind === 'invalid-token')
+        jest.mocked(createSupabaseSessionClient).mockReturnValue({
+          auth: {
+            getUser: jest.fn(async () => ({ data: { user: null }, error: null })),
+          },
+        } as never);
+      await expect(
+        new LiveSessionsService().logLiveSessionAuditEvent(
+          'session-auth',
+          'audit-auth-test',
+          kind === 'anonymous' ? null : 'test-token',
+          auditInput,
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(insert).not.toHaveBeenCalled();
+    },
+  );
+
+  it('attributes a personal browser handoff to its authenticated host', async () => {
+    const insert = mockSessionAndInsert({
+      id: 'session-handoff-audit',
+      org_id: 'org-1',
+      channel_id: 'channel-1',
+    });
+    jest
+      .mocked(resolveMeetingLink)
+      .mockResolvedValue({ purpose: 'access', auth_user_id: 'host-user' } as never);
+    await expect(
+      new LiveSessionsService().logLiveSessionAuditEvent(
+        'session-handoff-audit',
+        'handoff-ip',
+        null,
+        { ...auditInput, linkToken: 'synthetic' },
+      ),
+    ).resolves.toEqual({ success: true });
+    expect(insert).toHaveBeenCalledWith(
+      expect.objectContaining({ actor_profile_id: 'host-profile' }),
+    );
+  });
+  it('does not accept a shared invitation as host authentication', async () => {
+    const insert = mockSessionAndInsert({
+      id: 'session-invite-audit',
+      org_id: 'org-1',
+      channel_id: 'channel-1',
+    });
+    jest
+      .mocked(resolveMeetingLink)
+      .mockResolvedValue({ purpose: 'invite', auth_user_id: null } as never);
+    await expect(
+      new LiveSessionsService().logLiveSessionAuditEvent(
+        'session-invite-audit',
+        'invite-ip',
+        null,
+        { ...auditInput, linkToken: 'synthetic' },
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(insert).not.toHaveBeenCalled();
   });
 
   it('404s when the session does not exist', async () => {
@@ -630,11 +744,51 @@ describe('LiveSessionsService.logLiveSessionAuditEvent', () => {
 
     const service = new LiveSessionsService();
     const attempt = () =>
-      service.logLiveSessionAuditEvent('session-1', '10.0.0.3', null, auditInput);
+      service.logLiveSessionAuditEvent('session-1', '10.0.0.3', 'host-token', auditInput);
 
     for (let i = 0; i < 60; i += 1) {
       await expect(attempt()).resolves.toEqual({ success: true });
     }
     await expect(attempt()).rejects.toThrow('Too many audit events');
+  });
+});
+
+describe('LiveSessionsService shared-IP invitation verification', () => {
+  it('does not throttle successful invitation opens behind one IP', async () => {
+    const service = new LiveSessionsService();
+    jest.spyOn(service, 'getPublicLiveSessionInfo').mockResolvedValue({
+      exists: true,
+      isActive: true,
+      sessionId: 'link-nat',
+      sessionTitle: 'Class',
+      isHost: false,
+    });
+    for (let i = 0; i < 20; i++)
+      await expect(
+        service.getLinkInfo('link-nat', 'synthetic', false, null, 'school-nat'),
+      ).resolves.toMatchObject({ linkToken: 'synthetic' });
+  });
+  it('limits failed invitation checks before further verification', async () => {
+    const service = new LiveSessionsService();
+    const info = jest
+      .spyOn(service, 'getPublicLiveSessionInfo')
+      .mockImplementation(async (_identifier, _access, token) => {
+        if (token) throw new ForbiddenException('Invalid link');
+        return {
+          exists: true,
+          isActive: true,
+          sessionId: 'link-failed',
+          sessionTitle: 'Class',
+          isHost: false,
+        };
+      });
+    for (let i = 0; i < 5; i++)
+      await expect(
+        service.getLinkInfo('link-failed', 'invalid', false, null, 'invalid-ip'),
+      ).rejects.toThrow('Invalid link');
+    await expect(
+      service.getLinkInfo('link-failed', 'invalid', false, null, 'invalid-ip'),
+    ).rejects.toThrow('Too many join attempts');
+    expect(info.mock.calls.filter((call) => call[2] === 'invalid')).toHaveLength(5);
   });
 });

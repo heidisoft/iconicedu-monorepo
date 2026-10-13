@@ -241,3 +241,11 @@ export type LiveSessionMemberAccessVM =
       externalJoinUrl: string | null;
       displayName: string;
     };
+
+export type LiveSessionQualityEventVM = {
+  id: string;
+  display_name: string;
+  metric: 'network_quality' | 'connection_state';
+  level: string;
+  occurred_at: string;
+};

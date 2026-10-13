@@ -1547,6 +1547,7 @@ export function ZoomVideoSessionEmbed({
       void logLiveSessionAuditEvent(
         liveSessionId,
         {
+          linkToken: meetingLinkToken,
           action: 'mute_participant',
           targetDisplayName: participantDisplayName,
           occurredAt: new Date().toISOString(),
@@ -1554,7 +1555,7 @@ export function ZoomVideoSessionEmbed({
         accessToken,
       );
     },
-    [isSelfHost, isSelfCoHost, liveSessionId, accessToken],
+    [isSelfHost, isSelfCoHost, liveSessionId, accessToken, meetingLinkToken],
   );
 
   // Host-only "End session for everyone" — distinct from the regular Leave
@@ -1569,6 +1570,7 @@ export function ZoomVideoSessionEmbed({
     void logLiveSessionAuditEvent(
       liveSessionId,
       {
+        linkToken: meetingLinkToken,
         action: 'end_session_for_all',
         targetDisplayName: null,
         occurredAt: new Date().toISOString(),
@@ -1577,7 +1579,7 @@ export function ZoomVideoSessionEmbed({
     );
     leaveMeeting(true);
     setShowEndForAllConfirm(false);
-  }, [isSelfHost, liveSessionId, accessToken, leaveMeeting]);
+  }, [isSelfHost, liveSessionId, accessToken, meetingLinkToken, leaveMeeting]);
 
   const pip = useMeetingPictureInPicture({
     connected: status === 'connected' && !showFeedbackPrompt,

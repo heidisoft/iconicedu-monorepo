@@ -6,6 +6,7 @@ export type LiveSessionAuditAction =
   | 'recording_started';
 
 export type LogLiveSessionAuditEventDto = {
+  linkToken?: string;
   action: LiveSessionAuditAction;
   targetDisplayName: string | null;
   occurredAt: string;
@@ -44,7 +45,14 @@ export function parseLogLiveSessionAuditEventDto(
     throw new BadRequestException('occurredAt must be a valid ISO date string');
   }
 
+  const linkToken = body.linkToken;
+  if (
+    linkToken !== undefined &&
+    (typeof linkToken !== 'string' || !/^[\w-]{32}$/.test(linkToken))
+  )
+    throw new BadRequestException('Invalid meeting access token');
   return {
+    ...(typeof linkToken === 'string' ? { linkToken } : {}),
     action: action as LiveSessionAuditAction,
     targetDisplayName,
     occurredAt,

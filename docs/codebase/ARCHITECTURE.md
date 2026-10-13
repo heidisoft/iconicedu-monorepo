@@ -211,3 +211,5 @@ tab-scoped recovery, independently of the explicit leave action. Browser suspens
 and operating-system audio interruptions do not guarantee continued background media.
 
 Classroom whiteboards under 600 pixels wide hide the Saved/participants bar to prioritize drawing space. The horizontal scrolling toolbar moves to the top, with quick styles below it. Wider boards retain board details and participant controls.
+
+Meeting quality-event reads go through the authenticated API, which requires an owner, admin, or staff account in the session organization. Audit writes require verified meeting-host authorization and attribute the action to that caller. Guest passcode and link throttles count failed verification attempts; successful classroom joins do not consume the shared-IP allowance.
