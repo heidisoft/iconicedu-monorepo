@@ -2,6 +2,7 @@ import React, {
   useCallback,
   useEffect,
   useRef,
+  useMemo,
   useState,
   useSyncExternalStore,
 } from 'react';
@@ -26,6 +27,8 @@ import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type {
   LiveSessionJoinCredentialsVM,
+  WhiteboardSnapshotVM,
+  AnnotationContext,
   MeetingWaitingParticipantVM,
 } from '@iconicedu/shared-types';
 import {
@@ -33,6 +36,10 @@ import {
   type NativeMeetingAdapter,
 } from '@/lib/classroom/meeting-controller';
 import { createZoomNativeAdapter } from '@/lib/classroom/zoom-native-adapter';
+import { createShareAnnotationLifecycle } from '@iconicedu/utils';
+import { nativeAnnotationApi } from '@/lib/classroom/annotation-api';
+import { capabilityGet, capabilityPost } from '@/lib/api/http-client';
+import { generateClientMessageId } from '@/lib/messages/client-message-id';
 import { classroomApi } from '@/lib/classroom/api';
 import { useTheme } from '@/providers/theme-provider';
 import { useNativePictureInPicture } from './use-native-picture-in-picture';
@@ -75,7 +82,7 @@ export function NativeClassroom({
   );
   const state = useSyncExternalStore(controller.subscribe, controller.snapshot);
   const { colors } = useTheme();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const [page, setPage] = useState(0);
   const pageSize = 4;
   const pageCount = Math.max(1, Math.ceil(state.participants.length / pageSize));
@@ -155,6 +162,36 @@ export function NativeClassroom({
   }, [state.phase]);
 
   const [error, setError] = useState<string | null>(null);
+  const annotationLifecycle = useMemo(
+    () =>
+      createShareAnnotationLifecycle(
+        (roomId, operation) =>
+          nativeAnnotationApi(sessionId, '0', credentials.annotationToken).save(
+            roomId,
+            operation,
+          ),
+        generateClientMessageId,
+      ),
+    [sessionId, credentials.annotationToken],
+  );
+  const rememberAnnotations = useCallback(
+    (shareKey: string, context: AnnotationContext) =>
+      annotationLifecycle.remember(shareKey, context),
+    [annotationLifecycle],
+  );
+  const previousShare = useRef<string | null>(null);
+  useEffect(() => {
+    const previous = previousShare.current;
+    previousShare.current = state.sharingUserId;
+    if (previous && previous !== state.sharingUserId)
+      void annotationLifecycle
+        .end(previous)
+        .catch(() =>
+          setError(
+            'Unable to close screen annotations. Please retry stopping the share.',
+          ),
+        );
+  }, [state.sharingUserId, annotationLifecycle]);
   const [originalAudio, setOriginalAudio] = useState(false);
   const [mirrored, setMirrored] = useState(false);
   useEffect(() => {
@@ -337,6 +374,19 @@ export function NativeClassroom({
       <NativeFocusedVideo
         user={state.participants.find((user) => user.id === focused?.id)}
         sharing={focused?.sharing ?? false}
+        shareContent={
+          focused?.sharing ? (
+            <NativeShareStage
+              sessionId={sessionId}
+              userId={focused.id}
+              token={credentials.annotationToken}
+              height={Math.max(180, height - 130)}
+              annotating={annotating}
+              composited={state.composited.includes(focused.id)}
+              onContext={rememberAnnotations}
+            />
+          ) : undefined
+        }
         onClose={() => setFocused(null)}
       />
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -461,6 +511,7 @@ export function NativeClassroom({
                   focused?.id !== state.sharingUserId && (
                     <NativeShareStage
                       sessionId={sessionId}
+                      onContext={rememberAnnotations}
                       userId={state.sharingUserId}
                       token={credentials.annotationToken}
                       height={width >= 700 ? 420 : 250}
@@ -656,9 +707,40 @@ export function NativeClassroom({
                     },
                   )}
                   {controller.settings.whiteboard.enabled &&
-                    button('Whiteboard', () =>
-                      setPanel(panel === 'whiteboard' ? 'none' : 'whiteboard'),
-                    )}
+                    button('Whiteboard', () => {
+                      void run(async () => {
+                        if (boardPending)
+                          throw new Error('Wait for whiteboard changes to save.');
+                        const access = credentials.whiteboard;
+                        if (access?.provider !== 'excalidraw' || !access.token) {
+                          setPanel(panel === 'whiteboard' ? 'none' : 'whiteboard');
+                          return;
+                        }
+                        const board = whiteboardRepository
+                          ? await whiteboardRepository.load()
+                          : await capabilityGet<WhiteboardSnapshotVM>(
+                              '/whiteboards/current',
+                              access.token,
+                            );
+                        if (board.role !== 'teacher') {
+                          setPanel(panel === 'whiteboard' ? 'none' : 'whiteboard');
+                          return;
+                        }
+                        const operation = {
+                          id: generateClientMessageId(),
+                          type: 'presentation' as const,
+                          enabled: !board.presentationActive,
+                        };
+                        const saved = whiteboardRepository
+                          ? await whiteboardRepository.save(operation)
+                          : await capabilityPost<WhiteboardSnapshotVM>(
+                              '/whiteboards/current/operations',
+                              access.token,
+                              operation,
+                            );
+                        onBoardPresentation(saved.presentationActive === true);
+                      });
+                    })}
                   {controller.settings.participants.visible &&
                     button(
                       `Participants${waiting.length ? ` (${waiting.length} waiting)` : ''}`,

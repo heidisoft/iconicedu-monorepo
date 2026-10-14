@@ -185,6 +185,7 @@ export function NativeScreenAnnotations({
   active,
   composited = false,
   apiOverride,
+  onContext,
 }: {
   sessionId: string;
   shareKey: string;
@@ -194,6 +195,7 @@ export function NativeScreenAnnotations({
   active: boolean;
   composited?: boolean;
   apiOverride?: ReturnType<typeof nativeAnnotationApi>;
+  onContext?: (context: AnnotationContext) => void;
 }) {
   const api = useMemo(
     () => apiOverride ?? nativeAnnotationApi(sessionId, shareKey, token),
@@ -201,6 +203,9 @@ export function NativeScreenAnnotations({
   );
   const { colors } = useTheme();
   const [context, setContext] = useState<AnnotationContext | null>(null);
+  useEffect(() => {
+    if (context) onContext?.(context);
+  }, [context, onContext]);
   const contextRef = useRef(context);
   contextRef.current = context;
   const [tool, setTool] = useState<AnnotationTool>('pen');

@@ -85,9 +85,9 @@ name: Native classroom UI lifecycle on iPad and Android tablets
     element: 'Allow student editing'
 - tapOn: 'Allow student editing'
 - assertVisible: 'Disable student editing'
-- tapOn: 'Present board'
 - assertVisible: 'Stop presenting board'
-- tapOn: 'Close whiteboard'
+- tapOn: 'Stop presenting board'
+- assertNotVisible: 'Class whiteboard'
 - scrollUntilVisible:
     element: 'Leave meeting'
     direction: UP

@@ -45,6 +45,7 @@ export function createWhiteboardClass() {
     commit;`);
   return {
     board,
+    session,
     page,
     teacher,
     student,

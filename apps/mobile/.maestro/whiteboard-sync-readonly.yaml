@@ -1,0 +1,7 @@
+appId: com.heidisoft.iconicedu
+---
+- extendedWaitUntil:
+    visible:
+      text: 'Educational library'
+      enabled: false
+    timeout: 30000

@@ -9,10 +9,12 @@ export function NativeFocusedVideo({
   user,
   sharing,
   onClose,
+  shareContent,
 }: {
   user?: NativeParticipant;
   sharing: boolean;
   onClose: () => void;
+  shareContent?: React.ReactNode;
 }) {
   const { colors } = useTheme();
   return (
@@ -40,7 +42,9 @@ export function NativeFocusedVideo({
               {sharing ? ' — shared screen' : ''}
             </Text>
           </View>
-          {user && (user.video || sharing) ? (
+          {user && sharing && shareContent ? (
+            shareContent
+          ) : user && (user.video || sharing) ? (
             <NativeVideoView userId={user.id} sharing={sharing} style={{ flex: 1 }} />
           ) : (
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>

@@ -1,3 +1,4 @@
+import type { AnnotationContext } from '@iconicedu/shared-types';
 import React, { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { VideoAspect, ZoomVideoSdkUser, useZoom } from '@zoom/react-native-videosdk';
@@ -11,6 +12,7 @@ export function NativeShareStage({
   height,
   annotating,
   composited,
+  onContext,
 }: {
   sessionId: string;
   userId: string;
@@ -18,6 +20,7 @@ export function NativeShareStage({
   height: number;
   annotating: boolean;
   composited: boolean;
+  onContext?: (shareKey: string, context: AnnotationContext) => void;
 }) {
   const zoom = useZoom();
   const [viewport, setViewport] = useState({ width: 0, height });
@@ -73,6 +76,7 @@ export function NativeShareStage({
           }}
         >
           <NativeScreenAnnotations
+            onContext={onContext ? (context) => onContext(userId, context) : undefined}
             sessionId={sessionId}
             shareKey={userId}
             token={token}
