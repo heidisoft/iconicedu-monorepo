@@ -58,6 +58,7 @@
     "@tanstack/react-query": "^5.90.11",
     "@zoom/react-native-videosdk": "2.6.1",
     "expo": "^55.0.0",
+    "expo-asset": "~55.0.8",
     "expo-audio": "~55.0.8",
     "expo-camera": "~55.0.19",
     "expo-constants": "^55.0.7",

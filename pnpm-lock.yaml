@@ -229,6 +229,9 @@ importers:
       expo:
         specifier: ^55.0.0
         version: 55.0.5(@babel/core@7.29.7)(@expo/dom-webview@55.0.3)(@expo/metro-runtime@55.0.6)(expo-router@55.0.4)(react-dom@19.2.4(react@19.2.4))(react-native-webview@13.16.1(react-native@0.83.2(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.2.4))(react@19.2.4))(react-native@0.83.2(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.2.4))(react@19.2.4)(typescript@5.9.3)
+      expo-asset:
+        specifier: ~55.0.8
+        version: 55.0.8(expo@55.0.5)(react-native@0.83.2(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.2.4))(react@19.2.4)(typescript@5.9.3)
       expo-audio:
         specifier: ~55.0.8
         version: 55.0.8(expo-asset@55.0.8(expo@55.0.5)(react-native@0.83.2(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(expo@55.0.5)(react-native@0.83.2(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.2.4))(react@19.2.4)

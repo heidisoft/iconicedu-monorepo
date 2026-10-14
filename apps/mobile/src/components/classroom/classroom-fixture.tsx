@@ -10,6 +10,7 @@ import type {
   NativeMeetingAdapter,
   NativeMeetingEvent,
   NativeParticipant,
+  NativeShareMode,
 } from '@/lib/classroom/meeting-controller';
 import type { NativeWhiteboardRepository } from '@/components/classroom/native-whiteboard';
 import type { classroomApi } from '@/lib/classroom/api';
@@ -22,6 +23,7 @@ export function createClassroomFixtureAdapter(
 ): NativeMeetingAdapter {
   let cameraId = 'front',
     audioId = 'speaker';
+  let shareMode: NativeShareMode = 'single';
   let send: (event: NativeMeetingEvent) => void = () => {};
   const users: NativeParticipant[] = [
     {
@@ -55,7 +57,7 @@ export function createClassroomFixtureAdapter(
       send({ type: 'joined', selfId: '1', participants: [...users] });
     },
     async leave() {
-      send({ type: 'left', reason: 'BySelf' });
+      send({ type: 'left', reason: 'self' });
     },
     async microphone(id, enabled) {
       const user = users.find((item) => item.id === id);
@@ -67,7 +69,7 @@ export function createClassroomFixtureAdapter(
     },
     async switchCamera() {},
     async share(enabled) {
-      send({ type: 'share', userId: enabled ? '1' : null });
+      send({ type: 'share', userId: '1', active: enabled });
     },
     async cohost(id, enabled) {
       const user = users.find((item) => item.id === id);
@@ -87,7 +89,16 @@ export function createClassroomFixtureAdapter(
       send({ type: 'participants', participants: users.map((item) => ({ ...item })) });
     },
     async recording(active) {
-      send({ type: 'recording', active });
+      send({ type: 'recording', status: active ? 'recording' : 'stopped' });
+    },
+    async resumeRecording() {
+      send({ type: 'recording', status: 'recording' });
+    },
+    async shareMode() {
+      return shareMode;
+    },
+    async setShareMode(mode) {
+      shareMode = mode;
     },
     async chat(text) {
       send({ type: 'chat', id: String(Date.now()), sender: 'Test teacher', text });
