@@ -1,23 +1,47 @@
 import { createNativePictureInPicture } from './native-picture-in-picture';
 import { NativeModules, PermissionsAndroid, Platform } from 'react-native';
 import {
+  ConsentType,
   EventType,
   Errors,
   RecordingStatus,
   ShareStatus,
+  ZoomVideoSDKChatPrivilegeType,
   ZoomVideoSdkUser,
   useZoom,
 } from '@zoom/react-native-videosdk';
 import type {
+  NativeLeaveReason,
   NativeMeetingAdapter,
   NativeMeetingEvent,
   NativeParticipant,
   NativeMediaDevice,
+  NativeRecordingStatus,
+  NativeShareMode,
 } from './meeting-controller';
 
 type Zoom = ReturnType<typeof useZoom>;
 const object = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+const recordingStatus = (status: unknown): NativeRecordingStatus =>
+  status === RecordingStatus.Start
+    ? 'recording'
+    : status === RecordingStatus.Pause
+      ? 'paused'
+      : 'stopped';
+// iOS sends the bare reason ("EndByHost"); Android prefixes it ("SessionLeaveReason_EndByHost").
+const leaveReason = (reason: unknown): NativeLeaveReason => {
+  const value = String(reason ?? '');
+  if (value.endsWith('BySelf')) return 'self';
+  if (value.endsWith('EndByHost')) return 'ended-by-host';
+  if (value.endsWith('KickByHost')) return 'removed';
+  if (value.endsWith('NetworkError')) return 'network';
+  return 'unknown';
+};
+const sharing = (status: unknown) =>
+  status === ShareStatus.Start ||
+  status === ShareStatus.Resume ||
+  status === ShareStatus.Pause;
 function checked(result: unknown) {
   if (result != null && result !== Errors.Success && result !== 0 && result !== true)
     throw new Error('Zoom could not complete this action');
@@ -60,9 +84,26 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
             }),
           );
           const joining = joinedPending;
-          const recordingStatus = joining
+          const status = joining
             ? await zoom.recordingHelper.getCloudRecordingStatus().catch(() => undefined)
             : undefined;
+          // Shares already running before this join do not replay a status event.
+          const presenters = joining
+            ? (
+                await Promise.all(
+                  users.map(async (value) => {
+                    const user = new ZoomVideoSdkUser(value);
+                    const actions: Array<{ shareStatus?: unknown }> =
+                      await Promise.resolve(user.getShareActionList?.() ?? []).catch(
+                        () => [],
+                      );
+                    return actions.some((action) => sharing(action.shareStatus))
+                      ? value.userId
+                      : null;
+                  }),
+                )
+              ).filter((id): id is string => !!id)
+            : [];
           if (request !== refreshEpoch || generation !== current) return;
           selfId = self.userId;
           send(
@@ -71,11 +112,9 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
               : { type: 'participants', participants },
           );
           joinedPending = false;
-          if (recordingStatus !== undefined)
-            send({
-              type: 'recording',
-              active: recordingStatus === RecordingStatus.Start,
-            });
+          presenters.forEach((userId) => send({ type: 'share', userId, active: true }));
+          if (status !== undefined)
+            send({ type: 'recording', status: recordingStatus(status) });
         } catch {
           send({
             type: 'error',
@@ -154,7 +193,7 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
             .catch(() => {});
         }),
         zoom.addListener(EventType.onSessionLeave, (value: unknown) => {
-          send({ type: 'left', reason: String(object(value).reason ?? '') });
+          send({ type: 'left', reason: leaveReason(object(value).reason) });
           void NativeModules.ClassroomControls.stopMeetingService().catch(() => {});
           void NativeModules.ClassroomControls.stopShareService().catch(() => {});
         }),
@@ -182,21 +221,34 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
           const event = object(value),
             action = object(event.shareAction),
             user = object(event.user);
-          send({
-            type: 'share',
-            userId:
-              action.shareStatus === ShareStatus.Stop ||
-              action.shareStatus === ShareStatus.None
-                ? null
-                : typeof user.userId === 'string'
-                  ? user.userId
-                  : null,
-          });
+          if (typeof user.userId === 'string')
+            send({
+              type: 'share',
+              userId: user.userId,
+              active: sharing(action.shareStatus),
+            });
         }),
-        zoom.addListener(EventType.onCloudRecordingStatus, (value: unknown) =>
+        zoom.addListener(EventType.onCloudRecordingStatus, (value: unknown) => {
+          const status = recordingStatus(object(value).status);
+          send({ type: 'recording', status });
+          if (status !== 'recording') return;
+          // Zoom only holds a consent handler for participants who must answer.
+          void zoom
+            .getRecordingConsentType()
+            .then((type) => {
+              if (type === ConsentType.ConsentType_Traditional)
+                send({ type: 'recording-consent', consent: 'traditional' });
+              else if (type === ConsentType.ConsentType_Individual)
+                send({ type: 'recording-consent', consent: 'individual' });
+            })
+            .catch(() => {});
+        }),
+        zoom.addListener(EventType.onChatPrivilegeChanged, (value: unknown) =>
           send({
-            type: 'recording',
-            active: object(value).status === RecordingStatus.Start,
+            type: 'chat-privilege',
+            allowed:
+              object(value).privilege !==
+              ZoomVideoSDKChatPrivilegeType.ZoomVideoSDKChatPrivilege_No_One,
           }),
         ),
         zoom.addListener(EventType.onChatNewMessageNotify, (value: unknown) => {
@@ -315,17 +367,28 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
     async mirror(enabled) {
       checked(await zoom.videoHelper.mirrorMyVideo(enabled));
     },
-    async lockSharing(locked) {
-      checked(await zoom.shareHelper.lockShare(locked));
+    async shareMode() {
+      const mode: unknown = await NativeModules.ClassroomControls.getShareMode();
+      if (mode === 'locked' || mode === 'single' || mode === 'multiple') return mode;
+      throw new Error('Update the app to change sharing.');
+    },
+    async setShareMode(mode: NativeShareMode) {
+      checked(await NativeModules.ClassroomControls.setShareMode(mode));
     },
     async share(enabled) {
       const lockedForParticipant =
         enabled &&
         (await zoom.shareHelper.isShareLocked()) &&
         !(await new ZoomVideoSdkUser(await zoom.session.getMySelf()).getIsHost());
-      if (enabled && ((await zoom.shareHelper.isOtherSharing()) || lockedForParticipant))
+      if (lockedForParticipant)
+        throw new Error('Only the host can share while sharing is locked.');
+      const multiple =
+        enabled &&
+        (await NativeModules.ClassroomControls.getShareMode?.().catch(() => null)) ===
+          'multiple';
+      if (enabled && !multiple && (await zoom.shareHelper.isOtherSharing()))
         throw new Error(
-          'Screen sharing is unavailable while another presenter is sharing or sharing is locked.',
+          'Another presenter is sharing. Ask the host to allow multiple presenters.',
         );
       checked(
         await (enabled
@@ -370,6 +433,24 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
         await (enabled
           ? zoom.recordingHelper.startCloudRecording()
           : zoom.recordingHelper.stopCloudRecording()),
+      );
+    },
+    async resumeRecording() {
+      checked(await zoom.recordingHelper.resumeCloudRecording());
+    },
+    async recordingConsent(accept) {
+      if (
+        !(await (accept ? zoom.acceptRecordingConsent() : zoom.declineRecordingConsent()))
+      )
+        throw new Error('Zoom could not record your recording choice. Please retry.');
+    },
+    async chatPrivilege(allowed) {
+      checked(
+        await zoom.chatHelper.changeChatPrivilege(
+          allowed
+            ? ZoomVideoSDKChatPrivilegeType.ZoomVideoSDKChatPrivilege_Publicly
+            : ZoomVideoSDKChatPrivilegeType.ZoomVideoSDKChatPrivilege_No_One,
+        ),
       );
     },
     async chat(text) {

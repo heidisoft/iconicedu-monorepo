@@ -13,13 +13,26 @@ export type NativeParticipant = {
   muted: boolean;
   video: boolean;
 };
+/** Mirrors web's share privilege: host only, one presenter, or simultaneous presenters. */
+export type NativeShareMode = 'locked' | 'single' | 'multiple';
+export type NativeLeaveReason =
+  | 'self'
+  | 'ended-by-host'
+  | 'removed'
+  | 'network'
+  | 'unknown';
+export type NativeRecordingStatus = 'stopped' | 'recording' | 'paused';
+/** Traditional consent leaves the class on decline; individual consent stays unrecorded. */
+export type NativeRecordingConsent = 'traditional' | 'individual';
 export type NativeMeetingEvent =
   | { type: 'joined'; selfId: string; participants: NativeParticipant[] }
   | { type: 'participants'; participants: NativeParticipant[] }
-  | { type: 'left'; reason: string }
+  | { type: 'left'; reason: NativeLeaveReason }
   | { type: 'error'; message: string }
-  | { type: 'share'; userId: string | null }
-  | { type: 'recording'; active: boolean }
+  | { type: 'share'; userId: string; active: boolean }
+  | { type: 'recording'; status: NativeRecordingStatus }
+  | { type: 'recording-consent'; consent: NativeRecordingConsent }
+  | { type: 'chat-privilege'; allowed: boolean }
   | { type: 'chat'; id: string; sender: string; text: string }
   | { type: 'connection'; reconnecting: boolean }
   | { type: 'hand'; userId: string; raised: boolean }
@@ -50,7 +63,8 @@ export interface NativeMeetingAdapter {
   selectCamera?(id: string): Promise<void>;
   selectAudioRoute?(id: string): Promise<void>;
   mirror?(enabled: boolean): Promise<void>;
-  lockSharing?(locked: boolean): Promise<void>;
+  shareMode?(): Promise<NativeShareMode>;
+  setShareMode?(mode: NativeShareMode): Promise<void>;
   share(enabled: boolean): Promise<void>;
   cohost(userId: string, enabled: boolean): Promise<void>;
   host(userId: string): Promise<void>;
@@ -62,6 +76,9 @@ export interface NativeMeetingAdapter {
   ): Promise<void>;
   captions(enabled: boolean): Promise<void>;
   recording(enabled: boolean): Promise<void>;
+  resumeRecording?(): Promise<void>;
+  recordingConsent?(accept: boolean): Promise<void>;
+  chatPrivilege?(allowed: boolean): Promise<void>;
   chat(text: string): Promise<void>;
   speaker(enabled: boolean): Promise<void>;
   testSpeaker(enabled: boolean): Promise<void>;
@@ -77,8 +94,15 @@ export type NativeMeetingState = {
   speaking: string[];
   microphone: boolean;
   camera: boolean;
+  /** The presenter on stage; `sharingUserIds` keeps every simultaneous presenter. */
   sharingUserId: string | null;
+  sharingUserIds: string[];
+  shareMode: NativeShareMode | null;
   recording: boolean;
+  recordingPaused: boolean;
+  recordingConsent: NativeRecordingConsent | null;
+  chatAllowed: boolean;
+  leaveReason: NativeLeaveReason | null;
   error: string | null;
   composited: string[];
   network: 'good' | 'normal' | 'bad' | null;
@@ -95,7 +119,13 @@ const initial = (): NativeMeetingState => ({
   microphone: false,
   camera: true,
   sharingUserId: null,
+  sharingUserIds: [],
+  shareMode: null,
   recording: false,
+  recordingPaused: false,
+  recordingConsent: null,
+  chatAllowed: true,
+  leaveReason: null,
   error: null,
   messages: [],
   composited: [],
@@ -177,12 +207,19 @@ export class NativeMeetingController {
           phase: 'meeting',
           selfId: event.selfId,
           participants: event.participants,
+          leaveReason: null,
         });
+        this.enforceChatPolicy();
         break;
       case 'participants': {
+        const wasHost = !!this.self?.host;
         const self = event.participants.find((user) => user.id === this.state.selfId);
+        const presenters = this.state.sharingUserIds.filter((id) =>
+          event.participants.some((user) => user.id === id),
+        );
         this.update({
           participants: event.participants,
+          ...this.stage(presenters),
           speaking: this.state.speaking.filter((id) =>
             event.participants.some((user) => user.id === id && !user.muted),
           ),
@@ -191,12 +228,22 @@ export class NativeMeetingController {
           ),
           ...(self ? { microphone: !self.muted, camera: self.video } : {}),
         });
+        // Web applies the chat policy when it holds host; follow host transfers too.
+        if (!wasHost && self?.host) this.enforceChatPolicy();
         break;
       }
       case 'left':
         this.clearEphemeral();
         if (this.joinDeadline) clearTimeout(this.joinDeadline);
-        this.update({ phase: 'ended', sharingUserId: null, recording: false });
+        this.update({
+          phase: 'ended',
+          sharingUserId: null,
+          sharingUserIds: [],
+          recording: false,
+          recordingPaused: false,
+          recordingConsent: null,
+          leaveReason: event.reason,
+        });
         break;
       case 'error':
         if (this.state.phase === 'joining') {
@@ -209,11 +256,37 @@ export class NativeMeetingController {
             .finally(() => this.update({ phase: 'preview', error: event.message }));
         } else this.update({ error: event.message });
         break;
-      case 'share':
-        this.update({ sharingUserId: event.userId });
+      case 'share': {
+        const known = this.state.sharingUserIds.includes(event.userId);
+        if (!event.active) {
+          this.update(
+            this.stage(this.state.sharingUserIds.filter((id) => id !== event.userId)),
+          );
+          break;
+        }
+        // Like web, a newly started share takes the stage; pause/resume updates do not.
+        this.update(
+          known
+            ? this.stage(this.state.sharingUserIds)
+            : {
+                sharingUserIds: [...this.state.sharingUserIds, event.userId],
+                sharingUserId: event.userId,
+              },
+        );
         break;
+      }
       case 'recording':
-        this.update({ recording: event.active });
+        this.update({
+          recording: event.status !== 'stopped',
+          recordingPaused: event.status === 'paused',
+          ...(event.status === 'stopped' ? { recordingConsent: null } : {}),
+        });
+        break;
+      case 'recording-consent':
+        this.update({ recordingConsent: event.consent });
+        break;
+      case 'chat-privilege':
+        this.update({ chatAllowed: event.allowed });
         break;
       case 'chat':
         this.update({
@@ -276,6 +349,50 @@ export class NativeMeetingController {
         break;
     }
   }
+  /** Keep the viewed presenter while sharing; otherwise fall back like web. */
+  private stage(presenters: string[]) {
+    const current = this.state.sharingUserId;
+    return {
+      sharingUserIds: presenters,
+      sharingUserId:
+        current && presenters.includes(current) ? current : (presenters[0] ?? null),
+    };
+  }
+  private enforceChatPolicy() {
+    const { visible, enabled } = this.settings.messages;
+    if (!this.self?.host || (visible && enabled) || !this.adapter.chatPrivilege) return;
+    void this.adapter
+      .chatPrivilege(false)
+      .then(() => this.update({ chatAllowed: false }))
+      .catch(() =>
+        this.update({ error: 'Unable to turn off chat for this class. Please retry.' }),
+      );
+  }
+  viewShare(userId: string) {
+    if (this.state.sharingUserIds.includes(userId))
+      this.update({ sharingUserId: userId });
+  }
+  async refreshShareMode() {
+    if (!this.adapter.shareMode) return;
+    this.update({ shareMode: await this.adapter.shareMode() });
+  }
+  async setShareMode(mode: NativeShareMode) {
+    if (!this.self?.host) throw new Error('Host access required');
+    if (!this.adapter.setShareMode) throw new Error('Update the app to change sharing.');
+    await this.adapter.setShareMode(mode);
+    this.update({ shareMode: mode });
+  }
+  async respondToRecordingConsent(accept: boolean) {
+    const consent = this.state.recordingConsent;
+    if (!consent || !this.adapter.recordingConsent) return;
+    await this.adapter.recordingConsent(accept);
+    this.update({ recordingConsent: null });
+    // Zoom removes traditional-consent decliners; make sure local state follows.
+    if (!accept && consent === 'traditional' && this.state.phase !== 'ended')
+      await this.leave().catch(() =>
+        this.update({ phase: 'ended', leaveReason: 'self' }),
+      );
+  }
   private clearEphemeral() {
     for (const timer of this.reactionTimers) clearTimeout(timer);
     this.reactionTimers.clear();
@@ -330,22 +447,29 @@ export class NativeMeetingController {
   }
   async recording(enabled: boolean) {
     this.requireModerator();
-    if (
-      !this.settings.recording.enabled ||
-      (!enabled && !this.settings.recording.allowStop)
-    )
+    if (!this.settings.recording.enabled)
+      throw new Error('Recording controls are unavailable');
+    // Web resumes a paused recording from the same control instead of stopping it.
+    if (enabled && this.state.recordingPaused) {
+      if (!this.adapter.resumeRecording)
+        throw new Error('Update the app to resume recording.');
+      await this.adapter.resumeRecording();
+      return;
+    }
+    if (!enabled && !this.settings.recording.allowStop)
       throw new Error('Recording controls are unavailable');
     await this.adapter.recording(enabled);
   }
   async chat(text: string) {
     if (!this.settings.messages.enabled || !text.trim()) return;
+    if (!this.state.chatAllowed) throw new Error('The host has turned off chat.');
     await this.adapter.chat(text.trim());
   }
   async leave(endForAll = false) {
     if (endForAll && !this.self?.host) throw new Error('Host access required');
     await this.adapter.leave(endForAll);
     this.clearEphemeral();
-    this.update({ phase: 'ended' });
+    this.update({ phase: 'ended', leaveReason: this.state.leaveReason ?? 'self' });
   }
   async dispose() {
     if (this.disposed) return;

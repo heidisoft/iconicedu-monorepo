@@ -30,6 +30,23 @@ RCT_EXPORT_METHOD(startScreenShare:(RCTPromiseResolveBlock)resolve reject:(RCTPr
     resolve(@YES);
   });
 }
+// Web's share privilege has no RN wrapper equivalent.
+RCT_EXPORT_METHOD(getShareMode:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject) {
+  dispatch_async(dispatch_get_main_queue(), ^{
+    ZoomVideoSDKShareHelper *share = [[ZoomVideoSDK shareInstance] getShareHelper];
+    resolve([share isShareLocked] ? @"locked" : [share isMultiShareEnabled] ? @"multiple" : @"single");
+  });
+}
+RCT_EXPORT_METHOD(setShareMode:(NSString *)mode resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject) {
+  dispatch_async(dispatch_get_main_queue(), ^{
+    ZoomVideoSDKShareHelper *share = [[ZoomVideoSDK shareInstance] getShareHelper];
+    BOOL locked = [mode isEqualToString:@"locked"];
+    ZoomVideoSDKError lockResult = [share lockShare:locked];
+    ZoomVideoSDKError multiResult = locked ? Errors_Success : [share enableMultiShare:[mode isEqualToString:@"multiple"]];
+    if (lockResult == Errors_Success && multiResult == Errors_Success) resolve(@YES);
+    else reject(@"share_mode", @"Unable to change who can share", nil);
+  });
+}
 RCT_EXPORT_METHOD(startMeetingService:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject) { resolve(@YES); }
 RCT_EXPORT_METHOD(stopMeetingService:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject) { resolve(@YES); }
 RCT_EXPORT_METHOD(stopShareService:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject) {

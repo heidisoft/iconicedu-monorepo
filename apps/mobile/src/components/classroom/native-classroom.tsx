@@ -30,7 +30,9 @@ import type {
 } from '@iconicedu/shared-types';
 import {
   NativeMeetingController,
+  type NativeLeaveReason,
   type NativeMeetingAdapter,
+  type NativeShareMode,
 } from '@/lib/classroom/meeting-controller';
 import { createZoomNativeAdapter } from '@/lib/classroom/zoom-native-adapter';
 import { classroomApi } from '@/lib/classroom/api';
@@ -45,8 +47,23 @@ import { NativeVideoView } from './native-video-view';
 import { NativeShareStage } from './native-share-stage';
 import { NativeWhiteboard, type NativeWhiteboardRepository } from './native-whiteboard';
 
+const LEAVE_TITLES: Record<NativeLeaveReason, string> = {
+  self: 'You left the classroom',
+  'ended-by-host': 'The host ended the class',
+  removed: 'You were removed from the class',
+  network: 'You were disconnected from the class',
+  unknown: 'The class connection closed',
+};
+// Same choices and copy as the web settings panel.
+const SHARE_MODES: Array<[NativeShareMode, string]> = [
+  ['locked', 'Only the host can share'],
+  ['multiple', 'Multiple participants can share simultaneously'],
+  ['single', 'One participant can share at a time'],
+];
+
 export function NativeClassroom({
   sessionId,
+  title,
   credentials: initialCredentials,
   hostEligible = false,
   adapterOverride,
@@ -56,6 +73,8 @@ export function NativeClassroom({
   meetingApi = classroomApi,
 }: {
   sessionId: string;
+  /** The class title shown to people; `credentials.sessionName` is Zoom's session key. */
+  title?: string;
   credentials: LiveSessionJoinCredentialsVM;
   hostEligible?: boolean;
   adapterOverride?: NativeMeetingAdapter;
@@ -179,6 +198,12 @@ export function NativeClassroom({
     }
   };
   const moderator = controller.self?.host || controller.self?.cohost;
+  const selfSharing = !!state.selfId && state.sharingUserIds.includes(state.selfId);
+  const isHost = !!controller.self?.host;
+  useEffect(() => {
+    if (isHost && state.phase === 'meeting')
+      void controller.refreshShareMode().catch(() => {});
+  }, [controller, isHost, state.phase]);
   useEffect(
     () => () => {
       void controller.dispose();
@@ -353,8 +378,8 @@ export function NativeClassroom({
               {preview
                 ? 'Ready to join?'
                 : state.phase === 'ended'
-                  ? 'You left the classroom'
-                  : credentials.sessionName}
+                  ? LEAVE_TITLES[state.leaveReason ?? 'self']
+                  : (title ?? credentials.sessionName)}
             </Text>
             {(error || state.error) && (
               <Text accessibilityRole="alert" style={{ color: colors.text }}>
@@ -380,14 +405,54 @@ export function NativeClassroom({
               <Text style={{ color: colors.text }}>Connection: {state.network}</Text>
             )}
             {state.recording && (
-              <Text accessibilityLabel="Recording active" style={{ color: colors.text }}>
-                ● Recording
+              <Text
+                accessibilityLabel={
+                  state.recordingPaused ? 'Recording paused' : 'Recording active'
+                }
+                style={{ color: colors.text }}
+              >
+                {state.recordingPaused ? '❚❚ Recording paused' : '● Recording'}
               </Text>
+            )}
+            {state.recordingConsent && (
+              <View
+                accessibilityRole="alert"
+                style={{
+                  gap: 8,
+                  padding: 12,
+                  borderRadius: 12,
+                  backgroundColor: colors.card,
+                }}
+              >
+                <Text style={{ color: colors.text }}>
+                  {state.recordingConsent === 'traditional'
+                    ? 'This class is being recorded. Stay to consent to the recording, or leave the class.'
+                    : 'The host wants to record you. You can stay in the class either way.'}
+                </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {button(
+                    state.recordingConsent === 'traditional'
+                      ? 'Stay and consent'
+                      : 'Allow recording',
+                    () => {
+                      void run(() => controller.respondToRecordingConsent(true));
+                    },
+                  )}
+                  {button(
+                    state.recordingConsent === 'traditional'
+                      ? 'Leave class'
+                      : "Don't record me",
+                    () => {
+                      void run(() => controller.respondToRecordingConsent(false));
+                    },
+                  )}
+                </View>
+              </View>
             )}
             {preview ? (
               <NativeDevicePreview
                 displayName={displayName}
-                sessionName={credentials.sessionName}
+                sessionName={title ?? credentials.sessionName}
                 camera={state.camera}
                 microphone={state.microphone}
                 joining={state.phase === 'joining'}
@@ -470,6 +535,27 @@ export function NativeClassroom({
                   )}
                 {state.sharingUserId && state.sharingUserId === state.selfId && (
                   <Text style={{ color: colors.text }}>You are sharing your screen</Text>
+                )}
+                {state.sharingUserIds.length > 1 && (
+                  <View
+                    accessibilityLabel="Presenters"
+                    style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}
+                  >
+                    {state.sharingUserIds.map((id) => {
+                      const name =
+                        id === state.selfId
+                          ? 'your'
+                          : `${state.participants.find((user) => user.id === id)?.name ?? 'Participant'}'s`;
+                      return button(
+                        `View ${name} screen`,
+                        () => {
+                          setAnnotating(false);
+                          controller.viewShare(id);
+                        },
+                        id === state.sharingUserId,
+                      );
+                    })}
+                  </View>
                 )}
                 {pageCount > 1 && (
                   <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -630,31 +716,25 @@ export function NativeClassroom({
                       },
                     )}
                   {controller.self?.host &&
-                    adapter.lockSharing &&
-                    button('Only host can share', () => {
-                      void run(() => adapter.lockSharing!(true));
-                    })}
-                  {controller.self?.host &&
-                    adapter.lockSharing &&
-                    button('Allow participants to share', () => {
-                      void run(() => adapter.lockSharing!(false));
-                    })}
+                    adapter.setShareMode &&
+                    SHARE_MODES.map(([mode, label]) =>
+                      button(
+                        state.shareMode === mode ? `${label} (selected)` : label,
+                        () => {
+                          void run(() => controller.setShareMode(mode));
+                        },
+                        state.shareMode === mode,
+                      ),
+                    )}
                   {state.sharingUserId &&
                     state.sharingUserId !== state.selfId &&
                     button(
                       annotating ? 'Stop annotating' : 'Annotate shared screen',
                       () => setAnnotating((previous) => !previous),
                     )}
-                  {button(
-                    state.sharingUserId === state.selfId
-                      ? 'Stop sharing screen'
-                      : 'Share screen',
-                    () => {
-                      void run(() =>
-                        controller.share(state.sharingUserId !== state.selfId),
-                      );
-                    },
-                  )}
+                  {button(selfSharing ? 'Stop sharing screen' : 'Share screen', () => {
+                    void run(() => controller.share(!selfSharing));
+                  })}
                   {controller.settings.whiteboard.enabled &&
                     button('Whiteboard', () =>
                       setPanel(panel === 'whiteboard' ? 'none' : 'whiteboard'),
@@ -681,13 +761,23 @@ export function NativeClassroom({
                   {moderator &&
                     controller.settings.recording.enabled &&
                     button(
-                      state.recording ? 'Stop recording' : 'Start recording',
+                      state.recordingPaused
+                        ? 'Resume recording'
+                        : state.recording
+                          ? controller.settings.recording.allowStop
+                            ? 'Stop recording'
+                            : 'Recording locked'
+                          : 'Start recording',
                       () => {
                         void run(async () => {
-                          await controller.recording(!state.recording);
+                          await controller.recording(
+                            state.recordingPaused || !state.recording,
+                          );
                         });
                       },
-                      state.recording && !controller.settings.recording.allowStop,
+                      state.recording &&
+                        !state.recordingPaused &&
+                        !controller.settings.recording.allowStop,
                     )}
                   {button('Leave meeting', () =>
                     boardPending
@@ -1022,7 +1112,12 @@ export function NativeClassroom({
                     {message.sender}: {message.text}
                   </Text>
                 ))}
-                {controller.settings.messages.enabled && (
+                {!state.chatAllowed && (
+                  <Text style={{ color: colors.text }}>
+                    The host has turned off chat.
+                  </Text>
+                )}
+                {controller.settings.messages.enabled && state.chatAllowed && (
                   <>
                     <TextInput
                       accessibilityLabel="Message"
