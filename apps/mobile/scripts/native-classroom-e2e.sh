@@ -32,6 +32,16 @@ if [[ "$PLATFORM" == ios ]]; then
   xcrun simctl bootstatus "$DEVICE_ID" -b
   xcrun simctl install "$DEVICE_ID" "$TASK_DIR/derived/Build/Products/Debug-iphonesimulator/ICONICAcademy.app"
 elif [[ "$PLATFORM" == android ]]; then
+  # GitHub's Ubuntu image ships the SDK command-line tools without putting them on PATH.
+  SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+  if [[ -z "$SDK_ROOT" ]]; then echo 'ANDROID_HOME is not set'; exit 1; fi
+  if [[ -d "$SDK_ROOT/cmdline-tools/latest/bin" ]]; then PATH="$SDK_ROOT/cmdline-tools/latest/bin:$PATH"; fi
+  if [[ -d "$SDK_ROOT/platform-tools" ]]; then PATH="$SDK_ROOT/platform-tools:$PATH"; fi
+  export PATH
+  if ! command -v sdkmanager > /dev/null; then
+    echo "sdkmanager not found under $SDK_ROOT/cmdline-tools"; exit 1
+  fi
+  (yes || true) | sdkmanager --licenses > "$TASK_DIR/sdk-licenses.log" 2>&1
   sdkmanager 'system-images;android-36;google_apis;x86_64' > "$TASK_DIR/sdk.log" 2>&1
   printf 'no\n' | avdmanager create avd -n IconicClassroomTablet -k 'system-images;android-36;google_apis;x86_64' -d pixel_tablet
   "$ANDROID_HOME/emulator/emulator" -avd IconicClassroomTablet -no-window -no-snapshot -no-audio -gpu swiftshader_indirect > "$TASK_DIR/emulator.log" 2>&1 &
@@ -59,6 +69,23 @@ for attempt in $(seq 1 30); do
   sleep 1
 done
 curl --fail --silent http://127.0.0.1:8085/status > /dev/null
+# Prepare the manifest and the exact bundle the dev client requests before Maestro opens
+# it. On cold CI runners these took longer than the dev client waits, failing every flow.
+fetch_manifest() {
+  curl --fail --silent --show-error --max-time 900 -H "expo-platform: $PLATFORM" \
+    -H 'accept: application/expo+json,application/json' http://127.0.0.1:8085/
+}
+STARTED=$SECONDS
+MANIFEST=$(fetch_manifest)
+echo "Development manifest ready in $((SECONDS - STARTED))s"
+BUNDLE_URL=$(node -e 'process.stdout.write(JSON.parse(process.argv[1]).launchAsset?.url ?? "")' "$MANIFEST")
+if [[ -z "$BUNDLE_URL" ]]; then echo 'Unable to resolve the development bundle URL'; exit 1; fi
+STARTED=$SECONDS
+curl --fail --silent --show-error --max-time 900 -o /dev/null "$BUNDLE_URL"
+echo "Development bundle ready in $((SECONDS - STARTED))s"
+STARTED=$SECONDS
+fetch_manifest > /dev/null
+echo "Repeat manifest request took $((SECONDS - STARTED))s"
 maestro --device "$DEVICE_ID" test .maestro/classroom-ui.yaml .maestro/classroom-join-failure.yaml .maestro/classroom-moderation.yaml .maestro/classroom-student.yaml .maestro/classroom-link-entry.yaml .maestro/classroom-deep-links.yaml .maestro/classroom-export.yaml .maestro/classroom-annotations.yaml .maestro/classroom-media-controls.yaml .maestro/classroom-whiteboard-write.yaml
 node scripts/verify-classroom-export.mjs "$PLATFORM" "$DEVICE_ID"
 

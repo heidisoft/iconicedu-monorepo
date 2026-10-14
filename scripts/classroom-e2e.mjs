@@ -129,6 +129,9 @@ if (mode === 'live') {
     ...(mode === 'ui' ? webUI : integration).map((name) => `${name}.spec.ts`),
     '--workers=1',
     '--retries=0',
+    // Runs against `next dev`, which compiles each route on first visit; CI runners
+    // need more than the default 30s for that without hiding real failures behind retries.
+    '--timeout=90000',
   ]);
 } else if (mode === 'ui') {
   if (!process.env.NATIVE_SYNC_DEVICE_ID)
