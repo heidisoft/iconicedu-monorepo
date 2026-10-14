@@ -6,7 +6,9 @@ TASK_DIR="${RUNNER_TEMP:-/tmp}/iconic-native-e2e"
 mkdir -p "$TASK_DIR"
 pnpm canvas:build
 pnpm exec expo prebuild --no-install > "$TASK_DIR/prebuild.log" 2>&1
-REACT_NATIVE_PACKAGER_HOSTNAME=127.0.0.1 pnpm exec expo start --dev-client --port 8085 --lan > "$TASK_DIR/metro.log" 2>&1 &
+# A fixed runtime version keeps development manifests fast enough for the dev launcher.
+NATIVE_CLASSROOM_E2E_RUNTIME_VERSION=native-classroom-e2e \
+  REACT_NATIVE_PACKAGER_HOSTNAME=127.0.0.1 pnpm exec expo start --dev-client --port 8085 --lan > "$TASK_DIR/metro.log" 2>&1 &
 METRO_PID=$!
 EMULATOR_PID=''
 LINK_API_PID=''
@@ -42,11 +44,14 @@ elif [[ "$PLATFORM" == android ]]; then
     echo "sdkmanager not found under $SDK_ROOT/cmdline-tools"; exit 1
   fi
   (yes || true) | sdkmanager --licenses > "$TASK_DIR/sdk-licenses.log" 2>&1
-  sdkmanager 'system-images;android-36;google_apis;x86_64' > "$TASK_DIR/sdk.log" 2>&1
+  # API 36 images need a current emulator; the runner's preinstalled one can lag behind.
+  sdkmanager emulator platform-tools 'system-images;android-36;google_apis;x86_64' > "$TASK_DIR/sdk.log" 2>&1
   printf 'no\n' | avdmanager create avd -n IconicClassroomTablet -k 'system-images;android-36;google_apis;x86_64' -d pixel_tablet
   "$ANDROID_HOME/emulator/emulator" -avd IconicClassroomTablet -no-window -no-snapshot -no-audio -gpu swiftshader_indirect > "$TASK_DIR/emulator.log" 2>&1 &
   EMULATOR_PID=$!
-  adb wait-for-device
+  if ! timeout 600 adb wait-for-device; then
+    echo 'Emulator did not connect to adb within 10 minutes'; tail -80 "$TASK_DIR/emulator.log"; exit 1
+  fi
   for attempt in $(seq 1 120); do
     if [[ "$(adb shell getprop sys.boot_completed | tr -d '\r')" == 1 ]]; then break; fi
     sleep 2

@@ -7,9 +7,15 @@ const shortCommit =
   process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ??
   null;
 
+// Native E2E only: fingerprinting the project on every development manifest request
+// outlasts the dev launcher's 10s request timeout on CI runners. Builds, EAS updates and
+// normal development never set this and keep the fingerprint policy from app.json.
+const e2eRuntimeVersion = process.env.NATIVE_CLASSROOM_E2E_RUNTIME_VERSION?.trim();
+
 module.exports = ({ config }) => ({
   ...baseConfig,
   ...config,
+  ...(e2eRuntimeVersion ? { runtimeVersion: e2eRuntimeVersion } : {}),
   ios: {
     ...baseConfig.ios,
     ...config.ios,

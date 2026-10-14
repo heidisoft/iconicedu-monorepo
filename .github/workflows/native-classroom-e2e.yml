@@ -41,7 +41,7 @@ jobs:
       - name: Build and test iPad simulator
         run: bash apps/mobile/scripts/native-classroom-e2e.sh ios
       - name: Upload synthetic test diagnostics
-        if: failure()
+        if: failure() || cancelled()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: native-classroom-ipad-diagnostics
@@ -64,7 +64,7 @@ jobs:
       - name: Build and test Android tablet emulator
         run: bash apps/mobile/scripts/native-classroom-e2e.sh android
       - name: Upload synthetic test diagnostics
-        if: failure()
+        if: failure() || cancelled()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: native-classroom-android-diagnostics
