@@ -164,6 +164,40 @@ Admission retry tokens are bound to the signed-in account, display name, selecte
 
 After configuring the public signing identities and deploying web, run `pnpm --filter mobile links:verify`. It refuses empty identity lists, redirects, non-JSON responses and mismatched hosted app/certificate/path associations. Run its offline regression checks with `pnpm --filter mobile test:links:deployment`. Successful hosted metadata verification must be followed by cold/warm HTTPS link tests in signed internal builds on physical iPad and Android tablets.
 
+### Complete classroom regression suite
+
+From the repository root, `pnpm test:e2e:classroom <layer> <platform>` selects an explicit verification layer:
+
+| Layer         | Platform                  | Coverage                                                                                                                                                                                                                                                                   |
+| ------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ui`          | `web`                     | Preview identity/devices, microphone/camera lifecycle, participants, host/co-host, recording controls/composition, annotation tools, fullscreen and responsive layouts. Uses development-only fixtures and synthetic meeting adapters.                                     |
+| `ui`          | `ios` or `android`        | Native preview, join failures, admission/moderation, accountless links, microphone/camera/share transitions, annotation history, whiteboard drawing/text/assets/export and saved recovery. Uses development-only fixtures.                                                 |
+| `integration` | `web`                     | Real local API/PostgreSQL admission/recovery and whiteboard/annotation persistence, collaboration and classroom isolation.                                                                                                                                                 |
+| `integration` | `ios` or `android`        | Web/native whiteboard and annotation synchronization against real local API/PostgreSQL. Select the installed development client with `NATIVE_SYNC_DEVICE_ID`.                                                                                                              |
+| `live`        | `web`, `ios` or `android` | Real signed-in homepage, classroom and session-card entry through preview, media toggles, participants, raised hands, recording, screen capture and whiteboard changes. Requires a dedicated deployed test environment, provisioned classrooms and signed native binaries. |
+
+For UI/integration layers start the required development servers first. Set `PLAYWRIGHT_BASE_URL` and `PLAYWRIGHT_SKIP_WEBSERVER=1` for an existing web server. Integration requires local Supabase and API with current migrations. Native UI requires Metro on 8085 and an installed SDK development build; the bootstrap flow deliberately restarts the app. See the cross-client commands below for API/proxy ports. Run device tests serially; never share the same device/proxy between concurrent runs.
+
+Live configuration is local and untracked. Copy `ops/classroom-e2e.example.json` to `.classroom-e2e.local.json`, then replace every route, selector and display name with values for dedicated synthetic test classes. Provision the ten matrix cases independently: homepage and classroom each cover scheduled/unscheduled classes with/without a running meeting; session cards cover scheduled classes with/without a running meeting. The test operator must ensure each initial state and a blank whiteboard before every run. The web suite also checks the join API's `created` response for newly started meetings. Each class must opt into Video SDK, enable whiteboard and recording with stop permitted, and allow the test teacher to host. Existing meetings must have their original host connected or otherwise grant the test account recording permission. Tests end their test meetings; do not point them at ordinary lessons. The native device must already be signed in with the synthetic teacher account.
+
+The live runner refuses missing matrix rows or unsigned-in web configuration. For web, save synthetic test-account auth to a private file outside the repository (or ignored `.classroom-auth*.json`) using Playwright's storage-state support. Native selectors must identify one Join action on the configured source screen. Configure the source view to show only the selected test class if its accessible Join label is shared by several cards. External Zoom URL classrooms intentionally retain the legacy provider flow and are not native Video SDK test cases.
+
+```bash
+CLASSROOM_E2E_CONFIG="$PWD/.classroom-e2e.local.json" \
+PLAYWRIGHT_AUTH_STATE=/private/path/test-teacher-auth.json \
+pnpm test:e2e:classroom live web
+
+CLASSROOM_E2E_CONFIG="$PWD/.classroom-e2e.local.json" \
+NATIVE_SYNC_DEVICE_ID=YOUR_DEVICE_ID \
+pnpm test:e2e:classroom live ios
+```
+
+Live browser tests disable trace/video/screenshots and retries. Run them headed and grant screen capture when the browser requests it. Native live capture accepts the operating system's broadcast/projection prompt; OS-version variations must be checked on the actual iPad/iPhone/Android device. Keep Maestro failure artifacts private: they can contain invitation URLs from source dialogs. Live screen annotation requires a second participant presenting; the automated web/native API synchronization checks do not certify actual Zoom screen transport. Verify both presenter directions on physical devices using the separate live annotation receiver flow, while the peer shares a synthetic slide. Verify the peer observes microphone/video/hand changes and recording notifications; single-client button state alone is not media delivery evidence. Missing live environment/device results must be reported as unverified, never as passing fixtures.
+
+The suite configuration parser is covered by `pnpm test:e2e:classroom:config` and included in the CI deployment checks. This test infrastructure is a feature-flag maintenance exemption and adds no new classroom authorization or admission behavior.
+
+For live annotation transport, a second signed-in test participant must share a fresh synthetic slide with annotation permission enabled. Run the receiver on web with `CLASSROOM_E2E_ANNOTATION_PATH=/live/TEST_CODE PLAYWRIGHT_AUTH_STATE=/private/path/receiver-auth.json PLAYWRIGHT_BASE_URL=https://YOUR_TEST_WEB PLAYWRIGHT_SKIP_WEBSERVER=1 pnpm --filter web test:e2e classroom-live-annotations.spec.ts --headed --workers=1 --retries=0`. On the native receiver run `maestro --device YOUR_DEVICE_ID test -e SESSION_ID=TEST_CODE .maestro/classroom-live-annotations.yaml` from `apps/mobile`. Both receivers verify a blank room, drawing, undo/redo and removal of the test mark. Repeat with web presenting to native and native presenting to web, and confirm the presenting peer sees the marks before undoing them. These flows require a running peer and cannot be certified by the single-device UI suite.
+
 ### Cross-client collaboration checks
 
 Web and native use the same whiteboard operations, permission state, presentation state and ephemeral laser endpoints. An educator's Whiteboard action presents the board to the class; a participant's action opens their local view. Screen annotation rooms use the Zoom presenter ID as their share key. Switching the displayed presenter or entering focused view does not end a room; only an actual share-stop event closes that presenter's room. A presenter change resets native annotation state until the new share dimensions arrive.

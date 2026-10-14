@@ -1,0 +1,123 @@
+appId: com.heidisoft.iconicedu
+name: Real signed-in source page to native classroom preview and meeting controls
+---
+- openLink: 'iconicedu://${NATIVE_PATH}'
+- tapOn:
+    text: 'Open'
+    optional: true
+- extendedWaitUntil:
+    visible: '${JOIN_LABEL}'
+    timeout: 30000
+- tapOn: '${JOIN_LABEL}'
+- runFlow:
+    when:
+      visible: 'Session ready to join'
+    commands:
+      - tapOn: 'Open Zoom|Open session'
+- extendedWaitUntil:
+    visible: 'Ready to join\?'
+    timeout: 45000
+- assertVisible: '${DISPLAY_NAME}'
+- assertNotVisible: 'Session passcode'
+- tapOn: 'Turn camera off'
+- tapOn: 'Turn camera on'
+- tapOn: 'Turn camera off'
+- scrollUntilVisible:
+    element: 'Join now'
+- tapOn: 'Join now'
+- extendedWaitUntil:
+    visible: 'Leave class|Leave or end class|End class'
+    timeout: 60000
+- tapOn: 'Unmute microphone'
+- assertVisible: 'Mute microphone'
+- tapOn: 'Mute microphone'
+- assertVisible: 'Unmute microphone'
+- tapOn: 'Start video'
+- assertVisible: 'Stop video'
+- tapOn: 'Stop video'
+- assertVisible: 'Start video'
+- tapOn: 'More controls'
+- runFlow:
+    when:
+      visible: 'Claim host'
+    commands:
+      - tapOn: 'Claim host'
+      - tapOn: 'Claim host'
+- scrollUntilVisible:
+    element: 'Participants.*'
+- tapOn: 'Participants.*'
+- assertVisible: '${DISPLAY_NAME}'
+- tapOn: 'Close People'
+- scrollUntilVisible:
+    element: 'Raise hand'
+- tapOn: 'Raise hand'
+- assertVisible: 'Lower hand'
+- tapOn: 'Lower hand'
+- scrollUntilVisible:
+    element: 'Start recording'
+- tapOn: 'Start recording'
+- extendedWaitUntil:
+    visible: 'Recording active'
+    timeout: 30000
+- scrollUntilVisible:
+    element: 'Stop recording'
+- tapOn: 'Stop recording'
+- assertNotVisible: 'Recording active'
+- scrollUntilVisible:
+    element: 'Share screen'
+- tapOn: 'Share screen'
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn: 'Start Broadcast'
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - tapOn:
+          text: 'A single app|Entire screen'
+          optional: true
+      - tapOn: 'Entire screen'
+      - tapOn: 'Start now|Start sharing'
+- extendedWaitUntil:
+    visible: 'Stop sharing screen'
+    timeout: 30000
+- tapOn: 'Stop sharing screen'
+- assertVisible: 'Share screen'
+- scrollUntilVisible:
+    element: 'Whiteboard'
+- tapOn: 'Whiteboard'
+- extendedWaitUntil:
+    visible: 'Class whiteboard'
+    timeout: 30000
+- tapOn: 'Draw'
+- swipe:
+    start: '45%,45%'
+    end: '60%,55%'
+    duration: 1000
+- extendedWaitUntil:
+    visible:
+      id: 'whiteboard-saved-elements-1'
+    timeout: 30000
+- tapOn: 'Text'
+- tapOn:
+    point: '45%,60%'
+- inputText: 'Live tablet writing'
+- tapOn: 'Class whiteboard'
+- extendedWaitUntil:
+    visible:
+      id: 'whiteboard-saved-elements-2'
+    timeout: 30000
+- tapOn: 'Educational library'
+- tapOn: 'Number line'
+- extendedWaitUntil:
+    visible: 'Saved'
+    timeout: 30000
+- tapOn: 'Stop presenting board'
+- assertNotVisible: 'Class whiteboard'
+- scrollUntilVisible:
+    element: 'Leave class|Leave or end class|End class'
+- tapOn: 'Leave class|Leave or end class|End class'
+- tapOn: 'End for everyone|End class'
+- assertVisible: 'You left the classroom'

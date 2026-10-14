@@ -1,0 +1,14 @@
+appId: com.heidisoft.iconicedu
+name: Release the dedicated live test meeting after a failed journey
+---
+- runFlow:
+    when:
+      visible: 'Stop presenting board'
+    commands:
+      - tapOn: 'Stop presenting board'
+- runFlow:
+    when:
+      visible: 'Leave class|Leave or end class|End class'
+    commands:
+      - tapOn: 'Leave class|Leave or end class|End class'
+      - tapOn: 'End for everyone|End class|Leave'

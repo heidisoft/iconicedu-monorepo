@@ -77,10 +77,14 @@ test.describe('live session setup and leave navigation', () => {
     const settingsBox = await tile
       .getByRole('button', { name: 'Settings' })
       .boundingBox();
+    const audioTestBox = await tile
+      .getByRole('button', { name: 'Test audio and video' })
+      .boundingBox();
     expect(settingsBox!.width).toBe(32);
     expect(settingsBox!.height).toBe(cameraBox!.height);
     expect(settingsBox!.y).toBeCloseTo(cameraBox!.y, 0);
-    expect(settingsBox!.x - (cameraBox!.x + cameraBox!.width)).toBeCloseTo(6, 0);
+    expect(audioTestBox!.x - (cameraBox!.x + cameraBox!.width)).toBeCloseTo(6, 0);
+    expect(settingsBox!.x - (audioTestBox!.x + audioTestBox!.width)).toBeCloseTo(6, 0);
     expect(nameBox).not.toBeNull();
     expect(micBox).not.toBeNull();
     expect(cameraBox).not.toBeNull();

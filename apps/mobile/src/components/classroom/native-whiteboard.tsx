@@ -242,7 +242,11 @@ export function NativeWhiteboard({
             })}
           {(boardWidth >= 600 || optionsOpen) && (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-              <Text accessibilityLiveRegion="polite" style={{ color: colors.text }}>
+              <Text
+                testID={`whiteboard-saved-elements-${snapshot?.document.pages[0]?.elements.filter((element) => !element.deleted).length ?? 0}`}
+                accessibilityLiveRegion="polite"
+                style={{ color: colors.text }}
+              >
                 {saving ? 'Saving…' : 'Saved'}
               </Text>
               {snapshot?.role === 'teacher' && (

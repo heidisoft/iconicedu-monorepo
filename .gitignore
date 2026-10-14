@@ -24,6 +24,8 @@ supabase/.temp
 .d.ts.map
 .temp
 playwright-report
+.classroom-e2e.local.json
+.classroom-auth*.json
 test-results
 apps/web/playwright/.auth
 local.properties
