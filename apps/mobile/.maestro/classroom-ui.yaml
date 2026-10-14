@@ -65,7 +65,9 @@ name: Native classroom UI lifecycle on iPad and Android tablets
 - scrollUntilVisible:
     element: 'Send message'
 - tapOn: 'Send message'
-- assertVisible: 'Test teacher: Hello from native tablet'
+- assertVisible: 'Hello from native tablet'
+- assertVisible: 'You'
+- tapOn: 'Close In-call Messages'
 - scrollUntilVisible:
     element: 'Start recording'
     direction: UP
@@ -88,9 +90,6 @@ name: Native classroom UI lifecycle on iPad and Android tablets
 - assertVisible: 'Stop presenting board'
 - tapOn: 'Stop presenting board'
 - assertNotVisible: 'Class whiteboard'
-- scrollUntilVisible:
-    element: 'Leave meeting'
-    direction: UP
-- tapOn: 'Leave meeting'
+- tapOn: 'Leave or end class'
 - tapOn: 'Leave'
 - assertVisible: 'You left the classroom'

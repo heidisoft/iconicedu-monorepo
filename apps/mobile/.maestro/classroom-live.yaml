@@ -19,9 +19,16 @@ name: Live Zoom native join and leave - signed-in test account required
 - tapOn: 'Turn camera off'
 - tapOn: 'Join now'
 - extendedWaitUntil:
-    visible: 'Leave meeting'
+    visible: 'Leave class|Leave or end class|End class'
     timeout: 45000
 - assertNotVisible: 'Unable to join.*'
-- tapOn: 'Leave meeting'
-- tapOn: 'Leave'
+- tapOn: 'Leave class|Leave or end class|End class'
+# Students and hosts with others get Leave; a host alone confirms End class.
+- tapOn:
+    text: 'Leave'
+    optional: true
+- tapOn:
+    text: 'End class'
+    index: 1
+    optional: true
 - assertVisible: 'You left the classroom'

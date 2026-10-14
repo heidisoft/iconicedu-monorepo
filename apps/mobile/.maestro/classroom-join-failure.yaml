@@ -26,4 +26,4 @@ name: Native classroom failed join keeps preview usable
 - scrollUntilVisible:
     element: 'Join now'
 - assertVisible: 'Join now'
-- assertNotVisible: 'Leave meeting'
+- assertNotVisible: 'Leave class|Leave or end class|End class'

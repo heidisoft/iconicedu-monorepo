@@ -184,7 +184,7 @@ describe('native classroom parity with web meeting behaviour', () => {
     f.emit({ type: 'recording-consent', consent: 'traditional' });
     expect(f.screen.getByText(/This class is being recorded/)).toBeTruthy();
     await act(async () => {
-      fireEvent.press(f.screen.getByLabelText('Leave class'));
+      fireEvent.press(f.screen.getByLabelText('Decline and leave'));
     });
     expect(f.adapter.recordingConsent).toHaveBeenCalledWith(false);
     expect(f.adapter.leave).toHaveBeenCalledWith(false);
@@ -342,5 +342,98 @@ describe('native classroom parity with web meeting behaviour', () => {
     f.emit({ type: 'share', userId: '2', active: false });
     expect(mockEndAnnotations).toHaveBeenCalledWith('2');
     expect(mockEndAnnotations).toHaveBeenCalledTimes(1);
+  });
+  it('shows the attendee count, labels your tile and can hide your self-view', async () => {
+    const f = setup();
+    await f.join();
+    expect(f.screen.getByText('· 2 Attendees')).toBeTruthy();
+    expect(f.screen.getByLabelText('Student (You) status')).toBeTruthy();
+    fireEvent.press(f.screen.getByLabelText('More controls'));
+    fireEvent.press(f.screen.getByLabelText('Hide self-view'));
+    expect(f.screen.queryByLabelText('Focus Student')).toBeNull();
+    expect(f.screen.getByLabelText('Focus Teacher')).toBeTruthy();
+  });
+  it('uses web leave wording for students, a lone host and a host with a student', async () => {
+    const { Alert } = require('react-native');
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    try {
+      const student = setup();
+      await student.join();
+      fireEvent.press(student.screen.getByLabelText('Leave class'));
+      expect(alert.mock.calls.at(-1)?.[0]).toBe('Leave the class?');
+      student.screen.unmount();
+
+      const host = setup('1');
+      await host.join();
+      fireEvent.press(host.screen.getByLabelText('Leave or end class'));
+      expect(alert.mock.calls.at(-1)?.[0]).toBe('Leave or end the class?');
+      const buttons = alert.mock.calls.at(-1)?.[2] as Array<{
+        text: string;
+        onPress?: () => void;
+      }>;
+      expect(buttons.map((button) => button.text)).toEqual([
+        'Cancel',
+        'Leave',
+        'End for everyone',
+      ]);
+      await act(async () => buttons[2].onPress?.());
+      expect(host.adapter.leave).toHaveBeenCalledWith(true);
+      expect(meetingApi.audit).toHaveBeenCalledWith('session-1', 'end_session_for_all');
+    } finally {
+      alert.mockRestore();
+    }
+  });
+  it('offers End class to a host who is alone', async () => {
+    const { Alert } = require('react-native');
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    try {
+      const f = setup('1');
+      f.adapter.join.mockImplementation(async () => {});
+      await act(async () => {
+        fireEvent.press(f.screen.getByLabelText('Join now'));
+      });
+      f.emit({ type: 'joined', selfId: '1', participants: [teacher] });
+      fireEvent.press(f.screen.getByLabelText('End class'));
+      expect(alert.mock.calls.at(-1)?.[0]).toBe('End the class?');
+    } finally {
+      alert.mockRestore();
+    }
+  });
+  it('opens chat as a sheet with You, relative times and an empty state', async () => {
+    const f = setup();
+    await f.join();
+    fireEvent.press(f.screen.getByLabelText('Messages'));
+    expect(f.screen.getByText('In-call Messages')).toBeTruthy();
+    expect(f.screen.getByText('No messages yet.')).toBeTruthy();
+    f.emit({
+      type: 'chat',
+      id: 'm1',
+      sender: 'Student',
+      text: 'Can you explain step 2?',
+      self: true,
+      sentAt: Date.now() - 5 * 60_000,
+    });
+    expect(f.screen.getByText('You')).toBeTruthy();
+    expect(f.screen.getByText('5 min ago')).toBeTruthy();
+    fireEvent.changeText(f.screen.getByLabelText('Message'), 'Thanks');
+    await act(async () => {
+      fireEvent.press(f.screen.getByLabelText('Send message'));
+    });
+    expect(f.adapter.chat).toHaveBeenCalledWith('Thanks');
+  });
+  it('asks for a labelled rating with Submit and Skip after the lesson', async () => {
+    const { router } = require('expo-router');
+    const f = setup();
+    await f.join();
+    f.emit({ type: 'left', reason: 'ended-by-host' });
+    expect(f.screen.getByLabelText('Submit').props.accessibilityState.disabled).toBe(
+      true,
+    );
+    fireEvent.press(f.screen.getByLabelText('Great'));
+    await act(async () => {
+      fireEvent.press(f.screen.getByLabelText('Submit'));
+    });
+    expect(meetingApi.feedback).toHaveBeenCalledWith('session-1', 5, 'Student');
+    expect(router.back).toHaveBeenCalled();
   });
 });

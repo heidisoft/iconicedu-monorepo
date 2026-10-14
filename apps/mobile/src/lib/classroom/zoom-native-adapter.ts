@@ -74,6 +74,12 @@ export function describeNativeError(errorType: unknown) {
     'The meeting encountered a connection or device error. Please retry.'
   );
 }
+// Zoom reports chat time in seconds on some platforms; normalise to milliseconds.
+const chatTime = (value: unknown) => {
+  const time = Number(value);
+  if (!Number.isFinite(time) || time <= 0) return Date.now();
+  return time < 1e12 ? time * 1000 : time;
+};
 const sharing = (status: unknown) =>
   status === ShareStatus.Start ||
   status === ShareStatus.Resume ||
@@ -308,6 +314,8 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
               id: message.messageID,
               sender: String(sender.userName ?? message.senderName ?? 'Participant'),
               text: message.content,
+              self: message.isSelfSend === true,
+              sentAt: chatTime(message.timestamp),
             });
         }),
         zoom.addListener(EventType.onUserFailoverStatusChanged, (value: unknown) => {
@@ -492,6 +500,9 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
           ? zoom.recordingHelper.startCloudRecording()
           : zoom.recordingHelper.stopCloudRecording()),
       );
+    },
+    async joinChime() {
+      await NativeModules.ClassroomControls.playJoinChime?.();
     },
     async resumeRecording() {
       checked(await zoom.recordingHelper.resumeCloudRecording());

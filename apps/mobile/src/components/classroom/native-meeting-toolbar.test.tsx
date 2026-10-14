@@ -30,7 +30,7 @@ it('keeps common actions accessible and reveals secondary actions under More', (
   const screen = render(
     <NativeMeetingToolbar>
       {action('Mute microphone')}
-      {action('Leave meeting')}
+      {action('Leave class')}
       {action('Claim host', claim)}
     </NativeMeetingToolbar>,
   );

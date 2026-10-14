@@ -17,7 +17,7 @@ name: Real native entry, invitation refresh recovery and guest admission
     visible: 'Ready to join\?'
     timeout: 10000
 - assertVisible: 'Tablet guest'
-- assertNotVisible: 'Leave meeting'
+- assertNotVisible: 'Leave class|Leave or end class|End class'
 - openLink: 'iconicedu://classroom-link-fixture?mode=invited&resume=1'
 - tapOn:
     text: 'Open'

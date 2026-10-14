@@ -17,13 +17,13 @@ name: Android native picture-in-picture transition and restoration
     visible:
       id: 'classroom-picture-in-picture'
     timeout: 10000
-- assertNotVisible: 'Leave meeting'
+- assertNotVisible: 'Leave class|Leave or end class|End class'
 - launchApp:
     stopApp: false
 - extendedWaitUntil:
     visible: 'Native classroom test'
     timeout: 15000
-- assertVisible: 'Leave meeting'
+- assertVisible: 'Leave class|Leave or end class|End class'
 - tapOn: 'More controls'
 - tapOn: 'Audio settings'
 - tapOn: 'Automatic floating call'
@@ -33,7 +33,7 @@ name: Android native picture-in-picture transition and restoration
     visible:
       id: 'classroom-picture-in-picture'
     timeout: 10000
-- assertNotVisible: 'Leave meeting'
+- assertNotVisible: 'Leave class|Leave or end class|End class'
 - launchApp:
     stopApp: false
 - extendedWaitUntil:

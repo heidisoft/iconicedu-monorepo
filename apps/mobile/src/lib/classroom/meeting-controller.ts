@@ -35,7 +35,7 @@ export type NativeMeetingEvent =
   | { type: 'chat-privilege'; allowed: boolean }
   | { type: 'permission'; device: 'camera' | 'microphone' }
   | { type: 'audio-interrupted'; active: boolean }
-  | { type: 'chat'; id: string; sender: string; text: string }
+  | ({ type: 'chat' } & NativeChatMessage)
   | { type: 'connection'; reconnecting: boolean }
   | { type: 'hand'; userId: string; raised: boolean }
   | { type: 'reaction'; userId: string; emoji: string }
@@ -43,6 +43,14 @@ export type NativeMeetingEvent =
   | { type: 'composition'; userId: string; active: boolean }
   | { type: 'speaking'; userIds: string[] }
   | { type: 'network'; level: 'good' | 'normal' | 'bad' };
+/** `self` and `sentAt` let the chat show "You" and web's relative times. */
+export type NativeChatMessage = {
+  id: string;
+  sender: string;
+  text: string;
+  self: boolean;
+  sentAt: number;
+};
 export type NativeMediaDevice = { id: string; label: string; selected: boolean };
 export type NativeMediaDevices = {
   cameras: NativeMediaDevice[];
@@ -82,6 +90,8 @@ export interface NativeMeetingAdapter {
   recordingConsent?(accept: boolean): Promise<void>;
   chatPrivilege?(allowed: boolean): Promise<void>;
   chat(text: string): Promise<void>;
+  /** Web's two-note chime; best effort and never blocks the call. */
+  joinChime?(): Promise<void>;
   speaker(enabled: boolean): Promise<void>;
   testSpeaker(enabled: boolean): Promise<void>;
   testMicrophone(enabled: boolean): Promise<void>;
@@ -115,7 +125,7 @@ export type NativeMeetingState = {
   raisedHands: string[];
   reactions: Array<{ userId: string; emoji: string }>;
   caption: string;
-  messages: Array<{ id: string; sender: string; text: string }>;
+  messages: NativeChatMessage[];
 };
 const initial = (): NativeMeetingState => ({
   phase: 'preview',
@@ -217,10 +227,16 @@ export class NativeMeetingController {
           participants: event.participants,
           leaveReason: null,
         });
+        this.chime();
         this.enforceChatPolicy();
         break;
       case 'participants': {
         const wasHost = !!this.self?.host;
+        const arrived = event.participants.some(
+          (user) =>
+            user.id !== this.state.selfId &&
+            !this.state.participants.some((known) => known.id === user.id),
+        );
         const self = event.participants.find((user) => user.id === this.state.selfId);
         const presenters = this.state.sharingUserIds.filter((id) =>
           event.participants.some((user) => user.id === id),
@@ -236,6 +252,7 @@ export class NativeMeetingController {
           ),
           ...(self ? { microphone: !self.muted, camera: self.video } : {}),
         });
+        if (arrived && this.state.phase === 'meeting') this.chime();
         // Web applies the chat policy when it holds host; follow host transfers too.
         if (!wasHost && self?.host) this.enforceChatPolicy();
         break;
@@ -375,6 +392,9 @@ export class NativeMeetingController {
       sharingUserId:
         current && presenters.includes(current) ? current : (presenters[0] ?? null),
     };
+  }
+  private chime() {
+    void this.adapter.joinChime?.().catch(() => {});
   }
   private enforceChatPolicy() {
     const { visible, enabled } = this.settings.messages;

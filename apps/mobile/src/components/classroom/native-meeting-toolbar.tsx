@@ -12,6 +12,7 @@ import {
   MessageCircle,
   Users,
   PhoneOff,
+  OctagonX,
 } from 'lucide-react-native';
 import { useTheme } from '@/providers/theme-provider';
 
@@ -25,7 +26,9 @@ const primary = (label: string) => {
   if (label === 'Whiteboard') return { Icon: PenLine, active: false };
   if (label.startsWith('Messages')) return { Icon: MessageCircle, active: false };
   if (label.startsWith('Participants')) return { Icon: Users, active: false };
-  if (label === 'Leave meeting') return { Icon: PhoneOff, active: false, danger: true };
+  if (label === 'Leave class' || label === 'Leave or end class')
+    return { Icon: PhoneOff, active: false, danger: true };
+  if (label === 'End class') return { Icon: OctagonX, active: false, danger: true };
   return null;
 };
 type ActionProps = {

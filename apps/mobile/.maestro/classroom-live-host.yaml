@@ -16,7 +16,7 @@ name: Real native host meeting controls - use a dedicated test classroom
     element: 'Join now'
 - tapOn: 'Join now'
 - extendedWaitUntil:
-    visible: 'Leave meeting'
+    visible: 'Leave class|Leave or end class|End class'
     timeout: 45000
 - scrollUntilVisible:
     element: 'More controls'
@@ -36,9 +36,7 @@ name: Real native host meeting controls - use a dedicated test classroom
 - tapOn: 'Make co-host ${PEER_NAME}'
 - assertVisible: 'Remove co-host ${PEER_NAME}'
 - tapOn: 'Remove co-host ${PEER_NAME}'
-- scrollUntilVisible:
-    element: 'Leave meeting'
-    direction: UP
-- tapOn: 'Leave meeting'
+- tapOn: 'Close People'
+- tapOn: 'Leave class|Leave or end class|End class'
 - tapOn: 'Leave'
 - assertVisible: 'You left the classroom'

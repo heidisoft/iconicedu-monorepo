@@ -195,7 +195,14 @@ describe('native classroom lifecycle and permissions', () => {
     await f.connected();
     f.emit({ type: 'share', userId: '2', active: true });
     f.emit({ type: 'recording', status: 'recording' });
-    f.emit({ type: 'chat', id: 'm1', sender: 'Student', text: 'Hello' });
+    f.emit({
+      type: 'chat',
+      id: 'm1',
+      sender: 'Student',
+      text: 'Hello',
+      self: false,
+      sentAt: 0,
+    });
     f.emit({ type: 'connection', reconnecting: true });
     expect(f.controller.state).toMatchObject({
       sharingUserId: '2',
@@ -349,6 +356,20 @@ describe('native classroom lifecycle and permissions', () => {
     f.controller.permissionRestored('microphone');
     expect(f.controller.state.permissionBlocked).toBeNull();
   });
+  it('chimes like web when you join and when someone new arrives, not on refreshes', async () => {
+    const f = fixture();
+    f.adapter.joinChime = jest.fn().mockResolvedValue(undefined);
+    await f.connected('1', [teacher]);
+    expect(f.adapter.joinChime).toHaveBeenCalledTimes(1);
+    f.emit({ type: 'participants', participants: [teacher, student] });
+    expect(f.adapter.joinChime).toHaveBeenCalledTimes(2);
+    f.emit({
+      type: 'participants',
+      participants: [{ ...teacher, muted: false }, student],
+    });
+    f.emit({ type: 'participants', participants: [teacher] });
+    expect(f.adapter.joinChime).toHaveBeenCalledTimes(2);
+  });
   it('records why the session ended', async () => {
     const f = fixture();
     await f.connected('2');
@@ -378,6 +399,8 @@ it('expires reactions, deduplicates repeated messages, and clears departed speak
     id: 'same-message',
     sender: 'Student',
     text: 'Hello',
+    self: false,
+    sentAt: 0,
   };
   f.emit(message);
   f.emit(message);

@@ -101,7 +101,14 @@ export function createClassroomFixtureAdapter(
       shareMode = mode;
     },
     async chat(text) {
-      send({ type: 'chat', id: String(Date.now()), sender: 'Test teacher', text });
+      send({
+        type: 'chat',
+        id: String(Date.now()),
+        sender: 'Test teacher',
+        text,
+        self: true,
+        sentAt: Date.now(),
+      });
     },
     async command(command) {
       if (command.type === 'raise-hand')

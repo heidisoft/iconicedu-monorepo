@@ -522,4 +522,22 @@ describe('Zoom native bridge adapter', () => {
       os.restore();
     }
   });
+  it('marks your own chat messages and normalises Zoom timestamps to milliseconds', () => {
+    const f = fixture(),
+      receive = jest.fn();
+    f.adapter.subscribe(receive);
+    const chat = (extra: Record<string, unknown>) =>
+      f.listeners.get('onChatNewMessageNotify')?.({
+        messageID: String(Math.random()),
+        content: 'Hi',
+        senderName: 'Student',
+        ...extra,
+      });
+    chat({ isSelfSend: true, timestamp: 1_700_000_000 });
+    chat({ isSelfSend: false, timestamp: 1_700_000_000_000 });
+    expect(receive.mock.calls.map((call) => [call[0].self, call[0].sentAt])).toEqual([
+      [true, 1_700_000_000_000],
+      [false, 1_700_000_000_000],
+    ]);
+  });
 });

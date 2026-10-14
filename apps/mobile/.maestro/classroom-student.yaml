@@ -13,8 +13,9 @@ name: Students cannot use host controls
 - scrollUntilVisible:
     element: 'Join now'
 - tapOn: 'Join now'
-- scrollUntilVisible:
-    element: 'Leave meeting'
+- extendedWaitUntil:
+    visible: 'Leave class'
+    timeout: 30000
 - assertNotVisible: 'End for everyone'
 - assertNotVisible: 'Start recording'
 - assertNotVisible: 'Claim host'
@@ -25,6 +26,7 @@ name: Students cannot use host controls
 - assertNotVisible: 'Make co-host.*'
 - assertNotVisible: 'Make host.*'
 - assertNotVisible: 'Mute Test student'
+- tapOn: 'Close People'
 - scrollUntilVisible:
     element: 'Whiteboard'
     direction: UP

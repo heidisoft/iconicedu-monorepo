@@ -13,7 +13,7 @@ name: OS link through secure recovery and real HTTP entry/preview
 - extendedWaitUntil:
     visible: 'Ready to join\?'
     timeout: 30000
-- assertNotVisible: 'Leave meeting'
+- assertNotVisible: 'Leave class|Leave or end class|End class'
 # The same OS link must remount real entry and recover the stored name/token.
 - openLink: 'iconicedu://live/e2e-invite-${RUN_ID}#invite=iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii'
 - extendedWaitUntil:
@@ -30,7 +30,7 @@ name: OS link through secure recovery and real HTTP entry/preview
     direction: UP
     timeout: 40000
 - assertVisible: 'Ready to join\?'
-- assertNotVisible: 'Leave meeting'
+- assertNotVisible: 'Leave class|Leave or end class|End class'
 - scrollUntilVisible:
     element: 'Join now'
 - tapOn: 'Join now'
@@ -38,7 +38,7 @@ name: OS link through secure recovery and real HTTP entry/preview
     element: 'The meeting encountered a connection or device error. Please retry.'
     direction: UP
     timeout: 40000
-- assertNotVisible: 'Leave meeting'
+- assertNotVisible: 'Leave class|Leave or end class|End class'
 - openLink: 'iconicedu://live/e2e-waiting-${RUN_ID}#invite=iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii'
 - extendedWaitUntil:
     visible: 'Guest name'
@@ -52,7 +52,7 @@ name: OS link through secure recovery and real HTTP entry/preview
 - extendedWaitUntil:
     visible: 'Ready to join\?'
     timeout: 30000
-- assertNotVisible: 'Leave meeting'
+- assertNotVisible: 'Leave class|Leave or end class|End class'
 # Synthetic API consumes the handoff and drops its first response.
 - openLink: 'iconicedu://live/e2e-handoff-${RUN_ID}#handoff=hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh'
 - extendedWaitUntil:
