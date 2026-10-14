@@ -1,6 +1,6 @@
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readClassroomE2EConfig } from './classroom-e2e-config.mjs';
@@ -36,6 +36,72 @@ function run(command, args, cwd = root, env = {}) {
   });
   if (result.error) throw result.error;
   if (result.status !== 0) process.exit(result.status ?? 1);
+}
+async function waitForServer(url, timeoutMs = 180_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      await fetch(url, { signal: AbortSignal.timeout(10_000) });
+      return;
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+  }
+  throw new Error(`Web dev server did not start at ${url}`);
+}
+/**
+ * `next dev` compiles each route on its first visit, which on CI runners can outlast a
+ * test step or navigation assertion. Compile every fixture route once, then run the
+ * suite against that server. The fixtures are dev-only, so a production build is not an
+ * option.
+ */
+async function runWithPreparedWebServer(args) {
+  const port = process.env.CLASSROOM_E2E_WEB_PORT ?? '3000';
+  const baseURL = `http://127.0.0.1:${port}`;
+  const server = spawn('pnpm', ['--filter', 'web', 'dev'], {
+    cwd: root,
+    stdio: 'inherit',
+    detached: true,
+    env: { ...process.env, PORT: port },
+  });
+  try {
+    await waitForServer(baseURL);
+    const fixtures = readdirSync(join(root, 'apps/web/app/(public)/visual-test'), {
+      withFileTypes: true,
+    })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => `/visual-test/${entry.name}`);
+    for (const route of fixtures) {
+      const started = Date.now();
+      const response = await fetch(`${baseURL}${route}`, {
+        signal: AbortSignal.timeout(300_000),
+      });
+      console.log(
+        `Prepared ${route} (${response.status}) in ${Math.round((Date.now() - started) / 1000)}s`,
+      );
+    }
+    const result = spawnSync(
+      'pnpm',
+      ['--filter', 'web', 'exec', 'playwright', 'test', ...args],
+      {
+        cwd: root,
+        stdio: 'inherit',
+        env: {
+          ...process.env,
+          PLAYWRIGHT_BASE_URL: baseURL,
+          PLAYWRIGHT_SKIP_WEBSERVER: '1',
+        },
+      },
+    );
+    if (result.error) throw result.error;
+    return result.status ?? 1;
+  } finally {
+    try {
+      process.kill(-server.pid, 'SIGTERM');
+    } catch {
+      // The server already exited.
+    }
+  }
 }
 if (
   !['ui', 'integration', 'live'].includes(mode) ||
@@ -120,19 +186,14 @@ if (mode === 'live') {
     }
   }
 } else if (platform === 'web') {
-  run('pnpm', [
-    '--filter',
-    'web',
-    'exec',
-    'playwright',
-    'test',
+  const status = await runWithPreparedWebServer([
     ...(mode === 'ui' ? webUI : integration).map((name) => `${name}.spec.ts`),
     '--workers=1',
     '--retries=0',
-    // Runs against `next dev`, which compiles each route on first visit; CI runners
-    // need more than the default 30s for that without hiding real failures behind retries.
+    // Headroom for slow CI runners without hiding real failures behind retries.
     '--timeout=90000',
   ]);
+  process.exit(status);
 } else if (mode === 'ui') {
   if (!process.env.NATIVE_SYNC_DEVICE_ID)
     throw new Error('NATIVE_SYNC_DEVICE_ID is required.');

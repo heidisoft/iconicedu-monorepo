@@ -70,7 +70,10 @@ elif [[ "$PLATFORM" == android ]]; then
   adb shell settings put global window_animation_scale 0
   adb shell settings put global transition_animation_scale 0
   adb shell settings put global animator_duration_scale 0
-  if ! (cd android && ./gradlew :app:assembleDebug --no-parallel -PreactNativeArchitectures=x86_64) > "$TASK_DIR/build.log" 2>&1; then
+  # Reanimated links libworklets.so from its per-ABI CMake task, but only its aggregate
+  # externalNativeBuild task waits for Worklets, so build Worklets' native library first.
+  if ! (cd android && ./gradlew :react-native-worklets:externalNativeBuildDebug :app:assembleDebug \
+      --no-parallel -PreactNativeArchitectures=x86_64) > "$TASK_DIR/build.log" 2>&1; then
     tail -120 "$TASK_DIR/build.log"; exit 1
   fi
   DEVICE_ID=$(adb devices | awk '/emulator-/ {print $1; exit}')
