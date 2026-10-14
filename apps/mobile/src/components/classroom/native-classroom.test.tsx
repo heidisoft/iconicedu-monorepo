@@ -34,8 +34,17 @@ jest.mock('expo-camera', () => ({
   ],
 }));
 jest.mock('expo-image-picker', () => ({}));
+jest.mock('expo-asset', () => ({
+  Asset: {
+    fromModule: (source: unknown) => ({
+      downloadAsync: async () => {},
+      localUri: `file:///bundle/${String(source)}.jpg`,
+    }),
+  },
+}));
 jest.mock('expo-router', () => ({ router: { back: jest.fn() } }));
 jest.mock('react-native-safe-area-context', () => ({
+  SafeAreaProvider: ({ children }: { children: React.ReactNode }) => children,
   SafeAreaView: ({ children }: { children: React.ReactNode }) => children,
 }));
 jest.mock('@/providers/theme-provider', () => ({
@@ -192,7 +201,7 @@ describe('native classroom parity with web meeting behaviour', () => {
     const f = setup('1');
     await f.join();
     f.emit({ type: 'recording', status: 'paused' });
-    expect(f.screen.getByText('❚❚ Recording paused')).toBeTruthy();
+    expect(f.screen.getByLabelText('Recording paused')).toBeTruthy();
     fireEvent.press(f.screen.getByLabelText('More controls'));
     await act(async () => {
       fireEvent.press(f.screen.getByLabelText('Resume recording'));
@@ -239,5 +248,46 @@ describe('native classroom parity with web meeting behaviour', () => {
       ['connection_state', 'reconnecting'],
     ]);
     expect(f.screen.getByText(/connection is unstable/)).toBeTruthy();
+  });
+  it('keeps hand raise and web reactions in a dock and shows reactions on the tile', async () => {
+    const f = setup();
+    await f.join();
+    fireEvent.press(f.screen.getByLabelText('Raise hand'));
+    await waitFor(() =>
+      expect(f.adapter.command).toHaveBeenCalledWith({
+        type: 'raise-hand',
+        raised: true,
+      }),
+    );
+    fireEvent.press(f.screen.getByLabelText('Open reactions'));
+    expect(
+      f.screen.getAllByLabelText(/^React /).map((node) => node.props.accessibilityLabel),
+    ).toEqual(['React 👍', 'React 👏', 'React 🎉', 'React ❤️', 'React 😂']);
+    f.emit({ type: 'reaction', userId: '1', emoji: '🎉' });
+    expect(f.screen.getByLabelText('Teacher reacted 🎉')).toBeTruthy();
+  });
+  it('remembers a web catalog background chosen in preview and applies it after joining', async () => {
+    const AsyncStorage = require('@react-native-async-storage/async-storage');
+    await AsyncStorage.clear();
+    const f = setup();
+    await act(async () => {
+      fireEvent.press(f.screen.getByLabelText('Test audio and video'));
+    });
+    fireEvent.press(f.screen.getByLabelText('Video settings tab'));
+    expect(f.screen.getByText(/applied when you join/)).toBeTruthy();
+    await act(async () => {
+      fireEvent.press(f.screen.getByLabelText('Background photo: Background 1'));
+    });
+    expect(f.adapter.background).not.toHaveBeenCalled();
+    expect(await AsyncStorage.getItem('classroom.background-preset.v1')).toBe(
+      'image:pexels-anna-nekrashevich-8534465.jpg',
+    );
+    await f.join();
+    await waitFor(() =>
+      expect(f.adapter.background).toHaveBeenCalledWith(
+        'image',
+        expect.stringMatching(/^file:\/\/\/bundle\//),
+      ),
+    );
   });
 });

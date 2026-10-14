@@ -8,6 +8,7 @@ import React, {
 import {
   Alert,
   AppState,
+  Image,
   Keyboard,
   KeyboardAvoidingView,
   Linking,
@@ -44,6 +45,14 @@ import { NativeFocusedVideo } from './native-focused-video';
 import { NativeDevicePreview } from './native-device-preview';
 import { NativeClassroomSettings } from './native-classroom-settings';
 import { NativeMeetingToolbar } from './native-meeting-toolbar';
+import { NativeHandAndReactions, NativeMeetingStatus } from './native-meeting-dock';
+import type { MeetingBackgroundPreset } from '@iconicedu/utils';
+import {
+  BACKGROUND_PHOTOS,
+  backgroundPhotoFile,
+  readBackgroundPreference,
+  writeBackgroundPreference,
+} from '@/lib/classroom/background-catalog';
 import { NativeVideoView } from './native-video-view';
 import { NativeShareStage } from './native-share-stage';
 import { NativeWhiteboard, type NativeWhiteboardRepository } from './native-whiteboard';
@@ -200,6 +209,52 @@ export function NativeClassroom({
   };
   const moderator = controller.self?.host || controller.self?.cohost;
   const selfSharing = !!state.selfId && state.sharingUserIds.includes(state.selfId);
+  const reactionFor = (userId: string) =>
+    [...state.reactions].reverse().find((reaction) => reaction.userId === userId)?.emoji;
+  const [backgroundPreset, setBackgroundPreset] =
+    useState<MeetingBackgroundPreset>('none');
+  useEffect(() => {
+    void readBackgroundPreference().then(setBackgroundPreset);
+  }, []);
+  const applyBackground = useCallback(
+    async (preset: MeetingBackgroundPreset) => {
+      if (preset === 'none' || preset === 'blur') await adapter.background(preset);
+      else await adapter.background('image', await backgroundPhotoFile(preset));
+    },
+    [adapter],
+  );
+  const selectBackground = (preset: MeetingBackgroundPreset) =>
+    void run(async () => {
+      // Zoom applies effects to the in-session camera; a preview choice is applied on join.
+      if (state.phase === 'meeting' || state.phase === 'reconnecting')
+        await applyBackground(preset);
+      setBackgroundPreset(preset);
+      await writeBackgroundPreference(preset);
+    });
+  // Like web's initial media settings, the remembered effect follows people into class.
+  const backgroundRestored = useRef(false);
+  useEffect(() => {
+    if (state.phase !== 'meeting' || backgroundRestored.current) return;
+    backgroundRestored.current = true;
+    if (backgroundPreset !== 'none')
+      void applyBackground(backgroundPreset).catch(() =>
+        setError(
+          'Your saved background could not be applied. Choose it in Video settings.',
+        ),
+      );
+  }, [state.phase, backgroundPreset, applyBackground]);
+  const backgroundChoiceStyle = (selected: boolean) => ({
+    width: 96,
+    height: 64,
+    borderRadius: 12,
+    overflow: 'hidden' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    padding: 4,
+    backgroundColor: colors.card,
+    borderWidth: 2,
+    borderColor: selected ? colors.action : colors.border,
+  });
   const isHost = !!controller.self?.host;
   useEffect(() => {
     if (isHost && state.phase === 'meeting')
@@ -416,11 +471,6 @@ export function NativeClassroom({
                 {state.caption}
               </Text>
             )}
-            {state.reactions.length > 0 && (
-              <Text style={{ color: colors.text }}>
-                {state.reactions.map((reaction) => reaction.emoji).join(' ')}
-              </Text>
-            )}
             {state.network === 'bad' && (
               <Text accessibilityRole="alert" style={{ color: colors.text }}>
                 Your connection is unstable. Video may pause while it recovers.
@@ -446,15 +496,11 @@ export function NativeClassroom({
                 })}
               </View>
             )}
-            {state.recording && (
-              <Text
-                accessibilityLabel={
-                  state.recordingPaused ? 'Recording paused' : 'Recording active'
-                }
-                style={{ color: colors.text }}
-              >
-                {state.recordingPaused ? '❚❚ Recording paused' : '● Recording'}
-              </Text>
+            {(state.phase === 'meeting' || state.phase === 'reconnecting') && (
+              <NativeMeetingStatus
+                recording={state.recording}
+                paused={state.recordingPaused}
+              />
             )}
             {state.recordingConsent && (
               <View
@@ -663,6 +709,15 @@ export function NativeClassroom({
                           </Text>
                         </View>
                       )}
+                      {reactionFor(user.id) && (
+                        <Text
+                          accessibilityLabel={`${user.name} reacted ${reactionFor(user.id)}`}
+                          accessibilityLiveRegion="polite"
+                          style={{ position: 'absolute', top: 8, right: 8, fontSize: 32 }}
+                        >
+                          {reactionFor(user.id)}
+                        </Text>
+                      )}
                       <Text style={{ color: colors.text, padding: 8 }}>
                         {user.name}
                         {state.raisedHands.includes(user.id) ? ' ✋' : ''}
@@ -677,6 +732,19 @@ export function NativeClassroom({
                   button('Expand shared screen', () =>
                     setFocused({ id: state.sharingUserId!, sharing: true }),
                   )}
+                <NativeHandAndReactions
+                  raised={state.raisedHands.includes(state.selfId ?? '')}
+                  onHand={() => {
+                    void run(() =>
+                      controller.raiseHand(
+                        !state.raisedHands.includes(state.selfId ?? ''),
+                      ),
+                    );
+                  }}
+                  onReact={(emoji) => {
+                    void run(() => controller.react(emoji));
+                  }}
+                />
                 <NativeMeetingToolbar>
                   {button(
                     state.microphone ? 'Mute microphone' : 'Unmute microphone',
@@ -687,12 +755,6 @@ export function NativeClassroom({
                   {button('Audio settings', () =>
                     setPanel(panel === 'audio' ? 'none' : 'audio'),
                   )}
-                  {button('Blur background', () => {
-                    void run(() => adapter.background('blur'));
-                  })}
-                  {button('Remove background', () => {
-                    void run(() => adapter.background('none'));
-                  })}
                   {button(state.camera ? 'Stop video' : 'Start video', () => {
                     void run(() => controller.camera(!state.camera));
                   })}
@@ -713,23 +775,6 @@ export function NativeClassroom({
                         ],
                       ),
                     )}
-                  {button(
-                    state.raisedHands.includes(state.selfId ?? '')
-                      ? 'Lower hand'
-                      : 'Raise hand',
-                    () => {
-                      void run(() =>
-                        controller.raiseHand(
-                          !state.raisedHands.includes(state.selfId ?? ''),
-                        ),
-                      );
-                    },
-                  )}
-                  {['👏', '👍', '❤️', '😂', '🎉'].map((emoji) =>
-                    button(`React ${emoji}`, () => {
-                      void run(() => controller.react(emoji));
-                    }),
-                  )}
                   {button(captions ? 'Turn captions off' : 'Turn captions on', () => {
                     void run(async () => {
                       await adapter.captions(!captions);
@@ -1040,12 +1085,60 @@ export function NativeClassroom({
                   ))}
 
                   <Text style={{ color: colors.text }}>Camera and background</Text>
-                  {button('Blur background', () => {
-                    void run(() => adapter.background('blur'));
-                  })}
-                  {button('Remove background', () => {
-                    void run(() => adapter.background('none'));
-                  })}
+                  {preview && (
+                    <Text style={{ color: colors.textMuted }}>
+                      Your background is applied when you join the class.
+                    </Text>
+                  )}
+                  <View
+                    accessibilityLabel="Backgrounds"
+                    style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}
+                  >
+                    {(
+                      [
+                        ['none', 'No background effect'],
+                        ['blur', 'Blur background'],
+                      ] as const
+                    ).map(([preset, label]) => (
+                      <Pressable
+                        key={preset}
+                        accessibilityRole="button"
+                        accessibilityLabel={label}
+                        accessibilityState={{ selected: backgroundPreset === preset }}
+                        onPress={() => selectBackground(preset)}
+                        style={backgroundChoiceStyle(backgroundPreset === preset)}
+                      >
+                        <Text style={{ color: colors.text, textAlign: 'center' }}>
+                          {label}
+                        </Text>
+                      </Pressable>
+                    ))}
+                    {BACKGROUND_PHOTOS.map((photo) => (
+                      <Pressable
+                        key={photo.value}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Background photo: ${photo.label}`}
+                        accessibilityState={{
+                          selected: backgroundPreset === photo.value,
+                        }}
+                        onPress={() => selectBackground(photo.value)}
+                        style={backgroundChoiceStyle(backgroundPreset === photo.value)}
+                      >
+                        <Image
+                          source={photo.source}
+                          resizeMode="cover"
+                          style={{
+                            position: 'absolute',
+                            top: 0,
+                            right: 0,
+                            bottom: 0,
+                            left: 0,
+                          }}
+                        />
+                      </Pressable>
+                    ))}
+                  </View>
+                  {/* Library photos are this device's own files, so they are not remembered. */}
                   {button('Choose background image', () => {
                     void run(async () => {
                       const result = await ImagePicker.launchImageLibraryAsync({
