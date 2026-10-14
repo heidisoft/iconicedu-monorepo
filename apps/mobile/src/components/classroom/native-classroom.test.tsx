@@ -14,7 +14,7 @@ jest.mock('@zoom/react-native-videosdk', () => ({
   useZoom: () => ({
     addListener: () => ({ remove: () => {} }),
     isInSession: async () => false,
-    audioHelper: { resetAudioSession: async () => {} },
+    audioHelper: { setSDKAudioSessionEnv: async () => true },
     whiteboardHelper: {
       isOtherSharingWhiteboard: async () => false,
       canStopShareWhiteboard: async () => false,
@@ -289,5 +289,38 @@ describe('native classroom parity with web meeting behaviour', () => {
         expect.stringMatching(/^file:\/\/\/bundle\//),
       ),
     );
+  });
+  it('explains an interrupted call and pauses the camera while the app is in the background', async () => {
+    const { AppState } = require('react-native');
+    const listeners: Array<(state: string) => void> = [];
+    const spy = jest.spyOn(AppState, 'addEventListener').mockImplementation(((
+      _type: string,
+      listener: (state: string) => void,
+    ) => {
+      listeners.push(listener);
+      return { remove: () => listeners.splice(listeners.indexOf(listener), 1) };
+    }) as never);
+    try {
+      const f = setup();
+      await f.join();
+      f.emit({ type: 'audio-interrupted', active: true });
+      expect(f.screen.getByText(/paused by another call/)).toBeTruthy();
+      f.emit({ type: 'audio-interrupted', active: false });
+      expect(f.screen.queryByText(/paused by another call/)).toBeNull();
+      await act(async () => listeners.forEach((listener) => listener('background')));
+      expect(f.adapter.camera).toHaveBeenLastCalledWith(false);
+      await act(async () => listeners.forEach((listener) => listener('active')));
+      expect(f.adapter.camera).toHaveBeenLastCalledWith(true);
+      // A camera that was already off stays off after returning.
+      f.adapter.camera.mockClear();
+      await act(async () => {
+        fireEvent.press(f.screen.getByLabelText('Stop video'));
+      });
+      await act(async () => listeners.forEach((listener) => listener('background')));
+      await act(async () => listeners.forEach((listener) => listener('active')));
+      expect(f.adapter.camera.mock.calls).toEqual([[false]]);
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

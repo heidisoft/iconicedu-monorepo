@@ -1,5 +1,10 @@
 import { createNativePictureInPicture } from './native-picture-in-picture';
-import { NativeModules, PermissionsAndroid, Platform } from 'react-native';
+import {
+  NativeEventEmitter,
+  NativeModules,
+  PermissionsAndroid,
+  Platform,
+} from 'react-native';
 import {
   ConsentType,
   EventType,
@@ -319,9 +324,22 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
             .catch(() => {});
         }),
       ];
+      // iOS only: the native module resets Zoom's audio session when the interruption ends.
+      const interruptions =
+        Platform.OS === 'ios' && NativeModules.ClassroomControls?.addListener
+          ? new NativeEventEmitter(NativeModules.ClassroomControls).addListener(
+              'ClassroomAudioInterrupted',
+              (value: unknown) =>
+                send({
+                  type: 'audio-interrupted',
+                  active: object(value).active === true,
+                }),
+            )
+          : null;
       return () => {
         ++generation;
         subscriptions.forEach((subscription) => subscription.remove());
+        interruptions?.remove();
       };
     },
     async prepareAudio() {

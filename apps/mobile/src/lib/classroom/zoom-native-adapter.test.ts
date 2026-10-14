@@ -1,4 +1,9 @@
-import { NativeModules, PermissionsAndroid, Platform } from 'react-native';
+import {
+  DeviceEventEmitter,
+  NativeModules,
+  PermissionsAndroid,
+  Platform,
+} from 'react-native';
 import { createZoomNativeAdapter, describeNativeError } from './zoom-native-adapter';
 import type { useZoom } from '@zoom/react-native-videosdk';
 jest.mock('@zoom/react-native-videosdk', () => ({
@@ -495,5 +500,26 @@ describe('Zoom native bridge adapter', () => {
       { type: 'network', level: 'bad' },
       { type: 'network', level: 'good' },
     ]);
+  });
+  it('reports iOS audio interruptions and stops listening on disconnect', () => {
+    const f = fixture(),
+      receive = jest.fn();
+    NativeModules.ClassroomControls.addListener = jest.fn();
+    NativeModules.ClassroomControls.removeListeners = jest.fn();
+    const os = jest.replaceProperty(Platform, 'OS', 'ios');
+    try {
+      const disconnect = f.adapter.subscribe(receive);
+      DeviceEventEmitter.emit('ClassroomAudioInterrupted', { active: true });
+      DeviceEventEmitter.emit('ClassroomAudioInterrupted', { active: false });
+      expect(receive.mock.calls.map((call) => call[0])).toEqual([
+        { type: 'audio-interrupted', active: true },
+        { type: 'audio-interrupted', active: false },
+      ]);
+      disconnect();
+      DeviceEventEmitter.emit('ClassroomAudioInterrupted', { active: true });
+      expect(receive).toHaveBeenCalledTimes(2);
+    } finally {
+      os.restore();
+    }
   });
 });

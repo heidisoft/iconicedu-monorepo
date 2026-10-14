@@ -282,6 +282,28 @@ export function NativeClassroom({
     );
     return () => subscription.remove();
   }, [zoom, panel]);
+  // Outside picture-in-picture the OS stops the camera in the background; turn it off
+  // deliberately so others see the avatar, and turn it back on when the app returns.
+  const cameraPausedInBackground = useRef(false);
+  const inClass = state.phase === 'meeting' || state.phase === 'reconnecting';
+  useEffect(() => {
+    if (!inClass) return;
+    const subscription = AppState.addEventListener('change', (next) => {
+      const current = controller.snapshot();
+      if (next === 'background' && current.camera && !pip.active) {
+        cameraPausedInBackground.current = true;
+        void controller.camera(false).catch(() => {
+          cameraPausedInBackground.current = false;
+        });
+      } else if (next === 'active' && cameraPausedInBackground.current) {
+        cameraPausedInBackground.current = false;
+        void controller
+          .camera(true)
+          .catch(() => setError('Your camera could not restart. Turn it on again.'));
+      }
+    });
+    return () => subscription.remove();
+  }, [inClass, controller, pip.active]);
   useEffect(() => {
     const blocked = state.permissionBlocked;
     if (!blocked) return;
@@ -302,7 +324,7 @@ export function NativeClassroom({
         void zoom
           .isInSession()
           .then((inSession) =>
-            inSession ? zoom.audioHelper.resetAudioSession() : undefined,
+            inSession ? zoom.audioHelper.setSDKAudioSessionEnv() : undefined,
           )
           .catch(() =>
             setError('Check your audio output after returning to the meeting.'),
@@ -474,6 +496,11 @@ export function NativeClassroom({
             {state.network === 'bad' && (
               <Text accessibilityRole="alert" style={{ color: colors.text }}>
                 Your connection is unstable. Video may pause while it recovers.
+              </Text>
+            )}
+            {state.audioInterrupted && (
+              <Text accessibilityRole="alert" style={{ color: colors.text }}>
+                Classroom audio is paused by another call. It resumes when that call ends.
               </Text>
             )}
             {state.permissionBlocked && (

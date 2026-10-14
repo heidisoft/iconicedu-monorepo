@@ -56,6 +56,8 @@ Native settings enumerate SDK cameras and OS communication audio routes. On iOS/
 
 Floating calls use a dedicated AVKit video-call content source on iOS/iPadOS 16+ and Android activity picture-in-picture on supported devices. The application does not invoke the SDK sample's hard-coded CallKit identity. Automatic entry defaults off and is stored as a local preference. Shared screens take priority over the focused participant, then remote video; leaving clears subscriptions and disables automatic entry. Picture-in-picture is suspended while the whiteboard is open or has pending drawings, preserving unsaved edits. The floating surface contains call video, rather than the full interactive classroom UI. Android users restore the meeting with system controls; iPad camera/background behavior still needs physical-device verification.
 
+Native classrooms do not use CallKit; adding it is a product decision because CallKit apps are restricted on some App Store storefronts. Instead, iOS observes audio-session interruptions (phone calls, Siri, including iPad call banners that keep the app in the foreground), shows that class audio is paused, and restores Zoom's audio session environment when the interruption ends. Outside picture-in-picture, the camera is turned off when the app moves to the background, so others see the avatar instead of a frozen frame, and turned back on when the app returns; a camera that was already off stays off. Android audio-focus behavior during phone calls is left to the Zoom SDK and needs physical-device verification.
+
 ## Automated verification
 
 ### Web/native compatibility contract

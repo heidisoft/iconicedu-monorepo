@@ -34,6 +34,7 @@ export type NativeMeetingEvent =
   | { type: 'recording-consent'; consent: NativeRecordingConsent }
   | { type: 'chat-privilege'; allowed: boolean }
   | { type: 'permission'; device: 'camera' | 'microphone' }
+  | { type: 'audio-interrupted'; active: boolean }
   | { type: 'chat'; id: string; sender: string; text: string }
   | { type: 'connection'; reconnecting: boolean }
   | { type: 'hand'; userId: string; raised: boolean }
@@ -106,6 +107,8 @@ export type NativeMeetingState = {
   leaveReason: NativeLeaveReason | null;
   /** The OS revoked access mid-class; the screen offers a path to Settings. */
   permissionBlocked: 'camera' | 'microphone' | null;
+  /** A phone call or Siri holds the device audio; it resumes when that ends. */
+  audioInterrupted: boolean;
   error: string | null;
   composited: string[];
   network: 'good' | 'normal' | 'bad' | null;
@@ -130,6 +133,7 @@ const initial = (): NativeMeetingState => ({
   chatAllowed: true,
   leaveReason: null,
   permissionBlocked: null,
+  audioInterrupted: false,
   error: null,
   messages: [],
   composited: [],
@@ -241,6 +245,7 @@ export class NativeMeetingController {
         if (this.joinDeadline) clearTimeout(this.joinDeadline);
         this.update({
           phase: 'ended',
+          audioInterrupted: false,
           sharingUserId: null,
           sharingUserIds: [],
           recording: false,
@@ -291,6 +296,9 @@ export class NativeMeetingController {
         break;
       case 'chat-privilege':
         this.update({ chatAllowed: event.allowed });
+        break;
+      case 'audio-interrupted':
+        this.update({ audioInterrupted: event.active });
         break;
       case 'permission':
         this.update({
