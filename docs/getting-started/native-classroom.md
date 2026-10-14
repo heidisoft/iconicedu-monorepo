@@ -143,6 +143,8 @@ Shared HTTPS `/live/<code>#invite=<capability>` links use iOS Universal Links an
 
 Deployment configuration lives in `ops/mobile-links.json` and contains only public identifiers:
 
+The configured Apple application identifier uses the verified App ID Prefix `5NVN93C486`. The Android fingerprint is the Google Play app signing certificate; internal EAS builds must register their own signing fingerprint if it differs.
+
 1. Confirm `domains` matches the actual shared-link host and `EXPO_PUBLIC_WEB_URL` in each build. The initial host follows the existing `app.iconicedu.com` web default; confirm it before release.
 2. Set `iosApplicationIdentifiers` to the exact application identifier from the signed app's entitlements (`application-identifier`, usually `TEAMID.com.heidisoft.iconicedu`). Do not assume the Team ID and application identifier prefix are always equal.
 3. Set `androidCertificateSha256` to the SHA-256 fingerprints of the certificates signing supported builds. Google Play App Signing can use a different certificate from EAS internal builds; register both if both should open links. Do not publish private signing keys or keystores.
