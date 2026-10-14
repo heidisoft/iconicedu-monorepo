@@ -1,3 +1,5 @@
+import { buildMeetingBackgroundCatalog } from '@iconicedu/utils';
+
 // Webpack watches this directory in development and discovers files at build
 // time in production. Only filenames enter the client bundle; images remain
 // served from public, without importing their bytes into the settings UI.
@@ -27,26 +29,11 @@ function discoverFiles(): string[] {
   }
 }
 export function buildBackgroundCatalog(files: string[]) {
-  // Next also exposes module-resolution aliases in a context. Keep only files
-  // directly inside this directory so aliases never become duplicate choices.
-  return [
-    ...new Set(
-      files.filter((key) => /^\.\/[^/]+\.(?:png|jpe?g|webp|avif|svg)$/i.test(key)),
-    ),
-  ]
-    .sort()
-    .map((key, index) => {
-      const filename = key.replace(/^\.\//, '');
-      const stem = filename
-        .replace(/\.[^.]+$/, '')
-        .replace(/[-_]+/g, ' ')
-        .trim();
-      return {
-        value: `image:${filename}` as const,
-        label: stem.length > 32 || /\d{5}/.test(stem) ? `Background ${index + 1}` : stem,
-        src: `/live-session-backgrounds/${encodeURIComponent(filename)}`,
-      };
-    });
+  return buildMeetingBackgroundCatalog(files).map(({ value, label, filename }) => ({
+    value,
+    label,
+    src: `/live-session-backgrounds/${encodeURIComponent(filename)}`,
+  }));
 }
 
 export const BACKGROUND_PRESETS = buildBackgroundCatalog(discoverFiles());

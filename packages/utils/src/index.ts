@@ -95,3 +95,4 @@ export * from './annotations/coordinates';
 export * from './annotations/state';
 export * from './annotations/participant-color';
 export * from './whiteboard/assets';
+export * from './live-sessions/background-catalog';

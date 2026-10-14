@@ -52,6 +52,7 @@ export function NativeClassroomEntry({
   const [guestName, setGuestName] = useState('');
   const [guestPasscode, setGuestPasscode] = useState('');
   const [passcodeRequired, setPasscodeRequired] = useState(false);
+  const [title, setTitle] = useState<string>();
   const link = useRef<string | undefined>(undefined);
   const guest = useRef<{ displayName: string; passcode: string } | null>(null);
 
@@ -84,6 +85,7 @@ export function NativeClassroomEntry({
         if (!info.exists || !info.isActive)
           throw new Error('This meeting is no longer active.');
         setCanonicalId(info.sessionId ?? sessionId);
+        setTitle(info.sessionTitle);
         if (info.isHost) {
           guest.current = null;
           setGuestPasscode('');
@@ -188,6 +190,7 @@ export function NativeClassroomEntry({
         {...meetingProps}
         meetingApi={api}
         sessionId={canonicalId}
+        title={title}
         credentials={credentials}
         hostEligible={hostEligible}
         onRejoin={() => {

@@ -193,8 +193,8 @@ describe('native classroom lifecycle and permissions', () => {
   it('receives screen shares, recording, chat, mute and reconnect events', async () => {
     const f = fixture();
     await f.connected();
-    f.emit({ type: 'share', userId: '2' });
-    f.emit({ type: 'recording', active: true });
+    f.emit({ type: 'share', userId: '2', active: true });
+    f.emit({ type: 'recording', status: 'recording' });
     f.emit({ type: 'chat', id: 'm1', sender: 'Student', text: 'Hello' });
     f.emit({ type: 'connection', reconnecting: true });
     expect(f.controller.state).toMatchObject({
@@ -231,8 +231,132 @@ describe('native classroom lifecycle and permissions', () => {
     expect(f.disconnect).toHaveBeenCalledTimes(1);
     expect(f.adapter.stopAudioTests).toHaveBeenCalled();
     expect(f.adapter.leave).toHaveBeenCalledWith(false);
-    f.emit({ type: 'recording', active: true });
+    f.emit({ type: 'recording', status: 'recording' });
     expect(f.controller.state.recording).toBe(false);
+  });
+  it('keeps simultaneous presenters on stage and falls back when one stops', async () => {
+    const f = fixture();
+    await f.connected('1', [teacher, student, { ...student, id: '3', name: 'Peer' }]);
+    f.emit({ type: 'share', userId: '2', active: true });
+    f.emit({ type: 'share', userId: '3', active: true });
+    expect(f.controller.state).toMatchObject({
+      sharingUserIds: ['2', '3'],
+      sharingUserId: '3',
+    });
+    f.controller.viewShare('2');
+    // A pause/resume update for a known presenter does not steal the stage.
+    f.emit({ type: 'share', userId: '3', active: true });
+    expect(f.controller.state.sharingUserId).toBe('2');
+    f.emit({ type: 'share', userId: '2', active: false });
+    expect(f.controller.state).toMatchObject({
+      sharingUserIds: ['3'],
+      sharingUserId: '3',
+    });
+    f.emit({ type: 'participants', participants: [teacher, student] });
+    expect(f.controller.state).toMatchObject({ sharingUserIds: [], sharingUserId: null });
+    f.controller.viewShare('9');
+    expect(f.controller.state.sharingUserId).toBeNull();
+  });
+  it('lets only the host change who can share', async () => {
+    const f = fixture();
+    f.adapter.shareMode = jest.fn().mockResolvedValue('locked');
+    f.adapter.setShareMode = jest.fn().mockResolvedValue(undefined);
+    await f.connected('2');
+    await expect(f.controller.setShareMode('multiple')).rejects.toThrow('Host access');
+    f.emit({ type: 'participants', participants: [teacher, { ...student, host: true }] });
+    await f.controller.refreshShareMode();
+    expect(f.controller.state.shareMode).toBe('locked');
+    await f.controller.setShareMode('multiple');
+    expect(f.adapter.setShareMode).toHaveBeenCalledWith('multiple');
+    expect(f.controller.state.shareMode).toBe('multiple');
+  });
+  it('resumes a paused recording from the record control even when stopping is locked', async () => {
+    const f = fixture();
+    f.controller.settings.recording.allowStop = false;
+    f.adapter.resumeRecording = jest.fn().mockResolvedValue(undefined);
+    await f.connected();
+    f.emit({ type: 'recording', status: 'paused' });
+    expect(f.controller.state).toMatchObject({ recording: true, recordingPaused: true });
+    await f.controller.recording(true);
+    expect(f.adapter.resumeRecording).toHaveBeenCalledTimes(1);
+    expect(f.adapter.recording).not.toHaveBeenCalled();
+    f.emit({ type: 'recording', status: 'recording' });
+    await expect(f.controller.recording(false)).rejects.toThrow('unavailable');
+  });
+  it('stays in class after declining individual recording consent', async () => {
+    const f = fixture();
+    f.adapter.recordingConsent = jest.fn().mockResolvedValue(undefined);
+    await f.connected('2');
+    f.emit({ type: 'recording', status: 'recording' });
+    f.emit({ type: 'recording-consent', consent: 'individual' });
+    await f.controller.respondToRecordingConsent(false);
+    expect(f.adapter.recordingConsent).toHaveBeenCalledWith(false);
+    expect(f.adapter.leave).not.toHaveBeenCalled();
+    expect(f.controller.state).toMatchObject({
+      phase: 'meeting',
+      recordingConsent: null,
+    });
+  });
+  it('leaves class after declining traditional recording consent', async () => {
+    const f = fixture();
+    f.adapter.recordingConsent = jest.fn().mockResolvedValue(undefined);
+    await f.connected('2');
+    f.emit({ type: 'recording-consent', consent: 'traditional' });
+    await f.controller.respondToRecordingConsent(false);
+    expect(f.adapter.leave).toHaveBeenCalledWith(false);
+    expect(f.controller.state).toMatchObject({ phase: 'ended', leaveReason: 'self' });
+  });
+  it('clears an unanswered consent prompt once recording stops', async () => {
+    const f = fixture();
+    await f.connected('2');
+    f.emit({ type: 'recording-consent', consent: 'traditional' });
+    f.emit({ type: 'recording', status: 'stopped' });
+    expect(f.controller.state.recordingConsent).toBeNull();
+  });
+  it('turns chat off for everyone when the host has messages disabled, like web', async () => {
+    const f = fixture();
+    f.controller.settings.messages = { visible: true, enabled: false };
+    f.adapter.chatPrivilege = jest.fn().mockResolvedValue(undefined);
+    await f.connected('2');
+    expect(f.adapter.chatPrivilege).not.toHaveBeenCalled();
+    // Becoming host through a transfer applies the policy too.
+    f.emit({ type: 'participants', participants: [teacher, { ...student, host: true }] });
+    await Promise.resolve();
+    expect(f.adapter.chatPrivilege).toHaveBeenCalledWith(false);
+    expect(f.controller.state.chatAllowed).toBe(false);
+  });
+  it('blocks sending after the host turns chat off', async () => {
+    const f = fixture();
+    await f.connected();
+    f.emit({ type: 'chat-privilege', allowed: false });
+    await expect(f.controller.chat('Hello')).rejects.toThrow('turned off chat');
+    expect(f.adapter.chat).not.toHaveBeenCalled();
+  });
+  it('turns the blocked device off and clears the block once access returns', async () => {
+    const f = fixture();
+    await f.connected();
+    f.emit({
+      type: 'participants',
+      participants: [{ ...teacher, muted: false }, student],
+    });
+    f.emit({ type: 'permission', device: 'microphone' });
+    expect(f.controller.state).toMatchObject({
+      permissionBlocked: 'microphone',
+      microphone: false,
+    });
+    f.controller.permissionRestored('camera');
+    expect(f.controller.state.permissionBlocked).toBe('microphone');
+    f.controller.permissionRestored('microphone');
+    expect(f.controller.state.permissionBlocked).toBeNull();
+  });
+  it('records why the session ended', async () => {
+    const f = fixture();
+    await f.connected('2');
+    f.emit({ type: 'left', reason: 'ended-by-host' });
+    expect(f.controller.state).toMatchObject({
+      phase: 'ended',
+      leaveReason: 'ended-by-host',
+    });
   });
   it('does not leave another session when preview is dismissed', async () => {
     const f = fixture();

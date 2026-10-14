@@ -8,8 +8,10 @@ import React, {
 import {
   Alert,
   AppState,
+  Image,
   Keyboard,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -30,7 +32,9 @@ import type {
 } from '@iconicedu/shared-types';
 import {
   NativeMeetingController,
+  type NativeLeaveReason,
   type NativeMeetingAdapter,
+  type NativeShareMode,
 } from '@/lib/classroom/meeting-controller';
 import { createZoomNativeAdapter } from '@/lib/classroom/zoom-native-adapter';
 import { classroomApi } from '@/lib/classroom/api';
@@ -41,12 +45,35 @@ import { NativeFocusedVideo } from './native-focused-video';
 import { NativeDevicePreview } from './native-device-preview';
 import { NativeClassroomSettings } from './native-classroom-settings';
 import { NativeMeetingToolbar } from './native-meeting-toolbar';
+import { NativeHandAndReactions, NativeMeetingStatus } from './native-meeting-dock';
+import type { MeetingBackgroundPreset } from '@iconicedu/utils';
+import {
+  BACKGROUND_PHOTOS,
+  backgroundPhotoFile,
+  readBackgroundPreference,
+  writeBackgroundPreference,
+} from '@/lib/classroom/background-catalog';
 import { NativeVideoView } from './native-video-view';
 import { NativeShareStage } from './native-share-stage';
 import { NativeWhiteboard, type NativeWhiteboardRepository } from './native-whiteboard';
 
+const LEAVE_TITLES: Record<NativeLeaveReason, string> = {
+  self: 'You left the classroom',
+  'ended-by-host': 'The host ended the class',
+  removed: 'You were removed from the class',
+  network: 'You were disconnected from the class',
+  unknown: 'The class connection closed',
+};
+// Same choices and copy as the web settings panel.
+const SHARE_MODES: Array<[NativeShareMode, string]> = [
+  ['locked', 'Only the host can share'],
+  ['multiple', 'Multiple participants can share simultaneously'],
+  ['single', 'One participant can share at a time'],
+];
+
 export function NativeClassroom({
   sessionId,
+  title,
   credentials: initialCredentials,
   hostEligible = false,
   adapterOverride,
@@ -56,6 +83,8 @@ export function NativeClassroom({
   meetingApi = classroomApi,
 }: {
   sessionId: string;
+  /** The class title shown to people; `credentials.sessionName` is Zoom's session key. */
+  title?: string;
   credentials: LiveSessionJoinCredentialsVM;
   hostEligible?: boolean;
   adapterOverride?: NativeMeetingAdapter;
@@ -83,8 +112,8 @@ export function NativeClassroom({
     Math.min(page, pageCount - 1) * pageSize,
     (Math.min(page, pageCount - 1) + 1) * pageSize,
   );
-  const [cameraPermission, requestCamera] = useCameraPermissions();
-  const [micPermission, requestMic] = useMicrophonePermissions();
+  const [cameraPermission, requestCamera, getCamera] = useCameraPermissions();
+  const [micPermission, requestMic, getMic] = useMicrophonePermissions();
   const [panel, setPanel] = useState<
     'none' | 'audio' | 'participants' | 'chat' | 'whiteboard'
   >('none');
@@ -179,6 +208,58 @@ export function NativeClassroom({
     }
   };
   const moderator = controller.self?.host || controller.self?.cohost;
+  const selfSharing = !!state.selfId && state.sharingUserIds.includes(state.selfId);
+  const reactionFor = (userId: string) =>
+    [...state.reactions].reverse().find((reaction) => reaction.userId === userId)?.emoji;
+  const [backgroundPreset, setBackgroundPreset] =
+    useState<MeetingBackgroundPreset>('none');
+  useEffect(() => {
+    void readBackgroundPreference().then(setBackgroundPreset);
+  }, []);
+  const applyBackground = useCallback(
+    async (preset: MeetingBackgroundPreset) => {
+      if (preset === 'none' || preset === 'blur') await adapter.background(preset);
+      else await adapter.background('image', await backgroundPhotoFile(preset));
+    },
+    [adapter],
+  );
+  const selectBackground = (preset: MeetingBackgroundPreset) =>
+    void run(async () => {
+      // Zoom applies effects to the in-session camera; a preview choice is applied on join.
+      if (state.phase === 'meeting' || state.phase === 'reconnecting')
+        await applyBackground(preset);
+      setBackgroundPreset(preset);
+      await writeBackgroundPreference(preset);
+    });
+  // Like web's initial media settings, the remembered effect follows people into class.
+  const backgroundRestored = useRef(false);
+  useEffect(() => {
+    if (state.phase !== 'meeting' || backgroundRestored.current) return;
+    backgroundRestored.current = true;
+    if (backgroundPreset !== 'none')
+      void applyBackground(backgroundPreset).catch(() =>
+        setError(
+          'Your saved background could not be applied. Choose it in Video settings.',
+        ),
+      );
+  }, [state.phase, backgroundPreset, applyBackground]);
+  const backgroundChoiceStyle = (selected: boolean) => ({
+    width: 96,
+    height: 64,
+    borderRadius: 12,
+    overflow: 'hidden' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    padding: 4,
+    backgroundColor: colors.card,
+    borderWidth: 2,
+    borderColor: selected ? colors.action : colors.border,
+  });
+  const isHost = !!controller.self?.host;
+  useEffect(() => {
+    if (isHost && state.phase === 'meeting')
+      void controller.refreshShareMode().catch(() => {});
+  }, [controller, isHost, state.phase]);
   useEffect(
     () => () => {
       void controller.dispose();
@@ -201,13 +282,49 @@ export function NativeClassroom({
     );
     return () => subscription.remove();
   }, [zoom, panel]);
+  // Outside picture-in-picture the OS stops the camera in the background; turn it off
+  // deliberately so others see the avatar, and turn it back on when the app returns.
+  const cameraPausedInBackground = useRef(false);
+  const inClass = state.phase === 'meeting' || state.phase === 'reconnecting';
+  useEffect(() => {
+    if (!inClass) return;
+    const subscription = AppState.addEventListener('change', (next) => {
+      const current = controller.snapshot();
+      if (next === 'background' && current.camera && !pip.active) {
+        cameraPausedInBackground.current = true;
+        void controller.camera(false).catch(() => {
+          cameraPausedInBackground.current = false;
+        });
+      } else if (next === 'active' && cameraPausedInBackground.current) {
+        cameraPausedInBackground.current = false;
+        void controller
+          .camera(true)
+          .catch(() => setError('Your camera could not restart. Turn it on again.'));
+      }
+    });
+    return () => subscription.remove();
+  }, [inClass, controller, pip.active]);
+  useEffect(() => {
+    const blocked = state.permissionBlocked;
+    if (!blocked) return;
+    // Returning from Settings clears the banner once the OS grants access again.
+    const subscription = AppState.addEventListener('change', (next) => {
+      if (next !== 'active') return;
+      void (blocked === 'camera' ? getCamera() : getMic())
+        .then((permission) => {
+          if (permission.granted) controller.permissionRestored(blocked);
+        })
+        .catch(() => {});
+    });
+    return () => subscription.remove();
+  }, [state.permissionBlocked, controller, getCamera, getMic]);
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (next) => {
       if (next === 'active' && state.phase === 'meeting' && Platform.OS === 'ios')
         void zoom
           .isInSession()
           .then((inSession) =>
-            inSession ? zoom.audioHelper.resetAudioSession() : undefined,
+            inSession ? zoom.audioHelper.setSDKAudioSessionEnv() : undefined,
           )
           .catch(() =>
             setError('Check your audio output after returning to the meeting.'),
@@ -254,22 +371,27 @@ export function NativeClassroom({
       void meetingApi.audit(sessionId, 'recording_started').catch(() => {});
     recordingReported.current = state.recording;
   }, [state.recording, state.participants, controller, sessionId, meetingApi]);
+  // Same vocabulary as web: connection problems only, and good/bad network transitions.
   useEffect(() => {
-    if (state.phase !== 'meeting' && state.phase !== 'reconnecting') return;
-    void meetingApi
-      .quality(
-        sessionId,
-        'connection_state',
-        state.phase === 'meeting' ? 'Connected' : 'Reconnecting',
-        credentials.displayName,
-      )
-      .catch(() => {});
-  }, [state.phase, sessionId, credentials.displayName, meetingApi]);
-  useEffect(() => {
-    if (state.network)
+    const level =
+      state.phase === 'reconnecting'
+        ? 'reconnecting'
+        : state.phase === 'ended' && state.leaveReason === 'network'
+          ? 'fail'
+          : null;
+    if (level)
       void meetingApi
-        .quality(sessionId, 'network_quality', state.network, credentials.displayName)
+        .quality(sessionId, 'connection_state', level, credentials.displayName)
         .catch(() => {});
+  }, [state.phase, state.leaveReason, sessionId, credentials.displayName, meetingApi]);
+  const reportedNetwork = useRef<string | null>(null);
+  useEffect(() => {
+    if (state.network !== 'good' && state.network !== 'bad') return;
+    if (reportedNetwork.current === state.network) return;
+    reportedNetwork.current = state.network;
+    void meetingApi
+      .quality(sessionId, 'network_quality', state.network, credentials.displayName)
+      .catch(() => {});
   }, [state.network, sessionId, credentials.displayName, meetingApi]);
   const button = (label: string, action: () => void, disabled = false) => (
     <Pressable
@@ -353,8 +475,8 @@ export function NativeClassroom({
               {preview
                 ? 'Ready to join?'
                 : state.phase === 'ended'
-                  ? 'You left the classroom'
-                  : credentials.sessionName}
+                  ? LEAVE_TITLES[state.leaveReason ?? 'self']
+                  : (title ?? credentials.sessionName)}
             </Text>
             {(error || state.error) && (
               <Text accessibilityRole="alert" style={{ color: colors.text }}>
@@ -371,23 +493,81 @@ export function NativeClassroom({
                 {state.caption}
               </Text>
             )}
-            {state.reactions.length > 0 && (
-              <Text style={{ color: colors.text }}>
-                {state.reactions.map((reaction) => reaction.emoji).join(' ')}
+            {state.network === 'bad' && (
+              <Text accessibilityRole="alert" style={{ color: colors.text }}>
+                Your connection is unstable. Video may pause while it recovers.
               </Text>
             )}
-            {state.network && (
-              <Text style={{ color: colors.text }}>Connection: {state.network}</Text>
-            )}
-            {state.recording && (
-              <Text accessibilityLabel="Recording active" style={{ color: colors.text }}>
-                ● Recording
+            {state.audioInterrupted && (
+              <Text accessibilityRole="alert" style={{ color: colors.text }}>
+                Classroom audio is paused by another call. It resumes when that call ends.
               </Text>
+            )}
+            {state.permissionBlocked && (
+              <View
+                accessibilityRole="alert"
+                style={{
+                  gap: 8,
+                  padding: 12,
+                  borderRadius: 12,
+                  backgroundColor: colors.card,
+                }}
+              >
+                <Text style={{ color: colors.text }}>
+                  {state.permissionBlocked === 'camera'
+                    ? 'Camera access is blocked. Allow camera access in Settings to be seen.'
+                    : 'Microphone access is blocked. Allow microphone access in Settings to be heard.'}
+                </Text>
+                {button('Open Settings', () => {
+                  void Linking.openSettings();
+                })}
+              </View>
+            )}
+            {(state.phase === 'meeting' || state.phase === 'reconnecting') && (
+              <NativeMeetingStatus
+                recording={state.recording}
+                paused={state.recordingPaused}
+              />
+            )}
+            {state.recordingConsent && (
+              <View
+                accessibilityRole="alert"
+                style={{
+                  gap: 8,
+                  padding: 12,
+                  borderRadius: 12,
+                  backgroundColor: colors.card,
+                }}
+              >
+                <Text style={{ color: colors.text }}>
+                  {state.recordingConsent === 'traditional'
+                    ? 'This class is being recorded. Stay to consent to the recording, or leave the class.'
+                    : 'The host wants to record you. You can stay in the class either way.'}
+                </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {button(
+                    state.recordingConsent === 'traditional'
+                      ? 'Stay and consent'
+                      : 'Allow recording',
+                    () => {
+                      void run(() => controller.respondToRecordingConsent(true));
+                    },
+                  )}
+                  {button(
+                    state.recordingConsent === 'traditional'
+                      ? 'Leave class'
+                      : "Don't record me",
+                    () => {
+                      void run(() => controller.respondToRecordingConsent(false));
+                    },
+                  )}
+                </View>
+              </View>
             )}
             {preview ? (
               <NativeDevicePreview
                 displayName={displayName}
-                sessionName={credentials.sessionName}
+                sessionName={title ?? credentials.sessionName}
                 camera={state.camera}
                 microphone={state.microphone}
                 joining={state.phase === 'joining'}
@@ -471,6 +651,27 @@ export function NativeClassroom({
                 {state.sharingUserId && state.sharingUserId === state.selfId && (
                   <Text style={{ color: colors.text }}>You are sharing your screen</Text>
                 )}
+                {state.sharingUserIds.length > 1 && (
+                  <View
+                    accessibilityLabel="Presenters"
+                    style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}
+                  >
+                    {state.sharingUserIds.map((id) => {
+                      const name =
+                        id === state.selfId
+                          ? 'your'
+                          : `${state.participants.find((user) => user.id === id)?.name ?? 'Participant'}'s`;
+                      return button(
+                        `View ${name} screen`,
+                        () => {
+                          setAnnotating(false);
+                          controller.viewShare(id);
+                        },
+                        id === state.sharingUserId,
+                      );
+                    })}
+                  </View>
+                )}
                 {pageCount > 1 && (
                   <View style={{ flexDirection: 'row', gap: 8 }}>
                     {button(
@@ -535,6 +736,15 @@ export function NativeClassroom({
                           </Text>
                         </View>
                       )}
+                      {reactionFor(user.id) && (
+                        <Text
+                          accessibilityLabel={`${user.name} reacted ${reactionFor(user.id)}`}
+                          accessibilityLiveRegion="polite"
+                          style={{ position: 'absolute', top: 8, right: 8, fontSize: 32 }}
+                        >
+                          {reactionFor(user.id)}
+                        </Text>
+                      )}
                       <Text style={{ color: colors.text, padding: 8 }}>
                         {user.name}
                         {state.raisedHands.includes(user.id) ? ' ✋' : ''}
@@ -549,6 +759,19 @@ export function NativeClassroom({
                   button('Expand shared screen', () =>
                     setFocused({ id: state.sharingUserId!, sharing: true }),
                   )}
+                <NativeHandAndReactions
+                  raised={state.raisedHands.includes(state.selfId ?? '')}
+                  onHand={() => {
+                    void run(() =>
+                      controller.raiseHand(
+                        !state.raisedHands.includes(state.selfId ?? ''),
+                      ),
+                    );
+                  }}
+                  onReact={(emoji) => {
+                    void run(() => controller.react(emoji));
+                  }}
+                />
                 <NativeMeetingToolbar>
                   {button(
                     state.microphone ? 'Mute microphone' : 'Unmute microphone',
@@ -559,12 +782,6 @@ export function NativeClassroom({
                   {button('Audio settings', () =>
                     setPanel(panel === 'audio' ? 'none' : 'audio'),
                   )}
-                  {button('Blur background', () => {
-                    void run(() => adapter.background('blur'));
-                  })}
-                  {button('Remove background', () => {
-                    void run(() => adapter.background('none'));
-                  })}
                   {button(state.camera ? 'Stop video' : 'Start video', () => {
                     void run(() => controller.camera(!state.camera));
                   })}
@@ -585,23 +802,6 @@ export function NativeClassroom({
                         ],
                       ),
                     )}
-                  {button(
-                    state.raisedHands.includes(state.selfId ?? '')
-                      ? 'Lower hand'
-                      : 'Raise hand',
-                    () => {
-                      void run(() =>
-                        controller.raiseHand(
-                          !state.raisedHands.includes(state.selfId ?? ''),
-                        ),
-                      );
-                    },
-                  )}
-                  {['👏', '👍', '❤️', '😂', '🎉'].map((emoji) =>
-                    button(`React ${emoji}`, () => {
-                      void run(() => controller.react(emoji));
-                    }),
-                  )}
                   {button(captions ? 'Turn captions off' : 'Turn captions on', () => {
                     void run(async () => {
                       await adapter.captions(!captions);
@@ -630,31 +830,25 @@ export function NativeClassroom({
                       },
                     )}
                   {controller.self?.host &&
-                    adapter.lockSharing &&
-                    button('Only host can share', () => {
-                      void run(() => adapter.lockSharing!(true));
-                    })}
-                  {controller.self?.host &&
-                    adapter.lockSharing &&
-                    button('Allow participants to share', () => {
-                      void run(() => adapter.lockSharing!(false));
-                    })}
+                    adapter.setShareMode &&
+                    SHARE_MODES.map(([mode, label]) =>
+                      button(
+                        state.shareMode === mode ? `${label} (selected)` : label,
+                        () => {
+                          void run(() => controller.setShareMode(mode));
+                        },
+                        state.shareMode === mode,
+                      ),
+                    )}
                   {state.sharingUserId &&
                     state.sharingUserId !== state.selfId &&
                     button(
                       annotating ? 'Stop annotating' : 'Annotate shared screen',
                       () => setAnnotating((previous) => !previous),
                     )}
-                  {button(
-                    state.sharingUserId === state.selfId
-                      ? 'Stop sharing screen'
-                      : 'Share screen',
-                    () => {
-                      void run(() =>
-                        controller.share(state.sharingUserId !== state.selfId),
-                      );
-                    },
-                  )}
+                  {button(selfSharing ? 'Stop sharing screen' : 'Share screen', () => {
+                    void run(() => controller.share(!selfSharing));
+                  })}
                   {controller.settings.whiteboard.enabled &&
                     button('Whiteboard', () =>
                       setPanel(panel === 'whiteboard' ? 'none' : 'whiteboard'),
@@ -681,13 +875,23 @@ export function NativeClassroom({
                   {moderator &&
                     controller.settings.recording.enabled &&
                     button(
-                      state.recording ? 'Stop recording' : 'Start recording',
+                      state.recordingPaused
+                        ? 'Resume recording'
+                        : state.recording
+                          ? controller.settings.recording.allowStop
+                            ? 'Stop recording'
+                            : 'Recording locked'
+                          : 'Start recording',
                       () => {
                         void run(async () => {
-                          await controller.recording(!state.recording);
+                          await controller.recording(
+                            state.recordingPaused || !state.recording,
+                          );
                         });
                       },
-                      state.recording && !controller.settings.recording.allowStop,
+                      state.recording &&
+                        !state.recordingPaused &&
+                        !controller.settings.recording.allowStop,
                     )}
                   {button('Leave meeting', () =>
                     boardPending
@@ -908,12 +1112,60 @@ export function NativeClassroom({
                   ))}
 
                   <Text style={{ color: colors.text }}>Camera and background</Text>
-                  {button('Blur background', () => {
-                    void run(() => adapter.background('blur'));
-                  })}
-                  {button('Remove background', () => {
-                    void run(() => adapter.background('none'));
-                  })}
+                  {preview && (
+                    <Text style={{ color: colors.textMuted }}>
+                      Your background is applied when you join the class.
+                    </Text>
+                  )}
+                  <View
+                    accessibilityLabel="Backgrounds"
+                    style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}
+                  >
+                    {(
+                      [
+                        ['none', 'No background effect'],
+                        ['blur', 'Blur background'],
+                      ] as const
+                    ).map(([preset, label]) => (
+                      <Pressable
+                        key={preset}
+                        accessibilityRole="button"
+                        accessibilityLabel={label}
+                        accessibilityState={{ selected: backgroundPreset === preset }}
+                        onPress={() => selectBackground(preset)}
+                        style={backgroundChoiceStyle(backgroundPreset === preset)}
+                      >
+                        <Text style={{ color: colors.text, textAlign: 'center' }}>
+                          {label}
+                        </Text>
+                      </Pressable>
+                    ))}
+                    {BACKGROUND_PHOTOS.map((photo) => (
+                      <Pressable
+                        key={photo.value}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Background photo: ${photo.label}`}
+                        accessibilityState={{
+                          selected: backgroundPreset === photo.value,
+                        }}
+                        onPress={() => selectBackground(photo.value)}
+                        style={backgroundChoiceStyle(backgroundPreset === photo.value)}
+                      >
+                        <Image
+                          source={photo.source}
+                          resizeMode="cover"
+                          style={{
+                            position: 'absolute',
+                            top: 0,
+                            right: 0,
+                            bottom: 0,
+                            left: 0,
+                          }}
+                        />
+                      </Pressable>
+                    ))}
+                  </View>
+                  {/* Library photos are this device's own files, so they are not remembered. */}
                   {button('Choose background image', () => {
                     void run(async () => {
                       const result = await ImagePicker.launchImageLibraryAsync({
@@ -1022,7 +1274,12 @@ export function NativeClassroom({
                     {message.sender}: {message.text}
                   </Text>
                 ))}
-                {controller.settings.messages.enabled && (
+                {!state.chatAllowed && (
+                  <Text style={{ color: colors.text }}>
+                    The host has turned off chat.
+                  </Text>
+                )}
+                {controller.settings.messages.enabled && state.chatAllowed && (
                   <>
                     <TextInput
                       accessibilityLabel="Message"

@@ -1,23 +1,83 @@
 import { createNativePictureInPicture } from './native-picture-in-picture';
-import { NativeModules, PermissionsAndroid, Platform } from 'react-native';
 import {
+  NativeEventEmitter,
+  NativeModules,
+  PermissionsAndroid,
+  Platform,
+} from 'react-native';
+import {
+  ConsentType,
   EventType,
   Errors,
   RecordingStatus,
   ShareStatus,
+  ZoomVideoSDKChatPrivilegeType,
   ZoomVideoSdkUser,
   useZoom,
 } from '@zoom/react-native-videosdk';
 import type {
+  NativeLeaveReason,
   NativeMeetingAdapter,
   NativeMeetingEvent,
   NativeParticipant,
   NativeMediaDevice,
+  NativeRecordingStatus,
+  NativeShareMode,
 } from './meeting-controller';
 
 type Zoom = ReturnType<typeof useZoom>;
 const object = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+const recordingStatus = (status: unknown): NativeRecordingStatus =>
+  status === RecordingStatus.Start
+    ? 'recording'
+    : status === RecordingStatus.Pause
+      ? 'paused'
+      : 'stopped';
+// iOS sends the bare reason ("EndByHost"); Android prefixes it ("SessionLeaveReason_EndByHost").
+const leaveReason = (reason: unknown): NativeLeaveReason => {
+  const value = String(reason ?? '');
+  if (value.endsWith('BySelf')) return 'self';
+  if (value.endsWith('EndByHost')) return 'ended-by-host';
+  if (value.endsWith('KickByHost')) return 'removed';
+  if (value.endsWith('NetworkError')) return 'network';
+  return 'unknown';
+};
+// Same intent as web's describeZoomFailure: tell people what to do next, never raw SDK codes.
+const NATIVE_ERRORS: Array<[RegExp, string]> = [
+  [
+    /^Auth|JoinSession_(Invalid_SessionToken|Token)/,
+    'Your classroom pass has expired. Leave and join the class again.',
+  ],
+  [
+    /Session_No_Rights|Fail_Assign_User_Privilege/,
+    'You do not have permission for that action.',
+  ],
+  [/No_License/, 'This classroom has reached its plan limits. Ask the host for help.'],
+  [
+    /Audio_No_Microphone|Permission_RECORD_AUDIO/,
+    'No microphone is available. Allow microphone access or join without audio.',
+  ],
+  [/Audio/, 'Classroom audio stopped working. Check your microphone and speaker.'],
+  [/Share/, 'Screen sharing stopped working. Try sharing again.'],
+  [/Video|Camera/, 'Your camera stopped working. Turn your camera off and on again.'],
+  [
+    /Not_In_Session|Session_Disconnecting|Session_Join_Failed|Session_Not_Started/,
+    'You are not connected to the classroom. Check your connection and rejoin.',
+  ],
+];
+export function describeNativeError(errorType: unknown) {
+  // Strip the shared prefix, which itself contains "Video".
+  const type = String(errorType ?? '').replace(/^ZoomVideoSDKError_/, '');
+  return (
+    NATIVE_ERRORS.find(([pattern]) => pattern.test(type))?.[1] ??
+    'The meeting encountered a connection or device error. Please retry.'
+  );
+}
+const sharing = (status: unknown) =>
+  status === ShareStatus.Start ||
+  status === ShareStatus.Resume ||
+  status === ShareStatus.Pause;
 function checked(result: unknown) {
   if (result != null && result !== Errors.Success && result !== 0 && result !== true)
     throw new Error('Zoom could not complete this action');
@@ -60,9 +120,26 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
             }),
           );
           const joining = joinedPending;
-          const recordingStatus = joining
+          const status = joining
             ? await zoom.recordingHelper.getCloudRecordingStatus().catch(() => undefined)
             : undefined;
+          // Shares already running before this join do not replay a status event.
+          const presenters = joining
+            ? (
+                await Promise.all(
+                  users.map(async (value) => {
+                    const user = new ZoomVideoSdkUser(value);
+                    const actions: Array<{ shareStatus?: unknown }> =
+                      await Promise.resolve(user.getShareActionList?.() ?? []).catch(
+                        () => [],
+                      );
+                    return actions.some((action) => sharing(action.shareStatus))
+                      ? value.userId
+                      : null;
+                  }),
+                )
+              ).filter((id): id is string => !!id)
+            : [];
           if (request !== refreshEpoch || generation !== current) return;
           selfId = self.userId;
           send(
@@ -71,11 +148,9 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
               : { type: 'participants', participants },
           );
           joinedPending = false;
-          if (recordingStatus !== undefined)
-            send({
-              type: 'recording',
-              active: recordingStatus === RecordingStatus.Start,
-            });
+          presenters.forEach((userId) => send({ type: 'share', userId, active: true }));
+          if (status !== undefined)
+            send({ type: 'recording', status: recordingStatus(status) });
         } catch {
           send({
             type: 'error',
@@ -97,15 +172,16 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
         zoom.addListener(EventType.onUserVideoNetworkStatusChanged, (value: unknown) => {
           const event = object(value),
             user = object(event.user);
-          if (String(user.userId) === selfId && typeof event.status === 'string')
-            send({
-              type: 'network',
-              level: event.status.endsWith('_Bad')
-                ? 'bad'
-                : event.status.endsWith('_Normal')
-                  ? 'normal'
-                  : 'good',
-            });
+          if (String(user.userId) !== selfId || typeof event.status !== 'string') return;
+          // "None" means Zoom has no measurement yet, not a good connection.
+          const level = event.status.endsWith('_Bad')
+            ? 'bad'
+            : event.status.endsWith('_Normal')
+              ? 'normal'
+              : event.status.endsWith('_Good')
+                ? 'good'
+                : null;
+          if (level) send({ type: 'network', level });
         }),
         zoom.addListener(EventType.onOriginalLanguageMsgReceived, (value: unknown) => {
           const info = object(object(value).messageInfo);
@@ -154,7 +230,7 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
             .catch(() => {});
         }),
         zoom.addListener(EventType.onSessionLeave, (value: unknown) => {
-          send({ type: 'left', reason: String(object(value).reason ?? '') });
+          send({ type: 'left', reason: leaveReason(object(value).reason) });
           void NativeModules.ClassroomControls.stopMeetingService().catch(() => {});
           void NativeModules.ClassroomControls.stopShareService().catch(() => {});
         }),
@@ -171,32 +247,53 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
             void refresh();
           }),
         ),
-        zoom.addListener(EventType.onError, () =>
-          send({
-            type: 'error',
-            message:
-              'The meeting encountered a connection or device error. Please retry.',
-          }),
-        ),
+        zoom.addListener(EventType.onError, (value: unknown) => {
+          const errorType = String(object(value).errorType ?? '');
+          // Failover is reported through onUserFailoverStatusChanged.
+          if (errorType.endsWith('Session_Reconnecting')) return;
+          // Android reports revoked microphone access as an error, not a permission event.
+          if (errorType.endsWith('Permission_RECORD_AUDIO'))
+            send({ type: 'permission', device: 'microphone' });
+          else send({ type: 'error', message: describeNativeError(errorType) });
+        }),
+        zoom.addListener(EventType.onRequireSystemPermission, (value: unknown) => {
+          const type = String(object(value).permissionType ?? '');
+          if (type.endsWith('_Camera')) send({ type: 'permission', device: 'camera' });
+          else if (type.endsWith('_Microphone'))
+            send({ type: 'permission', device: 'microphone' });
+        }),
         zoom.addListener(EventType.onUserShareStatusChanged, (value: unknown) => {
           const event = object(value),
             action = object(event.shareAction),
             user = object(event.user);
-          send({
-            type: 'share',
-            userId:
-              action.shareStatus === ShareStatus.Stop ||
-              action.shareStatus === ShareStatus.None
-                ? null
-                : typeof user.userId === 'string'
-                  ? user.userId
-                  : null,
-          });
+          if (typeof user.userId === 'string')
+            send({
+              type: 'share',
+              userId: user.userId,
+              active: sharing(action.shareStatus),
+            });
         }),
-        zoom.addListener(EventType.onCloudRecordingStatus, (value: unknown) =>
+        zoom.addListener(EventType.onCloudRecordingStatus, (value: unknown) => {
+          const status = recordingStatus(object(value).status);
+          send({ type: 'recording', status });
+          if (status !== 'recording') return;
+          // Zoom only holds a consent handler for participants who must answer.
+          void zoom
+            .getRecordingConsentType()
+            .then((type) => {
+              if (type === ConsentType.ConsentType_Traditional)
+                send({ type: 'recording-consent', consent: 'traditional' });
+              else if (type === ConsentType.ConsentType_Individual)
+                send({ type: 'recording-consent', consent: 'individual' });
+            })
+            .catch(() => {});
+        }),
+        zoom.addListener(EventType.onChatPrivilegeChanged, (value: unknown) =>
           send({
-            type: 'recording',
-            active: object(value).status === RecordingStatus.Start,
+            type: 'chat-privilege',
+            allowed:
+              object(value).privilege !==
+              ZoomVideoSDKChatPrivilegeType.ZoomVideoSDKChatPrivilege_No_One,
           }),
         ),
         zoom.addListener(EventType.onChatNewMessageNotify, (value: unknown) => {
@@ -227,9 +324,22 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
             .catch(() => {});
         }),
       ];
+      // iOS only: the native module resets Zoom's audio session when the interruption ends.
+      const interruptions =
+        Platform.OS === 'ios' && NativeModules.ClassroomControls?.addListener
+          ? new NativeEventEmitter(NativeModules.ClassroomControls).addListener(
+              'ClassroomAudioInterrupted',
+              (value: unknown) =>
+                send({
+                  type: 'audio-interrupted',
+                  active: object(value).active === true,
+                }),
+            )
+          : null;
       return () => {
         ++generation;
         subscriptions.forEach((subscription) => subscription.remove());
+        interruptions?.remove();
       };
     },
     async prepareAudio() {
@@ -315,17 +425,28 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
     async mirror(enabled) {
       checked(await zoom.videoHelper.mirrorMyVideo(enabled));
     },
-    async lockSharing(locked) {
-      checked(await zoom.shareHelper.lockShare(locked));
+    async shareMode() {
+      const mode: unknown = await NativeModules.ClassroomControls.getShareMode();
+      if (mode === 'locked' || mode === 'single' || mode === 'multiple') return mode;
+      throw new Error('Update the app to change sharing.');
+    },
+    async setShareMode(mode: NativeShareMode) {
+      checked(await NativeModules.ClassroomControls.setShareMode(mode));
     },
     async share(enabled) {
       const lockedForParticipant =
         enabled &&
         (await zoom.shareHelper.isShareLocked()) &&
         !(await new ZoomVideoSdkUser(await zoom.session.getMySelf()).getIsHost());
-      if (enabled && ((await zoom.shareHelper.isOtherSharing()) || lockedForParticipant))
+      if (lockedForParticipant)
+        throw new Error('Only the host can share while sharing is locked.');
+      const multiple =
+        enabled &&
+        (await NativeModules.ClassroomControls.getShareMode?.().catch(() => null)) ===
+          'multiple';
+      if (enabled && !multiple && (await zoom.shareHelper.isOtherSharing()))
         throw new Error(
-          'Screen sharing is unavailable while another presenter is sharing or sharing is locked.',
+          'Another presenter is sharing. Ask the host to allow multiple presenters.',
         );
       checked(
         await (enabled
@@ -370,6 +491,24 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
         await (enabled
           ? zoom.recordingHelper.startCloudRecording()
           : zoom.recordingHelper.stopCloudRecording()),
+      );
+    },
+    async resumeRecording() {
+      checked(await zoom.recordingHelper.resumeCloudRecording());
+    },
+    async recordingConsent(accept) {
+      if (
+        !(await (accept ? zoom.acceptRecordingConsent() : zoom.declineRecordingConsent()))
+      )
+        throw new Error('Zoom could not record your recording choice. Please retry.');
+    },
+    async chatPrivilege(allowed) {
+      checked(
+        await zoom.chatHelper.changeChatPrivilege(
+          allowed
+            ? ZoomVideoSDKChatPrivilegeType.ZoomVideoSDKChatPrivilege_Publicly
+            : ZoomVideoSDKChatPrivilegeType.ZoomVideoSDKChatPrivilege_No_One,
+        ),
       );
     },
     async chat(text) {
