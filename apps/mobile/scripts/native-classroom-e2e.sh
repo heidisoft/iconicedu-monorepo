@@ -46,7 +46,17 @@ elif [[ "$PLATFORM" == android ]]; then
   (yes || true) | sdkmanager --licenses > "$TASK_DIR/sdk-licenses.log" 2>&1
   # API 36 images need a current emulator; the runner's preinstalled one can lag behind.
   sdkmanager emulator platform-tools 'system-images;android-36;google_apis;x86_64' > "$TASK_DIR/sdk.log" 2>&1
-  printf 'no\n' | avdmanager create avd -n IconicClassroomTablet -k 'system-images;android-36;google_apis;x86_64' -d pixel_tablet
+  # avdmanager and the emulator must agree on where AVDs live, or the emulator reports
+  # "Unknown AVD name" and never reaches adb.
+  export ANDROID_AVD_HOME="$HOME/.android/avd"
+  mkdir -p "$ANDROID_AVD_HOME"
+  if ! printf 'no\n' | avdmanager create avd --force -n IconicClassroomTablet \
+      -k 'system-images;android-36;google_apis;x86_64' -d pixel_tablet > "$TASK_DIR/avd.log" 2>&1; then
+    cat "$TASK_DIR/avd.log"; exit 1
+  fi
+  if ! "$SDK_ROOT/emulator/emulator" -list-avds | grep -qx IconicClassroomTablet; then
+    echo 'The tablet AVD was not created'; cat "$TASK_DIR/avd.log"; exit 1
+  fi
   "$ANDROID_HOME/emulator/emulator" -avd IconicClassroomTablet -no-window -no-snapshot -no-audio -gpu swiftshader_indirect > "$TASK_DIR/emulator.log" 2>&1 &
   EMULATOR_PID=$!
   if ! timeout 600 adb wait-for-device; then
