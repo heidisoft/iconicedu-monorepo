@@ -82,7 +82,9 @@ describe('SessionCompletedCarousel', () => {
       rating: 5,
       comment: null,
     });
-  });
+    // Waits in real time for the card's hold (up to 15s above), so the test needs more
+    // than jest's 5s default when every package's tests run in parallel.
+  }, 20000);
 
   it('rotates a bare-confirmed card to the back of the deck after the vote grace window', async () => {
     jest.useFakeTimers();
