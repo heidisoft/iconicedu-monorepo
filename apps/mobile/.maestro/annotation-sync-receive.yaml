@@ -1,0 +1,5 @@
+appId: com.heidisoft.iconicedu
+---
+- extendedWaitUntil:
+    visible: '2 annotations'
+    timeout: 30000

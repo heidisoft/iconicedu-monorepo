@@ -1,3 +1,4 @@
+import { prepareClassroomFixture } from './fixture-developer-tools';
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
@@ -7,8 +8,13 @@ import { NativeClassroom } from './native-classroom';
 import { createClassroomFixtureAdapter } from './classroom-fixture';
 /** Only SDK media is synthetic. Whiteboard transport and persistence use the local apps/api. */
 export default function WhiteboardSyncFixture() {
-  const { role = 'student' } = useLocalSearchParams<{ role?: string }>();
+  const { role = 'student', run = '' } = useLocalSearchParams<{
+    role?: string;
+    run?: string;
+  }>();
   const [entry, setEntry] = useState<{
+    role: string;
+    run: string;
     sessionId: string;
     credentials: LiveSessionJoinCredentialsVM;
   } | null>(null);
@@ -18,20 +24,24 @@ export default function WhiteboardSyncFixture() {
   );
   useEffect(() => {
     let active = true;
-    void publicApiGet<{ sessionId: string; credentials: LiveSessionJoinCredentialsVM }>(
-      `/__whiteboard-entry?role=${encodeURIComponent(role)}`,
-    ).then((value) => {
-      if (active) setEntry(value);
-    });
+    void prepareClassroomFixture()
+      .then(() =>
+        publicApiGet<{ sessionId: string; credentials: LiveSessionJoinCredentialsVM }>(
+          `/__whiteboard-entry?role=${encodeURIComponent(role)}`,
+        ),
+      )
+      .then((value) => {
+        if (active) setEntry({ ...value, role, run });
+      });
     return () => {
       active = false;
     };
-  }, [role]);
-  if (!entry)
+  }, [role, run]);
+  if (!entry || entry.role !== role || entry.run !== run)
     return <ActivityIndicator accessibilityLabel="Loading local whiteboard test" />;
   return (
     <NativeClassroom
-      key={role}
+      key={`${role}:${run}`}
       sessionId={entry.sessionId}
       credentials={entry.credentials}
       adapterOverride={adapter}

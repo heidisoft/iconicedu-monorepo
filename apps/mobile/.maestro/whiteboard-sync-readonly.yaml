@@ -1,7 +1,8 @@
 appId: com.heidisoft.iconicedu
 ---
+- tapOn: 'Educational library'
 - extendedWaitUntil:
     visible:
-      text: 'Educational library'
+      text: 'Number line'
       enabled: false
     timeout: 30000

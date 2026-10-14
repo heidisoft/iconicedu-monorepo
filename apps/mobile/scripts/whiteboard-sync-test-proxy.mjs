@@ -3,6 +3,16 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 const entry = JSON.parse(await readFile(process.env.WHITEBOARD_SYNC_ENTRY_FILE, 'utf8'));
 createServer(async (req, res) => {
+  if (req.url === '/__health') {
+    res.writeHead(200);
+    return res.end();
+  }
+  if (req.url === '/__annotation-entry') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(
+      JSON.stringify({ sessionId: entry.session, token: entry.annotationToken }),
+    );
+  }
   if (req.url?.startsWith('/__whiteboard-entry?')) {
     const role = new URL(req.url, 'http://localhost').searchParams.get('role');
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -22,7 +32,10 @@ createServer(async (req, res) => {
       }),
     );
   }
-  if (!req.url?.startsWith('/whiteboards/')) {
+  if (
+    !req.url?.startsWith('/whiteboards/') &&
+    !req.url?.startsWith('/screen-annotations/')
+  ) {
     res.writeHead(404);
     return res.end();
   }

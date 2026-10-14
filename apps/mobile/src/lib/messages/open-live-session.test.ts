@@ -3,10 +3,11 @@ import { rememberNativeInvitation } from '@/lib/classroom/link-recovery';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '@/lib/supabase/client';
-import { apiPost } from '@/lib/api/http-client';
+import { apiPost, publicApiPost } from '@/lib/api/http-client';
 import { openLiveSession, getLiveSessionShareUrl } from './open-live-session';
 jest.mock('@/lib/classroom/link-recovery', () => ({
   rememberNativeInvitation: jest.fn().mockResolvedValue(undefined),
+  nativeHandoffRedemptionKey: jest.fn().mockResolvedValue('synthetic-redemption-key'),
 }));
 jest.mock('@/lib/supabase/client', () => ({
   supabase: { auth: { getSession: jest.fn() } },
@@ -16,7 +17,10 @@ jest.mock('expo-web-browser', () => ({
   openBrowserAsync: jest.fn(),
   WebBrowserPresentationStyle: { FULL_SCREEN: 'fullScreen' },
 }));
-jest.mock('@/lib/api/http-client', () => ({ apiPost: jest.fn() }));
+jest.mock('@/lib/api/http-client', () => ({
+  apiPost: jest.fn(),
+  publicApiPost: jest.fn(),
+}));
 describe('mobile meeting browser and sharing', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -62,7 +66,7 @@ describe('mobile meeting browser and sharing', () => {
     await openLiveSession('/live/aaaa-bbbb-cccc');
     expect(router.navigate).toHaveBeenCalledWith({
       pathname: '/classroom/[sessionId]',
-      params: { sessionId: 'aaaa-bbbb-cccc' },
+      params: { sessionId: 'aaaa-bbbb-cccc', entry: expect.stringMatching(/^[\d-]+$/) },
     });
     expect(apiPost).not.toHaveBeenCalled();
     expect(WebBrowser.openBrowserAsync).not.toHaveBeenCalled();
@@ -91,7 +95,7 @@ it('stores native invitations encrypted before navigating without a secret URL p
   );
   expect(router.navigate).toHaveBeenCalledWith({
     pathname: '/classroom/[sessionId]',
-    params: { sessionId: 'aaaa-bbbb-cccc' },
+    params: { sessionId: 'aaaa-bbbb-cccc', entry: expect.stringMatching(/^[\d-]+$/) },
   });
 });
 
@@ -107,5 +111,32 @@ it('preserves guest invitations in the browser fallback without requiring login'
   expect(WebBrowser.openBrowserAsync).toHaveBeenCalledWith(
     'https://app.invalid/live/aaaa#invite=synthetic',
     expect.any(Object),
+  );
+});
+
+it('uses the same recoverable native handoff route as OS-delivered links', async () => {
+  jest.clearAllMocks();
+  NativeModules.RNZoomVideoSdk = {};
+  process.env.EXPO_PUBLIC_WEB_URL = 'https://app.invalid';
+  jest.mocked(publicApiPost).mockResolvedValue({ linkToken: 'synthetic-access' });
+  await openLiveSession('/live/aaaa#handoff=synthetic');
+  expect(publicApiPost).toHaveBeenCalledWith(
+    '/live-sessions/aaaa/link-info',
+    expect.objectContaining({ handoff: true, redemptionKey: 'synthetic-redemption-key' }),
+  );
+  expect(router.navigate).toHaveBeenCalledWith({
+    pathname: '/classroom/[sessionId]',
+    params: { sessionId: 'aaaa', entry: expect.any(String) },
+  });
+  expect(WebBrowser.openBrowserAsync).not.toHaveBeenCalled();
+});
+it('refreshes entry when the in-app Join action opens the same classroom twice', async () => {
+  jest.clearAllMocks();
+  NativeModules.RNZoomVideoSdk = {};
+  process.env.EXPO_PUBLIC_WEB_URL = 'https://app.invalid';
+  await openLiveSession('/live/aaaa');
+  await openLiveSession('/live/aaaa');
+  expect(jest.mocked(router.navigate).mock.calls[0][0]).not.toEqual(
+    jest.mocked(router.navigate).mock.calls[1][0],
   );
 });

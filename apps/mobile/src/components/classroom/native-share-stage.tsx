@@ -27,6 +27,7 @@ export function NativeShareStage({
   const [source, setSource] = useState({ width: 0, height: 0 });
   useEffect(() => {
     let mounted = true;
+    setSource({ width: 0, height: 0 });
     const refresh = async () => {
       try {
         const users = [
@@ -76,6 +77,7 @@ export function NativeShareStage({
           }}
         >
           <NativeScreenAnnotations
+            key={`${sessionId}:${userId}`}
             onContext={onContext ? (context) => onContext(userId, context) : undefined}
             sessionId={sessionId}
             shareKey={userId}

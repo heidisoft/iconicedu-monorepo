@@ -1,44 +1,35 @@
-import { rememberNativeInvitation } from '@/lib/classroom/link-recovery';
+import { redirectClassroomLink } from '@/lib/classroom/incoming-link';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { Linking, Alert, NativeModules } from 'react-native';
 import { supabase } from '@/lib/supabase/client';
 import { apiPost } from '@/lib/api/http-client';
-import { resolveJoinHrefForMobile } from './live-session-join';
+import {
+  resolveJoinHrefForMobile,
+  getAppLiveSessionIdentifier,
+} from './live-session-join';
 
-function meetingIdentifier(href: string) {
-  const url = new URL(resolveJoinHrefForMobile(href));
-  const base = new URL(
-    process.env.EXPO_PUBLIC_WEB_URL?.trim() || 'http://localhost:3000',
-  );
-  return url.origin === base.origin
-    ? /^\/live\/([^/]+)$/.exec(url.pathname)?.[1]
-    : undefined;
-}
 /** Personal handoffs are never used for sharing or copied to the clipboard. */
 export async function openLiveSession(href: string) {
   try {
-    const identifier = meetingIdentifier(href);
+    const identifier = getAppLiveSessionIdentifier(href);
     if (!identifier) {
       await Linking.openURL(resolveJoinHrefForMobile(href));
       return;
     }
     if (NativeModules.RNZoomVideoSdk) {
-      const fragment = new URLSearchParams(
-        new URL(resolveJoinHrefForMobile(href)).hash.slice(1),
+      const destination = await redirectClassroomLink(
+        resolveJoinHrefForMobile(href),
+        new URL(resolveJoinHrefForMobile('/')).origin,
       );
-      if (fragment.has('handoff')) {
-        await WebBrowser.openBrowserAsync(resolveJoinHrefForMobile(href), {
-          presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
-        });
+      const resolved = /^\/classroom\/([a-zA-Z0-9-]+)\?entry=([\d-]+)$/.exec(destination);
+      if (!resolved) {
+        router.navigate('/classroom-link-error');
         return;
       }
-      const invitation = fragment.get('invite');
-      if (invitation) await rememberNativeInvitation(identifier, invitation);
-
       router.navigate({
         pathname: '/classroom/[sessionId]',
-        params: { sessionId: identifier },
+        params: { sessionId: resolved[1], entry: resolved[2] },
       });
       return;
     }
@@ -72,7 +63,7 @@ export async function openLiveSession(href: string) {
   }
 }
 export async function getLiveSessionShareUrl(href: string) {
-  const identifier = meetingIdentifier(href);
+  const identifier = getAppLiveSessionIdentifier(href);
   if (!identifier) return resolveJoinHrefForMobile(href);
   const result = await apiPost<{ sharePath?: string; joinPath: string }>(
     `/live-sessions/${encodeURIComponent(identifier)}/invite-link`,

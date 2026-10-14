@@ -1,0 +1,14 @@
+appId: com.heidisoft.iconicedu
+---
+- runFlow: bootstrap.yaml
+- openLink: 'iconicedu://annotation-sync-fixture?run=${RUN_ID}'
+- extendedWaitUntil:
+    visible: '1 annotation'
+    timeout: 30000
+- swipe:
+    start: '25%,25%'
+    end: '60%,30%'
+    duration: 1000
+- extendedWaitUntil:
+    visible: '2 annotations'
+    timeout: 30000

@@ -1,0 +1,6 @@
+appId: com.heidisoft.iconicedu
+---
+- tapOn: 'Undo annotation'
+- extendedWaitUntil:
+    visible: '1 annotation'
+    timeout: 30000

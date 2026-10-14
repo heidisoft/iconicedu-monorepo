@@ -4,9 +4,14 @@ import { publicApiPost } from '@/lib/api/http-client';
 let entrySequence = 0;
 
 /** Rewrite OS links before navigation so invitation capabilities never enter route params. */
-export async function redirectClassroomLink(path: string): Promise<string> {
+export async function redirectClassroomLink(
+  path: string,
+  webOrigin?: string,
+): Promise<string> {
   try {
-    const origin = process.env.EXPO_PUBLIC_WEB_URL?.trim() || 'https://app.iconicedu.com';
+    const origin =
+      webOrigin ??
+      (process.env.EXPO_PUBLIC_WEB_URL?.trim() || 'https://app.iconicedu.com');
     const url = new URL(path, origin);
     const native = url.protocol === 'iconicedu:';
     if (!native && url.origin !== new URL(origin).origin) return '/';

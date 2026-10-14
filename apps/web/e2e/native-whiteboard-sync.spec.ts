@@ -39,6 +39,8 @@ test('web and native share actual API drawing, permissions and presentation stat
             '--device',
             device!,
             'test',
+            '-e',
+            `RUN_ID=${Date.now()}`,
             '--debug-output',
             resolve(folder, `${flow}-artifacts`),
             `apps/mobile/.maestro/${flow}.yaml`,

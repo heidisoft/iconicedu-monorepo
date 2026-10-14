@@ -1,6 +1,6 @@
 appId: com.heidisoft.iconicedu
 ---
-- openLink: 'iconicedu://whiteboard-sync-fixture?role=teacher'
+- openLink: 'iconicedu://whiteboard-sync-fixture?role=teacher&run=${RUN_ID}'
 - extendedWaitUntil:
     visible: 'Ready to join\?'
     timeout: 30000
@@ -8,6 +8,7 @@ appId: com.heidisoft.iconicedu
 - scrollUntilVisible:
     element: 'Join now'
 - tapOn: 'Join now'
+- tapOn: 'More controls'
 - scrollUntilVisible:
     element: 'Whiteboard'
 - tapOn: 'Whiteboard'
