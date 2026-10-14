@@ -38,6 +38,37 @@ const leaveReason = (reason: unknown): NativeLeaveReason => {
   if (value.endsWith('NetworkError')) return 'network';
   return 'unknown';
 };
+// Same intent as web's describeZoomFailure: tell people what to do next, never raw SDK codes.
+const NATIVE_ERRORS: Array<[RegExp, string]> = [
+  [
+    /^Auth|JoinSession_(Invalid_SessionToken|Token)/,
+    'Your classroom pass has expired. Leave and join the class again.',
+  ],
+  [
+    /Session_No_Rights|Fail_Assign_User_Privilege/,
+    'You do not have permission for that action.',
+  ],
+  [/No_License/, 'This classroom has reached its plan limits. Ask the host for help.'],
+  [
+    /Audio_No_Microphone|Permission_RECORD_AUDIO/,
+    'No microphone is available. Allow microphone access or join without audio.',
+  ],
+  [/Audio/, 'Classroom audio stopped working. Check your microphone and speaker.'],
+  [/Share/, 'Screen sharing stopped working. Try sharing again.'],
+  [/Video|Camera/, 'Your camera stopped working. Turn your camera off and on again.'],
+  [
+    /Not_In_Session|Session_Disconnecting|Session_Join_Failed|Session_Not_Started/,
+    'You are not connected to the classroom. Check your connection and rejoin.',
+  ],
+];
+export function describeNativeError(errorType: unknown) {
+  // Strip the shared prefix, which itself contains "Video".
+  const type = String(errorType ?? '').replace(/^ZoomVideoSDKError_/, '');
+  return (
+    NATIVE_ERRORS.find(([pattern]) => pattern.test(type))?.[1] ??
+    'The meeting encountered a connection or device error. Please retry.'
+  );
+}
 const sharing = (status: unknown) =>
   status === ShareStatus.Start ||
   status === ShareStatus.Resume ||
@@ -136,15 +167,16 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
         zoom.addListener(EventType.onUserVideoNetworkStatusChanged, (value: unknown) => {
           const event = object(value),
             user = object(event.user);
-          if (String(user.userId) === selfId && typeof event.status === 'string')
-            send({
-              type: 'network',
-              level: event.status.endsWith('_Bad')
-                ? 'bad'
-                : event.status.endsWith('_Normal')
-                  ? 'normal'
-                  : 'good',
-            });
+          if (String(user.userId) !== selfId || typeof event.status !== 'string') return;
+          // "None" means Zoom has no measurement yet, not a good connection.
+          const level = event.status.endsWith('_Bad')
+            ? 'bad'
+            : event.status.endsWith('_Normal')
+              ? 'normal'
+              : event.status.endsWith('_Good')
+                ? 'good'
+                : null;
+          if (level) send({ type: 'network', level });
         }),
         zoom.addListener(EventType.onOriginalLanguageMsgReceived, (value: unknown) => {
           const info = object(object(value).messageInfo);
@@ -210,13 +242,21 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
             void refresh();
           }),
         ),
-        zoom.addListener(EventType.onError, () =>
-          send({
-            type: 'error',
-            message:
-              'The meeting encountered a connection or device error. Please retry.',
-          }),
-        ),
+        zoom.addListener(EventType.onError, (value: unknown) => {
+          const errorType = String(object(value).errorType ?? '');
+          // Failover is reported through onUserFailoverStatusChanged.
+          if (errorType.endsWith('Session_Reconnecting')) return;
+          // Android reports revoked microphone access as an error, not a permission event.
+          if (errorType.endsWith('Permission_RECORD_AUDIO'))
+            send({ type: 'permission', device: 'microphone' });
+          else send({ type: 'error', message: describeNativeError(errorType) });
+        }),
+        zoom.addListener(EventType.onRequireSystemPermission, (value: unknown) => {
+          const type = String(object(value).permissionType ?? '');
+          if (type.endsWith('_Camera')) send({ type: 'permission', device: 'camera' });
+          else if (type.endsWith('_Microphone'))
+            send({ type: 'permission', device: 'microphone' });
+        }),
         zoom.addListener(EventType.onUserShareStatusChanged, (value: unknown) => {
           const event = object(value),
             action = object(event.shareAction),

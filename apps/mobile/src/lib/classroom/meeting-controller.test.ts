@@ -332,6 +332,23 @@ describe('native classroom lifecycle and permissions', () => {
     await expect(f.controller.chat('Hello')).rejects.toThrow('turned off chat');
     expect(f.adapter.chat).not.toHaveBeenCalled();
   });
+  it('turns the blocked device off and clears the block once access returns', async () => {
+    const f = fixture();
+    await f.connected();
+    f.emit({
+      type: 'participants',
+      participants: [{ ...teacher, muted: false }, student],
+    });
+    f.emit({ type: 'permission', device: 'microphone' });
+    expect(f.controller.state).toMatchObject({
+      permissionBlocked: 'microphone',
+      microphone: false,
+    });
+    f.controller.permissionRestored('camera');
+    expect(f.controller.state.permissionBlocked).toBe('microphone');
+    f.controller.permissionRestored('microphone');
+    expect(f.controller.state.permissionBlocked).toBeNull();
+  });
   it('records why the session ended', async () => {
     const f = fixture();
     await f.connected('2');

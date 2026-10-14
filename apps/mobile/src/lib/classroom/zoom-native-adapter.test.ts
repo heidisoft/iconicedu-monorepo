@@ -1,5 +1,5 @@
 import { NativeModules, PermissionsAndroid, Platform } from 'react-native';
-import { createZoomNativeAdapter } from './zoom-native-adapter';
+import { createZoomNativeAdapter, describeNativeError } from './zoom-native-adapter';
 import type { useZoom } from '@zoom/react-native-videosdk';
 jest.mock('@zoom/react-native-videosdk', () => ({
   Errors: { Success: 'ZoomVideoSDKError_Success' },
@@ -44,6 +44,7 @@ jest.mock('@zoom/react-native-videosdk', () => ({
       'onOriginalLanguageMsgReceived',
       'onCommandReceived',
       'onChatPrivilegeChanged',
+      'onRequireSystemPermission',
     ].map((key) => [key, key]),
   ),
   ZoomVideoSdkUser: jest.fn((value) => ({
@@ -444,5 +445,55 @@ describe('Zoom native bridge adapter', () => {
     );
     f.zoom.acceptRecordingConsent.mockResolvedValue(false);
     await expect(f.adapter.recordingConsent!(true)).rejects.toThrow('recording choice');
+  });
+  it.each([
+    ['ZoomVideoSDKError_JoinSession_Invalid_SessionToken', 'classroom pass has expired'],
+    ['ZoomVideoSDKError_Auth_Error', 'classroom pass has expired'],
+    ['ZoomVideoSDKError_Session_Audio_No_Microphone', 'No microphone'],
+    ['ZoomVideoSDKError_Session_Video_Device_Error', 'camera stopped working'],
+    ['ZoomVideoSDKError_Session_Share_Error', 'Screen sharing stopped'],
+    ['ZoomVideoSDKError_Not_In_Session', 'not connected'],
+    ['something_new', 'connection or device error'],
+  ])('describes %s without exposing the SDK code', (type, message) => {
+    expect(describeNativeError(type)).toContain(message);
+    expect(describeNativeError(type)).not.toContain('ZoomVideoSDK');
+  });
+  it('turns SDK errors and permission loss into actionable events', () => {
+    const f = fixture(),
+      receive = jest.fn();
+    f.adapter.subscribe(receive);
+    f.listeners.get('onError')?.({ errorType: 'ZoomVideoSDKError_Session_Reconnecting' });
+    f.listeners.get('onError')?.({
+      errorType: 'ZoomVideoSDKError_Permission_RECORD_AUDIO',
+    });
+    f.listeners.get('onRequireSystemPermission')?.({
+      permissionType: 'ZoomVideoSDKSystemPermissionType_Camera',
+    });
+    f.listeners.get('onError')?.({ errorType: 'ZoomVideoSDKError_Session_Share_Error' });
+    expect(receive.mock.calls.map((call) => call[0])).toEqual([
+      { type: 'permission', device: 'microphone' },
+      { type: 'permission', device: 'camera' },
+      { type: 'error', message: 'Screen sharing stopped working. Try sharing again.' },
+    ]);
+  });
+  it('ignores network status until Zoom has measured the connection', async () => {
+    const f = fixture(),
+      receive = jest.fn();
+    f.adapter.subscribe(receive);
+    f.listeners.get('onSessionJoin')?.();
+    for (let index = 0; index < 20; index += 1) await Promise.resolve();
+    receive.mockClear();
+    const status = (value: string) =>
+      f.listeners.get('onUserVideoNetworkStatusChanged')?.({
+        status: `ZoomVideoSDKNetwork_${value}`,
+        user: { userId: '1' },
+      });
+    status('None');
+    status('Bad');
+    status('Good');
+    expect(receive.mock.calls.map((call) => call[0])).toEqual([
+      { type: 'network', level: 'bad' },
+      { type: 'network', level: 'good' },
+    ]);
   });
 });

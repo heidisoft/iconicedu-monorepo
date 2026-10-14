@@ -22,8 +22,16 @@ jest.mock('@zoom/react-native-videosdk', () => ({
   }),
 }));
 jest.mock('expo-camera', () => ({
-  useCameraPermissions: () => [{ granted: true }, async () => ({ granted: true })],
-  useMicrophonePermissions: () => [{ granted: true }, async () => ({ granted: true })],
+  useCameraPermissions: () => [
+    { granted: true },
+    async () => ({ granted: true }),
+    async () => ({ granted: true }),
+  ],
+  useMicrophonePermissions: () => [
+    { granted: true },
+    async () => ({ granted: true }),
+    async () => ({ granted: true }),
+  ],
 }));
 jest.mock('expo-image-picker', () => ({}));
 jest.mock('expo-router', () => ({ router: { back: jest.fn() } }));
@@ -205,5 +213,31 @@ describe('native classroom parity with web meeting behaviour', () => {
     f.emit({ type: 'chat-privilege', allowed: false });
     expect(f.screen.queryByLabelText('Message')).toBeNull();
     expect(f.screen.getByText('The host has turned off chat.')).toBeTruthy();
+  });
+  it('offers Settings when the OS blocks the microphone mid-class', async () => {
+    const f = setup();
+    await f.join();
+    const openSettings = jest
+      .spyOn(require('react-native').Linking, 'openSettings')
+      .mockResolvedValue(undefined);
+    f.emit({ type: 'permission', device: 'microphone' });
+    expect(f.screen.getByText(/Microphone access is blocked/)).toBeTruthy();
+    fireEvent.press(f.screen.getByLabelText('Open Settings'));
+    expect(openSettings).toHaveBeenCalled();
+  });
+  it('reports connection problems with the same levels as web, once per change', async () => {
+    const f = setup();
+    await f.join();
+    meetingApi.quality.mockClear();
+    f.emit({ type: 'network', level: 'normal' });
+    f.emit({ type: 'network', level: 'bad' });
+    f.emit({ type: 'network', level: 'normal' });
+    f.emit({ type: 'network', level: 'bad' });
+    f.emit({ type: 'connection', reconnecting: true });
+    expect(meetingApi.quality.mock.calls.map((call) => [call[1], call[2]])).toEqual([
+      ['network_quality', 'bad'],
+      ['connection_state', 'reconnecting'],
+    ]);
+    expect(f.screen.getByText(/connection is unstable/)).toBeTruthy();
   });
 });

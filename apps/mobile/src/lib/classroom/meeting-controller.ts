@@ -33,6 +33,7 @@ export type NativeMeetingEvent =
   | { type: 'recording'; status: NativeRecordingStatus }
   | { type: 'recording-consent'; consent: NativeRecordingConsent }
   | { type: 'chat-privilege'; allowed: boolean }
+  | { type: 'permission'; device: 'camera' | 'microphone' }
   | { type: 'chat'; id: string; sender: string; text: string }
   | { type: 'connection'; reconnecting: boolean }
   | { type: 'hand'; userId: string; raised: boolean }
@@ -103,6 +104,8 @@ export type NativeMeetingState = {
   recordingConsent: NativeRecordingConsent | null;
   chatAllowed: boolean;
   leaveReason: NativeLeaveReason | null;
+  /** The OS revoked access mid-class; the screen offers a path to Settings. */
+  permissionBlocked: 'camera' | 'microphone' | null;
   error: string | null;
   composited: string[];
   network: 'good' | 'normal' | 'bad' | null;
@@ -126,6 +129,7 @@ const initial = (): NativeMeetingState => ({
   recordingConsent: null,
   chatAllowed: true,
   leaveReason: null,
+  permissionBlocked: null,
   error: null,
   messages: [],
   composited: [],
@@ -288,6 +292,12 @@ export class NativeMeetingController {
       case 'chat-privilege':
         this.update({ chatAllowed: event.allowed });
         break;
+      case 'permission':
+        this.update({
+          permissionBlocked: event.device,
+          ...(event.device === 'camera' ? { camera: false } : { microphone: false }),
+        });
+        break;
       case 'chat':
         this.update({
           messages: [
@@ -367,6 +377,10 @@ export class NativeMeetingController {
       .catch(() =>
         this.update({ error: 'Unable to turn off chat for this class. Please retry.' }),
       );
+  }
+  /** Called after the OS reports access again, e.g. when returning from Settings. */
+  permissionRestored(device: 'camera' | 'microphone') {
+    if (this.state.permissionBlocked === device) this.update({ permissionBlocked: null });
   }
   viewShare(userId: string) {
     if (this.state.sharingUserIds.includes(userId))

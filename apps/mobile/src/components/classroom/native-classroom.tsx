@@ -10,6 +10,7 @@ import {
   AppState,
   Keyboard,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -102,8 +103,8 @@ export function NativeClassroom({
     Math.min(page, pageCount - 1) * pageSize,
     (Math.min(page, pageCount - 1) + 1) * pageSize,
   );
-  const [cameraPermission, requestCamera] = useCameraPermissions();
-  const [micPermission, requestMic] = useMicrophonePermissions();
+  const [cameraPermission, requestCamera, getCamera] = useCameraPermissions();
+  const [micPermission, requestMic, getMic] = useMicrophonePermissions();
   const [panel, setPanel] = useState<
     'none' | 'audio' | 'participants' | 'chat' | 'whiteboard'
   >('none');
@@ -227,6 +228,20 @@ export function NativeClassroom({
     return () => subscription.remove();
   }, [zoom, panel]);
   useEffect(() => {
+    const blocked = state.permissionBlocked;
+    if (!blocked) return;
+    // Returning from Settings clears the banner once the OS grants access again.
+    const subscription = AppState.addEventListener('change', (next) => {
+      if (next !== 'active') return;
+      void (blocked === 'camera' ? getCamera() : getMic())
+        .then((permission) => {
+          if (permission.granted) controller.permissionRestored(blocked);
+        })
+        .catch(() => {});
+    });
+    return () => subscription.remove();
+  }, [state.permissionBlocked, controller, getCamera, getMic]);
+  useEffect(() => {
     const subscription = AppState.addEventListener('change', (next) => {
       if (next === 'active' && state.phase === 'meeting' && Platform.OS === 'ios')
         void zoom
@@ -279,22 +294,27 @@ export function NativeClassroom({
       void meetingApi.audit(sessionId, 'recording_started').catch(() => {});
     recordingReported.current = state.recording;
   }, [state.recording, state.participants, controller, sessionId, meetingApi]);
+  // Same vocabulary as web: connection problems only, and good/bad network transitions.
   useEffect(() => {
-    if (state.phase !== 'meeting' && state.phase !== 'reconnecting') return;
-    void meetingApi
-      .quality(
-        sessionId,
-        'connection_state',
-        state.phase === 'meeting' ? 'Connected' : 'Reconnecting',
-        credentials.displayName,
-      )
-      .catch(() => {});
-  }, [state.phase, sessionId, credentials.displayName, meetingApi]);
-  useEffect(() => {
-    if (state.network)
+    const level =
+      state.phase === 'reconnecting'
+        ? 'reconnecting'
+        : state.phase === 'ended' && state.leaveReason === 'network'
+          ? 'fail'
+          : null;
+    if (level)
       void meetingApi
-        .quality(sessionId, 'network_quality', state.network, credentials.displayName)
+        .quality(sessionId, 'connection_state', level, credentials.displayName)
         .catch(() => {});
+  }, [state.phase, state.leaveReason, sessionId, credentials.displayName, meetingApi]);
+  const reportedNetwork = useRef<string | null>(null);
+  useEffect(() => {
+    if (state.network !== 'good' && state.network !== 'bad') return;
+    if (reportedNetwork.current === state.network) return;
+    reportedNetwork.current = state.network;
+    void meetingApi
+      .quality(sessionId, 'network_quality', state.network, credentials.displayName)
+      .catch(() => {});
   }, [state.network, sessionId, credentials.displayName, meetingApi]);
   const button = (label: string, action: () => void, disabled = false) => (
     <Pressable
@@ -401,8 +421,30 @@ export function NativeClassroom({
                 {state.reactions.map((reaction) => reaction.emoji).join(' ')}
               </Text>
             )}
-            {state.network && (
-              <Text style={{ color: colors.text }}>Connection: {state.network}</Text>
+            {state.network === 'bad' && (
+              <Text accessibilityRole="alert" style={{ color: colors.text }}>
+                Your connection is unstable. Video may pause while it recovers.
+              </Text>
+            )}
+            {state.permissionBlocked && (
+              <View
+                accessibilityRole="alert"
+                style={{
+                  gap: 8,
+                  padding: 12,
+                  borderRadius: 12,
+                  backgroundColor: colors.card,
+                }}
+              >
+                <Text style={{ color: colors.text }}>
+                  {state.permissionBlocked === 'camera'
+                    ? 'Camera access is blocked. Allow camera access in Settings to be seen.'
+                    : 'Microphone access is blocked. Allow microphone access in Settings to be heard.'}
+                </Text>
+                {button('Open Settings', () => {
+                  void Linking.openSettings();
+                })}
+              </View>
             )}
             {state.recording && (
               <Text
