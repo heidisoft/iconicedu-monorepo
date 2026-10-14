@@ -72,9 +72,18 @@ elif [[ "$PLATFORM" == android ]]; then
   adb shell settings put global animator_duration_scale 0
   # Reanimated links libworklets.so from its per-ABI CMake task, but only its aggregate
   # externalNativeBuild task waits for Worklets, so build Worklets' native library first.
-  if ! (cd android && ./gradlew :react-native-worklets:externalNativeBuildDebug :app:assembleDebug \
-      --no-parallel -PreactNativeArchitectures=x86_64) > "$TASK_DIR/build.log" 2>&1; then
-    tail -120 "$TASK_DIR/build.log"; exit 1
+  WORKLETS_ANDROID=$(node -p "require('path').dirname(require.resolve('react-native-worklets/package.json'))")/android
+  list_worklets_libraries() {
+    echo 'libworklets.so outputs:'; find "$WORKLETS_ANDROID/build" -name libworklets.so 2>/dev/null || true
+  }
+  if ! (cd android && ./gradlew :react-native-worklets:externalNativeBuildDebug \
+      --no-parallel -PreactNativeArchitectures=x86_64) > "$TASK_DIR/worklets-build.log" 2>&1; then
+    tail -120 "$TASK_DIR/worklets-build.log"; exit 1
+  fi
+  list_worklets_libraries
+  if ! (cd android && ./gradlew :app:assembleDebug --no-parallel -PreactNativeArchitectures=x86_64) \
+      > "$TASK_DIR/build.log" 2>&1; then
+    tail -120 "$TASK_DIR/build.log"; list_worklets_libraries; exit 1
   fi
   DEVICE_ID=$(adb devices | awk '/emulator-/ {print $1; exit}')
   adb -s "$DEVICE_ID" install -r android/app/build/outputs/apk/debug/app-debug.apk

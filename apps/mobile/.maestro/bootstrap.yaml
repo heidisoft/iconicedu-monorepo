@@ -2,7 +2,9 @@ appId: com.heidisoft.iconicedu
 name: Open the native development build used by classroom UI tests
 ---
 - stopApp
-- openLink: 'iconicedu://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A8085'
+# disableOnboarding sits inside the app URL because iOS reads it there; otherwise the
+# developer-menu introduction covers the app on the first launch of a fresh simulator.
+- openLink: 'iconicedu://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A8085%2F%3FdisableOnboarding%3D1'
 - tapOn:
     text: 'Open'
     optional: true
