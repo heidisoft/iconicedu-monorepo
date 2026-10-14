@@ -67,7 +67,10 @@ describe('DevicePreviewStep', () => {
     expect(onJoin).not.toHaveBeenCalled();
     await user.click(trigger);
     await user.click(screen.getByRole('button', { name: 'Device settings' }));
-    expect(await screen.findByRole('dialog', { name: 'Settings' })).toBeVisible();
+    // The settings sheet animates in; allow for slow runs when every package tests in parallel.
+    expect(
+      await screen.findByRole('dialog', { name: 'Settings' }, { timeout: 5000 }),
+    ).toBeVisible();
   });
   it('uses visible, accessible device controls and returns the selected state', async () => {
     const user = userEvent.setup();
