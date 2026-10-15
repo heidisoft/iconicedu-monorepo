@@ -62,6 +62,7 @@
     "mobile:prebuild:clean": "pnpm --filter mobile native:prebuild:clean",
     "mobile:eas:build:dev": "pnpm --filter mobile eas:build:dev",
     "mobile:eas:build:preview": "pnpm --filter mobile eas:build:preview",
+    "mobile:eas:build:preview:store": "pnpm --filter mobile eas:build:preview:store",
     "mobile:eas:build:prod": "pnpm --filter mobile eas:build:prod",
     "mobile:eas:submit": "pnpm --filter mobile eas:submit",
     "----------- UTILITIES -----------": "",

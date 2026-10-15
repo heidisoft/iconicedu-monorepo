@@ -22,6 +22,14 @@
         "EXPO_PUBLIC_POSTHOG_HOST": "https://t.iconicedu.lk"
       }
     },
+    "preview-store": {
+      "extends": "preview",
+      "distribution": "store",
+      "autoIncrement": true,
+      "android": {
+        "buildType": "app-bundle"
+      }
+    },
     "production": {
       "channel": "production",
       "environment": "production",
@@ -33,6 +41,12 @@
     }
   },
   "submit": {
+    "preview-store": {
+      "ios": {},
+      "android": {
+        "track": "internal"
+      }
+    },
     "production": {
       "android": {
         "track": "internal"
