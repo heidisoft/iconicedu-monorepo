@@ -52,35 +52,35 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		05CEA34A1D9F4A6CA95D2D8D /* SampleHandler.mm */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = sourcecode.cpp.objcpp; name = SampleHandler.mm; path = SampleHandler.mm; sourceTree = "<group>"; };
-		0FE19EA555FF8B29EE48CAA6 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = ICONICAcademy/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		0FF42BBED7C54B61913F2E7E /* CoreMedia.framework */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = wrapper.framework; name = CoreMedia.framework; path = System/Library/Frameworks/CoreMedia.framework; sourceTree = SDKROOT; };
+		05CEA34A1D9F4A6CA95D2D8D /* SampleHandler.mm */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = sourcecode.cpp.objcpp; path = SampleHandler.mm; sourceTree = "<group>"; };
+		0FE19EA555FF8B29EE48CAA6 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = ICONICAcademy/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		0FF42BBED7C54B61913F2E7E /* CoreMedia.framework */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = wrapper.framework; name = CoreMedia.framework; path = System/Library/Frameworks/CoreMedia.framework; sourceTree = SDKROOT; };
 		13B07F961A680F5B00A75B9A /* ICONICAcademy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ICONICAcademy.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = ICONICAcademy/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = ICONICAcademy/Info.plist; sourceTree = "<group>"; };
-		1BD9C533BFF74A11AF7B2027 /* ClassroomControls.mm */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = sourcecode.cpp.objcpp; name = ClassroomControls.mm; path = ICONICAcademy/ClassroomControls.mm; sourceTree = "<group>"; };
+		1BD9C533BFF74A11AF7B2027 /* ClassroomControls.mm */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = sourcecode.cpp.objcpp; name = ClassroomControls.mm; path = ICONICAcademy/ClassroomControls.mm; sourceTree = "<group>"; };
 		232A1EB6F40BBA82F70D4651 /* Pods-ClassroomBroadcast.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-ClassroomBroadcast.debug.xcconfig"; path = "Target Support Files/Pods-ClassroomBroadcast/Pods-ClassroomBroadcast.debug.xcconfig"; sourceTree = "<group>"; };
-		471C92766F194F1D97179765 /* CoreGraphics.framework */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
-		552149887B75450B991740E9 /* ClassroomBroadcast.entitlements */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = ClassroomBroadcast.entitlements; path = ClassroomBroadcast.entitlements; sourceTree = "<group>"; };
-		5F6A247FDB9349DCA4D2B84F /* ClassroomDevices.mm */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = sourcecode.cpp.objcpp; name = ClassroomDevices.mm; path = ICONICAcademy/ClassroomDevices.mm; sourceTree = "<group>"; };
-		6E2213861A044CFD9D886CFB /* CoreVideo.framework */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = wrapper.framework; name = CoreVideo.framework; path = System/Library/Frameworks/CoreVideo.framework; sourceTree = SDKROOT; };
-		7037881777FF4A52945707EC /* SampleHandler.mm */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = sourcecode.cpp.objcpp; name = SampleHandler.mm; path = ClassroomBroadcast/SampleHandler.mm; sourceTree = "<group>"; };
-		7E7670B63A304F58A6938BD3 /* ClassroomPictureInPicture.mm */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = sourcecode.cpp.objcpp; name = ClassroomPictureInPicture.mm; path = ICONICAcademy/ClassroomPictureInPicture.mm; sourceTree = "<group>"; };
+		471C92766F194F1D97179765 /* CoreGraphics.framework */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
+		552149887B75450B991740E9 /* ClassroomBroadcast.entitlements */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; path = ClassroomBroadcast.entitlements; sourceTree = "<group>"; };
+		5F6A247FDB9349DCA4D2B84F /* ClassroomDevices.mm */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = sourcecode.cpp.objcpp; name = ClassroomDevices.mm; path = ICONICAcademy/ClassroomDevices.mm; sourceTree = "<group>"; };
+		6E2213861A044CFD9D886CFB /* CoreVideo.framework */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = wrapper.framework; name = CoreVideo.framework; path = System/Library/Frameworks/CoreVideo.framework; sourceTree = SDKROOT; };
+		7037881777FF4A52945707EC /* SampleHandler.mm */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = sourcecode.cpp.objcpp; name = SampleHandler.mm; path = ClassroomBroadcast/SampleHandler.mm; sourceTree = "<group>"; };
+		7E7670B63A304F58A6938BD3 /* ClassroomPictureInPicture.mm */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = sourcecode.cpp.objcpp; name = ClassroomPictureInPicture.mm; path = ICONICAcademy/ClassroomPictureInPicture.mm; sourceTree = "<group>"; };
 		95B5A15D7E790B5B522304F2 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-ICONICAcademy/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
 		9F815B89CE136F7DB4734D32 /* libPods-ClassroomBroadcast.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-ClassroomBroadcast.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = ICONICAcademy/SplashScreen.storyboard; sourceTree = "<group>"; };
 		B3FADCE25CE3FEB4CD94E70F /* Pods-ICONICAcademy.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-ICONICAcademy.release.xcconfig"; path = "Target Support Files/Pods-ICONICAcademy/Pods-ICONICAcademy.release.xcconfig"; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
-		D5BAF00888DE4083A5B76F22 /* ReplayKit.framework */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = wrapper.framework; name = ReplayKit.framework; path = System/Library/Frameworks/ReplayKit.framework; sourceTree = SDKROOT; };
+		D5BAF00888DE4083A5B76F22 /* ReplayKit.framework */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = wrapper.framework; name = ReplayKit.framework; path = System/Library/Frameworks/ReplayKit.framework; sourceTree = SDKROOT; };
 		D81235C51751955E8DCDC7E9 /* Pods-ICONICAcademy.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-ICONICAcademy.debug.xcconfig"; path = "Target Support Files/Pods-ICONICAcademy/Pods-ICONICAcademy.debug.xcconfig"; sourceTree = "<group>"; };
-		DC7048A8E89B4EA38F378453 /* VideoToolbox.framework */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = wrapper.framework; name = VideoToolbox.framework; path = System/Library/Frameworks/VideoToolbox.framework; sourceTree = SDKROOT; };
+		DC7048A8E89B4EA38F378453 /* VideoToolbox.framework */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = wrapper.framework; name = VideoToolbox.framework; path = System/Library/Frameworks/VideoToolbox.framework; sourceTree = SDKROOT; };
 		DEF651BFDACAF7C152D55242 /* libPods-ICONICAcademy.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-ICONICAcademy.a"; sourceTree = BUILT_PRODUCTS_DIR; };
-		E29B6F17AA5641139E7D836C /* ClassroomBroadcast-Info.plist */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = text.plist.xml; name = "ClassroomBroadcast-Info.plist"; path = "ClassroomBroadcast-Info.plist"; sourceTree = "<group>"; };
+		E29B6F17AA5641139E7D836C /* ClassroomBroadcast-Info.plist */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = text.plist.xml; path = "ClassroomBroadcast-Info.plist"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F04EB2D20284047386B2A308 /* Pods-ClassroomBroadcast.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-ClassroomBroadcast.release.xcconfig"; path = "Target Support Files/Pods-ClassroomBroadcast/Pods-ClassroomBroadcast.release.xcconfig"; sourceTree = "<group>"; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = ICONICAcademy/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* ICONICAcademy-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "ICONICAcademy-Bridging-Header.h"; path = "ICONICAcademy/ICONICAcademy-Bridging-Header.h"; sourceTree = "<group>"; };
-		FC26F9FDFD6E49BAAA7B19CD /* ClassroomBroadcast.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = undefined; name = ClassroomBroadcast.appex; path = ClassroomBroadcast.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		FC26F9FDFD6E49BAAA7B19CD /* ClassroomBroadcast.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; fileEncoding = 9; includeInIndex = 0; path = ClassroomBroadcast.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -139,7 +139,6 @@
 				232A1EB6F40BBA82F70D4651 /* Pods-ClassroomBroadcast.debug.xcconfig */,
 				F04EB2D20284047386B2A308 /* Pods-ClassroomBroadcast.release.xcconfig */,
 			);
-			name = Pods;
 			path = Pods;
 			sourceTree = "<group>";
 		};
@@ -165,8 +164,15 @@
 				E29B6F17AA5641139E7D836C /* ClassroomBroadcast-Info.plist */,
 				552149887B75450B991740E9 /* ClassroomBroadcast.entitlements */,
 			);
-			name = ClassroomBroadcast;
 			path = ClassroomBroadcast;
+			sourceTree = "<group>";
+		};
+		51576A123080ED50005175D3 /* Recovered References */ = {
+			isa = PBXGroup;
+			children = (
+				7037881777FF4A52945707EC /* SampleHandler.mm */,
+			);
+			name = "Recovered References";
 			sourceTree = "<group>";
 		};
 		832341AE1AAA6A7D00B99B32 /* Libraries */ = {
@@ -188,6 +194,7 @@
 				46F4E324F91C43DA9DC82882 /* ClassroomBroadcast */,
 				5F6A247FDB9349DCA4D2B84F /* ClassroomDevices.mm */,
 				7E7670B63A304F58A6938BD3 /* ClassroomPictureInPicture.mm */,
+				51576A123080ED50005175D3 /* Recovered References */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -273,8 +280,14 @@
 			attributes = {
 				LastUpgradeCheck = 1130;
 				TargetAttributes = {
+					0A443885C1FB4021A5C8FFBC = {
+						DevelopmentTeam = 5NVN93C486;
+						ProvisioningStyle = Automatic;
+					};
 					13B07F861A680F5B00A75B9A = {
+						DevelopmentTeam = 5NVN93C486;
 						LastSwiftMigration = 1250;
+						ProvisioningStyle = Automatic;
 					};
 				};
 			};
@@ -374,12 +387,28 @@
 				"${PODS_ROOT}/Target Support Files/Pods-ICONICAcademy/Pods-ICONICAcademy-frameworks.sh",
 				"${PODS_XCFRAMEWORKS_BUILD_DIR}/React-Core-prebuilt/React.framework/React",
 				"${PODS_XCFRAMEWORKS_BUILD_DIR}/ReactNativeDependencies/ReactNativeDependencies.framework/ReactNativeDependencies",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/ZoomVideoSDK/CptShare/CptShare.framework/CptShare",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/ZoomVideoSDK/Whiteboard/Whiteboard.framework/Whiteboard",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/ZoomVideoSDK/ZoomTask/ZoomTask.framework/ZoomTask",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/ZoomVideoSDK/ZoomVideoSDK/ZoomVideoSDK.framework/ZoomVideoSDK",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/ZoomVideoSDK/util/util.framework/util",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/ZoomVideoSDK/zContext/zContext.framework/zContext",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/ZoomVideoSDK/zm_annoter_dynamic/zm_annoter_dynamic.framework/zm_annoter_dynamic",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/ZoomVideoSDK/zoomcml/zoomcml.framework/zoomcml",
 				"${PODS_XCFRAMEWORKS_BUILD_DIR}/hermes-engine/Pre-built/hermesvm.framework/hermesvm",
 			);
 			name = "[CP] Embed Pods Frameworks";
 			outputPaths = (
 				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/React.framework",
 				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/ReactNativeDependencies.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/CptShare.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/Whiteboard.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/ZoomTask.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/ZoomVideoSDK.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/util.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/zContext.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/zm_annoter_dynamic.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/zoomcml.framework",
 				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/hermesvm.framework",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -524,8 +553,10 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
 				CODE_SIGN_ENTITLEMENTS = ClassroomBroadcast/ClassroomBroadcast.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 2;
+				DEVELOPMENT_TEAM = 5NVN93C486;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = "ClassroomBroadcast/ClassroomBroadcast-Info.plist";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
@@ -550,7 +581,10 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = ICONICAcademy/ICONICAcademy.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5NVN93C486;
 				ENABLE_BITCODE = NO;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"$(inherited)",
@@ -570,7 +604,7 @@
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
 				PRODUCT_BUNDLE_IDENTIFIER = com.heidisoft.iconicedu;
-				PRODUCT_NAME = ICONICAcademy;
+				PRODUCT_NAME = "ICONICAcademy";
 				SWIFT_OBJC_BRIDGING_HEADER = "ICONICAcademy/ICONICAcademy-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -586,7 +620,10 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = ICONICAcademy/ICONICAcademy.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5NVN93C486;
 				INFOPLIST_FILE = ICONICAcademy/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -601,7 +638,7 @@
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
 				PRODUCT_BUNDLE_IDENTIFIER = com.heidisoft.iconicedu;
-				PRODUCT_NAME = ICONICAcademy;
+				PRODUCT_NAME = "ICONICAcademy";
 				SWIFT_OBJC_BRIDGING_HEADER = "ICONICAcademy/ICONICAcademy-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -616,8 +653,10 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
 				CODE_SIGN_ENTITLEMENTS = ClassroomBroadcast/ClassroomBroadcast.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 2;
+				DEVELOPMENT_TEAM = 5NVN93C486;
 				ENABLE_BITCODE = NO;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"DEBUG=1",
