@@ -80,7 +80,8 @@
           "color": "#ffffff"
         }
       ],
-      "./plugins/with-native-classroom"
+      "./plugins/with-native-classroom",
+      "./plugins/with-scene-lifecycle"
     ],
     "extra": {
       "router": {},

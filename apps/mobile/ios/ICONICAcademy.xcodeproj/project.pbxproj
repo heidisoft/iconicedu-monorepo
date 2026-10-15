@@ -25,6 +25,7 @@
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
 		D7A99CFB6BC84F768F80E5DE /* CoreVideo.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6E2213861A044CFD9D886CFB /* CoreVideo.framework */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
+		FB8AF98D8D7440E8B3C59DB8 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F332677D276F484E808CEB04 /* SceneDelegate.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -81,6 +82,7 @@
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = ICONICAcademy/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* ICONICAcademy-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "ICONICAcademy-Bridging-Header.h"; path = "ICONICAcademy/ICONICAcademy-Bridging-Header.h"; sourceTree = "<group>"; };
 		FC26F9FDFD6E49BAAA7B19CD /* ClassroomBroadcast.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; fileEncoding = 9; includeInIndex = 0; path = ClassroomBroadcast.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		F332677D276F484E808CEB04 /* SceneDelegate.swift */ = {isa = PBXFileReference; name = "SceneDelegate.swift"; path = "ICONICAcademy/SceneDelegate.swift"; sourceTree = "<group>"; fileEncoding = 4; lastKnownFileType = sourcecode.swift; explicitFileType = undefined; includeInIndex = 0; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -195,6 +197,7 @@
 				5F6A247FDB9349DCA4D2B84F /* ClassroomDevices.mm */,
 				7E7670B63A304F58A6938BD3 /* ClassroomPictureInPicture.mm */,
 				51576A123080ED50005175D3 /* Recovered References */,
+				F332677D276F484E808CEB04 /* SceneDelegate.swift */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -524,6 +527,7 @@
 				47180A428C174DBFA4A43114 /* ClassroomControls.mm in Sources */,
 				2414236765614920BCD6945A /* ClassroomDevices.mm in Sources */,
 				7DD7BBB29D0546D5BB8624A0 /* ClassroomPictureInPicture.mm in Sources */,
+				FB8AF98D8D7440E8B3C59DB8 /* SceneDelegate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
