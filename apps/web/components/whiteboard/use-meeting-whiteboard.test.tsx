@@ -10,6 +10,12 @@ vi.mock('../live-sessions/zoom-video/use-zoom-whiteboard-feature', () => ({
     toggle: vi.fn(),
   })),
 }));
+vi.mock('@iconicedu/web/lib/whiteboard/api', () => ({
+  createWhiteboardRepository: vi.fn(() => ({
+    load: vi.fn(),
+    save: vi.fn().mockResolvedValue({}),
+  })),
+}));
 describe('meeting whiteboard provider boundary', () => {
   it('defaults granted application boards to the native surface and leaves Zoom disabled', async () => {
     const { result } = renderHook(() =>

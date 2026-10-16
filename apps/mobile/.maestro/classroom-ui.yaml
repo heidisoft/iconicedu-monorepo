@@ -19,8 +19,8 @@ name: Native classroom UI lifecycle on iPad and Android tablets
 - assertVisible: 'Test teacher'
 - tapOn: 'Turn camera off'
 - scrollUntilVisible:
-    element: 'Test audio and video'
-- tapOn: 'Test audio and video'
+    element: 'Settings'
+- tapOn: 'Settings'
 - tapOn: 'Video settings tab'
 - assertVisible: 'Choose background image'
 - tapOn: 'Camera device: Back camera'
@@ -37,7 +37,7 @@ name: Native classroom UI lifecycle on iPad and Android tablets
 - tapOn: 'Test speakers'
 - assertVisible: 'Stop speaker test'
 - tapOn: 'Stop speaker test'
-- tapOn: 'Done testing'
+- tapOn: 'Close settings'
 - scrollUntilVisible:
     element: 'Join now'
     direction: UP
@@ -50,11 +50,16 @@ name: Native classroom UI lifecycle on iPad and Android tablets
     element: 'More controls'
     direction: UP
 - tapOn: 'More controls'
+- runFlow: open-classroom-controls.yaml
 - scrollUntilVisible:
     element: 'Raise hand'
+- runFlow: open-classroom-controls.yaml
 - tapOn: 'Raise hand'
+- runFlow: open-classroom-controls.yaml
 - assertVisible: 'Lower hand'
+- runFlow: open-classroom-controls.yaml
 - tapOn: 'Lower hand'
+- runFlow: open-classroom-controls.yaml
 - scrollUntilVisible:
     element: 'Messages'
 - tapOn: 'Messages'
@@ -68,28 +73,45 @@ name: Native classroom UI lifecycle on iPad and Android tablets
 - assertVisible: 'Hello from native tablet'
 - assertVisible: 'You'
 - tapOn: 'Close In-call Messages'
+- runFlow: open-classroom-controls.yaml
 - scrollUntilVisible:
     element: 'Start recording'
     direction: UP
+- runFlow: open-classroom-controls.yaml
 - tapOn: 'Start recording'
 - scrollUntilVisible:
     element: 'Recording active'
     direction: UP
 - assertVisible: 'Recording active'
+- runFlow: open-classroom-controls.yaml
+- scrollUntilVisible:
+    element: 'Pause recording'
+- tapOn: 'Pause recording'
+- assertVisible: 'Recording paused'
+- runFlow: open-classroom-controls.yaml
+- scrollUntilVisible:
+    element: 'Resume recording'
+- tapOn: 'Resume recording'
+- assertVisible: 'Recording active'
+- runFlow: open-classroom-controls.yaml
 - scrollUntilVisible:
     element: 'Stop recording'
+- runFlow: open-classroom-controls.yaml
 - tapOn: 'Stop recording'
+- runFlow: open-classroom-controls.yaml
 - scrollUntilVisible:
     element: 'Whiteboard'
     direction: UP
+- runFlow: open-classroom-controls.yaml
 - tapOn: 'Whiteboard'
+- tapOn: 'Whiteboard options'
 - scrollUntilVisible:
     element: 'Allow student editing'
 - tapOn: 'Allow student editing'
 - assertVisible: 'Disable student editing'
 - assertVisible: 'Stop presenting board'
-- tapOn: 'Stop presenting board'
-- assertNotVisible: 'Class whiteboard'
+- tapOn: 'Return to video'
+- assertNotVisible: 'Return to video'
 - tapOn: 'Leave or end class'
 - tapOn: 'Leave'
 - assertVisible: 'You left the classroom'

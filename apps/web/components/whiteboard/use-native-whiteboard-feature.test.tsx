@@ -133,9 +133,32 @@ describe('video-independent whiteboard presentation', () => {
     );
     expect(result.current.presenting).toBe(true);
     f.repository.save.mockRejectedValue(new Error('offline'));
-    await act(() => result.current.toggle());
-    expect(result.current.error).toContain('Unable to update');
+    await act(() => result.current.stop());
+    expect(result.current.error).toContain('Unable to stop');
     expect(result.current.open).toBe(true);
     await waitFor(() => expect(result.current.open).toBe(true));
   });
+});
+
+it('allows a student to start and stop their own presentation without enabling drawing', async () => {
+  const f = fixture('student');
+  const { result } = renderHook(() =>
+    useNativeWhiteboardFeature(
+      { provider: 'excalidraw', token: 'capability' },
+      true,
+      true,
+      f.repository,
+      f.collaboration,
+    ),
+  );
+  await act(() => result.current.toggle());
+  expect(result.current.canStop).toBe(true);
+  await act(() => result.current.toggle());
+  expect(result.current.open).toBe(false);
+  expect(f.repository.save).toHaveBeenCalledTimes(1);
+  await act(() => result.current.stop());
+  expect(f.repository.save).toHaveBeenLastCalledWith(
+    expect.objectContaining({ type: 'presentation', enabled: false }),
+  );
+  expect(result.current.active).toBe(false);
 });

@@ -202,6 +202,9 @@ describe('native screen annotation delivery', () => {
       snapshot: { ...context.snapshot, studentsEnabled: false },
     });
     await waitFor(() => expect(api.load).toHaveBeenCalled());
+    expect(
+      screen.getByText('The host has turned off participant annotations.'),
+    ).toBeTruthy();
     stroke(screen);
     expect(api.save).not.toHaveBeenCalled();
     expect(screen.getByTestId('annotation-drawing-surface').props.pointerEvents).toBe(

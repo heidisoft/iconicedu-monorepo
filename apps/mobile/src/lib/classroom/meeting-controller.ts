@@ -87,6 +87,7 @@ export interface NativeMeetingAdapter {
   captions(enabled: boolean): Promise<void>;
   recording(enabled: boolean): Promise<void>;
   resumeRecording?(): Promise<void>;
+  pauseRecording?(): Promise<void>;
   recordingConsent?(accept: boolean): Promise<void>;
   chatPrivilege?(allowed: boolean): Promise<void>;
   chat(text: string): Promise<void>;
@@ -501,6 +502,19 @@ export class NativeMeetingController {
     if (!enabled && !this.settings.recording.allowStop)
       throw new Error('Recording controls are unavailable');
     await this.adapter.recording(enabled);
+  }
+  async pauseRecording() {
+    this.requireModerator();
+    if (
+      !this.settings.recording.enabled ||
+      !this.settings.recording.allowStop ||
+      !this.state.recording ||
+      this.state.recordingPaused
+    )
+      throw new Error('Pausing recording is unavailable');
+    if (!this.adapter.pauseRecording)
+      throw new Error('Update the app to pause recording.');
+    await this.adapter.pauseRecording();
   }
   async chat(text: string) {
     if (!this.settings.messages.enabled || !text.trim()) return;

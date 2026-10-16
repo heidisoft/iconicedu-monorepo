@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { ChevronLeft, ChevronRight, Hand, MicOff } from 'lucide-react-native';
 import type { NativeParticipant } from '@/lib/classroom/meeting-controller';
 import { useTheme } from '@/providers/theme-provider';
@@ -246,6 +246,7 @@ export function NativeParticipantGallery({
 
 /** Web keeps faces visible beside a presentation as a small filmstrip. */
 export function NativeParticipantFilmstrip({
+  vertical = false,
   participants,
   selfId,
   speaking,
@@ -253,6 +254,7 @@ export function NativeParticipantFilmstrip({
   reactionFor,
   onFocus,
 }: {
+  vertical?: boolean;
   participants: NativeParticipant[];
   selfId: string | null;
   speaking: string[];
@@ -261,12 +263,23 @@ export function NativeParticipantFilmstrip({
   onFocus: (userId: string) => void;
 }) {
   return (
-    <View
+    <ScrollView
       accessibilityLabel="Meeting participants"
-      style={{ height: 96, flexDirection: 'row', gap: 8 }}
+      horizontal={!vertical}
+      showsHorizontalScrollIndicator={false}
+      showsVerticalScrollIndicator={false}
+      style={
+        vertical
+          ? { width: 132, flexGrow: 0, flexShrink: 0 }
+          : { height: 96, flexGrow: 0 }
+      }
+      contentContainerStyle={{ flexDirection: vertical ? 'column' : 'row', gap: 8 }}
     >
-      {participants.slice(0, 4).map((user) => (
-        <View key={user.id} style={{ width: 140 }}>
+      {participants.map((user) => (
+        <View
+          key={user.id}
+          style={vertical ? { width: 132, height: 96 } : { width: 140, height: 96 }}
+        >
           <NativeParticipantTile
             compact
             user={user}
@@ -279,6 +292,6 @@ export function NativeParticipantFilmstrip({
           />
         </View>
       ))}
-    </View>
+    </ScrollView>
   );
 }

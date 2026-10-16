@@ -10,7 +10,11 @@ import {
   View,
 } from 'react-native';
 import { Send, X } from 'lucide-react-native';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import {
+  SafeAreaProvider,
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 import type { NativeChatMessage } from '@/lib/classroom/meeting-controller';
 import { useTheme } from '@/providers/theme-provider';
 
@@ -32,53 +36,111 @@ export function NativeMeetingSheet({
   onClose,
   children,
   footer,
+  onDismiss,
+  compact = false,
 }: {
   open: boolean;
   title: string;
   onClose: () => void;
   children: React.ReactNode;
   footer?: React.ReactNode;
+  onDismiss?: () => void;
+  compact?: boolean;
 }) {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+  const content = useRef<View>(null);
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
+  // pageSheet uses an inset origin; keyboard events use screen coordinates.
+  const measureContent = () =>
+    content.current?.measureInWindow((_x, y) => setKeyboardOffset(y));
   return (
     <Modal
       visible={open}
       animationType="slide"
-      presentationStyle="pageSheet"
+      transparent={compact}
+      presentationStyle={compact ? 'overFullScreen' : 'pageSheet'}
       onRequestClose={onClose}
+      onDismiss={onDismiss}
+      onShow={measureContent}
     >
       <SafeAreaProvider>
-        <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-          <KeyboardAvoidingView
-            style={{ flex: 1 }}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        <SafeAreaView
+          style={{
+            flex: 1,
+            justifyContent: compact ? 'flex-end' : undefined,
+            backgroundColor: compact ? 'rgba(0,0,0,0.4)' : colors.bg,
+          }}
+        >
+          {compact && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Dismiss ${title}`}
+              onPress={onClose}
+              style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}
+            />
+          )}
+          <View
+            ref={content}
+            onLayout={measureContent}
+            pointerEvents="box-none"
+            style={{ flex: 1, justifyContent: compact ? 'flex-end' : undefined }}
           >
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: 20,
-              }}
+            <KeyboardAvoidingView
+              style={
+                compact
+                  ? {
+                      maxHeight: '75%',
+                      width: '100%',
+                      maxWidth: 560,
+                      alignSelf: 'center',
+                      backgroundColor: colors.card,
+                      borderTopLeftRadius: 24,
+                      borderTopRightRadius: 24,
+                      overflow: 'hidden',
+                    }
+                  : { flex: 1 }
+              }
+              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+              keyboardVerticalOffset={
+                Platform.OS === 'ios' ? Math.max(keyboardOffset, insets.top) : 0
+              }
             >
-              <Text
-                accessibilityRole="header"
-                style={{ color: colors.text, fontSize: 26, fontWeight: '500' }}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingHorizontal: 20,
+                  paddingVertical: 12,
+                }}
               >
-                {title}
-              </Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Close ${title}`}
-                onPress={onClose}
-                style={{ padding: 8 }}
-              >
-                <X size={22} color={colors.text} />
-              </Pressable>
-            </View>
-            {children}
-            {footer}
-          </KeyboardAvoidingView>
+                <Text
+                  accessibilityRole="header"
+                  style={{ color: colors.text, fontSize: 18, fontWeight: '600' }}
+                >
+                  {title}
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Close ${title}`}
+                  onPress={onClose}
+                  style={{
+                    minWidth: 44,
+                    minHeight: 44,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: 22,
+                    backgroundColor: colors.actionSubtle,
+                  }}
+                >
+                  <X size={22} color={colors.text} />
+                </Pressable>
+              </View>
+              {children}
+              {footer}
+            </KeyboardAvoidingView>
+          </View>
         </SafeAreaView>
       </SafeAreaProvider>
     </Modal>
@@ -102,6 +164,9 @@ export function NativeChatSheet({
 }) {
   const { colors } = useTheme();
   const [draft, setDraft] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const sendingRef = useRef(false);
   const scroll = useRef<ScrollView>(null);
   // Re-render each minute so relative times stay current while the sheet is open.
   const [now, setNow] = useState(Date.now());
@@ -116,8 +181,17 @@ export function NativeChatSheet({
   }, [open, messages]);
   const send = () => {
     const text = draft.trim();
-    if (!text) return;
-    void onSend(text).then(() => setDraft(''));
+    if (!text || !canSend || sendingRef.current) return;
+    sendingRef.current = true;
+    setSending(true);
+    setSendError(null);
+    void onSend(text)
+      .then(() => setDraft((current) => (current.trim() === text ? '' : current)))
+      .catch(() => setSendError('Message could not be sent. Try again.'))
+      .finally(() => {
+        sendingRef.current = false;
+        setSending(false);
+      });
   };
   return (
     <NativeMeetingSheet
@@ -156,17 +230,17 @@ export function NativeChatSheet({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Send message"
-              accessibilityState={{ disabled: !draft.trim() }}
-              disabled={!draft.trim()}
+              accessibilityState={{ disabled: sending || !draft.trim(), busy: sending }}
+              disabled={sending || !draft.trim()}
               onPress={send}
               style={{
-                width: 40,
-                height: 40,
-                borderRadius: 20,
+                width: 44,
+                height: 44,
+                borderRadius: 22,
                 alignItems: 'center',
                 justifyContent: 'center',
                 backgroundColor: colors.action,
-                opacity: draft.trim() ? 1 : 0.5,
+                opacity: draft.trim() && !sending ? 1 : 0.5,
               }}
             >
               <Send size={18} color={colors.actionForeground} />
@@ -177,6 +251,15 @@ export function NativeChatSheet({
         ) : null
       }
     >
+      {sendError && (
+        <Text
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+          style={{ color: colors.red, marginHorizontal: 20, marginBottom: 8 }}
+        >
+          {sendError}
+        </Text>
+      )}
       <ScrollView
         ref={scroll}
         onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: false })}

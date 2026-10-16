@@ -1,0 +1,47 @@
+appId: com.heidisoft.iconicedu
+name: Presentation visibility expansion and recording status
+---
+- runFlow: bootstrap.yaml
+- openLink: iconicedu://classroom-fixture
+- extendedWaitUntil:
+    visible: 'Ready to join\?'
+    timeout: 30000
+- tapOn: 'Turn camera off'
+- tapOn: 'Join now'
+- assertVisible: 'Share screen'
+- runFlow: open-classroom-controls.yaml
+- scrollUntilVisible:
+    element: 'Start recording'
+- tapOn: 'Start recording'
+- assertVisible: 'Recording active'
+- runFlow: open-classroom-controls.yaml
+- scrollUntilVisible:
+    element: 'Whiteboard'
+    direction: UP
+- tapOn: 'Whiteboard'
+- extendedWaitUntil:
+    visible: 'Draw'
+    timeout: 30000
+- assertVisible: 'More controls'
+- tapOn: 'Expand whiteboard to full screen'
+- extendedWaitUntil:
+    visible: 'Draw'
+    timeout: 30000
+- assertVisible: 'Collapse whiteboard'
+- assertVisible: 'Recording active'
+- tapOn: 'Collapse whiteboard'
+- assertVisible: 'More controls'
+- tapOn: 'Return to video'
+- assertNotVisible: 'Return to video'
+- runFlow: open-classroom-controls.yaml
+- tapOn: 'Return to whiteboard'
+- assertVisible: 'Return to video'
+- tapOn: 'Whiteboard options'
+- assertVisible: 'Stop presenting board'
+- tapOn: 'Stop presenting board'
+- extendedWaitUntil:
+    notVisible: 'Return to video'
+    timeout: 10000
+- tapOn: 'Leave or end class'
+- tapOn: 'Leave'
+- assertVisible: 'You left the classroom'

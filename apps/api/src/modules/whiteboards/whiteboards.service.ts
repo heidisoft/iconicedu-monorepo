@@ -172,9 +172,7 @@ export class WhiteboardsService {
         board.document.presenting === true &&
         board.document.presentation?.sessionId === sessionId &&
         (presence.data ?? []).some(
-          (p) =>
-            p.role === 'teacher' &&
-            p.token_hash.slice(0, 16) === board.document.presentation?.presenterId,
+          (p) => p.token_hash.slice(0, 16) === board.document.presentation?.presenterId,
         ),
       ...(revision === board.revision
         ? {}
@@ -192,12 +190,32 @@ export class WhiteboardsService {
     const { db, boardId, role, sessionId } = await this.access(token);
     for (let attempt = 0; attempt < 5; attempt++) {
       const board = await this.load(db, boardId);
+      // A lost stop response must be retryable after its presenter identity was cleared.
+      if (op.type === 'presentation' && board.applied_operations.includes(op.id))
+        return this.get(token);
+      if (op.type === 'presentation' && role !== 'teacher') {
+        const owner = board.document.presentation;
+        const self = hashWhiteboardToken(token).slice(0, 16);
+        if (!op.enabled && owner?.presenterId !== self)
+          throw new ForbiddenException(
+            'Only the presenter or a teacher can stop sharing',
+          );
+        if (
+          op.enabled &&
+          owner?.presenterId !== self &&
+          (await this.get(token)).presentationActive
+        )
+          throw new ForbiddenException(
+            'Another participant is presenting the whiteboard',
+          );
+      }
       // Check permissions even on replay: a lock cannot be bypassed with an old operation id.
       const document = applyWhiteboardOperation(board.document, op, role);
       if (board.applied_operations.includes(op.id)) return this.get(token);
       if (op.type === 'presentation') {
         if (op.enabled) {
           document.presentation = {
+            presentationId: op.id,
             presenterId: hashWhiteboardToken(token).slice(0, 16),
             sessionId,
           };

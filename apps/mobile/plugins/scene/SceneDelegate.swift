@@ -42,6 +42,17 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
       withModuleName: "main",
       in: window,
       launchOptions: launchOptions)
+
+    // Expo's dev launcher consumes URLs through its app-delegate subscriber,
+    // separately from React Native's initial URL. UIScene does not deliver a
+    // cold-launch URL to application(_:open:options:), so forward it explicitly
+    // once the factory has initialized the launcher.
+    if !connectionOptions.urlContexts.isEmpty {
+      self.scene(scene, openURLContexts: connectionOptions.urlContexts)
+    }
+    for activity in connectionOptions.userActivities {
+      self.scene(scene, continue: activity)
+    }
   }
 
   func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {

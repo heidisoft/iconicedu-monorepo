@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { AudioLines, Mic, MicOff, Settings, Video, VideoOff } from 'lucide-react-native';
+import { Mic, MicOff, Settings, Video, VideoOff } from 'lucide-react-native';
 import { useTheme } from '@/providers/theme-provider';
 
 type Props = {
@@ -14,7 +14,6 @@ type Props = {
   onCamera: () => void;
   onMicrophone: () => void;
   onSettings: () => void;
-  onTest: () => void;
   onJoin: () => void;
 };
 /** Web preview hierarchy adapted to tablet columns and native touch targets. */
@@ -57,7 +56,6 @@ export function NativeDevicePreview(props: Props) {
             props.onMicrophone,
           )}
           {iconButton('Settings', Settings, props.onSettings)}
-          {iconButton('Test audio and video', AudioLines, props.onTest)}
         </View>
       </View>
       <View style={{ width: wide ? 320 : undefined, justifyContent: 'center', gap: 16 }}>

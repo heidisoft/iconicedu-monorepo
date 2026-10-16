@@ -107,6 +107,8 @@ function fixture() {
       makeHost: jest.fn().mockResolvedValue(true),
     },
     recordingHelper: {
+      canStartRecording: success(),
+      pauseCloudRecording: success(),
       getCloudRecordingStatus: jest.fn().mockResolvedValue('stopped'),
       startCloudRecording: success(),
       stopCloudRecording: success(),
@@ -189,6 +191,7 @@ describe('Zoom native bridge adapter', () => {
     );
     expect(f.zoom.joinSession).toHaveBeenCalledWith(
       expect.objectContaining({
+        sessionName: 'test',
         userName: 'Verified student',
         token: 'synthetic',
         audioOptions: expect.objectContaining({ mute: true }),
@@ -256,6 +259,21 @@ describe('Zoom native bridge adapter', () => {
     expect(NativeModules.ClassroomControls.startScreenShare).toHaveBeenCalled();
     expect(f.zoom.shareHelper.shareScreen).not.toHaveBeenCalled();
     os.restore();
+  });
+  it('surfaces an unavailable iOS broadcast picker without falling back to a hidden SDK control', async () => {
+    const f = fixture();
+    const os = jest.replaceProperty(Platform, 'OS', 'ios');
+    try {
+      NativeModules.ClassroomControls.startScreenShare.mockRejectedValueOnce(
+        new Error('Install the latest native build'),
+      );
+      await expect(f.adapter.share(true)).rejects.toThrow(
+        'Install the latest native build',
+      );
+      expect(f.zoom.shareHelper.shareScreen).not.toHaveBeenCalled();
+    } finally {
+      os.restore();
+    }
   });
   it('does not open capture consent when sharing is locked or someone is presenting', async () => {
     const f = fixture();
@@ -437,6 +455,16 @@ describe('Zoom native bridge adapter', () => {
     for (let index = 0; index < 30; index += 1) await Promise.resolve();
     expect(receive).toHaveBeenCalledWith({ type: 'share', userId: '2', active: true });
     ZoomVideoSdkUser.mockImplementation(original);
+  });
+  it('checks cloud recording availability and forwards pause to the SDK', async () => {
+    const f = fixture();
+    f.zoom.recordingHelper.canStartRecording.mockResolvedValue(
+      'ZoomVideoSDKError_No_Permission',
+    );
+    await expect(f.adapter.recording(true)).rejects.toThrow('unavailable');
+    expect(f.zoom.recordingHelper.startCloudRecording).not.toHaveBeenCalled();
+    await f.adapter.pauseRecording!();
+    expect(f.zoom.recordingHelper.pauseCloudRecording).toHaveBeenCalledTimes(1);
   });
   it('resumes recording, answers consent and restricts chat through the SDK', async () => {
     const f = fixture();

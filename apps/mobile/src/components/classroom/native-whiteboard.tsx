@@ -2,7 +2,8 @@ import { useNativeWhiteboardLasers } from './use-native-whiteboard-lasers';
 import { exportClassroomImage } from '@/lib/classroom/export-image';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Modal, Pressable, Text, View } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { Minimize2, Maximize2, SlidersHorizontal } from 'lucide-react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import type {
@@ -32,7 +33,10 @@ export function NativeWhiteboard({
   onPending,
   visible = true,
   onClose,
+  closeLabel = 'Return to video',
+  onExpand,
   controls,
+  embedded = false,
 }: {
   token: string;
   repository?: NativeWhiteboardRepository;
@@ -40,7 +44,10 @@ export function NativeWhiteboard({
   onPending?: (pending: boolean) => void;
   visible?: boolean;
   onClose?: () => void;
+  closeLabel?: string;
+  onExpand?: () => void;
   controls?: React.ReactNode;
+  embedded?: boolean;
 }) {
   const { colors, isDark } = useTheme();
   const webview = useRef<WebView>(null);
@@ -97,7 +104,9 @@ export function NativeWhiteboard({
               queue.current[0],
             );
         queue.current.shift();
-        setSnapshot(value);
+        setSnapshot((previous) =>
+          previous && previous.revision > value.revision ? previous : value,
+        );
         setError(null);
         if (key && !repository) {
           if (queue.current.length)
@@ -122,8 +131,10 @@ export function NativeWhiteboard({
   };
   useEffect(() => {
     let active = true;
+    let loading = false;
     const refresh = async () => {
-      if (busy.current || queue.current.length || drawing.current) return;
+      if (loading) return;
+      loading = true;
       try {
         const value = repository
           ? await repository.load()
@@ -150,13 +161,32 @@ export function NativeWhiteboard({
               }
             }
           }
-          setSnapshot((previous) =>
-            previous && previous.revision > value.revision ? previous : value,
-          );
-          setError(null);
+          setSnapshot((previous) => {
+            if (previous && previous.revision > value.revision) return previous;
+            // Follow presentation stops even while local strokes are drawing or retrying.
+            // Preserve unsaved canvas content until the edit queue has finished.
+            if (previous && (busy.current || queue.current.length || drawing.current))
+              return {
+                ...previous,
+                revision: value.revision,
+                role: value.role,
+                actorId: value.actorId,
+                presence: value.presence,
+                presentationActive: value.presentationActive,
+                document: {
+                  ...previous.document,
+                  presenting: value.document.presenting,
+                  presentation: value.document.presentation,
+                },
+              };
+            return value;
+          });
+          if (!busy.current && !queue.current.length && !drawing.current) setError(null);
         }
       } catch {
         if (active) setError('Unable to load the whiteboard. Check your connection.');
+      } finally {
+        loading = false;
       }
     };
     void refresh();
@@ -180,8 +210,8 @@ export function NativeWhiteboard({
     );
   }, [snapshot, ready, isDark]);
   useEffect(() => {
-    if (!visible) setReady(false);
-  }, [visible]);
+    if (!visible && !embedded) setReady(false);
+  }, [visible, embedded]);
   const close = () => {
     if (drawing.current) {
       Alert.alert('Finishing your drawing', 'Wait a moment for the last stroke to save.');
@@ -189,12 +219,20 @@ export function NativeWhiteboard({
     }
     onClose?.();
   };
-  const lastPresentation = useRef(false);
+  useEffect(() => {
+    setReady(false);
+  }, [embedded]);
+  const lastPresentation = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (!snapshot) return;
     const active = snapshot.presentationActive === true;
-    if (active !== lastPresentation.current) {
-      lastPresentation.current = active;
+    const key = active
+      ? (snapshot.document.presentation?.presentationId ??
+        snapshot.document.presentation?.presenterId ??
+        'active')
+      : 'closed';
+    if (key !== lastPresentation.current) {
+      lastPresentation.current = key;
       onPresentation?.(active);
     }
   }, [snapshot, onPresentation]);
@@ -210,27 +248,21 @@ export function NativeWhiteboard({
       <Text style={{ color: colors.text }}>{label}</Text>
     </Pressable>
   );
+  const Container = embedded ? View : Modal;
+  const Insets = embedded ? View : SafeAreaView;
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={close}>
+    <Container
+      {...(embedded
+        ? { style: { flex: 1 } }
+        : { visible, animationType: 'slide' as const, onRequestClose: close })}
+    >
       <SafeAreaProvider>
-        <SafeAreaView
+        <Insets
           style={{ flex: 1, backgroundColor: colors.card }}
+          testID={`whiteboard-saved-elements-${snapshot?.document.pages[0]?.elements.filter((element) => !element.deleted).length ?? 0}`}
+          accessibilityLabel="Class whiteboard"
           onLayout={(event) => setBoardWidth(event.nativeEvent.layout.width)}
         >
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}
-          >
-            {onClose && button('Close whiteboard', close)}
-            <Text accessibilityRole="header" style={{ color: colors.text, padding: 12 }}>
-              Class whiteboard
-            </Text>
-          </View>
-          {boardWidth < 600 &&
-            button('Whiteboard options', () => setOptionsOpen((previous) => !previous))}
           {error && (
             <Text accessibilityRole="alert" style={{ color: colors.text }}>
               {error}
@@ -240,15 +272,65 @@ export function NativeWhiteboard({
             button('Retry saving', () => {
               void flush();
             })}
-          {(boardWidth >= 600 || optionsOpen) && (
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-              <Text
-                testID={`whiteboard-saved-elements-${snapshot?.document.pages[0]?.elements.filter((element) => !element.deleted).length ?? 0}`}
-                accessibilityLiveRegion="polite"
-                style={{ color: colors.text }}
-              >
+          {optionsOpen && (
+            <ScrollView
+              style={{
+                position: 'absolute',
+                zIndex: 3,
+                bottom: 132,
+                maxHeight: '65%',
+                right: 12,
+                width: Math.min(300, Math.max(0, boardWidth - 24)),
+                padding: 12,
+                borderRadius: 16,
+                backgroundColor: colors.card,
+                borderWidth: 1,
+                borderColor: colors.border,
+              }}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ gap: 4, paddingBottom: 12 }}
+            >
+              <Text accessibilityLiveRegion="polite" style={{ color: colors.text }}>
                 {saving ? 'Saving…' : 'Saved'}
               </Text>
+              {snapshot?.role === 'student' && !snapshot.document.studentEditing && (
+                <Text
+                  accessibilityLiveRegion="polite"
+                  style={{ color: colors.textMuted, padding: 12 }}
+                >
+                  View only. Ask the host to allow editing.
+                </Text>
+              )}
+              {button('Educational library', () => {
+                webview.current?.injectJavaScript(
+                  'window.classroomAction?.("library"); true;',
+                );
+                setOptionsOpen(false);
+              })}
+              {button('Export whiteboard image', () => {
+                webview.current?.injectJavaScript(
+                  'window.classroomAction?.("export"); true;',
+                );
+                setOptionsOpen(false);
+              })}
+              {snapshot &&
+                (!snapshot.presentationActive ||
+                  snapshot.role === 'teacher' ||
+                  snapshot.actorId === snapshot.document.presentation?.presenterId) && (
+                  <>
+                    {button(
+                      snapshot.presentationActive
+                        ? 'Stop presenting board'
+                        : 'Present board',
+                      () =>
+                        save({
+                          id: generateClientMessageId(),
+                          type: 'presentation',
+                          enabled: !snapshot.presentationActive,
+                        }),
+                    )}
+                  </>
+                )}
               {snapshot?.role === 'teacher' && (
                 <>
                   {button(
@@ -260,17 +342,6 @@ export function NativeWhiteboard({
                         id: generateClientMessageId(),
                         type: 'student-editing',
                         enabled: !snapshot.document.studentEditing,
-                      }),
-                  )}
-                  {button(
-                    snapshot.presentationActive
-                      ? 'Stop presenting board'
-                      : 'Present board',
-                    () =>
-                      save({
-                        id: generateClientMessageId(),
-                        type: 'presentation',
-                        enabled: !snapshot.presentationActive,
                       }),
                   )}
                   {button('Clear board', () =>
@@ -290,7 +361,7 @@ export function NativeWhiteboard({
                   )}
                 </>
               )}
-            </View>
+            </ScrollView>
           )}
           <WebView
             ref={webview}
@@ -369,9 +440,91 @@ export function NativeWhiteboard({
             }}
             onError={() => setError('Unable to open the drawing canvas. Please retry.')}
           />
-          {controls}
-        </SafeAreaView>
+          <View
+            style={{
+              position: 'absolute',
+              zIndex: 2,
+              right: 12,
+              bottom: 76,
+              flexDirection: 'row-reverse',
+              gap: 8,
+            }}
+          >
+            {onExpand && (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Expand whiteboard to full screen"
+                onPress={() => {
+                  if (drawing.current) {
+                    Alert.alert(
+                      'Finishing your drawing',
+                      'Wait a moment for the last stroke to save.',
+                    );
+                    return;
+                  }
+                  onExpand();
+                }}
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: colors.card,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                }}
+              >
+                <Maximize2 size={20} color={colors.text} />
+              </Pressable>
+            )}
+            {onClose && (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={closeLabel}
+                onPress={close}
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: colors.card,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                }}
+              >
+                <Minimize2 size={20} color={colors.text} />
+              </Pressable>
+            )}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={
+                optionsOpen ? 'Close whiteboard options' : 'Whiteboard options'
+              }
+              accessibilityState={{ expanded: optionsOpen }}
+              onPress={() => setOptionsOpen((previous) => !previous)}
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 22,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: colors.card,
+                borderWidth: 1,
+                borderColor: colors.border,
+              }}
+            >
+              <SlidersHorizontal size={20} color={colors.text} />
+            </Pressable>
+          </View>
+          {controls && (
+            <View style={{ position: 'absolute', zIndex: 2, left: 12, bottom: 76 }}>
+              {controls}
+            </View>
+          )}
+        </Insets>
       </SafeAreaProvider>
-    </Modal>
+    </Container>
   );
 }

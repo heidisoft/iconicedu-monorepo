@@ -13,18 +13,22 @@ name: Native whiteboard assets and PNG export
 - scrollUntilVisible:
     element: 'Join now'
 - tapOn: 'Join now'
+- runFlow: open-classroom-controls.yaml
 - scrollUntilVisible:
     element: 'Whiteboard'
+- runFlow: open-classroom-controls.yaml
 - tapOn: 'Whiteboard'
 - extendedWaitUntil:
-    visible: 'Export whiteboard image'
+    visible: 'Draw'
     timeout: 30000
+- tapOn: 'Whiteboard options'
 - tapOn: 'Educational library'
 - tapOn: 'Number line'
 - extendedWaitUntil:
     visible:
-      text: 'Export whiteboard image'
-      enabled: true
+      id: 'whiteboard-saved-elements-[1-9][0-9]*'
     timeout: 20000
+- tapOn: 'Whiteboard options'
 - tapOn: 'Export whiteboard image'
+- runFlow: assert-classroom-export.yaml
 - takeScreenshot: native-whiteboard-export

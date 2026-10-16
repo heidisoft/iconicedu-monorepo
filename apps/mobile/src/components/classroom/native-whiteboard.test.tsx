@@ -12,6 +12,7 @@ jest.mock('expo-file-system/legacy', () => ({
   writeAsStringAsync: jest.fn().mockResolvedValue(undefined),
 }));
 jest.mock('expo-sharing', () => ({ shareAsync: jest.fn().mockResolvedValue(undefined) }));
+const mockInjectJavaScript = jest.fn();
 jest.mock('react-native-webview', () => {
   const React = require('react');
   const { View } = require('react-native');
@@ -20,7 +21,7 @@ jest.mock('react-native-webview', () => {
       props: Record<string, unknown>,
       ref: unknown,
     ) {
-      React.useImperativeHandle(ref, () => ({ injectJavaScript: jest.fn() }));
+      React.useImperativeHandle(ref, () => ({ injectJavaScript: mockInjectJavaScript }));
       return React.createElement(View, { ...props, testID: 'drawing-canvas' });
     }),
   };
@@ -67,6 +68,7 @@ describe('native collaborative whiteboard recovery', () => {
   });
   it('keeps capabilities out of the WebView and saves native drawing changes through the API', async () => {
     const screen = render(<NativeWhiteboard token="private-capability" />);
+    await act(async () => {});
     await waitFor(() => expect(capabilityGet).toHaveBeenCalled());
     fireEvent(screen.getByTestId('drawing-canvas'), 'message', {
       nativeEvent: { data: JSON.stringify({ type: 'elements', elements: [element] }) },
@@ -215,3 +217,120 @@ describe('native collaborative whiteboard recovery', () => {
     expect(onPending).toHaveBeenCalledWith(true);
   });
 });
+
+it('fills the board without a heading and exposes options through floating controls', async () => {
+  jest.mocked(capabilityGet).mockResolvedValue(snapshot);
+  const onClose = jest.fn();
+  const screen = render(<NativeWhiteboard token="synthetic" onClose={onClose} />);
+  await waitFor(() => expect(screen.getByTestId('drawing-canvas')).toBeTruthy());
+  expect(screen.queryByText('Class whiteboard')).toBeNull();
+  expect(screen.queryByText('Allow student editing')).toBeNull();
+  fireEvent.press(screen.getByLabelText('Whiteboard options'));
+  expect(screen.getByText('Allow student editing')).toBeTruthy();
+  expect(screen.getByText('Educational library')).toBeTruthy();
+  fireEvent.press(screen.getByLabelText('Close whiteboard options'));
+  expect(screen.queryByText('Allow student editing')).toBeNull();
+  fireEvent.press(screen.getByLabelText('Return to video'));
+  expect(onClose).toHaveBeenCalledTimes(1);
+});
+
+it('routes native library and export options to the canvas without sharing capabilities', async () => {
+  jest.mocked(capabilityGet).mockResolvedValue(snapshot);
+  const screen = render(<NativeWhiteboard token="synthetic-capability" />);
+  await act(async () => {});
+  fireEvent.press(screen.getByLabelText('Whiteboard options'));
+  fireEvent.press(screen.getByText('Educational library'));
+  expect(mockInjectJavaScript).toHaveBeenLastCalledWith(
+    'window.classroomAction?.("library"); true;',
+  );
+  expect(screen.queryByText('Educational library')).toBeNull();
+  fireEvent.press(screen.getByLabelText('Whiteboard options'));
+  fireEvent.press(screen.getByText('Export whiteboard image'));
+  expect(mockInjectJavaScript).toHaveBeenLastCalledWith(
+    'window.classroomAction?.("export"); true;',
+  );
+});
+
+it('explains view-only permissions without showing teacher editing controls', async () => {
+  jest.mocked(capabilityGet).mockResolvedValue({
+    ...snapshot,
+    role: 'student',
+    document: { ...snapshot.document, studentEditing: false },
+  });
+  const screen = render(<NativeWhiteboard token="synthetic" embedded />);
+  await waitFor(() => expect(screen.getByTestId('drawing-canvas')).toBeTruthy());
+  fireEvent.press(screen.getByLabelText('Whiteboard options'));
+  expect(screen.getByText('View only. Ask the host to allow editing.')).toBeTruthy();
+  expect(screen.queryByText('Allow student editing')).toBeNull();
+});
+
+it.each(['drawing', 'retrying', 'saving'] as const)(
+  'observes a remote stop while local edits are %s',
+  async (phase) => {
+    jest.useFakeTimers();
+    let value = {
+      ...snapshot,
+      presentationActive: true,
+      document: {
+        ...snapshot.document,
+        presentation: {
+          presentationId: 'present-1',
+          presenterId: 'peer',
+          sessionId: 'session',
+        },
+      },
+    };
+    let finishSave: (value: typeof snapshot) => void = () => {};
+    const repository = {
+      load: jest.fn(async () => value),
+      save:
+        phase === 'saving'
+          ? jest.fn(
+              () =>
+                new Promise<typeof snapshot>((resolve) => {
+                  finishSave = resolve;
+                }),
+            )
+          : jest.fn().mockRejectedValue(new Error('offline')),
+    };
+    const onPresentation = jest.fn();
+    const screen = render(
+      <NativeWhiteboard
+        token="synthetic"
+        repository={repository}
+        onPresentation={onPresentation}
+      />,
+    );
+    try {
+      await act(async () => {});
+      expect(onPresentation).toHaveBeenLastCalledWith(true);
+      fireEvent(screen.getByTestId('drawing-canvas'), 'message', {
+        nativeEvent: {
+          data: JSON.stringify(
+            phase === 'drawing'
+              ? { type: 'drawing' }
+              : { type: 'elements', elements: [element] },
+          ),
+        },
+      });
+      await act(async () => {});
+      value = { ...value, revision: 2, presentationActive: false };
+      await act(async () => {
+        jest.advanceTimersByTime(1500);
+      });
+      expect(onPresentation).toHaveBeenLastCalledWith(false);
+      expect(repository.load).toHaveBeenCalledTimes(2);
+      if (phase === 'retrying')
+        expect(screen.getByRole('alert')).toHaveTextContent(
+          'Changes are waiting to save. Keep this board open and tap Retry.',
+        );
+      await act(async () =>
+        finishSave({ ...value, revision: 1, presentationActive: true }),
+      );
+      expect(onPresentation).toHaveBeenLastCalledWith(false);
+    } finally {
+      screen.unmount();
+      jest.useRealTimers();
+    }
+  },
+);

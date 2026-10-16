@@ -1,4 +1,5 @@
 'use client';
+import { Presentation } from 'lucide-react';
 import { subscribeMeetingDeviceRecovery } from '@iconicedu/web/lib/live-sessions/browser-device-recovery';
 import { MeetingConnectionRecovery } from './zoom-video/meeting-connection-recovery';
 import { changeZoomCoHost } from '@iconicedu/web/lib/live-sessions/zoom-session-lifecycle';
@@ -33,7 +34,6 @@ import {
   MonitorUp,
   MonitorX,
   OctagonX,
-  Pencil,
   PictureInPicture2,
   PhoneOff,
   Settings,
@@ -2143,7 +2143,7 @@ export function ZoomVideoSessionEmbed({
                   onClick={() => void toggleWhiteboard()}
                 >
                   <PoppingIcon toggleKey={isPresentingWhiteboard}>
-                    <Pencil className="size-4" />
+                    <Presentation className="size-4" />
                   </PoppingIcon>
                 </MeetingControlButton>
               ) : null}
@@ -2180,6 +2180,16 @@ export function ZoomVideoSessionEmbed({
                     mobileOnly: true,
                     onSelect: () => setActivePanel('chat'),
                   },
+                  ...(whiteboard.nativeToken && whiteboard.canStop
+                    ? [
+                        {
+                          id: 'stop-whiteboard',
+                          label: 'Stop presenting whiteboard',
+                          icon: <Presentation />,
+                          onSelect: () => void whiteboard.stop(),
+                        },
+                      ]
+                    : []),
                   ...(isWhiteboardActive && !whiteboard.nativeToken
                     ? [
                         {

@@ -36,7 +36,7 @@ function ActionRow({
       type="button"
       disabled={action.disabled}
       className={cn(
-        'flex min-h-12 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-medium transition-colors',
+        'flex min-h-20 w-full flex-col items-center justify-center gap-2 rounded-xl px-2 py-3 text-center text-xs font-medium transition-colors',
         'hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40',
         action.active && 'bg-primary/10 text-primary',
       )}
@@ -45,7 +45,7 @@ function ActionRow({
         close();
       }}
     >
-      <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted [&_svg]:size-4">
+      <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-muted [&_svg]:size-5">
         {action.icon}
       </span>
       {action.label}
@@ -92,10 +92,12 @@ export function ZoomMoreControls({
       <>
         <Drawer open={open} onOpenChange={onOpenChange} dismissible>
           <DrawerTrigger asChild>{trigger}</DrawerTrigger>
-          <DrawerContent className="pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <DrawerContent className="max-h-[75dvh] overflow-y-auto pb-[max(1rem,env(safe-area-inset-bottom))]">
             <DrawerHeader className="relative pr-14 text-left">
               <DrawerTitle>More controls</DrawerTitle>
-              <DrawerDescription>Additional tools for this class</DrawerDescription>
+              <DrawerDescription className="sr-only">
+                Additional tools for this class
+              </DrawerDescription>
               <DrawerClose asChild>
                 <IconActionButton
                   variant="ghost"
@@ -107,7 +109,7 @@ export function ZoomMoreControls({
                 </IconActionButton>
               </DrawerClose>
             </DrawerHeader>
-            <div className="grid grid-cols-2 gap-1 px-4 pb-2">
+            <div className="grid grid-cols-3 gap-1 px-4 pb-2">
               {menuActions.map((action) => (
                 <ActionRow
                   key={action.id}

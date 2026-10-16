@@ -4,8 +4,78 @@
 #import <AudioToolbox/AudioToolbox.h>
 #import <ReplayKit/ReplayKit.h>
 #import <ZoomVideoSDK/ZoomVideoSDK.h>
+// Use Apple's visible control. Programmatically tapping its private button can
+// silently fail, especially while a React Native modal is being dismissed.
+@interface ClassroomBroadcastController : UIViewController <UIAdaptivePresentationControllerDelegate>
+@property(nonatomic, strong) RPSystemBroadcastPickerView *picker;
+@property(nonatomic, strong) NSTimer *statusTimer;
+@end
+@implementation ClassroomBroadcastController
+- (void)viewDidLoad {
+  [super viewDidLoad];
+  self.view.backgroundColor = UIColor.systemBackgroundColor;
+  UILabel *title = [UILabel new];
+  title.text = @"Share screen";
+  title.font = [UIFont preferredFontForTextStyle:UIFontTextStyleHeadline];
+  UILabel *instructions = [UILabel new];
+  instructions.text = @"Tap the broadcast button, then Start Broadcast. Everything on your screen will be visible to the class.";
+  instructions.font = [UIFont preferredFontForTextStyle:UIFontTextStyleSubheadline];
+  instructions.textColor = UIColor.secondaryLabelColor;
+  instructions.numberOfLines = 0;
+  instructions.textAlignment = NSTextAlignmentCenter;
+  self.picker = [[RPSystemBroadcastPickerView alloc] initWithFrame:CGRectMake(0, 0, 64, 64)];
+  self.picker.preferredExtension = @"com.heidisoft.iconicedu.classroom-broadcast";
+  self.picker.showsMicrophoneButton = NO;
+  self.picker.accessibilityLabel = @"Start screen broadcast";
+  [self.picker.widthAnchor constraintEqualToConstant:64].active = YES;
+  [self.picker.heightAnchor constraintEqualToConstant:64].active = YES;
+  // Expose the same accessible name on the actual UIKit control.
+  for (UIView *view in self.picker.subviews)
+    if ([view isKindOfClass:UIButton.class]) view.accessibilityLabel = @"Start screen broadcast";
+  UIButton *cancel = [UIButton buttonWithType:UIButtonTypeSystem];
+  [cancel setTitle:@"Cancel" forState:UIControlStateNormal];
+  [cancel addTarget:self action:@selector(close) forControlEvents:UIControlEventTouchUpInside];
+  [cancel.heightAnchor constraintGreaterThanOrEqualToConstant:44].active = YES;
+  UIStackView *stack = [[UIStackView alloc] initWithArrangedSubviews:@[title, instructions, self.picker, cancel]];
+  stack.axis = UILayoutConstraintAxisVertical;
+  stack.alignment = UIStackViewAlignmentCenter;
+  stack.spacing = 12;
+  stack.translatesAutoresizingMaskIntoConstraints = NO;
+  [self.view addSubview:stack];
+  [NSLayoutConstraint activateConstraints:@[
+    [stack.leadingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.leadingAnchor constant:24],
+    [stack.trailingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.trailingAnchor constant:-24],
+    [stack.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor constant:24],
+    [stack.bottomAnchor constraintLessThanOrEqualToAnchor:self.view.safeAreaLayoutGuide.bottomAnchor constant:-12],
+    [instructions.widthAnchor constraintEqualToAnchor:stack.widthAnchor]
+  ]];
+}
+- (void)viewDidAppear:(BOOL)animated {
+  [super viewDidAppear:animated];
+  self.presentationController.delegate = self;
+  [self.statusTimer invalidate];
+  __weak ClassroomBroadcastController *weakSelf = self;
+  self.statusTimer = [NSTimer scheduledTimerWithTimeInterval:0.5 repeats:YES block:^(NSTimer *timer) {
+    ClassroomBroadcastController *controller = weakSelf;
+    if (!controller) { [timer invalidate]; return; }
+    if (![[ZoomVideoSDK sharedInstance] isInSession] || [[[ZoomVideoSDK sharedInstance] getShareHelper] isScreenSharingOut])
+      [controller close];
+  }];
+}
+- (void)close {
+  [self.statusTimer invalidate];
+  self.statusTimer = nil;
+  [self dismissViewControllerAnimated:YES completion:nil];
+}
+- (void)presentationControllerDidDismiss:(UIPresentationController *)presentationController {
+  [self.statusTimer invalidate];
+  self.statusTimer = nil;
+}
+- (void)dealloc { [self.statusTimer invalidate]; }
+@end
+
 @interface ClassroomControls : RCTEventEmitter <RCTBridgeModule>
-@property(nonatomic, strong) RPSystemBroadcastPickerView *broadcastPicker;
+@property(nonatomic, strong) ClassroomBroadcastController *broadcastController;
 @property(nonatomic) BOOL listening;
 @property(nonatomic) BOOL observingInterruptions;
 @property(nonatomic) SystemSoundID joinChime;
@@ -90,18 +160,34 @@ RCT_EXPORT_METHOD(claimHost:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRe
 }
 RCT_EXPORT_METHOD(startScreenShare:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject) {
   dispatch_async(dispatch_get_main_queue(), ^{
-    RPSystemBroadcastPickerView *picker = [[RPSystemBroadcastPickerView alloc] initWithFrame:CGRectMake(0, 0, 44, 44)];
-    picker.preferredExtension = @"com.heidisoft.iconicedu.classroom-broadcast";
-    picker.showsMicrophoneButton = NO;
-    UIViewController *controller = RCTPresentedViewController();
-    if (!controller) { reject(@"screen_share", @"Unable to open screen sharing", nil); return; }
-    [self.broadcastPicker removeFromSuperview];
-    self.broadcastPicker = picker;
-    picker.alpha = 0.01;
-    picker.userInteractionEnabled = NO;
-    [controller.view addSubview:picker];
-    for (UIView *view in picker.subviews) if ([view isKindOfClass:UIButton.class]) { [(UIButton *)view sendActionsForControlEvents:UIControlEventTouchUpInside]; break; }
-    resolve(@YES);
+    if (![[ZoomVideoSDK sharedInstance] isInSession]) {
+      reject(@"screen_share", @"Join the class before sharing your screen.", nil); return;
+    }
+    NSURL *extensionURL = [NSBundle.mainBundle.builtInPlugInsURL URLByAppendingPathComponent:@"ClassroomBroadcast.appex"];
+    NSBundle *extension = extensionURL ? [NSBundle bundleWithURL:extensionURL] : nil;
+    if (![extension.bundleIdentifier isEqualToString:@"com.heidisoft.iconicedu.classroom-broadcast"]) {
+      reject(@"screen_share", @"Screen sharing is missing from this app build. Install the latest native build and retry.", nil); return;
+    }
+    if (![NSFileManager.defaultManager containerURLForSecurityApplicationGroupIdentifier:@"group.com.heidisoft.iconicedu.classroom"]) {
+      reject(@"screen_share", @"Screen sharing is unavailable in this app build. Install the latest signed native build and retry.", nil); return;
+    }
+    UIViewController *presenter = RCTPresentedViewController();
+    if (!presenter || !presenter.view.window || presenter.isBeingDismissed) {
+      reject(@"screen_share", @"Wait for the menu to close, then try sharing again.", nil); return;
+    }
+    if (self.broadcastController.presentingViewController) {
+      reject(@"screen_share", @"The screen broadcast control is already open.", nil); return;
+    }
+    ClassroomBroadcastController *controller = [ClassroomBroadcastController new];
+    controller.modalPresentationStyle = UIModalPresentationPageSheet;
+    controller.sheetPresentationController.prefersGrabberVisible = YES;
+    if (@available(iOS 16.0, *)) {
+      controller.sheetPresentationController.detents = @[[UISheetPresentationControllerDetent customDetentWithIdentifier:@"broadcast" resolver:^CGFloat(id<UISheetPresentationControllerDetentResolutionContext> context) { return MIN(300, context.maximumDetentValue); }]];
+    } else {
+      controller.sheetPresentationController.detents = @[UISheetPresentationControllerDetent.mediumDetent];
+    }
+    self.broadcastController = controller;
+    [presenter presentViewController:controller animated:YES completion:^{ resolve(@YES); }];
   });
 }
 // Web's share privilege has no RN wrapper equivalent.
@@ -129,8 +215,8 @@ RCT_EXPORT_METHOD(stopMeetingService:(RCTPromiseResolveBlock)resolve reject:(RCT
 }
 RCT_EXPORT_METHOD(stopShareService:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject) {
   dispatch_async(dispatch_get_main_queue(), ^{
-    [self.broadcastPicker removeFromSuperview];
-    self.broadcastPicker = nil;
+    if (self.broadcastController.presentingViewController) [self.broadcastController close];
+    self.broadcastController = nil;
     resolve(@YES);
   });
 }

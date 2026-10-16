@@ -686,6 +686,14 @@ export function NativeScreenAnnotations({
               </Text>
             </Pressable>
           )}
+          {context?.actor.role === 'student' && !context.snapshot.studentsEnabled && (
+            <Text
+              accessibilityLiveRegion="polite"
+              style={{ color: colors.textMuted, padding: 12 }}
+            >
+              The host has turned off participant annotations.
+            </Text>
+          )}
           {pending && (
             <Text accessibilityLiveRegion="polite" style={{ color: colors.text }}>
               Saving annotations…

@@ -19,17 +19,25 @@ name: Students cannot use host controls
 - assertNotVisible: 'End for everyone'
 - assertNotVisible: 'Start recording'
 - assertNotVisible: 'Claim host'
+- runFlow: open-classroom-controls.yaml
 - scrollUntilVisible:
     element: 'Participants'
     direction: UP
+- runFlow: open-classroom-controls.yaml
 - tapOn: 'Participants'
 - assertNotVisible: 'Make co-host.*'
 - assertNotVisible: 'Make host.*'
 - assertNotVisible: 'Mute Test student'
 - tapOn: 'Close People'
+- runFlow: open-classroom-controls.yaml
 - scrollUntilVisible:
     element: 'Whiteboard'
     direction: UP
+- runFlow: open-classroom-controls.yaml
 - tapOn: 'Whiteboard'
+- extendedWaitUntil:
+    visible: 'Return to video'
+    timeout: 30000
+- tapOn: 'Whiteboard options'
 - assertNotVisible: 'Allow student editing'
 - assertNotVisible: 'Clear board'

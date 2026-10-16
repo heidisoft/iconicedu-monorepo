@@ -36,9 +36,27 @@ export function NativeMeetingStatus({
       >
         {formatElapsed(elapsed)}
       </Text>
+      <NativeRecordingIndicator recording={recording} paused={paused} />
+    </View>
+  );
+}
+
+export function NativeRecordingIndicator({
+  recording,
+  paused,
+}: {
+  recording: boolean;
+  paused: boolean;
+}) {
+  const { colors } = useTheme();
+  return (
+    <>
       {recording && (
         <View
+          accessible
+          accessibilityRole="text"
           accessibilityLabel={paused ? 'Recording paused' : 'Recording active'}
+          accessibilityLiveRegion="polite"
           style={{
             flexDirection: 'row',
             alignItems: 'center',
@@ -57,12 +75,12 @@ export function NativeMeetingStatus({
               backgroundColor: paused ? colors.textMuted : colors.red,
             }}
           />
-          <Text style={{ color: colors.text }}>
-            {paused ? 'Recording paused' : 'Recording'}
+          <Text style={{ color: colors.text, fontSize: 11, fontWeight: '700' }}>
+            {paused ? 'PAUSED' : 'REC'}
           </Text>
         </View>
       )}
-    </View>
+    </>
   );
 }
 
@@ -86,7 +104,9 @@ export function NativeHandAndReactions({
     justifyContent: 'center' as const,
   };
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+    <View
+      style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}
+    >
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={raised ? 'Lower hand' : 'Raise hand'}
@@ -128,7 +148,7 @@ export function NativeHandAndReactions({
                 setPicking(false);
                 onReact(emoji);
               }}
-              style={{ ...round, width: 40, height: 40 }}
+              style={{ ...round, width: 44, height: 44 }}
             >
               <Text style={{ fontSize: 22 }}>{emoji}</Text>
             </Pressable>

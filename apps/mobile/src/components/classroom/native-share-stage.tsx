@@ -59,7 +59,11 @@ export function NativeShareStage({
     [source, viewport],
   );
   return (
-    <View style={{ height }} onLayout={(event) => setViewport(event.nativeEvent.layout)}>
+    <View
+      testID="classroom-shared-screen"
+      style={{ height }}
+      onLayout={(event) => setViewport(event.nativeEvent.layout)}
+    >
       <NativeVideoView
         userId={userId}
         sharing

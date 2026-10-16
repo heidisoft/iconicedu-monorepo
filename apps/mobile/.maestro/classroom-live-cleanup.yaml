@@ -3,9 +3,9 @@ name: Release the dedicated live test meeting after a failed journey
 ---
 - runFlow:
     when:
-      visible: 'Stop presenting board'
+      visible: 'Return to video'
     commands:
-      - tapOn: 'Stop presenting board'
+      - tapOn: 'Return to video'
 - runFlow:
     when:
       visible: 'Leave class|Leave or end class|End class'

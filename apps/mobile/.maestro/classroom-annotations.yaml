@@ -22,4 +22,5 @@ name: Native annotation drawing and versioned history
 - tapOn: 'Redo annotation'
 - assertVisible: '1 annotation'
 - tapOn: 'Export annotations image'
+- runFlow: assert-classroom-export.yaml
 - takeScreenshot: native-annotation-export

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Modal, Pressable, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { X } from 'lucide-react-native';
@@ -14,9 +14,10 @@ export function NativeFocusedVideo({
   user?: NativeParticipant;
   sharing: boolean;
   onClose: () => void;
-  shareContent?: React.ReactNode;
+  shareContent?: (height: number) => React.ReactNode;
 }) {
   const { colors } = useTheme();
+  const [contentHeight, setContentHeight] = useState(0);
   return (
     <Modal visible={!!user} animationType="fade" onRequestClose={onClose}>
       <SafeAreaProvider>
@@ -31,7 +32,9 @@ export function NativeFocusedVideo({
           >
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Close focused video"
+              accessibilityLabel={
+                sharing ? 'Collapse shared screen' : 'Close focused video'
+              }
               onPress={onClose}
               style={{ padding: 12 }}
             >
@@ -43,7 +46,13 @@ export function NativeFocusedVideo({
             </Text>
           </View>
           {user && sharing && shareContent ? (
-            shareContent
+            <View
+              testID="focused-share-content"
+              style={{ flex: 1 }}
+              onLayout={(event) => setContentHeight(event.nativeEvent.layout.height)}
+            >
+              {shareContent(contentHeight)}
+            </View>
           ) : user && (user.video || sharing) ? (
             <NativeVideoView userId={user.id} sharing={sharing} style={{ flex: 1 }} />
           ) : (

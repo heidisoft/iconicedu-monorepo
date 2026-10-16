@@ -1,5 +1,5 @@
 import { useClassroomLasers } from './use-classroom-lasers';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   Excalidraw,
@@ -17,6 +17,7 @@ import '@excalidraw/excalidraw/index.css';
 declare global {
   interface Window {
     ReactNativeWebView: { postMessage(value: string): void };
+    classroomAction?: (action: 'export' | 'library') => void;
     classroomScene?: (message: {
       elements: WhiteboardElementVM[];
       editable: boolean;
@@ -28,7 +29,6 @@ const send = (value: unknown) =>
   window.ReactNativeWebView.postMessage(JSON.stringify(value));
 function Canvas() {
   const [library, setLibrary] = useState(false);
-  const [elementCount, setElementCount] = useState(0);
   const [search, setSearch] = useState('');
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
   useClassroomLasers(api);
@@ -66,7 +66,7 @@ function Canvas() {
       delete window.classroomScene;
     };
   }, [api]);
-  const exportImage = async () => {
+  const exportImage = useCallback(async () => {
     if (!api) return;
     try {
       const blob = await exportToBlob({
@@ -82,29 +82,19 @@ function Canvas() {
     } catch {
       send({ type: 'export-error' });
     }
-  };
+  }, [api]);
+  useEffect(() => {
+    window.classroomAction = (action) => {
+      if (action === 'export') void exportImage();
+      else if (action === 'library') setLibrary((previous) => !previous);
+    };
+    return () => {
+      delete window.classroomAction;
+    };
+  }, [exportImage]);
   return (
     <>
       <Excalidraw
-        renderTopRightUI={() => (
-          <>
-            <button
-              aria-label="Export whiteboard image"
-              disabled={elementCount === 0}
-              onClick={() => {
-                void exportImage();
-              }}
-            >
-              Export image
-            </button>
-            <button
-              aria-label="Educational library"
-              onClick={() => setLibrary((previous) => !previous)}
-            >
-              Library
-            </button>
-          </>
-        )}
         excalidrawAPI={setApi}
         onPointerUpdate={(event) => {
           if (event.pointer.tool === 'laser')
@@ -139,7 +129,6 @@ function Canvas() {
         viewModeEnabled={!editable}
         initialData={{ appState: { currentItemFontFamily: 2 } }}
         onChange={(elements) => {
-          setElementCount(elements.filter((element) => !element.isDeleted).length);
           if (!editable || applying.current) return;
           const changed = elements.filter(
             (element) =>

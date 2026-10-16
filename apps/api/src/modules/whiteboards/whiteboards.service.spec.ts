@@ -66,10 +66,10 @@ describe('whiteboard API capabilities and atomic persistence', () => {
       false,
     ],
     [
-      'student presence',
+      'active participant presenter',
       { presenterId: 'presenter', sessionId: 'session' },
       [{ token_hash: 'presenter', role: 'student' }],
-      false,
+      true,
     ],
     [
       'active presenter',
@@ -117,6 +117,83 @@ describe('whiteboard API capabilities and atomic persistence', () => {
     await service.mutate(token, { id: 'stop', type: 'presentation', enabled: false });
     expect(db.rpc.mock.calls[1][1].p_document.presenting).toBe(false);
     expect(db.rpc.mock.calls[1][1].p_document).not.toHaveProperty('presentation');
+  });
+  it('allows a participant to present without granting editing permissions', async () => {
+    const { db } = mockDb('student', true);
+    await new WhiteboardsService().mutate(token, {
+      id: 'participant-start',
+      type: 'presentation',
+      enabled: true,
+    });
+    expect(db.rpc.mock.calls[0][1].p_document).toMatchObject({
+      studentEditing: false,
+      presenting: true,
+      presentation: {
+        presenterId: hashWhiteboardToken(token).slice(0, 16),
+        sessionId: 'session',
+        presentationId: 'participant-start',
+      },
+    });
+  });
+  it('prevents a participant from stopping or replacing another live presenter', async () => {
+    const { db, current, grant } = mockDb('student');
+    current.single.mockResolvedValue({
+      data: {
+        ...board,
+        document: {
+          ...board.document,
+          presenting: true,
+          presentation: { presenterId: 'other', sessionId: 'session' },
+        },
+      },
+      error: null,
+    });
+    grant.then = builder([{ token_hash: 'other', role: 'student' }]).then;
+    const service = new WhiteboardsService();
+    await expect(
+      service.mutate(token, { id: 'stop-other', type: 'presentation', enabled: false }),
+    ).rejects.toThrow('Only the presenter');
+    await expect(
+      service.mutate(token, { id: 'replace-other', type: 'presentation', enabled: true }),
+    ).rejects.toThrow('Another participant');
+    expect(db.rpc).not.toHaveBeenCalled();
+  });
+  it('allows the participant presenter to stop their own presentation', async () => {
+    const { db, current } = mockDb('student', true);
+    current.single.mockResolvedValue({
+      data: {
+        ...board,
+        document: {
+          ...board.document,
+          presenting: true,
+          presentation: {
+            presenterId: hashWhiteboardToken(token).slice(0, 16),
+            sessionId: 'session',
+          },
+        },
+      },
+      error: null,
+    });
+    await new WhiteboardsService().mutate(token, {
+      id: 'stop-self',
+      type: 'presentation',
+      enabled: false,
+    });
+    expect(db.rpc.mock.calls[0][1].p_document.presenting).toBe(false);
+    expect(db.rpc.mock.calls[0][1].p_document).not.toHaveProperty('presentation');
+  });
+  it('replays a participant stop without requiring the cleared presenter identity', async () => {
+    const { db, current } = mockDb('student');
+    current.single.mockResolvedValue({
+      data: { ...board, applied_operations: ['stopped'] },
+      error: null,
+    });
+    await new WhiteboardsService().mutate(token, {
+      id: 'stopped',
+      type: 'presentation',
+      enabled: false,
+    });
+    expect(db.rpc).not.toHaveBeenCalled();
   });
   it('rejects missing, forged and expired capabilities', async () => {
     const service = new WhiteboardsService();

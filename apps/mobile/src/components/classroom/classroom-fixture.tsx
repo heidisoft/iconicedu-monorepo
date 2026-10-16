@@ -1,7 +1,8 @@
+import { prepareClassroomFixture } from './fixture-developer-tools';
 import { createNativePictureInPicture } from '@/lib/classroom/native-picture-in-picture';
 import { Platform } from 'react-native';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Text } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { useZoom } from '@zoom/react-native-videosdk';
@@ -20,7 +21,7 @@ import type { WhiteboardSnapshotVM } from '@iconicedu/shared-types';
 export function createClassroomFixtureAdapter(
   role = 'teacher',
   failure?: string,
-): NativeMeetingAdapter {
+): NativeMeetingAdapter & { peerShare(active: boolean): void } {
   let cameraId = 'front',
     audioId = 'speaker';
   let shareMode: NativeShareMode = 'single';
@@ -44,6 +45,9 @@ export function createClassroomFixtureAdapter(
     },
   ];
   return {
+    peerShare(active) {
+      send({ type: 'share', userId: '2', active });
+    },
     pictureInPicture:
       Platform.OS === 'android' ? createNativePictureInPicture() : undefined,
     subscribe: (listener) => {
@@ -90,6 +94,9 @@ export function createClassroomFixtureAdapter(
     },
     async recording(active) {
       send({ type: 'recording', status: active ? 'recording' : 'stopped' });
+    },
+    async pauseRecording() {
+      send({ type: 'recording', status: 'paused' });
     },
     async resumeRecording() {
       send({ type: 'recording', status: 'recording' });
@@ -144,14 +151,22 @@ export function createClassroomFixtureAdapter(
 }
 
 function Fixture() {
-  const { role = 'teacher', failure } = useLocalSearchParams<{
+  const {
+    role = 'teacher',
+    failure,
+    scenario,
+  } = useLocalSearchParams<{
     role?: string;
     failure?: string;
+    scenario?: string;
   }>();
   const { getSdkVersion } = useZoom();
   const [sdkVersion, setSdkVersion] = useState('Loading');
   useEffect(() => {
-    void getSdkVersion().then(setSdkVersion);
+    void prepareClassroomFixture()
+      .then(() => getSdkVersion())
+      .then(setSdkVersion)
+      .catch(() => setSdkVersion('Unavailable'));
   }, [getSdkVersion]);
   const adapter = useMemo(
     () => createClassroomFixtureAdapter(role, failure),
@@ -186,6 +201,7 @@ function Fixture() {
   const repository = useMemo<NativeWhiteboardRepository>(() => {
     let snapshot: WhiteboardSnapshotVM = {
       id: 'fixture-board',
+      actorId: 'fixture-presenter',
       revision: 0,
       role: role === 'teacher' ? 'teacher' : 'student',
       presence: [],
@@ -201,6 +217,8 @@ function Fixture() {
         return snapshot;
       },
       async save(op) {
+        if (failure === 'whiteboard-save' && op.type === 'elements')
+          throw new Error('Synthetic save failure');
         snapshot = {
           ...snapshot,
           revision: snapshot.revision + 1,
@@ -214,17 +232,27 @@ function Fixture() {
           snapshot.document.pages[0].elements = [...elements.values()];
         }
         if (op.type === 'student-editing') snapshot.document.studentEditing = op.enabled;
-        if (op.type === 'presentation') snapshot.presentationActive = op.enabled;
+        if (op.type === 'presentation') {
+          snapshot.presentationActive = op.enabled;
+          snapshot.document.presenting = op.enabled;
+          snapshot.document.presentation = op.enabled
+            ? {
+                presenterId: 'fixture-presenter',
+                sessionId: 'fixture-session',
+                presentationId: op.id,
+              }
+            : undefined;
+        }
         if (op.type === 'clear-page') snapshot.document.pages[0].elements = [];
         return snapshot;
       },
     };
-  }, [role]);
+  }, [role, failure]);
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <Text testID="native-sdk-version">Native SDK {sdkVersion}</Text>
       <NativeClassroom
-        key={`${role}:${failure}`}
+        key={`${role}:${failure}:${scenario}`}
         sessionId="00000000-0000-4000-8000-000000000001"
         credentials={{
           sessionName: 'Native classroom test',
@@ -246,6 +274,40 @@ function Fixture() {
         whiteboardRepository={repository}
         meetingApi={meetingApi}
       />
+      {scenario === 'presentation-transition' && (
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Fixture remote whiteboard stop"
+            style={{ padding: 8, minHeight: 44 }}
+            onPress={() => {
+              void repository.save({
+                id: `remote-stop-${Date.now()}`,
+                type: 'presentation',
+                enabled: false,
+              });
+            }}
+          >
+            <Text>Stop peer board</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Fixture start peer screen share"
+            style={{ padding: 8, minHeight: 44 }}
+            onPress={() => adapter.peerShare(true)}
+          >
+            <Text>Start peer share</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Fixture stop peer screen share"
+            style={{ padding: 8, minHeight: 44 }}
+            onPress={() => adapter.peerShare(false)}
+          >
+            <Text>Stop peer share</Text>
+          </Pressable>
+        </View>
+      )}
     </SafeAreaView>
   );
 }

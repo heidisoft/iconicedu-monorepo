@@ -25,9 +25,10 @@ name: Android native picture-in-picture transition and restoration
     timeout: 15000
 - assertVisible: 'Leave class|Leave or end class|End class'
 - tapOn: 'More controls'
-- tapOn: 'Audio settings'
+- tapOn: 'Settings'
+- tapOn: 'Meeting settings tab'
 - tapOn: 'Automatic floating call'
-- tapOn: 'Done testing'
+- tapOn: 'Close settings'
 - pressKey: HOME
 - extendedWaitUntil:
     visible:
@@ -40,6 +41,7 @@ name: Android native picture-in-picture transition and restoration
     visible: 'Native classroom test'
     timeout: 15000
 - tapOn: 'More controls'
-- tapOn: 'Audio settings'
+- tapOn: 'Settings'
+- tapOn: 'Meeting settings tab'
 - tapOn: 'Automatic floating call'
-- tapOn: 'Done testing'
+- tapOn: 'Close settings'

@@ -277,6 +277,22 @@ describe('native classroom lifecycle and permissions', () => {
     expect(f.adapter.setShareMode).toHaveBeenCalledWith('multiple');
     expect(f.controller.state.shareMode).toBe('multiple');
   });
+  it('limits pausing to moderators and classes that permit stopping', async () => {
+    const f = fixture();
+    f.adapter.pauseRecording = jest.fn().mockResolvedValue(undefined);
+    await f.connected('2');
+    f.emit({ type: 'recording', status: 'recording' });
+    await expect(f.controller.pauseRecording()).rejects.toThrow();
+    f.emit({
+      type: 'participants',
+      participants: [teacher, { ...student, cohost: true }],
+    });
+    await f.controller.pauseRecording();
+    expect(f.adapter.pauseRecording).toHaveBeenCalledTimes(1);
+    f.controller.settings.recording.allowStop = false;
+    await expect(f.controller.pauseRecording()).rejects.toThrow();
+    expect(f.adapter.pauseRecording).toHaveBeenCalledTimes(1);
+  });
   it('resumes a paused recording from the record control even when stopping is locked', async () => {
     const f = fixture();
     f.controller.settings.recording.allowStop = false;

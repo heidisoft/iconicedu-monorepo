@@ -78,6 +78,20 @@ type ChannelLiveSessionPublicRow = {
   app_metadata?: Record<string, unknown> | null;
 };
 
+/** Host/member/guest clients must join the topic used by the provider's signed token. */
+function resolveZoomSessionName(
+  session: Pick<ChannelLiveSessionPublicRow, 'provider_session_id' | 'provider_metadata'>,
+  joinAccess: { metadata?: Record<string, unknown> },
+): string {
+  const name =
+    joinAccess.metadata?.sessionName ??
+    session.provider_metadata?.sessionName ??
+    session.provider_session_id;
+  if (typeof name === 'string' && name.trim()) return name;
+  // A database row ID is not a Zoom topic. Failing here avoids an isolated room.
+  throw new InternalServerErrorException('Unable to resolve the classroom session');
+}
+
 // Best-effort, process-local guard against passcode brute-forcing on the
 // unauthenticated guest-join endpoint. Not distributed — fine for a single
 // Railway instance, but a horizontally-scaled deployment would need a shared
@@ -822,8 +836,7 @@ export class LiveSessionsService {
           }
         : {}),
       token: joinAccess.token,
-      sessionName:
-        typeof metadata.sessionName === 'string' ? metadata.sessionName : session.id,
+      sessionName: resolveZoomSessionName(session, joinAccess),
       displayName,
       expiresAt: joinAccess.expiresAt ?? null,
       settings,
@@ -995,10 +1008,7 @@ export class LiveSessionsService {
         token: joinAccess.token,
         expiresAt: joinAccess.expiresAt ?? null,
         settings,
-        sessionName:
-          typeof joinAccess.metadata?.sessionName === 'string'
-            ? joinAccess.metadata.sessionName
-            : session.id,
+        sessionName: resolveZoomSessionName(session, joinAccess),
         displayName,
         passcode:
           typeof session.provider_metadata?.passcode === 'string'

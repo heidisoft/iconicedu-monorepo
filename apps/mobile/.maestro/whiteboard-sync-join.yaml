@@ -12,4 +12,4 @@ appId: com.heidisoft.iconicedu
 - extendedWaitUntil:
     visible: 'Cross-client classroom'
     timeout: 30000
-- assertNotVisible: 'Class whiteboard'
+- assertNotVisible: 'Return to video'

@@ -27,9 +27,11 @@ name: Real native host meeting controls - use a dedicated test classroom
     commands:
       - tapOn: 'Claim host'
       - tapOn: 'Claim host'
+- runFlow: open-classroom-controls.yaml
 - scrollUntilVisible:
     element: 'Participants.*'
     direction: UP
+- runFlow: open-classroom-controls.yaml
 - tapOn: 'Participants.*'
 - scrollUntilVisible:
     element: 'Make co-host ${PEER_NAME}'

@@ -175,7 +175,9 @@ pnpm dev:api
 pnpm dev:mobile
 ```
 
-`pnpm dev:mobile` is the guided first-run workflow. On a fresh clone, choose to generate and build the native project. For normal TypeScript, UI, or styling changes after a development client is installed, start Metro without rebuilding.
+`pnpm dev:mobile` is the guided first-run workflow. On a fresh clone, choose to generate and build the native project. For normal TypeScript, UI, or styling changes after a development client is installed, start Metro without rebuilding. On macOS, this also opens the installed development client in the iOS Simulator. Metro keeps its bundle cache between launches; use `pnpm dev:mobile --clear` when troubleshooting a stale bundle. The launcher uses the workspace Expo CLI through pnpm. Rebuild the iOS client after pulling changes to `plugins/scene/SceneDelegate.swift`; the scene delegate forwards cold-launch URLs to Expo so opening a development link loads the app instead of stopping at the launcher home screen.
+
+iOS 27 may log a deprecated `UIApplication.statusBarStyle` call, Core Animation handler messages, launch-measurement failures, and PointerUI service messages. These native system diagnostics alone do not establish an app crash. Verify that Metro finishes bundling and the app renders; investigate any red error screen or crash separately. With Metro running on port 8081 and a signed-out iOS simulator, run `maestro --udid <simulator-udid> test apps/mobile/.maestro/development-launch.yaml` from the repository root to verify cold launch reaches the login screen.
 
 The full `pnpm dev` command starts Metro non-interactively and assumes a native development client is already installed. See the [mobile workflow](../../apps/mobile/README.md) for first builds, native rebuild rules, EAS builds, and device networking.
 

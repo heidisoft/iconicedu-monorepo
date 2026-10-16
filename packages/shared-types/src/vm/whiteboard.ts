@@ -23,7 +23,7 @@ export interface WhiteboardDocumentVM {
   studentEditing: boolean;
   presenting?: boolean;
   /** Server-owned identity of the grant and meeting that started presenting. */
-  presentation?: { presenterId: string; sessionId: string };
+  presentation?: { presenterId: string; sessionId: string; presentationId?: string };
   /** Retired page IDs prevent delayed add-page messages from resurrecting deleted pages. */
   deletedPageIds?: string[];
 }

@@ -13,8 +13,10 @@ name: Teacher admits guests, assigns co-hosts and ends the classroom
 - scrollUntilVisible:
     element: 'Join now'
 - tapOn: 'Join now'
+- runFlow: open-classroom-controls.yaml
 - scrollUntilVisible:
     element: 'Participants.*'
+- runFlow: open-classroom-controls.yaml
 - tapOn: 'Participants.*'
 - scrollUntilVisible:
     element: 'Admit Waiting guest'

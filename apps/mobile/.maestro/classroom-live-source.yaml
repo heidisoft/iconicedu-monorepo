@@ -43,24 +43,34 @@ name: Real signed-in source page to native classroom preview and meeting control
     commands:
       - tapOn: 'Claim host'
       - tapOn: 'Claim host'
+- runFlow: open-classroom-controls.yaml
 - scrollUntilVisible:
     element: 'Participants.*'
+- runFlow: open-classroom-controls.yaml
 - tapOn: 'Participants.*'
 - assertVisible: '${DISPLAY_NAME}'
 - tapOn: 'Close People'
+- runFlow: open-classroom-controls.yaml
 - scrollUntilVisible:
     element: 'Raise hand'
+- runFlow: open-classroom-controls.yaml
 - tapOn: 'Raise hand'
+- runFlow: open-classroom-controls.yaml
 - assertVisible: 'Lower hand'
+- runFlow: open-classroom-controls.yaml
 - tapOn: 'Lower hand'
+- runFlow: open-classroom-controls.yaml
 - scrollUntilVisible:
     element: 'Start recording'
+- runFlow: open-classroom-controls.yaml
 - tapOn: 'Start recording'
 - extendedWaitUntil:
     visible: 'Recording active'
     timeout: 30000
+- runFlow: open-classroom-controls.yaml
 - scrollUntilVisible:
     element: 'Stop recording'
+- runFlow: open-classroom-controls.yaml
 - tapOn: 'Stop recording'
 - assertNotVisible: 'Recording active'
 - scrollUntilVisible:
@@ -70,6 +80,7 @@ name: Real signed-in source page to native classroom preview and meeting control
     when:
       platform: iOS
     commands:
+      - tapOn: 'Start screen broadcast'
       - tapOn: 'Start Broadcast'
 - runFlow:
     when:
@@ -85,11 +96,13 @@ name: Real signed-in source page to native classroom preview and meeting control
     timeout: 30000
 - tapOn: 'Stop sharing screen'
 - assertVisible: 'Share screen'
+- runFlow: open-classroom-controls.yaml
 - scrollUntilVisible:
     element: 'Whiteboard'
+- runFlow: open-classroom-controls.yaml
 - tapOn: 'Whiteboard'
 - extendedWaitUntil:
-    visible: 'Class whiteboard'
+    visible: 'Return to video'
     timeout: 30000
 - tapOn: 'Draw'
 - swipe:
@@ -104,18 +117,20 @@ name: Real signed-in source page to native classroom preview and meeting control
 - tapOn:
     point: '45%,60%'
 - inputText: 'Live tablet writing'
-- tapOn: 'Class whiteboard'
+- hideKeyboard
 - extendedWaitUntil:
     visible:
       id: 'whiteboard-saved-elements-2'
     timeout: 30000
+- tapOn: 'Whiteboard options'
 - tapOn: 'Educational library'
 - tapOn: 'Number line'
 - extendedWaitUntil:
-    visible: 'Saved'
+    visible:
+      id: 'whiteboard-saved-elements-3'
     timeout: 30000
-- tapOn: 'Stop presenting board'
-- assertNotVisible: 'Class whiteboard'
+- tapOn: 'Return to video'
+- assertNotVisible: 'Return to video'
 - scrollUntilVisible:
     element: 'Leave class|Leave or end class|End class'
 - tapOn: 'Leave class|Leave or end class|End class'

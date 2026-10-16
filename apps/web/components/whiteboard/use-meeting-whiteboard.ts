@@ -32,6 +32,8 @@ export function useMeetingWhiteboard(
         containerRef,
         status: nativeBoard.open ? WhiteboardStatus.InProgress : WhiteboardStatus.Closed,
         presenting: nativeBoard.presenting,
+        stop: nativeBoard.stop,
+        canStop: nativeBoard.canStop,
         supported: enabled,
         error: nativeBoard.error,
         dismissError: nativeBoard.dismissError,
@@ -39,5 +41,5 @@ export function useMeetingWhiteboard(
         exportPdf: async () => {},
         nativeToken: access?.token,
       }
-    : { ...zoom, nativeToken: undefined };
+    : { ...zoom, nativeToken: undefined, stop: zoom.toggle, canStop: zoom.presenting };
 }

@@ -203,6 +203,8 @@ if (mode === 'live') {
       '--device',
       process.env.NATIVE_SYNC_DEVICE_ID,
       'test',
+      '-e',
+      `METRO_PORT=${process.env.METRO_PORT ?? '8085'}`,
       ...[
         'ui',
         'join-failure',
@@ -214,6 +216,9 @@ if (mode === 'live') {
         'annotations',
         'media-controls',
         'whiteboard-write',
+        'presentation',
+        'presentation-transition',
+        ...(platform === 'android' ? ['picture-in-picture'] : []),
       ].map((name) => `.maestro/classroom-${name}.yaml`),
     ],
     `${root}apps/mobile`,

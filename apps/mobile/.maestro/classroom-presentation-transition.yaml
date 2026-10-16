@@ -1,0 +1,43 @@
+appId: com.heidisoft.iconicedu
+name: Remote whiteboard stop followed by a peer screen share
+---
+- runFlow: bootstrap.yaml
+- openLink: 'iconicedu://classroom-fixture?scenario=presentation-transition&failure=whiteboard-save'
+- extendedWaitUntil:
+    visible: 'Ready to join\?'
+    timeout: 30000
+- tapOn: 'Turn camera off'
+- tapOn: 'Join now'
+- runFlow: open-classroom-controls.yaml
+- tapOn: 'Whiteboard'
+- extendedWaitUntil:
+    visible: 'Draw'
+    timeout: 30000
+- tapOn: 'Draw'
+- swipe:
+    start: '30%,40%'
+    end: '45%,50%'
+    duration: 700
+- extendedWaitUntil:
+    visible: 'Changes are waiting to save.*'
+    timeout: 10000
+- tapOn: 'Fixture remote whiteboard stop'
+- extendedWaitUntil:
+    notVisible: 'Return to video'
+    timeout: 10000
+- tapOn: 'Fixture start peer screen share'
+- extendedWaitUntil:
+    visible:
+      id: 'classroom-shared-screen'
+    timeout: 10000
+- assertNotVisible: 'Return to video'
+- tapOn: 'Expand shared screen to full screen'
+- assertVisible: 'Collapse shared screen'
+- tapOn: 'Collapse shared screen'
+- tapOn: 'Fixture stop peer screen share'
+- assertNotVisible:
+    id: 'classroom-shared-screen'
+- tapOn: 'Leave or end class'
+- assertVisible: 'Drawing changes are waiting to save'
+- tapOn: 'OK'
+- stopApp

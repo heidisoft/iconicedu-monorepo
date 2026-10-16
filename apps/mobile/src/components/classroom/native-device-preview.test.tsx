@@ -26,7 +26,6 @@ function setup(joining = false) {
     onCamera: jest.fn(),
     onMicrophone: jest.fn(),
     onSettings: jest.fn(),
-    onTest: jest.fn(),
     onJoin: jest.fn(),
   };
   return {
@@ -43,8 +42,7 @@ it('retains signed-in identity and requires explicit Join after preview', () => 
   expect(screen.getByDisplayValue('Test teacher')).toBeTruthy();
   expect(screen.getByText('Camera preview')).toBeTruthy();
   expect(props.onJoin).not.toHaveBeenCalled();
-  fireEvent.press(screen.getByLabelText('Test audio and video'));
-  expect(props.onTest).toHaveBeenCalledTimes(1);
+  expect(screen.queryByLabelText('Test audio and video')).toBeNull();
   fireEvent.press(screen.getByLabelText('Settings'));
   expect(props.onSettings).toHaveBeenCalledTimes(1);
   fireEvent.press(screen.getByLabelText('Join now'));

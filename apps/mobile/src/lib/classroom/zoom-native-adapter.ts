@@ -495,6 +495,13 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
       checked(await zoom.userHelper.makeHost(id));
     },
     async recording(enabled) {
+      if (enabled) {
+        const result = await zoom.recordingHelper.canStartRecording();
+        if (result !== Errors.Success && result !== 0)
+          throw new Error(
+            'Cloud recording is unavailable. Ask the host to check recording permissions.',
+          );
+      }
       checked(
         await (enabled
           ? zoom.recordingHelper.startCloudRecording()
@@ -503,6 +510,9 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
     },
     async joinChime() {
       await NativeModules.ClassroomControls.playJoinChime?.();
+    },
+    async pauseRecording() {
+      checked(await zoom.recordingHelper.pauseCloudRecording());
     },
     async resumeRecording() {
       checked(await zoom.recordingHelper.resumeCloudRecording());

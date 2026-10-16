@@ -12,6 +12,7 @@ appId: com.heidisoft.iconicedu
 - scrollUntilVisible:
     element: 'Whiteboard'
 - tapOn: 'Whiteboard'
+- tapOn: 'Whiteboard options'
 - extendedWaitUntil:
     visible: 'Stop presenting board'
     timeout: 30000
