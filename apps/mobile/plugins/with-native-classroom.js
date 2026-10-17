@@ -160,6 +160,8 @@ module.exports = function withNativeClassroom(config) {
       )?.[0];
       if (extensionId && !project.getFirstTarget().firstTarget.dependencies.length)
         project.addTargetDependency(project.getFirstTarget().uuid, [extensionId]);
+      if (extensionId)
+        project.addFramework('CoreImage.framework', { target: extensionId });
       updateVersions();
       return value;
     }
@@ -188,6 +190,7 @@ module.exports = function withNativeClassroom(config) {
     for (const framework of [
       'ReplayKit',
       'CoreGraphics',
+      'CoreImage',
       'CoreVideo',
       'CoreMedia',
       'VideoToolbox',

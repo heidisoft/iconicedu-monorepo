@@ -1,6 +1,19 @@
+import { X } from 'lucide-react-native';
+import { NativeAnnotationBar } from './native-annotation-bar';
+import { DrawingStyleStrip } from '@iconicedu/ui-native';
+import { NativeAnnotationToolbar } from './native-annotation-toolbar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import {
+  Alert,
+  NativeModules,
+  PanResponder,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import Svg, {
   Circle,
   Ellipse,
@@ -38,33 +51,6 @@ import {
 import { exportClassroomImage } from '@/lib/classroom/export-image';
 import { useTheme } from '@/providers/theme-provider';
 
-const tools: AnnotationTool[] = [
-  'cursor',
-  'select',
-  'pen',
-  'highlighter',
-  'vanishingPen',
-  'line',
-  'arrow',
-  'doubleArrow',
-  'rectangle',
-  'rectangleFilled',
-  'rectangleHighlight',
-  'ellipse',
-  'ellipseFilled',
-  'ellipseHighlight',
-  'diamond',
-  'text',
-  'eraser',
-  'spotlight',
-  'pointerArrow',
-  'stampCheck',
-  'stampX',
-  'stampStar',
-  'stampHeart',
-  'stampQuestion',
-  'stampArrow',
-];
 const stamps: Record<string, string> = {
   stampCheck: '✓',
   stampX: '✕',
@@ -184,8 +170,10 @@ export function NativeScreenAnnotations({
   height,
   active,
   composited = false,
+  publishing = false,
   apiOverride,
   onContext,
+  onToggle,
 }: {
   sessionId: string;
   shareKey: string;
@@ -194,8 +182,10 @@ export function NativeScreenAnnotations({
   height: number;
   active: boolean;
   composited?: boolean;
+  publishing?: boolean;
   apiOverride?: ReturnType<typeof nativeAnnotationApi>;
   onContext?: (context: AnnotationContext) => void;
+  onToggle?: () => void;
 }) {
   const api = useMemo(
     () => apiOverride ?? nativeAnnotationApi(sessionId, shareKey, token),
@@ -208,6 +198,89 @@ export function NativeScreenAnnotations({
   }, [context, onContext]);
   const contextRef = useRef(context);
   contextRef.current = context;
+  const [optionsPanel, setOptionsPanel] = useState<'format' | 'more' | null>(null);
+  const optionsOpen = optionsPanel !== null;
+  const [showNames, setShowNames] = useState(true);
+  const [customColor, setCustomColor] = useState('#000000');
+  const [pressure, setPressure] = useState(false);
+  const [dock, setDock] = useState('top');
+  const [position, setPosition] = useState({ x: 8, y: 8 });
+  const positionRef = useRef(position);
+  const dragStart = useRef(position);
+  const boundsRef = useRef({ width, height });
+  boundsRef.current = { width, height };
+  const persistPosition = (nextDock: string, nextPosition = positionRef.current) => {
+    setDock(nextDock);
+    void AsyncStorage.setItem(
+      'annotation-toolbar',
+      JSON.stringify({ dock: nextDock, position: nextPosition }),
+    ).catch(() => {});
+  };
+  const drag = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        dragStart.current = positionRef.current;
+        setPosition(positionRef.current);
+        setDock('floating');
+      },
+      onPanResponderMove: (_event, gesture) => {
+        const next = {
+          x: Math.max(
+            8,
+            Math.min(
+              dragStart.current.x + gesture.dx,
+              Math.max(
+                8,
+                boundsRef.current.width - Math.min(800, boundsRef.current.width - 16) - 8,
+              ),
+            ),
+          ),
+          y: Math.max(
+            8,
+            Math.min(dragStart.current.y + gesture.dy, boundsRef.current.height - 120),
+          ),
+        };
+        positionRef.current = next;
+        setPosition(next);
+      },
+      onPanResponderRelease: () => {
+        void AsyncStorage.setItem(
+          'annotation-toolbar',
+          JSON.stringify({ dock: 'floating', position: positionRef.current }),
+        ).catch(() => {});
+      },
+    }),
+  ).current;
+  useEffect(() => {
+    let mounted = true;
+    void AsyncStorage.getItem('annotation-toolbar')
+      .then((value) => {
+        if (!value || !mounted) return;
+        try {
+          const saved = JSON.parse(value);
+          if (
+            ['top', 'bottom', 'left', 'right', 'floating'].includes(saved.dock) &&
+            Number.isFinite(saved.position?.x) &&
+            Number.isFinite(saved.position?.y)
+          ) {
+            setDock(saved.dock);
+            setPosition(saved.position);
+          }
+        } catch {
+          /* Ignore outdated optional toolbar preferences. */
+        }
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, []);
+  useEffect(() => {
+    setOptionsPanel(null);
+    setSelected(null);
+    setTool(active ? 'pen' : 'cursor');
+  }, [active]);
   const [tool, setTool] = useState<AnnotationTool>('pen');
   const [lasers, setLasers] = useState<AnnotationLaserStroke[]>([]);
   const outgoingLasers = useRef<AnnotationLaserStroke[]>([]);
@@ -258,6 +331,38 @@ export function NativeScreenAnnotations({
   const [error, setError] = useState<string | null>(null);
   const [text, setText] = useState('');
   const svg = useRef<Svg>(null);
+  const publicationSvg = useRef<Svg>(null);
+  const publicationContext = useRef(context);
+  publicationContext.current = context;
+  useEffect(() => {
+    if (!publishing || !NativeModules.ClassroomControls?.setShareOverlay) return;
+    let active = true;
+    let busy = false;
+    const publish = () => {
+      if (busy || !publicationContext.current) return;
+      busy = true;
+      publicationSvg.current?.toDataURL((data) => {
+        if (!active) {
+          busy = false;
+          return;
+        }
+        void NativeModules.ClassroomControls.setShareOverlay(
+          `data:image/png;base64,${data}`,
+        )
+          .catch(() => {})
+          .finally(() => {
+            busy = false;
+          });
+      });
+    };
+    publish();
+    const timer = setInterval(publish, 500);
+    return () => {
+      active = false;
+      clearInterval(timer);
+      void NativeModules.ClassroomControls.setShareOverlay('').catch(() => {});
+    };
+  }, [publishing]);
   const [selected, setSelected] = useState<string | null>(null);
   const selection = useRef<{ object: AnnotationObject; start: AnnotationPoint } | null>(
     null,
@@ -270,6 +375,9 @@ export function NativeScreenAnnotations({
     bold: false,
     italic: false,
   });
+  useEffect(() => {
+    setCustomColor(style.color);
+  }, [style.color]);
   const history = useRef(new NativeAnnotationHistory());
   const [, setHistoryVersion] = useState(0);
   const callbacks = useRef(
@@ -441,7 +549,10 @@ export function NativeScreenAnnotations({
     setStyle((previous) => ({ ...previous, ...patch }));
     changeSelected((object) => ({ ...object, style: { ...object.style, ...patch } }));
   };
-  const point = (x: number, y: number): AnnotationPoint => ({
+  const point = (x: number, y: number, force?: number): AnnotationPoint => ({
+    ...(pressure && Number.isFinite(force)
+      ? { pressure: Math.max(0, Math.min(1, force!)) }
+      : {}),
     x: Math.min(1, Math.max(0, x / width)),
     y: Math.min(1, Math.max(0, y / height)),
   });
@@ -586,6 +697,7 @@ export function NativeScreenAnnotations({
   };
   return (
     <View
+      testID={`annotation-saved-elements-${context?.snapshot.objects.filter((object) => !object.deleted).length ?? 0}`}
       style={{ position: 'absolute', width, height }}
       pointerEvents={active ? 'auto' : 'box-none'}
     >
@@ -595,15 +707,43 @@ export function NativeScreenAnnotations({
         pointerEvents={active && editable && tool !== 'cursor' ? 'auto' : 'none'}
         onStartShouldSetResponder={() => active && editable && tool !== 'cursor'}
         onResponderGrant={(event) =>
-          start(point(event.nativeEvent.locationX, event.nativeEvent.locationY))
+          start(
+            point(
+              event.nativeEvent.locationX,
+              event.nativeEvent.locationY,
+              (event.nativeEvent as { force?: number }).force,
+            ),
+          )
         }
         onResponderMove={(event) =>
-          move(point(event.nativeEvent.locationX, event.nativeEvent.locationY))
+          move(
+            point(
+              event.nativeEvent.locationX,
+              event.nativeEvent.locationY,
+              (event.nativeEvent as { force?: number }).force,
+            ),
+          )
         }
         onResponderTerminationRequest={() => false}
         onResponderRelease={finish}
         onResponderTerminate={finish}
       >
+        {publishing && (
+          <View
+            pointerEvents="none"
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            style={{ position: 'absolute', left: -10000 }}
+          >
+            <Svg ref={publicationSvg} width={width} height={height}>
+              {context?.snapshot.objects
+                .filter((object) => !object.deleted)
+                .map((object) => (
+                  <Shape key={object.id} object={object} width={width} height={height} />
+                ))}
+            </Svg>
+          </View>
+        )}
         <Svg ref={svg} width={width} height={height}>
           {!composited &&
             context?.snapshot.objects
@@ -641,6 +781,19 @@ export function NativeScreenAnnotations({
                 />
               );
             })()}
+          {showNames && selectedObject && (
+            <SvgText
+              x={nativeAnnotationBounds(selectedObject, width, height).x}
+              y={Math.max(
+                12,
+                nativeAnnotationBounds(selectedObject, width, height).y - 8,
+              )}
+              fill={selectedObject.style.color}
+              fontSize={12}
+            >
+              {selectedObject.creatorName}
+            </SvgText>
+          )}
           {draft && <Shape object={draft} width={width} height={height} />}
           {context?.pointers
             ?.filter((pointer) => pointer.expiresAt > now)
@@ -664,14 +817,40 @@ export function NativeScreenAnnotations({
             ))}
         </Svg>
       </View>
-      {active && (
+      {(active || onToggle) && (
         <View
+          pointerEvents="box-none"
+          onLayout={(event) => {
+            positionRef.current = {
+              x: event.nativeEvent.layout.x,
+              y: event.nativeEvent.layout.y,
+            };
+          }}
           style={{
             position: 'absolute',
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: colors.card,
+            left:
+              dock === 'right'
+                ? Math.max(8, width - Math.min(800, width - 16) - 8)
+                : dock === 'floating'
+                  ? Math.min(
+                      position.x,
+                      Math.max(8, width - Math.min(800, width - 16) - 8),
+                    )
+                  : 8,
+            top:
+              dock === 'bottom'
+                ? Math.max(
+                    8,
+                    height -
+                      (active && editable && !['cursor', 'eraser'].includes(tool)
+                        ? 112
+                        : 60),
+                  )
+                : dock === 'floating'
+                  ? Math.min(position.y, Math.max(8, height - 120))
+                  : 8,
+            width: Math.max(52, Math.min(800, width - 16)),
+            zIndex: 10,
           }}
         >
           {error && (
@@ -699,257 +878,493 @@ export function NativeScreenAnnotations({
               Saving annotations…
             </Text>
           )}
-          <Text accessibilityLiveRegion="polite" style={{ color: colors.text }}>
-            {context?.snapshot.objects.filter((object) => !object.deleted).length ?? 0}{' '}
-            {(context?.snapshot.objects.filter((object) => !object.deleted).length ??
-              0) === 1
-              ? 'annotation'
-              : 'annotations'}
-          </Text>
-          <ScrollView horizontal>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Undo annotation"
-              disabled={!editable || !history.current.counts.undo}
-              onPress={() => changeHistory('undo')}
-              style={{ padding: 12 }}
-            >
-              <Text style={{ color: colors.text }}>Undo</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Redo annotation"
-              disabled={!editable || !history.current.counts.redo}
-              onPress={() => changeHistory('redo')}
-              style={{ padding: 12 }}
-            >
-              <Text style={{ color: colors.text }}>Redo</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Export annotations image"
-              disabled={pending || !!draft}
-              onPress={() => {
-                setSelected(null);
-                requestAnimationFrame(() =>
-                  requestAnimationFrame(() =>
-                    svg.current?.toDataURL((value) => {
-                      void exportClassroomImage(`data:image/png;base64,${value}`).catch(
-                        () =>
-                          Alert.alert(
-                            'Unable to export annotations',
-                            'Please try again.',
-                          ),
-                      );
-                    }),
-                  ),
-                );
+          <NativeAnnotationBar
+            expanded={active}
+            width={Math.max(52, Math.min(800, width - 16))}
+            onToggle={() => onToggle?.()}
+            dragHandlers={drag.panHandlers}
+          >
+            <NativeAnnotationToolbar
+              tool={tool}
+              editable={editable}
+              onTool={(value) => {
+                setOptionsPanel(null);
+                setTool(value);
+                if (value !== 'select') setSelected(null);
               }}
-              style={{ padding: 12 }}
+              onUndo={() => changeHistory('undo')}
+              onRedo={() => changeHistory('redo')}
+              canUndo={history.current.counts.undo > 0}
+              canRedo={history.current.counts.redo > 0}
+              onOpenMenu={() => setOptionsPanel(null)}
+              panelWidth={Math.min(280, Math.max(52, width - 32))}
+              panelSide={dock === 'bottom' ? 'top' : 'bottom'}
+              onOptions={(panel) =>
+                setOptionsPanel((current) => (current === panel ? null : panel))
+              }
+            />
+          </NativeAnnotationBar>
+          {active && editable && !['cursor', 'eraser'].includes(tool) && (
+            <DrawingStyleStrip
+              color={style.color}
+              width={style.width}
+              widths={[1, 3, 6]}
+              foreground={colors.text}
+              showWidth={tool !== 'text'}
+              onStyle={(patch) => {
+                changeStyle({
+                  ...(patch.strokeColor ? { color: patch.strokeColor } : {}),
+                  ...(patch.strokeWidth ? { width: patch.strokeWidth } : {}),
+                });
+                setOptionsPanel(null);
+              }}
+              onMore={() =>
+                setOptionsPanel((current) => (current === 'format' ? null : 'format'))
+              }
+            />
+          )}
+          {active && optionsOpen && (
+            <ScrollView
+              style={{
+                position: 'absolute',
+                [dock === 'bottom' ? 'bottom' : 'top']: 108,
+                left: 0,
+                width: Math.min(280, Math.max(52, width - 32)),
+                maxHeight: Math.max(88, height * 0.5),
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderRadius: 16,
+                backgroundColor: colors.card,
+                padding: 8,
+              }}
             >
-              <Text style={{ color: colors.text }}>Export image</Text>
-            </Pressable>
-            {selectedObject && (
-              <>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ color: colors.text }}>
+                  {optionsPanel === 'format' ? 'Format' : 'More'}
+                </Text>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Rotate selected annotation"
-                  disabled={pending}
-                  onPress={() =>
-                    changeSelected((object) => ({
-                      ...object,
-                      rotation: (object.rotation + 15) % 360,
-                    }))
-                  }
-                  style={{ padding: 12 }}
+                  accessibilityLabel="Close annotation options"
+                  onPress={() => setOptionsPanel(null)}
                 >
-                  <Text style={{ color: colors.text }}>Rotate</Text>
+                  <X size={20} color={colors.text} />
                 </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Enlarge selected annotation"
-                  disabled={pending}
-                  onPress={() =>
-                    changeSelected((object) => scaleNativeAnnotation(object, 1.1))
-                  }
-                  style={{ padding: 12 }}
-                >
-                  <Text style={{ color: colors.text }}>Larger</Text>
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Shrink selected annotation"
-                  disabled={pending}
-                  onPress={() =>
-                    changeSelected((object) => scaleNativeAnnotation(object, 0.9))
-                  }
-                  style={{ padding: 12 }}
-                >
-                  <Text style={{ color: colors.text }}>Smaller</Text>
-                </Pressable>
-              </>
-            )}
-            {Object.entries({
-              Black: '#000000',
-              Red: '#dc2626',
-              Blue: '#2563eb',
-              Green: '#008000',
-              Purple: '#9333ea',
-            }).map(([name, color]) => (
-              <Pressable
-                key={name}
-                accessibilityRole="button"
-                accessibilityLabel={`${name} annotation color`}
-                disabled={pending}
-                accessibilityState={{ selected: style.color === color }}
-                onPress={() => changeStyle({ color })}
-                style={{ padding: 12 }}
-              >
-                <Text style={{ color }}>{name}</Text>
-              </Pressable>
-            ))}
-            {[2, 4, 8].map((width) => (
-              <Pressable
-                key={width}
-                accessibilityRole="button"
-                accessibilityLabel={`Annotation stroke width ${width}`}
-                disabled={pending}
-                onPress={() => changeStyle({ width })}
-                style={{ padding: 12 }}
-              >
-                <Text style={{ color: colors.text }}>{width}px</Text>
-              </Pressable>
-            ))}
-            {(tool === 'text' || selectedObject?.type === 'text') && (
-              <>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Bold annotation text"
-                  disabled={pending}
-                  onPress={() => changeStyle({ bold: !style.bold })}
-                  style={{ padding: 12 }}
-                >
-                  <Text style={{ color: colors.text }}>Bold</Text>
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Italic annotation text"
-                  disabled={pending}
-                  onPress={() => changeStyle({ italic: !style.italic })}
-                  style={{ padding: 12 }}
-                >
-                  <Text style={{ color: colors.text }}>Italic</Text>
-                </Pressable>
-                {[16, 24, 32, 48].map((fontSize) => (
+              </View>
+              <View style={{ gap: 8 }}>
+                {optionsPanel === 'more' && (
+                  <>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Export annotations image"
+                      disabled={pending || !!draft}
+                      onPress={() => {
+                        setSelected(null);
+                        requestAnimationFrame(() =>
+                          requestAnimationFrame(() =>
+                            svg.current?.toDataURL((value) => {
+                              void exportClassroomImage(
+                                `data:image/png;base64,${value}`,
+                              ).catch(() =>
+                                Alert.alert(
+                                  'Unable to export annotations',
+                                  'Please try again.',
+                                ),
+                              );
+                            }),
+                          ),
+                        );
+                      }}
+                      style={{ padding: 12 }}
+                    >
+                      <Text style={{ color: colors.text }}>Export image</Text>
+                    </Pressable>
+                    {selectedObject && (
+                      <>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel="Duplicate selected"
+                          disabled={!editable}
+                          onPress={() => {
+                            if (
+                              !context ||
+                              (context.actor.role !== 'educator' &&
+                                selectedObject.creatorId !== context.actor.userId)
+                            )
+                              return;
+                            const object = moveAnnotation(selectedObject, 0.02, 0.02);
+                            const id = generateClientMessageId();
+                            setSelected(id);
+                            save({
+                              eventId: '',
+                              kind: 'put',
+                              baseVersion: 0,
+                              object: {
+                                ...object,
+                                id,
+                                creatorId: context.actor.userId,
+                                creatorName: context.actor.name,
+                                version: 1,
+                                updatedAt: Date.now(),
+                              },
+                            });
+                          }}
+                          style={{ padding: 12 }}
+                        >
+                          <Text style={{ color: colors.text }}>Duplicate selected</Text>
+                        </Pressable>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel="Delete selected"
+                          disabled={!editable}
+                          onPress={() => {
+                            if (
+                              !context ||
+                              (context.actor.role !== 'educator' &&
+                                selectedObject.creatorId !== context.actor.userId)
+                            )
+                              return;
+                            save({
+                              eventId: '',
+                              kind: 'delete',
+                              id: selectedObject.id,
+                              baseVersion: selectedObject.version,
+                            });
+                            setSelected(null);
+                          }}
+                          style={{ padding: 12 }}
+                        >
+                          <Text style={{ color: colors.text }}>Delete selected</Text>
+                        </Pressable>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel="Rotate selected annotation"
+                          disabled={pending}
+                          onPress={() =>
+                            changeSelected((object) => ({
+                              ...object,
+                              rotation: (object.rotation + 15) % 360,
+                            }))
+                          }
+                          style={{ padding: 12 }}
+                        >
+                          <Text style={{ color: colors.text }}>Rotate</Text>
+                        </Pressable>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel="Enlarge selected annotation"
+                          disabled={pending}
+                          onPress={() =>
+                            changeSelected((object) => scaleNativeAnnotation(object, 1.1))
+                          }
+                          style={{ padding: 12 }}
+                        >
+                          <Text style={{ color: colors.text }}>Larger</Text>
+                        </Pressable>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel="Shrink selected annotation"
+                          disabled={pending}
+                          onPress={() =>
+                            changeSelected((object) => scaleNativeAnnotation(object, 0.9))
+                          }
+                          style={{ padding: 12 }}
+                        >
+                          <Text style={{ color: colors.text }}>Smaller</Text>
+                        </Pressable>
+                      </>
+                    )}
+                  </>
+                )}
+                {optionsPanel === 'format' && (
+                  <>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+                      {Object.entries({
+                        Black: '#000000',
+                        Red: '#ef4444',
+                        Orange: '#f97316',
+                        Yellow: '#facc15',
+                        Green: '#22c55e',
+                        Blue: '#3b82f6',
+                        Purple: '#a855f7',
+                        White: '#ffffff',
+                      }).map(([name, color]) => (
+                        <Pressable
+                          key={name}
+                          accessibilityRole="button"
+                          accessibilityLabel={`${name} annotation color`}
+                          disabled={pending}
+                          accessibilityState={{ selected: style.color === color }}
+                          onPress={() => (
+                            setStyle((previous) => ({ ...previous, color })),
+                            setOptionsPanel(null)
+                          )}
+                          style={{
+                            width: 44,
+                            height: 44,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <View
+                            style={{
+                              width: 24,
+                              height: 24,
+                              borderRadius: 4,
+                              backgroundColor: color,
+                              borderWidth: style.color === color ? 2 : 1,
+                              borderColor: colors.text,
+                            }}
+                          />
+                        </Pressable>
+                      ))}
+                    </View>
+                    {[1, 3, 6].map((width) => (
+                      <Pressable
+                        key={width}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Annotation stroke width ${width}`}
+                        disabled={pending}
+                        onPress={() => setStyle((previous) => ({ ...previous, width }))}
+                        style={{ padding: 12 }}
+                      >
+                        <Text style={{ color: colors.text }}>{width}px</Text>
+                      </Pressable>
+                    ))}
+                    {active && (tool === 'text' || selectedObject?.type === 'text') && (
+                      <>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel="Bold annotation text"
+                          disabled={pending}
+                          onPress={() =>
+                            setStyle((previous) => ({
+                              ...previous,
+                              bold: !previous.bold,
+                            }))
+                          }
+                          style={{ padding: 12 }}
+                        >
+                          <Text style={{ color: colors.text }}>Bold</Text>
+                        </Pressable>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel="Italic annotation text"
+                          disabled={pending}
+                          onPress={() =>
+                            setStyle((previous) => ({
+                              ...previous,
+                              italic: !previous.italic,
+                            }))
+                          }
+                          style={{ padding: 12 }}
+                        >
+                          <Text style={{ color: colors.text }}>Italic</Text>
+                        </Pressable>
+                        {[16, 24, 32, 48].map((fontSize) => (
+                          <Pressable
+                            key={fontSize}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Annotation text size ${fontSize}`}
+                            disabled={pending}
+                            onPress={() =>
+                              setStyle((previous) => ({ ...previous, fontSize }))
+                            }
+                            style={{ padding: 12 }}
+                          >
+                            <Text style={{ color: colors.text }}>{fontSize}pt</Text>
+                          </Pressable>
+                        ))}
+                      </>
+                    )}
+                    <Text style={{ color: colors.text }}>Custom color</Text>
+                    <TextInput
+                      accessibilityLabel="Annotation color"
+                      value={customColor}
+                      onChangeText={setCustomColor}
+                      onEndEditing={() => {
+                        if (/^#[0-9a-f]{6}$/i.test(customColor))
+                          setStyle((previous) => ({ ...previous, color: customColor }));
+                        else setCustomColor(style.color);
+                      }}
+                      style={{ color: colors.text, padding: 12 }}
+                    />
+                    <Text style={{ color: colors.text }}>Opacity (%)</Text>
+                    <TextInput
+                      accessibilityLabel="Annotation opacity"
+                      keyboardType="numeric"
+                      value={String(Math.round(style.opacity * 100))}
+                      onChangeText={(value) => {
+                        const opacity = Number(value);
+                        if (Number.isFinite(opacity))
+                          setStyle((previous) => ({
+                            ...previous,
+                            opacity: Math.max(0, Math.min(100, opacity)) / 100,
+                          }));
+                      }}
+                      style={{ color: colors.text, padding: 12 }}
+                    />
+                    <Text style={{ color: colors.text }}>Stroke width</Text>
+                    <TextInput
+                      accessibilityLabel="Stroke width"
+                      keyboardType="numeric"
+                      value={String(style.width)}
+                      onChangeText={(value) => {
+                        const width = Number(value);
+                        if (Number.isFinite(width))
+                          setStyle((previous) => ({
+                            ...previous,
+                            width: Math.max(1, Math.min(20, width)),
+                          }));
+                      }}
+                      style={{ color: colors.text, padding: 12 }}
+                    />
+                    <Text style={{ color: colors.text }}>Text size</Text>
+                    <TextInput
+                      accessibilityLabel="Text size"
+                      keyboardType="numeric"
+                      value={String(style.fontSize)}
+                      onChangeText={(value) => {
+                        const fontSize = Number(value);
+                        if (Number.isFinite(fontSize))
+                          setStyle((previous) => ({
+                            ...previous,
+                            fontSize: Math.max(8, Math.min(96, fontSize)),
+                          }));
+                      }}
+                      style={{ color: colors.text, padding: 12 }}
+                    />
+                    <Pressable
+                      accessibilityRole="checkbox"
+                      accessibilityLabel="Pressure sensitive pen"
+                      accessibilityState={{ checked: pressure }}
+                      onPress={() => setPressure((value) => !value)}
+                      style={{ padding: 12 }}
+                    >
+                      <Text style={{ color: colors.text }}>Pressure sensitive pen</Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Apply to selected"
+                      disabled={!editable || !selectedObject}
+                      onPress={() => {
+                        changeSelected((object) => ({ ...object, style: { ...style } }));
+                        setOptionsPanel(null);
+                      }}
+                      style={{ padding: 12 }}
+                    >
+                      <Text style={{ color: colors.text }}>Apply to selected</Text>
+                    </Pressable>
+                  </>
+                )}
+              </View>
+              {optionsPanel === 'more' && (
+                <View style={{ gap: 8 }}>
                   <Pressable
-                    key={fontSize}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Annotation text size ${fontSize}`}
-                    disabled={pending}
-                    onPress={() => changeStyle({ fontSize })}
+                    accessibilityRole="checkbox"
+                    accessibilityLabel="Show annotator names"
+                    accessibilityState={{ checked: showNames }}
+                    onPress={() => setShowNames((value) => !value)}
                     style={{ padding: 12 }}
                   >
-                    <Text style={{ color: colors.text }}>{fontSize}pt</Text>
+                    <Text style={{ color: colors.text }}>Show annotator names</Text>
                   </Pressable>
-                ))}
-              </>
-            )}
-          </ScrollView>
-          <ScrollView horizontal>
-            {tools.map((value) => (
-              <Pressable
-                key={value}
-                accessibilityRole="button"
-                accessibilityState={{ selected: value === tool }}
-                onPress={() => {
-                  setTool(value);
-                  if (value !== 'select') setSelected(null);
-                }}
-                style={{ padding: 12, minHeight: 44 }}
-              >
-                <Text style={{ color: colors.text }}>
-                  {value
-                    .replace(/([A-Z])/g, ' $1')
-                    .replace(/^./, (letter) => letter.toUpperCase())}
-                </Text>
-              </Pressable>
-            ))}
-            {context?.actor.role === 'educator' && (
-              <Pressable
-                accessibilityRole="button"
-                onPress={() =>
-                  save({
-                    eventId: '',
-                    kind: 'permissions',
-                    enabled: !context.snapshot.studentsEnabled,
-                  })
-                }
-                style={{ padding: 12 }}
-              >
-                <Text style={{ color: colors.text }}>
-                  {context.snapshot.studentsEnabled
-                    ? 'Disable student annotations'
-                    : 'Allow student annotations'}
-                </Text>
-              </Pressable>
-            )}
-            <Pressable
-              accessibilityRole="button"
-              disabled={!editable}
-              onPress={() =>
-                Alert.alert(
-                  'Clear annotations?',
-                  'Clear your annotations from this screen share.',
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    {
-                      text: 'Clear mine',
-                      style: 'destructive',
-                      onPress: () => save({ eventId: '', kind: 'clear', scope: 'mine' }),
-                    },
-                  ],
-                )
-              }
-              style={{ padding: 12 }}
-            >
-              <Text style={{ color: colors.text }}>Clear mine</Text>
-            </Pressable>
-            {context?.actor.role === 'educator' &&
-              (['students', 'all'] as const).map((scope) => (
-                <Pressable
-                  key={scope}
-                  accessibilityRole="button"
-                  disabled={!editable}
-                  accessibilityLabel={
-                    scope === 'all'
-                      ? 'Clear all annotations'
-                      : 'Clear student annotations'
-                  }
-                  onPress={() =>
-                    Alert.alert(
-                      'Clear annotations?',
-                      scope === 'all'
-                        ? 'Clear every annotation on this shared screen.'
-                        : 'Clear student annotations on this shared screen.',
-                      [
-                        { text: 'Cancel', style: 'cancel' },
-                        {
-                          text: 'Clear',
-                          style: 'destructive',
-                          onPress: () => save({ eventId: '', kind: 'clear', scope }),
-                        },
-                      ],
-                    )
-                  }
-                  style={{ padding: 12 }}
-                >
-                  <Text style={{ color: colors.text }}>
-                    {scope === 'all' ? 'Clear all' : 'Clear students'}
-                  </Text>
-                </Pressable>
-              ))}
-          </ScrollView>
-          {(tool === 'text' || selectedObject?.type === 'text') && (
+                  <Text style={{ color: colors.text }}>Toolbar position</Text>
+                  {['top', 'bottom', 'left', 'right', 'floating'].map((value) => (
+                    <Pressable
+                      key={value}
+                      accessibilityRole="radio"
+                      accessibilityLabel={`Toolbar position ${value}`}
+                      accessibilityState={{ checked: dock === value }}
+                      onPress={() => {
+                        persistPosition(value);
+                        setOptionsPanel(null);
+                      }}
+                      style={{ padding: 12 }}
+                    >
+                      <Text style={{ color: colors.text }}>{value}</Text>
+                    </Pressable>
+                  ))}
+                  {context?.actor.role === 'educator' && (
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() =>
+                        save({
+                          eventId: '',
+                          kind: 'permissions',
+                          enabled: !context.snapshot.studentsEnabled,
+                        })
+                      }
+                      style={{ padding: 12 }}
+                    >
+                      <Text style={{ color: colors.text }}>
+                        {context.snapshot.studentsEnabled
+                          ? 'Disable student annotations'
+                          : 'Allow student annotations'}
+                      </Text>
+                    </Pressable>
+                  )}
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={!editable}
+                    onPress={() =>
+                      Alert.alert(
+                        'Clear annotations?',
+                        'Clear your annotations from this screen share.',
+                        [
+                          { text: 'Cancel', style: 'cancel' },
+                          {
+                            text: 'Clear mine',
+                            style: 'destructive',
+                            onPress: () =>
+                              save({ eventId: '', kind: 'clear', scope: 'mine' }),
+                          },
+                        ],
+                      )
+                    }
+                    style={{ padding: 12 }}
+                  >
+                    <Text style={{ color: colors.text }}>Clear mine</Text>
+                  </Pressable>
+                  {context?.actor.role === 'educator' &&
+                    (['students', 'all'] as const).map((scope) => (
+                      <Pressable
+                        key={scope}
+                        accessibilityRole="button"
+                        disabled={!editable}
+                        accessibilityLabel={
+                          scope === 'all'
+                            ? 'Clear all annotations'
+                            : 'Clear student annotations'
+                        }
+                        onPress={() =>
+                          Alert.alert(
+                            'Clear annotations?',
+                            scope === 'all'
+                              ? 'Clear every annotation on this shared screen.'
+                              : 'Clear student annotations on this shared screen.',
+                            [
+                              { text: 'Cancel', style: 'cancel' },
+                              {
+                                text: 'Clear',
+                                style: 'destructive',
+                                onPress: () =>
+                                  save({ eventId: '', kind: 'clear', scope }),
+                              },
+                            ],
+                          )
+                        }
+                        style={{ padding: 12 }}
+                      >
+                        <Text style={{ color: colors.text }}>
+                          {scope === 'all' ? 'Clear all' : 'Clear students'}
+                        </Text>
+                      </Pressable>
+                    ))}
+                </View>
+              )}
+            </ScrollView>
+          )}
+          {active && (tool === 'text' || selectedObject?.type === 'text') && (
             <>
               <TextInput
                 accessibilityLabel="Annotation text"

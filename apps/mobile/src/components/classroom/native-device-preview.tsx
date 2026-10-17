@@ -90,6 +90,7 @@ export function NativeDevicePreview(props: Props) {
             padding: 12,
             borderRadius: 24,
             alignItems: 'center',
+            justifyContent: 'center',
             backgroundColor: colors.action,
             opacity: props.joining ? 0.5 : 1,
           }}

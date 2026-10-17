@@ -1,3 +1,4 @@
+import { useReducedMotion } from './use-reduced-motion';
 import React from 'react';
 import { Modal, Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import {
@@ -30,8 +31,14 @@ export function NativeClassroomSettings({
   meeting?: React.ReactNode;
 }) {
   const { colors } = useTheme();
+  const reducedMotion = useReducedMotion();
   return (
-    <Modal visible={open} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal
+      visible={open}
+      transparent
+      animationType={reducedMotion ? 'none' : 'fade'}
+      onRequestClose={onClose}
+    >
       <SafeAreaProvider>
         <SafeAreaView
           style={{

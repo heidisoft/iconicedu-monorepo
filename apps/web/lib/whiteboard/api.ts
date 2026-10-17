@@ -1,4 +1,6 @@
 import type {
+  WhiteboardViewportVM,
+  WhiteboardViewportPresenceVM,
   WhiteboardLaserPresenceVM,
   WhiteboardLaserSampleVM,
   WhiteboardOperationVM,
@@ -6,6 +8,8 @@ import type {
 } from '@iconicedu/shared-types';
 import { createPublicApiClient } from '@iconicedu/web/lib/api/http-client';
 export interface WhiteboardRepository {
+  viewports?(): Promise<WhiteboardViewportPresenceVM[]>;
+  publishViewport?(viewport: WhiteboardViewportVM): Promise<unknown>;
   lasers?(): Promise<WhiteboardLaserPresenceVM[]>;
   publishLaser?(samples: WhiteboardLaserSampleVM[]): Promise<unknown>;
   load(): Promise<WhiteboardSnapshotVM>;
@@ -16,6 +20,9 @@ export function createWhiteboardRepository(token: string): WhiteboardRepository 
   const client = createPublicApiClient(token);
   let cached: WhiteboardSnapshotVM | null = null;
   return {
+    viewports: () =>
+      client.get<WhiteboardViewportPresenceVM[]>('/whiteboards/current/viewport'),
+    publishViewport: (viewport) => client.post('/whiteboards/current/viewport', viewport),
     lasers: () => client.get<WhiteboardLaserPresenceVM[]>('/whiteboards/current/laser'),
     publishLaser: (samples) => client.post('/whiteboards/current/laser', samples),
     async load() {

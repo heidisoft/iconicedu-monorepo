@@ -1,3 +1,6 @@
+import { NativeScreenAnnotations } from './native-screen-annotations';
+import { useNativeRecordingComposition } from './use-native-recording-composition';
+import { NativeInvitationSheet } from './native-invitation-sheet';
 import React, {
   useCallback,
   useEffect,
@@ -15,7 +18,6 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  Share,
   Text,
   View,
   useWindowDimensions,
@@ -61,6 +63,25 @@ import {
   Maximize2,
   PictureInPicture2,
   Users,
+  UserCheck,
+  UserX,
+  ShieldCheck,
+  ShieldOff,
+  Presentation,
+  MonitorUp,
+  MonitorX,
+  MessageCircle,
+  Settings,
+  Captions,
+  Share as ShareIcon,
+  Circle,
+  Pause,
+  Play,
+  Square,
+  PhoneOff,
+  ImagePlus,
+  LogIn,
+  Check,
 } from 'lucide-react-native';
 import {
   NativeClassroomSettings,
@@ -134,11 +155,15 @@ export function NativeClassroom({
   const [controller] = useState(
     () => new NativeMeetingController(adapter, initialCredentials),
   );
+  const [invitationOpen, setInvitationOpen] = useState(false);
   const state = useSyncExternalStore(controller.subscribe, controller.snapshot);
   const { colors } = useTheme();
   const { width, height } = useWindowDimensions();
   const [cameraPermission, requestCamera, getCamera] = useCameraPermissions();
   const [micPermission, requestMic, getMic] = useMicrophonePermissions();
+  useNativeRecordingComposition(adapter, controller, state);
+  const boardPublisher = useRef<(() => Promise<void>) | null>(null);
+  const boardPublishing = useRef(false);
   const [panel, setPanel] = useState<
     'none' | 'audio' | 'participants' | 'chat' | 'whiteboard'
   >('none');
@@ -189,16 +214,25 @@ export function NativeClassroom({
       subscription.remove();
     };
   }, [state.phase, credentials.whiteboard?.provider, zoom]);
-  const onBoardPresentation = useCallback((active: boolean) => {
-    setBoardActive(active);
-    setBoardVisible(active);
-    if (!active) setBoardExpanded(false);
-  }, []);
+  const onBoardPresentation = useCallback(
+    (active: boolean) => {
+      if (!active && boardPublishing.current) {
+        boardPublishing.current = false;
+        void adapter
+          .share(false)
+          .catch(() => setError('Unable to stop whiteboard publishing. Please retry.'));
+      }
+      setBoardActive(active);
+      setBoardVisible(active);
+      if (!active) setBoardExpanded(false);
+    },
+    [adapter],
+  );
   const previousShares = useRef(new Set<string>());
   useEffect(() => {
     const started = state.sharingUserIds.some((id) => !previousShares.current.has(id));
     previousShares.current = new Set(state.sharingUserIds);
-    if (started) {
+    if (started && !boardPublishing.current) {
       // A new SDK share replaces the local board view without stopping the class board.
       setBoardVisible(false);
       setBoardExpanded(false);
@@ -293,24 +327,53 @@ export function NativeClassroom({
       );
     }
   };
-  const changeRecording = useCallback(async (action: () => Promise<unknown>) => {
-    if (recordingBusy.current) return;
-    recordingBusy.current = true;
-    setRecordingPending(true);
-    setError(null);
-    try {
-      await action();
-    } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : 'Unable to update recording. Please retry.',
-      );
-    } finally {
-      recordingBusy.current = false;
-      setRecordingPending(false);
-    }
-  }, []);
+  const changeRecording = useCallback(
+    async (action: () => Promise<unknown>, publishContent = true) => {
+      if (recordingBusy.current) return;
+      recordingBusy.current = true;
+      setRecordingPending(true);
+      setError(null);
+      try {
+        if (
+          publishContent &&
+          boardVisible &&
+          !boardPublishing.current &&
+          boardPublisher.current
+        ) {
+          boardPublishing.current = true;
+          try {
+            await boardPublisher.current();
+          } catch (cause) {
+            boardPublishing.current = false;
+            throw cause;
+          }
+          if (state.selfId) controller.composition(state.selfId, true);
+        }
+        await action();
+      } catch (cause) {
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : 'Unable to update recording. Please retry.',
+        );
+      } finally {
+        recordingBusy.current = false;
+        setRecordingPending(false);
+      }
+    },
+    [boardVisible, controller, state.selfId],
+  );
+  useEffect(() => {
+    if (
+      state.recording &&
+      !state.recordingPaused &&
+      boardVisible &&
+      !boardPublishing.current &&
+      adapter.startWhiteboardShare &&
+      boardPublisher.current
+    )
+      void changeRecording(async () => {});
+  }, [adapter, boardVisible, state.recording, state.recordingPaused, changeRecording]);
   const moderator = controller.self?.host || controller.self?.cohost;
   const selfSharing = !!state.selfId && state.sharingUserIds.includes(state.selfId);
   const participantCount = state.participants.length;
@@ -593,24 +656,83 @@ export function NativeClassroom({
       .quality(sessionId, 'network_quality', state.network, credentials.displayName)
       .catch(() => {});
   }, [state.network, sessionId, credentials.displayName, meetingApi]);
-  const button = (label: string, action: () => void, disabled = false) => (
-    <Pressable
-      key={label}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      disabled={disabled}
-      onPress={action}
-      style={{
-        minHeight: 44,
-        padding: 12,
-        borderRadius: 12,
-        backgroundColor: colors.actionSubtle,
-        opacity: disabled ? 0.5 : 1,
-      }}
-    >
-      <Text style={{ color: colors.text }}>{label}</Text>
-    </Pressable>
-  );
+  const button = (label: string, action: () => void, disabled = false) => {
+    const Icon = label.startsWith('Admit')
+      ? UserCheck
+      : label.startsWith('Decline')
+        ? UserX
+        : label.startsWith('Remove co-host')
+          ? ShieldOff
+          : /host|participant annotations/.test(label)
+            ? ShieldCheck
+            : label.startsWith('Mute')
+              ? Mic
+              : label.startsWith('Unmute')
+                ? MicOff
+                : /video|camera/.test(label)
+                  ? Video
+                  : /Settings/.test(label)
+                    ? Settings
+                    : /captions/.test(label)
+                      ? Captions
+                      : /whiteboard/.test(label.toLowerCase())
+                        ? Presentation
+                        : label.startsWith('Participants')
+                          ? Users
+                          : label.startsWith('Messages')
+                            ? MessageCircle
+                            : label === 'Invite'
+                              ? ShareIcon
+                              : label.startsWith('Stop sharing')
+                                ? MonitorX
+                                : label === 'Share screen'
+                                  ? MonitorUp
+                                  : /floating/.test(label)
+                                    ? PictureInPicture2
+                                    : label.startsWith('Expand')
+                                      ? Maximize2
+                                      : label === 'Pause recording'
+                                        ? Pause
+                                        : label === 'Resume recording'
+                                          ? Play
+                                          : label === 'Stop recording'
+                                            ? Square
+                                            : /recording/.test(label) &&
+                                                !label.startsWith('Allow')
+                                              ? Circle
+                                              : /consent|Allow recording/.test(label)
+                                                ? Check
+                                                : /leave|Leave|End class/.test(label)
+                                                  ? PhoneOff
+                                                  : /background/.test(label)
+                                                    ? ImagePlus
+                                                    : /Rejoin/.test(label)
+                                                      ? LogIn
+                                                      : Users;
+    return (
+      <Pressable
+        key={label}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        disabled={disabled}
+        accessibilityState={{ disabled }}
+        onPress={action}
+        style={{
+          minHeight: 44,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 10,
+          padding: 12,
+          borderRadius: 12,
+          backgroundColor: colors.actionSubtle,
+          opacity: disabled ? 0.5 : 1,
+        }}
+      >
+        <Icon size={20} color={colors.text} />
+        <Text style={{ color: colors.text, flexShrink: 1 }}>{label}</Text>
+      </Pressable>
+    );
+  };
   const join = () =>
     run(async () => {
       if (state.camera && !(cameraPermission?.granted || (await requestCamera()).granted))
@@ -656,6 +778,24 @@ export function NativeClassroom({
   const preview = state.phase === 'preview' || state.phase === 'joining';
   const whiteboardStage = (
     <>
+      {selfSharing && !boardPublishing.current && state.selfId && (
+        <View
+          pointerEvents="none"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={{ position: 'absolute', left: -10000, width, height }}
+        >
+          <NativeScreenAnnotations
+            sessionId={sessionId}
+            shareKey={state.selfId}
+            token={credentials.annotationToken}
+            width={width}
+            height={height}
+            active={false}
+            publishing
+          />
+        </View>
+      )}
       {!preview &&
         state.phase !== 'ended' &&
         controller.settings.whiteboard.enabled &&
@@ -667,13 +807,12 @@ export function NativeClassroom({
               display: boardVisible ? 'flex' : 'none',
             }}
           >
-            {state.recording && state.sharingUserId !== state.selfId && (
-              <Text style={{ color: colors.text }}>
-                Share your screen to include this whiteboard in the recording.
-              </Text>
-            )}
             <NativeWhiteboard
               token={credentials.whiteboard.token}
+              onPublisher={(publish) => {
+                boardPublisher.current = publish;
+              }}
+              publishView={adapter.startWhiteboardShare}
               repository={whiteboardRepository}
               onPresentation={onBoardPresentation}
               onPending={setBoardPending}
@@ -683,7 +822,13 @@ export function NativeClassroom({
               closeLabel={boardExpanded ? 'Collapse whiteboard' : 'Return to video'}
               onClose={() => {
                 if (boardExpanded) setBoardExpanded(false);
-                else setBoardVisible(false);
+                else {
+                  if (boardPublishing.current) {
+                    boardPublishing.current = false;
+                    void run(() => controller.share(false));
+                  }
+                  setBoardVisible(false);
+                }
               }}
               controls={
                 boardExpanded ? (
@@ -1108,6 +1253,13 @@ export function NativeClassroom({
           </View>
         </ScrollView>
       </NativeMeetingSheet>
+      <NativeInvitationSheet
+        open={inClass && invitationOpen && controller.settings.invite.enabled}
+        onClose={() => setInvitationOpen(false)}
+        title={title ?? 'Live class'}
+        link={credentials.sharePath ?? ''}
+        passcode={credentials.meetingPasscode}
+      />
       <NativeChatSheet
         open={inClass && panel === 'chat'}
         messages={state.messages}
@@ -1164,7 +1316,9 @@ export function NativeClassroom({
                 token={credentials.annotationToken}
                 height={contentHeight}
                 annotating={annotating}
+                onToggleAnnotation={() => setAnnotating((value) => !value)}
                 composited={state.composited.includes(focused.id)}
+                publishAnnotations={false}
                 onContext={rememberAnnotations}
               />
             )
@@ -1338,6 +1492,7 @@ export function NativeClassroom({
                           token={credentials.annotationToken}
                           height={stageHeight}
                           annotating={annotating}
+                          onToggleAnnotation={() => setAnnotating((value) => !value)}
                           composited={state.composited.includes(state.sharingUserId)}
                         />
                       ) : !otherSharing ? (
@@ -1482,11 +1637,6 @@ export function NativeClassroom({
                   },
                   !pip.ready,
                 )}
-              {state.sharingUserId &&
-                state.sharingUserId !== state.selfId &&
-                button(annotating ? 'Stop annotating' : 'Annotate shared screen', () =>
-                  setAnnotating((previous) => !previous),
-                )}
               {moderator &&
                 shareContext &&
                 button(
@@ -1510,6 +1660,7 @@ export function NativeClassroom({
                   },
                 )}
               {button(selfSharing ? 'Stop sharing screen' : 'Share screen', () => {
+                boardPublishing.current = false;
                 void run(() => controller.share(!selfSharing));
               })}
               {controller.settings.whiteboard.enabled &&
@@ -1561,11 +1712,7 @@ export function NativeClassroom({
                 )}
               {controller.settings.invite.enabled &&
                 credentials.sharePath &&
-                button('Invite', () => {
-                  void run(() =>
-                    Share.share({ message: credentials.sharePath ?? '' }).then(() => {}),
-                  );
-                })}
+                button('Invite', () => setInvitationOpen(true))}
               {moderator &&
                 controller.settings.recording.enabled &&
                 button(
@@ -1583,7 +1730,7 @@ export function NativeClassroom({
                       await controller.recording(
                         state.recordingPaused || !state.recording,
                       );
-                    });
+                    }, state.recordingPaused || !state.recording);
                   },
                   recordingPending ||
                     (state.recording &&
@@ -1599,7 +1746,7 @@ export function NativeClassroom({
                 button(
                   'Pause recording',
                   () => {
-                    void changeRecording(() => controller.pauseRecording());
+                    void changeRecording(() => controller.pauseRecording(), false);
                   },
                   recordingPending,
                 )}

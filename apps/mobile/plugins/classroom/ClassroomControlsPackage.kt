@@ -12,9 +12,68 @@ import com.facebook.react.ReactPackage
 import com.facebook.react.bridge.*
 import com.facebook.react.uimanager.ViewManager
 import us.zoom.sdk.ZoomVideoSDK
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Rect
+import android.os.SystemClock
+import android.util.Base64
+import com.facebook.react.uimanager.UIManagerHelper
+
+/** Shared by the projection service and React bridge; no credentials cross this boundary. */
+object ClassroomComposition {
+  @Volatile var overlay: Bitmap? = null
+  @Volatile var overlayAt = 0L
+  @Volatile var frameAt = 0L
+  @Volatile var publishingView = false
+  fun reset() { overlay = null; overlayAt = 0; frameAt = 0; publishingView = false }
+  fun compose(frame: Bitmap) {
+    val image = overlay ?: return
+    if (SystemClock.elapsedRealtime() - overlayAt > 5000) { ZoomVideoSDK.getInstance().shareHelper.stopShare(); reset(); return }
+    val output = frame.copy(Bitmap.Config.ARGB_8888, true) ?: return
+    Canvas(output).drawBitmap(image, null, Rect(0, 0, output.width, output.height), null)
+    if (ZoomVideoSDK.getInstance().shareHelper.applyPreprocessingOverlayImage(output) == 0) frameAt = SystemClock.elapsedRealtime()
+  }
+}
 
 class ClassroomControlsModule(private val context: ReactApplicationContext) : ReactContextBaseJavaModule(context) {
   override fun getName() = "ClassroomControls"
+  @ReactMethod fun setShareOverlay(dataUrl: String, promise: Promise) {
+    try {
+      if (dataUrl.isEmpty()) { ClassroomComposition.reset(); promise.resolve(true); return }
+      val prefix = "data:image/png;base64,"
+      require(dataUrl.startsWith(prefix) && dataUrl.length <= 28000000)
+      val bytes = Base64.decode(dataUrl.substring(prefix.length), Base64.DEFAULT)
+      val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+      BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+      require(bounds.outWidth in 1..4096 && bounds.outHeight in 1..4096)
+      ClassroomComposition.overlay = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: error("Invalid image")
+      ClassroomComposition.overlayAt = SystemClock.elapsedRealtime()
+      promise.resolve(true)
+    } catch (error: Exception) { promise.reject("composition", "Unable to publish annotations", error) }
+  }
+  @ReactMethod fun startWhiteboardShare(tag: Int, promise: Promise) {
+    UiThreadUtil.runOnUiThread {
+      try {
+        val view = UIManagerHelper.getUIManagerForReactTag(context, tag)?.resolveView(tag) ?: error("Whiteboard is not ready")
+        val share = ZoomVideoSDK.getInstance().shareHelper
+        check(!share.isSharingOut)
+        val result = share.startShareView(view)
+        ClassroomComposition.publishingView = result == 0
+        if (result == 0) promise.resolve(true) else promise.reject("composition", "Unable to publish the whiteboard")
+      } catch (error: Exception) { promise.reject("composition", "Wait for the whiteboard to load, then retry", error) }
+    }
+  }
+  @ReactMethod fun compositionStatus(promise: Promise) {
+    val share = ZoomVideoSDK.getInstance().shareHelper
+    val now = SystemClock.elapsedRealtime()
+    promise.resolve(share.isSharingOut && (ClassroomComposition.publishingView || (ClassroomComposition.frameAt > 0 && now - ClassroomComposition.frameAt < 3000 && now - ClassroomComposition.overlayAt < 5000)))
+  }
+  @ReactMethod fun copyText(text: String, promise: Promise) {
+    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Classroom invitation", text))
+    promise.resolve(true)
+  }
   @ReactMethod fun startMeetingService(promise: Promise) {
     try { context.startForegroundService(Intent(context, ClassroomAudioService::class.java)); promise.resolve(true) }
     catch (error: Exception) { promise.reject("audio_service", "Keep the app open to continue classroom audio", error) }
@@ -82,6 +141,7 @@ class ClassroomControlsModule(private val context: ReactApplicationContext) : Re
     }
   }
   @ReactMethod fun stopShareService(promise: Promise) {
+    ClassroomComposition.reset()
     context.stopService(Intent(context, ClassroomShareService::class.java))
     promise.resolve(true)
   }

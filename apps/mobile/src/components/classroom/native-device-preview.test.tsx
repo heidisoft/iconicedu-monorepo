@@ -55,3 +55,12 @@ it('prevents duplicate join and media changes while joining', () => {
   expect(props.onJoin).not.toHaveBeenCalled();
   expect(props.onCamera).not.toHaveBeenCalled();
 });
+it.each([false, true])('centers the join label while joining is %s', (joining) => {
+  const { screen } = setup(joining);
+  expect(
+    screen.getByRole('button', { name: joining ? 'Joining…' : 'Join now' }),
+  ).toHaveStyle({
+    alignItems: 'center',
+    justifyContent: 'center',
+  });
+});

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { AnnotationContext, AnnotationCommit } from '@iconicedu/shared-types';
@@ -8,6 +8,7 @@ import { NativeScreenAnnotations } from './native-screen-annotations';
 
 /** Development-only native gesture fixture; live authorization remains in apps/api. */
 export default function AnnotationFixture() {
+  const [active, setActive] = useState(true);
   const { width, height } = useWindowDimensions();
   const api = useMemo<ReturnType<typeof nativeAnnotationApi>>(() => {
     let context: AnnotationContext = {
@@ -78,7 +79,8 @@ export default function AnnotationFixture() {
           shareKey="123"
           width={width - 32}
           height={height * 0.6}
-          active
+          active={active}
+          onToggle={() => setActive((value) => !value)}
           apiOverride={api}
         />
       </View>

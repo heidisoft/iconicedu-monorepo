@@ -80,6 +80,7 @@ function fixture() {
       getRemoteUsers: jest.fn().mockResolvedValue([]),
     },
     joinSession: jest.fn().mockResolvedValue(undefined),
+    isInSession: jest.fn().mockResolvedValue(false),
     leaveSession: jest.fn(),
     audioHelper: { unmuteAudio: success(), muteAudio: success(), setSpeaker: success() },
     videoHelper: {
@@ -568,4 +569,49 @@ describe('Zoom native bridge adapter', () => {
       [false, 1_700_000_000_000],
     ]);
   });
+});
+
+it('recovers a cold iOS join when the native joined event is missed', async () => {
+  jest.useFakeTimers();
+  const f = fixture();
+  const raf = jest
+    .spyOn(global, 'requestAnimationFrame')
+    .mockImplementation((callback) => {
+      callback(0);
+      return 0;
+    });
+  f.zoom.isInSession.mockResolvedValue(true);
+  const receive = jest.fn();
+  const dispose = f.adapter.subscribe(receive);
+  await f.adapter.join(
+    {
+      sessionName: 'test',
+      displayName: 'Test teacher',
+      token: 'synthetic',
+      expiresAt: null,
+    },
+    { microphone: false, camera: true },
+  );
+  await jest.advanceTimersByTimeAsync(500);
+  expect(receive.mock.calls.filter(([event]) => event.type === 'joined')).toHaveLength(1);
+  f.listeners.get('onSessionJoin')?.();
+  await jest.advanceTimersByTimeAsync(500);
+  expect(receive.mock.calls.filter(([event]) => event.type === 'joined')).toHaveLength(1);
+  dispose();
+  raf.mockRestore();
+  jest.useRealTimers();
+});
+it('enters the classroom before optional recording status resolves on first join', async () => {
+  const f = fixture();
+  f.zoom.recordingHelper.getCloudRecordingStatus.mockImplementation(
+    () => new Promise(() => {}),
+  );
+  const receive = jest.fn();
+  const dispose = f.adapter.subscribe(receive);
+  f.listeners.get('onSessionJoin')?.();
+  for (let index = 0; index < 20; index++) await Promise.resolve();
+  expect(receive).toHaveBeenCalledWith(
+    expect.objectContaining({ type: 'joined', selfId: '1' }),
+  );
+  dispose();
 });

@@ -66,3 +66,15 @@ export interface WhiteboardLaserPresenceVM {
   samples: WhiteboardLaserSampleVM[];
   expiresAt: number;
 }
+
+/** Ephemeral scene-space viewport, independent of screen dimensions. */
+export interface WhiteboardViewportVM {
+  centerX: number;
+  centerY: number;
+  zoom: number;
+}
+export interface WhiteboardViewportPresenceVM {
+  actorId: string;
+  viewport: WhiteboardViewportVM;
+  expiresAt: number;
+}

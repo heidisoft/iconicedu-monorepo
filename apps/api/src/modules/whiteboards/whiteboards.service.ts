@@ -7,6 +7,8 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import type {
+  WhiteboardViewportVM,
+  WhiteboardViewportPresenceVM,
   WhiteboardLaserPresenceVM,
   WhiteboardLaserSampleVM,
   WhiteboardDocumentVM,
@@ -71,6 +73,53 @@ export class WhiteboardsService {
       document: WhiteboardDocumentVM;
       applied_operations: string[];
     };
+  }
+  async publishViewport(token: string, value: unknown) {
+    const viewport = value as WhiteboardViewportVM | null;
+    if (
+      !viewport ||
+      !Number.isFinite(viewport.centerX) ||
+      !Number.isFinite(viewport.centerY) ||
+      Math.abs(viewport.centerX) > 10_000_000 ||
+      Math.abs(viewport.centerY) > 10_000_000 ||
+      !Number.isFinite(viewport.zoom) ||
+      viewport.zoom < 0.1 ||
+      viewport.zoom > 30
+    )
+      throw new BadRequestException('Invalid whiteboard viewport');
+    const { db } = await this.access(token);
+    const result = await db
+      .from('classroom_whiteboard_access')
+      .update({
+        viewport: {
+          centerX: viewport.centerX,
+          centerY: viewport.centerY,
+          zoom: viewport.zoom,
+        },
+        viewport_updated_at: new Date().toISOString(),
+      })
+      .eq('token_hash', hashWhiteboardToken(token));
+    if (result.error) throw new InternalServerErrorException('Unable to share viewport');
+    return { ok: true };
+  }
+  async getViewports(token: string): Promise<WhiteboardViewportPresenceVM[]> {
+    const { db, boardId, sessionId } = await this.access(token);
+    const now = Date.now();
+    const result = await db
+      .from('classroom_whiteboard_access')
+      .select('token_hash, viewport, viewport_updated_at')
+      .eq('board_id', boardId)
+      .eq('live_session_id', sessionId)
+      .gt('expires_at', new Date(now).toISOString())
+      .gt('viewport_updated_at', new Date(now - 10_000).toISOString());
+    if (result.error) throw new InternalServerErrorException('Unable to load viewports');
+    return (result.data ?? [])
+      .filter((peer) => peer.token_hash !== hashWhiteboardToken(token) && peer.viewport)
+      .map((peer) => ({
+        actorId: peer.token_hash.slice(0, 16),
+        viewport: peer.viewport as WhiteboardViewportVM,
+        expiresAt: Date.parse(peer.viewport_updated_at) + 10_000,
+      }));
   }
   async publishLaser(token: string, value: unknown) {
     if (

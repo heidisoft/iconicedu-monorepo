@@ -1,5 +1,6 @@
 #import <React/RCTEventEmitter.h>
 #import <React/RCTUtils.h>
+#import <React/RCTUIManager.h>
 #import <AVFoundation/AVFoundation.h>
 #import <AudioToolbox/AudioToolbox.h>
 #import <ReplayKit/ReplayKit.h>
@@ -77,11 +78,52 @@
 @interface ClassroomControls : RCTEventEmitter <RCTBridgeModule>
 @property(nonatomic, strong) ClassroomBroadcastController *broadcastController;
 @property(nonatomic) BOOL listening;
+@property(nonatomic) BOOL publishingView;
 @property(nonatomic) BOOL observingInterruptions;
 @property(nonatomic) SystemSoundID joinChime;
 @end
 @implementation ClassroomControls
 RCT_EXPORT_MODULE(ClassroomControls)
+- (NSURL *)compositionFile:(NSString *)name {
+  NSURL *root = [NSFileManager.defaultManager containerURLForSecurityApplicationGroupIdentifier:@"group.com.heidisoft.iconicedu.classroom"];
+  return root ? [root URLByAppendingPathComponent:name] : nil;
+}
+RCT_EXPORT_METHOD(setShareOverlay:(NSString *)dataUrl resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject) {
+  NSURL *url = [self compositionFile:@"classroom-overlay.png"];
+  if (!url) { reject(@"composition", @"Screen composition is unavailable in this build.", nil); return; }
+  if (!dataUrl.length) { [NSFileManager.defaultManager removeItemAtURL:url error:nil]; resolve(@YES); return; }
+  NSString *prefix = @"data:image/png;base64,";
+  if (![dataUrl hasPrefix:prefix] || dataUrl.length > 28000000) { reject(@"composition", @"Invalid annotation image.", nil); return; }
+  NSData *data = [[NSData alloc] initWithBase64EncodedString:[dataUrl substringFromIndex:prefix.length] options:0];
+  if (data && [data writeToURL:url atomically:YES]) resolve(@YES);
+  else reject(@"composition", @"Unable to publish annotations.", nil);
+}
+RCT_EXPORT_METHOD(startWhiteboardShare:(nonnull NSNumber *)tag resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject) {
+  [self.bridge.uiManager addUIBlock:^(RCTUIManager *manager, NSDictionary<NSNumber *, UIView *> *registry) {
+    UIView *view = registry[tag];
+    if (!view || CGRectIsEmpty(view.bounds)) { reject(@"composition", @"Wait for the whiteboard to load, then retry.", nil); return; }
+    ZoomVideoSDKShareHelper *share = [[ZoomVideoSDK sharedInstance] getShareHelper];
+    if ([share isSharingOut]) { reject(@"composition", @"Stop screen sharing before publishing the whiteboard.", nil); return; }
+    ZoomVideoSDKError result = [share startShareWithView:view];
+    self.publishingView = result == Errors_Success;
+    if (self.publishingView) resolve(@YES); else reject(@"composition", @"Unable to publish the whiteboard.", nil);
+  }];
+}
+RCT_EXPORT_METHOD(compositionStatus:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject) {
+  dispatch_async(dispatch_get_main_queue(), ^{
+    ZoomVideoSDKShareHelper *share = [[ZoomVideoSDK sharedInstance] getShareHelper];
+    if (![share isSharingOut]) self.publishingView = NO;
+    NSString *frame = [NSString stringWithContentsOfURL:[self compositionFile:@"classroom-composition-frame"] encoding:NSUTF8StringEncoding error:nil];
+    NSDictionary *attributes = [NSFileManager.defaultManager attributesOfItemAtPath:[self compositionFile:@"classroom-overlay.png"].path error:nil];
+    NSTimeInterval now = NSDate.date.timeIntervalSince1970;
+    BOOL overlayFresh = attributes && now - [attributes[NSFileModificationDate] timeIntervalSince1970] < 5;
+    BOOL active = self.publishingView || ([share isScreenSharingOut] && overlayFresh && now - frame.doubleValue < 3);
+    resolve(@(active));
+  });
+}
+RCT_EXPORT_METHOD(copyText:(NSString *)text resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject) {
+  dispatch_async(dispatch_get_main_queue(), ^{ UIPasteboard.generalPasteboard.string = text; resolve(@YES); });
+}
 + (BOOL)requiresMainQueueSetup { return YES; }
 - (NSArray<NSString *> *)supportedEvents { return @[@"ClassroomAudioInterrupted"]; }
 - (void)startObserving { self.listening = YES; }
@@ -217,6 +259,9 @@ RCT_EXPORT_METHOD(stopShareService:(RCTPromiseResolveBlock)resolve reject:(RCTPr
   dispatch_async(dispatch_get_main_queue(), ^{
     if (self.broadcastController.presentingViewController) [self.broadcastController close];
     self.broadcastController = nil;
+    self.publishingView = NO;
+    [NSFileManager.defaultManager removeItemAtURL:[self compositionFile:@"classroom-overlay.png"] error:nil];
+    [NSFileManager.defaultManager removeItemAtURL:[self compositionFile:@"classroom-composition-frame"] error:nil];
     resolve(@YES);
   });
 }

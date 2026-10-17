@@ -1,3 +1,4 @@
+import { NativeFloatingReaction } from './native-meeting-motion';
 import React, { useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { ChevronLeft, ChevronRight, Hand, MicOff } from 'lucide-react-native';
@@ -88,6 +89,7 @@ export function NativeParticipantTile({
           </View>
         </View>
       )}
+      {reaction && <NativeFloatingReaction key={reaction} emoji={reaction} />}
       {reaction && (
         <Text
           accessibilityLabel={`${user.name} reacted ${reaction}`}

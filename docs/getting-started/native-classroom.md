@@ -41,14 +41,17 @@ Register each test iPad before creating the iOS build so its provisioning profil
 ## Classroom boundaries
 
 - Signed-in identity and enrolled-student selection come from the API. Guest names, invitation capabilities and identity-bound admission retry tokens recover from encrypted device-only storage; passcodes and SDK JWTs are never persisted. Expired/revoked invitation responses clear the stored capability so Retry can use the normal join flow. Plain-link guests can enter a name and passcode; invited guests bypass passcode entry after API verification. Session buttons, meeting cards, classroom URLs in message text and OS-delivered invitations/personal handoffs use the same native entry handler. Binaries without the native SDK retain browser access. Native join links carry a meeting identifier; SDK credentials are renewed when Join is pressed. Preview remains an explicit step.
-- One SDK provider owns the application lifecycle. Route cleanup removes subscriptions and leaves the active session; joining never automatically reclaims host. Eligible teachers/staff claim host explicitly with confirmation. Co-host assignment does not replace the host.
+- One SDK provider owns the application lifecycle. Route cleanup removes subscriptions and leaves the active session; joining never automatically reclaims host. Eligible teachers/staff claim host explicitly with confirmation. Co-host assignment does not replace the host. First joins reconcile the SDK’s actual session state if an iOS join event is missed. Recording and existing-share status load after entering the classroom. A failed join returns to preview after a 30-second join deadline and at most five seconds of SDK cleanup, with Retry available.
 - The app-owned whiteboard uses a bundled offline Excalidraw canvas with the same scene contract and educational assets as web. API capabilities stay in native code and never enter the WebView. Latin drawing fonts are bundled offline; CJK glyphs use device fallback fonts. The API checks editing and presentation permissions. Save retries retain operation IDs, and pending drawings are recovered locally for the same authorized board. PNG exports use the native share sheet.
 - Screen annotations use the same API rooms and normalized object coordinates as web. Native overlays fit the received content rectangle rather than the surrounding letterbox. A composited share from web already contains its annotations and must not receive duplicate permanent overlays.
 - Sharing follows web's share privilege. Hosts choose host-only, one presenter, or simultaneous presenters; native bridges Zoom multi-share because the React Native wrapper only exposes locking. Viewers see every presenter, the newest share takes the stage, and a stopped share falls back to a remaining presenter.
 - Recording state includes web's automatic pause, resumed from the same record control. When the Zoom account requires recording consent, participants answer in the app: declining traditional consent leaves the class, declining individual consent stays unrecorded. A mobile host with messages disabled turns chat off for everyone through the SDK chat privilege, as web does.
 - The ended screen states why the session closed (left, ended by host, removed, network). SDK errors use actionable copy, and camera/microphone access revoked mid-class offers Settings. Quality events use web's vocabulary: `good`/`bad` network transitions and `reconnecting`/`fail` connection states.
 - Background photos are downscaled copies of `apps/web/public/live-session-backgrounds` in `apps/mobile/assets/live-session-backgrounds` (longest side 1920px), named by the shared `buildMeetingBackgroundCatalog`. Add or remove a photo in both directories and register it in `src/lib/classroom/background-catalog.ts`. The chosen effect is remembered locally and applied after joining; camera-library photos are not remembered.
-- Cloud recording records SDK media. To include the app-owned board or other native UI, the presenter must approve device screen broadcasting. Drawing on the board alone does not silently start an operating-system broadcast.
+- Recording a visible app-owned whiteboard publishes its canvas through Zoom's native view-sharing API. Screen sharing composites saved annotation objects into outgoing frames: Android uses Zoom share preprocessing and iOS uses the ReplayKit extension. UI controls and selection handles are excluded from the annotation overlay. Native publishers announce composition only after outgoing frames are composed; web and native expire silent announcements after six seconds. Recording start/resume requires all active screen presenters to publish composed content, and loss of content pauses recording (or stops it if pause fails). Stale annotation overlays stop screen sharing rather than continuing with missing annotations. Signed-device verification of the actual cloud video remains required; component tests and simulator builds cannot certify recorded pixels.
+- Whiteboards expose persistent save/reconnect status and participant initials, PNG/SVG exports, and user-accessible download/discard of pending edits. Discard requires confirmation and reloads the saved scene before removing the local queue. The educational library groups assets by category and reports empty search results.
+- Invite opens a native sheet with separate copy actions for the join link and passcode, plus the operating-system invitation share chooser. Chat keeps the full received in-call history for parity with web; leaving clears the meeting state.
+- Native sheets, focused video, whiteboards, settings, reaction trajectories and control-pop animations respect the system reduced-motion preference. Canvas tools and meeting actions use semantic Lucide icons with accessible labels and selected/disabled state.
 
 ## 1-1 lesson experience
 
@@ -222,3 +225,54 @@ NATIVE_SYNC_DEVICE_ID=YOUR_SIMULATOR_ID PLAYWRIGHT_SKIP_WEBSERVER=1 PLAYWRIGHT_B
 ```
 
 The tests skip without `NATIVE_SYNC_DEVICE_ID`. Temporary capabilities stay in private local bootstrap files and are removed during cleanup; traces and recordings are disabled for the interoperability scenarios. Native fixture routes are unavailable in release builds and suppress Expo's floating developer button so it cannot intercept canvas gestures. Successful collaboration tests must still be followed by the physical-device screen broadcasting and recording checks above.
+
+### Following the whiteboard viewport
+
+Whiteboard options on mobile and the Follow viewport selector on web let participants
+follow the tutor (the default), select another participant, or explore freely. Tutors
+can select participants too. Following shares the scene center and zoom, so different
+screen sizes stay centered on the same drawing area. Editing permissions do not change.
+If the selected person leaves or stops sharing updates, the board holds its last view;
+choose another participant or Explore freely to navigate independently.
+
+Viewport updates use capability-authenticated API endpoints, are scoped to the current
+board and live session, and expire after ten seconds. They never change saved drawing
+revisions. Apply migration `20261016120000_whiteboard_viewport_presence.sql` before
+deploying the API. Web controls remain behind the catalogued, default-off
+`enable-classroom-whiteboard` flag.
+
+The web meeting toolbar opens the whiteboard when no presentation is active. The
+presenter or a tutor can click **Stop presenting whiteboard** to end it for everyone
+directly. Other participants see a disabled presentation indicator with an explanation
+of who can stop it. There is no local hide action or intermediate options menu.
+
+### Drawing controls on mobile
+
+Screen sharing exposes the same pencil toggle as web. Tap it to show the compact
+annotation toolbar: Pan, Laser pointer, Select, Pen, Text, Eraser, Shapes, Highlighter,
+Stamps, Attention, Undo, Redo, styles, and additional actions. Shapes, stamps, and
+attention tools expand in groups; style and advanced actions stay in an options panel.
+
+The mobile whiteboard orders controls like web: Pan, Laser pointer, Select, Pen, Text,
+Eraser, Shapes, Library, Undo, View controls, and More actions. View controls include
+grids, snapping, fit, and zoom. More actions contains redo and tutor-only clearing.
+The contextual style strip updates stroke width, color, and shape fill. Local undo
+and redo preserve other participants’ drawing elements.
+
+Following reads remote viewports independently of publishing the local view, so an
+outgoing request failure cannot stop incoming updates. The default tutor selection
+uses a currently publishing tutor after reconnects. Whiteboard options report whether
+the selected view is following, waiting for updates, or reconnecting.
+
+The mobile screen-annotation bar uses a single pencil/close launcher, a rounded
+scrollable icon row, and the same 240 ms width transition as web. System reduced
+motion disables that transition. Closing collapses the bar, closes options and stops
+drawing; reopening selects the pen. No annotation count is displayed.
+
+Shapes, stamps and attention options use labeled grids. Format and More are separate
+panels with explicit close controls. Format includes the web palette, custom color,
+width, opacity, text settings, pressure capture and Apply to selected. More includes
+duplicate/delete, export, permission-aware clearing, annotator names and toolbar
+position. The drag handle and dock selection persist position on the device. Touch
+targets remain at least 44 points; selecting an object shows its author where web
+uses hover.

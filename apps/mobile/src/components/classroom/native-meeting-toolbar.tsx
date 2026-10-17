@@ -1,3 +1,4 @@
+import { NativeControlPop } from './native-meeting-motion';
 import React, { Children, isValidElement, useRef, useState } from 'react';
 import { Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import {
@@ -47,6 +48,8 @@ const menuItem = (label: string) => {
   if (label === 'Share screen') return { Icon: MonitorUp, title: 'Share screen' };
   if (label === 'Stop sharing screen')
     return { Icon: MonitorX, title: 'Stop sharing', active: true };
+  if (label === 'Stop presenting whiteboard')
+    return { Icon: Presentation, title: label, active: true };
   if (label === 'Whiteboard' || label === 'Return to whiteboard')
     return { Icon: Presentation, title: label };
   if (label.startsWith('Messages'))
@@ -149,10 +152,12 @@ export function NativeMeetingToolbar({
                 opacity: action.props.disabled ? 0.5 : 1,
               }}
             >
-              <Icon
-                size={22}
-                color={control.danger ? colors.primaryForeground : colors.text}
-              />
+              <NativeControlPop value={control.active}>
+                <Icon
+                  size={22}
+                  color={control.danger ? colors.primaryForeground : colors.text}
+                />
+              </NativeControlPop>
               <Text
                 numberOfLines={1}
                 style={{

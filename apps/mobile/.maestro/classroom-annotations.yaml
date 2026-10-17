@@ -9,18 +9,23 @@ name: Native annotation drawing and versioned history
 - extendedWaitUntil:
     visible: 'Native annotation test'
     timeout: 30000
-- assertVisible: '0 annotations'
+- assertVisible:
+    id: 'annotation-saved-elements-0'
 - swipe:
     start: '25%,25%'
     end: '60%,30%'
     duration: 1000
 - extendedWaitUntil:
-    visible: '1 annotation'
+    visible:
+      id: 'annotation-saved-elements-1'
     timeout: 10000
 - tapOn: 'Undo annotation'
-- assertVisible: '0 annotations'
+- assertVisible:
+    id: 'annotation-saved-elements-0'
 - tapOn: 'Redo annotation'
-- assertVisible: '1 annotation'
+- assertVisible:
+    id: 'annotation-saved-elements-1'
+- tapOn: 'More annotation actions'
 - tapOn: 'Export annotations image'
 - runFlow: assert-classroom-export.yaml
 - takeScreenshot: native-annotation-export

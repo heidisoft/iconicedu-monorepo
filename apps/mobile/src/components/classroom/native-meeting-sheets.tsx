@@ -1,3 +1,4 @@
+import { useReducedMotion } from './use-reduced-motion';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
@@ -49,6 +50,7 @@ export function NativeMeetingSheet({
 }) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const reducedMotion = useReducedMotion();
   const content = useRef<View>(null);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   // pageSheet uses an inset origin; keyboard events use screen coordinates.
@@ -57,7 +59,7 @@ export function NativeMeetingSheet({
   return (
     <Modal
       visible={open}
-      animationType="slide"
+      animationType={reducedMotion ? 'none' : 'slide'}
       transparent={compact}
       presentationStyle={compact ? 'overFullScreen' : 'pageSheet'}
       onRequestClose={onClose}

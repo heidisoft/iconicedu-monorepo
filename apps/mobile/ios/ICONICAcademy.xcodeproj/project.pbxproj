@@ -26,6 +26,7 @@
 		D7A99CFB6BC84F768F80E5DE /* CoreVideo.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6E2213861A044CFD9D886CFB /* CoreVideo.framework */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
 		FB8AF98D8D7440E8B3C59DB8 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F332677D276F484E808CEB04 /* SceneDelegate.swift */; };
+		CEECEFC94CC54A73966EF8C3 /* CoreImage.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7A70DAE48E7C4065974E7DC3 /* CoreImage.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -83,6 +84,7 @@
 		F11748442D0722820044C1D9 /* ICONICAcademy-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "ICONICAcademy-Bridging-Header.h"; path = "ICONICAcademy/ICONICAcademy-Bridging-Header.h"; sourceTree = "<group>"; };
 		FC26F9FDFD6E49BAAA7B19CD /* ClassroomBroadcast.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; fileEncoding = 9; includeInIndex = 0; path = ClassroomBroadcast.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		F332677D276F484E808CEB04 /* SceneDelegate.swift */ = {isa = PBXFileReference; name = "SceneDelegate.swift"; path = "ICONICAcademy/SceneDelegate.swift"; sourceTree = "<group>"; fileEncoding = 4; lastKnownFileType = sourcecode.swift; explicitFileType = undefined; includeInIndex = 0; };
+		7A70DAE48E7C4065974E7DC3 /* CoreImage.framework */ = {isa = PBXFileReference; name = "CoreImage.framework"; path = "System/Library/Frameworks/CoreImage.framework"; sourceTree = SDKROOT; fileEncoding = undefined; lastKnownFileType = wrapper.framework; explicitFileType = undefined; includeInIndex = 0; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -104,6 +106,7 @@
 				1E11FCAB05C2463485CC6222 /* CoreMedia.framework in Frameworks */,
 				15A4E098610C4A52A11F2F26 /* VideoToolbox.framework in Frameworks */,
 				72D1844AED50815BB68C3264 /* libPods-ClassroomBroadcast.a in Frameworks */,
+				CEECEFC94CC54A73966EF8C3 /* CoreImage.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -155,6 +158,7 @@
 				0FF42BBED7C54B61913F2E7E /* CoreMedia.framework */,
 				DC7048A8E89B4EA38F378453 /* VideoToolbox.framework */,
 				9F815B89CE136F7DB4734D32 /* libPods-ClassroomBroadcast.a */,
+				7A70DAE48E7C4065974E7DC3 /* CoreImage.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";

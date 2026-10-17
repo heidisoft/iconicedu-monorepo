@@ -40,6 +40,10 @@ const context: AnnotationContext = {
     objects: [],
   },
 };
+beforeEach(() => {
+  jest.clearAllMocks();
+  jest.mocked(AsyncStorage.getItem).mockResolvedValue(null);
+});
 function setup(value = context) {
   let current = { ...value.snapshot, objects: [...value.snapshot.objects] };
   const api = {
@@ -111,7 +115,7 @@ describe('native screen annotation delivery', () => {
         'auto',
       ),
     );
-    fireEvent.press(screen.getByText('Vanishing Pen'));
+    fireEvent.press(screen.getByLabelText('Laser pointer'));
     stroke(screen);
     await waitFor(() => expect(api.laser).toHaveBeenCalled());
     await waitFor(() =>
@@ -156,13 +160,13 @@ describe('native screen annotation delivery', () => {
       ),
     );
     stroke(screen);
-    await waitFor(() => expect(screen.getByText('1 annotation')).toBeTruthy());
+    await waitFor(() => expect(api.save).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(screen.queryByText('Saving annotations…')).toBeNull());
     fireEvent.press(screen.getByLabelText('Undo annotation'));
-    await waitFor(() => expect(screen.getByText('0 annotations')).toBeTruthy());
+    await waitFor(() => expect(api.save).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(screen.queryByText('Saving annotations…')).toBeNull());
     fireEvent.press(screen.getByLabelText('Redo annotation'));
-    await waitFor(() => expect(screen.getByText('1 annotation')).toBeTruthy());
+    await waitFor(() => expect(api.save).toHaveBeenCalledTimes(3));
     expect(api.save.mock.calls.map((call) => call[1].kind)).toEqual([
       'put',
       'delete',
@@ -181,14 +185,15 @@ describe('native screen annotation delivery', () => {
       ),
     );
     stroke(screen);
-    await waitFor(() => expect(screen.getByText('1 annotation')).toBeTruthy());
+    await waitFor(() => expect(api.save).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(screen.queryByText('Saving annotations…')).toBeNull());
-    fireEvent.press(screen.getByText('Select'));
+    fireEvent.press(screen.getByLabelText('Select'));
     const surface = screen.getByTestId('annotation-drawing-surface');
     fireEvent(surface, 'responderGrant', {
       nativeEvent: { locationX: 75, locationY: 60 },
     });
     fireEvent(surface, 'responderRelease');
+    fireEvent.press(screen.getByLabelText('More annotation actions'));
     fireEvent.press(screen.getByLabelText('Rotate selected annotation'));
     await waitFor(() => expect(api.save).toHaveBeenCalledTimes(2));
     expect(api.save.mock.calls[1][1]).toMatchObject({
@@ -232,6 +237,7 @@ it('sends educator clear-all through the shared API after confirmation', async (
     ...context,
     actor: { ...context.actor, role: 'educator' },
   });
+  fireEvent.press(screen.getByLabelText('More annotation actions'));
   await waitFor(() =>
     expect(screen.getByLabelText('Clear all annotations')).toBeTruthy(),
   );
@@ -249,4 +255,101 @@ it('sends educator clear-all through the shared API after confirmation', async (
     ),
   );
   dialog.mockRestore();
+});
+
+it('removes annotation totals and keeps Format separate from More actions', async () => {
+  const { api, screen } = setup();
+  await waitFor(() =>
+    expect(screen.getByTestId('annotation-drawing-surface').props.pointerEvents).toBe(
+      'auto',
+    ),
+  );
+  stroke(screen);
+  await waitFor(() => expect(api.save).toHaveBeenCalledTimes(1));
+  expect(screen.queryByText(/^\d+ annotations?$/)).toBeNull();
+  fireEvent.press(screen.getByLabelText('Annotation styles'));
+  expect(screen.getByLabelText('Annotation opacity')).toBeTruthy();
+  expect(screen.queryByLabelText('Export annotations image')).toBeNull();
+  fireEvent.press(screen.getByLabelText('More annotation actions'));
+  expect(screen.getByLabelText('Export annotations image')).toBeTruthy();
+  expect(screen.queryByLabelText('Annotation opacity')).toBeNull();
+  fireEvent.press(screen.getByLabelText('Close annotation options'));
+  expect(screen.queryByLabelText('Export annotations image')).toBeNull();
+});
+it('opens and closes a single launcher, stops drawing when collapsed, and reopens with the pen', async () => {
+  const onToggle = jest.fn();
+  const screen = render(
+    <NativeScreenAnnotations
+      sessionId="session"
+      shareKey="peer"
+      width={320}
+      height={220}
+      active={false}
+      onToggle={onToggle}
+    />,
+  );
+  await act(async () => {});
+  expect(screen.queryByLabelText('Pen')).toBeNull();
+  fireEvent.press(screen.getByLabelText('Open annotation toolbar'));
+  expect(onToggle).toHaveBeenCalledTimes(1);
+  screen.rerender(
+    <NativeScreenAnnotations
+      sessionId="session"
+      shareKey="peer"
+      width={320}
+      height={220}
+      active
+      onToggle={onToggle}
+    />,
+  );
+  expect(screen.getByLabelText('Pen')).toBeTruthy();
+  fireEvent.press(screen.getByLabelText('Close annotation toolbar'));
+  screen.rerender(
+    <NativeScreenAnnotations
+      sessionId="session"
+      shareKey="peer"
+      width={320}
+      height={220}
+      active={false}
+      onToggle={onToggle}
+    />,
+  );
+  expect(screen.getByTestId('annotation-drawing-surface').props.pointerEvents).toBe(
+    'none',
+  );
+  expect(screen.queryByLabelText('Pen')).toBeNull();
+});
+
+it('applies staged formatting to a selection and persists the toolbar dock', async () => {
+  const { api, screen } = setup();
+  await waitFor(() =>
+    expect(screen.getByTestId('annotation-drawing-surface').props.pointerEvents).toBe(
+      'auto',
+    ),
+  );
+  stroke(screen);
+  await waitFor(() => expect(api.save).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(screen.queryByText('Saving annotations…')).toBeNull());
+  fireEvent.press(screen.getByLabelText('Select'));
+  fireEvent(screen.getByTestId('annotation-drawing-surface'), 'responderGrant', {
+    nativeEvent: { locationX: 75, locationY: 60 },
+  });
+  fireEvent(screen.getByTestId('annotation-drawing-surface'), 'responderRelease');
+  fireEvent.press(screen.getByLabelText('Annotation styles'));
+  fireEvent.changeText(screen.getByLabelText('Annotation opacity'), '50');
+  expect(api.save).toHaveBeenCalledTimes(1);
+  fireEvent.press(screen.getByLabelText('Apply to selected'));
+  await waitFor(() => expect(api.save).toHaveBeenCalledTimes(2));
+  expect(api.save.mock.calls[1][1]).toMatchObject({
+    kind: 'put',
+    baseVersion: 1,
+    object: { style: { opacity: 0.5 } },
+  });
+  await waitFor(() => expect(screen.queryByText('Saving annotations…')).toBeNull());
+  fireEvent.press(screen.getByLabelText('More annotation actions'));
+  fireEvent.press(screen.getByLabelText('Toolbar position bottom'));
+  expect(AsyncStorage.setItem).toHaveBeenCalledWith(
+    'annotation-toolbar',
+    expect.stringContaining('"dock":"bottom"'),
+  );
 });

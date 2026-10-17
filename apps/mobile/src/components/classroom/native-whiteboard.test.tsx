@@ -227,7 +227,7 @@ it('fills the board without a heading and exposes options through floating contr
   expect(screen.queryByText('Allow student editing')).toBeNull();
   fireEvent.press(screen.getByLabelText('Whiteboard options'));
   expect(screen.getByText('Allow student editing')).toBeTruthy();
-  expect(screen.getByText('Educational library')).toBeTruthy();
+  expect(screen.getByLabelText('Library')).toBeTruthy();
   fireEvent.press(screen.getByLabelText('Close whiteboard options'));
   expect(screen.queryByText('Allow student editing')).toBeNull();
   fireEvent.press(screen.getByLabelText('Return to video'));
@@ -238,12 +238,14 @@ it('routes native library and export options to the canvas without sharing capab
   jest.mocked(capabilityGet).mockResolvedValue(snapshot);
   const screen = render(<NativeWhiteboard token="synthetic-capability" />);
   await act(async () => {});
-  fireEvent.press(screen.getByLabelText('Whiteboard options'));
-  fireEvent.press(screen.getByText('Educational library'));
+  fireEvent(screen.getByTestId('drawing-canvas'), 'message', {
+    nativeEvent: { data: '{"type":"ready"}' },
+  });
+  await act(async () => {});
+  fireEvent.press(screen.getByLabelText('Library'));
   expect(mockInjectJavaScript).toHaveBeenLastCalledWith(
-    'window.classroomAction?.("library"); true;',
+    'window.classroomCommand?.({"type":"library"}); true;',
   );
-  expect(screen.queryByText('Educational library')).toBeNull();
   fireEvent.press(screen.getByLabelText('Whiteboard options'));
   fireEvent.press(screen.getByText('Export whiteboard image'));
   expect(mockInjectJavaScript).toHaveBeenLastCalledWith(
@@ -334,3 +336,113 @@ it.each(['drawing', 'retrying', 'saving'] as const)(
     }
   },
 );
+
+it('offers tutor following by default and participant or free navigation choices', async () => {
+  const repository = {
+    load: jest.fn().mockResolvedValue({
+      ...snapshot,
+      role: 'student',
+      actorId: 'self',
+      presence: [
+        { id: 'tutor', name: 'Tutor', role: 'teacher' },
+        { id: 'peer', name: 'Peer', role: 'student' },
+      ],
+    }),
+    save: jest.fn(),
+    viewports: jest.fn().mockResolvedValue([
+      {
+        actorId: 'tutor',
+        viewport: { centerX: 30, centerY: 40, zoom: 2 },
+        expiresAt: Date.now() + 10000,
+      },
+    ]),
+    publishViewport: jest.fn().mockResolvedValue({}),
+  };
+  const screen = render(<NativeWhiteboard token="token" repository={repository} />);
+  await act(async () => {});
+  fireEvent(screen.getByTestId('drawing-canvas'), 'message', {
+    nativeEvent: { data: JSON.stringify({ type: 'ready' }) },
+  });
+  await act(async () => {});
+  expect(mockInjectJavaScript).toHaveBeenCalledWith(
+    expect.stringContaining('classroomViewport?.({"centerX":30,"centerY":40,"zoom":2})'),
+  );
+  fireEvent.press(screen.getByLabelText('Whiteboard options'));
+  expect(
+    screen.getByRole('radio', { name: '✓ Follow tutor (default)', checked: true }),
+  ).toBeTruthy();
+  fireEvent.press(screen.getByLabelText('Follow Peer'));
+  expect(screen.getByRole('radio', { name: 'Follow Peer', checked: true })).toBeTruthy();
+  fireEvent.press(screen.getByRole('radio', { name: 'Explore freely' }));
+  expect(
+    screen.getByRole('radio', { name: '✓ Explore freely', checked: true }),
+  ).toBeTruthy();
+  await act(async () => {});
+});
+
+it('keeps save status and participant presence visible outside options', async () => {
+  jest.mocked(AsyncStorage.getItem).mockResolvedValue(null);
+  jest.mocked(capabilityGet).mockResolvedValue({
+    ...snapshot,
+    presence: [{ id: 'teacher', name: 'Teacher Person', role: 'teacher' }],
+  });
+  const screen = render(<NativeWhiteboard token="fixture" />);
+  await waitFor(() => expect(screen.getByText('Saved')).toBeTruthy());
+  expect(screen.getByLabelText('Whiteboard participants: Teacher Person')).toBeTruthy();
+  expect(screen.getByText('TP')).toBeTruthy();
+});
+it('exports SVG through a separate canvas action', async () => {
+  jest.mocked(capabilityGet).mockResolvedValue(snapshot);
+  jest.mocked(AsyncStorage.getItem).mockResolvedValue(null);
+  const screen = render(<NativeWhiteboard token="fixture" />);
+  await act(async () => {});
+  fireEvent.press(screen.getByLabelText('Whiteboard options'));
+  fireEvent.press(screen.getByLabelText('Export whiteboard SVG'));
+  expect(mockInjectJavaScript).toHaveBeenCalledWith(
+    'window.classroomAction?.("export-svg"); true;',
+  );
+  await act(async () =>
+    fireEvent(screen.getByTestId('drawing-canvas'), 'message', {
+      nativeEvent: {
+        data: JSON.stringify({
+          type: 'export-svg',
+          svg: '<svg xmlns="http://www.w3.org/2000/svg"/>',
+        }),
+      },
+    }),
+  );
+  await waitFor(() =>
+    expect(Sharing.shareAsync).toHaveBeenCalledWith(
+      expect.stringMatching(/\.svg$/),
+      expect.objectContaining({ mimeType: 'image/svg+xml' }),
+    ),
+  );
+});
+it('exports queued edits and discards them only after confirmation and successful reload', async () => {
+  jest.mocked(capabilityGet).mockResolvedValue(snapshot);
+  jest.mocked(AsyncStorage.getItem).mockResolvedValue(null);
+  jest.mocked(capabilityPost).mockRejectedValue(new Error('offline'));
+  const { Alert } = require('react-native');
+  const alert = jest.spyOn(Alert, 'alert');
+  const screen = render(<NativeWhiteboard token="fixture" />);
+  await act(async () => {});
+  fireEvent(screen.getByTestId('drawing-canvas'), 'message', {
+    nativeEvent: { data: JSON.stringify({ type: 'elements', elements: [element] }) },
+  });
+  await waitFor(() => expect(screen.getByText('Unsaved · retrying')).toBeTruthy());
+  fireEvent.press(screen.getByLabelText('Whiteboard options'));
+  await act(async () => fireEvent.press(screen.getByLabelText('Download unsaved edits')));
+  expect(FileSystem.writeAsStringAsync).toHaveBeenCalledWith(
+    expect.stringMatching(/\.json$/),
+    expect.stringContaining('"type":"elements"'),
+  );
+  fireEvent.press(screen.getByLabelText('Discard unsaved edits'));
+  expect(screen.getByText('Unsaved · retrying')).toBeTruthy();
+  const buttons = alert.mock.calls.at(-1)?.[2];
+  await act(async () =>
+    buttons?.find((button: { text: string }) => button.text === 'Discard')?.onPress?.(),
+  );
+  expect(screen.queryByText('Unsaved · retrying')).toBeNull();
+  expect(AsyncStorage.removeItem).toHaveBeenCalledWith('classroom-drawing:board:teacher');
+  alert.mockRestore();
+});

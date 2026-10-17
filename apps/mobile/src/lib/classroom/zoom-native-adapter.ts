@@ -94,6 +94,8 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
   let generation = 0;
   let handRaised = false;
   let selfId: string | null = null;
+  let awaitingJoin = false;
+  let startJoinRecovery: (() => void) | null = null;
   let microphoneTest = false;
   let microphonePlayback = false;
   let speakerTest = false;
@@ -102,7 +104,10 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
     subscribe(listener) {
       const current = ++generation;
       let refreshEpoch = 0;
+      const compositions = new Map<string, ReturnType<typeof setTimeout>>();
       let joinedPending = false;
+      let didJoin = false;
+      let joinRecovery: ReturnType<typeof setInterval> | null = null;
       const send = (event: NativeMeetingEvent) => {
         if (generation === current) listener(event);
       };
@@ -126,26 +131,6 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
             }),
           );
           const joining = joinedPending;
-          const status = joining
-            ? await zoom.recordingHelper.getCloudRecordingStatus().catch(() => undefined)
-            : undefined;
-          // Shares already running before this join do not replay a status event.
-          const presenters = joining
-            ? (
-                await Promise.all(
-                  users.map(async (value) => {
-                    const user = new ZoomVideoSdkUser(value);
-                    const actions: Array<{ shareStatus?: unknown }> =
-                      await Promise.resolve(user.getShareActionList?.() ?? []).catch(
-                        () => [],
-                      );
-                    return actions.some((action) => sharing(action.shareStatus))
-                      ? value.userId
-                      : null;
-                  }),
-                )
-              ).filter((id): id is string => !!id)
-            : [];
           if (request !== refreshEpoch || generation !== current) return;
           selfId = self.userId;
           send(
@@ -154,14 +139,50 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
               : { type: 'participants', participants },
           );
           joinedPending = false;
-          presenters.forEach((userId) => send({ type: 'share', userId, active: true }));
-          if (status !== undefined)
-            send({ type: 'recording', status: recordingStatus(status) });
+          if (joining) {
+            didJoin = true;
+            awaitingJoin = false;
+            if (joinRecovery) clearInterval(joinRecovery);
+            joinRecovery = null;
+            void NativeModules.ClassroomControls.startMeetingService().catch(() =>
+              send({
+                type: 'error',
+                message: 'Keep the app open to continue classroom audio.',
+              }),
+            );
+            void zoom.cmdChannel
+              .sendCommand('', JSON.stringify({ type: 'raise-hand-state-request' }))
+              .catch(() => {});
+            // Ancillary SDK helpers can stall on a cold iOS session. Entry is already confirmed.
+            void zoom.recordingHelper
+              .getCloudRecordingStatus()
+              .then((status) => {
+                if (generation === current)
+                  send({ type: 'recording', status: recordingStatus(status) });
+              })
+              .catch(() => {});
+            void Promise.all(
+              users.map(async (value) => {
+                const user = new ZoomVideoSdkUser(value);
+                const actions: Array<{ shareStatus?: unknown }> = await Promise.resolve(
+                  user.getShareActionList?.() ?? [],
+                ).catch(() => []);
+                if (
+                  generation === current &&
+                  actions.some((action) => sharing(action.shareStatus))
+                )
+                  send({ type: 'share', userId: value.userId, active: true });
+              }),
+            ).catch(() => {});
+          }
         } catch {
-          send({
-            type: 'error',
-            message: 'Unable to update participants. Please reconnect.',
-          });
+          // The first native event can arrive before the user helpers are ready.
+          // Reconciliation retries this during join; the controller owns the deadline.
+          if (!awaitingJoin)
+            send({
+              type: 'error',
+              message: 'Unable to update participants. Please reconnect.',
+            });
         }
       };
       const subscriptions = [
@@ -211,9 +232,20 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
             else if (
               command.type === 'meeting-composited-share-v1' &&
               typeof command.active === 'boolean'
-            )
+            ) {
+              const previous = compositions.get(userId);
+              if (previous) clearTimeout(previous);
+              if (command.active)
+                compositions.set(
+                  userId,
+                  setTimeout(() => {
+                    compositions.delete(userId);
+                    send({ type: 'composition', userId, active: false });
+                  }, 6000),
+                );
+              else compositions.delete(userId);
               send({ type: 'composition', userId, active: command.active });
-            else if (
+            } else if (
               command.type === 'reaction' &&
               typeof command.emoji === 'string' &&
               command.emoji.length <= 16
@@ -224,16 +256,7 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
           }
         }),
         zoom.addListener(EventType.onSessionJoin, () => {
-          void refresh(true);
-          void NativeModules.ClassroomControls.startMeetingService().catch(() =>
-            send({
-              type: 'error',
-              message: 'Keep the app open to continue classroom audio.',
-            }),
-          );
-          void zoom.cmdChannel
-            .sendCommand('', JSON.stringify({ type: 'raise-hand-state-request' }))
-            .catch(() => {});
+          void refresh(!didJoin);
         }),
         zoom.addListener(EventType.onSessionLeave, (value: unknown) => {
           send({ type: 'left', reason: leaveReason(object(value).reason) });
@@ -344,7 +367,30 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
                 }),
             )
           : null;
+      let reconciling = false;
+      startJoinRecovery = () => {
+        if (joinRecovery) return;
+        joinRecovery = setInterval(() => {
+          if (!awaitingJoin || reconciling || generation !== current || didJoin) return;
+          reconciling = true;
+          void zoom
+            .isInSession()
+            .then(async (connected) => {
+              if (connected && awaitingJoin && generation === current && !didJoin)
+                await refresh(true);
+            })
+            .catch(() => {})
+            .finally(() => {
+              reconciling = false;
+            });
+        }, 500);
+      };
       return () => {
+        if (joinRecovery) clearInterval(joinRecovery);
+        compositions.forEach(clearTimeout);
+        compositions.clear();
+        startJoinRecovery = null;
+        awaitingJoin = false;
         ++generation;
         subscriptions.forEach((subscription) => subscription.remove());
         interruptions?.remove();
@@ -363,6 +409,8 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
       await new Promise<void>((resolve) =>
         requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
       );
+      awaitingJoin = true;
+      startJoinRecovery?.();
       await zoom.joinSession({
         sessionName: credentials.sessionName,
         userName: credentials.displayName,
@@ -377,6 +425,7 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
       });
     },
     async leave(endForAll) {
+      awaitingJoin = false;
       await pictureInPicture?.configure('', false, false).catch(() => {});
       // The wrapper drops this native promise; await the bridge so failures stay recoverable.
       checked(await NativeModules.RNZoomVideoSdk.leaveSession(endForAll));
@@ -432,6 +481,22 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
     },
     async mirror(enabled) {
       checked(await zoom.videoHelper.mirrorMyVideo(enabled));
+    },
+    async startWhiteboardShare(tag) {
+      if (!NativeModules.ClassroomControls.startWhiteboardShare)
+        throw new Error('Update the app to publish whiteboards.');
+      checked(await NativeModules.ClassroomControls.startWhiteboardShare(tag));
+    },
+    async compositionStatus() {
+      return !!(await NativeModules.ClassroomControls.compositionStatus?.());
+    },
+    async announceComposition(active) {
+      checked(
+        await zoom.cmdChannel.sendCommand(
+          '',
+          JSON.stringify({ type: 'meeting-composited-share-v1', active }),
+        ),
+      );
     },
     async shareMode() {
       const mode: unknown = await NativeModules.ClassroomControls.getShareMode();

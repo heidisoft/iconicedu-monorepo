@@ -450,3 +450,60 @@ it('clears inactive captions after six seconds and removes ephemeral content on 
   });
   jest.useRealTimers();
 });
+
+it('bounds timeout recovery even when SDK join and leave promises never resolve', async () => {
+  jest.useFakeTimers();
+  const f = fixture();
+  f.adapter.join.mockImplementationOnce(() => new Promise(() => {}));
+  f.adapter.leave.mockImplementationOnce(() => new Promise(() => {}));
+  void f.controller.join();
+  await jest.advanceTimersByTimeAsync(35000);
+  expect(f.controller.state.phase).toBe('preview');
+  expect(f.controller.state.error).toContain('timed out');
+  await f.controller.join();
+  expect(f.adapter.join).toHaveBeenCalledTimes(2);
+  f.emit({ type: 'joined', selfId: '1', participants: [teacher] });
+  expect(f.controller.state.phase).toBe('meeting');
+  jest.useRealTimers();
+});
+
+it('retains all received chat messages through a long lesson', async () => {
+  const f = fixture();
+  await f.connected();
+  for (let i = 0; i < 250; i++)
+    f.emit({
+      type: 'chat',
+      id: String(i),
+      sender: 'Student',
+      text: String(i),
+      self: false,
+      sentAt: i,
+    });
+  expect(f.controller.snapshot().messages).toHaveLength(250);
+  expect(f.controller.snapshot().messages[0].text).toBe('0');
+});
+it('requires published annotation content before recording a shared screen', async () => {
+  const f = fixture();
+  await f.connected();
+  f.emit({ type: 'share', userId: '2', active: true });
+  await expect(f.controller.recording(true)).rejects.toThrow(
+    'not publishing annotations',
+  );
+  expect(f.adapter.recording).not.toHaveBeenCalled();
+  f.emit({ type: 'composition', userId: '2', active: true });
+  await f.controller.recording(true);
+  expect(f.adapter.recording).toHaveBeenCalledWith(true);
+});
+it('pauses once when a composed presenter stops publishing', async () => {
+  const f = fixture();
+  f.adapter.pauseRecording = jest.fn().mockResolvedValue(undefined);
+  await f.connected();
+  f.emit({ type: 'share', userId: '2', active: true });
+  f.emit({ type: 'composition', userId: '2', active: true });
+  f.emit({ type: 'recording', status: 'recording' });
+  f.emit({ type: 'composition', userId: '2', active: false });
+  f.emit({ type: 'composition', userId: '2', active: false });
+  await Promise.resolve();
+  expect(f.adapter.pauseRecording).toHaveBeenCalledTimes(1);
+  expect(f.controller.snapshot().error).toContain('publishing stopped');
+});

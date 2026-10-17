@@ -1,6 +1,11 @@
 import React from 'react';
-import { act, render, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { NativeShareStage } from './native-share-stage';
+jest.mock('@/providers/theme-provider', () => ({
+  useTheme: () => ({
+    colors: { text: 'black', card: 'white', action: 'green', actionForeground: 'white' },
+  }),
+}));
 const mockWidth = jest.fn();
 const mockZoom = {
   session: {
@@ -17,10 +22,29 @@ jest.mock('@zoom/react-native-videosdk', () => ({
 }));
 jest.mock('./native-video-view', () => ({ NativeVideoView: () => null }));
 jest.mock('./native-screen-annotations', () => {
-  const Text = require('react-native').Text;
+  const { Text, View, Pressable } = require('react-native');
   return {
-    NativeScreenAnnotations: ({ shareKey }: { shareKey: string }) => (
-      <Text testID="annotations">{shareKey}</Text>
+    NativeScreenAnnotations: ({
+      shareKey,
+      active,
+      onToggle,
+    }: {
+      shareKey: string;
+      active: boolean;
+      onToggle?: () => void;
+    }) => (
+      <View>
+        <Text testID="annotations">{shareKey}</Text>
+        {onToggle && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={
+              active ? 'Close annotation toolbar' : 'Open annotation toolbar'
+            }
+            onPress={onToggle}
+          />
+        )}
+      </View>
     ),
   };
 });
@@ -53,4 +77,30 @@ it('removes previous presenter annotations until the new share dimensions arrive
   });
   await waitFor(() => expect(screen.getByTestId('annotations')).toHaveTextContent('2'));
   screen.unmount();
+});
+
+it('exposes the same pencil toggle in embedded and full-screen share stages', async () => {
+  mockWidth.mockResolvedValue(1280);
+  const onToggleAnnotation = jest.fn();
+  const props = {
+    sessionId: 'meeting',
+    userId: '2',
+    height: 400,
+    composited: false,
+    onToggleAnnotation,
+  };
+  const screen = render(<NativeShareStage {...props} annotating={false} />);
+  await act(async () =>
+    screen
+      .UNSAFE_getAllByType(require('react-native').View)[0]
+      .props.onLayout({ nativeEvent: { layout: { width: 600, height: 400 } } }),
+  );
+  await waitFor(() =>
+    expect(screen.getByLabelText('Open annotation toolbar')).toBeTruthy(),
+  );
+  fireEvent.press(screen.getByLabelText('Open annotation toolbar'));
+  expect(onToggleAnnotation).toHaveBeenCalledTimes(1);
+  screen.rerender(<NativeShareStage {...props} annotating />);
+  fireEvent.press(screen.getByLabelText('Close annotation toolbar'));
+  expect(onToggleAnnotation).toHaveBeenCalledTimes(2);
 });

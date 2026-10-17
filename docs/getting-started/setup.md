@@ -209,6 +209,8 @@ It includes formatting, repository guards, linting, type checking, tests, and bu
 
 ## 6. Sign In With Seed Data
 
+Seeded classroom channels default to Zoom Video SDK video sessions. Configure the API’s `ZOOM_VIDEO_SDK_KEY`, `ZOOM_VIDEO_SDK_SECRET`, and `WEB_URL` as documented in [deployment](../operations/deployment.md) to join them; placeholder external meeting links are not used.
+
 Every `supabase db reset` loads the following local accounts with password `Seed123!`:
 
 | Email                              | Role     |

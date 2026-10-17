@@ -43,6 +43,7 @@ export function useRecordingShareCompositor(
       },
     );
     compositor.current = instance;
+    const expiry = new Map<number, ReturnType<typeof setTimeout>>();
     const receive = ({ senderId, text }: { senderId: string; text: string }) => {
       if (!/^[0-9]+$/.test(senderId)) return;
       let value: { type?: unknown; active?: unknown };
@@ -55,8 +56,26 @@ export function useRecordingShareCompositor(
       if (value.type !== messageType || typeof value.active !== 'boolean') return;
       // Sender ID is supplied by Zoom; message bodies cannot claim another presenter.
       const id = Number(senderId);
-      if (value.active) known.current.add(id);
-      else {
+      const previous = expiry.get(id);
+      if (previous) clearTimeout(previous);
+      expiry.delete(id);
+      if (value.active) {
+        known.current.add(id);
+        expiry.set(
+          id,
+          setTimeout(() => {
+            expiry.delete(id);
+            if (!known.current.delete(id)) return;
+            setComposited(new Set(known.current));
+            if (id === latest.current.activePresenter) {
+              setError(
+                'The presenter stopped publishing annotation content. Ask them to re-share before resuming recording.',
+              );
+              latest.current.onFailure();
+            }
+          }, 6000),
+        );
+      } else {
         const wasComposited = known.current.delete(id);
         if (wasComposited && id === latest.current.activePresenter) {
           setError(
@@ -70,12 +89,16 @@ export function useRecordingShareCompositor(
     const stop = (payload: { userId: number; action: string }) => {
       if (payload.action === 'Stop') {
         known.current.delete(payload.userId);
+        const timer = expiry.get(payload.userId);
+        if (timer) clearTimeout(timer);
+        expiry.delete(payload.userId);
         setComposited(new Set(known.current));
       }
     };
     client.on('peer-share-state-change', stop);
     client.on('command-channel-message', receive);
     return () => {
+      expiry.forEach(clearTimeout);
       client.off('command-channel-message', receive);
       client.off('peer-share-state-change', stop);
       compositor.current = null;

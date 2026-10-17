@@ -11,7 +11,9 @@ export function NativeShareStage({
   token,
   height,
   annotating,
+  onToggleAnnotation,
   composited,
+  publishAnnotations = true,
   onContext,
 }: {
   sessionId: string;
@@ -19,21 +21,23 @@ export function NativeShareStage({
   token?: string;
   height: number;
   annotating: boolean;
+  onToggleAnnotation?: () => void;
   composited: boolean;
+  publishAnnotations?: boolean;
   onContext?: (shareKey: string, context: AnnotationContext) => void;
 }) {
   const zoom = useZoom();
   const [viewport, setViewport] = useState({ width: 0, height });
+  const [publishing, setPublishing] = useState(false);
   const [source, setSource] = useState({ width: 0, height: 0 });
   useEffect(() => {
     let mounted = true;
     setSource({ width: 0, height: 0 });
     const refresh = async () => {
       try {
-        const users = [
-          await zoom.session.getMySelf(),
-          ...(await zoom.session.getRemoteUsers()),
-        ];
+        const self = await zoom.session.getMySelf();
+        if (mounted) setPublishing(self.userId === userId);
+        const users = [self, ...(await zoom.session.getRemoteUsers())];
         const user = users.find((value) => value.userId === userId);
         if (!user) return;
         const statistics = new ZoomVideoSdkUser(user).shareStatisticInfo;
@@ -89,7 +93,9 @@ export function NativeShareStage({
             width={bounds.width}
             height={bounds.height}
             active={annotating}
-            composited={composited}
+            onToggle={onToggleAnnotation}
+            composited={composited && !publishing}
+            publishing={publishing && publishAnnotations}
           />
         </View>
       )}

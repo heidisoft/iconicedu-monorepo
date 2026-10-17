@@ -46,8 +46,17 @@ jest.mock('expo-camera', () => ({
 jest.mock('expo-image-picker', () => ({}));
 const mockAnnotationSave = jest.fn().mockResolvedValue({});
 const mockAnnotationLoad = jest.fn().mockResolvedValue({
-  snapshot: { roomId: 'room', studentsEnabled: true },
-  actor: { role: 'educator' },
+  snapshot: {
+    roomId: 'room',
+    studentsEnabled: true,
+    objects: [],
+    revision: 0,
+    ended: false,
+    shareSessionId: 'room',
+  },
+  actor: { role: 'educator', userId: '1', displayName: 'Teacher' },
+  pointers: [],
+  lasers: [],
 });
 jest.mock('@/lib/classroom/annotation-api', () => ({
   nativeAnnotationApi: () => ({ load: mockAnnotationLoad, save: mockAnnotationSave }),

@@ -1,13 +1,40 @@
+import { useReducedMotion } from './use-reduced-motion';
+import { NativeWhiteboardToolbar, type Tool } from './native-whiteboard-toolbar';
+import { useNativeWhiteboardFollow } from './use-native-whiteboard-follow';
 import { useNativeWhiteboardLasers } from './use-native-whiteboard-lasers';
-import { exportClassroomImage } from '@/lib/classroom/export-image';
+import {
+  exportClassroomImage,
+  exportClassroomDocument,
+} from '@/lib/classroom/export-image';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, Text, View } from 'react-native';
-import { Minimize2, Maximize2, SlidersHorizontal } from 'lucide-react-native';
+import {
+  Alert,
+  findNodeHandle,
+  Modal,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from 'react-native';
+import {
+  Minimize2,
+  Maximize2,
+  SlidersHorizontal,
+  Download,
+  RotateCcw,
+  Trash2,
+  Presentation,
+  Users,
+  Eye,
+  Pencil,
+} from 'lucide-react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import type {
   WhiteboardElementVM,
+  WhiteboardViewportVM,
+  WhiteboardViewportPresenceVM,
   WhiteboardLaserPresenceVM,
   WhiteboardLaserSampleVM,
   WhiteboardOperationVM,
@@ -19,6 +46,8 @@ import { generateClientMessageId } from '@/lib/messages/client-message-id';
 import { classroomCanvasHtml } from './canvas/canvas.generated';
 
 export interface NativeWhiteboardRepository {
+  viewports?(): Promise<WhiteboardViewportPresenceVM[]>;
+  publishViewport?(viewport: WhiteboardViewportVM): Promise<unknown>;
   lasers?(): Promise<WhiteboardLaserPresenceVM[]>;
   publishLaser?(samples: WhiteboardLaserSampleVM[]): Promise<unknown>;
   load(): Promise<WhiteboardSnapshotVM>;
@@ -37,8 +66,12 @@ export function NativeWhiteboard({
   onExpand,
   controls,
   embedded = false,
+  onPublisher,
+  publishView,
 }: {
   token: string;
+  onPublisher?: (publish: (() => Promise<void>) | null) => void;
+  publishView?: (tag: number) => Promise<void>;
   repository?: NativeWhiteboardRepository;
   onPresentation?: (active: boolean) => void;
   onPending?: (pending: boolean) => void;
@@ -50,13 +83,46 @@ export function NativeWhiteboard({
   embedded?: boolean;
 }) {
   const { colors, isDark } = useTheme();
+  const reducedMotion = useReducedMotion();
   const webview = useRef<WebView>(null);
+  const shareView = useRef<View>(null);
   const [snapshot, setSnapshot] = useState<WhiteboardSnapshotVM | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [boardWidth, setBoardWidth] = useState(0);
   const [ready, setReady] = useState(false);
+  const [styleState, setStyleState] = useState<{
+    tool: Tool;
+    color: string;
+    width: number;
+    fill: string;
+    selectionType?: string;
+  }>();
   const [saving, setSaving] = useState(false);
+  const [discarding, setDiscarding] = useState(false);
+  const publisher = useCallback(async () => {
+    const tag = findNodeHandle(shareView.current);
+    if (!ready || !tag || !publishView)
+      throw new Error('Wait for the whiteboard to load before recording.');
+    await publishView(tag);
+  }, [publishView, ready]);
+  useEffect(() => {
+    onPublisher?.(publisher);
+    return () => onPublisher?.(null);
+  }, [onPublisher, publisher]);
+  const receiveViewport = useCallback((viewport: WhiteboardViewportVM) => {
+    if (drawing.current) return;
+    webview.current?.injectJavaScript(
+      `window.classroomViewport?.(${JSON.stringify(viewport)}); true;`,
+    );
+  }, []);
+  const follow = useNativeWhiteboardFollow(
+    token,
+    repository,
+    snapshot,
+    ready && visible,
+    receiveViewport,
+  );
   const actorId = snapshot?.actorId;
   const receiveLasers = useCallback(
     (presence: WhiteboardLaserPresenceVM[]) => {
@@ -239,22 +305,48 @@ export function NativeWhiteboard({
   useEffect(() => {
     onPending?.(saving);
   }, [saving, onPending]);
-  const button = (label: string, onPress: () => void) => (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={{ padding: 12, minHeight: 44 }}
-    >
-      <Text style={{ color: colors.text }}>{label}</Text>
-    </Pressable>
-  );
+  const button = (label: string, onPress: () => void) => {
+    const Icon =
+      label.startsWith('Export') || label.startsWith('Download')
+        ? Download
+        : label.startsWith('Discard')
+          ? Trash2
+          : label.startsWith('Retry')
+            ? RotateCcw
+            : label.includes('present')
+              ? Presentation
+              : label.includes('editing') || label.includes('annotate')
+                ? Pencil
+                : Eye;
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        onPress={onPress}
+        style={{
+          padding: 12,
+          minHeight: 44,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 10,
+        }}
+      >
+        <Icon size={20} color={colors.text} />
+        <Text style={{ color: colors.text, flexShrink: 1 }}>{label}</Text>
+      </Pressable>
+    );
+  };
   const Container = embedded ? View : Modal;
   const Insets = embedded ? View : SafeAreaView;
   return (
     <Container
       {...(embedded
         ? { style: { flex: 1 } }
-        : { visible, animationType: 'slide' as const, onRequestClose: close })}
+        : {
+            visible,
+            animationType: reducedMotion ? ('none' as const) : ('slide' as const),
+            onRequestClose: close,
+          })}
     >
       <SafeAreaProvider>
         <Insets
@@ -268,6 +360,62 @@ export function NativeWhiteboard({
               {error}
             </Text>
           )}
+          <View
+            accessibilityLiveRegion="polite"
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 10,
+              padding: 10,
+              flexWrap: 'wrap',
+            }}
+          >
+            <Text accessibilityRole="text" style={{ color: colors.text }}>
+              {error
+                ? saving
+                  ? 'Unsaved · retrying'
+                  : 'Reconnecting…'
+                : saving
+                  ? 'Saving…'
+                  : snapshot
+                    ? 'Saved'
+                    : 'Connecting…'}
+            </Text>
+            <View
+              accessible
+              accessibilityLabel={`Whiteboard participants: ${snapshot?.presence.map((person) => person.name).join(', ') || 'Waiting for participants'}`}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+            >
+              <Users size={16} color={colors.text} />
+              {snapshot?.presence.slice(0, 4).map((person) => (
+                <View
+                  key={person.id}
+                  style={{
+                    borderRadius: 16,
+                    minWidth: 28,
+                    minHeight: 28,
+                    padding: 4,
+                    backgroundColor: colors.actionSubtle,
+                  }}
+                >
+                  <Text style={{ color: colors.text }}>
+                    {person.name
+                      .trim()
+                      .split(/\s+/)
+                      .slice(0, 2)
+                      .map((part) => part[0])
+                      .join('')
+                      .toUpperCase() || '?'}
+                  </Text>
+                </View>
+              ))}
+              {!!snapshot && snapshot.presence.length > 4 && (
+                <Text style={{ color: colors.text }}>
+                  +{snapshot.presence.length - 4}
+                </Text>
+              )}
+            </View>
+          </View>
           {error &&
             button('Retry saving', () => {
               void flush();
@@ -290,9 +438,6 @@ export function NativeWhiteboard({
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={{ gap: 4, paddingBottom: 12 }}
             >
-              <Text accessibilityLiveRegion="polite" style={{ color: colors.text }}>
-                {saving ? 'Saving…' : 'Saved'}
-              </Text>
               {snapshot?.role === 'student' && !snapshot.document.studentEditing && (
                 <Text
                   accessibilityLiveRegion="polite"
@@ -301,18 +446,135 @@ export function NativeWhiteboard({
                   View only. Ask the host to allow editing.
                 </Text>
               )}
-              {button('Educational library', () => {
-                webview.current?.injectJavaScript(
-                  'window.classroomAction?.("library"); true;',
-                );
-                setOptionsOpen(false);
-              })}
+              <Text style={{ color: colors.text, padding: 12 }}>Follow viewport</Text>
+              {follow.following !== 'free' && (
+                <Text
+                  accessibilityLiveRegion="polite"
+                  style={{ color: colors.textMuted, padding: 12 }}
+                >
+                  {follow.status === 'following'
+                    ? 'Following participant’s view'
+                    : follow.status === 'reconnecting'
+                      ? 'Unable to sync views. Check your connection.'
+                      : 'Waiting for participant’s view…'}
+                </Text>
+              )}
+              <Pressable
+                accessibilityRole="radio"
+                accessibilityState={{ checked: follow.following === 'tutor' }}
+                onPress={() => follow.setFollowing('tutor')}
+                style={{ padding: 12 }}
+              >
+                <Text style={{ color: colors.text }}>
+                  {follow.following === 'tutor' ? '✓ ' : ''}Follow tutor (default)
+                </Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="radio"
+                accessibilityState={{ checked: follow.following === 'free' }}
+                onPress={() => follow.setFollowing('free')}
+                style={{ padding: 12 }}
+              >
+                <Text style={{ color: colors.text }}>
+                  {follow.following === 'free' ? '✓ ' : ''}Explore freely
+                </Text>
+              </Pressable>
+              {snapshot?.presence
+                .filter((person) => person.id !== snapshot.actorId)
+                .map((person) => (
+                  <Pressable
+                    key={person.id}
+                    accessibilityRole="radio"
+                    accessibilityLabel={`Follow ${person.name}`}
+                    accessibilityState={{ checked: follow.following === person.id }}
+                    onPress={() => follow.setFollowing(person.id)}
+                    style={{ padding: 12 }}
+                  >
+                    <Text style={{ color: colors.text }}>
+                      {follow.following === person.id ? '✓ ' : ''}Follow {person.name}
+                    </Text>
+                  </Pressable>
+                ))}
               {button('Export whiteboard image', () => {
                 webview.current?.injectJavaScript(
                   'window.classroomAction?.("export"); true;',
                 );
                 setOptionsOpen(false);
               })}
+              {button('Export whiteboard SVG', () => {
+                webview.current?.injectJavaScript(
+                  'window.classroomAction?.("export-svg"); true;',
+                );
+                setOptionsOpen(false);
+              })}
+              {saving && (
+                <>
+                  {button('Download unsaved edits', () => {
+                    void exportClassroomDocument(
+                      JSON.stringify({
+                        schemaVersion: 1,
+                        boardId: snapshot?.id,
+                        savedAt: Date.now(),
+                        operations: queue.current,
+                      }),
+                      'json',
+                    ).catch(() =>
+                      Alert.alert(
+                        'Export failed',
+                        'Unable to export unsaved edits. Please retry.',
+                      ),
+                    );
+                  })}
+                  {button('Discard unsaved edits', () =>
+                    Alert.alert(
+                      'Discard unsaved edits?',
+                      'This removes only your pending changes. Saved class drawings remain.',
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        {
+                          text: 'Discard',
+                          style: 'destructive',
+                          onPress: () => {
+                            if (busy.current || drawing.current) {
+                              Alert.alert(
+                                'Please wait',
+                                'Wait until the current save or stroke finishes, then retry.',
+                              );
+                              return;
+                            }
+                            busy.current = true;
+                            setDiscarding(true);
+                            void (async () => {
+                              try {
+                                const value = repository
+                                  ? await repository.load()
+                                  : await capabilityGet<WhiteboardSnapshotVM>(
+                                      '/whiteboards/current',
+                                      token,
+                                    );
+                                const key = recoveryKey();
+                                if (key && !repository)
+                                  await AsyncStorage.removeItem(key);
+                                queue.current = [];
+                                setSaving(false);
+                                setError(null);
+                                setSnapshot(value);
+                              } catch {
+                                setError(
+                                  'Unable to discard unsaved edits. Please retry.',
+                                );
+                              } finally {
+                                busy.current = false;
+                                setDiscarding(false);
+                              }
+                            })();
+                          },
+                        },
+                      ],
+                    ),
+                  )}
+                </>
+              )}
               {snapshot &&
                 (!snapshot.presentationActive ||
                   snapshot.role === 'teacher' ||
@@ -344,102 +606,178 @@ export function NativeWhiteboard({
                         enabled: !snapshot.document.studentEditing,
                       }),
                   )}
-                  {button('Clear board', () =>
-                    Alert.alert('Clear whiteboard?', 'This clears the class drawing.', [
-                      { text: 'Cancel', style: 'cancel' },
-                      {
-                        text: 'Clear',
-                        style: 'destructive',
-                        onPress: () =>
-                          save({
-                            id: generateClientMessageId(),
-                            type: 'clear-page',
-                            pageId: snapshot.document.pages[0].id,
-                          }),
-                      },
-                    ]),
-                  )}
                 </>
               )}
             </ScrollView>
           )}
-          <WebView
-            ref={webview}
-            source={{ html: classroomCanvasHtml }}
-            originWhitelist={['about:blank']}
-            javaScriptEnabled
-            scrollEnabled={false}
-            nestedScrollEnabled
-            style={{ flex: 1 }}
-            onShouldStartLoadWithRequest={(request) => request.url === 'about:blank'}
-            onMessage={(event) => {
-              try {
-                const message = JSON.parse(event.nativeEvent.data) as {
-                  type?: string;
-                  elements?: WhiteboardElementVM[];
-                  dataUrl?: string;
-                  x?: number;
-                  y?: number;
-                  button?: 'down' | 'up';
-                };
-                if (message.type === 'laser') {
-                  if (
-                    typeof message.x === 'number' &&
-                    Number.isFinite(message.x) &&
-                    typeof message.y === 'number' &&
-                    Number.isFinite(message.y) &&
-                    (message.button === 'down' || message.button === 'up')
-                  )
-                    publishLaser({ x: message.x, y: message.y, button: message.button });
-                  return;
-                }
-                if (message.type === 'export-error') {
-                  Alert.alert(
-                    'Unable to export whiteboard',
-                    'Please try exporting the drawing again.',
-                  );
-                  return;
-                }
-                if (message.type === 'export') {
-                  if (typeof message.dataUrl !== 'string') return;
-                  void exportClassroomImage(message.dataUrl).catch((cause) =>
-                    setError(
-                      cause instanceof Error
-                        ? cause.message
-                        : 'Unable to export this drawing. Please retry.',
-                    ),
-                  );
-                  return;
-                }
-                if (message.type === 'drawing') {
-                  drawing.current = true;
-                  setSaving(true);
-                  onPending?.(true);
-                  return;
-                }
-                if (message.type === 'ready') {
-                  setReady(true);
-                  return;
-                }
-                if (
-                  message.type === 'elements' &&
-                  Array.isArray(message.elements) &&
-                  current.current
-                ) {
-                  drawing.current = false;
-                  save({
-                    id: generateClientMessageId(),
-                    type: 'elements',
-                    pageId: current.current.document.pages[0].id,
-                    elements: message.elements,
-                  });
-                }
-              } catch {
-                setError('Unable to read drawing changes. Please retry.');
-              }
-            }}
-            onError={() => setError('Unable to open the drawing canvas. Please retry.')}
+          <NativeWhiteboardToolbar
+            onFollow={() => setOptionsOpen(true)}
+            followLabel={
+              follow.following === 'tutor'
+                ? 'Follow tutor'
+                : follow.following === 'free'
+                  ? 'Explore freely'
+                  : `Follow ${snapshot?.presence.find((person) => person.id === follow.following)?.name ?? 'participant'}`
+            }
+            styleState={styleState}
+            ready={ready}
+            editable={
+              snapshot?.role === 'teacher' || snapshot?.document.studentEditing === true
+            }
+            canClear={snapshot?.role === 'teacher'}
+            onCommand={(command) =>
+              webview.current?.injectJavaScript(
+                `window.classroomCommand?.(${JSON.stringify(command)}); true;`,
+              )
+            }
+            onClear={() =>
+              Alert.alert('Clear whiteboard?', 'This clears the class drawing.', [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Clear',
+                  style: 'destructive',
+                  onPress: () => {
+                    if (snapshot)
+                      save({
+                        id: generateClientMessageId(),
+                        type: 'clear-page',
+                        pageId: snapshot.document.pages[0].id,
+                      });
+                  },
+                },
+              ])
+            }
           />
+          <View
+            ref={shareView}
+            collapsable={false}
+            pointerEvents={discarding ? 'none' : 'auto'}
+            style={{ flex: 1 }}
+          >
+            <WebView
+              ref={webview}
+              source={{ html: classroomCanvasHtml }}
+              originWhitelist={['about:blank']}
+              javaScriptEnabled
+              scrollEnabled={false}
+              nestedScrollEnabled
+              style={{ flex: 1 }}
+              onShouldStartLoadWithRequest={(request) => request.url === 'about:blank'}
+              onMessage={(event) => {
+                try {
+                  const message = JSON.parse(event.nativeEvent.data) as {
+                    type?: string;
+                    viewport?: WhiteboardViewportVM;
+                    tool?: Tool;
+                    color?: string;
+                    width?: number;
+                    fill?: string;
+                    selectionType?: string;
+                    elements?: WhiteboardElementVM[];
+                    dataUrl?: string;
+                    svg?: string;
+                    x?: number;
+                    y?: number;
+                    button?: 'down' | 'up';
+                  };
+                  if (
+                    message.type === 'tool-state' &&
+                    message.tool &&
+                    typeof message.color === 'string' &&
+                    typeof message.width === 'number' &&
+                    typeof message.fill === 'string'
+                  ) {
+                    setStyleState({
+                      tool: message.tool,
+                      color: message.color,
+                      width: message.width,
+                      fill: message.fill,
+                      selectionType: message.selectionType,
+                    });
+                    return;
+                  }
+                  if (message.type === 'viewport' && message.viewport) {
+                    const v = message.viewport;
+                    if (
+                      Number.isFinite(v.centerX) &&
+                      Number.isFinite(v.centerY) &&
+                      Number.isFinite(v.zoom)
+                    )
+                      follow.publish(v);
+                    return;
+                  }
+                  if (message.type === 'laser') {
+                    if (
+                      typeof message.x === 'number' &&
+                      Number.isFinite(message.x) &&
+                      typeof message.y === 'number' &&
+                      Number.isFinite(message.y) &&
+                      (message.button === 'down' || message.button === 'up')
+                    )
+                      publishLaser({
+                        x: message.x,
+                        y: message.y,
+                        button: message.button,
+                      });
+                    return;
+                  }
+                  if (message.type === 'export-error') {
+                    Alert.alert(
+                      'Unable to export whiteboard',
+                      'Please try exporting the drawing again.',
+                    );
+                    return;
+                  }
+                  if (message.type === 'export-svg' && typeof message.svg === 'string') {
+                    void exportClassroomDocument(message.svg, 'svg').catch(() =>
+                      Alert.alert(
+                        'Export failed',
+                        'Unable to export this drawing. Please retry.',
+                      ),
+                    );
+                    return;
+                  }
+                  if (message.type === 'export') {
+                    if (typeof message.dataUrl !== 'string') return;
+                    void exportClassroomImage(message.dataUrl).catch((cause) =>
+                      setError(
+                        cause instanceof Error
+                          ? cause.message
+                          : 'Unable to export this drawing. Please retry.',
+                      ),
+                    );
+                    return;
+                  }
+                  if (message.type === 'drawing') {
+                    drawing.current = true;
+                    setSaving(true);
+                    onPending?.(true);
+                    return;
+                  }
+                  if (message.type === 'ready') {
+                    setReady(true);
+                    return;
+                  }
+                  if (
+                    message.type === 'elements' &&
+                    Array.isArray(message.elements) &&
+                    current.current
+                  ) {
+                    drawing.current = false;
+                    save({
+                      id: generateClientMessageId(),
+                      type: 'elements',
+                      pageId: current.current.document.pages[0].id,
+                      elements: message.elements,
+                    });
+                  }
+                } catch {
+                  setError('Unable to read drawing changes. Please retry.');
+                }
+              }}
+              onError={() => setError('Unable to open the drawing canvas. Please retry.')}
+            />
+          </View>
           <View
             style={{
               position: 'absolute',

@@ -59,6 +59,9 @@ export type NativeMediaDevices = {
 };
 export interface NativeMeetingAdapter {
   pictureInPicture?: NativePictureInPictureAdapter;
+  startWhiteboardShare?(tag: number): Promise<void>;
+  compositionStatus?(): Promise<boolean>;
+  announceComposition?(active: boolean): Promise<void>;
   prepareAudio?(): Promise<void>;
   subscribe(listener: (event: NativeMeetingEvent) => void): () => void;
   join(
@@ -159,9 +162,11 @@ export class NativeMeetingController {
   private listeners = new Set<() => void>();
   private disconnect: (() => void) | null = null;
   private disposed = false;
+  private contentPausePending = false;
   private reactionTimers = new Set<ReturnType<typeof setTimeout>>();
   private captionTimer: ReturnType<typeof setTimeout> | null = null;
   private busy = false;
+  private joinAttempt = 0;
   private joinDeadline: ReturnType<typeof setTimeout> | null = null;
   settings: LiveSessionSettingsVM;
   constructor(
@@ -191,31 +196,42 @@ export class NativeMeetingController {
     this.settings = credentials.settings ?? DEFAULT_LIVE_SESSION_SETTINGS;
     this.disconnect ??= this.adapter.subscribe((event) => this.event(event));
     this.update({ phase: 'joining', error: null });
+    const attempt = ++this.joinAttempt;
     this.joinDeadline = setTimeout(() => {
-      if (this.state.phase !== 'joining' || this.disposed) return;
-      this.disconnect?.();
-      this.disconnect = null;
-      void this.adapter
-        .leave(false)
-        .catch(() => {})
-        .finally(() =>
-          this.update({
-            phase: 'preview',
-            error: 'Joining timed out. Check your connection and try again.',
-          }),
-        );
+      if (this.state.phase !== 'joining' || this.disposed || attempt !== this.joinAttempt)
+        return;
+      void this.recoverJoin('Joining timed out. Check your connection and try again.');
     }, 30000);
     try {
       await this.adapter.join(credentials, this.state);
       if (this.disposed) await this.adapter.leave(false);
     } catch {
-      if (this.joinDeadline) clearTimeout(this.joinDeadline);
-      this.update({
-        phase: 'preview',
-        error: 'Unable to join. Check your connection and try again.',
-      });
+      if (attempt === this.joinAttempt && this.snapshot().phase === 'joining')
+        await this.recoverJoin('Unable to join. Check your connection and try again.');
     } finally {
-      this.busy = false;
+      if (attempt === this.joinAttempt) this.busy = false;
+    }
+  }
+  private async recoverJoin(message: string) {
+    const attempt = ++this.joinAttempt;
+    if (this.joinDeadline) clearTimeout(this.joinDeadline);
+    this.disconnect?.();
+    this.disconnect = null;
+    this.busy = true;
+    let cleanupDeadline: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        this.adapter.leave(false).catch(() => {}),
+        new Promise<void>((resolve) => {
+          cleanupDeadline = setTimeout(resolve, 5000);
+        }),
+      ]);
+    } finally {
+      if (cleanupDeadline) clearTimeout(cleanupDeadline);
+      if (attempt === this.joinAttempt) {
+        this.busy = false;
+        this.update({ phase: 'preview', error: message });
+      }
     }
   }
   private event(event: NativeMeetingEvent) {
@@ -263,6 +279,8 @@ export class NativeMeetingController {
         if (this.joinDeadline) clearTimeout(this.joinDeadline);
         this.update({
           phase: 'ended',
+          messages: [],
+          composited: [],
           audioInterrupted: false,
           sharingUserId: null,
           sharingUserIds: [],
@@ -274,13 +292,7 @@ export class NativeMeetingController {
         break;
       case 'error':
         if (this.state.phase === 'joining') {
-          if (this.joinDeadline) clearTimeout(this.joinDeadline);
-          this.disconnect?.();
-          this.disconnect = null;
-          void this.adapter
-            .leave(false)
-            .catch(() => {})
-            .finally(() => this.update({ phase: 'preview', error: event.message }));
+          void this.recoverJoin(event.message);
         } else this.update({ error: event.message });
         break;
       case 'share': {
@@ -303,6 +315,7 @@ export class NativeMeetingController {
         break;
       }
       case 'recording':
+        if (event.status !== 'recording') this.contentPausePending = false;
         this.update({
           recording: event.status !== 'stopped',
           recordingPaused: event.status === 'paused',
@@ -329,7 +342,7 @@ export class NativeMeetingController {
           messages: [
             ...this.state.messages.filter((message) => message.id !== event.id),
             event,
-          ].slice(-200),
+          ],
         });
         break;
       case 'hand':
@@ -357,13 +370,17 @@ export class NativeMeetingController {
         this.reactionTimers.add(timer);
         break;
       }
-      case 'composition':
+      case 'composition': {
+        const known = this.state.composited.includes(event.userId);
+        if (!event.active && known) this.holdRecordingForContent(event.userId);
+        if (known === event.active) break;
         this.update({
           composited: event.active
-            ? [...new Set([...this.state.composited, event.userId])]
+            ? [...this.state.composited, event.userId]
             : this.state.composited.filter((id) => id !== event.userId),
         });
         break;
+      }
       case 'speaking':
         this.update({
           speaking: event.userIds.filter((id) =>
@@ -437,6 +454,7 @@ export class NativeMeetingController {
       );
   }
   private clearEphemeral() {
+    this.contentPausePending = false;
     for (const timer of this.reactionTimers) clearTimeout(timer);
     this.reactionTimers.clear();
     if (this.captionTimer) clearTimeout(this.captionTimer);
@@ -488,10 +506,45 @@ export class NativeMeetingController {
     if (!this.self?.host) throw new Error('Host access required');
     await this.adapter.host(userId);
   }
+  private holdRecordingForContent(userId: string) {
+    if (
+      this.contentPausePending ||
+      !this.state.sharingUserIds.includes(userId) ||
+      !this.state.recording ||
+      this.state.recordingPaused ||
+      (!this.self?.host && !this.self?.cohost)
+    )
+      return;
+    this.contentPausePending = true;
+    this.update({
+      error:
+        'Shared content publishing stopped. Pausing recording; ask the presenter to retry.',
+    });
+    void this.pauseRecording()
+      .catch(() => this.adapter.recording(false))
+      .catch(() => {
+        this.contentPausePending = false;
+        this.update({
+          error:
+            'Unable to pause recording after shared content publishing stopped. Stop recording and retry.',
+        });
+      });
+  }
+  composition(userId: string, active: boolean, requireContent = false) {
+    if (requireContent && !active) this.holdRecordingForContent(userId);
+    this.event({ type: 'composition', userId, active });
+  }
   async recording(enabled: boolean) {
     this.requireModerator();
     if (!this.settings.recording.enabled)
       throw new Error('Recording controls are unavailable');
+    if (
+      enabled &&
+      this.state.sharingUserIds.some((id) => !this.state.composited.includes(id))
+    )
+      throw new Error(
+        'The presenter is not publishing annotations for recording. Ask them to retry sharing before starting or resuming.',
+      );
     // Web resumes a paused recording from the same control instead of stopping it.
     if (enabled && this.state.recordingPaused) {
       if (!this.adapter.resumeRecording)

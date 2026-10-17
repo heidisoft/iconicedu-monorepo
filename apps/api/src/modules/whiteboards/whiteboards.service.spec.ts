@@ -344,3 +344,71 @@ describe('ephemeral whiteboard laser transport', () => {
     );
   });
 });
+
+describe('whiteboard viewport presence', () => {
+  beforeEach(() => jest.clearAllMocks());
+  it.each([
+    null,
+    {},
+    { centerX: 0, centerY: 0, zoom: 0 },
+    { centerX: Infinity, centerY: 0, zoom: 1 },
+    { centerX: 0, centerY: 0, zoom: 31 },
+    { centerX: '0', centerY: 0, zoom: 1 },
+  ])('rejects malformed viewport %p', async (value) => {
+    await expect(new WhiteboardsService().publishViewport(token, value)).rejects.toThrow(
+      'Invalid whiteboard viewport',
+    );
+    expect(createSupabaseServiceClient).not.toHaveBeenCalled();
+  });
+  it('allows view-only participants to publish only their own viewport', async () => {
+    const { grant, db } = mockDb('student', true);
+    await new WhiteboardsService().publishViewport(token, {
+      centerX: 12,
+      centerY: -30,
+      zoom: 2,
+      actorId: 'forged',
+    });
+    expect(grant.update).toHaveBeenCalledWith({
+      viewport: { centerX: 12, centerY: -30, zoom: 2 },
+      viewport_updated_at: expect.any(String),
+    });
+    expect(grant.eq).toHaveBeenCalledWith('token_hash', hashWhiteboardToken(token));
+    expect(db.rpc).not.toHaveBeenCalled();
+  });
+  it('scopes reads to the authorized board, session and live capabilities', async () => {
+    const { grant } = mockDb();
+    const viewport = { centerX: 10, centerY: 20, zoom: 1 };
+    grant.then = builder([
+      {
+        token_hash: hashWhiteboardToken(token),
+        viewport,
+        viewport_updated_at: new Date().toISOString(),
+      },
+      {
+        token_hash: 'peer'.repeat(16),
+        viewport,
+        viewport_updated_at: new Date().toISOString(),
+      },
+    ]).then;
+    const result = await new WhiteboardsService().getViewports(token);
+    expect(result).toEqual([
+      { actorId: 'peer'.repeat(4), viewport, expiresAt: expect.any(Number) },
+    ]);
+    expect(grant.eq).toHaveBeenCalledWith('board_id', 'board');
+    expect(grant.eq).toHaveBeenCalledWith('live_session_id', 'session');
+    expect(grant.gt).toHaveBeenCalledWith('expires_at', expect.any(String));
+    expect(grant.gt).toHaveBeenCalledWith('viewport_updated_at', expect.any(String));
+  });
+  it('rejects expired capabilities for viewport publication', async () => {
+    const { grant } = mockDb();
+    grant.maybeSingle.mockResolvedValue({ data: null, error: null });
+    await expect(
+      new WhiteboardsService().publishViewport(token, {
+        centerX: 0,
+        centerY: 0,
+        zoom: 1,
+      }),
+    ).rejects.toThrow('Whiteboard access expired');
+    expect(grant.update).not.toHaveBeenCalled();
+  });
+});

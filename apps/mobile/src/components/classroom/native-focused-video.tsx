@@ -1,3 +1,4 @@
+import { useReducedMotion } from './use-reduced-motion';
 import React, { useState } from 'react';
 import { Modal, Pressable, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -17,9 +18,14 @@ export function NativeFocusedVideo({
   shareContent?: (height: number) => React.ReactNode;
 }) {
   const { colors } = useTheme();
+  const reducedMotion = useReducedMotion();
   const [contentHeight, setContentHeight] = useState(0);
   return (
-    <Modal visible={!!user} animationType="fade" onRequestClose={onClose}>
+    <Modal
+      visible={!!user}
+      animationType={reducedMotion ? 'none' : 'fade'}
+      onRequestClose={onClose}
+    >
       <SafeAreaProvider>
         <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
           <View

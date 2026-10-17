@@ -9,6 +9,9 @@ import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import us.zoom.sdk.ZoomVideoSDK
+import us.zoom.sdk.ZoomVideoSDKSharePreprocessParam
+import us.zoom.sdk.ZoomVideoSDKSharePreprocessType
+import us.zoom.sdk.IZoomVideoSDKSharePreprocessor
 
 /** MediaProjection consent is granted in MainActivity before starting this service. */
 class ClassroomShareService : Service() {
@@ -27,12 +30,15 @@ class ClassroomShareService : Service() {
     @Suppress("DEPRECATION")
     val capture = intent?.getParcelableExtra<Intent>("capture")
     if (capture != null) {
-      val result = ZoomVideoSDK.getInstance().shareHelper.startShareScreen(capture)
+      val result = ZoomVideoSDK.getInstance().shareHelper.startShareWithPreprocessing(
+        ZoomVideoSDKSharePreprocessParam(ZoomVideoSDKSharePreprocessType.ZoomVideoSDKSharePreprocessType_screen, null, capture),
+        object : IZoomVideoSDKSharePreprocessor { override fun onCapturedRawDataReceived(bitmap: android.graphics.Bitmap) { ClassroomComposition.compose(bitmap) } }
+      )
       if (result != 0) stopSelf()
     } else stopSelf()
     return START_NOT_STICKY
   }
-  override fun onDestroy() { ZoomVideoSDK.getInstance().shareHelper.stopShare(); super.onDestroy() }
+  override fun onDestroy() { ClassroomComposition.reset(); ZoomVideoSDK.getInstance().shareHelper.stopShare(); super.onDestroy() }
   override fun onTaskRemoved(rootIntent: Intent?) { stopSelf() }
   override fun onBind(intent: Intent?): IBinder? = null
 }

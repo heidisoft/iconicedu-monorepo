@@ -98,3 +98,9 @@ export * from './whiteboard/assets';
 export * from './live-sessions/background-catalog';
 
 export { createShareAnnotationLifecycle } from './share-annotation-lifecycle';
+
+export {
+  SceneHistory,
+  changedElements,
+  sceneFingerprint,
+} from './whiteboard/scene-history';

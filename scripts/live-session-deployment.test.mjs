@@ -96,3 +96,17 @@ test('production applies schema before API deployment and preview configures its
       preview.run.indexOf('mutation environmentTriggersDeploy'),
   );
 });
+
+test('seeded classrooms default to Video SDK sessions without custom meeting links', () => {
+  const seed = fs.readFileSync('supabase/seed.sql', 'utf8');
+  const channels = seed.split('INSERT INTO "public"."channels"')[1].split(';')[0];
+  const configs = [...channels.matchAll(/'(\{"mode": "video"[^']*\})'/g)].map(
+    ([, json]) => JSON.parse(json),
+  );
+  assert.equal(configs.length, 7, 'all seeded classrooms have live-session defaults');
+  for (const config of configs) {
+    assert.equal(config.enabled, true);
+    assert.equal(config.provider, 'zoom');
+    assert.equal(config.joinUrl, undefined, 'Video SDK generates its own join access');
+  }
+});
