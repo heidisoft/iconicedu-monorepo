@@ -5,7 +5,7 @@ import { CaptureUpdateAction, Excalidraw, restoreElements } from '@excalidraw/ex
 import '@excalidraw/excalidraw/index.css';
 import type { ExcalidrawElement } from '@excalidraw/excalidraw/element/types';
 import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';
-import type { WhiteboardElementVM } from '@iconicedu/shared-types';
+import type { WhiteboardViewportVM, WhiteboardElementVM } from '@iconicedu/shared-types';
 import { ExcalidrawWhiteboardEngine, wrapCanvasElements } from './excalidraw-engine';
 import type { WhiteboardEngine, WhiteboardTool } from './whiteboard-engine';
 import './whiteboard-canvas.css';
@@ -22,8 +22,12 @@ export function ExcalidrawCanvas({
   onChange,
   onEngine,
   onToolChange,
+  onViewport,
+  viewport,
 }: {
   token?: string;
+  onViewport?: (viewport: WhiteboardViewportVM) => void;
+  viewport?: WhiteboardViewportVM;
   defaultColor?: string;
   tool: WhiteboardTool;
   elements: WhiteboardElementVM[];
@@ -43,7 +47,22 @@ export function ExcalidrawCanvas({
     type: 'selection',
   });
   const [hasStyleOptions, setHasStyleOptions] = useState(false);
+  const interacting = useRef(false);
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
+  useEffect(() => {
+    if (!api || !viewport) return;
+    const state = api.getAppState();
+    // Never move the canvas underneath an active stroke or drag.
+    if (interacting.current || state.editingTextElement) return;
+    api.updateScene({
+      appState: {
+        scrollX: state.width / (2 * viewport.zoom) - viewport.centerX,
+        scrollY: state.height / (2 * viewport.zoom) - viewport.centerY,
+        zoom: { value: viewport.zoom as typeof state.zoom.value },
+      },
+      captureUpdate: CaptureUpdateAction.NEVER,
+    });
+  }, [api, viewport]);
   const onPointerUpdate = useWhiteboardLaser(api, token);
   const engineRef = useRef<ExcalidrawWhiteboardEngine | null>(null);
   const onChangeRef = useRef(onChange);
@@ -120,6 +139,7 @@ export function ExcalidrawCanvas({
         }
       }}
       onPointerDownCapture={(event) => {
+        interacting.current = true;
         if ((event.target as HTMLElement).closest('.whiteboard-quick-styles')) return;
         if (
           !(event.target as HTMLElement).closest(
@@ -129,8 +149,14 @@ export function ExcalidrawCanvas({
           setOptionsOpen(false);
         engineRef.current?.begin();
       }}
-      onPointerUpCapture={() => requestAnimationFrame(() => engineRef.current?.commit())}
-      onPointerCancelCapture={() => engineRef.current?.commit()}
+      onPointerUpCapture={() => {
+        interacting.current = false;
+        requestAnimationFrame(() => engineRef.current?.commit());
+      }}
+      onPointerCancelCapture={() => {
+        interacting.current = false;
+        engineRef.current?.commit();
+      }}
       onKeyDownCapture={(event) => {
         if (event.key === 'Escape') setOptionsOpen(false);
         if (
@@ -233,6 +259,11 @@ export function ExcalidrawCanvas({
           },
         }}
         onChange={(next, state) => {
+          onViewport?.({
+            centerX: state.width / (2 * state.zoom.value) - state.scrollX,
+            centerY: state.height / (2 * state.zoom.value) - state.scrollY,
+            zoom: state.zoom.value,
+          });
           const selected = next.find(
             (element) => !element.isDeleted && state.selectedElementIds[element.id],
           );

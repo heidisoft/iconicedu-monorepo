@@ -1,4 +1,7 @@
 'use client';
+import { ZoomCaptions } from './zoom-video/zoom-captions';
+import { MeetingWhiteboardControl } from './zoom-video/meeting-whiteboard-control';
+import { Presentation } from 'lucide-react';
 import { subscribeMeetingDeviceRecovery } from '@iconicedu/web/lib/live-sessions/browser-device-recovery';
 import { MeetingConnectionRecovery } from './zoom-video/meeting-connection-recovery';
 import { changeZoomCoHost } from '@iconicedu/web/lib/live-sessions/zoom-session-lifecycle';
@@ -33,7 +36,6 @@ import {
   MonitorUp,
   MonitorX,
   OctagonX,
-  Pencil,
   PictureInPicture2,
   PhoneOff,
   Settings,
@@ -2113,39 +2115,37 @@ export function ZoomVideoSessionEmbed({
               />
 
               {supportsWhiteboard && (!isSomeoneSharing || isPresentingWhiteboard) ? (
-                <MeetingControlButton
-                  tooltip={
-                    whiteboard.nativeToken
-                      ? isWhiteboardActive
-                        ? 'Hide whiteboard'
-                        : 'Open whiteboard'
-                      : isPresentingWhiteboard
+                whiteboard.nativeToken ? (
+                  <MeetingWhiteboardControl
+                    visible={isWhiteboardActive}
+                    presenting={isPresentingWhiteboard}
+                    canStop={whiteboard.canStop}
+                    onToggle={() => void toggleWhiteboard()}
+                    onStop={() => void whiteboard.stop()}
+                  />
+                ) : (
+                  <MeetingControlButton
+                    tooltip={
+                      isPresentingWhiteboard
                         ? 'Stop whiteboard'
                         : isWhiteboardActive
                           ? 'The other person is presenting the whiteboard'
                           : 'Start whiteboard'
-                  }
-                  label={
-                    whiteboard.nativeToken
-                      ? isWhiteboardActive
-                        ? 'Hide whiteboard'
-                        : 'Open whiteboard'
-                      : isPresentingWhiteboard
-                        ? 'Stop whiteboard'
-                        : 'Start whiteboard'
-                  }
-                  tone={isPresentingWhiteboard ? 'active' : 'neutral'}
-                  disabled={
-                    !whiteboard.nativeToken &&
-                    !isPresentingWhiteboard &&
-                    (isSomeoneSharing || isWhiteboardActive)
-                  }
-                  onClick={() => void toggleWhiteboard()}
-                >
-                  <PoppingIcon toggleKey={isPresentingWhiteboard}>
-                    <Pencil className="size-4" />
-                  </PoppingIcon>
-                </MeetingControlButton>
+                    }
+                    label={
+                      isPresentingWhiteboard ? 'Stop whiteboard' : 'Start whiteboard'
+                    }
+                    tone={isPresentingWhiteboard ? 'active' : 'neutral'}
+                    disabled={
+                      !isPresentingWhiteboard && (isSomeoneSharing || isWhiteboardActive)
+                    }
+                    onClick={() => void toggleWhiteboard()}
+                  >
+                    <PoppingIcon toggleKey={isPresentingWhiteboard}>
+                      <Presentation className="size-4" />
+                    </PoppingIcon>
+                  </MeetingControlButton>
+                )
               ) : null}
 
               {settings.invite.enabled ? (
@@ -2376,11 +2376,7 @@ export function ZoomVideoSessionEmbed({
           </div>
         ) : null}
 
-        {isCaptionsOn && captionText ? (
-          <div className="absolute inset-x-4 bottom-24 z-20 mx-auto w-fit max-w-lg rounded-lg bg-black/80 px-4 py-2 text-center text-sm text-white">
-            {captionText}
-          </div>
-        ) : null}
+        {isCaptionsOn && <ZoomCaptions text={captionText} />}
 
         {connectionState === ConnectionState.Reconnecting ? (
           <div

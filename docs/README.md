@@ -37,6 +37,7 @@ Internal engineers, operators, and AI assistants.
 
 ### Mobile Engineer
 
+- [Native Classroom Development and Verification](getting-started/native-classroom.md)
 - [Local Setup](getting-started/setup.md)
 - [Development Workflow](getting-started/development-workflow.md)
 - [Architecture Overview](codebase/ARCHITECTURE.md)

@@ -123,7 +123,7 @@ provided by the app instead of an obsolete web endpoint. Native session cards, c
 headers and classroom info sheets display the same separate, selectable passcode section
 with its own share action. External provider links without a known passcode omit that section.
 
-Mobile opens app-hosted meetings with Expo WebBrowser. An authenticated
+Mobile binaries with the native Zoom SDK open app-hosted classrooms in the native preview and meeting route. Older binaries open these meetings with Expo WebBrowser. An authenticated
 `browser-handoff` request issues a single-use capability that expires in 60 seconds.
 The browser removes it from the fragment and redeems it via a POST body for four-hour,
 meeting-only access. This preserves the mobile identity and host authorization without
@@ -198,7 +198,9 @@ Legacy signed-in Zoom meeting URLs resolve access through the API and redirect t
 the shared public setup route. They cannot issue provider credentials or bypass
 preview and admission. Other meeting providers retain their existing join flow.
 
-Mobile opens personal browser handoffs full screen on iPadOS/iOS. Android uses a
+The native classroom keeps media in the iOS/Android Zoom Video SDK and uses the same API authorization, admission and collaboration contracts as web. The app-owned whiteboard embeds a bundled offline drawing canvas; capabilities remain in native HTTP adapters. ReplayKit and Android foreground services own device screen broadcasts. SDK secrets remain server-only. See [native classroom development and verification](../getting-started/native-classroom.md).
+
+The browser fallback opens personal handoffs full screen on iPadOS/iOS. Android uses a
 separate Custom Tab task with proxy-activity protection and a recents entry so
 users can return after switching apps. Default Android browser sharing is disabled;
 participants share invitations through meeting controls instead of personal handoffs.

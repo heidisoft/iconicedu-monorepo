@@ -174,6 +174,7 @@ export type LiveSessionJoinCredentialsVM = {
   annotationToken?: string;
   whiteboard?: import('./whiteboard').WhiteboardAccessVM;
   token: string;
+  /** Canonical Zoom topic for this class session; web and native pass it to the SDK verbatim. */
   sessionName: string;
   displayName: string;
   meetingPasscode?: string | null;

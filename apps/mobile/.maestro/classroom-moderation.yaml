@@ -1,0 +1,37 @@
+appId: com.heidisoft.iconicedu
+name: Teacher admits guests, assigns co-hosts and ends the classroom
+---
+- runFlow: bootstrap.yaml
+- openLink: iconicedu://classroom-fixture
+- tapOn:
+    text: 'Open'
+    optional: true
+- extendedWaitUntil:
+    visible: 'Ready to join\?'
+    timeout: 30000
+- tapOn: 'Turn camera off'
+- scrollUntilVisible:
+    element: 'Join now'
+- tapOn: 'Join now'
+- runFlow: open-classroom-controls.yaml
+- scrollUntilVisible:
+    element: 'Participants.*'
+- runFlow: open-classroom-controls.yaml
+- tapOn: 'Participants.*'
+- scrollUntilVisible:
+    element: 'Admit Waiting guest'
+- tapOn: 'Admit Waiting guest'
+- assertNotVisible: 'Waiting guest is waiting'
+- scrollUntilVisible:
+    element: 'Make co-host Test student'
+- tapOn: 'Make co-host Test student'
+- assertVisible: 'Remove co-host Test student'
+- tapOn: 'Remove co-host Test student'
+- assertVisible: 'Make co-host Test student'
+- tapOn: 'Close People'
+- tapOn: 'Leave or end class'
+- tapOn: 'Cancel'
+- assertNotVisible: 'You left the classroom'
+- tapOn: 'Leave or end class'
+- tapOn: 'End for everyone'
+- assertVisible: 'You left the classroom'

@@ -1,0 +1,106 @@
+{
+  "dedicatedTestEnvironment": true,
+  "webOrigin": "https://classroom.example.test",
+  "journeys": [
+    {
+      "source": "home",
+      "scheduled": true,
+      "existingSession": true,
+      "webPath": "/REPLACE_ORG/home",
+      "joinSelector": "REPLACE_WITH_UNIQUE_JOIN_BUTTON_SELECTOR",
+      "nativePath": "/",
+      "nativeJoinLabel": "REPLACE_WITH_UNIQUE_JOIN_LABEL",
+      "displayName": "Test teacher"
+    },
+    {
+      "source": "home",
+      "scheduled": true,
+      "existingSession": false,
+      "webPath": "/REPLACE_ORG/home",
+      "joinSelector": "REPLACE_WITH_UNIQUE_JOIN_BUTTON_SELECTOR",
+      "nativePath": "/",
+      "nativeJoinLabel": "REPLACE_WITH_UNIQUE_JOIN_LABEL",
+      "displayName": "Test teacher"
+    },
+    {
+      "source": "home",
+      "scheduled": false,
+      "existingSession": true,
+      "webPath": "/REPLACE_ORG/home",
+      "joinSelector": "REPLACE_WITH_UNIQUE_JOIN_BUTTON_SELECTOR",
+      "nativePath": "/",
+      "nativeJoinLabel": "REPLACE_WITH_UNIQUE_JOIN_LABEL",
+      "displayName": "Test teacher"
+    },
+    {
+      "source": "home",
+      "scheduled": false,
+      "existingSession": false,
+      "webPath": "/REPLACE_ORG/home",
+      "joinSelector": "REPLACE_WITH_UNIQUE_JOIN_BUTTON_SELECTOR",
+      "nativePath": "/",
+      "nativeJoinLabel": "REPLACE_WITH_UNIQUE_JOIN_LABEL",
+      "displayName": "Test teacher"
+    },
+    {
+      "source": "classroom",
+      "scheduled": true,
+      "existingSession": true,
+      "webPath": "/REPLACE_ORG/spaces/REPLACE_CHANNEL",
+      "joinSelector": "REPLACE_WITH_UNIQUE_JOIN_BUTTON_SELECTOR",
+      "nativePath": "/spaces/REPLACE_CHANNEL",
+      "nativeJoinLabel": "REPLACE_WITH_UNIQUE_JOIN_LABEL",
+      "displayName": "Test teacher"
+    },
+    {
+      "source": "classroom",
+      "scheduled": true,
+      "existingSession": false,
+      "webPath": "/REPLACE_ORG/spaces/REPLACE_CHANNEL",
+      "joinSelector": "REPLACE_WITH_UNIQUE_JOIN_BUTTON_SELECTOR",
+      "nativePath": "/spaces/REPLACE_CHANNEL",
+      "nativeJoinLabel": "REPLACE_WITH_UNIQUE_JOIN_LABEL",
+      "displayName": "Test teacher"
+    },
+    {
+      "source": "classroom",
+      "scheduled": false,
+      "existingSession": true,
+      "webPath": "/REPLACE_ORG/spaces/REPLACE_CHANNEL",
+      "joinSelector": "REPLACE_WITH_UNIQUE_JOIN_BUTTON_SELECTOR",
+      "nativePath": "/spaces/REPLACE_CHANNEL",
+      "nativeJoinLabel": "REPLACE_WITH_UNIQUE_JOIN_LABEL",
+      "displayName": "Test teacher"
+    },
+    {
+      "source": "classroom",
+      "scheduled": false,
+      "existingSession": false,
+      "webPath": "/REPLACE_ORG/spaces/REPLACE_CHANNEL",
+      "joinSelector": "REPLACE_WITH_UNIQUE_JOIN_BUTTON_SELECTOR",
+      "nativePath": "/spaces/REPLACE_CHANNEL",
+      "nativeJoinLabel": "REPLACE_WITH_UNIQUE_JOIN_LABEL",
+      "displayName": "Test teacher"
+    },
+    {
+      "source": "sessions",
+      "scheduled": true,
+      "existingSession": true,
+      "webPath": "/REPLACE_ORG/sessions",
+      "joinSelector": "REPLACE_WITH_UNIQUE_JOIN_BUTTON_SELECTOR",
+      "nativePath": "/spaces",
+      "nativeJoinLabel": "REPLACE_WITH_UNIQUE_JOIN_LABEL",
+      "displayName": "Test teacher"
+    },
+    {
+      "source": "sessions",
+      "scheduled": true,
+      "existingSession": false,
+      "webPath": "/REPLACE_ORG/sessions",
+      "joinSelector": "REPLACE_WITH_UNIQUE_JOIN_BUTTON_SELECTOR",
+      "nativePath": "/spaces",
+      "nativeJoinLabel": "REPLACE_WITH_UNIQUE_JOIN_LABEL",
+      "displayName": "Test teacher"
+    }
+  ]
+}

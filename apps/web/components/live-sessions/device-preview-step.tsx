@@ -19,7 +19,6 @@ import {
   Check,
   X,
   Settings,
-  AudioLines,
 } from 'lucide-react';
 
 // flag-exempt: completes the existing pre-join audio/device verification.
@@ -38,13 +37,6 @@ const PreviewSettings = lazy(() =>
   })),
 );
 import { Button } from '@iconicedu/ui-web/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@iconicedu/ui-web/ui/dialog';
 import { cn, getInitials } from '@iconicedu/ui-web/lib/utils';
 
 // Start with browser capture; use Zoom’s local preview only when background
@@ -123,7 +115,6 @@ export function DevicePreviewStep({
     setMediaSettingsChanged(true);
   };
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [selfCheckOpen, setSelfCheckOpen] = useState(false);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [cameraId, setCameraId] = useState<string>();
   const [microphoneId, setMicrophoneId] = useState<string>();
@@ -518,18 +509,6 @@ export function DevicePreviewStep({
               type="button"
               variant="ghost"
               size="icon"
-              aria-label="Test audio and video"
-              title="Test audio and video"
-              disabled={isLoading || busy}
-              onClick={() => setSelfCheckOpen(true)}
-              className="size-8 rounded-full bg-black/45 text-white shadow-sm backdrop-blur-lg hover:bg-black/60 hover:text-white"
-            >
-              <AudioLines className="size-4" aria-hidden="true" />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
               aria-label="Settings"
               title="Settings"
               disabled={isLoading || busy}
@@ -544,42 +523,6 @@ export function DevicePreviewStep({
           </div>
         </div>
       </div>
-      <Dialog open={selfCheckOpen} onOpenChange={setSelfCheckOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Test your audio and video</DialogTitle>
-            <DialogDescription>
-              Check your devices before joining the session.
-            </DialogDescription>
-          </DialogHeader>
-          <AudioSelfCheck
-            stream={streamRef.current}
-            muted={muted}
-            speakerId={mediaSettings.speakerId}
-          />
-          <div className="space-y-1 border-t pt-4 text-sm">
-            <p className="font-medium">Camera</p>
-            <p className="text-muted-foreground">
-              {videoOff
-                ? 'Camera is off. Turn it on in preview to check your video.'
-                : 'Check your picture in the preview before joining.'}
-            </p>
-          </div>
-          <div className="flex flex-wrap justify-end gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setSelfCheckOpen(false);
-                setSettingsOpen(true);
-                void refreshDevices();
-              }}
-            >
-              Device settings
-            </Button>
-            <Button onClick={() => setSelfCheckOpen(false)}>Done</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
       {settingsOpen && (
         <Suspense
           fallback={
@@ -589,6 +532,13 @@ export function DevicePreviewStep({
           }
         >
           <PreviewSettings
+            audioCheck={
+              <AudioSelfCheck
+                stream={streamRef.current}
+                muted={muted}
+                speakerId={mediaSettings.speakerId}
+              />
+            }
             open={settingsOpen}
             hideTrigger
             onOpenChange={setSettingsOpen}

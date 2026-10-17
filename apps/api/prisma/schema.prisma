@@ -327,6 +327,8 @@ model ClassroomWhiteboardAccess {
 
   @@index([boardId, lastSeenAt])
   @@map("classroom_whiteboard_access")
+  viewport Json?
+  viewportUpdatedAt DateTime? @map("viewport_updated_at") @db.Timestamptz(6)
   laserSamples Json @default("[]") @map("laser_samples")
   laserUpdatedAt DateTime? @map("laser_updated_at") @db.Timestamptz(6)
 }

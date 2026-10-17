@@ -1,0 +1,29 @@
+appId: com.heidisoft.iconicedu
+name: Native classroom failed join keeps preview usable
+---
+- runFlow: bootstrap.yaml
+- openLink: 'iconicedu://classroom-fixture?failure=join'
+- tapOn:
+    text: 'Open'
+    optional: true
+- tapOn:
+    text: 'Allow'
+    optional: true
+- tapOn:
+    text: 'Allow'
+    optional: true
+- extendedWaitUntil:
+    visible: 'Ready to join\?'
+    timeout: 30000
+- tapOn: 'Turn camera off'
+- scrollUntilVisible:
+    element: 'Join now'
+- tapOn: 'Join now'
+- scrollUntilVisible:
+    element: 'Unable to join. Check your connection and try again.'
+    direction: UP
+- assertVisible: 'Ready to join\?'
+- scrollUntilVisible:
+    element: 'Join now'
+- assertVisible: 'Join now'
+- assertNotVisible: 'Leave class|Leave or end class|End class'

@@ -1,0 +1,269 @@
+import React, { useState } from 'react';
+import { Pressable, ScrollView, Text, View } from 'react-native';
+import {
+  Hand,
+  MousePointer2,
+  Pencil,
+  Type,
+  Eraser,
+  Shapes,
+  Minus,
+  ArrowRight,
+  ArrowLeftRight,
+  Square,
+  Circle,
+  Diamond,
+  Highlighter,
+  Stamp,
+  Check,
+  X,
+  Star,
+  Heart,
+  CircleHelp,
+  LocateFixed,
+  MoveUpRight,
+  Undo2,
+  Redo2,
+  Palette,
+  Ellipsis,
+  ChevronDown,
+} from 'lucide-react-native';
+import { LaserPointerIcon } from '@iconicedu/ui-native';
+import type { AnnotationTool } from '@iconicedu/shared-types';
+import { useTheme } from '@/providers/theme-provider';
+const primary = [
+  ['cursor', 'Pan', Hand],
+  ['vanishingPen', 'Laser pointer', LaserPointerIcon],
+  ['select', 'Select', MousePointer2],
+  ['pen', 'Pen', Pencil],
+  ['text', 'Text', Type],
+  ['eraser', 'Eraser', Eraser],
+] as const;
+const shapes = [
+  ['line', 'Line', Minus],
+  ['arrow', 'Arrow', ArrowRight],
+  ['doubleArrow', 'Double arrow', ArrowLeftRight],
+  ['rectangle', 'Rectangle', Square],
+  ['ellipse', 'Ellipse', Circle],
+  ['diamond', 'Diamond', Diamond],
+  ['rectangleFilled', 'Filled rectangle', Square],
+  ['ellipseFilled', 'Filled ellipse', Circle],
+  ['rectangleHighlight', 'Rectangle highlight', Square],
+  ['ellipseHighlight', 'Ellipse highlight', Circle],
+] as const;
+const stamps = [
+  ['stampCheck', 'Check', Check],
+  ['stampX', 'Cross', X],
+  ['stampStar', 'Star', Star],
+  ['stampHeart', 'Heart', Heart],
+  ['stampQuestion', 'Question', CircleHelp],
+  ['stampArrow', 'Stamp arrow', ArrowRight],
+] as const;
+const attention = [
+  ['spotlight', 'Spotlight', LocateFixed],
+  ['pointerArrow', 'Named pointer', MoveUpRight],
+] as const;
+export function NativeAnnotationToolbar({
+  tool,
+  editable,
+  onTool,
+  onUndo,
+  onRedo,
+  canUndo,
+  canRedo,
+  onOptions,
+  onOpenMenu,
+  panelSide = 'bottom',
+  panelOffset = 104,
+  panelWidth = 260,
+}: {
+  tool: AnnotationTool;
+  editable: boolean;
+  onTool: (tool: AnnotationTool) => void;
+  onUndo: () => void;
+  onRedo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  onOptions: (panel: 'format' | 'more') => void;
+  onOpenMenu?: () => void;
+  panelSide?: 'top' | 'bottom';
+  panelOffset?: number;
+  panelWidth?: number;
+}) {
+  const { colors } = useTheme();
+  const [menu, setMenu] = useState<string | null>(null);
+  const button = (
+    label: string,
+    Icon: React.ComponentType<{ size?: number; color?: string }>,
+    onPress: () => void,
+    disabled = false,
+    selected = false,
+    dropdown = false,
+  ) => (
+    <Pressable
+      key={label}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{
+        disabled,
+        selected,
+        ...(dropdown ? { expanded: menu === label } : {}),
+      }}
+      disabled={disabled}
+      onPress={onPress}
+      style={{
+        minWidth: 44,
+        height: 44,
+        borderRadius: 22,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: selected ? colors.actionSubtle : undefined,
+        opacity: disabled ? 0.4 : 1,
+      }}
+    >
+      <Icon size={20} color={colors.text} />
+      {dropdown && <ChevronDown size={12} color={colors.text} />}
+    </Pressable>
+  );
+  const choose = (value: AnnotationTool) => {
+    onTool(value);
+    setMenu(null);
+  };
+  const toggle = (value: string) => {
+    onOpenMenu?.();
+    setMenu(menu === value ? null : value);
+  };
+  const group = menu === 'Shapes' ? shapes : menu === 'Stamps' ? stamps : attention;
+  return (
+    <View style={{ height: 44 }}>
+      <ScrollView
+        horizontal
+        accessibilityLabel="Screen annotation tools"
+        contentContainerStyle={{ gap: 2, padding: 4 }}
+      >
+        {primary.map(([value, label, Icon]) =>
+          button(
+            label,
+            Icon,
+            () => choose(value),
+            !editable && value !== 'cursor',
+            tool === value,
+          ),
+        )}
+        {button(
+          'Shapes',
+          Shapes,
+          () => toggle('Shapes'),
+          !editable,
+          shapes.some(([value]) => value === tool),
+          true,
+        )}
+        {button(
+          'Highlighter',
+          Highlighter,
+          () => choose('highlighter'),
+          !editable,
+          tool === 'highlighter',
+        )}
+        {button(
+          'Stamps',
+          Stamp,
+          () => toggle('Stamps'),
+          !editable,
+          stamps.some(([value]) => value === tool),
+          true,
+        )}
+        {button(
+          'Attention',
+          LocateFixed,
+          () => toggle('Attention'),
+          !editable,
+          attention.some(([value]) => value === tool),
+          true,
+        )}
+        {button('Undo annotation', Undo2, onUndo, !editable || !canUndo)}
+        {button('Redo annotation', Redo2, onRedo, !editable || !canRedo)}
+        {button(
+          'Annotation styles',
+          Palette,
+          () => {
+            setMenu(null);
+            onOptions('format');
+          },
+          false,
+          false,
+          true,
+        )}
+        {button(
+          'More annotation actions',
+          Ellipsis,
+          () => {
+            setMenu(null);
+            onOptions('more');
+          },
+          false,
+          false,
+          true,
+        )}
+      </ScrollView>
+      {menu && (
+        <View
+          accessibilityLabel={menu}
+          style={{
+            position: 'absolute',
+            [panelSide === 'bottom' ? 'top' : 'bottom']: panelOffset,
+            left: -76,
+            width: panelWidth,
+            backgroundColor: colors.card,
+            borderWidth: 1,
+            borderColor: colors.border,
+            borderRadius: 16,
+            padding: 8,
+            zIndex: 10,
+          }}
+        >
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <Text style={{ color: colors.text }}>{menu}</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Close ${menu}`}
+              onPress={() => setMenu(null)}
+              style={{ padding: 8 }}
+            >
+              <X size={16} color={colors.text} />
+            </Pressable>
+          </View>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+            {group.map(([value, label, Icon]) => (
+              <Pressable
+                key={value}
+                accessibilityRole="button"
+                accessibilityLabel={label}
+                accessibilityState={{ disabled: !editable, selected: tool === value }}
+                disabled={!editable}
+                onPress={() => choose(value)}
+                style={{
+                  width: '33.333%',
+                  minHeight: 64,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 4,
+                }}
+              >
+                <Icon
+                  size={20}
+                  color={colors.text}
+                  fill={label.startsWith('Filled') ? colors.text : 'none'}
+                />
+                <Text style={{ color: colors.text, fontSize: 11, textAlign: 'center' }}>
+                  {label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      )}
+    </View>
+  );
+}

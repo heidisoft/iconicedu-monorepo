@@ -88,3 +88,8 @@ target 'ICONICAcademy' do
     end
   end
 end
+
+# Native classroom ReplayKit broadcast extension.
+target 'ClassroomBroadcast' do
+  pod 'ZoomVideoSDK/ZoomVideoSDKScreenShare', '2.6.0'
+end

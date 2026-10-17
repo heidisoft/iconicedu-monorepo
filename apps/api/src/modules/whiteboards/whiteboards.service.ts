@@ -7,6 +7,8 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import type {
+  WhiteboardViewportVM,
+  WhiteboardViewportPresenceVM,
   WhiteboardLaserPresenceVM,
   WhiteboardLaserSampleVM,
   WhiteboardDocumentVM,
@@ -71,6 +73,53 @@ export class WhiteboardsService {
       document: WhiteboardDocumentVM;
       applied_operations: string[];
     };
+  }
+  async publishViewport(token: string, value: unknown) {
+    const viewport = value as WhiteboardViewportVM | null;
+    if (
+      !viewport ||
+      !Number.isFinite(viewport.centerX) ||
+      !Number.isFinite(viewport.centerY) ||
+      Math.abs(viewport.centerX) > 10_000_000 ||
+      Math.abs(viewport.centerY) > 10_000_000 ||
+      !Number.isFinite(viewport.zoom) ||
+      viewport.zoom < 0.1 ||
+      viewport.zoom > 30
+    )
+      throw new BadRequestException('Invalid whiteboard viewport');
+    const { db } = await this.access(token);
+    const result = await db
+      .from('classroom_whiteboard_access')
+      .update({
+        viewport: {
+          centerX: viewport.centerX,
+          centerY: viewport.centerY,
+          zoom: viewport.zoom,
+        },
+        viewport_updated_at: new Date().toISOString(),
+      })
+      .eq('token_hash', hashWhiteboardToken(token));
+    if (result.error) throw new InternalServerErrorException('Unable to share viewport');
+    return { ok: true };
+  }
+  async getViewports(token: string): Promise<WhiteboardViewportPresenceVM[]> {
+    const { db, boardId, sessionId } = await this.access(token);
+    const now = Date.now();
+    const result = await db
+      .from('classroom_whiteboard_access')
+      .select('token_hash, viewport, viewport_updated_at')
+      .eq('board_id', boardId)
+      .eq('live_session_id', sessionId)
+      .gt('expires_at', new Date(now).toISOString())
+      .gt('viewport_updated_at', new Date(now - 10_000).toISOString());
+    if (result.error) throw new InternalServerErrorException('Unable to load viewports');
+    return (result.data ?? [])
+      .filter((peer) => peer.token_hash !== hashWhiteboardToken(token) && peer.viewport)
+      .map((peer) => ({
+        actorId: peer.token_hash.slice(0, 16),
+        viewport: peer.viewport as WhiteboardViewportVM,
+        expiresAt: Date.parse(peer.viewport_updated_at) + 10_000,
+      }));
   }
   async publishLaser(token: string, value: unknown) {
     if (
@@ -172,9 +221,7 @@ export class WhiteboardsService {
         board.document.presenting === true &&
         board.document.presentation?.sessionId === sessionId &&
         (presence.data ?? []).some(
-          (p) =>
-            p.role === 'teacher' &&
-            p.token_hash.slice(0, 16) === board.document.presentation?.presenterId,
+          (p) => p.token_hash.slice(0, 16) === board.document.presentation?.presenterId,
         ),
       ...(revision === board.revision
         ? {}
@@ -192,12 +239,32 @@ export class WhiteboardsService {
     const { db, boardId, role, sessionId } = await this.access(token);
     for (let attempt = 0; attempt < 5; attempt++) {
       const board = await this.load(db, boardId);
+      // A lost stop response must be retryable after its presenter identity was cleared.
+      if (op.type === 'presentation' && board.applied_operations.includes(op.id))
+        return this.get(token);
+      if (op.type === 'presentation' && role !== 'teacher') {
+        const owner = board.document.presentation;
+        const self = hashWhiteboardToken(token).slice(0, 16);
+        if (!op.enabled && owner?.presenterId !== self)
+          throw new ForbiddenException(
+            'Only the presenter or a teacher can stop sharing',
+          );
+        if (
+          op.enabled &&
+          owner?.presenterId !== self &&
+          (await this.get(token)).presentationActive
+        )
+          throw new ForbiddenException(
+            'Another participant is presenting the whiteboard',
+          );
+      }
       // Check permissions even on replay: a lock cannot be bypassed with an old operation id.
       const document = applyWhiteboardOperation(board.document, op, role);
       if (board.applied_operations.includes(op.id)) return this.get(token);
       if (op.type === 'presentation') {
         if (op.enabled) {
           document.presentation = {
+            presentationId: op.id,
             presenterId: hashWhiteboardToken(token).slice(0, 16),
             sessionId,
           };

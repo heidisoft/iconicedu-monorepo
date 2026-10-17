@@ -57,11 +57,15 @@ describe('public live session identity and authorization', () => {
   let selections: string[];
   let enrolledStudents: string[];
   let lookupFilters: Array<{ table: string; filters: Record<string, unknown> }>;
+  let sessionMetadata: Record<string, unknown>;
+  let providerSessionId: string | null;
   beforeEach(() => {
     jest.clearAllMocks();
     jest.mocked(hasOrgStaffRole).mockResolvedValue(false);
     jest.mocked(evaluateApiBooleanFlag).mockResolvedValue(false);
     authUserId = 'member-auth';
+    sessionMetadata = { sessionName: 'test-class', passcode: 'demo' };
+    providerSessionId = 'test-class';
     hasOrgProfile = true;
     status = 'live';
     invitesEnabled = true;
@@ -134,8 +138,8 @@ describe('public live session identity and authorization', () => {
                 provider: 'zoom',
                 status,
                 started_by_profile_id: 'host-profile',
-                provider_session_id: 'test-class',
-                provider_metadata: { sessionName: 'test-class', passcode: 'demo' },
+                provider_session_id: providerSessionId,
+                provider_metadata: sessionMetadata,
                 ...(!invitesEnabled
                   ? {
                       app_metadata: {
@@ -182,6 +186,92 @@ describe('public live session identity and authorization', () => {
     });
     jest.mocked(getLiveSessionProvider).mockReturnValue({ getJoinAccess } as never);
     jest.mocked(verifyZoomPasscode).mockReturnValue(true);
+  });
+  it.each([
+    [
+      'provider-issued topic',
+      { sessionName: 'signed-class-topic' },
+      { sessionName: 'stored-class-topic', passcode: 'demo' },
+      'signed-class-topic',
+    ],
+    ['legacy provider ID', undefined, { passcode: 'demo' }, 'test-class'],
+  ])(
+    'uses the same %s for host and participant joins on either client',
+    async (_case, issuedMetadata, storedMetadata, expectedName) => {
+      sessionMetadata = storedMetadata as Record<string, unknown>;
+      getJoinAccess.mockResolvedValue({
+        token: 'synthetic-token',
+        metadata: issuedMetadata,
+      });
+      authUserId = 'host-auth';
+      const service = new LiveSessionsService();
+      const host = await service.getPublicLiveSessionInfo(
+        'session-identity',
+        'synthetic-host-auth',
+      );
+      authUserId = null;
+      const participant = await service.guestJoinLiveSession(
+        'session-identity',
+        'cross-client-participant',
+        { displayName: 'Student', passcode: 'demo' },
+      );
+      expect(host).toMatchObject({
+        isHost: true,
+        hostJoin: { sessionName: expectedName },
+      });
+      expect(participant.sessionName).toBe(expectedName);
+      expect(getJoinAccess).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          sessionId: 'session-identity',
+          providerSessionId: 'test-class',
+          isHost: true,
+        }),
+      );
+      expect(getJoinAccess).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          sessionId: 'session-identity',
+          providerSessionId: 'test-class',
+          isHost: false,
+        }),
+      );
+    },
+  );
+  it('does not replace a blank provider-issued topic with another room name', async () => {
+    getJoinAccess.mockResolvedValue({
+      token: 'synthetic-token',
+      metadata: { sessionName: ' ' },
+    });
+    authUserId = 'host-auth';
+    const service = new LiveSessionsService();
+    await expect(
+      service.getPublicLiveSessionInfo('session-identity', 'synthetic-host-auth'),
+    ).rejects.toThrow('Unable to resolve the classroom session');
+    authUserId = null;
+    await expect(
+      service.guestJoinLiveSession('session-identity', 'blank-topic', {
+        displayName: 'Student',
+        passcode: 'demo',
+      }),
+    ).rejects.toThrow('Unable to resolve the classroom session');
+  });
+  it('rejects credentials with no Zoom topic instead of using the database ID', async () => {
+    providerSessionId = null;
+    sessionMetadata = { passcode: 'demo' };
+    getJoinAccess.mockResolvedValue({ token: 'synthetic-token' });
+    authUserId = 'host-auth';
+    const service = new LiveSessionsService();
+    await expect(
+      service.getPublicLiveSessionInfo('session-identity', 'synthetic-host-auth'),
+    ).rejects.toThrow('Unable to resolve the classroom session');
+    authUserId = null;
+    await expect(
+      service.guestJoinLiveSession('session-identity', 'missing-topic', {
+        displayName: 'Student',
+        passcode: 'demo',
+      }),
+    ).rejects.toThrow('Unable to resolve the classroom session');
   });
   it('resolves a normalized short code to a canonical guest session without credentials', async () => {
     const info = await new LiveSessionsService().getPublicLiveSessionInfo(

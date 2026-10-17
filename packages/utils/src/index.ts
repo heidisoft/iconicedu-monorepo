@@ -94,3 +94,13 @@ export function createEnumNormalizer<T extends string>(allowedValues: readonly T
 export * from './annotations/coordinates';
 export * from './annotations/state';
 export * from './annotations/participant-color';
+export * from './whiteboard/assets';
+export * from './live-sessions/background-catalog';
+
+export { createShareAnnotationLifecycle } from './share-annotation-lifecycle';
+
+export {
+  SceneHistory,
+  changedElements,
+  sceneFingerprint,
+} from './whiteboard/scene-history';

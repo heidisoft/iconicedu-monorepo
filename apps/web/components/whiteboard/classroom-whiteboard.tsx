@@ -3,6 +3,14 @@ import dynamic from 'next/dynamic';
 import { useState } from 'react';
 import { participantColor } from '@iconicedu/utils';
 import { ErrorBoundary } from '@iconicedu/ui-web/components/error-boundary';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+} from '@iconicedu/ui-web/ui/dropdown-menu';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import {
   AlertDialog,
@@ -20,6 +28,8 @@ import type { WhiteboardEngine, WhiteboardTool } from './canvas/whiteboard-engin
 import { WhiteboardBoardDetails } from './components/whiteboard-board-details';
 import { WhiteboardToolbar } from './components/whiteboard-toolbar';
 import { WhiteboardLibrary } from './components/whiteboard-library';
+import type { WhiteboardViewportVM } from '@iconicedu/shared-types';
+import { useWhiteboardFollow } from './use-whiteboard-follow';
 import { useWhiteboard } from './use-whiteboard';
 const Canvas = dynamic(
   () => import('./canvas/excalidraw-canvas').then((m) => m.ExcalidrawCanvas),
@@ -45,6 +55,14 @@ export function ClassroomWhiteboard({
   const [confirmation, setConfirmation] = useState<'clear' | 'discard' | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
   const snapshot = board.snapshot;
+  const [viewport, setViewport] = useState<WhiteboardViewportVM>();
+  const follow = useWhiteboardFollow(
+    token,
+    repository,
+    snapshot,
+    !!snapshot,
+    setViewport,
+  );
   if (!snapshot)
     return (
       <section
@@ -122,7 +140,7 @@ export function ClassroomWhiteboard({
         <aside
           data-testid="whiteboard-overlay-toolbar"
           aria-label="Drawing controls"
-          className="pointer-events-auto col-start-1 row-start-2 @min-[760px]:row-start-1 justify-self-start max-w-full w-fit overflow-x-auto rounded-full border border-border bg-card p-1 shadow-sm"
+          className="pointer-events-auto flex items-center col-start-1 row-start-2 @min-[760px]:row-start-1 justify-self-start max-w-full w-fit overflow-x-auto rounded-full border border-border bg-card p-1 shadow-sm"
         >
           <WhiteboardToolbar
             engine={engine}
@@ -134,6 +152,40 @@ export function ClassroomWhiteboard({
             onLibrary={() => setLibrary(!library)}
             libraryOpen={library}
           />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="toolbar" size="sm" aria-label="Follow viewport">
+                {follow.following === 'tutor'
+                  ? 'Follow tutor'
+                  : follow.following === 'free'
+                    ? 'Explore freely'
+                    : `Follow ${snapshot.presence.find((person) => person.id === follow.following)?.name ?? 'participant'}`}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              container={
+                typeof document === 'undefined' ? undefined : document.fullscreenElement
+              }
+            >
+              <DropdownMenuLabel>Follow viewport</DropdownMenuLabel>
+              <DropdownMenuRadioGroup
+                value={follow.following}
+                onValueChange={follow.setFollowing}
+              >
+                <DropdownMenuRadioItem value="tutor">
+                  Tutor (default)
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="free">Explore freely</DropdownMenuRadioItem>
+                {snapshot.presence
+                  .filter((person) => person.id !== snapshot.actorId)
+                  .map((person) => (
+                    <DropdownMenuRadioItem key={person.id} value={person.id}>
+                      {person.name}
+                    </DropdownMenuRadioItem>
+                  ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </aside>
       </div>
       <div className="absolute inset-x-3 bottom-12 z-20 flex flex-col gap-2">
@@ -179,6 +231,8 @@ export function ClassroomWhiteboard({
         >
           <Canvas
             token={token}
+            viewport={viewport}
+            onViewport={follow.publish}
             key={page.id}
             elements={page.elements}
             defaultColor={
