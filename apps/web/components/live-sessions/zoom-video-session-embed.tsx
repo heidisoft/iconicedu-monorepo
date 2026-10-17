@@ -1,4 +1,5 @@
 'use client';
+import { ZoomCaptions } from './zoom-video/zoom-captions';
 import { MeetingWhiteboardControl } from './zoom-video/meeting-whiteboard-control';
 import { Presentation } from 'lucide-react';
 import { subscribeMeetingDeviceRecovery } from '@iconicedu/web/lib/live-sessions/browser-device-recovery';
@@ -2375,11 +2376,7 @@ export function ZoomVideoSessionEmbed({
           </div>
         ) : null}
 
-        {isCaptionsOn && captionText ? (
-          <div className="absolute inset-x-4 bottom-24 z-20 mx-auto w-fit max-w-lg rounded-lg bg-black/80 px-4 py-2 text-center text-sm text-white">
-            {captionText}
-          </div>
-        ) : null}
+        {isCaptionsOn && <ZoomCaptions text={captionText} />}
 
         {connectionState === ConnectionState.Reconnecting ? (
           <div

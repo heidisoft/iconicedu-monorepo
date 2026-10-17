@@ -446,3 +446,14 @@ it('exports queued edits and discards them only after confirmation and successfu
   expect(AsyncStorage.removeItem).toHaveBeenCalledWith('classroom-drawing:board:teacher');
   alert.mockRestore();
 });
+it('explores freely and resumes tutor follow without opening board options', async () => {
+  jest.mocked(AsyncStorage.getItem).mockResolvedValue(null);
+  jest.mocked(capabilityGet).mockResolvedValue(snapshot);
+  const screen = render(<NativeWhiteboard token="fixture" />);
+  await act(async () => {});
+  fireEvent.press(screen.getByLabelText('Explore whiteboard freely'));
+  expect(screen.getByText('Exploring freely')).toBeTruthy();
+  expect(screen.queryByLabelText('Close whiteboard options')).toBeNull();
+  fireEvent.press(screen.getByLabelText('Resume following tutor'));
+  expect(screen.getByText('Following tutor · waiting for their view')).toBeTruthy();
+});

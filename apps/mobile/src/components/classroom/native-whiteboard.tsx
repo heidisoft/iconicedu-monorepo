@@ -1,3 +1,4 @@
+import { NativeWhiteboardFollowStatus } from './native-whiteboard-follow-status';
 import { useReducedMotion } from './use-reduced-motion';
 import { NativeWhiteboardToolbar, type Tool } from './native-whiteboard-toolbar';
 import { useNativeWhiteboardFollow } from './use-native-whiteboard-follow';
@@ -416,6 +417,17 @@ export function NativeWhiteboard({
               )}
             </View>
           </View>
+          <NativeWhiteboardFollowStatus
+            following={follow.following !== 'free'}
+            status={follow.status}
+            label={
+              follow.following === 'tutor'
+                ? 'Following tutor'
+                : `Following ${snapshot?.presence.find((person) => person.id === follow.following)?.name ?? 'participant'}`
+            }
+            onExplore={() => follow.setFollowing('free')}
+            onTutor={() => follow.setFollowing('tutor')}
+          />
           {error &&
             button('Retry saving', () => {
               void flush();

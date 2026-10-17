@@ -53,6 +53,16 @@ Register each test iPad before creating the iOS build so its provisioning profil
 - Invite opens a native sheet with separate copy actions for the join link and passcode, plus the operating-system invitation share chooser. Chat keeps the full received in-call history for parity with web; leaving clears the meeting state.
 - Native sheets, focused video, whiteboards, settings, reaction trajectories and control-pop animations respect the system reduced-motion preference. Canvas tools and meeting actions use semantic Lucide icons with accessible labels and selected/disabled state.
 
+## Device, sharing and follow controls
+
+Audio settings and Video settings are available directly from the call bar. Each opens its matching settings tab without changing microphone or camera state. Original sound explains speech versus music mode and recommends headphones when noise suppression is disabled. Poor-connection help offers a camera-off action; it leaves the microphone state unchanged.
+
+While publishing a screen or whiteboard, a persistent notice identifies the outbound content and exposes Stop sharing. Expanded whiteboards retain this action. Stopping whiteboard publishing first stops outbound SDK media, then ends the app board presentation; if the latter fails, the classroom reports that the board remains open so the host can retry. Stop failures keep the action available and repeated taps cannot issue concurrent stops.
+
+Whiteboard follow state stays visible beside the board status. Explore freely and Follow tutor are reachable without opening options; participant-specific follow remains in options. Following controls viewport navigation only; editing permission stays under the existing teacher control.
+
+These controls follow the discoverability principles in [Meet's device controls](https://support.google.com/meet/answer/10409699), [Meet's presentation guidance](https://support.google.com/meet/answer/9308856) and [Zoom's participant-follow controls](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0061925). Web captions retain a polite, atomic live region while enabled, including between caption messages, for screen-reader announcements.
+
 ## 1-1 lesson experience
 
 The in-class screen follows web's call layout rather than a scrolling page: a header with the class title, attendee count, timer and recording badge; a stage that the gallery or shared content fills; and pinned controls. Chat ("In-call Messages", with "You" and web's relative times), People and the Zoom-hosted whiteboard open as sheets. Joining plays web's two-note chime, rendered natively as a system sound on iOS and on the call-signalling stream on Android so it never changes the call's audio routing or focus. After leaving, people rate the session with web's five labelled choices and can Submit or Skip.

@@ -10,6 +10,7 @@ function press(element: Parameters<typeof fireEvent.press>[0]) {
     if (!modal.props.visible && modal.props.onDismiss) fireEvent(modal, 'dismiss');
   }
 }
+jest.mock('./use-reduced-motion', () => ({ useReducedMotion: () => true }));
 jest.mock('@/providers/theme-provider', () => ({
   useTheme: () => ({
     colors: {
@@ -125,4 +126,22 @@ it('places screen sharing third with chat in More', () => {
     'Leave class',
     'More controls',
   ]);
+});
+it('opens audio and video settings directly without toggling media or opening More', () => {
+  const audio = jest.fn(),
+    video = jest.fn(),
+    microphone = jest.fn(),
+    camera = jest.fn();
+  const screen = render(
+    <NativeMeetingToolbar onAudioSettings={audio} onVideoSettings={video}>
+      {action('Mute microphone', microphone)}
+      {action('Stop video', camera)}
+    </NativeMeetingToolbar>,
+  );
+  fireEvent.press(screen.getByLabelText('Audio settings'));
+  fireEvent.press(screen.getByLabelText('Video settings'));
+  expect(audio).toHaveBeenCalledTimes(1);
+  expect(video).toHaveBeenCalledTimes(1);
+  expect(microphone).not.toHaveBeenCalled();
+  expect(camera).not.toHaveBeenCalled();
 });

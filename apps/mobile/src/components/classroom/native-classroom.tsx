@@ -1,3 +1,5 @@
+import { NativeSharingNotice } from './native-sharing-notice';
+import { NativeConnectionHelp } from './native-connection-help';
 import { NativeScreenAnnotations } from './native-screen-annotations';
 import { useNativeRecordingComposition } from './use-native-recording-composition';
 import { NativeInvitationSheet } from './native-invitation-sheet';
@@ -776,6 +778,35 @@ export function NativeClassroom({
       </View>
     );
   const preview = state.phase === 'preview' || state.phase === 'joining';
+  const stopSharing = async () => {
+    const wasBoard = boardPublishing.current;
+    await controller.share(false);
+    boardPublishing.current = false;
+    if (wasBoard && credentials.whiteboard?.token) {
+      const operation = {
+        id: generateClientMessageId(),
+        type: 'presentation' as const,
+        enabled: false,
+      };
+      try {
+        if (whiteboardRepository) await whiteboardRepository.save(operation);
+        else
+          await capabilityPost<WhiteboardSnapshotVM>(
+            '/whiteboards/current/operations',
+            credentials.whiteboard.token,
+            operation,
+          );
+      } catch (cause) {
+        setError(
+          'Screen sharing stopped, but the class whiteboard is still open. Return to the board and retry stopping its presentation.',
+        );
+        throw cause;
+      }
+      setBoardActive(false);
+      setBoardVisible(false);
+      setBoardExpanded(false);
+    }
+  };
   const whiteboardStage = (
     <>
       {selfSharing && !boardPublishing.current && state.selfId && (
@@ -840,6 +871,12 @@ export function NativeClassroom({
                       alignItems: 'center',
                     }}
                   >
+                    {selfSharing && (
+                      <NativeSharingNotice
+                        whiteboard={boardPublishing.current}
+                        onStop={stopSharing}
+                      />
+                    )}
                     <NativeRecordingIndicator
                       recording={state.recording}
                       paused={state.recordingPaused}
@@ -1003,7 +1040,11 @@ export function NativeClassroom({
             </View>
             <ClassroomSettingRow
               label="Original sound"
-              value="Disable noise suppression for music"
+              value={
+                originalAudio
+                  ? 'Music mode: noise suppression is off. Headphones help prevent echo.'
+                  : 'Speech mode reduces background noise. Turn on for music or instruments.'
+              }
               icon={Waves}
               checked={originalAudio}
               onChange={(enabled) => {
@@ -1364,6 +1405,20 @@ export function NativeClassroom({
             />
           </View>
           <View style={{ paddingHorizontal: 16, gap: 8, paddingBottom: 8 }}>
+            {selfSharing && (
+              <NativeSharingNotice
+                whiteboard={boardPublishing.current}
+                onStop={stopSharing}
+              />
+            )}
+            {state.network === 'bad' && (
+              <NativeConnectionHelp
+                cameraOn={state.camera}
+                onCameraOff={() => {
+                  void run(() => controller.camera(false));
+                }}
+              />
+            )}
             {(error || state.error) && (
               <Text accessibilityRole="alert" style={{ color: colors.text }}>
                 {error ?? state.error}
@@ -1372,11 +1427,6 @@ export function NativeClassroom({
             {state.phase === 'reconnecting' && (
               <Text accessibilityRole="alert" style={{ color: colors.text }}>
                 Reconnecting to the classroom…
-              </Text>
-            )}
-            {state.network === 'bad' && (
-              <Text accessibilityRole="alert" style={{ color: colors.text }}>
-                Your connection is unstable. Video may pause while it recovers.
               </Text>
             )}
             {state.audioInterrupted && (
@@ -1506,7 +1556,8 @@ export function NativeClassroom({
                           }}
                         >
                           <Text style={{ color: colors.text }}>
-                            You are sharing your screen
+                            Switch to the app or document you want to present. Everything
+                            visible on your device is shared.
                           </Text>
                         </View>
                       ) : null}
@@ -1580,6 +1631,14 @@ export function NativeClassroom({
           </View>
           <View style={{ padding: 12, gap: 8 }}>
             <NativeMeetingToolbar
+              onAudioSettings={() => {
+                setSettingsTab('audio');
+                setPanel('audio');
+              }}
+              onVideoSettings={() => {
+                setSettingsTab('video');
+                setPanel('audio');
+              }}
               more={
                 <NativeHandAndReactions
                   raised={state.raisedHands.includes(state.selfId ?? '')}

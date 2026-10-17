@@ -97,9 +97,13 @@ type ActionProps = {
 export function NativeMeetingToolbar({
   children,
   more,
+  onAudioSettings,
+  onVideoSettings,
 }: {
   children: React.ReactNode;
   more?: React.ReactNode;
+  onAudioSettings?: () => void;
+  onVideoSettings?: () => void;
 }) {
   const { colors } = useTheme();
   const [expanded, setExpanded] = useState(false);
@@ -117,6 +121,43 @@ export function NativeMeetingToolbar({
   const secondary = actions.filter((action) => !pinned(action.props.accessibilityLabel));
   return (
     <View style={{ gap: 8 }}>
+      {(onAudioSettings || onVideoSettings) && (
+        <View
+          accessibilityLabel="Device settings"
+          style={{ flexDirection: 'row', gap: 8 }}
+        >
+          {(
+            [
+              ['Audio settings', Mic, onAudioSettings],
+              ['Video settings', Video, onVideoSettings],
+            ] as const
+          ).map(
+            ([label, Icon, onPress]) =>
+              onPress && (
+                <Pressable
+                  key={label}
+                  accessibilityRole="button"
+                  accessibilityLabel={label}
+                  onPress={onPress}
+                  style={{
+                    flex: 1,
+                    minHeight: 44,
+                    paddingHorizontal: 12,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 8,
+                    borderRadius: 22,
+                    backgroundColor: colors.actionSubtle,
+                  }}
+                >
+                  <Icon size={18} color={colors.text} />
+                  <Text style={{ color: colors.text, flex: 1 }}>{label}</Text>
+                  <ChevronRight size={16} color={colors.text} />
+                </Pressable>
+              ),
+          )}
+        </View>
+      )}
       <View
         accessibilityRole="toolbar"
         style={{

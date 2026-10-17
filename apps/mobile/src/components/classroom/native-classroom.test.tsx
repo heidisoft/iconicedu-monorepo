@@ -83,6 +83,7 @@ jest.mock('react-native-safe-area-context', () => ({
   SafeAreaProvider: ({ children }: { children: React.ReactNode }) => children,
   SafeAreaView: ({ children }: { children: React.ReactNode }) => children,
 }));
+jest.mock('./use-reduced-motion', () => ({ useReducedMotion: () => true }));
 jest.mock('@/providers/theme-provider', () => ({
   useTheme: () => ({
     colors: { bg: 'white', text: 'black', card: 'white', actionSubtle: 'grey' },
@@ -644,4 +645,38 @@ it('closes expanded sharing when the presenter stops sharing', async () => {
   f.emit({ type: 'share', userId: '1', active: false });
   expect(f.screen.UNSAFE_getByType(Focused).props.sharing).toBe(false);
   expect(f.screen.queryByTestId('share-stage')).toBeNull();
+});
+it('opens the requested device tab directly from the call controls', async () => {
+  const f = setup('1');
+  await f.join();
+  press(f.screen.getByLabelText('Video settings'));
+  expect(
+    f.screen.getByLabelText('Video settings tab').props.accessibilityState.selected,
+  ).toBe(true);
+  press(f.screen.getByLabelText('Close settings'));
+  await act(async () => {});
+  press(f.screen.getByLabelText('Audio settings'));
+  expect(
+    f.screen.getByLabelText('Audio settings tab').props.accessibilityState.selected,
+  ).toBe(true);
+});
+it('stops the outbound share from its persistent status notice', async () => {
+  const f = setup('1');
+  await f.join();
+  f.emit({ type: 'share', userId: '1', active: true });
+  await act(async () => {});
+  press(f.screen.getByLabelText('Stop screen sharing'));
+  await waitFor(() => expect(f.adapter.share).toHaveBeenCalledWith(false));
+});
+it('turns off only the camera when using poor-connection help', async () => {
+  const f = setup('1');
+  await f.join();
+  if (f.screen.queryByLabelText('Start video'))
+    press(f.screen.getByLabelText('Start video'));
+  await act(async () => {});
+  const microphoneCalls = jest.mocked(f.adapter.microphone).mock.calls.length;
+  f.emit({ type: 'network', level: 'bad' });
+  press(f.screen.getByLabelText('Turn camera off to improve connection'));
+  await waitFor(() => expect(f.adapter.camera).toHaveBeenLastCalledWith(false));
+  expect(jest.mocked(f.adapter.microphone).mock.calls).toHaveLength(microphoneCalls);
 });
